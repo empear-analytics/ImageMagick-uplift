@@ -1090,9 +1090,28 @@ static MagickBooleanType DeleteMatchingImageProfiles(Image *image,
   return(MagickTrue);
 }
 
-MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
-  const void *datum,const size_t length,ExceptionInfo *exception)
+static const StringInfo *SyncsRGBImageProfile(Image *image,
+  const StringInfo *icc_profile,const StringInfo *profile,
+  ExceptionInfo *exception)
 {
+  if ((icc_profile != (const StringInfo *) NULL) &&
+      (CompareStringInfo(icc_profile,profile) == 0))
+    {
+      const char
+        *value;
+
+      value=GetImageProperty(image,"exif:ColorSpace",exception);
+      (void) value;
+      if (LocaleCompare(value,"1") != 0)
+        SetsRGBImageProfile(image,exception);
+      value=GetImageProperty(image,"exif:InteroperabilityIndex",exception);
+      if (LocaleCompare(value,"R98.") != 0)
+        SetsRGBImageProfile(image,exception);
+      icc_profile=GetImageProfile(image,"icc");
+    }
+  return(icc_profile);
+}
+
 #define ProfileImageTag  "Profile/Image"
 #ifndef TYPE_XYZ_8
   #define TYPE_XYZ_8 (COLORSPACE_SH(PT_XYZ)|CHANNELS_SH(3)|BYTES_SH(1))
@@ -1110,6 +1129,9 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
   ThrowBinaryException(severity,tag,context); \
 }
 
+MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
+  const void *datum,const size_t length,ExceptionInfo *exception)
+{
   MagickBooleanType
     status;
 
@@ -1139,21 +1161,7 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
         *icc_profile;
 
       icc_profile=GetImageProfile(image,"icc");
-      if ((icc_profile != (const StringInfo *) NULL) &&
-          (CompareStringInfo(icc_profile,profile) == 0))
-        {
-          const char
-            *value;
-
-          value=GetImageProperty(image,"exif:ColorSpace",exception);
-          (void) value;
-          if (LocaleCompare(value,"1") != 0)
-            SetsRGBImageProfile(image,exception);
-          value=GetImageProperty(image,"exif:InteroperabilityIndex",exception);
-          if (LocaleCompare(value,"R98.") != 0)
-            SetsRGBImageProfile(image,exception);
-          icc_profile=GetImageProfile(image,"icc");
-        }
+      icc_profile=SyncsRGBImageProfile(image,icc_profile,profile,exception);
       if ((icc_profile != (const StringInfo *) NULL) &&
           (CompareStringInfo(icc_profile,profile) == 0))
         {
@@ -1762,6 +1770,72 @@ static void SpliceProfileInto8Bim(Image *image,const StringInfo *profile,
   extract_profile=DestroyStringInfo(extract_profile);
 }
 
+typedef struct _ResourceHeaderTargets
+{
+  const unsigned char
+    **q,
+    **p;
+
+  unsigned short
+    *id;
+
+  ssize_t
+    *count;
+} ResourceHeaderTargets;
+
+static MagickBooleanType Read8BimResourceHeader(const unsigned char *datum,
+  const size_t length,const ResourceHeaderTargets *targets)
+{
+  const unsigned char
+    **const q = targets->q,
+    **const p = targets->p;
+
+  unsigned short
+    *const id = targets->id;
+
+  ssize_t
+    *const count = targets->count;
+
+  unsigned char
+    length_byte;
+
+  unsigned int
+    value;
+
+  (*q)=(*p);
+  if (LocaleNCompare((char *) (*p),"8BIM",4) != 0)
+    return(MagickFalse);
+  (*p)+=(ptrdiff_t) 4;
+  (*p)=ReadResourceShort((*p),id);
+  (*p)=ReadResourceByte((*p),&length_byte);
+  (*p)+=(ptrdiff_t) length_byte;
+  if (((length_byte+1) & 0x01) != 0)
+    (*p)++;
+  if ((*p) > (datum+length-4))
+    return(MagickFalse);
+  (*p)=ReadResourceLong((*p),&value);
+  (*count)=(ssize_t) value;
+  if (((*count) & 0x01) != 0)
+    (*count)++;
+  return(MagickTrue);
+}
+
+static MagickBooleanType Get8BimProfileId(const char *name,
+  unsigned short *profile_id)
+{
+  if (LocaleCompare(name,"icc") == 0)
+    (*profile_id)=0x040f;
+  else
+    if (LocaleCompare(name,"iptc") == 0)
+      (*profile_id)=0x0404;
+    else
+      if (LocaleCompare(name,"xmp") == 0)
+        (*profile_id)=0x0424;
+      else
+        return(MagickFalse);
+  return(MagickTrue);
+}
+
 static void WriteTo8BimProfile(Image *image,const char *name,
   const StringInfo *profile)
 {
@@ -1781,26 +1855,15 @@ static void WriteTo8BimProfile(Image *image,const char *name,
   ssize_t
     count;
 
-  unsigned char
-    length_byte;
-
-  unsigned int
-    value;
-
   unsigned short
     id,
     profile_id;
 
-  if (LocaleCompare(name,"icc") == 0)
-    profile_id=0x040f;
-  else
-    if (LocaleCompare(name,"iptc") == 0)
-      profile_id=0x0404;
-    else
-      if (LocaleCompare(name,"xmp") == 0)
-        profile_id=0x0424;
-      else
-        return;
+  const ResourceHeaderTargets
+    targets = { &q, &p, &id, &count };
+
+  if (Get8BimProfileId(name,&profile_id) == MagickFalse)
+    return;
   profile_8bim=(StringInfo *) GetValueFromSplayTree((SplayTreeInfo *)
     image->profiles,"8bim");
   if (profile_8bim == (StringInfo *) NULL)
@@ -1809,21 +1872,8 @@ static void WriteTo8BimProfile(Image *image,const char *name,
   length=GetStringInfoLength(profile_8bim);
   for (p=datum; p < (datum+length-16); )
   {
-    q=p;
-    if (LocaleNCompare((char *) p,"8BIM",4) != 0)
+    if (Read8BimResourceHeader(datum,length,&targets) == MagickFalse)
       break;
-    p+=(ptrdiff_t) 4;
-    p=ReadResourceShort(p,&id);
-    p=ReadResourceByte(p,&length_byte);
-    p+=(ptrdiff_t) length_byte;
-    if (((length_byte+1) & 0x01) != 0)
-      p++;
-    if (p > (datum+length-4))
-      break;
-    p=ReadResourceLong(p,&value);
-    count=(ssize_t) value;
-    if ((count & 0x01) != 0)
-      count++;
     if (IsInvalid8BimCount(count,p,datum,length) != MagickFalse)
       break;
     if (id != profile_id)
@@ -2740,6 +2790,423 @@ static void SyncExifDimension(const ExifTagInfo *exif_tag,unsigned char *ifd,
       image->columns : image->rows,format,components,q,p);
 }
 
+static MagickBooleanType ReadExifMarker(unsigned char **exif,size_t *length,
+  MagickBooleanType *broke)
+{
+  (*broke)=MagickFalse;
+  if (ReadProfileByte(exif,length) != 0x45)
+    return(MagickFalse);
+  if (ReadProfileByte(exif,length) != 0x78)
+    return(MagickFalse);
+  if (ReadProfileByte(exif,length) != 0x69)
+    return(MagickFalse);
+  if (ReadProfileByte(exif,length) != 0x66)
+    return(MagickFalse);
+  if (ReadProfileByte(exif,length) != 0x00)
+    return(MagickFalse);
+  if (ReadProfileByte(exif,length) != 0x00)
+    return(MagickFalse);
+  (*broke)=MagickTrue;
+  return(MagickTrue);
+}
+
+static void SkipToExifHeader(unsigned char **exif,size_t *length)
+{
+  MagickBooleanType
+    broke = MagickFalse;
+
+  while ((*length) != 0)
+  {
+    if (ReadExifMarker(exif,length,&broke) == MagickFalse)
+      continue;
+    if (broke != MagickFalse)
+      break;
+  }
+}
+
+static MagickBooleanType ReadExifHeader(unsigned char **exif,size_t *length,
+  EndianType *endian)
+{
+  ssize_t
+    id;
+
+  if ((*length) < 16)
+    return(MagickFalse);
+  id=(ssize_t) ReadProfileShort(LSBEndian,(*exif));
+  if ((id != 0x4949) && (id != 0x4D4D))
+    {
+      SkipToExifHeader(exif,length);
+      if ((*length) < 16)
+        return(MagickFalse);
+      id=(ssize_t) ReadProfileShort(LSBEndian,(*exif));
+    }
+  (*endian)=LSBEndian;
+  if (id == 0x4949)
+    (*endian)=LSBEndian;
+  else
+    if (id == 0x4D4D)
+      (*endian)=MSBEndian;
+    else
+      return(MagickFalse);
+  if (ReadProfileShort((*endian),(*exif)+2) != 0x002a)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static void SyncExifResolutionUnit(const ExifTagInfo *exif_tag)
+{
+  if (exif_tag->directory != exif_tag->ifd0)
+    return;
+  if (exif_tag->number_bytes == 4)
+    {
+      (void) WriteProfileLong(exif_tag->endian,((size_t)
+        exif_tag->image->units)+1,exif_tag->p);
+      return;
+    }
+  (void) WriteProfileShort(exif_tag->endian,(unsigned short)
+    (exif_tag->image->units+1),exif_tag->p);
+}
+
+static void SyncExifTag(const ExifTagInfo *exif_tag,
+  unsigned char *exif_directory)
+{
+  const Image
+    *const image = exif_tag->image;
+
+  unsigned char
+    *const ifd0 = exif_tag->ifd0;
+
+  const unsigned short
+    tag_value = exif_tag->tag_value;
+
+  switch (tag_value)
+  {
+    case TAG_IMAGE_WIDTH:
+    case TAG_IMAGE_LENGTH:
+    {
+      SyncExifDimension(exif_tag,ifd0,TAG_IMAGE_WIDTH);
+      break;
+    }
+    case TAG_PIXEL_X_DIMENSION:
+    case TAG_PIXEL_Y_DIMENSION:
+    {
+      SyncExifDimension(exif_tag,exif_directory,TAG_PIXEL_X_DIMENSION);
+      break;
+    }
+    case 0x0128:
+    {
+      SyncExifResolutionUnit(exif_tag);
+      break;
+    }
+    default:
+    {
+      SyncExifIfd0Tag(tag_value,*exif_tag,image);
+      break;
+    }
+  }
+}
+
+typedef struct _ExifWalkInfo
+{
+  const Image
+    *image;
+
+  EndianType
+    endian;
+
+  unsigned char
+    *exif;
+
+  size_t
+    length;
+
+  unsigned char
+    *directory,
+    *ifd0;
+
+  SplayTreeInfo
+    *exif_resources;
+} ExifWalkInfo;
+
+typedef struct _ExifWalkTargets
+{
+  ssize_t
+    *level;
+
+  size_t
+    *entry;
+
+  unsigned char
+    **exif_directory;
+
+  DirectoryInfo
+    *directory_stack;
+} ExifWalkTargets;
+
+typedef struct _ExifEntryTargets
+{
+  unsigned char
+    **q;
+
+  unsigned short
+    *tag_value;
+
+  ssize_t
+    *format;
+
+  int
+    *components;
+
+  size_t
+    *number_bytes;
+} ExifEntryTargets;
+
+static MagickBooleanType ReadExifEntry(const ExifWalkInfo *walk,
+  const size_t entry,const ExifEntryTargets *targets)
+{
+  const EndianType
+    endian = walk->endian;
+
+  unsigned char
+    *const exif = walk->exif;
+
+  const size_t
+    length = walk->length;
+
+  unsigned char
+    *const directory = walk->directory;
+
+  SplayTreeInfo
+    *const exif_resources = walk->exif_resources;
+
+  unsigned char
+    **const q = targets->q;
+
+  unsigned short
+    *const tag_value = targets->tag_value;
+
+  ssize_t
+    *const format = targets->format;
+
+  int
+    *const components = targets->components;
+
+  size_t
+    *const number_bytes = targets->number_bytes;
+
+  static int
+    format_bytes[] = {0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8};
+
+  (*q)=(unsigned char *) (directory+2+(12*entry));
+  if ((*q) > (exif+length-12))
+    return(MagickFalse);  /* corrupt EXIF */
+  if (GetValueFromSplayTree(exif_resources,(*q)) == (*q))
+    return(MagickFalse);
+  (void) AddValueToSplayTree(exif_resources,(*q),(*q));
+  (*tag_value)=(unsigned short) ReadProfileShort(endian,(*q));
+  (*format)=(ssize_t) ReadProfileShort(endian,(*q)+2);
+  if (((*format) < 0) || (((*format)-1) >= EXIF_NUM_FORMATS))
+    return(MagickFalse);
+  (*components)=(int) ReadProfileLong(endian,(*q)+4);
+  if ((*components) < 0)
+    return(MagickFalse);  /* corrupt EXIF */
+  (*number_bytes)=(size_t) (*components)*(size_t) format_bytes[(*format)];
+  if ((ssize_t) (*number_bytes) < (*components))
+    return(MagickFalse);  /* prevent overflow */
+  return(MagickTrue);
+}
+
+static MagickBooleanType PushExifDirectory(const ExifWalkInfo *walk,
+  const ExifTagInfo *exif_tag,const size_t number_entries,
+  const ExifWalkTargets *targets)
+{
+  const EndianType
+    endian = walk->endian;
+
+  unsigned char
+    *const exif = walk->exif;
+
+  const size_t
+    length = walk->length;
+
+  unsigned char
+    *const directory = walk->directory,
+    *const ifd0 = walk->ifd0;
+
+  const unsigned short
+    tag_value = exif_tag->tag_value;
+
+  const ssize_t
+    format = exif_tag->format;
+
+  const int
+    components = exif_tag->components;
+
+  const size_t
+    number_bytes = exif_tag->number_bytes;
+
+  unsigned char
+    *const p = exif_tag->p;
+
+  ssize_t
+    *const level = targets->level;
+
+  size_t
+    *const entry = targets->entry;
+
+  unsigned char
+    **const exif_directory = targets->exif_directory;
+
+  DirectoryInfo
+    *const directory_stack = targets->directory_stack;
+
+  ssize_t
+    offset;
+
+  if (IsExifDirectoryOffset(tag_value,format,components,number_bytes) ==
+      MagickFalse)
+    return(MagickFalse);
+  offset=(ssize_t) ReadProfileLong(endian,p);
+  if (((size_t) offset >= (length-1)) ||
+      ((*level) >= (MaxDirectoryStack-2)))
+    return(MagickFalse);
+  if ((directory == ifd0) && (tag_value == TAG_EXIF_OFFSET))
+    (*exif_directory)=exif+offset;
+  directory_stack[(*level)].directory=directory;
+  (*entry)++;
+  directory_stack[(*level)].entry=(*entry);
+  (*level)++;
+  directory_stack[(*level)].directory=exif+offset;
+  directory_stack[(*level)].entry=0;
+  (*level)++;
+  if ((directory+2+(12*number_entries)) > (exif+length))
+    return(MagickTrue);
+  offset=(ssize_t) ReadProfileLong(endian,directory+2+(12*
+    number_entries));
+  if (IsNextDirectoryOffset(offset,length,(*level)) != MagickFalse)
+    {
+      directory_stack[(*level)].directory=exif+offset;
+      directory_stack[(*level)].entry=0;
+      (*level)++;
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType SyncExifEntry(const ExifWalkInfo *walk,
+  const size_t number_entries,const ExifWalkTargets *targets)
+{
+  const Image
+    *const image = walk->image;
+
+  const EndianType
+    endian = walk->endian;
+
+  unsigned char
+    *const exif = walk->exif;
+
+  const size_t
+    length = walk->length;
+
+  unsigned char
+    *const directory = walk->directory,
+    *const ifd0 = walk->ifd0;
+
+  size_t
+    *const entry = targets->entry;
+
+  unsigned char
+    **const exif_directory = targets->exif_directory;
+
+  ExifEntryInfo
+    exif_entry;
+
+  ExifTagInfo
+    exif_tag;
+
+  int
+    components;
+
+  unsigned char
+    *p,
+    *q;
+
+  size_t
+    number_bytes;
+
+  ssize_t
+    format;
+
+  unsigned short
+    tag_value;
+
+  const ExifEntryTargets
+    entry_targets = { &q, &tag_value, &format, &components, &number_bytes };
+
+  if (ReadExifEntry(walk,(*entry),&entry_targets) == MagickFalse)
+    return(MagickTrue);
+  exif_entry.endian=endian;
+  exif_entry.exif=exif;
+  exif_entry.length=length;
+  exif_entry.number_bytes=number_bytes;
+  exif_entry.q=q;
+  if (LocateExifEntryValue(&exif_entry,&p) == MagickFalse)
+    return(MagickFalse);
+  exif_tag.image=image;
+  exif_tag.endian=endian;
+  exif_tag.directory=directory;
+  exif_tag.ifd0=ifd0;
+  exif_tag.tag_value=tag_value;
+  exif_tag.format=format;
+  exif_tag.components=components;
+  exif_tag.number_bytes=number_bytes;
+  exif_tag.q=q;
+  exif_tag.p=p;
+  SyncExifTag(&exif_tag,(*exif_directory));
+  if (PushExifDirectory(walk,&exif_tag,number_entries,targets) !=
+      MagickFalse)
+    return(MagickTrue);
+  return(MagickFalse);
+}
+
+static void SyncExifDirectory(const ExifWalkInfo *walk,
+  const ExifWalkTargets *targets)
+{
+  const EndianType
+    endian = walk->endian;
+
+  unsigned char
+    *const exif = walk->exif;
+
+  const size_t
+    length = walk->length;
+
+  unsigned char
+    *const directory = walk->directory;
+
+  size_t
+    *const entry = targets->entry;
+
+  size_t
+    directory_length,
+    number_entries;
+
+  /*
+    Determine how many entries there are in the current IFD.
+  */
+  directory_length=length-(size_t) (directory-exif);
+  if (directory_length < 6)
+    return;
+  number_entries=(size_t) (unsigned short) ReadProfileShort(endian,
+    directory);
+  if (number_entries > ((directory_length-6)/12))
+    return;
+  for ( ; (*entry) < number_entries; (*entry)++)
+  {
+    if (SyncExifEntry(walk,number_entries,targets) != MagickFalse)
+      break;
+  }
+}
+
 static void SyncExifProfile(const Image *image,unsigned char *exif,
   size_t length)
 {
@@ -2749,61 +3216,28 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
   EndianType
     endian;
 
+  ExifWalkInfo
+    walk;
+
   size_t
-    directory_length,
-    entry,
-    number_entries;
+    entry;
 
   SplayTreeInfo
     *exif_resources;
 
   ssize_t
-    id,
     level,
     offset;
-
-  static int
-    format_bytes[] = {0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8};
 
   unsigned char
     *directory,
     *exif_directory,
     *ifd0;
 
-  if (length < 16)
-    return;
-  id=(ssize_t) ReadProfileShort(LSBEndian,exif);
-  if ((id != 0x4949) && (id != 0x4D4D))
-    {
-      while (length != 0)
-      {
-        if (ReadProfileByte(&exif,&length) != 0x45)
-          continue;
-        if (ReadProfileByte(&exif,&length) != 0x78)
-          continue;
-        if (ReadProfileByte(&exif,&length) != 0x69)
-          continue;
-        if (ReadProfileByte(&exif,&length) != 0x66)
-          continue;
-        if (ReadProfileByte(&exif,&length) != 0x00)
-          continue;
-        if (ReadProfileByte(&exif,&length) != 0x00)
-          continue;
-        break;
-      }
-      if (length < 16)
-        return;
-      id=(ssize_t) ReadProfileShort(LSBEndian,exif);
-    }
-  endian=LSBEndian;
-  if (id == 0x4949)
-    endian=LSBEndian;
-  else
-    if (id == 0x4D4D)
-      endian=MSBEndian;
-    else
-      return;
-  if (ReadProfileShort(endian,exif+2) != 0x002a)
+  const ExifWalkTargets
+    targets = { &level, &entry, &exif_directory, directory_stack };
+
+  if (ReadExifHeader(&exif,&length,&endian) == MagickFalse)
     return;
   /*
     This the offset to the first IFD.
@@ -2828,133 +3262,14 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
       }
     if ((directory < exif) || (directory > (exif+length-2)))
       break;
-    /*
-      Determine how many entries there are in the current IFD.
-    */
-    directory_length=length-(size_t) (directory-exif);
-    if (directory_length < 6)
-      continue;
-    number_entries=(size_t) (unsigned short) ReadProfileShort(endian,
-      directory);
-    if (number_entries > ((directory_length-6)/12))
-      continue;
-    for ( ; entry < number_entries; entry++)
-    {
-      ExifEntryInfo
-        exif_entry;
-
-      ExifTagInfo
-        exif_tag;
-
-      int
-        components;
-
-      unsigned char
-        *p,
-        *q;
-
-      size_t
-        number_bytes;
-
-      ssize_t
-        format;
-
-      unsigned short
-        tag_value;
-
-      q=(unsigned char *) (directory+2+(12*entry));
-      if (q > (exif+length-12))
-        break;  /* corrupt EXIF */
-      if (GetValueFromSplayTree(exif_resources,q) == q)
-        break;
-      (void) AddValueToSplayTree(exif_resources,q,q);
-      tag_value=(unsigned short) ReadProfileShort(endian,q);
-      format=(ssize_t) ReadProfileShort(endian,q+2);
-      if ((format < 0) || ((format-1) >= EXIF_NUM_FORMATS))
-        break;
-      components=(int) ReadProfileLong(endian,q+4);
-      if (components < 0)
-        break;  /* corrupt EXIF */
-      number_bytes=(size_t) components*(size_t) format_bytes[format];
-      if ((ssize_t) number_bytes < components)
-        break;  /* prevent overflow */
-      exif_entry.endian=endian;
-      exif_entry.exif=exif;
-      exif_entry.length=length;
-      exif_entry.number_bytes=number_bytes;
-      exif_entry.q=q;
-      if (LocateExifEntryValue(&exif_entry,&p) == MagickFalse)
-        continue;
-      exif_tag.image=image;
-      exif_tag.endian=endian;
-      exif_tag.directory=directory;
-      exif_tag.ifd0=ifd0;
-      exif_tag.tag_value=tag_value;
-      exif_tag.format=format;
-      exif_tag.components=components;
-      exif_tag.number_bytes=number_bytes;
-      exif_tag.q=q;
-      exif_tag.p=p;
-      switch (tag_value)
-      {
-        case TAG_IMAGE_WIDTH:
-        case TAG_IMAGE_LENGTH:
-        {
-          SyncExifDimension(&exif_tag,ifd0,TAG_IMAGE_WIDTH);
-          break;
-        }
-        case TAG_PIXEL_X_DIMENSION:
-        case TAG_PIXEL_Y_DIMENSION:
-        {
-          SyncExifDimension(&exif_tag,exif_directory,TAG_PIXEL_X_DIMENSION);
-          break;
-        }
-        case 0x0128:
-        {
-          if (directory != ifd0)
-            break;
-          if (number_bytes == 4)
-            {
-              (void) WriteProfileLong(endian,((size_t) image->units)+1,p);
-              break;
-            }
-          (void) WriteProfileShort(endian,(unsigned short) (image->units+1),p);
-          break;
-        }
-        default:
-        {
-          SyncExifIfd0Tag(tag_value,exif_tag,image);
-          break;
-        }
-      }
-      if (IsExifDirectoryOffset(tag_value,format,components,number_bytes) ==
-          MagickFalse)
-        continue;
-      offset=(ssize_t) ReadProfileLong(endian,p);
-      if (((size_t) offset >= (length-1)) ||
-          (level >= (MaxDirectoryStack-2)))
-        continue;
-      if ((directory == ifd0) && (tag_value == TAG_EXIF_OFFSET))
-        exif_directory=exif+offset;
-      directory_stack[level].directory=directory;
-      entry++;
-      directory_stack[level].entry=entry;
-      level++;
-      directory_stack[level].directory=exif+offset;
-      directory_stack[level].entry=0;
-      level++;
-      if ((directory+2+(12*number_entries)) > (exif+length))
-        break;
-      offset=(ssize_t) ReadProfileLong(endian,directory+2+(12*
-        number_entries));
-      if (IsNextDirectoryOffset(offset,length,level) != MagickFalse)
-        {
-          directory_stack[level].directory=exif+offset;
-          directory_stack[level].entry=0;
-          level++;
-        }
-      break;
-    }
+    walk.image=image;
+    walk.endian=endian;
+    walk.exif=exif;
+    walk.length=length;
+    walk.directory=directory;
+    walk.ifd0=ifd0;
+    walk.exif_resources=exif_resources;
+    SyncExifDirectory(&walk,&targets);
   } while (level > 0);
   exif_resources=DestroySplayTree(exif_resources);
   return;
@@ -3182,9 +3497,11 @@ static void GetXMPContinuedFraction(double value,
       term;
 
     term=floor(remainder);
-    if ((TryAccumulate(term,num,prev_num,&new_num) == MagickFalse) ||
-        (TryAccumulate(term,den,prev_den,&new_den) == MagickFalse) ||
-        (new_den == 0))
+    if (TryAccumulate(term,num,prev_num,&new_num) == MagickFalse)
+      break;
+    if (TryAccumulate(term,den,prev_den,&new_den) == MagickFalse)
+      break;
+    if (new_den == 0)
       break;
     prev_num=num;
     num=new_num;
@@ -3335,6 +3652,86 @@ static void SkipClipPathRecord(const ssize_t selector,unsigned char **blob,
   }
 }
 
+typedef struct _ClipPathTargets
+{
+  unsigned char
+    **blob;
+
+  size_t
+    *length;
+
+  ssize_t
+    *knot_count;
+} ClipPathTargets;
+
+static void ReadClipPathSubpathLength(const ClipPathTargets *targets)
+{
+  unsigned char
+    **const blob = targets->blob;
+
+  size_t
+    *const length = targets->length;
+
+  ssize_t
+    *const knot_count = targets->knot_count;
+
+  if ((*knot_count) != 0)
+    {
+      (*blob)+=24;
+      (*length)-=(size_t) MagickMin((*length),24U);
+      return;
+    }
+  /*
+    Expected subpath length record.
+  */
+  (*knot_count)=(ssize_t) ReadProfileMSBShort(blob,length);
+  (*blob)+=22;
+  (*length)-=(size_t) MagickMin((*length),22);
+}
+
+static void UpdateClipPathSubpathKnot(const ClipPathResizeInfo *resize,
+  const ClipPathTargets *targets)
+{
+  unsigned char
+    **const blob = targets->blob;
+
+  size_t
+    *const length = targets->length;
+
+  ssize_t
+    *const knot_count = targets->knot_count;
+
+  if ((*knot_count) == 0)
+    {
+      /*
+        Unexpected subpath knot.
+      */
+      (*blob)+=24;
+      (*length)-=(size_t) MagickMin((*length),24);
+      return;
+    }
+  /*
+    Add sub-path knot
+  */
+  UpdateClipPathKnot(resize,blob,length);
+  (*knot_count)--;
+}
+
+static inline MagickBooleanType IsClipPathKnotSelector(const ssize_t selector)
+{
+  switch (selector)
+  {
+    case 1:
+    case 2:
+    case 4:
+    case 5:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
 static void UpdateClipPath(unsigned char *blob,size_t length,
   const ClipPathResizeInfo *resize)
 {
@@ -3342,48 +3739,24 @@ static void UpdateClipPath(unsigned char *blob,size_t length,
     knot_count,
     selector;
 
+  const ClipPathTargets
+    targets = { &blob, &length, &knot_count };
+
   knot_count=0;
   while (length != 0)
   {
     selector=(ssize_t) ReadProfileMSBShort(&blob,&length);
+    if (IsClipPathKnotSelector(selector) != MagickFalse)
+      {
+        UpdateClipPathSubpathKnot(resize,&targets);
+        continue;
+      }
     switch (selector)
     {
       case 0:
       case 3:
       {
-        if (knot_count != 0)
-          {
-            blob+=24;
-            length-=(size_t) MagickMin(length,24U);
-            break;
-          }
-        /*
-          Expected subpath length record.
-        */
-        knot_count=(ssize_t) ReadProfileMSBShort(&blob,&length);
-        blob+=22;
-        length-=(size_t) MagickMin(length,22);
-        break;
-      }
-      case 1:
-      case 2:
-      case 4:
-      case 5:
-      {
-        if (knot_count == 0)
-          {
-            /*
-              Unexpected subpath knot.
-            */
-            blob+=24;
-            length-=(size_t) MagickMin(length,24);
-            break;
-          }
-        /*
-          Add sub-path knot
-        */
-        UpdateClipPathKnot(resize,&blob,&length);
-        knot_count--;
+        ReadClipPathSubpathLength(&targets);
         break;
       }
       default:
@@ -3393,6 +3766,48 @@ static void UpdateClipPath(unsigned char *blob,size_t length,
       }
     }
   }
+}
+
+static MagickBooleanType Skip8BIMClipPathMarker(unsigned char **info,
+  size_t *length)
+{
+  if (ReadProfileByte(info,length) != (unsigned char) '8')
+    return(MagickTrue);
+  if (ReadProfileByte(info,length) != (unsigned char) 'B')
+    return(MagickTrue);
+  if (ReadProfileByte(info,length) != (unsigned char) 'I')
+    return(MagickTrue);
+  if (ReadProfileByte(info,length) != (unsigned char) 'M')
+    return(MagickTrue);
+  return(MagickFalse);
+}
+
+static void Update8BIMResource(const ClipPathResizeInfo *resize,
+  unsigned char **info,size_t *length)
+{
+  ssize_t
+    count,
+    id;
+
+  id=(ssize_t) ReadProfileMSBShort(info,length);
+  count=(ssize_t) ReadProfileByte(info,length);
+  if ((count != 0) && ((size_t) count <= (*length)))
+    {
+      (*info)+=count;
+      (*length)-=(size_t) count;
+    }
+  if ((count & 0x01) == 0)
+    (void) ReadProfileByte(info,length);
+  count=(ssize_t) ReadProfileMSBLong(info,length);
+  if ((count < 0) || ((size_t) count > (*length)))
+    {
+      (*length)=0;
+      return;
+    }
+  if ((id > 1999) && (id < 2999))
+    UpdateClipPath((*info),(size_t) count,resize);
+  (*info)+=count;
+  (*length)-=(size_t) MagickMin((*length),(size_t) count);
 }
 
 MagickPrivate void Update8BIMClipPath(const Image *image,
@@ -3408,10 +3823,6 @@ MagickPrivate void Update8BIMClipPath(const Image *image,
   size_t
     length;
 
-  ssize_t
-    count,
-    id;
-
   unsigned char
     *info;
 
@@ -3424,32 +3835,8 @@ MagickPrivate void Update8BIMClipPath(const Image *image,
   info=GetStringInfoDatum(profile);
   while (length > 0)
   {
-    if (ReadProfileByte(&info,&length) != (unsigned char) '8')
+    if (Skip8BIMClipPathMarker(&info,&length) != MagickFalse)
       continue;
-    if (ReadProfileByte(&info,&length) != (unsigned char) 'B')
-      continue;
-    if (ReadProfileByte(&info,&length) != (unsigned char) 'I')
-      continue;
-    if (ReadProfileByte(&info,&length) != (unsigned char) 'M')
-      continue;
-    id=(ssize_t) ReadProfileMSBShort(&info,&length);
-    count=(ssize_t) ReadProfileByte(&info,&length);
-    if ((count != 0) && ((size_t) count <= length))
-      {
-        info+=count;
-        length-=(size_t) count;
-      }
-    if ((count & 0x01) == 0)
-      (void) ReadProfileByte(&info,&length);
-    count=(ssize_t) ReadProfileMSBLong(&info,&length);
-    if ((count < 0) || ((size_t) count > length))
-      {
-        length=0;
-        continue;
-      }
-    if ((id > 1999) && (id < 2999))
-      UpdateClipPath(info,(size_t) count,&resize);
-    info+=count;
-    length-=(size_t) MagickMin(length,(size_t) count);
+    Update8BIMResource(&resize,&info,&length);
   }
 }
