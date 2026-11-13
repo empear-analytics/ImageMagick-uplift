@@ -78,30 +78,63 @@
 #include "MagickCore/thread-private.h"
 #include "MagickCore/utility.h"
 
+typedef struct _QuantumChannels
+{
+  QuantumType
+    key;
+
+  size_t
+    value;
+} QuantumChannels;
+
+static const QuantumChannels
+  QuantumChannelCounts[] =
+  {
+    { GrayAlphaQuantum, 2 },
+    { IndexAlphaQuantum, 2 },
+    { RGBQuantum, 3 },
+    { BGRQuantum, 3 },
+    { RGBAQuantum, 4 },
+    { RGBOQuantum, 4 },
+    { BGRAQuantum, 4 },
+    { CMYKQuantum, 4 },
+    { CMYKAQuantum, 5 },
+    { CbYCrAQuantum, 4 },
+    { CbYCrQuantum, 3 },
+    { CbYCrYQuantum, 4 }
+  };
+
+static const QuantumChannels *FindQuantumChannels(const QuantumType key)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(QuantumChannelCounts)/sizeof(*QuantumChannelCounts));
+       i++)
+    if (QuantumChannelCounts[i].key == key)
+      return(QuantumChannelCounts+i);
+  return((const QuantumChannels *) NULL);
+}
+
 static size_t GetQuantumChannels(const Image *image,
   const QuantumType quantum_type)
 {
+  const QuantumChannels
+    *entry;
+
   size_t
     channels;
 
   channels=1;
-  switch (quantum_type)
-  {
-    case GrayAlphaQuantum: channels=2; break;
-    case IndexAlphaQuantum: channels=2; break;
-    case RGBQuantum: channels=3; break;
-    case BGRQuantum: channels=3; break;
-    case RGBAQuantum: channels=4; break;
-    case RGBOQuantum: channels=4; break;
-    case BGRAQuantum: channels=4; break;
-    case CMYKQuantum: channels=4; break;
-    case CMYKAQuantum: channels=5; break;
-    case MultispectralQuantum: channels=GetImageChannels(image); break;
-    case CbYCrAQuantum: channels=4; break;
-    case CbYCrQuantum: channels=3; break;
-    case CbYCrYQuantum: channels=4; break;
-    default: break;
-  }
+  entry=FindQuantumChannels(quantum_type);
+  if (entry != (const QuantumChannels *) NULL)
+    channels=entry->value;
+  else
+    switch (quantum_type)
+    {
+      case MultispectralQuantum: channels=GetImageChannels(image); break;
+      default: break;
+    }
   return(channels);
 }
 
