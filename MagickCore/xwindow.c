@@ -2314,9 +2314,6 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
       int
         rotations;
 
-      double
-        normalized_degrees;
-
       /*
         Rotate image.
       */
@@ -2328,11 +2325,7 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
       /*
         Annotation is relative to the degree of rotation.
       */
-      normalized_degrees=draw_info->degrees;
-      while (normalized_degrees < -45.0)
-        normalized_degrees+=360.0;
-      for (rotations=0; normalized_degrees > 45.0; rotations++)
-        normalized_degrees-=90.0;
+      rotations=XQuarterTurns(draw_info->degrees);
       switch (rotations % 4)
       {
         default:
