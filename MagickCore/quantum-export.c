@@ -5561,13 +5561,7 @@ static void ExportUnpacked10BitRGBAQuantum(const Image *image,
   {
     for (i=0; i < 4; i++)
     {
-      switch (i)
-      {
-        case 0: quantum=(size_t) GetPixelRed(image,p); break;
-        case 1: quantum=(size_t) GetPixelGreen(image,p); break;
-        case 2: quantum=(size_t) GetPixelBlue(image,p); break;
-        case 3: quantum=(size_t) GetPixelAlpha(image,p); break;
-      }
+      GetUnpacked10BitAlphaSample(image,p,i,&quantum);
       switch (n % 3)
       {
         case 0:
