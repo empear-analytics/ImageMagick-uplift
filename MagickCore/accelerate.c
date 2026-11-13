@@ -2087,6 +2087,9 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
     *hostPtr,
     *inputPixels;
 
+  if (clEnv == (MagickCLEnv) NULL)
+    return(MagickFalse);
+
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
@@ -2371,27 +2374,8 @@ cleanup:
 MagickPrivate MagickBooleanType AccelerateEqualizeImage(Image *image,
   ExceptionInfo *exception)
 {
-  MagickBooleanType
-    status;
-
-  MagickCLEnv
-    clEnv;
-
-  assert(image != NULL);
-  assert(exception != (ExceptionInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-
-  if ((checkAccelerateConditionRGBA(image) == MagickFalse) ||
-      (checkHistogramCondition(image,image->intensity) == MagickFalse))
-    return(MagickFalse);
-
-  clEnv=getOpenCLEnvironment(exception);
-  if (clEnv == (MagickCLEnv) NULL)
-    return(MagickFalse);
-
-  status=ComputeEqualizeImage(image,clEnv,exception);
-  return(status);
+  return(ComputeEqualizeImage(image,getAccelerateEnvironment(image,
+    HistogramAccelerateCheck,__func__,exception),exception));
 }
 
 /*
