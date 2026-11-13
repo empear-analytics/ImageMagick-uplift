@@ -605,6 +605,49 @@ static MagickBooleanType PushFloodfillSegment(const FloodfillStack *stack,
   return(MagickTrue);
 }
 
+typedef struct _FloodfillRunPush
+{
+  FloodfillStack
+    stack;
+
+  ssize_t
+    offset,
+    start,
+    x,
+    x2,
+    y;
+} FloodfillRunPush;
+
+static MagickBooleanType PushFloodfillRun(const FloodfillRunPush *push)
+{
+  const FloodfillStack
+    stack = push->stack;
+
+  const ssize_t
+    offset = push->offset,
+    start = push->start,
+    x = push->x,
+    x2 = push->x2,
+    y = push->y;
+
+  {
+    const FloodfillSegment
+      segment = { y, start, x-1, offset };
+
+    if (PushFloodfillSegment(&stack,&segment) == MagickFalse)
+      return(MagickFalse);
+  }
+  if (x > (x2+1))
+    {
+      const FloodfillSegment
+        segment = { y, x2+1, x-1, -offset };
+
+      if (PushFloodfillSegment(&stack,&segment) == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 typedef struct _FloodfillSegments
 {
   Image
@@ -733,20 +776,12 @@ static MagickBooleanType FillFloodplaneSegments(
           if (FillFloodplaneRun(&row,&x) == MagickFalse)
             break;
           {
-            const FloodfillSegment
-              segment = { y, start, x-1, offset };
+            const FloodfillRunPush
+              push = { stack, offset, start, x, x2, y };
 
-            if (PushFloodfillSegment(&stack,&segment) == MagickFalse)
+            if (PushFloodfillRun(&push) == MagickFalse)
               return(MagickFalse);
           }
-          if (x > (x2+1))
-            {
-              const FloodfillSegment
-                segment = { y, x2+1, x-1, -offset };
-
-              if (PushFloodfillSegment(&stack,&segment) == MagickFalse)
-                return(MagickFalse);
-            }
         }
       if (AdvanceFloodfillRun(&row,x2,&advance) == MagickFalse)
         break;
