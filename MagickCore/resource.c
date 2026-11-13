@@ -558,6 +558,19 @@ static MagickBooleanType AddTemporaryResource(const char *path)
   return(status);
 }
 
+static int RegisterUniqueFileResource(const char *path,int file)
+{
+  MagickBooleanType
+    status;
+
+  if (file == -1)
+    return(file);
+  status=AddTemporaryResource(path);
+  if (status == MagickFalse)
+    file=close_utf8(file)-1;
+  return(file);
+}
+
 static void AcquireResourceRandomInfo(void)
 {
   if (random_info == (RandomInfo *) NULL)
@@ -573,9 +586,6 @@ MagickExport int AcquireUniqueFileResource(char *path)
 {
   int
     file;
-
-  MagickBooleanType
-    status;
 
   ssize_t
     i;
@@ -613,12 +623,7 @@ MagickExport int AcquireUniqueFileResource(char *path)
   }
   if ((GetLogEventMask() & ResourceEvent) != 0)
     (void) LogMagickEvent(ResourceEvent,GetMagickModule(),"%s",path);
-  if (file == -1)
-    return(file);
-  status=AddTemporaryResource(path);
-  if (status == MagickFalse)
-    file=close_utf8(file)-1;
-  return(file);
+  return(RegisterUniqueFileResource(path,file));
 }
 
 static void GetMagickResourceTail(const ResourceType type,
