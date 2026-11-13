@@ -1091,6 +1091,50 @@ static MagickBooleanType ReadAttributeValue(const char **q,const size_t extent,
   return(MagickTrue);
 }
 
+typedef struct _ConfigureIncludeInput
+{
+  const ConfigureLoadTarget
+    *target;
+
+  const char
+    *filename;
+
+  char
+    *token;
+
+  size_t
+    extent,
+    depth;
+} ConfigureIncludeInput;
+
+static void LoadConfigureIncludes(const ConfigureIncludeInput *include,
+  const char **q,MagickStatusType *status)
+{
+  const ConfigureLoadTarget
+    *const target = include->target;
+
+  const char
+    *const filename = include->filename;
+
+  char
+    *const token = include->token;
+
+  const size_t
+    extent = include->extent,
+    depth = include->depth;
+
+  ExceptionInfo
+    *exception = target->exception;
+
+  while (NextIncludeFile(q,extent,token) != MagickFalse)
+    if (depth >= MagickMaxRecursionDepth)
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
+    else
+      (*status)&=(MagickStatusType) LoadConfigureInclude(target,filename,
+        token,depth);
+}
+
 static MagickBooleanType LoadConfigureCache(const ConfigureLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1141,13 +1185,15 @@ static MagickBooleanType LoadConfigureCache(const ConfigureLoadTarget *target,
         /*
           Include element.
         */
-        while (NextIncludeFile(&q,extent,token) != MagickFalse)
-          if (depth >= MagickMaxRecursionDepth)
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
-          else
-            status&=(MagickStatusType) LoadConfigureInclude(target,filename,
-              token,depth);
+        ConfigureIncludeInput
+          include;
+
+        include.target=target;
+        include.filename=filename;
+        include.token=token;
+        include.extent=extent;
+        include.depth=depth;
+        LoadConfigureIncludes(&include,&q,&status);
         continue;
       }
     if (LocaleCompare(keyword,"<configure") == 0)
