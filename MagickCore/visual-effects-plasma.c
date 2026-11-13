@@ -411,15 +411,13 @@ static MagickBooleanType PlasmaImageProxy(const PlasmaContext *context,
       if (SetPlasmaEdgePixel(&midpoint,PlasmaColumnEdge,segment->x1,
           &status) == MagickFalse)
         return(MagickTrue);
-      if (fabs(segment->x1-segment->x2) >= MagickEpsilon)
-        {
-          /*
-            Right pixel.
-          */
-          if (SetPlasmaEdgePixel(&midpoint,PlasmaColumnEdge,segment->x2,
-              &status) == MagickFalse)
-            return(MagickFalse);
-        }
+      /*
+        Right pixel.
+      */
+      if ((fabs(segment->x1-segment->x2) >= MagickEpsilon) &&
+          (SetPlasmaEdgePixel(&midpoint,PlasmaColumnEdge,segment->x2,
+              &status) == MagickFalse))
+        return(MagickFalse);
     }
   if ((fabs(segment->y1-y_mid) >= MagickEpsilon) ||
       (fabs(segment->y2-y_mid) >= MagickEpsilon))
@@ -434,15 +432,13 @@ static MagickBooleanType PlasmaImageProxy(const PlasmaContext *context,
               &status) == MagickFalse)
             return(MagickTrue);
         }
-      if (fabs(segment->y1-segment->y2) >= MagickEpsilon)
-        {
-          /*
-            Top pixel.
-          */
-          if (SetPlasmaEdgePixel(&midpoint,PlasmaRowEdge,segment->y1,
-              &status) == MagickFalse)
-            return(MagickTrue);
-        }
+      /*
+        Top pixel.
+      */
+      if ((fabs(segment->y1-segment->y2) >= MagickEpsilon) &&
+          (SetPlasmaEdgePixel(&midpoint,PlasmaRowEdge,segment->y1,
+              &status) == MagickFalse))
+        return(MagickTrue);
     }
   if (SetPlasmaMiddlePixel(&midpoint,&status) == MagickFalse)
     return(MagickTrue);
