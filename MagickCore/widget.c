@@ -16485,6 +16485,45 @@ static void RedrawTextViewText(const TextViewContext *context,
   (*expose_info).y=(*slider_info).y;
 }
 
+static void RedrawTextViewLines(const TextViewContext *context,
+  const TextViewWidgets *widgets)
+{
+  const unsigned int
+    lines = context->lines;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  size_t
+    *const state = widgets->state;
+
+  unsigned int
+    *const visible_lines = widgets->visible_lines;
+
+  XWidgetInfo
+    *const selection_info = widgets->selection_info;
+
+  if ((*state) & RedrawListState)
+    {
+      /*
+        Determine slider id and position.
+      */
+      if ((*slider_info).id >= (int) (lines-(*visible_lines)))
+        (*slider_info).id=(int) (lines-(*visible_lines));
+      if (((*slider_info).id < 0) || (lines <= (*visible_lines)))
+        (*slider_info).id=0;
+      (*slider_info).y=(*slider_info).min_y;
+      if (lines != 0)
+        (*slider_info).y+=(*slider_info).id*((*slider_info).max_y-
+          (*slider_info).min_y+1)/(int) lines;
+      if ((*slider_info).id != (*selection_info).id)
+        {
+          RedrawTextViewText(context,widgets);
+        }
+      (*state)&=(unsigned int) (~RedrawListState);
+    }
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -16640,25 +16679,7 @@ MagickPrivate void XTextViewWidget(Display *display,
   {
     UpdateTextViewLayout(&view_context,&view_widgets);
     RedrawTextViewWidget(&view_context,&view_widgets);
-    if (state & RedrawListState)
-      {
-        /*
-          Determine slider id and position.
-        */
-        if (slider_info.id >= (int) (lines-visible_lines))
-          slider_info.id=(int) (lines-visible_lines);
-        if ((slider_info.id < 0) || (lines <= visible_lines))
-          slider_info.id=0;
-        slider_info.y=slider_info.min_y;
-        if (lines != 0)
-          slider_info.y+=slider_info.id*(slider_info.max_y-
-            slider_info.min_y+1)/(int) lines;
-        if (slider_info.id != selection_info.id)
-          {
-            RedrawTextViewText(&view_context,&view_widgets);
-          }
-        state&=(unsigned int) (~RedrawListState);
-      }
+    RedrawTextViewLines(&view_context,&view_widgets);
     /*
       Wait for next event.
     */
