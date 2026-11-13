@@ -564,6 +564,81 @@ MagickExport MagickBooleanType DecipherImage(Image *image,
   return(status);
 }
 
+typedef struct _CipherRow
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  QuantumInfo
+    *quantum_info;
+
+  QuantumType
+    quantum_type;
+
+  unsigned char
+    *pixels;
+
+  AESInfo
+    *aes_info;
+} CipherRow;
+
+static void CipherQuantumRow(const CipherRow *row,unsigned char *input_block,
+  unsigned char *output_block,ExceptionInfo *exception)
+{
+  AESInfo
+    *const aes_info = row->aes_info;
+
+  CacheView
+    *const image_view = row->image_view;
+
+  Image
+    *const image = row->image;
+
+  QuantumInfo
+    *const quantum_info = row->quantum_info;
+
+  const QuantumType
+    quantum_type = row->quantum_type;
+
+  size_t
+    length;
+
+  ssize_t
+    i,
+    x;
+
+  unsigned char
+    *const pixels = row->pixels,
+    *p;
+
+  length=ExportQuantumPixels(image,image_view,quantum_info,quantum_type,
+    pixels,exception);
+  p=pixels;
+  for (x=0; x < (ssize_t) length; x+=AESBlocksize)
+  {
+    (void) memcpy(output_block,input_block,AESBlocksize*
+      sizeof(*output_block));
+    IncrementCipherNonce(AESBlocksize,input_block);
+    EncipherAESBlock(aes_info,output_block,output_block);
+    for (i=0; i < AESBlocksize; i++)
+      p[i]^=output_block[i];
+    p+=(ptrdiff_t) AESBlocksize;
+  }
+  (void) memcpy(output_block,input_block,AESBlocksize*
+    sizeof(*output_block));
+  EncipherAESBlock(aes_info,output_block,output_block);
+  for (i=0; x < (ssize_t) length; x++)
+  {
+    p[i]^=output_block[i];
+    i++;
+  }
+  (void) ImportQuantumPixels(image,image_view,quantum_info,quantum_type,
+    pixels,exception);
+}
+
 MagickExport MagickBooleanType PasskeyDecipherImage(Image *image,
   const StringInfo *passkey,ExceptionInfo *exception)
 {
@@ -592,12 +667,6 @@ MagickExport MagickBooleanType PasskeyDecipherImage(Image *image,
 
   SignatureInfo
     *signature_info;
-
-  unsigned char
-    *p;
-
-  size_t
-    length;
 
   ssize_t
     y;
@@ -668,9 +737,8 @@ MagickExport MagickBooleanType PasskeyDecipherImage(Image *image,
   image_view=AcquireAuthenticCacheView(image,exception);
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ssize_t
-      i,
-      x;
+    CipherRow
+      row;
 
     Quantum
       *magick_restrict q;
@@ -678,29 +746,13 @@ MagickExport MagickBooleanType PasskeyDecipherImage(Image *image,
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
     if (q == (Quantum *) NULL)
       break;
-    length=ExportQuantumPixels(image,image_view,quantum_info,quantum_type,
-      pixels,exception);
-    p=pixels;
-    for (x=0; x < (ssize_t) length; x+=AESBlocksize)
-    {
-      (void) memcpy(output_block,input_block,AESBlocksize*
-        sizeof(*output_block));
-      IncrementCipherNonce(AESBlocksize,input_block);
-      EncipherAESBlock(aes_info,output_block,output_block);
-      for (i=0; i < AESBlocksize; i++)
-        p[i]^=output_block[i];
-      p+=(ptrdiff_t) AESBlocksize;
-    }
-    (void) memcpy(output_block,input_block,AESBlocksize*
-      sizeof(*output_block));
-    EncipherAESBlock(aes_info,output_block,output_block);
-    for (i=0; x < (ssize_t) length; x++)
-    {
-      p[i]^=output_block[i];
-      i++;
-    }
-    (void) ImportQuantumPixels(image,image_view,quantum_info,quantum_type,
-      pixels,exception);
+    row.image=image;
+    row.image_view=image_view;
+    row.quantum_info=quantum_info;
+    row.quantum_type=quantum_type;
+    row.pixels=pixels;
+    row.aes_info=aes_info;
+    CipherQuantumRow(&row,input_block,output_block,exception);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       break;
     proceed=SetImageProgress(image,DecipherImageTag,(MagickOffsetType) y,
@@ -803,14 +855,8 @@ MagickExport MagickBooleanType PasskeyEncipherImage(Image *image,
   QuantumType
     quantum_type;
 
-  unsigned char
-    *p;
-
   SignatureInfo
     *signature_info;
-
-  size_t
-    length;
 
   ssize_t
     y;
@@ -888,9 +934,8 @@ MagickExport MagickBooleanType PasskeyEncipherImage(Image *image,
   image_view=AcquireAuthenticCacheView(image,exception);
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ssize_t
-      i,
-      x;
+    CipherRow
+      row;
 
     Quantum
       *magick_restrict q;
@@ -898,29 +943,13 @@ MagickExport MagickBooleanType PasskeyEncipherImage(Image *image,
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
     if (q == (Quantum *) NULL)
       break;
-    length=ExportQuantumPixels(image,image_view,quantum_info,quantum_type,
-      pixels,exception);
-    p=pixels;
-    for (x=0; x < (ssize_t) length; x+=AESBlocksize)
-    {
-      (void) memcpy(output_block,input_block,AESBlocksize*
-        sizeof(*output_block));
-      IncrementCipherNonce(AESBlocksize,input_block);
-      EncipherAESBlock(aes_info,output_block,output_block);
-      for (i=0; i < AESBlocksize; i++)
-        p[i]^=output_block[i];
-      p+=(ptrdiff_t) AESBlocksize;
-    }
-    (void) memcpy(output_block,input_block,AESBlocksize*
-      sizeof(*output_block));
-    EncipherAESBlock(aes_info,output_block,output_block);
-    for (i=0; x < (ssize_t) length; x++)
-    {
-      p[i]^=output_block[i];
-      i++;
-    }
-    (void) ImportQuantumPixels(image,image_view,quantum_info,quantum_type,
-      pixels,exception);
+    row.image=image;
+    row.image_view=image_view;
+    row.quantum_info=quantum_info;
+    row.quantum_type=quantum_type;
+    row.pixels=pixels;
+    row.aes_info=aes_info;
+    CipherQuantumRow(&row,input_block,output_block,exception);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       break;
     proceed=SetImageProgress(image,EncipherImageTag,(MagickOffsetType) y,
