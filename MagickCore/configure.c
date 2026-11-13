@@ -1135,6 +1135,20 @@ static void LoadConfigureIncludes(const ConfigureIncludeInput *include,
         token,depth);
 }
 
+static MagickStatusType AppendConfigureElement(LinkedListInfo *cache,
+  ConfigureInfo *configure_info,ExceptionInfo *exception)
+{
+  MagickStatusType
+    status;
+
+  status=AppendValueToLinkedList(cache,configure_info);
+  if (status == MagickFalse)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ResourceLimitError,"MemoryAllocationFailed","`%s'",
+      configure_info->name);
+  return(status);
+}
+
 static MagickBooleanType LoadConfigureCache(const ConfigureLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1214,11 +1228,7 @@ static MagickBooleanType LoadConfigureCache(const ConfigureLoadTarget *target,
     if ((LocaleCompare(keyword,"/>") == 0) ||
         (LocaleCompare(keyword,"</policy>") == 0))
       {
-        status=AppendValueToLinkedList(cache,configure_info);
-        if (status == MagickFalse)
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            ResourceLimitError,"MemoryAllocationFailed","`%s'",
-            configure_info->name);
+        status=AppendConfigureElement(cache,configure_info,exception);
         configure_info=(ConfigureInfo *) NULL;
         continue;
       }
