@@ -12984,6 +12984,83 @@ Sonnet 5.5) under the mandate of 2026-10-24.
 
 ---
 
+## Recipe HE - Hoist a Case's Exit Test above its Switch
+
+**Use when:** CodeScene reports *Bumpy Road Ahead* on a function whose loop body holds a
+`switch (c)` in which one group is `if (T) return(R); S; break;` and its label `L` is a
+character constant (`geometry-parse.c`'s `ParseGeometry`: group `'('` tests for a `)`
+after it and returns, else deletes the character like group `')'`). The `if` inside the
+case inside the loop is a bump.
+
+**Not covered by:** Recipe HT, whose test is common to the two branches of an `if`;
+Recipe SG, which spreads a guard over nested tests; Recipes SD, SR and RC, which move
+whole groups into a function; Recipe PL, whose peeled group is the exit alone.
+
+**How:**
+
+1. The `switch (c)` is the last statement of a loop body outside every OpenMP region; `c`
+   is a local `int` nothing assigns after the statements before the `switch`. The group
+   `G` is `case L: { if (T) return(R); S break; }`, `T` is a comparison with no side
+   effect (a dereference and `==`), `R` is an expression with no side effect, and no
+   other group falls into `G`.
+2. Directly before the `switch`, after every statement of the body that precedes it, write
+   `if ((c == L) && (T)) return(R);`, with `L` and `T` and `R` as `G` wrote them.
+3. Write `G` as `case L: { S break; }`; when another group has the same body `S`, the two
+   share their labels (`case '(': case ')':`).
+
+**Before:**
+
+```c
+    switch (c)
+    {
+      case '(':
+      {
+        if (*(p+1) == ')')
+          return(flags);
+        (void) CopyMagickString(p,p+1,MagickPathExtent);
+        break;
+      }
+      case ')':
+      {
+        (void) CopyMagickString(p,p+1,MagickPathExtent);
+        break;
+      }
+```
+
+**After:**
+
+```c
+    if ((c == '(') && (*(p+1) == ')'))
+      return(flags);
+    switch (c)
+    {
+      case '(':
+      case ')':
+      {
+        (void) CopyMagickString(p,p+1,MagickPathExtent);
+        break;
+      }
+```
+
+**Careful:**
+
+- When `c` equals `L` the original runs `T` first thing in `G`, and returns `R` if it
+  holds, else runs `S`; the new test runs `T` on the same value, after the same earlier
+  statements, and returns `R` if it holds, else the `switch` takes `G` and runs `S`. When `c`
+  differs from `L` the original ran no `T`, and the new `&&` does not either. `T` and `R`
+  have no side effect (step 1), so evaluating `T` before the `switch` rather than in `G`
+  changes nothing, and nothing runs between the two points.
+- The statements the loop body runs between the two points are none: the test stands
+  directly before the `switch`.
+
+**Evidence level:** oracle (the cases that reach the function).
+
+**Provenance:** 2026-11-13, from `geometry-parse.c`'s `ParseGeometry` (campaign B, M121):
+7.01 to 7.04, the bump gone. Added by Claude Code (Claude Sonnet 5.5) under the mandate of
+2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -13299,3 +13376,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | NEW | DT | Drop `? MagickTrue : MagickFalse` after a comparison or a chain of them; proof `obj_identical.sh` and `ci_warnings.sh` | `policy.c` (seven sites in seven functions; 6.21 to 6.38, object code identical); P writes the ternary and nothing removes it | mandate (2026-10-24) |
 | 2026-11-12 | NEW | LL | Replace an ascending `if (x >= L) var=V;` ladder by descending returns in a helper; proof oracle plus the monotone-limits reading | `type.c` `LoadFontConfigFonts` (stretch and weight ladders; cc 41 to 23, 5.08 to 5.16); E keeps the ladder's cc | mandate (2026-10-24) |
 | 2026-11-13 | NEW | PA | Peel an advancing label group (`p++; break;` under many labels) out of a loop's `switch` into a membership predicate and an `if (...) { p++; continue; }`; evidence oracle | `geometry-parse.c`'s `GetGeometry` and `ParseGeometry` (seventeen labels in each; cc 50 and 52 to 36 and 38, 6.80 to 6.99); LP and PL peel groups that return, SD keeps the labels in a switch | mandate (2026-10-24) |
+| 2026-11-13 | NEW | HE | Hoist a case's exit test (`case L: { if (T) return(R); S break; }`) to an `if ((c == L) && (T)) return(R);` before the loop's `switch`; evidence oracle | `geometry-parse.c`'s `ParseGeometry` (bump gone, 7.01 to 7.04); HT, SG and PL do not reach a test inside a case | mandate (2026-10-24) |
