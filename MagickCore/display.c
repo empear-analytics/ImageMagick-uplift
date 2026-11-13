@@ -15651,6 +15651,92 @@ static void XRotateCropGeometry(const RotateCropInput *crop,
     }
 }
 
+typedef struct _RotateUpdateInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    **image;
+
+  ExceptionInfo
+    *exception;
+
+  double
+    normalized_degrees;
+
+  unsigned int
+    rotations;
+} RotateUpdateInput;
+
+static MagickBooleanType XRotateUpdate(const RotateUpdateInput *update,
+  unsigned int *width,unsigned int *height)
+{
+  Display
+    *const display = update->display;
+
+  XResourceInfo
+    *const resource_info = update->resource_info;
+
+  XWindows
+    *const windows = update->windows;
+
+  Image
+    **const image = update->image;
+
+  ExceptionInfo
+    *const exception = update->exception;
+
+  const double
+    normalized_degrees = update->normalized_degrees;
+
+  const unsigned int
+    rotations = update->rotations;
+
+  int
+    x,
+    y;
+
+  if (windows->image.orphan != MagickFalse)
+    return(MagickTrue);
+  if (normalized_degrees != 0.0)
+    {
+      /*
+        Update image colormap.
+      */
+      windows->image.window_changes.width=(int) (*image)->columns;
+      windows->image.window_changes.height=(int) (*image)->rows;
+      if (windows->image.crop_geometry != (char *) NULL)
+        {
+          /*
+            Obtain dimensions of image from crop geometry.
+          */
+          (void) XParseGeometry(windows->image.crop_geometry,&x,&y,
+            width,height);
+          windows->image.window_changes.width=(int) (*width);
+          windows->image.window_changes.height=(int) (*height);
+        }
+      XConfigureImageColormap(display,resource_info,windows,*image,exception);
+    }
+  else
+    if (((rotations % 4) == 1) || ((rotations % 4) == 3))
+      {
+        windows->image.window_changes.width=windows->image.ximage->height;
+        windows->image.window_changes.height=windows->image.ximage->width;
+      }
+  /*
+    Update image configuration.
+  */
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+  return(MagickTrue);
+}
+
 static MagickBooleanType XRotateImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,double degrees,Image **image,
   ExceptionInfo *exception)
@@ -15750,38 +15836,13 @@ static MagickBooleanType XRotateImage(Display *display,
 
     XRotateCropGeometry(&crop,&width,&height);
   }
-  if (windows->image.orphan != MagickFalse)
-    return(MagickTrue);
-  if (normalized_degrees != 0.0)
-    {
-      /*
-        Update image colormap.
-      */
-      windows->image.window_changes.width=(int) (*image)->columns;
-      windows->image.window_changes.height=(int) (*image)->rows;
-      if (windows->image.crop_geometry != (char *) NULL)
-        {
-          /*
-            Obtain dimensions of image from crop geometry.
-          */
-          (void) XParseGeometry(windows->image.crop_geometry,&x,&y,
-            &width,&height);
-          windows->image.window_changes.width=(int) width;
-          windows->image.window_changes.height=(int) height;
-        }
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-    }
-  else
-    if (((rotations % 4) == 1) || ((rotations % 4) == 3))
-      {
-        windows->image.window_changes.width=windows->image.ximage->height;
-        windows->image.window_changes.height=windows->image.ximage->width;
-      }
-  /*
-    Update image configuration.
-  */
-  (void) XConfigureImage(display,resource_info,windows,*image,exception);
-  return(MagickTrue);
+  {
+    const RotateUpdateInput
+      update = { display, resource_info, windows, image, exception,
+        normalized_degrees, rotations };
+
+    return(XRotateUpdate(&update,&width,&height));
+  }
 }
 
 /*
