@@ -9850,6 +9850,23 @@ static void XCreateWindowTextProperties(XWindowInfo *window_info,
       window_info->icon_name);
 }
 
+#if defined(MAGICKCORE_HAVE_SHAPE)
+static void XQueryShapeSupport(Display *display,XWindowInfo *window_info)
+{
+  int
+    error_base,
+    event_base;
+
+  /*
+    Can we apply a non-rectangular shaping mask?
+  */
+  error_base=0;
+  event_base=0;
+  if (XShapeQueryExtension(display,&error_base,&event_base) == 0)
+    window_info->shape=MagickFalse;
+}
+#endif
+
 MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
   int argc,XClassHint *class_hint,XWMHints *manager_hints,
   XWindowInfo *window_info)
@@ -9895,17 +9912,7 @@ MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
   if (window_info->shape != MagickFalse)
     {
 #if defined(MAGICKCORE_HAVE_SHAPE)
-      int
-        error_base,
-        event_base;
-
-      /*
-        Can we apply a non-rectangular shaping mask?
-      */
-      error_base=0;
-      event_base=0;
-      if (XShapeQueryExtension(display,&error_base,&event_base) == 0)
-        window_info->shape=MagickFalse;
+      XQueryShapeSupport(display,window_info);
 #else
       window_info->shape=MagickFalse;
 #endif
