@@ -795,16 +795,16 @@ static void Get8BIMProperty(const Image *image,const char *key,
     if (resource != (char *) NULL)
       macroman_resource=(char *) ConvertMacRomanToUTF8((unsigned char *)
         resource);
-    if (Is8BIMResourceName(name) != MagickFalse)
-      if (IsUnrequestedResource(resource,macroman_resource,name) != MagickFalse)
-        {
-          /*
-            No name match, scroll forward and try next.
-          */
-          info+=count;
-          length=(size_t) ((ssize_t) length-MagickMin(count,(ssize_t) length));
-          continue;
-        }
+    if ((Is8BIMResourceName(name) != MagickFalse) &&
+        (IsUnrequestedResource(resource,macroman_resource,name) != MagickFalse))
+      {
+        /*
+          No name match, scroll forward and try next.
+        */
+        info+=count;
+        length=(size_t) ((ssize_t) length-MagickMin(count,(ssize_t) length));
+        continue;
+      }
     if ((*name == '#') && (sub_number != 1))
       {
         /*
