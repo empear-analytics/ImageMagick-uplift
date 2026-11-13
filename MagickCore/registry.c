@@ -501,7 +501,6 @@ MagickExport MagickBooleanType SetImageRegistry(const RegistryType type,
   clone_value=(void *) NULL;
   switch (type)
   {
-    case StringRegistryType:
     default:
     {
       const char
