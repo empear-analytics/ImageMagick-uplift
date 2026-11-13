@@ -2774,6 +2774,35 @@ static void SkipToExifHeader(unsigned char **exif,size_t *length)
   }
 }
 
+static MagickBooleanType ReadExifHeader(unsigned char **exif,size_t *length,
+  EndianType *endian)
+{
+  ssize_t
+    id;
+
+  if ((*length) < 16)
+    return(MagickFalse);
+  id=(ssize_t) ReadProfileShort(LSBEndian,(*exif));
+  if ((id != 0x4949) && (id != 0x4D4D))
+    {
+      SkipToExifHeader(exif,length);
+      if ((*length) < 16)
+        return(MagickFalse);
+      id=(ssize_t) ReadProfileShort(LSBEndian,(*exif));
+    }
+  (*endian)=LSBEndian;
+  if (id == 0x4949)
+    (*endian)=LSBEndian;
+  else
+    if (id == 0x4D4D)
+      (*endian)=MSBEndian;
+    else
+      return(MagickFalse);
+  if (ReadProfileShort((*endian),(*exif)+2) != 0x002a)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static void SyncExifProfile(const Image *image,unsigned char *exif,
   size_t length)
 {
@@ -2792,7 +2821,6 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
     *exif_resources;
 
   ssize_t
-    id,
     level,
     offset;
 
@@ -2804,25 +2832,7 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
     *exif_directory,
     *ifd0;
 
-  if (length < 16)
-    return;
-  id=(ssize_t) ReadProfileShort(LSBEndian,exif);
-  if ((id != 0x4949) && (id != 0x4D4D))
-    {
-      SkipToExifHeader(&exif,&length);
-      if (length < 16)
-        return;
-      id=(ssize_t) ReadProfileShort(LSBEndian,exif);
-    }
-  endian=LSBEndian;
-  if (id == 0x4949)
-    endian=LSBEndian;
-  else
-    if (id == 0x4D4D)
-      endian=MSBEndian;
-    else
-      return;
-  if (ReadProfileShort(endian,exif+2) != 0x002a)
+  if (ReadExifHeader(&exif,&length,&endian) == MagickFalse)
     return;
   /*
     This the offset to the first IFD.
