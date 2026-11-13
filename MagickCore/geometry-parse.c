@@ -711,6 +711,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
     c;
 
   MagickStatusType
+    flag,
     flags;
 
   /*
@@ -753,50 +754,15 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
         p++;
         continue;
       }
+    flag=GetGeometryMetaFlag(c);
+    if (flag != NoValue)
+      {
+        flags|=flag;
+        (void) CopyMagickString(p,p+1,MagickPathExtent);
+        continue;
+      }
     switch (c)
     {
-      case '%':
-      {
-        flags|=PercentValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '!':
-      {
-        flags|=AspectValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '<':
-      {
-        flags|=LessValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '>':
-      {
-        flags|=GreaterValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '#':
-      {
-        flags|=MaximumValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '^':
-      {
-        flags|=MinimumValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '@':
-      {
-        flags|=AreaValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
       case '(':
       case ')':
       {
