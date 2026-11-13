@@ -854,9 +854,7 @@ static void SyncImageDepthAndFilterSettings(const ImageInfo *image_info,
   option=GetImageOption(image_info,"density");
   if (option != (const char *) NULL)
     SetImageResolutionFromDensity(image,option);
-  option=GetImageOption(image_info,"depth");
-  if (option != (const char *) NULL)
-    image->depth=StringToUnsignedLong(option);
+  SyncUnsignedLongOption(image_info,"depth",&image->depth);
   option=GetImageOption(image_info,"endian");
   if (option != (const char *) NULL)
     image->endian=(EndianType) ParseCommandOption(MagickEndianOptions,
@@ -872,9 +870,8 @@ static void SyncImageDepthAndFilterSettings(const ImageInfo *image_info,
   if (option != (const char *) NULL)
     image->gravity=(GravityType) ParseCommandOption(MagickGravityOptions,
       MagickFalse,option);
-  option=GetImageOption(image_info,"green-primary");
-  if (option != (const char *) NULL)
-    ParseChromaticityPrimary(option,&image->chromaticity.green_primary);
+  SyncChromaticityOption(image_info,"green-primary",
+    &image->chromaticity.green_primary);
 }
 
 static void SyncImageRenderingSettings(const ImageInfo *image_info,
