@@ -296,15 +296,20 @@ MagickExport ssize_t FormatMagickTime(const time_t time,const size_t length,
 %    o  time_info: Timer statistics structure.
 %
 */
-MagickExport double GetElapsedTime(TimerInfo *time_info)
+static double GetStoppedTimerTotal(TimerInfo *time_info,const Timer *value)
 {
-  assert(time_info != (TimerInfo *) NULL);
-  assert(time_info->signature == MagickCoreSignature);
   if (time_info->state == UndefinedTimerState)
     return(0.0);
   if (time_info->state == RunningTimerState)
     StopTimer(time_info);
-  return(time_info->elapsed.total);
+  return((*value).total);
+}
+
+MagickExport double GetElapsedTime(TimerInfo *time_info)
+{
+  assert(time_info != (TimerInfo *) NULL);
+  assert(time_info->signature == MagickCoreSignature);
+  return(GetStoppedTimerTotal(time_info,&time_info->elapsed));
 }
 
 /*
@@ -403,11 +408,7 @@ MagickExport double GetUserTime(TimerInfo *time_info)
 {
   assert(time_info != (TimerInfo *) NULL);
   assert(time_info->signature == MagickCoreSignature);
-  if (time_info->state == UndefinedTimerState)
-    return(0.0);
-  if (time_info->state == RunningTimerState)
-    StopTimer(time_info);
-  return(time_info->user.total);
+  return(GetStoppedTimerTotal(time_info,&time_info->user));
 }
 
 /*
