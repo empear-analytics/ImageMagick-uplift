@@ -7273,6 +7273,40 @@ static void ToggleFileBrowserButtons(const FileBrowserContext *context,
     }
 }
 
+static void MoveFileBrowserButtons(const FileBrowserContext *context,
+  XEvent event,const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  size_t
+    *const files = widgets->files;
+
+  /*
+    Discard pending button motion events.
+  */
+  while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
+  if ((*slider_info).active)
+    {
+      /*
+        Move slider matte.
+      */
+      (*slider_info)=TrackFontBrowserSlider((*slider_info),event,
+        (int) (*files));
+      (*state)|=RedrawListState;
+      return;
+    }
+  if ((*state) & InactiveWidgetState)
+    return;
+  ToggleFileBrowserButtons(context,event,widgets);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8064,22 +8098,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
       }
       case MotionNotify:
       {
-        /*
-          Discard pending button motion events.
-        */
-        while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
-        if (slider_info.active)
-          {
-            /*
-              Move slider matte.
-            */
-            slider_info=TrackFontBrowserSlider(slider_info,event,(int) files);
-            state|=RedrawListState;
-            break;
-          }
-        if (state & InactiveWidgetState)
-          break;
-        ToggleFileBrowserButtons(&file_context,event,&file_widgets);
+        MoveFileBrowserButtons(&file_context,event,&file_widgets);
         break;
       }
       case SelectionClear:
