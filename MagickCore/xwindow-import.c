@@ -1828,6 +1828,28 @@ static void XDrawCropRectangle(Display *display,const Window root_window,
       (unsigned int) crop_info->height-1);
 }
 
+static void XCheckCropBoundary(RectangleInfo *crop_info,const int x_offset,
+  const int y_offset)
+{
+  /*
+    Check boundary conditions.
+  */
+  if ((int) crop_info->x < x_offset)
+    crop_info->width=(size_t) (x_offset-crop_info->x);
+  else
+    {
+      crop_info->width=(size_t) (crop_info->x-x_offset);
+      crop_info->x=(ssize_t) x_offset;
+    }
+  if ((int) crop_info->y < y_offset)
+    crop_info->height=(size_t) (y_offset-crop_info->y);
+  else
+    {
+      crop_info->height=(size_t) (crop_info->y-y_offset);
+      crop_info->y=(ssize_t) y_offset;
+    }
+}
+
 static Window XSelectWindow(Display *display,RectangleInfo *crop_info)
 {
   Cursor
@@ -1917,23 +1939,7 @@ static Window XSelectWindow(Display *display,RectangleInfo *crop_info)
         while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
         crop_info->x=(ssize_t) event.xmotion.x;
         crop_info->y=(ssize_t) event.xmotion.y;
-        /*
-          Check boundary conditions.
-        */
-        if ((int) crop_info->x < x_offset)
-          crop_info->width=(size_t) (x_offset-crop_info->x);
-        else
-          {
-            crop_info->width=(size_t) (crop_info->x-x_offset);
-            crop_info->x=(ssize_t) x_offset;
-          }
-        if ((int) crop_info->y < y_offset)
-          crop_info->height=(size_t) (y_offset-crop_info->y);
-        else
-          {
-            crop_info->height=(size_t) (crop_info->y-y_offset);
-            crop_info->y=(ssize_t) y_offset;
-          }
+        XCheckCropBoundary(crop_info,x_offset,y_offset);
       }
       default:
         break;
