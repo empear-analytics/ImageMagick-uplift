@@ -16622,6 +16622,16 @@ static void RespondToTextViewEvents(const TextViewContext *context,
   } while (((*state) & ExitState) == 0);
 }
 
+static void WithdrawTextViewWidget(Display *display,XWindows *windows,
+  XFontStruct *text_info)
+{
+  if (text_info != windows->widget.font_info)
+    (void) XFreeFont(display,text_info);
+  XSetCursorState(display,windows,MagickFalse);
+  (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
+  XCheckRefreshWindows(display,windows);
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -16774,10 +16784,6 @@ MagickPrivate void XTextViewWidget(Display *display,
   view_context.font_info=font_info;
   view_context.text_info=text_info;
   RespondToTextViewEvents(&view_context,&targets,&view_widgets);
-  if (text_info != windows->widget.font_info)
-    (void) XFreeFont(display,text_info);
-  XSetCursorState(display,windows,MagickFalse);
-  (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
-  XCheckRefreshWindows(display,windows);
+  WithdrawTextViewWidget(display,windows,text_info);
 }
 #endif
