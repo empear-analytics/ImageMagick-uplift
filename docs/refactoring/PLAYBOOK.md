@@ -2811,6 +2811,17 @@ Q and U, whose first step refuses a block containing `goto`.
 1. The block lies outside every OpenMP region and contains no `#pragma` line. Every
    `goto` in it jumps to one label `L` outside the block; it contains no `return`, and no
    `continue` or `break` that leaves it.
+   A `goto M;` to a second label `M` may stand in it as well when the caller's statement
+   directly after the block is `goto M;` itself (2026-11-13; `MorphologyApply`'s direct
+   path, `goto exit_cleanup;` ahead of the `goto exit_cleanup;` that follows the block):
+   each such `goto M;` counts as falling off the block's end and becomes
+   `return(MagickTrue);` at step 3, and nothing else of the block changes. Recipes Y and
+   I, which take this step, admit it too. The caller then writes step 5's
+   `if (Helper(...) == MagickFalse) goto L;` with the `goto M;` after it unchanged, so a
+   path that jumped to `M` returns `MagickTrue`, runs nothing in the caller but that
+   `goto M;`, and arrives at `M` having run the same statements in the same order; the
+   other paths are as step 3 says. Check by reading that nothing stands between the
+   block and that `goto M;`, and that `M` differs from `L`.
 2. The block writes at most one variable of the caller, `v`, a plain local (not a
    parameter, a global or a `static`; a parameter Recipe O step 2 counts as a plain
    local qualifies) whose address is not taken elsewhere. Writes
@@ -14792,3 +14803,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | DV | Drop a `static` function's parameter that every caller fills with a member of another argument; the callee reads the member into a local; evidence oracle | `stream.c`'s `StreamDoublePixels` and `StreamFloatPixels` (five arguments to four; 6.12 to 6.13); M merges identical arguments only | mandate (2026-10-24) |
 | 2026-11-13 | NEW | KD | Replace a run of `if (LocaleCompare(v,"K") == 0) return(F(...));` calls of one signature by a `static const` table of key/function-pointer records and a lookup loop; evidence oracle | `pixel-import.c` `ImportCharPixel` (cc 10, file 6.69 to 6.89); KT assigns, KR returns strings, KE assigns enumerators | mandate (2026-10-24) |
 | 2026-11-13 | NEW | ME | Merge Mirrored Twins That Leave Through a Constant Return: copies of one block that leave the function through `return(c);` (Recipe Y steps 1 and 2; `c` may differ between copies), in two mirrored sides (Recipe MT step 1's alignment) whose copies differ in one member-access value, become one `static inline MagickBooleanType` function taking the input struct, a constant selector, the value and the written variable by pointer; each copy becomes `if (Helper(...) == MagickFalse) return(c);` with its own constant. *Careful* gives the argument (the conditional evaluates only the copy's run, in its order; the constants stay in the callers) | `visual-effects-plasma.c`'s `PlasmaImageProxy` (campaign A, W21 round four, lane d): four edge-pixel blocks (left/right along a column, bottom/top along a row) that Recipes MT, Y, SV and W refuse; helpers per side cloned (8.15), precomputed coordinates moved `errno`-writing casts; a probe of the chain this recipe opens: 8.50 to 9.09 | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | V | Step 1: a `goto M;` to a second label may stand in the block when the caller's statement directly after the block is `goto M;`; it becomes `return(MagickTrue);` like falling off the end, and Recipes Y and I admit it too (the path returns success and the caller runs only that `goto M;`) | `morphology.c`'s `MorphologyApply`: the direct-method path's `goto exit_cleanup;` kept the stage block (cc 11, the special, direct, reflected-kernel and loop tests) from Recipe I; with it, the function leaves Complex Method (6.90 to 6.93) | mandate (2026-10-24) |
