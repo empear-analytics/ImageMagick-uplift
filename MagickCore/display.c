@@ -13989,116 +13989,116 @@ static void XROICommand(const ROICommandInput *command_input,XEvent *event,
     (*state)|=UpdateRegionState;
 }
 
+static const char
+  *const ROIMenu[] =
+  {
+    "Help",
+    "Dismiss",
+    (char *) NULL
+  },
+  *const ApplyMenu[] =
+  {
+    "File",
+    "Edit",
+    "Transform",
+    "Enhance",
+    "Effects",
+    "F/X",
+    "Miscellany",
+    "Help",
+    "Dismiss",
+    (char *) NULL
+  },
+  *const ROIFileMenu[] =
+  {
+    "Save...",
+    "Print...",
+    (char *) NULL
+  },
+  *const ROIEditMenu[] =
+  {
+    "Undo",
+    "Redo",
+    (char *) NULL
+  },
+  *const ROITransformMenu[] =
+  {
+    "Flop",
+    "Flip",
+    "Rotate Right",
+    "Rotate Left",
+    (char *) NULL
+  },
+  *const ROIEnhanceMenu[] =
+  {
+    "Hue...",
+    "Saturation...",
+    "Brightness...",
+    "Gamma...",
+    "Spiff",
+    "Dull",
+    "Contrast Stretch...",
+    "Sigmoidal Contrast...",
+    "Normalize",
+    "Equalize",
+    "Negate",
+    "Grayscale",
+    "Map...",
+    "Quantize...",
+    (char *) NULL
+  },
+  *const ROIEffectsMenu[] =
+  {
+    "Despeckle",
+    "Emboss",
+    "Reduce Noise",
+    "Add Noise",
+    "Sharpen...",
+    "Blur...",
+    "Threshold...",
+    "Edge Detect...",
+    "Spread...",
+    "Shade...",
+    "Raise...",
+    "Segment...",
+    (char *) NULL
+  },
+  *const ROIFXMenu[] =
+  {
+    "Solarize...",
+    "Sepia Tone...",
+    "Swirl...",
+    "Implode...",
+    "Vignette...",
+    "Wave...",
+    "Oil Paint...",
+    "Charcoal Draw...",
+    (char *) NULL
+  },
+  *const ROIMiscellanyMenu[] =
+  {
+    "Image Info",
+    "Zoom Image",
+    "Show Preview...",
+    "Show Histogram",
+    "Show Matte",
+    (char *) NULL
+  };
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
 {
   const char
-    *const ROIMenu[] =
-    {
-      "Help",
-      "Dismiss",
-      (char *) NULL
-    },
-    *const ApplyMenu[] =
-    {
-      "File",
-      "Edit",
-      "Transform",
-      "Enhance",
-      "Effects",
-      "F/X",
-      "Miscellany",
-      "Help",
-      "Dismiss",
-      (char *) NULL
-    },
-    *const FileMenu[] =
-    {
-      "Save...",
-      "Print...",
-      (char *) NULL
-    },
-    *const EditMenu[] =
-    {
-      "Undo",
-      "Redo",
-      (char *) NULL
-    },
-    *const TransformMenu[] =
-    {
-      "Flop",
-      "Flip",
-      "Rotate Right",
-      "Rotate Left",
-      (char *) NULL
-    },
-    *const EnhanceMenu[] =
-    {
-      "Hue...",
-      "Saturation...",
-      "Brightness...",
-      "Gamma...",
-      "Spiff",
-      "Dull",
-      "Contrast Stretch...",
-      "Sigmoidal Contrast...",
-      "Normalize",
-      "Equalize",
-      "Negate",
-      "Grayscale",
-      "Map...",
-      "Quantize...",
-      (char *) NULL
-    },
-    *const EffectsMenu[] =
-    {
-      "Despeckle",
-      "Emboss",
-      "Reduce Noise",
-      "Add Noise",
-      "Sharpen...",
-      "Blur...",
-      "Threshold...",
-      "Edge Detect...",
-      "Spread...",
-      "Shade...",
-      "Raise...",
-      "Segment...",
-      (char *) NULL
-    },
-    *const FXMenu[] =
-    {
-      "Solarize...",
-      "Sepia Tone...",
-      "Swirl...",
-      "Implode...",
-      "Vignette...",
-      "Wave...",
-      "Oil Paint...",
-      "Charcoal Draw...",
-      (char *) NULL
-    },
-    *const MiscellanyMenu[] =
-    {
-      "Image Info",
-      "Zoom Image",
-      "Show Preview...",
-      "Show Histogram",
-      "Show Matte",
-      (char *) NULL
-    };
-
-  const char
     *const *Menus[ApplyMenus] =
     {
-      FileMenu,
-      EditMenu,
-      TransformMenu,
-      EnhanceMenu,
-      EffectsMenu,
-      FXMenu,
-      MiscellanyMenu
+      ROIFileMenu,
+      ROIEditMenu,
+      ROITransformMenu,
+      ROIEnhanceMenu,
+      ROIEffectsMenu,
+      ROIFXMenu,
+      ROIMiscellanyMenu
     };
 
   static const DisplayCommand
