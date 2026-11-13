@@ -1788,6 +1788,13 @@ static void PrepareWriteImagesInfo(ImageInfo *write_info,Image *images,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void SyncWriteBlobStream(ImageInfo *write_info,Image *p,
+  Image *images)
+{
+  if (write_info->blob != (void *) NULL)
+    SyncBlobStream(write_info,p,images);
+}
+
 MagickExport MagickBooleanType WriteImages(const ImageInfo *image_info,
   Image *images,const char *filename,ExceptionInfo *exception)
 {
@@ -1840,8 +1847,7 @@ MagickExport MagickBooleanType WriteImages(const ImageInfo *image_info,
       progress_monitor=SetImageProgressMonitor(p,(MagickProgressMonitor) NULL,
         p->client_data);
     status&=(MagickStatusType) WriteImage(write_info,p,exception);
-    if (write_info->blob != (void *) NULL)
-      SyncBlobStream(write_info,p,images);
+    SyncWriteBlobStream(write_info,p,images);
     if (number_images != 1)
       (void) SetImageProgressMonitor(p,progress_monitor,p->client_data);
     if (write_info->adjoin != MagickFalse)
