@@ -609,6 +609,14 @@ static void AccumulateAppendTraits(const Image *next,const Image *images,
     (*alpha_trait)=BlendPixelTrait;
 }
 
+static Image *DestroyImageOnFailure(Image *image,
+  const MagickBooleanType status)
+{
+  if (status == MagickFalse)
+    image=DestroyImage(image);
+  return(image);
+}
+
 MagickExport Image *AppendImages(const Image *images,
   const MagickBooleanType stack,ExceptionInfo *exception)
 {
@@ -726,9 +734,7 @@ MagickExport Image *AppendImages(const Image *images,
     next=GetNextImageInList(next);
   }
   append_view=DestroyCacheView(append_view);
-  if (status == MagickFalse)
-    append_image=DestroyImage(append_image);
-  return(append_image);
+  return(DestroyImageOnFailure(append_image,status));
 }
 
 /*
@@ -1843,9 +1849,7 @@ MagickExport Image *GetImageMask(const Image *image,const PixelMask type,
   }
   mask_view=DestroyCacheView(mask_view);
   image_view=DestroyCacheView(image_view);
-  if (status == MagickFalse)
-    mask_image=DestroyImage(mask_image);
-  return(mask_image);
+  return(DestroyImageOnFailure(mask_image,status));
 }
 
 /*
@@ -4496,9 +4500,7 @@ MagickExport Image *SmushImages(const Image *images,
     image=GetNextImageInList(image);
   }
   SetSmushExtent(smush_image,stack,x_offset,y_offset);
-  if (status == MagickFalse)
-    smush_image=DestroyImage(smush_image);
-  return(smush_image);
+  return(DestroyImageOnFailure(smush_image,status));
 }
 
 /*
