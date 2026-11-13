@@ -5331,6 +5331,40 @@ static void XCompositePress(const CompositeCommandInput *input,
   (*composite_info).y=(ssize_t) windows->image.y+(*event).xbutton.y;
 }
 
+static void XCompositeRelease(const CompositeCommandInput *input,
+  const XEvent *event,const CompositeEventTargets *targets)
+{
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  RectangleInfo
+    *const composite_info = targets->composite_info;
+
+  size_t
+    *const state = targets->state;
+
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Button Release: 0x%lx %u +%d+%d",(*event).xbutton.window,
+      (*event).xbutton.button,(*event).xbutton.x,(*event).xbutton.y);
+  if ((*event).xbutton.button != Button1)
+    return;
+  if ((*event).xbutton.window != windows->image.id)
+    return;
+  if (((*composite_info).width != 0) && ((*composite_info).height != 0))
+    {
+      /*
+        User has selected the location of the composite image.
+      */
+      (*composite_info).x=(ssize_t) windows->image.x+(*event).xbutton.x;
+      (*composite_info).y=(ssize_t) windows->image.y+(*event).xbutton.y;
+      (*state)|=ExitState;
+    }
+}
+
 static MagickBooleanType XCompositeImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -5478,23 +5512,7 @@ static MagickBooleanType XCompositeImage(Display *display,
       }
       case ButtonRelease:
       {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Button Release: 0x%lx %u +%d+%d",event.xbutton.window,
-            event.xbutton.button,event.xbutton.x,event.xbutton.y);
-        if (event.xbutton.button != Button1)
-          break;
-        if (event.xbutton.window != windows->image.id)
-          break;
-        if ((composite_info.width != 0) && (composite_info.height != 0))
-          {
-            /*
-              User has selected the location of the composite image.
-            */
-            composite_info.x=(ssize_t) windows->image.x+event.xbutton.x;
-            composite_info.y=(ssize_t) windows->image.y+event.xbutton.y;
-            state|=ExitState;
-          }
+        XCompositeRelease(&command_input,&event,&event_targets);
         break;
       }
       case Expose:
