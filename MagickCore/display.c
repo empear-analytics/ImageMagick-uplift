@@ -16751,6 +16751,33 @@ static MagickBooleanType XOffsetImageWindowDown(XWindows *windows,
   return(MagickTrue);
 }
 
+static MagickBooleanType XOffsetImageWindowUpRight(XWindows *windows,
+  const KeySym key_symbol,const unsigned int x_offset,
+  const unsigned int y_offset)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_Next:
+    case XK_Up:
+    case XK_KP_Up:
+    {
+      windows->image.y-=(int) y_offset;
+      break;
+    }
+    case XK_Right:
+    case XK_KP_Right:
+    {
+      windows->image.x+=(int) x_offset;
+      break;
+    }
+    default:
+    {
+      return(XOffsetImageWindowDown(windows,key_symbol,y_offset));
+    }
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType XOffsetImageWindow(XWindows *windows,
   const KeySym key_symbol,const unsigned int x_offset,
   const unsigned int y_offset)
@@ -16770,22 +16797,9 @@ static MagickBooleanType XOffsetImageWindow(XWindows *windows,
       windows->image.x-=(int) x_offset;
       break;
     }
-    case XK_Next:
-    case XK_Up:
-    case XK_KP_Up:
-    {
-      windows->image.y-=(int) y_offset;
-      break;
-    }
-    case XK_Right:
-    case XK_KP_Right:
-    {
-      windows->image.x+=(int) x_offset;
-      break;
-    }
     default:
     {
-      return(XOffsetImageWindowDown(windows,key_symbol,y_offset));
+      return(XOffsetImageWindowUpRight(windows,key_symbol,x_offset,y_offset));
     }
   }
   return(MagickTrue);
