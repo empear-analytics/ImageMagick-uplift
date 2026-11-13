@@ -3258,24 +3258,20 @@ MagickExport ssize_t ParseChannelOption(const char *channels)
   {
     if (MergeChannelLetter(channels[i],&channel) != MagickFalse)
       continue;
-    switch (channels[i])
+    if (channels[i] != ',')
+      return(-1);
     {
-      case ',':
-      {
-        ssize_t
-          type;
+      ssize_t
+        type;
 
-        /*
-          Gather the additional channel flags and merge with shorthand.
-        */
-        type=ParseCommandOption(MagickChannelOptions,MagickTrue,channels+i+1);
-        if (type < 0)
-          return(type);
-        channel|=type;
-        return(channel);
-      }
-      default:
-        return(-1);
+      /*
+        Gather the additional channel flags and merge with shorthand.
+      */
+      type=ParseCommandOption(MagickChannelOptions,MagickTrue,channels+i+1);
+      if (type < 0)
+        return(type);
+      channel|=type;
+      return(channel);
     }
   }
   return(channel);
