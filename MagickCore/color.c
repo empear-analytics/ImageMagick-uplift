@@ -2781,6 +2781,36 @@ static MagickBooleanType ReadHexRGBADigits(const char *name,const size_t n,
   return(MagickTrue);
 }
 
+static MagickBooleanType QueryHexColor(const char *name,PixelInfo *color,
+  ExceptionInfo *exception)
+{
+  PixelPacket
+    pixel = { 0, 0, 0, 0, 0 };
+
+  size_t
+    depth,
+    n;
+
+  /*
+    Parse hex color.
+  */
+  name++;
+  for (n=0; isxdigit((int) ((unsigned char) name[n])) != 0; n++) ;
+  if (IsHexColorLength(n) != MagickFalse)
+    {
+      if (ReadHexRGBDigits(name,n,&pixel) == MagickFalse)
+        return(MagickFalse);
+      depth=4*(n/3);
+    }
+  else
+    {
+      if (ReadHexRGBADigits(name,n,&pixel,exception) == MagickFalse)
+        return(MagickFalse);
+      depth=4*(n/4);
+    }
+  return(SetHexColor(color,&pixel,depth,n));
+}
+
 MagickExport MagickBooleanType QueryColorCompliance(const char *name,
   const ComplianceType compliance,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2808,33 +2838,7 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
     name++;
   GetPixelInfo((Image *) NULL,color);
   if (*name == '#')
-    {
-      PixelPacket
-        pixel = { 0, 0, 0, 0, 0 };
-
-      size_t
-        depth,
-        n;
-
-      /*
-        Parse hex color.
-      */
-      name++;
-      for (n=0; isxdigit((int) ((unsigned char) name[n])) != 0; n++) ;
-      if (IsHexColorLength(n) != MagickFalse)
-        {
-          if (ReadHexRGBDigits(name,n,&pixel) == MagickFalse)
-            return(MagickFalse);
-          depth=4*(n/3);
-        }
-      else
-        {
-          if (ReadHexRGBADigits(name,n,&pixel,exception) == MagickFalse)
-            return(MagickFalse);
-          depth=4*(n/4);
-        }
-      return(SetHexColor(color,&pixel,depth,n));
-    }
+    return(QueryHexColor(name,color,exception));
   q=strchr(name,'(');
   if (q != (char *) NULL)
     return(QueryColorFunction(name,q,color,exception));
