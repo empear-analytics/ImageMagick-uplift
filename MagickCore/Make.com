@@ -60,6 +60,7 @@ $call Make compress-lzw.c
 $call Make configure.c
 $call Make configure-paths.c
 $call Make constitute.c
+$call Make constitute-codec.c
 $call Make constitute-pixels.c
 $call Make decorate.c
 $call Make decorate-raise.c
