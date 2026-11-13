@@ -12158,7 +12158,9 @@ guard over tests inside it.
    line in it, no `&&`, `?:`, assignment or increment in the controlling expression, each operand in
    its own parentheses (a single comparison or a call), and no `else`. `X` is the one statement
    `return(F);` or `return;`, with `F` a constant (an enumeration constant or a literal), braces or
-   none.
+   none. `X` may instead be `break;` or `continue;` (2026-11-13): every guard of step 2 stands
+   where the `if` stood, inside the same loops and `switch`es, so each leaves the same statement
+   the original's `X` left.
 2. Write one guard per operand, in the operands' order, each with the operand's text (the
    outer parentheses of the operand go) and `X` unchanged: `if (A1) X` `if (A2) X` ... `if (An) X`.
 3. Every such `if` of one function may go in one commit (one recipe, one function).
@@ -12195,7 +12197,8 @@ guard over tests inside it.
   runs `X` and leaves, so no later operand is evaluated, exactly as the short circuit. When none
   holds, nothing runs and control reaches the next statement. Each operand is evaluated at most
   once, as before.
-- `X` is a bare `return`: a guard that ran any statement before it would not be this recipe.
+- `X` is a bare `return`, `break` or `continue`: a guard that ran any statement before it would
+  not be this recipe.
 
 **Evidence level:** oracle, with `refactor_guard.py` (and `--calls`) clean; for lines no case
 reaches, the object code `IDENTICAL` or `MODULO-IDENTICAL` as step 4 says.
@@ -12205,6 +12208,12 @@ a, wide build): the three-trait failure test is the file's only *Complex Conditi
 predicate is flat (3.19 to 3.19, with a new *Code Duplication* function), three guards: 3.19 to
 3.27, the category leaves. Added by Claude Code (Claude Sonnet 5.5) under the owner's OK of
 2026-11-10 to evolve the recipes.
+
+`X` as `break;` or `continue;` (2026-11-13, campaign B, M127 lane c): `profile.c`'s
+`GetXMPContinuedFraction`, whose loop leaves on two failed `TryAccumulate` calls or a zero
+denominator; 4.60 to 4.72 in a probe. Added by Claude Code (Claude Opus 5.5) under the mandate
+of 2026-10-24.
+Lane: c
 
 ---
 
@@ -14822,3 +14831,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | W | Step 3: up to three plain locals the caller reads after the block may be written, each by pointer on Recipe RV step 6(b)'s terms (`(*v)` at every use, `&v` passed on written `v`), counted among step 5's four parameters; `R` reads none of them. *Careful* unchanged: on the success path each pointer has carried the block's writes to the caller's variable, on a failure path the caller returns at once | `profile.c`'s `SyncExifProfile` (lane c, M127): the Exif header block (length test, marker scan, byte-order test, `0x002a` test) returns on failure and writes `exif`, `length` and `endian`, which the IFD walk reads; part of a chain measured 3.58 to 4.03 on a scratch copy | mandate (2026-10-24) |
 | 2026-11-13 | NEW | BC | Extract a Loop-Body Tail Returning Whether It Broke: the tail of a sequential loop's body whose every path ends the iteration by `continue;` or `break;` becomes a `static MagickBooleanType` function returning `MagickTrue` for each `break;` and `MagickFalse` for each `continue;`; the caller writes `if (Helper(...) != MagickFalse) break;` as the body's last statement; evidence oracle | `profile.c`'s `SyncExifDirectory` (lane c, M127): the sub-directory push as `PushExifDirectory`, 3.84 to 3.90; LX needs a fifth parameter for its `broke` flag, LB refuses the `continue`, OC the `break` | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | PA | Step 1: `c` may be a local of any integer type the body does not write after its assignment (the predicate takes that type), and the peeled group's body may be one call statement and `break;` instead of `p++; break;`, the call writing nothing the `switch` tests; step 3 copies the call. *Careful* unchanged: the label sets are disjoint and the `switch` was the body's last statement, so `continue` after the call ends the iteration where the group's `break;` did | `profile.c`'s `UpdateClipPath` (lane c, M127): the knot group `1, 2, 4, 5` (`UpdateClipPathSubpathKnot(resize,&targets);`) of a `switch` on `ssize_t selector`; 4.36 to 4.46 on a scratch copy | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | GD | Step 1: the exit `X` may be `break;` or `continue;`; every guard stands where the `if` stood, so each leaves the same loop or `switch` the original left, after the same operands were evaluated in the same order | `profile.c`'s `GetXMPContinuedFraction` (lane c, M127): a three-operand disjunction (two failed `TryAccumulate` calls, a zero `new_den`) ending in `break;`, the file's only *Complex Conditional*; 4.60 to 4.72 in a probe | mandate (2026-10-24) |
