@@ -11675,6 +11675,43 @@ static void XMagnifyImage(Display *display,XWindows *windows,XEvent *event,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void XSelectMagnifyDigit(XWindows *windows,const KeySym key_symbol)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_0:
+    case XK_1:
+    case XK_2:
+    case XK_3:
+    case XK_4:
+    case XK_5:
+    case XK_6:
+    case XK_7:
+    case XK_8:
+    case XK_9:
+    {
+      windows->magnify.data=(key_symbol-XK_0);
+      break;
+    }
+    case XK_KP_0:
+    case XK_KP_1:
+    case XK_KP_2:
+    case XK_KP_3:
+    case XK_KP_4:
+    case XK_KP_5:
+    case XK_KP_6:
+    case XK_KP_7:
+    case XK_KP_8:
+    case XK_KP_9:
+    {
+      windows->magnify.data=(key_symbol-XK_KP_0);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static void XMagnifyWindowCommand(Display *display,XWindows *windows,
   const MagickStatusType state,const KeySym key_symbol,ExceptionInfo *exception)
 {
@@ -11730,36 +11767,11 @@ static void XMagnifyWindowCommand(Display *display,XWindows *windows,
         windows->magnify.y+=(int) quantum;
       break;
     }
-    case XK_0:
-    case XK_1:
-    case XK_2:
-    case XK_3:
-    case XK_4:
-    case XK_5:
-    case XK_6:
-    case XK_7:
-    case XK_8:
-    case XK_9:
-    {
-      windows->magnify.data=(key_symbol-XK_0);
-      break;
-    }
-    case XK_KP_0:
-    case XK_KP_1:
-    case XK_KP_2:
-    case XK_KP_3:
-    case XK_KP_4:
-    case XK_KP_5:
-    case XK_KP_6:
-    case XK_KP_7:
-    case XK_KP_8:
-    case XK_KP_9:
-    {
-      windows->magnify.data=(key_symbol-XK_KP_0);
-      break;
-    }
     default:
+    {
+      XSelectMagnifyDigit(windows,key_symbol);
       break;
+    }
   }
   XMakeMagnifyImage(display,windows,exception);
 }
