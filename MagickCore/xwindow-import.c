@@ -1458,6 +1458,25 @@ static void XSetDescendForColormaps(Display *display,const Window target,
     }
 }
 
+static void XNameWindowImage(Display *display,const Window target,
+  const ImageInfo *image_info,Image *image)
+{
+  Status
+    status;
+
+  XTextProperty
+    window_name;
+
+  status=XGetWMName(display,target,&window_name);
+  if (status == True)
+    {
+      if (*image_info->filename == '\0')
+        (void) CopyMagickString(image->filename,(char *) window_name.value,
+          (size_t) MagickMin(window_name.nitems+1,MagickPathExtent));
+      (void) XFree((void *) window_name.value);
+    }
+}
+
 MagickExport Image *XImportImage(const ImageInfo *image_info,
   XImportInfo *ximage_info,ExceptionInfo *exception)
 {
@@ -1481,9 +1500,6 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
     prior_target,
     root,
     target;
-
-  XTextProperty
-    window_name;
 
   WindowImageContext
     window_context;
@@ -1639,14 +1655,7 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
               image=crop_image;
             }
         }
-      status=XGetWMName(display,target,&window_name);
-      if (status == True)
-        {
-          if (*image_info->filename == '\0')
-            (void) CopyMagickString(image->filename,(char *) window_name.value,
-              (size_t) MagickMin(window_name.nitems+1,MagickPathExtent));
-          (void) XFree((void *) window_name.value);
-        }
+      XNameWindowImage(display,target,image_info,image);
     }
   if (ximage_info->silent == MagickFalse)
     {
