@@ -1137,6 +1137,23 @@ static void TransferFileList(const FileListTransfer *transfer,char *filename,
   }
 }
 
+static MagickBooleanType HasFileListFiles(char ***filelist,
+  const size_t number_files)
+{
+  ssize_t
+    j;
+
+  if ((*filelist) == (char **) NULL)
+    return(MagickFalse);
+  j=FindNonDirectory((*filelist),number_files);
+  if (j == (ssize_t) number_files)
+    {
+      (*filelist)=DestroyFileList((*filelist),number_files);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static void LogExpandedCommandLine(char **vector,const ssize_t count)
 {
   if (IsEventLogging() != MagickFalse)
@@ -1159,8 +1176,7 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
     **vector;
 
   ssize_t
-    i,
-    j;
+    i;
 
   size_t
     number_files;
@@ -1249,14 +1265,8 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
         if (ReadFileList(option,&targets) == MagickFalse)
           continue;
       }
-    if (filelist == (char **) NULL)
+    if (HasFileListFiles(&filelist,number_files) == MagickFalse)
       continue;
-    j=FindNonDirectory(filelist,number_files);
-    if (j == (ssize_t) number_files)
-      {
-        filelist=DestroyFileList(filelist,number_files);
-        continue;
-      }
     /*
       Transfer file list to argument vector.
     */
