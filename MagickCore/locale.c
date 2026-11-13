@@ -1361,6 +1361,22 @@ static MagickStatusType AddLocaleMessage(SplayTreeInfo *cache,
   return(status);
 }
 
+static MagickStatusType LoadIncludedLocaleFile(const LocaleLoadTarget *target,
+  const char *filename,const char *token,const size_t depth,
+  MagickStatusType status)
+{
+  ExceptionInfo
+    *exception = target->exception;
+
+  if (depth >= MagickMaxRecursionDepth)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
+  else
+    status&=(MagickStatusType) LoadLocaleInclude(target,filename,
+      token,depth);
+  return(status);
+}
+
 static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1426,14 +1442,7 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
           Include element.
         */
         while (NextIncludeFile(&q,extent,token,locale) != MagickFalse)
-        {
-          if (depth >= MagickMaxRecursionDepth)
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
-          else
-            status&=(MagickStatusType) LoadLocaleInclude(target,filename,
-              token,depth);
-        }
+          status=LoadIncludedLocaleFile(target,filename,token,depth,status);
         continue;
       }
     if (LocaleCompare(keyword,"<locale") == 0)
