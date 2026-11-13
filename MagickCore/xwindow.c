@@ -1960,24 +1960,46 @@ static int AdvanceDitherColumn(int j)
   return(j);
 }
 
-static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
+typedef struct _XDitherSource
 {
-  static const short int
-    dither_red[2][16]=
-    {
-      {-16,  4, -1, 11,-14,  6, -3,  9,-15,  5, -2, 10,-13,  7, -4,  8},
-      { 15, -5,  0,-12, 13, -7,  2,-10, 14, -6,  1,-11, 12, -8,  3, -9}
-    },
-    dither_green[2][16]=
-    {
-      { 11,-15,  7, -3,  8,-14,  4, -2, 10,-16,  6, -4,  9,-13,  5, -1},
-      {-12, 14, -8,  2, -9, 13, -5,  1,-11, 15, -7,  3,-10, 12, -6,  0}
-    },
-    dither_blue[2][16]=
-    {
-      { -3,  9,-13,  7, -1, 11,-15,  5, -4,  8,-14,  6, -2, 10,-16,  4},
-      {  2,-10, 12, -8,  0,-12, 14, -6,  3, -9, 13, -7,  1,-11, 15, -5}
-    };
+  Image
+    *image;
+
+  XImage
+    *ximage;
+
+  ExceptionInfo
+    *exception;
+
+  unsigned char
+    *(*red_map)[16];
+
+  unsigned char
+    *(*green_map)[16];
+
+  unsigned char
+    *(*blue_map)[16];
+} XDitherSource;
+
+static void DitherXImagePixels(const XDitherSource *source)
+{
+  Image
+    *const image = source->image;
+
+  XImage
+    *const ximage = source->ximage;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  unsigned char
+    *(*const red_map)[16] = source->red_map;
+
+  unsigned char
+    *(*const green_map)[16] = source->green_map;
+
+  unsigned char
+    *(*const blue_map)[16] = source->blue_map;
 
   CacheView
     *image_view;
@@ -2000,37 +2022,9 @@ static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
   size_t
     pixel;
 
-  unsigned char
-    *blue_map[2][16],
-    *green_map[2][16],
-    *red_map[2][16];
-
   unsigned int
     scanline_pad;
 
-  XDitherTables
-    tables;
-
-  /*
-    Allocate and initialize dither maps.
-  */
-  AcquireDitherMaps(red_map,green_map,blue_map);
-  /*
-    Initialize dither tables.
-  */
-  for (i=0; i < 2; i++)
-    for (j=0; j < 16; j++)
-    {
-      tables.i=i;
-      tables.j=j;
-      tables.dither_red=dither_red;
-      tables.red_map=red_map;
-      tables.dither_green=dither_green;
-      tables.green_map=green_map;
-      tables.dither_blue=dither_blue;
-      tables.blue_map=blue_map;
-      SetDitherEntries(tables);
-    }
   /*
     Dither image.
   */
@@ -2067,6 +2061,69 @@ static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
       i=0;
   }
   image_view=DestroyCacheView(image_view);
+}
+
+static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
+{
+  static const short int
+    dither_red[2][16]=
+    {
+      {-16,  4, -1, 11,-14,  6, -3,  9,-15,  5, -2, 10,-13,  7, -4,  8},
+      { 15, -5,  0,-12, 13, -7,  2,-10, 14, -6,  1,-11, 12, -8,  3, -9}
+    },
+    dither_green[2][16]=
+    {
+      { 11,-15,  7, -3,  8,-14,  4, -2, 10,-16,  6, -4,  9,-13,  5, -1},
+      {-12, 14, -8,  2, -9, 13, -5,  1,-11, 15, -7,  3,-10, 12, -6,  0}
+    },
+    dither_blue[2][16]=
+    {
+      { -3,  9,-13,  7, -1, 11,-15,  5, -4,  8,-14,  6, -2, 10,-16,  4},
+      {  2,-10, 12, -8,  0,-12, 14, -6,  3, -9, 13, -7,  1,-11, 15, -5}
+    };
+
+  int
+    i,
+    j;
+
+  unsigned char
+    *blue_map[2][16],
+    *green_map[2][16],
+    *red_map[2][16];
+
+  XDitherSource
+    source;
+
+  XDitherTables
+    tables;
+
+  /*
+    Allocate and initialize dither maps.
+  */
+  AcquireDitherMaps(red_map,green_map,blue_map);
+  /*
+    Initialize dither tables.
+  */
+  for (i=0; i < 2; i++)
+    for (j=0; j < 16; j++)
+    {
+      tables.i=i;
+      tables.j=j;
+      tables.dither_red=dither_red;
+      tables.red_map=red_map;
+      tables.dither_green=dither_green;
+      tables.green_map=green_map;
+      tables.dither_blue=dither_blue;
+      tables.blue_map=blue_map;
+      SetDitherEntries(tables);
+    }
+  source.image=image;
+  source.ximage=ximage;
+  source.exception=exception;
+  source.red_map=red_map;
+  source.green_map=green_map;
+  source.blue_map=blue_map;
+  DitherXImagePixels(&source);
   /*
     Free allocated memory.
   */
