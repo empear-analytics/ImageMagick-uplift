@@ -1348,9 +1348,9 @@ static MagickBooleanType RenderType(const RenderTarget *target,
     {
       if (*draw_info->font == '@')
         {
-          const FreetypeTarget freetype = { image, draw_info,
+          const FreetypeTarget ft_font = { image, draw_info,
             draw_info->encoding };
-          status=RenderFreetype(&freetype,offset,metrics,exception);
+          status=RenderFreetype(&ft_font,offset,metrics,exception);
           return(status);
         }
       if (*draw_info->font == '-')
@@ -1359,9 +1359,9 @@ static MagickBooleanType RenderType(const RenderTarget *target,
         return(RenderPostscript(image,draw_info,offset,metrics,exception));
       if (IsPathAccessible(draw_info->font) != MagickFalse)
         {
-          const FreetypeTarget freetype = { image, draw_info,
+          const FreetypeTarget ft_font = { image, draw_info,
             draw_info->encoding };
-          status=RenderFreetype(&freetype,offset,metrics,exception);
+          status=RenderFreetype(&ft_font,offset,metrics,exception);
           return(status);
         }
       type_info=GetTypeInfo(draw_info->font,exception);
@@ -1395,8 +1395,8 @@ static MagickBooleanType RenderType(const RenderTarget *target,
     type_info=GetDefaultTypeInfo(draw_info,type_info);
   if (type_info == (const TypeInfo *) NULL)
     {
-      const FreetypeTarget freetype = { image, draw_info, draw_info->encoding };
-      status=RenderFreetype(&freetype,offset,metrics,exception);
+      const FreetypeTarget ft_font = { image, draw_info, draw_info->encoding };
+      status=RenderFreetype(&ft_font,offset,metrics,exception);
       return(status);
     }
   annotate_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
@@ -2108,6 +2108,7 @@ static FT_Encoding SelectAdobeBig5Encoding(const char *encoding,
 static FT_Encoding SelectCjkLatinEncoding(const char *encoding,
   FT_Encoding encoding_type)
 {
+  magick_unreferenced(encoding);
 #if defined(FT_ENCODING_PRC)
   if (LocaleCompare(encoding,"GB2312") == 0)
     encoding_type=FT_ENCODING_PRC;
