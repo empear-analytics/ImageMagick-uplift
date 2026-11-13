@@ -232,6 +232,24 @@ static void InitializeLocationExtrema(const StatisticType type,
   }
 }
 
+static void AccumulateRowExtrema(const Image *image,const StatisticType type,
+  const Quantum *magick_restrict p,ChannelStatistics *channel_statistics)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    if (GetPixelReadMask(image,p) <= (QuantumRange/2))
+      {
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        continue;
+      }
+    AccumulateLocationExtrema(image,type,p,channel_statistics);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static ChannelStatistics *GetLocationStatistics(const Image *image,
   const StatisticType type,ExceptionInfo *exception)
 {
@@ -261,22 +279,10 @@ static ChannelStatistics *GetLocationStatistics(const Image *image,
     const Quantum
       *magick_restrict p;
 
-    ssize_t
-      x;
-
     p=GetVirtualPixels(image,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      if (GetPixelReadMask(image,p) <= (QuantumRange/2))
-        {
-          p+=(ptrdiff_t) GetPixelChannels(image);
-          continue;
-        }
-      AccumulateLocationExtrema(image,type,p,channel_statistics);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    AccumulateRowExtrema(image,type,p,channel_statistics);
   }
   return(channel_statistics);
 }
