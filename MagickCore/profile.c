@@ -1112,9 +1112,6 @@ static const StringInfo *SyncsRGBImageProfile(Image *image,
   return(icc_profile);
 }
 
-MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
-  const void *datum,const size_t length,ExceptionInfo *exception)
-{
 #define ProfileImageTag  "Profile/Image"
 #ifndef TYPE_XYZ_8
   #define TYPE_XYZ_8 (COLORSPACE_SH(PT_XYZ)|CHANNELS_SH(3)|BYTES_SH(1))
@@ -1132,6 +1129,9 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
   ThrowBinaryException(severity,tag,context); \
 }
 
+MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
+  const void *datum,const size_t length,ExceptionInfo *exception)
+{
   MagickBooleanType
     status;
 
