@@ -6404,6 +6404,46 @@ static void ExportRGBFamilyQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static void ExportBGRGrayFamilyQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumType quantum_type,
+  QuantumPixelSpan span)
+{
+  switch (quantum_type)
+  {
+    case BGRAQuantum:
+    {
+      ExportBGRAQuantum(image,quantum_info,&span);
+      break;
+    }
+    case BGROQuantum:
+    {
+      ExportBGROQuantum(image,quantum_info,&span);
+      break;
+    }
+    case GrayQuantum:
+    {
+      ExportGrayQuantum(image,quantum_info,&span);
+      break;
+    }
+    case GrayAlphaQuantum:
+    {
+      ExportGrayAlphaQuantum(image,quantum_info,&span);
+      break;
+    }
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      ExportPixelChannel(image,quantum_info,&span,RedPixelChannel);
+      break;
+    }
+    default:
+    {
+      ExportRGBFamilyQuantum(image,quantum_info,quantum_type,span);
+      break;
+    }
+  }
+}
+
 MagickExport size_t ExportQuantumPixels(const Image *image,
   CacheView *image_view,QuantumInfo *quantum_info,
   const QuantumType quantum_type,unsigned char *magick_restrict pixels,
@@ -6463,16 +6503,6 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
       ExportAlphaQuantum(image,quantum_info,&span,exception);
       break;
     }
-    case BGRAQuantum:
-    {
-      ExportBGRAQuantum(image,quantum_info,&span);
-      break;
-    }
-    case BGROQuantum:
-    {
-      ExportBGROQuantum(image,quantum_info,&span);
-      break;
-    }
     case BlackQuantum:
     {
       ExportBlackQuantum(image,quantum_info,&span,exception);
@@ -6509,16 +6539,6 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
       ExportCbYCrYQuantum(image,quantum_info,&span);
       break;
     }
-    case GrayQuantum:
-    {
-      ExportGrayQuantum(image,quantum_info,&span);
-      break;
-    }
-    case GrayAlphaQuantum:
-    {
-      ExportGrayAlphaQuantum(image,quantum_info,&span);
-      break;
-    }
     case GreenQuantum:
     case MagentaQuantum:
     {
@@ -6536,12 +6556,6 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
       ExportIndexAlphaQuantum(image,quantum_info,&span,exception);
       break;
     }
-    case RedQuantum:
-    case CyanQuantum:
-    {
-      ExportPixelChannel(image,quantum_info,&span,RedPixelChannel);
-      break;
-    }
     case OpacityQuantum:
     {
       ExportOpacityQuantum(image,quantum_info,&span,exception);
@@ -6549,7 +6563,7 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
     }
     default:
     {
-      ExportRGBFamilyQuantum(image,quantum_info,quantum_type,span);
+      ExportBGRGrayFamilyQuantum(image,quantum_info,quantum_type,span);
       break;
     }
   }
