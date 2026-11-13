@@ -1226,6 +1226,52 @@ static MagickBooleanType ParseEXIFHexTag(const char **property,size_t *tag)
   return(MagickTrue);
 }
 
+static MagickBooleanType ParseEXIFTagRequest(const TagInfo *EXIFTag,
+  const char **property,ssize_t *all,size_t *tag)
+{
+  (*all)=0;
+  (*tag)=(~0UL);
+  switch (*((*property)+5))
+  {
+    case '*':
+    {
+      /*
+        Caller has asked for all the tags in the EXIF data.
+      */
+      (*tag)=0;
+      (*all)=1; /* return the data in description=value format */
+      break;
+    }
+    case '!':
+    {
+      (*tag)=0;
+      (*all)=2; /* return the data in tagid=value format */
+      break;
+    }
+    case '#':
+    case '@':
+    {
+      /*
+        Check for a hex based tag specification first.
+      */
+      (*tag)=(*((*property)+5) == '@') ? 1UL : 0UL;
+      (*property)+=6;
+      if (ParseEXIFHexTag(property,tag) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+    default:
+    {
+      /*
+        Try to match the text with a tag name instead.
+      */
+      (*tag)=GetEXIFTagByName(EXIFTag,(*property),(*tag));
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
 static void GetEXIFProperty(const Image *image,const char *property,
   ExceptionInfo *exception)
 {
@@ -1573,46 +1619,8 @@ static void GetEXIFProperty(const Image *image,const char *property,
     property++;
   if (strlen(property) <= 5)
     return;
-  all=0;
-  tag=(~0UL);
-  switch (*(property+5))
-  {
-    case '*':
-    {
-      /*
-        Caller has asked for all the tags in the EXIF data.
-      */
-      tag=0;
-      all=1; /* return the data in description=value format */
-      break;
-    }
-    case '!':
-    {
-      tag=0;
-      all=2; /* return the data in tagid=value format */
-      break;
-    }
-    case '#':
-    case '@':
-    {
-      /*
-        Check for a hex based tag specification first.
-      */
-      tag=(*(property+5) == '@') ? 1UL : 0UL;
-      property+=6;
-      if (ParseEXIFHexTag(&property,&tag) == MagickFalse)
-        return;
-      break;
-    }
-    default:
-    {
-      /*
-        Try to match the text with a tag name instead.
-      */
-      tag=GetEXIFTagByName(EXIFTag,property,tag);
-      break;
-    }
-  }
+  if (ParseEXIFTagRequest(EXIFTag,&property,&all,&tag) == MagickFalse)
+    return;
   if (tag == (~0UL))
     return;
   length=GetStringInfoLength(profile);
