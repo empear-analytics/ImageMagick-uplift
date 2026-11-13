@@ -1360,6 +1360,17 @@ static char **DestroyDelegateCommands(char **commands,ssize_t i)
   return((char **) RelinquishMagickMemory(commands));
 }
 
+static void OpenInvokeDelegate(const ImageInfo *image_info,
+  const Image *image)
+{
+  assert(image_info != (ImageInfo *) NULL);
+  assert(image_info->signature == MagickCoreSignature);
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+}
+
 MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   Image *image,const char *decode,const char *encode,ExceptionInfo *exception)
 {
@@ -1381,12 +1392,7 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   /*
     Get delegate.
   */
-  assert(image_info != (ImageInfo *) NULL);
-  assert(image_info->signature == MagickCoreSignature);
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  OpenInvokeDelegate(image_info,image);
   if (AuthorizeDelegateNames(decode,encode,exception) == MagickFalse)
     return(MagickFalse);
   temporary=(*image->filename == '\0') ? MagickTrue : MagickFalse;
