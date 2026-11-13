@@ -8328,6 +8328,27 @@ static void XMapDrawCommandWidget(Display *display,XWindows *windows,
     windows->im_update_widget,CurrentTime);
 }
 
+static MagickBooleanType XAcquireDrawCoordinates(ExceptionInfo *exception,
+  const DrawShapeTargets *targets)
+{
+  XPoint
+    **const coordinate_info = targets->coordinate_info;
+
+  unsigned int
+    *const max_coordinates = targets->max_coordinates;
+
+  (*max_coordinates)=2048;
+  (*coordinate_info)=(XPoint *) AcquireQuantumMemory((size_t) (*max_coordinates),
+    sizeof(*(*coordinate_info)));
+  if ((*coordinate_info) == (XPoint *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'","...");
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -8422,15 +8443,8 @@ static MagickBooleanType XDrawEditImage(Display *display,
   /*
     Allocate polygon info.
   */
-  max_coordinates=2048;
-  coordinate_info=(XPoint *) AcquireQuantumMemory((size_t) max_coordinates,
-    sizeof(*coordinate_info));
-  if (coordinate_info == (XPoint *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'","...");
-      return(MagickFalse);
-    }
+  if (XAcquireDrawCoordinates(exception,&shape_targets) == MagickFalse)
+    return(MagickFalse);
   /*
     Map Command widget.
   */
