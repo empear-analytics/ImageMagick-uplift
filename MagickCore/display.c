@@ -7815,6 +7815,35 @@ static void XSizeDrawRegion(const DrawEditContext *context,
     (*draw_info).x+x,(*draw_info).y+y);
 }
 
+static void XSetDrawLineInfo(XDrawInfo *draw_info,const XSegment *line_info,
+  const unsigned int line_width)
+{
+  (*draw_info).line_info=(*line_info);
+  if ((*line_info).x1 > (int) (line_width/2))
+    (*draw_info).line_info.x1=(short) line_width/2;
+  if ((*line_info).y1 > (int) (line_width/2))
+    (*draw_info).line_info.y1=(short) line_width/2;
+  (*draw_info).line_info.x2=(short) ((*line_info).x2-(*line_info).x1+
+    ((int) line_width/2));
+  (*draw_info).line_info.y2=(short) ((*line_info).y2-(*line_info).y1+
+    ((int) line_width/2));
+  if (((*draw_info).line_info.x2 < 0) && ((*draw_info).line_info.y2 < 0))
+    {
+      (*draw_info).line_info.x2=(-(*draw_info).line_info.x2);
+      (*draw_info).line_info.y2=(-(*draw_info).line_info.y2);
+    }
+  if ((*draw_info).line_info.x2 < 0)
+    {
+      (*draw_info).line_info.x2=(-(*draw_info).line_info.x2);
+      Swap((*draw_info).line_info.x1,(*draw_info).line_info.x2);
+    }
+  if ((*draw_info).line_info.y2 < 0)
+    {
+      (*draw_info).line_info.y2=(-(*draw_info).line_info.y2);
+      Swap((*draw_info).line_info.y1,(*draw_info).line_info.y2);
+    }
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -8159,30 +8188,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
     draw_info.element=element;
     draw_info.stipple=stipple;
     draw_info.line_width=line_width;
-    draw_info.line_info=line_info;
-    if (line_info.x1 > (int) (line_width/2))
-      draw_info.line_info.x1=(short) line_width/2;
-    if (line_info.y1 > (int) (line_width/2))
-      draw_info.line_info.y1=(short) line_width/2;
-    draw_info.line_info.x2=(short) (line_info.x2-line_info.x1+
-      ((int) line_width/2));
-    draw_info.line_info.y2=(short) (line_info.y2-line_info.y1+
-      ((int) line_width/2));
-    if ((draw_info.line_info.x2 < 0) && (draw_info.line_info.y2 < 0))
-      {
-        draw_info.line_info.x2=(-draw_info.line_info.x2);
-        draw_info.line_info.y2=(-draw_info.line_info.y2);
-      }
-    if (draw_info.line_info.x2 < 0)
-      {
-        draw_info.line_info.x2=(-draw_info.line_info.x2);
-        Swap(draw_info.line_info.x1,draw_info.line_info.x2);
-      }
-    if (draw_info.line_info.y2 < 0)
-      {
-        draw_info.line_info.y2=(-draw_info.line_info.y2);
-        Swap(draw_info.line_info.y1,draw_info.line_info.y2);
-      }
+    XSetDrawLineInfo(&draw_info,&line_info,line_width);
     draw_info.rectangle_info=rectangle_info;
     if (draw_info.rectangle_info.x > (ssize_t) (line_width/2))
       draw_info.rectangle_info.x=(ssize_t) line_width/2;
