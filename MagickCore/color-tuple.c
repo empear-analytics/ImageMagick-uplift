@@ -235,6 +235,16 @@ static double GetColorComponentScale(const PixelInfo *pixel,
   return(scale);
 }
 
+static void AdjustGreenComponent(const PixelInfo *pixel,
+  const ComplianceType compliance,double *color,double *scale)
+{
+  if (IsHueCompatibleColorspace(pixel->colorspace) != MagickFalse)
+    *scale=100.0;
+  if ((compliance != NoCompliance) &&
+      (IsLabCompatibleColorspace(pixel->colorspace) != MagickFalse))
+    (*color)-=QuantumRange/2.0;
+}
+
 static void SetAlphaComponent(const PixelInfo *pixel,
   const ComplianceType compliance,double *color,double *scale)
 {
@@ -268,11 +278,7 @@ MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
     case GreenPixelChannel:
     {
       color=pixel->green;
-      if (IsHueCompatibleColorspace(pixel->colorspace) != MagickFalse)
-        scale=100.0;
-      if ((compliance != NoCompliance) &&
-          (IsLabCompatibleColorspace(pixel->colorspace) != MagickFalse))
-        color-=QuantumRange/2.0;
+      AdjustGreenComponent(pixel,compliance,&color,&scale);
       if (pixel->colorspace == XYZColorspace)
         color/=2.55;
       if (pixel->colorspace == OklchColorspace)
