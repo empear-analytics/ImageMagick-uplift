@@ -2652,6 +2652,17 @@ static void SetColorChannelsFromGeometry(PixelInfo *color,
     SetHueColorFromGeometry(color,geometry_info);
 }
 
+static void StripColorspaceAlphaSuffix(char *colorspace,const ssize_t i,
+  PixelInfo *color)
+{
+  color->alpha_trait=UndefinedPixelTrait;
+  if ((i > 0) && (colorspace[i] == 'a'))
+    {
+      colorspace[i]='\0';
+      color->alpha_trait=BlendPixelTrait;
+    }
+}
+
 static MagickBooleanType QueryColorFunction(const char *name,
   const char *q,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2688,12 +2699,7 @@ static MagickBooleanType QueryColorFunction(const char *name,
       (LocaleCompare(colorspace,"icc-color") == 0))
     SetICCColorspace(name,colorspace,&i,&scale,&icc_color);
   LocaleLower(colorspace);
-  color->alpha_trait=UndefinedPixelTrait;
-  if ((i > 0) && (colorspace[i] == 'a'))
-    {
-      colorspace[i]='\0';
-      color->alpha_trait=BlendPixelTrait;
-    }
+  StripColorspaceAlphaSuffix(colorspace,i,color);
   type=ParseCommandOption(MagickColorspaceOptions,MagickFalse,colorspace);
   if (type < 0)
     {
