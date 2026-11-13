@@ -2147,12 +2147,91 @@ static void XDrawElementToPixmap(Display *display,const Pixmap draw_pixmap,
   }
 }
 
+typedef struct _DrawRotationTargets
+{
+  Image
+    **draw_image;
+
+  int
+    *x,
+    *y;
+} DrawRotationTargets;
+
+static MagickBooleanType XRotateDrawImage(const XDrawInfo *draw_info,
+  ExceptionInfo *exception,const DrawRotationTargets *targets)
+{
+  Image
+    **const draw_image = targets->draw_image;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  if (draw_info->degrees != 0.0)
+    {
+      Image
+        *rotate_image;
+
+      int
+        rotations;
+
+      /*
+        Rotate image.
+      */
+      rotate_image=RotateImage((*draw_image),draw_info->degrees,exception);
+      if (rotate_image == (Image *) NULL)
+        return(MagickFalse);
+      *draw_image=DestroyImage(*draw_image);
+      (*draw_image)=rotate_image;
+      /*
+        Annotation is relative to the degree of rotation.
+      */
+      rotations=XQuarterTurns(draw_info->degrees);
+      switch (rotations % 4)
+      {
+        default:
+        case 0:
+          break;
+        case 1:
+        {
+          /*
+            Rotate 90 degrees.
+          */
+          (*x)=(*x)-(int) (*draw_image)->columns/2;
+          (*y)=(*y)+(int) (*draw_image)->columns/2;
+          break;
+        }
+        case 2:
+        {
+          /*
+            Rotate 180 degrees.
+          */
+          (*x)=(*x)-(int) (*draw_image)->columns;
+          break;
+        }
+        case 3:
+        {
+          /*
+            Rotate 270 degrees.
+          */
+          (*x)=(*x)-(int) (*draw_image)->columns/2;
+          (*y)=(*y)-(int) ((*draw_image)->rows-((*draw_image)->columns/2));
+          break;
+        }
+      }
+    }
+  return(MagickTrue);
+}
+
 MagickPrivate MagickBooleanType XDrawImage(Display *display,
   const XPixelInfo *pixel,XDrawInfo *draw_info,Image *image,
   ExceptionInfo *exception)
 {
   CacheView
     *draw_view;
+
+  DrawRotationTargets
+    targets;
 
   GC
     draw_context;
@@ -2293,59 +2372,11 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
   */
   (void) XParseGeometry(draw_info->geometry,&x,&y,&width,&height);
   draw_image=XScaleAnnotateImage(draw_image,width,height,exception);
-  if (draw_info->degrees != 0.0)
-    {
-      Image
-        *rotate_image;
-
-      int
-        rotations;
-
-      /*
-        Rotate image.
-      */
-      rotate_image=RotateImage(draw_image,draw_info->degrees,exception);
-      if (rotate_image == (Image *) NULL)
-        return(MagickFalse);
-      draw_image=DestroyImage(draw_image);
-      draw_image=rotate_image;
-      /*
-        Annotation is relative to the degree of rotation.
-      */
-      rotations=XQuarterTurns(draw_info->degrees);
-      switch (rotations % 4)
-      {
-        default:
-        case 0:
-          break;
-        case 1:
-        {
-          /*
-            Rotate 90 degrees.
-          */
-          x=x-(int) draw_image->columns/2;
-          y=y+(int) draw_image->columns/2;
-          break;
-        }
-        case 2:
-        {
-          /*
-            Rotate 180 degrees.
-          */
-          x=x-(int) draw_image->columns;
-          break;
-        }
-        case 3:
-        {
-          /*
-            Rotate 270 degrees.
-          */
-          x=x-(int) draw_image->columns/2;
-          y=y-(int) (draw_image->rows-(draw_image->columns/2));
-          break;
-        }
-      }
-    }
+  targets.draw_image=(&draw_image);
+  targets.x=(&x);
+  targets.y=(&y);
+  if (XRotateDrawImage(draw_info,exception,&targets) == MagickFalse)
+    return(MagickFalse);
   /*
     Composite text onto the image.
   */
