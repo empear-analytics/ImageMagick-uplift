@@ -476,6 +476,25 @@ static const HuffmanTable *LookupHuffmanEntry(HuffmanTable **hash,
   return(entry);
 }
 
+static void SkipHuffmanToEndOfLine(Image *image,int *caller_byte,
+  int *caller_mask,size_t *caller_runlength)
+{
+  int
+    byte = (*caller_byte),
+    mask = (*caller_mask);
+
+  size_t
+    bit,
+    runlength = (*caller_runlength);
+
+  while (runlength < 11)
+    InputBit(bit);
+  do { InputBit(bit); } while ((int) bit == 0);
+  (*caller_byte)=byte;
+  (*caller_mask)=mask;
+  (*caller_runlength)=runlength;
+}
+
 MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -546,9 +565,7 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   mask=0;
   null_lines=0;
   runlength=0;
-  while (runlength < 11)
-   InputBit(bit);
-  do { InputBit(bit); } while ((int) bit == 0);
+  SkipHuffmanToEndOfLine(image,&byte,&mask,&runlength);
   image->resolution.x=204.0;
   image->resolution.y=196.0;
   image->units=PixelsPerInchResolution;
@@ -580,9 +597,7 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
         break;
       if (x >= (ssize_t) image->columns)
         {
-          while (runlength < 11)
-            InputBit(bit);
-          do { InputBit(bit); } while ((int) bit == 0);
+          SkipHuffmanToEndOfLine(image,&byte,&mask,&runlength);
           break;
         }
       bail=MagickFalse;
@@ -609,9 +624,7 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
         break;
       if (length > 13)
         {
-          while (runlength < 11)
-            InputBit(bit);
-          do { InputBit(bit); } while ((int) bit == 0);
+          SkipHuffmanToEndOfLine(image,&byte,&mask,&runlength);
           break;
         }
       entry=LookupHuffmanEntry((color != MagickFalse) ? mw_hash : mb_hash,color,
