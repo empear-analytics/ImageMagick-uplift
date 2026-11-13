@@ -3037,6 +3037,16 @@ static MagickBooleanType IsIdentityAffine(const DrawInfo *draw_info)
     (fabs(draw_info->affine.ry) < MagickEpsilon) ? MagickTrue : MagickFalse);
 }
 
+static void SetPostscriptAlphaChannels(Image *image,Image *annotate_image,
+  ExceptionInfo *exception)
+{
+  if ((image->alpha_trait & BlendPixelTrait) == 0)
+    (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
+  if (annotate_image->alpha_trait == UndefinedPixelTrait)
+    (void) SetImageAlphaChannel(annotate_image,OpaqueAlphaChannel,
+      exception);
+}
+
 static MagickBooleanType RenderPostscript(Image *image,
   const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
   ExceptionInfo *exception)
@@ -3140,11 +3150,7 @@ static MagickBooleanType RenderPostscript(Image *image,
       /*
         Render fill color.
       */
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
-      if (annotate_image->alpha_trait == UndefinedPixelTrait)
-        (void) SetImageAlphaChannel(annotate_image,OpaqueAlphaChannel,
-          exception);
+      SetPostscriptAlphaChannels(image,annotate_image,exception);
       fill_color=draw_info->fill;
       status=MagickTrue;
       annotate_view=AcquireAuthenticCacheView(annotate_image,exception);
