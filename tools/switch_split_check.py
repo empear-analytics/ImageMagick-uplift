@@ -40,6 +40,7 @@ import re
 import subprocess
 import sys
 from collections import namedtuple
+from dataclasses import dataclass
 
 TOKEN = re.compile(
     r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|[A-Za-z_]\w*|\d[\w.]*|->|<<=|>>=|\+\+|--|'
@@ -255,54 +256,87 @@ def normalise(body, bound, ptr_params):
     return tuple(out)
 
 
-class Chain:
-    """The `switch` of a function: its controlling expression, bindings and groups."""
+@dataclass
+class Source:
+    """One side of the comparison: its comment-free text, its tokens and its functions."""
 
-    def __init__(self, toks, funcs, name, problems, strict):
+    text: str
+    toks: list
+    funcs: dict
+
+
+def parse(text):
+    clean = strip_comments(text)
+    toks = tokens(clean)
+    return Source(clean, toks, functions(toks))
+
+
+BINDING = re.compile(r"^(?:[\w]+ )+\* const (\w+) = (\w+) -> (\w+) ;$")
+
+
+def pointer_parameters(params):
+    """The names of the pointer parameters among the declarations params."""
+    return {a[-1] for a in params if "*" in a}
+
+
+def statements(toks):
+    """toks cut after each `;`: the complete statements, and the unfinished tail."""
+    complete, cur = [], []
+    for t in toks:
+        cur.append(t)
+        if t == ";":
+            complete.append(cur)
+            cur = []
+    return complete, cur
+
+
+class Chain:
+    """The `switch` of a function: its controlling expression, bindings and groups.
+
+    Only a function with a switch (ok) has the attributes expr, params, ptr_params, bound and
+    groups. A strict chain also reads the body outside the switch: bindings and nothing else.
+    """
+
+    def __init__(self, src, name, problems, strict):
         self.name = name
-        fn = funcs[name]
-        self.fn = fn
-        s, ps, pe, bo, bc = fn
-        sw = switches(toks, bo + 1, bc)
-        if not sw:
+        fn = src.funcs[name]
+        found = switches(src.toks, fn.body_open + 1, fn.body_close)
+        self.ok = bool(found)
+        if not found:
             problems.append("%s has no switch" % name)
-            self.ok = False
             return
-        self.ok = True
-        self.sw = sw[0]
-        i, pc, bopen, bclose = self.sw
-        self.expr = tuple(toks[i + 2:pc])
-        self.params = param_names(toks, fn)
-        self.ptr_params = set()
-        for a in split_args(toks[ps + 1:pe]):
-            if "*" in a:
-                self.ptr_params.add(a[-1])
-        # the body is bindings and the switch, nothing else
-        rest = toks[bo + 1:i] + toks[bclose + 1:bc] if strict else []
+        i, pc, bopen, bclose = found[0]
+        params = parameters(src.toks, fn)
+        self.expr = tuple(src.toks[i + 2:pc])
+        self.params = [a[-1] for a in params]
+        self.ptr_params = pointer_parameters(params)
         self.bound = {}
-        decls = []
-        cur = []
-        for t in rest:
-            cur.append(t)
-            if t == ";":
-                decls.append(cur)
-                cur = []
-        if cur:
-            problems.append("%s: statements outside its switch: %s" % (name, " ".join(cur)))
-        self.rest_ok = True
-        for d in decls:
-            m = re.match(r"^(?:[\w]+ )+\* const (\w+) = (\w+) -> (\w+) ;$", " ".join(d))
-            if not m:
-                problems.append("%s: not a binding: %s" % (name, " ".join(d)))
-                continue
-            v, p, member = m.groups()
-            if v != member:
-                problems.append("%s: %s bound from member %s" % (name, v, member))
-            if p not in self.params:
-                problems.append("%s: binding from %s, not a parameter" % (name, p))
-            self.bound[v] = (p, member)
-        self.groups = groups(toks, bopen + 1, bclose)
-        self.toks = toks
+        if strict:
+            outside = src.toks[fn.body_open + 1:i] + src.toks[bclose + 1:fn.body_close]
+            self.read_bindings(outside, problems)
+        self.groups = groups(src.toks, bopen + 1, bclose)
+
+    def read_bindings(self, outside, problems):
+        decls, unfinished = statements(outside)
+        if unfinished:
+            problems.append("%s: statements outside its switch: %s" %
+                            (self.name, " ".join(unfinished)))
+        for decl in decls:
+            self.bind(decl, problems)
+
+    def bind(self, decl, problems):
+        """Record the binding `T *const v = p->v;` of a member v of the parameter p."""
+        text = " ".join(decl)
+        m = BINDING.match(text)
+        if not m:
+            problems.append("%s: not a binding: %s" % (self.name, text))
+            return
+        v, p, member = m.groups()
+        if v != member:
+            problems.append("%s: %s bound from member %s" % (self.name, v, member))
+        if p not in self.params:
+            problems.append("%s: binding from %s, not a parameter" % (self.name, p))
+        self.bound[v] = (p, member)
 
 
 CALL_TAIL = [")", ";", "break", ";"]
@@ -320,52 +354,82 @@ def link_target(norm_body, names):
     return b[0], b[2:-4]
 
 
-def flatten(toks, funcs, name, expr, problems, names, tag, ptr_all, top=True):
-    """[(function, group index, labels, normalised body)] with links expanded."""
-    ch = Chain(toks, funcs, name, problems, not top)
-    if not ch.ok:
-        return [], []
-    if ch.expr != expr and expr is not None:
-        problems.append("%s %s: controls on `%s`, not `%s`" %
-                        (tag, name, " ".join(ch.expr), " ".join(expr)))
-    out = []
-    seen = [ch]
-    for k, (labels, body) in enumerate(ch.groups):
-        nb = normalise(body, set(ch.bound), ptr_all)
-        lk = link_target(nb, names)
-        if lk and labels == ("default :",) and lk[0] in funcs and lk[0] != name:
-            nxt = lk[0]
-            sub, subch = flatten(toks, funcs, nxt, ch.expr, problems, names, tag, ptr_all, False)
-            # arguments by position: the next helper's parameter of the same name
-            nparams = param_names(toks, funcs[nxt])
-            args = split_args(list(lk[1]))
-            if len(args) != len(nparams):
-                problems.append("%s: call of %s passes %d arguments for %d parameters" %
-                                (name, nxt, len(args), len(nparams)))
-            else:
-                nptr = Chain(toks, funcs, nxt, [], False).ptr_params
-                for a, p in zip(args, nparams):
-                    if a != [p] and not (a == ["&", p] and p in nptr):
-                        problems.append("%s: call of %s passes `%s` where the parameter "
-                                        "is %s" % (name, nxt, " ".join(a), p))
-            out.append((name, k, None, ("LINK", nxt)))
-            out.extend(sub)
-            seen.extend(subch)
-        else:
-            out.append((name, k, labels, nb))
-    return out, seen
+Group = namedtuple("Group", "function index labels body")
 
 
-def cut(toks, start, end, marker):
-    return toks[:start] + [marker] + toks[end + 1:]
+def passes_parameter(arg, param, pointer_params):
+    """Whether the argument tokens arg hand on the parameter param, or its address."""
+    if arg == [param]:
+        return True
+    return arg == ["&", param] and param in pointer_params
+
+
+@dataclass
+class Walk:
+    """Flattens the chain of switches of one side, collecting problems as it goes."""
+
+    src: Source
+    problems: list
+    names: set
+    ptr_all: set
+    tag: str
+
+    def flatten(self, name, expr, top=True):
+        """[Group] with links expanded, and the chains read."""
+        ch = Chain(self.src, name, self.problems, not top)
+        if not ch.ok:
+            return [], []
+        self.check_expression(ch, expr)
+        out, seen = [], [ch]
+        for k, (labels, body) in enumerate(ch.groups):
+            expanded, chains = self.expand(ch, k, labels, body)
+            out.extend(expanded)
+            seen.extend(chains)
+        return out, seen
+
+    def check_expression(self, ch, expr):
+        if expr is not None and ch.expr != expr:
+            self.problems.append("%s %s: controls on `%s`, not `%s`" %
+                                 (self.tag, ch.name, " ".join(ch.expr), " ".join(expr)))
+
+    def expand(self, ch, k, labels, body):
+        """The group, or the link and the groups of the helper it calls, with their chains."""
+        nb = normalise(body, set(ch.bound), self.ptr_all)
+        link = self.link_of(ch.name, labels, nb)
+        if link is None:
+            return [Group(ch.name, k, labels, nb)], []
+        nxt, args = link
+        sub, subch = self.flatten(nxt, ch.expr, False)
+        self.check_link_arguments(ch.name, nxt, args)
+        return [Group(ch.name, k, None, ("LINK", nxt))] + sub, subch
+
+    def link_of(self, name, labels, body):
+        """(next helper, argument tokens) when the group is a `default:` that only calls one."""
+        link = link_target(body, self.names)
+        if link is None or labels != ("default :",):
+            return None
+        return link if link[0] != name and link[0] in self.src.funcs else None
+
+    def check_link_arguments(self, name, nxt, args):
+        """Arguments by position: the next helper's parameter of the same name."""
+        nparams = param_names(self.src.toks, self.src.funcs[nxt])
+        given = split_args(list(args))
+        if len(given) != len(nparams):
+            self.problems.append("%s: call of %s passes %d arguments for %d parameters" %
+                                 (name, nxt, len(given), len(nparams)))
+            return
+        nptr = Chain(self.src, nxt, [], False).ptr_params
+        for a, p in zip(given, nparams):
+            if not passes_parameter(a, p, nptr):
+                self.problems.append("%s: call of %s passes `%s` where the parameter is %s" %
+                                     (name, nxt, " ".join(a), p))
 
 
 def check(old_text, new_text, caller, helpers):
     problems = []
-    otoks = tokens(strip_comments(old_text))
-    ntoks = tokens(strip_comments(new_text))
-    ofuncs = functions(otoks)
-    nfuncs = functions(ntoks)
+    old, new = parse(old_text), parse(new_text)
+    otoks, ntoks = old.toks, new.toks
+    ofuncs, nfuncs = old.funcs, new.funcs
     if caller not in ofuncs or caller not in nfuncs:
         return ["%s not found on both sides" % caller], ""
     added = sorted(set(nfuncs) - set(ofuncs))
@@ -380,15 +444,15 @@ def check(old_text, new_text, caller, helpers):
     # the typedef initialiser of the targets struct is read from the caller
     chain_names = [caller] + list(helpers)
     # the controlling expression: the new caller's switch that holds the call of the first helper
-    nch = Chain(ntoks, nfuncs, caller, problems, False)
+    nch = Chain(new, caller, problems, False)
     if not nch.ok:
         return problems, ""
     expr = nch.expr
     ptr_all = set()
     for h in helpers:
-        ptr_all |= Chain(ntoks, nfuncs, h, [], False).ptr_params
-    new_flat, new_chains = flatten(ntoks, nfuncs, caller, expr, problems, names, "new", ptr_all)
-    old_flat, old_chains = flatten(otoks, ofuncs, caller, expr, problems, names, "old", ptr_all)
+        ptr_all |= Chain(new, h, [], False).ptr_params
+    new_flat, new_chains = Walk(new, problems, names, ptr_all, "new").flatten(caller, expr)
+    old_flat, old_chains = Walk(old, problems, names, ptr_all, "old").flatten(caller, expr)
     # every helper must be reached by the chain
     reached = {c.name for c in new_chains}
     for h in helpers:
@@ -421,7 +485,7 @@ def check(old_text, new_text, caller, helpers):
         elif lab not in new_map and set(lab) <= new_labels:
             problems.append("group %s: its labels are split across groups" % " ".join(lab))
     # a group the caller keeps is unchanged, as written (the normalisation above is for moved ones)
-    oraw = {lab: body for (lab, body) in Chain(otoks, ofuncs, caller, [], False).groups}
+    oraw = {lab: body for (lab, body) in Chain(old, caller, [], False).groups}
     for lab, body in nch.groups:
         if lab != ("default :",) and lab in oraw and oraw[lab] != body:
             problems.append("kept group %s was edited" % " ".join(lab))
