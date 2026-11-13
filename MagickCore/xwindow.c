@@ -353,6 +353,24 @@ static void DestroyXIconPixelInfo(XWindows *windows)
     }
 }
 
+static void DestroyXPixelInfo(XWindows *windows)
+{
+  if (windows->pixel_info != (XPixelInfo *) NULL)
+    {
+      if (windows->pixel_info->pixels != (unsigned long *) NULL)
+        windows->pixel_info->pixels=(unsigned long *)
+          RelinquishMagickMemory(windows->pixel_info->pixels);
+      if (windows->pixel_info->annotate_context != (GC) NULL)
+        XFreeGC(windows->display,windows->pixel_info->annotate_context);
+      if (windows->pixel_info->widget_context != (GC) NULL)
+        XFreeGC(windows->display,windows->pixel_info->widget_context);
+      if (windows->pixel_info->highlight_context != (GC) NULL)
+        XFreeGC(windows->display,windows->pixel_info->highlight_context);
+      windows->pixel_info=(XPixelInfo *)
+        RelinquishMagickMemory(windows->pixel_info);
+    }
+}
+
 MagickExport void DestroyXResources(void)
 {
   int
@@ -411,20 +429,7 @@ MagickExport void DestroyXResources(void)
   windows->icon_resources=(XResourceInfo *)
     RelinquishMagickMemory(windows->icon_resources);
   DestroyXIconPixelInfo(windows);
-  if (windows->pixel_info != (XPixelInfo *) NULL)
-    {
-      if (windows->pixel_info->pixels != (unsigned long *) NULL)
-        windows->pixel_info->pixels=(unsigned long *)
-          RelinquishMagickMemory(windows->pixel_info->pixels);
-      if (windows->pixel_info->annotate_context != (GC) NULL)
-        XFreeGC(windows->display,windows->pixel_info->annotate_context);
-      if (windows->pixel_info->widget_context != (GC) NULL)
-        XFreeGC(windows->display,windows->pixel_info->widget_context);
-      if (windows->pixel_info->highlight_context != (GC) NULL)
-        XFreeGC(windows->display,windows->pixel_info->highlight_context);
-      windows->pixel_info=(XPixelInfo *)
-        RelinquishMagickMemory(windows->pixel_info);
-    }
+  DestroyXPixelInfo(windows);
   if (windows->font_info != (XFontStruct *) NULL)
     {
       XFreeFont(windows->display,windows->font_info);
