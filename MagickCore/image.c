@@ -105,58 +105,111 @@
 #include "MagickCore/version.h"
 #include "MagickCore/xwindow-private.h"
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   A c q u i r e I m a g e                                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  AcquireImage() returns a pointer to an image structure initialized to
-%  default values.
-%
-%  The format of the AcquireImage method is:
-%
-%      Image *AcquireImage(const ImageInfo *image_info,ExceptionInfo *exception)
-%
-%  A description of each parameter follows:
-%
-%    o image_info: Many of the image default values are set from this
-%      structure.  For example, filename, compression, depth, background color,
-%      and others.
-%
-%    o exception: return any errors or warnings in this structure.
-%
-*/
-MagickExport Image *AcquireImage(const ImageInfo *image_info,
-  ExceptionInfo *exception)
+static void SetImageSize(Image *image,const char *size)
 {
-  const char
-    *option;
+  if (size != (char *) NULL)
+    {
+      (void) ParseAbsoluteGeometry(size,&image->extract_info);
+      image->columns=image->extract_info.width;
+      image->rows=image->extract_info.height;
+      image->offset=image->extract_info.x;
+      image->extract_info.x=0;
+      image->extract_info.y=0;
+    }
+}
 
-  Image
-    *image;
-
-  MagickSizeType
-    time_limit;
-
+static void SetImageExtract(Image *image,const char *extract)
+{
   MagickStatusType
     flags;
 
-  /*
-    Allocate image structure.
-  */
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  image=(Image *) AcquireCriticalMemory(sizeof(*image));
-  (void) memset(image,0,sizeof(*image));
-  /*
-    Initialize Image structure.
-  */
+  if (extract != (char *) NULL)
+    {
+      RectangleInfo
+        geometry;
+
+      (void) memset(&geometry,0,sizeof(geometry));
+      flags=ParseAbsoluteGeometry(extract,&geometry);
+      if (((flags & XValue) != 0) || ((flags & YValue) != 0))
+        {
+          image->extract_info=geometry;
+          Swap(image->columns,image->extract_info.width);
+          Swap(image->rows,image->extract_info.height);
+        }
+    }
+}
+
+static void SetImageDensity(Image *image,const char *density)
+{
+  MagickStatusType
+    flags;
+
+  if (density != (char *) NULL)
+    {
+      GeometryInfo
+        geometry_info;
+
+      flags=ParseGeometry(density,&geometry_info);
+      if ((flags & RhoValue) != 0)
+        image->resolution.x=geometry_info.rho;
+      image->resolution.y=image->resolution.x;
+      if ((flags & SigmaValue) != 0)
+        image->resolution.y=geometry_info.sigma;
+    }
+}
+
+static void SetImagePage(Image *image,const char *page)
+{
+  if (page != (char *) NULL)
+    {
+      char
+        *geometry;
+
+      image->page=image->extract_info;
+      geometry=GetPageGeometry(page);
+      (void) ParseAbsoluteGeometry(geometry,&image->page);
+      geometry=DestroyString(geometry);
+    }
+}
+
+static void SetImageDelay(Image *image,const char *delay)
+{
+  MagickStatusType
+    flags;
+
+  if (delay != (const char *) NULL)
+    {
+      GeometryInfo
+        geometry_info;
+
+      flags=ParseGeometry(delay,&geometry_info);
+      if ((flags & GreaterValue) != 0)
+        {
+          if ((double) image->delay > floor(geometry_info.rho+0.5))
+            image->delay=(size_t) CastDoubleToSsizeT(floor(geometry_info.rho+
+              0.5));
+        }
+      else
+        if ((flags & LessValue) != 0)
+          {
+            if ((double) image->delay < floor(geometry_info.rho+0.5))
+              image->ticks_per_second=CastDoubleToSsizeT(floor(
+                geometry_info.sigma+0.5));
+          }
+        else
+          image->delay=(size_t) CastDoubleToSsizeT(floor(geometry_info.rho+
+            0.5));
+      if ((flags & SigmaValue) != 0)
+        image->ticks_per_second=CastDoubleToSsizeT(floor(geometry_info.sigma+
+          0.5));
+    }
+}
+
+static void SetImageDefaults(Image *image)
+{
+  MagickSizeType
+    time_limit;
+
   (void) CopyMagickString(image->magick,"MIFF",MagickPathExtent);
   image->storage_class=DirectClass;
   image->depth=MAGICKCORE_QUANTUM_DEPTH;
@@ -200,6 +253,55 @@ MagickExport Image *AcquireImage(const ImageInfo *image_info,
   image->reference_count=1;
   image->semaphore=AcquireSemaphoreInfo();
   image->signature=MagickCoreSignature;
+}
+
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%   A c q u i r e I m a g e                                                   %
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  AcquireImage() returns a pointer to an image structure initialized to
+%  default values.
+%
+%  The format of the AcquireImage method is:
+%
+%      Image *AcquireImage(const ImageInfo *image_info,ExceptionInfo *exception)
+%
+%  A description of each parameter follows:
+%
+%    o image_info: Many of the image default values are set from this
+%      structure.  For example, filename, compression, depth, background color,
+%      and others.
+%
+%    o exception: return any errors or warnings in this structure.
+%
+*/
+MagickExport Image *AcquireImage(const ImageInfo *image_info,
+  ExceptionInfo *exception)
+{
+  const char
+    *option;
+
+  Image
+    *image;
+
+  /*
+    Allocate image structure.
+  */
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  image=(Image *) AcquireCriticalMemory(sizeof(*image));
+  (void) memset(image,0,sizeof(*image));
+  /*
+    Initialize Image structure.
+  */
+  SetImageDefaults(image);
   if (image_info == (ImageInfo *) NULL)
     return(image);
   /*
@@ -212,56 +314,15 @@ MagickExport Image *AcquireImage(const ImageInfo *image_info,
   (void) CopyMagickString(image->magick_filename,image_info->filename,
     MagickPathExtent);
   (void) CopyMagickString(image->magick,image_info->magick,MagickPathExtent);
-  if (image_info->size != (char *) NULL)
-    {
-      (void) ParseAbsoluteGeometry(image_info->size,&image->extract_info);
-      image->columns=image->extract_info.width;
-      image->rows=image->extract_info.height;
-      image->offset=image->extract_info.x;
-      image->extract_info.x=0;
-      image->extract_info.y=0;
-    }
-  if (image_info->extract != (char *) NULL)
-    {
-      RectangleInfo
-        geometry;
-
-      (void) memset(&geometry,0,sizeof(geometry));
-      flags=ParseAbsoluteGeometry(image_info->extract,&geometry);
-      if (((flags & XValue) != 0) || ((flags & YValue) != 0))
-        {
-          image->extract_info=geometry;
-          Swap(image->columns,image->extract_info.width);
-          Swap(image->rows,image->extract_info.height);
-        }
-    }
+  SetImageSize(image,image_info->size);
+  SetImageExtract(image,image_info->extract);
   image->compression=image_info->compression;
   image->quality=image_info->quality;
   image->endian=image_info->endian;
   image->interlace=image_info->interlace;
   image->units=image_info->units;
-  if (image_info->density != (char *) NULL)
-    {
-      GeometryInfo
-        geometry_info;
-
-      flags=ParseGeometry(image_info->density,&geometry_info);
-      if ((flags & RhoValue) != 0)
-        image->resolution.x=geometry_info.rho;
-      image->resolution.y=image->resolution.x;
-      if ((flags & SigmaValue) != 0)
-        image->resolution.y=geometry_info.sigma;
-    }
-  if (image_info->page != (char *) NULL)
-    {
-      char
-        *geometry;
-
-      image->page=image->extract_info;
-      geometry=GetPageGeometry(image_info->page);
-      (void) ParseAbsoluteGeometry(geometry,&image->page);
-      geometry=DestroyString(geometry);
-    }
+  SetImageDensity(image,image_info->density);
+  SetImagePage(image,image_info->page);
   if (image_info->depth != 0)
     image->depth=image_info->depth;
   image->dither=image_info->dither;
@@ -281,33 +342,7 @@ MagickExport Image *AcquireImage(const ImageInfo *image_info,
   /*
     Global options that are only set for new images.
   */
-  option=GetImageOption(image_info,"delay");
-  if (option != (const char *) NULL)
-    {
-      GeometryInfo
-        geometry_info;
-
-      flags=ParseGeometry(option,&geometry_info);
-      if ((flags & GreaterValue) != 0)
-        {
-          if ((double) image->delay > floor(geometry_info.rho+0.5))
-            image->delay=(size_t) CastDoubleToSsizeT(floor(geometry_info.rho+
-              0.5));
-        }
-      else
-        if ((flags & LessValue) != 0)
-          {
-            if ((double) image->delay < floor(geometry_info.rho+0.5))
-              image->ticks_per_second=CastDoubleToSsizeT(floor(
-                geometry_info.sigma+0.5));
-          }
-        else
-          image->delay=(size_t) CastDoubleToSsizeT(floor(geometry_info.rho+
-            0.5));
-      if ((flags & SigmaValue) != 0)
-        image->ticks_per_second=CastDoubleToSsizeT(floor(geometry_info.sigma+
-          0.5));
-    }
+  SetImageDelay(image,GetImageOption(image_info,"delay"));
   option=GetImageOption(image_info,"dispose");
   if (option != (const char *) NULL)
     image->dispose=(DisposeType) ParseCommandOption(MagickDisposeOptions,
