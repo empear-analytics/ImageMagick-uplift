@@ -1819,6 +1819,15 @@ static MagickBooleanType XGrabTargetCursor(Display *display,
 
 #define MinimumCropArea  (unsigned int) 9
 
+static void XDrawCropRectangle(Display *display,const Window root_window,
+  const GC annotate_context,const RectangleInfo *crop_info)
+{
+  if ((crop_info->width*crop_info->height) >= MinimumCropArea)
+    (void) XDrawRectangle(display,root_window,annotate_context,
+      (int) crop_info->x,(int) crop_info->y,(unsigned int) crop_info->width-1,
+      (unsigned int) crop_info->height-1);
+}
+
 static Window XSelectWindow(Display *display,RectangleInfo *crop_info)
 {
   Cursor
@@ -1870,20 +1879,14 @@ static Window XSelectWindow(Display *display,RectangleInfo *crop_info)
   (void) XGrabServer(display);
   do
   {
-    if ((crop_info->width*crop_info->height) >= MinimumCropArea)
-      (void) XDrawRectangle(display,root_window,annotate_context,
-        (int) crop_info->x,(int) crop_info->y,(unsigned int) crop_info->width-1,
-        (unsigned int) crop_info->height-1);
+    XDrawCropRectangle(display,root_window,annotate_context,crop_info);
     /*
       Allow another event.
     */
     (void) XAllowEvents(display,SyncPointer,CurrentTime);
     (void) XWindowEvent(display,root_window,ButtonPressMask |
       ButtonReleaseMask | ButtonMotionMask,&event);
-    if ((crop_info->width*crop_info->height) >= MinimumCropArea)
-      (void) XDrawRectangle(display,root_window,annotate_context,
-        (int) crop_info->x,(int) crop_info->y,(unsigned int) crop_info->width-1,
-        (unsigned int) crop_info->height-1);
+    XDrawCropRectangle(display,root_window,annotate_context,crop_info);
     switch (event.type)
     {
       case ButtonPress:
