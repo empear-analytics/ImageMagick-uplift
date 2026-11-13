@@ -1055,15 +1055,15 @@ static inline void Eagle3XB(const Image *magick_unused(source),
   corner_tr=IsEagle3XTopRightCorner(pixels,channels) != MagickFalse;
   corner_bl=IsEagle3XBottomLeftCorner(pixels,channels) != MagickFalse;
   corner_br=IsEagle3XBottomRightCorner(pixels,channels) != MagickFalse;
-  CopyPixels(&magnify,(ssize_t) (corner_tl ? 0 : 4),0);
+  CopyPixelsIf(&magnify,corner_tl != 0,0,0);
   CopyPixels(&magnify,4,1);
-  CopyPixels(&magnify,(ssize_t) (corner_tr ? 1 : 4),2);
+  CopyPixelsIf(&magnify,corner_tr != 0,1,2);
   CopyPixels(&magnify,4,3);
   CopyPixels(&magnify,4,4);
   CopyPixels(&magnify,4,5);
-  CopyPixels(&magnify,(ssize_t) (corner_bl ? 3 : 4),6);
+  CopyPixelsIf(&magnify,corner_bl != 0,3,6);
   CopyPixels(&magnify,4,7);
-  CopyPixels(&magnify,(ssize_t) (corner_br ? 5 : 4),8);
+  CopyPixelsIf(&magnify,corner_br != 0,5,8);
 }
 
 static inline MagickBooleanType IsScale3XTopEdge(const Quantum *pixels,
