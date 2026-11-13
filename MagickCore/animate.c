@@ -1036,11 +1036,113 @@ static void XSortSceneList(Image **image_list,const size_t number_scenes)
     qsort((void *) image_list,number_scenes,sizeof(Image *),SceneCompare);
 }
 
+typedef struct _AnimateBackgroundSetup
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  ExceptionInfo
+    *exception;
+
+  Image
+    *images,
+    **image_list;
+
+  size_t
+    number_scenes;
+
+  XVisualInfo
+    *visual_info;
+
+  XStandardColormap
+    *map_info;
+} AnimateBackgroundSetup;
+
+typedef struct _AnimateBackgroundTargets
+{
+  XWindowInfo
+    *window_info;
+
+  XResourceInfo
+    *resources;
+
+  XWindowAttributes
+    *window_attributes;
+} AnimateBackgroundTargets;
+
+static void XCreateBackgroundXImage(const AnimateBackgroundSetup *setup,
+  const AnimateBackgroundTargets *targets)
+{
+  char
+    geometry[MagickPathExtent];
+
+  Display
+    *const display = setup->display;
+
+  Image
+    **const image_list = setup->image_list;
+
+  MagickStatusType
+    status;
+
+  RectangleInfo
+    geometry_info;
+
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XWindowAttributes
+    *const window_attributes = targets->window_attributes;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  (*window_info).width=(unsigned int) image_list[0]->columns;
+  (*window_info).height=(unsigned int) image_list[0]->rows;
+  if ((image_list[0]->columns != (*window_info).width) ||
+      (image_list[0]->rows != (*window_info).height))
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
+      image_list[0]->filename);
+  (void) FormatLocaleString(geometry,MagickPathExtent,"%ux%u+0+0>",
+    (*window_attributes).width,(*window_attributes).height);
+  geometry_info.width=(*window_info).width;
+  geometry_info.height=(*window_info).height;
+  geometry_info.x=(ssize_t) (*window_info).x;
+  geometry_info.y=(ssize_t) (*window_info).y;
+  (void) ParseMetaGeometry(geometry,&geometry_info.x,&geometry_info.y,
+    &geometry_info.width,&geometry_info.height);
+  (*window_info).width=(unsigned int) geometry_info.width;
+  (*window_info).height=(unsigned int) geometry_info.height;
+  (*window_info).x=(int) geometry_info.x;
+  (*window_info).y=(int) geometry_info.y;
+  status=XMakeImage(display,resources,window_info,image_list[0],
+    (*window_info).width,(*window_info).height,setup->exception);
+  if (status == MagickFalse)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
+      setup->images->filename);
+  (*window_info).x=0;
+  (*window_info).y=0;
+  if (setup->resource_info->debug != MagickFalse)
+    {
+      (void) LogMagickEvent(X11Event,GetMagickModule(),
+        "Image: %s[%.17g] %.17gx%.17g ",image_list[0]->filename,(double)
+        image_list[0]->scene,(double) image_list[0]->columns,(double)
+        image_list[0]->rows);
+      if (image_list[0]->colors != 0)
+        (void) LogMagickEvent(X11Event,GetMagickModule(),"%.17gc ",(double)
+          image_list[0]->colors);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"%s",
+        image_list[0]->magick);
+    }
+}
+
 MagickExport void XAnimateBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *images,ExceptionInfo *exception)
 {
   char
-    geometry[MagickPathExtent],
     visual_type[MagickPathExtent];
 
   Image
@@ -1053,9 +1155,6 @@ MagickExport void XAnimateBackgroundImage(Display *display,
 
   MagickStatusType
     status;
-
-  RectangleInfo
-    geometry_info;
 
   size_t
     delay,
@@ -1094,6 +1193,12 @@ MagickExport void XAnimateBackgroundImage(Display *display,
 
   XWindowAttributes
     window_attributes;
+
+  AnimateBackgroundSetup
+    setup;
+
+  const AnimateBackgroundTargets
+    targets = { &window_info, &resources, &window_attributes };
 
   /*
     Determine target window.
@@ -1221,43 +1326,15 @@ MagickExport void XAnimateBackgroundImage(Display *display,
   /*
     Create the X image.
   */
-  window_info.width=(unsigned int) image_list[0]->columns;
-  window_info.height=(unsigned int) image_list[0]->rows;
-  if ((image_list[0]->columns != window_info.width) ||
-      (image_list[0]->rows != window_info.height))
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
-      image_list[0]->filename);
-  (void) FormatLocaleString(geometry,MagickPathExtent,"%ux%u+0+0>",
-    window_attributes.width,window_attributes.height);
-  geometry_info.width=window_info.width;
-  geometry_info.height=window_info.height;
-  geometry_info.x=(ssize_t) window_info.x;
-  geometry_info.y=(ssize_t) window_info.y;
-  (void) ParseMetaGeometry(geometry,&geometry_info.x,&geometry_info.y,
-    &geometry_info.width,&geometry_info.height);
-  window_info.width=(unsigned int) geometry_info.width;
-  window_info.height=(unsigned int) geometry_info.height;
-  window_info.x=(int) geometry_info.x;
-  window_info.y=(int) geometry_info.y;
-  status=XMakeImage(display,&resources,&window_info,image_list[0],
-    window_info.width,window_info.height,exception);
-  if (status == MagickFalse)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
-      images->filename);
-  window_info.x=0;
-  window_info.y=0;
-  if (resource_info->debug != MagickFalse)
-    {
-      (void) LogMagickEvent(X11Event,GetMagickModule(),
-        "Image: %s[%.17g] %.17gx%.17g ",image_list[0]->filename,(double)
-        image_list[0]->scene,(double) image_list[0]->columns,(double)
-        image_list[0]->rows);
-      if (image_list[0]->colors != 0)
-        (void) LogMagickEvent(X11Event,GetMagickModule(),"%.17gc ",(double)
-          image_list[0]->colors);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"%s",
-        image_list[0]->magick);
-    }
+  setup.display=display;
+  setup.resource_info=resource_info;
+  setup.exception=exception;
+  setup.images=images;
+  setup.image_list=image_list;
+  setup.number_scenes=number_scenes;
+  setup.visual_info=visual_info;
+  setup.map_info=map_info;
+  XCreateBackgroundXImage(&setup,&targets);
   /*
     Adjust image dimensions as specified by backdrop or geometry options.
   */
