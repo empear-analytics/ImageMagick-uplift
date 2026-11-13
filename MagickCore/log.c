@@ -1491,6 +1491,67 @@ static MagickBooleanType GrowLogEventText(char **text,char **q,
   return(MagickTrue);
 }
 
+typedef struct _LogEventText
+{
+  char
+    *text;
+
+  size_t
+    extent;
+
+  double
+    elapsed_time,
+    user_time;
+
+  time_t
+    seconds;
+} LogEventText;
+
+static void TranslateLogTimeSpecifier(const LogEventText *event_text,
+  const char *p,char **q)
+{
+  char
+    *const text = event_text->text;
+
+  const size_t
+    extent = event_text->extent;
+
+  const double
+    elapsed_time = event_text->elapsed_time,
+    user_time = event_text->user_time;
+
+  const time_t
+    seconds = event_text->seconds;
+
+  switch (*p)
+  {
+    case 'r':
+    {
+      (*q)+=(ptrdiff_t) FormatLocaleString((*q),extent-((*q)-text),
+        "%lu:%02lu.%03lu",(unsigned long) (elapsed_time/60.0),(unsigned long)
+        floor(fmod(elapsed_time,60.0)),(unsigned long) (1000.0*(elapsed_time-
+        floor(elapsed_time))+0.5));
+      break;
+    }
+    case 't':
+    {
+      (*q)+=(ptrdiff_t) FormatMagickTime(seconds,extent-((*q)-text),(*q));
+      break;
+    }
+    case 'u':
+    {
+      (*q)+=(ptrdiff_t) FormatLocaleString((*q),extent-((*q)-text),"%0.3fu",
+        user_time);
+      break;
+    }
+    default:
+    {
+      (*q)+=FormatLogSpecifier((*q),extent-((*q)-text),*p);
+      break;
+    }
+  }
+}
+
 static char *TranslateEvent(const LogEventLocation *location,
   const char *domain,const char *event)
 {
@@ -1526,6 +1587,9 @@ static char *TranslateEvent(const LogEventLocation *location,
 
   time_t
     seconds;
+
+  LogEventText
+    event_text;
 
   exception=AcquireExceptionInfo();
   log_info=GetLogInfo("*",exception);
@@ -1611,6 +1675,11 @@ static char *TranslateEvent(const LogEventLocation *location,
     p++;
     if (*p == '\0')
       break;
+    event_text.text=text;
+    event_text.extent=extent;
+    event_text.elapsed_time=elapsed_time;
+    event_text.user_time=user_time;
+    event_text.seconds=seconds;
     switch (*p)
     {
       case 'd':
@@ -1646,27 +1715,9 @@ static char *TranslateEvent(const LogEventLocation *location,
           extent-(q-text));
         break;
       }
-      case 'r':
-      {
-        q+=(ptrdiff_t) FormatLocaleString(q,extent-(q-text),"%lu:%02lu.%03lu",
-          (unsigned long) (elapsed_time/60.0),(unsigned long) floor(fmod(
-          elapsed_time,60.0)),(unsigned long) (1000.0*(elapsed_time-floor(
-          elapsed_time))+0.5));
-        break;
-      }
-      case 't':
-      {
-        q+=(ptrdiff_t) FormatMagickTime(seconds,extent-(q-text),q);
-        break;
-      }
-      case 'u':
-      {
-        q+=(ptrdiff_t) FormatLocaleString(q,extent-(q-text),"%0.3fu",user_time);
-        break;
-      }
       default:
       {
-        q+=FormatLogSpecifier(q,extent-(q-text),*p);
+        TranslateLogTimeSpecifier(&event_text,p,&q);
         break;
       }
     }
