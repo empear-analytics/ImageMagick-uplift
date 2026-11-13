@@ -140,6 +140,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/decorate-raise.c \
   MagickCore/decorate.h \
   MagickCore/delegate.c \
+  MagickCore/delegate-invoke.c \
   MagickCore/delegate.h \
   MagickCore/delegate-private.h \
   MagickCore/deprecate.c \
