@@ -2373,6 +2373,17 @@ static void PrintImageChannelReports(FILE *file,Image *image,
     }
 }
 
+static FILE *OpenIdentifyImage(const Image *image,FILE *file)
+{
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if (file == (FILE *) NULL)
+    file=stdout;
+  return(file);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -2410,12 +2421,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   size_t
     depth;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (file == (FILE *) NULL)
-    file=stdout;
+  file=OpenIdentifyImage(image,file);
   colorspace=image->colorspace;
   locate=GetImageArtifact(image,"identify:locate");
   if (locate != (const char *) NULL)
