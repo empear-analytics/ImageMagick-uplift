@@ -14416,6 +14416,18 @@ static void PlaceMenuWidget(Display *display,XWindows *windows,
   XConstrainWindowPosition(display,&windows->widget);
 }
 
+static Cursor DefineMenuCursor(Display *display,XWindows *windows)
+{
+  Cursor
+    cursor;
+
+  cursor=XCreateFontCursor(display,XC_right_ptr);
+  (void) XCheckDefineCursor(display,windows->image.id,cursor);
+  (void) XCheckDefineCursor(display,windows->command.id,cursor);
+  (void) XCheckDefineCursor(display,windows->widget.id,cursor);
+  return(cursor);
+}
+
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   const char *title,const char *const *selections,char *item)
 {
@@ -14490,10 +14502,7 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
     Respond to X events.
   */
   selection_info.height=height;
-  cursor=XCreateFontCursor(display,XC_right_ptr);
-  (void) XCheckDefineCursor(display,windows->image.id,cursor);
-  (void) XCheckDefineCursor(display,windows->command.id,cursor);
-  (void) XCheckDefineCursor(display,windows->widget.id,cursor);
+  cursor=DefineMenuCursor(display,windows);
   state=UpdateConfigurationState;
   event_context.display=display;
   event_context.windows=windows;
