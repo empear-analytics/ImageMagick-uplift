@@ -7733,9 +7733,6 @@ static void ReleaseFileBrowserScroll(const FileBrowserContext *context,
   ReleaseFileBrowserButtons(context,event,widgets);
 }
 
-MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
-  const char *action,char *reply)
-{
 #define CancelButtonText  "Cancel"
 #define DirectoryText  "Directory:"
 #define FilenameText  "File name:"
@@ -7744,6 +7741,9 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
 #define HomeButtonText  "Home"
 #define UpButtonText  "Up"
 
+MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
+  const char *action,char *reply)
+{
   char
     *directory,
     **filelist,
