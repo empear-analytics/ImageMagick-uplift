@@ -737,6 +737,23 @@ RestoreMSCWarning \
     }  \
 }
 
+static void OutputHuffmanEndOfLine(const ImageInfo *image_info,Image *image,
+  unsigned char *caller_byte,unsigned char *caller_bit)
+{
+  int
+    k;
+
+  unsigned char
+    bit = (*caller_bit),
+    byte = (*caller_byte);
+
+  for (k=0; k < 11; k++)
+    OutputBit(0);
+  OutputBit(1);
+  (*caller_byte)=byte;
+  (*caller_bit)=bit;
+}
+
 MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
   Image *image,Image *inject_image,ExceptionInfo *exception)
 {
@@ -744,7 +761,6 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
     *entry;
 
   int
-    k,
     runlength;
 
   Image
@@ -814,9 +830,7 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
       /*
         End of line.
       */
-      for (k=0; k < 11; k++)
-        OutputBit(0);
-      OutputBit(1);
+      OutputHuffmanEndOfLine(image_info,image,&byte,&bit);
     }
   /*
     Compress to 1D Huffman pixels.
@@ -883,9 +897,7 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
     /*
       End of line.
     */
-    for (k=0; k < 11; k++)
-      OutputBit(0);
-    OutputBit(1);
+    OutputHuffmanEndOfLine(image_info,image,&byte,&bit);
     q=scanline;
     if (GetPreviousImageInList(huffman_image) == (Image *) NULL)
       {
@@ -900,9 +912,7 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
   */
   for (i=0; i < 6; i++)
   {
-    for (k=0; k < 11; k++)
-      OutputBit(0);
-    OutputBit(1);
+    OutputHuffmanEndOfLine(image_info,image,&byte,&bit);
   }
   /*
     Flush bits.
