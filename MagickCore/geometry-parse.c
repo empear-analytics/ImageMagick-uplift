@@ -251,31 +251,78 @@ static void ParseGeometryYOffset(char **p,MagickStatusType *flags,ssize_t *y)
     }
 }
 
+typedef struct _GeometryMetaFlag
+{
+  int
+    key;
+
+  MagickStatusType
+    flag;
+} GeometryMetaFlag;
+
+static const GeometryMetaFlag
+  GeometryMetaFlags[] =
+  {
+    { '%', PercentValue },
+    { '!', AspectValue },
+    { '<', LessValue },
+    { '>', GreaterValue },
+    { '#', MaximumValue },
+    { '^', MinimumValue },
+    { '@', AreaValue }
+  };
+
+static inline MagickStatusType GetGeometryMetaFlag(const int c)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(GeometryMetaFlags)/sizeof(*GeometryMetaFlags)); i++)
+    if (GeometryMetaFlags[i].key == c)
+      return(GeometryMetaFlags[i].flag);
+  return(NoValue);
+}
+
+static const int
+  GeometryAdvanceCharacters[] =
+  {
+    '-',
+    ',',
+    '+',
+    '0',
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7',
+    '8',
+    '9',
+    215,
+    'e',
+    'E'
+  };
+
 static inline MagickBooleanType IsGeometryAdvanceCharacter(const int c)
 {
-  switch (c)
-  {
-    case '-':
-    case ',':
-    case '+':
-    case '0':
-    case '1':
-    case '2':
-    case '3':
-    case '4':
-    case '5':
-    case '6':
-    case '7':
-    case '8':
-    case '9':
-    case 215:
-    case 'e':
-    case 'E':
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(GeometryAdvanceCharacters)/
+       sizeof(*GeometryAdvanceCharacters)); i++)
+    if (GeometryAdvanceCharacters[i] == c)
       return(MagickTrue);
-    default:
-      break;
-  }
   return(MagickFalse);
+}
+
+static void ParseGeometryXYOffsets(char **p,MagickStatusType *flags,
+  ssize_t *x,ssize_t *y)
+{
+  if ((**p == '+') || (**p == '-'))
+    ParseGeometryXOffset(p,flags,x);
+  if ((**p == '+') || (**p == '-'))
+    ParseGeometryYOffset(p,flags,y);
 }
 
 MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
@@ -289,6 +336,7 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
     c;
 
   MagickStatusType
+    flag,
     flags;
 
   /*
@@ -313,50 +361,15 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
         p++;
         continue;
       }
+    flag=GetGeometryMetaFlag(c);
+    if (flag != NoValue)
+      {
+        flags|=flag;
+        (void) CopyMagickString(p,p+1,MagickPathExtent);
+        continue;
+      }
     switch (c)
     {
-      case '%':
-      {
-        flags|=PercentValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '!':
-      {
-        flags|=AspectValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '<':
-      {
-        flags|=LessValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '>':
-      {
-        flags|=GreaterValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '#':
-      {
-        flags|=MaximumValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '^':
-      {
-        flags|=MinimumValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '@':
-      {
-        flags|=AreaValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
       case '(':
       case ')':
       {
@@ -394,10 +407,7 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
     return(flags);
   flags=ParseGeometryWidth(&p,flags,width);
   flags=ParseGeometryHeight(&p,flags,height);
-  if ((*p == '+') || (*p == '-'))
-    ParseGeometryXOffset(&p,&flags,x);
-  if ((*p == '+') || (*p == '-'))
-    ParseGeometryYOffset(&p,&flags,y);
+  ParseGeometryXYOffsets(&p,&flags,x,y);
   if ((flags & PercentValue) != 0)
     flags=SetPercentGeometrySize(flags,width,height);
 #if 0
@@ -693,6 +703,22 @@ static MagickStatusType ParseGeometrySigma(char **p,MagickStatusType flags,
   return(flags);
 }
 
+static MagickStatusType ParseGeometryFields(char *p,
+  const char *pedantic_geometry,MagickStatusType flags,
+  GeometryInfo *geometry_info)
+{
+  flags=ParseGeometryRho(&p,flags,geometry_info);
+  flags=ParseGeometrySigma(&p,flags,geometry_info);
+  flags=ParseGeometryOffsets(p,flags,geometry_info);
+  if (strchr(pedantic_geometry,':') != (char *) NULL)
+    NormalizeSamplingFactor(flags,geometry_info);
+  if (IsNegativeHeightGeometry(flags) != MagickFalse)
+    flags=ShiftNegativeHeight(flags,geometry_info);
+  if ((flags & PercentValue) != 0)
+    SetPercentGeometryInfo(flags,geometry_info);
+  return(flags);
+}
+
 MagickExport MagickStatusType ParseGeometry(const char *geometry,
   GeometryInfo *geometry_info)
 {
@@ -707,6 +733,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
     c;
 
   MagickStatusType
+    flag,
     flags;
 
   /*
@@ -749,50 +776,15 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
         p++;
         continue;
       }
+    flag=GetGeometryMetaFlag(c);
+    if (flag != NoValue)
+      {
+        flags|=flag;
+        (void) CopyMagickString(p,p+1,MagickPathExtent);
+        continue;
+      }
     switch (c)
     {
-      case '%':
-      {
-        flags|=PercentValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '!':
-      {
-        flags|=AspectValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '<':
-      {
-        flags|=LessValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '>':
-      {
-        flags|=GreaterValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '#':
-      {
-        flags|=MaximumValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '^':
-      {
-        flags|=MinimumValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case '@':
-      {
-        flags|=AreaValue;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
       case '(':
       case ')':
       {
@@ -833,15 +825,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
   p=pedantic_geometry;
   if (*p == '\0')
     return(flags);
-  flags=ParseGeometryRho(&p,flags,geometry_info);
-  flags=ParseGeometrySigma(&p,flags,geometry_info);
-  flags=ParseGeometryOffsets(p,flags,geometry_info);
-  if (strchr(pedantic_geometry,':') != (char *) NULL)
-    NormalizeSamplingFactor(flags,geometry_info);
-  if (IsNegativeHeightGeometry(flags) != MagickFalse)
-    flags=ShiftNegativeHeight(flags,geometry_info);
-  if ((flags & PercentValue) != 0)
-    SetPercentGeometryInfo(flags,geometry_info);
+  flags=ParseGeometryFields(p,pedantic_geometry,flags,geometry_info);
 #if 0
   /* Debugging Geometry */
   (void) fprintf(stderr,"ParseGeometry...\n");

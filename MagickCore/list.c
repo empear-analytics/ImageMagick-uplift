@@ -240,6 +240,13 @@ static ssize_t ParseCloneSceneEnd(char **p,const ssize_t first,
   return(last);
 }
 
+static char *SkipSceneSeparators(char *p)
+{
+  while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == ','))
+    p++;
+  return(p);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -314,8 +321,7 @@ MagickExport Image *CloneImages(const Image *images,const char *scenes,
     MagickBooleanType
       match;
 
-    while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == ','))
-      p++;
+    p=SkipSceneSeparators(p);
     first=(ssize_t) strtol(p,&p,10);
     offset=first;
     first=ClampSceneIndex(first,length);
@@ -433,8 +439,7 @@ static void MarkScenesForDeletion(MagickBooleanType *delete_list,
     char
       *q;
 
-    while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == ','))
-      p++;
+    p=SkipSceneSeparators(p);
     first=strtol(p,&q,10);
     if (p == q)
       break;

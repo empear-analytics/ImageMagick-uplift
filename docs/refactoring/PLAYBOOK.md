@@ -3581,6 +3581,16 @@ its own pointer is Recipe O's form plus an exit, but gives five or more paramete
    left in the caller as `{ S return(c); }` is; its expression reads no written
    variable. So does V step 7's side-effect-free `S return(e);`, whose `e` reads no
    written variable.
+   So does V step 7's last form, cleanup statements `S` followed by `return(<expr>);`
+   whose expression makes calls (`ConvertPathToPolygon`'s `(void)
+   ThrowMagickException(...); points=(PointInfo *) RelinquishMagickMemory(points);
+   return(DestroyPolygonInfo(polygon_info));`), the same text at every exit (checked by
+   script), left unchanged in the caller after `if (Helper(...,&targets) ==
+   MagickFalse)` (2026-11-13). As in the macro form, `S` and the expression may read
+   and write the written variables: every write the block made to them has landed
+   through the members before the helper returns, so `S` reads what it read inside the
+   block, and nothing reads them after the caller's `return`. The expression reads no
+   variable the block writes but through a pointer passed by value (`polygon_info`).
    `M` may also be one of MagickCore's own throw macros (`exception-private.h`:
    `ThrowImageException`, `ThrowBinaryException` and the like), whose expansion is
    `(void) ThrowMagickException(exception,GetMagickModule(),...);` and `return(c);` of
@@ -4538,7 +4548,11 @@ Recipe D, whose copies are moved whole and so may not leave the caller.
    and no `continue` or `break` that leaves it.
 2. `R` is a constant, or reads only what the block writes through a pointer the caller
    also holds (`*source`), so the caller evaluating `R` after the call gets the value the
-   block's `return` would have returned.
+   block's `return` would have returned. `R` may also be a plain local of the caller
+   that the block neither writes nor takes the address of (2026-11-13;
+   `splay-tree.c`'s `RemoveNodeFromSplayTree`, `return(value);` with `value` set to
+   `NULL` before the block): it holds the same value after the call as at the block's
+   `return`.
 3. The block writes no plain local of the caller, apart from locals nothing after the
    block reads (Recipe E step 4), which the new function declares, and locals it writes
    only on paths that end in `return(R);`, which go by value. Writes through pointers it
@@ -4603,7 +4617,9 @@ static MagickBooleanType ExtendXMLBuffer(char **source,const size_t *length,
 **Careful:**
 
 - On a failure path the caller returns from the same point as before, with the same
-  value: a constant, or what the block left behind the pointer.
+  value: a constant, what the block left behind the pointer, or a local of the caller
+  that nothing in the block writes (step 2), read after the call as it was read at the
+  block's `return`.
 - Under step 8 the failure path is the same with no value: the caller's `return;` runs
   directly after the helper's `return(MagickFalse);`, where the block's `return;` stood,
   after every statement the block ran before it.
@@ -10052,6 +10068,10 @@ recipe turns control flow into data.
    The labels may instead all be character constants when `n` is a parameter of type
    `char` (a predicate Recipe EC made), each the value of a member of the basic
    character set (C11 5.2.1), so that it is representable in `char` and non-negative.
+   When `n` is a parameter of type `int`, the labels may be character constants and
+   integer literals mixed (2026-11-13; `geometry-parse.c`'s
+   `IsGeometryAdvanceCharacter`, `case '-': ... case 215: case 'e':`), and the table is
+   of `int`.
    Index form: the labels are the integer literals `0` to `k` in increasing order, one
    per case, each case's body is `return(vi);` of a constant `vi` (a string literal, a
    numeric literal or an enumeration constant), there is no `default:` or it is `break;`
@@ -10134,6 +10154,10 @@ static const char *poly_basis_str(ssize_t n)
   `char` (C11 6.2.5p3), so the element initialised from it holds the same value, and
   `T[i] == n` promotes both `char` operands to `int` and compares the values the `case`
   compared.
+- Integer labels on an `int` parameter. A `case` converts its constant to the promoted
+  type of `n`, here `int` itself (C11 6.8.4.2p5); a character constant and an integer
+  literal that fits in `int` are already `int` values, so the `int` element initialised
+  from each holds the value the `case` compared, and `T[i] == n` compares two `int`s.
 - Index form. For `0 <= n <= k` the `switch` returns `vn`; the table's element `n` is
   `vn` (step 5), of the return type, so `T[n]` is the value the `return` converted.
   Otherwise the `switch` falls through to `return(d);`. The count `sizeof(T)/sizeof(*T)`
@@ -10895,6 +10919,23 @@ the caller (a *Bumpy Road Ahead* in `AcquireRidgesKernel`, 3.08 in a probe).
    added once (the loop's start) and every value still present; `--calls` moves the
    copies' callees and `R`'s callee down by the copies less one, and the helper up by
    two.
+
+8. Records and a `void` caller (2026-11-13). The copies may differ in two constants, a
+   numeric literal (the same value at each of its positions in one copy, as Recipe D's
+   *One value at several positions*) and a string literal, and each copy may write its
+   own local, the copies being the same once those locals are renamed to one name
+   (Recipe D's renaming) and the constants replaced: `years=ttl/31536000;
+   seconds=ttl % 31536000; if (seconds == 0) { (void) FormatLocaleString(timeString,
+   MagickPathExtent,"%lld years",years); return; }`, then `months` with `2628000`, and
+   so on (`resource.c`'s `FormatTimeToLive`). The table is then of a `typedef struct`
+   with one member per constant, the numeric one of the type of the other operand of
+   the arithmetic it takes part in (`MagickSizeType` for `ttl/31536000`, which the
+   usual arithmetic conversions bring to that type), the string one `const char *`, one
+   element `{ n, "s" }` per copy; the renamed local is declared once in the helper, of
+   the type every copy's local had. In a `void` caller each exit is `return;`: it
+   becomes `return(MagickFalse);` and step 6 writes `if (Helper(...) == MagickFalse)
+   return;`, as Recipe W step 8 does. A string used as a format reaches the callee as
+   a pointer to the same characters (*Careful*).
 
 **Before:**
 
@@ -13533,6 +13574,15 @@ on", so this recipe returns a result and sets a flag, as Recipe BR does for a br
    same iteration reads the same struct, since nothing between the fill and that call writes
    a member's variable), then the written variables by pointer in the order the block first
    writes them, then `broke`: at most four parameters.
+   When the written variables, one pointer each, would take the call past four
+   parameters (2026-11-13), their addresses go in one `const` targets struct, Recipe LB
+   step 8's form (Recipe I steps 3, 5 and 6): a `typedef struct` directly above the new
+   function with one pointer member per written variable, in the order the block first
+   writes them, under its name and holding addresses only; the caller declares it
+   `const` with the addresses as its initialiser among the declarations at the top of
+   the block that holds the call, the function takes it after the input struct and
+   before `broke`, binds each member once (`T *const v = targets->v;`) and writes `(*v)`
+   as step 2 says. Each written variable still meets step 2.
 5. The caller declares `MagickBooleanType broke = MagickFalse;` once among the declarations at
    the top of its body (Recipe BR step 5). Where the block stood write, as two statements at the
    level where the block stood, `if (Helper(...,&broke) == MagickFalse) continue;` and directly
@@ -14636,6 +14686,215 @@ macro's eight `if`s count in it) (campaign A, W22 lane c). Earlier lanes saw it 
 a probe but no recipe covered the macro. After Recipes RD and HN, 3.70 to 3.90 in a probe, no
 finding on a new function. Added by Claude Code (Claude Opus 5.5) under the owner's OK of
 2026-11-10 to evolve the recipes.
+
+---
+
+## Recipe UR - Unnest a Repeated Test of the Guard's Own Condition
+
+**Use when:** CodeScene reports *Deep, Nested Complexity* (or *Bumpy Road Ahead*), and the
+deepest level is a guard that ends by testing its own condition again: `if (C) { S if (C)
+X }`, typically an allocation made only when a pointer is still `NULL`, followed by the
+failure test of that same pointer, as `draw.c`'s `ConvertPathToPolygon` does for a new
+subpath's point array (`if (points == NULL) { number_points=16; points=Acquire...; if
+(points == NULL) { throw; return(...); } }`). The failure exit records `GetMagickModule()`
+and stays in the function, so no extraction takes the nested `if` away.
+
+**Not covered by:** Recipe SG, whose shape (b) spreads `G` over `if ((G) && (B))` and
+requires that `S` write nothing `G` reads (here `S` assigns the very variable `C` tests);
+Recipe UX, whose guard is a disjunction `(A) || (B)` and whose inner test chooses between
+two exits; Recipe CN, whose outer `if` holds the inner one and nothing else; Recipes E, V,
+W and I, which move the block, and with it the throw, into a helper.
+
+**How:**
+
+1. Find `if (C) { S if (C) X }` outside every OpenMP region: the outer `if` has no `else`;
+   its braces hold no declaration, label or preprocessor line; `S` is one or more
+   statements; the last statement in the braces is `if (C) X` with no `else`, whose
+   condition is the outer condition's text, character for character.
+2. `C` has no side effect: comparisons and logical operators over variables and
+   constants, no call, assignment, increment or `volatile` object.
+3. Rewrite it as two statements at the outer `if`'s indentation: `if (C) { S }`, the
+   outer condition and `S` unchanged; then `if (C) X`, moved out unchanged and re-indented
+   one level up. Nothing else changes.
+4. Run `tools/ci_warnings.sh <file>`, `tools/cxx_warnings.sh <file>`,
+   `refactor_guard.py` (the literals of `C` may count once more: a WARN whose counts only
+   rose, every value present; name it in the commit message), and the oracle for the
+   function.
+
+**Before:**
+
+```c
+        if (points == (PointInfo *) NULL)
+          {
+            number_points=16;
+            points=(PointInfo *) AcquireQuantumMemory((size_t) number_points,
+              sizeof(*points));
+            if (points == (PointInfo *) NULL)
+              {
+                (void) ThrowMagickException(exception,GetMagickModule(),
+                  ResourceLimitError,"MemoryAllocationFailed","`%s'","");
+                return(DestroyPolygonInfo(polygon_info));
+              }
+          }
+```
+
+**After:**
+
+```c
+        if (points == (PointInfo *) NULL)
+          {
+            number_points=16;
+            points=(PointInfo *) AcquireQuantumMemory((size_t) number_points,
+              sizeof(*points));
+          }
+        if (points == (PointInfo *) NULL)
+          {
+            (void) ThrowMagickException(exception,GetMagickModule(),
+              ResourceLimitError,"MemoryAllocationFailed","`%s'","");
+            return(DestroyPolygonInfo(polygon_info));
+          }
+```
+
+**Careful:**
+
+- Why the behaviour is the same, path by path. If `C` is false at the outer test, the
+  original runs nothing; the new code skips `S` and evaluates `C` again: nothing ran
+  between the two evaluations and `C` has no side effect (step 2), so it is false again
+  and `X` is skipped too. If `C` is true, the original runs `S` and then evaluates `C`;
+  the new code runs `S` and then evaluates the same text at the same point, reading what
+  `S` left, and runs `X` exactly when the original did.
+- Unlike Recipe SG, `S` may write what `C` reads: the second test is evaluated after `S`
+  in both forms, and the case in which the two forms could differ (`C` false at first)
+  runs no statement in between.
+- `X` need not leave: the inner `if` was the last statement in the braces, so in both
+  forms nothing follows it but what follows the outer `if`.
+- The step adds a decision (cyclomatic complexity `+1`) and removes a level of nesting,
+  so it pays only where the depth is the finding that matters.
+
+**Evidence level:** oracle, with steps 1 and 2 checked by reading.
+
+**Provenance:** 2026-11-13, from `draw.c`'s `ConvertPathToPolygon` (campaign B, M127):
+the new-subpath allocation keeps the function at nesting depth 4 once the edge growth
+(Recipe V) and the subpath flush (Recipe I) have left; the probed end state of the three
+steps takes the function out of *Deep, Nested Complexity*, 2.62 to 2.68. Added by Claude
+Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
+
+---
+
+## Recipe KP - Peel a Keyed Flag Group out of a Loop's Switch Through a Lookup Table
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Brain Method* on a
+function whose loop body ends in a `switch (c)` over a character in which a run of
+groups, one label each, are the same statements but for the enumeration constant each
+ORs into a flags variable, as `geometry-parse.c`'s `GetGeometry` and `ParseGeometry`
+do for the seven meta characters (`case '%': flags|=PercentValue;
+(void) CopyMagickString(p,p+1,MagickPathExtent); break;`, then `!`, `<`, `>`, `#`, `^`,
+`@`).
+
+**Not covered by:** Recipe PA, whose peeled group is one body under many labels (here
+each label has its own constant); Recipe KL, whose roles are a string and a numeric
+literal and whose run stays in the `switch`'s `default:`; Recipes KS and KR, which
+replace a whole function that is one `switch`; Recipe SV, which keeps one group per
+label; Recipe SD, which keeps the labels in a new `switch` (a new *Complex Method*).
+
+**How:**
+
+1. The `switch (c)` is the last statement of the body of a `for` or `while` loop outside
+   every OpenMP region, with no `#` line in it; `c` is a local `int` that nothing in the
+   `switch` assigns. The run is two or more groups, each one label `Li` (a character
+   constant or an integer literal), none falling into another or out of it, whose bodies
+   are the same token sequence `f|=Ki; S break;` once the enumeration constant `Ki` is
+   replaced by a name: `f` a local the caller declares, `S` statements with no
+   declaration, `break`, `continue`, `return` or `goto`. Every `Ki` is nonzero, and no
+   `Li` occurs in another group. The loop's increment expression is empty.
+2. Directly above the first function that uses it write `typedef struct` with members
+   `int key` and one member `flag` of `f`'s type, then a `static const` array of that
+   type with no size, one element `{ Li, Ki }` per group in the `switch`'s order.
+3. Below it write a `static inline` lookup function of `f`'s type taking `const int c`:
+   `size_t i;`, `for (i=0; i < (sizeof(T)/sizeof(*T)); i++) if (T[i].key == c)
+   return(T[i].flag);` and `return(NoValue);` (the constant `0` of the flag type that
+   the file uses for "no flag").
+4. Delete the run's groups. Directly before the `switch`, write `flag=Lookup(c);` and
+   `if (flag != NoValue) { f|=flag; S continue; }`, with `S` the groups' common text, and
+   declare `flag` beside `f` in the caller, of the same type.
+5. *Several sites.* A loop in another function of the file whose run has the same labels
+   and constants uses the same table and lookup function.
+6. Check by script that every deleted label is the key of exactly one element holding the
+   constant its group ORed in, that `S` is each deleted group's text without the `f|=Ki;`
+   and the `break;`, and that nothing else in the `switch` changed.
+
+**Before:**
+
+```c
+    switch (c)
+    {
+      case '%':
+      {
+        flags|=PercentValue;
+        (void) CopyMagickString(p,p+1,MagickPathExtent);
+        break;
+      }
+      case '!':
+      ...
+      case '@':
+      {
+        flags|=AreaValue;
+        (void) CopyMagickString(p,p+1,MagickPathExtent);
+        break;
+      }
+      case '(':
+      ...
+```
+
+**After:**
+
+```c
+static const GeometryMetaFlag
+  GeometryMetaFlags[] =
+  {
+    { '%', PercentValue },
+    ...
+    { '@', AreaValue }
+  };
+...
+    flag=GetGeometryMetaFlag(c);
+    if (flag != NoValue)
+      {
+        flags|=flag;
+        (void) CopyMagickString(p,p+1,MagickPathExtent);
+        continue;
+      }
+    switch (c)
+    {
+      case '(':
+      ...
+```
+
+**Careful:**
+
+- Why the behaviour is the same. For a `c` equal to some `Li` the lookup returns `Ki`,
+  nonzero, so the new `if` runs `f|=Ki;` and `S`, as the group did; `continue;` goes to
+  the loop's test as the group's `break;` did, since the `switch` ends the body and the
+  increment is empty (step 1). For any other `c` the lookup returns `NoValue`, the `if`
+  does nothing, and the `switch` sends `c` to the group it went to before, the deleted
+  labels being disjoint from the others.
+- The table's `key` is `int`, so a character constant or literal label keeps the value
+  the `case` compared with the promoted `c` (Recipe TB's *Integer labels*); `flag` has
+  `f`'s type, so `f|=flag` ORs the value `f|=Ki` ORed.
+- The lookup reads a `static const` table and has no side effect; the order of the
+  comparisons changes, which is speed only (the loop runs per character of a geometry
+  string, not per pixel).
+- A new table is data only this file reads; no existing table changes.
+
+**Evidence level:** oracle (the cases that reach each loop's function), with step 6
+checked by script.
+
+**Provenance:** 2026-11-13, from `geometry-parse.c`'s `GetGeometry` and `ParseGeometry`
+(campaign B, M127 lane b round 3): a probe 7.40 to 7.60, cc 35 and 39 to 30 and 34; the
+lookup written as a `switch` was itself a *Complex Method* (cc 9) and gained 0.02. Added
+by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
 
 ---
 
@@ -16025,3 +16284,10 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | GS | Group a Cleanup Macro's Locals into Sets Released in Its Order: a function-local macro of guarded `DestroyImage` calls over locals of a few same-shaped sets becomes one struct type and one release function per set, called in the macro's order; each acquisition chain becomes a function filling its set, the final chain a function returning the result. *Careful* gives the argument (every exit releases the same non-`NULL` images in the same order; the result is returned on the same path; an unreleased temporary stays unreleased) | `composite.c`'s `BlendDivergentImage` (cc 20, 114 lines) (campaign A, W22 lane c): after Recipes RD and HN, 3.70 to 3.90 in a probe | owner |
 | 2026-11-13 | NEW | WP | Fold Wrapper Prologues into One Function and a Guard in Each Callee: wrappers that assert, optionally log, test a precondition of one of a few kinds, fetch a resource that may be `NULL` and return their `static` worker's result become one statement `return(Worker(image,getNameEnvironment(image,Kind,__func__,exception),...));`; the prologue function keeps the asserts, the log (under the wrapper's `__func__`, `NULL` for a wrapper that did not log), the test and the fetch in order, and each worker returns the failure value first when the resource is `NULL`. *Careful* gives the argument (same side effects in the same order, the fetch only where it ran, the worker's guard before anything of its own) | `accelerate.c`'s `Accelerate*Image` wrappers (campaign A, W22 lane d): ten wrappers in *Code Duplication*; D, CF, W, E and G leave a test in each wrapper, which stays flagged; four wrappers in this form, 3.27 to 3.71 in a probe | owner |
 | 2026-11-13 | AMEND | F | Step 1 (*Automatic form*): an automatic array of `const` string pointers, or of pointers to such arrays, whose initialiser holds only string literals, a null pointer and the names of other moved arrays, moves as `static` when every use is an element read, an argument to a pointer-to-`const` parameter whose callee keeps no copy past the call, or a member of a local struct the function only reads. *Careful* gives the argument (const-valued data nothing writes, the same address to the same callees, lifetimes distinguishable only by a use after return, which step 1 refuses); the evidence is the oracle plus the data-section comparison, since the caller's code loses the stores that built the array | `animate.c`'s `XAnimateImages` (campaign A, W22 lane d, wide build): `CommandMenu`, `AnimateMenu`, `SpeedMenu`, `DirectionMenu`, `HelpMenu` and `Menus` are 48 lines of the function's 726; Recipe F handled only `static` declarations | owner |
+| 2026-11-13 | NEW | UR | Unnest a repeated test of the guard's own condition: `if (C) { S if (C) X }` becomes `if (C) { S }` and `if (C) X` for a side-effect-free `C`, even when `S` writes what `C` reads (the forms can differ only when `C` was false, and then nothing runs between the two tests); evidence oracle | `draw.c`'s `ConvertPathToPolygon` (the new-subpath allocation and its failure test, the last depth-4 site; chain probe 2.62 to 2.68); SG requires `S` not to write `G`'s reads, UX needs a disjunction | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | I | Step 8: V step 7's `S return(<expr>);` with a calling expression may be left in the caller, and `S` and the expression may read and write the written variables, as the macro form may (the writes land through the members before the helper returns) | `draw.c`'s `ConvertPathToPolygon`: the subpath flush writes `number_edges`, `points`, `ghostline` and `edge`, and its exit releases `points` before `return(DestroyPolygonInfo(polygon_info));`; chain probe 2.62 to 2.68 | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | LX | Step 4: written variables whose pointers would take the call past four parameters go in one `const` targets struct (Recipe LB step 8's form), taken after the input struct and before `broke` | `cache.c`'s `GetVirtualPixelRows`: the single-pixel transfer writes `length`, `q` and `s`, continues the column loop and breaks it when the fetch fails; with the input struct and `broke` the pointers would give six parameters | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | TB | Step 1: on a parameter of type `int`, the membership labels may be character constants and integer literals mixed, the table of `int` (*Careful*: integer labels); Lane: b | `geometry-parse.c`'s `IsGeometryAdvanceCharacter` (sixteen labels, `215` among them, cc 18; probe 7.04 to 7.40); the character form needs a `char` parameter | mandate (2026-10-24) |
+| 2026-11-13 | NEW | KP | Peel a run of one-label groups that OR a different enumeration constant into a flags variable out of a loop's character `switch`, through a `static const` table of `{ key, flag }` and a lookup before the `switch`; evidence oracle; Lane: b | `geometry-parse.c`'s `GetGeometry` and `ParseGeometry` (seven meta characters each; probe 7.40 to 7.60); PA needs one shared body, KL a string and a numeric literal | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | W | Step 2: `R` may be a plain local of the caller that the block neither writes nor takes the address of; Lane: b | `splay-tree.c`'s `RemoveNodeFromSplayTree` (`return(value);`, `value` set before the block), the twin of `DeleteNodeFromSplayTree`'s `return(MagickFalse);` block (probe 8.54 to 8.81) | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | RT | Step 8: copies differing in a numeric and a string literal (a table of two-member records), each writing its own renamed local, in a `void` caller whose exits are `return;`; Lane: b | `resource.c`'s `FormatTimeToLive` (six unit copies); with it the file's line budget admits the helpers of `AcquireMagickResource` (probe 8.46 to 8.97 over three steps) | mandate (2026-10-24) |

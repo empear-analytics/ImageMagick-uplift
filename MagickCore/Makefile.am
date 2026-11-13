@@ -81,6 +81,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/animate.h \
   MagickCore/animate-private.h \
   MagickCore/annotate.c \
+  MagickCore/annotate-metrics.c \
   MagickCore/annotate.h \
   MagickCore/artifact.c \
   MagickCore/artifact.h \
@@ -107,8 +108,10 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/client.c \
   MagickCore/client.h \
   MagickCore/coder.c \
+  MagickCore/coder-list.c \
   MagickCore/coder.h \
   MagickCore/color.c \
+  MagickCore/color-tuple.c \
   MagickCore/color-equivalent.c \
   MagickCore/color.h \
   MagickCore/color-private.h \
@@ -130,16 +133,19 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/composite.h \
   MagickCore/composite-private.h \
   MagickCore/compress.c \
+  MagickCore/compress-lzw.c \
   MagickCore/compress.h \
   MagickCore/configure.c \
   MagickCore/configure-paths.c \
   MagickCore/configure.h \
   MagickCore/constitute.c \
+  MagickCore/constitute-pixels.c \
   MagickCore/constitute.h \
   MagickCore/decorate.c \
   MagickCore/decorate-raise.c \
   MagickCore/decorate.h \
   MagickCore/delegate.c \
+  MagickCore/delegate-invoke.c \
   MagickCore/delegate.h \
   MagickCore/delegate-private.h \
   MagickCore/deprecate.c \
@@ -171,6 +177,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/enhance-level-colors.c \
   MagickCore/enhance.h \
   MagickCore/exception.c \
+  MagickCore/exception-throw.c \
   MagickCore/exception.h \
   MagickCore/exception-private.h \
   MagickCore/feature.c \
@@ -195,6 +202,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/identify.c \
   MagickCore/identify.h \
   MagickCore/image.c \
+  MagickCore/image-settings.c \
   MagickCore/image-filename.c \
   MagickCore/image.h \
   MagickCore/image-private.h \
@@ -209,6 +217,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/list.c \
   MagickCore/list.h \
   MagickCore/locale.c \
+  MagickCore/locale-format.c \
   MagickCore/locale_.h \
   MagickCore/log.c \
   MagickCore/log.h \
@@ -220,9 +229,11 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/magick-type.h \
   MagickCore/magick.h \
   MagickCore/matrix.c \
+  MagickCore/matrix-gauss.c \
   MagickCore/matrix.h \
   MagickCore/matrix-private.h \
   MagickCore/memory.c \
+  MagickCore/memory-quantum.c \
   MagickCore/memory_.h \
   MagickCore/memory-private.h \
   MagickCore/method-attribute.h \
@@ -249,12 +260,15 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/opencl.h \
   MagickCore/opencl-private.h \
   MagickCore/option.c \
+  MagickCore/option-image.c \
   MagickCore/option.h \
   MagickCore/option-private.h \
   MagickCore/paint.c \
   MagickCore/paint-floodfill.c \
   MagickCore/paint.h \
   MagickCore/pixel.c \
+  MagickCore/pixel-fuzzy.c \
+  MagickCore/pixel-gamma.c \
   MagickCore/pixel-import.c \
   MagickCore/pixel-export.c \
   MagickCore/pixel.h \
@@ -276,6 +290,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/quantize-posterize.c \
   MagickCore/quantize.h \
   MagickCore/quantum.c \
+  MagickCore/quantum-type.c \
   MagickCore/quantum.h \
   MagickCore/quantum-export.c \
   MagickCore/quantum-import.c \
@@ -326,6 +341,8 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/stream.h \
   MagickCore/stream-private.h \
   MagickCore/string.c \
+  MagickCore/string-copy.c \
+  MagickCore/string-info.c \
   MagickCore/string-argv.c \
   MagickCore/string-si.c \
   MagickCore/string_.h \
@@ -338,6 +355,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/timer.h \
   MagickCore/timer-private.h \
   MagickCore/token.c \
+  MagickCore/token-isglob.c \
   MagickCore/token-next.c \
   MagickCore/token-glob.c \
   MagickCore/token.h \
@@ -372,6 +390,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/widget.h \
   MagickCore/widget-private.h \
   MagickCore/xml-tree.c \
+  MagickCore/xml-tree-file.c \
   MagickCore/xml-tree.h \
   MagickCore/xml-tree-private.h \
   MagickCore/xwindow.c \
