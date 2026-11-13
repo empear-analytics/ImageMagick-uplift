@@ -694,6 +694,14 @@ MagickExport char *GetConfigureOption(const char *option)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void ReportMissingConfigureFile(LinkedListInfo *options,
+  const char *filename,ExceptionInfo *exception)
+{
+  if (GetNumberOfElementsInLinkedList(options) == 0)
+    (void) ThrowMagickException(exception,GetMagickModule(),ConfigureWarning,
+      "UnableToOpenConfigureFile","`%s'",filename);
+}
+
 MagickExport LinkedListInfo *GetConfigureOptions(const char *filename,
   ExceptionInfo *exception)
 {
@@ -754,9 +762,7 @@ MagickExport LinkedListInfo *GetConfigureOptions(const char *filename,
         }
     }
 #endif
-  if (GetNumberOfElementsInLinkedList(options) == 0)
-    (void) ThrowMagickException(exception,GetMagickModule(),ConfigureWarning,
-      "UnableToOpenConfigureFile","`%s'",filename);
+  ReportMissingConfigureFile(options,filename,exception);
   ResetLinkedListIterator(options);
   return(options);
 }
