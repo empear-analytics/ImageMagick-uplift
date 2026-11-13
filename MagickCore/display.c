@@ -14448,6 +14448,12 @@ typedef struct _ROIContext
 
   Cursor
     cursor;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    *text;
 } ROIContext;
 
 static void XROIPointerCommand(const ROIContext *context,
@@ -14611,6 +14617,42 @@ static void XROIPointerEvent(const ROIContext *context,
   }
 }
 
+static void XROITrackPointer(const ROIContext *context,
+  const ROITargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  do
+  {
+    if (context->windows->info.mapped != MagickFalse)
+      {
+        /*
+          Display pointer position.
+        */
+        (void) FormatLocaleString(context->text,MagickPathExtent," %+ld%+ld ",
+          (long) (*roi_info).x,(long) (*roi_info).y);
+        XInfoWidget(context->display,context->windows,context->text);
+      }
+    /*
+      Wait for next event.
+    */
+    XScreenEvent(context->display,context->windows,event,context->exception);
+    if ((*event).xany.window == context->windows->command.id)
+      {
+        XROIPointerCommand(context,targets);
+        continue;
+      }
+    XROIPointerEvent(context,targets);
+  } while (((*state) & ExitState) == 0);
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -14673,28 +14715,9 @@ static MagickBooleanType XROIImage(Display *display,
   context.resource_info=resource_info;
   context.windows=windows;
   context.cursor=cursor;
-  do
-  {
-    if (windows->info.mapped != MagickFalse)
-      {
-        /*
-          Display pointer position.
-        */
-        (void) FormatLocaleString(text,MagickPathExtent," %+ld%+ld ",
-          (long) roi_info.x,(long) roi_info.y);
-        XInfoWidget(display,windows,text);
-      }
-    /*
-      Wait for next event.
-    */
-    XScreenEvent(display,windows,&event,exception);
-    if (event.xany.window == windows->command.id)
-      {
-        XROIPointerCommand(&context,&targets);
-        continue;
-      }
-    XROIPointerEvent(&context,&targets);
-  } while ((state & ExitState) == 0);
+  context.exception=exception;
+  context.text=text;
+  XROITrackPointer(&context,&targets);
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask);
   if ((state & EscapeState) != 0)
