@@ -18848,24 +18848,24 @@ static DisplayCommand
     QuitCommand
   };
 
+static DisplayCommand
+  *Commands[MagickMenus] =
+  {
+    FileCommands,
+    EditCommands,
+    ViewCommands,
+    TransformCommands,
+    EnhanceCommands,
+    EffectsCommands,
+    FXCommands,
+    ImageEditCommands,
+    MiscellanyCommands,
+    HelpCommands
+  };
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
-  static DisplayCommand
-    *Commands[MagickMenus] =
-    {
-      FileCommands,
-      EditCommands,
-      ViewCommands,
-      TransformCommands,
-      EnhanceCommands,
-      EffectsCommands,
-      FXCommands,
-      ImageEditCommands,
-      MiscellanyCommands,
-      HelpCommands
-    };
-
   char
     command[MagickPathExtent],
     *directory,
