@@ -13685,6 +13685,40 @@ static void XPastePress(const PasteCommandInput *input,const XEvent *event,
   (*paste_info).y=(ssize_t) windows->image.y+(*event).xbutton.y;
 }
 
+static void XPasteRelease(const PasteCommandInput *input,const XEvent *event,
+  const PasteTargets *targets)
+{
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  RectangleInfo
+    *const paste_info = targets->paste_info;
+
+  size_t
+    *const state = targets->state;
+
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Button Release: 0x%lx %u +%d+%d",(*event).xbutton.window,
+      (*event).xbutton.button,(*event).xbutton.x,(*event).xbutton.y);
+  if ((*event).xbutton.button != Button1)
+    return;
+  if ((*event).xbutton.window != windows->image.id)
+    return;
+  if (((*paste_info).width != 0) && ((*paste_info).height != 0))
+    {
+      /*
+        User has selected the location of the paste image.
+      */
+      (*paste_info).x=(ssize_t) windows->image.x+(*event).xbutton.x;
+      (*paste_info).y=(ssize_t) windows->image.y+(*event).xbutton.y;
+      (*state)|=ExitState;
+    }
+}
+
 static MagickBooleanType XPasteImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -13803,23 +13837,7 @@ static MagickBooleanType XPasteImage(Display *display,
       }
       case ButtonRelease:
       {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Button Release: 0x%lx %u +%d+%d",event.xbutton.window,
-            event.xbutton.button,event.xbutton.x,event.xbutton.y);
-        if (event.xbutton.button != Button1)
-          break;
-        if (event.xbutton.window != windows->image.id)
-          break;
-        if ((paste_info.width != 0) && (paste_info.height != 0))
-          {
-            /*
-              User has selected the location of the paste image.
-            */
-            paste_info.x=(ssize_t) windows->image.x+event.xbutton.x;
-            paste_info.y=(ssize_t) windows->image.y+event.xbutton.y;
-            state|=ExitState;
-          }
+        XPasteRelease(&command_input,&event,&paste_targets);
         break;
       }
       case Expose:
