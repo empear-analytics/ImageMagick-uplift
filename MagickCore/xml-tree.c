@@ -2721,6 +2721,108 @@ static MagickBooleanType SkipToRootTag(char **p,ExceptionInfo *exception)
   return(MagickTrue);
 }
 
+typedef struct _XMLStartTagInput
+{
+  XMLTreeRoot
+    *root;
+
+  char
+    *tag;
+
+  int
+    terminal;
+
+  ExceptionInfo
+    *exception;
+} XMLStartTagInput;
+
+typedef struct _XMLStartTagTargets
+{
+  char
+    ***attribute,
+    ***attributes,
+    **p;
+
+  ssize_t
+    *l;
+
+  size_t
+    *ignore_depth;
+} XMLStartTagTargets;
+
+static MagickBooleanType ParseXMLStartTag(const XMLStartTagInput *input,
+  const XMLStartTagTargets *targets)
+{
+  char
+    ***const attribute = targets->attribute,
+    ***const attributes = targets->attributes,
+    **const p = targets->p;
+
+  ssize_t
+    *const l = targets->l;
+
+  size_t
+    *const ignore_depth = targets->ignore_depth;
+
+  XMLTreeRoot
+    *const root = input->root;
+
+  char
+    *const tag = input->tag;
+
+  const int
+    terminal = input->terminal;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  AttributeSectionInfo
+    section;
+
+  AttributeSectionTargets
+    section_targets;
+
+  StartTagInfo
+    start_tag;
+
+  StartTagTargets
+    start_tag_targets;
+
+  /*
+    Tag.
+  */
+  if (root->node == (XMLTreeInfo *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        OptionWarning,"ParseError","root tag missing");
+      return(MagickFalse);
+    }
+  (*p)+=(ptrdiff_t) strcspn((*p),XMLWhitespace "/>");
+  while (isspace((int) ((unsigned char) *(*p))) != 0)
+    *(*p)++='\0';
+  section.root=root;
+  section.tag=tag;
+  section.ignore_depth=(*ignore_depth);
+  section.exception=exception;
+  section_targets.attribute=attribute;
+  section_targets.attributes=attributes;
+  section_targets.p=p;
+  section_targets.l=l;
+  if (ParseStartTagAttributes(&section,&section_targets) == MagickFalse)
+    return(MagickFalse);
+  start_tag.root=root;
+  start_tag.tag=tag;
+  start_tag.attributes=(*attributes);
+  start_tag.l=(*l);
+  start_tag.terminal=terminal;
+  start_tag.exception=exception;
+  start_tag_targets.p=p;
+  start_tag_targets.ignore_depth=ignore_depth;
+  if (EndStartTag(&start_tag,&start_tag_targets) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 typedef struct _XMLTreeUTF8Targets
 {
   char
@@ -2815,53 +2917,17 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
     c=(*p);
     if (IsXMLNameStart(p,c) != MagickFalse)
       {
-        AttributeSectionInfo
-          section;
+        const XMLStartTagTargets
+          start_targets = { &attribute, &attributes, &p, &l, &ignore_depth };
 
-        AttributeSectionTargets
-          section_targets;
+        XMLStartTagInput
+          start_input;
 
-        StartTagInfo
-          start_tag;
-
-        StartTagTargets
-          start_tag_targets;
-
-        /*
-          Tag.
-        */
-        if (root->node == (XMLTreeInfo *) NULL)
-          {
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              OptionWarning,"ParseError","root tag missing");
-            utf8=DestroyString(utf8);
-            return(&root->root);
-          }
-        p+=(ptrdiff_t) strcspn(p,XMLWhitespace "/>");
-        while (isspace((int) ((unsigned char) *p)) != 0)
-          *p++='\0';
-        section.root=root;
-        section.tag=tag;
-        section.ignore_depth=ignore_depth;
-        section.exception=exception;
-        section_targets.attribute=(&attribute);
-        section_targets.attributes=(&attributes);
-        section_targets.p=(&p);
-        section_targets.l=(&l);
-        if (ParseStartTagAttributes(&section,&section_targets) == MagickFalse)
-          {
-            utf8=DestroyString(utf8);
-            return(&root->root);
-          }
-        start_tag.root=root;
-        start_tag.tag=tag;
-        start_tag.attributes=attributes;
-        start_tag.l=l;
-        start_tag.terminal=terminal;
-        start_tag.exception=exception;
-        start_tag_targets.p=(&p);
-        start_tag_targets.ignore_depth=(&ignore_depth);
-        if (EndStartTag(&start_tag,&start_tag_targets) == MagickFalse)
+        start_input.root=root;
+        start_input.tag=tag;
+        start_input.terminal=terminal;
+        start_input.exception=exception;
+        if (ParseXMLStartTag(&start_input,&start_targets) == MagickFalse)
           {
             utf8=DestroyString(utf8);
             return(&root->root);
