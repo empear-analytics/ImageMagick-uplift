@@ -2319,6 +2319,64 @@ static inline MagickBooleanType IsDotDirectoryEntry(const char *name)
     (LocaleCompare(name,"..") == 0)) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _FileListDirectoryTargets
+{
+  DIR
+    **current_directory;
+
+  size_t
+    *max_entries;
+
+  char
+    ***filelist;
+
+  struct dirent
+    **buffer;
+} FileListDirectoryTargets;
+
+static MagickBooleanType OpenFileListDirectory(const char *directory,
+  const FileListDirectoryTargets *targets)
+{
+  DIR
+    **const current_directory = targets->current_directory;
+
+  size_t
+    *const max_entries = targets->max_entries;
+
+  char
+    ***const filelist = targets->filelist;
+
+  struct dirent
+    **const buffer = targets->buffer;
+
+  (*current_directory)=opendir(directory);
+  if ((*current_directory) == (DIR *) NULL)
+    return(MagickFalse);
+  /*
+    Allocate filelist.
+  */
+  (*max_entries)=2048;
+  (*filelist)=(char **) AcquireQuantumMemory((size_t) (*max_entries),
+    sizeof(*(*filelist)));
+  if ((*filelist) == (char **) NULL)
+    {
+      (void) closedir((*current_directory));
+      return(MagickFalse);
+    }
+  /*
+    Save the current and change to the new directory.
+  */
+  (*buffer)=(struct dirent *) AcquireMagickMemory(sizeof(*(*buffer))+
+    FILENAME_MAX+1);
+  if ((*buffer) == (struct dirent *) NULL)
+    {
+      (*filelist)=(char **) RelinquishMagickMemory((*filelist));
+      (void) closedir((*current_directory));
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickPrivate char **ListFiles(const char *directory,const char *pattern,
   size_t *number_entries)
 {
@@ -2335,6 +2393,9 @@ MagickPrivate char **ListFiles(const char *directory,const char *pattern,
   size_t
     max_entries;
 
+  FileListDirectoryTargets
+    directory_targets;
+
   /*
     Open directory.
   */
@@ -2344,30 +2405,12 @@ MagickPrivate char **ListFiles(const char *directory,const char *pattern,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",directory);
   *number_entries=0;
-  current_directory=opendir(directory);
-  if (current_directory == (DIR *) NULL)
+  directory_targets.current_directory=(&current_directory);
+  directory_targets.max_entries=(&max_entries);
+  directory_targets.filelist=(&filelist);
+  directory_targets.buffer=(&buffer);
+  if (OpenFileListDirectory(directory,&directory_targets) == MagickFalse)
     return((char **) NULL);
-  /*
-    Allocate filelist.
-  */
-  max_entries=2048;
-  filelist=(char **) AcquireQuantumMemory((size_t) max_entries,
-    sizeof(*filelist));
-  if (filelist == (char **) NULL)
-    {
-      (void) closedir(current_directory);
-      return((char **) NULL);
-    }
-  /*
-    Save the current and change to the new directory.
-  */
-  buffer=(struct dirent *) AcquireMagickMemory(sizeof(*buffer)+FILENAME_MAX+1);
-  if (buffer == (struct dirent *) NULL)
-    {
-      filelist=(char **) RelinquishMagickMemory(filelist);
-      (void) closedir(current_directory);
-      return((char **) NULL);
-    }
   while ((MagickReadDirectory(current_directory,buffer,&entry) == 0) &&
          (entry != (struct dirent *) NULL))
   {
