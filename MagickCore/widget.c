@@ -7038,6 +7038,9 @@ typedef struct _FileBrowserWidgets
     *expose_info,
     *text_info,
     *selection_info;
+
+  XEvent
+    *event;
 } FileBrowserWidgets;
 
 typedef struct _FileBrowserContext
@@ -8324,6 +8327,63 @@ static void RedrawFileBrowserList(const FileBrowserContext *context,
   (*state)&=(unsigned int) (~RedrawListState);
 }
 
+static MagickBooleanType WaitForFileBrowserEvent(
+  const FileBrowserContext *context,const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info,
+    *const north_info = widgets->north_info,
+    *const south_info = widgets->south_info;
+
+  size_t
+    *const files = widgets->files,
+    *const delay = widgets->delay;
+
+  XEvent
+    *const event = widgets->event;
+
+  if ((*north_info).raised && (*south_info).raised)
+    (void) XIfEvent(display,event,XScreenEvent,(char *) windows);
+  else
+    {
+      /*
+        Brief delay before advancing scroll bar.
+      */
+      XDelay(display,(*delay));
+      (*delay)=SuspendTime;
+      (void) XCheckIfEvent(display,event,XScreenEvent,(char *) windows);
+      if (((*north_info).raised == MagickFalse) && ((*slider_info).id > 0))
+        {
+          /*
+            Move slider up.
+          */
+          (*slider_info).id--;
+          (*state)|=RedrawListState;
+        }
+      if (((*south_info).raised == MagickFalse) &&
+          ((*slider_info).id < (int) (*files)))
+        {
+          /*
+            Move slider down.
+          */
+          (*slider_info).id++;
+          (*state)|=RedrawListState;
+        }
+      if ((*event).type != ButtonRelease)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8396,7 +8456,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
       &scroll_info, &slider_info, &visible_files, &files, &up_info, &home_info,
       &special_info, &action_info, &cancel_info, &i, &filelist, &north_info,
       &south_info, &list_info, &delay, &expose_info, &text_info,
-      &selection_info };
+      &selection_info, &event };
 
   FileBrowserContext
     file_context;
@@ -8540,36 +8600,8 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
     /*
       Wait for next event.
     */
-    if (north_info.raised && south_info.raised)
-      (void) XIfEvent(display,&event,XScreenEvent,(char *) windows);
-    else
-      {
-        /*
-          Brief delay before advancing scroll bar.
-        */
-        XDelay(display,delay);
-        delay=SuspendTime;
-        (void) XCheckIfEvent(display,&event,XScreenEvent,(char *) windows);
-        if ((north_info.raised == MagickFalse) && (slider_info.id > 0))
-          {
-            /*
-              Move slider up.
-            */
-            slider_info.id--;
-            state|=RedrawListState;
-          }
-        if ((south_info.raised == MagickFalse) &&
-            (slider_info.id < (int) files))
-          {
-            /*
-              Move slider down.
-            */
-            slider_info.id++;
-            state|=RedrawListState;
-          }
-        if (event.type != ButtonRelease)
-          continue;
-      }
+    if (WaitForFileBrowserEvent(&file_context,&file_widgets) == MagickFalse)
+      continue;
     switch (event.type)
     {
       case ButtonPress:
