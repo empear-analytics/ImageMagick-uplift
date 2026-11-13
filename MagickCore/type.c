@@ -1389,6 +1389,28 @@ static inline MagickBooleanType IsElementEnd(const char *keyword)
     (LocaleCompare(keyword,"</policy>") == 0)) ? MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType SkipMarkupElement(const char *keyword,
+  const char **q,const size_t extent,char *token)
+{
+  if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
+    {
+      /*
+        DOCTYPE element.
+      */
+      (*q)=SkipDoctypeElement((*q));
+      return(MagickTrue);
+    }
+  if (LocaleNCompare(keyword,"<!--",4) == 0)
+    {
+      /*
+        Comment element.
+      */
+      (*q)=SkipCommentElement((*q),extent,token);
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1445,22 +1467,8 @@ static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
     if (*token == '\0')
       break;
     (void) CopyMagickString(keyword,token,MagickPathExtent);
-    if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
-      {
-        /*
-          DOCTYPE element.
-        */
-        q=SkipDoctypeElement(q);
-        continue;
-      }
-    if (LocaleNCompare(keyword,"<!--",4) == 0)
-      {
-        /*
-          Comment element.
-        */
-        q=SkipCommentElement(q,extent,token);
-        continue;
-      }
+    if (SkipMarkupElement(keyword,&q,extent,token) != MagickFalse)
+      continue;
     if (LocaleCompare(keyword,"<include") == 0)
       {
         /*
