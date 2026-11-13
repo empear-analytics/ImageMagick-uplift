@@ -3532,6 +3532,41 @@ static size_t XChopKeyPress(const ChopEventInput *input,XEvent *event,
   return(state);
 }
 
+typedef struct _ChopTargets
+{
+  XSegment
+    *segment_info;
+
+  size_t
+    *state;
+} ChopTargets;
+
+static void XChopStartPress(const ChopEventInput *input,const XEvent *event,
+  const ChopTargets *targets)
+{
+  XWindows
+    *const windows = input->windows;
+
+  XSegment
+    *const segment_info = targets->segment_info;
+
+  size_t
+    *const state = targets->state;
+
+  if ((*event).xbutton.button != Button1)
+    return;
+  if ((*event).xbutton.window != windows->image.id)
+    return;
+  /*
+    User has committed to start point of chopping line.
+  */
+  (*segment_info).x1=(short int) (*event).xbutton.x;
+  (*segment_info).x2=(short int) (*event).xbutton.x;
+  (*segment_info).y1=(short int) (*event).xbutton.y;
+  (*segment_info).y2=(short int) (*event).xbutton.y;
+  (*state)|=ExitState;
+}
+
 static MagickBooleanType XChopImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -3589,6 +3624,9 @@ static MagickBooleanType XChopImage(Display *display,
 
   const ChopEventInput
     input = { display, resource_info, windows };
+
+  const ChopTargets
+    targets = { &segment_info, &state };
 
   /*
     Map Command widget.
@@ -3676,18 +3714,7 @@ static MagickBooleanType XChopImage(Display *display,
     {
       case ButtonPress:
       {
-        if (event.xbutton.button != Button1)
-          break;
-        if (event.xbutton.window != windows->image.id)
-          break;
-        /*
-          User has committed to start point of chopping line.
-        */
-        segment_info.x1=(short int) event.xbutton.x;
-        segment_info.x2=(short int) event.xbutton.x;
-        segment_info.y1=(short int) event.xbutton.y;
-        segment_info.y2=(short int) event.xbutton.y;
-        state|=ExitState;
+        XChopStartPress(&input,&event,&targets);
         break;
       }
       case ButtonRelease:
