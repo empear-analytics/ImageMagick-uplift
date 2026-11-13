@@ -769,18 +769,18 @@ MagickExport MagickStatusType ParseGravityGeometry(const Image *image,
   if (height == 0)
     region_info->height=image->page.height | image->rows;
   GravityAdjustGeometry(image->columns,image->rows,image->gravity,region_info);
-  if ((flags & LessValue) != 0)
-    if (IsRegionSmallerThanImage(image,region_info) != MagickFalse)
-      {
-        SetGeometry(image,region_info);
-        return(NoValue);
-      }
-  if ((flags & GreaterValue) != 0)
-    if (IsRegionLargerThanImage(image,region_info) != MagickFalse)
-      {
-        SetGeometry(image,region_info);
-        return(NoValue);
-      }
+  if (((flags & LessValue) != 0) &&
+      (IsRegionSmallerThanImage(image,region_info) != MagickFalse))
+    {
+      SetGeometry(image,region_info);
+      return(NoValue);
+    }
+  if (((flags & GreaterValue) != 0) &&
+      (IsRegionLargerThanImage(image,region_info) != MagickFalse))
+    {
+      SetGeometry(image,region_info);
+      return(NoValue);
+    }
   region_info->width=width;
   region_info->height=height;
   return(flags);
