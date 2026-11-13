@@ -1150,6 +1150,20 @@ static MagickBooleanType ReadEXIFMarker(const unsigned char **exif,
   return(MagickTrue);
 }
 
+static void SkipToEXIFHeader(const unsigned char **exif,size_t *length)
+{
+  MagickBooleanType
+    broke = MagickFalse;
+
+  while ((*length) != 0)
+  {
+    if (ReadEXIFMarker(exif,length,&broke) == MagickFalse)
+      continue;
+    if (broke != MagickFalse)
+      break;
+  }
+}
+
 static void GetEXIFProperty(const Image *image,const char *property,
   ExceptionInfo *exception)
 {
@@ -1468,9 +1482,6 @@ static void GetEXIFProperty(const Image *image,const char *property,
   EndianType
     endian;
 
-  MagickBooleanType
-    broke = MagickFalse;
-
   size_t
     entry,
     length,
@@ -1576,13 +1587,7 @@ static void GetEXIFProperty(const Image *image,const char *property,
   if (length < 6)
     return;
   exif=GetStringInfoDatum(profile);
-  while (length != 0)
-  {
-    if (ReadEXIFMarker(&exif,&length,&broke) == MagickFalse)
-      continue;
-    if (broke != MagickFalse)
-      break;
-  }
+  SkipToEXIFHeader(&exif,&length);
   if (length < 16)
     return;
   id=(ssize_t) ReadPropertySignedShort(LSBEndian,exif);
