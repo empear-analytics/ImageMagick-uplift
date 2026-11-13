@@ -15737,6 +15737,78 @@ static MagickBooleanType XRotateUpdate(const RotateUpdateInput *update,
   return(MagickTrue);
 }
 
+typedef struct _RotateApplyInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    **image;
+
+  ExceptionInfo
+    *exception;
+
+  double
+    degrees,
+    normalized_degrees;
+
+  unsigned int
+    pen_id;
+} RotateApplyInput;
+
+static MagickBooleanType XRotateApply(const RotateApplyInput *apply)
+{
+  Display
+    *const display = apply->display;
+
+  XResourceInfo
+    *const resource_info = apply->resource_info;
+
+  XWindows
+    *const windows = apply->windows;
+
+  Image
+    **const image = apply->image;
+
+  ExceptionInfo
+    *const exception = apply->exception;
+
+  const double
+    degrees = apply->degrees,
+    normalized_degrees = apply->normalized_degrees;
+
+  const unsigned int
+    pen_id = apply->pen_id;
+
+  Image
+    *rotate_image;
+
+  if (normalized_degrees != 0.0)
+    (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
+      exception);
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (*image)->background_color.red=(double) ScaleShortToQuantum(
+    windows->pixel_info->pen_colors[pen_id].red);
+  (*image)->background_color.green=(double) ScaleShortToQuantum(
+    windows->pixel_info->pen_colors[pen_id].green);
+  (*image)->background_color.blue=(double) ScaleShortToQuantum(
+    windows->pixel_info->pen_colors[pen_id].blue);
+  rotate_image=RotateImage(*image,degrees,exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (rotate_image == (Image *) NULL)
+    return(MagickFalse);
+  *image=DestroyImage(*image);
+  *image=rotate_image;
+  return(MagickTrue);
+}
+
 static MagickBooleanType XRotateImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,double degrees,Image **image,
   ExceptionInfo *exception)
@@ -15774,9 +15846,6 @@ static MagickBooleanType XRotateImage(Display *display,
   char
     command[MagickPathExtent];
 
-  Image
-    *rotate_image;
-
   int
     x,
     y;
@@ -15813,23 +15882,14 @@ static MagickBooleanType XRotateImage(Display *display,
     normalized_degrees+=360.0;
   for (rotations=0; normalized_degrees > 45.0; rotations++)
     normalized_degrees-=90.0;
-  if (normalized_degrees != 0.0)
-    (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
-      exception);
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (*image)->background_color.red=(double) ScaleShortToQuantum(
-    windows->pixel_info->pen_colors[pen_id].red);
-  (*image)->background_color.green=(double) ScaleShortToQuantum(
-    windows->pixel_info->pen_colors[pen_id].green);
-  (*image)->background_color.blue=(double) ScaleShortToQuantum(
-    windows->pixel_info->pen_colors[pen_id].blue);
-  rotate_image=RotateImage(*image,degrees,exception);
-  XSetCursorState(display,windows,MagickFalse);
-  if (rotate_image == (Image *) NULL)
-    return(MagickFalse);
-  *image=DestroyImage(*image);
-  *image=rotate_image;
+  {
+    const RotateApplyInput
+      apply = { display, resource_info, windows, image, exception, degrees,
+        normalized_degrees, pen_id };
+
+    if (XRotateApply(&apply) == MagickFalse)
+      return(MagickFalse);
+  }
   {
     const RotateCropInput
       crop = { windows, image, rotations, x, y };
