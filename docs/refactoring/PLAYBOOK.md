@@ -8440,6 +8440,12 @@ whole `switch` with the tail of the function.
    its own commit.
 5. Check by script that each site's labels and the function's are the same set, each
    label once, and that each `B` equals the original body but for indentation.
+6. *Widening (2026-11-13).* `e` may be `*p`, the character a pointer local points to
+   (a read with no side effect; the parameter is `const char`), and `B` may instead be
+   statements that do not leave the function, followed by the group's one `break;`,
+   which then is the last statement of `B` and is dropped in step 3 (the end of the `if`
+   goes where the `break` went: to the statement after the `switch`). `B` holds no other
+   `break`, `continue` or label.
 
 **Before:**
 
@@ -17407,3 +17413,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | H | Step 2: when the helpers above the function stand in a conditional block that the unblocked helper must join, the run goes directly above that block's `#if`; proof unchanged (`pp_identical.sh`); Lane: b | `random.c`'s `GenerateEntropicChaos`: `MaxEntropyExtent`, used by the device-entropy block that joins `ReadRandom` under `#if !defined(MAGICKCORE_WINDOWS_SUPPORT)` | mandate (2026-10-24) |
 | 2026-11-13 | NEW | BW | Reword a Banner's Repeated Parameter Text: after BF, one banner of a pair replaces its `o name: text` parameter items by prose that keeps every role and example; evidence guard (`obj_identical.sh` IDENTICAL); Lane: b | `memory.c`'s `GetMagickMemoryMethods` and `SetMagickMemoryMethods` (*Code Duplication* through identical items; probe 7.67 to 8.42) | owner |
 | 2026-11-13 | NEW | TP | Extract a Nested Test Path as a Predicate Writing One Local: `if (A) { S; if (B) { T; U } }` whose `S` and `T` only update one local becomes `if (Helper(...,&v) != MagickFalse) { U }`, the helper holding both tests and the updates through a pointer; evidence oracle; Lane: b | `compress-lzw.c`'s `LZWEncodeImage` (code-width block, whose tail calls the `OutputCode` macro; probe 9.92 to 10.0) | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | LP | Step 6: `e` may be `*p` (a character read, the predicate takes `const char`), and `B` may be statements that stay in the function ending in the group's one `break;`, which the `if` form drops; Lane: b | `token-isglob.c`'s `IsGlob` (six glob characters setting `status=MagickTrue; break;`, cc 11) | mandate (2026-10-24) |
