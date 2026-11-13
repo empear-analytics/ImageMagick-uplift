@@ -251,6 +251,17 @@ static void AdjustGreenComponent(const PixelInfo *pixel,
     (*color)-=QuantumRange/2.0;
 }
 
+static void SetGreenComponent(const PixelInfo *pixel,
+  const ComplianceType compliance,double *color,double *scale)
+{
+  *color=pixel->green;
+  AdjustGreenComponent(pixel,compliance,color,scale);
+  if (pixel->colorspace == XYZColorspace)
+    (*color)/=2.55;
+  if (pixel->colorspace == OklchColorspace)
+    *scale=1.0;
+}
+
 static void SetAlphaComponent(const PixelInfo *pixel,
   const ComplianceType compliance,double *color,double *scale)
 {
@@ -290,12 +301,7 @@ MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
     }
     case GreenPixelChannel:
     {
-      color=pixel->green;
-      AdjustGreenComponent(pixel,compliance,&color,&scale);
-      if (pixel->colorspace == XYZColorspace)
-        color/=2.55;
-      if (pixel->colorspace == OklchColorspace)
-        scale=1.0;
+      SetGreenComponent(pixel,compliance,&color,&scale);
       break;
     }
     case AlphaPixelChannel:
