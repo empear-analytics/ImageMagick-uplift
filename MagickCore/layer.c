@@ -1792,6 +1792,64 @@ static MagickBooleanType TryPreviousDisposal(
   return(cleared);
 }
 
+typedef struct _BackgroundBoundsTargets
+{
+  RectangleInfo
+    *bgnd_bounds,
+    *try_bounds;
+} BackgroundBoundsTargets;
+
+static void ExpandBackgroundBounds(const Image *curr,Image *bgnd_image,
+  ExceptionInfo *exception,const BackgroundBoundsTargets *targets)
+{
+  RectangleInfo
+    *const bgnd_bounds = targets->bgnd_bounds,
+    *const try_bounds = targets->try_bounds;
+
+  /*
+    Straight background disposal failed to clear pixels needed!
+    Lets try expanding the disposal area of the previous frame, to
+    include the pixels that are cleared.  This guaranteed
+    to work, though may not be the most optimized solution.
+  */
+  (*try_bounds)=CompareImagesBounds(curr->previous,curr,CompareClearLayer,exception);
+#if DEBUG_OPT_FRAME
+            (void) FormatLocaleFile(stderr, "expand_clear: %.17gx%.17g%+.20g%+.20g%s\n",
+                (double) try_bounds.width,(double) try_bounds.height,
+                (double) try_bounds.x,(double) try_bounds.y,
+                try_bounds.x<0?"  (no expand necessary)":"");
+#endif
+  (*bgnd_bounds)=ExpandDisposalBounds((*bgnd_bounds),(*try_bounds));
+  ClearBounds(bgnd_image,bgnd_bounds,exception);
+#if DEBUG_OPT_FRAME
+/* Something strange is happening with a specific animation
+ * CompareAnyLayers (normal method) and CompareClearLayers returns the whole
+ * image, which is not possibly correct!  As verified by previous tests.
+ * Something changed beyond the bgnd_bounds clearing.  But without being able
+ * to see, or writet he image at this point it is hard to tell what is wrong!
+ * Only CompareOverlay seemed to return something sensible.
+ */
+            try_bounds=CompareImagesBounds(bgnd_image,curr,CompareClearLayer,exception);
+            (void) FormatLocaleFile(stderr, "expand_ctst: %.17gx%.17g%+.20g%+.20g\n",
+                (double) try_bounds.width,(double) try_bounds.height,
+                (double) try_bounds.x,(double) try_bounds.y );
+            try_bounds=CompareImagesBounds(bgnd_image,curr,CompareAnyLayer,exception);
+            try_cleared=IsBoundsCleared(bgnd_image,curr,&try_bounds,exception);
+            (void) FormatLocaleFile(stderr, "expand_any : %.17gx%.17g%+.20g%+.20g%s\n",
+                (double) try_bounds.width,(double) try_bounds.height,
+                (double) try_bounds.x,(double) try_bounds.y,
+                try_cleared?"   (pixels cleared)":"");
+#endif
+  (*try_bounds)=CompareImagesBounds(bgnd_image,curr,CompareOverlayLayer,exception);
+#if DEBUG_OPT_FRAME
+            try_cleared=IsBoundsCleared(bgnd_image,curr,&try_bounds,exception);
+            (void) FormatLocaleFile(stderr, "expand_test: %.17gx%.17g%+.20g%+.20g%s\n",
+                (double) try_bounds.width,(double) try_bounds.height,
+                (double) try_bounds.x,(double) try_bounds.y,
+                try_cleared?"   (pixels cleared)":"");
+#endif
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1825,6 +1883,9 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
 
   const DuplicateFrameTargets
     targets = { &dup_image, &dup_bounds, &cleared };
+
+  const BackgroundBoundsTargets
+    bgnd_targets = { &bgnd_bounds, &try_bounds };
 
   assert(image != (const Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -1947,48 +2008,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
 #endif
         if ( try_cleared )
           {
-            /*
-              Straight background disposal failed to clear pixels needed!
-              Lets try expanding the disposal area of the previous frame, to
-              include the pixels that are cleared.  This guaranteed
-              to work, though may not be the most optimized solution.
-            */
-            try_bounds=CompareImagesBounds(curr->previous,curr,CompareClearLayer,exception);
-#if DEBUG_OPT_FRAME
-            (void) FormatLocaleFile(stderr, "expand_clear: %.17gx%.17g%+.20g%+.20g%s\n",
-                (double) try_bounds.width,(double) try_bounds.height,
-                (double) try_bounds.x,(double) try_bounds.y,
-                try_bounds.x<0?"  (no expand necessary)":"");
-#endif
-            bgnd_bounds=ExpandDisposalBounds(bgnd_bounds,try_bounds);
-            ClearBounds(bgnd_image,&bgnd_bounds,exception);
-#if DEBUG_OPT_FRAME
-/* Something strange is happening with a specific animation
- * CompareAnyLayers (normal method) and CompareClearLayers returns the whole
- * image, which is not possibly correct!  As verified by previous tests.
- * Something changed beyond the bgnd_bounds clearing.  But without being able
- * to see, or writet he image at this point it is hard to tell what is wrong!
- * Only CompareOverlay seemed to return something sensible.
- */
-            try_bounds=CompareImagesBounds(bgnd_image,curr,CompareClearLayer,exception);
-            (void) FormatLocaleFile(stderr, "expand_ctst: %.17gx%.17g%+.20g%+.20g\n",
-                (double) try_bounds.width,(double) try_bounds.height,
-                (double) try_bounds.x,(double) try_bounds.y );
-            try_bounds=CompareImagesBounds(bgnd_image,curr,CompareAnyLayer,exception);
-            try_cleared=IsBoundsCleared(bgnd_image,curr,&try_bounds,exception);
-            (void) FormatLocaleFile(stderr, "expand_any : %.17gx%.17g%+.20g%+.20g%s\n",
-                (double) try_bounds.width,(double) try_bounds.height,
-                (double) try_bounds.x,(double) try_bounds.y,
-                try_cleared?"   (pixels cleared)":"");
-#endif
-            try_bounds=CompareImagesBounds(bgnd_image,curr,CompareOverlayLayer,exception);
-#if DEBUG_OPT_FRAME
-            try_cleared=IsBoundsCleared(bgnd_image,curr,&try_bounds,exception);
-            (void) FormatLocaleFile(stderr, "expand_test: %.17gx%.17g%+.20g%+.20g%s\n",
-                (double) try_bounds.width,(double) try_bounds.height,
-                (double) try_bounds.x,(double) try_bounds.y,
-                try_cleared?"   (pixels cleared)":"");
-#endif
+            ExpandBackgroundBounds(curr,bgnd_image,exception,&bgnd_targets);
           }
         /*
           Test if this background dispose is smaller than any of the
