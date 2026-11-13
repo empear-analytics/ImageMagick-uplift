@@ -716,6 +716,9 @@ static MagickBooleanType ComputeContrastImage(Image *image,MagickCLEnv clEnv,
     gsize[2],
     i;
 
+  if (clEnv == (MagickCLEnv) NULL)
+    return(MagickFalse);
+
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
@@ -781,26 +784,8 @@ cleanup:
 MagickPrivate MagickBooleanType AccelerateContrastImage(Image *image,
   const MagickBooleanType sharpen,ExceptionInfo *exception)
 {
-  MagickBooleanType
-    status;
-
-  MagickCLEnv
-    clEnv;
-
-  assert(image != NULL);
-  assert(exception != (ExceptionInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-
-  if (checkAccelerateCondition(image) == MagickFalse)
-    return(MagickFalse);
-
-  clEnv=getOpenCLEnvironment(exception);
-  if (clEnv == (MagickCLEnv) NULL)
-    return(MagickFalse);
-
-  status=ComputeContrastImage(image,clEnv,sharpen,exception);
-  return(status);
+  return(ComputeContrastImage(image,getAccelerateEnvironment(image,
+    BasicAccelerateCheck,__func__,exception),sharpen,exception));
 }
 
 /*
