@@ -14296,6 +14296,65 @@ enumerator.
 
 ---
 
+## Recipe TC - Drop a Trailing Conditional Continue
+
+**Use when:** CodeScene reports *Complex Method*, *Bumpy Road Ahead* or *Large Method*,
+and the last statement of a loop body is `if (cond) continue;`, with no `else`: the
+`continue` goes where falling off the end of the body goes, so the test decides nothing
+(`locale.c`'s `LoadLocaleCache`, whose XML loop ends in `if (*token != '=') continue;`).
+
+**Not covered by:** Recipe G, CN, EJ and UX, which reshape a test and keep it; Recipe NG,
+which drops a test before a NULL-safe call and changes the object code; Recipe DD and DL,
+which drop `case` labels of a `switch`, not a statement of a loop body.
+
+**How:**
+
+1. The `if (cond) continue;` is the last statement of the body of a `for`, `while` or
+   `do` loop, with no `else`, and the `continue` belongs to that loop (no `switch` or
+   inner loop between them).
+2. `cond` has no side effect: no assignment, increment, decrement or call (a dereference
+   and comparisons of locals, as `*token != '='`, qualify). A call refuses the step.
+3. Delete the two lines; nothing else changes.
+4. Proof: `tools/obj_identical.sh FILE` prints `IDENTICAL` (the compiler already drops a
+   test whose two outcomes reach the same place). Any difference refuses the step.
+
+**Before:**
+
+```c
+    (void) GetNextToken(q,(const char **) NULL,extent,token);
+    if (*token != '=')
+      continue;
+  }
+```
+
+**After:**
+
+```c
+    (void) GetNextToken(q,(const char **) NULL,extent,token);
+  }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. A `continue` of a `for` runs its increment expression and
+  then its test, as reaching the end of the body does; for `while` and `do` it goes to the
+  test, as the end of the body does. Both outcomes of `cond` lead to the same next step,
+  and evaluating `cond` has no effect, so removing it removes nothing observable. A
+  `cond` that reads through a pointer could fault on a bad address, but every read it makes
+  is one the program made just before on the same value (step 2 and the object-code check
+  catch the rest).
+- Do not use it when the test is followed by a closing brace of an inner block rather than
+  of the loop body: the `continue` then skips statements after that block.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL`.
+
+**Provenance:** 2026-11-13, from `locale.c`'s `LoadLocaleCache` (campaign B, M127 lane c):
+LoadLocaleCache cc 22 to 20, locale.c 6.46 to 6.50 in a probe, object code identical.
+Lane: c
+Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -14631,3 +14690,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | DV | Drop a `static` function's parameter that every caller fills with a member of another argument; the callee reads the member into a local; evidence oracle | `stream.c`'s `StreamDoublePixels` and `StreamFloatPixels` (five arguments to four; 6.12 to 6.13); M merges identical arguments only | mandate (2026-10-24) |
 | 2026-11-13 | NEW | KD | Replace a run of `if (LocaleCompare(v,"K") == 0) return(F(...));` calls of one signature by a `static const` table of key/function-pointer records and a lookup loop; evidence oracle | `pixel-import.c` `ImportCharPixel` (cc 10, file 6.69 to 6.89); KT assigns, KR returns strings, KE assigns enumerators | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | DT | Step 2 keeps the condition inside a `(MagickBooleanType)` cast, step 4 adds `tools/cxx_warnings.sh`: the bare comparison is `bool` in C++ and broke main's Windows jobs (C2440/C2664 in `policy.c`, `constitute.c`, `stream.c`; the casts fixed them with object code identical) | build fixes on `campaign/M126` | mandate (2026-10-24) |
+| 2026-11-13 | NEW | TC | Drop a loop body's last statement `if (cond) continue;` when `cond` has no side effect; proof `obj_identical.sh` | `locale.c`'s `LoadLocaleCache` (cc 22 to 20, 6.46 to 6.50, object code identical) | mandate (2026-10-24) |
