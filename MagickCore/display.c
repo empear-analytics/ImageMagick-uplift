@@ -15809,6 +15809,20 @@ static MagickBooleanType XRotateApply(const RotateApplyInput *apply)
   return(MagickTrue);
 }
 
+static const ModeType
+  RotateDirectionTable[] =
+  {
+    HorizontalRotateCommand,
+    VerticalRotateCommand
+  },
+  RotateCommandTable[] =
+  {
+    RotateColorCommand,
+    RotateDirectionCommand,
+    RotateHelpCommand,
+    RotateDismissCommand
+  };
+
 static MagickBooleanType XRotateImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,double degrees,Image **image,
   ExceptionInfo *exception)
@@ -15825,20 +15839,6 @@ static MagickBooleanType XRotateImage(Display *display,
 
   static ModeType
     direction = HorizontalRotateCommand;
-
-  static const ModeType
-    DirectionCommands[] =
-    {
-      HorizontalRotateCommand,
-      VerticalRotateCommand
-    },
-    RotateCommands[] =
-    {
-      RotateColorCommand,
-      RotateDirectionCommand,
-      RotateHelpCommand,
-      RotateDismissCommand
-    };
 
   static unsigned int
     pen_id = 0;
@@ -15863,7 +15863,7 @@ static MagickBooleanType XRotateImage(Display *display,
 
   const RotateLoopInput
     loop_input = { display, resource_info, windows, RotateMenu,
-      RotateCommands, DirectionCommands, command, targets, exception };
+      RotateCommandTable, RotateDirectionTable, command, targets, exception };
 
   const RotateAngleTargets
     angle_targets = { &x, &y, &direction, &degrees };
