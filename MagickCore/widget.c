@@ -14894,6 +14894,35 @@ static const char
     "display images as an X server pixmap"
   };
 
+static void MapPreferencesWidget(Display *display,XWindows *windows)
+{
+  Status
+    status;
+
+  XTextProperty
+    window_name;
+
+  XWindowChanges
+    window_changes;
+
+  (void) CopyMagickString(windows->widget.name,"Preferences",MagickPathExtent);
+  status=XStringListToTextProperty(&windows->widget.name,1,&window_name);
+  if (status != False)
+    {
+      XSetWMName(display,windows->widget.id,&window_name);
+      XSetWMIconName(display,windows->widget.id,&window_name);
+      (void) XFree((void *) window_name.value);
+    }
+  window_changes.width=(int) windows->widget.width;
+  window_changes.height=(int) windows->widget.height;
+  window_changes.x=windows->widget.x;
+  window_changes.y=windows->widget.y;
+  (void) XReconfigureWMWindow(display,windows->widget.id,windows->widget.screen,
+    (unsigned int) (CWWidth | CWHeight | CWX | CWY),&window_changes);
+  (void) XMapRaised(display,windows->widget.id);
+  windows->widget.mapped=MagickFalse;
+}
+
 MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XResourceInfo *resource_info,XWindows *windows)
 {
@@ -14906,9 +14935,6 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
 
   int
     i;
-
-  Status
-    status;
 
   unsigned int
     height,
@@ -14924,17 +14950,11 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XFontStruct
     *font_info;
 
-  XTextProperty
-    window_name;
-
   XWidgetInfo
     apply_info,
     cache_info,
     cancel_info,
     preferences_info[NumberPreferences];
-
-  XWindowChanges
-    window_changes;
 
   /*
     Determine Preferences widget attributes.
@@ -14973,22 +14993,7 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   /*
     Map Preferences widget.
   */
-  (void) CopyMagickString(windows->widget.name,"Preferences",MagickPathExtent);
-  status=XStringListToTextProperty(&windows->widget.name,1,&window_name);
-  if (status != False)
-    {
-      XSetWMName(display,windows->widget.id,&window_name);
-      XSetWMIconName(display,windows->widget.id,&window_name);
-      (void) XFree((void *) window_name.value);
-    }
-  window_changes.width=(int) windows->widget.width;
-  window_changes.height=(int) windows->widget.height;
-  window_changes.x=windows->widget.x;
-  window_changes.y=windows->widget.y;
-  (void) XReconfigureWMWindow(display,windows->widget.id,windows->widget.screen,
-    (unsigned int) (CWWidth | CWHeight | CWX | CWY),&window_changes);
-  (void) XMapRaised(display,windows->widget.id);
-  windows->widget.mapped=MagickFalse;
+  MapPreferencesWidget(display,windows);
   /*
     Respond to X events.
   */
