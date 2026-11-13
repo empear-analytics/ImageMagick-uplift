@@ -1377,6 +1377,46 @@ static MagickSizeType GetPolicyLimit(const char *name,
   return(policy_limit);
 }
 
+static void SetMagickResourceLimitTail(const ResourceType type,
+  const MagickSizeType limit,char **value,MagickBooleanType *status)
+{
+  switch (type)
+  {
+    case ThrottleResource:
+    {
+      *value=GetPolicyValue("resource:throttle");
+      if (*value == (char *) NULL)
+        resource_info.throttle_limit=limit;
+      else
+        resource_info.throttle_limit=MagickMax(limit,StringToMagickSizeType(
+          *value,100.0));
+      break;
+    }
+    case TimeResource:
+    {
+      *value=GetPolicyValue("resource:time");
+      if (*value == (char *) NULL)
+        resource_info.time_limit=limit;
+      else
+        resource_info.time_limit=MagickMin(limit,(MagickSizeType)
+          ParseMagickTimeToLive(*value));
+      break;
+    }
+    case WidthResource:
+    {
+      resource_info.width_limit=GetPolicyLimit("resource:width",limit);
+      resource_info.width_limit=MagickMin(resource_info.width_limit,
+        (MagickSizeType) MAGICK_SSIZE_MAX);
+      break;
+    }
+    default:
+    {
+      *status=MagickFalse;
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType SetMagickResourceLimit(const ResourceType type,
   const MagickSizeType limit)
 {
@@ -1438,36 +1478,9 @@ MagickExport MagickBooleanType SetMagickResourceLimit(const ResourceType type,
           resource_info.thread_limit=1;
       break;
     }
-    case ThrottleResource:
-    {
-      value=GetPolicyValue("resource:throttle");
-      if (value == (char *) NULL)
-        resource_info.throttle_limit=limit;
-      else
-        resource_info.throttle_limit=MagickMax(limit,StringToMagickSizeType(
-          value,100.0));
-      break;
-    }
-    case TimeResource:
-    {
-      value=GetPolicyValue("resource:time");
-      if (value == (char *) NULL)
-        resource_info.time_limit=limit;
-      else
-        resource_info.time_limit=MagickMin(limit,(MagickSizeType)
-          ParseMagickTimeToLive(value));
-      break;
-    }
-    case WidthResource:
-    {
-      resource_info.width_limit=GetPolicyLimit("resource:width",limit);
-      resource_info.width_limit=MagickMin(resource_info.width_limit,
-        (MagickSizeType) MAGICK_SSIZE_MAX);
-      break;
-    }
     default:
     {
-      status=MagickFalse;
+      SetMagickResourceLimitTail(type,limit,&value,&status);
       break;
     }
   }
