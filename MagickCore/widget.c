@@ -8612,6 +8612,40 @@ static unsigned int WidestFileBrowserName(XFontStruct *font_info,
   return(text_width);
 }
 
+static void MapFileBrowserWidget(Display *display,XWindows *windows,
+  MagickStatusType mask)
+{
+  Status
+    status;
+
+  XTextProperty
+    window_name;
+
+  XWindowChanges
+    window_changes;
+
+  /*
+    Map File Browser widget.
+  */
+  (void) CopyMagickString(windows->widget.name,"Browse and Select a File",
+    MagickPathExtent);
+  status=XStringListToTextProperty(&windows->widget.name,1,&window_name);
+  if (status != False)
+    {
+      XSetWMName(display,windows->widget.id,&window_name);
+      XSetWMIconName(display,windows->widget.id,&window_name);
+      (void) XFree((void *) window_name.value);
+    }
+  window_changes.width=(int) windows->widget.width;
+  window_changes.height=(int) windows->widget.height;
+  window_changes.x=windows->widget.x;
+  window_changes.y=windows->widget.y;
+  (void) XReconfigureWMWindow(display,windows->widget.id,
+    windows->widget.screen,mask,&window_changes);
+  (void) XMapRaised(display,windows->widget.id);
+  windows->widget.mapped=MagickFalse;
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8629,9 +8663,6 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
 
   static MagickStatusType
     mask = (MagickStatusType) (CWWidth | CWHeight | CWX | CWY);
-
-  Status
-    status;
 
   size_t
     delay,
@@ -8654,9 +8685,6 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   XFontStruct
     *font_info;
 
-  XTextProperty
-    window_name;
-
   XWidgetInfo
     action_info,
     cancel_info,
@@ -8672,9 +8700,6 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
     south_info,
     text_info,
     up_info;
-
-  XWindowChanges
-    window_changes;
 
   const FileBrowserTargets
     targets = { &reply_info, &state, &selection_info, &list_info };
@@ -8735,26 +8760,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   if (windows->widget.height < windows->widget.min_height)
     windows->widget.height=windows->widget.min_height;
   XConstrainWindowPosition(display,&windows->widget);
-  /*
-    Map File Browser widget.
-  */
-  (void) CopyMagickString(windows->widget.name,"Browse and Select a File",
-    MagickPathExtent);
-  status=XStringListToTextProperty(&windows->widget.name,1,&window_name);
-  if (status != False)
-    {
-      XSetWMName(display,windows->widget.id,&window_name);
-      XSetWMIconName(display,windows->widget.id,&window_name);
-      (void) XFree((void *) window_name.value);
-    }
-  window_changes.width=(int) windows->widget.width;
-  window_changes.height=(int) windows->widget.height;
-  window_changes.x=windows->widget.x;
-  window_changes.y=windows->widget.y;
-  (void) XReconfigureWMWindow(display,windows->widget.id,
-    windows->widget.screen,mask,&window_changes);
-  (void) XMapRaised(display,windows->widget.id);
-  windows->widget.mapped=MagickFalse;
+  MapFileBrowserWidget(display,windows,mask);
   /*
     Respond to X events.
   */
