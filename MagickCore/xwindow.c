@@ -8602,6 +8602,23 @@ static void XQuantizeToVisual(const XVisualInfo *visual_info,
       }
 }
 
+static Colormap XCreateVisualColormap(Display *display,
+  const XVisualInfo *visual_info,const Image *image)
+{
+  Colormap
+    colormap;
+
+  colormap=XDefaultColormap(display,visual_info->screen);
+  if (visual_info->visual != XDefaultVisual(display,visual_info->screen))
+    colormap=XCreateColormap(display,XRootWindow(display,visual_info->screen),
+      visual_info->visual,visual_info->klass == DirectColor ?
+      AllocAll : AllocNone);
+  if (colormap == (Colormap) NULL)
+    ThrowXWindowFatalException(ResourceLimitFatalError,"UnableToCreateColormap",
+      image->filename);
+  return(colormap);
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -8682,14 +8699,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
     Free previous and create new colormap.
   */
   (void) XFreeStandardColormap(display,visual_info,map_info,pixel);
-  colormap=XDefaultColormap(display,visual_info->screen);
-  if (visual_info->visual != XDefaultVisual(display,visual_info->screen))
-    colormap=XCreateColormap(display,XRootWindow(display,visual_info->screen),
-      visual_info->visual,visual_info->klass == DirectColor ?
-      AllocAll : AllocNone);
-  if (colormap == (Colormap) NULL)
-    ThrowXWindowFatalException(ResourceLimitFatalError,"UnableToCreateColormap",
-      image->filename);
+  colormap=XCreateVisualColormap(display,visual_info,image);
   /*
     Initialize the map and pixel info structures.
   */
