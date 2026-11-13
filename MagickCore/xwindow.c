@@ -339,6 +339,20 @@ static void DestroyXWindowOwnedImage(Display *display,XWindowInfo *window)
     }
 }
 
+static void DestroyXIconPixelInfo(XWindows *windows)
+{
+  if (windows->icon_pixel != (XPixelInfo *) NULL)
+    {
+      if (windows->icon_pixel->pixels != (unsigned long *) NULL)
+        windows->icon_pixel->pixels=(unsigned long *)
+          RelinquishMagickMemory(windows->icon_pixel->pixels);
+      if (windows->icon_pixel->annotate_context != (GC) NULL)
+        XFreeGC(windows->display,windows->icon_pixel->annotate_context);
+      windows->icon_pixel=(XPixelInfo *)
+        RelinquishMagickMemory(windows->icon_pixel);
+    }
+}
+
 MagickExport void DestroyXResources(void)
 {
   int
@@ -396,16 +410,7 @@ MagickExport void DestroyXResources(void)
   }
   windows->icon_resources=(XResourceInfo *)
     RelinquishMagickMemory(windows->icon_resources);
-  if (windows->icon_pixel != (XPixelInfo *) NULL)
-    {
-      if (windows->icon_pixel->pixels != (unsigned long *) NULL)
-        windows->icon_pixel->pixels=(unsigned long *)
-          RelinquishMagickMemory(windows->icon_pixel->pixels);
-      if (windows->icon_pixel->annotate_context != (GC) NULL)
-        XFreeGC(windows->display,windows->icon_pixel->annotate_context);
-      windows->icon_pixel=(XPixelInfo *)
-        RelinquishMagickMemory(windows->icon_pixel);
-    }
+  DestroyXIconPixelInfo(windows);
   if (windows->pixel_info != (XPixelInfo *) NULL)
     {
       if (windows->pixel_info->pixels != (unsigned long *) NULL)
