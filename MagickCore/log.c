@@ -1664,6 +1664,56 @@ static void TranslateLogLocationSpecifier(const LogEventText *event_text,
   }
 }
 
+static void FormatLogEventXML(const LogEventText *event_text,
+  const char *domain)
+{
+  char
+    *const text = event_text->text;
+
+  const size_t
+    extent = event_text->extent;
+
+  const double
+    elapsed_time = event_text->elapsed_time,
+    user_time = event_text->user_time;
+
+  const time_t
+    seconds = event_text->seconds;
+
+  const char
+    *const event = event_text->event,
+    *const function = event_text->function,
+    *const module = event_text->module;
+
+  const size_t
+    line = event_text->line;
+
+  char
+    timestamp[MagickTimeExtent];
+
+  /*
+    Translate event in "XML" format.
+  */
+  (void) FormatMagickTime(seconds,sizeof(timestamp),timestamp);
+  (void) FormatLocaleString(text,extent,
+    "<entry>\n"
+    "  <timestamp>%s</timestamp>\n"
+    "  <elapsed-time>%lu:%02lu.%06lu</elapsed-time>\n"
+    "  <user-time>%0.3f</user-time>\n"
+    "  <process-id>%.17g</process-id>\n"
+    "  <thread-id>%.17g</thread-id>\n"
+    "  <module>%s</module>\n"
+    "  <function>%s</function>\n"
+    "  <line>%.17g</line>\n"
+    "  <domain>%s</domain>\n"
+    "  <event>%s</event>\n"
+    "</entry>",timestamp,(unsigned long) (elapsed_time/60.0),
+    (unsigned long) floor(fmod(elapsed_time,60.0)),(unsigned long)
+    (1000000.0*(elapsed_time-floor(elapsed_time))+0.5),user_time,
+    (double) getpid(),(double) GetMagickThreadSignature(),module,function,
+    (double) line,domain,event);
+}
+
 static char *TranslateEvent(const LogEventLocation *location,
   const char *domain,const char *event)
 {
@@ -1717,30 +1767,16 @@ static char *TranslateEvent(const LogEventLocation *location,
   extent=strlen(event)+MagickPathExtent;
   if (LocaleCompare(log_info->format,"xml") == 0)
     {
-      char
-        timestamp[MagickTimeExtent];
-
-      /*
-        Translate event in "XML" format.
-      */
-      (void) FormatMagickTime(seconds,sizeof(timestamp),timestamp);
-      (void) FormatLocaleString(text,extent,
-        "<entry>\n"
-        "  <timestamp>%s</timestamp>\n"
-        "  <elapsed-time>%lu:%02lu.%06lu</elapsed-time>\n"
-        "  <user-time>%0.3f</user-time>\n"
-        "  <process-id>%.17g</process-id>\n"
-        "  <thread-id>%.17g</thread-id>\n"
-        "  <module>%s</module>\n"
-        "  <function>%s</function>\n"
-        "  <line>%.17g</line>\n"
-        "  <domain>%s</domain>\n"
-        "  <event>%s</event>\n"
-        "</entry>",timestamp,(unsigned long) (elapsed_time/60.0),
-        (unsigned long) floor(fmod(elapsed_time,60.0)),(unsigned long)
-        (1000000.0*(elapsed_time-floor(elapsed_time))+0.5),user_time,
-        (double) getpid(),(double) GetMagickThreadSignature(),module,function,
-        (double) line,domain,event);
+      event_text.text=text;
+      event_text.extent=extent;
+      event_text.elapsed_time=elapsed_time;
+      event_text.user_time=user_time;
+      event_text.seconds=seconds;
+      event_text.event=event;
+      event_text.function=function;
+      event_text.module=module;
+      event_text.line=line;
+      FormatLogEventXML(&event_text,domain);
       return(text);
     }
   /*
