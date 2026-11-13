@@ -1458,6 +1458,27 @@ static void XSetDescendForColormaps(Display *display,const Window target,
     }
 }
 
+static Image *XCropWindowImage(Image *image,const RectangleInfo crop_info,
+  ExceptionInfo *exception)
+{
+  if ((crop_info.width != 0) && (crop_info.height != 0))
+    {
+      Image
+        *crop_image;
+
+      /*
+        Crop image as defined by the cropping rectangle.
+      */
+      crop_image=CropImage(image,&crop_info,exception);
+      if (crop_image != (Image *) NULL)
+        {
+          image=DestroyImage(image);
+          image=crop_image;
+        }
+    }
+  return(image);
+}
+
 static void XNameWindowImage(Display *display,const Window target,
   const ImageInfo *image_info,Image *image)
 {
@@ -1640,21 +1661,7 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
     {
       (void) CopyMagickString(image->filename,image_info->filename,
         MagickPathExtent);
-      if ((crop_info.width != 0) && (crop_info.height != 0))
-        {
-          Image
-            *crop_image;
-
-          /*
-            Crop image as defined by the cropping rectangle.
-          */
-          crop_image=CropImage(image,&crop_info,exception);
-          if (crop_image != (Image *) NULL)
-            {
-              image=DestroyImage(image);
-              image=crop_image;
-            }
-        }
+      image=XCropWindowImage(image,crop_info,exception);
       XNameWindowImage(display,target,image_info,image);
     }
   if (ximage_info->silent == MagickFalse)
