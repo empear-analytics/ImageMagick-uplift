@@ -16932,6 +16932,105 @@ Lane: b
 
 ---
 
+## Recipe TP - Extract a Nested Test Path as a Predicate Writing One Local
+
+**Use when:** CodeScene reports *Bumpy Road Ahead* (or *Deep, Nested Complexity*) on a
+loop body whose bump is a selection `if (A) { S; if (B) { T; U } }` (no `else` on either
+`if`) where `S` and `T` only update one local `v` of the caller (`code_width++;`,
+`code_width--;`) and `U`, the rest of the inner body, uses a function-local macro or
+several other locals and cannot move, as in `LZWEncodeImage`'s "next bit width" block,
+whose `U` calls the `OutputCode` macro.
+
+**Not covered by:** Recipe P, whose predicate has no side effect; Recipe E and Recipe O,
+which move the whole block, `U` included; Recipe CN, which cannot join `A` and `B` across
+`S`; Recipe RV, whose block leaves the function.
+
+**How:**
+
+1. The selection lies outside every OpenMP region. `A`, `S`, `B` and `T` read only
+   parameters of the caller and locals the block does not write, and write only `v`
+   (a plain local whose address is not taken elsewhere), with no call that has a side
+   effect. `T` is the leading statements of the inner body, before `U`.
+2. Write a `static MagickBooleanType` function directly above the caller taking the
+   values `A`, `S`, `B` and `T` read (by value) and `T *v` last. Its body is the outer
+   `if (A) { S; if (B) { T; return(MagickTrue); } }` copied verbatim with each `v`
+   written `(*v)`, followed by `return(MagickFalse);`. Comments inside move with it.
+3. The caller becomes `if (Helper(..., &v) != MagickFalse) { U }`, `U` unchanged. `S`
+   runs exactly when `A` holds, `T` and `U` exactly when `A` and then `B` hold, in the
+   same order as before.
+4. Check every argument against its parameter by reading; run `refactor_guard.py
+   --calls` (one new name, `+2`), `tools/ci_warnings.sh` and `tools/cxx_warnings.sh`,
+   and the oracle for the caller.
+
+**Before:**
+
+```c
+    if ((next_index >> code_width) != 0)
+      {
+        code_width++;
+        if (code_width > 12)
+          {
+            /*
+              Did we overflow the max bit width?
+            */
+            code_width--;
+            OutputCode(LZWClr);
+            ResetLZWTable(table);
+            next_index=LZWEod+1;
+            code_width=9;
+          }
+        }
+```
+
+**After:**
+
+```c
+static MagickBooleanType IsLZWCodeWidthOverflow(const size_t next_index,
+  size_t *code_width)
+{
+  if ((next_index >> (*code_width)) != 0)
+    {
+      (*code_width)++;
+      if ((*code_width) > 12)
+        {
+          /*
+            Did we overflow the max bit width?
+          */
+          (*code_width)--;
+          return(MagickTrue);
+        }
+    }
+  return(MagickFalse);
+}
+...
+    if (IsLZWCodeWidthOverflow(next_index,&code_width) != MagickFalse)
+      {
+        OutputCode(LZWClr);
+        ResetLZWTable(table);
+        next_index=LZWEod+1;
+        code_width=9;
+      }
+```
+
+**Careful:**
+
+- The operators of `A` and `B` stay as written; only `v` gains `(*...)`. A comparison is
+  not inverted to make an early return.
+- `U` must not need `v`'s value from before `T`: it runs after the helper has written
+  `v` through the pointer, exactly where it ran before.
+- A selection with an `else`, or an `S` or `T` that writes a second local, is not this
+  recipe.
+
+**Evidence level:** oracle (the cases that reach the caller).
+
+**Provenance:** 2026-11-13, from `compress-lzw.c`'s `LZWEncodeImage` (campaign B, M127
+lane b round 6): the code-width block was the second bump of the loop body and its tail
+calls `OutputCode`; probe 9.92 to 10.0. Added by Claude Code (Claude Opus 5.5) under the
+mandate of 2026-10-24.
+Lane: b
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -17307,3 +17406,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | OS | Share an Option-Sync Block Through a Helper Keyed by the Option Name: copies of `option=GetImageOption(image_info,"K"); if (option != NULL) S;` whose `S` stores into one member become calls of a `static void` helper taking the key and a pointer to the member; one function per commit; targets *Overall Code Complexity*; evidence oracle; Lane: b | `image-settings.c`'s `SyncImage...Settings` (`quality`, `scene`, `depth`, `loop`, `page`, `tile-offset`, colours) | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | H | Step 2: when the helpers above the function stand in a conditional block that the unblocked helper must join, the run goes directly above that block's `#if`; proof unchanged (`pp_identical.sh`); Lane: b | `random.c`'s `GenerateEntropicChaos`: `MaxEntropyExtent`, used by the device-entropy block that joins `ReadRandom` under `#if !defined(MAGICKCORE_WINDOWS_SUPPORT)` | mandate (2026-10-24) |
 | 2026-11-13 | NEW | BW | Reword a Banner's Repeated Parameter Text: after BF, one banner of a pair replaces its `o name: text` parameter items by prose that keeps every role and example; evidence guard (`obj_identical.sh` IDENTICAL); Lane: b | `memory.c`'s `GetMagickMemoryMethods` and `SetMagickMemoryMethods` (*Code Duplication* through identical items; probe 7.67 to 8.42) | owner |
+| 2026-11-13 | NEW | TP | Extract a Nested Test Path as a Predicate Writing One Local: `if (A) { S; if (B) { T; U } }` whose `S` and `T` only update one local becomes `if (Helper(...,&v) != MagickFalse) { U }`, the helper holding both tests and the updates through a pointer; evidence oracle; Lane: b | `compress-lzw.c`'s `LZWEncodeImage` (code-width block, whose tail calls the `OutputCode` macro; probe 9.92 to 10.0) | mandate (2026-10-24) |
