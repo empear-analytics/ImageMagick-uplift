@@ -13235,6 +13235,136 @@ Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
+## Recipe LX - Extract Block Returning Whether the Iteration Went On, Flagging a Break
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Complex Method* or *Large Method*, and the
+block that would fix it stands in the body of a sequential loop, is followed by statements that
+stay, and leaves through all three exits a loop body has: `continue;` of the loop on some paths,
+`break;` of the loop on others, and falling off its end on the rest, as `opencl.c`'s
+`LoadOpenCLDeviceBenchmark` does for its element tests (`continue;` once a `<device` record is
+allocated, `break;` when the allocation fails, a fall-through for every other keyword).
+
+**Not covered by:** Recipe LC, whose block has no `break`; Recipe LB, whose block leaves only
+through `break;`; Recipe BR, whose second exit is a `return`, not a `continue`; Recipe EX, whose
+exits are a `continue;` and several `return(R);`; Recipe OC, whose every path ends the iteration.
+A helper cannot leave its caller's loop, and one result cannot say "continue", "break" and "go
+on", so this recipe returns a result and sets a flag, as Recipe BR does for a break and a return.
+
+**How:**
+
+1. The block lies outside every OpenMP region and contains no `#pragma` line. The innermost loop
+   or `switch` around it is a sequential loop `Lp`; every `continue;` in the block that leaves it
+   continues `Lp`, and every `break;` in it that leaves it ends `Lp`. It holds at least one of
+   each, no `return` and no `goto`. A `break` or `continue` of a loop or `switch` nested inside
+   it stays as it is. The block may be a whole `if` statement or a run of sibling statements (the
+   commit names the run).
+2. The variables of the caller it writes and that the caller reads afterwards meet Recipe O
+   step 2 (plain locals whose address the caller passes elsewhere only to calls that keep no
+   copy of it): each goes by pointer, written `(*v)` at every use, `&v` passed on written `v`
+   (Recipe LC step 2). A variable it writes before it reads it on every path, and that nothing
+   after the block reads, is declared in the new function (Recipe E step 4).
+3. Cut the block into a new `static MagickBooleanType` function directly above the caller, whose
+   last parameter is `MagickBooleanType *broke` and whose first statement is
+   `(*broke)=MagickFalse;`. Each `continue;` that continued `Lp` becomes `return(MagickFalse);`,
+   one for one; each `break;` that ended `Lp` becomes `(*broke)=MagickTrue;` followed by
+   `return(MagickTrue);`, in braces when it stood as the body of an `if`; the function ends
+   with `return(MagickTrue);`. A call of an earlier helper of Recipe LC inside the block
+   (`if (H(...,&v) != MagickFalse) continue;`) is written under the same rule: its `continue;`
+   becomes `return(MagickFalse);` and its `&v` becomes `v`. Nothing else in the text changes.
+4. Pass what the block only reads as Recipe LC step 4 does (parameters, or the `const`-read
+   input struct the caller fills directly before its first helper call; a later helper of the
+   same iteration reads the same struct, since nothing between the fill and that call writes
+   a member's variable), then the written variables by pointer in the order the block first
+   writes them, then `broke`: at most four parameters.
+5. The caller declares `MagickBooleanType broke = MagickFalse;` once among the declarations at
+   the top of its body (Recipe BR step 5). Where the block stood write, as two statements at the
+   level where the block stood, `if (Helper(...,&broke) == MagickFalse) continue;` and directly
+   after it `if (broke != MagickFalse) break;`, so that `continue` and `break` act on `Lp` as the
+   block's own statements did. Check every argument against its parameter by reading.
+
+**Before:**
+
+```c
+    if (SkipOpenCLBenchmarkMarkup(keyword,extent,token,&q) != MagickFalse)
+      continue;
+    if (LocaleCompare(keyword,"<device") == 0)
+      {
+        device_benchmark=(MagickCLDeviceBenchmark *) AcquireQuantumMemory(1,
+          sizeof(*device_benchmark));
+        if (device_benchmark == (MagickCLDeviceBenchmark *) NULL)
+          break;
+        (void) memset(device_benchmark,0,sizeof(*device_benchmark));
+        device_benchmark->score=MAGICKCORE_OPENCL_UNDEFINED_SCORE;
+        continue;
+      }
+```
+
+**After:**
+
+```c
+static MagickBooleanType ReadOpenCLBenchmarkMarkup(
+  const OpenCLBenchmarkTokens *tokens,const char **q,
+  MagickCLDeviceBenchmark **device_benchmark,MagickBooleanType *broke)
+{
+  ...
+  (*broke)=MagickFalse;
+  if (SkipOpenCLBenchmarkMarkup(keyword,extent,token,q) != MagickFalse)
+    return(MagickFalse);
+  if (LocaleCompare(keyword,"<device") == 0)
+    {
+      (*device_benchmark)=(MagickCLDeviceBenchmark *) AcquireQuantumMemory(1,
+        sizeof(**device_benchmark));
+      if ((*device_benchmark) == (MagickCLDeviceBenchmark *) NULL)
+        {
+          (*broke)=MagickTrue;
+          return(MagickTrue);
+        }
+      (void) memset((*device_benchmark),0,sizeof(**device_benchmark));
+      (*device_benchmark)->score=MAGICKCORE_OPENCL_UNDEFINED_SCORE;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+...
+    if (ReadOpenCLBenchmarkMarkup(&tokens,&q,&device_benchmark,&broke) ==
+        MagickFalse)
+      continue;
+    if (broke != MagickFalse)
+      break;
+```
+
+**Careful:**
+
+- Three kinds of path leave the block. A `continue;` path runs the same statements up to the
+  `continue;` and the helper returns `MagickFalse` with `broke` clear: the caller's first test
+  runs the `continue;` the block would have run, and nothing runs between the two. A `break;`
+  path runs the same statements, sets the flag and returns `MagickTrue`: the first test does
+  not fire, the second does, and the `break;` ends `Lp` at the same point, after the same
+  writes. A path that falls off the block's end returns `MagickTrue` with the flag clear (the
+  first statement cleared it, and only the `break;` paths set it): both tests fall through
+  and the statements after the block run as they ran after it.
+- The flag is cleared at each call, so a value left by another helper of the loop that shares
+  `broke` is never read; after a `break;` the loop has ended.
+- Every write the block made lands in the caller's variable through its pointer, at the same
+  point and in the same order; what the block only reads is the same value at the call.
+- The `continue;` and the `break;` stand in the caller as plain statements, not inside a
+  `switch`, so both act on `Lp`.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` and steps 1, 2 and 5 checked by
+reading; the exits that no case reaches (an allocation failure, here) one by one against the
+text.
+
+**Provenance:** 2026-11-13, from `opencl.c`'s `LoadOpenCLDeviceBenchmark` (campaign A, W21 round
+three, lane c): after Recipes OC and LC the function held one bump and cc 9 in the `<device`
+branch (`if (NULL) break;` inside the branch that ends in `continue;`); LB refuses the
+`continue;`, SG refuses the guard that holds a call, BR needs a `return`. The `<device` branch
+together with the earlier LC helper's call as one helper of this form, 7.89 to 8.15: the function
+leaves Bumpy Road Ahead and Complex Method (as a helper of its own, without the LC call, the
+branch measured 7.95 and the function kept cc 9). Added by Claude Code (Claude Sonnet 5.5) under
+the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -13661,3 +13791,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | CQ | Name a Selection of Calls Over Its Condition: sites `if (C) F(...); else G(...);` (one call per branch, `C` an `int` condition that may call read-only functions, the other arguments free of side effects and traps) become calls of one `static inline void` helper taking `C`'s value as `const int selected` and the sites' differing arguments; *Careful* gives the argument (`C` evaluated once before either branch, the other arguments evaluated in the branch not taken too with no effect); proof: the oracle, `--calls`, `nm` for inlining, and a timing (at most 3% slower) | `magnify.c`'s `Scale3X` (campaign A, W21 lane d): eight `if (C) CopyPixels(&magnify,a,d); else CopyPixels(&magnify,4,d);` over `PixelsEqual` and `IsScale3X*Edge` conditions, cc 12; Recipe NS refuses a call in the condition and the owner's `?:` fold for magnify (2026-11-12) leaves the decisions in place. A probe: 8.84 to 9.09 | owner |
 | 2026-11-13 | AMEND | CQ | Step 7: a site that is one call whose argument is a parenthesised `(C ? a : k)`, `k` the literal the helper's else branch passes, becomes the helper's call (`C != 0` for a `C` that is not an `int`); *Careful* gives the argument (the same selection with the call written once; `C` evaluated once) | `magnify.c`'s `Eagle3X` (three sites) and `Eagle3XB` (four): `CopyPixels(&magnify,(ssize_t) (corner_tr ? 1 : 4),2);` with `corner_tr` a `ssize_t` holding a comparison, beside `Scale3X`'s if/else sites; a probe: the file 9.38 to 10.0 together with `Scale2X` and Recipe P on `IsEpbx2XBlendable` | owner |
 | 2026-11-13 | NEW | EX | Dispatch the Exits of an Extracted Block Through a Result Code: a block in a sequential loop body that leaves by `continue;` and by `return(R);` with different `R` (or by several `return`s) becomes a function returning an enumerator per exit, and the caller's `switch` runs each exit's original statement. *Careful* gives the argument (same statements up to the exit, nothing between the helper's return and the caller's exit, `R` read from caller variables written through pointers) | `layer.c`'s `OptimizeLayerFrames` (campaign A, W21 lane b): the `bounds[i].x < 0` choice with its two cleanup returns and its `i++; continue;`; BR, CR, I and LC refuse it; 8.82 to 8.85 with the choice as one helper, 8.92 with step 7's pass-through on its `else` body | owner |
+| 2026-11-13 | NEW | LX | Extract Block Returning Whether the Iteration Went On, Flagging a Break: a block in a sequential loop body that leaves by `continue;`, by `break;` and by falling off its end becomes a function returning `MagickFalse` for each `continue;` and `MagickTrue` otherwise, with a `MagickBooleanType *broke` out-parameter set by each `break;`; the caller writes `if (Helper(...,&broke) == MagickFalse) continue;` and `if (broke != MagickFalse) break;`. *Careful* gives the argument for the three kinds of path | `opencl.c`'s `LoadOpenCLDeviceBenchmark` (campaign A, W21 round three, lane c): the `<device` branch's `if (NULL) break;` before its `continue;`, which LB, SG and BR refuse; 7.89 to 8.15 with the run of the LC helper's call and the branch as one helper | owner |
