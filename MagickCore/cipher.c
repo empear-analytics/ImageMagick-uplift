@@ -742,6 +742,49 @@ static ssize_t CipherImageRows(const CipherRows *rows,
   return(y);
 }
 
+typedef struct _CipherKeyTargets
+{
+  AESInfo
+    **aes_info;
+
+  StringInfo
+    **nonce;
+} CipherKeyTargets;
+
+static MagickBooleanType AcquireCipherKeyAndNonce(Image *image,
+  const StringInfo *passkey,ExceptionInfo *exception,
+  const CipherKeyTargets *targets)
+{
+  AESInfo
+    **const aes_info = targets->aes_info;
+
+  StringInfo
+    **const nonce = targets->nonce;
+
+  StringInfo
+    *key;
+
+  (*aes_info)=AcquireAESInfo();
+  key=CloneStringInfo(passkey);
+  if (key == (StringInfo *) NULL)
+    {
+      (*aes_info)=DestroyAESInfo((*aes_info));
+      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
+        image->filename);
+    }
+  (*nonce)=SplitStringInfo(key,GetStringInfoLength(key)/2);
+  if ((*nonce) == (StringInfo *) NULL)
+    {
+      key=DestroyStringInfo(key);
+      (*aes_info)=DestroyAESInfo((*aes_info));
+      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
+        image->filename);
+    }
+  SetAESKey((*aes_info),key);
+  key=DestroyStringInfo(key);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType PasskeyDecipherImage(Image *image,
   const StringInfo *passkey,ExceptionInfo *exception)
 {
@@ -772,13 +815,15 @@ MagickExport MagickBooleanType PasskeyDecipherImage(Image *image,
     y;
 
   StringInfo
-    *key,
     *nonce;
 
   unsigned char
     input_block[AESBlocksize],
     output_block[AESBlocksize],
     *pixels;
+
+  const CipherKeyTargets
+    targets = { &aes_info, &nonce };
 
   /*
     Generate decipher key and nonce.
@@ -791,24 +836,9 @@ MagickExport MagickBooleanType PasskeyDecipherImage(Image *image,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   if (passkey == (const StringInfo *) NULL)
     return(MagickTrue);
-  aes_info=AcquireAESInfo();
-  key=CloneStringInfo(passkey);
-  if (key == (StringInfo *) NULL)
-    {
-      aes_info=DestroyAESInfo(aes_info);
-      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-        image->filename);
-    }
-  nonce=SplitStringInfo(key,GetStringInfoLength(key)/2);
-  if (nonce == (StringInfo *) NULL)
-    {
-      key=DestroyStringInfo(key);
-      aes_info=DestroyAESInfo(aes_info);
-      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-        image->filename);
-    }
-  SetAESKey(aes_info,key);
-  key=DestroyStringInfo(key);
+  if (AcquireCipherKeyAndNonce(image,passkey,exception,&targets) ==
+      MagickFalse)
+    return(MagickFalse);
   signature_info=AcquireNonceSignature(image,nonce);
   (void) memset(input_block,0,sizeof(input_block));
   digest=GetStringInfoDatum(GetSignatureDigest(signature_info));
