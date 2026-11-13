@@ -13281,6 +13281,22 @@ static unsigned int GetListBrowserWidth(XFontStruct *font_info,
   return(width);
 }
 
+static void PositionListBrowserWidget(XWindowInfo *window_info,
+  XFontStruct *font_info,unsigned int text_width,unsigned int height)
+{
+  window_info->width=MagickMin(text_width,MaxTextWidth)+(unsigned int)
+    ((9*QuantumMargin) >> 1);
+  window_info->min_width=(MinTextWidth+4*(unsigned int) QuantumMargin);
+  if (window_info->width < window_info->min_width)
+    window_info->width=window_info->min_width;
+  window_info->height=(((81*height) >> 2)+(unsigned int)
+    ((13*QuantumMargin) >> 1)+4);
+  window_info->min_height=(((23*height) >> 1)+(unsigned int)
+    ((13*QuantumMargin) >> 1)+4);
+  if (window_info->height < window_info->min_height)
+    window_info->height=window_info->min_height;
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -13374,17 +13390,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   /*
     Position List Browser widget.
   */
-  window_info->width=MagickMin(text_width,MaxTextWidth)+(unsigned int)
-    ((9*QuantumMargin) >> 1);
-  window_info->min_width=(MinTextWidth+4*(unsigned int) QuantumMargin);
-  if (window_info->width < window_info->min_width)
-    window_info->width=window_info->min_width;
-  window_info->height=(((81*height) >> 2)+(unsigned int)
-    ((13*QuantumMargin) >> 1)+4);
-  window_info->min_height=(((23*height) >> 1)+(unsigned int)
-    ((13*QuantumMargin) >> 1)+4);
-  if (window_info->height < window_info->min_height)
-    window_info->height=window_info->min_height;
+  PositionListBrowserWidget(window_info,font_info,text_width,height);
   XConstrainWindowPosition(display,window_info);
   /*
     Map List Browser widget.
