@@ -1150,6 +1150,78 @@ static void XCompositeWindowImage(const WindowCompositeInput *input)
   composite_image=DestroyImage(composite_image);
 }
 
+typedef struct _WindowConvertInput
+{
+  Image
+    *composite_image;
+
+  ExceptionInfo
+    *exception;
+
+  XImage
+    *ximage;
+
+  XColor
+    *colors;
+
+  unsigned int
+    number_colors;
+
+  WindowInfo
+    *window_info;
+
+  int
+    id;
+} WindowConvertInput;
+
+static MagickBooleanType XConvertWindowImage(const WindowConvertInput *input)
+{
+  Image
+    *const composite_image = input->composite_image;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  XImage
+    *const ximage = input->ximage;
+
+  XColor
+    *const colors = input->colors;
+
+  const unsigned int
+    number_colors = input->number_colors;
+
+  WindowInfo
+    *const window_info = input->window_info;
+
+  const int
+    id = input->id;
+
+  CacheView
+    *composite_view;
+
+  /*
+    Convert X image to MIFF format.
+  */
+  if ((window_info[id].visual->klass != TrueColor) &&
+      (window_info[id].visual->klass != DirectColor))
+    composite_image->storage_class=PseudoClass;
+  composite_image->columns=(size_t) ximage->width;
+  composite_image->rows=(size_t) ximage->height;
+  composite_view=AcquireAuthenticCacheView(composite_image,exception);
+  {
+    const WindowImageSource
+      source = { composite_image, composite_view, exception, ximage,
+        colors, number_colors, window_info, id };
+
+    if (XImportWindowImage(&source) == MagickFalse)
+      return(MagickFalse);
+  }
+  composite_view=DestroyCacheView(composite_view);
+  XDestroyImage(ximage);
+  return(MagickTrue);
+}
+
 static void XRelinquishColormapInfo(ColormapInfo **colormap_info)
 {
   ColormapInfo
@@ -1362,9 +1434,6 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
     }
   if (level <= 1)
     {
-      CacheView
-        *composite_view;
-
       Image
         *composite_image,
         *image;
@@ -1426,25 +1495,14 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
             XDestroyImage(ximage);
             return((Image *) NULL);
           }
-        /*
-          Convert X image to MIFF format.
-        */
-        if ((window_info[id].visual->klass != TrueColor) &&
-            (window_info[id].visual->klass != DirectColor))
-          composite_image->storage_class=PseudoClass;
-        composite_image->columns=(size_t) ximage->width;
-        composite_image->rows=(size_t) ximage->height;
-        composite_view=AcquireAuthenticCacheView(composite_image,exception);
         {
-          const WindowImageSource
-            source = { composite_image, composite_view, exception, ximage,
-              colors, number_colors, window_info, id };
+          const WindowConvertInput
+            input = { composite_image, exception, ximage, colors,
+              number_colors, window_info, id };
 
-          if (XImportWindowImage(&source) == MagickFalse)
+          if (XConvertWindowImage(&input) == MagickFalse)
             return((Image *) NULL);
         }
-        composite_view=DestroyCacheView(composite_view);
-        XDestroyImage(ximage);
         if (image == (Image *) NULL)
           {
             image=composite_image;
