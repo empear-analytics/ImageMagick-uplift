@@ -224,9 +224,32 @@ static void SwapVectorEntries(double **vectors,const size_t number_vectors,
     GaussJordanSwap(vectors[k][row],vectors[k][column]);
 }
 
-static void EliminateColumn(long double **hp_matrix,double **vectors,
-  const size_t rank,const size_t number_vectors,const ssize_t column)
+typedef struct _GaussJordanSystem
 {
+  long double
+    **hp_matrix;
+
+  double
+    **vectors;
+
+  size_t
+    rank,
+    number_vectors;
+} GaussJordanSystem;
+
+static void EliminateColumn(const GaussJordanSystem *system,
+  const ssize_t column)
+{
+  long double
+    **const hp_matrix = system->hp_matrix;
+
+  double
+    **const vectors = system->vectors;
+
+  const size_t
+    rank = system->rank,
+    number_vectors = system->number_vectors;
+
   long double
     scale;
 
@@ -245,19 +268,6 @@ static void EliminateColumn(long double **hp_matrix,double **vectors,
           vectors[k][j]-=(double)(scale*(long double) vectors[k][column]);
       }
 }
-
-typedef struct _GaussJordanSystem
-{
-  long double
-    **hp_matrix;
-
-  double
-    **vectors;
-
-  size_t
-    rank,
-    number_vectors;
-} GaussJordanSystem;
 
 static void NormalizePivotRow(const GaussJordanSystem *system,
   const ssize_t column)
@@ -364,7 +374,7 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
     if (fabsl(hp_matrix[column][column]) < LDBL_MIN)
       ThrowGaussJordanException();  /* Singular matrix */
     NormalizePivotRow(&system,column);
-    EliminateColumn(hp_matrix,vectors,rank,number_vectors,column);
+    EliminateColumn(&system,column);
   }
   UnscrambleColumns(hp_matrix,rank,columns,rows);
   /*
