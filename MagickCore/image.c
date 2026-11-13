@@ -105,6 +105,12 @@
 #include "MagickCore/version.h"
 #include "MagickCore/xwindow-private.h"
 
+static void LimitImageDelay(Image *image,const double rho)
+{
+  if ((double) image->delay > floor(rho+0.5))
+    image->delay=(size_t) CastDoubleToSsizeT(floor(rho+0.5));
+}
+
 static void SetImageSize(Image *image,const char *size)
 {
   if (size != (char *) NULL)
@@ -170,12 +176,6 @@ static void SetImagePage(Image *image,const char *page)
       (void) ParseAbsoluteGeometry(geometry,&image->page);
       geometry=DestroyString(geometry);
     }
-}
-
-static void LimitImageDelay(Image *image,const double rho)
-{
-  if ((double) image->delay > floor(rho+0.5))
-    image->delay=(size_t) CastDoubleToSsizeT(floor(rho+0.5));
 }
 
 static void LimitImageTicks(Image *image,const GeometryInfo *geometry_info)
