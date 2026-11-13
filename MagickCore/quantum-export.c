@@ -6673,6 +6673,13 @@ static void GetExportPixelQueue(const Image *image,CacheView *image_view,
     }
 }
 
+static void SwapCbYCrRedGreen(const Image *image,CacheView *image_view,
+  const QuantumType quantum_type,const MagickSizeType number_pixels)
+{
+  if (IsCbYCrQuantumType(quantum_type) != MagickFalse)
+    SwapRedGreenQuantum(image,image_view,number_pixels);
+}
+
 MagickExport size_t ExportQuantumPixels(const Image *image,
   CacheView *image_view,QuantumInfo *quantum_info,
   const QuantumType quantum_type,unsigned char *magick_restrict pixels,
@@ -6707,8 +6714,7 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
     return(0);
   if (quantum_info->alpha_type == AssociatedQuantumAlpha)
     AssociateQuantumAlpha(image,image_view);
-  if (IsCbYCrQuantumType(quantum_type) != MagickFalse)
-    SwapRedGreenQuantum(image,image_view,number_pixels);
+  SwapCbYCrRedGreen(image,image_view,quantum_type,number_pixels);
   q=pixels;
   ResetQuantumState(quantum_info);
   extent=GetQuantumExtent(image,quantum_info,quantum_type);
@@ -6729,7 +6735,6 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
       break;
     }
   }
-  if (IsCbYCrQuantumType(quantum_type) != MagickFalse)
-    SwapRedGreenQuantum(image,image_view,number_pixels);
+  SwapCbYCrRedGreen(image,image_view,quantum_type,number_pixels);
   return(extent);
 }
