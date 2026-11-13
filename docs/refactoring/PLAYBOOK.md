@@ -14363,6 +14363,118 @@ Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
 
 ---
 
+## Recipe BC - Extract a Loop-Body Tail Returning Whether It Broke
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead*, and
+the block that would fix it is the tail of a sequential loop's body (or its whole body)
+whose every path ends the iteration through `continue;` or `break;` of that loop, as the
+sub-directory push of `profile.c`'s `SyncExifDirectory` does (`continue;` when the tag is
+no directory offset or the offset is out of range, `break;` after the push on every other
+path).
+
+**Not covered by:** Recipe LX, which takes the same exits but returns a second result
+through a `broke` out-parameter, one parameter more (here it would be the fifth); Recipe
+LB, whose block leaves only through `break;`; Recipe LC, whose block has no `break`;
+Recipe OC, whose block leaves only through `continue;`. At the end of a loop's body a
+`continue;` and falling off the end are the same step, so one result can say "break" or
+"go on".
+
+**How:**
+
+1. The block lies outside every OpenMP region and contains no `#pragma` line. It ends the
+   body of a sequential loop `Lp` (nothing of the body follows it). Every `continue;` in
+   it that leaves it continues `Lp`, every `break;` in it that leaves it ends `Lp`; it
+   holds no `return` and no `goto`. A `break` or `continue` of a loop or `switch` nested
+   inside it stays as it is.
+2. The variables of the caller it writes meet Recipe O step 2; each goes by pointer,
+   written `(*v)` at every use, or through a `const` targets struct of their addresses
+   that the caller already passes to helpers of the same loop (Recipe OC step 7, LB step
+   8), passed on unchanged and bound once at the top (`T *const v = targets->v;`). A
+   temporary it writes before reading, that nothing after it reads, is declared in the
+   new function (Recipe E step 4).
+3. Cut the block into a new `static MagickBooleanType` function directly above the
+   caller. Each `break;` that ended `Lp` becomes `return(MagickTrue);`, each `continue;`
+   that continued `Lp` becomes `return(MagickFalse);`, one for one; if the block can fall
+   off its end, the function ends with `return(MagickFalse);`. Nothing else in the text
+   changes.
+4. Pass what it only reads as parameters, or through `const` input structs: an input
+   struct the caller already passes to helpers of the same loop (passed on unchanged),
+   and a struct local the caller fills member by member from those variables directly
+   before the block (nothing between the fill and the block writes a member's variable;
+   Recipe N), each bound once at the top of the function (`const T v = name->v;`). At
+   most four parameters.
+5. Where the block stood, as the last statement of the body, write
+   `if (Helper(...) != MagickFalse) break;`. Check every argument against its parameter
+   by reading.
+
+**Before:**
+
+```c
+    SyncExifTag(&exif_tag,(*exif_directory));
+    if (IsExifDirectoryOffset(tag_value,format,components,number_bytes) ==
+        MagickFalse)
+      continue;
+    offset=(ssize_t) ReadProfileLong(endian,p);
+    if (((size_t) offset >= (length-1)) ||
+        ((*level) >= (MaxDirectoryStack-2)))
+      continue;
+    ...
+    if ((directory+2+(12*number_entries)) > (exif+length))
+      break;
+    ...
+    break;
+  }
+```
+
+**After:**
+
+```c
+static MagickBooleanType PushExifDirectory(const ExifWalkInfo *walk,
+  const ExifTagInfo *exif_tag,const size_t number_entries,
+  const ExifWalkTargets *targets)
+{
+  ...
+  if (IsExifDirectoryOffset(tag_value,format,components,number_bytes) ==
+      MagickFalse)
+    return(MagickFalse);
+  ...
+  if ((directory+2+(12*number_entries)) > (exif+length))
+    return(MagickTrue);
+  ...
+  return(MagickTrue);
+}
+...
+    SyncExifTag(&exif_tag,(*exif_directory));
+    if (PushExifDirectory(walk,&exif_tag,number_entries,targets) !=
+        MagickFalse)
+      break;
+  }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The function runs the block's statements up to the exit
+  the block would have taken; a `continue;` there (now `return(MagickFalse);`) and the
+  end of the body both go to `Lp`'s increment and test, and the caller's `if` falls off
+  the body's end on `MagickFalse`; a `break;` (now `return(MagickTrue);`) is followed by
+  the caller's `break;`, with nothing in between. Each written variable is the caller's
+  own object through its pointer, so the next iteration, or the code after `Lp`, reads
+  what the block wrote.
+- The block must be the body's tail: with a statement after it, `continue;` would skip
+  that statement and `return(MagickFalse);` would not (use Recipe LX then).
+- A struct bound at the top is read once; check by reading that the block writes no
+  member's variable before reading it.
+
+**Evidence level:** oracle, for the function the step changes (`casemap.py` first; name
+the original caller), with `refactor_guard.py --calls`.
+
+**Provenance:** 2026-11-13, from `profile.c`'s `SyncExifDirectory` (campaign B, M127 lane
+c): the push tail as `PushExifDirectory`, 3.84 to 3.90; LX would have needed five
+parameters. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: c
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -14700,3 +14812,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | DT | Step 2 keeps the condition inside a `(MagickBooleanType)` cast, step 4 adds `tools/cxx_warnings.sh`: the bare comparison is `bool` in C++ and broke main's Windows jobs (C2440/C2664 in `policy.c`, `constitute.c`, `stream.c`; the casts fixed them with object code identical) | build fixes on `campaign/M126` | mandate (2026-10-24) |
 | 2026-11-13 | NEW | TC | Drop a loop body's last statement `if (cond) continue;` when `cond` has no side effect; proof `obj_identical.sh` | `locale.c`'s `LoadLocaleCache` (cc 22 to 20, 6.46 to 6.50, object code identical) | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | W | Step 3: up to three plain locals the caller reads after the block may be written, each by pointer on Recipe RV step 6(b)'s terms (`(*v)` at every use, `&v` passed on written `v`), counted among step 5's four parameters; `R` reads none of them. *Careful* unchanged: on the success path each pointer has carried the block's writes to the caller's variable, on a failure path the caller returns at once | `profile.c`'s `SyncExifProfile` (lane c, M127): the Exif header block (length test, marker scan, byte-order test, `0x002a` test) returns on failure and writes `exif`, `length` and `endian`, which the IFD walk reads; part of a chain measured 3.58 to 4.03 on a scratch copy | mandate (2026-10-24) |
+| 2026-11-13 | NEW | BC | Extract a Loop-Body Tail Returning Whether It Broke: the tail of a sequential loop's body whose every path ends the iteration by `continue;` or `break;` becomes a `static MagickBooleanType` function returning `MagickTrue` for each `break;` and `MagickFalse` for each `continue;`; the caller writes `if (Helper(...) != MagickFalse) break;` as the body's last statement; evidence oracle | `profile.c`'s `SyncExifDirectory` (lane c, M127): the sub-directory push as `PushExifDirectory`, 3.84 to 3.90; LX needs a fifth parameter for its `broke` flag, LB refuses the `continue`, OC the `break` | mandate (2026-10-24) |
