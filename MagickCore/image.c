@@ -3280,6 +3280,14 @@ static MagickBooleanType CopyImageToSeekableFile(ImageInfo *image_info,
   return(MagickTrue);
 }
 
+static void ResetUnsupportedEndian(ImageInfo *image_info,
+  const MagickInfo *magick_info)
+{
+  if ((magick_info == (const MagickInfo *) NULL) ||
+      (GetMagickEndianSupport(magick_info) == MagickFalse))
+    image_info->endian=UndefinedEndian;
+}
+
 static MagickBooleanType SetImageMagickFromMagic(ImageInfo *image_info,
   const MagickInfo *magick_info,const MagicInfo *magic_info,
   ExceptionInfo *sans_exception)
@@ -3299,9 +3307,7 @@ static MagickBooleanType SetImageMagickFromMagic(ImageInfo *image_info,
             magic_info),MagickPathExtent);
           magick_info=GetMagickInfo(image_info->magick,sans_exception);
         }
-      if ((magick_info == (const MagickInfo *) NULL) ||
-          (GetMagickEndianSupport(magick_info) == MagickFalse))
-        image_info->endian=UndefinedEndian;
+      ResetUnsupportedEndian(image_info,magick_info);
       sans_exception=DestroyExceptionInfo(sans_exception);
       return(MagickFalse);
     }
@@ -3374,9 +3380,7 @@ static MagickBooleanType SetImageMagickFromContent(ImageInfo *image_info,
       sans_exception) == MagickFalse)
     return(MagickTrue);
   magick_info=GetMagickInfo(image_info->magick,sans_exception);
-  if ((magick_info == (const MagickInfo *) NULL) ||
-      (GetMagickEndianSupport(magick_info) == MagickFalse))
-    image_info->endian=UndefinedEndian;
+  ResetUnsupportedEndian(image_info,magick_info);
   sans_exception=DestroyExceptionInfo(sans_exception);
   return(MagickTrue);
 }
@@ -3480,9 +3484,7 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
     magick_info=SetUserSpecifiedFormat(image_info,magic,component,
       sans_exception,exception);
   sans_exception=DestroyExceptionInfo(sans_exception);
-  if ((magick_info == (const MagickInfo *) NULL) ||
-      (GetMagickEndianSupport(magick_info) == MagickFalse))
-    image_info->endian=UndefinedEndian;
+  ResetUnsupportedEndian(image_info,magick_info);
   if ((image_info->adjoin != MagickFalse) && (frames > 1))
     TestMultipleImageSupport(image_info,component,exception);
   if ((image_info->adjoin != MagickFalse) && (frames > 0))
