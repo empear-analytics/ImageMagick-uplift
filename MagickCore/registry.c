@@ -494,6 +494,19 @@ static void *CloneRegistryString(const char *key,const void *value)
   return((void *) ConstantString(string));
 }
 
+static inline MagickBooleanType IsInvalidRegistryImage(const Image *image)
+{
+  return(((image == (const Image *) NULL) ||
+    (image->signature != MagickCoreSignature)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsInvalidRegistryImageInfo(
+  const ImageInfo *image_info)
+{
+  return(((image_info == (const ImageInfo *) NULL) ||
+    (image_info->signature != MagickCoreSignature)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType SetImageRegistry(const RegistryType type,
   const char *key,const void *value,ExceptionInfo *exception)
 {
@@ -522,8 +535,7 @@ MagickExport MagickBooleanType SetImageRegistry(const RegistryType type,
         *image;
 
       image=(const Image *) value;
-      if ((image == (const Image *) NULL) ||
-          (image->signature != MagickCoreSignature))
+      if (IsInvalidRegistryImage(image) != MagickFalse)
         {
           (void) ThrowMagickException(exception,GetMagickModule(),RegistryError,
             "UnableToSetRegistry","%s",key);
@@ -538,8 +550,7 @@ MagickExport MagickBooleanType SetImageRegistry(const RegistryType type,
         *image_info;
 
       image_info=(const ImageInfo *) value;
-      if ((image_info == (const ImageInfo *) NULL) ||
-          (image_info->signature != MagickCoreSignature))
+      if (IsInvalidRegistryImageInfo(image_info) != MagickFalse)
         {
           (void) ThrowMagickException(exception,GetMagickModule(),RegistryError,
             "UnableToSetRegistry","%s",key);
