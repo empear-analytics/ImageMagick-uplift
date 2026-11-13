@@ -134,6 +134,17 @@ static MagickStatusType SetPercentGeometrySize(MagickStatusType flags,
   return(flags);
 }
 
+static void SkipGeometrySigns(char **p,MagickStatusType *flags,
+  const MagickStatusType negative)
+{
+  while ((**p == '+') || (**p == '-'))
+  {
+    if (**p == '-')
+      *flags^=negative;  /* negate sign */
+    (*p)++;
+  }
+}
+
 static void ParseGeometryXOffset(char **p,MagickStatusType *flags,ssize_t *x)
 {
   char
@@ -142,12 +153,7 @@ static void ParseGeometryXOffset(char **p,MagickStatusType *flags,ssize_t *x)
   /*
     Parse x value.
   */
-  while ((**p == '+') || (**p == '-'))
-  {
-    if (**p == '-')
-      *flags^=XNegative;  /* negate sign */
-    (*p)++;
-  }
+  SkipGeometrySigns(p,flags,XNegative);
   q=(*p);
   if (x != (ssize_t *) NULL)
     *x=CastDoubleToSsizeT(StringToDouble(*p,p));
@@ -159,16 +165,125 @@ static void ParseGeometryXOffset(char **p,MagickStatusType *flags,ssize_t *x)
     }
 }
 
+static MagickStatusType ParseGeometryWidth(char **p,MagickStatusType flags,
+  size_t *width)
+{
+  char
+    *q;
+
+  double
+    value;
+
+  int
+    c;
+
+  q=(*p);
+  value=StringToDouble(*p,&q);
+  (void) value;
+  if (LocaleNCompare(*p,"0x",2) == 0)
+    value=(double) strtol(*p,&q,10);
+  if ((**p == '+') || (**p == '-'))
+    return(flags);
+  c=(int) ((unsigned char) *q);
+  if (IsGeometryWidthTerminator(c,q) == MagickFalse)
+    return(flags);
+  /*
+    Parse width.
+  */
+  q=(*p);
+  if (width != (size_t *) NULL)
+    {
+      if (LocaleNCompare(*p,"0x",2) == 0)
+        *width=(size_t) strtol(*p,p,10);
+      else
+        *width=CastDoubleToSizeT(StringToDouble(*p,p)+0.5);
+    }
+  if (*p != q)
+    flags|=WidthValue;
+  return(flags);
+}
+
+static MagickStatusType ParseGeometryHeight(char **p,MagickStatusType flags,
+  size_t *height)
+{
+  char
+    *q;
+
+  int
+    c;
+
+  if ((**p == '+') || (**p == '-'))
+    return(flags);
+  c=(int) ((unsigned char) **p);
+  if (IsGeometryHeightSeparator(c,*p) == MagickFalse)
+    return(flags);
+  (*p)++;
+  if ((**p == '+') || (**p == '-'))
+    return(flags);
+  /*
+    Parse height.
+  */
+  q=(*p);
+  if (height != (size_t *) NULL)
+    *height=CastDoubleToSizeT(StringToDouble(*p,p)+0.5);
+  if (*p != q)
+    flags|=HeightValue;
+  return(flags);
+}
+
+static void ParseGeometryYOffset(char **p,MagickStatusType *flags,ssize_t *y)
+{
+  char
+    *q;
+
+  /*
+    Parse y value.
+  */
+  SkipGeometrySigns(p,flags,YNegative);
+  q=(*p);
+  if (y != (ssize_t *) NULL)
+    *y=CastDoubleToSsizeT(StringToDouble(*p,p));
+  if (*p != q)
+    {
+      *flags|=YValue;
+      if (((*flags & YNegative) != 0) && (y != (ssize_t *) NULL))
+        *y=CastDoubleToSsizeT(-1.0**y);
+    }
+}
+
+static inline MagickBooleanType IsGeometryAdvanceCharacter(const int c)
+{
+  switch (c)
+  {
+    case '-':
+    case ',':
+    case '+':
+    case '0':
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+    case '8':
+    case '9':
+    case 215:
+    case 'e':
+    case 'E':
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
 MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
   ssize_t *y,size_t *width,size_t *height)
 {
   char
     *p,
-    pedantic_geometry[MagickPathExtent],
-    *q;
-
-  double
-    value;
+    pedantic_geometry[MagickPathExtent];
 
   int
     c;
@@ -193,6 +308,11 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
         continue;
       }
     c=(int) *p;
+    if (IsGeometryAdvanceCharacter(c) != MagickFalse)
+      {
+        p++;
+        continue;
+      }
     switch (c)
     {
       case '%':
@@ -250,26 +370,6 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
         p++;
         break;
       }
-      case '-':
-      case ',':
-      case '+':
-      case '0':
-      case '1':
-      case '2':
-      case '3':
-      case '4':
-      case '5':
-      case '6':
-      case '7':
-      case '8':
-      case '9':
-      case 215:
-      case 'e':
-      case 'E':
-      {
-        p++;
-        break;
-      }
       case '.':
       {
         p++;
@@ -292,73 +392,12 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
   p=pedantic_geometry;
   if (*p == '\0')
     return(flags);
-  q=p;
-  value=StringToDouble(p,&q);
-  (void) value;
-  if (LocaleNCompare(p,"0x",2) == 0)
-    value=(double) strtol(p,&q,10);
-  if ((*p != '+') && (*p != '-'))
-    {
-      c=(int) ((unsigned char) *q);
-      if (IsGeometryWidthTerminator(c,q) != MagickFalse)
-        {
-          /*
-            Parse width.
-          */
-          q=p;
-          if (width != (size_t *) NULL)
-            {
-              if (LocaleNCompare(p,"0x",2) == 0)
-                *width=(size_t) strtol(p,&p,10);
-              else
-                *width=CastDoubleToSizeT(StringToDouble(p,&p)+0.5);
-            }
-          if (p != q)
-            flags|=WidthValue;
-        }
-    }
-  if ((*p != '+') && (*p != '-'))
-    {
-      c=(int) ((unsigned char) *p);
-      if (IsGeometryHeightSeparator(c,p) != MagickFalse)
-        {
-          p++;
-          if ((*p != '+') && (*p != '-'))
-            {
-              /*
-                Parse height.
-              */
-              q=p;
-              if (height != (size_t *) NULL)
-                *height=CastDoubleToSizeT(StringToDouble(p,&p)+0.5);
-              if (p != q)
-                flags|=HeightValue;
-            }
-        }
-    }
+  flags=ParseGeometryWidth(&p,flags,width);
+  flags=ParseGeometryHeight(&p,flags,height);
   if ((*p == '+') || (*p == '-'))
     ParseGeometryXOffset(&p,&flags,x);
   if ((*p == '+') || (*p == '-'))
-    {
-      /*
-        Parse y value.
-      */
-      while ((*p == '+') || (*p == '-'))
-      {
-        if (*p == '-')
-          flags^=YNegative;  /* negate sign */
-        p++;
-      }
-      q=p;
-      if (y != (ssize_t *) NULL)
-        *y=CastDoubleToSsizeT(StringToDouble(p,&p));
-      if (p != q)
-        {
-          flags|=YValue;
-          if (((flags & YNegative) != 0) && (y != (ssize_t *) NULL))
-            *y=CastDoubleToSsizeT(-1.0**y);
-        }
-    }
+    ParseGeometryYOffset(&p,&flags,y);
   if ((flags & PercentValue) != 0)
     flags=SetPercentGeometrySize(flags,width,height);
 #if 0
@@ -518,16 +557,148 @@ static void SetPercentGeometryInfo(const MagickStatusType flags,
     geometry_info->rho=geometry_info->sigma;
 }
 
+static MagickBooleanType ParseGeometryOffsetValue(char **p,
+  MagickStatusType *flags,const MagickStatusType negative,double *value)
+{
+  char
+    *q;
+
+  if (IsGeometryOffsetSeparator(*p) != MagickFalse)
+    (*p)++;
+  SkipGeometrySigns(p,flags,negative);
+  q=(*p);
+  *value=StringToDouble(*p,p);
+  if (*p == q)
+    return(MagickFalse);
+  if ((*flags & negative) != 0)
+    *value=(-(*value));
+  return(MagickTrue);
+}
+
+static void SkipGeometryWhitespace(char **p)
+{
+  while (isspace((int) ((unsigned char) **p)) != 0)
+    (*p)++;
+}
+
+static MagickStatusType ParseGeometryOffsets(char *p,MagickStatusType flags,
+  GeometryInfo *geometry_info)
+{
+  double
+    value;
+
+  SkipGeometryWhitespace(&p);
+  if (IsGeometryOffsetPrefix(p) == MagickFalse)
+    return(flags);
+  /*
+    Parse xi value.
+  */
+  if (ParseGeometryOffsetValue(&p,&flags,XiNegative,&value) != MagickFalse)
+    {
+      flags|=XiValue;
+      geometry_info->xi=value;
+    }
+  SkipGeometryWhitespace(&p);
+  /*
+    Parse psi value.
+  */
+  if ((IsGeometryOffsetPrefix(p) != MagickFalse) &&
+      (ParseGeometryOffsetValue(&p,&flags,PsiNegative,&value) != MagickFalse))
+    {
+      flags|=PsiValue;
+      geometry_info->psi=value;
+    }
+  SkipGeometryWhitespace(&p);
+  /*
+    Parse chi value.
+  */
+  if ((IsGeometryOffsetPrefix(p) != MagickFalse) &&
+      (ParseGeometryOffsetValue(&p,&flags,ChiNegative,&value) != MagickFalse))
+    {
+      flags|=ChiValue;
+      geometry_info->chi=value;
+    }
+  return(flags);
+}
+
+static MagickStatusType ParseGeometryRho(char **p,MagickStatusType flags,
+  GeometryInfo *geometry_info)
+{
+  char
+    *q;
+
+  double
+    value;
+
+  int
+    c;
+
+  q=(*p);
+  value=StringToDouble(*p,&q);
+  if (LocaleNCompare(*p,"0x",2) == 0)
+    (void) strtol(*p,&q,10);
+  c=(int) ((unsigned char) *q);
+  if (IsGeometryRhoTerminator(c,q) != MagickFalse)
+    {
+      /*
+        Parse rho.
+      */
+      q=(*p);
+      if (LocaleNCompare(*p,"0x",2) == 0)
+        value=(double) strtol(*p,p,10);
+      else
+        value=StringToDouble(*p,p);
+      if (*p != q)
+        {
+          flags|=RhoValue;
+          geometry_info->rho=value;
+        }
+    }
+  return(flags);
+}
+
+static MagickStatusType ParseGeometrySigma(char **p,MagickStatusType flags,
+  GeometryInfo *geometry_info)
+{
+  char
+    *q;
+
+  double
+    value;
+
+  int
+    c;
+
+  q=(*p);
+  c=(int) ((unsigned char) **p);
+  if (IsGeometrySigmaSeparator(c,*p) != MagickFalse)
+    {
+      /*
+        Parse sigma.
+      */
+      (*p)++;
+      SkipGeometryWhitespace(p);
+      c=(int) ((unsigned char) *q);
+      if (IsGeometrySigmaParsable(c,*p,q) != MagickFalse)
+        {
+          q=(*p);
+          value=StringToDouble(*p,p);
+          if (*p != q)
+            {
+              flags|=SigmaValue;
+              geometry_info->sigma=value;
+            }
+        }
+    }
+  return(flags);
+}
+
 MagickExport MagickStatusType ParseGeometry(const char *geometry,
   GeometryInfo *geometry_info)
 {
   char
     *p,
-    pedantic_geometry[MagickPathExtent],
-    *q;
-
-  double
-    value;
+    pedantic_geometry[MagickPathExtent];
 
   GeometryInfo
     coordinate;
@@ -569,6 +740,13 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
     if (isspace((int) ((unsigned char) c)) != 0)
       {
         (void) CopyMagickString(p,p+1,MagickPathExtent);
+        continue;
+      }
+    if ((c == '(') && (*(p+1) == ')'))
+      return(flags);
+    if (IsGeometryAdvanceCharacter(c) != MagickFalse)
+      {
+        p++;
         continue;
       }
     switch (c)
@@ -616,12 +794,6 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
         break;
       }
       case '(':
-      {
-        if (*(p+1) == ')')
-          return(flags);
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
       case ')':
       {
         (void) CopyMagickString(p,p+1,MagickPathExtent);
@@ -634,23 +806,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
         p++;
         break;
       }
-      case '-':
-      case '+':
-      case ',':
-      case '0':
-      case '1':
-      case '2':
-      case '3':
-      case '4':
-      case '5':
-      case '6':
-      case '7':
-      case '8':
-      case '9':
       case '/':
-      case 215:
-      case 'e':
-      case 'E':
       {
         p++;
         break;
@@ -677,124 +833,9 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
   p=pedantic_geometry;
   if (*p == '\0')
     return(flags);
-  q=p;
-  value=StringToDouble(p,&q);
-  if (LocaleNCompare(p,"0x",2) == 0)
-    (void) strtol(p,&q,10);
-  c=(int) ((unsigned char) *q);
-  if (IsGeometryRhoTerminator(c,q) != MagickFalse)
-    {
-      /*
-        Parse rho.
-      */
-      q=p;
-      if (LocaleNCompare(p,"0x",2) == 0)
-        value=(double) strtol(p,&p,10);
-      else
-        value=StringToDouble(p,&p);
-      if (p != q)
-        {
-          flags|=RhoValue;
-          geometry_info->rho=value;
-        }
-    }
-  q=p;
-  c=(int) ((unsigned char) *p);
-  if (IsGeometrySigmaSeparator(c,p) != MagickFalse)
-    {
-      /*
-        Parse sigma.
-      */
-      p++;
-      while (isspace((int) ((unsigned char) *p)) != 0)
-        p++;
-      c=(int) ((unsigned char) *q);
-      if (IsGeometrySigmaParsable(c,p,q) != MagickFalse)
-        {
-          q=p;
-          value=StringToDouble(p,&p);
-          if (p != q)
-            {
-              flags|=SigmaValue;
-              geometry_info->sigma=value;
-            }
-        }
-    }
-  while (isspace((int) ((unsigned char) *p)) != 0)
-    p++;
-  if (IsGeometryOffsetPrefix(p) != MagickFalse)
-    {
-      /*
-        Parse xi value.
-      */
-      if (IsGeometryOffsetSeparator(p) != MagickFalse)
-        p++;
-      while ((*p == '+') || (*p == '-'))
-      {
-        if (*p == '-')
-          flags^=XiNegative;  /* negate sign */
-        p++;
-      }
-      q=p;
-      value=StringToDouble(p,&p);
-      if (p != q)
-        {
-          flags|=XiValue;
-          if ((flags & XiNegative) != 0)
-            value=(-value);
-          geometry_info->xi=value;
-        }
-      while (isspace((int) ((unsigned char) *p)) != 0)
-        p++;
-      if (IsGeometryOffsetPrefix(p) != MagickFalse)
-        {
-          /*
-            Parse psi value.
-          */
-          if (IsGeometryOffsetSeparator(p) != MagickFalse)
-            p++;
-          while ((*p == '+') || (*p == '-'))
-          {
-            if (*p == '-')
-              flags^=PsiNegative;  /* negate sign */
-            p++;
-          }
-          q=p;
-          value=StringToDouble(p,&p);
-          if (p != q)
-            {
-              flags|=PsiValue;
-              if ((flags & PsiNegative) != 0)
-                value=(-value);
-              geometry_info->psi=value;
-            }
-      }
-      while (isspace((int) ((unsigned char) *p)) != 0)
-        p++;
-      if (IsGeometryOffsetPrefix(p) != MagickFalse)
-        {
-          /*
-            Parse chi value.
-          */
-          if (IsGeometryOffsetSeparator(p) != MagickFalse)
-            p++;
-          while ((*p == '+') || (*p == '-'))
-          {
-            if (*p == '-')
-              flags^=ChiNegative;  /* negate sign */
-            p++;
-          }
-          q=p;
-          value=StringToDouble(p,&p);
-          if (p != q)
-            {
-              flags|=ChiValue;
-              if ((flags & ChiNegative) != 0)
-                value=(-value);
-              geometry_info->chi=value;
-            }
-        }
-    }
+  flags=ParseGeometryRho(&p,flags,geometry_info);
+  flags=ParseGeometrySigma(&p,flags,geometry_info);
+  flags=ParseGeometryOffsets(p,flags,geometry_info);
   if (strchr(pedantic_geometry,':') != (char *) NULL)
     NormalizeSamplingFactor(flags,geometry_info);
   if (IsNegativeHeightGeometry(flags) != MagickFalse)

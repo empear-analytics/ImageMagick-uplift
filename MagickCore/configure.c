@@ -824,6 +824,39 @@ static MagickBooleanType IsConfigureCacheInstantiated(ExceptionInfo *exception)
   return(configure_cache != (LinkedListInfo *) NULL ? MagickTrue : MagickFalse);
 }
 
+static void PrintConfigureHeader(FILE *file,const ConfigureInfo *configure_info)
+{
+  if (configure_info->path != (char *) NULL)
+    (void) FormatLocaleFile(file,"\nPath: %s\n\n",configure_info->path);
+  (void) FormatLocaleFile(file,"Name                  Value\n");
+  (void) FormatLocaleFile(file,
+    "-------------------------------------------------"
+    "------------------------------\n");
+}
+
+static void PrintConfigureEntry(FILE *file,const ConfigureInfo *configure_info)
+{
+  const char
+    *name,
+    *value;
+
+  ssize_t
+    j;
+
+  name="unknown";
+  if (configure_info->name != (char *) NULL)
+    name=configure_info->name;
+  (void) FormatLocaleFile(file,"%s",name);
+  for (j=(ssize_t) strlen(name); j <= 20; j++)
+    (void) FormatLocaleFile(file," ");
+  (void) FormatLocaleFile(file," ");
+  value="unknown";
+  if (configure_info->value != (char *) NULL)
+    value=configure_info->value;
+  (void) FormatLocaleFile(file,"%s",value);
+  (void) FormatLocaleFile(file,"\n");
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -852,9 +885,7 @@ MagickExport MagickBooleanType ListConfigureInfo(FILE *file,
   ExceptionInfo *exception)
 {
   const char
-    *name,
-    *path,
-    *value;
+    *path;
 
   const ConfigureInfo
     **configure_info;
@@ -864,9 +895,6 @@ MagickExport MagickBooleanType ListConfigureInfo(FILE *file,
 
   size_t
     number_options;
-
-  ssize_t
-    j;
 
   if (file == (const FILE *) NULL)
     file=stdout;
@@ -880,28 +908,9 @@ MagickExport MagickBooleanType ListConfigureInfo(FILE *file,
       continue;
     if ((path == (const char *) NULL) ||
         (LocaleCompare(path,configure_info[i]->path) != 0))
-      {
-        if (configure_info[i]->path != (char *) NULL)
-          (void) FormatLocaleFile(file,"\nPath: %s\n\n",
-            configure_info[i]->path);
-        (void) FormatLocaleFile(file,"Name                  Value\n");
-        (void) FormatLocaleFile(file,
-          "-------------------------------------------------"
-          "------------------------------\n");
-      }
+      PrintConfigureHeader(file,configure_info[i]);
     path=configure_info[i]->path;
-    name="unknown";
-    if (configure_info[i]->name != (char *) NULL)
-      name=configure_info[i]->name;
-    (void) FormatLocaleFile(file,"%s",name);
-    for (j=(ssize_t) strlen(name); j <= 20; j++)
-      (void) FormatLocaleFile(file," ");
-    (void) FormatLocaleFile(file," ");
-    value="unknown";
-    if (configure_info[i]->value != (char *) NULL)
-      value=configure_info[i]->value;
-    (void) FormatLocaleFile(file,"%s",value);
-    (void) FormatLocaleFile(file,"\n");
+    PrintConfigureEntry(file,configure_info[i]);
   }
   (void) fflush(file);
   configure_info=(const ConfigureInfo **) RelinquishMagickMemory((void *)
@@ -948,6 +957,140 @@ static inline MagickBooleanType IsIncludeElementOpen(const char *token,
     MagickTrue : MagickFalse);
 }
 
+static void GetIncludePath(const char *filename,const char *token,
+  char *path)
+{
+  GetPathComponent(filename,HeadPath,path);
+  if (*path != '\0')
+    (void) ConcatenateMagickString(path,DirectorySeparator,
+      MagickPathExtent);
+  if (*token == *DirectorySeparator)
+    (void) CopyMagickString(path,token,MagickPathExtent);
+  else
+    (void) ConcatenateMagickString(path,token,MagickPathExtent);
+}
+
+static MagickBooleanType LoadConfigureInclude(const ConfigureLoadTarget *target,
+  const char *filename,const char *token,const size_t depth)
+{
+  const ConfigureLoadTarget include_target = { target->cache,
+    target->exception };
+
+  char
+    path[MagickPathExtent],
+    *file_xml;
+
+  MagickBooleanType
+    status;
+
+  status=MagickTrue;
+  GetIncludePath(filename,token,path);
+  file_xml=FileToXML(path,~0UL);
+  if (file_xml != (char *) NULL)
+    {
+      status=LoadConfigureCache(&include_target,file_xml,path,depth+1);
+      file_xml=DestroyString(file_xml);
+    }
+  return(status);
+}
+
+static const char *SkipQuotedText(const char *q)
+{
+  const char
+    quote = (*q),
+    *p = q+1;
+
+  /*
+    Return the last character of the quoted text: the closing quote, or the
+    last character of the string if the quote is not closed.
+  */
+  while ((*p != '\0') && (*p != quote))
+    p++;
+  return(*p == '\0' ? p-1 : p);
+}
+
+static const char *SkipDoctypeElement(const char *q)
+{
+  int
+    bracket_depth = 0;
+
+  while (*q != '\0')
+  {
+    if (strchr("\"'",*q) != (char *) NULL)
+      q=SkipQuotedText(q);
+    else if (*q == '[')
+      bracket_depth++;
+    else if ((*q == ']') && (bracket_depth > 0))
+      bracket_depth--;
+    else if ((*q == '>') && (bracket_depth == 0))
+      return(q+1);   /* consume final '>' */
+    q++;
+  }
+  return(q);
+}
+
+static const char *SkipCommentElement(const char *q,const size_t extent,
+  char *token)
+{
+  while ((LocaleNCompare(q,"->",2) != 0) && (*q != '\0'))
+    (void) GetNextToken(q,&q,extent,token);
+  return(q);
+}
+
+static void SetConfigureAttribute(ConfigureInfo *configure_info,
+  const char *keyword,const char *token)
+{
+  if (LocaleCompare(keyword,"name") == 0)
+    configure_info->name=ConstantString(token);
+  else if (LocaleCompare(keyword,"stealth") == 0)
+    configure_info->stealth=IsStringTrue(token);
+  else if (LocaleCompare(keyword,"value") == 0)
+    configure_info->value=ConstantString(token);
+}
+
+static MagickBooleanType NextIncludeFile(const char **q,const size_t extent,
+  char *token)
+{
+  char
+    keyword[MagickPathExtent];
+
+  while (IsIncludeElementOpen(token,*q) != MagickFalse)
+  {
+    (void) CopyMagickString(keyword,token,MagickPathExtent);
+    (void) GetNextToken(*q,q,extent,token);
+    if (*token != '=')
+      continue;
+    (void) GetNextToken(*q,q,extent,token);
+    if (LocaleCompare(keyword,"file") == 0)
+      return(MagickTrue);
+  }
+  return(MagickFalse);
+}
+
+static MagickBooleanType SkipMarkupElement(const char *keyword,const char **q,
+  const size_t extent,char *token)
+{
+  if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
+    *q=SkipDoctypeElement(*q);
+  else
+    if (LocaleNCompare(keyword,"<!--",4) == 0)
+      *q=SkipCommentElement(*q,extent,token);
+    else
+      return(MagickFalse);
+  return(MagickTrue);
+}
+
+static MagickBooleanType ReadAttributeValue(const char **q,const size_t extent,
+  char *token)
+{
+  (void) GetNextToken(*q,(const char **) NULL,extent,token);
+  if (*token != '=')
+    return(MagickFalse);
+  (void) GetNextToken(*q,q,extent,token);
+  (void) GetNextToken(*q,q,extent,token);
+  return(MagickTrue);
+}
+
 static MagickBooleanType LoadConfigureCache(const ConfigureLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -991,98 +1134,20 @@ static MagickBooleanType LoadConfigureCache(const ConfigureLoadTarget *target,
     if (*token == '\0')
       break;
     (void) CopyMagickString(keyword,token,MagickPathExtent);
-    if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
-      {
-        int
-          bracket_depth = 0,
-          quote = 0;
-
-        /*
-          DOCTYPE element.
-        */
-        for ( ; *q != '\0'; q++)
-        {
-          if (quote != 0)
-            {
-              if (*q == quote)
-                quote=0;
-            }
-          else
-            {
-              if ((*q == '"') || (*q == '\''))
-                quote=(*q);
-              else
-                if (*q == '[')
-                  bracket_depth++;
-                else
-                  if (*q == ']')
-                    {
-                      if (bracket_depth > 0)
-                        bracket_depth--;
-                    }
-                  else
-                    if ((*q == '>') && (bracket_depth == 0))
-                      {
-                        q++;   /* consume final '>' */
-                        break;
-                      }
-            }
-        }
-        continue;
-      }
-    if (LocaleNCompare(keyword,"<!--",4) == 0)
-      {
-        /*
-          Comment element.
-        */
-        while ((LocaleNCompare(q,"->",2) != 0) && (*q != '\0'))
-          (void) GetNextToken(q,&q,extent,token);
-        continue;
-      }
+    if (SkipMarkupElement(keyword,&q,extent,token) != MagickFalse)
+      continue;
     if (LocaleCompare(keyword,"<include") == 0)
       {
         /*
           Include element.
         */
-        while (IsIncludeElementOpen(token,q) != MagickFalse)
-        {
-          (void) CopyMagickString(keyword,token,MagickPathExtent);
-          (void) GetNextToken(q,&q,extent,token);
-          if (*token != '=')
-            continue;
-          (void) GetNextToken(q,&q,extent,token);
-          if (LocaleCompare(keyword,"file") == 0)
-            {
-              if (depth >= MagickMaxRecursionDepth)
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
-              else
-                {
-                  const ConfigureLoadTarget include_target = { cache,
-                    exception };
-
-                  char
-                    path[MagickPathExtent],
-                    *file_xml;
-
-                  GetPathComponent(filename,HeadPath,path);
-                  if (*path != '\0')
-                    (void) ConcatenateMagickString(path,DirectorySeparator,
-                      MagickPathExtent);
-                  if (*token == *DirectorySeparator)
-                    (void) CopyMagickString(path,token,MagickPathExtent);
-                  else
-                    (void) ConcatenateMagickString(path,token,MagickPathExtent);
-                  file_xml=FileToXML(path,~0UL);
-                  if (file_xml != (char *) NULL)
-                    {
-                      status&=(MagickStatusType) LoadConfigureCache(
-                        &include_target,file_xml,path,depth+1);
-                      file_xml=DestroyString(file_xml);
-                    }
-                }
-            }
-        }
+        while (NextIncludeFile(&q,extent,token) != MagickFalse)
+          if (depth >= MagickMaxRecursionDepth)
+            (void) ThrowMagickException(exception,GetMagickModule(),
+              ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
+          else
+            status&=(MagickStatusType) LoadConfigureInclude(target,filename,
+              token,depth);
         continue;
       }
     if (LocaleCompare(keyword,"<configure") == 0)
@@ -1114,46 +1179,8 @@ static MagickBooleanType LoadConfigureCache(const ConfigureLoadTarget *target,
     /*
       Parse configure element.
     */
-    (void) GetNextToken(q,(const char **) NULL,extent,token);
-    if (*token != '=')
-      continue;
-    (void) GetNextToken(q,&q,extent,token);
-    (void) GetNextToken(q,&q,extent,token);
-    switch (*keyword)
-    {
-      case 'N':
-      case 'n':
-      {
-        if (LocaleCompare((char *) keyword,"name") == 0)
-          {
-            configure_info->name=ConstantString(token);
-            break;
-          }
-        break;
-      }
-      case 'S':
-      case 's':
-      {
-        if (LocaleCompare((char *) keyword,"stealth") == 0)
-          {
-            configure_info->stealth=IsStringTrue(token);
-            break;
-          }
-        break;
-      }
-      case 'V':
-      case 'v':
-      {
-        if (LocaleCompare((char *) keyword,"value") == 0)
-          {
-            configure_info->value=ConstantString(token);
-            break;
-          }
-        break;
-      }
-      default:
-        break;
-    }
+    if (ReadAttributeValue(&q,extent,token) != MagickFalse)
+      SetConfigureAttribute(configure_info,keyword,token);
   }
   token=(char *) RelinquishMagickMemory(token);
   return(status != 0 ? MagickTrue : MagickFalse);

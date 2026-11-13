@@ -454,6 +454,31 @@ static size_t CountTextLines(const char *text)
   return(number_lines);
 }
 
+static size_t GetTextLineHeight(const TypeMetric *metrics,
+  const DrawInfo *draw_info)
+{
+  size_t
+    height;
+
+  height=CastDoubleToSizeT(metrics->ascent-metrics->descent+0.5);
+  if (height == 0)
+    height=(size_t) draw_info->pointsize;
+  height=CastDoubleToSizeT(floor((double) height+
+    draw_info->interline_spacing+0.5));
+  return(height);
+}
+
+static PixelInfo GetDecorationColor(const DrawInfo *annotate_info)
+{
+  PixelInfo
+    pixel;
+
+  pixel=annotate_info->fill;
+  if (annotate_info->stroke.alpha != (MagickRealType) TransparentAlpha)
+    pixel=annotate_info->stroke;
+  return(pixel);
+}
+
 MagickExport MagickBooleanType AnnotateImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -556,11 +581,7 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
     (void) CloneString(&annotate->text,textlist[i]);
     if ((metrics.width == 0) || (annotate->gravity != NorthWestGravity))
       (void) GetTypeMetrics(image,annotate,&metrics,exception);
-    height=CastDoubleToSizeT(metrics.ascent-metrics.descent+0.5);
-    if (height == 0)
-      height=(size_t) draw_info->pointsize;
-    height=CastDoubleToSizeT(floor((double) height+
-      draw_info->interline_spacing+0.5));
+    height=GetTextLineHeight(&metrics,draw_info);
     switch (annotate->gravity)
     {
       default:
@@ -674,9 +695,7 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
       }
     annotate_info->affine.tx=offset.x;
     annotate_info->affine.ty=offset.y;
-    pixel=annotate_info->fill;
-    if (annotate_info->stroke.alpha != (MagickRealType) TransparentAlpha)
-      pixel=annotate_info->stroke;
+    pixel=GetDecorationColor(annotate_info);
     (void) QueryColorname(image,&pixel,AllCompliance,color,exception);
     (void) FormatLocaleString(primitive,MagickPathExtent,"stroke %s "
       "stroke-width %g line 0,0 %g,0",color,(double)
@@ -2086,6 +2105,28 @@ static FT_Encoding SelectAdobeBig5Encoding(const char *encoding,
   return(encoding_type);
 }
 
+static FT_Encoding SelectCjkLatinEncoding(const char *encoding,
+  FT_Encoding encoding_type)
+{
+#if defined(FT_ENCODING_PRC)
+  if (LocaleCompare(encoding,"GB2312") == 0)
+    encoding_type=FT_ENCODING_PRC;
+#endif
+#if defined(FT_ENCODING_JOHAB)
+  if (LocaleCompare(encoding,"Johab") == 0)
+    encoding_type=FT_ENCODING_JOHAB;
+#endif
+#if defined(FT_ENCODING_ADOBE_LATIN_1)
+  if (LocaleCompare(encoding,"Latin-1") == 0)
+    encoding_type=FT_ENCODING_ADOBE_LATIN_1;
+#endif
+#if defined(FT_ENCODING_ADOBE_LATIN_2)
+  if (LocaleCompare(encoding,"Latin-2") == 0)
+    encoding_type=FT_ENCODING_OLD_LATIN_2;
+#endif
+  return(encoding_type);
+}
+
 static void BlendGlyphAlpha(const Image *image,double fill_opacity,
   Quantum *q)
 {
@@ -2412,6 +2453,39 @@ static MagickBooleanType RasterizeGlyphBitmap(const GlyphBitmapTarget *target,
   return(status);
 }
 
+static FT_Int32 GetFreetypeLoadFlags(const DrawInfo *draw_info)
+{
+  FT_Int32
+    flags;
+
+  flags=FT_LOAD_DEFAULT;
+  if (draw_info->render == MagickFalse)
+    flags=FT_LOAD_NO_BITMAP;
+  if (draw_info->text_antialias == MagickFalse)
+    flags|=FT_LOAD_TARGET_MONO;
+  else
+    {
+#if defined(FT_LOAD_TARGET_LIGHT)
+      flags|=FT_LOAD_TARGET_LIGHT;
+#elif defined(FT_LOAD_TARGET_LCD)
+      flags|=FT_LOAD_TARGET_LCD;
+#endif
+    }
+  return(flags);
+}
+
+static DrawInfo *CloneFreetypeAnnotateInfo(const DrawInfo *draw_info)
+{
+  DrawInfo
+    *annotate_info;
+
+  annotate_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
+  if (annotate_info->dash_pattern != (double *) NULL)
+    annotate_info->dash_pattern[0]=0.0;
+  (void) CloneString(&annotate_info->primitive,"path '");
+  return(annotate_info);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2604,22 +2678,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   if (encoding != (const char *) NULL)
     {
       encoding_type=SelectAdobeBig5Encoding(encoding,encoding_type);
-#if defined(FT_ENCODING_PRC)
-      if (LocaleCompare(encoding,"GB2312") == 0)
-        encoding_type=FT_ENCODING_PRC;
-#endif
-#if defined(FT_ENCODING_JOHAB)
-      if (LocaleCompare(encoding,"Johab") == 0)
-        encoding_type=FT_ENCODING_JOHAB;
-#endif
-#if defined(FT_ENCODING_ADOBE_LATIN_1)
-      if (LocaleCompare(encoding,"Latin-1") == 0)
-        encoding_type=FT_ENCODING_ADOBE_LATIN_1;
-#endif
-#if defined(FT_ENCODING_ADOBE_LATIN_2)
-      if (LocaleCompare(encoding,"Latin-2") == 0)
-        encoding_type=FT_ENCODING_OLD_LATIN_2;
-#endif
+      encoding_type=SelectCjkLatinEncoding(encoding,encoding_type);
       if (LocaleCompare(encoding,"None") == 0)
         encoding_type=FT_ENCODING_NONE;
       if (LocaleCompare(encoding,"SJIScode") == 0)
@@ -2674,19 +2733,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
       encoding != (char *) NULL ? encoding : "none",
       draw_info->encoding != (char *) NULL ? draw_info->encoding : "none",
       draw_info->pointsize);
-  flags=FT_LOAD_DEFAULT;
-  if (draw_info->render == MagickFalse)
-    flags=FT_LOAD_NO_BITMAP;
-  if (draw_info->text_antialias == MagickFalse)
-    flags|=FT_LOAD_TARGET_MONO;
-  else
-    {
-#if defined(FT_LOAD_TARGET_LIGHT)
-      flags|=FT_LOAD_TARGET_LIGHT;
-#elif defined(FT_LOAD_TARGET_LCD)
-      flags|=FT_LOAD_TARGET_LCD;
-#endif
-    }
+  flags=GetFreetypeLoadFlags(draw_info);
   flags=GetFreetypeHintingFlags(image,flags,exception);
   glyph.id=0;
   glyph.image=(FT_Glyph) NULL;
@@ -2694,10 +2741,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   origin.x=0;
   origin.y=0;
   affine=GetFreetypeAffine(draw_info);
-  annotate_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
-  if (annotate_info->dash_pattern != (double *) NULL)
-    annotate_info->dash_pattern[0]=0.0;
-  (void) CloneString(&annotate_info->primitive,"path '");
+  annotate_info=CloneFreetypeAnnotateInfo(draw_info);
   status=MagickTrue;
   if (draw_info->render != MagickFalse)
     SetFreetypeCanvas(image,exception);
@@ -2865,23 +2909,176 @@ static MagickBooleanType IsValidPostscriptFontname(const char *font)
   return(MagickTrue);
 }
 
-static MagickBooleanType RenderPostscript(Image *image,
-  const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
-  ExceptionInfo *exception)
+static PointInfo GetPostscriptExtent(const DrawInfo *draw_info)
+{
+  PointInfo
+    extent,
+    point;
+
+  ssize_t
+    i;
+
+  size_t
+    length;
+
+  extent.x=0.0;
+  extent.y=0.0;
+  length=strlen(draw_info->text);
+  for (i=0; i <= (ssize_t) (length+2); i++)
+  {
+    point.x=fabs(draw_info->affine.sx*i*draw_info->pointsize+
+      draw_info->affine.ry*2.0*draw_info->pointsize);
+    point.y=fabs(draw_info->affine.rx*i*draw_info->pointsize+
+      draw_info->affine.sy*2.0*draw_info->pointsize);
+    if (point.x > extent.x)
+      extent.x=point.x;
+    if (point.y > extent.y)
+      extent.y=point.y;
+  }
+  return(extent);
+}
+
+static void SetPostscriptMetrics(const DrawInfo *draw_info,
+  const Image *annotate_image,const PointInfo resolution,TypeMetric *metrics)
+{
+  metrics->pixels_per_em.x=(resolution.y/DefaultResolution)*
+    ExpandAffine(&draw_info->affine)*draw_info->pointsize;
+  metrics->pixels_per_em.y=metrics->pixels_per_em.x;
+  metrics->ascent=metrics->pixels_per_em.y;
+  metrics->descent=metrics->pixels_per_em.y/-5.0;
+  metrics->width=(double) annotate_image->columns/
+    ExpandAffine(&draw_info->affine);
+  metrics->height=floor(metrics->ascent-metrics->descent+0.5);
+  metrics->max_advance=metrics->pixels_per_em.x;
+  metrics->bounds.x1=0.0;
+  metrics->bounds.y1=metrics->descent;
+  metrics->bounds.x2=metrics->ascent+metrics->descent;
+  metrics->bounds.y2=metrics->ascent+metrics->descent;
+  metrics->underline_position=(-2.0);
+  metrics->underline_thickness=1.0;
+}
+
+static void WritePostscriptPrologue(FILE *file)
+{
+  (void) FormatLocaleFile(file,"%%!PS-Adobe-3.0\n");
+  (void) FormatLocaleFile(file,"/ReencodeType\n");
+  (void) FormatLocaleFile(file,"{\n");
+  (void) FormatLocaleFile(file,"  findfont dup length\n");
+  (void) FormatLocaleFile(file,
+    "  dict begin { 1 index /FID ne {def} {pop pop} ifelse } forall\n");
+  (void) FormatLocaleFile(file,
+    "  /Encoding ISOLatin1Encoding def currentdict end definefont pop\n");
+  (void) FormatLocaleFile(file,"} bind def\n");
+}
+
+static void WritePostscriptFont(FILE *file,const DrawInfo *draw_info)
+{
+  if (IsValidPostscriptFontname(draw_info->font) == MagickFalse)
+    (void) FormatLocaleFile(file,
+      "/Times-Roman-ISO dup /Times-Roman ReencodeType findfont setfont\n");
+  else
+    (void) FormatLocaleFile(file,
+      "/%s-ISO dup /%s ReencodeType findfont setfont\n",draw_info->font,
+      draw_info->font);
+}
+
+static PointInfo GetPostscriptResolution(const DrawInfo *draw_info)
+{
+  PointInfo
+    resolution;
+
+  resolution.x=DefaultResolution;
+  resolution.y=DefaultResolution;
+  if (draw_info->density != (char *) NULL)
+    {
+      GeometryInfo
+        geometry_info;
+
+      MagickStatusType
+        flags;
+
+      flags=ParseGeometry(draw_info->density,&geometry_info);
+      if ((flags & RhoValue) != 0)
+        resolution.x=geometry_info.rho;
+      resolution.y=resolution.x;
+      if ((flags & SigmaValue) != 0)
+        resolution.y=geometry_info.sigma;
+    }
+  return(resolution);
+}
+
+static void WritePostscriptText(FILE *file,const DrawInfo *draw_info,
+  const MagickBooleanType identity,ExceptionInfo *exception)
 {
   char
-    filename[MagickPathExtent],
-    geometry[MagickPathExtent],
     *text;
 
-  FILE
-    *file;
+  text=EscapeParenthesis(draw_info->text,MAGICK_SIZE_MAX,exception);
+  if (identity == MagickFalse)
+    (void) FormatLocaleFile(file,"(%s) stringwidth pop -0.5 mul -0.5 rmoveto\n",
+      text);
+  (void) FormatLocaleFile(file,"(%s) show\n",text);
+  text=DestroyString(text);
+}
+
+static Image *ReadPostscriptImage(const DrawInfo *draw_info,
+  const PointInfo extent,const char *filename,ExceptionInfo *exception)
+{
+  char
+    geometry[MagickPathExtent];
 
   Image
     *annotate_image;
 
   ImageInfo
     *annotate_info;
+
+  (void) FormatLocaleString(geometry,MagickPathExtent,"%.17gx%.17g+0+0!",
+    floor(extent.x+0.5),floor(extent.y+0.5));
+  annotate_info=AcquireImageInfo();
+  (void) FormatLocaleString(annotate_info->filename,MagickPathExtent,"ps:%s",
+    filename);
+  (void) CloneString(&annotate_info->page,geometry);
+  if (draw_info->density != (char *) NULL)
+    (void) CloneString(&annotate_info->density,draw_info->density);
+  annotate_info->antialias=draw_info->text_antialias;
+  annotate_image=ReadImage(annotate_info,exception);
+  CatchException(exception);
+  annotate_info=DestroyImageInfo(annotate_info);
+  (void) RelinquishUniqueFileResource(filename);
+  return(annotate_image);
+}
+
+static MagickBooleanType IsIdentityAffine(const DrawInfo *draw_info)
+{
+  return((fabs(draw_info->affine.sx-draw_info->affine.sy) < MagickEpsilon) &&
+    (fabs(draw_info->affine.rx) < MagickEpsilon) &&
+    (fabs(draw_info->affine.ry) < MagickEpsilon) ? MagickTrue : MagickFalse);
+}
+
+static void SetPostscriptAlphaChannels(Image *image,Image *annotate_image,
+  ExceptionInfo *exception)
+{
+  if ((image->alpha_trait & BlendPixelTrait) == 0)
+    (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
+  if (annotate_image->alpha_trait == UndefinedPixelTrait)
+    (void) SetImageAlphaChannel(annotate_image,OpaqueAlphaChannel,
+      exception);
+}
+
+static MagickBooleanType RenderPostscript(Image *image,
+  const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
+  ExceptionInfo *exception)
+{
+  char
+    filename[MagickPathExtent],
+    geometry[MagickPathExtent];
+
+  FILE
+    *file;
+
+  Image
+    *annotate_image;
 
   int
     unique_file;
@@ -2892,14 +3089,7 @@ static MagickBooleanType RenderPostscript(Image *image,
 
   PointInfo
     extent,
-    point,
     resolution;
-
-  ssize_t
-    i;
-
-  size_t
-    length;
 
   ssize_t
     y;
@@ -2920,90 +3110,28 @@ static MagickBooleanType RenderPostscript(Image *image,
       ThrowFileException(exception,FileOpenError,"UnableToOpenFile",filename);
       return(MagickFalse);
     }
-  (void) FormatLocaleFile(file,"%%!PS-Adobe-3.0\n");
-  (void) FormatLocaleFile(file,"/ReencodeType\n");
-  (void) FormatLocaleFile(file,"{\n");
-  (void) FormatLocaleFile(file,"  findfont dup length\n");
-  (void) FormatLocaleFile(file,
-    "  dict begin { 1 index /FID ne {def} {pop pop} ifelse } forall\n");
-  (void) FormatLocaleFile(file,
-    "  /Encoding ISOLatin1Encoding def currentdict end definefont pop\n");
-  (void) FormatLocaleFile(file,"} bind def\n");
+  WritePostscriptPrologue(file);
   /*
     Sample to compute bounding box.
   */
-  identity=(fabs(draw_info->affine.sx-draw_info->affine.sy) < MagickEpsilon) &&
-    (fabs(draw_info->affine.rx) < MagickEpsilon) &&
-    (fabs(draw_info->affine.ry) < MagickEpsilon) ? MagickTrue : MagickFalse;
-  extent.x=0.0;
-  extent.y=0.0;
-  length=strlen(draw_info->text);
-  for (i=0; i <= (ssize_t) (length+2); i++)
-  {
-    point.x=fabs(draw_info->affine.sx*i*draw_info->pointsize+
-      draw_info->affine.ry*2.0*draw_info->pointsize);
-    point.y=fabs(draw_info->affine.rx*i*draw_info->pointsize+
-      draw_info->affine.sy*2.0*draw_info->pointsize);
-    if (point.x > extent.x)
-      extent.x=point.x;
-    if (point.y > extent.y)
-      extent.y=point.y;
-  }
+  identity=IsIdentityAffine(draw_info);
+  extent=GetPostscriptExtent(draw_info);
   (void) FormatLocaleFile(file,"%g %g moveto\n",identity  != MagickFalse ? 0.0 :
     extent.x/2.0,extent.y/2.0);
   (void) FormatLocaleFile(file,"%g %g scale\n",draw_info->pointsize,
     draw_info->pointsize);
-  if (IsValidPostscriptFontname(draw_info->font) == MagickFalse)
-    (void) FormatLocaleFile(file,
-      "/Times-Roman-ISO dup /Times-Roman ReencodeType findfont setfont\n");
-  else
-    (void) FormatLocaleFile(file,
-      "/%s-ISO dup /%s ReencodeType findfont setfont\n",draw_info->font,
-      draw_info->font);
+  WritePostscriptFont(file,draw_info);
   (void) FormatLocaleFile(file,"[%g %g %g %g 0 0] concat\n",
     draw_info->affine.sx,-draw_info->affine.rx,-draw_info->affine.ry,
     draw_info->affine.sy);
-  text=EscapeParenthesis(draw_info->text,MAGICK_SIZE_MAX,exception);
-  if (identity == MagickFalse)
-    (void) FormatLocaleFile(file,"(%s) stringwidth pop -0.5 mul -0.5 rmoveto\n",
-      text);
-  (void) FormatLocaleFile(file,"(%s) show\n",text);
-  text=DestroyString(text);
+  WritePostscriptText(file,draw_info,identity,exception);
   (void) FormatLocaleFile(file,"showpage\n");
   (void) fclose(file);
-  (void) FormatLocaleString(geometry,MagickPathExtent,"%.17gx%.17g+0+0!",
-    floor(extent.x+0.5),floor(extent.y+0.5));
-  annotate_info=AcquireImageInfo();
-  (void) FormatLocaleString(annotate_info->filename,MagickPathExtent,"ps:%s",
-    filename);
-  (void) CloneString(&annotate_info->page,geometry);
-  if (draw_info->density != (char *) NULL)
-    (void) CloneString(&annotate_info->density,draw_info->density);
-  annotate_info->antialias=draw_info->text_antialias;
-  annotate_image=ReadImage(annotate_info,exception);
-  CatchException(exception);
-  annotate_info=DestroyImageInfo(annotate_info);
-  (void) RelinquishUniqueFileResource(filename);
+  annotate_image=ReadPostscriptImage(draw_info,extent,filename,exception);
   if (annotate_image == (Image *) NULL)
     return(MagickFalse);
   (void) NegateImage(annotate_image,MagickFalse,exception);
-  resolution.x=DefaultResolution;
-  resolution.y=DefaultResolution;
-  if (draw_info->density != (char *) NULL)
-    {
-      GeometryInfo
-        geometry_info;
-
-      MagickStatusType
-        flags;
-
-      flags=ParseGeometry(draw_info->density,&geometry_info);
-      if ((flags & RhoValue) != 0)
-        resolution.x=geometry_info.rho;
-      resolution.y=resolution.x;
-      if ((flags & SigmaValue) != 0)
-        resolution.y=geometry_info.sigma;
-    }
+  resolution=GetPostscriptResolution(draw_info);
   if (identity == MagickFalse)
     (void) TransformImage(&annotate_image,"0x0",(char *) NULL,exception);
   else
@@ -3021,21 +3149,7 @@ static MagickBooleanType RenderPostscript(Image *image,
         crop_info.height,(double) crop_info.x,(double) crop_info.y);
       (void) TransformImage(&annotate_image,geometry,(char *) NULL,exception);
     }
-  metrics->pixels_per_em.x=(resolution.y/DefaultResolution)*
-    ExpandAffine(&draw_info->affine)*draw_info->pointsize;
-  metrics->pixels_per_em.y=metrics->pixels_per_em.x;
-  metrics->ascent=metrics->pixels_per_em.y;
-  metrics->descent=metrics->pixels_per_em.y/-5.0;
-  metrics->width=(double) annotate_image->columns/
-    ExpandAffine(&draw_info->affine);
-  metrics->height=floor(metrics->ascent-metrics->descent+0.5);
-  metrics->max_advance=metrics->pixels_per_em.x;
-  metrics->bounds.x1=0.0;
-  metrics->bounds.y1=metrics->descent;
-  metrics->bounds.x2=metrics->ascent+metrics->descent;
-  metrics->bounds.y2=metrics->ascent+metrics->descent;
-  metrics->underline_position=(-2.0);
-  metrics->underline_thickness=1.0;
+  SetPostscriptMetrics(draw_info,annotate_image,resolution,metrics);
   if (draw_info->render == MagickFalse)
     {
       annotate_image=DestroyImage(annotate_image);
@@ -3055,11 +3169,7 @@ static MagickBooleanType RenderPostscript(Image *image,
       /*
         Render fill color.
       */
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
-      if (annotate_image->alpha_trait == UndefinedPixelTrait)
-        (void) SetImageAlphaChannel(annotate_image,OpaqueAlphaChannel,
-          exception);
+      SetPostscriptAlphaChannels(image,annotate_image,exception);
       fill_color=draw_info->fill;
       status=MagickTrue;
       annotate_view=AcquireAuthenticCacheView(annotate_image,exception);

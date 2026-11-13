@@ -538,14 +538,89 @@ MagickExport void GetPixelInfo(const Image *image,PixelInfo *pixel)
 %    o pixel: Specifies a pointer to a Quantum structure.
 %
 */
-MagickExport MagickRealType GetPixelInfoIntensity(
-  const Image *magick_restrict image,const PixelInfo *magick_restrict pixel)
+typedef MagickRealType
+  (*PixelGammaHandler)(const MagickRealType);
+
+static const double
+  rec601_weights[3] = { 0.298839, 0.586811, 0.114350 },
+  rec709_weights[3] = { 0.212656, 0.715158, 0.072186 };
+
+static MagickRealType GammaWeightedIntensity(const MagickRealType *sample,
+  const PixelGammaHandler gamma,const double *weight)
 {
   MagickRealType
     blue,
     green,
-    red,
-    intensity;
+    red;
+
+  red=sample[0];
+  green=sample[1];
+  blue=sample[2];
+  if (gamma != (PixelGammaHandler) NULL)
+    {
+      red=gamma(red);
+      green=gamma(green);
+      blue=gamma(blue);
+    }
+  return(weight[0]*red+weight[1]*green+weight[2]*blue);
+}
+
+static MagickRealType LumaIntensityFromSamples(
+  const PixelIntensityMethod method,const PixelGammaHandler encode,
+  const PixelGammaHandler decode,const MagickRealType *sample)
+{
+  switch (method)
+  {
+    case Rec601LumaPixelIntensityMethod:
+      return(GammaWeightedIntensity(sample,encode,rec601_weights));
+    case Rec601LuminancePixelIntensityMethod:
+      return(GammaWeightedIntensity(sample,decode,rec601_weights));
+    case Rec709LuminancePixelIntensityMethod:
+      return(GammaWeightedIntensity(sample,decode,rec709_weights));
+    default:
+      break;
+  }
+  return(GammaWeightedIntensity(sample,encode,rec709_weights));
+}
+
+static MagickRealType IntensityFromSamples(const PixelIntensityMethod method,
+  const PixelGammaHandler encode,const PixelGammaHandler decode,
+  const MagickRealType *sample)
+{
+  MagickRealType
+    blue,
+    green,
+    red;
+
+  red=sample[0];
+  green=sample[1];
+  blue=sample[2];
+  switch (method)
+  {
+    case AveragePixelIntensityMethod:
+      return((red+green+blue)/3.0);
+    case BrightnessPixelIntensityMethod:
+      return(MagickMax(MagickMax(red,green),blue));
+    case LightnessPixelIntensityMethod:
+      return((MagickMin(MagickMin(red,green),blue)+
+        MagickMax(MagickMax(red,green),blue))/2.0);
+    case MSPixelIntensityMethod:
+      return((MagickRealType) (((double) red*red+green*green+blue*blue)/
+        (3.0*(double) QuantumRange)));
+    case RMSPixelIntensityMethod:
+      return((MagickRealType) (sqrt((double) red*red+green*green+blue*blue)/
+        sqrt(3.0)));
+    default:
+      break;
+  }
+  return(LumaIntensityFromSamples(method,encode,decode,sample));
+}
+
+MagickExport MagickRealType GetPixelInfoIntensity(
+  const Image *magick_restrict image,const PixelInfo *magick_restrict pixel)
+{
+  MagickRealType
+    sample[3];
 
   PixelIntensityMethod
     method;
@@ -553,88 +628,14 @@ MagickExport MagickRealType GetPixelInfoIntensity(
   method=Rec709LumaPixelIntensityMethod;
   if (image != (const Image *) NULL)
     method=image->intensity;
-  red=pixel->red;
-  green=pixel->green;
-  blue=pixel->blue;
-  switch (method)
-  {
-    case AveragePixelIntensityMethod:
-    {
-      intensity=(red+green+blue)/3.0;
-      break;
-    }
-    case BrightnessPixelIntensityMethod:
-    {
-      intensity=MagickMax(MagickMax(red,green),blue);
-      break;
-    }
-    case LightnessPixelIntensityMethod:
-    {
-      intensity=(MagickMin(MagickMin(red,green),blue)+
-        MagickMax(MagickMax(red,green),blue))/2.0;
-      break;
-    }
-    case MSPixelIntensityMethod:
-    {
-      intensity=(MagickRealType) (((double) red*red+green*green+blue*blue)/
-        (3.0*(double) QuantumRange));
-      break;
-    }
-    case Rec601LumaPixelIntensityMethod:
-    {
-      if (pixel->colorspace == RGBColorspace)
-        {
-          red=EncodePixelGamma(red);
-          green=EncodePixelGamma(green);
-          blue=EncodePixelGamma(blue);
-        }
-      intensity=0.298839*red+0.586811*green+0.114350*blue;
-      break;
-    }
-    case Rec601LuminancePixelIntensityMethod:
-    {
-      if (pixel->colorspace == sRGBColorspace)
-        {
-          red=DecodePixelGamma(red);
-          green=DecodePixelGamma(green);
-          blue=DecodePixelGamma(blue);
-        }
-      intensity=0.298839*red+0.586811*green+0.114350*blue;
-      break;
-    }
-    case Rec709LumaPixelIntensityMethod:
-    default:
-    {
-      if (pixel->colorspace == RGBColorspace)
-        {
-          red=EncodePixelGamma(red);
-          green=EncodePixelGamma(green);
-          blue=EncodePixelGamma(blue);
-        }
-      intensity=0.212656*red+0.715158*green+0.072186*blue;
-      break;
-    }
-    case Rec709LuminancePixelIntensityMethod:
-    {
-      if (pixel->colorspace == sRGBColorspace)
-        {
-          red=DecodePixelGamma(red);
-          green=DecodePixelGamma(green);
-          blue=DecodePixelGamma(blue);
-        }
-      intensity=0.212656*red+0.715158*green+0.072186*blue;
-      break;
-    }
-    case RMSPixelIntensityMethod:
-    {
-      intensity=(MagickRealType) (sqrt((double) red*red+green*green+blue*blue)/
-        sqrt(3.0));
-      break;
-    }
-  }
-  return(intensity);
+  sample[0]=pixel->red;
+  sample[1]=pixel->green;
+  sample[2]=pixel->blue;
+  return(IntensityFromSamples(method,
+    pixel->colorspace == RGBColorspace ? EncodePixelGamma : NULL,
+    pixel->colorspace == sRGBColorspace ? DecodePixelGamma : NULL,sample));
 }
-
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -676,100 +677,20 @@ MagickExport MagickRealType GetPixelIntensity(
   const Image *magick_restrict image,const Quantum *magick_restrict pixel)
 {
   MagickRealType
-    blue,
-    green,
-    red,
-    intensity;
+    sample[3];
 
-  red=(MagickRealType) GetPixelRed(image,pixel);
+  sample[0]=(MagickRealType) GetPixelRed(image,pixel);
   if (image->number_channels == 1)
-    return(red);
-  green=(MagickRealType) GetPixelGreen(image,pixel);
-  blue=(MagickRealType) GetPixelBlue(image,pixel);
-  switch (image->intensity)
-  {
-    case AveragePixelIntensityMethod:
-    {
-      intensity=(red+green+blue)/3.0;
-      break;
-    }
-    case BrightnessPixelIntensityMethod:
-    {
-      intensity=MagickMax(MagickMax(red,green),blue);
-      break;
-    }
-    case LightnessPixelIntensityMethod:
-    {
-      intensity=(MagickMin(MagickMin(red,green),blue)+
-        MagickMax(MagickMax(red,green),blue))/2.0;
-      break;
-    }
-    case MSPixelIntensityMethod:
-    {
-      intensity=(MagickRealType) (((double) red*red+green*green+blue*blue)/
-        (3.0*(double) QuantumRange));
-      break;
-    }
-    case Rec601LumaPixelIntensityMethod:
-    {
-      if ((image->colorspace == RGBColorspace) ||
-          (image->colorspace == LinearGRAYColorspace))
-        {
-          red=EncodePixelGamma(red);
-          green=EncodePixelGamma(green);
-          blue=EncodePixelGamma(blue);
-        }
-      intensity=0.298839*red+0.586811*green+0.114350*blue;
-      break;
-    }
-    case Rec601LuminancePixelIntensityMethod:
-    {
-      if ((image->colorspace == sRGBColorspace) ||
-          (image->colorspace == GRAYColorspace))
-        {
-          red=DecodePixelGamma(red);
-          green=DecodePixelGamma(green);
-          blue=DecodePixelGamma(blue);
-        }
-      intensity=0.298839*red+0.586811*green+0.114350*blue;
-      break;
-    }
-    case Rec709LumaPixelIntensityMethod:
-    default:
-    {
-      if ((image->colorspace == RGBColorspace) ||
-          (image->colorspace == LinearGRAYColorspace))
-        {
-          red=EncodePixelGamma(red);
-          green=EncodePixelGamma(green);
-          blue=EncodePixelGamma(blue);
-        }
-      intensity=0.212656*red+0.715158*green+0.072186*blue;
-      break;
-    }
-    case Rec709LuminancePixelIntensityMethod:
-    {
-      if ((image->colorspace == sRGBColorspace) ||
-          (image->colorspace == GRAYColorspace))
-        {
-          red=DecodePixelGamma(red);
-          green=DecodePixelGamma(green);
-          blue=DecodePixelGamma(blue);
-        }
-      intensity=0.212656*red+0.715158*green+0.072186*blue;
-      break;
-    }
-    case RMSPixelIntensityMethod:
-    {
-      intensity=(MagickRealType) (sqrt((double) red*red+green*green+blue*blue)/
-        sqrt(3.0));
-      break;
-    }
-  }
-  return(intensity);
+    return(sample[0]);
+  sample[1]=(MagickRealType) GetPixelGreen(image,pixel);
+  sample[2]=(MagickRealType) GetPixelBlue(image,pixel);
+  return(IntensityFromSamples(image->intensity,
+    (image->colorspace == RGBColorspace) ||
+    (image->colorspace == LinearGRAYColorspace) ? EncodePixelGamma : NULL,
+    (image->colorspace == sRGBColorspace) ||
+    (image->colorspace == GRAYColorspace) ? DecodePixelGamma : NULL,sample));
 }
-
-
+
 static void LoadInterpolatePixels(const Image *magick_restrict image,
   const PixelChannel channel,const PixelTrait traits,
   const Quantum *magick_restrict p,const ssize_t count,double *alpha,
@@ -890,6 +811,35 @@ static inline double MeshInterpolate(const PointInfo *delta,const double p,
   return(delta->x*x+delta->y*y+(1.0-delta->x-delta->y)*p);
 }
 
+static const ssize_t
+  mesh_corners[4][3] =
+  {
+    { 2, 3, 0 },  /* bottom-left triangle, diagonal 0-3 */
+    { 1, 0, 3 },  /* top-right triangle, diagonal 0-3 */
+    { 0, 1, 2 },  /* top-left triangle, diagonal 1-2 */
+    { 3, 2, 1 }   /* bottom-right triangle, diagonal 1-2 */
+  };
+
+static const ssize_t *SelectMeshTriangle(PointInfo *delta,
+  const MagickBooleanType diagonal_nw_se)
+{
+  if (diagonal_nw_se != MagickFalse)
+    {
+      if (delta->x <= delta->y)
+        {
+          delta->y=1.0-delta->y;
+          return(mesh_corners[0]);
+        }
+      delta->x=1.0-delta->x;
+      return(mesh_corners[1]);
+    }
+  if (delta->x <= (1.0-delta->y))
+    return(mesh_corners[2]);
+  delta->x=1.0-delta->x;
+  delta->y=1.0-delta->y;
+  return(mesh_corners[3]);
+}
+
 typedef struct _ChannelInterpolation
 {
   const Image
@@ -919,6 +869,9 @@ typedef struct _ChannelInterpolation
 static MagickBooleanType InterpolateMeshPixelChannel(
   const ChannelInterpolation *grid,double *pixel,MagickBooleanType status)
 {
+  const ssize_t
+    *corner;
+
   const Quantum
     *magick_restrict p;
 
@@ -946,63 +899,57 @@ static MagickBooleanType InterpolateMeshPixelChannel(
     GetPixelLuma(grid->image,p+3*GetPixelChannels(grid->image));
   luminance.y=GetPixelLuma(grid->image,p+GetPixelChannels(grid->image))-(double)
     GetPixelLuma(grid->image,p+2*GetPixelChannels(grid->image));
-  if (fabs((double) luminance.x) < fabs((double) luminance.y))
+  corner=SelectMeshTriangle(&delta,fabs((double) luminance.x) <
+    fabs((double) luminance.y));
+  gamma=MeshInterpolate(&delta,alpha[corner[0]],alpha[corner[1]],
+    alpha[corner[2]]);
+  gamma=MagickSafeReciprocal(gamma);
+  *pixel=gamma*MeshInterpolate(&delta,pixels[corner[0]],pixels[corner[1]],
+    pixels[corner[2]]);
+  return(status);
+}
+
+static double BlendInterpolateSamples(double *alpha,double *pixels,
+  const PointInfo *delta,const MagickBooleanType color)
+{
+  double
+    gamma;
+
+  ssize_t
+    i;
+
+  gamma=1.0;  /* number of pixels blended together (its variable) */
+  for (i=0; i <= 1L; i++) {
+    if (delta->y >= 0.75)
+      {
+        alpha[i]=alpha[i+2];  /* take right pixels */
+        pixels[i]=pixels[i+2];
+      }
+    else
+      if (delta->y > 0.25)
+        {
+          gamma=2.0;  /* blend both pixels in row */
+          alpha[i]+=alpha[i+2];  /* add up alpha weights */
+          pixels[i]+=pixels[i+2];
+        }
+  }
+  if (delta->x >= 0.75)
     {
-      /*
-        Diagonal 0-3 NW-SE.
-      */
-      if (delta.x <= delta.y)
-        {
-          /*
-            Bottom-left triangle (pixel: 2, diagonal: 0-3).
-          */
-          delta.y=1.0-delta.y;
-          gamma=MeshInterpolate(&delta,alpha[2],alpha[3],alpha[0]);
-          gamma=MagickSafeReciprocal(gamma);
-          *pixel=gamma*MeshInterpolate(&delta,pixels[2],pixels[3],
-            pixels[0]);
-        }
-      else
-        {
-          /*
-            Top-right triangle (pixel: 1, diagonal: 0-3).
-          */
-          delta.x=1.0-delta.x;
-          gamma=MeshInterpolate(&delta,alpha[1],alpha[0],alpha[3]);
-          gamma=MagickSafeReciprocal(gamma);
-          *pixel=gamma*MeshInterpolate(&delta,pixels[1],pixels[0],
-            pixels[3]);
-        }
+      alpha[0]=alpha[1];  /* take bottom row blend */
+      pixels[0]=pixels[1];
     }
   else
-    {
-      /*
-        Diagonal 1-2 NE-SW.
-      */
-      if (delta.x <= (1.0-delta.y))
-        {
-          /*
-            Top-left triangle (pixel: 0, diagonal: 1-2).
-          */
-          gamma=MeshInterpolate(&delta,alpha[0],alpha[1],alpha[2]);
-          gamma=MagickSafeReciprocal(gamma);
-          *pixel=gamma*MeshInterpolate(&delta,pixels[0],pixels[1],
-            pixels[2]);
-        }
-      else
-        {
-          /*
-            Bottom-right triangle (pixel: 3, diagonal: 1-2).
-          */
-          delta.x=1.0-delta.x;
-          delta.y=1.0-delta.y;
-          gamma=MeshInterpolate(&delta,alpha[3],alpha[2],alpha[1]);
-          gamma=MagickSafeReciprocal(gamma);
-          *pixel=gamma*MeshInterpolate(&delta,pixels[3],pixels[2],
-            pixels[1]);
-        }
-    }
-  return(status);
+    if (delta->x > 0.25)
+      {
+        gamma*=2.0;  /* blend both rows */
+        alpha[0]+=alpha[1];  /* add up alpha weights */
+        pixels[0]+=pixels[1];
+      }
+  if (color != MagickFalse)
+    gamma=MagickSafeReciprocal(alpha[0]);  /* (color) 1/alpha_weights */
+  else
+    gamma=MagickSafeReciprocal(gamma);  /* (alpha) 1/number_of_pixels */
+  return(gamma*pixels[0]);
 }
 
 static MagickBooleanType InterpolateBlendPixelChannel(
@@ -1013,11 +960,10 @@ static MagickBooleanType InterpolateBlendPixelChannel(
 
   double
     alpha[16],
-    gamma,
     pixels[16];
 
-  ssize_t
-    i;
+  PointInfo
+    delta;
 
   p=GetCacheViewVirtualPixels(grid->image_view,grid->x_offset,grid->y_offset,
     2,2,grid->exception);
@@ -1026,53 +972,12 @@ static MagickBooleanType InterpolateBlendPixelChannel(
       status=MagickFalse;
       return(status);
     }
-  if ((grid->traits & BlendPixelTrait) == 0)
-    for (i=0; i < 4; i++)
-    {
-      alpha[i]=1.0;
-      pixels[i]=(MagickRealType) p[i*(ssize_t) GetPixelChannels(grid->image)+
-        GetPixelChannelOffset(grid->image,grid->channel)];
-    }
-  else
-    for (i=0; i < 4; i++)
-    {
-      alpha[i]=QuantumScale*(double) GetPixelAlpha(grid->image,p+i*
-        (ssize_t) GetPixelChannels(grid->image));
-      pixels[i]=alpha[i]*(double) p[i*(ssize_t) GetPixelChannels(grid->image)+
-        GetPixelChannelOffset(grid->image,grid->channel)];
-    }
-  gamma=1.0;  /* number of pixels blended together (its variable) */
-  for (i=0; i <= 1L; i++) {
-    if ((grid->y-grid->y_offset) >= 0.75)
-      {
-        alpha[i]=alpha[i+2];  /* take right pixels */
-        pixels[i]=pixels[i+2];
-      }
-    else
-      if ((grid->y-grid->y_offset) > 0.25)
-        {
-          gamma=2.0;  /* blend both pixels in row */
-          alpha[i]+=alpha[i+2];  /* add up alpha weights */
-          pixels[i]+=pixels[i+2];
-        }
-  }
-  if ((grid->x-grid->x_offset) >= 0.75)
-    {
-      alpha[0]=alpha[1];  /* take bottom row blend */
-      pixels[0]=pixels[1];
-    }
-  else
-    if ((grid->x-grid->x_offset) > 0.25)
-      {
-        gamma*=2.0;  /* blend both rows */
-        alpha[0]+=alpha[1];  /* add up alpha weights */
-        pixels[0]+=pixels[1];
-      }
-  if (grid->channel != AlphaPixelChannel)
-    gamma=MagickSafeReciprocal(alpha[0]);  /* (color) 1/alpha_weights */
-  else
-    gamma=MagickSafeReciprocal(gamma);  /* (alpha) 1/number_of_pixels */
-  *pixel=gamma*pixels[0];
+  LoadInterpolatePixels(grid->image,grid->channel,grid->traits,p,4,alpha,
+    pixels);
+  delta.x=grid->x-grid->x_offset;
+  delta.y=grid->y-grid->y_offset;
+  *pixel=BlendInterpolateSamples(alpha,pixels,&delta,
+    grid->channel != AlphaPixelChannel);
   return(status);
 }
 
@@ -1151,6 +1056,34 @@ static MagickBooleanType InterpolateBilinearPixelChannel(
   return(status);
 }
 
+static RectangleInfo GetAverageWindow(const PixelInterpolateMethod interpolate,
+  const PointInfo *point,const ssize_t x_offset,const ssize_t y_offset)
+{
+  RectangleInfo
+    window;
+
+  window.width=2;  /* size of the area to average - default nearest 4 */
+  window.height=2;
+  window.x=x_offset;
+  window.y=y_offset;
+  if (interpolate == Average9InterpolatePixel)
+    {
+      window.width=3;
+      window.height=3;
+      window.x=CastDoubleToSsizeT(floor(point->x+0.5)-1.0);
+      window.y=CastDoubleToSsizeT(floor(point->y+0.5)-1.0);
+    }
+  else
+    if (interpolate == Average16InterpolatePixel)
+      {
+        window.width=4;
+        window.height=4;
+        window.x--;
+        window.y--;
+      }
+  return(window);
+}
+
 static MagickBooleanType InterpolateAveragePixelChannel(
   const ChannelInterpolation *grid,const PixelInterpolateMethod interpolate,
   double *pixel,MagickBooleanType status)
@@ -1163,28 +1096,22 @@ static MagickBooleanType InterpolateAveragePixelChannel(
     gamma,
     pixels[16];
 
+  PointInfo
+    point;
+
+  RectangleInfo
+    window;
+
   ssize_t
     count,
-    i,
-    x_offset = grid->x_offset,
-    y_offset = grid->y_offset;
+    i;
 
-  count=2;  /* size of the area to average - default nearest 4 */
-  if (interpolate == Average9InterpolatePixel)
-    {
-      count=3;
-      x_offset=CastDoubleToSsizeT(floor(grid->x+0.5)-1.0);
-      y_offset=CastDoubleToSsizeT(floor(grid->y+0.5)-1.0);
-    }
-  else
-    if (interpolate == Average16InterpolatePixel)
-      {
-        count=4;
-        x_offset--;
-        y_offset--;
-      }
-  p=GetCacheViewVirtualPixels(grid->image_view,x_offset,y_offset,
-    (size_t) count,(size_t) count,grid->exception);
+  point.x=grid->x;
+  point.y=grid->y;
+  window=GetAverageWindow(interpolate,&point,grid->x_offset,grid->y_offset);
+  count=(ssize_t) window.width;
+  p=GetCacheViewVirtualPixels(grid->image_view,window.x,window.y,window.width,
+    window.height,grid->exception);
   if (p == (const Quantum *) NULL)
     {
       status=MagickFalse;
@@ -1671,8 +1598,10 @@ static void InterpolateBlendChannel(const ChannelsInterpolation *grid,
 {
   double
     alpha[16],
-    gamma,
     pixels[16];
+
+  PointInfo
+    delta;
 
   ssize_t
     j;
@@ -1699,45 +1628,19 @@ static void InterpolateBlendChannel(const ChannelsInterpolation *grid,
       if (channel != AlphaPixelChannel)
         pixels[j]*=alpha[j];
     }
-  gamma=1.0;  /* number of pixels blended together (its variable) */
-  for (j=0; j <= 1L; j++)
-  {
-    if ((grid->y-grid->y_offset) >= 0.75)
-      {
-        alpha[j]=alpha[j+2];  /* take right pixels */
-        pixels[j]=pixels[j+2];
-      }
-    else
-      if ((grid->y-grid->y_offset) > 0.25)
-        {
-          gamma=2.0;  /* blend both pixels in row */
-          alpha[j]+=alpha[j+2];  /* add up alpha weights */
-          pixels[j]+=pixels[j+2];
-        }
-  }
-  if ((grid->x-grid->x_offset) >= 0.75)
-    {
-      alpha[0]=alpha[1];  /* take bottom row blend */
-      pixels[0]=pixels[1];
-    }
-  else
-     if ((grid->x-grid->x_offset) > 0.25)
-       {
-         gamma*=2.0;  /* blend both rows */
-         alpha[0]+=alpha[1];  /* add up alpha weights */
-         pixels[0]+=pixels[1];
-       }
-  if (channel != AlphaPixelChannel)
-    gamma=MagickSafeReciprocal(alpha[0]);  /* (color) 1/alpha_weights */
-  else
-    gamma=MagickSafeReciprocal(gamma);  /* (alpha) 1/number_of_pixels */
-  SetPixelChannel(grid->destination,channel,ClampToQuantum(gamma*pixels[0]),
+  delta.x=grid->x-grid->x_offset;
+  delta.y=grid->y-grid->y_offset;
+  SetPixelChannel(grid->destination,channel,ClampToQuantum(
+    BlendInterpolateSamples(alpha,pixels,&delta,channel != AlphaPixelChannel)),
     pixel);
 }
 
 static void InterpolateMeshChannel(const ChannelsInterpolation *grid,
   const Quantum *magick_restrict p,const ssize_t i,Quantum *pixel)
 {
+  const ssize_t
+    *corner;
+
   double
     alpha[16],
     gamma,
@@ -1782,62 +1685,13 @@ static void InterpolateMeshChannel(const ChannelsInterpolation *grid,
   luminance.y=fabs((double) (GetPixelLuma(grid->source,p+
     GetPixelChannels(grid->source))-GetPixelLuma(grid->source,p+2*
     GetPixelChannels(grid->source))));
-  if (luminance.x < luminance.y)
-    {
-      /*
-        Diagonal 0-3 NW-SE.
-      */
-      if (delta.x <= delta.y)
-        {
-          /*
-            Bottom-left triangle (pixel: 2, diagonal: 0-3).
-          */
-          delta.y=1.0-delta.y;
-          gamma=MeshInterpolate(&delta,alpha[2],alpha[3],alpha[0]);
-          gamma=MagickSafeReciprocal(gamma);
-          SetPixelChannel(grid->destination,channel,ClampToQuantum(gamma*
-            MeshInterpolate(&delta,pixels[2],pixels[3],pixels[0])),pixel);
-        }
-      else
-        {
-          /*
-            Top-right triangle (pixel: 1, diagonal: 0-3).
-          */
-          delta.x=1.0-delta.x;
-          gamma=MeshInterpolate(&delta,alpha[1],alpha[0],alpha[3]);
-          gamma=MagickSafeReciprocal(gamma);
-          SetPixelChannel(grid->destination,channel,ClampToQuantum(gamma*
-            MeshInterpolate(&delta,pixels[1],pixels[0],pixels[3])),pixel);
-        }
-    }
-  else
-    {
-      /*
-        Diagonal 1-2 NE-SW.
-      */
-      if (delta.x <= (1.0-delta.y))
-        {
-          /*
-            Top-left triangle (pixel: 0, diagonal: 1-2).
-          */
-          gamma=MeshInterpolate(&delta,alpha[0],alpha[1],alpha[2]);
-          gamma=MagickSafeReciprocal(gamma);
-          SetPixelChannel(grid->destination,channel,ClampToQuantum(gamma*
-            MeshInterpolate(&delta,pixels[0],pixels[1],pixels[2])),pixel);
-        }
-      else
-        {
-          /*
-            Bottom-right triangle (pixel: 3, diagonal: 1-2).
-          */
-          delta.x=1.0-delta.x;
-          delta.y=1.0-delta.y;
-          gamma=MeshInterpolate(&delta,alpha[3],alpha[2],alpha[1]);
-          gamma=MagickSafeReciprocal(gamma);
-          SetPixelChannel(grid->destination,channel,ClampToQuantum(gamma*
-            MeshInterpolate(&delta,pixels[3],pixels[2],pixels[1])),pixel);
-        }
-    }
+  corner=SelectMeshTriangle(&delta,luminance.x < luminance.y);
+  gamma=MeshInterpolate(&delta,alpha[corner[0]],alpha[corner[1]],
+    alpha[corner[2]]);
+  gamma=MagickSafeReciprocal(gamma);
+  SetPixelChannel(grid->destination,channel,ClampToQuantum(gamma*
+    MeshInterpolate(&delta,pixels[corner[0]],pixels[corner[1]],
+    pixels[corner[2]])),pixel);
 }
 
 static MagickBooleanType InterpolateCubicChannels(
@@ -1935,6 +1789,38 @@ static void InterpolateKernelChannels(const ChannelsInterpolation grid,
   }
 }
 
+static MagickBooleanType InterpolateAverageChannels(
+  const ChannelsInterpolation *grid,const PixelInterpolateMethod interpolate,
+  Quantum *pixel,MagickBooleanType status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  PointInfo
+    point;
+
+  RectangleInfo
+    window;
+
+  ssize_t
+    count;
+
+  point.x=grid->x;
+  point.y=grid->y;
+  window=GetAverageWindow(interpolate,&point,grid->x_offset,grid->y_offset);
+  count=(ssize_t) window.width;
+  p=GetCacheViewVirtualPixels(grid->source_view,window.x,window.y,window.width,
+    window.height,grid->exception);
+  if (p == (const Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  count*=count;  /* Number of pixels to average */
+  AverageInterpolateChannels(grid,p,count,pixel);
+  return(status);
+}
+
 MagickExport MagickBooleanType InterpolatePixelChannels(
   const Image *magick_restrict source,const CacheView_ *source_view,
   const Image *magick_restrict destination,const PixelInterpolateMethod method,
@@ -1946,16 +1832,6 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
   MagickBooleanType
     status;
 
-  const Quantum
-    *magick_restrict p;
-
-  ssize_t
-    i;
-
-  ssize_t
-    x_offset,
-    y_offset;
-
   PixelInterpolateMethod
     interpolate;
 
@@ -1963,8 +1839,6 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
   assert(source->signature == MagickCoreSignature);
   assert(source_view != (CacheView *) NULL);
   status=MagickTrue;
-  x_offset=CastDoubleToSsizeT(floor(x));
-  y_offset=CastDoubleToSsizeT(floor(y));
   interpolate=method;
   if (interpolate == UndefinedInterpolatePixel)
     interpolate=source->interpolate;
@@ -1973,8 +1847,8 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
   grid.destination=destination;
   grid.x=x;
   grid.y=y;
-  grid.x_offset=x_offset;
-  grid.y_offset=y_offset;
+  grid.x_offset=CastDoubleToSsizeT(floor(x));
+  grid.y_offset=CastDoubleToSsizeT(floor(y));
   grid.exception=exception;
   switch (interpolate)
   {
@@ -1982,32 +1856,7 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
     case Average9InterpolatePixel:  /* nearest 9 neighbours */
     case Average16InterpolatePixel:  /* nearest 16 neighbours */
     {
-      ssize_t
-        count;
-
-      count=2;  /* size of the area to average - default nearest 4 */
-      if (interpolate == Average9InterpolatePixel)
-        {
-          count=3;
-          x_offset=CastDoubleToSsizeT(floor(x+0.5)-1.0);
-          y_offset=CastDoubleToSsizeT(floor(y+0.5)-1.0);
-        }
-      else
-        if (interpolate == Average16InterpolatePixel)
-          {
-            count=4;
-            x_offset--;
-            y_offset--;
-          }
-      p=GetCacheViewVirtualPixels(source_view,x_offset,y_offset,(size_t) count,
-        (size_t) count,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      count*=count;  /* Number of pixels to average */
-      AverageInterpolateChannels(&grid,p,count,pixel);
+      status=InterpolateAverageChannels(&grid,interpolate,pixel,status);
       break;
     }
     default:
@@ -2023,25 +1872,9 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
     }
     case NearestInterpolatePixel:
     {
-      x_offset=CastDoubleToSsizeT(floor(x+0.5));
-      y_offset=CastDoubleToSsizeT(floor(y+0.5));
-      p=GetCacheViewVirtualPixels(source_view,x_offset,y_offset,1,1,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      for (i=0; i < (ssize_t) GetPixelChannels(source); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(source,i);
-        PixelTrait traits = GetPixelChannelTraits(source,channel);
-        PixelTrait destination_traits=GetPixelChannelTraits(destination,
-          channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (destination_traits == UndefinedPixelTrait))
-          continue;
-        SetPixelChannel(destination,channel,p[i],pixel);
-      }
+      grid.x_offset=CastDoubleToSsizeT(floor(x+0.5));
+      grid.y_offset=CastDoubleToSsizeT(floor(y+0.5));
+      status=InterpolateIntegerChannels(&grid,pixel,status);
       break;
     }
   }
@@ -2137,6 +1970,9 @@ static MagickBooleanType InterpolateMeshPixelInfo(
   const PixelInfoInterpolation *grid,PixelInfo *pixels,PixelInfo *pixel,
   MagickBooleanType status)
 {
+  const ssize_t
+    *corner;
+
   const Quantum
     *p;
 
@@ -2168,102 +2004,23 @@ static MagickBooleanType InterpolateMeshPixelInfo(
     alpha+2);
   AlphaBlendPixelInfo(grid->image,p+3*GetPixelChannels(grid->image),pixels+3,
     alpha+3);
-  if (fabs((double) luminance.x) < fabs((double) luminance.y))
-    {
-      /*
-        Diagonal 0-3 NW-SE.
-      */
-      if (delta.x <= delta.y)
-        {
-          /*
-            Bottom-left triangle (pixel: 2, diagonal: 0-3).
-          */
-          delta.y=1.0-delta.y;
-          gamma=MeshInterpolate(&delta,alpha[2],alpha[3],alpha[0]);
-          gamma=MagickSafeReciprocal(gamma);
-          pixel->red=gamma*MeshInterpolate(&delta,pixels[2].red,
-            pixels[3].red,pixels[0].red);
-          pixel->green=gamma*MeshInterpolate(&delta,pixels[2].green,
-            pixels[3].green,pixels[0].green);
-          pixel->blue=gamma*MeshInterpolate(&delta,pixels[2].blue,
-            pixels[3].blue,pixels[0].blue);
-          if (grid->image->colorspace == CMYKColorspace)
-            pixel->black=gamma*MeshInterpolate(&delta,pixels[2].black,
-              pixels[3].black,pixels[0].black);
-          gamma=MeshInterpolate(&delta,1.0,1.0,1.0);
-          pixel->alpha=gamma*MeshInterpolate(&delta,pixels[2].alpha,
-            pixels[3].alpha,pixels[0].alpha);
-        }
-      else
-        {
-          /*
-            Top-right triangle (pixel:1 , diagonal: 0-3).
-          */
-          delta.x=1.0-delta.x;
-          gamma=MeshInterpolate(&delta,alpha[1],alpha[0],alpha[3]);
-          gamma=MagickSafeReciprocal(gamma);
-          pixel->red=gamma*MeshInterpolate(&delta,pixels[1].red,
-            pixels[0].red,pixels[3].red);
-          pixel->green=gamma*MeshInterpolate(&delta,pixels[1].green,
-            pixels[0].green,pixels[3].green);
-          pixel->blue=gamma*MeshInterpolate(&delta,pixels[1].blue,
-            pixels[0].blue,pixels[3].blue);
-          if (grid->image->colorspace == CMYKColorspace)
-            pixel->black=gamma*MeshInterpolate(&delta,pixels[1].black,
-              pixels[0].black,pixels[3].black);
-          gamma=MeshInterpolate(&delta,1.0,1.0,1.0);
-          pixel->alpha=gamma*MeshInterpolate(&delta,pixels[1].alpha,
-            pixels[0].alpha,pixels[3].alpha);
-        }
-    }
-  else
-    {
-      /*
-        Diagonal 1-2 NE-SW.
-      */
-      if (delta.x <= (1.0-delta.y))
-        {
-          /*
-            Top-left triangle (pixel: 0, diagonal: 1-2).
-          */
-          gamma=MeshInterpolate(&delta,alpha[0],alpha[1],alpha[2]);
-          gamma=MagickSafeReciprocal(gamma);
-          pixel->red=gamma*MeshInterpolate(&delta,pixels[0].red,
-            pixels[1].red,pixels[2].red);
-          pixel->green=gamma*MeshInterpolate(&delta,pixels[0].green,
-            pixels[1].green,pixels[2].green);
-          pixel->blue=gamma*MeshInterpolate(&delta,pixels[0].blue,
-            pixels[1].blue,pixels[2].blue);
-          if (grid->image->colorspace == CMYKColorspace)
-            pixel->black=gamma*MeshInterpolate(&delta,pixels[0].black,
-              pixels[1].black,pixels[2].black);
-          gamma=MeshInterpolate(&delta,1.0,1.0,1.0);
-          pixel->alpha=gamma*MeshInterpolate(&delta,pixels[0].alpha,
-            pixels[1].alpha,pixels[2].alpha);
-        }
-      else
-        {
-          /*
-            Bottom-right triangle (pixel: 3, diagonal: 1-2).
-          */
-          delta.x=1.0-delta.x;
-          delta.y=1.0-delta.y;
-          gamma=MeshInterpolate(&delta,alpha[3],alpha[2],alpha[1]);
-          gamma=MagickSafeReciprocal(gamma);
-          pixel->red=gamma*MeshInterpolate(&delta,pixels[3].red,
-            pixels[2].red,pixels[1].red);
-          pixel->green=gamma*MeshInterpolate(&delta,pixels[3].green,
-            pixels[2].green,pixels[1].green);
-          pixel->blue=gamma*MeshInterpolate(&delta,pixels[3].blue,
-            pixels[2].blue,pixels[1].blue);
-          if (grid->image->colorspace == CMYKColorspace)
-            pixel->black=gamma*MeshInterpolate(&delta,pixels[3].black,
-              pixels[2].black,pixels[1].black);
-          gamma=MeshInterpolate(&delta,1.0,1.0,1.0);
-          pixel->alpha=gamma*MeshInterpolate(&delta,pixels[3].alpha,
-            pixels[2].alpha,pixels[1].alpha);
-        }
-    }
+  corner=SelectMeshTriangle(&delta,fabs((double) luminance.x) <
+    fabs((double) luminance.y));
+  gamma=MeshInterpolate(&delta,alpha[corner[0]],alpha[corner[1]],
+    alpha[corner[2]]);
+  gamma=MagickSafeReciprocal(gamma);
+  pixel->red=gamma*MeshInterpolate(&delta,pixels[corner[0]].red,
+    pixels[corner[1]].red,pixels[corner[2]].red);
+  pixel->green=gamma*MeshInterpolate(&delta,pixels[corner[0]].green,
+    pixels[corner[1]].green,pixels[corner[2]].green);
+  pixel->blue=gamma*MeshInterpolate(&delta,pixels[corner[0]].blue,
+    pixels[corner[1]].blue,pixels[corner[2]].blue);
+  if (grid->image->colorspace == CMYKColorspace)
+    pixel->black=gamma*MeshInterpolate(&delta,pixels[corner[0]].black,
+      pixels[corner[1]].black,pixels[corner[2]].black);
+  gamma=MeshInterpolate(&delta,1.0,1.0,1.0);
+  pixel->alpha=gamma*MeshInterpolate(&delta,pixels[corner[0]].alpha,
+    pixels[corner[1]].alpha,pixels[corner[2]].alpha);
   return(status);
 }
 
@@ -2400,28 +2157,22 @@ static MagickBooleanType InterpolateAveragePixelInfo(
   PixelInfo
     pixels[16];
 
+  PointInfo
+    point;
+
+  RectangleInfo
+    window;
+
   ssize_t
     count,
-    i,
-    x_offset = grid->x_offset,
-    y_offset = grid->y_offset;
+    i;
 
-  count=2;  /* size of the area to average - default nearest 4 */
-  if (interpolate == Average9InterpolatePixel)
-    {
-      count=3;
-      x_offset=CastDoubleToSsizeT(floor(grid->x+0.5)-1.0);
-      y_offset=CastDoubleToSsizeT(floor(grid->y+0.5)-1.0);
-    }
-  else
-    if (interpolate == Average16InterpolatePixel)
-      {
-        count=4;
-        x_offset--;
-        y_offset--;
-      }
-  p=GetCacheViewVirtualPixels(grid->image_view,x_offset,y_offset,
-    (size_t) count,(size_t) count,grid->exception);
+  point.x=grid->x;
+  point.y=grid->y;
+  window=GetAverageWindow(interpolate,&point,grid->x_offset,grid->y_offset);
+  count=(ssize_t) window.width;
+  p=GetCacheViewVirtualPixels(grid->image_view,window.x,window.y,window.width,
+    window.height,grid->exception);
   if (p == (const Quantum *) NULL)
     {
       status=MagickFalse;
@@ -2816,6 +2567,20 @@ static double GetFuzzyHueDistance(const PixelInfo *p,double pixel)
   return(pixel);
 }
 
+static double GetFuzzyAlpha(const PixelInfo *p)
+{
+  if (p->alpha_trait != UndefinedPixelTrait)
+    return(p->alpha);
+  return((double) OpaqueAlpha);
+}
+
+static double GetFuzzyAlphaScale(const PixelInfo *p)
+{
+  if (p->alpha_trait != UndefinedPixelTrait)
+    return(QuantumScale*p->alpha);
+  return(1.0);
+}
+
 MagickExport MagickBooleanType IsFuzzyEquivalencePixelInfo(const PixelInfo *p,
   const PixelInfo *q)
 {
@@ -2834,9 +2599,7 @@ MagickExport MagickBooleanType IsFuzzyEquivalencePixelInfo(const PixelInfo *p,
       /*
         Transparencies are involved - set alpha distance.
       */
-      pixel=(p->alpha_trait != UndefinedPixelTrait ? p->alpha :
-        (double) OpaqueAlpha)-(q->alpha_trait != UndefinedPixelTrait ?
-        q->alpha : (double) OpaqueAlpha);
+      pixel=GetFuzzyAlpha(p)-GetFuzzyAlpha(q);
       distance=pixel*pixel;
       if (MagickSafeSignificantError(distance,fuzz) != MagickFalse)
         return(MagickFalse);
@@ -2844,10 +2607,8 @@ MagickExport MagickBooleanType IsFuzzyEquivalencePixelInfo(const PixelInfo *p,
         Generate a alpha scaling factor to generate a 4D cone on colorspace.
         If one color is transparent, distance has no color component.
       */
-      if (p->alpha_trait != UndefinedPixelTrait)
-        scale=(QuantumScale*p->alpha);
-      if (q->alpha_trait != UndefinedPixelTrait)
-        scale*=(QuantumScale*q->alpha);
+      scale=GetFuzzyAlphaScale(p);
+      scale*=GetFuzzyAlphaScale(q);
       if (scale <= MagickEpsilon)
         return(MagickTrue);
     }
@@ -2908,6 +2669,43 @@ MagickExport MagickBooleanType IsFuzzyEquivalencePixelInfo(const PixelInfo *p,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static ssize_t SetColorChannelAttributes(const Image *image,
+  const PixelTrait trait,ssize_t n)
+{
+  if ((image->colorspace == LinearGRAYColorspace) ||
+      (image->colorspace == GRAYColorspace))
+    {
+      SetPixelChannelAttributes(image,BluePixelChannel,trait,n);
+      SetPixelChannelAttributes(image,GreenPixelChannel,trait,n);
+      SetPixelChannelAttributes(image,RedPixelChannel,trait,n++);
+    }
+  else
+    {
+      SetPixelChannelAttributes(image,RedPixelChannel,trait,n++);
+      SetPixelChannelAttributes(image,GreenPixelChannel,trait,n++);
+      SetPixelChannelAttributes(image,BluePixelChannel,trait,n++);
+    }
+  if (image->colorspace == CMYKColorspace)
+    SetPixelChannelAttributes(image,BlackPixelChannel,trait,n++);
+  return(n);
+}
+
+static ssize_t SetExtraChannelAttributes(const Image *image,ssize_t n)
+{
+  if (image->alpha_trait != UndefinedPixelTrait)
+    SetPixelChannelAttributes(image,AlphaPixelChannel,CopyPixelTrait,n++);
+  if (image->storage_class == PseudoClass)
+    SetPixelChannelAttributes(image,IndexPixelChannel,CopyPixelTrait,n++);
+  if ((image->channels & ReadMaskChannel) != 0)
+    SetPixelChannelAttributes(image,ReadMaskPixelChannel,CopyPixelTrait,n++);
+  if ((image->channels & WriteMaskChannel) != 0)
+    SetPixelChannelAttributes(image,WriteMaskPixelChannel,CopyPixelTrait,n++);
+  if ((image->channels & CompositeMaskChannel) != 0)
+    SetPixelChannelAttributes(image,CompositeMaskPixelChannel,CopyPixelTrait,
+      n++);
+  return(n);
+}
+
 MagickPrivate MagickBooleanType ResetPixelChannelMap(Image *image,
   ExceptionInfo *exception)
 {
@@ -2925,32 +2723,8 @@ MagickPrivate MagickBooleanType ResetPixelChannelMap(Image *image,
   if (image->alpha_trait != UndefinedPixelTrait)
     trait=(PixelTrait) (trait | BlendPixelTrait);
   n=0;
-  if ((image->colorspace == LinearGRAYColorspace) ||
-      (image->colorspace == GRAYColorspace))
-    {
-      SetPixelChannelAttributes(image,BluePixelChannel,trait,n);
-      SetPixelChannelAttributes(image,GreenPixelChannel,trait,n);
-      SetPixelChannelAttributes(image,RedPixelChannel,trait,n++);
-    }
-  else
-    {
-      SetPixelChannelAttributes(image,RedPixelChannel,trait,n++);
-      SetPixelChannelAttributes(image,GreenPixelChannel,trait,n++);
-      SetPixelChannelAttributes(image,BluePixelChannel,trait,n++);
-    }
-  if (image->colorspace == CMYKColorspace)
-    SetPixelChannelAttributes(image,BlackPixelChannel,trait,n++);
-  if (image->alpha_trait != UndefinedPixelTrait)
-    SetPixelChannelAttributes(image,AlphaPixelChannel,CopyPixelTrait,n++);
-  if (image->storage_class == PseudoClass)
-    SetPixelChannelAttributes(image,IndexPixelChannel,CopyPixelTrait,n++);
-  if ((image->channels & ReadMaskChannel) != 0)
-    SetPixelChannelAttributes(image,ReadMaskPixelChannel,CopyPixelTrait,n++);
-  if ((image->channels & WriteMaskChannel) != 0)
-    SetPixelChannelAttributes(image,WriteMaskPixelChannel,CopyPixelTrait,n++);
-  if ((image->channels & CompositeMaskChannel) != 0)
-    SetPixelChannelAttributes(image,CompositeMaskPixelChannel,CopyPixelTrait,
-      n++);
+  n=SetColorChannelAttributes(image,trait,n);
+  n=SetExtraChannelAttributes(image,n);
   if (image->number_meta_channels != 0)
     {
       PixelChannel
@@ -3007,6 +2781,89 @@ MagickPrivate MagickBooleanType ResetPixelChannelMap(Image *image,
 %
 */
 
+static const char *GetRedChannelLogName(const Image *image)
+{
+  if ((image->colorspace == LinearGRAYColorspace) ||
+      (image->colorspace == GRAYColorspace))
+    return("gray");
+  if (image->colorspace == CMYKColorspace)
+    return("cyan");
+  return("red");
+}
+
+static const char *GetColorChannelLogName(const Image *image,
+  const PixelChannel channel)
+{
+  switch (channel)
+  {
+    case RedPixelChannel:
+      return(GetRedChannelLogName(image));
+    case GreenPixelChannel:
+    {
+      if (image->colorspace == CMYKColorspace)
+        return("magenta");
+      return("green");
+    }
+    case BluePixelChannel:
+    {
+      if (image->colorspace == CMYKColorspace)
+        return("yellow");
+      return("blue");
+    }
+    default:
+      break;
+  }
+  return((const char *) NULL);
+}
+
+static const char *GetSpecialChannelLogName(const PixelChannel channel)
+{
+  switch (channel)
+  {
+    case ReadMaskPixelChannel:
+      return("read-mask");
+    case WriteMaskPixelChannel:
+      return("write-mask");
+    case CompositeMaskPixelChannel:
+      return("composite-mask");
+    case MetaPixelChannels:
+      return("meta");
+    default:
+      break;
+  }
+  return((const char *) NULL);
+}
+
+static const char *GetPixelChannelLogName(const Image *image,
+  const PixelChannel channel)
+{
+  const char
+    *name;
+
+  name=GetColorChannelLogName(image,channel);
+  if (name != (const char *) NULL)
+    return(name);
+  name=GetSpecialChannelLogName(channel);
+  if (name != (const char *) NULL)
+    return(name);
+  switch (channel)
+  {
+    case BlackPixelChannel:
+    {
+      if (image->storage_class == PseudoClass)
+        return("index");
+      return("black");
+    }
+    case IndexPixelChannel:
+      return("index");
+    case AlphaPixelChannel:
+      return("alpha");
+    default:
+      break;
+  }
+  return("undefined");
+}
+
 static void LogPixelChannels(const Image *image)
 {
   ssize_t
@@ -3027,72 +2884,7 @@ static void LogPixelChannels(const Image *image)
       channel;
 
     channel=GetPixelChannelChannel(image,i);
-    switch (channel)
-    {
-      case RedPixelChannel:
-      {
-        name="red";
-        if (image->colorspace == CMYKColorspace)
-          name="cyan";
-        if ((image->colorspace == LinearGRAYColorspace) ||
-            (image->colorspace == GRAYColorspace))
-          name="gray";
-        break;
-      }
-      case GreenPixelChannel:
-      {
-        name="green";
-        if (image->colorspace == CMYKColorspace)
-          name="magenta";
-        break;
-      }
-      case BluePixelChannel:
-      {
-        name="blue";
-        if (image->colorspace == CMYKColorspace)
-          name="yellow";
-        break;
-      }
-      case BlackPixelChannel:
-      {
-        name="black";
-        if (image->storage_class == PseudoClass)
-          name="index";
-        break;
-      }
-      case IndexPixelChannel:
-      {
-        name="index";
-        break;
-      }
-      case AlphaPixelChannel:
-      {
-        name="alpha";
-        break;
-      }
-      case ReadMaskPixelChannel:
-      {
-        name="read-mask";
-        break;
-      }
-      case WriteMaskPixelChannel:
-      {
-        name="write-mask";
-        break;
-      }
-      case CompositeMaskPixelChannel:
-      {
-        name="composite-mask";
-        break;
-      }
-      case MetaPixelChannels:
-      {
-        name="meta";
-        break;
-      }
-      default:
-        name="undefined";
-    }
+    name=GetPixelChannelLogName(image,channel);
     if (image->colorspace ==  UndefinedColorspace)
       {
         (void) FormatLocaleString(channel_name,MagickPathExtent,"%.17g",
@@ -3284,6 +3076,40 @@ static void SortRowPixels(const Image *image,Quantum *magick_restrict q)
   }
 }
 
+typedef struct _SortPixelsRow
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+} SortPixelsRow;
+
+static MagickBooleanType SortPixelsLine(const SortPixelsRow *row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(row->image_view,0,y,row->image->columns,1,
+    row->exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  SortRowPixels(row->image,q);
+  if (SyncCacheViewAuthenticPixels(row->image_view,row->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType SortImagePixels(Image *image,
   ExceptionInfo *exception)
 {
@@ -3317,20 +3143,11 @@ MagickExport MagickBooleanType SortImagePixels(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
+    const SortPixelsRow
+      row = { image, image_view, exception };
 
-    if (status == MagickFalse)
+    if (SortPixelsLine(&row,y,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    SortRowPixels(image,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType

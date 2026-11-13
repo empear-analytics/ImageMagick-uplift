@@ -419,6 +419,17 @@ static inline MagickBooleanType IsExecutableToken(const char *token)
   return(MagickFalse);
 }
 
+static void DestroyDelegateArguments(char **arguments,
+  const int number_arguments)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) number_arguments; i++)
+    arguments[i]=DestroyString(arguments[i]);
+  (void) RelinquishMagickMemory(arguments);
+}
+
 static MagickBooleanType AuthorizeDelegateArguments(char **arguments,
   const int number_arguments,ExceptionInfo *exception)
 {
@@ -439,20 +450,73 @@ static MagickBooleanType AuthorizeDelegateArguments(char **arguments,
       continue;
     if (IsRightsAuthorized(domain,rights,arguments[i]) == MagickFalse)
       {
-        ssize_t
-          j;
-
         errno=EPERM;
         (void) ThrowMagickException(exception,GetMagickModule(),PolicyError,
           "NotAuthorized","`%s'",arguments[i]);
-        for (j=0; j < (ssize_t) number_arguments; j++)
-          arguments[j]=DestroyString(arguments[j]);
-        arguments=(char **) RelinquishMagickMemory(arguments);
+        DestroyDelegateArguments(arguments,number_arguments);
         return(MagickFalse);
       }
   }
   return(MagickTrue);
 }
+
+#if defined(MAGICKCORE_POSIX_SUPPORT) && defined(MAGICKCORE_HAVE_EXECVP)
+static int WaitForDelegateChild(const pid_t child_pid)
+{
+  int
+    child_status = 0,
+    status = (-1);
+
+  pid_t
+    pid;
+
+  pid=(pid_t) waitpid(child_pid,&child_status,0);
+  if (pid == -1)
+    return(-1);
+  if (WIFEXITED(child_status) != 0)
+    status=WEXITSTATUS(child_status);
+  else
+    if (WIFSIGNALED(child_status))
+      status=(-1);
+  return(status);
+}
+
+static int RunDelegateProgram(char **arguments,const char *sanitize_command)
+{
+  pid_t
+    child_pid;
+
+  /*
+    Call application directly rather than from a shell.
+  */
+  child_pid=(pid_t) fork();
+  if (child_pid == (pid_t) -1)
+    return(system(sanitize_command));
+  if (child_pid != 0)
+    return(WaitForDelegateChild(child_pid));
+  (void) execvp(arguments[1],arguments+1);
+  _exit(1);
+}
+#endif
+
+#if defined(MAGICKCORE_POSIX_SUPPORT) && defined(MAGICKCORE_HAVE_POPEN)
+static int ReadDelegateOutput(const char *sanitize_command,char *message)
+{
+  FILE
+    *file;
+
+  size_t
+    offset = 0;
+
+  file=popen_utf8(sanitize_command,"r");
+  if (file == (FILE *) NULL)
+    return(system(sanitize_command));
+  while ((offset < MagickPathExtent) &&
+         (fgets(message+offset,(int) (MagickPathExtent-offset),file) != NULL))
+    offset+=strlen(message);
+  return(pclose(file));
+}
+#endif
 
 MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
   const MagickBooleanType verbose,const char *command,char *message,
@@ -466,18 +530,13 @@ MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
     number_arguments,
     status;
 
-  ssize_t
-    i;
-
   status=(-1);
   arguments=StringToArgv(command,&number_arguments);
   if (arguments == (char **) NULL)
     return(status);
   if (*arguments[1] == '\0')
     {
-      for (i=0; i < (ssize_t) number_arguments; i++)
-        arguments[i]=DestroyString(arguments[i]);
-      arguments=(char **) RelinquishMagickMemory(arguments);
+      DestroyDelegateArguments(arguments,number_arguments);
       return(-1);
     }
   if (AuthorizeDelegateArguments(arguments,number_arguments,exception) ==
@@ -496,24 +555,7 @@ MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
 #if defined(MAGICKCORE_POSIX_SUPPORT)
 #if defined(MAGICKCORE_HAVE_POPEN)
   if ((asynchronous == MagickFalse) && (message !=  (char *) NULL))
-    {
-      FILE
-        *file;
-
-      file=popen_utf8(sanitize_command,"r");
-      if (file == (FILE *) NULL)
-        status=system(sanitize_command);
-      else
-        {
-          size_t
-            offset = 0;
-
-          while ((offset < MagickPathExtent) &&
-                 (fgets(message+offset,(int) (MagickPathExtent-offset),file) != NULL))
-            offset+=strlen(message);
-          status=pclose(file);
-        }
-    }
+    status=ReadDelegateOutput(sanitize_command,message);
   else
 #endif
     {
@@ -524,44 +566,7 @@ MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
           (strpbrk(sanitize_command,"&;<>|") != (char *) NULL))
         status=system(sanitize_command);
       else
-        {
-          pid_t
-            child_pid;
-
-          /*
-            Call application directly rather than from a shell.
-          */
-          child_pid=(pid_t) fork();
-          if (child_pid == (pid_t) -1)
-            status=system(sanitize_command);
-          else
-            if (child_pid == 0)
-              {
-                status=execvp(arguments[1],arguments+1);
-                _exit(1);
-              }
-            else
-              {
-                int
-                  child_status;
-
-                pid_t
-                  pid;
-
-                child_status=0;
-                pid=(pid_t) waitpid(child_pid,&child_status,0);
-                if (pid == -1)
-                  status=(-1);
-                else
-                  {
-                    if (WIFEXITED(child_status) != 0)
-                      status=WEXITSTATUS(child_status);
-                    else
-                      if (WIFSIGNALED(child_status))
-                        status=(-1);
-                  }
-              }
-        }
+        status=RunDelegateProgram(arguments,sanitize_command);
 #endif
     }
 #elif defined(MAGICKCORE_WINDOWS_SUPPORT)
@@ -602,9 +607,7 @@ MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
           "FailedToExecuteCommand","`%s' (%d)",sanitize_command,status);
     }
   sanitize_command=DestroyString(sanitize_command);
-  for (i=0; i < (ssize_t) number_arguments; i++)
-    arguments[i]=DestroyString(arguments[i]);
-  arguments=(char **) RelinquishMagickMemory(arguments);
+  DestroyDelegateArguments(arguments,number_arguments);
   return(status);
 }
 
@@ -646,24 +649,369 @@ MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
 %
 */
 
+static inline MagickBooleanType IsImageInfoLetter(const char letter)
+{
+  return(((letter != '\0') && (strchr("aouS",letter) != (char *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsImageLetter(const char letter)
+{
+  return(((letter != '\0') &&
+    (strchr("bdefghimpqrstwxyzACDFGHIMOPQTUWXY~@#",letter) != (char *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
+static const char *GetListProperty(const Image *image,const char letter,
+  char *value)
+{
+  switch (letter)
+  {
+    case 'n': /* Number of images in the list.  */
+    {
+      if (image != (Image *) NULL)
+        (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
+          GetImageListLength(image));
+      return(value);
+    }
+    case '%': /* percent escaped */
+      return("%");
+    default:
+      return(value);
+  }
+}
+
+static const char *GetMnemonicProperty(Image *image,const char letter,
+  char *value,ExceptionInfo *exception)
+{
+  switch (letter)
+  {
+    case 'r': /* Image storage class, colorspace, and alpha enabled.  */
+    {
+      ColorspaceType
+        colorspace;
+
+      colorspace=image->colorspace;
+      (void) FormatLocaleString(value,MagickPathExtent,"%s %s %s",
+        CommandOptionToMnemonic(MagickClassOptions,(ssize_t)
+        image->storage_class),CommandOptionToMnemonic(MagickColorspaceOptions,
+        (ssize_t) colorspace),image->alpha_trait != UndefinedPixelTrait ?
+        "Alpha" : "");
+      return(value);
+    }
+    case 'A': /* Image alpha channel  */
+      return(CommandOptionToMnemonic(MagickPixelTraitOptions,(ssize_t)
+        image->alpha_trait));
+    case 'C': /* Image compression method.  */
+      return(CommandOptionToMnemonic(MagickCompressOptions,
+        (ssize_t) image->compression));
+    case 'D': /* Image dispose method.  */
+      return(CommandOptionToMnemonic(MagickDisposeOptions,
+        (ssize_t) image->dispose));
+    case 'U': /* Image resolution units. */
+      return(CommandOptionToMnemonic(MagickResolutionOptions,
+        (ssize_t) image->units));
+    case '#':
+    {
+      /*
+        Image signature.
+      */
+      (void) SignatureImage(image,exception);
+      return(GetImageProperty(image,"signature",exception));
+    }
+    default:
+      return(GetListProperty(image,letter,value));
+  }
+}
+
+static const char *GetQualityProperty(Image *image,const char letter,
+  char *value,ExceptionInfo *exception)
+{
+  switch (letter)
+  {
+    case '~': /* BPG image compression quality */
+    {
+      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
+        (100-(image->quality == 0 ? 42 : image->quality))/2);
+      return(value);
+    }
+    case 'Q': /* image compression quality */
+    {
+      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
+        (image->quality == 0 ? 92 : image->quality));
+      return(value);
+    }
+    default:
+      return(GetMnemonicProperty(image,letter,value,exception));
+  }
+}
+
+static double GetResolutionValue(const double resolution,
+  const ResolutionType units)
+{
+  return(fabs(resolution) > MagickEpsilon ? resolution :
+    units == PixelsPerCentimeterResolution ? DefaultResolution/2.54 :
+    DefaultResolution);
+}
+
+static const char *GetMeasureProperty(Image *image,const char letter,
+  char *value,ExceptionInfo *exception)
+{
+  switch (letter)
+  {
+    case 'b':  /* image size read in - in bytes */
+    {
+      (void) FormatMagickSize(image->extent,MagickFalse,"B",MagickPathExtent,
+        value);
+      if (image->extent == 0)
+        (void) FormatMagickSize(GetBlobSize(image),MagickFalse,"B",
+          MagickPathExtent,value);
+      return(value);
+    }
+    case 'x': /* Image horizontal resolution (with units) */
+    {
+      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",
+        GetResolutionValue(image->resolution.x,image->units));
+      return(value);
+    }
+    case 'y': /* Image vertical resolution (with units) */
+    {
+      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",
+        GetResolutionValue(image->resolution.y,image->units));
+      return(value);
+    }
+    default:
+      return(GetQualityProperty(image,letter,value,exception));
+  }
+}
+
+static const char *GetCounterProperty(Image *image,const char letter,
+  char *value,ExceptionInfo *exception)
+{
+  switch (letter)
+  {
+    case 'p': /* Image index in current image list */
+    {
+      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
+        GetImageIndexInList(image));
+      return(value);
+    }
+    case 'q': /* Quantum depth of image in memory */
+    {
+      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
+        MAGICKCORE_QUANTUM_DEPTH);
+      return(value);
+    }
+    case 's': /* Image scene number */
+    {
+      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
+        image->scene);
+      return(value);
+    }
+    case 'z': /* Image depth as read in */
+    {
+      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",
+        (double) image->depth);
+      return(value);
+    }
+    case 'I': /* image iterations for animations */
+    {
+      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
+        image->iterations);
+      return(value);
+    }
+    case 'T': /* image time delay for animations */
+    {
+      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
+        image->delay);
+      return(value);
+    }
+    default:
+      return(GetMeasureProperty(image,letter,value,exception));
+  }
+}
+
+static const char *GetPageProperty(Image *image,const char letter,
+  char *value,ExceptionInfo *exception)
+{
+  switch (letter)
+  {
+    case 'H': /* layer canvas height */
+    {
+      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",
+        (double) image->page.height);
+      return(value);
+    }
+    case 'W': /* layer canvas width */
+    {
+      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
+        image->page.width);
+      return(value);
+    }
+    case 'X': /* layer canvas X offset */
+    {
+      (void) FormatLocaleString(value,MagickPathExtent,"%+.20g",(double)
+        image->page.x);
+      return(value);
+    }
+    case 'Y': /* layer canvas Y offset */
+    {
+      (void) FormatLocaleString(value,MagickPathExtent,"%+.20g",(double)
+        image->page.y);
+      return(value);
+    }
+    default:
+      return(GetCounterProperty(image,letter,value,exception));
+  }
+}
+
+static const char *GetSizeProperty(Image *image,const char letter,
+  char *value,ExceptionInfo *exception)
+{
+  switch (letter)
+  {
+    case 'h': /* Image height (current) */
+    {
+      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
+        (image->rows != 0 ? image->rows : image->magick_rows));
+      return(value);
+    }
+    case 'w': /* Image width (current) */
+    {
+      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
+        (image->columns != 0 ? image->columns : image->magick_columns));
+      return(value);
+    }
+    case 'G': /* Image size as geometry = "%wx%h" */
+    {
+      (void) FormatLocaleString(value,MagickPathExtent,"%.17gx%.17g",
+        (double) image->magick_columns,(double) image->magick_rows);
+      return(value);
+    }
+    case 'P': /* layer canvas page size = "%Wx%H" */
+    {
+      (void) FormatLocaleString(value,MagickPathExtent,"%.17gx%.17g",
+        (double) image->page.width,(double) image->page.height);
+      return(value);
+    }
+    default:
+      return(GetPageProperty(image,letter,value,exception));
+  }
+}
+
+static const char *GetGeometryProperty(Image *image,const char letter,
+  char *value,ExceptionInfo *exception)
+{
+  switch (letter)
+  {
+    case 'g': /* Image geometry, canvas and offset  %Wx%H+%X+%Y */
+    {
+      (void) FormatLocaleString(value,MagickPathExtent,
+        "%.17gx%.17g%+.20g%+.20g",(double) image->page.width,(double)
+        image->page.height,(double) image->page.x,(double) image->page.y);
+      return(value);
+    }
+    case 'O': /* layer canvas offset with sign = "+%X+%Y" */
+    {
+      (void) FormatLocaleString(value,MagickPathExtent,"%+ld%+ld",(long)
+        image->page.x,(long) image->page.y);
+      return(value);
+    }
+    case '@': /* Trim bounding box, without actually trimming! */
+    {
+      RectangleInfo
+        page;
+
+      page=GetImageBoundingBox(image,exception);
+      (void) FormatLocaleString(value,MagickPathExtent,
+        "%.17gx%.17g%+.20g%+.20g",(double) page.width,(double) page.height,
+        (double) page.x,(double) page.y);
+      return(value);
+    }
+    default:
+      return(GetSizeProperty(image,letter,value,exception));
+  }
+}
+
+static const char *GetNameProperty(Image *image,const char letter,
+  char *value,ExceptionInfo *exception)
+{
+  switch (letter)
+  {
+    case 'i': /* Filename last used for an image (read or write) */
+      return(image->filename);
+    case 'm': /* Image format (file magick) */
+      return(image->magick);
+    case 'F':
+    {
+      /*
+        Magick filename - filename given incl. coder & read mods.
+      */
+      (void) CopyMagickString(value,image->magick_filename,MagickPathExtent);
+      return(value);
+    }
+    case 'M': /* Magick filename - filename given incl. coder & read mods */
+      return(image->magick_filename);
+    default:
+      return(GetGeometryProperty(image,letter,value,exception));
+  }
+}
+
+static const char *GetPathProperty(Image *image,const char letter,
+  char *value,ExceptionInfo *exception)
+{
+  switch (letter)
+  {
+    case 'd':  /* Directory component of filename */
+    {
+      GetPathComponent(image->magick_filename,HeadPath,value);
+      return(value);
+    }
+    case 'e': /* Filename extension (suffix) of image file */
+    {
+      GetPathComponent(image->magick_filename,ExtensionPath,value);
+      return(value);
+    }
+    case 'f': /* Filename without directory component */
+    {
+      GetPathComponent(image->magick_filename,TailPath,value);
+      return(value);
+    }
+    case 't': /* Base filename without directory or extension */
+    {
+      GetPathComponent(image->magick_filename,BasePath,value);
+      return(value);
+    }
+    default:
+      return(GetNameProperty(image,letter,value,exception));
+  }
+}
+
+static const char *GetImageInfoProperty(const ImageInfo *image_info,
+  const char letter,char *value)
+{
+  switch (letter)
+  {
+    case 'a': /* authentication passphrase */
+      return(GetImageOption(image_info,"authenticate"));
+    case 'o': /* Output Filename */
+      return(image_info->filename);
+    case 'u': /* Unique filename */
+      return(image_info->unique);
+    default:
+    {
+      /* Number of scenes in image list.  */
+      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
+        (image_info->number_scenes == 0 ? 2147483647 :
+         image_info->number_scenes));
+      return(value);
+    }
+  }
+}
+
 static char *GetMagickPropertyLetter(ImageInfo *image_info,Image *image,
   const char letter,ExceptionInfo *exception)
 {
-#define WarnNoImageReturn(format,letter) \
-  if (image == (Image *) NULL) \
-    { \
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning, \
-        "NoImageForProperty",format,letter); \
-      break; \
-    }
-#define WarnNoImageInfoReturn(format,letter) \
-  if (image_info == (ImageInfo *) NULL) \
-    { \
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning, \
-        "NoImageInfoForProperty",format,letter); \
-      break; \
-    }
-
   char
     value[MagickPathExtent];
 
@@ -680,317 +1028,19 @@ static char *GetMagickPropertyLetter(ImageInfo *image_info,Image *image,
   */
   *value='\0';           /* formatted string */
   string=(const char *) value;
-  switch (letter)
-  {
-    case 'a': /* authentication passphrase */
-    {
-      WarnNoImageInfoReturn("\"%%%c\"",letter);
-      string=GetImageOption(image_info,"authenticate");
-      break;
-    }
-    case 'b':  /* image size read in - in bytes */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) FormatMagickSize(image->extent,MagickFalse,"B",MagickPathExtent,
-        value);
-      if (image->extent == 0)
-        (void) FormatMagickSize(GetBlobSize(image),MagickFalse,"B",
-          MagickPathExtent,value);
-      break;
-    }
-    case 'd':  /* Directory component of filename */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      GetPathComponent(image->magick_filename,HeadPath,value);
-      break;
-    }
-    case 'e': /* Filename extension (suffix) of image file */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      GetPathComponent(image->magick_filename,ExtensionPath,value);
-      break;
-    }
-    case 'f': /* Filename without directory component */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      GetPathComponent(image->magick_filename,TailPath,value);
-      break;
-    }
-    case 'g': /* Image geometry, canvas and offset  %Wx%H+%X+%Y */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) FormatLocaleString(value,MagickPathExtent,
-        "%.17gx%.17g%+.20g%+.20g",(double) image->page.width,(double)
-        image->page.height,(double) image->page.x,(double) image->page.y);
-      break;
-    }
-    case 'h': /* Image height (current) */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-        (image->rows != 0 ? image->rows : image->magick_rows));
-      break;
-    }
-    case 'i': /* Filename last used for an image (read or write) */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      string=image->filename;
-      break;
-    }
-    case 'm': /* Image format (file magick) */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      string=image->magick;
-      break;
-    }
-    case 'n': /* Number of images in the list.  */
-    {
-      if (image != (Image *) NULL)
-        (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-          GetImageListLength(image));
-      break;
-    }
-    case 'o': /* Output Filename */
-    {
-      WarnNoImageInfoReturn("\"%%%c\"",letter);
-      string=image_info->filename;
-      break;
-    }
-    case 'p': /* Image index in current image list */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-        GetImageIndexInList(image));
-      break;
-    }
-    case 'q': /* Quantum depth of image in memory */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-        MAGICKCORE_QUANTUM_DEPTH);
-      break;
-    }
-    case 'r': /* Image storage class, colorspace, and alpha enabled.  */
-    {
-      ColorspaceType
-        colorspace;
-
-      WarnNoImageReturn("\"%%%c\"",letter);
-      colorspace=image->colorspace;
-      (void) FormatLocaleString(value,MagickPathExtent,"%s %s %s",
-        CommandOptionToMnemonic(MagickClassOptions,(ssize_t)
-        image->storage_class),CommandOptionToMnemonic(MagickColorspaceOptions,
-        (ssize_t) colorspace),image->alpha_trait != UndefinedPixelTrait ?
-        "Alpha" : "");
-      break;
-    }
-    case 's': /* Image scene number */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-        image->scene);
-      break;
-    }
-    case 't': /* Base filename without directory or extension */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      GetPathComponent(image->magick_filename,BasePath,value);
-      break;
-    }
-    case 'u': /* Unique filename */
-    {
-      WarnNoImageInfoReturn("\"%%%c\"",letter);
-      string=image_info->unique;
-      break;
-    }
-    case 'w': /* Image width (current) */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-        (image->columns != 0 ? image->columns : image->magick_columns));
-      break;
-    }
-    case 'x': /* Image horizontal resolution (with units) */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",
-        fabs(image->resolution.x) > MagickEpsilon ? image->resolution.x :
-        image->units == PixelsPerCentimeterResolution ? DefaultResolution/2.54 :
-        DefaultResolution);
-      break;
-    }
-    case 'y': /* Image vertical resolution (with units) */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",
-        fabs(image->resolution.y) > MagickEpsilon ? image->resolution.y :
-        image->units == PixelsPerCentimeterResolution ? DefaultResolution/2.54 :
-        DefaultResolution);
-      break;
-    }
-    case 'z': /* Image depth as read in */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",
-        (double) image->depth);
-      break;
-    }
-    case 'A': /* Image alpha channel  */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      string=CommandOptionToMnemonic(MagickPixelTraitOptions,(ssize_t)
-        image->alpha_trait);
-      break;
-    }
-    case 'C': /* Image compression method.  */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      string=CommandOptionToMnemonic(MagickCompressOptions,
-        (ssize_t) image->compression);
-      break;
-    }
-    case 'D': /* Image dispose method.  */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      string=CommandOptionToMnemonic(MagickDisposeOptions,
-        (ssize_t) image->dispose);
-      break;
-    }
-    case 'F':
-    {
-      /*
-        Magick filename - filename given incl. coder & read mods.
-      */
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) CopyMagickString(value,image->magick_filename,MagickPathExtent);
-      break;
-    }
-    case 'G': /* Image size as geometry = "%wx%h" */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) FormatLocaleString(value,MagickPathExtent,"%.17gx%.17g",
-        (double) image->magick_columns,(double) image->magick_rows);
-      break;
-    }
-    case 'H': /* layer canvas height */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",
-        (double) image->page.height);
-      break;
-    }
-    case 'I': /* image iterations for animations */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-        image->iterations);
-      break;
-    }
-    case 'M': /* Magick filename - filename given incl. coder & read mods */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      string=image->magick_filename;
-      break;
-    }
-    case 'O': /* layer canvas offset with sign = "+%X+%Y" */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) FormatLocaleString(value,MagickPathExtent,"%+ld%+ld",(long)
-        image->page.x,(long) image->page.y);
-      break;
-    }
-    case 'P': /* layer canvas page size = "%Wx%H" */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) FormatLocaleString(value,MagickPathExtent,"%.17gx%.17g",
-        (double) image->page.width,(double) image->page.height);
-      break;
-    }
-    case '~': /* BPG image compression quality */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-        (100-(image->quality == 0 ? 42 : image->quality))/2);
-      break;
-    }
-    case 'Q': /* image compression quality */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-        (image->quality == 0 ? 92 : image->quality));
-      break;
-    }
-    case 'S': /* Number of scenes in image list.  */
-    {
-      WarnNoImageInfoReturn("\"%%%c\"",letter);
-      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-        (image_info->number_scenes == 0 ? 2147483647 :
-         image_info->number_scenes));
-      break;
-    }
-    case 'T': /* image time delay for animations */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-        image->delay);
-      break;
-    }
-    case 'U': /* Image resolution units. */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      string=CommandOptionToMnemonic(MagickResolutionOptions,
-        (ssize_t) image->units);
-      break;
-    }
-    case 'W': /* layer canvas width */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-        image->page.width);
-      break;
-    }
-    case 'X': /* layer canvas X offset */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) FormatLocaleString(value,MagickPathExtent,"%+.20g",(double)
-        image->page.x);
-      break;
-    }
-    case 'Y': /* layer canvas Y offset */
-    {
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) FormatLocaleString(value,MagickPathExtent,"%+.20g",(double)
-        image->page.y);
-      break;
-    }
-    case '%': /* percent escaped */
-    {
-      string="%";
-      break;
-    }
-    case '@': /* Trim bounding box, without actually trimming! */
-    {
-      RectangleInfo
-        page;
-
-      WarnNoImageReturn("\"%%%c\"",letter);
-      page=GetImageBoundingBox(image,exception);
-      (void) FormatLocaleString(value,MagickPathExtent,
-        "%.17gx%.17g%+.20g%+.20g",(double) page.width,(double) page.height,
-        (double) page.x,(double) page.y);
-      break;
-    }
-    case '#':
-    {
-      /*
-        Image signature.
-      */
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) SignatureImage(image,exception);
-      string=GetImageProperty(image,"signature",exception);
-      break;
-    }
-  }
+  if ((IsImageInfoLetter(letter) != MagickFalse) &&
+      (image_info == (ImageInfo *) NULL))
+    (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+      "NoImageInfoForProperty","\"%%%c\"",letter);
+  else
+    if ((IsImageLetter(letter) != MagickFalse) && (image == (Image *) NULL))
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+        "NoImageForProperty","\"%%%c\"",letter);
+    else
+      if (IsImageInfoLetter(letter) != MagickFalse)
+        string=GetImageInfoProperty(image_info,letter,value);
+      else
+        string=GetPathProperty(image,letter,value,exception);
   return(SanitizeDelegateString(string));
 }
 
@@ -1106,6 +1156,40 @@ static void DecodeDelegateEntity(const char **p,char **q)
   q+=(ptrdiff_t) length; \
 }
 
+static MagickBooleanType DecodeDelegatePercent(const char **p,char **q,
+  const MagickBooleanType number)
+{
+  /*
+    Doubled percent - or percent at end of string - and a percent that follows
+    a number are literal.
+  */
+  (*p)++; /* advance beyond the percent */
+  if (IsPropertyEnd(*p) != MagickFalse)
+    (*p)--;
+  if (**p == '%')
+    {
+      *(*q)++='%';
+      return(MagickTrue);
+    }
+  if (number != MagickFalse)
+    {
+      /*
+        But only if not preceded by a number!
+      */
+      *(*q)++='%'; /* do NOT substitute the percent */
+      (*p)--;      /* back up one */
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
+static const char *SkipDelegateSpace(const char *p)
+{
+  while ((isspace((int) ((unsigned char) *p)) != 0) && (*p != '\0'))
+    p++;
+  return(p);
+}
+
 static char *InterpretDelegateProperties(ImageInfo *image_info,
   Image *image,const char *embed_text,ExceptionInfo *exception)
 {
@@ -1134,9 +1218,7 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
      (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no-image");
   if (embed_text == (const char *) NULL)
     return(ConstantString(""));
-  p=embed_text;
-  while ((isspace((int) ((unsigned char) *p)) != 0) && (*p != '\0'))
-    p++;
+  p=SkipDelegateSpace(embed_text);
   if (*p == '\0')
     return(ConstantString(""));
   /*
@@ -1173,29 +1255,8 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
         continue;
       }
     }
-    p++; /* advance beyond the percent */
-    /*
-      Doubled Percent - or percent at end of string.
-    */
-    if (IsPropertyEnd(p) != MagickFalse)
-      p--;
-    if (*p == '%')
-      {
-        *q++='%';
-        continue;
-      }
-    /*
-      Single letter escapes %c.
-    */
-    if (number != MagickFalse)
-      {
-        /*
-          But only if not preceded by a number!
-        */
-        *q++='%'; /* do NOT substitute the percent */
-        p--;      /* back up one */
-        continue;
-      }
+    if (DecodeDelegatePercent(&p,&q,number) != MagickFalse)
+      continue;
     string=GetMagickPropertyLetter(image_info,image,*p,exception);
     if (string != (char *) NULL)
       {
@@ -1333,27 +1394,26 @@ static MagickBooleanType IsBidirectionalMismatch(
   return(MagickTrue);
 }
 
+static MagickBooleanType IsDelegateMatch(const DelegateInfo *delegate_info,
+  const char *decode,const char *encode)
+{
+  if (delegate_info->mode > 0)
+    return(LocaleCompare(delegate_info->decode,decode) == 0 ? MagickTrue :
+      MagickFalse);
+  if (delegate_info->mode < 0)
+    return(LocaleCompare(delegate_info->encode,encode) == 0 ? MagickTrue :
+      MagickFalse);
+  return(IsBidirectionalMismatch(delegate_info,decode,encode) == MagickFalse ?
+    MagickTrue : MagickFalse);
+}
+
 static void FindDelegateElement(const char *decode,const char *encode,
   ElementInfo **p,const DelegateInfo **delegate_info)
 {
   while (*p != (ElementInfo *) NULL)
   {
     *delegate_info=(const DelegateInfo* ) (*p)->value;
-    if ((*delegate_info)->mode > 0)
-      {
-        if (LocaleCompare((*delegate_info)->decode,decode) == 0)
-          break;
-        *p=(*p)->next;
-        continue;
-      }
-    if ((*delegate_info)->mode < 0)
-      {
-        if (LocaleCompare((*delegate_info)->encode,encode) == 0)
-          break;
-        *p=(*p)->next;
-        continue;
-      }
-    if (IsBidirectionalMismatch(*delegate_info,decode,encode) == MagickFalse)
+    if (IsDelegateMatch(*delegate_info,decode,encode) != MagickFalse)
       break;
     *p=(*p)->next;
   }
@@ -1915,6 +1975,13 @@ static void WaitForDelegateInput(const Image *image)
     (void) MagickDelay(100);  /* sleep 0.1 seconds */
 }
 
+static void RelinquishTemporaryInput(const Image *image,
+  const MagickBooleanType temporary)
+{
+  if (temporary != MagickFalse)
+    (void) RelinquishUniqueFileResource(image->filename);
+}
+
 typedef struct _DelegateInvocation
 {
   ImageInfo
@@ -2031,8 +2098,7 @@ static MagickBooleanType ConvertDelegateInput(
   if (magick == (char *) NULL)
     {
       (void) RelinquishUniqueFileResource(image_info->unique);
-      if (temporary != MagickFalse)
-        (void) RelinquishUniqueFileResource(image->filename);
+      RelinquishTemporaryInput(image,temporary);
       (void) ThrowMagickException(exception,GetMagickModule(),
         DelegateError,"DelegateFailed","`%s'",decode ? decode : encode);
       return(MagickFalse);
@@ -2110,6 +2176,11 @@ typedef struct _DelegateExecution
 
   ExceptionInfo
     *exception;
+
+  const char
+    *input_filename,
+    *output_filename,
+    *text;
 } DelegateExecution;
 
 static void ExecuteDelegateCommand(const DelegateExecution *execution,
@@ -2140,11 +2211,115 @@ static void ExecuteDelegateCommand(const DelegateExecution *execution,
     }
 }
 
+static MagickBooleanType CopyDelegateOutput(const ImageInfo *image_info,
+  const char *input_filename,const char *output_filename,
+  ExceptionInfo *exception)
+{
+  if ((strcmp(input_filename,output_filename) != 0) &&
+      (CopyDelegateFile(image_info->filename,output_filename,MagickTrue,exception) == MagickFalse))
+    {
+      (void) RelinquishUniqueFileResource(output_filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static void RelinquishDelegateFiles(const ImageInfo *image_info,
+  const Image *image)
+{
+  if (image_info->temporary != MagickFalse)
+    (void) RelinquishUniqueFileResource(image_info->filename);
+  (void) RelinquishUniqueFileResource(image_info->unique);
+  (void) RelinquishUniqueFileResource(image_info->filename);
+  (void) RelinquishUniqueFileResource(image->filename);
+}
+
+static MagickBooleanType RunDelegateStep(const DelegateExecution *execution,
+  MagickBooleanType *status)
+{
+  ImageInfo
+    *const image_info = execution->image_info;
+
+  Image
+    *const image = execution->image;
+
+  ExceptionInfo
+    *const exception = execution->exception;
+
+  char
+    *command;
+
+  (void) AcquireUniqueSymbolicLink(execution->output_filename,
+    image_info->filename);
+  if (AcquireUniqueFilename(image_info->unique) == MagickFalse)
+    {
+      ThrowFileException(exception,FileOpenError,
+        "UnableToCreateTemporaryFile",image_info->unique);
+      return(MagickFalse);
+    }
+  if (LinkDelegateInput(image,execution->input_filename,exception,status) ==
+      MagickFalse)
+    return(MagickFalse);
+  *status=MagickTrue;
+  command=InterpretDelegateProperties(image_info,image,execution->text,
+    exception);
+  ExecuteDelegateCommand(execution,status,&command);
+  RestoreDelegateInput(image,execution->input_filename,exception,status);
+  if (CopyDelegateOutput(image_info,execution->input_filename,
+      execution->output_filename,exception) == MagickFalse)
+    *status=MagickFalse;
+  RelinquishDelegateFiles(image_info,image);
+  return(MagickTrue);
+}
+
+static MagickBooleanType AcquireDelegateOutputFilename(ImageInfo *image_info,
+  const Image *image,const MagickBooleanType temporary,
+  ExceptionInfo *exception)
+{
+  if (*image_info->filename != '\0')
+    return(MagickTrue);
+  if (AcquireUniqueFilename(image_info->filename) == MagickFalse)
+    {
+      RelinquishTemporaryInput(image,temporary);
+      ThrowFileException(exception,FileOpenError,
+        "UnableToCreateTemporaryFile",image_info->filename);
+      return(MagickFalse);
+    }
+  image_info->temporary=MagickTrue;
+  return(MagickTrue);
+}
+
+static inline MagickBooleanType IsDelegateNameDenied(const char *name)
+{
+  return(((name != (const char *) NULL) &&
+    (IsRightsAuthorized(DelegatePolicyDomain,ExecutePolicyRights,name) ==
+     MagickFalse)) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType AcquireDelegateInputFilename(Image *image,
+  const MagickBooleanType temporary,ExceptionInfo *exception)
+{
+  if ((temporary != MagickFalse) && (AcquireUniqueFilename(image->filename) ==
+      MagickFalse))
+    {
+      ThrowFileException(exception,FileOpenError,"UnableToCreateTemporaryFile",
+        image->filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static char **DestroyDelegateCommands(char **commands,ssize_t i)
+{
+  for ( ; commands[i] != (char *) NULL; i++)
+    commands[i]=DestroyString(commands[i]);
+  return((char **) RelinquishMagickMemory(commands));
+}
+
 MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   Image *image,const char *decode,const char *encode,ExceptionInfo *exception)
 {
   char
-    *command,
     **commands,
     input_filename[MagickPathExtent],
     output_filename[MagickPathExtent];
@@ -2155,9 +2330,6 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   MagickBooleanType
     status,
     temporary;
-
-  PolicyRights
-    rights;
 
   ssize_t
     i;
@@ -2171,42 +2343,24 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  rights=ExecutePolicyRights;
-  if ((decode != (const char *) NULL) &&
-      (IsRightsAuthorized(DelegatePolicyDomain,rights,decode) == MagickFalse))
+  if (IsDelegateNameDenied(decode) != MagickFalse)
     ThrowPolicyException(decode,MagickFalse);
-  if ((encode != (const char *) NULL) &&
-      (IsRightsAuthorized(DelegatePolicyDomain,rights,encode) == MagickFalse))
+  if (IsDelegateNameDenied(encode) != MagickFalse)
     ThrowPolicyException(encode,MagickFalse);
   temporary=(*image->filename == '\0') ? MagickTrue : MagickFalse;
-  if ((temporary != MagickFalse) && (AcquireUniqueFilename(image->filename) ==
-      MagickFalse))
-    {
-      ThrowFileException(exception,FileOpenError,"UnableToCreateTemporaryFile",
-        image->filename);
-      return(MagickFalse);
-    }
+  if (AcquireDelegateInputFilename(image,temporary,exception) == MagickFalse)
+    return(MagickFalse);
   delegate_info=GetDelegateInfo(decode,encode,exception);
   if (delegate_info == (DelegateInfo *) NULL)
     {
-      if (temporary != MagickFalse)
-        (void) RelinquishUniqueFileResource(image->filename);
+      RelinquishTemporaryInput(image,temporary);
       (void) ThrowMagickException(exception,GetMagickModule(),DelegateError,
         "NoTagFound","`%s'",decode ? decode : encode);
       return(MagickFalse);
     }
-  if (*image_info->filename == '\0')
-    {
-      if (AcquireUniqueFilename(image_info->filename) == MagickFalse)
-        {
-          if (temporary != MagickFalse)
-            (void) RelinquishUniqueFileResource(image->filename);
-          ThrowFileException(exception,FileOpenError,
-            "UnableToCreateTemporaryFile",image_info->filename);
-          return(MagickFalse);
-        }
-      image_info->temporary=MagickTrue;
-    }
+  if (AcquireDelegateOutputFilename(image_info,image,temporary,exception) ==
+      MagickFalse)
+    return(MagickFalse);
   if (IsTwoStepDelegate(delegate_info,decode,encode) != MagickFalse)
     {
       DelegateInvocation
@@ -2228,52 +2382,24 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   commands=StringToList(delegate_info->commands);
   if (commands == (char **) NULL)
     {
-      if (temporary != MagickFalse)
-        (void) RelinquishUniqueFileResource(image->filename);
+      RelinquishTemporaryInput(image,temporary);
       (void) ThrowMagickException(exception,GetMagickModule(),
         ResourceLimitError,"MemoryAllocationFailed","`%s'",
         decode ? decode : encode);
       return(MagickFalse);
     }
-  command=(char *) NULL;
   status=MagickTrue;
   (void) CopyMagickString(output_filename,image_info->filename,
     MagickPathExtent);
   (void) CopyMagickString(input_filename,image->filename,MagickPathExtent);
   for (i=0; commands[i] != (char *) NULL; i++)
   {
-    DelegateExecution
-      execution;
+    const DelegateExecution
+      execution = { delegate_info, image_info, image, exception,
+        input_filename, output_filename, commands[i] };
 
-    (void) AcquireUniqueSymbolicLink(output_filename,image_info->filename);
-    if (AcquireUniqueFilename(image_info->unique) == MagickFalse)
-      {
-        ThrowFileException(exception,FileOpenError,
-          "UnableToCreateTemporaryFile",image_info->unique);
-        break;
-      }
-    if (LinkDelegateInput(image,input_filename,exception,&status) ==
-        MagickFalse)
+    if (RunDelegateStep(&execution,&status) == MagickFalse)
       break;
-    status=MagickTrue;
-    command=InterpretDelegateProperties(image_info,image,commands[i],exception);
-    execution.delegate_info=delegate_info;
-    execution.image_info=image_info;
-    execution.image=image;
-    execution.exception=exception;
-    ExecuteDelegateCommand(&execution,&status,&command);
-    RestoreDelegateInput(image,input_filename,exception,&status);
-    if ((strcmp(input_filename,output_filename) != 0) &&
-        (CopyDelegateFile(image_info->filename,output_filename,MagickTrue,exception) == MagickFalse))
-      {
-        (void) RelinquishUniqueFileResource(output_filename);
-        status=MagickFalse;
-      }
-    if (image_info->temporary != MagickFalse)
-      (void) RelinquishUniqueFileResource(image_info->filename);
-    (void) RelinquishUniqueFileResource(image_info->unique);
-    (void) RelinquishUniqueFileResource(image_info->filename);
-    (void) RelinquishUniqueFileResource(image->filename);
     if (status == MagickFalse)
       {
         (void) ThrowMagickException(exception,GetMagickModule(),DelegateError,
@@ -2288,11 +2414,8 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   /*
     Relinquish resources.
   */
-  for ( ; commands[i] != (char *) NULL; i++)
-    commands[i]=DestroyString(commands[i]);
-  commands=(char **) RelinquishMagickMemory(commands);
-  if (temporary != MagickFalse)
-    (void) RelinquishUniqueFileResource(image->filename);
+  commands=DestroyDelegateCommands(commands,i);
+  RelinquishTemporaryInput(image,temporary);
   return(status);
 }
 
@@ -2465,10 +2588,12 @@ typedef struct _DelegateInclude
     *filename;
 
   char
+    *keyword,
     *token;
 
   size_t
-    depth;
+    depth,
+    extent;
 } DelegateInclude;
 
 static void LoadDelegateInclude(const DelegateInclude *include,
@@ -2512,117 +2637,182 @@ static void LoadDelegateInclude(const DelegateInclude *include,
     }
 }
 
+static const char *SkipQuotedText(const char *q)
+{
+  const char
+    quote = (*q),
+    *p = q+1;
+
+  /*
+    Return the last character of the quoted text: the closing quote, or the
+    last character of the string if the quote is not closed.
+  */
+  while ((*p != '\0') && (*p != quote))
+    p++;
+  return(*p == '\0' ? p-1 : p);
+}
+
+static const char *SkipDoctypeElement(const char *q)
+{
+  int
+    bracket_depth = 0;
+
+  while (*q != '\0')
+  {
+    if (strchr("\"'",*q) != (char *) NULL)
+      q=SkipQuotedText(q);
+    else if (*q == '[')
+      bracket_depth++;
+    else if ((*q == ']') && (bracket_depth > 0))
+      bracket_depth--;
+    else if ((*q == '>') && (bracket_depth == 0))
+      return(q+1);   /* consume final '>' */
+    q++;
+  }
+  return(q);
+}
+
+static const char *SkipCommentElement(const char *q,const size_t extent,
+  char *token)
+{
+  while ((LocaleNCompare(q,"->",2) != 0) && (*q != '\0'))
+    (void) GetNextToken(q,&q,extent,token);
+  return(q);
+}
+
+static void SetDelegateCommands(DelegateInfo *delegate_info,
+  const char *token)
+{
+  char
+    *commands;
+
+  commands=AcquireString(token);
+#if defined(MAGICKCORE_WINDOWS_SUPPORT)
+  if (strchr(commands,'@') != (char *) NULL)
+    {
+      char
+        path[MagickPathExtent];
+
+      NTGhostscriptEXE(path,MagickPathExtent);
+      (void) SubstituteString((char **) &commands,"@PSDelegate@",path);
+      (void) SubstituteString((char **) &commands,"\\","/");
+    }
+#endif
+  (void) SubstituteString((char **) &commands,"&quot;","\"");
+  (void) SubstituteString((char **) &commands,"&apos;","'");
+  (void) SubstituteString((char **) &commands,"&amp;","&");
+  (void) SubstituteString((char **) &commands,"&gt;",">");
+  (void) SubstituteString((char **) &commands,"&lt;","<");
+  if (delegate_info->commands != (char *) NULL)
+    delegate_info->commands=DestroyString(delegate_info->commands);
+  delegate_info->commands=commands;
+}
+
 static void SetDelegateThreadSupport(DelegateInfo *delegate_info,
+  const char *token)
+{
+  delegate_info->thread_support=IsStringTrue(token);
+  if (delegate_info->thread_support == MagickFalse)
+    delegate_info->semaphore=AcquireSemaphoreInfo();
+}
+
+static void SetDelegateMode(DelegateInfo *delegate_info,const char *token)
+{
+  delegate_info->mode=1;
+  if (LocaleCompare(token,"bi") == 0)
+    delegate_info->mode=0;
+  else
+    if (LocaleCompare(token,"encode") == 0)
+      delegate_info->mode=(-1);
+}
+
+static void SetDelegateInfoAttribute(DelegateInfo *delegate_info,
   const char *keyword,const char *token)
 {
-  switch (*keyword)
-  {
-    case 'T':
-    case 't':
+  if (LocaleCompare((char *) keyword,"command") == 0)
+    SetDelegateCommands(delegate_info,token);
+  else if (LocaleCompare((char *) keyword,"decode") == 0)
     {
-      if (LocaleCompare((char *) keyword,"thread-support") == 0)
-        {
-          delegate_info->thread_support=IsStringTrue(token);
-          if (delegate_info->thread_support == MagickFalse)
-            delegate_info->semaphore=AcquireSemaphoreInfo();
-          break;
-        }
-      break;
+      delegate_info->decode=ConstantString(token);
+      delegate_info->mode=1;
     }
-    default:
-      break;
+  else if (LocaleCompare((char *) keyword,"encode") == 0)
+    {
+      delegate_info->encode=ConstantString(token);
+      delegate_info->mode=(-1);
+    }
+  else if (LocaleCompare((char *) keyword,"mode") == 0)
+    SetDelegateMode(delegate_info,token);
+  else if (LocaleCompare((char *) keyword,"spawn") == 0)
+    delegate_info->spawn=IsStringTrue(token);
+  else if (LocaleCompare((char *) keyword,"stealth") == 0)
+    delegate_info->stealth=IsStringTrue(token);
+  else if (LocaleCompare((char *) keyword,"thread-support") == 0)
+    SetDelegateThreadSupport(delegate_info,token);
+}
+
+static MagickBooleanType SkipDelegateElement(const char **q,
+  const char *keyword,const size_t extent,char *token)
+{
+  if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
+    {
+      /*
+        DOCTYPE element.
+      */
+      *q=SkipDoctypeElement(*q);
+      return(MagickTrue);
+    }
+  if (LocaleNCompare(keyword,"<!--",4) == 0)
+    {
+      /*
+        Comment element.
+      */
+      *q=SkipCommentElement(*q,extent,token);
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
+static inline MagickBooleanType IsDelegateEnd(const char *keyword)
+{
+  return(((LocaleCompare(keyword,"/>") == 0) ||
+    (LocaleCompare(keyword,"</policy>") == 0)) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType IsIncludeFileAttribute(const char **q,
+  const size_t extent,char *keyword,char *token)
+{
+  (void) CopyMagickString(keyword,token,MagickPathExtent);
+  (void) GetNextToken(*q,q,extent,token);
+  if (*token != '=')
+    return(MagickFalse);
+  (void) GetNextToken(*q,q,extent,token);
+  return(LocaleCompare(keyword,"file") == 0 ? MagickTrue : MagickFalse);
+}
+
+static void LoadDelegateIncludeElement(const DelegateInclude *include,
+  const char **q,MagickStatusType *status)
+{
+  while (IsIncludeElementOpen(include->token,*q) != MagickFalse)
+  {
+    if (IsIncludeFileAttribute(q,include->extent,include->keyword,
+        include->token) != MagickFalse)
+      LoadDelegateInclude(include,status);
   }
 }
 
-static void SetDelegateFormatAttribute(DelegateInfo *delegate_info,
-  const char *keyword,const char *token)
+static DelegateInfo *AcquireDelegateInfo(const char *filename)
 {
-  switch (*keyword)
-  {
-    case 'D':
-    case 'd':
-    {
-      if (LocaleCompare((char *) keyword,"decode") == 0)
-        {
-          delegate_info->decode=ConstantString(token);
-          delegate_info->mode=1;
-          break;
-        }
-      break;
-    }
-    case 'E':
-    case 'e':
-    {
-      if (LocaleCompare((char *) keyword,"encode") == 0)
-        {
-          delegate_info->encode=ConstantString(token);
-          delegate_info->mode=(-1);
-          break;
-        }
-      break;
-    }
-    default:
-    {
-      SetDelegateThreadSupport(delegate_info,keyword,token);
-      break;
-    }
-  }
-}
+  DelegateInfo
+    *delegate_info;
 
-static void SetDelegateModeAttribute(DelegateInfo *delegate_info,
-  const char *keyword,const char *token)
-{
-  switch (*keyword)
-  {
-    case 'M':
-    case 'm':
-    {
-      if (LocaleCompare((char *) keyword,"mode") == 0)
-        {
-          delegate_info->mode=1;
-          if (LocaleCompare(token,"bi") == 0)
-            delegate_info->mode=0;
-          else
-            if (LocaleCompare(token,"encode") == 0)
-              delegate_info->mode=(-1);
-          break;
-        }
-      break;
-    }
-    default:
-    {
-      SetDelegateFormatAttribute(delegate_info,keyword,token);
-      break;
-    }
-  }
-}
-
-static void SetDelegateSpawnAttribute(DelegateInfo *delegate_info,
-  const char *keyword,const char *token)
-{
-  switch (*keyword)
-  {
-    case 'S':
-    case 's':
-    {
-      if (LocaleCompare((char *) keyword,"spawn") == 0)
-        {
-          delegate_info->spawn=IsStringTrue(token);
-          break;
-        }
-      if (LocaleCompare((char *) keyword,"stealth") == 0)
-        {
-          delegate_info->stealth=IsStringTrue(token);
-          break;
-        }
-      break;
-    }
-    default:
-    {
-      SetDelegateModeAttribute(delegate_info,keyword,token);
-      break;
-    }
-  }
+  delegate_info=(DelegateInfo *) AcquireCriticalMemory(
+    sizeof(*delegate_info));
+  (void) memset(delegate_info,0,sizeof(*delegate_info));
+  delegate_info->path=ConstantString(filename);
+  delegate_info->thread_support=MagickTrue;
+  delegate_info->signature=MagickCoreSignature;
+  return(delegate_info);
 }
 
 static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
@@ -2670,79 +2860,18 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
     if (*token == '\0')
       break;
     (void) CopyMagickString(keyword,token,MagickPathExtent);
-    if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
-      {
-        int
-          bracket_depth = 0,
-          quote = 0;
-
-        /*
-          DOCTYPE element.
-        */
-        for ( ; *q != '\0'; q++)
-        {
-          if (quote != 0)
-            {
-              if (*q == quote)
-                quote=0;
-            }
-          else
-            {
-              if ((*q == '"') || (*q == '\''))
-                quote=(*q);
-              else
-                if (*q == '[')
-                  bracket_depth++;
-                else
-                  if (*q == ']')
-                    {
-                      if (bracket_depth > 0)
-                        bracket_depth--;
-                    }
-                  else
-                    if ((*q == '>') && (bracket_depth == 0))
-                      {
-                        q++;   /* consume final '>' */
-                        break;
-                      }
-            }
-        }
-        continue;
-      }
-    if (LocaleNCompare(keyword,"<!--",4) == 0)
-      {
-        /*
-          Comment element.
-        */
-        while ((LocaleNCompare(q,"->",2) != 0) && (*q != '\0'))
-          (void) GetNextToken(q,&q,extent,token);
-        continue;
-      }
+    if (SkipDelegateElement(&q,keyword,extent,token) != MagickFalse)
+      continue;
     if (LocaleCompare(keyword,"<include") == 0)
       {
         /*
           Include element.
         */
-        while (IsIncludeElementOpen(token,q) != MagickFalse)
-        {
-          (void) CopyMagickString(keyword,token,MagickPathExtent);
-          (void) GetNextToken(q,&q,extent,token);
-          if (*token != '=')
-            continue;
-          (void) GetNextToken(q,&q,extent,token);
-          if (LocaleCompare(keyword,"file") == 0)
-            {
-              DelegateInclude
-                include;
+        const DelegateInclude
+          include = { cache, exception, filename, keyword, token, depth,
+            extent };
 
-              include.cache=cache;
-              include.exception=exception;
-              include.filename=filename;
-              include.token=token;
-              include.depth=depth;
-              LoadDelegateInclude(&include,&status);
-            }
-        }
+        LoadDelegateIncludeElement(&include,&q,&status);
         continue;
       }
     if (LocaleCompare(keyword,"<delegate") == 0)
@@ -2750,18 +2879,12 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
         /*
           Delegate element.
         */
-        delegate_info=(DelegateInfo *) AcquireCriticalMemory(
-          sizeof(*delegate_info));
-        (void) memset(delegate_info,0,sizeof(*delegate_info));
-        delegate_info->path=ConstantString(filename);
-        delegate_info->thread_support=MagickTrue;
-        delegate_info->signature=MagickCoreSignature;
+        delegate_info=AcquireDelegateInfo(filename);
         continue;
       }
     if (delegate_info == (DelegateInfo *) NULL)
       continue;
-    if ((LocaleCompare(keyword,"/>") == 0) ||
-        (LocaleCompare(keyword,"</policy>") == 0))
+    if (IsDelegateEnd(keyword) != MagickFalse)
       {
         status=AppendValueToLinkedList(cache,delegate_info);
         if (status == MagickFalse)
@@ -2776,47 +2899,7 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
       continue;
     (void) GetNextToken(q,&q,extent,token);
     (void) GetNextToken(q,&q,extent,token);
-    switch (*keyword)
-    {
-      case 'C':
-      case 'c':
-      {
-        if (LocaleCompare((char *) keyword,"command") == 0)
-          {
-            char
-              *commands;
-
-            commands=AcquireString(token);
-#if defined(MAGICKCORE_WINDOWS_SUPPORT)
-            if (strchr(commands,'@') != (char *) NULL)
-              {
-                char
-                  path[MagickPathExtent];
-
-                NTGhostscriptEXE(path,MagickPathExtent);
-                (void) SubstituteString((char **) &commands,"@PSDelegate@",
-                  path);
-                (void) SubstituteString((char **) &commands,"\\","/");
-              }
-#endif
-            (void) SubstituteString((char **) &commands,"&quot;","\"");
-            (void) SubstituteString((char **) &commands,"&apos;","'");
-            (void) SubstituteString((char **) &commands,"&amp;","&");
-            (void) SubstituteString((char **) &commands,"&gt;",">");
-            (void) SubstituteString((char **) &commands,"&lt;","<");
-            if (delegate_info->commands != (char *) NULL)
-              delegate_info->commands=DestroyString(delegate_info->commands);
-            delegate_info->commands=commands;
-            break;
-          }
-        break;
-      }
-      default:
-      {
-        SetDelegateSpawnAttribute(delegate_info,keyword,token);
-        break;
-      }
-    }
+    SetDelegateInfoAttribute(delegate_info,keyword,token);
   }
   token=(char *) RelinquishMagickMemory(token);
   return(status != 0 ? MagickTrue : MagickFalse);

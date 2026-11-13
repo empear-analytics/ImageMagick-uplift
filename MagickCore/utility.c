@@ -770,6 +770,24 @@ static void FormatExpandedPath(char *file_path,const char *magick,
     }
 }
 
+static char *AcquireCommandLine(char **vector,const ssize_t count)
+{
+  char
+    *command_line;
+
+  ssize_t
+    i;
+
+  command_line=AcquireString(vector[0]);
+  for (i=1; i < count; i++)
+  {
+    (void) ConcatenateString(&command_line," {");
+    (void) ConcatenateString(&command_line,vector[i]);
+    (void) ConcatenateString(&command_line,"}");
+  }
+  return(command_line);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1202,13 +1220,7 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
       char
         *command_line;
 
-      command_line=AcquireString(vector[0]);
-      for (i=1; i < count; i++)
-      {
-        (void) ConcatenateString(&command_line," {");
-        (void) ConcatenateString(&command_line,vector[i]);
-        (void) ConcatenateString(&command_line,"}");
-      }
+      command_line=AcquireCommandLine(vector,count);
       (void) LogMagickEvent(ConfigureEvent,GetMagickModule(),
         "Command line: %s",command_line);
       command_line=DestroyString(command_line);
@@ -1218,6 +1230,73 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
   return(MagickTrue);
 }
 
+#if defined(MAGICKCORE_HAVE__NSGETEXECUTABLEPATH)
+static void GetNSExecutablePath(char *path,const size_t extent)
+{
+  char
+    executable_path[PATH_MAX << 1];
+
+  uint32_t
+    length;
+
+  length=sizeof(executable_path);
+  if (_NSGetExecutablePath(executable_path,&length) == 0)
+    {
+      char
+        *real_path = realpath_utf8(executable_path);
+
+      if (real_path != (char *) NULL)
+        {
+          (void) CopyMagickString(path,real_path,extent);
+          real_path=DestroyString(real_path);
+        }
+    }
+}
+#endif
+
+#if defined(MAGICKCORE_HAVE_GETPID) && defined(MAGICKCORE_HAVE_READLINK) && defined(PATH_MAX)
+static void GetProcExecutionPath(char *path,const size_t extent)
+{
+  char
+    execution_path[PATH_MAX+1],
+    link_path[MagickPathExtent];
+
+  ssize_t
+    count;
+
+  (void) FormatLocaleString(link_path,MagickPathExtent,"/proc/%.17g/exe",
+    (double) getpid());
+  count=readlink(link_path,execution_path,PATH_MAX);
+  if (count == -1)
+    {
+      (void) FormatLocaleString(link_path,MagickPathExtent,"/proc/%.17g/file",
+        (double) getpid());
+      count=readlink(link_path,execution_path,PATH_MAX);
+    }
+  if ((count > 0) && (count <= (ssize_t) PATH_MAX))
+    {
+      execution_path[count]='\0';
+      (void) CopyMagickString(path,execution_path,extent);
+    }
+}
+#endif
+
+#if defined(MAGICKCORE_HAVE_GETEXECNAME)
+static void GetExecNamePath(char *path,const size_t extent)
+{
+  const char
+    *execution_path;
+
+  execution_path=(const char *) getexecname();
+  if (execution_path != (const char *) NULL)
+    {
+      if (*execution_path != *DirectorySeparator)
+        (void) ConcatenateMagickString(path,DirectorySeparator,extent);
+      (void) ConcatenateMagickString(path,execution_path,extent);
+    }
+}
+#endif
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1252,65 +1331,13 @@ MagickPrivate MagickBooleanType GetExecutionPath(char *path,const size_t extent)
   directory=getcwd(path,(unsigned long) extent);
   (void) directory;
 #if defined(MAGICKCORE_HAVE_GETPID) && defined(MAGICKCORE_HAVE_READLINK) && defined(PATH_MAX)
-  {
-    char
-      execution_path[PATH_MAX+1],
-      link_path[MagickPathExtent];
-
-    ssize_t
-      count;
-
-    (void) FormatLocaleString(link_path,MagickPathExtent,"/proc/%.17g/exe",
-      (double) getpid());
-    count=readlink(link_path,execution_path,PATH_MAX);
-    if (count == -1)
-      {
-        (void) FormatLocaleString(link_path,MagickPathExtent,"/proc/%.17g/file",
-          (double) getpid());
-        count=readlink(link_path,execution_path,PATH_MAX);
-      }
-    if ((count > 0) && (count <= (ssize_t) PATH_MAX))
-      {
-        execution_path[count]='\0';
-        (void) CopyMagickString(path,execution_path,extent);
-      }
-  }
+  GetProcExecutionPath(path,extent);
 #endif
 #if defined(MAGICKCORE_HAVE__NSGETEXECUTABLEPATH)
-  {
-    char
-      executable_path[PATH_MAX << 1];
-
-    uint32_t
-      length;
-
-    length=sizeof(executable_path);
-    if (_NSGetExecutablePath(executable_path,&length) == 0)
-      {
-        char
-          *real_path = realpath_utf8(executable_path);
-
-        if (real_path != (char *) NULL)
-          {
-            (void) CopyMagickString(path,real_path,extent);
-            real_path=DestroyString(real_path);
-          }
-      }
-  }
+  GetNSExecutablePath(path,extent);
 #endif
 #if defined(MAGICKCORE_HAVE_GETEXECNAME)
-  {
-    const char
-      *execution_path;
-
-    execution_path=(const char *) getexecname();
-    if (execution_path != (const char *) NULL)
-      {
-        if (*execution_path != *DirectorySeparator)
-          (void) ConcatenateMagickString(path,DirectorySeparator,extent);
-        (void) ConcatenateMagickString(path,execution_path,extent);
-      }
-  }
+  GetExecNamePath(path,extent);
 #endif
 #if defined(MAGICKCORE_WINDOWS_SUPPORT)
   NTGetExecutionPath(path,extent);
@@ -1656,6 +1683,20 @@ static char *LocateBasenameSeparator(char *component)
   return(p);
 }
 
+static void GetBasePathSansCompressExtension(const char *path,
+  char *component)
+{
+  char
+    extension[MagickPathExtent];
+
+  /*
+    Base path sans any compression extension.
+  */
+  GetPathComponent(path,ExtensionPath,extension);
+  if (IsCompressionExtension(extension) != MagickFalse)
+    GetPathComponent(path,BasePath,component);
+}
+
 MagickExport void GetPathComponent(const char *path,PathType type,
   char *component)
 {
@@ -1727,15 +1768,7 @@ MagickExport void GetPathComponent(const char *path,PathType type,
     }
     case BasePathSansCompressExtension:
     {
-      char
-        extension[MagickPathExtent];
-
-      /*
-        Base path sans any compression extension.
-      */
-      GetPathComponent(path,ExtensionPath,extension);
-      if (IsCompressionExtension(extension) != MagickFalse)
-        GetPathComponent(path,BasePath,component);
+      GetBasePathSansCompressExtension(path,component);
       break;
     }
     case ExtensionPath:

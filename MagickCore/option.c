@@ -2600,79 +2600,95 @@ MagickExport const char *GetImageOption(const ImageInfo *image_info,
 %
 */
 
+typedef struct _CommandOptionTable
+{
+  CommandOption
+    option;
+
+  const OptionInfo
+    *info;
+} CommandOptionTable;
+
+static const CommandOptionTable
+  CommandOptionTables[] =
+  {
+    { MagickAlignOptions, AlignOptions },
+    { MagickAlphaChannelOptions, AlphaChannelOptions },
+    { MagickAutoThresholdOptions, AutoThresholdOptions },
+    { MagickBooleanOptions, BooleanOptions },
+    { MagickCacheOptions, CacheOptions },
+    { MagickChannelOptions, ChannelOptions },
+    { MagickClassOptions, ClassOptions },
+    { MagickCLIOptions, CLIOptions },
+    { MagickClipPathOptions, ClipPathOptions },
+    { MagickColorspaceOptions, ColorspaceOptions },
+    { MagickCommandOptions, CommandOptions },
+    { MagickComplianceOptions, ComplianceOptions },
+    { MagickComplexOptions, ComplexOptions },
+    { MagickComposeOptions, ComposeOptions },
+    { MagickCompressOptions, CompressOptions },
+    { MagickDataTypeOptions, DataTypeOptions },
+    { MagickDebugOptions, LogEventOptions },
+    { MagickDecorateOptions, DecorateOptions },
+    { MagickDirectionOptions, DirectionOptions },
+    { MagickDisposeOptions, DisposeOptions },
+    { MagickDistortOptions, DistortOptions },
+    { MagickDitherOptions, DitherOptions },
+    { MagickEndianOptions, EndianOptions },
+    { MagickEvaluateOptions, EvaluateOptions },
+    { MagickFillRuleOptions, FillRuleOptions },
+    { MagickFilterOptions, FilterOptions },
+    { MagickFunctionOptions, FunctionOptions },
+    { MagickGradientOptions, GradientOptions },
+    { MagickGravityOptions, GravityOptions },
+    { MagickIlluminantOptions, IlluminantOptions },
+    { MagickIntentOptions, IntentOptions },
+    { MagickInterlaceOptions, InterlaceOptions },
+    { MagickInterpolateOptions, InterpolateOptions },
+    { MagickKernelOptions, KernelOptions },
+    { MagickLayerOptions, LayerOptions },
+    { MagickLineCapOptions, LineCapOptions },
+    { MagickLineJoinOptions, LineJoinOptions },
+    { MagickListOptions, ListOptions },
+    { MagickLogEventOptions, LogEventOptions },
+    { MagickMetricOptions, MetricOptions },
+    { MagickMethodOptions, MethodOptions },
+    { MagickModeOptions, ModeOptions },
+    { MagickMorphologyOptions, MorphologyOptions },
+    { MagickNoiseOptions, NoiseOptions },
+    { MagickOrientationOptions, OrientationOptions },
+    { MagickPixelChannelOptions, PixelChannelOptions },
+    { MagickPixelIntensityOptions, PixelIntensityOptions },
+    { MagickPixelMaskOptions, PixelMaskOptions },
+    { MagickPixelTraitOptions, PixelTraitOptions },
+    { MagickPolicyDomainOptions, PolicyDomainOptions },
+    { MagickPolicyRightsOptions, PolicyRightsOptions },
+    { MagickPreviewOptions, PreviewOptions },
+    { MagickPrimitiveOptions, PrimitiveOptions },
+    { MagickQuantumFormatOptions, QuantumFormatOptions },
+    { MagickResolutionOptions, ResolutionOptions },
+    { MagickResourceOptions, ResourceOptions },
+    { MagickSparseColorOptions, SparseColorOptions },
+    { MagickStatisticOptions, StatisticOptions },
+    { MagickStorageOptions, StorageOptions },
+    { MagickStretchOptions, StretchOptions },
+    { MagickToolOptions, ToolOptions },
+    { MagickStyleOptions, StyleOptions },
+    { MagickTypeOptions, TypeOptions },
+    { MagickValidateOptions, ValidateOptions },
+    { MagickVirtualPixelOptions, VirtualPixelOptions },
+    { MagickWeightOptions, WeightOptions },
+    { MagickWordBreakOptions, WordBreakOptions }
+  };
+
 static const OptionInfo *GetOptionInfo(const CommandOption option)
 {
-  switch (option)
-  {
-    case MagickAlignOptions: return(AlignOptions);
-    case MagickAlphaChannelOptions: return(AlphaChannelOptions);
-    case MagickAutoThresholdOptions: return(AutoThresholdOptions);
-    case MagickBooleanOptions: return(BooleanOptions);
-    case MagickCacheOptions: return(CacheOptions);
-    case MagickChannelOptions: return(ChannelOptions);
-    case MagickClassOptions: return(ClassOptions);
-    case MagickCLIOptions: return(CLIOptions);
-    case MagickClipPathOptions: return(ClipPathOptions);
-    case MagickColorspaceOptions: return(ColorspaceOptions);
-    case MagickCommandOptions: return(CommandOptions);
-    case MagickComplianceOptions: return(ComplianceOptions);
-    case MagickComplexOptions: return(ComplexOptions);
-    case MagickComposeOptions: return(ComposeOptions);
-    case MagickCompressOptions: return(CompressOptions);
-    case MagickDataTypeOptions: return(DataTypeOptions);
-    case MagickDebugOptions: return(LogEventOptions);
-    case MagickDecorateOptions: return(DecorateOptions);
-    case MagickDirectionOptions: return(DirectionOptions);
-    case MagickDisposeOptions: return(DisposeOptions);
-    case MagickDistortOptions: return(DistortOptions);
-    case MagickDitherOptions: return(DitherOptions);
-    case MagickEndianOptions: return(EndianOptions);
-    case MagickEvaluateOptions: return(EvaluateOptions);
-    case MagickFillRuleOptions: return(FillRuleOptions);
-    case MagickFilterOptions: return(FilterOptions);
-    case MagickFunctionOptions: return(FunctionOptions);
-    case MagickGradientOptions: return(GradientOptions);
-    case MagickGravityOptions: return(GravityOptions);
-    case MagickIlluminantOptions: return(IlluminantOptions);
-    case MagickIntentOptions: return(IntentOptions);
-    case MagickInterlaceOptions: return(InterlaceOptions);
-    case MagickInterpolateOptions: return(InterpolateOptions);
-    case MagickKernelOptions: return(KernelOptions);
-    case MagickLayerOptions: return(LayerOptions);
-    case MagickLineCapOptions: return(LineCapOptions);
-    case MagickLineJoinOptions: return(LineJoinOptions);
-    case MagickListOptions: return(ListOptions);
-    case MagickLogEventOptions: return(LogEventOptions);
-    case MagickMetricOptions: return(MetricOptions);
-    case MagickMethodOptions: return(MethodOptions);
-    case MagickModeOptions: return(ModeOptions);
-    case MagickMorphologyOptions: return(MorphologyOptions);
-    case MagickNoiseOptions: return(NoiseOptions);
-    case MagickOrientationOptions: return(OrientationOptions);
-    case MagickPixelChannelOptions: return(PixelChannelOptions);
-    case MagickPixelIntensityOptions: return(PixelIntensityOptions);
-    case MagickPixelMaskOptions: return(PixelMaskOptions);
-    case MagickPixelTraitOptions: return(PixelTraitOptions);
-    case MagickPolicyDomainOptions: return(PolicyDomainOptions);
-    case MagickPolicyRightsOptions: return(PolicyRightsOptions);
-    case MagickPreviewOptions: return(PreviewOptions);
-    case MagickPrimitiveOptions: return(PrimitiveOptions);
-    case MagickQuantumFormatOptions: return(QuantumFormatOptions);
-    case MagickResolutionOptions: return(ResolutionOptions);
-    case MagickResourceOptions: return(ResourceOptions);
-    case MagickSparseColorOptions: return(SparseColorOptions);
-    case MagickStatisticOptions: return(StatisticOptions);
-    case MagickStorageOptions: return(StorageOptions);
-    case MagickStretchOptions: return(StretchOptions);
-    case MagickToolOptions: return(ToolOptions);
-    case MagickStyleOptions: return(StyleOptions);
-    case MagickTypeOptions: return(TypeOptions);
-    case MagickValidateOptions: return(ValidateOptions);
-    case MagickVirtualPixelOptions: return(VirtualPixelOptions);
-    case MagickWeightOptions: return(WeightOptions);
-    case MagickWordBreakOptions: return(WordBreakOptions);
-    default: break;
-  }
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(CommandOptionTables)/sizeof(*CommandOptionTables)); i++)
+    if (CommandOptionTables[i].option == option)
+      return(CommandOptionTables[i].info);
   return((const OptionInfo *) NULL);
 }
 
@@ -2735,6 +2751,36 @@ static inline MagickBooleanType IsTokenCharacter(const char *p,
     (*p != '\0')) ? MagickTrue : MagickFalse);
 }
 
+static inline ssize_t MergeOptionValue(const ssize_t option_types,
+  const ssize_t value,const MagickBooleanType negate)
+{
+  if (negate != MagickFalse)
+    return(option_types &~ value);
+  return(option_types | value);
+}
+
+static const char *ReadOptionToken(const char *p,const int sentinel,
+  char *token,MagickBooleanType *negate)
+{
+  char
+    *q;
+
+  while (IsTokenSeparator(p,sentinel) != MagickFalse)
+    p++;
+  *negate=(*p == '!') ? MagickTrue : MagickFalse;
+  if (*negate != MagickFalse)
+    p++;
+  q=token;
+  while (IsTokenCharacter(p,sentinel) != MagickFalse)
+  {
+    if ((q-token) >= (MagickPathExtent-1))
+      break;
+    *q++=(*p++);
+  }
+  *q='\0';
+  return(p);
+}
+
 MagickExport ssize_t GetCommandOptionFlags(const CommandOption option,
   const MagickBooleanType list,const char *options)
 {
@@ -2750,9 +2796,6 @@ MagickExport ssize_t GetCommandOptionFlags(const CommandOption option,
 
   MagickBooleanType
     negate;
-
-  char
-    *q;
 
   const char
     *p;
@@ -2771,26 +2814,11 @@ MagickExport ssize_t GetCommandOptionFlags(const CommandOption option,
     sentinel='|';
   for (p=options; p != (char *) NULL; p=strchr(p,sentinel))
   {
-    while (IsTokenSeparator(p,sentinel) != MagickFalse)
-      p++;
-    negate=(*p == '!') ? MagickTrue : MagickFalse;
-    if (negate != MagickFalse)
-      p++;
-    q=token;
-    while (IsTokenCharacter(p,sentinel) != MagickFalse)
-    {
-      if ((q-token) >= (MagickPathExtent-1))
-        break;
-      *q++=(*p++);
-    }
-    *q='\0';
+    p=ReadOptionToken(p,sentinel,token,&negate);
     command_info=FindCommandOptionInfo(option_info,token);
     if (command_info->mnemonic == (const char *) NULL)
       return(-1);
-    if (negate != MagickFalse)
-      option_types=option_types &~ command_info->flags;
-    else
-      option_types=option_types | command_info->flags;
+    option_types=MergeOptionValue(option_types,command_info->flags,negate);
     if (list == MagickFalse)
       break;
   }
@@ -3141,6 +3169,52 @@ MagickExport MagickBooleanType ListCommandOptions(FILE *file,
   return(MagickTrue);
 }
 
+typedef struct _ChannelLetter
+{
+  char
+    letter;
+
+  ChannelType
+    channel;
+} ChannelLetter;
+
+static const ChannelLetter
+  ChannelLetters[] =
+  {
+    { 'A', AlphaChannel },
+    { 'a', AlphaChannel },
+    { 'B', BlueChannel },
+    { 'b', BlueChannel },
+    { 'C', CyanChannel },
+    { 'c', CyanChannel },
+    { 'g', GreenChannel },
+    { 'G', GreenChannel },
+    { 'K', BlackChannel },
+    { 'k', BlackChannel },
+    { 'M', MagentaChannel },
+    { 'm', MagentaChannel },
+    { 'o', AlphaChannel },
+    { 'O', AlphaChannel }, /* depreciate */
+    { 'R', RedChannel },
+    { 'r', RedChannel },
+    { 'Y', YellowChannel },
+    { 'y', YellowChannel }
+  };
+
+static MagickBooleanType MergeChannelLetter(const char letter,ssize_t *channel)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(ChannelLetters)/sizeof(*ChannelLetters)); i++)
+    if (ChannelLetters[i].letter == letter)
+      {
+        *channel|=ChannelLetters[i].channel;
+        return(MagickTrue);
+      }
+  return(MagickFalse);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -3182,78 +3256,22 @@ MagickExport ssize_t ParseChannelOption(const char *channels)
   length=strlen(channels);
   for (i=0; i < (ssize_t) length; i++)
   {
-    switch (channels[i])
+    if (MergeChannelLetter(channels[i],&channel) != MagickFalse)
+      continue;
+    if (channels[i] != ',')
+      return(-1);
     {
-      case 'A':
-      case 'a':
-      {
-        channel|=AlphaChannel;
-        break;
-      }
-      case 'B':
-      case 'b':
-      {
-        channel|=BlueChannel;
-        break;
-      }
-      case 'C':
-      case 'c':
-      {
-        channel|=CyanChannel;
-        break;
-      }
-      case 'g':
-      case 'G':
-      {
-        channel|=GreenChannel;
-        break;
-      }
-      case 'K':
-      case 'k':
-      {
-        channel|=BlackChannel;
-        break;
-      }
-      case 'M':
-      case 'm':
-      {
-        channel|=MagentaChannel;
-        break;
-      }
-      case 'o':
-      case 'O':
-      {
-        channel|=AlphaChannel; /* depreciate */
-        break;
-      }
-      case 'R':
-      case 'r':
-      {
-        channel|=RedChannel;
-        break;
-      }
-      case 'Y':
-      case 'y':
-      {
-        channel|=YellowChannel;
-        break;
-      }
-      case ',':
-      {
-        ssize_t
-          type;
+      ssize_t
+        type;
 
-        /*
-          Gather the additional channel flags and merge with shorthand.
-        */
-        type=ParseCommandOption(MagickChannelOptions,MagickTrue,channels+i+1);
-        if (type < 0)
-          return(type);
-        channel|=type;
-        return(channel);
-      }
-      default:
-        return(-1);
+      /*
+        Gather the additional channel flags and merge with shorthand.
+      */
+      type=ParseCommandOption(MagickChannelOptions,MagickTrue,channels+i+1);
+      if (type < 0)
+        return(type);
+      channel|=type;
+      return(channel);
     }
   }
   return(channel);
@@ -3304,9 +3322,6 @@ MagickExport ssize_t ParseCommandOption(const CommandOption option,
   MagickBooleanType
     negate;
 
-  char
-    *q;
-
   const char
     *p;
 
@@ -3324,26 +3339,11 @@ MagickExport ssize_t ParseCommandOption(const CommandOption option,
     sentinel='|';
   for (p=options; p != (char *) NULL; p=strchr(p,sentinel))
   {
-    while (IsTokenSeparator(p,sentinel) != MagickFalse)
-      p++;
-    negate=(*p == '!') ? MagickTrue : MagickFalse;
-    if (negate != MagickFalse)
-      p++;
-    q=token;
-    while (IsTokenCharacter(p,sentinel) != MagickFalse)
-    {
-      if ((q-token) >= (MagickPathExtent-1))
-        break;
-      *q++=(*p++);
-    }
-    *q='\0';
+    p=ReadOptionToken(p,sentinel,token,&negate);
     command_info=FindCommandOptionInfo(option_info,token);
     if (command_info->mnemonic == (const char *) NULL)
       return(-1);
-    if (negate != MagickFalse)
-      option_types=option_types &~ command_info->type;
-    else
-      option_types=option_types | command_info->type;
+    option_types=MergeOptionValue(option_types,command_info->type,negate);
     if (list == MagickFalse)
       break;
   }

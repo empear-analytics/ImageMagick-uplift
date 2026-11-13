@@ -191,6 +191,55 @@ static ssize_t ClampSceneIndex(ssize_t first,const size_t length)
   return(first);
 }
 
+static MagickBooleanType CloneSceneToList(const Image *images,
+  const ssize_t first,Image **clone_images,ExceptionInfo *exception)
+{
+  const Image
+    *next;
+
+  Image
+    *image;
+
+  MagickBooleanType
+    match;
+
+  ssize_t
+    i;
+
+  match=MagickFalse;
+  i=0;
+  for (next=images; next != (Image *) NULL; next=GetNextImageInList(next))
+  {
+    if (i == (ssize_t) first)
+      {
+        image=CloneImage(next,0,0,MagickTrue,exception);
+        if (image == (Image *) NULL)
+          break;
+        AppendImageToList(clone_images,image);
+        match=MagickTrue;
+      }
+    i++;
+  }
+  return(match);
+}
+
+static ssize_t ParseCloneSceneEnd(char **p,const ssize_t first,
+  const size_t length)
+{
+  ssize_t
+    last;
+
+  last=first;
+  while (isspace((int) ((unsigned char) **p)) != 0)
+    (*p)++;
+  if (**p == '-')
+    {
+      last=(ssize_t) strtol((*p)+1,p,10);
+      last=ClampSceneIndex(last,length);
+    }
+  return(last);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -237,19 +286,14 @@ MagickExport Image *CloneImages(const Image *images,const char *scenes,
   const char
     *artifact;
 
-  const Image
-    *next;
-
   Image
-    *clone_images,
-    *image;
+    *clone_images;
 
   size_t
     length;
 
   ssize_t
     first,
-    i,
     last,
     offset,
     step;
@@ -276,33 +320,16 @@ MagickExport Image *CloneImages(const Image *images,const char *scenes,
     offset=first;
     first=ClampSceneIndex(first,length);
     first%=(ssize_t) (length << 1);
-    last=first;
-    while (isspace((int) ((unsigned char) *p)) != 0)
-      p++;
-    if (*p == '-')
-      {
-        last=(ssize_t) strtol(p+1,&p,10);
-        last=ClampSceneIndex(last,length);
-      }
+    last=ParseCloneSceneEnd(&p,first,length);
     last%=(ssize_t) (length << 1);
     match=MagickFalse;
     step=GetFrameStep(artifact);
     step=(ssize_t) (first > last ? -step : step);
     for ( ; step > 0 ? (last-first) >= 0 : (last-first) <= 0; first+=step)
     {
-      i=0;
-      for (next=images; next != (Image *) NULL; next=GetNextImageInList(next))
-      {
-        if (i == (ssize_t) first)
-          {
-            image=CloneImage(next,0,0,MagickTrue,exception);
-            if (image == (Image *) NULL)
-              break;
-            AppendImageToList(&clone_images,image);
-            match=MagickTrue;
-          }
-        i++;
-      }
+      if (CloneSceneToList(images,first,&clone_images,exception) !=
+          MagickFalse)
+        match=MagickTrue;
       if (match == MagickFalse)
         (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
           "InvalidImageIndex","%g `%s'",(double) offset,images->filename);
@@ -374,6 +401,57 @@ static void MarkImagesForDeletion(MagickBooleanType *delete_list,
       delete_list[i]=MagickTrue;
 }
 
+static MagickBooleanType ParseSceneRangeEnd(char **p,long *last,
+  const size_t length)
+{
+  char
+    *q;
+
+  if (**p != '-')
+    return(MagickTrue);
+  *last=strtol((*p)+1,&q,10);
+  if (((*p)+1) == q)
+    return(MagickFalse);
+  *p=q;
+  if (*last < 0)
+    *last+=(long) length;
+  return(MagickTrue);
+}
+
+static void MarkScenesForDeletion(MagickBooleanType *delete_list,
+  const char *scenes,const size_t length)
+{
+  char
+    *p;
+
+  long
+    first,
+    last;
+
+  for (p=(char *) scenes; *p != '\0'; )
+  {
+    char
+      *q;
+
+    while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == ','))
+      p++;
+    first=strtol(p,&q,10);
+    if (p == q)
+      break;
+    p=q;
+    if (first < 0)
+      first+=(long) length;
+    last=first;
+    while (isspace((int) ((unsigned char) *p)) != 0)
+      p++;
+    if (ParseSceneRangeEnd(&p,&last,length) == MagickFalse)
+      break;
+    if (first > last)
+      continue;
+    MarkImagesForDeletion(delete_list,first,last,length);
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -413,13 +491,6 @@ static void MarkImagesForDeletion(MagickBooleanType *delete_list,
 MagickExport void DeleteImages(Image **images,const char *scenes,
   ExceptionInfo *exception)
 {
-  char
-    *p;
-
-  long
-    first,
-    last;
-
   MagickBooleanType
     *delete_list;
 
@@ -452,35 +523,7 @@ MagickExport void DeleteImages(Image **images,const char *scenes,
   /*
     Note which images will be deleted, avoid duplicates.
   */
-  for (p=(char *) scenes; *p != '\0'; )
-  {
-    char
-      *q;
-
-    while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == ','))
-      p++;
-    first=strtol(p,&q,10);
-    if (p == q)
-      break;
-    p=q;
-    if (first < 0)
-      first+=(long) length;
-    last=first;
-    while (isspace((int) ((unsigned char) *p)) != 0)
-      p++;
-    if (*p == '-')
-      {
-        last=strtol(p+1,&q,10);
-        if ((p+1) == q)
-          break;
-        p=q;
-        if (last < 0)
-          last+=(long) length;
-      }
-    if (first > last)
-      continue;
-    MarkImagesForDeletion(delete_list,first,last,length);
-  }
+  MarkScenesForDeletion(delete_list,scenes,length);
   /*
     Delete images marked for deletion, once only.
   */

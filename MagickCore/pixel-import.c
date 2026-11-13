@@ -581,6 +581,30 @@ static MagickBooleanType ImportCharMapPixels(const ImportCharMapLoop *loop,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+typedef struct _ImportCharMapInfo
+{
+  const char
+    *map;
+
+  MagickBooleanType
+    (*import_pixels)(Image *,const RectangleInfo *,const unsigned char *,
+      ExceptionInfo *);
+} ImportCharMapInfo;
+
+static const ImportCharMapInfo
+  ImportCharMaps[] =
+  {
+    { "BGR", ImportCharBGRPixels },
+    { "BGRA", ImportCharBGRAPixels },
+    { "BGRO", ImportCharBGROPixels },
+    { "BGRP", ImportCharBGRPPixels },
+    { "I", ImportCharIPixels },
+    { "RGB", ImportCharRGBPixels },
+    { "RGBA", ImportCharRGBAPixels },
+    { "RGBO", ImportCharRGBOPixels },
+    { "RGBP", ImportCharRGBPPixels }
+  };
+
 static MagickBooleanType ImportCharPixel(Image *image,
   const RectangleInfo *roi,const ImportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -600,25 +624,13 @@ static MagickBooleanType ImportCharPixel(Image *image,
   ImportCharMapLoop
     loop;
 
+  size_t
+    i;
+
   p=(const unsigned char *) pixels;
-  if (LocaleCompare(map,"BGR") == 0)
-    return(ImportCharBGRPixels(image,roi,p,exception));
-  if (LocaleCompare(map,"BGRA") == 0)
-    return(ImportCharBGRAPixels(image,roi,p,exception));
-  if (LocaleCompare(map,"BGRO") == 0)
-    return(ImportCharBGROPixels(image,roi,p,exception));
-  if (LocaleCompare(map,"BGRP") == 0)
-    return(ImportCharBGRPPixels(image,roi,p,exception));
-  if (LocaleCompare(map,"I") == 0)
-    return(ImportCharIPixels(image,roi,p,exception));
-  if (LocaleCompare(map,"RGB") == 0)
-    return(ImportCharRGBPixels(image,roi,p,exception));
-  if (LocaleCompare(map,"RGBA") == 0)
-    return(ImportCharRGBAPixels(image,roi,p,exception));
-  if (LocaleCompare(map,"RGBO") == 0)
-    return(ImportCharRGBOPixels(image,roi,p,exception));
-  if (LocaleCompare(map,"RGBP") == 0)
-    return(ImportCharRGBPPixels(image,roi,p,exception));
+  for (i=0; i < (sizeof(ImportCharMaps)/sizeof(*ImportCharMaps)); i++)
+    if (LocaleCompare(map,ImportCharMaps[i].map) == 0)
+      return(ImportCharMaps[i].import_pixels(image,roi,p,exception));
   loop.image=image;
   loop.roi=roi;
   loop.map=map;

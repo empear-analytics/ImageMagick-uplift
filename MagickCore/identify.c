@@ -192,7 +192,6 @@ static void AccumulateLocationExtrema(const Image *image,
       continue;
     switch (type)
     {
-      case MaximumStatistic:
       default:
       {
         if ((double) p[i] > channel_statistics[channel].maxima)
@@ -209,6 +208,30 @@ static void AccumulateLocationExtrema(const Image *image,
   }
 }
 
+static void InitializeLocationExtrema(const StatisticType type,
+  ChannelStatistics *channel_statistics)
+{
+  ssize_t
+    i;
+
+  for (i=0; i <= (ssize_t) MaxPixelChannels; i++)
+  {
+    switch (type)
+    {
+      default:
+      {
+        channel_statistics[i].maxima=(-MagickMaximumValue);
+        break;
+      }
+      case MinimumStatistic:
+      {
+        channel_statistics[i].minima=MagickMaximumValue;
+        break;
+      }
+    }
+  }
+}
+
 static ChannelStatistics *GetLocationStatistics(const Image *image,
   const StatisticType type,ExceptionInfo *exception)
 {
@@ -216,7 +239,6 @@ static ChannelStatistics *GetLocationStatistics(const Image *image,
     *channel_statistics;
 
   ssize_t
-    i,
     y;
 
   assert(image != (Image *) NULL);
@@ -233,23 +255,7 @@ static ChannelStatistics *GetLocationStatistics(const Image *image,
     }
   (void) memset(channel_statistics,0,(MaxPixelChannels+1)*
     sizeof(*channel_statistics));
-  for (i=0; i <= (ssize_t) MaxPixelChannels; i++)
-  {
-    switch (type)
-    {
-      case MaximumStatistic:
-      default:
-      {
-        channel_statistics[i].maxima=(-MagickMaximumValue);
-        break;
-      }
-      case MinimumStatistic:
-      {
-        channel_statistics[i].minima=MagickMaximumValue;
-        break;
-      }
-    }
-  }
+  InitializeLocationExtrema(type,channel_statistics);
   for (y=0; y < (ssize_t) image->rows; y++)
   {
     const Quantum
@@ -336,6 +342,28 @@ static ssize_t PrintChannelFeatures(FILE *file,const PixelChannel channel,
   return(n);
 }
 
+static double GetLocationTarget(const ChannelLocationsReport *report,
+  const PixelChannel channel)
+{
+  double
+    target;
+
+  switch (report->type)
+  {
+    default:
+    {
+      target=report->channel_statistics[channel].maxima;
+      break;
+    }
+    case MinimumStatistic:
+    {
+      target=report->channel_statistics[channel].minima;
+      break;
+    }
+  }
+  return(target);
+}
+
 static ssize_t PrintChannelLocations(const ChannelLocationsReport *report,
   const PixelChannel channel,const char *name)
 {
@@ -355,20 +383,7 @@ static ssize_t PrintChannelLocations(const ChannelLocationsReport *report,
     n,
     y;
 
-  switch (report->type)
-  {
-    case MaximumStatistic:
-    default:
-    {
-      target=report->channel_statistics[channel].maxima;
-      break;
-    }
-    case MinimumStatistic:
-    {
-      target=report->channel_statistics[channel].minima;
-      break;
-    }
-  }
+  target=GetLocationTarget(report,channel);
   (void) FormatLocaleFile(file,"  %s: %.*g (%.*g)",name,GetMagickPrecision(),
     target,GetMagickPrecision(),QuantumScale*target);
   exception=AcquireExceptionInfo();
@@ -394,8 +409,7 @@ static ssize_t PrintChannelLocations(const ChannelLocationsReport *report,
       if (traits == UndefinedPixelTrait)
         continue;
       offset=GetPixelChannelOffset(image,channel);
-      match=fabs((double) p[offset]-target) < MagickEpsilon ? MagickTrue :
-        MagickFalse;
+      match=fabs((double) p[offset]-target) < MagickEpsilon;
       if (match != MagickFalse)
         {
           if ((report->locations != 0) &&
@@ -457,6 +471,32 @@ static ssize_t PrintChannelMoments(const ChannelMomentsReport *report,
   return(n);
 }
 
+static ssize_t PrintPerceptualHashRows(FILE *file,
+  const ChannelPerceptualHash *channel_phash,const PixelChannel channel)
+{
+  ssize_t
+    j,
+    n;
+
+  n=0;
+  for (j=0; j < MaximumNumberOfPerceptualHashes; j++)
+  {
+    ssize_t
+      k;
+
+    n+=FormatLocaleFile(file,"      PH%.17g: ",(double) j+1);
+    for (k=0; k < (ssize_t) channel_phash[0].number_colorspaces; k++)
+    {
+      n+=FormatLocaleFile(file,"%.*g",GetMagickPrecision(),
+        channel_phash[channel].phash[k][j]);
+      if (k < (ssize_t) (channel_phash[0].number_colorspaces-1))
+        n+=FormatLocaleFile(file,", ");
+    }
+    n+=FormatLocaleFile(file,"\n");
+  }
+  return(n);
+}
+
 static ssize_t PrintChannelPerceptualHash(Image *image,FILE *file,
   const ChannelPerceptualHash *channel_phash)
 {
@@ -484,9 +524,6 @@ static ssize_t PrintChannelPerceptualHash(Image *image,FILE *file,
     PixelTrait
       traits;
 
-    ssize_t
-      j;
-
     channel=GetPixelChannelChannel(image,i);
     if (channel == IndexPixelChannel)
       continue;
@@ -494,21 +531,7 @@ static ssize_t PrintChannelPerceptualHash(Image *image,FILE *file,
     if (traits == UndefinedPixelTrait)
       continue;
     n=FormatLocaleFile(file,"    Channel %.17g:\n",(double) channel);
-    for (j=0; j < MaximumNumberOfPerceptualHashes; j++)
-    {
-      ssize_t
-        k;
-
-      n+=FormatLocaleFile(file,"      PH%.17g: ",(double) j+1);
-      for (k=0; k < (ssize_t) channel_phash[0].number_colorspaces; k++)
-      {
-        n+=FormatLocaleFile(file,"%.*g",GetMagickPrecision(),
-          channel_phash[channel].phash[k][j]);
-        if (k < (ssize_t) (channel_phash[0].number_colorspaces-1))
-          n+=FormatLocaleFile(file,", ");
-      }
-      n+=FormatLocaleFile(file,"\n");
-    }
+    n+=PrintPerceptualHashRows(file,channel_phash,channel);
   }
   return(n);
 }
@@ -582,66 +605,56 @@ static inline MagickBooleanType IsDirectoryNameCharacter(const char *q,
     MagickFalse);
 }
 
-static void PrintChannelDepths(FILE *file,const Image *image,
-  const ColorspaceType colorspace,const ChannelStatistics *channel_statistics)
+static void PrintRGBChannelDepths(FILE *file,const Image *image,
+  const ChannelStatistics *channel_statistics)
+{
+  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+    (void) FormatLocaleFile(file,"    Red: %.17g-bit\n",(double)
+      channel_statistics[RedPixelChannel].depth);
+  if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+    (void) FormatLocaleFile(file,"    Green: %.17g-bit\n",(double)
+      channel_statistics[GreenPixelChannel].depth);
+  if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+    (void) FormatLocaleFile(file,"    Blue: %.17g-bit\n",(double)
+      channel_statistics[BluePixelChannel].depth);
+}
+
+static void PrintCMYKChannelDepths(FILE *file,const Image *image,
+  const ChannelStatistics *channel_statistics)
+{
+  if ((GetPixelCyanTraits(image) & UpdatePixelTrait) != 0)
+    (void) FormatLocaleFile(file,"    Cyan: %.17g-bit\n",(double)
+      channel_statistics[CyanPixelChannel].depth);
+  if ((GetPixelMagentaTraits(image) & UpdatePixelTrait) != 0)
+    (void) FormatLocaleFile(file,"    Magenta: %.17g-bit\n",(double)
+      channel_statistics[MagentaPixelChannel].depth);
+  if ((GetPixelYellowTraits(image) & UpdatePixelTrait) != 0)
+    (void) FormatLocaleFile(file,"    Yellow: %.17g-bit\n",(double)
+      channel_statistics[YellowPixelChannel].depth);
+  if ((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0)
+    (void) FormatLocaleFile(file,"    Black: %.17g-bit\n",(double)
+      channel_statistics[BlackPixelChannel].depth);
+}
+
+static void PrintAllChannelDepths(FILE *file,const Image *image,
+  const ChannelStatistics *channel_statistics)
 {
   ssize_t
     i;
 
-  (void) FormatLocaleFile(file,"  Channel depth:\n");
-  switch (colorspace)
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
   {
-    case RGBColorspace:
-    case sRGBColorspace:
-    {
-      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-        (void) FormatLocaleFile(file,"    Red: %.17g-bit\n",(double)
-          channel_statistics[RedPixelChannel].depth);
-      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-        (void) FormatLocaleFile(file,"    Green: %.17g-bit\n",(double)
-          channel_statistics[GreenPixelChannel].depth);
-      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-        (void) FormatLocaleFile(file,"    Blue: %.17g-bit\n",(double)
-          channel_statistics[BluePixelChannel].depth);
-      break;
-    }
-    case CMYKColorspace:
-    {
-      if ((GetPixelCyanTraits(image) & UpdatePixelTrait) != 0)
-        (void) FormatLocaleFile(file,"    Cyan: %.17g-bit\n",(double)
-          channel_statistics[CyanPixelChannel].depth);
-      if ((GetPixelMagentaTraits(image) & UpdatePixelTrait) != 0)
-        (void) FormatLocaleFile(file,"    Magenta: %.17g-bit\n",(double)
-          channel_statistics[MagentaPixelChannel].depth);
-      if ((GetPixelYellowTraits(image) & UpdatePixelTrait) != 0)
-        (void) FormatLocaleFile(file,"    Yellow: %.17g-bit\n",(double)
-          channel_statistics[YellowPixelChannel].depth);
-      if ((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0)
-        (void) FormatLocaleFile(file,"    Black: %.17g-bit\n",(double)
-          channel_statistics[BlackPixelChannel].depth);
-      break;
-    }
-    case LinearGRAYColorspace:
-    case GRAYColorspace:
-    {
-      if ((GetPixelGrayTraits(image) & UpdatePixelTrait) != 0)
-        (void) FormatLocaleFile(file,"    Gray: %.17g-bit\n",(double)
-          channel_statistics[GrayPixelChannel].depth);
-      break;
-    }
-    default:
-    {
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) != 0)
-          (void) FormatLocaleFile(file,"    Channel %.17g: %.17g-bit\n",
-            (double) i,(double) channel_statistics[channel].depth);
-      }
-      break;
-    }
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) != 0)
+      (void) FormatLocaleFile(file,"    Channel %.17g: %.17g-bit\n",
+        (double) i,(double) channel_statistics[channel].depth);
   }
+}
+
+static void PrintMaskChannelDepths(FILE *file,const Image *image,
+  const ChannelStatistics *channel_statistics)
+{
   if (image->alpha_trait != UndefinedPixelTrait)
     (void) FormatLocaleFile(file,"    Alpha: %.17g-bit\n",(double)
       channel_statistics[AlphaPixelChannel].depth);
@@ -654,6 +667,14 @@ static void PrintChannelDepths(FILE *file,const Image *image,
   if ((image->channels & CompositeMaskChannel) != 0)
     (void) FormatLocaleFile(file,"    Composite mask: %.17g-bit\n",
       (double) channel_statistics[CompositeMaskPixelChannel].depth);
+}
+
+static void PrintMetaChannelDepths(FILE *file,const Image *image,
+  const ChannelStatistics *channel_statistics)
+{
+  ssize_t
+    i;
+
   if (image->number_meta_channels != 0)
     for (i=0; i < (ssize_t) image->number_meta_channels; i++)
     {
@@ -663,6 +684,41 @@ static void PrintChannelDepths(FILE *file,const Image *image,
       (void) FormatLocaleFile(file,"    Meta channel[%.17g]: %.17g-bit\n",
         (double) i,(double) channel_statistics[channel].depth);
     }
+}
+
+static void PrintChannelDepths(FILE *file,const Image *image,
+  const ColorspaceType colorspace,const ChannelStatistics *channel_statistics)
+{
+  (void) FormatLocaleFile(file,"  Channel depth:\n");
+  switch (colorspace)
+  {
+    case RGBColorspace:
+    case sRGBColorspace:
+    {
+      PrintRGBChannelDepths(file,image,channel_statistics);
+      break;
+    }
+    case CMYKColorspace:
+    {
+      PrintCMYKChannelDepths(file,image,channel_statistics);
+      break;
+    }
+    case LinearGRAYColorspace:
+    case GRAYColorspace:
+    {
+      if ((GetPixelGrayTraits(image) & UpdatePixelTrait) != 0)
+        (void) FormatLocaleFile(file,"    Gray: %.17g-bit\n",(double)
+          channel_statistics[GrayPixelChannel].depth);
+      break;
+    }
+    default:
+    {
+      PrintAllChannelDepths(file,image,channel_statistics);
+      break;
+    }
+  }
+  PrintMaskChannelDepths(file,image,channel_statistics);
+  PrintMetaChannelDepths(file,image,channel_statistics);
 }
 
 static void PrintImageProperties(FILE *file,Image *image,
@@ -691,6 +747,37 @@ static void PrintImageProperties(FILE *file,Image *image,
     }
 }
 
+static void PrintRGBChannelMoments(const Image *image,
+  const ChannelMomentsReport *report)
+{
+  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+    (void) PrintChannelMoments(report,RedPixelChannel,"Red");
+  if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+    (void) PrintChannelMoments(report,GreenPixelChannel,"Green");
+  if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+    (void) PrintChannelMoments(report,BluePixelChannel,"Blue");
+}
+
+static void PrintCMYKChannelMoments(const Image *image,
+  const ChannelMomentsReport *report)
+{
+  if ((GetPixelCyanTraits(image) & UpdatePixelTrait) != 0)
+    (void) PrintChannelMoments(report,CyanPixelChannel,"Cyan");
+  if ((GetPixelMagentaTraits(image) & UpdatePixelTrait) != 0)
+    (void) PrintChannelMoments(report,MagentaPixelChannel,"Magenta");
+  if ((GetPixelYellowTraits(image) & UpdatePixelTrait) != 0)
+    (void) PrintChannelMoments(report,YellowPixelChannel,"Yellow");
+  if ((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0)
+    (void) PrintChannelMoments(report,BlackPixelChannel,"Black");
+}
+
+static void PrintUpdatedChannelMoments(const ChannelMomentsReport *report,
+  const PixelTrait traits,const PixelChannel channel,const char *name)
+{
+  if ((traits & UpdatePixelTrait) != 0)
+    (void) PrintChannelMoments(report,channel,name);
+}
+
 static void PrintChannelMomentsTable(FILE *file,const Image *image,
   const ColorspaceType colorspace,ChannelMoments *channel_moments)
 {
@@ -713,30 +800,18 @@ static void PrintChannelMomentsTable(FILE *file,const Image *image,
     case RGBColorspace:
     case sRGBColorspace:
     {
-      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(&report,RedPixelChannel,"Red");
-      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(&report,GreenPixelChannel,"Green");
-      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(&report,BluePixelChannel,"Blue");
+      PrintRGBChannelMoments(image,&report);
       break;
     }
     case CMYKColorspace:
     {
-      if ((GetPixelCyanTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(&report,CyanPixelChannel,"Cyan");
-      if ((GetPixelMagentaTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(&report,MagentaPixelChannel,"Magenta");
-      if ((GetPixelYellowTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(&report,YellowPixelChannel,"Yellow");
-      if ((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(&report,BlackPixelChannel,"Black");
+      PrintCMYKChannelMoments(image,&report);
       break;
     }
     case GRAYColorspace:
     {
-      if ((GetPixelGrayTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(&report,GrayPixelChannel,"Gray");
+      PrintUpdatedChannelMoments(&report,GetPixelGrayTraits(image),
+        GrayPixelChannel,"Gray");
       break;
     }
     default:
@@ -767,69 +842,82 @@ static void PrintChannelMomentsTable(FILE *file,const Image *image,
     }
 }
 
+typedef struct _IPTCTagName
+{
+  long
+    key;
+
+  const char
+    *name;
+} IPTCTagName;
+
+static const IPTCTagName
+  IPTCTagNames[] =
+  {
+    { 5, "Image Name" },
+    { 7, "Edit Status" },
+    { 10, "Priority" },
+    { 15, "Category" },
+    { 20, "Supplemental Category" },
+    { 22, "Fixture Identifier" },
+    { 25, "Keyword" },
+    { 30, "Release Date" },
+    { 35, "Release Time" },
+    { 40, "Special Instructions" },
+    { 45, "Reference Service" },
+    { 47, "Reference Date" },
+    { 50, "Reference Number" },
+    { 55, "Created Date" },
+    { 60, "Created Time" },
+    { 65, "Originating Program" },
+    { 70, "Program Version" },
+    { 75, "Object Cycle" },
+    { 80, "Byline" },
+    { 85, "Byline Title" },
+    { 90, "City" },
+    { 92, "Sub-Location" },
+    { 95, "Province State" },
+    { 100, "Country Code" },
+    { 101, "Country" },
+    { 103, "Original Transmission Reference" },
+    { 105, "Headline" },
+    { 110, "Credit" },
+    { 115, "Src" },
+    { 116, "Copyright String" },
+    { 120, "Caption" },
+    { 121, "Local Caption" },
+    { 122, "Caption Writer" },
+    { 200, "Custom Field 1" },
+    { 201, "Custom Field 2" },
+    { 202, "Custom Field 3" },
+    { 203, "Custom Field 4" },
+    { 204, "Custom Field 5" },
+    { 205, "Custom Field 6" },
+    { 206, "Custom Field 7" },
+    { 207, "Custom Field 8" },
+    { 208, "Custom Field 9" },
+    { 209, "Custom Field 10" },
+    { 210, "Custom Field 11" },
+    { 211, "Custom Field 12" },
+    { 212, "Custom Field 13" },
+    { 213, "Custom Field 14" },
+    { 214, "Custom Field 15" },
+    { 215, "Custom Field 16" },
+    { 216, "Custom Field 17" },
+    { 217, "Custom Field 18" },
+    { 218, "Custom Field 19" },
+    { 219, "Custom Field 20" }
+  };
+
 static const char *GetIPTCTagName(const long record)
 {
-  const char
-    *tag;
+  size_t
+    i;
 
-  switch (record)
-  {
-    case 5: tag="Image Name"; break;
-    case 7: tag="Edit Status"; break;
-    case 10: tag="Priority"; break;
-    case 15: tag="Category"; break;
-    case 20: tag="Supplemental Category"; break;
-    case 22: tag="Fixture Identifier"; break;
-    case 25: tag="Keyword"; break;
-    case 30: tag="Release Date"; break;
-    case 35: tag="Release Time"; break;
-    case 40: tag="Special Instructions"; break;
-    case 45: tag="Reference Service"; break;
-    case 47: tag="Reference Date"; break;
-    case 50: tag="Reference Number"; break;
-    case 55: tag="Created Date"; break;
-    case 60: tag="Created Time"; break;
-    case 65: tag="Originating Program"; break;
-    case 70: tag="Program Version"; break;
-    case 75: tag="Object Cycle"; break;
-    case 80: tag="Byline"; break;
-    case 85: tag="Byline Title"; break;
-    case 90: tag="City"; break;
-    case 92: tag="Sub-Location"; break;
-    case 95: tag="Province State"; break;
-    case 100: tag="Country Code"; break;
-    case 101: tag="Country"; break;
-    case 103: tag="Original Transmission Reference"; break;
-    case 105: tag="Headline"; break;
-    case 110: tag="Credit"; break;
-    case 115: tag="Src"; break;
-    case 116: tag="Copyright String"; break;
-    case 120: tag="Caption"; break;
-    case 121: tag="Local Caption"; break;
-    case 122: tag="Caption Writer"; break;
-    case 200: tag="Custom Field 1"; break;
-    case 201: tag="Custom Field 2"; break;
-    case 202: tag="Custom Field 3"; break;
-    case 203: tag="Custom Field 4"; break;
-    case 204: tag="Custom Field 5"; break;
-    case 205: tag="Custom Field 6"; break;
-    case 206: tag="Custom Field 7"; break;
-    case 207: tag="Custom Field 8"; break;
-    case 208: tag="Custom Field 9"; break;
-    case 209: tag="Custom Field 10"; break;
-    case 210: tag="Custom Field 11"; break;
-    case 211: tag="Custom Field 12"; break;
-    case 212: tag="Custom Field 13"; break;
-    case 213: tag="Custom Field 14"; break;
-    case 214: tag="Custom Field 15"; break;
-    case 215: tag="Custom Field 16"; break;
-    case 216: tag="Custom Field 17"; break;
-    case 217: tag="Custom Field 18"; break;
-    case 218: tag="Custom Field 19"; break;
-    case 219: tag="Custom Field 20"; break;
-    default: tag="unknown"; break;
-  }
-  return(tag);
+  for (i=0; i < (sizeof(IPTCTagNames)/sizeof(*IPTCTagNames)); i++)
+    if (IPTCTagNames[i].key == record)
+      return(IPTCTagNames[i].name);
+  return("unknown");
 }
 
 static void PrintIPTCValue(FILE *file,const StringInfo *profile,
@@ -1148,53 +1236,66 @@ static void PrintAlphaColor(FILE *file,const Image *image,
   (void) FormatLocaleFile(file,"  %s\n",tuple);
 }
 
-static void PrintColorspaceLocations(const Image *image,
-  const ColorspaceType colorspace,ChannelLocationsReport report)
+static void PrintAllChannelLocations(const Image *image,
+  const ChannelLocationsReport *report)
 {
   ssize_t
     i;
 
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) != 0)
+      (void) PrintChannelLocations(report,channel,"Channel");
+  }
+}
+
+static void PrintUpdatedChannelLocations(const ChannelLocationsReport *report,
+  const PixelTrait traits,const PixelChannel channel,const char *name)
+{
+  if ((traits & UpdatePixelTrait) != 0)
+    (void) PrintChannelLocations(report,channel,name);
+}
+
+static void PrintColorspaceLocations(const Image *image,
+  const ColorspaceType colorspace,ChannelLocationsReport report)
+{
   switch (colorspace)
   {
     case RGBColorspace:
     case sRGBColorspace:
     {
-      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelLocations(&report,RedPixelChannel,"Red");
-      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelLocations(&report,GreenPixelChannel,"Green");
-      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelLocations(&report,BluePixelChannel,"Blue");
+      PrintUpdatedChannelLocations(&report,GetPixelRedTraits(image),
+        RedPixelChannel,"Red");
+      PrintUpdatedChannelLocations(&report,GetPixelGreenTraits(image),
+        GreenPixelChannel,"Green");
+      PrintUpdatedChannelLocations(&report,GetPixelBlueTraits(image),
+        BluePixelChannel,"Blue");
       break;
     }
     case CMYKColorspace:
     {
-      if ((GetPixelCyanTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelLocations(&report,CyanPixelChannel,"Cyan");
-      if ((GetPixelMagentaTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelLocations(&report,MagentaPixelChannel,"Magenta");
-      if ((GetPixelYellowTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelLocations(&report,YellowPixelChannel,"Yellow");
-      if ((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelLocations(&report,BlackPixelChannel,"Black");
+      PrintUpdatedChannelLocations(&report,GetPixelCyanTraits(image),
+        CyanPixelChannel,"Cyan");
+      PrintUpdatedChannelLocations(&report,GetPixelMagentaTraits(image),
+        MagentaPixelChannel,"Magenta");
+      PrintUpdatedChannelLocations(&report,GetPixelYellowTraits(image),
+        YellowPixelChannel,"Yellow");
+      PrintUpdatedChannelLocations(&report,GetPixelBlackTraits(image),
+        BlackPixelChannel,"Black");
       break;
     }
     case LinearGRAYColorspace:
     case GRAYColorspace:
     {
-      if ((GetPixelGrayTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelLocations(&report,GrayPixelChannel,"Gray");
+      PrintUpdatedChannelLocations(&report,GetPixelGrayTraits(image),
+        GrayPixelChannel,"Gray");
       break;
     }
     default:
     {
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) != 0)
-          (void) PrintChannelLocations(&report,channel,"Channel");
-      }
+      PrintAllChannelLocations(image,&report);
       break;
     }
   }
@@ -2000,6 +2101,82 @@ static void GetRequestedMoments(const Image *image,
     }
 }
 
+static void PrintImagePermissions(FILE *file,const struct stat *properties)
+{
+  if (properties->st_mode != 0)
+    {
+      static const char *rwx[] =
+        { "---", "--x", "-w-", "-wx", "r--", "r-x", "rw-", "rwx"};
+      (void) FormatLocaleFile(file,"  Permissions: %s%s%s\n",
+        rwx[(properties->st_mode >> 6) & 0x07],
+        rwx[(properties->st_mode >> 3) & 0x07],
+        rwx[(properties->st_mode >> 0) & 0x07]);
+    }
+}
+
+static MagickBooleanType PrintImageLocations(Image *image,FILE *file,
+  const char *locate,ExceptionInfo *exception)
+{
+  ChannelLocationsReport report;
+
+  ChannelStatistics
+    *channel_statistics;
+
+  ColorspaceType
+    colorspace;
+
+  size_t
+    locations;
+
+  StatisticType
+    statistic_type;
+
+  colorspace=image->colorspace;
+  /*
+    Display minimum, maximum, or mean pixel locations.
+  */
+  statistic_type=(StatisticType) ParseCommandOption(MagickStatisticOptions,
+    MagickFalse,locate);
+  locations=GetLocationsLimit(image);
+  channel_statistics=GetLocationStatistics(image,statistic_type,exception);
+  if (channel_statistics == (ChannelStatistics *) NULL)
+    return(MagickFalse);
+  report.file=file;
+  report.image=image;
+  report.type=statistic_type;
+  report.locations=locations;
+  report.channel_statistics=channel_statistics;
+
+  (void) FormatLocaleFile(file,"Channel %s locations:\n",locate);
+  PrintColorspaceLocations(image,colorspace,report);
+  if (image->alpha_trait != UndefinedPixelTrait)
+    (void) PrintChannelLocations(&report,AlphaPixelChannel,"Alpha");
+  channel_statistics=(ChannelStatistics *) RelinquishMagickMemory(
+    channel_statistics);
+  return(ferror(file) != 0 ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType PrintImageSummary(Image *image,FILE *file,
+  const double elapsed_time,const double user_time)
+{
+  ColorspaceType
+    colorspace;
+
+  colorspace=image->colorspace;
+  /*
+    Display summary info about the image.
+  */
+  PrintImageSummaryHeader(file,image);
+  PrintImageSummaryAttributes(file,image,colorspace);
+  (void) FormatLocaleFile(file,"%0.3fu %lu:%02lu.%03lu",user_time,
+    (unsigned long) (elapsed_time/60.0),(unsigned long) floor(fmod(
+    elapsed_time,60.0)),(unsigned long) (1000.0*(elapsed_time-
+    floor(elapsed_time))));
+  (void) FormatLocaleFile(file,"\n");
+  (void) fflush(file);
+  return(ferror(file) != 0 ? MagickFalse : MagickTrue);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -2046,56 +2223,12 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   colorspace=image->colorspace;
   locate=GetImageArtifact(image,"identify:locate");
   if (locate != (const char *) NULL)
-    {
-      size_t
-        locations;
-
-      StatisticType
-        statistic_type;
-
-      ChannelLocationsReport report;
-
-      /*
-        Display minimum, maximum, or mean pixel locations.
-      */
-      statistic_type=(StatisticType) ParseCommandOption(MagickStatisticOptions,
-        MagickFalse,locate);
-      locations=GetLocationsLimit(image);
-      channel_statistics=GetLocationStatistics(image,statistic_type,exception);
-      if (channel_statistics == (ChannelStatistics *) NULL)
-        return(MagickFalse);
-      report.file=file;
-      report.image=image;
-      report.type=statistic_type;
-      report.locations=locations;
-      report.channel_statistics=channel_statistics;
-
-      (void) FormatLocaleFile(file,"Channel %s locations:\n",locate);
-      PrintColorspaceLocations(image,colorspace,report);
-      if (image->alpha_trait != UndefinedPixelTrait)
-        (void) PrintChannelLocations(&report,AlphaPixelChannel,"Alpha");
-      channel_statistics=(ChannelStatistics *) RelinquishMagickMemory(
-        channel_statistics);
-      return(ferror(file) != 0 ? MagickFalse : MagickTrue);
-    }
+    return(PrintImageLocations(image,file,locate,exception));
   elapsed_time=GetElapsedTime(&image->timer);
   user_time=GetUserTime(&image->timer);
   GetTimerInfo(&image->timer);
   if (verbose == MagickFalse)
-    {
-      /*
-        Display summary info about the image.
-      */
-      PrintImageSummaryHeader(file,image);
-      PrintImageSummaryAttributes(file,image,colorspace);
-      (void) FormatLocaleFile(file,"%0.3fu %lu:%02lu.%03lu",user_time,
-        (unsigned long) (elapsed_time/60.0),(unsigned long) floor(fmod(
-        elapsed_time,60.0)),(unsigned long) (1000.0*(elapsed_time-
-        floor(elapsed_time))));
-      (void) FormatLocaleFile(file,"\n");
-      (void) fflush(file);
-      return(ferror(file) != 0 ? MagickFalse : MagickTrue);
-    }
+    return(PrintImageSummary(image,file,elapsed_time,user_time));
   /*
     Display verbose info about the image.
   */
@@ -2117,15 +2250,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   (void) FormatLocaleFile(file,"Image:\n  Filename: %s\n",image->filename);
   PrintImageBaseFilename(file,image);
   properties=(*GetBlobProperties(image));
-  if (properties.st_mode != 0)
-    {
-      static const char *rwx[] =
-        { "---", "--x", "-w-", "-wx", "r--", "r-x", "rw-", "rwx"};
-      (void) FormatLocaleFile(file,"  Permissions: %s%s%s\n",
-        rwx[(properties.st_mode >> 6) & 0x07],
-        rwx[(properties.st_mode >> 3) & 0x07],
-        rwx[(properties.st_mode >> 0) & 0x07]);
-    }
+  PrintImagePermissions(file,&properties);
   PrintImageFormat(file,image,exception);
   (void) FormatLocaleFile(file,"  Class: %s\n",CommandOptionToMnemonic(
     MagickClassOptions,(ssize_t) image->storage_class));

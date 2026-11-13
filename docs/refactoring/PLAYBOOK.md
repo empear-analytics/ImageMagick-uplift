@@ -12720,6 +12720,74 @@ the mandate of 2026-10-24.
 
 ---
 
+## Recipe LL - Replace an Override Ladder by Descending Returns
+
+**Use when:** CodeScene reports *Complex Method* or *Large Method* on a function that maps
+one integer to a value by a run of `if (x >= LIMIT) var=VALUE;` statements, after a
+default assignment, with the limits written in ascending order (`type.c`'s
+`LoadFontConfigFonts`: nine `width >= FC_WIDTH_*` tests and nine `weight >= FC_WEIGHT_*`
+tests, each overriding the one before).
+
+**Not covered by:** Recipe E, which moves the ladder unchanged and so keeps its cc; Recipe
+SF, which flattens a `switch`; Recipe KT, which replaces a keyed run by a table.
+
+**How:**
+
+1. The run is `var=DEFAULT;` (or the default is the value already in `var`), then
+   `if (x >= L1) var=V1;` ... `if (x >= Ln) var=Vn;`, each test on the same unmodified
+   `x`, each branch one assignment to the same `var`, no other statement between them.
+2. Read each limit's value from the header (macro chains such as
+   `FC_WEIGHT_NORMAL` to `FC_WEIGHT_REGULAR` followed) and check that `L1 < L2 < ... <
+   Ln`. With ascending limits the last test that holds is the one with the greatest
+   limit not above `x`, so the ladder yields `Vk` for the greatest `Lk <= x` and the
+   default when none holds. A limit out of order, or two equal, refuses the step.
+3. Write a `static inline` function taking `const <type> x` and returning the value, with
+   `if (x >= Ln) return(Vn);` for the limits from the greatest down, then
+   `return(DEFAULT);`. A function with more than five tests is split at one limit `Lm`:
+   the outer function tests `x >= Lm` and calls an inner function holding the tests from
+   `Ln` down to just above `Lm` (its fall-through value is the value at `Lm`), then
+   continues with the lower tests. Each function stays under cc 9.
+4. The caller assigns `var=Name(x);` where the default assignment and the ladder were.
+   A statement that reads `var` inside the ladder, or `x` modified in it, refuses the
+   step.
+
+**Before:**
+
+```c
+    type_info->weight=400;
+    status=FcPatternGetInteger(font_set->fonts[i],FC_WEIGHT,0,&weight);
+    if (weight >= FC_WEIGHT_THIN)
+      type_info->weight=100;
+    /* ... eight more ascending tests ... */
+    if (weight >= FC_WEIGHT_BLACK)
+      type_info->weight=900;
+```
+
+**After:**
+
+```c
+    status=FcPatternGetInteger(font_set->fonts[i],FC_WEIGHT,0,&weight);
+    type_info->weight=GetFontConfigWeight(weight);
+```
+
+**Careful:**
+
+- Step 2 is the argument. The default stays what the member had when no test holds, and
+  the helper returns the same constant for `x` below every limit.
+- `x` may be uninitialised where the library call fails; the helper receives the same
+  value the ladder tested.
+- The object code differs, so `obj_identical.sh` does not apply.
+
+**Evidence level:** oracle, for the function the step changes (`casemap.py` first), and
+the reading of step 2 in the commit message.
+
+**Provenance:** 2026-11-12, from `type.c`'s `LoadFontConfigFonts` (campaign B, M121):
+cc 41 to 23, the file 5.08 to 5.16. Added by Claude Code (Claude Sonnet 5.5) under the
+mandate of 2026-10-24.
+
+---
+
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -12822,6 +12890,613 @@ After every commit, as [`AGENTS.md`](../../AGENTS.md) sets out:
 4. `python3 tools/ch.py --review <file>`
 
 Before pushing a branch: `python3 tools/oracle/oracle.py run`, the whole catalogue.
+
+---
+
+## Recipe PA - Peel an Advancing Label Set out of a Loop's Switch as a Predicate
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Brain Method* on a
+function whose loop body ends in a `switch (c)` over a character, one of whose groups is
+many labels with the body `p++; break;` (advance one character and go round again), as in
+`geometry-parse.c`'s `GetGeometry` and `ParseGeometry`: the digits, the signs, `e`, `E`
+and `215` are seventeen labels of cc 50 and 52.
+
+**Not covered by:** Recipes LP and PL, whose peeled group leaves the function and whose
+labels are enumeration constants or integers returned from; Recipe SD, which keeps the
+labels in a `switch` of the new function; Recipe EC, which names an equality chain, not a
+`switch`; Recipe TB, which replaces a `switch` of constants.
+
+**How:**
+
+1. The `switch (c)` is the last statement of the body of a `for` or `while` loop outside
+   every OpenMP region; `c` is a local `int` that nothing in the `switch` assigns; the
+   statements of the body before the `switch` do not depend on the `switch`'s groups.
+   The peeled group `G` has labels `L1 ... Ln` (character constants or integer literals)
+   and exactly the body `p++; break;` (the group's braces and comments aside); no label
+   of `G` occurs in another group, and no group falls into `G` or out of it. No `#` line
+   stands inside the `switch`.
+2. Directly above the first function that uses it write `static inline
+   MagickBooleanType Name(const int c)` whose body is `switch (c) { <L1 ... Ln in the
+   original order> return(MagickTrue); default: break; } return(MagickFalse);`.
+3. Delete `G` from the `switch`, and directly before the `switch` write `if (Name(c) !=
+   MagickFalse) { p++; continue; }`, with the `p++` text of `G`.
+4. *Several sites.* A loop in another function whose group has the same labels as a set
+   uses the same predicate. A group with some further label keeps that label alone as a
+   group of the same body in its `switch` (`ParseGeometry`'s `/`).
+5. Check by script that the predicate's labels are exactly the peeled labels, each once,
+   and that nothing else in the `switch` changed.
+
+**Before:**
+
+```c
+    c=(int) *p;
+    switch (c)
+    {
+      case '%':
+        ...
+      case '-':
+      case ',':
+      case '+':
+      case '0':
+      ...
+      case 'E':
+      {
+        p++;
+        break;
+      }
+      case '.':
+```
+
+**After:**
+
+```c
+    c=(int) *p;
+    if (IsGeometryAdvanceCharacter(c) != MagickFalse)
+      {
+        p++;
+        continue;
+      }
+    switch (c)
+    {
+      case '%':
+        ...
+      case '.':
+```
+
+**Careful:**
+
+- The `switch` selects by the value of `c`, and the groups' label sets are disjoint
+  (step 1), so removing `G` leaves every other value going to the group it went to. The
+  predicate returns `MagickTrue` exactly for the labels of `G` (step 5), each compared
+  with the same `int` the `switch` promoted, so `G`'s body runs on the same values.
+- `G`'s `break;` leaves the `switch`, and the `switch` is the last statement of the loop
+  body (step 1), so control goes to the loop's next test; `continue;` goes to the same
+  place (a `for` loop's increment expression is empty in the loops this recipe meets; a
+  non-empty one would run in both forms, as after the `break`).
+- The predicate is a label run, allowed as a *Complex Method* by the owner's ruling of
+  2026-11-07; the `default: break;` keeps `-Wswitch` quiet.
+
+**Evidence level:** oracle (the cases that reach each loop's function).
+
+**Provenance:** 2026-11-13, from `geometry-parse.c`'s `GetGeometry` and `ParseGeometry`
+(campaign B, M121): 6.80 to 6.99, cc 50 and 52 to 36 and 38. Added by Claude Code (Claude
+Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
+## Recipe HE - Hoist a Case's Exit Test above its Switch
+
+**Use when:** CodeScene reports *Bumpy Road Ahead* on a function whose loop body holds a
+`switch (c)` in which one group is `if (T) return(R); S; break;` and its label `L` is a
+character constant (`geometry-parse.c`'s `ParseGeometry`: group `'('` tests for a `)`
+after it and returns, else deletes the character like group `')'`). The `if` inside the
+case inside the loop is a bump.
+
+**Not covered by:** Recipe HT, whose test is common to the two branches of an `if`;
+Recipe SG, which spreads a guard over nested tests; Recipes SD, SR and RC, which move
+whole groups into a function; Recipe PL, whose peeled group is the exit alone.
+
+**How:**
+
+1. The `switch (c)` is the last statement of a loop body outside every OpenMP region; `c`
+   is a local `int` nothing assigns after the statements before the `switch`. The group
+   `G` is `case L: { if (T) return(R); S break; }`, `T` is a comparison with no side
+   effect (a dereference and `==`), `R` is an expression with no side effect, and no
+   other group falls into `G`.
+2. Directly before the `switch`, after every statement of the body that precedes it, write
+   `if ((c == L) && (T)) return(R);`, with `L` and `T` and `R` as `G` wrote them.
+3. Write `G` as `case L: { S break; }`; when another group has the same body `S`, the two
+   share their labels (`case '(': case ')':`).
+
+**Before:**
+
+```c
+    switch (c)
+    {
+      case '(':
+      {
+        if (*(p+1) == ')')
+          return(flags);
+        (void) CopyMagickString(p,p+1,MagickPathExtent);
+        break;
+      }
+      case ')':
+      {
+        (void) CopyMagickString(p,p+1,MagickPathExtent);
+        break;
+      }
+```
+
+**After:**
+
+```c
+    if ((c == '(') && (*(p+1) == ')'))
+      return(flags);
+    switch (c)
+    {
+      case '(':
+      case ')':
+      {
+        (void) CopyMagickString(p,p+1,MagickPathExtent);
+        break;
+      }
+```
+
+**Careful:**
+
+- When `c` equals `L` the original runs `T` first thing in `G`, and returns `R` if it
+  holds, else runs `S`; the new test runs `T` on the same value, after the same earlier
+  statements, and returns `R` if it holds, else the `switch` takes `G` and runs `S`. When `c`
+  differs from `L` the original ran no `T`, and the new `&&` does not either. `T` and `R`
+  have no side effect (step 1), so evaluating `T` before the `switch` rather than in `G`
+  changes nothing, and nothing runs between the two points.
+- The statements the loop body runs between the two points are none: the test stands
+  directly before the `switch`.
+
+**Evidence level:** oracle (the cases that reach the function).
+
+**Provenance:** 2026-11-13, from `geometry-parse.c`'s `ParseGeometry` (campaign B, M121):
+7.01 to 7.04, the bump gone. Added by Claude Code (Claude Sonnet 5.5) under the mandate of
+2026-10-24.
+
+---
+
+## Recipe FO - Open the File with the Shortest Static Helper
+
+**Use when:** CodeScene reports *Large Method* on a small `static` helper that is the first
+function of the file: CodeScene starts the first function's span at the `#include` block
+(`docs/cs-first-function-span-findings.md`), so its length counts about sixty lines of
+includes. `image.c`'s `SetImageSize`, nine lines long, reports 76 lines.
+
+**Not covered by:** Recipe H, which moves preprocessor lines and not functions; Recipe E,
+which adds a function, where this only reorders the definitions that are there.
+
+**How:**
+
+1. The file's first function is a `static` function `F` with a *Large Method* finding whose
+   own body is under 20 lines.
+2. Pick a `static` function `G` of the same file with the fewest lines (a body of one or
+   two statements, no more than `F`'s), defined later than `F` and not used by `F`.
+   `G` and every function it calls, if any, are declared above `G`'s new place or are
+   not `static`.
+3. Cut `G` whole, with its comment if it has one, and paste it directly above `F`. Nothing
+   else moves.
+
+**Before:**
+
+```c
+static void SetImageSize(Image *image,const char *size)
+{
+  ...nine lines...
+}
+...
+static void LimitImageDelay(Image *image,const double rho)
+{
+  if ((double) image->delay > floor(rho+0.5))
+    image->delay=(size_t) CastDoubleToSsizeT(floor(rho+0.5));
+}
+```
+
+**After:**
+
+```c
+static void LimitImageDelay(Image *image,const double rho)
+{
+  if ((double) image->delay > floor(rho+0.5))
+    image->delay=(size_t) CastDoubleToSsizeT(floor(rho+0.5));
+}
+
+static void SetImageSize(Image *image,const char *size)
+{
+  ...nine lines...
+}
+```
+
+**Careful:**
+
+- Only the order of definitions changes. A `static` function is called by name, and the
+  compiler needs a declaration above each call, which step 2 keeps true. The rule of
+  step 2's `G` having no `static` callee below its new place is the one way the move can
+  fail, and the build catches it.
+- Nothing is called differently, so the object file holds the same code; it is checked
+  with `sh tools/obj_identical.sh MagickCore/<file>.c`, which must print `IDENTICAL`.
+- A file whose first function is already the shortest one gains nothing; the step is for
+  a first function that the include span pushes over the threshold.
+
+**Evidence level:** guard (`obj_identical.sh` prints `IDENTICAL` for the whole object
+file; no oracle run is needed for an identical object).
+
+**Provenance:** 2026-11-13, from `image.c` (campaign B, M121): `SetImageSize`'s 76-line
+span cleared by opening the file with `LimitImageDelay`, 5.17 to 5.37. Added by Claude Code
+(Claude Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
+## Recipe KS - Replace a Keyed Constant-Assigning Switch by a Lookup Table
+
+**Use when:** CodeScene reports *Complex Method* on a `static` function whose body is one
+`switch` on an integer parameter in which every group is one label that assigns a string
+literal to one local and breaks, with a `default:` group of the same shape, and the
+function then returns that local. `identify.c`'s `GetIPTCTagName` (fifty-four labels,
+`case 5: tag="Image Name"; break;` ..., `default: tag="unknown"; break;`, cc 55).
+
+**Not covered by:** Recipe KT, whose groups assign the result of a call; Recipe TB, whose
+labels are `0` to `k` or whose groups return; Recipe EM, which tests membership only.
+
+**How:**
+
+1. The function is `static`, outside every OpenMP region; its body is the local's
+   declaration, one `switch (n)` and `return(v);`. Every group is `case L: v="s"; break;`
+   with `L` an integer literal, all distinct, and `default: v="s"; break;`.
+   No `#if` line stands inside the `switch`.
+2. Every caller only reads the characters of the returned string (`%s`, `strlen`,
+   `strcmp`) and never compares, stores or writes through the pointer itself, since two
+   equal literals need not share one address (check by `grep`). The function is not
+   called per pixel or per channel.
+3. Directly above the function write a `static const` array of a `typedef struct` of two
+   members (`key` of `n`'s type, `const char *name`), one element `{ L, "s" }` per
+   non-default group, in the `switch`'s order.
+4. Replace the body by: `size_t i;`, a `for (i=0; i < (sizeof(T)/sizeof(*T)); i++)` with
+   `if (T[i].key == n) return(T[i].name);`, then `return("s");` of the `default:` group's
+   literal.
+5. Check by script that each label is the key of exactly one element holding the string
+   its group assigned, and that nothing else in the file changed.
+
+**Before:**
+
+```c
+  switch (record)
+  {
+    case 5: tag="Image Name"; break;
+    ...
+    default: tag="unknown"; break;
+  }
+  return(tag);
+```
+
+**After:**
+
+```c
+  for (i=0; i < (sizeof(IPTCTagNames)/sizeof(*IPTCTagNames)); i++)
+    if (IPTCTagNames[i].key == record)
+      return(IPTCTagNames[i].name);
+  return("unknown");
+```
+
+**Careful:**
+
+- Labels are distinct, so the first matching element is the only one and holds the
+  string the matching group assigned; when none matches the `default:` string is
+  returned, as the `switch` assigned it. `n` is compared with the same type it had
+  there (`key` has `n`'s type), so the same values match.
+- The table is `static const` and never written; no existing table changes.
+- Searching up to fifty elements replaces a jump, for a call made once per IPTC record of
+  a profile that `identify` prints, outside every pixel loop (step 2).
+
+**Evidence level:** oracle (the cases that reach the function), with step 5's script and
+step 2 checked by reading.
+
+**Provenance:** 2026-11-13, from `identify.c` (campaign B, M122): `GetIPTCTagName`, cc 55,
+the largest *Complex Method* of the file; KT needs a call in every group. Added by
+Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
+## Recipe KR - Replace a Keyed Returning Switch by a Lookup Table
+
+**Use when:** CodeScene reports *Complex Method* on a `static` function whose body is one
+`switch` on an enumerated parameter in which every group is one label that returns a
+string literal (`case TypeWarning: return("Type/Warning/");`), with a `default: break;`
+and `return("");` after the `switch`. `exception.c`'s `ExceptionSeverityToTag` (sixty-three
+labels, cc 65).
+
+**Not covered by:** Recipe KS, whose groups assign to a local and `break`; Recipe KT,
+whose groups call; Recipe TB, whose labels are `0` to `k`; Recipe EM, which tests
+membership only.
+
+**How:**
+
+1. The function is `static`, outside every OpenMP region; its body is one `switch (n)`
+   followed by one `return("s");`. Every group is `case L: return("s");` with `L` an
+   enumerator or integer literal, all with distinct values, and the `default:` group is
+   `break;`. No `#if` line stands inside the `switch`.
+2. Every caller only reads the characters of the returned string (`%s`, `strlen`,
+   `strcmp`) and never compares or stores the pointer (check by `grep`). The function is
+   not called per pixel.
+3. Directly above the function write a `static const` array of a `typedef struct` of two
+   members (`key` of `n`'s type, `const char *name`), one element `{ L, "s" }` per group,
+   in the `switch`'s order.
+4. Replace the body by: `size_t i;`, a `for (i=0; i < (sizeof(T)/sizeof(*T)); i++)` with
+   `if (T[i].key == n) return(T[i].name);`, then the final `return("s");`.
+5. Check by script that each label is the key of exactly one element holding the string
+   its group returned, and that nothing else in the file changed.
+
+**Before:**
+
+```c
+  switch (severity)
+  {
+    case ResourceLimitWarning: return("Resource/Limit/Warning/");
+    ...
+    default: break;
+  }
+  return("");
+```
+
+**After:**
+
+```c
+  for (i=0; i < (sizeof(ExceptionTags)/sizeof(*ExceptionTags)); i++)
+    if (ExceptionTags[i].severity == severity)
+      return(ExceptionTags[i].tag);
+  return("");
+```
+
+**Careful:**
+
+- Labels have distinct values, so the first matching element is the only one and holds the
+  string its group returned; when none matches the final `return` gives what the
+  `default:` fell through to. `key` has `n`'s type, so the same values match.
+- The table is `static const` and never written; no existing table changes.
+- Searching up to sixty-three elements replaces a jump, for a call made once per
+  exception message lookup, outside every pixel loop (step 2).
+
+**Evidence level:** oracle (the cases that reach the function), with step 5's script and
+step 2 checked by reading.
+
+**Provenance:** 2026-11-13, from `exception.c` (campaign B, M122): `ExceptionSeverityToTag`,
+cc 65, the largest *Complex Method* of the file; KS assigns to a local. Added by Claude
+Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
+## Recipe DD - Drop a Case That Repeats the Default
+
+**Use when:** CodeScene reports *Complex Method* on a function whose `switch` has a
+`case L:` with its own statements that are character for character those of the `default:`
+group, as `stream.c`'s `GetStreamPacketSize` has `default: packet_size=sizeof(unsigned
+char); break;` and `case CharPixel: packet_size=sizeof(unsigned char); break;`. Each label
+counts as a branch.
+
+**Not covered by:** Recipe DL, whose labels carry no statements of their own and fall into
+`default:`; it refuses a label with statements.
+
+**How:**
+
+1. Find a `case L:` group and the `default:` group with identical statements (same text,
+   ending in `break;` or the same `return`), where `L` is a constant label.
+2. Delete the `case L:` group. Nothing else is written. `L` now reaches `default:`, which
+   does what the group did.
+3. Run `sh tools/obj_identical.sh <file>`: it must print `IDENTICAL`; otherwise revert.
+   Run `tools/ci_warnings.sh <file>` and keep the step only if it prints `OK`.
+
+**Before:**
+
+```c
+    default: packet_size=sizeof(unsigned char); break;
+    case CharPixel: packet_size=sizeof(unsigned char); break;
+```
+
+**After:**
+
+```c
+    default: packet_size=sizeof(unsigned char); break;
+```
+
+**Careful:**
+
+- The two groups must be identical statements; a group that differs by one token is not
+  covered.
+- A group that falls through into a following label, or that sits between a label and a
+  group that matters, is refused: the fall-through target would change.
+- The labels documented which enumerators the function handles; a comment on `default:`
+  may keep that.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
+`HEAD`.
+
+**Provenance:** 2026-11-13, from `stream.c`'s `GetStreamPacketSize` (campaign B, M123):
+cc 9 to 8, the file 5.84 to 5.98, object code identical. Added by Claude Code (Claude
+Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
+## Recipe KE - Replace a Letter-Keyed Parser Switch by a Table of Records
+
+**Use when:** CodeScene reports *Complex Method* on a function whose loop body is a
+`switch` over one character, each group `case 'X': case 'x': { v[i]=EnumX; <test>
+break; }` assigning an enumerator and, for some groups, running the same exit test, with a
+`default:` that exits. `stream.c`'s `StreamImagePixels` (eleven letters in both cases,
+four with the CMYK test, cc 39).
+
+**Not covered by:** Recipe KS, whose groups assign a string literal and whose function
+returns it; Recipe SR, which splits the switch into functions that keep its labels.
+
+**How:**
+
+1. The loop is outside every OpenMP region. Every group assigns one enumerator to the same
+   element and either breaks or first runs one identical test (a condition, then the same
+   exit statements). The `default:` group holds the exit statements of the unknown letter.
+2. Write above the function a `typedef struct` of the key (`char`), the enumerator and one
+   flag (`MagickBooleanType`) that says whether the group runs the test, and a `static`
+   function returning a pointer to the matching element of a `static const` array, or
+   `NULL`. Each group's labels become elements (one per label, keys distinct).
+3. In the loop: `info=Helper(c);` an `if (info == NULL)` holding the `default:` statements
+   unchanged; the assignment `v[i]=info->quantum;`; then the test, written as
+   `if ((info->flag == MagickFalse) || (<test passes>)) continue;` followed by the
+   exit statements unchanged. Every `ThrowMagickException` stays in the original function.
+4. Run `tools/ci_warnings.sh <file>` (must print `OK`) and the oracle for the function.
+
+**Before:**
+
+```c
+      case 'C':
+      case 'c':
+      {
+        quantum_map[i]=CyanQuantum;
+        if (image->colorspace == CMYKColorspace)
+          break;
+        ...exit...
+      }
+```
+
+**After:**
+
+```c
+    map_info=GetStreamMapInfo(stream_info->map[i]);
+    if (map_info == (const StreamMapInfo *) NULL) { ...default exit... }
+    quantum_map[i]=map_info->quantum;
+    if ((map_info->separation == MagickFalse) ||
+        (image->colorspace == CMYKColorspace))
+      continue;
+    ...exit...
+```
+
+**Careful:**
+
+- Keys are distinct, so the first match is the only one, holding what the group assigned.
+  Letters outside the table take the `default:` exit as before; the test runs for exactly
+  the groups that ran it (the flag), and for them the exit follows the same condition.
+- The assignment happens before the test, as in the groups (it precedes the exit).
+- The table is `static const` and never written; the lookup scans at most twenty-two
+  elements per map letter, once per stream write.
+
+**Evidence level:** oracle (the cases that reach the function).
+
+**Provenance:** 2026-11-13, from `stream.c`'s `StreamImagePixels` (campaign B, M123):
+5.98 to 6.12 with the three exits kept in place. Added by Claude Code (Claude Sonnet 5.5)
+under the mandate of 2026-10-24.
+
+---
+
+## Recipe DV - Drop a Parameter the Callee Can Read from Another
+
+**Use when:** CodeScene reports *Excess Number of Function Arguments* (five) on a `static`
+function that receives both a pointer `s` and a pointer `s->m` (a member of `*s`), as
+`stream.c`'s `StreamDoublePixels(stream_info,image,quantum_info,...)` whose only caller
+passes `stream_info->quantum_info`.
+
+**Not covered by:** Recipe M, whose callers pass one identifier twice; Recipe B, which
+bundles arguments into a new struct.
+
+**How:**
+
+1. The function is `static`; every call passes exactly `s->m` (same text, `s` the other
+   argument) for the parameter, checked by `grep`.
+2. Delete the parameter. At the top of the body declare a local of the parameter's type
+   and assign it `s->m;` (a plain member read, no call, no side effect). Delete the
+   argument at each call.
+3. If the caller then only set that variable from `s->m` for this call, delete it
+   (`-Wunused-but-set-variable` shows it). Run `tools/ci_warnings.sh <file>` (must print
+   `OK`) and the oracle for the function and its callers.
+
+**Before:**
+
+```c
+static void StreamDoublePixels(const StreamInfo *stream_info,const Image *image,
+  QuantumInfo *quantum_info,QuantumType *quantum_map,size_t length)
+```
+
+**After:**
+
+```c
+static void StreamDoublePixels(const StreamInfo *stream_info,const Image *image,
+  QuantumType *quantum_map,size_t length)
+{
+  QuantumInfo
+    *quantum_info;
+
+  quantum_info=stream_info->quantum_info;
+```
+
+**Careful:**
+
+- The member must not change between the caller's read and the callee's; nothing in the
+  two functions assigns `stream_info->quantum_info` (check by `grep`).
+- The type of the local is the parameter's type, so uses of it compile unchanged.
+
+**Evidence level:** oracle (the cases that reach the function).
+
+**Provenance:** 2026-11-13, from `stream.c` (campaign B, M123): `StreamDoublePixels` and
+`StreamFloatPixels`, 6.12 to 6.13. Added by Claude Code (Claude Sonnet 5.5) under the
+mandate of 2026-10-24.
+
+---
+
+## Recipe KD - Replace a Dispatch Ladder by a Table of Function Pointers
+
+**Use when:** CodeScene reports *Complex Method* on a function whose complexity is a run
+of `if (LocaleCompare(map,"K") == 0) return(F(args));` statements, one per key, each
+calling a different function of one signature, followed by a fallback that is not part of
+the run. `pixel-import.c`'s `ImportCharPixel` (nine maps, cc 10).
+
+**Not covered by:** Recipe KT, whose groups assign one call's result under integer labels;
+Recipe KR, whose groups return string literals; Recipe KE, whose groups assign an
+enumerator.
+
+**How:**
+
+1. The run lies outside every OpenMP region. Every statement is `if (LocaleCompare(v,"K")
+   == 0)` returning `F(a,b,...)` with the same arguments and `v` the same variable; keys
+   distinct; the `F` are `static` functions of one signature (parameter qualifiers that
+   are top-level, such as `magick_restrict`, may differ); the run is followed by the
+   fallback, which stays.
+2. Directly above the function write a `typedef struct` of the key (`const char *`) and
+   a pointer to a function of that signature, and a `static const` array of it with one
+   element `{ "K", F }` per statement, in order.
+3. Declare `size_t i;` at the function's top and replace the run by `for (i=0; i <
+   (sizeof(T)/sizeof(*T)); i++) if (LocaleCompare(v,T[i].key) == 0)
+   return(T[i].fn(a,b,...));`. Every `ThrowMagickException` stays where it was.
+4. Run `tools/ci_warnings.sh <file>` (must print `OK`) and the oracle for the function.
+
+**Before:**
+
+```c
+  if (LocaleCompare(map,"BGR") == 0)
+    return(ImportCharBGRPixels(image,roi,p,exception));
+  if (LocaleCompare(map,"BGRA") == 0)
+    return(ImportCharBGRAPixels(image,roi,p,exception));
+```
+
+**After:**
+
+```c
+  for (i=0; i < (sizeof(ImportCharMaps)/sizeof(*ImportCharMaps)); i++)
+    if (LocaleCompare(map,ImportCharMaps[i].map) == 0)
+      return(ImportCharMaps[i].import_pixels(image,roi,p,exception));
+```
+
+**Careful:**
+
+- Keys are distinct and tested in the original order, so the first match is the same
+  call with the same arguments; a map outside the table reaches the fallback as before.
+- The table is `static const`; the lookup scans at most nine elements once per import.
+
+**Evidence level:** oracle (the cases that reach the function).
+
+**Provenance:** 2026-11-13, from `pixel-import.c`'s `ImportCharPixel` (campaign B, M124):
+6.69 to 6.89 for the file. Added by Claude Code (Claude Sonnet 5.5) under the mandate of
+2026-10-24.
 
 ---
 
@@ -13138,3 +13813,13 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | NEW | LF | Move a loop's leading run of `if (<test>) continue;` into one `Is<Name>` predicate; evidence oracle | `policy.c`'s `IsRightsAuthorizedByName` (5.88 to 5.93); P names one expression and keeps its `if` | mandate (2026-10-24) |
 | 2026-11-12 | NEW | DL | Drop `case` labels that fall straight into `default:`; proof `obj_identical.sh` | `policy.c`'s `SetMagickSecurityPolicyValue` (five enumerator labels; 6.02 to 6.21, object code identical) | mandate (2026-10-24) |
 | 2026-11-12 | NEW | DT | Drop `? MagickTrue : MagickFalse` after a comparison or a chain of them; proof `obj_identical.sh` and `ci_warnings.sh` | `policy.c` (seven sites in seven functions; 6.21 to 6.38, object code identical); P writes the ternary and nothing removes it | mandate (2026-10-24) |
+| 2026-11-12 | NEW | LL | Replace an ascending `if (x >= L) var=V;` ladder by descending returns in a helper; proof oracle plus the monotone-limits reading | `type.c` `LoadFontConfigFonts` (stretch and weight ladders; cc 41 to 23, 5.08 to 5.16); E keeps the ladder's cc | mandate (2026-10-24) |
+| 2026-11-13 | NEW | PA | Peel an advancing label group (`p++; break;` under many labels) out of a loop's `switch` into a membership predicate and an `if (...) { p++; continue; }`; evidence oracle | `geometry-parse.c`'s `GetGeometry` and `ParseGeometry` (seventeen labels in each; cc 50 and 52 to 36 and 38, 6.80 to 6.99); LP and PL peel groups that return, SD keeps the labels in a switch | mandate (2026-10-24) |
+| 2026-11-13 | NEW | HE | Hoist a case's exit test (`case L: { if (T) return(R); S break; }`) to an `if ((c == L) && (T)) return(R);` before the loop's `switch`; evidence oracle | `geometry-parse.c`'s `ParseGeometry` (bump gone, 7.01 to 7.04); HT, SG and PL do not reach a test inside a case | mandate (2026-10-24) |
+| 2026-11-13 | NEW | FO | Open the file with the shortest `static` helper: move a one- or two-statement helper above a first function that the include-block span makes a *Large Method*; evidence `obj_identical.sh` IDENTICAL | `image.c` (`SetImageSize`, 76 lines for nine; 5.17 to 5.37); H moves preprocessor lines, E adds functions | mandate (2026-10-24) |
+| 2026-11-13 | NEW | KS | Replace a keyed `switch` whose groups assign string literals to one local by a `static const` key/name table and a lookup loop; evidence oracle | `identify.c` `GetIPTCTagName` (cc 55); KT needs a call per group, TB needs `0..k` labels | mandate (2026-10-24) |
+| 2026-11-13 | NEW | KR | Replace a keyed `switch` whose groups return string literals by a `static const` key/name table and a lookup loop; evidence oracle | `exception.c` `ExceptionSeverityToTag` (cc 65); KS assigns to a local, TB needs `0..k` labels | mandate (2026-10-24) |
+| 2026-11-13 | NEW | DD | Drop a `case` whose statements repeat the `default:` group; proof `obj_identical.sh` | `stream.c`'s `GetStreamPacketSize` (cc 9 to 8, 5.84 to 5.98, object code identical); DL refuses a label with its own statements | mandate (2026-10-24) |
+| 2026-11-13 | NEW | KE | Replace a letter-keyed `switch` that assigns an enumerator (and for some letters tests then exits) by a `static const` table of records and a lookup helper; evidence oracle | `stream.c`'s `StreamImagePixels` map parser (cc 39 to 16, 5.98 to 6.12); KS assigns strings and returns, SR keeps the labels | mandate (2026-10-24) |
+| 2026-11-13 | NEW | DV | Drop a `static` function's parameter that every caller fills with a member of another argument; the callee reads the member into a local; evidence oracle | `stream.c`'s `StreamDoublePixels` and `StreamFloatPixels` (five arguments to four; 6.12 to 6.13); M merges identical arguments only | mandate (2026-10-24) |
+| 2026-11-13 | NEW | KD | Replace a run of `if (LocaleCompare(v,"K") == 0) return(F(...));` calls of one signature by a `static const` table of key/function-pointer records and a lookup loop; evidence oracle | `pixel-import.c` `ImportCharPixel` (cc 10, file 6.69 to 6.89); KT assigns, KR returns strings, KE assigns enumerators | mandate (2026-10-24) |

@@ -866,7 +866,7 @@ MagickExport MagickBooleanType OpenStream(const ImageInfo *image_info,
 static inline MagickBooleanType IsCacheMorphologyChanged(const Image *image,
   const CacheInfo *cache_info,const PixelChannelMap *p,const PixelChannelMap *q)
 {
-  return(((image->storage_class != cache_info->storage_class) ||
+  return((image->storage_class != cache_info->storage_class) ||
     (image->colorspace != cache_info->colorspace) ||
     (image->alpha_trait != cache_info->alpha_trait) ||
     (image->channels != cache_info->channels) ||
@@ -875,8 +875,7 @@ static inline MagickBooleanType IsCacheMorphologyChanged(const Image *image,
     (image->number_channels != cache_info->number_channels) ||
     (memcmp(p,q,image->number_channels*sizeof(*p)) != 0) ||
     (image->metacontent_extent != cache_info->metacontent_extent) ||
-    (cache_info->nexus_info == (NexusInfo **) NULL)) ? MagickTrue :
-    MagickFalse);
+    (cache_info->nexus_info == (NexusInfo **) NULL));
 }
 
 static inline MagickBooleanType ValidatePixelCacheMorphology(
@@ -1235,7 +1234,6 @@ static size_t GetStreamPacketSize(const StreamInfo *stream_info)
   switch (stream_info->storage_type)
   {
     default: packet_size=sizeof(unsigned char); break;
-    case CharPixel: packet_size=sizeof(unsigned char); break;
     case DoublePixel: packet_size=sizeof(double); break;
     case FloatPixel: packet_size=sizeof(float); break;
     case LongPixel: packet_size=sizeof(unsigned int); break;
@@ -3179,11 +3177,15 @@ static void StreamCharPixels(const StreamInfo *stream_info,const Image *image,
 }
 
 static void StreamDoublePixels(const StreamInfo *stream_info,const Image *image,
-  QuantumInfo *quantum_info,QuantumType *quantum_map,size_t length)
+  QuantumType *quantum_map,size_t length)
 {
+  QuantumInfo
+    *quantum_info;
+
   double
     *q;
 
+  quantum_info=stream_info->quantum_info;
   q=(double *) stream_info->pixels;
   if (LocaleCompare(stream_info->map,"BGR") == 0)
     {
@@ -3224,11 +3226,15 @@ static void StreamDoublePixels(const StreamInfo *stream_info,const Image *image,
 }
 
 static void StreamFloatPixels(const StreamInfo *stream_info,const Image *image,
-  QuantumInfo *quantum_info,QuantumType *quantum_map,size_t length)
+  QuantumType *quantum_map,size_t length)
 {
+  QuantumInfo
+    *quantum_info;
+
   float
     *q;
 
+  quantum_info=stream_info->quantum_info;
   q=(float *) stream_info->pixels;
   if (LocaleCompare(stream_info->map,"BGR") == 0)
     {
@@ -3448,11 +3454,61 @@ static void StreamShortPixels(const StreamInfo *stream_info,const Image *image,
   StreamShortMapPixels(image,quantum_map,length,q);
 }
 
+typedef struct _StreamMapInfo
+{
+  char
+    key;
+
+  QuantumType
+    quantum;
+
+  MagickBooleanType
+    separation;
+} StreamMapInfo;
+
+static const StreamMapInfo *GetStreamMapInfo(const char key)
+{
+  static const StreamMapInfo
+    map_info[] =
+    {
+      { 'A', AlphaQuantum, MagickFalse },
+      { 'a', AlphaQuantum, MagickFalse },
+      { 'B', BlueQuantum, MagickFalse },
+      { 'b', BlueQuantum, MagickFalse },
+      { 'C', CyanQuantum, MagickTrue },
+      { 'c', CyanQuantum, MagickTrue },
+      { 'G', GreenQuantum, MagickFalse },
+      { 'g', GreenQuantum, MagickFalse },
+      { 'I', IndexQuantum, MagickFalse },
+      { 'i', IndexQuantum, MagickFalse },
+      { 'K', BlackQuantum, MagickTrue },
+      { 'k', BlackQuantum, MagickTrue },
+      { 'M', MagentaQuantum, MagickTrue },
+      { 'm', MagentaQuantum, MagickTrue },
+      { 'O', OpacityQuantum, MagickFalse },
+      { 'o', OpacityQuantum, MagickFalse },
+      { 'P', UndefinedQuantum, MagickFalse },
+      { 'p', UndefinedQuantum, MagickFalse },
+      { 'R', RedQuantum, MagickFalse },
+      { 'r', RedQuantum, MagickFalse },
+      { 'Y', YellowQuantum, MagickTrue },
+      { 'y', YellowQuantum, MagickTrue }
+    };
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) (sizeof(map_info)/sizeof(*map_info)); i++)
+    if (map_info[i].key == key)
+      return(map_info+i);
+  return((const StreamMapInfo *) NULL);
+}
+
 static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
   const Image *image,ExceptionInfo *exception)
 {
-  QuantumInfo
-    *quantum_info;
+  const StreamMapInfo
+    *map_info;
 
   QuantumType
     *quantum_map;
@@ -3480,104 +3536,23 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
   (void) memset(quantum_map,0,length*sizeof(*quantum_map));
   for (i=0; i < (ssize_t) length; i++)
   {
-    switch (stream_info->map[i])
-    {
-      case 'A':
-      case 'a':
-      {
-        quantum_map[i]=AlphaQuantum;
-        break;
-      }
-      case 'B':
-      case 'b':
-      {
-        quantum_map[i]=BlueQuantum;
-        break;
-      }
-      case 'C':
-      case 'c':
-      {
-        quantum_map[i]=CyanQuantum;
-        if (image->colorspace == CMYKColorspace)
-          break;
-        quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
-        (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-          "ColorSeparatedImageRequired","`%s'",stream_info->map);
-        return(MagickFalse);
-      }
-      case 'g':
-      case 'G':
-      {
-        quantum_map[i]=GreenQuantum;
-        break;
-      }
-      case 'I':
-      case 'i':
-      {
-        quantum_map[i]=IndexQuantum;
-        break;
-      }
-      case 'K':
-      case 'k':
-      {
-        quantum_map[i]=BlackQuantum;
-        if (image->colorspace == CMYKColorspace)
-          break;
-        quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
-        (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-          "ColorSeparatedImageRequired","`%s'",stream_info->map);
-        return(MagickFalse);
-      }
-      case 'M':
-      case 'm':
-      {
-        quantum_map[i]=MagentaQuantum;
-        if (image->colorspace == CMYKColorspace)
-          break;
-        quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
-        (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-          "ColorSeparatedImageRequired","`%s'",stream_info->map);
-        return(MagickFalse);
-      }
-      case 'o':
-      case 'O':
-      {
-        quantum_map[i]=OpacityQuantum;
-        break;
-      }
-      case 'P':
-      case 'p':
-      {
-        quantum_map[i]=UndefinedQuantum;
-        break;
-      }
-      case 'R':
-      case 'r':
-      {
-        quantum_map[i]=RedQuantum;
-        break;
-      }
-      case 'Y':
-      case 'y':
-      {
-        quantum_map[i]=YellowQuantum;
-        if (image->colorspace == CMYKColorspace)
-          break;
-        quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
-        (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-          "ColorSeparatedImageRequired","`%s'",stream_info->map);
-        return(MagickFalse);
-      }
-      default:
+    map_info=GetStreamMapInfo(stream_info->map[i]);
+    if (map_info == (const StreamMapInfo *) NULL)
       {
         quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
         (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
           "UnrecognizedPixelMap","`%s'",stream_info->map);
         return(MagickFalse);
       }
-    }
+    quantum_map[i]=map_info->quantum;
+    if ((map_info->separation == MagickFalse) ||
+        (image->colorspace == CMYKColorspace))
+      continue;
+    quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
+    (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
+      "ColorSeparatedImageRequired","`%s'",stream_info->map);
+    return(MagickFalse);
   }
-  quantum_info=stream_info->quantum_info;
   switch (stream_info->storage_type)
   {
     case CharPixel:
@@ -3587,12 +3562,12 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
     }
     case DoublePixel:
     {
-      StreamDoublePixels(stream_info,image,quantum_info,quantum_map,length);
+      StreamDoublePixels(stream_info,image,quantum_map,length);
       break;
     }
     case FloatPixel:
     {
-      StreamFloatPixels(stream_info,image,quantum_info,quantum_map,length);
+      StreamFloatPixels(stream_info,image,quantum_map,length);
       break;
     }
     case LongPixel:

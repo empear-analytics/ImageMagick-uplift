@@ -949,26 +949,11 @@ static void ExportAnyDepthBGRQuantum(const Image *image,
   }
 }
 
-static void ExportBGRQuantum(const Image *image,QuantumInfo *quantum_info,
-  const QuantumPixelSpan *span)
+static void ExportOtherDepthBGRQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
 {
   switch (quantum_info->depth)
   {
-    case 8:
-    {
-      Export8BitBGRQuantum(image,quantum_info,span);
-      break;
-    }
-    case 10:
-    {
-      Export10BitBGRQuantum(image,quantum_info,span);
-      break;
-    }
-    case 12:
-    {
-      Export12BitBGRQuantum(image,quantum_info,span);
-      break;
-    }
     case 16:
     {
       Export16BitBGRQuantum(image,quantum_info,span);
@@ -991,6 +976,34 @@ static void ExportBGRQuantum(const Image *image,QuantumInfo *quantum_info,
     default:
     {
       ExportAnyDepthBGRQuantum(image,quantum_info,span);
+      break;
+    }
+  }
+}
+
+static void ExportBGRQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span)
+{
+  switch (quantum_info->depth)
+  {
+    case 8:
+    {
+      Export8BitBGRQuantum(image,quantum_info,span);
+      break;
+    }
+    case 10:
+    {
+      Export10BitBGRQuantum(image,quantum_info,span);
+      break;
+    }
+    case 12:
+    {
+      Export12BitBGRQuantum(image,quantum_info,span);
+      break;
+    }
+    default:
+    {
+      ExportOtherDepthBGRQuantum(image,quantum_info,span);
       break;
     }
   }
@@ -1029,6 +1042,18 @@ static void Export8BitBGRAQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static void GetUnpacked10BitAlphaSample(const Image *image,
+  const Quantum *magick_restrict p,const ssize_t i,size_t *quantum)
+{
+  switch (i)
+  {
+    case 0: *quantum=(size_t) GetPixelRed(image,p); break;
+    case 1: *quantum=(size_t) GetPixelGreen(image,p); break;
+    case 2: *quantum=(size_t) GetPixelBlue(image,p); break;
+    case 3: *quantum=(size_t) GetPixelAlpha(image,p); break;
+  }
+}
+
 static void ExportUnpacked10BitBGRAQuantum(const Image *image,
   QuantumInfo *quantum_info,const QuantumPixelSpan *span,QuantumAny range)
 {
@@ -1063,13 +1088,7 @@ static void ExportUnpacked10BitBGRAQuantum(const Image *image,
   {
     for (i=0; i < 4; i++)
     {
-      switch (i)
-      {
-        case 0: quantum=(size_t) GetPixelRed(image,p); break;
-        case 1: quantum=(size_t) GetPixelGreen(image,p); break;
-        case 2: quantum=(size_t) GetPixelBlue(image,p); break;
-        case 3: quantum=(size_t) GetPixelAlpha(image,p); break;
-      }
+      GetUnpacked10BitAlphaSample(image,p,i,&quantum);
       switch (n % 3)
       {
         case 0:
@@ -1464,6 +1483,18 @@ static void Export8BitBGROQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static void GetUnpacked10BitOpacitySample(const Image *image,
+  const Quantum *magick_restrict p,const ssize_t i,size_t *quantum)
+{
+  switch (i)
+  {
+    case 0: *quantum=(size_t) GetPixelRed(image,p); break;
+    case 1: *quantum=(size_t) GetPixelGreen(image,p); break;
+    case 2: *quantum=(size_t) GetPixelBlue(image,p); break;
+    case 3: *quantum=(size_t) GetPixelOpacity(image,p); break;
+  }
+}
+
 static void ExportUnpacked10BitBGROQuantum(const Image *image,
   QuantumInfo *quantum_info,const QuantumPixelSpan *span,QuantumAny range)
 {
@@ -1498,13 +1529,7 @@ static void ExportUnpacked10BitBGROQuantum(const Image *image,
   {
     for (i=0; i < 4; i++)
     {
-      switch (i)
-      {
-        case 0: quantum=(size_t) GetPixelRed(image,p); break;
-        case 1: quantum=(size_t) GetPixelGreen(image,p); break;
-        case 2: quantum=(size_t) GetPixelBlue(image,p); break;
-        case 3: quantum=(size_t) GetPixelOpacity(image,p); break;
-      }
+      GetUnpacked10BitOpacitySample(image,p,i,&quantum);
       switch (n % 3)
       {
         case 0:
@@ -2896,6 +2921,13 @@ static void ExportCMYKOQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static inline int Get1BitBelowSample(const Image *image,
+  const Quantum *magick_restrict p,const double threshold,
+  const unsigned char black,const unsigned char white)
+{
+  return(GetPixelLuma(image,p) < threshold ? black : white);
+}
+
 static void Export1BitGrayQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span)
 {
@@ -2932,21 +2964,21 @@ static void Export1BitGrayQuantum(const Image *image,QuantumInfo *quantum_info,
   for (x=((ssize_t) number_pixels-7); x > 0; x-=8)
   {
     *q='\0';
-    *q|=(GetPixelLuma(image,p) < threshold ? black : white) << 7;
+    *q|=Get1BitBelowSample(image,p,threshold,black,white) << 7;
     p+=(ptrdiff_t) GetPixelChannels(image);
-    *q|=(GetPixelLuma(image,p) < threshold ? black : white) << 6;
+    *q|=Get1BitBelowSample(image,p,threshold,black,white) << 6;
     p+=(ptrdiff_t) GetPixelChannels(image);
-    *q|=(GetPixelLuma(image,p) < threshold ? black : white) << 5;
+    *q|=Get1BitBelowSample(image,p,threshold,black,white) << 5;
     p+=(ptrdiff_t) GetPixelChannels(image);
-    *q|=(GetPixelLuma(image,p) < threshold ? black : white) << 4;
+    *q|=Get1BitBelowSample(image,p,threshold,black,white) << 4;
     p+=(ptrdiff_t) GetPixelChannels(image);
-    *q|=(GetPixelLuma(image,p) < threshold ? black : white) << 3;
+    *q|=Get1BitBelowSample(image,p,threshold,black,white) << 3;
     p+=(ptrdiff_t) GetPixelChannels(image);
-    *q|=(GetPixelLuma(image,p) < threshold ? black : white) << 2;
+    *q|=Get1BitBelowSample(image,p,threshold,black,white) << 2;
     p+=(ptrdiff_t) GetPixelChannels(image);
-    *q|=(GetPixelLuma(image,p) < threshold ? black : white) << 1;
+    *q|=Get1BitBelowSample(image,p,threshold,black,white) << 1;
     p+=(ptrdiff_t) GetPixelChannels(image);
-    *q|=(GetPixelLuma(image,p) < threshold ? black : white) << 0;
+    *q|=Get1BitBelowSample(image,p,threshold,black,white) << 0;
     p+=(ptrdiff_t) GetPixelChannels(image);
     q++;
   }
@@ -2955,7 +2987,7 @@ static void Export1BitGrayQuantum(const Image *image,QuantumInfo *quantum_info,
       *q='\0';
       for (bit=7; bit >= (ssize_t) (8-(number_pixels % 8)); bit--)
       {
-        *q|=(GetPixelLuma(image,p) < threshold ? black : white) << bit;
+        *q|=Get1BitBelowSample(image,p,threshold,black,white) << bit;
         p+=(ptrdiff_t) GetPixelChannels(image);
       }
       q++;
@@ -3336,6 +3368,33 @@ static void ExportAnyDepthGrayQuantum(const Image *image,
   }
 }
 
+static void ExportOtherDepthGrayQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  switch (quantum_info->depth)
+  {
+    case 32:
+    {
+      Export32BitGrayQuantum(image,quantum_info,span);
+      break;
+    }
+    case 64:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          Export64BitFloatGrayQuantum(image,quantum_info,span);
+          break;
+        }
+      magick_fallthrough;
+    }
+    default:
+    {
+      ExportAnyDepthGrayQuantum(image,quantum_info,span);
+      break;
+    }
+  }
+}
+
 static void ExportGrayQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span)
 {
@@ -3371,26 +3430,30 @@ static void ExportGrayQuantum(const Image *image,QuantumInfo *quantum_info,
       Export16BitGrayQuantum(image,quantum_info,span);
       break;
     }
-    case 32:
-    {
-      Export32BitGrayQuantum(image,quantum_info,span);
-      break;
-    }
-    case 64:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          Export64BitFloatGrayQuantum(image,quantum_info,span);
-          break;
-        }
-      magick_fallthrough;
-    }
     default:
     {
-      ExportAnyDepthGrayQuantum(image,quantum_info,span);
+      ExportOtherDepthGrayQuantum(image,quantum_info,span);
       break;
     }
   }
+}
+
+static inline int Get1BitAboveSample(const Image *image,
+  const Quantum *magick_restrict p,const double threshold,
+  const unsigned char black,const unsigned char white)
+{
+  return(GetPixelLuma(image,p) > threshold ? black : white);
+}
+
+static inline int Get1BitOpaqueSample(const Image *image,
+  const Quantum *magick_restrict p)
+{
+  unsigned char
+    pixel;
+
+  pixel=(unsigned char) (GetPixelAlpha(image,p) == OpaqueAlpha ?
+    0x00 : 0x01);
+  return((int) pixel != 0 ? 0x00 : 0x01);
 }
 
 static void Export1BitGrayAlphaQuantum(const Image *image,
@@ -3413,7 +3476,6 @@ static void Export1BitGrayAlphaQuantum(const Image *image,
 
   unsigned char
     black,
-    pixel,
     white;
 
   ssize_t
@@ -3430,25 +3492,17 @@ static void Export1BitGrayAlphaQuantum(const Image *image,
   for (x=((ssize_t) number_pixels-3); x > 0; x-=4)
   {
     *q='\0';
-    *q|=(GetPixelLuma(image,p) > threshold ? black : white) << 7;
-    pixel=(unsigned char) (GetPixelAlpha(image,p) == OpaqueAlpha ?
-      0x00 : 0x01);
-    *q|=(((int) pixel != 0 ? 0x00 : 0x01) << 6);
+    *q|=Get1BitAboveSample(image,p,threshold,black,white) << 7;
+    *q|=Get1BitOpaqueSample(image,p) << 6;
     p+=(ptrdiff_t) GetPixelChannels(image);
-    *q|=(GetPixelLuma(image,p) > threshold ? black : white) << 5;
-    pixel=(unsigned char) (GetPixelAlpha(image,p) == OpaqueAlpha ?
-      0x00 : 0x01);
-    *q|=(((int) pixel != 0 ? 0x00 : 0x01) << 4);
+    *q|=Get1BitAboveSample(image,p,threshold,black,white) << 5;
+    *q|=Get1BitOpaqueSample(image,p) << 4;
     p+=(ptrdiff_t) GetPixelChannels(image);
-    *q|=(GetPixelLuma(image,p) > threshold ? black : white) << 3;
-    pixel=(unsigned char) (GetPixelAlpha(image,p) == OpaqueAlpha ?
-      0x00 : 0x01);
-    *q|=(((int) pixel != 0 ? 0x00 : 0x01) << 2);
+    *q|=Get1BitAboveSample(image,p,threshold,black,white) << 3;
+    *q|=Get1BitOpaqueSample(image,p) << 2;
     p+=(ptrdiff_t) GetPixelChannels(image);
-    *q|=(GetPixelLuma(image,p) > threshold ? black : white) << 1;
-    pixel=(unsigned char) (GetPixelAlpha(image,p) == OpaqueAlpha ?
-      0x00 : 0x01);
-    *q|=(((int) pixel != 0 ? 0x00 : 0x01) << 0);
+    *q|=Get1BitAboveSample(image,p,threshold,black,white) << 1;
+    *q|=Get1BitOpaqueSample(image,p) << 0;
     p+=(ptrdiff_t) GetPixelChannels(image);
     q++;
   }
@@ -3457,12 +3511,10 @@ static void Export1BitGrayAlphaQuantum(const Image *image,
       *q='\0';
       for (bit=0; bit <= (ssize_t) (number_pixels % 4); bit+=2)
       {
-        *q|=(GetPixelLuma(image,p) > threshold ? black : white) <<
+        *q|=Get1BitAboveSample(image,p,threshold,black,white) <<
           (7-bit);
-        pixel=(unsigned char) (GetPixelAlpha(image,p) == OpaqueAlpha ?
-          0x00 : 0x01);
-        *q|=(((int) pixel != 0 ? 0x00 : 0x01) << (unsigned char)
-          (7-bit-1));
+        *q|=Get1BitOpaqueSample(image,p) << (unsigned char)
+          (7-bit-1);
         p+=(ptrdiff_t) GetPixelChannels(image);
       }
       q++;
@@ -3715,26 +3767,11 @@ static void ExportAnyDepthGrayAlphaQuantum(const Image *image,
   }
 }
 
-static void ExportGrayAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
-  const QuantumPixelSpan *span)
+static void ExportOtherDepthGrayAlphaQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
 {
   switch (quantum_info->depth)
   {
-    case 1:
-    {
-      Export1BitGrayAlphaQuantum(image,quantum_info,span);
-      break;
-    }
-    case 4:
-    {
-      Export4BitGrayAlphaQuantum(image,span);
-      break;
-    }
-    case 8:
-    {
-      Export8BitGrayAlphaQuantum(image,quantum_info,span);
-      break;
-    }
     case 16:
     {
       Export16BitGrayAlphaQuantum(image,quantum_info,span);
@@ -3757,6 +3794,34 @@ static void ExportGrayAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
     default:
     {
       ExportAnyDepthGrayAlphaQuantum(image,quantum_info,span);
+      break;
+    }
+  }
+}
+
+static void ExportGrayAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span)
+{
+  switch (quantum_info->depth)
+  {
+    case 1:
+    {
+      Export1BitGrayAlphaQuantum(image,quantum_info,span);
+      break;
+    }
+    case 4:
+    {
+      Export4BitGrayAlphaQuantum(image,span);
+      break;
+    }
+    case 8:
+    {
+      Export8BitGrayAlphaQuantum(image,quantum_info,span);
+      break;
+    }
+    default:
+    {
+      ExportOtherDepthGrayAlphaQuantum(image,quantum_info,span);
       break;
     }
   }
@@ -4035,32 +4100,11 @@ static void ExportAnyDepthIndexQuantum(const Image *image,
   }
 }
 
-static void ExportIndexQuantum(const Image *image,QuantumInfo *quantum_info,
-  const QuantumPixelSpan *span,ExceptionInfo *exception)
+static void ExportOtherDepthIndexQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
 {
-  if (image->storage_class != PseudoClass)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-        "ColormappedImageRequired","`%s'",image->filename);
-      return;
-    }
   switch (quantum_info->depth)
   {
-    case 1:
-    {
-      Export1BitIndexQuantum(image,span);
-      break;
-    }
-    case 4:
-    {
-      Export4BitIndexQuantum(image,span);
-      break;
-    }
-    case 8:
-    {
-      Export8BitIndexQuantum(image,quantum_info,span);
-      break;
-    }
     case 16:
     {
       Export16BitIndexQuantum(image,quantum_info,span);
@@ -4088,6 +4132,47 @@ static void ExportIndexQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static void ExportIndexQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span,ExceptionInfo *exception)
+{
+  if (image->storage_class != PseudoClass)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
+        "ColormappedImageRequired","`%s'",image->filename);
+      return;
+    }
+  switch (quantum_info->depth)
+  {
+    case 1:
+    {
+      Export1BitIndexQuantum(image,span);
+      break;
+    }
+    case 4:
+    {
+      Export4BitIndexQuantum(image,span);
+      break;
+    }
+    case 8:
+    {
+      Export8BitIndexQuantum(image,quantum_info,span);
+      break;
+    }
+    default:
+    {
+      ExportOtherDepthIndexQuantum(image,quantum_info,span);
+      break;
+    }
+  }
+}
+
+static inline unsigned char Get1BitTransparentSample(const Image *image,
+  const Quantum *magick_restrict p)
+{
+  return((unsigned char) (GetPixelAlpha(image,p) == (Quantum)
+    TransparentAlpha ? 1 : 0));
+}
+
 static void Export1BitIndexAlphaQuantum(const Image *image,
   const QuantumPixelSpan *span)
 {
@@ -4113,26 +4198,22 @@ static void Export1BitIndexAlphaQuantum(const Image *image,
   {
     pixel=(unsigned char) ((ssize_t) GetPixelIndex(image,p));
     *q=((pixel & 0x01) << 7);
-    pixel=(unsigned char) (GetPixelAlpha(image,p) == (Quantum)
-      TransparentAlpha ? 1 : 0);
+    pixel=Get1BitTransparentSample(image,p);
     *q|=((pixel & 0x01) << 6);
     p+=(ptrdiff_t) GetPixelChannels(image);
     pixel=(unsigned char) ((ssize_t) GetPixelIndex(image,p));
     *q|=((pixel & 0x01) << 5);
-    pixel=(unsigned char) (GetPixelAlpha(image,p) == (Quantum)
-      TransparentAlpha ? 1 : 0);
+    pixel=Get1BitTransparentSample(image,p);
     *q|=((pixel & 0x01) << 4);
     p+=(ptrdiff_t) GetPixelChannels(image);
     pixel=(unsigned char) ((ssize_t) GetPixelIndex(image,p));
     *q|=((pixel & 0x01) << 3);
-    pixel=(unsigned char) (GetPixelAlpha(image,p) == (Quantum)
-      TransparentAlpha ? 1 : 0);
+    pixel=Get1BitTransparentSample(image,p);
     *q|=((pixel & 0x01) << 2);
     p+=(ptrdiff_t) GetPixelChannels(image);
     pixel=(unsigned char) ((ssize_t) GetPixelIndex(image,p));
     *q|=((pixel & 0x01) << 1);
-    pixel=(unsigned char) (GetPixelAlpha(image,p) == (Quantum)
-      TransparentAlpha ? 1 : 0);
+    pixel=Get1BitTransparentSample(image,p);
     *q|=((pixel & 0x01) << 0);
     p+=(ptrdiff_t) GetPixelChannels(image);
     q++;
@@ -4144,8 +4225,7 @@ static void Export1BitIndexAlphaQuantum(const Image *image,
       {
         pixel=(unsigned char) ((ssize_t) GetPixelIndex(image,p));
         *q|=((pixel & 0x01) << (unsigned char) (bit+4));
-        pixel=(unsigned char) (GetPixelAlpha(image,p) == (Quantum)
-          TransparentAlpha ? 1 : 0);
+        pixel=Get1BitTransparentSample(image,p);
         *q|=((pixel & 0x01) << (unsigned char) (bit+4-1));
         p+=(ptrdiff_t) GetPixelChannels(image);
       }
@@ -4394,6 +4474,38 @@ static void ExportAnyDepthIndexAlphaQuantum(const Image *image,
   }
 }
 
+static void ExportOtherDepthIndexAlphaQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  switch (quantum_info->depth)
+  {
+    case 16:
+    {
+      Export16BitIndexAlphaQuantum(image,quantum_info,span);
+      break;
+    }
+    case 32:
+    {
+      Export32BitIndexAlphaQuantum(image,quantum_info,span);
+      break;
+    }
+    case 64:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          Export64BitFloatIndexAlphaQuantum(image,quantum_info,span);
+          break;
+        }
+      magick_fallthrough;
+    }
+    default:
+    {
+      ExportAnyDepthIndexAlphaQuantum(image,quantum_info,span);
+      break;
+    }
+  }
+}
+
 static void ExportIndexAlphaQuantum(const Image *image,
   QuantumInfo *quantum_info,const QuantumPixelSpan *span,
   ExceptionInfo *exception)
@@ -4421,28 +4533,9 @@ static void ExportIndexAlphaQuantum(const Image *image,
       Export8BitIndexAlphaQuantum(image,quantum_info,span);
       break;
     }
-    case 16:
-    {
-      Export16BitIndexAlphaQuantum(image,quantum_info,span);
-      break;
-    }
-    case 32:
-    {
-      Export32BitIndexAlphaQuantum(image,quantum_info,span);
-      break;
-    }
-    case 64:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          Export64BitFloatIndexAlphaQuantum(image,quantum_info,span);
-          break;
-        }
-      magick_fallthrough;
-    }
     default:
     {
-      ExportAnyDepthIndexAlphaQuantum(image,quantum_info,span);
+      ExportOtherDepthIndexAlphaQuantum(image,quantum_info,span);
       break;
     }
   }
@@ -4661,28 +4754,11 @@ static void ExportAnyDepthMultispectralQuantum(const Image *image,
   }
 }
 
-static void ExportMultispectralQuantum(const Image *image,QuantumInfo *quantum_info,
-  const QuantumPixelSpan *span,ExceptionInfo *exception)
+static void ExportOtherDepthMultispectralQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
 {
-  if (image->number_meta_channels == 0)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-        "MultispectralImageRequired","`%s'",image->filename);
-      return;
-    }
-  if (quantum_info->meta_channel != 0)
-    {
-      ExportPixelChannel(image,quantum_info,span,
-        (PixelChannel) (MetaPixelChannels+quantum_info->meta_channel-1));
-      return;
-    }
   switch (quantum_info->depth)
   {
-    case 8:
-    {
-      Export8BitMultispectralQuantum(image,quantum_info,span);
-      break;
-    }
     case 16:
     {
       Export16BitMultispectralQuantum(image,quantum_info,span);
@@ -4705,6 +4781,36 @@ static void ExportMultispectralQuantum(const Image *image,QuantumInfo *quantum_i
     default:
     {
       ExportAnyDepthMultispectralQuantum(image,quantum_info,span);
+      break;
+    }
+  }
+}
+
+static void ExportMultispectralQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span,ExceptionInfo *exception)
+{
+  if (image->number_meta_channels == 0)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
+        "MultispectralImageRequired","`%s'",image->filename);
+      return;
+    }
+  if (quantum_info->meta_channel != 0)
+    {
+      ExportPixelChannel(image,quantum_info,span,
+        (PixelChannel) (MetaPixelChannels+quantum_info->meta_channel-1));
+      return;
+    }
+  switch (quantum_info->depth)
+  {
+    case 8:
+    {
+      Export8BitMultispectralQuantum(image,quantum_info,span);
+      break;
+    }
+    default:
+    {
+      ExportOtherDepthMultispectralQuantum(image,quantum_info,span);
       break;
     }
   }
@@ -5388,26 +5494,11 @@ static void ExportAnyDepthRGBQuantum(const Image *image,
   }
 }
 
-static void ExportRGBQuantum(const Image *image,QuantumInfo *quantum_info,
-  const QuantumPixelSpan *span)
+static void ExportOtherDepthRGBQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
 {
   switch (quantum_info->depth)
   {
-    case 8:
-    {
-      Export8BitRGBQuantum(image,quantum_info,span);
-      break;
-    }
-    case 10:
-    {
-      Export10BitRGBQuantum(image,quantum_info,span);
-      break;
-    }
-    case 12:
-    {
-      Export12BitRGBQuantum(image,quantum_info,span);
-      break;
-    }
     case 16:
     {
       Export16BitRGBQuantum(image,quantum_info,span);
@@ -5430,6 +5521,34 @@ static void ExportRGBQuantum(const Image *image,QuantumInfo *quantum_info,
     default:
     {
       ExportAnyDepthRGBQuantum(image,quantum_info,span);
+      break;
+    }
+  }
+}
+
+static void ExportRGBQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span)
+{
+  switch (quantum_info->depth)
+  {
+    case 8:
+    {
+      Export8BitRGBQuantum(image,quantum_info,span);
+      break;
+    }
+    case 10:
+    {
+      Export10BitRGBQuantum(image,quantum_info,span);
+      break;
+    }
+    case 12:
+    {
+      Export12BitRGBQuantum(image,quantum_info,span);
+      break;
+    }
+    default:
+    {
+      ExportOtherDepthRGBQuantum(image,quantum_info,span);
       break;
     }
   }
@@ -5502,13 +5621,7 @@ static void ExportUnpacked10BitRGBAQuantum(const Image *image,
   {
     for (i=0; i < 4; i++)
     {
-      switch (i)
-      {
-        case 0: quantum=(size_t) GetPixelRed(image,p); break;
-        case 1: quantum=(size_t) GetPixelGreen(image,p); break;
-        case 2: quantum=(size_t) GetPixelBlue(image,p); break;
-        case 3: quantum=(size_t) GetPixelAlpha(image,p); break;
-      }
+      GetUnpacked10BitAlphaSample(image,p,i,&quantum);
       switch (n % 3)
       {
         case 0:
@@ -5937,13 +6050,7 @@ static void ExportUnpacked10BitRGBOQuantum(const Image *image,
   {
     for (i=0; i < 4; i++)
     {
-      switch (i)
-      {
-        case 0: quantum=(size_t) GetPixelRed(image,p); break;
-        case 1: quantum=(size_t) GetPixelGreen(image,p); break;
-        case 2: quantum=(size_t) GetPixelBlue(image,p); break;
-        case 3: quantum=(size_t) GetPixelOpacity(image,p); break;
-      }
+      GetUnpacked10BitOpacitySample(image,p,i,&quantum);
       switch (n % 3)
       {
         case 0:
@@ -6372,6 +6479,207 @@ static void AssociateQuantumAlpha(const Image *image,CacheView *image_view)
   }
 }
 
+static inline MagickBooleanType IsCbYCrQuantumType(
+  const QuantumType quantum_type)
+{
+  return(((quantum_type == CbYCrQuantum) || (quantum_type == CbYCrAQuantum)) ?
+    MagickTrue : MagickFalse);
+}
+
+static void ExportRGBFamilyQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumType quantum_type,QuantumPixelSpan span)
+{
+  switch (quantum_type)
+  {
+    case BGRQuantum:
+    {
+      ExportBGRQuantum(image,quantum_info,&span);
+      break;
+    }
+    case RGBQuantum:
+    case CbYCrQuantum:
+    {
+      ExportRGBQuantum(image,quantum_info,&span);
+      break;
+    }
+    case RGBAQuantum:
+    case CbYCrAQuantum:
+    {
+      ExportRGBAQuantum(image,quantum_info,&span);
+      break;
+    }
+    case RGBOQuantum:
+    {
+      ExportRGBOQuantum(image,quantum_info,&span);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void ExportBGRGrayFamilyQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumType quantum_type,
+  QuantumPixelSpan span)
+{
+  switch (quantum_type)
+  {
+    case BGRAQuantum:
+    {
+      ExportBGRAQuantum(image,quantum_info,&span);
+      break;
+    }
+    case BGROQuantum:
+    {
+      ExportBGROQuantum(image,quantum_info,&span);
+      break;
+    }
+    case GrayQuantum:
+    {
+      ExportGrayQuantum(image,quantum_info,&span);
+      break;
+    }
+    case GrayAlphaQuantum:
+    {
+      ExportGrayAlphaQuantum(image,quantum_info,&span);
+      break;
+    }
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      ExportPixelChannel(image,quantum_info,&span,RedPixelChannel);
+      break;
+    }
+    default:
+    {
+      ExportRGBFamilyQuantum(image,quantum_info,quantum_type,span);
+      break;
+    }
+  }
+}
+
+static void ExportChannelFamilyQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumType quantum_type,
+  QuantumPixelSpan span)
+{
+  switch (quantum_type)
+  {
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      ExportPixelChannel(image,quantum_info,&span,BluePixelChannel);
+      break;
+    }
+    case CbYCrYQuantum:
+    {
+      ExportCbYCrYQuantum(image,quantum_info,&span);
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      ExportPixelChannel(image,quantum_info,&span,
+        GreenPixelChannel);
+      break;
+    }
+    default:
+    {
+      ExportBGRGrayFamilyQuantum(image,quantum_info,quantum_type,span);
+      break;
+    }
+  }
+}
+
+static void ExportCMYKFamilyQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumType quantum_type,
+  QuantumPixelSpan span,ExceptionInfo *exception)
+{
+  switch (quantum_type)
+  {
+    case BlackQuantum:
+    {
+      ExportBlackQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    case CMYKQuantum:
+    {
+      ExportCMYKQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    case CMYKAQuantum:
+    {
+      ExportCMYKAQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    case MultispectralQuantum:
+    {
+      ExportMultispectralQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    case CMYKOQuantum:
+    {
+      ExportCMYKOQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    case OpacityQuantum:
+    {
+      ExportOpacityQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    default:
+    {
+      ExportChannelFamilyQuantum(image,quantum_info,quantum_type,span);
+      break;
+    }
+  }
+}
+
+static void ExportIndexFamilyQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumType quantum_type,
+  QuantumPixelSpan span,ExceptionInfo *exception)
+{
+  switch (quantum_type)
+  {
+    case IndexQuantum:
+    {
+      ExportIndexQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    case IndexAlphaQuantum:
+    {
+      ExportIndexAlphaQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    default:
+    {
+      ExportCMYKFamilyQuantum(image,quantum_info,quantum_type,span,exception);
+      break;
+    }
+  }
+}
+
+static void GetExportPixelQueue(const Image *image,CacheView *image_view,
+  MagickSizeType *number_pixels,const Quantum *magick_restrict *p)
+{
+  if (image_view == (CacheView *) NULL)
+    {
+      *number_pixels=GetImageExtent(image);
+      *p=GetVirtualPixelQueue(image);
+    }
+  else
+    {
+      *number_pixels=GetCacheViewExtent(image_view);
+      *p=GetCacheViewVirtualPixelQueue(image_view);
+    }
+}
+
+static void SwapCbYCrRedGreen(const Image *image,CacheView *image_view,
+  const QuantumType quantum_type,const MagickSizeType number_pixels)
+{
+  if (IsCbYCrQuantumType(quantum_type) != MagickFalse)
+    SwapRedGreenQuantum(image,image_view,number_pixels);
+}
+
 MagickExport size_t ExportQuantumPixels(const Image *image,
   CacheView *image_view,QuantumInfo *quantum_info,
   const QuantumType quantum_type,unsigned char *magick_restrict pixels,
@@ -6401,22 +6709,12 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   if (pixels == (unsigned char *) NULL)
     pixels=(unsigned char *) GetQuantumPixels(quantum_info);
-  if (image_view == (CacheView *) NULL)
-    {
-      number_pixels=GetImageExtent(image);
-      p=GetVirtualPixelQueue(image);
-    }
-  else
-    {
-      number_pixels=GetCacheViewExtent(image_view);
-      p=GetCacheViewVirtualPixelQueue(image_view);
-    }
+  GetExportPixelQueue(image,image_view,&number_pixels,&p);
   if (p == (Quantum *) NULL)
     return(0);
   if (quantum_info->alpha_type == AssociatedQuantumAlpha)
     AssociateQuantumAlpha(image,image_view);
-  if ((quantum_type == CbYCrQuantum) || (quantum_type == CbYCrAQuantum))
-    SwapRedGreenQuantum(image,image_view,number_pixels);
+  SwapCbYCrRedGreen(image,image_view,quantum_type,number_pixels);
   q=pixels;
   ResetQuantumState(quantum_info);
   extent=GetQuantumExtent(image,quantum_info,quantum_type);
@@ -6431,116 +6729,12 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
       ExportAlphaQuantum(image,quantum_info,&span,exception);
       break;
     }
-    case BGRQuantum:
-    {
-      ExportBGRQuantum(image,quantum_info,&span);
-      break;
-    }
-    case BGRAQuantum:
-    {
-      ExportBGRAQuantum(image,quantum_info,&span);
-      break;
-    }
-    case BGROQuantum:
-    {
-      ExportBGROQuantum(image,quantum_info,&span);
-      break;
-    }
-    case BlackQuantum:
-    {
-      ExportBlackQuantum(image,quantum_info,&span,exception);
-      break;
-    }
-    case BlueQuantum:
-    case YellowQuantum:
-    {
-      ExportPixelChannel(image,quantum_info,&span,BluePixelChannel);
-      break;
-    }
-    case CMYKQuantum:
-    {
-      ExportCMYKQuantum(image,quantum_info,&span,exception);
-      break;
-    }
-    case CMYKAQuantum:
-    {
-      ExportCMYKAQuantum(image,quantum_info,&span,exception);
-      break;
-    }
-    case MultispectralQuantum:
-    {
-      ExportMultispectralQuantum(image,quantum_info,&span,exception);
-      break;
-    }
-    case CMYKOQuantum:
-    {
-      ExportCMYKOQuantum(image,quantum_info,&span,exception);
-      break;
-    }
-    case CbYCrYQuantum:
-    {
-      ExportCbYCrYQuantum(image,quantum_info,&span);
-      break;
-    }
-    case GrayQuantum:
-    {
-      ExportGrayQuantum(image,quantum_info,&span);
-      break;
-    }
-    case GrayAlphaQuantum:
-    {
-      ExportGrayAlphaQuantum(image,quantum_info,&span);
-      break;
-    }
-    case GreenQuantum:
-    case MagentaQuantum:
-    {
-      ExportPixelChannel(image,quantum_info,&span,
-        GreenPixelChannel);
-      break;
-    }
-    case IndexQuantum:
-    {
-      ExportIndexQuantum(image,quantum_info,&span,exception);
-      break;
-    }
-    case IndexAlphaQuantum:
-    {
-      ExportIndexAlphaQuantum(image,quantum_info,&span,exception);
-      break;
-    }
-    case RedQuantum:
-    case CyanQuantum:
-    {
-      ExportPixelChannel(image,quantum_info,&span,RedPixelChannel);
-      break;
-    }
-    case OpacityQuantum:
-    {
-      ExportOpacityQuantum(image,quantum_info,&span,exception);
-      break;
-    }
-    case RGBQuantum:
-    case CbYCrQuantum:
-    {
-      ExportRGBQuantum(image,quantum_info,&span);
-      break;
-    }
-    case RGBAQuantum:
-    case CbYCrAQuantum:
-    {
-      ExportRGBAQuantum(image,quantum_info,&span);
-      break;
-    }
-    case RGBOQuantum:
-    {
-      ExportRGBOQuantum(image,quantum_info,&span);
-      break;
-    }
     default:
+    {
+      ExportIndexFamilyQuantum(image,quantum_info,quantum_type,span,exception);
       break;
+    }
   }
-  if ((quantum_type == CbYCrQuantum) || (quantum_type == CbYCrAQuantum))
-    SwapRedGreenQuantum(image,image_view,number_pixels);
+  SwapCbYCrRedGreen(image,image_view,quantum_type,number_pixels);
   return(extent);
 }

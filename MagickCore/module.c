@@ -387,6 +387,21 @@ static int ModuleCompare(const void *x,const void *y)
 }
 #endif
 
+static MagickBooleanType IsModuleMatch(const char *name,const char *pattern,
+  const MagickModuleType type)
+{
+  MagickBooleanType
+    status;
+
+  if (type == MagickImageFilterModule)
+    status=GlobExpression(name,FilterGlobExpression,MagickFalse);
+  else
+    status=GlobExpression(name,ModuleGlobExpression,MagickFalse);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  return(GlobExpression(name,pattern,MagickFalse));
+}
+
 MagickExport char **GetModuleList(const char *pattern,
   const MagickModuleType type,size_t *number_modules,ExceptionInfo *exception)
 {
@@ -457,13 +472,7 @@ MagickExport char **GetModuleList(const char *pattern,
   while ((MagickReadDirectory(directory,buffer,&entry) == 0) &&
          (entry != (struct dirent *) NULL))
   {
-    if (type == MagickImageFilterModule)
-      status=GlobExpression(entry->d_name,FilterGlobExpression,MagickFalse);
-    else
-      status=GlobExpression(entry->d_name,ModuleGlobExpression,MagickFalse);
-    if (status == MagickFalse)
-      continue;
-    if (GlobExpression(entry->d_name,pattern,MagickFalse) == MagickFalse)
+    if (IsModuleMatch(entry->d_name,pattern,type) == MagickFalse)
       continue;
     if (i >= (ssize_t) max_entries)
       {
