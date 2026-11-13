@@ -2735,6 +2735,28 @@ static inline MagickBooleanType IsTokenCharacter(const char *p,
     (*p != '\0')) ? MagickTrue : MagickFalse);
 }
 
+static const char *ReadOptionToken(const char *p,const int sentinel,
+  char *token,MagickBooleanType *negate)
+{
+  char
+    *q;
+
+  while (IsTokenSeparator(p,sentinel) != MagickFalse)
+    p++;
+  *negate=(*p == '!') ? MagickTrue : MagickFalse;
+  if (*negate != MagickFalse)
+    p++;
+  q=token;
+  while (IsTokenCharacter(p,sentinel) != MagickFalse)
+  {
+    if ((q-token) >= (MagickPathExtent-1))
+      break;
+    *q++=(*p++);
+  }
+  *q='\0';
+  return(p);
+}
+
 MagickExport ssize_t GetCommandOptionFlags(const CommandOption option,
   const MagickBooleanType list,const char *options)
 {
@@ -2750,9 +2772,6 @@ MagickExport ssize_t GetCommandOptionFlags(const CommandOption option,
 
   MagickBooleanType
     negate;
-
-  char
-    *q;
 
   const char
     *p;
@@ -2771,19 +2790,7 @@ MagickExport ssize_t GetCommandOptionFlags(const CommandOption option,
     sentinel='|';
   for (p=options; p != (char *) NULL; p=strchr(p,sentinel))
   {
-    while (IsTokenSeparator(p,sentinel) != MagickFalse)
-      p++;
-    negate=(*p == '!') ? MagickTrue : MagickFalse;
-    if (negate != MagickFalse)
-      p++;
-    q=token;
-    while (IsTokenCharacter(p,sentinel) != MagickFalse)
-    {
-      if ((q-token) >= (MagickPathExtent-1))
-        break;
-      *q++=(*p++);
-    }
-    *q='\0';
+    p=ReadOptionToken(p,sentinel,token,&negate);
     command_info=FindCommandOptionInfo(option_info,token);
     if (command_info->mnemonic == (const char *) NULL)
       return(-1);
@@ -3304,9 +3311,6 @@ MagickExport ssize_t ParseCommandOption(const CommandOption option,
   MagickBooleanType
     negate;
 
-  char
-    *q;
-
   const char
     *p;
 
@@ -3324,19 +3328,7 @@ MagickExport ssize_t ParseCommandOption(const CommandOption option,
     sentinel='|';
   for (p=options; p != (char *) NULL; p=strchr(p,sentinel))
   {
-    while (IsTokenSeparator(p,sentinel) != MagickFalse)
-      p++;
-    negate=(*p == '!') ? MagickTrue : MagickFalse;
-    if (negate != MagickFalse)
-      p++;
-    q=token;
-    while (IsTokenCharacter(p,sentinel) != MagickFalse)
-    {
-      if ((q-token) >= (MagickPathExtent-1))
-        break;
-      *q++=(*p++);
-    }
-    *q='\0';
+    p=ReadOptionToken(p,sentinel,token,&negate);
     command_info=FindCommandOptionInfo(option_info,token);
     if (command_info->mnemonic == (const char *) NULL)
       return(-1);
