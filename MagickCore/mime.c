@@ -1072,7 +1072,7 @@ static MagickBooleanType LoadMimeCache(const MimeLoadTarget *target,
     mime=GetNextXMLTreeTag(mime);
   }
   mime_map=DestroyXMLTree(mime_map);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (status != 0));
 }
 #endif
 
