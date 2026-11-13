@@ -917,12 +917,40 @@ static MagickBooleanType GetFontConfigFile(FcPattern *font,FcChar8 **family,
   return(MagickTrue);
 }
 
-MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
-  ExceptionInfo *exception)
+static void SetFontConfigTypeInfo(TypeInfo *type_info,FcPattern *font,
+  FcChar8 *family,FcChar8 *file)
 {
   char
     name[MagickPathExtent];
 
+  FcResult
+    status;
+
+  int
+    index,
+    slant,
+    width,
+    weight;
+
+  GetFontConfigName(font,family,name);
+  type_info->name=ConstantString(name);
+  (void) SubstituteString(&type_info->name," ","-");
+  type_info->family=ConstantString((const char *) family);
+  status=FcPatternGetInteger(font,FC_INDEX,0,&index);
+  if (status == FcResultMatch)
+    type_info->face=(size_t) index;
+  status=FcPatternGetInteger(font,FC_SLANT,0,&slant);
+  type_info->style=GetFontConfigStyle(slant);
+  status=FcPatternGetInteger(font,FC_WIDTH,0,&width);
+  type_info->stretch=GetFontConfigStretch(width);
+  status=FcPatternGetInteger(font,FC_WEIGHT,0,&weight);
+  type_info->weight=GetFontConfigWeight(weight);
+  type_info->glyphs=ConstantString((const char *) file);
+}
+
+MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
+  ExceptionInfo *exception)
+{
   FcBool
     result;
 
@@ -935,15 +963,6 @@ MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
 
   FcFontSet
     *font_set;
-
-  FcResult
-    status;
-
-  int
-    index,
-    slant,
-    width,
-    weight;
 
   ssize_t
     i;
@@ -978,20 +997,7 @@ MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
     (void) memset(type_info,0,sizeof(*type_info));
     type_info->path=ConstantString("System Fonts");
     type_info->signature=MagickCoreSignature;
-    GetFontConfigName(font_set->fonts[i],family,name);
-    type_info->name=ConstantString(name);
-    (void) SubstituteString(&type_info->name," ","-");
-    type_info->family=ConstantString((const char *) family);
-    status=FcPatternGetInteger(font_set->fonts[i],FC_INDEX,0,&index);
-    if (status == FcResultMatch)
-      type_info->face=(size_t) index;
-    status=FcPatternGetInteger(font_set->fonts[i],FC_SLANT,0,&slant);
-    type_info->style=GetFontConfigStyle(slant);
-    status=FcPatternGetInteger(font_set->fonts[i],FC_WIDTH,0,&width);
-    type_info->stretch=GetFontConfigStretch(width);
-    status=FcPatternGetInteger(font_set->fonts[i],FC_WEIGHT,0,&weight);
-    type_info->weight=GetFontConfigWeight(weight);
-    type_info->glyphs=ConstantString((const char *) file);
+    SetFontConfigTypeInfo(type_info,font_set->fonts[i],family,file);
     (void) AddValueToSplayTree(type_cache,type_info->name,type_info);
   }
   FcFontSetDestroy(font_set);
