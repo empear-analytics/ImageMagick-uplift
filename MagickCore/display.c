@@ -4383,6 +4383,57 @@ static const ModeType
     ColorEditDismissCommand
   };
 
+typedef struct _ColorEditContext
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    **image;
+
+  ExceptionInfo
+    *exception;
+
+  const ModeType
+    *ColorEditCommands;
+} ColorEditContext;
+
+static void XColorEditCommandAction(const ColorEditContext *context,
+  const int id,size_t *state)
+{
+  switch (context->ColorEditCommands[id])
+  {
+    case ColorEditUndoCommand:
+    {
+      (void) XMagickCommand(context->display,context->resource_info,
+        context->windows,UndoCommand,context->image,context->exception);
+      break;
+    }
+    case ColorEditHelpCommand:
+    default:
+    {
+      XTextViewHelp(context->display,context->resource_info,context->windows,
+        MagickFalse,"Help Viewer - Image Annotation",ImageColorEditHelp);
+      break;
+    }
+    case ColorEditDismissCommand:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+  }
+}
+
 static MagickBooleanType XColorEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -4423,6 +4474,9 @@ static MagickBooleanType XColorEditImage(Display *display,
   XEvent
     event;
 
+  ColorEditContext
+    context;
+
   const PaintMethodTargets
     method_targets = { &method };
 
@@ -4454,6 +4508,12 @@ static MagickBooleanType XColorEditImage(Display *display,
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask | PointerMotionMask);
   state=DefaultState;
+  context.display=display;
+  context.resource_info=resource_info;
+  context.windows=windows;
+  context.image=image;
+  context.exception=exception;
+  context.ColorEditCommands=ColorEditCommands;
   do
   {
     if (windows->info.mapped != MagickFalse)
@@ -4540,26 +4600,9 @@ static MagickBooleanType XColorEditImage(Display *display,
             XSelectFuzzFactor(&menu_input,FuzzMenu,fuzz,image);
             break;
           }
-          case ColorEditUndoCommand:
-          {
-            (void) XMagickCommand(display,resource_info,windows,UndoCommand,
-              image,exception);
-            break;
-          }
-          case ColorEditHelpCommand:
           default:
           {
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Image Annotation",ImageColorEditHelp);
-            break;
-          }
-          case ColorEditDismissCommand:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=EscapeState;
-            state|=ExitState;
+            XColorEditCommandAction(&context,id,&state);
             break;
           }
         }
