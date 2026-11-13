@@ -796,6 +796,35 @@ static inline double MeshInterpolate(const PointInfo *delta,const double p,
   return(delta->x*x+delta->y*y+(1.0-delta->x-delta->y)*p);
 }
 
+static const ssize_t
+  mesh_corners[4][3] =
+  {
+    { 2, 3, 0 },  /* bottom-left triangle, diagonal 0-3 */
+    { 1, 0, 3 },  /* top-right triangle, diagonal 0-3 */
+    { 0, 1, 2 },  /* top-left triangle, diagonal 1-2 */
+    { 3, 2, 1 }   /* bottom-right triangle, diagonal 1-2 */
+  };
+
+static const ssize_t *SelectMeshTriangle(PointInfo *delta,
+  const MagickBooleanType diagonal_nw_se)
+{
+  if (diagonal_nw_se != MagickFalse)
+    {
+      if (delta->x <= delta->y)
+        {
+          delta->y=1.0-delta->y;
+          return(mesh_corners[0]);
+        }
+      delta->x=1.0-delta->x;
+      return(mesh_corners[1]);
+    }
+  if (delta->x <= (1.0-delta->y))
+    return(mesh_corners[2]);
+  delta->x=1.0-delta->x;
+  delta->y=1.0-delta->y;
+  return(mesh_corners[3]);
+}
+
 typedef struct _ChannelInterpolation
 {
   const Image
@@ -825,6 +854,9 @@ typedef struct _ChannelInterpolation
 static MagickBooleanType InterpolateMeshPixelChannel(
   const ChannelInterpolation *grid,double *pixel,MagickBooleanType status)
 {
+  const ssize_t
+    *corner;
+
   const Quantum
     *magick_restrict p;
 
@@ -852,62 +884,13 @@ static MagickBooleanType InterpolateMeshPixelChannel(
     GetPixelLuma(grid->image,p+3*GetPixelChannels(grid->image));
   luminance.y=GetPixelLuma(grid->image,p+GetPixelChannels(grid->image))-(double)
     GetPixelLuma(grid->image,p+2*GetPixelChannels(grid->image));
-  if (fabs((double) luminance.x) < fabs((double) luminance.y))
-    {
-      /*
-        Diagonal 0-3 NW-SE.
-      */
-      if (delta.x <= delta.y)
-        {
-          /*
-            Bottom-left triangle (pixel: 2, diagonal: 0-3).
-          */
-          delta.y=1.0-delta.y;
-          gamma=MeshInterpolate(&delta,alpha[2],alpha[3],alpha[0]);
-          gamma=MagickSafeReciprocal(gamma);
-          *pixel=gamma*MeshInterpolate(&delta,pixels[2],pixels[3],
-            pixels[0]);
-        }
-      else
-        {
-          /*
-            Top-right triangle (pixel: 1, diagonal: 0-3).
-          */
-          delta.x=1.0-delta.x;
-          gamma=MeshInterpolate(&delta,alpha[1],alpha[0],alpha[3]);
-          gamma=MagickSafeReciprocal(gamma);
-          *pixel=gamma*MeshInterpolate(&delta,pixels[1],pixels[0],
-            pixels[3]);
-        }
-    }
-  else
-    {
-      /*
-        Diagonal 1-2 NE-SW.
-      */
-      if (delta.x <= (1.0-delta.y))
-        {
-          /*
-            Top-left triangle (pixel: 0, diagonal: 1-2).
-          */
-          gamma=MeshInterpolate(&delta,alpha[0],alpha[1],alpha[2]);
-          gamma=MagickSafeReciprocal(gamma);
-          *pixel=gamma*MeshInterpolate(&delta,pixels[0],pixels[1],
-            pixels[2]);
-        }
-      else
-        {
-          /*
-            Bottom-right triangle (pixel: 3, diagonal: 1-2).
-          */
-          delta.x=1.0-delta.x;
-          delta.y=1.0-delta.y;
-          gamma=MeshInterpolate(&delta,alpha[3],alpha[2],alpha[1]);
-          gamma=MagickSafeReciprocal(gamma);
-          *pixel=gamma*MeshInterpolate(&delta,pixels[3],pixels[2],
-            pixels[1]);
-        }
-    }
+  corner=SelectMeshTriangle(&delta,fabs((double) luminance.x) <
+    fabs((double) luminance.y));
+  gamma=MeshInterpolate(&delta,alpha[corner[0]],alpha[corner[1]],
+    alpha[corner[2]]);
+  gamma=MagickSafeReciprocal(gamma);
+  *pixel=gamma*MeshInterpolate(&delta,pixels[corner[0]],pixels[corner[1]],
+    pixels[corner[2]]);
   return(status);
 }
 
