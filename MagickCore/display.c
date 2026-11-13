@@ -3845,6 +3845,66 @@ static void XChopDragEvent(const XEvent *event,const ChopTargets *targets)
   }
 }
 
+static void XChopDragLine(const ChopEventInput *input,
+  const ChopTargets *targets,RectangleInfo *chop_info,unsigned int *distance)
+{
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  XWindows
+    *const windows = input->windows;
+
+  XSegment
+    *const segment_info = targets->segment_info;
+
+  size_t
+    *const state = targets->state;
+
+  ModeType
+    *const direction = targets->direction;
+
+  XEvent
+    event;
+
+  (*chop_info).width=0;
+  (*chop_info).height=0;
+  (*chop_info).x=0;
+  (*chop_info).y=0;
+  (*distance)=0;
+  (void) XSetFunction(display,windows->image.highlight_context,GXinvert);
+  (*state)=DefaultState;
+  do
+  {
+    XShowChopSelection(input,(*distance),(*chop_info),segment_info);
+    /*
+      Wait for next event.
+    */
+    XScreenEvent(display,windows,&event,exception);
+    if ((*distance) > 9)
+      XHighlightLine(display,windows->image.id,
+        windows->image.highlight_context,segment_info);
+    XChopDragEvent(&event,targets);
+    XClampChopSegment(windows,segment_info);
+    (*distance)=(unsigned int)
+      ((((*segment_info).x2-(*segment_info).x1)*
+        ((*segment_info).x2-(*segment_info).x1))+
+       (((*segment_info).y2-(*segment_info).y1)*
+        ((*segment_info).y2-(*segment_info).y1)));
+    /*
+      Compute chopping geometry.
+    */
+    if ((*direction) == HorizontalChopCommand)
+      XChopHorizontalGeometry(windows,segment_info,chop_info);
+    else
+      XChopVerticalGeometry(windows,segment_info,chop_info);
+  } while (((*state) & ExitState) == 0);
+  (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
+  (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+}
+
 static MagickBooleanType XChopImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -3887,9 +3947,6 @@ static MagickBooleanType XChopImage(Display *display,
   unsigned int
     distance;
 
-  XEvent
-    event;
-
   XSegment
     segment_info;
 
@@ -3929,38 +3986,7 @@ static MagickBooleanType XChopImage(Display *display,
   /*
     Draw line as pointer moves until the mouse button is released.
   */
-  chop_info.width=0;
-  chop_info.height=0;
-  chop_info.x=0;
-  chop_info.y=0;
-  distance=0;
-  (void) XSetFunction(display,windows->image.highlight_context,GXinvert);
-  state=DefaultState;
-  do
-  {
-    XShowChopSelection(&input,distance,chop_info,&segment_info);
-    /*
-      Wait for next event.
-    */
-    XScreenEvent(display,windows,&event,exception);
-    if (distance > 9)
-      XHighlightLine(display,windows->image.id,
-        windows->image.highlight_context,&segment_info);
-    XChopDragEvent(&event,&targets);
-    XClampChopSegment(windows,&segment_info);
-    distance=(unsigned int)
-      (((segment_info.x2-segment_info.x1)*(segment_info.x2-segment_info.x1))+
-       ((segment_info.y2-segment_info.y1)*(segment_info.y2-segment_info.y1)));
-    /*
-      Compute chopping geometry.
-    */
-    if (direction == HorizontalChopCommand)
-      XChopHorizontalGeometry(windows,&segment_info,&chop_info);
-    else
-      XChopVerticalGeometry(windows,&segment_info,&chop_info);
-  } while ((state & ExitState) == 0);
-  (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
-  (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+  XChopDragLine(&input,&targets,&chop_info,&distance);
   if (distance <= 9)
     return(MagickTrue);
   return(XChopApply(&input,image,chop_info));
