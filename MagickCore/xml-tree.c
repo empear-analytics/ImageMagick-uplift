@@ -1951,6 +1951,12 @@ static MagickBooleanType IsNonCircularEntity(char *n,char *v,char **entities)
     MagickFalse);
 }
 
+static void DestroyParsedEntity(char **entities,const ssize_t i,char *v)
+{
+  if (entities[i+1] != v)
+    entities[i+1]=DestroyString(entities[i+1]);
+}
+
 static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
   size_t length,ExceptionInfo *exception)
 {
@@ -2016,8 +2022,7 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
           entities[i]=n;
         else
           {
-            if (entities[i+1] != v)
-              entities[i+1]=DestroyString(entities[i+1]);
+            DestroyParsedEntity(entities,i,v);
             (void) ThrowMagickException(exception,GetMagickModule(),
               OptionWarning,"ParseError","circular entity declaration %s",n);
             predefined_entities=(char **) RelinquishMagickMemory(
