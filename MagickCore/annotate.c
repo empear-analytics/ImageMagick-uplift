@@ -2455,6 +2455,18 @@ static FT_Int32 GetFreetypeLoadFlags(const DrawInfo *draw_info)
   return(flags);
 }
 
+static DrawInfo *CloneFreetypeAnnotateInfo(const DrawInfo *draw_info)
+{
+  DrawInfo
+    *annotate_info;
+
+  annotate_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
+  if (annotate_info->dash_pattern != (double *) NULL)
+    annotate_info->dash_pattern[0]=0.0;
+  (void) CloneString(&annotate_info->primitive,"path '");
+  return(annotate_info);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2710,10 +2722,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   origin.x=0;
   origin.y=0;
   affine=GetFreetypeAffine(draw_info);
-  annotate_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
-  if (annotate_info->dash_pattern != (double *) NULL)
-    annotate_info->dash_pattern[0]=0.0;
-  (void) CloneString(&annotate_info->primitive,"path '");
+  annotate_info=CloneFreetypeAnnotateInfo(draw_info);
   status=MagickTrue;
   if (draw_info->render != MagickFalse)
     SetFreetypeCanvas(image,exception);
