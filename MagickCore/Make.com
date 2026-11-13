@@ -177,6 +177,7 @@ $call Make string-si.c
 $call Make thread.c
 $call Make timer.c
 $call Make token.c
+$call Make token-isglob.c
 $call Make token-next.c
 $call Make token-glob.c
 $call Make transform.c
