@@ -9867,6 +9867,18 @@ MagickPrivate XWindows *XSetWindows(XWindows *windows_info)
 %    o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
 %
 */
+#if defined(X11_PREFERENCES_PATH)
+static void PutXBooleanPreference(XrmDatabase *preferences_database,
+  const char *specifier,const MagickBooleanType enabled)
+{
+  const char
+    *value;
+
+  value=enabled ? "True" : "False";
+  XrmPutStringResource(preferences_database,specifier,(char *) value);
+}
+#endif
+
 MagickPrivate void XUserPreferences(XResourceInfo *resource_info)
 {
 #if defined(X11_PREFERENCES_PATH)
@@ -9889,38 +9901,38 @@ MagickPrivate void XUserPreferences(XResourceInfo *resource_info)
   client_name=GetClientName();
   preferences_database=XrmGetStringDatabase("");
   (void) FormatLocaleString(specifier,MagickPathExtent,"%s.backdrop",client_name);
-  value=resource_info->backdrop ? "True" : "False";
-  XrmPutStringResource(&preferences_database,specifier,(char *) value);
+  PutXBooleanPreference(&preferences_database,specifier,
+    resource_info->backdrop);
   (void) FormatLocaleString(specifier,MagickPathExtent,"%s.colormap",client_name);
   value=resource_info->colormap == SharedColormap ? "Shared" : "Private";
   XrmPutStringResource(&preferences_database,specifier,(char *) value);
   (void) FormatLocaleString(specifier,MagickPathExtent,"%s.confirmExit",
     client_name);
-  value=resource_info->confirm_exit ? "True" : "False";
-  XrmPutStringResource(&preferences_database,specifier,(char *) value);
+  PutXBooleanPreference(&preferences_database,specifier,
+    resource_info->confirm_exit);
   (void) FormatLocaleString(specifier,MagickPathExtent,"%s.confirmEdit",
     client_name);
-  value=resource_info->confirm_edit ? "True" : "False";
-  XrmPutStringResource(&preferences_database,specifier,(char *) value);
+  PutXBooleanPreference(&preferences_database,specifier,
+    resource_info->confirm_edit);
   (void) FormatLocaleString(specifier,MagickPathExtent,"%s.displayWarnings",
     client_name);
-  value=resource_info->display_warnings ? "True" : "False";
-  XrmPutStringResource(&preferences_database,specifier,(char *) value);
+  PutXBooleanPreference(&preferences_database,specifier,
+    resource_info->display_warnings);
   (void) FormatLocaleString(specifier,MagickPathExtent,"%s.dither",client_name);
   value=resource_info->quantize_info->dither_method != NoDitherMethod ?
     "True" : "False";
   XrmPutStringResource(&preferences_database,specifier,(char *) value);
   (void) FormatLocaleString(specifier,MagickPathExtent,"%s.gammaCorrect",
     client_name);
-  value=resource_info->gamma_correct ? "True" : "False";
-  XrmPutStringResource(&preferences_database,specifier,(char *) value);
+  PutXBooleanPreference(&preferences_database,specifier,
+    resource_info->gamma_correct);
   (void) FormatLocaleString(specifier,MagickPathExtent,"%s.undoCache",client_name);
   (void) FormatLocaleString(cache,MagickPathExtent,"%.17g",(double)
     resource_info->undo_cache);
   XrmPutStringResource(&preferences_database,specifier,cache);
   (void) FormatLocaleString(specifier,MagickPathExtent,"%s.usePixmap",client_name);
-  value=resource_info->use_pixmap ? "True" : "False";
-  XrmPutStringResource(&preferences_database,specifier,(char *) value);
+  PutXBooleanPreference(&preferences_database,specifier,
+    resource_info->use_pixmap);
   (void) FormatLocaleString(filename,MagickPathExtent,"%s%src",
     X11_PREFERENCES_PATH,client_name);
   ExpandFilename(filename);
