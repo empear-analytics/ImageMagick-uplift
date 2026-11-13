@@ -13132,6 +13132,76 @@ span cleared by opening the file with `LimitImageDelay`, 5.17 to 5.37. Added by 
 
 ---
 
+## Recipe KS - Replace a Keyed Constant-Assigning Switch by a Lookup Table
+
+**Use when:** CodeScene reports *Complex Method* on a `static` function whose body is one
+`switch` on an integer parameter in which every group is one label that assigns a string
+literal to one local and breaks, with a `default:` group of the same shape, and the
+function then returns that local. `identify.c`'s `GetIPTCTagName` (fifty-four labels,
+`case 5: tag="Image Name"; break;` ..., `default: tag="unknown"; break;`, cc 55).
+
+**Not covered by:** Recipe KT, whose groups assign the result of a call; Recipe TB, whose
+labels are `0` to `k` or whose groups return; Recipe EM, which tests membership only.
+
+**How:**
+
+1. The function is `static`, outside every OpenMP region; its body is the local's
+   declaration, one `switch (n)` and `return(v);`. Every group is `case L: v="s"; break;`
+   with `L` an integer literal, all distinct, and `default: v="s"; break;`.
+   No `#if` line stands inside the `switch`.
+2. Every caller only reads the characters of the returned string (`%s`, `strlen`,
+   `strcmp`) and never compares, stores or writes through the pointer itself, since two
+   equal literals need not share one address (check by `grep`). The function is not
+   called per pixel or per channel.
+3. Directly above the function write a `static const` array of a `typedef struct` of two
+   members (`key` of `n`'s type, `const char *name`), one element `{ L, "s" }` per
+   non-default group, in the `switch`'s order.
+4. Replace the body by: `size_t i;`, a `for (i=0; i < (sizeof(T)/sizeof(*T)); i++)` with
+   `if (T[i].key == n) return(T[i].name);`, then `return("s");` of the `default:` group's
+   literal.
+5. Check by script that each label is the key of exactly one element holding the string
+   its group assigned, and that nothing else in the file changed.
+
+**Before:**
+
+```c
+  switch (record)
+  {
+    case 5: tag="Image Name"; break;
+    ...
+    default: tag="unknown"; break;
+  }
+  return(tag);
+```
+
+**After:**
+
+```c
+  for (i=0; i < (sizeof(IPTCTagNames)/sizeof(*IPTCTagNames)); i++)
+    if (IPTCTagNames[i].key == record)
+      return(IPTCTagNames[i].name);
+  return("unknown");
+```
+
+**Careful:**
+
+- Labels are distinct, so the first matching element is the only one and holds the
+  string the matching group assigned; when none matches the `default:` string is
+  returned, as the `switch` assigned it. `n` is compared with the same type it had
+  there (`key` has `n`'s type), so the same values match.
+- The table is `static const` and never written; no existing table changes.
+- Searching up to fifty elements replaces a jump, for a call made once per IPTC record of
+  a profile that `identify` prints, outside every pixel loop (step 2).
+
+**Evidence level:** oracle (the cases that reach the function), with step 5's script and
+step 2 checked by reading.
+
+**Provenance:** 2026-11-13, from `identify.c` (campaign B, M122): `GetIPTCTagName`, cc 55,
+the largest *Complex Method* of the file; KT needs a call in every group. Added by
+Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -13449,3 +13519,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | PA | Peel an advancing label group (`p++; break;` under many labels) out of a loop's `switch` into a membership predicate and an `if (...) { p++; continue; }`; evidence oracle | `geometry-parse.c`'s `GetGeometry` and `ParseGeometry` (seventeen labels in each; cc 50 and 52 to 36 and 38, 6.80 to 6.99); LP and PL peel groups that return, SD keeps the labels in a switch | mandate (2026-10-24) |
 | 2026-11-13 | NEW | HE | Hoist a case's exit test (`case L: { if (T) return(R); S break; }`) to an `if ((c == L) && (T)) return(R);` before the loop's `switch`; evidence oracle | `geometry-parse.c`'s `ParseGeometry` (bump gone, 7.01 to 7.04); HT, SG and PL do not reach a test inside a case | mandate (2026-10-24) |
 | 2026-11-13 | NEW | FO | Open the file with the shortest `static` helper: move a one- or two-statement helper above a first function that the include-block span makes a *Large Method*; evidence `obj_identical.sh` IDENTICAL | `image.c` (`SetImageSize`, 76 lines for nine; 5.17 to 5.37); H moves preprocessor lines, E adds functions | mandate (2026-10-24) |
+| 2026-11-13 | NEW | KS | Replace a keyed `switch` whose groups assign string literals to one local by a `static const` key/name table and a lookup loop; evidence oracle | `identify.c` `GetIPTCTagName` (cc 55); KT needs a call per group, TB needs `0..k` labels | mandate (2026-10-24) |
