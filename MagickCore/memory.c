@@ -691,23 +691,11 @@ MagickExport void *AcquireQuantumMemory(const size_t count,const size_t quantum)
 %    o quantum: the size (in bytes) of each object.
 %
 */
-MagickExport MemoryInfo *AcquireVirtualMemory(const size_t count,
-  const size_t quantum)
+static void InitializeVirtualMemoryPolicy(void)
 {
   char
     *value;
 
-  MemoryInfo
-    *memory_info;
-
-  size_t
-    size;
-
-  if (HeapOverflowSanityCheckGetSize(count,quantum,&size) != MagickFalse)
-    {
-      errno=ENOMEM;
-      return((MemoryInfo *) NULL);
-    }
   if (virtual_anonymous_memory == 0)
     {
       virtual_anonymous_memory=1;
@@ -723,6 +711,57 @@ MagickExport MemoryInfo *AcquireVirtualMemory(const size_t count,
         }
       value=DestroyString(value);
     }
+}
+
+static void AcquireAlignedVirtualMemory(MemoryInfo *memory_info,
+  const size_t size)
+{
+  if ((virtual_anonymous_memory == 1) && (size <= GetMaxMemoryRequest()))
+    {
+      memory_info->blob=AcquireAlignedMemory(1,size);
+      if (memory_info->blob != NULL)
+        memory_info->type=AlignedVirtualMemory;
+    }
+}
+
+static void AcquireUnalignedVirtualMemory(MemoryInfo *memory_info,
+  const size_t size)
+{
+  if (memory_info->blob == NULL)
+    {
+      memory_info->blob=AcquireQuantumMemory(1,size);
+      if (memory_info->blob != NULL)
+        memory_info->type=UnalignedVirtualMemory;
+    }
+}
+
+static void SetFileVirtualMemoryType(MemoryInfo *memory_info)
+{
+  if (memory_info->blob != NULL)
+    memory_info->type=MapVirtualMemory;
+  else
+    {
+      (void) RelinquishUniqueFileResource(
+        memory_info->filename);
+      *memory_info->filename='\0';
+    }
+}
+
+MagickExport MemoryInfo *AcquireVirtualMemory(const size_t count,
+  const size_t quantum)
+{
+  MemoryInfo
+    *memory_info;
+
+  size_t
+    size;
+
+  if (HeapOverflowSanityCheckGetSize(count,quantum,&size) != MagickFalse)
+    {
+      errno=ENOMEM;
+      return((MemoryInfo *) NULL);
+    }
+  InitializeVirtualMemoryPolicy();
   memory_info=(MemoryInfo *) MagickAssumeAligned(AcquireAlignedMemory(1,
     sizeof(*memory_info)));
   if (memory_info == (MemoryInfo *) NULL)
@@ -730,12 +769,7 @@ MagickExport MemoryInfo *AcquireVirtualMemory(const size_t count,
   (void) memset(memory_info,0,sizeof(*memory_info));
   memory_info->length=size;
   memory_info->signature=MagickCoreSignature;
-  if ((virtual_anonymous_memory == 1) && (size <= GetMaxMemoryRequest()))
-    {
-      memory_info->blob=AcquireAlignedMemory(1,size);
-      if (memory_info->blob != NULL)
-        memory_info->type=AlignedVirtualMemory;
-    }
+  AcquireAlignedVirtualMemory(memory_info,size);
   if (memory_info->blob == NULL)
     {
       /*
@@ -770,25 +804,13 @@ MagickExport MemoryInfo *AcquireVirtualMemory(const size_t count,
                   if (posix_fallocate(file,0,(MagickOffsetType) size) == 0)
                     memory_info->blob=MapBlob(file,IOMode,0,size);
 #endif
-                  if (memory_info->blob != NULL)
-                    memory_info->type=MapVirtualMemory;
-                  else
-                    {
-                      (void) RelinquishUniqueFileResource(
-                        memory_info->filename);
-                      *memory_info->filename='\0';
-                    }
+                  SetFileVirtualMemoryType(memory_info);
                 }
               (void) close_utf8(file);
             }
         }
     }
-  if (memory_info->blob == NULL)
-    {
-      memory_info->blob=AcquireQuantumMemory(1,size);
-      if (memory_info->blob != NULL)
-        memory_info->type=UnalignedVirtualMemory;
-    }
+  AcquireUnalignedVirtualMemory(memory_info,size);
   if (memory_info->blob == NULL)
     memory_info=RelinquishVirtualMemory(memory_info);
   return(memory_info);

@@ -335,6 +335,20 @@ static PolicyDomain StripPolicyDomain(char *policyname)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType GetWildcardPolicy(const char *name,
+  const ElementInfo *p,PolicyInfo *policy,PolicyInfo **result)
+{
+  if ((name == (const char *) NULL) || (LocaleCompare(name,"*") == 0))
+    {
+      UnlockSemaphoreInfo(policy_semaphore);
+      if (p != (ElementInfo *) NULL)
+        policy=(PolicyInfo *) p->value;
+      (*result)=policy;
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 static PolicyInfo *GetPolicyInfo(const char *name,ExceptionInfo *exception)
 {
   char
@@ -347,7 +361,8 @@ static PolicyInfo *GetPolicyInfo(const char *name,ExceptionInfo *exception)
     domain;
 
   PolicyInfo
-    *policy;
+    *policy,
+    *returned;
 
   assert(exception != (ExceptionInfo *) NULL);
   if (IsPolicyCacheInstantiated(exception) == MagickFalse)
@@ -370,13 +385,8 @@ static PolicyInfo *GetPolicyInfo(const char *name,ExceptionInfo *exception)
   LockSemaphoreInfo(policy_semaphore);
   ResetLinkedListIterator(policy_cache);
   p=GetHeadElementInLinkedList(policy_cache);
-  if ((name == (const char *) NULL) || (LocaleCompare(name,"*") == 0))
-    {
-      UnlockSemaphoreInfo(policy_semaphore);
-      if (p != (ElementInfo *) NULL)
-        policy=(PolicyInfo *) p->value;
-      return(policy);
-    }
+  if (GetWildcardPolicy(name,p,policy,&returned) != MagickFalse)
+    return(returned);
   while (p != (ElementInfo *) NULL)
   {
     policy=(PolicyInfo *) p->value;
@@ -1261,6 +1271,35 @@ static const char *SkipDoctypeElement(const char *q)
   return(q);
 }
 
+static MagickBooleanType SkipPolicyElement(const char **q,
+  const char *keyword,const size_t extent,char *token)
+{
+  if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
+    {
+      /*
+        DOCTYPE element.
+      */
+      (*q)=SkipDoctypeElement((*q));
+      return(MagickTrue);
+    }
+  if (LocaleNCompare(keyword,"<!--",4) == 0)
+    {
+      /*
+        Comment element.
+      */
+      while ((LocaleNCompare((*q),"->",2) != 0) && (*(*q) != '\0'))
+        (void) GetNextToken((*q),q,extent,token);
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
+static inline MagickBooleanType IsPolicyEnd(const char *keyword)
+{
+  return((MagickBooleanType) ((LocaleCompare(keyword,"/>") == 0) ||
+    (LocaleCompare(keyword,"</policy>") == 0)));
+}
+
 static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
   const char *policy,const char *filename,const size_t depth);
 
@@ -1329,23 +1368,8 @@ static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
     if (*token == '\0')
       break;
     (void) CopyMagickString(keyword,token,MagickPathExtent);
-    if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
-      {
-        /*
-          DOCTYPE element.
-        */
-        q=SkipDoctypeElement(q);
-        continue;
-      }
-    if (LocaleNCompare(keyword,"<!--",4) == 0)
-      {
-        /*
-          Comment element.
-        */
-        while ((LocaleNCompare(q,"->",2) != 0) && (*q != '\0'))
-          (void) GetNextToken(q,&q,extent,token);
-        continue;
-      }
+    if (SkipPolicyElement(&q,keyword,extent,token) != MagickFalse)
+      continue;
     if (LocaleCompare(keyword,"<include") == 0)
       {
         /*
@@ -1384,8 +1408,7 @@ static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
       }
     if (policy_info == (PolicyInfo *) NULL)
       continue;
-    if ((LocaleCompare(keyword,"/>") == 0) ||
-        (LocaleCompare(keyword,"</policy>") == 0))
+    if (IsPolicyEnd(keyword) != MagickFalse)
       {
         status=AppendValueToLinkedList(cache,policy_info);
         if (status == MagickFalse)

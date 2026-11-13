@@ -1081,6 +1081,22 @@ static void PrintLocaleHeader(FILE *file,const char *path)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static const char *ListLocaleEntry(FILE *file,const LocaleInfo **locale_info,
+  const ssize_t i,const char *path)
+{
+  if ((path == (const char *) NULL) ||
+      (LocaleCompare(path,locale_info[i]->path) != 0))
+    {
+      PrintLocaleHeader(file,locale_info[i]->path);
+    }
+  path=locale_info[i]->path;
+  (void) FormatLocaleFile(file,"%s\n",locale_info[i]->tag);
+  if (locale_info[i]->message != (char *) NULL)
+    (void) FormatLocaleFile(file,"  %s",locale_info[i]->message);
+  (void) FormatLocaleFile(file,"\n");
+  return(path);
+}
+
 MagickExport MagickBooleanType ListLocaleInfo(FILE *file,
   ExceptionInfo *exception)
 {
@@ -1107,16 +1123,7 @@ MagickExport MagickBooleanType ListLocaleInfo(FILE *file,
   {
     if (locale_info[i]->stealth != MagickFalse)
       continue;
-    if ((path == (const char *) NULL) ||
-        (LocaleCompare(path,locale_info[i]->path) != 0))
-      {
-        PrintLocaleHeader(file,locale_info[i]->path);
-      }
-    path=locale_info[i]->path;
-    (void) FormatLocaleFile(file,"%s\n",locale_info[i]->tag);
-    if (locale_info[i]->message != (char *) NULL)
-      (void) FormatLocaleFile(file,"  %s",locale_info[i]->message);
-    (void) FormatLocaleFile(file,"\n");
+    path=ListLocaleEntry(file,locale_info,i,path);
   }
   (void) fflush(file);
   locale_info=(const LocaleInfo **)
@@ -1397,6 +1404,28 @@ static MagickBooleanType NextIncludeFile(const char **q,const size_t extent,
   return(MagickFalse);
 }
 
+static MagickBooleanType SkipLocaleElement(const char **q,
+  const char *keyword,const size_t extent,char *token)
+{
+  if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
+    {
+      /*
+        DOCTYPE element.
+      */
+      (*q)=SkipDoctypeElement((*q));
+      return(MagickTrue);
+    }
+  if (LocaleNCompare(keyword,"<!--",4) == 0)
+    {
+      /*
+        Comment element.
+      */
+      (*q)=SkipCommentElement((*q),extent,token);
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1454,22 +1483,8 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
     if (*token == '\0')
       break;
     (void) CopyMagickString(keyword,token,MagickLocaleExtent);
-    if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
-      {
-        /*
-          DOCTYPE element.
-        */
-        q=SkipDoctypeElement(q);
-        continue;
-      }
-    if (LocaleNCompare(keyword,"<!--",4) == 0)
-      {
-        /*
-          Comment element.
-        */
-        q=SkipCommentElement(q,extent,token);
-        continue;
-      }
+    if (SkipLocaleElement(&q,keyword,extent,token) != MagickFalse)
+      continue;
     if (LocaleCompare(keyword,"<include") == 0)
       {
         /*
@@ -1528,8 +1543,6 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
         continue;
       }
     (void) GetNextToken(q,(const char **) NULL,extent,token);
-    if (*token != '=')
-      continue;
   }
   token=(char *) RelinquishMagickMemory(token);
   (void) SetFatalErrorHandler(fatal_handler);
@@ -1684,16 +1697,34 @@ MagickExport int LocaleLowercase(const int c)
 %    o length: the number of characters to compare in strings p and q.
 %
 */
-MagickExport int LocaleNCompare(const char *p,const char *q,const size_t length)
+static inline MagickBooleanType CompareNullLocaleStrings(const char *p,
+  const char *q,int *result)
 {
   if (p == (char *) NULL)
     {
       if (q == (char *) NULL)
-        return(0);
-      return(-1);
+        {
+          (*result)=0;
+          return(MagickTrue);
+        }
+      (*result)=(-1);
+      return(MagickTrue);
     }
   if (q == (char *) NULL)
-    return(1);
+    {
+      (*result)=1;
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
+MagickExport int LocaleNCompare(const char *p,const char *q,const size_t length)
+{
+  int
+    returned;
+
+  if (CompareNullLocaleStrings(p,q,&returned) != MagickFalse)
+    return(returned);
   if (length == 0)
     return(0);
   {
