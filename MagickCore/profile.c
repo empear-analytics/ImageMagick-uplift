@@ -3668,6 +3668,34 @@ static void UpdateClipPath(unsigned char *blob,size_t length,
   }
 }
 
+static void Update8BIMResource(const ClipPathResizeInfo *resize,
+  unsigned char **info,size_t *length)
+{
+  ssize_t
+    count,
+    id;
+
+  id=(ssize_t) ReadProfileMSBShort(info,length);
+  count=(ssize_t) ReadProfileByte(info,length);
+  if ((count != 0) && ((size_t) count <= (*length)))
+    {
+      (*info)+=count;
+      (*length)-=(size_t) count;
+    }
+  if ((count & 0x01) == 0)
+    (void) ReadProfileByte(info,length);
+  count=(ssize_t) ReadProfileMSBLong(info,length);
+  if ((count < 0) || ((size_t) count > (*length)))
+    {
+      (*length)=0;
+      return;
+    }
+  if ((id > 1999) && (id < 2999))
+    UpdateClipPath((*info),(size_t) count,resize);
+  (*info)+=count;
+  (*length)-=(size_t) MagickMin((*length),(size_t) count);
+}
+
 MagickPrivate void Update8BIMClipPath(const Image *image,
   const size_t old_columns,const size_t old_rows,
   const RectangleInfo *new_geometry)
@@ -3680,10 +3708,6 @@ MagickPrivate void Update8BIMClipPath(const Image *image,
 
   size_t
     length;
-
-  ssize_t
-    count,
-    id;
 
   unsigned char
     *info;
@@ -3705,24 +3729,6 @@ MagickPrivate void Update8BIMClipPath(const Image *image,
       continue;
     if (ReadProfileByte(&info,&length) != (unsigned char) 'M')
       continue;
-    id=(ssize_t) ReadProfileMSBShort(&info,&length);
-    count=(ssize_t) ReadProfileByte(&info,&length);
-    if ((count != 0) && ((size_t) count <= length))
-      {
-        info+=count;
-        length-=(size_t) count;
-      }
-    if ((count & 0x01) == 0)
-      (void) ReadProfileByte(&info,&length);
-    count=(ssize_t) ReadProfileMSBLong(&info,&length);
-    if ((count < 0) || ((size_t) count > length))
-      {
-        length=0;
-        continue;
-      }
-    if ((id > 1999) && (id < 2999))
-      UpdateClipPath(info,(size_t) count,&resize);
-    info+=count;
-    length-=(size_t) MagickMin(length,(size_t) count);
+    Update8BIMResource(&resize,&info,&length);
   }
 }
