@@ -14697,6 +14697,16 @@ static void PositionNoticeWidth(XWindows *windows,XFontStruct *font_info,
     windows->widget.width=windows->widget.min_width;
 }
 
+static void PositionNoticeHeight(Display *display,XWindows *windows,
+  const unsigned int height)
+{
+  windows->widget.height=(unsigned int) (12*height);
+  windows->widget.min_height=(unsigned int) (7*height);
+  if (windows->widget.height < windows->widget.min_height)
+    windows->widget.height=windows->widget.min_height;
+  XConstrainWindowPosition(display,&windows->widget);
+}
+
 MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -14754,11 +14764,7 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
     Position Notice widget.
   */
   PositionNoticeWidth(windows,font_info,width);
-  windows->widget.height=(unsigned int) (12*height);
-  windows->widget.min_height=(unsigned int) (7*height);
-  if (windows->widget.height < windows->widget.min_height)
-    windows->widget.height=windows->widget.min_height;
-  XConstrainWindowPosition(display,&windows->widget);
+  PositionNoticeHeight(display,windows,height);
   /*
     Map Notice widget.
   */
