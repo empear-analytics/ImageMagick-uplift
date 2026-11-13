@@ -1447,17 +1447,38 @@ static void CacheOpenCLBenchmarks(MagickCLEnv clEnv)
   fclose(cache_file);
 }
 
-static void BenchmarkOpenCLDevices(MagickCLEnv clEnv)
+static void BenchmarkOpenCLDevice(MagickCLEnv clEnv,MagickCLEnv testEnv,
+  const size_t i)
 {
   MagickCLDevice
     device;
 
+  size_t
+    j;
+
+  device=clEnv->devices[i];
+  if (device->score == MAGICKCORE_OPENCL_UNDEFINED_SCORE)
+    RunDeviceBenchmark(clEnv,testEnv,device);
+
+  /* Set the score on all the other devices that are the same */
+  for (j = i+1; j < clEnv->number_devices; j++)
+  {
+    MagickCLDevice
+      other_device;
+
+    other_device=clEnv->devices[j];
+    if (IsSameOpenCLDevice(device,other_device))
+      other_device->score=device->score;
+  }
+}
+
+static void BenchmarkOpenCLDevices(MagickCLEnv clEnv)
+{
   MagickCLEnv
     testEnv;
 
   size_t
-    i,
-    j;
+    i;
 
   (void) LogMagickEvent(AccelerateEvent,GetMagickModule(),
     "Starting benchmark");
@@ -1473,22 +1494,7 @@ static void BenchmarkOpenCLDevices(MagickCLEnv clEnv)
     clEnv->devices[i]->score=MAGICKCORE_OPENCL_UNDEFINED_SCORE;
 
   for (i = 0; i < clEnv->number_devices; i++)
-  {
-    device=clEnv->devices[i];
-    if (device->score == MAGICKCORE_OPENCL_UNDEFINED_SCORE)
-      RunDeviceBenchmark(clEnv,testEnv,device);
-
-    /* Set the score on all the other devices that are the same */
-    for (j = i+1; j < clEnv->number_devices; j++)
-    {
-      MagickCLDevice
-        other_device;
-
-      other_device=clEnv->devices[j];
-      if (IsSameOpenCLDevice(device,other_device))
-        other_device->score=device->score;
-    }
-  }
+    BenchmarkOpenCLDevice(clEnv,testEnv,i);
 
   testEnv->enabled=MagickFalse;
   default_CLEnv=testEnv;
