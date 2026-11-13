@@ -10562,6 +10562,45 @@ static void XApplyQuitCommand(const XMagickCommandContext *context)
     }
 }
 
+static void XApplyDespeckleCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  Image
+    *despeckle_image;
+
+  /*
+    Despeckle image.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  despeckle_image=DespeckleImage(*image,exception);
+  if (despeckle_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=despeckle_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -11489,29 +11528,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       break;
     }
     case DespeckleCommand:
-    {
-      Image
-        *despeckle_image;
-
-      /*
-        Despeckle image.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      despeckle_image=DespeckleImage(*image,exception);
-      if (despeckle_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=despeckle_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyDespeckleCommand(&context);
       break;
-    }
     case EmbossCommand:
     {
       Image
