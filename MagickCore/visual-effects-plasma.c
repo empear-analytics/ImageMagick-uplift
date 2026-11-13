@@ -367,6 +367,40 @@ static inline MagickBooleanType SetPlasmaEdgePixel(
   return(MagickTrue);
 }
 
+static MagickBooleanType SetPlasmaRowPixels(const PlasmaMidpoint *midpoint,
+  MagickStatusType *status)
+{
+  const SegmentInfo
+    *const segment = midpoint->segment;
+
+  const ssize_t
+    x_mid = midpoint->x_mid,
+    y_mid = midpoint->y_mid;
+
+  if ((fabs(segment->y1-y_mid) >= MagickEpsilon) ||
+      (fabs(segment->y2-y_mid) >= MagickEpsilon))
+    {
+      if ((fabs(segment->x1-x_mid) >= MagickEpsilon) ||
+          (fabs(segment->y2-y_mid) >= MagickEpsilon))
+        {
+          /*
+            Bottom pixel.
+          */
+          if (SetPlasmaEdgePixel(midpoint,PlasmaRowEdge,segment->y2,
+              status) == MagickFalse)
+            return(MagickFalse);
+        }
+      /*
+        Top pixel.
+      */
+      if ((fabs(segment->y1-segment->y2) >= MagickEpsilon) &&
+          (SetPlasmaEdgePixel(midpoint,PlasmaRowEdge,segment->y1,
+              status) == MagickFalse))
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType PlasmaImageProxy(const PlasmaContext *context,
   const SegmentInfo *magick_restrict segment,size_t attenuate,size_t depth)
 {
@@ -419,27 +453,8 @@ static MagickBooleanType PlasmaImageProxy(const PlasmaContext *context,
               &status) == MagickFalse))
         return(MagickFalse);
     }
-  if ((fabs(segment->y1-y_mid) >= MagickEpsilon) ||
-      (fabs(segment->y2-y_mid) >= MagickEpsilon))
-    {
-      if ((fabs(segment->x1-x_mid) >= MagickEpsilon) ||
-          (fabs(segment->y2-y_mid) >= MagickEpsilon))
-        {
-          /*
-            Bottom pixel.
-          */
-          if (SetPlasmaEdgePixel(&midpoint,PlasmaRowEdge,segment->y2,
-              &status) == MagickFalse)
-            return(MagickTrue);
-        }
-      /*
-        Top pixel.
-      */
-      if ((fabs(segment->y1-segment->y2) >= MagickEpsilon) &&
-          (SetPlasmaEdgePixel(&midpoint,PlasmaRowEdge,segment->y1,
-              &status) == MagickFalse))
-        return(MagickTrue);
-    }
+  if (SetPlasmaRowPixels(&midpoint,&status) == MagickFalse)
+    return(MagickTrue);
   if (SetPlasmaMiddlePixel(&midpoint,&status) == MagickFalse)
     return(MagickTrue);
   if ((fabs(segment->x2-segment->x1) < 3.0) &&
