@@ -576,6 +576,18 @@ static MagickBooleanType AcquireStreamLength(CacheInfo *cache_info,
   return(MagickTrue);
 }
 
+static MagickBooleanType RenewStreamPixels(CacheInfo *cache_info,
+  const size_t length,ExceptionInfo *exception)
+{
+  if (cache_info->length < length)
+    {
+      RelinquishStreamPixels(cache_info);
+      if (AcquireStreamLength(cache_info,length,exception) == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static Quantum *AcquireStreamRegion(CacheInfo *cache_info,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -597,12 +609,8 @@ static Quantum *AcquireStreamRegion(CacheInfo *cache_info,const size_t columns,
         return((Quantum *) NULL);
     }
   else
-    if (cache_info->length < length)
-      {
-        RelinquishStreamPixels(cache_info);
-        if (AcquireStreamLength(cache_info,length,exception) == MagickFalse)
-          return((Quantum *) NULL);
-      }
+    if (RenewStreamPixels(cache_info,length,exception) == MagickFalse)
+      return((Quantum *) NULL);
   cache_info->metacontent=(void *) NULL;
   if (cache_info->metacontent_extent != 0)
     cache_info->metacontent=(void *) (cache_info->pixels+number_pixels*
