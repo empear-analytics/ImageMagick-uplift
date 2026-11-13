@@ -771,6 +771,13 @@ static void PrintCMYKChannelMoments(const Image *image,
     (void) PrintChannelMoments(report,BlackPixelChannel,"Black");
 }
 
+static void PrintUpdatedChannelMoments(const ChannelMomentsReport *report,
+  const PixelTrait traits,const PixelChannel channel,const char *name)
+{
+  if ((traits & UpdatePixelTrait) != 0)
+    (void) PrintChannelMoments(report,channel,name);
+}
+
 static void PrintChannelMomentsTable(FILE *file,const Image *image,
   const ColorspaceType colorspace,ChannelMoments *channel_moments)
 {
@@ -803,8 +810,8 @@ static void PrintChannelMomentsTable(FILE *file,const Image *image,
     }
     case GRAYColorspace:
     {
-      if ((GetPixelGrayTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(&report,GrayPixelChannel,"Gray");
+      PrintUpdatedChannelMoments(&report,GetPixelGrayTraits(image),
+        GrayPixelChannel,"Gray");
       break;
     }
     default:
