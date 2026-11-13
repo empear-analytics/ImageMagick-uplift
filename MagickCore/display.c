@@ -15399,6 +15399,33 @@ static void XSelectPageGeometry(Display *display,XWindows *windows,
     }
 }
 
+static MagickBooleanType XRequestJPEGQuality(Display *display,
+  XWindows *windows,Image *image,ImageInfo *image_info)
+{
+  if ((LocaleCompare(image_info->magick,"JPEG") == 0) ||
+      (LocaleCompare(image_info->magick,"JPG") == 0))
+    {
+      char
+        quality[MagickPathExtent];
+
+      int
+        status;
+
+      /*
+        Request JPEG quality from user.
+      */
+      (void) FormatLocaleString(quality,MagickPathExtent,"%.17g",(double)
+        image->quality);
+      status=XDialogWidget(display,windows,"Save","Enter JPEG quality:",
+        quality);
+      if (*quality == '\0')
+        return(MagickFalse);
+      image->quality=StringToUnsignedLong(quality);
+      image_info->interlace=status != 0 ? NoInterlace : PlaneInterlace;
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType XSaveImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -15458,27 +15485,8 @@ static MagickBooleanType XSaveImage(Display *display,
   image_info=CloneImageInfo(resource_info->image_info);
   (void) CopyMagickString(image_info->filename,filename,MagickPathExtent);
   (void) SetImageInfo(image_info,1,exception);
-  if ((LocaleCompare(image_info->magick,"JPEG") == 0) ||
-      (LocaleCompare(image_info->magick,"JPG") == 0))
-    {
-      char
-        quality[MagickPathExtent];
-
-      int
-        status;
-
-      /*
-        Request JPEG quality from user.
-      */
-      (void) FormatLocaleString(quality,MagickPathExtent,"%.17g",(double)
-        image->quality);
-      status=XDialogWidget(display,windows,"Save","Enter JPEG quality:",
-        quality);
-      if (*quality == '\0')
-        return(MagickTrue);
-      image->quality=StringToUnsignedLong(quality);
-      image_info->interlace=status != 0 ? NoInterlace : PlaneInterlace;
-    }
+  if (XRequestJPEGQuality(display,windows,image,image_info) == MagickFalse)
+    return(MagickTrue);
   XSelectPageGeometry(display,windows,image_info);
   /*
     Apply image transforms.
