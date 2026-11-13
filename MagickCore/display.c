@@ -12560,6 +12560,56 @@ static size_t XMatteKeyPress(const MatteCommandInput *input,XEvent *event,
   return(state);
 }
 
+typedef struct _MatteEventTargets
+{
+  int
+    *x,
+    *y;
+
+  size_t
+    *state;
+} MatteEventTargets;
+
+static void XMattePress(const MatteCommandInput *input,const XEvent *event,
+  const MatteEventTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  Image
+    **const image = input->image;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  size_t
+    *const state = targets->state;
+
+  if ((*event).xbutton.button != Button1)
+    return;
+  if (((*event).xbutton.window != windows->image.id) &&
+      ((*event).xbutton.window != windows->magnify.id))
+    return;
+  /*
+    Update matte data.
+  */
+  (*x)=(*event).xbutton.x;
+  (*y)=(*event).xbutton.y;
+  (void) XMagickCommand(display,resource_info,windows,
+    SaveToUndoBufferCommand,image,exception);
+  (*state)|=UpdateConfigurationState;
+}
+
 static MagickBooleanType XMatteEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -12623,6 +12673,9 @@ static MagickBooleanType XMatteEditImage(Display *display,
   const BorderColorTargets
     border_targets = { &border_color };
 
+  const MatteEventTargets
+    event_targets = { &x, &y, &state };
+
   const MatteCommandInput
     command_input = { display, resource_info, windows, MatteEditCommands,
       image, exception, MatteEditMenu, command, matte, method_targets,
@@ -12671,19 +12724,7 @@ static MagickBooleanType XMatteEditImage(Display *display,
     {
       case ButtonPress:
       {
-        if (event.xbutton.button != Button1)
-          break;
-        if ((event.xbutton.window != windows->image.id) &&
-            (event.xbutton.window != windows->magnify.id))
-          break;
-        /*
-          Update matte data.
-        */
-        x=event.xbutton.x;
-        y=event.xbutton.y;
-        (void) XMagickCommand(display,resource_info,windows,
-          SaveToUndoBufferCommand,image,exception);
-        state|=UpdateConfigurationState;
+        XMattePress(&command_input,&event,&event_targets);
         break;
       }
       case ButtonRelease:
