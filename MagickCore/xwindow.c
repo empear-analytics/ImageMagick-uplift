@@ -6122,6 +6122,37 @@ static void XPackContinuousLSB(const XImage *ximage,
   }
 }
 
+static MagickBooleanType XCreateAlphaCanvas(
+  const MakeImageContext *make_context,Image *image,Image **canvas)
+{
+  const XResourceInfo
+    *const resource_info = make_context->resource_info;
+
+  const XWindowInfo
+    *const window = make_context->window;
+
+  ExceptionInfo
+    *const exception = make_context->exception;
+
+  if (IsMutableAlphaImage(window,image) != MagickFalse)
+    {
+      Image
+        *pattern;
+
+      pattern=XReadTexturePattern(resource_info,image,exception);
+      if (pattern != (Image *) NULL)
+        {
+          *canvas=CloneImage(image,0,0,MagickTrue,exception);
+          if (*canvas == (Image *) NULL)
+            return(MagickFalse);
+          (void) CompositeImage(*canvas,pattern,DstOverCompositeOp,MagickTrue,
+            0,0,exception);
+          pattern=DestroyImage(pattern);
+        }
+    }
+  return(MagickTrue);
+}
+
 static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -6170,22 +6201,8 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   canvas=image;
-  if (IsMutableAlphaImage(window,image) != MagickFalse)
-    {
-      Image
-        *pattern;
-
-      pattern=XReadTexturePattern(resource_info,image,exception);
-      if (pattern != (Image *) NULL)
-        {
-          canvas=CloneImage(image,0,0,MagickTrue,exception);
-          if (canvas == (Image *) NULL)
-            return;
-          (void) CompositeImage(canvas,pattern,DstOverCompositeOp,MagickTrue,
-            0,0,exception);
-          pattern=DestroyImage(pattern);
-        }
-    }
+  if (XCreateAlphaCanvas(make_context,image,&canvas) == MagickFalse)
+    return;
   scanline_pad=(unsigned int) (ximage->bytes_per_line-((ximage->width*
     ximage->bits_per_pixel) >> 3));
   map_info=window->map_info;
