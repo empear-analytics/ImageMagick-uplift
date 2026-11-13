@@ -558,6 +558,17 @@ static MagickBooleanType AddTemporaryResource(const char *path)
   return(status);
 }
 
+static void AcquireResourceRandomInfo(void)
+{
+  if (random_info == (RandomInfo *) NULL)
+    {
+      LockResourceSemaphore(FileResource);
+      if (random_info == (RandomInfo *) NULL)
+        random_info=AcquireRandomInfo();
+      UnlockSemaphoreInfo(resource_semaphore[FileResource]);
+    }
+}
+
 MagickExport int AcquireUniqueFileResource(char *path)
 {
   int
@@ -572,13 +583,7 @@ MagickExport int AcquireUniqueFileResource(char *path)
   assert(path != (char *) NULL);
   if ((GetLogEventMask() & ResourceEvent) != 0)
     (void) LogMagickEvent(ResourceEvent,GetMagickModule(),"...");
-  if (random_info == (RandomInfo *) NULL)
-    {
-      LockResourceSemaphore(FileResource);
-      if (random_info == (RandomInfo *) NULL)
-        random_info=AcquireRandomInfo();
-      UnlockSemaphoreInfo(resource_semaphore[FileResource]);
-    }
+  AcquireResourceRandomInfo();
   file=(-1);
   for (i=0; i < (ssize_t) TMP_MAX; i++)
   {
