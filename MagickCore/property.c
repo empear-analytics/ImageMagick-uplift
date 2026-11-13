@@ -1509,6 +1509,91 @@ static void SetEXIFTagProperty(const EXIFWalkInfo *walk,
   key=DestroyString(key);
 }
 
+static MagickBooleanType PushEXIFDirectory(const EXIFWalkInfo *walk,
+  const EXIFTagInfo *exif_tag,const size_t number_entries,
+  const EXIFWalkTargets *targets)
+{
+  const EndianType
+    endian = walk->endian;
+
+  const unsigned char
+    *const exif = walk->exif;
+
+  const size_t
+    length = walk->length;
+
+  const unsigned char
+    *const directory = walk->directory;
+
+  const ssize_t
+    tag_offset = walk->tag_offset;
+
+  const size_t
+    tag_value = exif_tag->tag_value;
+
+  unsigned char
+    *const p = exif_tag->p;
+
+  ssize_t
+    *const level = targets->level;
+
+  size_t
+    *const entry = targets->entry;
+
+  DirectoryInfo
+    *const directory_stack = targets->directory_stack;
+
+  ssize_t
+    i;
+
+  if (IsSubdirectoryTag(tag_value) != MagickFalse)
+    {
+      ssize_t
+        tag_offset1;
+
+      tag_offset1=(ssize_t) ReadPropertySignedLong(endian,p);
+      if (((size_t) tag_offset1 < length) &&
+          ((*level) < (MaxDirectoryStack-2)))
+        {
+          ssize_t
+            tag_offset2;
+
+          tag_offset2=(ssize_t) ((tag_value == TAG_GPS_OFFSET) ? 0x10000 :
+            0);
+          directory_stack[(*level)].directory=directory;
+          (*entry)++;
+          directory_stack[(*level)].entry=(*entry);
+          directory_stack[(*level)].offset=tag_offset;
+          (*level)++;
+          /*
+            Check for duplicate tag.
+          */
+          for (i=0; i < (*level); i++)
+            if (directory_stack[i].directory == (exif+tag_offset1))
+              break;
+          if (i < (*level))
+            return(MagickTrue);  /* duplicate tag */
+          directory_stack[(*level)].directory=exif+tag_offset1;
+          directory_stack[(*level)].offset=tag_offset2;
+          directory_stack[(*level)].entry=0;
+          (*level)++;
+          if ((directory+2+(12*number_entries)+4) > (exif+length))
+            return(MagickTrue);
+          tag_offset1=(ssize_t) ReadPropertySignedLong(endian,directory+
+            2+(12*number_entries));
+          if (IsNextIFDOffset(tag_offset1,length,(*level)) != MagickFalse)
+            {
+              directory_stack[(*level)].directory=exif+tag_offset1;
+              directory_stack[(*level)].entry=0;
+              directory_stack[(*level)].offset=tag_offset2;
+              (*level)++;
+            }
+        }
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 static void GetEXIFDirectory(const EXIFWalkInfo *walk,
   const EXIFWalkTargets *targets)
 {
@@ -1542,15 +1627,9 @@ static void GetEXIFDirectory(const EXIFWalkInfo *walk,
   size_t
     *const entry = targets->entry;
 
-  DirectoryInfo
-    *const directory_stack = targets->directory_stack;
-
   size_t
     number_entries,
     tag_value;
-
-  ssize_t
-    i;
 
   /*
     Determine how many entries there are in the current IFD.
@@ -1626,51 +1705,9 @@ static void GetEXIFDirectory(const EXIFWalkInfo *walk,
         if (value != (char *) NULL)
           SetEXIFTagProperty(walk,tag_value,(*level),value);
       }
-      if (IsSubdirectoryTag(tag_value) != MagickFalse)
-        {
-          ssize_t
-            tag_offset1;
-
-          tag_offset1=(ssize_t) ReadPropertySignedLong(endian,p);
-          if (((size_t) tag_offset1 < length) &&
-              ((*level) < (MaxDirectoryStack-2)))
-            {
-              ssize_t
-                tag_offset2;
-
-              tag_offset2=(ssize_t) ((tag_value == TAG_GPS_OFFSET) ? 0x10000 :
-                0);
-              directory_stack[(*level)].directory=directory;
-              (*entry)++;
-              directory_stack[(*level)].entry=(*entry);
-              directory_stack[(*level)].offset=tag_offset;
-              (*level)++;
-              /*
-                Check for duplicate tag.
-              */
-              for (i=0; i < (*level); i++)
-                if (directory_stack[i].directory == (exif+tag_offset1))
-                  break;
-              if (i < (*level))
-                break;  /* duplicate tag */
-              directory_stack[(*level)].directory=exif+tag_offset1;
-              directory_stack[(*level)].offset=tag_offset2;
-              directory_stack[(*level)].entry=0;
-              (*level)++;
-              if ((directory+2+(12*number_entries)+4) > (exif+length))
-                break;
-              tag_offset1=(ssize_t) ReadPropertySignedLong(endian,directory+
-                2+(12*number_entries));
-              if (IsNextIFDOffset(tag_offset1,length,(*level)) != MagickFalse)
-                {
-                  directory_stack[(*level)].directory=exif+tag_offset1;
-                  directory_stack[(*level)].entry=0;
-                  directory_stack[(*level)].offset=tag_offset2;
-                  (*level)++;
-                }
-            }
-          break;
-        }
+    if (PushEXIFDirectory(walk,&exif_tag,number_entries,targets) !=
+        MagickFalse)
+      break;
   }
 }
 
