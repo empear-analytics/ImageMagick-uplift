@@ -5961,6 +5961,9 @@ typedef struct _CropTargets
 
   size_t
     *state;
+
+  XEvent
+    *event;
 } CropTargets;
 
 static void XCropSelectionRequest(XEvent *event,const RectangleInfo crop_info,
@@ -6302,6 +6305,65 @@ static const ModeType
     RectifyDismissCommand
   };
 
+typedef struct _CropContext
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  ClipboardMode
+    mode;
+
+  const char
+    *const *CropModeMenu;
+} CropContext;
+
+static void XCropPointerCommand(const CropContext *context,
+  const CropTargets *targets)
+{
+  int
+    id;
+
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  /*
+    Select a command from the Command widget.
+  */
+  id=XCommandWidget(context->display,context->windows,context->CropModeMenu,
+    event);
+  if (id < 0)
+    return;
+  switch (CropCommands[id])
+  {
+    case CropHelpCommand:
+    {
+      XShowCropHelp(context->display,context->resource_info,context->windows,
+        context->mode);
+      break;
+    }
+    case CropDismissCommand:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -6332,7 +6394,6 @@ static MagickBooleanType XCropImage(Display *display,
     cursor;
 
   int
-    id,
     x,
     y;
 
@@ -6362,8 +6423,11 @@ static MagickBooleanType XCropImage(Display *display,
   XEvent
     event;
 
+  CropContext
+    context;
+
   const CropTargets
-    targets = { &x, &y, &crop_info, &state };
+    targets = { &x, &y, &crop_info, &state, &event };
 
   /*
     Map Command widget.
@@ -6404,6 +6468,11 @@ static MagickBooleanType XCropImage(Display *display,
   crop_info.height=0;
   cursor=XCreateFontCursor(display,XC_fleur);
   state=DefaultState;
+  context.display=display;
+  context.resource_info=resource_info;
+  context.windows=windows;
+  context.mode=mode;
+  context.CropModeMenu=CropModeMenu;
   do
   {
     if (windows->info.mapped != MagickFalse)
@@ -6421,31 +6490,7 @@ static MagickBooleanType XCropImage(Display *display,
     XScreenEvent(display,windows,&event,exception);
     if (event.xany.window == windows->command.id)
       {
-        /*
-          Select a command from the Command widget.
-        */
-        id=XCommandWidget(display,windows,CropModeMenu,&event);
-        if (id < 0)
-          continue;
-        switch (CropCommands[id])
-        {
-          case CropHelpCommand:
-          {
-            XShowCropHelp(display,resource_info,windows,mode);
-            break;
-          }
-          case CropDismissCommand:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-          default:
-            break;
-        }
+        XCropPointerCommand(&context,&targets);
         continue;
       }
     switch (event.type)
