@@ -863,8 +863,8 @@ MagickExport MagickBooleanType OpenStream(const ImageInfo *image_info,
 %
 */
 
-static inline MagickBooleanType IsCacheMorphologyChanged(const Image *image,
-  const CacheInfo *cache_info,const PixelChannelMap *p,const PixelChannelMap *q)
+static inline MagickBooleanType IsCacheGeometryChanged(const Image *image,
+  const CacheInfo *cache_info)
 {
   return((MagickBooleanType) ((image->storage_class != cache_info->storage_class) ||
     (image->colorspace != cache_info->colorspace) ||
@@ -872,7 +872,14 @@ static inline MagickBooleanType IsCacheMorphologyChanged(const Image *image,
     (image->channels != cache_info->channels) ||
     (image->columns != cache_info->columns) ||
     (image->rows != cache_info->rows) ||
-    (image->number_channels != cache_info->number_channels) ||
+    (image->number_channels != cache_info->number_channels)));
+}
+
+static inline MagickBooleanType IsCacheMorphologyChanged(const Image *image,
+  const CacheInfo *cache_info,const PixelChannelMap *p,const PixelChannelMap *q)
+{
+  return((MagickBooleanType) (
+    (IsCacheGeometryChanged(image,cache_info) != MagickFalse) ||
     (memcmp(p,q,image->number_channels*sizeof(*p)) != 0) ||
     (image->metacontent_extent != cache_info->metacontent_extent) ||
     (cache_info->nexus_info == (NexusInfo **) NULL)));
