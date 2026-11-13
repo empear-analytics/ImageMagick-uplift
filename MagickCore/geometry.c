@@ -232,6 +232,56 @@ MagickExport char *GetPageGeometry(const char *page_geometry)
   return(AcquireString(page));
 }
 
+static void GravityAdjustX(const size_t width,const GravityType gravity,
+  RectangleInfo *region)
+{
+  switch (gravity)
+  {
+    case NorthEastGravity:
+    case EastGravity:
+    case SouthEastGravity:
+    {
+      region->x=CastDoubleToSsizeT((double) width-region->width-region->x);
+      break;
+    }
+    case NorthGravity:
+    case SouthGravity:
+    case CenterGravity:
+    {
+      region->x=CastDoubleToSsizeT((double) width/2.0-region->width/2.0+
+        region->x);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void GravityAdjustY(const size_t height,const GravityType gravity,
+  RectangleInfo *region)
+{
+  switch (gravity)
+  {
+    case SouthWestGravity:
+    case SouthGravity:
+    case SouthEastGravity:
+    {
+      region->y=CastDoubleToSsizeT((double) height-region->height-region->y);
+      break;
+    }
+    case EastGravity:
+    case WestGravity:
+    case CenterGravity:
+    {
+      region->y=CastDoubleToSsizeT((double) height/2.0-region->height/2.0+
+        region->y);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -270,46 +320,8 @@ MagickExport void GravityAdjustGeometry(const size_t width,
     region->height=height;
   if (region->width == 0)
     region->width=width;
-  switch (gravity)
-  {
-    case NorthEastGravity:
-    case EastGravity:
-    case SouthEastGravity:
-    {
-      region->x=CastDoubleToSsizeT((double) width-region->width-region->x);
-      break;
-    }
-    case NorthGravity:
-    case SouthGravity:
-    case CenterGravity:
-    {
-      region->x=CastDoubleToSsizeT((double) width/2.0-region->width/2.0+
-        region->x);
-      break;
-    }
-    default:
-      break;
-  }
-  switch (gravity)
-  {
-    case SouthWestGravity:
-    case SouthGravity:
-    case SouthEastGravity:
-    {
-      region->y=CastDoubleToSsizeT((double) height-region->height-region->y);
-      break;
-    }
-    case EastGravity:
-    case WestGravity:
-    case CenterGravity:
-    {
-      region->y=CastDoubleToSsizeT((double) height/2.0-region->height/2.0+
-        region->y);
-      break;
-    }
-    default:
-      break;
-  }
+  GravityAdjustX(width,gravity,region);
+  GravityAdjustY(height,gravity,region);
   return;
 }
 
