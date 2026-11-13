@@ -10554,16 +10554,88 @@ static MagickBooleanType XInitializeRenderResources(const DrawInfo *draw_info,
   return(MagickTrue);
 }
 
-MagickPrivate MagickBooleanType XRenderImage(Image *image,
-  const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
-  ExceptionInfo *exception)
+typedef struct _XRenderRequest
 {
+  Image
+    *image;
+
+  const DrawInfo
+    *draw_info;
+
+  const PointInfo
+    *offset;
+
+  TypeMetric
+    *metrics;
+
+  ExceptionInfo
+    *exception;
+} XRenderRequest;
+
+static MagickBooleanType XRenderFillColor(const XRenderRequest *request,
+  Display *display,XAnnotateInfo *annotate_info,XPixelInfo *pixel)
+{
+  Image
+    *const image = request->image;
+
+  const DrawInfo
+    *const draw_info = request->draw_info;
+
+  const PointInfo
+    *const offset = request->offset;
+
+  TypeMetric
+    *const metrics = request->metrics;
+
+  ExceptionInfo
+    *const exception = request->exception;
+
   MagickBooleanType
     status;
 
   size_t
     height,
     width;
+
+  /*
+    Render fill color.
+  */
+  width=(*annotate_info).width;
+  height=(*annotate_info).height;
+  if ((fabs(draw_info->affine.rx) >= MagickEpsilon) ||
+      (fabs(draw_info->affine.ry) >= MagickEpsilon))
+    {
+      if ((fabs(draw_info->affine.sx-draw_info->affine.sy) < MagickEpsilon) &&
+          (fabs(draw_info->affine.rx+draw_info->affine.ry) < MagickEpsilon))
+        (*annotate_info).degrees=(double) (180.0/MagickPI)*
+          atan2(draw_info->affine.rx,draw_info->affine.sx);
+    }
+  (void) FormatLocaleString((*annotate_info).geometry,MagickPathExtent,
+    "%.17gx%.17g%+.20g%+.20g",(double) width,(double) height,
+    ceil(offset->x-0.5),ceil(offset->y-metrics->ascent-metrics->descent+
+    draw_info->interline_spacing-0.5));
+  (*pixel).pen_color.red=ScaleQuantumToShort(
+    ClampToQuantum(draw_info->fill.red));
+  (*pixel).pen_color.green=ScaleQuantumToShort(
+    ClampToQuantum(draw_info->fill.green));
+  (*pixel).pen_color.blue=ScaleQuantumToShort(
+    ClampToQuantum(draw_info->fill.blue));
+  status=XAnnotateImage(display,pixel,annotate_info,image,exception);
+  if (status == 0)
+    {
+      ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
+        image->filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+MagickPrivate MagickBooleanType XRenderImage(Image *image,
+  const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
+  ExceptionInfo *exception)
+{
+  XRenderRequest
+    request;
 
   static Display
     *display = (Display *) NULL;
@@ -10649,37 +10721,12 @@ MagickPrivate MagickBooleanType XRenderImage(Image *image,
     return(MagickTrue);
   if (draw_info->fill.alpha == (double) TransparentAlpha)
     return(MagickTrue);
-  /*
-    Render fill color.
-  */
-  width=annotate_info.width;
-  height=annotate_info.height;
-  if ((fabs(draw_info->affine.rx) >= MagickEpsilon) ||
-      (fabs(draw_info->affine.ry) >= MagickEpsilon))
-    {
-      if ((fabs(draw_info->affine.sx-draw_info->affine.sy) < MagickEpsilon) &&
-          (fabs(draw_info->affine.rx+draw_info->affine.ry) < MagickEpsilon))
-        annotate_info.degrees=(double) (180.0/MagickPI)*
-          atan2(draw_info->affine.rx,draw_info->affine.sx);
-    }
-  (void) FormatLocaleString(annotate_info.geometry,MagickPathExtent,
-    "%.17gx%.17g%+.20g%+.20g",(double) width,(double) height,
-    ceil(offset->x-0.5),ceil(offset->y-metrics->ascent-metrics->descent+
-    draw_info->interline_spacing-0.5));
-  pixel.pen_color.red=ScaleQuantumToShort(
-    ClampToQuantum(draw_info->fill.red));
-  pixel.pen_color.green=ScaleQuantumToShort(
-    ClampToQuantum(draw_info->fill.green));
-  pixel.pen_color.blue=ScaleQuantumToShort(
-    ClampToQuantum(draw_info->fill.blue));
-  status=XAnnotateImage(display,&pixel,&annotate_info,image,exception);
-  if (status == 0)
-    {
-      ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
-        image->filename);
-      return(MagickFalse);
-    }
-  return(MagickTrue);
+  request.image=image;
+  request.draw_info=draw_info;
+  request.offset=offset;
+  request.metrics=metrics;
+  request.exception=exception;
+  return(XRenderFillColor(&request,display,&annotate_info,&pixel));
 }
 
 /*
