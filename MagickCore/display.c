@@ -12206,6 +12206,13 @@ typedef struct _MatteCommandInput
 
   ExceptionInfo
     *exception;
+
+  const char
+    *const *MatteEditMenu;
+
+  char
+    *command,
+    *matte;
 } MatteCommandInput;
 
 static void XMatteEditControl(const MatteCommandInput *input,const int id,
@@ -12254,6 +12261,84 @@ static void XMatteEditControl(const MatteCommandInput *input,const int id,
     }
     default:
       break;
+  }
+}
+
+static void XMatteEditValues(const MatteCommandInput *input,const int id,
+  size_t *state)
+{
+  Display
+    *const display = input->display;
+
+  XWindows
+    *const windows = input->windows;
+
+  const ModeType
+    *const MatteEditCommands = input->MatteEditCommands;
+
+  Image
+    **const image = input->image;
+
+  const char
+    *const *const MatteEditMenu = input->MatteEditMenu;
+
+  EditMenuInput
+    menu_input;
+
+  switch (MatteEditCommands[id])
+  {
+    case MatteEditFuzzCommand:
+    {
+      const char
+        *const FuzzMenu[] =
+        {
+          "0%",
+          "2%",
+          "5%",
+          "10%",
+          "15%",
+          "Dialog...",
+          (char *) NULL,
+        };
+
+      static char
+        fuzz[MagickPathExtent];
+
+      menu_input.display=display;
+      menu_input.windows=windows;
+      menu_input.MatteEditMenu=MatteEditMenu;
+      menu_input.id=id;
+      menu_input.command=input->command;
+      XSelectFuzzFactor(&menu_input,FuzzMenu,fuzz,image);
+      break;
+    }
+    case MatteEditValueCommand:
+    {
+      const char
+        *const MatteMenu[] =
+        {
+          "Opaque",
+          "Transparent",
+          "Dialog...",
+          (char *) NULL,
+        };
+
+      static char
+        message[MagickPathExtent];
+
+      menu_input.display=display;
+      menu_input.windows=windows;
+      menu_input.MatteEditMenu=MatteEditMenu;
+      menu_input.id=id;
+      menu_input.command=input->command;
+      XSelectMatteValue(&menu_input,MatteMenu,message,input->matte);
+      break;
+    }
+    default:
+    {
+      XMatteEditControl(input,id,state);
+      break;
+    }
   }
 }
 
@@ -12327,7 +12412,7 @@ static MagickBooleanType XMatteEditImage(Display *display,
 
   const MatteCommandInput
     command_input = { display, resource_info, windows, MatteEditCommands,
-      image, exception };
+      image, exception, MatteEditMenu, command, matte };
 
   /*
     Map Command widget.
@@ -12402,56 +12487,9 @@ static MagickBooleanType XMatteEditImage(Display *display,
             XSelectBorderColor(&menu_input,resource_info,&border_targets);
             break;
           }
-          case MatteEditFuzzCommand:
-          {
-            const char
-              *const FuzzMenu[] =
-              {
-                "0%",
-                "2%",
-                "5%",
-                "10%",
-                "15%",
-                "Dialog...",
-                (char *) NULL,
-              };
-
-            static char
-              fuzz[MagickPathExtent];
-
-            menu_input.display=display;
-            menu_input.windows=windows;
-            menu_input.MatteEditMenu=MatteEditMenu;
-            menu_input.id=id;
-            menu_input.command=command;
-            XSelectFuzzFactor(&menu_input,FuzzMenu,fuzz,image);
-            break;
-          }
-          case MatteEditValueCommand:
-          {
-            const char
-              *const MatteMenu[] =
-              {
-                "Opaque",
-                "Transparent",
-                "Dialog...",
-                (char *) NULL,
-              };
-
-            static char
-              message[MagickPathExtent];
-
-            menu_input.display=display;
-            menu_input.windows=windows;
-            menu_input.MatteEditMenu=MatteEditMenu;
-            menu_input.id=id;
-            menu_input.command=command;
-            XSelectMatteValue(&menu_input,MatteMenu,message,matte);
-            break;
-          }
           default:
           {
-            XMatteEditControl(&command_input,id,&state);
+            XMatteEditValues(&command_input,id,&state);
             break;
           }
         }
