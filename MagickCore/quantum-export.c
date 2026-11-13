@@ -6372,6 +6372,13 @@ static void AssociateQuantumAlpha(const Image *image,CacheView *image_view)
   }
 }
 
+static inline MagickBooleanType IsCbYCrQuantumType(
+  const QuantumType quantum_type)
+{
+  return(((quantum_type == CbYCrQuantum) || (quantum_type == CbYCrAQuantum)) ?
+    MagickTrue : MagickFalse);
+}
+
 static void ExportRGBFamilyQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumType quantum_type,QuantumPixelSpan span)
 {
@@ -6587,7 +6594,7 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
     return(0);
   if (quantum_info->alpha_type == AssociatedQuantumAlpha)
     AssociateQuantumAlpha(image,image_view);
-  if ((quantum_type == CbYCrQuantum) || (quantum_type == CbYCrAQuantum))
+  if (IsCbYCrQuantumType(quantum_type) != MagickFalse)
     SwapRedGreenQuantum(image,image_view,number_pixels);
   q=pixels;
   ResetQuantumState(quantum_info);
@@ -6609,7 +6616,7 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
       break;
     }
   }
-  if ((quantum_type == CbYCrQuantum) || (quantum_type == CbYCrAQuantum))
+  if (IsCbYCrQuantumType(quantum_type) != MagickFalse)
     SwapRedGreenQuantum(image,image_view,number_pixels);
   return(extent);
 }
