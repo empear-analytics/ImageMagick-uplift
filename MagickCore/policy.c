@@ -764,6 +764,21 @@ static MagickBooleanType IsCanonicalMatch(const char *canonical_path,
   return(IsGlobMatch(canonical_directory,pattern));
 }
 
+static void AcquireCanonicalPaths(const char *pattern,
+  char **canonical_directory,char **canonical_candidate,char **canonical_path)
+{
+  char
+    directory[MagickPathExtent],
+    filename[MagickPathExtent];
+
+  GetPathComponent(pattern,HeadPath,directory);
+  GetPathComponent(pattern,TailPath,filename);
+  *canonical_directory=realpath_utf8(directory);
+  *canonical_candidate=AcquireCanonicalCandidate(*canonical_directory,
+    filename);
+  *canonical_path=realpath_utf8(pattern);
+}
+
 MagickExport MagickBooleanType IsRightsAuthorizedByName(
   const PolicyDomain domain,const char *name,const PolicyRights rights,
   const char *pattern)
@@ -771,9 +786,7 @@ MagickExport MagickBooleanType IsRightsAuthorizedByName(
   char
     *canonical_directory = (char *) NULL,
     *canonical_path = (char *) NULL,
-    *canonical_candidate = (char *) NULL,
-    directory[MagickPathExtent],
-    filename[MagickPathExtent];
+    *canonical_candidate = (char *) NULL;
 
   ElementInfo
     *p;
@@ -838,12 +851,8 @@ MagickExport MagickBooleanType IsRightsAuthorizedByName(
               Generate directory, basename, and canonical path.
             */
             paths_provisioned=MagickTrue;
-            GetPathComponent(pattern,HeadPath,directory);
-            GetPathComponent(pattern,TailPath,filename);
-            canonical_directory=realpath_utf8(directory);
-            canonical_candidate=AcquireCanonicalCandidate(canonical_directory,
-              filename);
-            canonical_path=realpath_utf8(pattern);
+            AcquireCanonicalPaths(pattern,&canonical_directory,
+              &canonical_candidate,&canonical_path);
           }
         /*
           Match against directory, basename, and canonical path.
