@@ -2760,6 +2760,20 @@ static MagickBooleanType ReadExifMarker(unsigned char **exif,size_t *length,
   return(MagickTrue);
 }
 
+static void SkipToExifHeader(unsigned char **exif,size_t *length)
+{
+  MagickBooleanType
+    broke = MagickFalse;
+
+  while ((*length) != 0)
+  {
+    if (ReadExifMarker(exif,length,&broke) == MagickFalse)
+      continue;
+    if (broke != MagickFalse)
+      break;
+  }
+}
+
 static void SyncExifProfile(const Image *image,unsigned char *exif,
   size_t length)
 {
@@ -2768,9 +2782,6 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
 
   EndianType
     endian;
-
-  MagickBooleanType
-    broke = MagickFalse;
 
   size_t
     directory_length,
@@ -2798,13 +2809,7 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
   id=(ssize_t) ReadProfileShort(LSBEndian,exif);
   if ((id != 0x4949) && (id != 0x4D4D))
     {
-      while (length != 0)
-      {
-        if (ReadExifMarker(&exif,&length,&broke) == MagickFalse)
-          continue;
-        if (broke != MagickFalse)
-          break;
-      }
+      SkipToExifHeader(&exif,&length);
       if (length < 16)
         return;
       id=(ssize_t) ReadProfileShort(LSBEndian,exif);
