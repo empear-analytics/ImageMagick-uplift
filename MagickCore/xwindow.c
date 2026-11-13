@@ -4645,6 +4645,34 @@ static XImage *XDiscardSharedXImage(XImage *ximage,
     }
   return(ximage);
 }
+
+static XImage *XAllocateSharedSegment(XWindowInfo *window,
+  XShmSegmentInfo *segment_info,XImage *ximage)
+{
+  size_t
+    length;
+
+  length=0;
+  if (ximage == (XImage *) NULL)
+    window->shared_memory=MagickFalse;
+  else
+    {
+      length=(size_t) (ximage->bytes_per_line*ximage->height);
+      if (CheckOverflowException(length,ximage->bytes_per_line,ximage->height))
+        window->shared_memory=MagickFalse;
+    }
+  if (window->shared_memory != MagickFalse)
+    segment_info[1].shmid=shmget(IPC_PRIVATE,length,IPC_CREAT | 0777);
+  if (window->shared_memory != MagickFalse)
+    segment_info[1].shmaddr=(char *) shmat(segment_info[1].shmid,0,0);
+  if (segment_info[1].shmid < 0)
+    window->shared_memory=MagickFalse;
+  if (window->shared_memory != MagickFalse)
+    (void) shmctl(segment_info[1].shmid,IPC_RMID,0);
+  else
+    ximage=XDiscardSharedXImage(ximage,segment_info);
+  return(ximage);
+}
 #endif
 
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
@@ -4703,9 +4731,6 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
 #if defined(MAGICKCORE_HAVE_SHARED_MEMORY)
   if (window->shared_memory != MagickFalse)
     {
-      size_t
-        length;
-
       XShmSegmentInfo
         *segment_info;
 
@@ -4714,25 +4739,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
       segment_info[1].shmaddr=(char *) NULL;
       ximage=XShmCreateImage(display,window->visual,(unsigned int) depth,format,
         (char *) NULL,&segment_info[1],width,height);
-      length=0;
-      if (ximage == (XImage *) NULL)
-        window->shared_memory=MagickFalse;
-      else
-        {
-          length=(size_t) (ximage->bytes_per_line*ximage->height);
-          if (CheckOverflowException(length,ximage->bytes_per_line,ximage->height))
-            window->shared_memory=MagickFalse;
-        }
-      if (window->shared_memory != MagickFalse)
-        segment_info[1].shmid=shmget(IPC_PRIVATE,length,IPC_CREAT | 0777);
-      if (window->shared_memory != MagickFalse)
-        segment_info[1].shmaddr=(char *) shmat(segment_info[1].shmid,0,0);
-      if (segment_info[1].shmid < 0)
-        window->shared_memory=MagickFalse;
-      if (window->shared_memory != MagickFalse)
-        (void) shmctl(segment_info[1].shmid,IPC_RMID,0);
-      else
-        ximage=XDiscardSharedXImage(ximage,segment_info);
+      ximage=XAllocateSharedSegment(window,segment_info,ximage);
     }
 #endif
   ximage=XAttachSharedXImage(display,window,ximage);
