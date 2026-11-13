@@ -8248,6 +8248,75 @@ static MagickBooleanType XFitDrawBounds(
   return(MagickFalse);
 }
 
+static void XPrepareDrawInfo(const DrawEditContext *context,
+  const DrawPointerTargets *pointer_targets,
+  const DrawShapeTargets *shape_targets,const DrawStyleTargets *style_targets)
+{
+  Display
+    *const display = context->display;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  Image
+    **const image = context->image;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ElementType
+    *const element = pointer_targets->element;
+
+  XSegment
+    *const line_info = shape_targets->line_info;
+
+  RectangleInfo
+    *const rectangle_info = shape_targets->rectangle_info;
+
+  XPoint
+    **const coordinate_info = shape_targets->coordinate_info;
+
+  int
+    *const number_coordinates = shape_targets->number_coordinates;
+
+  XDrawInfo
+    *const draw_info = style_targets->draw_info;
+
+  unsigned int
+    *const pen_id = style_targets->pen_id;
+
+  unsigned int
+    *const line_width = style_targets->line_width;
+
+  Pixmap
+    *const stipple = style_targets->stipple;
+
+  (*draw_info).x=(int) (*rectangle_info).x;
+  (*draw_info).y=(int) (*rectangle_info).y;
+  (void) XMagickCommand(display,resource_info,windows,SaveToUndoBufferCommand,
+    image,exception);
+  XSizeDrawRegion(context,draw_info,(*line_width),rectangle_info);
+  /*
+    Initialize drawing attributes.
+  */
+  (*draw_info).degrees=0.0;
+  (*draw_info).element=(*element);
+  (*draw_info).stipple=(*stipple);
+  (*draw_info).line_width=(*line_width);
+  XSetDrawLineInfo(draw_info,line_info,(*line_width));
+  (*draw_info).rectangle_info=(*rectangle_info);
+  if ((*draw_info).rectangle_info.x > (ssize_t) ((*line_width)/2))
+    (*draw_info).rectangle_info.x=(ssize_t) (*line_width)/2;
+  if ((*draw_info).rectangle_info.y > (ssize_t) ((*line_width)/2))
+    (*draw_info).rectangle_info.y=(ssize_t) (*line_width)/2;
+  (*draw_info).number_coordinates=(unsigned int) (*number_coordinates);
+  (*draw_info).coordinate_info=(*coordinate_info);
+  windows->pixel_info->pen_color=windows->pixel_info->pen_colors[(*pen_id)];
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -8393,27 +8462,8 @@ static MagickBooleanType XDrawEditImage(Display *display,
     /*
       Drawing is relative to image configuration.
     */
-    draw_info.x=(int) rectangle_info.x;
-    draw_info.y=(int) rectangle_info.y;
-    (void) XMagickCommand(display,resource_info,windows,SaveToUndoBufferCommand,
-      image,exception);
-    XSizeDrawRegion(&draw_context,&draw_info,line_width,&rectangle_info);
-    /*
-      Initialize drawing attributes.
-    */
-    draw_info.degrees=0.0;
-    draw_info.element=element;
-    draw_info.stipple=stipple;
-    draw_info.line_width=line_width;
-    XSetDrawLineInfo(&draw_info,&line_info,line_width);
-    draw_info.rectangle_info=rectangle_info;
-    if (draw_info.rectangle_info.x > (ssize_t) (line_width/2))
-      draw_info.rectangle_info.x=(ssize_t) line_width/2;
-    if (draw_info.rectangle_info.y > (ssize_t) (line_width/2))
-      draw_info.rectangle_info.y=(ssize_t) line_width/2;
-    draw_info.number_coordinates=(unsigned int) number_coordinates;
-    draw_info.coordinate_info=coordinate_info;
-    windows->pixel_info->pen_color=windows->pixel_info->pen_colors[pen_id];
+    XPrepareDrawInfo(&draw_context,&pointer_targets,&shape_targets,
+      &style_targets);
     /*
       Draw element on image.
     */
