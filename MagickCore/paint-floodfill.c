@@ -648,6 +648,59 @@ static MagickBooleanType PushFloodfillRun(const FloodfillRunPush *push)
   return(MagickTrue);
 }
 
+typedef struct _FloodfillSegmentScan
+{
+  FloodfillAdvance
+    advance;
+
+  FloodfillRow
+    row;
+
+  FloodfillStack
+    stack;
+
+  ssize_t
+    offset,
+    x1,
+    x2,
+    y;
+} FloodfillSegmentScan;
+
+static MagickBooleanType PushFloodfillLeft(const FloodfillSegmentScan *scan,
+  const FloodfillAdvance *advance)
+{
+  const FloodfillStack
+    stack = scan->stack;
+
+  const ssize_t
+    offset = scan->offset,
+    x1 = scan->x1,
+    y = scan->y;
+
+  MagickBooleanType
+    *const skip = advance->skip;
+
+  ssize_t
+    *const start = advance->start,
+    *const x = advance->x;
+
+  (*skip)=(*x) >= x1 ? MagickTrue : MagickFalse;
+  if ((*skip) == MagickFalse)
+    {
+      (*start)=(*x)+1;
+      if ((*start) < x1)
+        {
+          const FloodfillSegment
+            segment = { y, (*start), x1-1, -offset };
+
+          if (PushFloodfillSegment(&stack,&segment) == MagickFalse)
+            return(MagickFalse);
+        }
+      (*x)=x1+1;
+    }
+  return(MagickTrue);
+}
+
 typedef struct _FloodfillSegments
 {
   Image
@@ -728,6 +781,9 @@ static MagickBooleanType FillFloodplaneSegments(
     FloodfillRow
       row;
 
+    FloodfillSegmentScan
+      scan;
+
     ssize_t
       x;
 
@@ -753,22 +809,17 @@ static MagickBooleanType FillFloodplaneSegments(
     row.invert=segments->invert;
     row.y=y;
     row.exception=segments->exception;
+    scan.advance=advance;
+    scan.row=row;
+    scan.stack=stack;
+    scan.offset=offset;
+    scan.x1=x1;
+    scan.x2=x2;
+    scan.y=y;
     if (FillFloodplaneLeft(&row,x1,&x) == MagickFalse)
       break;
-    skip=x >= x1 ? MagickTrue : MagickFalse;
-    if (skip == MagickFalse)
-      {
-        start=x+1;
-        if (start < x1)
-          {
-            const FloodfillSegment
-              segment = { y, start, x1-1, -offset };
-
-            if (PushFloodfillSegment(&stack,&segment) == MagickFalse)
-              return(MagickFalse);
-          }
-        x=x1+1;
-      }
+    if (PushFloodfillLeft(&scan,&advance) == MagickFalse)
+      return(MagickFalse);
     do
     {
       if (skip == MagickFalse)
