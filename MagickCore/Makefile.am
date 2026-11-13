@@ -177,6 +177,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/enhance-level-colors.c \
   MagickCore/enhance.h \
   MagickCore/exception.c \
+  MagickCore/exception-throw.c \
   MagickCore/exception.h \
   MagickCore/exception-private.h \
   MagickCore/feature.c \

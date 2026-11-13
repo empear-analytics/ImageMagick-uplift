@@ -67,6 +67,7 @@ if ( ! GetOptions(
 	 'enhance-tone.c',
 	 'enhance-level-colors.c',
 	 'exception.c',
+	 'exception-throw.c',
 	 'fx.c',
 	 'image.c',
 	 'image-settings.c',
