@@ -14672,12 +14672,25 @@ static unsigned int GetNoticeReasonWidth(XFontStruct *font_info,
   return(width);
 }
 
-MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
-  const char *reason,const char *description)
+static unsigned int GetNoticeDescriptionWidth(XFontStruct *font_info,
+  const char *description,unsigned int width)
 {
   const char
     *text;
 
+  if (description != (char *) NULL)
+    {
+      text=GetLocaleExceptionMessage(XServerError,description);
+      if (text != (char *) NULL)
+        if (WidgetTextWidth(font_info,(char *) text) > width)
+          width=WidgetTextWidth(font_info,(char *) text);
+    }
+  return(width);
+}
+
+MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
+  const char *reason,const char *description)
+{
   int
     x,
     y;
@@ -14726,13 +14739,7 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
   XCheckRefreshWindows(display,windows);
   font_info=windows->widget.font_info;
   width=GetNoticeReasonWidth(font_info,reason);
-  if (description != (char *) NULL)
-    {
-      text=GetLocaleExceptionMessage(XServerError,description);
-      if (text != (char *) NULL)
-        if (WidgetTextWidth(font_info,(char *) text) > width)
-          width=WidgetTextWidth(font_info,(char *) text);
-    }
+  width=GetNoticeDescriptionWidth(font_info,description,width);
   height=(unsigned int) (font_info->ascent+font_info->descent);
   /*
     Position Notice widget.
