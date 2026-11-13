@@ -15657,6 +15657,9 @@ typedef struct _TextViewWidgets
 
   unsigned int
     *visible_lines;
+
+  XEvent
+    *event;
 } TextViewWidgets;
 
 typedef struct _TextViewContext
@@ -15798,6 +15801,57 @@ static void PressTextViewKey(const TextViewContext *context,const XEvent event,
     }
 }
 
+static void MoveTextViewPointer(const TextViewContext *context,
+  const TextViewWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    lines = context->lines;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const dismiss_info = widgets->dismiss_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XEvent
+    *const event = widgets->event;
+
+  /*
+    Discard pending button motion events.
+  */
+  while (XCheckMaskEvent(display,ButtonMotionMask,event)) ;
+  if ((*slider_info).active)
+    {
+      /*
+        Move slider matte.
+      */
+      (*slider_info)=TrackListBrowserSlider((*slider_info),(*event),lines);
+      (*state)|=RedrawListState;
+      return;
+    }
+  if ((*state) & InactiveWidgetState)
+    return;
+  if ((*dismiss_info).raised == MatteIsActive((*dismiss_info),(*event).xmotion))
+    {
+      /*
+        Dismiss button status changed.
+      */
+      (*dismiss_info).raised=
+        (*dismiss_info).raised == MagickFalse ? MagickTrue : MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,dismiss_info);
+      return;
+    }
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -15853,7 +15907,7 @@ MagickPrivate void XTextViewWidget(Display *display,
 
   const TextViewWidgets
     view_widgets = { &north_info, &south_info, &delay, &slider_info,
-      &dismiss_info, &state, &scroll_info, &visible_lines };
+      &dismiss_info, &state, &scroll_info, &visible_lines, &event };
 
   TextViewContext
     view_context;
@@ -16238,31 +16292,7 @@ MagickPrivate void XTextViewWidget(Display *display,
       }
       case MotionNotify:
       {
-        /*
-          Discard pending button motion events.
-        */
-        while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
-        if (slider_info.active)
-          {
-            /*
-              Move slider matte.
-            */
-            slider_info=TrackListBrowserSlider(slider_info,event,lines);
-            state|=RedrawListState;
-            break;
-          }
-        if (state & InactiveWidgetState)
-          break;
-        if (dismiss_info.raised == MatteIsActive(dismiss_info,event.xmotion))
-          {
-            /*
-              Dismiss button status changed.
-            */
-            dismiss_info.raised=
-              dismiss_info.raised == MagickFalse ? MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&dismiss_info);
-            break;
-          }
+        MoveTextViewPointer(&view_context,&view_widgets);
         break;
       }
       case SelectionClear:
