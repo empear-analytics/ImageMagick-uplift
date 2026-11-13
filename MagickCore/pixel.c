@@ -1056,6 +1056,34 @@ static MagickBooleanType InterpolateBilinearPixelChannel(
   return(status);
 }
 
+static RectangleInfo GetAverageWindow(const PixelInterpolateMethod interpolate,
+  const PointInfo *point,const ssize_t x_offset,const ssize_t y_offset)
+{
+  RectangleInfo
+    window;
+
+  window.width=2;  /* size of the area to average - default nearest 4 */
+  window.height=2;
+  window.x=x_offset;
+  window.y=y_offset;
+  if (interpolate == Average9InterpolatePixel)
+    {
+      window.width=3;
+      window.height=3;
+      window.x=CastDoubleToSsizeT(floor(point->x+0.5)-1.0);
+      window.y=CastDoubleToSsizeT(floor(point->y+0.5)-1.0);
+    }
+  else
+    if (interpolate == Average16InterpolatePixel)
+      {
+        window.width=4;
+        window.height=4;
+        window.x--;
+        window.y--;
+      }
+  return(window);
+}
+
 static MagickBooleanType InterpolateAveragePixelChannel(
   const ChannelInterpolation *grid,const PixelInterpolateMethod interpolate,
   double *pixel,MagickBooleanType status)
@@ -1068,28 +1096,22 @@ static MagickBooleanType InterpolateAveragePixelChannel(
     gamma,
     pixels[16];
 
+  PointInfo
+    point;
+
+  RectangleInfo
+    window;
+
   ssize_t
     count,
-    i,
-    x_offset = grid->x_offset,
-    y_offset = grid->y_offset;
+    i;
 
-  count=2;  /* size of the area to average - default nearest 4 */
-  if (interpolate == Average9InterpolatePixel)
-    {
-      count=3;
-      x_offset=CastDoubleToSsizeT(floor(grid->x+0.5)-1.0);
-      y_offset=CastDoubleToSsizeT(floor(grid->y+0.5)-1.0);
-    }
-  else
-    if (interpolate == Average16InterpolatePixel)
-      {
-        count=4;
-        x_offset--;
-        y_offset--;
-      }
-  p=GetCacheViewVirtualPixels(grid->image_view,x_offset,y_offset,
-    (size_t) count,(size_t) count,grid->exception);
+  point.x=grid->x;
+  point.y=grid->y;
+  window=GetAverageWindow(interpolate,&point,grid->x_offset,grid->y_offset);
+  count=(ssize_t) window.width;
+  p=GetCacheViewVirtualPixels(grid->image_view,window.x,window.y,window.width,
+    window.height,grid->exception);
   if (p == (const Quantum *) NULL)
     {
       status=MagickFalse;
@@ -1774,27 +1796,21 @@ static MagickBooleanType InterpolateAverageChannels(
   const Quantum
     *magick_restrict p;
 
-  ssize_t
-    count,
-    x_offset = grid->x_offset,
-    y_offset = grid->y_offset;
+  PointInfo
+    point;
 
-  count=2;  /* size of the area to average - default nearest 4 */
-  if (interpolate == Average9InterpolatePixel)
-    {
-      count=3;
-      x_offset=CastDoubleToSsizeT(floor(grid->x+0.5)-1.0);
-      y_offset=CastDoubleToSsizeT(floor(grid->y+0.5)-1.0);
-    }
-  else
-    if (interpolate == Average16InterpolatePixel)
-      {
-        count=4;
-        x_offset--;
-        y_offset--;
-      }
-  p=GetCacheViewVirtualPixels(grid->source_view,x_offset,y_offset,
-    (size_t) count,(size_t) count,grid->exception);
+  RectangleInfo
+    window;
+
+  ssize_t
+    count;
+
+  point.x=grid->x;
+  point.y=grid->y;
+  window=GetAverageWindow(interpolate,&point,grid->x_offset,grid->y_offset);
+  count=(ssize_t) window.width;
+  p=GetCacheViewVirtualPixels(grid->source_view,window.x,window.y,window.width,
+    window.height,grid->exception);
   if (p == (const Quantum *) NULL)
     {
       status=MagickFalse;
@@ -2141,28 +2157,22 @@ static MagickBooleanType InterpolateAveragePixelInfo(
   PixelInfo
     pixels[16];
 
+  PointInfo
+    point;
+
+  RectangleInfo
+    window;
+
   ssize_t
     count,
-    i,
-    x_offset = grid->x_offset,
-    y_offset = grid->y_offset;
+    i;
 
-  count=2;  /* size of the area to average - default nearest 4 */
-  if (interpolate == Average9InterpolatePixel)
-    {
-      count=3;
-      x_offset=CastDoubleToSsizeT(floor(grid->x+0.5)-1.0);
-      y_offset=CastDoubleToSsizeT(floor(grid->y+0.5)-1.0);
-    }
-  else
-    if (interpolate == Average16InterpolatePixel)
-      {
-        count=4;
-        x_offset--;
-        y_offset--;
-      }
-  p=GetCacheViewVirtualPixels(grid->image_view,x_offset,y_offset,
-    (size_t) count,(size_t) count,grid->exception);
+  point.x=grid->x;
+  point.y=grid->y;
+  window=GetAverageWindow(interpolate,&point,grid->x_offset,grid->y_offset);
+  count=(ssize_t) window.width;
+  p=GetCacheViewVirtualPixels(grid->image_view,window.x,window.y,window.width,
+    window.height,grid->exception);
   if (p == (const Quantum *) NULL)
     {
       status=MagickFalse;
