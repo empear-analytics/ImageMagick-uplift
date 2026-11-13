@@ -5867,9 +5867,6 @@ MagickExport Image *XAnimateImages(Display *display,
   XWMHints
     *manager_hints;
 
-  AnimateStartInputs
-    start;
-
   assert(images != (Image *) NULL);
   assert(images->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
@@ -5904,29 +5901,15 @@ MagickExport Image *XAnimateImages(Display *display,
   class_hints=windows->class_hints;
   manager_hints=windows->manager_hints;
   root_window=XRootWindow(display,visual_info->screen);
-  start.display=display;
-  start.resource_info=resource_info;
-  start.argv=argv;
-  start.argc=argc;
-  start.windows=windows;
-  start.images=images;
-  start.exception=exception;
-  start.warning_handler=warning_handler;
-  start.working_directory=working_directory;
-  start.magick_windows=magick_windows;
-  start.number_windows=number_windows;
-  start.visual_info=visual_info;
-  start.map_info=map_info;
-  start.pixel=pixel;
-  start.font_info=font_info;
-  start.root_window=root_window;
-  start.class_hints=class_hints;
-  start.manager_hints=manager_hints;
-  start.icon_resources=icon_resources;
-  start.icon_visual=icon_visual;
-  start.icon_map=icon_map;
-  start.icon_pixel=icon_pixel;
-  return(XStartAnimateSession(&start));
+  {
+    const AnimateStartInputs
+      start = { display, resource_info, argv, argc, windows, images, exception,
+        warning_handler, working_directory, magick_windows, number_windows,
+        visual_info, map_info, pixel, font_info, root_window, class_hints,
+        manager_hints, icon_resources, icon_visual, icon_map, icon_pixel };
+
+    return(XStartAnimateSession(&start));
+  }
 }
 
 /*
