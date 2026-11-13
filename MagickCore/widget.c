@@ -15012,6 +15012,8 @@ typedef struct _PreferencesWidgets
 
   size_t
     *state;
+  XEvent
+    *event;
 } PreferencesWidgets;
 
 typedef struct _PreferencesContext
@@ -15343,6 +15345,53 @@ static void PressPreferencesKey(const PreferencesContext *context,
     }
 }
 
+static void MovePreferencesPointer(const PreferencesContext *context,
+  const PreferencesWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const apply_info = widgets->apply_info;
+
+  XWidgetInfo
+    *const cancel_info = widgets->cancel_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XEvent
+    *const event = widgets->event;
+
+  /*
+    Discard pending button motion events.
+  */
+  while (XCheckMaskEvent(display,ButtonMotionMask,event)) ;
+  if ((*state) & InactiveWidgetState)
+    return;
+  if ((*apply_info).raised == MatteIsActive((*apply_info),(*event).xmotion))
+    {
+      /*
+        Apply button status changed.
+      */
+      (*apply_info).raised=(*apply_info).raised == MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,apply_info);
+      return;
+    }
+  if ((*cancel_info).raised == MatteIsActive((*cancel_info),(*event).xmotion))
+    {
+      /*
+        Cancel button status changed.
+      */
+      (*cancel_info).raised=(*cancel_info).raised == MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      return;
+    }
+}
+
 MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XResourceInfo *resource_info,XWindows *windows)
 {
@@ -15371,7 +15420,7 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
 
   const PreferencesWidgets
     widgets = { &cache_info, &cache[0], &preferences_info[0], &cancel_info,
-      &apply_info, &width, &state };
+      &apply_info, &width, &state, &event };
 
   PreferencesContext
     context;
@@ -15461,30 +15510,7 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
       }
       case MotionNotify:
       {
-        /*
-          Discard pending button motion events.
-        */
-        while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
-        if (state & InactiveWidgetState)
-          break;
-        if (apply_info.raised == MatteIsActive(apply_info,event.xmotion))
-          {
-            /*
-              Apply button status changed.
-            */
-            apply_info.raised=apply_info.raised == MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&apply_info);
-            break;
-          }
-        if (cancel_info.raised == MatteIsActive(cancel_info,event.xmotion))
-          {
-            /*
-              Cancel button status changed.
-            */
-            cancel_info.raised=cancel_info.raised == MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-            break;
-          }
+        MovePreferencesPointer(&context,&widgets);
         break;
       }
       default:
