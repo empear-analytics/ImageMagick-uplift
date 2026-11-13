@@ -196,8 +196,18 @@ typedef struct _PivotSearch
     rank;
 } PivotSearch;
 
-static void FindPivot(const PivotSearch *search,long double *max,
-  ssize_t *row,ssize_t *column)
+typedef struct _PivotTargets
+{
+  long double
+    *max;
+
+  ssize_t
+    *row,
+    *column;
+} PivotTargets;
+
+static void ScanPivotRow(const PivotSearch *search,
+  const PivotTargets *targets,const ssize_t j)
 {
   long double
     **const hp_matrix = search->hp_matrix;
@@ -208,21 +218,45 @@ static void FindPivot(const PivotSearch *search,long double *max,
   const size_t
     rank = search->rank;
 
+  long double
+    *const max = targets->max;
+
   ssize_t
-    j,
+    *const row = targets->row,
+    *const column = targets->column;
+
+  ssize_t
     k;
+
+  for (k=0; k < (ssize_t) rank; k++)
+    if ((pivots[k] == 0) && (fabsl(hp_matrix[j][k]) > *max))
+      {
+        *max=fabsl(hp_matrix[j][k]);
+        *row=j;
+        *column=k;
+      }
+}
+
+static void FindPivot(const PivotSearch *search,long double *max,
+  ssize_t *row,ssize_t *column)
+{
+  const PivotTargets
+    targets = { max, row, column };
+
+  const ssize_t
+    *const pivots = search->pivots;
+
+  const size_t
+    rank = search->rank;
+
+  ssize_t
+    j;
 
   *column=(-1);
   *row=(-1);
   for (j=0; j < (ssize_t) rank; j++)
     if (pivots[j] != 1)
-      for (k=0; k < (ssize_t) rank; k++)
-        if ((pivots[k] == 0) && (fabsl(hp_matrix[j][k]) > *max))
-          {
-            *max=fabsl(hp_matrix[j][k]);
-            *row=j;
-            *column=k;
-          }
+      ScanPivotRow(search,&targets,j);
 }
 
 static void SwapMatrixRows(long double **hp_matrix,const size_t rank,
