@@ -1186,6 +1186,21 @@ static void PrintMagickNote(FILE *file,const MagickInfo **magick_info,
     }
 }
 
+static void PrintMagickFormatSupport(FILE *file,const MagickInfo **magick_info,
+  const ssize_t i)
+{
+  (void) FormatLocaleFile(file,"%c%c%c ",magick_info[i]->decoder ? 'r' : '-',
+    magick_info[i]->encoder ? 'w' : '-',magick_info[i]->encoder != NULL &&
+    GetMagickAdjoin(magick_info[i]) != MagickFalse ? '+' : '-');
+  if (magick_info[i]->description != (char *) NULL)
+    (void) FormatLocaleFile(file,"  %s",magick_info[i]->description);
+  if (magick_info[i]->version != (char *) NULL)
+    (void) FormatLocaleFile(file," (%s)",magick_info[i]->version);
+  (void) FormatLocaleFile(file,"\n");
+  if (magick_info[i]->note != (char *) NULL)
+    PrintMagickNote(file,magick_info,i);
+}
+
 MagickExport MagickBooleanType ListMagickInfo(FILE *file,
   ExceptionInfo *exception)
 {
@@ -1234,16 +1249,7 @@ MagickExport MagickBooleanType ListMagickInfo(FILE *file,
       (void) FormatLocaleFile(file,"%9s ",magick_module);
     }
 #endif
-    (void) FormatLocaleFile(file,"%c%c%c ",magick_info[i]->decoder ? 'r' : '-',
-      magick_info[i]->encoder ? 'w' : '-',magick_info[i]->encoder != NULL &&
-      GetMagickAdjoin(magick_info[i]) != MagickFalse ? '+' : '-');
-    if (magick_info[i]->description != (char *) NULL)
-      (void) FormatLocaleFile(file,"  %s",magick_info[i]->description);
-    if (magick_info[i]->version != (char *) NULL)
-      (void) FormatLocaleFile(file," (%s)",magick_info[i]->version);
-    (void) FormatLocaleFile(file,"\n");
-    if (magick_info[i]->note != (char *) NULL)
-      PrintMagickNote(file,magick_info,i);
+    PrintMagickFormatSupport(file,magick_info,i);
   }
   (void) FormatLocaleFile(file,"\n* native blob support\n");
   (void) FormatLocaleFile(file,"r read support\n");
