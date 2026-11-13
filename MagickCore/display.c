@@ -18682,24 +18682,24 @@ static const char
     (char *) NULL
   };
 
+static const char
+  *const *Menus[MagickMenus] =
+  {
+    FileMenu,
+    EditMenu,
+    ViewMenu,
+    TransformMenu,
+    EnhanceMenu,
+    EffectsMenu,
+    FXMenu,
+    ImageEditMenu,
+    MiscellanyMenu,
+    HelpMenu
+  };
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
-  const char
-    *const *Menus[MagickMenus] =
-    {
-      FileMenu,
-      EditMenu,
-      ViewMenu,
-      TransformMenu,
-      EnhanceMenu,
-      EffectsMenu,
-      FXMenu,
-      ImageEditMenu,
-      MiscellanyMenu,
-      HelpMenu
-    };
-
   static DisplayCommand
     CommandMenus[] =
     {
