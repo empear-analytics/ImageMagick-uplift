@@ -7597,6 +7597,24 @@ static void XHighlightMagnifyCenter(Display *display,XWindows *windows,
       (unsigned int) highlight_info.height-3);
 }
 
+static int XGetMagnifyOriginX(XWindows *windows,const XImage *ximage,
+  const unsigned int width,const unsigned int magnify)
+{
+  int
+    x;
+
+  if ((windows->magnify.x < 0) ||
+      (windows->magnify.x >= windows->image.ximage->width))
+    windows->magnify.x=windows->image.ximage->width >> 1;
+  x=windows->magnify.x-(int) ((width/magnify) >> 1);
+  if (x < 0)
+    x=0;
+  else
+    if (x > (ximage->width-(int) (width/magnify)))
+      x=ximage->width-(int) (width/magnify);
+  return(x);
+}
+
 MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   ExceptionInfo *exception)
 {
@@ -7640,15 +7658,7 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   ximage=windows->image.ximage;
   width=(unsigned int) windows->magnify.ximage->width;
   height=(unsigned int) windows->magnify.ximage->height;
-  if ((windows->magnify.x < 0) ||
-      (windows->magnify.x >= windows->image.ximage->width))
-    windows->magnify.x=windows->image.ximage->width >> 1;
-  x=windows->magnify.x-(int) ((width/magnify) >> 1);
-  if (x < 0)
-    x=0;
-  else
-    if (x > (ximage->width-(int) (width/magnify)))
-      x=ximage->width-(int) (width/magnify);
+  x=XGetMagnifyOriginX(windows,ximage,width,magnify);
   if ((windows->magnify.y < 0) ||
       (windows->magnify.y >= windows->image.ximage->height))
     windows->magnify.y=windows->image.ximage->height >> 1;
