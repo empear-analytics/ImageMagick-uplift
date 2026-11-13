@@ -14938,6 +14938,18 @@ static unsigned int GetPreferencesTextWidth(XFontStruct *font_info)
   return(text_width);
 }
 
+static unsigned int GetPreferencesButtonWidth(XFontStruct *font_info)
+{
+  unsigned int
+    width;
+
+  width=WidgetTextWidth(font_info,ApplyButtonText);
+  if (WidgetTextWidth(font_info,CancelButtonText) > width)
+    width=WidgetTextWidth(font_info,CancelButtonText);
+  width+=(unsigned int) QuantumMargin;
+  return(width);
+}
+
 MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XResourceInfo *resource_info,XWindows *windows)
 {
@@ -14982,10 +14994,7 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XCheckRefreshWindows(display,windows);
   font_info=windows->widget.font_info;
   text_width=GetPreferencesTextWidth(font_info);
-  width=WidgetTextWidth(font_info,ApplyButtonText);
-  if (WidgetTextWidth(font_info,CancelButtonText) > width)
-    width=WidgetTextWidth(font_info,CancelButtonText);
-  width+=(unsigned int) QuantumMargin;
+  width=GetPreferencesButtonWidth(font_info);
   height=(unsigned int) (font_info->ascent+font_info->descent);
   /*
     Position Preferences widget.
