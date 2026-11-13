@@ -8935,15 +8935,30 @@ static void XAllocateColorRamp(const XTrueColorSource *source,
     XFillColorRamp(map_info,(*number_colors),color,p);
 }
 
+static void XAllocGuiColors(Display *display,const Colormap colormap,
+  XPixelInfo *pixel)
+{
+  ssize_t
+    i;
+
+  (void) XAllocColor(display,colormap,&pixel->foreground_color);
+  (void) XAllocColor(display,colormap,&pixel->background_color);
+  (void) XAllocColor(display,colormap,&pixel->border_color);
+  (void) XAllocColor(display,colormap,&pixel->matte_color);
+  (void) XAllocColor(display,colormap,&pixel->highlight_color);
+  (void) XAllocColor(display,colormap,&pixel->shadow_color);
+  (void) XAllocColor(display,colormap,&pixel->depth_color);
+  (void) XAllocColor(display,colormap,&pixel->trough_color);
+  for (i=0; i < MaxNumberPens; i++)
+    (void) XAllocColor(display,colormap,&pixel->pen_colors[i]);
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
 {
   Colormap
     colormap;
-
-  ssize_t
-    i;
 
   Status
     status;
@@ -9063,16 +9078,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
       /*
         Preallocate our GUI colors.
       */
-      (void) XAllocColor(display,colormap,&pixel->foreground_color);
-      (void) XAllocColor(display,colormap,&pixel->background_color);
-      (void) XAllocColor(display,colormap,&pixel->border_color);
-      (void) XAllocColor(display,colormap,&pixel->matte_color);
-      (void) XAllocColor(display,colormap,&pixel->highlight_color);
-      (void) XAllocColor(display,colormap,&pixel->shadow_color);
-      (void) XAllocColor(display,colormap,&pixel->depth_color);
-      (void) XAllocColor(display,colormap,&pixel->trough_color);
-      for (i=0; i < MaxNumberPens; i++)
-        (void) XAllocColor(display,colormap,&pixel->pen_colors[i]);
+      XAllocGuiColors(display,colormap,pixel);
       /*
         Determine if image colors will "fit" into X server colormap.
       */
