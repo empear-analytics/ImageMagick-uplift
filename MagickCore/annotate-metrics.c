@@ -230,6 +230,16 @@ static double GetMultilineHeight(const DrawInfo *draw_info,
     0.5)+(count-1)*draw_info->interline_spacing);
 }
 
+static DrawInfo *CloneMultilineDrawInfo(const DrawInfo *draw_info)
+{
+  DrawInfo
+    *annotate_info;
+
+  annotate_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
+  annotate_info->text=DestroyString(annotate_info->text);
+  return(annotate_info);
+}
+
 MagickExport MagickBooleanType GetMultilineTypeMetrics(Image *image,
   const DrawInfo *draw_info,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -270,8 +280,7 @@ MagickExport MagickBooleanType GetMultilineTypeMetrics(Image *image,
         "LabelExpected","`%s'",image->filename);
       return(MagickFalse);
     }
-  annotate_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
-  annotate_info->text=DestroyString(annotate_info->text);
+  annotate_info=CloneMultilineDrawInfo(draw_info);
   /*
     Convert newlines to multiple lines of text.
   */
