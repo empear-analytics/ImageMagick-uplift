@@ -465,6 +465,23 @@ static NodeInfo *GetSuccessorNode(const SplayTreeInfo *splay_tree)
   return(next);
 }
 
+static void JoinSplayTreeSubtrees(SplayTreeInfo *splay_tree,NodeInfo *left,
+  NodeInfo *right)
+{
+  if (left == (NodeInfo *) NULL)
+    {
+      splay_tree->root=right;
+      return;
+    }
+  splay_tree->root=left;
+  if (right != (NodeInfo *) NULL)
+    {
+      while (left->right != (NodeInfo *) NULL)
+        left=left->right;
+      left->right=right;
+    }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -541,19 +558,7 @@ MagickExport MagickBooleanType DeleteNodeByValueFromSplayTree(
         RelinquishNodeContents(splay_tree,splay_tree->root);
         splay_tree->root=(NodeInfo *) RelinquishMagickMemory(splay_tree->root);
         splay_tree->nodes--;
-        if (left == (NodeInfo *) NULL)
-          {
-            splay_tree->root=right;
-            UnlockSemaphoreInfo(splay_tree->semaphore);
-            return(MagickTrue);
-          }
-        splay_tree->root=left;
-        if (right != (NodeInfo *) NULL)
-          {
-            while (left->right != (NodeInfo *) NULL)
-              left=left->right;
-            left->right=right;
-          }
+        JoinSplayTreeSubtrees(splay_tree,left,right);
         UnlockSemaphoreInfo(splay_tree->semaphore);
         return(MagickTrue);
       }
@@ -1204,19 +1209,7 @@ MagickExport void *RemoveNodeByValueFromSplayTree(SplayTreeInfo *splay_tree,
             splay_tree->root->value);
         splay_tree->root=(NodeInfo *) RelinquishMagickMemory(splay_tree->root);
         splay_tree->nodes--;
-        if (left == (NodeInfo *) NULL)
-          {
-            splay_tree->root=right;
-            UnlockSemaphoreInfo(splay_tree->semaphore);
-            return(key);
-          }
-        splay_tree->root=left;
-        if (right != (NodeInfo *) NULL)
-          {
-            while (left->right != (NodeInfo *) NULL)
-              left=left->right;
-            left->right=right;
-          }
+        JoinSplayTreeSubtrees(splay_tree,left,right);
         UnlockSemaphoreInfo(splay_tree->semaphore);
         return(key);
       }
@@ -1287,19 +1280,7 @@ MagickExport void *RemoveNodeFromSplayTree(SplayTreeInfo *splay_tree,
     splay_tree->root->key=splay_tree->relinquish_key(splay_tree->root->key);
   splay_tree->root=(NodeInfo *) RelinquishMagickMemory(splay_tree->root);
   splay_tree->nodes--;
-  if (left == (NodeInfo *) NULL)
-    {
-      splay_tree->root=right;
-      UnlockSemaphoreInfo(splay_tree->semaphore);
-      return(value);
-    }
-  splay_tree->root=left;
-  if (right != (NodeInfo *) NULL)
-    {
-      while (left->right != (NodeInfo *) NULL)
-        left=left->right;
-      left->right=right;
-    }
+  JoinSplayTreeSubtrees(splay_tree,left,right);
   UnlockSemaphoreInfo(splay_tree->semaphore);
   return(value);
 }
