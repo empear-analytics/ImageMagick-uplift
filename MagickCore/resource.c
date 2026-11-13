@@ -574,6 +574,46 @@ MagickExport int AcquireUniqueFileResource(char *path)
   return(file);
 }
 
+static void GetMagickResourceTail(const ResourceType type,
+  MagickSizeType *resource)
+{
+  switch (type)
+  {
+    case MapResource:
+    {
+      *resource=(MagickSizeType) resource_info.map;
+      break;
+    }
+    case MemoryResource:
+    {
+      *resource=(MagickSizeType) resource_info.memory;
+      break;
+    }
+    case TimeResource:
+    {
+      *resource=(MagickSizeType) resource_info.time;
+      break;
+    }
+    case ThreadResource:
+    {
+      *resource=(MagickSizeType) resource_info.thread;
+      break;
+    }
+    case ThrottleResource:
+    {
+      *resource=(MagickSizeType) resource_info.throttle;
+      break;
+    }
+    case WidthResource:
+    {
+      *resource=(MagickSizeType) resource_info.width;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -630,38 +670,11 @@ MagickExport MagickSizeType GetMagickResource(const ResourceType type)
       resource=(MagickSizeType) resource_info.list_length;
       break;
     }
-    case MapResource:
-    {
-      resource=(MagickSizeType) resource_info.map;
-      break;
-    }
-    case MemoryResource:
-    {
-      resource=(MagickSizeType) resource_info.memory;
-      break;
-    }
-    case TimeResource:
-    {
-      resource=(MagickSizeType) resource_info.time;
-      break;
-    }
-    case ThreadResource:
-    {
-      resource=(MagickSizeType) resource_info.thread;
-      break;
-    }
-    case ThrottleResource:
-    {
-      resource=(MagickSizeType) resource_info.throttle;
-      break;
-    }
-    case WidthResource:
-    {
-      resource=(MagickSizeType) resource_info.width;
-      break;
-    }
     default:
+    {
+      GetMagickResourceTail(type,&resource);
       break;
+    }
   }
   UnlockResourceSemaphore(type);
   return(resource);
