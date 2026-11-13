@@ -1354,6 +1354,19 @@ static TypeInfo *AcquireTypeNode(const char *filename)
   return(type_info);
 }
 
+static MagickStatusType AddTypeNode(SplayTreeInfo *cache,TypeInfo *type_info,
+  ExceptionInfo *exception)
+{
+  MagickStatusType
+    status;
+
+  status=AddValueToSplayTree(cache,type_info->name,type_info);
+  if (status == MagickFalse)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ResourceLimitError,"MemoryAllocationFailed","`%s'",type_info->name);
+  return(status);
+}
+
 static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1437,10 +1450,7 @@ static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
       continue;
     if (IsElementEnd(keyword) != MagickFalse)
       {
-        status=AddValueToSplayTree(cache,type_info->name,type_info);
-        if (status == MagickFalse)
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            ResourceLimitError,"MemoryAllocationFailed","`%s'",type_info->name);
+        status=AddTypeNode(cache,type_info,exception);
         type_info=(TypeInfo *) NULL;
         continue;
       }
