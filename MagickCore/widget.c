@@ -7022,6 +7022,9 @@ typedef struct _FileBrowserWidgets
 
   ssize_t
     *i;
+
+  char
+    ***filelist;
 } FileBrowserWidgets;
 
 typedef struct _FileBrowserContext
@@ -7040,6 +7043,9 @@ typedef struct _FileBrowserContext
 
   XFontStruct
     *font_info;
+
+  unsigned int
+    height;
 } FileBrowserContext;
 
 static void ClientFileBrowserMessage(const FileBrowserContext *context,
@@ -7435,6 +7441,47 @@ static void PressFileBrowserButtons(const FileBrowserContext *context,
   PressFileBrowserReply(context,event,widgets);
 }
 
+static void ChooseFileBrowserEntry(const FileBrowserContext *context,
+  const XEvent event,const FileBrowserTargets *targets,
+  const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const reply = context->reply,
+    *const working_path = context->working_path;
+
+  const unsigned int
+    height = context->height;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  size_t
+    *const files = widgets->files;
+
+  char
+    ***const filelist = widgets->filelist;
+
+  FileBrowserPress
+    entry;
+
+  entry.display=display;
+  entry.windows=windows;
+  entry.filelist=(*filelist);
+  entry.files=(*files);
+  entry.height=height;
+  entry.event=event;
+  entry.slider_info=(*slider_info);
+  entry.working_path=working_path;
+  entry.reply=reply;
+  SelectFileBrowserEntry(&entry,targets);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -7523,7 +7570,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const FileBrowserWidgets
     file_widgets = { &reply_info, &state,
       &scroll_info, &slider_info, &visible_files, &files, &up_info, &home_info,
-      &special_info, &action_info, &cancel_info, &i };
+      &special_info, &action_info, &cancel_info, &i, &filelist };
 
   FileBrowserContext
     file_context;
@@ -7631,6 +7678,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   file_context.working_path=working_path;
   file_context.primary_selection=primary_selection;
   file_context.font_info=font_info;
+  file_context.height=height;
   do
   {
     if (state & UpdateConfigurationState)
@@ -8003,19 +8051,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
           }
         if (MatteIsActive(list_info,event.xbutton))
           {
-            FileBrowserPress
-              entry;
-
-            entry.display=display;
-            entry.windows=windows;
-            entry.filelist=filelist;
-            entry.files=files;
-            entry.height=height;
-            entry.event=event;
-            entry.slider_info=slider_info;
-            entry.working_path=working_path;
-            entry.reply=reply;
-            SelectFileBrowserEntry(&entry,&targets);
+            ChooseFileBrowserEntry(&file_context,event,&targets,&file_widgets);
             break;
           }
         PressFileBrowserButtons(&file_context,event,&file_widgets);
