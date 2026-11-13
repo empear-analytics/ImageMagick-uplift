@@ -4262,6 +4262,54 @@ static void XChangeToHomeDirectory(XResourceInfo *resource_info,
       "UnableToOpenFile","%s",resource_info->home_directory);
 }
 
+static void XReleaseAnimateWindows(const AnimateWindowSetup *setup,
+  const Image *nexus)
+{
+  Display
+    *const display = setup->display;
+
+  XResourceInfo
+    *const resource_info = setup->resource_info;
+
+  XWindows
+    *const windows = setup->windows;
+
+  XVisualInfo
+    *const visual_info = setup->visual_info;
+
+  XStandardColormap
+    *const map_info = setup->map_info;
+
+  XPixelInfo
+    *const pixel = setup->pixel;
+
+  XVisualInfo
+    *const icon_visual = setup->icon_visual;
+
+  XStandardColormap
+    *const icon_map = setup->icon_map;
+
+  XPixelInfo
+    *const icon_pixel = setup->icon_pixel;
+
+  if (nexus == (Image *) NULL)
+    {
+      AnimateX11Resources
+        x11_resources;
+
+      x11_resources.display=display;
+      x11_resources.resource_info=resource_info;
+      x11_resources.windows=windows;
+      x11_resources.visual_info=visual_info;
+      x11_resources.map_info=map_info;
+      x11_resources.pixel=pixel;
+      x11_resources.icon_visual=icon_visual;
+      x11_resources.icon_map=icon_map;
+      x11_resources.icon_pixel=icon_pixel;
+      XReleaseAnimateResources(&x11_resources);
+    }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4922,22 +4970,7 @@ MagickExport Image *XAnimateImages(Display *display,
     RelinquishMagickMemory(windows->image.pixmaps);
   windows->image.matte_pixmaps=(Pixmap *)
     RelinquishMagickMemory(windows->image.matte_pixmaps);
-  if (nexus == (Image *) NULL)
-    {
-      AnimateX11Resources
-        x11_resources;
-
-      x11_resources.display=display;
-      x11_resources.resource_info=resource_info;
-      x11_resources.windows=windows;
-      x11_resources.visual_info=visual_info;
-      x11_resources.map_info=map_info;
-      x11_resources.pixel=pixel;
-      x11_resources.icon_visual=icon_visual;
-      x11_resources.icon_map=icon_map;
-      x11_resources.icon_pixel=icon_pixel;
-      XReleaseAnimateResources(&x11_resources);
-    }
+  XReleaseAnimateWindows(&setup,nexus);
   (void) XSync(display,MagickFalse);
   /*
     Restore our progress monitor and warning handlers.
