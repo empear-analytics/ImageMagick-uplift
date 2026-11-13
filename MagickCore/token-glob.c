@@ -141,6 +141,44 @@ static MagickBooleanType MatchCharacterClass(const char *p,const char *q,
 %
 */
 
+static MagickBooleanType GlobExpression_(const char *magick_restrict,
+  const char *magick_restrict,const MagickBooleanType,const size_t);
+
+static MagickBooleanType GlobStar(const char *magick_restrict expression,
+  const char *magick_restrict pattern,const MagickBooleanType case_insensitive,
+  const size_t depth)
+{
+  do
+  {
+    /*
+      Skip consecutive '*'.
+    */
+    pattern+=GetUTFOctets(pattern);
+  }
+  while (GetUTFCode(pattern) == '*');
+  while (1)
+  {
+    /*
+      Try to match at each position.
+    */
+    if (GlobExpression_(expression,pattern,case_insensitive,depth+1) != MagickFalse)
+      {
+        /*
+          Consume rest of expression and pattern.
+        */
+        while (GetUTFCode(expression) != 0)
+          expression+=GetUTFOctets(expression);
+        while (GetUTFCode(pattern) != 0)
+          pattern+=GetUTFOctets(pattern);
+        return(MagickTrue);
+      }
+      if (GetUTFCode(expression) == 0)
+        break;
+      expression+=GetUTFOctets(expression);
+    }
+  return(MagickFalse);
+}
+
 static MagickBooleanType GlobExpression_(const char *magick_restrict expression,
   const char *magick_restrict pattern,const MagickBooleanType case_insensitive,
   const size_t depth)
@@ -185,37 +223,7 @@ static MagickBooleanType GlobExpression_(const char *magick_restrict expression,
     switch (pcode)
     {
       case '*':
-      {
-        do
-        {
-          /*
-            Skip consecutive '*'.
-          */
-          pattern+=GetUTFOctets(pattern);
-        }
-        while (GetUTFCode(pattern) == '*');
-        while (1)
-        {
-          /*
-            Try to match at each position.
-          */
-          if (GlobExpression_(expression,pattern,case_insensitive,depth+1) != MagickFalse)
-            {
-              /*
-                Consume rest of expression and pattern.
-              */
-              while (GetUTFCode(expression) != 0)
-                expression+=GetUTFOctets(expression);
-              while (GetUTFCode(pattern) != 0)
-                pattern+=GetUTFOctets(pattern);
-              return(MagickTrue);
-            }
-            if (GetUTFCode(expression) == 0)
-              break;
-            expression+=GetUTFOctets(expression);
-          }
-        return(MagickFalse);
-      }
+        return(GlobStar(expression,pattern,case_insensitive,depth));
       case '?':
       {
         if (ecode == 0)
