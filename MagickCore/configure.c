@@ -380,6 +380,14 @@ MagickExport LinkedListInfo *DestroyConfigureOptions(LinkedListInfo *options)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static const ConfigureInfo *GetConfigureElementValue(ElementInfo *p,
+  const ConfigureInfo *option)
+{
+  if (p != (ElementInfo *) NULL)
+    option=(const ConfigureInfo *) p->value;
+  return(option);
+}
+
 MagickExport const ConfigureInfo *GetConfigureInfo(const char *name,
   ExceptionInfo *exception)
 {
@@ -401,9 +409,7 @@ MagickExport const ConfigureInfo *GetConfigureInfo(const char *name,
   if ((name == (const char *) NULL) || (LocaleCompare(name,"*") == 0))
     {
       UnlockSemaphoreInfo(configure_semaphore);
-      if (p != (ElementInfo *) NULL)
-        option=(const ConfigureInfo *) p->value;
-      return(option);
+      return(GetConfigureElementValue(p,option));
     }
   while (p != (ElementInfo *) NULL)
   {
