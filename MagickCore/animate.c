@@ -1075,6 +1075,9 @@ typedef struct _AnimateBackgroundTargets
   unsigned int
     *width,
     *height;
+
+  XPixelInfo
+    *pixel;
 } AnimateBackgroundTargets;
 
 static void XCreateBackgroundXImage(const AnimateBackgroundSetup *setup,
@@ -1400,6 +1403,47 @@ static void XRunBackgroundAnimation(const AnimateBackgroundSetup *setup,
   } while (event.type != DestroyNotify);
 }
 
+static void XMakeBackgroundColormap(const AnimateBackgroundSetup *setup,
+  const AnimateBackgroundTargets *targets)
+{
+  ExceptionInfo
+    *const exception = setup->exception;
+
+  Image
+    *display_image,
+    **const image_list = setup->image_list;
+
+  int
+    scene;
+
+  XPixelInfo
+    *const pixel = targets->pixel;
+
+  XResourceInfo
+    *const resource_info = setup->resource_info,
+    *const resources = targets->resources;
+
+  XVisualInfo
+    *const visual_info = setup->visual_info;
+
+  (*resources).colormap=SharedColormap;
+  display_image=image_list[0];
+  for (scene=0; scene < (int) setup->number_scenes; scene++)
+  {
+    if (IsTrueColorMap(resource_info->map_type,visual_info) != MagickFalse)
+      (void) SetImageType(image_list[scene],image_list[scene]->alpha_trait ==
+        BlendPixelTrait ? TrueColorType : TrueColorAlphaType,exception);
+    if ((display_image->columns < image_list[scene]->columns) &&
+        (display_image->rows < image_list[scene]->rows))
+      display_image=image_list[scene];
+  }
+  if (IsTrueColorMap(resource_info->map_type,visual_info) != MagickFalse)
+    (void) SetImageType(display_image,display_image->alpha_trait !=
+      BlendPixelTrait ? TrueColorType : TrueColorAlphaType,exception);
+  XMakeStandardColormap(setup->display,visual_info,resources,display_image,
+    setup->map_info,pixel,exception);
+}
+
 MagickExport void XAnimateBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *images,ExceptionInfo *exception)
 {
@@ -1408,7 +1452,6 @@ MagickExport void XAnimateBackgroundImage(Display *display,
 
   Image
     *coalesce_image,
-    *display_image,
     **image_list;
 
   int
@@ -1454,7 +1497,7 @@ MagickExport void XAnimateBackgroundImage(Display *display,
 
   const AnimateBackgroundTargets
     targets = { &window_info, &resources, &window_attributes, &width,
-      &height };
+      &height, &pixel };
 
   /*
     Determine target window.
@@ -1545,25 +1588,18 @@ MagickExport void XAnimateBackgroundImage(Display *display,
     ThrowXWindowFatalException(ResourceLimitFatalError,
       "MemoryAllocationFailed",images->filename);
   XSortSceneList(image_list,number_scenes);
+  setup.display=display;
+  setup.resource_info=resource_info;
+  setup.exception=exception;
+  setup.images=images;
+  setup.image_list=image_list;
+  setup.number_scenes=number_scenes;
+  setup.visual_info=visual_info;
+  setup.map_info=map_info;
   /*
     Initialize Standard Colormap.
   */
-  resources.colormap=SharedColormap;
-  display_image=image_list[0];
-  for (scene=0; scene < (int) number_scenes; scene++)
-  {
-    if (IsTrueColorMap(resource_info->map_type,visual_info) != MagickFalse)
-      (void) SetImageType(image_list[scene],image_list[scene]->alpha_trait ==
-        BlendPixelTrait ? TrueColorType : TrueColorAlphaType,exception);
-    if ((display_image->columns < image_list[scene]->columns) &&
-        (display_image->rows < image_list[scene]->rows))
-      display_image=image_list[scene];
-  }
-  if (IsTrueColorMap(resource_info->map_type,visual_info) != MagickFalse)
-    (void) SetImageType(display_image,display_image->alpha_trait !=
-      BlendPixelTrait ? TrueColorType : TrueColorAlphaType,exception);
-  XMakeStandardColormap(display,visual_info,&resources,display_image,map_info,
-    &pixel,exception);
+  XMakeBackgroundColormap(&setup,&targets);
   /*
     Graphic context superclass.
   */
@@ -1582,14 +1618,6 @@ MagickExport void XAnimateBackgroundImage(Display *display,
   /*
     Create the X image.
   */
-  setup.display=display;
-  setup.resource_info=resource_info;
-  setup.exception=exception;
-  setup.images=images;
-  setup.image_list=image_list;
-  setup.number_scenes=number_scenes;
-  setup.visual_info=visual_info;
-  setup.map_info=map_info;
   XCreateBackgroundXImage(&setup,&targets);
   /*
     Adjust image dimensions as specified by backdrop or geometry options.
