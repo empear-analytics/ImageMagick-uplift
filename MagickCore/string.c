@@ -897,13 +897,29 @@ static inline MagickBooleanType NeedsEscape(const char c,const char escape)
   return((c == '\\') || (c == escape) ? MagickTrue : MagickFalse);
 }
 
+static void CopyEscapedString(char *destination,const char *source,
+  const char escape)
+{
+  char
+    *q;
+
+  const char
+    *p;
+
+  q=destination;
+  for (p=source; *p != '\0'; p++)
+  {
+    if (NeedsEscape(*p,escape) != MagickFalse)
+      *q++='\\';
+    *q++=(*p);
+  }
+  *q='\0';
+}
+
 MagickExport char *EscapeString(const char *source,const char escape)
 {
   char
     *destination;
-
-  char
-    *q;
 
   const char
     *p;
@@ -930,14 +946,7 @@ MagickExport char *EscapeString(const char *source,const char escape)
   if (destination == (char *) NULL)
     ThrowFatalException(ResourceLimitFatalError,"UnableToEscapeString");
   *destination='\0';
-  q=destination;
-  for (p=source; *p != '\0'; p++)
-  {
-    if (NeedsEscape(*p,escape) != MagickFalse)
-      *q++='\\';
-    *q++=(*p);
-  }
-  *q='\0';
+  CopyEscapedString(destination,source,escape);
   return(destination);
 }
 
