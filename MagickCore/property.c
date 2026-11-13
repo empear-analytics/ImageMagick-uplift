@@ -291,13 +291,18 @@ MagickExport MagickBooleanType DefineImageProperty(Image *image,
 %    o property: the image property.
 %
 */
-MagickExport MagickBooleanType DeleteImageProperty(Image *image,
-  const char *property)
+static void CheckPropertyImage(const Image *image)
 {
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+}
+
+MagickExport MagickBooleanType DeleteImageProperty(Image *image,
+  const char *property)
+{
+  CheckPropertyImage(image);
   if (image->properties == (void *) NULL)
     return(MagickFalse);
   return(DeleteNodeFromSplayTree((SplayTreeInfo *) image->properties,property));
@@ -328,10 +333,7 @@ MagickExport MagickBooleanType DeleteImageProperty(Image *image,
 */
 MagickExport void DestroyImageProperties(Image *image)
 {
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  CheckPropertyImage(image);
   if (image->properties != (void *) NULL)
     image->properties=(void *) DestroySplayTree((SplayTreeInfo *)
       image->properties);
@@ -3507,6 +3509,127 @@ static const char *GetMagickPropertyLetter(ImageInfo *image_info,
   return(CloneMagickPropertyValue(image_info,image,value));
 }
 
+static const char *GetPathComponentProperty(const Image *image,
+  const PathType type,char *value,const char *string)
+{
+  GetPathComponent(image->magick_filename,type,value);
+  if (*value == '\0')
+    string="";
+  return(string);
+}
+
+static void GetProfilesProperty(const Image *image,char *value)
+{
+  const char
+    *name;
+
+  ResetImageProfileIterator(image);
+  name=GetNextImageProfile(image);
+  if (name != (char *) NULL)
+    {
+      (void) CopyMagickString(value,name,MagickPathExtent);
+      name=GetNextImageProfile(image);
+      while (name != (char *) NULL)
+      {
+        ConcatenateMagickString(value,",",MagickPathExtent);
+        ConcatenateMagickString(value,name,MagickPathExtent);
+        name=GetNextImageProfile(image);
+      }
+    }
+}
+
+static const char *GetConvexHullExtremePoints(Image *image,char *value,
+  const char *string,ExceptionInfo *exception)
+{
+  char
+    *points;
+
+  PointInfo
+    extreme,
+    *convex_hull;
+
+  ssize_t
+    n;
+
+  size_t
+    number_points;
+
+  convex_hull=GetImageConvexHull(image,&number_points,exception);
+  if (convex_hull == (PointInfo *) NULL)
+    return(string);
+  points=AcquireString("");
+  extreme=convex_hull[0];  /* top */
+  for (n=0; n < (ssize_t) number_points; n++)
+  {
+    if (convex_hull[n].y < extreme.y)
+      {
+        extreme=convex_hull[n];
+        continue;
+      }
+    if (convex_hull[n].y != extreme.y)
+      continue;
+    if (convex_hull[n].x < extreme.x)
+      extreme=convex_hull[n];
+  }
+  (void) FormatLocaleString(value,MagickPathExtent,"%g,%g ",
+    extreme.x,extreme.y);
+  (void) ConcatenateString(&points,value);
+  extreme=convex_hull[0]; /* right */
+  for (n=0; n < (ssize_t) number_points; n++)
+  {
+    if (convex_hull[n].x > extreme.x)
+      {
+        extreme=convex_hull[n];
+        continue;
+      }
+    if (convex_hull[n].x != extreme.x)
+      continue;
+    if (convex_hull[n].y < extreme.y)
+      extreme=convex_hull[n];
+  }
+  (void) FormatLocaleString(value,MagickPathExtent,"%g,%g ",
+    extreme.x,extreme.y);
+  (void) ConcatenateString(&points,value);
+  extreme=convex_hull[0];  /* bottom */
+  for (n=0; n < (ssize_t) number_points; n++)
+  {
+    if (convex_hull[n].y > extreme.y)
+      {
+        extreme=convex_hull[n];
+        continue;
+      }
+    if (convex_hull[n].y != extreme.y)
+      continue;
+    if (convex_hull[n].x > extreme.x)
+      extreme=convex_hull[n];
+  }
+  (void) FormatLocaleString(value,MagickPathExtent,"%g,%g ",
+    extreme.x,extreme.y);
+  (void) ConcatenateString(&points,value);
+  extreme=convex_hull[0];  /* left */
+  for (n=0; n < (ssize_t) number_points; n++)
+  {
+    if (convex_hull[n].x < extreme.x)
+      {
+        extreme=convex_hull[n];
+        continue;
+      }
+    if (convex_hull[n].x != extreme.x)
+      continue;
+    if (convex_hull[n].y > extreme.y)
+      extreme=convex_hull[n];
+  }
+  (void) FormatLocaleString(value,MagickPathExtent,"%g,%g ",
+    extreme.x,extreme.y);
+  (void) ConcatenateString(&points,value);
+  convex_hull=(PointInfo *) RelinquishMagickMemory(convex_hull);
+  (void) SetImageProperty(image,"convex-hull:extreme-points",points,
+    exception);
+  points=DestroyString(points);
+  string=GetImageProperty(image,"convex-hull:extreme-points",exception);
+  return(string);
+}
+
 MagickExport const char *GetMagickProperty(ImageInfo *image_info,
   Image *image,const char *property,ExceptionInfo *exception)
 {
@@ -3536,9 +3659,7 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
       if (LocaleCompare("basename",property) == 0)
         {
           WarnNoImageReturn("\"%%[%s]\"",property);
-          GetPathComponent(image->magick_filename,BasePath,value);
-          if (*value == '\0')
-            string="";
+          string=GetPathComponentProperty(image,BasePath,value,string);
           break;
         }
       if (LocaleCompare("bit-depth",property) == 0)
@@ -3638,93 +3759,8 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
         }
       if (LocaleCompare("convex-hull:extreme-points",property) == 0)
         {
-          char
-            *points;
-
-          PointInfo
-            extreme,
-            *convex_hull;
-
-          ssize_t
-            n;
-
-          size_t
-            number_points;
-
           WarnNoImageReturn("\"%%[%s]\"",property);
-          convex_hull=GetImageConvexHull(image,&number_points,exception);
-          if (convex_hull == (PointInfo *) NULL)
-            break;
-          points=AcquireString("");
-          extreme=convex_hull[0];  /* top */
-          for (n=0; n < (ssize_t) number_points; n++)
-          {
-            if (convex_hull[n].y < extreme.y)
-              {
-                extreme=convex_hull[n];
-                continue;
-              }
-            if (convex_hull[n].y != extreme.y)
-              continue;
-            if (convex_hull[n].x < extreme.x)
-              extreme=convex_hull[n];
-          }
-          (void) FormatLocaleString(value,MagickPathExtent,"%g,%g ",
-            extreme.x,extreme.y);
-          (void) ConcatenateString(&points,value);
-          extreme=convex_hull[0]; /* right */
-          for (n=0; n < (ssize_t) number_points; n++)
-          {
-            if (convex_hull[n].x > extreme.x)
-              {
-                extreme=convex_hull[n];
-                continue;
-              }
-            if (convex_hull[n].x != extreme.x)
-              continue;
-            if (convex_hull[n].y < extreme.y)
-              extreme=convex_hull[n];
-          }
-          (void) FormatLocaleString(value,MagickPathExtent,"%g,%g ",
-            extreme.x,extreme.y);
-          (void) ConcatenateString(&points,value);
-          extreme=convex_hull[0];  /* bottom */
-          for (n=0; n < (ssize_t) number_points; n++)
-          {
-            if (convex_hull[n].y > extreme.y)
-              {
-                extreme=convex_hull[n];
-                continue;
-              }
-            if (convex_hull[n].y != extreme.y)
-              continue;
-            if (convex_hull[n].x > extreme.x)
-              extreme=convex_hull[n];
-          }
-          (void) FormatLocaleString(value,MagickPathExtent,"%g,%g ",
-            extreme.x,extreme.y);
-          (void) ConcatenateString(&points,value);
-          extreme=convex_hull[0];  /* left */
-          for (n=0; n < (ssize_t) number_points; n++)
-          {
-            if (convex_hull[n].x < extreme.x)
-              {
-                extreme=convex_hull[n];
-                continue;
-              }
-            if (convex_hull[n].x != extreme.x)
-              continue;
-            if (convex_hull[n].y > extreme.y)
-              extreme=convex_hull[n];
-          }
-          (void) FormatLocaleString(value,MagickPathExtent,"%g,%g ",
-            extreme.x,extreme.y);
-          (void) ConcatenateString(&points,value);
-          convex_hull=(PointInfo *) RelinquishMagickMemory(convex_hull);
-          (void) SetImageProperty(image,"convex-hull:extreme-points",points,
-            exception);
-          points=DestroyString(points);
-          string=GetImageProperty(image,"convex-hull:extreme-points",exception);
+          string=GetConvexHullExtremePoints(image,value,string,exception);
           break;
         }
       if (LocaleCompare("copyright",property) == 0)
@@ -3746,9 +3782,7 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
       if (LocaleCompare("directory",property) == 0)
         {
           WarnNoImageReturn("\"%%[%s]\"",property);
-          GetPathComponent(image->magick_filename,HeadPath,value);
-          if (*value == '\0')
-            string="";
+          string=GetPathComponentProperty(image,HeadPath,value,string);
           break;
         }
       break;
@@ -3769,9 +3803,7 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
       if (LocaleCompare("extension",property) == 0)
         {
           WarnNoImageReturn("\"%%[%s]\"",property);
-          GetPathComponent(image->magick_filename,ExtensionPath,value);
-          if (*value == '\0')
-            string="";
+          string=GetPathComponentProperty(image,ExtensionPath,value,string);
           break;
         }
       break;
@@ -4038,23 +4070,8 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
         }
       if (LocaleCompare("profiles",property) == 0)
         {
-          const char
-            *name;
-
           WarnNoImageReturn("\"%%[%s]\"",property);
-          ResetImageProfileIterator(image);
-          name=GetNextImageProfile(image);
-          if (name != (char *) NULL)
-            {
-              (void) CopyMagickString(value,name,MagickPathExtent);
-              name=GetNextImageProfile(image);
-              while (name != (char *) NULL)
-              {
-                ConcatenateMagickString(value,",",MagickPathExtent);
-                ConcatenateMagickString(value,name,MagickPathExtent);
-                name=GetNextImageProfile(image);
-              }
-            }
+          GetProfilesProperty(image,value);
           break;
         }
       break;
@@ -4223,11 +4240,7 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
 */
 MagickExport const char *GetNextImageProperty(const Image *image)
 {
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      image->filename);
+  CheckPropertyImage(image);
   if (image->properties == (void *) NULL)
     return((const char *) NULL);
   return((const char *) GetNextKeyInSplayTree((SplayTreeInfo *) image->properties));
@@ -4970,10 +4983,7 @@ MagickExport char *RemoveImageProperty(Image *image,const char *property)
 */
 MagickExport void ResetImagePropertyIterator(const Image *image)
 {
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  CheckPropertyImage(image);
   if (image->properties == (void *) NULL)
     return;
   ResetSplayTreeIterator((SplayTreeInfo *) image->properties);
