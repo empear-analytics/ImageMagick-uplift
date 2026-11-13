@@ -1067,6 +1067,76 @@ static void ComposeListedFilename(char *filename,const char *path,
   filelist[j]=DestroyString(filelist[j]);
 }
 
+typedef struct _FileListTransfer
+{
+  char
+    **vector,
+    **filelist;
+
+  size_t
+    number_files;
+
+  const char
+    *path,
+    *magick,
+    *subimage;
+} FileListTransfer;
+
+static void TransferFileList(const FileListTransfer *transfer,char *filename,
+  ssize_t *count,MagickBooleanType *destroy)
+{
+  char
+    **const vector = transfer->vector,
+    **const filelist = transfer->filelist,
+    *option;
+
+  const size_t
+    number_files = transfer->number_files;
+
+  const char
+    *const path = transfer->path,
+    *const magick = transfer->magick,
+    *const subimage = transfer->subimage;
+
+  ssize_t
+    j,
+    parameters;
+
+  for (j=0; j < (ssize_t) number_files; j++)
+  {
+    option=filelist[j];
+    parameters=ParseCommandOption(MagickCommandOptions,MagickFalse,option);
+    if (parameters > 0)
+      {
+        FileListParameters
+          list;
+
+        /*
+          Do not expand command option parameters.
+        */
+        vector[(*count)++]=ConstantString(option);
+        list.vector=vector;
+        list.filelist=filelist;
+        list.number_files=number_files;
+        list.parameters=parameters;
+        CopyFileListParameters(&list,&j,&(*count));
+        continue;
+      }
+    ComposeListedFilename(filename,path,filelist,j);
+    CheckFilenameLength(filename);
+    if (IsPathDirectory(filename) <= 0)
+      {
+        char
+          file_path[MagickPathExtent];
+
+        FormatExpandedPath(file_path,magick,filename,subimage);
+        CheckFilenameLength(file_path);
+        DestroyOriginalArgument(vector,&(*count),&(*destroy));
+        vector[(*count)++]=ConstantString(file_path);
+      }
+  }
+}
+
 MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
   char ***arguments)
 {
@@ -1110,6 +1180,9 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
       *option,
       path[MagickPathExtent],
       subimage[MagickPathExtent];
+
+    FileListTransfer
+      transfer;
 
     MagickBooleanType
       destroy;
@@ -1184,39 +1257,13 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
         filelist=DestroyFileList(filelist,number_files);
         return(MagickFalse);
       }
-    for (j=0; j < (ssize_t) number_files; j++)
-    {
-      option=filelist[j];
-      parameters=ParseCommandOption(MagickCommandOptions,MagickFalse,option);
-      if (parameters > 0)
-        {
-          FileListParameters
-            list;
-
-          /*
-            Do not expand command option parameters.
-          */
-          vector[count++]=ConstantString(option);
-          list.vector=vector;
-          list.filelist=filelist;
-          list.number_files=number_files;
-          list.parameters=parameters;
-          CopyFileListParameters(&list,&j,&count);
-          continue;
-        }
-      ComposeListedFilename(filename,path,filelist,j);
-      CheckFilenameLength(filename);
-      if (IsPathDirectory(filename) <= 0)
-        {
-          char
-            file_path[MagickPathExtent];
-
-          FormatExpandedPath(file_path,magick,filename,subimage);
-          CheckFilenameLength(file_path);
-          DestroyOriginalArgument(vector,&count,&destroy);
-          vector[count++]=ConstantString(file_path);
-        }
-    }
+    transfer.vector=vector;
+    transfer.filelist=filelist;
+    transfer.number_files=number_files;
+    transfer.path=path;
+    transfer.magick=magick;
+    transfer.subimage=subimage;
+    TransferFileList(&transfer,filename,&count,&destroy);
     filelist=(char **) RelinquishMagickMemory(filelist);
   }
   vector[count]=(char *) NULL;
