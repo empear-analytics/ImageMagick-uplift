@@ -1253,6 +1253,21 @@ static int WritePackbitsRun(Image *image,
   return(count);
 }
 
+static void WritePackbitsTriple(Image *image,
+  const unsigned char *magick_restrict pixels)
+{
+  if ((*pixels == *(pixels+1)) && (*(pixels+1) == *(pixels+2)))
+    {
+      (void) WriteBlobByte(image,(unsigned char) ((256-3)+1));
+      (void) WriteBlobByte(image,*pixels);
+      return;
+    }
+  (void) WriteBlobByte(image,(unsigned char) 2);
+  (void) WriteBlobByte(image,*pixels);
+  (void) WriteBlobByte(image,pixels[1]);
+  (void) WriteBlobByte(image,pixels[2]);
+}
+
 MagickExport MagickBooleanType PackbitsEncodeImage(Image *image,
   const size_t length,unsigned char *magick_restrict pixels,
   ExceptionInfo *exception)
@@ -1300,16 +1315,7 @@ MagickExport MagickBooleanType PackbitsEncodeImage(Image *image,
       case 3:
       {
         i-=3;
-        if ((*pixels == *(pixels+1)) && (*(pixels+1) == *(pixels+2)))
-          {
-            (void) WriteBlobByte(image,(unsigned char) ((256-3)+1));
-            (void) WriteBlobByte(image,*pixels);
-            break;
-          }
-        (void) WriteBlobByte(image,(unsigned char) 2);
-        (void) WriteBlobByte(image,*pixels);
-        (void) WriteBlobByte(image,pixels[1]);
-        (void) WriteBlobByte(image,pixels[2]);
+        WritePackbitsTriple(image,pixels);
         break;
       }
       default:
