@@ -1488,6 +1488,19 @@ typedef struct _WindowDescendInput
     *window_info;
 } WindowDescendInput;
 
+static void XRestoreWindowState(ColormapInfo **colormap_info,
+  WindowInfo **window_info,int *max_windows,int *number_windows)
+{
+  XRelinquishColormapInfo(colormap_info);
+  /*
+    Relinquish resources and restore initial state.
+  */
+  (*window_info)=(WindowInfo *) RelinquishMagickMemory((*window_info));
+  (*max_windows)=0;
+  (*number_windows)=0;
+  (*colormap_info)=(ColormapInfo *) NULL;
+}
+
 static void XDescendWindowHierarchy(const WindowDescendInput *descend,
   int *number_windows)
 {
@@ -1644,14 +1657,8 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
         if (XImportListedWindow(&iteration,&loop_targets) == MagickFalse)
           return((Image *) NULL);
       }
-      XRelinquishColormapInfo(&colormap_info);
-      /*
-        Relinquish resources and restore initial state.
-      */
-      window_info=(WindowInfo *) RelinquishMagickMemory(window_info);
-      max_windows=0;
-      number_windows=0;
-      colormap_info=(ColormapInfo *) NULL;
+      XRestoreWindowState(&colormap_info,&window_info,&max_windows,
+        &number_windows);
       return(image);
     }
   return((Image *) NULL);
