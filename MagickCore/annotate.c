@@ -479,6 +479,275 @@ static PixelInfo GetDecorationColor(const DrawInfo *annotate_info)
   return(pixel);
 }
 
+static void GetUpperGravityTextOffset(const GravityTextInfo *gravity,
+  PointInfo *offset)
+{
+  DrawInfo
+    *const annotate = gravity->annotate,
+    *const annotate_info = gravity->annotate_info;
+
+  const RectangleInfo
+    geometry = gravity->geometry;
+
+  const size_t
+    height = gravity->height;
+
+  const ssize_t
+    i = gravity->i;
+
+  const TypeMetric
+    metrics = gravity->metrics;
+
+  const size_t
+    number_lines = gravity->number_lines;
+
+  switch (annotate->gravity)
+  {
+    default:
+    {
+      GetGravityTextOffset(gravity,offset);
+      break;
+    }
+    case (GravityType) NorthGravity:
+    {
+      (*offset).x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+
+        geometry.width/2.0+i*annotate_info->affine.ry*height-
+        annotate_info->affine.sx*metrics.width/2.0+annotate_info->affine.ry*
+        (metrics.ascent+metrics.descent);
+      (*offset).y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
+        (metrics.bounds.y2-metrics.ascent)+i*annotate_info->affine.sy*height+
+        annotate_info->affine.sy*metrics.ascent-annotate_info->affine.rx*
+        metrics.width/2.0;
+      break;
+    }
+    case (GravityType) NorthEastGravity:
+    {
+      (*offset).x=GravityOffsetFlip(geometry.width)*annotate_info->affine.tx+
+        geometry.width+i*annotate_info->affine.ry*height-
+        annotate_info->affine.sx*metrics.width+annotate_info->affine.ry*
+        (metrics.ascent+metrics.descent)-1.0;
+      (*offset).y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
+        (metrics.bounds.y2-metrics.ascent)+i*annotate_info->affine.sy*height+
+        annotate_info->affine.sy*metrics.ascent-annotate_info->affine.rx*
+        metrics.width;
+      break;
+    }
+    case (GravityType) WestGravity:
+    {
+      (*offset).x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+i*
+        annotate_info->affine.ry*height+annotate_info->affine.ry*
+        (metrics.ascent+metrics.descent-(number_lines-1.0)*height)/2.0;
+      (*offset).y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
+        geometry.height/2.0+i*annotate_info->affine.sy*height+
+        annotate_info->affine.sy*(metrics.ascent+metrics.descent-
+        (number_lines-1.0)*height)/2.0;
+      break;
+    }
+  }
+}
+
+static void GetCenterGravityTextOffset(const GravityTextInfo *gravity,
+  PointInfo *offset)
+{
+  DrawInfo
+    *const annotate = gravity->annotate,
+    *const annotate_info = gravity->annotate_info;
+
+  const RectangleInfo
+    geometry = gravity->geometry;
+
+  const size_t
+    height = gravity->height;
+
+  const ssize_t
+    i = gravity->i;
+
+  const TypeMetric
+    metrics = gravity->metrics;
+
+  const size_t
+    number_lines = gravity->number_lines;
+
+  switch (annotate->gravity)
+  {
+    default:
+    {
+      GetUpperGravityTextOffset(gravity,offset);
+      break;
+    }
+    case (GravityType) CenterGravity:
+    {
+      (*offset).x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+
+        geometry.width/2.0+i*annotate_info->affine.ry*height-
+        annotate_info->affine.sx*metrics.width/2.0+annotate_info->affine.ry*
+        (metrics.ascent+metrics.descent-(number_lines-1.0)*height)/2.0;
+      (*offset).y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
+        geometry.height/2.0+i*annotate_info->affine.sy*height-
+        annotate_info->affine.rx*metrics.width/2.0+annotate_info->affine.sy*
+        (metrics.ascent+metrics.descent-(number_lines-1.0)*height)/2.0;
+      break;
+    }
+    case (GravityType) EastGravity:
+    {
+      (*offset).x=GravityOffsetFlip(geometry.width)*annotate_info->affine.tx+
+        geometry.width+i*annotate_info->affine.ry*height-
+        annotate_info->affine.sx*metrics.width+
+        annotate_info->affine.ry*(metrics.ascent+metrics.descent-
+        (number_lines-1.0)*height)/2.0-1.0;
+      (*offset).y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
+        geometry.height/2.0+i*annotate_info->affine.sy*height-
+        annotate_info->affine.rx*metrics.width+
+        annotate_info->affine.sy*(metrics.ascent+metrics.descent-
+        (number_lines-1.0)*height)/2.0;
+      break;
+    }
+  }
+}
+
+typedef struct _TextDecorationInfo
+{
+  Image
+    *image;
+
+  const DrawInfo
+    *draw_info;
+
+  DrawInfo
+    *annotate;
+
+  TypeMetric
+    metrics;
+
+  char
+    *primitive;
+
+  size_t
+    height;
+
+  ExceptionInfo
+    *exception;
+} TextDecorationInfo;
+
+static void DrawTextDecoration(const TextDecorationInfo *decoration,
+  DrawInfo *annotate_info)
+{
+  Image
+    *const image = decoration->image;
+
+  const DrawInfo
+    *const draw_info = decoration->draw_info;
+
+  DrawInfo
+    *const annotate = decoration->annotate;
+
+  const TypeMetric
+    metrics = decoration->metrics;
+
+  const char
+    *const primitive = decoration->primitive;
+
+  ExceptionInfo
+    *const exception = decoration->exception;
+
+  switch (annotate->decorate)
+  {
+    case OverlineDecoration:
+    {
+      annotate_info->affine.ty-=(draw_info->affine.sy*(metrics.ascent+
+        metrics.descent-metrics.underline_position));
+      (void) CloneString(&annotate_info->primitive,primitive);
+      (void) DrawImage(image,annotate_info,exception);
+      break;
+    }
+    case UnderlineDecoration:
+    {
+      annotate_info->affine.ty-=(draw_info->affine.sy*
+        metrics.underline_position);
+      (void) CloneString(&annotate_info->primitive,primitive);
+      (void) DrawImage(image,annotate_info,exception);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void DrawTextUndercolor(const TextDecorationInfo *decoration,
+  const PointInfo *offset)
+{
+  Image
+    *const image = decoration->image;
+
+  const DrawInfo
+    *const draw_info = decoration->draw_info;
+
+  const TypeMetric
+    metrics = decoration->metrics;
+
+  char
+    *const primitive = decoration->primitive;
+
+  const size_t
+    height = decoration->height;
+
+  ExceptionInfo
+    *const exception = decoration->exception;
+
+  if (draw_info->undercolor.alpha != (MagickRealType) TransparentAlpha)
+    {
+      DrawInfo
+        *undercolor_info;
+
+      /*
+        Text box.
+      */
+      undercolor_info=CloneDrawInfo((ImageInfo *) NULL,(DrawInfo *) NULL);
+      undercolor_info->fill=draw_info->undercolor;
+      undercolor_info->affine=draw_info->affine;
+      undercolor_info->affine.tx=(*offset).x-draw_info->affine.ry*
+        metrics.ascent;
+      undercolor_info->affine.ty=(*offset).y-draw_info->affine.sy*
+        metrics.ascent;
+      (void) FormatLocaleString(primitive,MagickPathExtent,
+        "rectangle 0.0,0.0 %g,%g",metrics.origin.x,(double) height);
+      (void) CloneString(&undercolor_info->primitive,primitive);
+      (void) DrawImage(image,undercolor_info,exception);
+      (void) DestroyDrawInfo(undercolor_info);
+    }
+}
+
+static void DrawTextLineThrough(const TextDecorationInfo *decoration,
+  DrawInfo *annotate_info)
+{
+  Image
+    *const image = decoration->image;
+
+  const DrawInfo
+    *const draw_info = decoration->draw_info;
+
+  DrawInfo
+    *const annotate = decoration->annotate;
+
+  const TypeMetric
+    metrics = decoration->metrics;
+
+  const char
+    *const primitive = decoration->primitive;
+
+  const size_t
+    height = decoration->height;
+
+  ExceptionInfo
+    *const exception = decoration->exception;
+
+  if (annotate->decorate == LineThroughDecoration) {
+      annotate_info->affine.ty-=(draw_info->affine.sy*(height+
+        metrics.underline_position+metrics.descent*2)/2.0);
+      (void) CloneString(&annotate_info->primitive,primitive);
+      (void) DrawImage(image,annotate_info,exception);
+  }
+}
+
 MagickExport MagickBooleanType AnnotateImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -568,6 +837,9 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
     TextAlignInfo
       text_align;
 
+    TextDecorationInfo
+      decoration;
+
     GravityTextInfo
       gravity;
 
@@ -593,7 +865,7 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
         gravity.i=i;
         gravity.metrics=metrics;
         gravity.number_lines=number_lines;
-        GetGravityTextOffset(&gravity,&offset);
+        GetCenterGravityTextOffset(&gravity,&offset);
         break;
       }
       case (GravityType) NorthWestGravity:
@@ -606,67 +878,6 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
           annotate_info->affine.sy*metrics.ascent;
         break;
       }
-      case (GravityType) NorthGravity:
-      {
-        offset.x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+
-          geometry.width/2.0+i*annotate_info->affine.ry*height-
-          annotate_info->affine.sx*metrics.width/2.0+annotate_info->affine.ry*
-          (metrics.ascent+metrics.descent);
-        offset.y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
-          (metrics.bounds.y2-metrics.ascent)+i*annotate_info->affine.sy*height+
-          annotate_info->affine.sy*metrics.ascent-annotate_info->affine.rx*
-          metrics.width/2.0;
-        break;
-      }
-      case (GravityType) NorthEastGravity:
-      {
-        offset.x=GravityOffsetFlip(geometry.width)*annotate_info->affine.tx+
-          geometry.width+i*annotate_info->affine.ry*height-
-          annotate_info->affine.sx*metrics.width+annotate_info->affine.ry*
-          (metrics.ascent+metrics.descent)-1.0;
-        offset.y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
-          (metrics.bounds.y2-metrics.ascent)+i*annotate_info->affine.sy*height+
-          annotate_info->affine.sy*metrics.ascent-annotate_info->affine.rx*
-          metrics.width;
-        break;
-      }
-      case (GravityType) WestGravity:
-      {
-        offset.x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+i*
-          annotate_info->affine.ry*height+annotate_info->affine.ry*
-          (metrics.ascent+metrics.descent-(number_lines-1.0)*height)/2.0;
-        offset.y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
-          geometry.height/2.0+i*annotate_info->affine.sy*height+
-          annotate_info->affine.sy*(metrics.ascent+metrics.descent-
-          (number_lines-1.0)*height)/2.0;
-        break;
-      }
-      case (GravityType) CenterGravity:
-      {
-        offset.x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+
-          geometry.width/2.0+i*annotate_info->affine.ry*height-
-          annotate_info->affine.sx*metrics.width/2.0+annotate_info->affine.ry*
-          (metrics.ascent+metrics.descent-(number_lines-1.0)*height)/2.0;
-        offset.y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
-          geometry.height/2.0+i*annotate_info->affine.sy*height-
-          annotate_info->affine.rx*metrics.width/2.0+annotate_info->affine.sy*
-          (metrics.ascent+metrics.descent-(number_lines-1.0)*height)/2.0;
-        break;
-      }
-      case (GravityType) EastGravity:
-      {
-        offset.x=GravityOffsetFlip(geometry.width)*annotate_info->affine.tx+
-          geometry.width+i*annotate_info->affine.ry*height-
-          annotate_info->affine.sx*metrics.width+
-          annotate_info->affine.ry*(metrics.ascent+metrics.descent-
-          (number_lines-1.0)*height)/2.0-1.0;
-        offset.y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
-          geometry.height/2.0+i*annotate_info->affine.sy*height-
-          annotate_info->affine.rx*metrics.width+
-          annotate_info->affine.sy*(metrics.ascent+metrics.descent-
-          (number_lines-1.0)*height)/2.0;
-        break;
-      }
     }
     text_align.annotate=annotate;
     text_align.annotate_info=annotate_info;
@@ -674,25 +885,14 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
     text_align.i=i;
     text_align.metrics=metrics;
     GetAnnotateAlignOffset(&text_align,&offset);
-    if (draw_info->undercolor.alpha != (MagickRealType) TransparentAlpha)
-      {
-        DrawInfo
-          *undercolor_info;
-
-        /*
-          Text box.
-        */
-        undercolor_info=CloneDrawInfo((ImageInfo *) NULL,(DrawInfo *) NULL);
-        undercolor_info->fill=draw_info->undercolor;
-        undercolor_info->affine=draw_info->affine;
-        undercolor_info->affine.tx=offset.x-draw_info->affine.ry*metrics.ascent;
-        undercolor_info->affine.ty=offset.y-draw_info->affine.sy*metrics.ascent;
-        (void) FormatLocaleString(primitive,MagickPathExtent,
-          "rectangle 0.0,0.0 %g,%g",metrics.origin.x,(double) height);
-        (void) CloneString(&undercolor_info->primitive,primitive);
-        (void) DrawImage(image,undercolor_info,exception);
-        (void) DestroyDrawInfo(undercolor_info);
-      }
+    decoration.image=image;
+    decoration.draw_info=draw_info;
+    decoration.annotate=annotate;
+    decoration.metrics=metrics;
+    decoration.primitive=primitive;
+    decoration.exception=exception;
+    decoration.height=height;
+    DrawTextUndercolor(&decoration,&offset);
     annotate_info->affine.tx=offset.x;
     annotate_info->affine.ty=offset.y;
     pixel=GetDecorationColor(annotate_info);
@@ -703,37 +903,13 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
     /*
       Annotate image with text.
     */
-    switch (annotate->decorate)
-    {
-      case OverlineDecoration:
-      {
-        annotate_info->affine.ty-=(draw_info->affine.sy*(metrics.ascent+
-          metrics.descent-metrics.underline_position));
-        (void) CloneString(&annotate_info->primitive,primitive);
-        (void) DrawImage(image,annotate_info,exception);
-        break;
-      }
-      case UnderlineDecoration:
-      {
-        annotate_info->affine.ty-=(draw_info->affine.sy*
-          metrics.underline_position);
-        (void) CloneString(&annotate_info->primitive,primitive);
-        (void) DrawImage(image,annotate_info,exception);
-        break;
-      }
-      default:
-        break;
-    }
+    DrawTextDecoration(&decoration,annotate_info);
     status=RenderType(&target,&offset,&metrics,exception);
     if (status == MagickFalse)
       break;
 
-    if (annotate->decorate == LineThroughDecoration) {
-        annotate_info->affine.ty-=(draw_info->affine.sy*(height+
-          metrics.underline_position+metrics.descent*2)/2.0);
-        (void) CloneString(&annotate_info->primitive,primitive);
-        (void) DrawImage(image,annotate_info,exception);
-    }
+    decoration.metrics=metrics;
+    DrawTextLineThrough(&decoration,annotate_info);
   }
   /*
     Relinquish resources.
@@ -1320,6 +1496,23 @@ static void SetTypeInfoFace(DrawInfo *annotate_info,
     (void) CloneString(&annotate_info->font,type_info->glyphs);
 }
 
+static MagickBooleanType RenderTargetFreetype(const RenderTarget *target,
+  const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
+{
+  Image
+    *image = target->image;
+
+  const DrawInfo
+    *draw_info = target->draw_info;
+
+  MagickBooleanType
+    status;
+
+  const FreetypeTarget ft_font = { image, draw_info, draw_info->encoding };
+  status=RenderFreetype(&ft_font,offset,metrics,exception);
+  return(status);
+}
+
 static MagickBooleanType RenderType(const RenderTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -1347,23 +1540,13 @@ static MagickBooleanType RenderType(const RenderTarget *target,
   if (draw_info->font != (char *) NULL)
     {
       if (*draw_info->font == '@')
-        {
-          const FreetypeTarget ft_font = { image, draw_info,
-            draw_info->encoding };
-          status=RenderFreetype(&ft_font,offset,metrics,exception);
-          return(status);
-        }
+        return(RenderTargetFreetype(target,offset,metrics,exception));
       if (*draw_info->font == '-')
         return(RenderX11(image,draw_info,offset,metrics,exception));
       if (*draw_info->font == '^')
         return(RenderPostscript(image,draw_info,offset,metrics,exception));
       if (IsPathAccessible(draw_info->font) != MagickFalse)
-        {
-          const FreetypeTarget ft_font = { image, draw_info,
-            draw_info->encoding };
-          status=RenderFreetype(&ft_font,offset,metrics,exception);
-          return(status);
-        }
+        return(RenderTargetFreetype(target,offset,metrics,exception));
       type_info=GetTypeInfo(draw_info->font,exception);
       if (type_info == (const TypeInfo *) NULL)
         (void) ThrowMagickException(exception,GetMagickModule(),TypeWarning,
@@ -1394,11 +1577,7 @@ static MagickBooleanType RenderType(const RenderTarget *target,
   if (type_info == (const TypeInfo *) NULL)
     type_info=GetDefaultTypeInfo(draw_info,type_info);
   if (type_info == (const TypeInfo *) NULL)
-    {
-      const FreetypeTarget ft_font = { image, draw_info, draw_info->encoding };
-      status=RenderFreetype(&ft_font,offset,metrics,exception);
-      return(status);
-    }
+    return(RenderTargetFreetype(target,offset,metrics,exception));
   annotate_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
   SetTypeInfoFace(annotate_info,type_info);
   freetype.image=image;
@@ -2245,6 +2424,36 @@ typedef struct _GlyphRows
     *exception;
 } GlyphRows;
 
+static Quantum *GetGlyphRowPixels(const GlyphRows *rows,
+  const ssize_t x_offset,const ssize_t y_offset,MagickBooleanType *active)
+{
+  Image
+    *const image = rows->image;
+
+  CacheView
+    *const image_view = rows->image_view;
+
+  const FT_BitmapGlyph
+    bitmap = rows->bitmap;
+
+  ExceptionInfo
+    *const exception = rows->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  q=(Quantum *) NULL;
+  if (IsColumnOutside(image,x_offset) != MagickFalse)
+    *active=MagickFalse;
+  else
+    {
+      q=GetCacheViewAuthenticPixels(image_view,x_offset,y_offset,
+        bitmap->bitmap.width,1,exception);
+      *active=q != (Quantum *) NULL ? MagickTrue : MagickFalse;
+    }
+  return(q);
+}
+
 static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
   MagickBooleanType *status)
 {
@@ -2299,15 +2508,7 @@ static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
   y_offset=CastDoubleToSsizeT(ceil(point.y+y-0.5));
   if (IsRowOutside(image,y_offset) != MagickFalse)
     return;
-  q=(Quantum *) NULL;
-  if (IsColumnOutside(image,x_offset) != MagickFalse)
-    active=MagickFalse;
-  else
-    {
-      q=GetCacheViewAuthenticPixels(image_view,x_offset,y_offset,
-        bitmap->bitmap.width,1,exception);
-      active=q != (Quantum *) NULL ? MagickTrue : MagickFalse;
-    }
+  q=GetGlyphRowPixels(rows,x_offset,y_offset,&active);
   n=y*bitmap->bitmap.pitch;
   for (x=0; x < (ssize_t) bitmap->bitmap.width; x++, n++)
   {
@@ -2487,6 +2688,63 @@ static DrawInfo *CloneFreetypeAnnotateInfo(const DrawInfo *draw_info)
   return(annotate_info);
 }
 
+static FT_Encoding SelectFreetypeEncoding(const char *encoding,
+  FT_Encoding encoding_type)
+{
+  encoding_type=SelectAdobeBig5Encoding(encoding,encoding_type);
+  encoding_type=SelectCjkLatinEncoding(encoding,encoding_type);
+  if (LocaleCompare(encoding,"None") == 0)
+    encoding_type=FT_ENCODING_NONE;
+  if (LocaleCompare(encoding,"SJIScode") == 0)
+    encoding_type=FT_ENCODING_SJIS;
+  if (LocaleCompare(encoding,"Symbol") == 0)
+    encoding_type=FT_ENCODING_MS_SYMBOL;
+  if (LocaleCompare(encoding,"Unicode") == 0)
+    encoding_type=FT_ENCODING_UNICODE;
+  if (LocaleCompare(encoding,"Wansung") == 0)
+    encoding_type=FT_ENCODING_WANSUNG;
+  return(encoding_type);
+}
+
+static void SelectFreetypeFontPath(const DrawInfo *draw_info,
+  FT_Open_Args *args,FT_Long *face_index,ExceptionInfo *exception)
+{
+  if (draw_info->font == (char *) NULL)
+    {
+      const TypeInfo *type_info = GetTypeInfo("*",exception);
+      if (type_info != (const TypeInfo *) NULL)
+        args->pathname=ConstantString(type_info->glyphs);
+    }
+  else
+    if (*draw_info->font != '@')
+      args->pathname=ConstantString(draw_info->font);
+    else
+      {
+        /*
+          Extract face index, e.g. @msgothic[1].
+        */
+        ImageInfo *image_info = AcquireImageInfo();
+        (void) CopyMagickString(image_info->filename,draw_info->font+1,
+          MagickPathExtent);
+        (void) SetImageInfo(image_info,0,exception);
+        *face_index=(FT_Long) image_info->scene;
+        args->pathname=ConstantString(image_info->filename);
+        image_info=DestroyImageInfo(image_info);
+     }
+}
+
+static FT_UInt GetFreetypeGlyphId(const GraphemeInfo *grapheme,
+  const FT_UInt missing_glyph_id)
+{
+  FT_UInt
+    id;
+
+  id=(FT_UInt) grapheme->index;
+  if (id == 0)
+    id=missing_glyph_id;
+  return(id);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2633,28 +2891,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   */
   face_index=(FT_Long) draw_info->face;
   (void) memset(&args,0,sizeof(args));
-  if (draw_info->font == (char *) NULL)
-    {
-      const TypeInfo *type_info = GetTypeInfo("*",exception);
-      if (type_info != (const TypeInfo *) NULL)
-        args.pathname=ConstantString(type_info->glyphs);
-    }
-  else
-    if (*draw_info->font != '@')
-      args.pathname=ConstantString(draw_info->font);
-    else
-      {
-        /*
-          Extract face index, e.g. @msgothic[1].
-        */
-        ImageInfo *image_info = AcquireImageInfo();
-        (void) CopyMagickString(image_info->filename,draw_info->font+1,
-          MagickPathExtent);
-        (void) SetImageInfo(image_info,0,exception);
-        face_index=(FT_Long) image_info->scene;
-        args.pathname=ConstantString(image_info->filename);
-        image_info=DestroyImageInfo(image_info);
-     }
+  SelectFreetypeFontPath(draw_info,&args,&face_index,exception);
   /*
     Configure streaming interface.
   */
@@ -2678,18 +2915,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   SelectFreetypeCharmap(face,encoding_type);
   if (encoding != (const char *) NULL)
     {
-      encoding_type=SelectAdobeBig5Encoding(encoding,encoding_type);
-      encoding_type=SelectCjkLatinEncoding(encoding,encoding_type);
-      if (LocaleCompare(encoding,"None") == 0)
-        encoding_type=FT_ENCODING_NONE;
-      if (LocaleCompare(encoding,"SJIScode") == 0)
-        encoding_type=FT_ENCODING_SJIS;
-      if (LocaleCompare(encoding,"Symbol") == 0)
-        encoding_type=FT_ENCODING_MS_SYMBOL;
-      if (LocaleCompare(encoding,"Unicode") == 0)
-        encoding_type=FT_ENCODING_UNICODE;
-      if (LocaleCompare(encoding,"Wansung") == 0)
-        encoding_type=FT_ENCODING_WANSUNG;
+      encoding_type=SelectFreetypeEncoding(encoding,encoding_type);
       ft_status=FT_Select_Charmap(face,encoding_type);
       if (ft_status != 0)
         {
@@ -2768,9 +2994,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     /*
       Render UTF-8 sequence.
     */
-    glyph.id=(FT_UInt) grapheme[i].index;
-    if (glyph.id == 0)
-      glyph.id=missing_glyph_id;
+    glyph.id=GetFreetypeGlyphId(grapheme+i,missing_glyph_id);
     if ((glyph.id != 0) && (last_glyph_id != 0))
       origin.x+=(FT_Pos) (64.0*draw_info->kerning);
     glyph.origin=origin;

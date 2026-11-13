@@ -495,6 +495,58 @@ static void SkipHuffmanToEndOfLine(Image *image,int *caller_byte,
   (*caller_runlength)=runlength;
 }
 
+typedef struct _HuffmanTransfer
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  unsigned char
+    *scanline;
+
+  ExceptionInfo
+    *exception;
+} HuffmanTransfer;
+
+static MagickBooleanType TransferHuffmanScanline(
+  const HuffmanTransfer *transfer,const ssize_t y)
+{
+  Image
+    *image = transfer->image;
+
+  CacheView
+    *image_view = transfer->image_view;
+
+  unsigned char
+    *scanline = transfer->scanline;
+
+  ExceptionInfo
+    *exception = transfer->exception;
+
+  MagickBooleanType
+    proceed;
+
+  Quantum
+    *magick_restrict q;
+
+  /*
+    Transfer scanline to image pixels.
+  */
+  q=QueueCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    return(MagickFalse);
+  SetHuffmanScanlinePixels(image,scanline,q);
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    return(MagickFalse);
+  proceed=SetImageProgress(image,LoadImageTag,(MagickOffsetType) y,
+    image->rows);
+  if (proceed == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -508,12 +560,12 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
     **mb_hash,
     **mw_hash;
 
+  HuffmanTransfer
+    transfer;
+
   int
     byte,
     mask;
-
-  MagickBooleanType
-    proceed;
 
   size_t
     bit,
@@ -570,11 +622,12 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   image->resolution.y=196.0;
   image->units=PixelsPerInchResolution;
   image_view=AcquireAuthenticCacheView(image,exception);
+  transfer.image=image;
+  transfer.image_view=image_view;
+  transfer.scanline=scanline;
+  transfer.exception=exception;
   for (y=0; ((y < (ssize_t) image->rows) && (null_lines < 3)); )
   {
-    Quantum
-      *magick_restrict q;
-
     ssize_t
       x;
 
@@ -665,18 +718,7 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
       code=0;
       length=0;
     }
-    /*
-      Transfer scanline to image pixels.
-    */
-    q=QueueCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    SetHuffmanScanlinePixels(image,scanline,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      break;
-    proceed=SetImageProgress(image,LoadImageTag,(MagickOffsetType) y,
-      image->rows);
-    if (proceed == MagickFalse)
+    if (TransferHuffmanScanline(&transfer,y) == MagickFalse)
       break;
     y++;
   }
@@ -802,6 +844,34 @@ static void OutputHuffmanEndOfLine(const ImageInfo *image_info,Image *image,
   (*caller_bit)=bit;
 }
 
+static void FlushHuffmanBits(const ImageInfo *image_info,Image *image,
+  const unsigned char byte,const unsigned char bit)
+{
+  if (((int) bit != 0x80) != 0)
+    {
+      if (LocaleCompare(image_info->magick,"FAX") == 0)
+        (void) WriteBlobByte(image,byte);
+      else
+        Ascii85Encode(image,byte);
+    }
+}
+
+static MagickBooleanType UpdateHuffmanProgress(Image *huffman_image,
+  const ssize_t y)
+{
+  MagickBooleanType
+    proceed;
+
+  if (GetPreviousImageInList(huffman_image) == (Image *) NULL)
+    {
+      proceed=SetImageProgress(huffman_image,LoadImageTag,
+        (MagickOffsetType) y,huffman_image->rows);
+      if (proceed == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
   Image *image,Image *inject_image,ExceptionInfo *exception)
 {
@@ -813,9 +883,6 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
 
   Image
     *huffman_image;
-
-  MagickBooleanType
-    proceed;
 
   ssize_t
     i;
@@ -928,13 +995,8 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
     */
     OutputHuffmanEndOfLine(image_info,image,&byte,&bit);
     q=scanline;
-    if (GetPreviousImageInList(huffman_image) == (Image *) NULL)
-      {
-        proceed=SetImageProgress(huffman_image,LoadImageTag,
-          (MagickOffsetType) y,huffman_image->rows);
-        if (proceed == MagickFalse)
-          break;
-      }
+    if (UpdateHuffmanProgress(huffman_image,y) == MagickFalse)
+      break;
   }
   /*
     End of page.
@@ -946,13 +1008,7 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
   /*
     Flush bits.
   */
-  if (((int) bit != 0x80) != 0)
-    {
-      if (LocaleCompare(image_info->magick,"FAX") == 0)
-        (void) WriteBlobByte(image,byte);
-      else
-        Ascii85Encode(image,byte);
-    }
+  FlushHuffmanBits(image_info,image,byte,bit);
   if (LocaleCompare(image_info->magick,"FAX") != 0)
     Ascii85Flush(image);
   huffman_image=DestroyImage(huffman_image);
@@ -1239,6 +1295,21 @@ static int WritePackbitsRun(Image *image,
   return(count);
 }
 
+static void WritePackbitsTriple(Image *image,
+  const unsigned char *magick_restrict pixels)
+{
+  if ((*pixels == *(pixels+1)) && (*(pixels+1) == *(pixels+2)))
+    {
+      (void) WriteBlobByte(image,(unsigned char) ((256-3)+1));
+      (void) WriteBlobByte(image,*pixels);
+      return;
+    }
+  (void) WriteBlobByte(image,(unsigned char) 2);
+  (void) WriteBlobByte(image,*pixels);
+  (void) WriteBlobByte(image,pixels[1]);
+  (void) WriteBlobByte(image,pixels[2]);
+}
+
 MagickExport MagickBooleanType PackbitsEncodeImage(Image *image,
   const size_t length,unsigned char *magick_restrict pixels,
   ExceptionInfo *exception)
@@ -1286,16 +1357,7 @@ MagickExport MagickBooleanType PackbitsEncodeImage(Image *image,
       case 3:
       {
         i-=3;
-        if ((*pixels == *(pixels+1)) && (*(pixels+1) == *(pixels+2)))
-          {
-            (void) WriteBlobByte(image,(unsigned char) ((256-3)+1));
-            (void) WriteBlobByte(image,*pixels);
-            break;
-          }
-        (void) WriteBlobByte(image,(unsigned char) 2);
-        (void) WriteBlobByte(image,*pixels);
-        (void) WriteBlobByte(image,pixels[1]);
-        (void) WriteBlobByte(image,pixels[2]);
+        WritePackbitsTriple(image,pixels);
         break;
       }
       default:

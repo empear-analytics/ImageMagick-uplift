@@ -518,6 +518,39 @@ static int ReadDelegateOutput(const char *sanitize_command,char *message)
 }
 #endif
 
+static MagickBooleanType AcceptDelegateArguments(char **arguments,
+  const int number_arguments,ExceptionInfo *exception)
+{
+  if (*arguments[1] == '\0')
+    {
+      DestroyDelegateArguments(arguments,number_arguments);
+      return(MagickFalse);
+    }
+  if (AuthorizeDelegateArguments(arguments,number_arguments,exception) ==
+      MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static char *PrepareDelegateCommand(const MagickBooleanType asynchronous,
+  const MagickBooleanType verbose,const char *command,char *message)
+{
+  char
+    *sanitize_command;
+
+  if (verbose != MagickFalse)
+    {
+      (void) FormatLocaleFile(stderr,"%s\n",command);
+      (void) fflush(stderr);
+    }
+  sanitize_command=SanitizeString(command);
+  if (asynchronous != MagickFalse)
+    (void) ConcatenateMagickString(sanitize_command,"&",MagickPathExtent);
+  if (message != (char *) NULL)
+    *message='\0';
+  return(sanitize_command);
+}
+
 MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
   const MagickBooleanType verbose,const char *command,char *message,
   ExceptionInfo *exception)
@@ -534,24 +567,11 @@ MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
   arguments=StringToArgv(command,&number_arguments);
   if (arguments == (char **) NULL)
     return(status);
-  if (*arguments[1] == '\0')
-    {
-      DestroyDelegateArguments(arguments,number_arguments);
-      return(-1);
-    }
-  if (AuthorizeDelegateArguments(arguments,number_arguments,exception) ==
+  if (AcceptDelegateArguments(arguments,number_arguments,exception) ==
       MagickFalse)
     return(-1);
-  if (verbose != MagickFalse)
-    {
-      (void) FormatLocaleFile(stderr,"%s\n",command);
-      (void) fflush(stderr);
-    }
-  sanitize_command=SanitizeString(command);
-  if (asynchronous != MagickFalse)
-    (void) ConcatenateMagickString(sanitize_command,"&",MagickPathExtent);
-  if (message != (char *) NULL)
-    *message='\0';
+  sanitize_command=PrepareDelegateCommand(asynchronous,verbose,command,
+    message);
 #if defined(MAGICKCORE_POSIX_SUPPORT)
 #if defined(MAGICKCORE_HAVE_POPEN)
   if ((asynchronous == MagickFalse) && (message !=  (char *) NULL))
@@ -1190,11 +1210,54 @@ static const char *SkipDelegateSpace(const char *p)
   return(p);
 }
 
+static MagickBooleanType DecodeDelegateCharacter(const char **p,char **q)
+{
+  switch (*(*p))
+  {
+    case '\\':
+    {
+      DecodeDelegateEscape(p,q);
+      return(MagickTrue);
+    }
+    case '&':
+    {
+      DecodeDelegateEntity(p,q);
+      return(MagickTrue);
+    }
+    case '%':
+      break;  /* continue to next set of handlers */
+    default:
+    {
+      *(*q)++=(*(*p));  /* any thing else is 'as normal' */
+      return(MagickTrue);
+    }
+  }
+  return(MagickFalse);
+}
+
+static MagickBooleanType IsEmptyDelegateText(const char *embed_text,
+  const char **p,char **result)
+{
+  if (embed_text == (const char *) NULL)
+    {
+      (*result)=ConstantString("");
+      return(MagickTrue);
+    }
+  (*p)=SkipDelegateSpace(embed_text);
+  if (*(*p) == '\0')
+    {
+      (*result)=ConstantString("");
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 static char *InterpretDelegateProperties(ImageInfo *image_info,
   Image *image,const char *embed_text,ExceptionInfo *exception)
 {
   char
     *interpret_text,
+    *returned,
     *string;
 
   char
@@ -1216,11 +1279,8 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
   else
    if ((image_info != (ImageInfo *) NULL) && (IsEventLogging() != MagickFalse))
      (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no-image");
-  if (embed_text == (const char *) NULL)
-    return(ConstantString(""));
-  p=SkipDelegateSpace(embed_text);
-  if (*p == '\0')
-    return(ConstantString(""));
+  if (IsEmptyDelegateText(embed_text,&p,&returned) != MagickFalse)
+    return(returned);
   /*
     Translate any embedded format characters.
   */
@@ -1235,26 +1295,8 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
     */
     *q='\0';
     ExtendInterpretText(MagickPathExtent);
-    switch (*p)
-    {
-      case '\\':
-      {
-        DecodeDelegateEscape(&p,&q);
-        continue;
-      }
-      case '&':
-      {
-        DecodeDelegateEntity(&p,&q);
-        continue;
-      }
-      case '%':
-        break;  /* continue to next set of handlers */
-      default:
-      {
-        *q++=(*p);  /* any thing else is 'as normal' */
-        continue;
-      }
-    }
+    if (DecodeDelegateCharacter(&p,&q) != MagickFalse)
+      continue;
     if (DecodeDelegatePercent(&p,&q,number) != MagickFalse)
       continue;
     string=GetMagickPropertyLetter(image_info,image,*p,exception);
