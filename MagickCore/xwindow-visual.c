@@ -260,6 +260,45 @@ static void XGetListedStandardColormap(Display *display,
   resource_info->color_recovery=i == 0 ? MagickTrue : MagickFalse;
 }
 
+static XVisualInfo *XPickRichestVisual(XVisualInfo *visual_list,
+  const int number_visuals)
+{
+  static const unsigned int
+    rank[]=
+      {
+        StaticGray,
+        GrayScale,
+        StaticColor,
+        DirectColor,
+        TrueColor,
+        PseudoColor
+      };
+
+  int
+    i;
+
+  XVisualInfo
+    *p,
+    *visual_info;
+
+  /*
+    Pick one visual that displays the most simultaneous colors.
+  */
+  visual_info=visual_list;
+  p=visual_list;
+  for (i=1; i < number_visuals; i++)
+  {
+    p++;
+    if (XVisualColormapSize(p) > XVisualColormapSize(visual_info))
+      visual_info=p;
+    else
+      if ((XVisualColormapSize(p) == XVisualColormapSize(visual_info)) &&
+          (rank[p->klass] > rank[visual_info->klass]))
+        visual_info=p;
+  }
+  return(visual_info);
+}
+
 MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
   XStandardColormap *map_info,XResourceInfo *resource_info)
 {
@@ -451,35 +490,7 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
     }
   else
     {
-      static const unsigned int
-        rank[]=
-          {
-            StaticGray,
-            GrayScale,
-            StaticColor,
-            DirectColor,
-            TrueColor,
-            PseudoColor
-          };
-
-      XVisualInfo
-        *p;
-
-      /*
-        Pick one visual that displays the most simultaneous colors.
-      */
-      visual_info=visual_list;
-      p=visual_list;
-      for (i=1; i < number_visuals; i++)
-      {
-        p++;
-        if (XVisualColormapSize(p) > XVisualColormapSize(visual_info))
-          visual_info=p;
-        else
-          if ((XVisualColormapSize(p) == XVisualColormapSize(visual_info)) &&
-              (rank[p->klass] > rank[visual_info->klass]))
-            visual_info=p;
-      }
+      visual_info=XPickRichestVisual(visual_list,number_visuals);
       visual_template.visualid=XVisualIDFromVisual(visual_info->visual);
     }
   (void) XFree((void *) visual_list);
