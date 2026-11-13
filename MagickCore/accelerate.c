@@ -1511,6 +1511,9 @@ static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
     *filteredPixels,
     *hostPtr;
 
+  if (clEnv == (MagickCLEnv) NULL)
+    return((Image *) NULL);
+
   queue=NULL;
   image_view=NULL;
   inputPixels=NULL;
@@ -1816,24 +1819,8 @@ cleanup:
 MagickPrivate Image *AccelerateDespeckleImage(const Image* image,
   ExceptionInfo* exception)
 {
-  Image
-    *filteredImage;
-
-  MagickCLEnv
-    clEnv;
-
-  assert(image != NULL);
-  assert(exception != (ExceptionInfo *) NULL);
-
-  if (checkAccelerateConditionRGBA(image) == MagickFalse)
-    return((Image *) NULL);
-
-  clEnv=getOpenCLEnvironment(exception);
-  if (clEnv == (MagickCLEnv) NULL)
-    return((Image *) NULL);
-
-  filteredImage=ComputeDespeckleImage(image,clEnv,exception);
-  return(filteredImage);
+  return(ComputeDespeckleImage(image,getAccelerateEnvironment(image,
+    RGBAAccelerateCheck,(const char *) NULL,exception),exception));
 }
 
 /*
