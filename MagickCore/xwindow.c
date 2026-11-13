@@ -6937,6 +6937,35 @@ static unsigned char *XPackMatteRowMSB(const Image *canvas,const Quantum *p,
   return(q);
 }
 
+static void XPackColormappedMSB(const XImage *ximage,
+  const XImageRowSource row_source,unsigned char *q)
+{
+  switch (ximage->bits_per_pixel)
+  {
+    case 2:
+    {
+      XPackColormapped2BitMSB(&row_source,q);
+      break;
+    }
+    case 4:
+    {
+      XPackColormapped4BitMSB(&row_source,q);
+      break;
+    }
+    case 6:
+    case 8:
+    {
+      XPackColormapped8BitMSB(&row_source,q);
+      break;
+    }
+    default:
+    {
+      XPackColormappedMultiByteMSB(&row_source,q);
+      break;
+    }
+  }
+}
+
 static void XMakeImageMSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -7076,30 +7105,7 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
     }
   else
     if (window->pixel_info->colors != 0)
-      switch (ximage->bits_per_pixel)
-      {
-        case 2:
-        {
-          XPackColormapped2BitMSB(&row_source,q);
-          break;
-        }
-        case 4:
-        {
-          XPackColormapped4BitMSB(&row_source,q);
-          break;
-        }
-        case 6:
-        case 8:
-        {
-          XPackColormapped8BitMSB(&row_source,q);
-          break;
-        }
-        default:
-        {
-          XPackColormappedMultiByteMSB(&row_source,q);
-          break;
-        }
-      }
+      XPackColormappedMSB(ximage,row_source,q);
     else
       switch (ximage->bits_per_pixel)
       {
