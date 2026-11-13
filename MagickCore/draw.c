@@ -664,12 +664,12 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
             number_points=16;
             points=(PointInfo *) AcquireQuantumMemory((size_t) number_points,
               sizeof(*points));
-            if (points == (PointInfo *) NULL)
-              {
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-                return(DestroyPolygonInfo(polygon_info));
-              }
+          }
+        if (points == (PointInfo *) NULL)
+          {
+            (void) ThrowMagickException(exception,GetMagickModule(),
+              ResourceLimitError,"MemoryAllocationFailed","`%s'","");
+            return(DestroyPolygonInfo(polygon_info));
           }
         ghostline=path_info[i].code == GhostlineCode ? MagickTrue : MagickFalse;
         point=path_info[i].point;
