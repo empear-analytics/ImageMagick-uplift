@@ -6,7 +6,7 @@
 The original object and the object of the file split off it number a function's `static` locals differently
 (clang's `XMagickCommand.radius.203` is `.196` once other numbered names no longer come before it), so a
 reference to the variable must compare equal across the two objects and a reference to another variable must
-not. canonical_data_names() names each such symbol by its rank among the numbers of its stem; the planted
+not. canonical_reference_names() names each such reference by its rank among the numbers of its stem that the functions use; the planted
 defects below are the references that must still differ.
 """
 import importlib.util, os, unittest
@@ -17,38 +17,47 @@ sbc = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(sbc)
 
 
-def names(rows):
-    """The canonical names of ROWS ((value, size, name) in .data), in order."""
-    return [n for _, _, n in sbc.canonical_data_names({".data": rows})[".data"]]
+def ref(sec, name, size=4096):
+    return "R_X86_64_PC32\t%s[%s:%d+0]" % (sec, name, size)
 
 
-class CanonicalDataNames(unittest.TestCase):
-    OLD = [(0, 4096, "F.radius.203"), (4096, 4096, "F.radius.212"), (8192, 4096, "F.factor.223"), (12288, 8, "plain")]
-    NEW = [(0, 4096, "F.radius.196"), (4096, 4096, "F.radius.205"), (8192, 4096, "F.factor.216"), (12288, 8, "plain")]
+def renamed(*refs):
+    """The canonical lines of one function that makes the references REFS, in order."""
+    return sbc.canonical_reference_names({"f": list(refs)})["f"]
+
+
+class CanonicalReferenceNames(unittest.TestCase):
+    OLD = [ref(".data", "F.radius.203"), ref(".data", "F.radius.212"), ref(".data", "F.factor.223"), ref(".bss", "plain", 8)]
+    NEW = [ref(".data", "F.radius.196"), ref(".data", "F.radius.205"), ref(".data", "F.factor.216"), ref(".bss", "plain", 8)]
 
     def test_renumbered_statics_get_the_same_names(self):
-        self.assertEqual(names(self.OLD), names(self.NEW))
-        self.assertEqual(names(self.OLD), ["F.radius.#0", "F.radius.#1", "F.factor.#0", "plain"])
+        self.assertEqual(renamed(*self.OLD), renamed(*self.NEW))
+        self.assertEqual(renamed(*self.OLD)[0], ref(".data", "F.radius.#0"))
+        self.assertEqual(renamed(*self.OLD)[1], ref(".data", "F.radius.#1"))
 
-    def test_objects_that_give_a_stem_different_numbers_in_other_order_differ(self):
-        # planted defect: the two radius variables swap places (the second now comes first)
-        swapped = [(0, 4096, "F.radius.205"), (4096, 4096, "F.radius.196"), (8192, 4096, "F.factor.216"), (12288, 8, "plain")]
-        self.assertNotEqual(names(self.OLD), names(swapped))
+    def test_swapped_order_differs(self):
+        # planted defect: the two radius variables are referenced the other way round
+        swapped = [self.NEW[1], self.NEW[0]] + self.NEW[2:]
+        self.assertNotEqual(renamed(*self.OLD), renamed(*swapped))
 
     def test_a_reference_to_another_stem_differs(self):
-        # planted defect: the variable that the old object calls F.factor.* is called F.radius.* in the new one
-        other = [(0, 4096, "F.radius.196"), (4096, 4096, "F.radius.205"), (8192, 4096, "F.radius.216"), (12288, 8, "plain")]
-        self.assertNotEqual(names(self.OLD), names(other))
+        # planted defect: the variable the old object calls F.factor.* is called F.radius.* in the new one
+        other = self.NEW[:2] + [ref(".data", "F.radius.216")] + self.NEW[3:]
+        self.assertNotEqual(renamed(*self.OLD), renamed(*other))
 
-    def test_a_missing_variable_changes_the_ranks_or_the_names(self):
-        # planted defect: one of the radius variables is gone from the new object
-        fewer = [(0, 4096, "F.radius.196"), (8192, 4096, "F.factor.216"), (12288, 8, "plain")]
-        self.assertNotEqual(names(self.OLD), names(fewer))
+    def test_a_missing_variable_differs(self):
+        # planted defect: the second radius variable is never referenced (it is gone from the new object)
+        fewer = [ref(".data", "F.radius.196"), ref(".data", "F.radius.196"), self.NEW[2], self.NEW[3]]
+        self.assertNotEqual(renamed(*self.OLD), renamed(*fewer))
 
-    def test_plain_names_and_other_sections_are_untouched(self):
-        syms = sbc.canonical_data_names({".bss": [(0, 4, "counter"), (4, 4, "g.x.7")], ".data": [(0, 4, "g.x.3")]})
-        self.assertEqual(syms[".bss"], [(0, 4, "counter"), (4, 4, "g.x.#0")])
-        self.assertEqual(syms[".data"], [(0, 4, "g.x.#0")])
+    def test_ranks_count_only_the_variables_the_functions_reference(self):
+        # gcc's `display.N` has no function in its name: the kept file's one variable is rank 0 in both objects even
+        # when the original object holds another `display.M` that only the moved functions use (not referenced here)
+        self.assertEqual(renamed(ref(".bss", "display.4915", 8)), renamed(ref(".bss", "display.4863", 8)))
+
+    def test_plain_names_other_sections_and_other_references_are_untouched(self):
+        self.assertEqual(renamed(ref(".bss", "counter", 4), "mov %eax,%ebx", ref(".data.rel.local", "t.7", 8)),
+                         [ref(".bss", "counter", 4), "mov %eax,%ebx", ref(".data.rel.local", "t.#0", 8)])
 
 
 if __name__ == "__main__":

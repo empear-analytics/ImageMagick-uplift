@@ -58,8 +58,9 @@ def pointer_slots(obj, strs, src):
     NUL-terminated string (a string-literal label or a .rodata.str section), else symbol and addend."""
     sections = {}
     slots = {}
-    for off, sym, add in re.findall(r"(?m)^([0-9a-f]+) R_X86_64_64\s+(\S+?)\+0x([0-9a-f]+)$",
+    for off, sym, add in re.findall(r"(?m)^([0-9a-f]+) R_X86_64_64\s+(\S+?)(?:\+0x([0-9a-f]+))?$",
                                     sh("objdump", "-r", "-j", ".data.rel.ro", obj, text=True).stdout):
+        add = add or "0"   # objdump omits a zero addend
         if sym.startswith(".rodata.str"):
             if sym not in sections: sections[sym] = section_bytes(obj, sym)
             text = sections[sym][int(add, 16):].split(b"\0", 1)[0]
@@ -68,33 +69,29 @@ def pointer_slots(obj, strs, src):
         else: slots[int(off, 16)] = "%s+%s" % (sym, add)
     return slots
 
-def canonical_data_names(syms):
-    """SYMS (section -> [(value, size, name)]) with every name of the form `stem.N` (the number a compiler appends
-    to a function's `static` local to keep its name unique in the object, as clang's `XMagickCommand.radius.203`)
-    renamed `stem.#K`, K being the rank of N among the numbers that the object gives that stem. The number
-    depends on how many names the compiler had made before, so it differs between the original object and the
-    object of the file split off it, while the rank does not: a reference to the same variable has the same
-    rank, and a reference to another variable of the stem, or to another stem, does not."""
-    ranks = {}
-    for sec, rows in syms.items():
-        for _, _, name in rows:
-            m = re.fullmatch(r"(.+)\.(\d+)", name)
-            if m: ranks.setdefault((sec, m.group(1)), set()).add(int(m.group(2)))
-    out = {}
-    for sec, rows in syms.items():
-        for value, size, name in rows:
-            m = re.fullmatch(r"(.+)\.(\d+)", name)
-            if m: name = "%s.#%d" % (m.group(1), sorted(ranks[(sec, m.group(1))]).index(int(m.group(2))))
-            out.setdefault(sec, []).append((value, size, name))
-    return out
+def canonical_reference_names(out):
+    """OUT (function name -> lines) with every reference `sec[stem.N:size+off]` to a variable whose name ends in a
+    number (the number a compiler appends to a function's `static` local to keep its name unique in the object, as
+    clang's `XMagickCommand.radius.203` or gcc's `display.4915`) renamed `sec[stem.#K:...]`, K being the rank of N among
+    the numbers of that stem that the functions of OUT reference. The number depends on how many names the compiler
+    had made before, so it differs between the original object and the object of the file split off it, while the
+    rank among the variables the compared functions use does not: a reference to the same variable has the same
+    rank, and a reference to another variable of the stem, to another stem or to a variable that is gone does not."""
+    pat = re.compile(r"(?<![\w.])(\.bss|\.data(?:\.rel\.local)?)\[(.+?)\.(\d+):")
+    numbers = {}
+    for lines in out.values():
+        for line in lines:
+            for sec, stem, n in pat.findall(line): numbers.setdefault((sec, stem), set()).add(int(n))
+    rank = lambda mm: "%s[%s.#%d:" % (mm.group(1), mm.group(2), sorted(numbers[(mm.group(1), mm.group(2))]).index(int(mm.group(3))))
+    return {name: [pat.sub(rank, line) for line in lines] for name, lines in out.items()}
 
 def data_symbols(obj):
-    """Map a section (.bss, .data) of OBJ to its (value, size, name) object symbols."""
+    """Map a section (.bss, .data, .data.rel.local) of OBJ to its (value, size, name) object symbols."""
     syms = {}
-    for value, sec, size, name in re.findall(r"(?m)^([0-9a-f]+) .{7} (\.bss|\.data)\s+([0-9a-f]+) (\S+)$",
+    for value, sec, size, name in re.findall(r"(?m)^([0-9a-f]+) .{7} (\.bss|\.data\.rel\.local|\.data)\s+([0-9a-f]+) (\S+)$",
                                              sh("objdump", "-t", obj, text=True).stdout):
         if name != sec: syms.setdefault(sec, []).append((int(value, 16), int(size, 16), name))
-    return canonical_data_names(syms)
+    return syms
 
 def symbol_at(syms, sec, target):
     """`sec[name:size+offset]` for the symbol of section SEC that the address TARGET (in the section) falls in, or None."""
@@ -141,7 +138,7 @@ def disasm(obj, names, src):
         for k in range(len(lines) - 1):
             # a PC-relative reference to a variable: the target is the addend plus 4 plus the bytes of any
             # immediate between the displacement and the end of the instruction, found from the addresses
-            m = re.match(r"^R_X86_64_PC32\s+(\.bss|\.data)(?:([+-])0x([0-9a-f]+))?\s*$", lines[k])
+            m = re.match(r"^R_X86_64_PC32\s+(\.bss|\.data\.rel\.local|\.data)(?:([+-])0x([0-9a-f]+))?\s*$", lines[k])
             if m:
                 nxt = next((at[name][j] for j in range(k + 1, len(lines)) if not lines[j].startswith("R_X86_64_")), None)
                 addend = int(m.group(3) or "0", 16) * (-1 if m.group(2) == "-" else 1)
@@ -152,7 +149,7 @@ def disasm(obj, names, src):
             if re.match(r"^mov\s+0x0\(%rip\),%\w+", lines[k]) and re.match(r"^R_X86_64_REX_GOTPCRELX\s", lines[k + 1]):
                 lines[k] = re.sub(r"^mov(\s+)", r"lea\1", lines[k])
                 lines[k + 1] = lines[k + 1].replace("R_X86_64_REX_GOTPCRELX", "R_X86_64_PC32", 1)
-    return {name: drop_padding(lines) for name, lines in out.items()}
+    return canonical_reference_names({name: drop_padding(lines) for name, lines in out.items()})
 
 def label_kind(x, y):
     """The kind of label number X and Y differ in alone, or None."""
