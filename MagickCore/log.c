@@ -260,13 +260,7 @@ static MagickBooleanType
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %  A c q u i r e L o g C a c h e                                              %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  AcquireLogCache() caches one or more log configurations which provides a
@@ -361,13 +355,7 @@ static LinkedListInfo *AcquireLogCache(const char *filename,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   C l o s e M a g i c k L o g                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  CloseMagickLog() closes the Magick log.
@@ -404,13 +392,7 @@ MagickExport void CloseMagickLog(void)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t L o g E v e n t M a s k                                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetLogEventMask() returns the current log event mask.
@@ -453,13 +435,7 @@ static ElementInfo *FindLogElement(ElementInfo *p,const char *name)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t L o g I n f o                                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetLogInfo() searches the log list for the specified name and if found
@@ -514,13 +490,7 @@ static LogInfo *GetLogInfo(const char *name,ExceptionInfo *exception)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t L o g I n f o L i s t                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetLogInfoList() returns any logs that match the specified pattern.
@@ -610,13 +580,7 @@ MagickExport const LogInfo **GetLogInfoList(const char *pattern,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t L o g L i s t                                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetLogList() returns any logs that match the specified pattern.
@@ -705,13 +669,7 @@ MagickExport char **GetLogList(const char *pattern,size_t *number_preferences,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t L o g N a m e                                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetLogName() returns the current log name.
@@ -728,13 +686,7 @@ MagickExport const char *GetLogName(void)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   I s L o g C a c h e I n s t a n t i a t e d                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  IsLogCacheInstantiated() determines if the log list is instantiated.  If
@@ -788,13 +740,7 @@ static MagickBooleanType IsLogCacheInstantiated(ExceptionInfo *exception)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %  I s E v e n t L o g g i n g                                                %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  IsEventLogging() returns MagickTrue if debug of events is enabled otherwise
@@ -857,13 +803,7 @@ static void ListLogEntry(FILE *file,const LogInfo *log_info)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %  L i s t L o g I n f o                                                      %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  ListLogInfo() lists the log info to a file.
@@ -1216,13 +1156,7 @@ static void ParseLogElement(const LogElementInput *element,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   L o a d L o g C a c h e                                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  LoadLogCache() loads the log configurations which provides a
@@ -1318,13 +1252,7 @@ static MagickBooleanType LoadLogCache(const LogLoadTarget *target,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   L o g C o m p o n e n t G e n e s i s                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  LogComponentGenesis() instantiates the log component.
@@ -1349,13 +1277,7 @@ MagickPrivate MagickBooleanType LogComponentGenesis(void)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   L o g C o m p o n e n t T e r m i n u s                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  LogComponentTerminus() destroys the logging component.
@@ -1446,13 +1368,7 @@ static void WriteLogToStreams(const LogInfo *log_info,const LogEventType type,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   L o g M a g i c k E v e n t                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  LogMagickEvent() logs an event as determined by the log configuration file.
@@ -2092,13 +2008,7 @@ MagickExport MagickBooleanType LogMagickEvent(const LogEventType type,
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   P a r s e L o g H a n d l e r s                                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  ParseLogHandlers() parses a string defining which handlers takes a log
@@ -2163,13 +2073,7 @@ static LogHandlerType ParseLogHandlers(const char *handlers)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   S e t L o g E v e n t M a s k                                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SetLogEventMask() accepts a list that determines which events to log.  All
@@ -2219,13 +2123,7 @@ MagickExport LogEventType SetLogEventMask(const char *events)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   S e t L o g F o r m a t                                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SetLogFormat() sets the format for the "human readable" log record.
@@ -2261,13 +2159,7 @@ MagickExport void SetLogFormat(const char *format)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   S e t L o g M e t h o d                                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SetLogMethod() sets the method that will be called when an event is logged.
@@ -2305,13 +2197,7 @@ MagickExport void SetLogMethod(MagickLogMethod method)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   S e t L o g N a m e                                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SetLogName() sets the log name and returns it.
