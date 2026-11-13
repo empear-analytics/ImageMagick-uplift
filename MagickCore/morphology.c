@@ -2585,6 +2585,94 @@ static void AddRankedBlurGaussian(KernelInfo *kernel,const ssize_t v,
   }
 }
 
+static KernelInfo *AcquireBlurKernel(KernelInfo *kernel,
+  const GeometryInfo *args)
+{
+  ssize_t
+    v;
+
+  double
+    sigma = fabs(args->sigma),
+    alpha, beta;
+
+  if ( args->rho >= 1.0 )
+    kernel->width = CastDoubleToSizeT(args->rho)*2+1;
+  else
+    kernel->width = GetOptimalKernelWidth1D(args->rho,sigma);
+  kernel->height = 1;
+  kernel->x = (ssize_t) (kernel->width-1)/2;
+  kernel->y = 0;
+  kernel->negative_range = kernel->positive_range = 0.0;
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+#if 1
+#define KernelRank 3
+  /* Formula derived from GetBlurKernel() in "effect.c" (plus bug fix).
+  ** It generates a gaussian 3 times the width, and compresses it into
+  ** the expected range.  This produces a closer normalization of the
+  ** resulting kernel, especially for very low sigma values.
+  ** As such while wierd it is prefered.
+  **
+  ** I am told this method originally came from Photoshop.
+  **
+  ** A properly normalized curve is generated (apart from edge clipping)
+  ** even though we later normalize the result (for edge clipping)
+  ** to allow the correct generation of a "Difference of Blurs".
+  */
+
+  /* initialize */
+  v = (ssize_t) (kernel->width*KernelRank-1)/2; /* start/end points to fit range */
+  (void) memset(kernel->values,0, (size_t)
+    kernel->width*kernel->height*sizeof(*kernel->values));
+  /* Calculate a Positive 1D Gaussian */
+  if ( sigma > MagickEpsilon )
+    { sigma *= KernelRank;               /* simplify loop expressions */
+      alpha = 1.0/(2.0*sigma*sigma);
+      beta= (double) (1.0/(MagickSQ2PI*sigma ));
+      AddRankedBlurGaussian(kernel,v,alpha,beta);
+    }
+  else /* special case - generate a unity kernel */
+    kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
+#else
+  /* Direct calculation without curve averaging
+     This is equivalent to a KernelRank of 1 */
+
+  /* Calculate a Positive Gaussian */
+  if ( sigma > MagickEpsilon )
+    { alpha = 1.0/(2.0*sigma*sigma);    /* simplify loop expressions */
+      beta = 1.0/(MagickSQ2PI*sigma);
+      for ( i=0, u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+        kernel->values[i] = exp(-((double)(u*u))*alpha)*beta;
+    }
+  else /* special case - generate a unity kernel */
+    { (void) memset(kernel->values,0, (size_t)
+        kernel->width*kernel->height*sizeof(*kernel->values));
+      kernel->values[kernel->x+kernel->y*kernel->width] = 1.0;
+    }
+#endif
+  /* Note the above kernel may have been 'clipped' by a user defined
+  ** radius, producing a smaller (darker) kernel.  Also for very small
+  ** sigma's (> 0.1) the central value becomes larger than one, as a
+  ** result of not generating a actual 'discrete' kernel, and thus
+  ** producing a very bright 'impulse'.
+  **
+  ** Because of these two factors Normalization is required!
+  */
+
+  /* Normalize the 1D Gaussian Kernel
+  **
+  ** NB: a CorrelateNormalize performs a normal Normalize if
+  ** there are no negative values.
+  */
+  CalcKernelMetaData(kernel);  /* the other kernel meta-data */
+  ScaleKernelInfo(kernel, 1.0, CorrelateNormalizeValue);
+
+  /* rotate the 1D kernel by given angle */
+  RotateKernelInfo(kernel, args->xi );
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -2593,9 +2681,6 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
 
   KernelInfo
     *kernel;
-
-  ssize_t
-    v;
 
   double
     nan = sqrt(-1.0);  /* Special Value : Not A Number */
@@ -2674,87 +2759,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
     case LoGKernel:
       return(AcquireGaussianKernel(kernel,type,args));
     case BlurKernel:
-      { double
-          sigma = fabs(args->sigma),
-          alpha, beta;
-
-        if ( args->rho >= 1.0 )
-          kernel->width = CastDoubleToSizeT(args->rho)*2+1;
-        else
-          kernel->width = GetOptimalKernelWidth1D(args->rho,sigma);
-        kernel->height = 1;
-        kernel->x = (ssize_t) (kernel->width-1)/2;
-        kernel->y = 0;
-        kernel->negative_range = kernel->positive_range = 0.0;
-        if (AcquireKernelValues(kernel) == MagickFalse)
-          return(DestroyKernelInfo(kernel));
-
-#if 1
-#define KernelRank 3
-        /* Formula derived from GetBlurKernel() in "effect.c" (plus bug fix).
-        ** It generates a gaussian 3 times the width, and compresses it into
-        ** the expected range.  This produces a closer normalization of the
-        ** resulting kernel, especially for very low sigma values.
-        ** As such while wierd it is prefered.
-        **
-        ** I am told this method originally came from Photoshop.
-        **
-        ** A properly normalized curve is generated (apart from edge clipping)
-        ** even though we later normalize the result (for edge clipping)
-        ** to allow the correct generation of a "Difference of Blurs".
-        */
-
-        /* initialize */
-        v = (ssize_t) (kernel->width*KernelRank-1)/2; /* start/end points to fit range */
-        (void) memset(kernel->values,0, (size_t)
-          kernel->width*kernel->height*sizeof(*kernel->values));
-        /* Calculate a Positive 1D Gaussian */
-        if ( sigma > MagickEpsilon )
-          { sigma *= KernelRank;               /* simplify loop expressions */
-            alpha = 1.0/(2.0*sigma*sigma);
-            beta= (double) (1.0/(MagickSQ2PI*sigma ));
-            AddRankedBlurGaussian(kernel,v,alpha,beta);
-          }
-        else /* special case - generate a unity kernel */
-          kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
-#else
-        /* Direct calculation without curve averaging
-           This is equivalent to a KernelRank of 1 */
-
-        /* Calculate a Positive Gaussian */
-        if ( sigma > MagickEpsilon )
-          { alpha = 1.0/(2.0*sigma*sigma);    /* simplify loop expressions */
-            beta = 1.0/(MagickSQ2PI*sigma);
-            for ( i=0, u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-              kernel->values[i] = exp(-((double)(u*u))*alpha)*beta;
-          }
-        else /* special case - generate a unity kernel */
-          { (void) memset(kernel->values,0, (size_t)
-              kernel->width*kernel->height*sizeof(*kernel->values));
-            kernel->values[kernel->x+kernel->y*kernel->width] = 1.0;
-          }
-#endif
-        /* Note the above kernel may have been 'clipped' by a user defined
-        ** radius, producing a smaller (darker) kernel.  Also for very small
-        ** sigma's (> 0.1) the central value becomes larger than one, as a
-        ** result of not generating a actual 'discrete' kernel, and thus
-        ** producing a very bright 'impulse'.
-        **
-        ** Because of these two factors Normalization is required!
-        */
-
-        /* Normalize the 1D Gaussian Kernel
-        **
-        ** NB: a CorrelateNormalize performs a normal Normalize if
-        ** there are no negative values.
-        */
-        CalcKernelMetaData(kernel);  /* the other kernel meta-data */
-        ScaleKernelInfo(kernel, 1.0, CorrelateNormalizeValue);
-
-        /* rotate the 1D kernel by given angle */
-        RotateKernelInfo(kernel, args->xi );
-        break;
-      }
+      return(AcquireBlurKernel(kernel,args));
     case CometKernel:
       return(AcquireCometKernel(kernel,args));
     case BinomialKernel:
