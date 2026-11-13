@@ -111,6 +111,16 @@
 #include "MagickCore/version.h"
 #include "MagickCore/xwindow-private.h"
 
+/*
+  Typedef declarations.
+*/
+typedef struct _FormatExceptions
+{
+  ExceptionInfo
+    *sans_exception,
+    *exception;
+} FormatExceptions;
+
 static void UpdateSceneRange(ImageInfo *image_info,size_t first,size_t last)
 {
   if (first > last)
@@ -306,9 +316,12 @@ static void AffirmUserSpecifiedFormat(ImageInfo *image_info,
 }
 
 static const MagickInfo *SetUserSpecifiedFormat(ImageInfo *image_info,
-  char *magic,char *component,ExceptionInfo *sans_exception,
-  ExceptionInfo *exception)
+  char *magic,char *component,const FormatExceptions *exceptions)
 {
+  ExceptionInfo
+    *const sans_exception = exceptions->sans_exception,
+    *const exception = exceptions->exception;
+
   const DelegateInfo
     *delegate_info;
 
@@ -602,6 +615,9 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
   ExceptionInfo
     *sans_exception;
 
+  FormatExceptions
+    exceptions;
+
   /*
     Look for 'image.format' in filename.
   */
@@ -628,8 +644,12 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
       SetImageInfoFilename(image_info,frames,component);
     }
   else
-    magick_info=SetUserSpecifiedFormat(image_info,magic,component,
-      sans_exception,exception);
+    {
+      exceptions.sans_exception=sans_exception;
+      exceptions.exception=exception;
+      magick_info=SetUserSpecifiedFormat(image_info,magic,component,
+        &exceptions);
+    }
   sans_exception=DestroyExceptionInfo(sans_exception);
   ResetUnsupportedEndian(image_info,magick_info);
   TestMultipleImageSupport(image_info,frames,component,exception);
