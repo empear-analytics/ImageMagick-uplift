@@ -16352,6 +16352,57 @@ static void UpdateTextViewLayout(const TextViewContext *context,
     }
 }
 
+static void RedrawTextViewWidget(const TextViewContext *context,
+  const TextViewWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const dismiss_info = widgets->dismiss_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info;
+
+  XWidgetInfo
+    *const selection_info = widgets->selection_info;
+
+  if ((*state) & RedrawWidgetState)
+    {
+      /*
+        Redraw Text View window.
+      */
+      XDrawBeveledMatte(display,&windows->widget,list_info);
+      XDrawBeveledMatte(display,&windows->widget,scroll_info);
+      XDrawTriangleNorth(display,&windows->widget,north_info);
+      XDrawBeveledButton(display,&windows->widget,slider_info);
+      XDrawTriangleSouth(display,&windows->widget,south_info);
+      XDrawBeveledButton(display,&windows->widget,dismiss_info);
+      XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
+      (*selection_info).id=(~0);
+      (*state)|=RedrawListState;
+      (*state)&=(unsigned int) (~RedrawWidgetState);
+    }
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -16506,22 +16557,7 @@ MagickPrivate void XTextViewWidget(Display *display,
   do
   {
     UpdateTextViewLayout(&view_context,&view_widgets);
-    if (state & RedrawWidgetState)
-      {
-        /*
-          Redraw Text View window.
-        */
-        XDrawBeveledMatte(display,&windows->widget,&list_info);
-        XDrawBeveledMatte(display,&windows->widget,&scroll_info);
-        XDrawTriangleNorth(display,&windows->widget,&north_info);
-        XDrawBeveledButton(display,&windows->widget,&slider_info);
-        XDrawTriangleSouth(display,&windows->widget,&south_info);
-        XDrawBeveledButton(display,&windows->widget,&dismiss_info);
-        XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
-        selection_info.id=(~0);
-        state|=RedrawListState;
-        state&=(unsigned int) (~RedrawWidgetState);
-      }
+    RedrawTextViewWidget(&view_context,&view_widgets);
     if (state & RedrawListState)
       {
         /*
