@@ -1261,6 +1261,29 @@ static const char *SkipDoctypeElement(const char *q)
   return(q);
 }
 
+static MagickBooleanType SkipPolicyElement(const char **q,
+  const char *keyword,const size_t extent,char *token)
+{
+  if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
+    {
+      /*
+        DOCTYPE element.
+      */
+      (*q)=SkipDoctypeElement((*q));
+      return(MagickTrue);
+    }
+  if (LocaleNCompare(keyword,"<!--",4) == 0)
+    {
+      /*
+        Comment element.
+      */
+      while ((LocaleNCompare((*q),"->",2) != 0) && (*(*q) != '\0'))
+        (void) GetNextToken((*q),q,extent,token);
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
   const char *policy,const char *filename,const size_t depth);
 
@@ -1329,23 +1352,8 @@ static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
     if (*token == '\0')
       break;
     (void) CopyMagickString(keyword,token,MagickPathExtent);
-    if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
-      {
-        /*
-          DOCTYPE element.
-        */
-        q=SkipDoctypeElement(q);
-        continue;
-      }
-    if (LocaleNCompare(keyword,"<!--",4) == 0)
-      {
-        /*
-          Comment element.
-        */
-        while ((LocaleNCompare(q,"->",2) != 0) && (*q != '\0'))
-          (void) GetNextToken(q,&q,extent,token);
-        continue;
-      }
+    if (SkipPolicyElement(&q,keyword,extent,token) != MagickFalse)
+      continue;
     if (LocaleCompare(keyword,"<include") == 0)
       {
         /*
