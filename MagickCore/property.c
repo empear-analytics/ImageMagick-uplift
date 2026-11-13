@@ -1455,8 +1455,8 @@ static char *AcquireEXIFTagValue(const EXIFWalkInfo *walk,
   return(value);
 }
 
-static void GetEXIFDirectory(const EXIFWalkInfo *walk,
-  const EXIFWalkTargets *targets)
+static void SetEXIFTagProperty(const EXIFWalkInfo *walk,
+  const size_t tag_value,const ssize_t level,char *value)
 {
   const Image
     *const image = walk->image;
@@ -1467,6 +1467,51 @@ static void GetEXIFDirectory(const EXIFWalkInfo *walk,
   const TagInfo
     *const EXIFTag = walk->EXIFTag;
 
+  const ssize_t
+    all = walk->all;
+
+  ExceptionInfo
+    *const exception = walk->exception;
+
+  char
+    *key;
+
+  key=AcquireString(property);
+  switch (all)
+  {
+    case 1:
+    {
+      const char
+        *description;
+
+      description=GetEXIFTagDescription(EXIFTag,tag_value);
+      (void) FormatLocaleString(key,MagickPathExtent,"%s",
+        description);
+      if (level == 2)
+        (void) SubstituteString(&key,"exif:","exif:Thumbnail.");
+      break;
+    }
+    case 2:
+    {
+      FormatEXIFTagIdKey(key,tag_value);
+      break;
+    }
+    default:
+    {
+      if (level == 2)
+        (void) SubstituteString(&key,"exif:","exif:Thumbnail.");
+    }
+  }
+  if ((image->properties == (void *) NULL) ||
+      (GetValueFromSplayTree((SplayTreeInfo *) image->properties,key) == (const void *) NULL))
+    (void) SetImageProperty((Image *) image,key,value,exception);
+  value=DestroyString(value);
+  key=DestroyString(key);
+}
+
+static void GetEXIFDirectory(const EXIFWalkInfo *walk,
+  const EXIFWalkTargets *targets)
+{
   const ssize_t
     all = walk->all;
 
@@ -1490,9 +1535,6 @@ static void GetEXIFDirectory(const EXIFWalkInfo *walk,
 
   SplayTreeInfo
     *const exif_resources = walk->exif_resources;
-
-  ExceptionInfo
-    *const exception = walk->exception;
 
   ssize_t
     *const level = targets->level;
@@ -1582,42 +1624,7 @@ static void GetEXIFDirectory(const EXIFWalkInfo *walk,
           break;
         value=AcquireEXIFTagValue(walk,&exif_tag);
         if (value != (char *) NULL)
-          {
-            char
-              *key;
-
-            key=AcquireString(property);
-            switch (all)
-            {
-              case 1:
-              {
-                const char
-                  *description;
-
-                description=GetEXIFTagDescription(EXIFTag,tag_value);
-                (void) FormatLocaleString(key,MagickPathExtent,"%s",
-                  description);
-                if ((*level) == 2)
-                  (void) SubstituteString(&key,"exif:","exif:Thumbnail.");
-                break;
-              }
-              case 2:
-              {
-                FormatEXIFTagIdKey(key,tag_value);
-                break;
-              }
-              default:
-              {
-                if ((*level) == 2)
-                  (void) SubstituteString(&key,"exif:","exif:Thumbnail.");
-              }
-            }
-            if ((image->properties == (void *) NULL) ||
-                (GetValueFromSplayTree((SplayTreeInfo *) image->properties,key) == (const void *) NULL))
-              (void) SetImageProperty((Image *) image,key,value,exception);
-            value=DestroyString(value);
-            key=DestroyString(key);
-          }
+          SetEXIFTagProperty(walk,tag_value,(*level),value);
       }
       if (IsSubdirectoryTag(tag_value) != MagickFalse)
         {
