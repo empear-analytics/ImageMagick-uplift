@@ -196,6 +196,28 @@ static inline MagickBooleanType IsMatrixMemoryAvailable(
     MagickFalse);
 }
 
+static void AcquireMatrixMemory(MatrixInfo *matrix_info)
+{
+  MagickBooleanType
+    status;
+
+  status=AcquireMagickResource(MemoryResource,matrix_info->length);
+  if (status != MagickFalse)
+    {
+      matrix_info->mapped=MagickFalse;
+      matrix_info->elements=MagickAssumeAligned(AcquireAlignedMemory(1,
+        (size_t) matrix_info->length));
+      if (matrix_info->elements == NULL)
+        {
+          matrix_info->mapped=MagickTrue;
+          matrix_info->elements=MapBlob(-1,IOMode,0,(size_t)
+            matrix_info->length);
+        }
+      if (matrix_info->elements == (unsigned short *) NULL)
+        RelinquishMagickResource(MemoryResource,matrix_info->length);
+    }
+}
+
 MagickExport MatrixInfo *AcquireMatrixInfo(const size_t columns,
   const size_t rows,const size_t stride,ExceptionInfo *exception)
 {
@@ -233,23 +255,7 @@ MagickExport MatrixInfo *AcquireMatrixInfo(const size_t columns,
   matrix_info->type=MemoryCache;
   status=AcquireMagickResource(AreaResource,matrix_info->length);
   if (IsMatrixMemoryAvailable(status,matrix_info) != MagickFalse)
-    {
-      status=AcquireMagickResource(MemoryResource,matrix_info->length);
-      if (status != MagickFalse)
-        {
-          matrix_info->mapped=MagickFalse;
-          matrix_info->elements=MagickAssumeAligned(AcquireAlignedMemory(1,
-            (size_t) matrix_info->length));
-          if (matrix_info->elements == NULL)
-            {
-              matrix_info->mapped=MagickTrue;
-              matrix_info->elements=MapBlob(-1,IOMode,0,(size_t)
-                matrix_info->length);
-            }
-          if (matrix_info->elements == (unsigned short *) NULL)
-            RelinquishMagickResource(MemoryResource,matrix_info->length);
-        }
-    }
+    AcquireMatrixMemory(matrix_info);
   matrix_info->file=(-1);
   if (matrix_info->elements == (unsigned short *) NULL)
     {
