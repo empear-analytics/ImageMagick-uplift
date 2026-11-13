@@ -1274,6 +1274,20 @@ static void SelectBlueComponent(const PixelInfo *pixel,
   }
 }
 
+static double GetColorComponentScale(const PixelInfo *pixel,
+  const ComplianceType compliance)
+{
+  double
+    scale;
+
+  scale=QuantumRange;
+  if ((compliance != NoCompliance) || (pixel->depth <= 8))
+    scale=255.0;
+  if (IsPercentColorComponent(compliance,pixel) != MagickFalse)
+    scale=100.0;
+  return(scale);
+}
+
 MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
   const PixelChannel channel,const ComplianceType compliance,char *tuple)
 {
@@ -1288,11 +1302,7 @@ MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
     scale;
 
   color=0.0;
-  scale=QuantumRange;
-  if ((compliance != NoCompliance) || (pixel->depth <= 8))
-    scale=255.0;
-  if (IsPercentColorComponent(compliance,pixel) != MagickFalse)
-    scale=100.0;
+  scale=GetColorComponentScale(pixel,compliance);
   switch (channel)
   {
     case RedPixelChannel:
