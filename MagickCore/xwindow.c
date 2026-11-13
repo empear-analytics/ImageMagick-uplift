@@ -2223,6 +2223,20 @@ static MagickBooleanType XRotateDrawImage(const XDrawInfo *draw_info,
   return(MagickTrue);
 }
 
+static void XSetDrawRowOpacity(const Image *draw_image,const Image *image,
+  Quantum *magick_restrict q)
+{
+  int
+    x;
+
+  for (x=0; x < (int) draw_image->columns; x++)
+  {
+    if (GetPixelAlpha(image,q) != TransparentAlpha)
+      SetPixelAlpha(draw_image,OpaqueAlpha,q);
+    q+=(ptrdiff_t) GetPixelChannels(draw_image);
+  }
+}
+
 MagickPrivate MagickBooleanType XDrawImage(Display *display,
   const XPixelInfo *pixel,XDrawInfo *draw_info,Image *image,
   ExceptionInfo *exception)
@@ -2383,9 +2397,6 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
   draw_view=AcquireAuthenticCacheView(draw_image,exception);
   for (y=0; y < (int) draw_image->rows; y++)
   {
-    int
-      x;
-
     Quantum
       *magick_restrict q;
 
@@ -2393,12 +2404,7 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
       exception);
     if (q == (Quantum *) NULL)
       break;
-    for (x=0; x < (int) draw_image->columns; x++)
-    {
-      if (GetPixelAlpha(image,q) != TransparentAlpha)
-        SetPixelAlpha(draw_image,OpaqueAlpha,q);
-      q+=(ptrdiff_t) GetPixelChannels(draw_image);
-    }
+    XSetDrawRowOpacity(draw_image,image,q);
     if (SyncCacheViewAuthenticPixels(draw_view,exception) == MagickFalse)
       break;
   }
