@@ -6824,6 +6824,37 @@ static void XCropSelectRegion(const CropContext *context,
   } while (((*state) & ExitState) == 0);
 }
 
+static void XCropCutPixels(Image *image,const RectangleInfo crop_info,
+  ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  int
+    x,
+    y;
+
+  Quantum
+    *q;
+
+  image_view=AcquireAuthenticCacheView(image,exception);
+  for (y=0; y < (int) crop_info.height; y++)
+  {
+    q=GetCacheViewAuthenticPixels(image_view,crop_info.x,y+crop_info.y,
+      crop_info.width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (int) crop_info.width; x++)
+    {
+      SetPixelAlpha(image,TransparentAlpha,q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      break;
+  }
+  image_view=DestroyCacheView(image_view);
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -6843,9 +6874,6 @@ static MagickBooleanType XCropImage(Display *display,
       (char *) NULL
     };
 
-  CacheView
-    *image_view;
-
   char
     text[MagickPathExtent];
 
@@ -6864,9 +6892,6 @@ static MagickBooleanType XCropImage(Display *display,
 
   RectangleInfo
     crop_info;
-
-  Quantum
-    *q;
 
   unsigned int
     height,
@@ -7002,22 +7027,7 @@ static MagickBooleanType XCropImage(Display *display,
   if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
     return(MagickFalse);
   image->alpha_trait=BlendPixelTrait;
-  image_view=AcquireAuthenticCacheView(image,exception);
-  for (y=0; y < (int) crop_info.height; y++)
-  {
-    q=GetCacheViewAuthenticPixels(image_view,crop_info.x,y+crop_info.y,
-      crop_info.width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (int) crop_info.width; x++)
-    {
-      SetPixelAlpha(image,TransparentAlpha,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      break;
-  }
-  image_view=DestroyCacheView(image_view);
+  XCropCutPixels(image,crop_info,exception);
   /*
     Update image configuration.
   */
