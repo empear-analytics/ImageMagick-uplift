@@ -8914,6 +8914,45 @@ MagickPrivate void XMakeStandardColormap(Display *display,
 %    o window_info: Specifies a pointer to a X11 XWindowInfo structure.
 %
 */
+static void XCreateOrConfigureWindow(Display *display,const Window parent,
+  XWindowInfo *window_info,const XSizeHints *size_hints)
+{
+  if (window_info->id == (Window) NULL)
+    window_info->id=XCreateWindow(display,parent,window_info->x,window_info->y,
+      (unsigned int) size_hints->width,(unsigned int) size_hints->height,
+      window_info->border_width,(int) window_info->depth,InputOutput,
+      window_info->visual,(unsigned long) window_info->mask,
+      &window_info->attributes);
+  else
+    {
+      MagickStatusType
+        mask;
+
+      XEvent
+        sans_event;
+
+      XWindowChanges
+        window_changes;
+
+      /*
+        Window already exists;  change relevant attributes.
+      */
+      (void) XChangeWindowAttributes(display,window_info->id,(unsigned long)
+        window_info->mask,&window_info->attributes);
+      mask=ConfigureNotify;
+      while (XCheckTypedWindowEvent(display,window_info->id,(int) mask,&sans_event)) ;
+      window_changes.x=window_info->x;
+      window_changes.y=window_info->y;
+      window_changes.width=(int) window_info->width;
+      window_changes.height=(int) window_info->height;
+      mask=(MagickStatusType) (CWWidth | CWHeight);
+      if (window_info->flags & USPosition)
+        mask|=CWX | CWY;
+      (void) XReconfigureWMWindow(display,window_info->id,window_info->screen,
+        mask,&window_changes);
+    }
+}
+
 MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
   int argc,XClassHint *class_hint,XWMHints *manager_hints,
   XWindowInfo *window_info)
@@ -9022,40 +9061,7 @@ MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
   size_hints->win_gravity=gravity;
   size_hints->flags|=PWinGravity;
 #endif
-  if (window_info->id == (Window) NULL)
-    window_info->id=XCreateWindow(display,parent,window_info->x,window_info->y,
-      (unsigned int) size_hints->width,(unsigned int) size_hints->height,
-      window_info->border_width,(int) window_info->depth,InputOutput,
-      window_info->visual,(unsigned long) window_info->mask,
-      &window_info->attributes);
-  else
-    {
-      MagickStatusType
-        mask;
-
-      XEvent
-        sans_event;
-
-      XWindowChanges
-        window_changes;
-
-      /*
-        Window already exists;  change relevant attributes.
-      */
-      (void) XChangeWindowAttributes(display,window_info->id,(unsigned long)
-        window_info->mask,&window_info->attributes);
-      mask=ConfigureNotify;
-      while (XCheckTypedWindowEvent(display,window_info->id,(int) mask,&sans_event)) ;
-      window_changes.x=window_info->x;
-      window_changes.y=window_info->y;
-      window_changes.width=(int) window_info->width;
-      window_changes.height=(int) window_info->height;
-      mask=(MagickStatusType) (CWWidth | CWHeight);
-      if (window_info->flags & USPosition)
-        mask|=CWX | CWY;
-      (void) XReconfigureWMWindow(display,window_info->id,window_info->screen,
-        mask,&window_changes);
-    }
+  XCreateOrConfigureWindow(display,parent,window_info,size_hints);
   if (window_info->id == (Window) NULL)
     ThrowXWindowFatalException(XServerFatalError,"UnableToCreateWindow",
       window_info->name);
