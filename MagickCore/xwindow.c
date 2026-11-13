@@ -4700,6 +4700,25 @@ static void XReplaceWindowXImage(Display *display,XWindowInfo *window,
   window->ximage=ximage;
 }
 
+static XImage *XReplaceWindowMatteImage(Display *display,XWindowInfo *window,
+  unsigned int width,unsigned int height)
+{
+  XImage
+    *matte_image;
+
+  matte_image=(XImage *) NULL;
+  if ((IsShapedImageWindow(window) != MagickFalse) &&
+      (IsShapeWithinDisplay(display,window,width,height) != MagickFalse))
+    matte_image=XCreateMatteXImage(display,window,width,height);
+  if (window->matte_image != (XImage *) NULL)
+    XDestroyWindowMatteImage(window);
+  window->matte_image=matte_image;
+  if (window->matte_pixmap != (Pixmap) NULL)
+    XFreeWindowMattePixmap(display,window);
+  window->stasis=MagickFalse;
+  return(matte_image);
+}
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
@@ -4794,16 +4813,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
       return(MagickFalse);
     }
   XReplaceWindowXImage(display,window,ximage);
-  matte_image=(XImage *) NULL;
-  if ((IsShapedImageWindow(window) != MagickFalse) &&
-      (IsShapeWithinDisplay(display,window,width,height) != MagickFalse))
-    matte_image=XCreateMatteXImage(display,window,width,height);
-  if (window->matte_image != (XImage *) NULL)
-    XDestroyWindowMatteImage(window);
-  window->matte_image=matte_image;
-  if (window->matte_pixmap != (Pixmap) NULL)
-    XFreeWindowMattePixmap(display,window);
-  window->stasis=MagickFalse;
+  matte_image=XReplaceWindowMatteImage(display,window,width,height);
   /*
     Convert pixels to X image data.
   */
