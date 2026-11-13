@@ -1020,7 +1020,7 @@ static inline void Eagle3X(const Image *magick_unused(source),
     Mix2Pixels(&magnify,0,2,1);
   else
     CopyPixels(&magnify,4,1);
-  CopyPixels(&magnify,(ssize_t) (corner_tr ? 1 : 4),2);
+  CopyPixelsIf(&magnify,corner_tr != 0,1,2);
   if (IsEagle3XLeftEdge(corner_tl,corner_bl) != MagickFalse)
     Mix2Pixels(&magnify,0,6,3);
   else
@@ -1030,12 +1030,12 @@ static inline void Eagle3X(const Image *magick_unused(source),
     Mix2Pixels(&magnify,2,8,5);
   else
     CopyPixels(&magnify,4,5);
-  CopyPixels(&magnify,(ssize_t) (corner_bl ? 3 : 4),6);
+  CopyPixelsIf(&magnify,corner_bl != 0,3,6);
   if (IsEagle3XBottomEdge(corner_bl,corner_br) != MagickFalse)
     Mix2Pixels(&magnify,6,8,7);
   else
     CopyPixels(&magnify,4,7);
-  CopyPixels(&magnify,(ssize_t) (corner_br ? 5 : 4),8);
+  CopyPixelsIf(&magnify,corner_br != 0,5,8);
 }
 
 static inline void Eagle3XB(const Image *magick_unused(source),
