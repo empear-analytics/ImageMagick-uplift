@@ -178,24 +178,15 @@ static void *DestroyTypeNode(void *type_info)
     *p;
 
   p=(TypeInfo *) type_info;
-  if (p->path != (char *) NULL)
-    p->path=DestroyString(p->path);
-  if (p->name != (char *) NULL)
-    p->name=DestroyString(p->name);
-  if (p->description != (char *) NULL)
-    p->description=DestroyString(p->description);
-  if (p->family != (char *) NULL)
-    p->family=DestroyString(p->family);
-  if (p->encoding != (char *) NULL)
-    p->encoding=DestroyString(p->encoding);
-  if (p->foundry != (char *) NULL)
-    p->foundry=DestroyString(p->foundry);
-  if (p->format != (char *) NULL)
-    p->format=DestroyString(p->format);
-  if (p->metrics != (char *) NULL)
-    p->metrics=DestroyString(p->metrics);
-  if (p->glyphs != (char *) NULL)
-    p->glyphs=DestroyString(p->glyphs);
+  p->path=DestroyString(p->path);
+  p->name=DestroyString(p->name);
+  p->description=DestroyString(p->description);
+  p->family=DestroyString(p->family);
+  p->encoding=DestroyString(p->encoding);
+  p->foundry=DestroyString(p->foundry);
+  p->format=DestroyString(p->format);
+  p->metrics=DestroyString(p->metrics);
+  p->glyphs=DestroyString(p->glyphs);
   return(RelinquishMagickMemory(p));
 }
 
