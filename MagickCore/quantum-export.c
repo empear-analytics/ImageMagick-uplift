@@ -6520,6 +6520,30 @@ static void ExportCMYKFamilyQuantum(const Image *image,
   }
 }
 
+static void ExportIndexFamilyQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumType quantum_type,
+  QuantumPixelSpan span,ExceptionInfo *exception)
+{
+  switch (quantum_type)
+  {
+    case IndexQuantum:
+    {
+      ExportIndexQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    case IndexAlphaQuantum:
+    {
+      ExportIndexAlphaQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    default:
+    {
+      ExportCMYKFamilyQuantum(image,quantum_info,quantum_type,span,exception);
+      break;
+    }
+  }
+}
+
 MagickExport size_t ExportQuantumPixels(const Image *image,
   CacheView *image_view,QuantumInfo *quantum_info,
   const QuantumType quantum_type,unsigned char *magick_restrict pixels,
@@ -6579,19 +6603,9 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
       ExportAlphaQuantum(image,quantum_info,&span,exception);
       break;
     }
-    case IndexQuantum:
-    {
-      ExportIndexQuantum(image,quantum_info,&span,exception);
-      break;
-    }
-    case IndexAlphaQuantum:
-    {
-      ExportIndexAlphaQuantum(image,quantum_info,&span,exception);
-      break;
-    }
     default:
     {
-      ExportCMYKFamilyQuantum(image,quantum_info,quantum_type,span,exception);
+      ExportIndexFamilyQuantum(image,quantum_info,quantum_type,span,exception);
       break;
     }
   }
