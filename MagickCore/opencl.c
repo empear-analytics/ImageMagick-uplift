@@ -1044,6 +1044,25 @@ static void ReadOpenCLBenchmarkAttribute(const OpenCLBenchmarkTokens *tokens,
   SetOpenCLBenchmarkAttribute((*device_benchmark),keyword,token);
 }
 
+static MagickBooleanType SkipOpenCLBenchmarkMarkup(const char *keyword,
+  const size_t extent,char *token,const char **q)
+{
+  if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
+    {
+      (*q)=SkipOpenCLBenchmarkDoctype((*q));
+      return(MagickTrue);
+    }
+  if (LocaleNCompare(keyword,"<!--",4) == 0)
+    {
+      /*
+        Comment element.
+      */
+      (*q)=SkipOpenCLBenchmarkComment((*q),extent,token);
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
 {
   char
@@ -1076,19 +1095,8 @@ static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
     if (*token == '\0')
       break;
     (void) CopyMagickString(keyword,token,MagickPathExtent);
-    if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
-      {
-        q=SkipOpenCLBenchmarkDoctype(q);
-        continue;
-      }
-    if (LocaleNCompare(keyword,"<!--",4) == 0)
-      {
-        /*
-          Comment element.
-        */
-        q=SkipOpenCLBenchmarkComment(q,extent,token);
-        continue;
-      }
+    if (SkipOpenCLBenchmarkMarkup(keyword,extent,token,&q) != MagickFalse)
+      continue;
     if (LocaleCompare(keyword,"<device") == 0)
       {
         /*
