@@ -375,6 +375,38 @@ static void XRestrictVisualByScreen(Display *display,
       (*visual_mask)|=VisualDepthMask;
 }
 
+static MagickBooleanType XGetStandardColormapList(Display *display,
+  const char *map_type,XResourceInfo *resource_info,
+  const StandardColormapTargets *targets)
+{
+  Status
+    *const status = targets->status;
+
+  int
+    *const number_maps = targets->number_maps;
+
+  Window
+    root_window;
+
+  /*
+    Choose a visual associated with a standard colormap.
+  */
+  root_window=XRootWindow(display,XDefaultScreen(display));
+  (*status)=False;
+  (*number_maps)=0;
+  if (LocaleCompare(map_type,"list") != 0)
+    XGetNamedStandardColormap(display,root_window,map_type,targets);
+  else
+    XGetListedStandardColormap(display,root_window,resource_info,targets);
+  if ((*status) == False)
+    {
+      ThrowXWindowException(XServerError,"UnableToGetStandardColormap",
+        map_type);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 typedef struct _StandardColormapSearch
 {
   XVisualInfo
@@ -484,31 +516,15 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
       Status
         status;
 
-      Window
-        root_window;
-
       XStandardColormap
         *map_list;
 
       const StandardColormapTargets
         targets = { &status,&map_list,&number_maps };
 
-      /*
-        Choose a visual associated with a standard colormap.
-      */
-      root_window=XRootWindow(display,XDefaultScreen(display));
-      status=False;
-      number_maps=0;
-      if (LocaleCompare(map_type,"list") != 0)
-        XGetNamedStandardColormap(display,root_window,map_type,&targets);
-      else
-        XGetListedStandardColormap(display,root_window,resource_info,&targets);
-      if (status == False)
-        {
-          ThrowXWindowException(XServerError,"UnableToGetStandardColormap",
-            map_type);
-          return((XVisualInfo *) NULL);
-        }
+      if (XGetStandardColormapList(display,map_type,resource_info,&targets) ==
+          MagickFalse)
+        return((XVisualInfo *) NULL);
       /*
         Search all Standard Colormaps and visuals for ids that match.
       */
