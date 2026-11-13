@@ -733,32 +733,13 @@ static inline MagickBooleanType IsRegionLargerThanImage(const Image *image,
     (region_info->height > image->rows)) ? MagickTrue : MagickFalse);
 }
 
-MagickExport MagickStatusType ParseGravityGeometry(const Image *image,
-  const char *geometry,RectangleInfo *region_info,ExceptionInfo *exception)
+static MagickStatusType AdjustGravityRegion(const Image *image,
+  RectangleInfo *region_info,const MagickStatusType flags)
 {
-  MagickStatusType
-    flags;
-
   size_t
     height,
     width;
 
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",geometry);
-  if ((geometry == (char *) NULL) || (*geometry == '\0'))
-    return(NoValue);
-  SetPageGeometryDefaults(image,region_info);
-  flags=ParseAbsoluteGeometry(geometry,region_info);
-  if (flags == NoValue)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-        "InvalidGeometry","`%s'",geometry);
-      return(flags);
-    }
-  if ((flags & PercentValue) != 0)
-    flags=SetPercentRegion(image,geometry,region_info,flags);
-  if ((flags & AspectRatioValue) != 0)
-    flags=SetAspectRatioRegion(image,geometry,region_info,flags);
   /*
     Adjust offset according to gravity setting.
   */
@@ -784,6 +765,31 @@ MagickExport MagickStatusType ParseGravityGeometry(const Image *image,
   region_info->width=width;
   region_info->height=height;
   return(flags);
+}
+
+MagickExport MagickStatusType ParseGravityGeometry(const Image *image,
+  const char *geometry,RectangleInfo *region_info,ExceptionInfo *exception)
+{
+  MagickStatusType
+    flags;
+
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",geometry);
+  if ((geometry == (char *) NULL) || (*geometry == '\0'))
+    return(NoValue);
+  SetPageGeometryDefaults(image,region_info);
+  flags=ParseAbsoluteGeometry(geometry,region_info);
+  if (flags == NoValue)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "InvalidGeometry","`%s'",geometry);
+      return(flags);
+    }
+  if ((flags & PercentValue) != 0)
+    flags=SetPercentRegion(image,geometry,region_info,flags);
+  if ((flags & AspectRatioValue) != 0)
+    flags=SetAspectRatioRegion(image,geometry,region_info,flags);
+  return(AdjustGravityRegion(image,region_info,flags));
 }
 
 
