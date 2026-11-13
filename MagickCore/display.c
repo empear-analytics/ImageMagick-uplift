@@ -13840,6 +13840,14 @@ static void XPasteStep(const PasteCommandInput *input,const Cursor cursor,
   XPasteEvent(input,&event,cursor,targets);
 }
 
+static const ModeType
+  PasteCommandTable[] =
+  {
+    PasteOperatorsCommand,
+    PasteHelpCommand,
+    PasteDismissCommand
+  };
+
 static MagickBooleanType XPasteImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -13851,14 +13859,6 @@ static MagickBooleanType XPasteImage(Display *display,
       "Help",
       "Dismiss",
       (char *) NULL
-    };
-
-  static const ModeType
-    PasteCommands[] =
-    {
-      PasteOperatorsCommand,
-      PasteHelpCommand,
-      PasteDismissCommand
     };
 
   static CompositeOperator
@@ -13885,7 +13885,7 @@ static MagickBooleanType XPasteImage(Display *display,
 
   const PasteCommandInput
     command_input = { display, resource_info, windows, PasteMenu,
-      PasteCommands, image, exception };
+      PasteCommandTable, image, exception };
 
   /*
     Copy image.
