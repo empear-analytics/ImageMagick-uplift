@@ -1021,6 +1021,14 @@ static void ScaleClonePage(Image *clone_image,const Image *image,
     (double) image->tile_offset.y-0.5));
 }
 
+static void CloneMontageStrings(Image *clone_image,const Image *image)
+{
+  if (image->montage != (char *) NULL)
+    (void) CloneString(&clone_image->montage,image->montage);
+  if (image->directory != (char *) NULL)
+    (void) CloneString(&clone_image->directory,image->directory);
+}
+
 MagickExport Image *CloneImage(const Image *image,const size_t columns,
   const size_t rows,const MagickBooleanType detach,ExceptionInfo *exception)
 {
@@ -1049,10 +1057,7 @@ MagickExport Image *CloneImage(const Image *image,const size_t columns,
     ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
   if ((columns == 0) || (rows == 0))
     {
-      if (image->montage != (char *) NULL)
-        (void) CloneString(&clone_image->montage,image->montage);
-      if (image->directory != (char *) NULL)
-        (void) CloneString(&clone_image->directory,image->directory);
+      CloneMontageStrings(clone_image,image);
       clone_image->cache=ReferencePixelCache(image->cache);
       return(clone_image);
     }
