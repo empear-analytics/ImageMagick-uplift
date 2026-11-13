@@ -719,6 +719,20 @@ static void SetPageGeometryDefaults(const Image *image,
     region_info->height=image->page.height;
 }
 
+static inline MagickBooleanType IsRegionSmallerThanImage(const Image *image,
+  const RectangleInfo *region_info)
+{
+  return(((region_info->width < image->columns) &&
+    (region_info->height < image->rows)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsRegionLargerThanImage(const Image *image,
+  const RectangleInfo *region_info)
+{
+  return(((region_info->width > image->columns) &&
+    (region_info->height > image->rows)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickStatusType ParseGravityGeometry(const Image *image,
   const char *geometry,RectangleInfo *region_info,ExceptionInfo *exception)
 {
@@ -756,15 +770,13 @@ MagickExport MagickStatusType ParseGravityGeometry(const Image *image,
     region_info->height=image->page.height | image->rows;
   GravityAdjustGeometry(image->columns,image->rows,image->gravity,region_info);
   if ((flags & LessValue) != 0)
-    if ((region_info->width < image->columns) &&
-        (region_info->height < image->rows))
+    if (IsRegionSmallerThanImage(image,region_info) != MagickFalse)
       {
         SetGeometry(image,region_info);
         return(NoValue);
       }
   if ((flags & GreaterValue) != 0)
-    if ((region_info->width > image->columns) &&
-        (region_info->height > image->rows))
+    if (IsRegionLargerThanImage(image,region_info) != MagickFalse)
       {
         SetGeometry(image,region_info);
         return(NoValue);
