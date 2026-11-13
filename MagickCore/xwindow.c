@@ -1952,6 +1952,14 @@ static void SetDitherEntries(const XDitherTables tables)
   }
 }
 
+static int AdvanceDitherColumn(int j)
+{
+  j++;
+  if (j == 16)
+    j=0;
+  return(j);
+}
+
 static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
 {
   static const short int
@@ -2051,9 +2059,7 @@ static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
         (((size_t) color.blue & 0xc0) >> 6));
       *q++=(char) pixel;
       p+=(ptrdiff_t) GetPixelChannels(image);
-      j++;
-      if (j == 16)
-        j=0;
+      j=AdvanceDitherColumn(j);
     }
     q+=(ptrdiff_t) scanline_pad;
     i++;
