@@ -13108,6 +13108,133 @@ Added by Claude Code (Claude Sonnet 5.5) under the owner's leave to evolve the r
 
 ---
 
+## Recipe EX - Dispatch the Exits of an Extracted Block Through a Result Code
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Complex Method* or *Large Method*, and
+the block that would fix it stands in the body of a sequential loop, is followed by
+statements that stay, and leaves through several different exits besides falling off its end:
+`continue;` of the loop and two or more `return(R);` whose expressions differ, as
+`layer.c`'s `OptimizeLayerFrames` does for its choice of disposal (an unchanged frame
+`continue`s, a failed duplicate trial returns one cleanup call, a failed background trial
+returns another).
+
+**Not covered by:** Recipe CR, whose returns are one constant; Recipe BR, whose `return`s
+share one expression and whose other exit is `break;`; Recipe LC, whose block has no
+`return`; Recipes I, V, W and RV, whose block has one `return(R);` or one `goto`.
+
+**How:**
+
+1. The block lies outside every OpenMP region and contains no `#pragma` line; the innermost
+   loop around it is a sequential loop `Lp`; it contains no `goto` and no `break` that leaves
+   it, every `continue;` that leaves it continues `Lp`, and every `return` in it is `return(R);`.
+   A `break` or `continue` of a loop or `switch` nested inside it stays as it is. List its
+   exits: each `continue;` is one, each distinct text of `R` is one, and falling off its end
+   is the last. At least two of the first kind must stand.
+2. Each `R` names only variables of the caller and constants, never a local the block
+   declares, and has no operand the block writes by copy: a variable the block writes is
+   written through a pointer (step 3), so that the caller, evaluating `R` after the call,
+   reads what the `return` would have read. Nothing runs between the exit and the caller's
+   copy of it but the helper's own return.
+3. The variables of the caller that the block writes and the caller (or an `R`) reads
+   afterwards go by pointer under the rules of Recipe I step 2 (plain locals whose address
+   the caller takes only for the `const` targets struct, read by nothing else) in the
+   members of a `const` targets struct of Recipe I, LB step 8 or CT step 3 that the caller
+   already declares, each member bound once and every use written `(*v)`, an `&v` handed on
+   written `v`; a variable the block writes before it reads it and nothing reads after is
+   declared in the new function (Recipe E step 4); variables the block declares move with it.
+   A `continue;` that follows `i++;` takes that write with it, through the pointer.
+4. Declare a `typedef enum` directly above the new function with one enumerator per exit
+   and one for falling off the end, named for what the exit does. Cut the block into a new
+   `static` function of that type, directly above the caller. Each `continue;` and each
+   `return(R);` becomes `return(<its enumerator>);`, the function ends with `return(<the
+   fall-through enumerator>);`, and nothing else in the text changes. Inputs come from the
+   `const` input struct the caller already fills (Recipe N step 8's siblings, `&name` in
+   the block becoming `name`) and the targets struct: at most four parameters.
+5. Where the block stood, write `switch (Helper(...))` with one `case` per exit that is not
+   the fall-through, holding the exit's original statement unchanged (`continue;`,
+   `return(R);`), and `default: break;`. `continue;` in the `switch` continues `Lp`, as it did.
+6. Check by reading that every exit has its enumerator, that each `case` holds the text of
+   its exit, and every argument against its parameter.
+7. Pass-through (2026-11-13, the helper's own branch). When the block is the whole body of
+   the last branch of an `if`/`else` that ends a function made under this recipe, the
+   function's closing statement is `return(<fall-through enumerator>);`, and every exit of the
+   block is a `return(<enumerator>);` of that function's own enumeration type, the new
+   function (made under steps 3 and 4, with the same enumerators for the same exits, and the
+   fall-through enumerator for falling off) is called as `return(Helper(...));` in place of
+   the block, and step 5's `switch` is not written: each path returns the enumerator it
+   returned before.
+8. Evidence: the oracle, with the lines of each exit that the whole catalogue reaches named
+   from the coverage run, and each exit it does not reach checked by reading;
+   `refactor_guard.py --calls` and `ci_linux_warnings.sh` (MSVC C4702: no statement follows a
+   `switch` whose every path returns, and none follows here).
+
+**Before:**
+
+```c
+    if ( bounds[i].x < 0 ) {
+      if (MarkDeletedFrame(add_frames,i,disposals,bounds) == MagickFalse)
+        {
+          i++;
+          continue;
+        }
+    }
+    else
+      {
+        cleared=TryPreviousDisposal(&trial,cleared);
+        dup_bounds.width=dup_bounds.height=0;
+        if (TryDuplicateFrame(&trial,&targets) == MagickFalse)
+          return(ReleaseFrameListsAndPrevious(bounds,disposals,prev_image));
+        if (TryBackgroundDisposal(&trial,dup_bounds,&targets) == MagickFalse)
+          return(ReleaseFrameListsAndImages(bounds,disposals,prev_image,
+            dup_image));
+      }
+```
+
+**After:**
+
+```c
+    switch (SelectFrameDisposal(&trial,&targets))
+    {
+      case FrameDisposalSkipped:
+        continue;
+      case FrameDisposalPreviousFailed:
+        return(ReleaseFrameListsAndPrevious(bounds,disposals,prev_image));
+      case FrameDisposalImagesFailed:
+        return(ReleaseFrameListsAndImages(bounds,disposals,prev_image,
+          dup_image));
+      default:
+        break;
+    }
+```
+
+**Careful:**
+
+- Every path through the block ends at one of its exits or falls off its end. After, the
+  helper runs the same statements in the same order up to that exit and returns its code;
+  the caller then runs the exit's own statement. No statement runs between the two, so the
+  caller's `continue;` or `return(R);` is the one the block would have run.
+- `R` is evaluated in the caller instead of inside the block: step 2 requires it to name only
+  caller variables and constants, and every variable the block wrote is written through a
+  pointer, so the value `R` reads is the one it read in the block.
+- A `return` that leaves the function ends the iteration and the loop in the caller as before;
+  the caller's `continue;` sits inside a `switch`, and `continue` ignores a `switch`.
+- The exits that no case reaches (allocation failures, here) are checked by reading, one
+  enumerator against one `case`.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` and steps 2, 3 and 6 checked by
+reading.
+
+**Provenance:** 2026-11-13, from `layer.c`'s `OptimizeLayerFrames` (campaign A, W21 lane b):
+the `if (bounds[i].x < 0) {...} else {...}` choice holds both of the function's remaining
+bumps (a nested `if` with `i++; continue;`, and two failure returns with different
+cleanups inside the `else`), and BR, CR, I and LC each refuse it. The choice as a helper
+with the dispatch in the caller keeps the two bumps in the helper, 8.82 to 8.85; its `else`
+body as a second helper under step 7, called as `return(TryFrameTrials(...));`, 8.85 to 8.92,
+no finding on either helper. Added by Claude Code (Claude
+Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -13533,3 +13660,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | O | Step 2: a block-scope `static` that the static clause admits (arithmetic, enumeration, pointer or structure type) may also have its address passed elsewhere in the caller, outside the block, to calls that keep no copy of it, as a plain local may; the helper's pointer is then the only one in use while it runs | `xwindow-visual.c`'s `XBestVisualInfo` (campaign A, W21 lane c, wide build): the visual-type ladder writes `visual_mask` and the members `klass` and `visualid` of `static XVisualInfo visual_template`, whose address also goes to `XGetVisualInfo` (reads the template, stores no pointer); the clause as written (address taken nowhere else) refused it | owner |
 | 2026-11-13 | NEW | CQ | Name a Selection of Calls Over Its Condition: sites `if (C) F(...); else G(...);` (one call per branch, `C` an `int` condition that may call read-only functions, the other arguments free of side effects and traps) become calls of one `static inline void` helper taking `C`'s value as `const int selected` and the sites' differing arguments; *Careful* gives the argument (`C` evaluated once before either branch, the other arguments evaluated in the branch not taken too with no effect); proof: the oracle, `--calls`, `nm` for inlining, and a timing (at most 3% slower) | `magnify.c`'s `Scale3X` (campaign A, W21 lane d): eight `if (C) CopyPixels(&magnify,a,d); else CopyPixels(&magnify,4,d);` over `PixelsEqual` and `IsScale3X*Edge` conditions, cc 12; Recipe NS refuses a call in the condition and the owner's `?:` fold for magnify (2026-11-12) leaves the decisions in place. A probe: 8.84 to 9.09 | owner |
 | 2026-11-13 | AMEND | CQ | Step 7: a site that is one call whose argument is a parenthesised `(C ? a : k)`, `k` the literal the helper's else branch passes, becomes the helper's call (`C != 0` for a `C` that is not an `int`); *Careful* gives the argument (the same selection with the call written once; `C` evaluated once) | `magnify.c`'s `Eagle3X` (three sites) and `Eagle3XB` (four): `CopyPixels(&magnify,(ssize_t) (corner_tr ? 1 : 4),2);` with `corner_tr` a `ssize_t` holding a comparison, beside `Scale3X`'s if/else sites; a probe: the file 9.38 to 10.0 together with `Scale2X` and Recipe P on `IsEpbx2XBlendable` | owner |
+| 2026-11-13 | NEW | EX | Dispatch the Exits of an Extracted Block Through a Result Code: a block in a sequential loop body that leaves by `continue;` and by `return(R);` with different `R` (or by several `return`s) becomes a function returning an enumerator per exit, and the caller's `switch` runs each exit's original statement. *Careful* gives the argument (same statements up to the exit, nothing between the helper's return and the caller's exit, `R` read from caller variables written through pointers) | `layer.c`'s `OptimizeLayerFrames` (campaign A, W21 lane b): the `bounds[i].x < 0` choice with its two cleanup returns and its `i++; continue;`; BR, CR, I and LC refuse it; 8.82 to 8.85 with the choice as one helper, 8.92 with step 7's pass-through on its `else` body | owner |
