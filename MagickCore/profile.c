@@ -1116,6 +1116,19 @@ static const StringInfo *SyncsRGBImageProfile(Image *image,
 #ifndef TYPE_XYZ_8
   #define TYPE_XYZ_8 (COLORSPACE_SH(PT_XYZ)|CHANNELS_SH(3)|BYTES_SH(1))
 #endif
+#if defined(MAGICKCORE_LCMS_DELEGATE)
+static void SyncProfileView(CacheView *image_view,ExceptionInfo *exception,
+  MagickBooleanType *status)
+{
+  MagickBooleanType
+    sync;
+
+  sync=SyncCacheViewAuthenticPixels(image_view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+}
+#endif
+
 #define ThrowProfileException(severity,tag,context) \
 { \
   if (profile != (StringInfo *) NULL) \
@@ -1496,9 +1509,6 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
               const int
                 id = GetOpenMPThreadId();
 
-              MagickBooleanType
-                sync;
-
               Quantum
                 *magick_restrict q;
 
@@ -1517,9 +1527,7 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
               else
                 TransformQuantumPixels(id,image,&source_info,&target_info,
                   transform,q);
-              sync=SyncCacheViewAuthenticPixels(image_view,exception);
-              if (sync == MagickFalse)
-                status=MagickFalse;
+              SyncProfileView(image_view,exception,&status);
               if (image->progress_monitor != (MagickProgressMonitor) NULL)
                 {
                   MagickBooleanType
