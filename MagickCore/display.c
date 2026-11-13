@@ -15426,6 +15426,24 @@ static MagickBooleanType XRequestJPEGQuality(Display *display,
   return(MagickTrue);
 }
 
+static MagickBooleanType XSeekOverwritePermission(Display *display,
+  XWindows *windows,const char *filename)
+{
+  if (IsPathAccessible(filename) != MagickFalse)
+    {
+      int
+        status;
+
+      /*
+        File exists-- seek user's permission before overwriting.
+      */
+      status=XConfirmWidget(display,windows,"Overwrite",filename);
+      if (status <= 0)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType XSaveImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -15470,18 +15488,8 @@ static MagickBooleanType XSaveImage(Display *display,
   XFileBrowserWidget(display,windows,"Save",filename);
   if (*filename == '\0')
     return(MagickTrue);
-  if (IsPathAccessible(filename) != MagickFalse)
-    {
-      int
-        status;
-
-      /*
-        File exists-- seek user's permission before overwriting.
-      */
-      status=XConfirmWidget(display,windows,"Overwrite",filename);
-      if (status <= 0)
-        return(MagickTrue);
-    }
+  if (XSeekOverwritePermission(display,windows,filename) == MagickFalse)
+    return(MagickTrue);
   image_info=CloneImageInfo(resource_info->image_info);
   (void) CopyMagickString(image_info->filename,filename,MagickPathExtent);
   (void) SetImageInfo(image_info,1,exception);
