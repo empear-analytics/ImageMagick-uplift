@@ -118,6 +118,35 @@ static void AppendConfigurePathList(LinkedListInfo *paths,char *path,
     }
 }
 
+static void AppendXDGConfigPath(LinkedListInfo *paths,char *path,char *home)
+{
+  if (home != (char *) NULL)
+    {
+      /*
+        Search $XDG_CONFIG_HOME/ImageMagick.
+      */
+      (void) FormatLocaleString(path,MagickPathExtent,"%s%sImageMagick%s",
+        home,DirectorySeparator,DirectorySeparator);
+      (void) AppendValueToLinkedList(paths,ConstantString(path));
+      home=DestroyString(home);
+    }
+}
+
+static void AppendHomeConfigPath(LinkedListInfo *paths,char *path,char *home)
+{
+  if (home != (char *) NULL)
+    {
+      /*
+        Search $HOME/.config/ImageMagick.
+      */
+      (void) FormatLocaleString(path,MagickPathExtent,
+        "%s%s.config%sImageMagick%s",home,DirectorySeparator,
+        DirectorySeparator,DirectorySeparator);
+      (void) AppendValueToLinkedList(paths,ConstantString(path));
+      home=DestroyString(home);
+    }
+}
+
 MagickExport LinkedListInfo *GetConfigurePaths(const char *filename,
   ExceptionInfo *exception)
 {
@@ -250,28 +279,9 @@ MagickExport LinkedListInfo *GetConfigurePaths(const char *filename,
     if (home == (char *) NULL)
       home=GetEnvironmentValue("USERPROFILE");
 #endif
-    if (home != (char *) NULL)
-      {
-        /*
-          Search $XDG_CONFIG_HOME/ImageMagick.
-        */
-        (void) FormatLocaleString(path,MagickPathExtent,"%s%sImageMagick%s",
-          home,DirectorySeparator,DirectorySeparator);
-        (void) AppendValueToLinkedList(paths,ConstantString(path));
-        home=DestroyString(home);
-      }
+    AppendXDGConfigPath(paths,path,home);
     home=GetEnvironmentValue("HOME");
-    if (home != (char *) NULL)
-      {
-        /*
-          Search $HOME/.config/ImageMagick.
-        */
-        (void) FormatLocaleString(path,MagickPathExtent,
-          "%s%s.config%sImageMagick%s",home,DirectorySeparator,
-          DirectorySeparator,DirectorySeparator);
-        (void) AppendValueToLinkedList(paths,ConstantString(path));
-        home=DestroyString(home);
-      }
+    AppendHomeConfigPath(paths,path,home);
   }
 #if defined(MAGICKCORE_WINDOWS_SUPPORT)
   {
