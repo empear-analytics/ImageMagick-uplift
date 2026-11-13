@@ -4258,15 +4258,12 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
           if (IsImageBeyondDisplay(display,window) != MagickFalse)
               resize_image=ResizeImage(window->image,width,height,
                 image->filter,exception);
+          else if (window->image->storage_class == PseudoClass)
+            resize_image=SampleImage(window->image,width,height,
+              exception);
           else
-            {
-              if (window->image->storage_class == PseudoClass)
-                resize_image=SampleImage(window->image,width,height,
-                  exception);
-              else
-                resize_image=ThumbnailImage(window->image,width,height,
-                  exception);
-            }
+            resize_image=ThumbnailImage(window->image,width,height,
+              exception);
           if (resize_image != (Image *) NULL)
             {
               if (window->image != image)
