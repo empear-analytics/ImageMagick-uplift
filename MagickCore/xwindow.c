@@ -4546,6 +4546,20 @@ static void XTransformWindowImage(const XWindowTransform *transform)
     XResizeWindowImage(transform);
 }
 
+#if defined(MAGICKCORE_HAVE_SHARED_MEMORY)
+static void XRemoveSharedSegment(XShmSegmentInfo *segment_info)
+{
+  if (segment_info[1].shmid >= 0)
+    {
+      if (segment_info[1].shmaddr != NULL)
+        (void) shmdt(segment_info[1].shmaddr);
+      (void) shmctl(segment_info[1].shmid,IPC_RMID,0);
+      segment_info[1].shmid=(-1);
+      segment_info[1].shmaddr=(char *) NULL;
+    }
+}
+#endif
+
 static XImage *XAttachSharedXImage(Display *display,XWindowInfo *window,
   XImage *ximage)
 {
@@ -4577,14 +4591,7 @@ static XImage *XAttachSharedXImage(Display *display,XWindowInfo *window,
           ximage->data=NULL;
           XDestroyImage(ximage);
           ximage=(XImage *) NULL;
-          if (segment_info[1].shmid >= 0)
-            {
-              if (segment_info[1].shmaddr != NULL)
-                (void) shmdt(segment_info[1].shmaddr);
-              (void) shmctl(segment_info[1].shmid,IPC_RMID,0);
-              segment_info[1].shmid=(-1);
-              segment_info[1].shmaddr=(char *) NULL;
-            }
+          XRemoveSharedSegment(segment_info);
         }
     }
 #endif
