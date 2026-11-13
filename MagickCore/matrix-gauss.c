@@ -324,6 +324,26 @@ static void EliminateColumn(const GaussJordanSystem *system,
       }
 }
 
+static void SwapPivotRows(const GaussJordanSystem *system,const ssize_t row,
+  const ssize_t column)
+{
+  long double
+    **const hp_matrix = system->hp_matrix;
+
+  double
+    **const vectors = system->vectors;
+
+  const size_t
+    rank = system->rank,
+    number_vectors = system->number_vectors;
+
+  if (row != column)
+    {
+      SwapMatrixRows(hp_matrix,rank,row,column);
+      SwapVectorEntries(vectors,number_vectors,row,column);
+    }
+}
+
 static void NormalizePivotRow(const GaussJordanSystem *system,
   const ssize_t column)
 {
@@ -422,11 +442,7 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
     if (IsSingularPivot(column,row,max) != MagickFalse)
       ThrowGaussJordanException();  /* Singular or nearly singular matrix */
     pivots[column]++;
-    if (row != column)
-      {
-        SwapMatrixRows(hp_matrix,rank,row,column);
-        SwapVectorEntries(vectors,number_vectors,row,column);
-      }
+    SwapPivotRows(&system,row,column);
     rows[i]=row;
     columns[i]=column;
     if (fabsl(hp_matrix[column][column]) < LDBL_MIN)
