@@ -10797,6 +10797,12 @@ and all.
    changed.
 5. The predicate is a label run (allowed as a *Complex Method* by the owner's ruling of
    2026-11-07); Recipe TB's membership form may make it a table, in a commit of its own.
+6. *Tail form (2026-11-13).* When the `switch` is the last statement of a `void`
+   function, a group whose body is statements that stay in the function followed by
+   its one `break;` (no other `break`, no `continue`, `goto` or `return`) leaves the
+   function as well: its `break;` goes to the end of the body. It may be peeled as `S`
+   = `{ <its statements>; return; }`: step 3 writes `if (Name(e) != MagickFalse)`
+   followed by that block, the statements unchanged, `break;` replaced by `return;`.
 
 **Before:**
 
@@ -13121,6 +13127,11 @@ keep every label.
    `WARN` for a count that dropped with every value present is the expected one);
    `--calls` shows the lookup added once. The function is not on a per-pixel path (check
    its callers by reading); otherwise time the step.
+7. *Kept groups (2026-11-13).* Groups of the form `v=x; break;` whose `x` is not a
+   numeric literal (a call such as `GetImageChannels(image)`) need not move: they stay,
+   labels and text unchanged, in a `switch (e)` that keeps them and the `default:` group,
+   and that `switch` is step 4's `else` branch. Only the literal groups go into the
+   table; step 5's script checks that the kept `switch` is the original without them.
 
 **Before:**
 
@@ -17414,3 +17425,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | BW | Reword a Banner's Repeated Parameter Text: after BF, one banner of a pair replaces its `o name: text` parameter items by prose that keeps every role and example; evidence guard (`obj_identical.sh` IDENTICAL); Lane: b | `memory.c`'s `GetMagickMemoryMethods` and `SetMagickMemoryMethods` (*Code Duplication* through identical items; probe 7.67 to 8.42) | owner |
 | 2026-11-13 | NEW | TP | Extract a Nested Test Path as a Predicate Writing One Local: `if (A) { S; if (B) { T; U } }` whose `S` and `T` only update one local becomes `if (Helper(...,&v) != MagickFalse) { U }`, the helper holding both tests and the updates through a pointer; evidence oracle; Lane: b | `compress-lzw.c`'s `LZWEncodeImage` (code-width block, whose tail calls the `OutputCode` macro; probe 9.92 to 10.0) | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | LP | Step 6: `e` may be `*p` (a character read, the predicate takes `const char`), and `B` may be statements that stay in the function ending in the group's one `break;`, which the `if` form drops; Lane: b | `token-isglob.c`'s `IsGlob` (six glob characters setting `status=MagickTrue; break;`, cc 11) | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | PL | Step 6, tail form: in a `void` function whose last statement is the `switch`, a group of statements ending in its one `break;` counts as leaving and is peeled as `{ <statements> return; }`; Lane: b | `quantum-type.c`'s `SetQuantumImageType` (seven colour-separation labels setting `image->type`) | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | KC | Step 7: groups `v=x; break;` with a non-literal `x` stay, with `default:`, in a kept `switch` that is step 4's `else` branch; Lane: b | `quantum-type.c`'s `GetQuantumChannels` (twelve literal channel counts and `MultispectralQuantum`'s `GetImageChannels(image)`) | mandate (2026-10-24) |
