@@ -26,6 +26,7 @@ $write sys$output "Making MagickCore..."
 $call Make accelerate.c
 $call Make animate.c
 $call Make annotate.c
+$call Make annotate-metrics.c
 $call Make artifact.c
 $call Make attribute.c
 $call Make attribute-hull.c

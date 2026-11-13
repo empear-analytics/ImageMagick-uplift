@@ -27,6 +27,7 @@ if ( ! GetOptions(
 #
 @srcs = ('animate.c',
 	 'annotate.c',
+	 'annotate-metrics.c',
 	 'attribute.c',
 	 'attribute-hull.c',
 	 'attribute-bounds.c',

@@ -81,6 +81,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/animate.h \
   MagickCore/animate-private.h \
   MagickCore/annotate.c \
+  MagickCore/annotate-metrics.c \
   MagickCore/annotate.h \
   MagickCore/artifact.c \
   MagickCore/artifact.h \
