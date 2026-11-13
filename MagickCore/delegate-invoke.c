@@ -125,15 +125,14 @@
 
 static inline MagickBooleanType IsImageInfoLetter(const char letter)
 {
-  return(((letter != '\0') && (strchr("aouS",letter) != (char *) NULL)) ?
-    MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((letter != '\0') && (strchr("aouS",letter)
+    != (char *) NULL)));
 }
 
 static inline MagickBooleanType IsImageLetter(const char letter)
 {
-  return(((letter != '\0') &&
-    (strchr("bdefghimpqrstwxyzACDFGHIMOPQTUWXY~@#",letter) != (char *) NULL)) ?
-    MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((letter != '\0') &&
+    (strchr("bdefghimpqrstwxyzACDFGHIMOPQTUWXY~@#",letter) != (char *) NULL)));
 }
 
 static const char *GetListProperty(const Image *image,const char letter,
@@ -526,8 +525,7 @@ static char *GetMagickPropertyLetter(ImageInfo *image_info,Image *image,
 
 static inline MagickBooleanType IsPropertyEnd(const char *p)
 {
-  return(((*p == '\0') || (*p == '\'') || (*p == '"')) ? MagickTrue :
-    MagickFalse);
+  return((MagickBooleanType) ((*p == '\0') || (*p == '\'') || (*p == '"')));
 }
 
 static void DecodeDelegateEscape(const char **p,char **q)
@@ -874,9 +872,8 @@ static inline MagickBooleanType IsKeptDestination(
   const MagickBooleanType overwrite,const char *destination,
   struct stat *attributes)
 {
-  return(((overwrite == MagickFalse) &&
-    (GetPathAttributes(destination,attributes) != MagickFalse)) ? MagickTrue :
-    MagickFalse);
+  return((MagickBooleanType) ((overwrite == MagickFalse) &&
+    (GetPathAttributes(destination,attributes) != MagickFalse)));
 }
 
 static size_t GetDelegateCopyQuantum(const int source_file)
@@ -1002,10 +999,11 @@ static MagickBooleanType CopyDelegateFile(const char *source,
 static inline MagickBooleanType IsTwoStepDelegate(
   const DelegateInfo *delegate_info,const char *decode,const char *encode)
 {
-  return(((delegate_info->mode != 0) && (((decode != (const char *) NULL) &&
+  return((MagickBooleanType) ((delegate_info->mode != 0) &&
+    (((decode != (const char *) NULL) &&
     (delegate_info->encode != (char *) NULL)) ||
     ((encode != (const char *) NULL) &&
-    (delegate_info->decode != (char *) NULL)))) ? MagickTrue : MagickFalse);
+    (delegate_info->decode != (char *) NULL)))));
 }
 
 static void WaitForDelegateInput(const Image *image)
@@ -1337,9 +1335,9 @@ static MagickBooleanType AcquireDelegateOutputFilename(ImageInfo *image_info,
 
 static inline MagickBooleanType IsDelegateNameDenied(const char *name)
 {
-  return(((name != (const char *) NULL) &&
+  return((MagickBooleanType) ((name != (const char *) NULL) &&
     (IsRightsAuthorized(DelegatePolicyDomain,ExecutePolicyRights,name) ==
-     MagickFalse)) ? MagickTrue : MagickFalse);
+     MagickFalse)));
 }
 
 static MagickBooleanType AuthorizeDelegateNames(const char *decode,
@@ -1473,7 +1471,7 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   OpenInvokeDelegate(image_info,image);
   if (AuthorizeDelegateNames(decode,encode,exception) == MagickFalse)
     return(MagickFalse);
-  temporary=(*image->filename == '\0') ? MagickTrue : MagickFalse;
+  temporary=(MagickBooleanType) (*image->filename == '\0');
   if (AcquireDelegateInputFilename(image,temporary,exception) == MagickFalse)
     return(MagickFalse);
   delegate_info=GetDelegateInfo(decode,encode,exception);
