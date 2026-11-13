@@ -170,6 +170,65 @@ static const char
    visual_info->red_mask | visual_info->green_mask | visual_info->blue_mask : \
    (unsigned long) visual_info->colormap_size),1UL << visual_info->depth)
 
+typedef struct _StandardColormapTargets
+{
+  Status
+    *status;
+
+  XStandardColormap
+    **map_list;
+
+  int
+    *number_maps;
+} StandardColormapTargets;
+
+static void XGetListedStandardColormap(Display *display,
+  const Window root_window,XResourceInfo *resource_info,
+  const StandardColormapTargets *targets)
+{
+  Atom
+    map_property;
+
+  int
+    i;
+
+  Status
+    *const status = targets->status;
+
+  XStandardColormap
+    **const map_list = targets->map_list;
+
+  int
+    *const number_maps = targets->number_maps;
+
+  static const char
+    *colormap[MaxStandardColormaps]=
+    {
+      "_HP_RGB_SMOOTH_MAP_LIST",
+      "RGB_BEST_MAP",
+      "RGB_DEFAULT_MAP",
+      "RGB_GRAY_MAP",
+      "RGB_RED_MAP",
+      "RGB_GREEN_MAP",
+      "RGB_BLUE_MAP",
+    };
+
+  /*
+    Choose a standard colormap from a list.
+  */
+  for (i=0; i < MaxStandardColormaps; i++)
+  {
+    map_property=XInternAtom(display,(char *) colormap[i],MagickTrue);
+    if (map_property == (Atom) NULL)
+      continue;
+    (*status)=XGetRGBColormaps(display,root_window,map_list,number_maps,
+      map_property);
+    if ((*status) != False)
+      break;
+  }
+  resource_info->color_recovery=i == 0 ? MagickTrue : MagickFalse;
+}
+
 MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
   XStandardColormap *map_info,XResourceInfo *resource_info)
 {
@@ -315,6 +374,9 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
       XStandardColormap
         *map_list;
 
+      const StandardColormapTargets
+        targets = { &status,&map_list,&number_maps };
+
       /*
         Choose a visual associated with a standard colormap.
       */
@@ -335,34 +397,7 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
               map_property);
         }
       else
-        {
-          static const char
-            *colormap[MaxStandardColormaps]=
-            {
-              "_HP_RGB_SMOOTH_MAP_LIST",
-              "RGB_BEST_MAP",
-              "RGB_DEFAULT_MAP",
-              "RGB_GRAY_MAP",
-              "RGB_RED_MAP",
-              "RGB_GREEN_MAP",
-              "RGB_BLUE_MAP",
-            };
-
-          /*
-            Choose a standard colormap from a list.
-          */
-          for (i=0; i < MaxStandardColormaps; i++)
-          {
-            map_property=XInternAtom(display,(char *) colormap[i],MagickTrue);
-            if (map_property == (Atom) NULL)
-              continue;
-            status=XGetRGBColormaps(display,root_window,&map_list,&number_maps,
-              map_property);
-            if (status != False)
-              break;
-          }
-          resource_info->color_recovery=i == 0 ? MagickTrue : MagickFalse;
-        }
+        XGetListedStandardColormap(display,root_window,resource_info,&targets);
       if (status == False)
         {
           ThrowXWindowException(XServerError,"UnableToGetStandardColormap",
