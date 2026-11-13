@@ -5083,6 +5083,62 @@ static MagickBooleanType XCreateBlendMattes(Image *image,Image *composite_image,
   return(MagickTrue);
 }
 
+typedef struct _CompositeCommandInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  const ModeType
+    *CompositeCommands;
+} CompositeCommandInput;
+
+static void XCompositeControl(const CompositeCommandInput *input,const int id,
+  size_t *state)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  const ModeType
+    *const CompositeCommands = input->CompositeCommands;
+
+  switch (CompositeCommands[id])
+  {
+    case CompositeHelpCommand:
+    {
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXcopy);
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Composite",ImageCompositeHelp);
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXinvert);
+      break;
+    }
+    case CompositeDismissCommand:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType XCompositeImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -5149,6 +5205,9 @@ static MagickBooleanType XCompositeImage(Display *display,
 
   const CompositeTargets
     targets = { &blend, &compose };
+
+  const CompositeCommandInput
+    command_input = { display, resource_info, windows, CompositeCommands };
 
   /*
     Request image file name from user.
@@ -5245,27 +5304,11 @@ static MagickBooleanType XCompositeImage(Display *display,
               &targets);
             break;
           }
-          case CompositeHelpCommand:
-          {
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXcopy);
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Image Composite",ImageCompositeHelp);
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXinvert);
-            break;
-          }
-          case CompositeDismissCommand:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
           default:
+          {
+            XCompositeControl(&command_input,id,&state);
             break;
+          }
         }
         continue;
       }
