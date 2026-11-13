@@ -1130,6 +1130,26 @@ static void FormatEXIFTagIdKey(char *key,const size_t tag_value)
 static int
   tag_bytes[] = {0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8};
 
+static MagickBooleanType ReadEXIFMarker(const unsigned char **exif,
+  size_t *length,MagickBooleanType *broke)
+{
+  (*broke)=MagickFalse;
+  if (ReadPropertyByte(exif,length) != 0x45)
+    return(MagickFalse);
+  if (ReadPropertyByte(exif,length) != 0x78)
+    return(MagickFalse);
+  if (ReadPropertyByte(exif,length) != 0x69)
+    return(MagickFalse);
+  if (ReadPropertyByte(exif,length) != 0x66)
+    return(MagickFalse);
+  if (ReadPropertyByte(exif,length) != 0x00)
+    return(MagickFalse);
+  if (ReadPropertyByte(exif,length) != 0x00)
+    return(MagickFalse);
+  (*broke)=MagickTrue;
+  return(MagickTrue);
+}
+
 static void GetEXIFProperty(const Image *image,const char *property,
   ExceptionInfo *exception)
 {
@@ -1448,6 +1468,9 @@ static void GetEXIFProperty(const Image *image,const char *property,
   EndianType
     endian;
 
+  MagickBooleanType
+    broke = MagickFalse;
+
   size_t
     entry,
     length,
@@ -1555,19 +1578,10 @@ static void GetEXIFProperty(const Image *image,const char *property,
   exif=GetStringInfoDatum(profile);
   while (length != 0)
   {
-    if (ReadPropertyByte(&exif,&length) != 0x45)
+    if (ReadEXIFMarker(&exif,&length,&broke) == MagickFalse)
       continue;
-    if (ReadPropertyByte(&exif,&length) != 0x78)
-      continue;
-    if (ReadPropertyByte(&exif,&length) != 0x69)
-      continue;
-    if (ReadPropertyByte(&exif,&length) != 0x66)
-      continue;
-    if (ReadPropertyByte(&exif,&length) != 0x00)
-      continue;
-    if (ReadPropertyByte(&exif,&length) != 0x00)
-      continue;
-    break;
+    if (broke != MagickFalse)
+      break;
   }
   if (length < 16)
     return;
