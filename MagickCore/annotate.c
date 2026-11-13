@@ -2939,6 +2939,17 @@ static void SetPostscriptMetrics(const DrawInfo *draw_info,
   metrics->underline_thickness=1.0;
 }
 
+static void WritePostscriptFont(FILE *file,const DrawInfo *draw_info)
+{
+  if (IsValidPostscriptFontname(draw_info->font) == MagickFalse)
+    (void) FormatLocaleFile(file,
+      "/Times-Roman-ISO dup /Times-Roman ReencodeType findfont setfont\n");
+  else
+    (void) FormatLocaleFile(file,
+      "/%s-ISO dup /%s ReencodeType findfont setfont\n",draw_info->font,
+      draw_info->font);
+}
+
 static PointInfo GetPostscriptResolution(const DrawInfo *draw_info)
 {
   PointInfo
@@ -3032,13 +3043,7 @@ static MagickBooleanType RenderPostscript(Image *image,
     extent.x/2.0,extent.y/2.0);
   (void) FormatLocaleFile(file,"%g %g scale\n",draw_info->pointsize,
     draw_info->pointsize);
-  if (IsValidPostscriptFontname(draw_info->font) == MagickFalse)
-    (void) FormatLocaleFile(file,
-      "/Times-Roman-ISO dup /Times-Roman ReencodeType findfont setfont\n");
-  else
-    (void) FormatLocaleFile(file,
-      "/%s-ISO dup /%s ReencodeType findfont setfont\n",draw_info->font,
-      draw_info->font);
+  WritePostscriptFont(file,draw_info);
   (void) FormatLocaleFile(file,"[%g %g %g %g 0 0] concat\n",
     draw_info->affine.sx,-draw_info->affine.rx,-draw_info->affine.ry,
     draw_info->affine.sy);
