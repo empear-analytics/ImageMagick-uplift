@@ -3047,8 +3047,8 @@ static MagickBooleanType PushExifDirectory(const ExifWalkInfo *walk,
   return(MagickTrue);
 }
 
-static void SyncExifDirectory(const ExifWalkInfo *walk,
-  const ExifWalkTargets *targets)
+static MagickBooleanType SyncExifEntry(const ExifWalkInfo *walk,
+  const size_t number_entries,const ExifWalkTargets *targets)
 {
   const Image
     *const image = walk->image;
@@ -3072,6 +3072,75 @@ static void SyncExifDirectory(const ExifWalkInfo *walk,
   unsigned char
     **const exif_directory = targets->exif_directory;
 
+  ExifEntryInfo
+    exif_entry;
+
+  ExifTagInfo
+    exif_tag;
+
+  int
+    components;
+
+  unsigned char
+    *p,
+    *q;
+
+  size_t
+    number_bytes;
+
+  ssize_t
+    format;
+
+  unsigned short
+    tag_value;
+
+  const ExifEntryTargets
+    entry_targets = { &q, &tag_value, &format, &components, &number_bytes };
+
+  if (ReadExifEntry(walk,(*entry),&entry_targets) == MagickFalse)
+    return(MagickTrue);
+  exif_entry.endian=endian;
+  exif_entry.exif=exif;
+  exif_entry.length=length;
+  exif_entry.number_bytes=number_bytes;
+  exif_entry.q=q;
+  if (LocateExifEntryValue(&exif_entry,&p) == MagickFalse)
+    return(MagickFalse);
+  exif_tag.image=image;
+  exif_tag.endian=endian;
+  exif_tag.directory=directory;
+  exif_tag.ifd0=ifd0;
+  exif_tag.tag_value=tag_value;
+  exif_tag.format=format;
+  exif_tag.components=components;
+  exif_tag.number_bytes=number_bytes;
+  exif_tag.q=q;
+  exif_tag.p=p;
+  SyncExifTag(&exif_tag,(*exif_directory));
+  if (PushExifDirectory(walk,&exif_tag,number_entries,targets) !=
+      MagickFalse)
+    return(MagickTrue);
+  return(MagickFalse);
+}
+
+static void SyncExifDirectory(const ExifWalkInfo *walk,
+  const ExifWalkTargets *targets)
+{
+  const EndianType
+    endian = walk->endian;
+
+  unsigned char
+    *const exif = walk->exif;
+
+  const size_t
+    length = walk->length;
+
+  unsigned char
+    *const directory = walk->directory;
+
+  size_t
+    *const entry = targets->entry;
+
   size_t
     directory_length,
     number_entries;
@@ -3088,53 +3157,7 @@ static void SyncExifDirectory(const ExifWalkInfo *walk,
     return;
   for ( ; (*entry) < number_entries; (*entry)++)
   {
-    ExifEntryInfo
-      exif_entry;
-
-    ExifTagInfo
-      exif_tag;
-
-    int
-      components;
-
-    unsigned char
-      *p,
-      *q;
-
-    size_t
-      number_bytes;
-
-    ssize_t
-      format;
-
-    unsigned short
-      tag_value;
-
-    const ExifEntryTargets
-      entry_targets = { &q, &tag_value, &format, &components, &number_bytes };
-
-    if (ReadExifEntry(walk,(*entry),&entry_targets) == MagickFalse)
-      break;
-    exif_entry.endian=endian;
-    exif_entry.exif=exif;
-    exif_entry.length=length;
-    exif_entry.number_bytes=number_bytes;
-    exif_entry.q=q;
-    if (LocateExifEntryValue(&exif_entry,&p) == MagickFalse)
-      continue;
-    exif_tag.image=image;
-    exif_tag.endian=endian;
-    exif_tag.directory=directory;
-    exif_tag.ifd0=ifd0;
-    exif_tag.tag_value=tag_value;
-    exif_tag.format=format;
-    exif_tag.components=components;
-    exif_tag.number_bytes=number_bytes;
-    exif_tag.q=q;
-    exif_tag.p=p;
-    SyncExifTag(&exif_tag,(*exif_directory));
-    if (PushExifDirectory(walk,&exif_tag,number_entries,targets) !=
-        MagickFalse)
+    if (SyncExifEntry(walk,number_entries,targets) != MagickFalse)
       break;
   }
 }
