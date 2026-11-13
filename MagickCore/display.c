@@ -2728,6 +2728,9 @@ typedef struct _AnnotateContext
 
   const AnnotateRotateTargets
     *rotate_targets;
+
+  Cursor
+    cursor;
 } AnnotateContext;
 
 static void XSetAnnotateMenuInput(const AnnotateContext *context,const int id,
@@ -2922,6 +2925,26 @@ static void XAnnotatePointerEvent(const AnnotateContext *context,
   }
 }
 
+static void XAnnotateCommandBranch(const AnnotateContext *context,
+  const AnnotateTargets *targets)
+{
+  int
+    id;
+
+  XEvent
+    *const event = targets->event;
+
+  /*
+    Select a command from the Command widget.
+  */
+  id=XCommandWidget(context->display,context->windows,AnnotateMenu,event);
+  (void) XCheckDefineCursor(context->display,context->windows->image.id,
+    context->cursor);
+  if (id < 0)
+    return;
+  XAnnotatePointerCommand(context,targets,id);
+}
+
 static MagickBooleanType XAnnotateEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -3023,6 +3046,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
   context.font_color_targets=&font_color_targets;
   context.box_color_targets=&box_color_targets;
   context.rotate_targets=&rotate_targets;
+  context.cursor=cursor;
   do
   {
     if (windows->info.mapped != MagickFalse)
@@ -3040,14 +3064,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
     XScreenEvent(display,windows,&event,exception);
     if (event.xany.window == windows->command.id)
       {
-        /*
-          Select a command from the Command widget.
-        */
-        id=XCommandWidget(display,windows,AnnotateMenu,&event);
-        (void) XCheckDefineCursor(display,windows->image.id,cursor);
-        if (id < 0)
-          continue;
-        XAnnotatePointerCommand(&context,&targets,id);
+        XAnnotateCommandBranch(&context,&targets);
         continue;
       }
     XAnnotatePointerEvent(&context,&targets);
