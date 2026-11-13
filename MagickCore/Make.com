@@ -178,6 +178,7 @@ $call Make vms.c
 $call Make widget.c
 $call Make xml-tree.c
 $call Make xwindow.c
+$call Make xwindow-image.c
 $call Make xwindow-visual.c
 $call Make xwindow-import.c
 $ set default [-.filters]
