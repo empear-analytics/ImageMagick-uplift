@@ -3447,9 +3447,62 @@ static void StreamShortPixels(const StreamInfo *stream_info,const Image *image,
   StreamShortMapPixels(image,quantum_map,length,q);
 }
 
+typedef struct _StreamMapInfo
+{
+  char
+    key;
+
+  QuantumType
+    quantum;
+
+  MagickBooleanType
+    separation;
+} StreamMapInfo;
+
+static const StreamMapInfo *GetStreamMapInfo(const char key)
+{
+  static const StreamMapInfo
+    map_info[] =
+    {
+      { 'A', AlphaQuantum, MagickFalse },
+      { 'a', AlphaQuantum, MagickFalse },
+      { 'B', BlueQuantum, MagickFalse },
+      { 'b', BlueQuantum, MagickFalse },
+      { 'C', CyanQuantum, MagickTrue },
+      { 'c', CyanQuantum, MagickTrue },
+      { 'G', GreenQuantum, MagickFalse },
+      { 'g', GreenQuantum, MagickFalse },
+      { 'I', IndexQuantum, MagickFalse },
+      { 'i', IndexQuantum, MagickFalse },
+      { 'K', BlackQuantum, MagickTrue },
+      { 'k', BlackQuantum, MagickTrue },
+      { 'M', MagentaQuantum, MagickTrue },
+      { 'm', MagentaQuantum, MagickTrue },
+      { 'O', OpacityQuantum, MagickFalse },
+      { 'o', OpacityQuantum, MagickFalse },
+      { 'P', UndefinedQuantum, MagickFalse },
+      { 'p', UndefinedQuantum, MagickFalse },
+      { 'R', RedQuantum, MagickFalse },
+      { 'r', RedQuantum, MagickFalse },
+      { 'Y', YellowQuantum, MagickTrue },
+      { 'y', YellowQuantum, MagickTrue }
+    };
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) (sizeof(map_info)/sizeof(*map_info)); i++)
+    if (map_info[i].key == key)
+      return(map_info+i);
+  return((const StreamMapInfo *) NULL);
+}
+
 static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
   const Image *image,ExceptionInfo *exception)
 {
+  const StreamMapInfo
+    *map_info;
+
   QuantumInfo
     *quantum_info;
 
@@ -3479,102 +3532,22 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
   (void) memset(quantum_map,0,length*sizeof(*quantum_map));
   for (i=0; i < (ssize_t) length; i++)
   {
-    switch (stream_info->map[i])
-    {
-      case 'A':
-      case 'a':
-      {
-        quantum_map[i]=AlphaQuantum;
-        break;
-      }
-      case 'B':
-      case 'b':
-      {
-        quantum_map[i]=BlueQuantum;
-        break;
-      }
-      case 'C':
-      case 'c':
-      {
-        quantum_map[i]=CyanQuantum;
-        if (image->colorspace == CMYKColorspace)
-          break;
-        quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
-        (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-          "ColorSeparatedImageRequired","`%s'",stream_info->map);
-        return(MagickFalse);
-      }
-      case 'g':
-      case 'G':
-      {
-        quantum_map[i]=GreenQuantum;
-        break;
-      }
-      case 'I':
-      case 'i':
-      {
-        quantum_map[i]=IndexQuantum;
-        break;
-      }
-      case 'K':
-      case 'k':
-      {
-        quantum_map[i]=BlackQuantum;
-        if (image->colorspace == CMYKColorspace)
-          break;
-        quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
-        (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-          "ColorSeparatedImageRequired","`%s'",stream_info->map);
-        return(MagickFalse);
-      }
-      case 'M':
-      case 'm':
-      {
-        quantum_map[i]=MagentaQuantum;
-        if (image->colorspace == CMYKColorspace)
-          break;
-        quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
-        (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-          "ColorSeparatedImageRequired","`%s'",stream_info->map);
-        return(MagickFalse);
-      }
-      case 'o':
-      case 'O':
-      {
-        quantum_map[i]=OpacityQuantum;
-        break;
-      }
-      case 'P':
-      case 'p':
-      {
-        quantum_map[i]=UndefinedQuantum;
-        break;
-      }
-      case 'R':
-      case 'r':
-      {
-        quantum_map[i]=RedQuantum;
-        break;
-      }
-      case 'Y':
-      case 'y':
-      {
-        quantum_map[i]=YellowQuantum;
-        if (image->colorspace == CMYKColorspace)
-          break;
-        quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
-        (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-          "ColorSeparatedImageRequired","`%s'",stream_info->map);
-        return(MagickFalse);
-      }
-      default:
+    map_info=GetStreamMapInfo(stream_info->map[i]);
+    if (map_info == (const StreamMapInfo *) NULL)
       {
         quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
         (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
           "UnrecognizedPixelMap","`%s'",stream_info->map);
         return(MagickFalse);
       }
-    }
+    quantum_map[i]=map_info->quantum;
+    if ((map_info->separation == MagickFalse) ||
+        (image->colorspace == CMYKColorspace))
+      continue;
+    quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
+    (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
+      "ColorSeparatedImageRequired","`%s'",stream_info->map);
+    return(MagickFalse);
   }
   quantum_info=stream_info->quantum_info;
   switch (stream_info->storage_type)
