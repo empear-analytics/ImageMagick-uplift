@@ -261,6 +261,40 @@ static MagickCLEnv getOpenCLEnvironment(ExceptionInfo* exception)
   return(clEnv);
 }
 
+typedef enum
+{
+  BasicAccelerateCheck,
+  RGBAAccelerateCheck,
+  HistogramAccelerateCheck
+} AccelerateCheck;
+
+static MagickBooleanType checkAccelerateKind(const Image *image,
+  const AccelerateCheck check)
+{
+  if (check == BasicAccelerateCheck)
+    return(checkAccelerateCondition(image));
+  if (checkAccelerateConditionRGBA(image) == MagickFalse)
+    return(MagickFalse);
+  if (check == RGBAAccelerateCheck)
+    return(MagickTrue);
+  return(checkHistogramCondition(image,image->intensity));
+}
+
+static MagickCLEnv getAccelerateEnvironment(const Image *image,
+  const AccelerateCheck check,const char *trace_function,
+  ExceptionInfo *exception)
+{
+  assert(image != NULL);
+  assert(exception != (ExceptionInfo *) NULL);
+  if ((trace_function != (const char *) NULL) &&
+      (IsEventLogging() != MagickFalse))
+    (void) LogMagickEvent(TraceEvent,__FILE__,trace_function,(const size_t)
+      __LINE__,"%s",image->filename);
+  if (checkAccelerateKind(image,check) == MagickFalse)
+    return((MagickCLEnv) NULL);
+  return(getOpenCLEnvironment(exception));
+}
+
 static MagickBooleanType IsRGBAChannelMask(const Image *image)
 {
   return((((image->channel_mask & RedChannel) != 0) &&
@@ -493,6 +527,9 @@ static Image *ComputeBlurImage(const Image* image,MagickCLEnv clEnv,
     length,
     lsize[2];
 
+  if (clEnv == (MagickCLEnv) NULL)
+    return((Image *) NULL);
+
   queue=NULL;
   filteredImage=NULL;
   imageBuffer=NULL;
@@ -634,26 +671,8 @@ cleanup:
 MagickPrivate Image* AccelerateBlurImage(const Image *image,
   const double radius,const double sigma,ExceptionInfo *exception)
 {
-  Image
-    *filteredImage;
-
-  MagickCLEnv
-    clEnv;
-
-  assert(image != NULL);
-  assert(exception != (ExceptionInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-
-  if (checkAccelerateCondition(image) == MagickFalse)
-    return((Image *) NULL);
-
-  clEnv=getOpenCLEnvironment(exception);
-  if (clEnv == (MagickCLEnv) NULL)
-    return((Image *) NULL);
-
-  filteredImage=ComputeBlurImage(image,clEnv,radius,sigma,exception);
-  return(filteredImage);
+  return(ComputeBlurImage(image,getAccelerateEnvironment(image,
+    BasicAccelerateCheck,__func__,exception),radius,sigma,exception));
 }
 
 /*
