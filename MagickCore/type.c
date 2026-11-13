@@ -478,6 +478,15 @@ static const TypeInfo *GetBestFamilyTypeInfo(const char *family,
   return(type_info);
 }
 
+static inline size_t GetDefaultFontWeight(const size_t weight)
+{
+  size_t
+    font_weight;
+
+  font_weight=(size_t) (weight == 0 ? 400 : weight);
+  return(font_weight);
+}
+
 MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
   const StyleType style,const StretchType stretch,const size_t weight,
   ExceptionInfo *exception)
@@ -516,7 +525,7 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
   (void) GetTypeInfo("*",exception);
   if (type_cache == (SplayTreeInfo *) NULL)
     return((TypeInfo *) NULL);
-  font_weight=(size_t) (weight == 0 ? 400 : weight);
+  font_weight=GetDefaultFontWeight(weight);
   type_info=GetExactTypeInfo(family,style,stretch,font_weight);
   if (type_info != (const TypeInfo *) NULL)
     return(type_info);
