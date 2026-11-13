@@ -17402,6 +17402,52 @@ static void XInitializeBackgroundVisual(Display *display,const Image *image,
   (*window_info).matte_pixmap=(Pixmap) NULL;
 }
 
+static void XCreateBackgroundWindowInfo(Display *display,Image *image,
+  ExceptionInfo *exception,const BackgroundTargets *targets)
+{
+  XStandardColormap
+    **const map_info = targets->map_info;
+
+  XPixelInfo
+    *const pixel = targets->pixel;
+
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XVisualInfo
+    **const visual_info = targets->visual_info;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  XGCValues
+    context_values;
+
+  /*
+    Initialize Standard Colormap.
+  */
+  (*resources).colormap=SharedColormap;
+  XMakeStandardColormap(display,(*visual_info),resources,image,(*map_info),
+    pixel,exception);
+  /*
+    Graphic context superclass.
+  */
+  context_values.background=(*pixel).foreground_color.pixel;
+  context_values.foreground=(*pixel).background_color.pixel;
+  (*pixel).annotate_context=XCreateGC(display,(*window_info).id,
+    (size_t) (GCBackground | GCForeground),&context_values);
+  if ((*pixel).annotate_context == (GC) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
+      image->filename);
+  /*
+    Initialize Image window attributes.
+  */
+  (*window_info).name=AcquireString("\0");
+  (*window_info).icon_name=AcquireString("\0");
+  XGetWindowInfo(display,(*visual_info),(*map_info),pixel,(XFontStruct *) NULL,
+    resources,window_info);
+}
+
 MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *image,ExceptionInfo *exception)
 {
@@ -17430,9 +17476,6 @@ MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
 
   Window
     root_window;
-
-  XGCValues
-    context_values;
 
   XResourceInfo
     resources;
@@ -17467,29 +17510,7 @@ MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
   */
   if (window_info.id == root_window)
     (void) XDestroyWindowColors(display,root_window);
-  /*
-    Initialize Standard Colormap.
-  */
-  resources.colormap=SharedColormap;
-  XMakeStandardColormap(display,visual_info,&resources,image,map_info,&pixel,
-    exception);
-  /*
-    Graphic context superclass.
-  */
-  context_values.background=pixel.foreground_color.pixel;
-  context_values.foreground=pixel.background_color.pixel;
-  pixel.annotate_context=XCreateGC(display,window_info.id,
-    (size_t) (GCBackground | GCForeground),&context_values);
-  if (pixel.annotate_context == (GC) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
-      image->filename);
-  /*
-    Initialize Image window attributes.
-  */
-  window_info.name=AcquireString("\0");
-  window_info.icon_name=AcquireString("\0");
-  XGetWindowInfo(display,visual_info,map_info,&pixel,(XFontStruct *) NULL,
-    &resources,&window_info);
+  XCreateBackgroundWindowInfo(display,image,exception,&targets);
   /*
     Create the X image.
   */
