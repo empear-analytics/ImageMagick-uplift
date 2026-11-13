@@ -942,6 +942,13 @@ static inline MagickBooleanType IsEmptyImageSize(const Image *image)
     MagickFalse);
 }
 
+static inline MagickBooleanType IsSceneSelection(const ImageInfo *read_info,
+  const Image *image)
+{
+  return(((IsSceneGeometry(read_info->scenes,MagickFalse) != MagickFalse) &&
+    (GetImageListLength(image) != 1)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *ReadImage(const ImageInfo *image_info,
   ExceptionInfo *exception)
 {
@@ -1102,8 +1109,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
           }
       }
     }
-  if ((IsSceneGeometry(read_info->scenes,MagickFalse) != MagickFalse) &&
-      (GetImageListLength(image) != 1))
+  if (IsSceneSelection(read_info,image) != MagickFalse)
     {
       image=SelectImageScenes(image,read_info->scenes,exception);
       if (image == (Image *) NULL)
