@@ -5213,6 +5213,85 @@ static MagickBooleanType XCompositeCommandBlock(
   return(MagickFalse);
 }
 
+typedef struct _CompositeEventTargets
+{
+  Image
+    **composite_image;
+
+  size_t
+    *state;
+} CompositeEventTargets;
+
+static void XCompositeKeyPress(const CompositeCommandInput *input,
+  XEvent *event,const CompositeEventTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  Image
+    **const composite_image = targets->composite_image;
+
+  size_t
+    *const state = targets->state;
+
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  int
+    length;
+
+  if ((*event).xkey.window != windows->image.id)
+    return;
+  /*
+    Respond to a user key press.
+  */
+  length=XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  *(command+length)='\0';
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Key press: 0x%lx (%s)",(unsigned long) key_symbol,command);
+  switch ((int) key_symbol)
+  {
+    case XK_Escape:
+    case XK_F20:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*composite_image)=DestroyImage((*composite_image));
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    case XK_F1:
+    case XK_Help:
+    {
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXcopy);
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Composite",ImageCompositeHelp);
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXinvert);
+      break;
+    }
+    default:
+    {
+      (void) XBell(display,0);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType XCompositeImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -5278,6 +5357,9 @@ static MagickBooleanType XCompositeImage(Display *display,
 
   const CompositeTargets
     targets = { &blend, &compose };
+
+  const CompositeEventTargets
+    event_targets = { &composite_image, &state };
 
   const CompositeCommandInput
     command_input = { display, resource_info, windows, CompositeCommands,
@@ -5395,56 +5477,7 @@ static MagickBooleanType XCompositeImage(Display *display,
         break;
       case KeyPress:
       {
-        char
-          command[MagickPathExtent];
-
-        KeySym
-          key_symbol;
-
-        int
-          length;
-
-        if (event.xkey.window != windows->image.id)
-          break;
-        /*
-          Respond to a user key press.
-        */
-        length=XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        *(command+length)='\0';
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Key press: 0x%lx (%s)",(unsigned long) key_symbol,command);
-        switch ((int) key_symbol)
-        {
-          case XK_Escape:
-          case XK_F20:
-          {
-            /*
-              Prematurely exit.
-            */
-            composite_image=DestroyImage(composite_image);
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-          case XK_F1:
-          case XK_Help:
-          {
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXcopy);
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Image Composite",ImageCompositeHelp);
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXinvert);
-            break;
-          }
-          default:
-          {
-            (void) XBell(display,0);
-            break;
-          }
-        }
+        XCompositeKeyPress(&command_input,&event,&event_targets);
         break;
       }
       case MotionNotify:
