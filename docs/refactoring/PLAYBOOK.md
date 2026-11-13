@@ -14380,6 +14380,82 @@ Lane: b
 
 ---
 
+## Recipe SP - Split a Predicate's Disjunction at a Leading Run
+
+**Use when:** CodeScene reports *Complex Method* on a predicate whose body is one
+`return` of a disjunction of many operands (`A1 || A2 || ... || An`, each `&&` and `||`
+counted as a branch), as `stream.c`'s `IsCacheMorphologyChanged` returns ten comparisons
+of an image against its pixel cache. No statement is left to extract.
+
+**Not covered by:** Recipe P, which names an expression that stands in an `if` and leaves
+an existing predicate as it is; Recipe GD, which turns an `if (A1 || ... ) return(F);`
+into guards and refuses a returned disjunction; Recipe DT, which drops a ternary and
+keeps every operand.
+
+**How:**
+
+1. The predicate lies outside every OpenMP region and its body is
+   `return((MagickBooleanType) (A1 || A2 || ... || An));` (or the same with
+   `? MagickTrue : MagickFalse`), each operand a comparison in its own parentheses, no
+   `?:`, assignment or increment in any operand, and no `#` line in it.
+2. Choose a leading run `A1 || ... || Ak` (`k` two or more, `k < n`) whose operands read
+   only some of the predicate's parameters.
+3. Directly above the predicate write `static inline MagickBooleanType <Name>(...)`
+   taking those parameters (same types and names) whose body is
+   `return((MagickBooleanType) (A1 || ... || Ak));`, the operands' text unchanged.
+4. In the predicate replace the run by the one operand `(<Name>(...) != MagickFalse)`,
+   the remaining operands `|| A(k+1) || ... || An` unchanged and in order.
+5. Run `tools/ci_warnings.sh <file>` and `tools/cxx_warnings.sh <file>` (both `OK`), and
+   the oracle for the functions that call the predicate.
+
+**Before:**
+
+```c
+  return((MagickBooleanType) ((image->storage_class != cache_info->storage_class) ||
+    (image->colorspace != cache_info->colorspace) ||
+    ...
+    (image->number_channels != cache_info->number_channels) ||
+    (memcmp(p,q,image->number_channels*sizeof(*p)) != 0) ||
+    (image->metacontent_extent != cache_info->metacontent_extent) ||
+    (cache_info->nexus_info == (NexusInfo **) NULL)));
+```
+
+**After:**
+
+```c
+static inline MagickBooleanType IsCacheGeometryChanged(const Image *image,
+  const CacheInfo *cache_info)
+{
+  return((MagickBooleanType) ((image->storage_class != cache_info->storage_class) ||
+    ...
+    (image->number_channels != cache_info->number_channels)));
+}
+...
+  return((MagickBooleanType) (
+    (IsCacheGeometryChanged(image,cache_info) != MagickFalse) ||
+    (memcmp(p,q,image->number_channels*sizeof(*p)) != 0) || ...));
+```
+
+**Careful:**
+
+- Why the behaviour is the same. `||` evaluates left to right and stops at the first
+  true operand; the new predicate evaluates `A1 ... Ak` in that order and yields `1` when
+  one holds, so the predicate's first operand is true exactly when one of them held, and
+  `A(k+1) ... An` are evaluated only when none did, as before. Each comparison yields `0`
+  or `1`, so the cast gives `MagickTrue` or `MagickFalse`.
+- An operand with a side effect is refused (step 1): its count of evaluations is kept,
+  but the step's argument is only made for pure operands.
+- The step adds a function: watch the file's function-count threshold.
+
+**Evidence level:** oracle (the cases that reach the predicate's callers).
+
+**Provenance:** 2026-11-13, from `stream.c`'s `IsCacheMorphologyChanged` (campaign B,
+M127): cc 10, the file 6.31 to 6.44. Added by Claude Code (Claude Opus 5.5) under the
+mandate of 2026-10-24.
+Lane: b
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -14716,3 +14792,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | KD | Replace a run of `if (LocaleCompare(v,"K") == 0) return(F(...));` calls of one signature by a `static const` table of key/function-pointer records and a lookup loop; evidence oracle | `pixel-import.c` `ImportCharPixel` (cc 10, file 6.69 to 6.89); KT assigns, KR returns strings, KE assigns enumerators | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | DT | Step 2 keeps the condition inside a `(MagickBooleanType)` cast, step 4 adds `tools/cxx_warnings.sh`: the bare comparison is `bool` in C++ and broke main's Windows jobs (C2440/C2664 in `policy.c`, `constitute.c`, `stream.c`; the casts fixed them with object code identical) | build fixes on `campaign/M126` | mandate (2026-10-24) |
 | 2026-11-13 | NEW | KF | Replace an enumerator-keyed `switch` whose groups each call a different function of one signature with the same arguments by a `static const` key/function-pointer table, a lookup function and one call, the `default` statements kept as the else branch; evidence oracle | `stream.c`'s `StreamImagePixels` (cc 16 to 9, 6.15 to 6.31); KD needs a `LocaleCompare` ladder of returns | mandate (2026-10-24) |
+| 2026-11-13 | NEW | SP | Split a predicate whose body returns a disjunction of pure comparisons at a leading run: the run becomes a `static inline` predicate, called as the first operand; evidence oracle | `stream.c`'s `IsCacheMorphologyChanged` (cc 10, 6.31 to 6.44); P names an `if` expression, GD needs an `if ... return` | mandate (2026-10-24) |
