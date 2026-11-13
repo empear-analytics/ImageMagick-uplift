@@ -1601,6 +1601,9 @@ static void InterpolateBlendChannel(const ChannelsInterpolation *grid,
 static void InterpolateMeshChannel(const ChannelsInterpolation *grid,
   const Quantum *magick_restrict p,const ssize_t i,Quantum *pixel)
 {
+  const ssize_t
+    *corner;
+
   double
     alpha[16],
     gamma,
@@ -1645,62 +1648,13 @@ static void InterpolateMeshChannel(const ChannelsInterpolation *grid,
   luminance.y=fabs((double) (GetPixelLuma(grid->source,p+
     GetPixelChannels(grid->source))-GetPixelLuma(grid->source,p+2*
     GetPixelChannels(grid->source))));
-  if (luminance.x < luminance.y)
-    {
-      /*
-        Diagonal 0-3 NW-SE.
-      */
-      if (delta.x <= delta.y)
-        {
-          /*
-            Bottom-left triangle (pixel: 2, diagonal: 0-3).
-          */
-          delta.y=1.0-delta.y;
-          gamma=MeshInterpolate(&delta,alpha[2],alpha[3],alpha[0]);
-          gamma=MagickSafeReciprocal(gamma);
-          SetPixelChannel(grid->destination,channel,ClampToQuantum(gamma*
-            MeshInterpolate(&delta,pixels[2],pixels[3],pixels[0])),pixel);
-        }
-      else
-        {
-          /*
-            Top-right triangle (pixel: 1, diagonal: 0-3).
-          */
-          delta.x=1.0-delta.x;
-          gamma=MeshInterpolate(&delta,alpha[1],alpha[0],alpha[3]);
-          gamma=MagickSafeReciprocal(gamma);
-          SetPixelChannel(grid->destination,channel,ClampToQuantum(gamma*
-            MeshInterpolate(&delta,pixels[1],pixels[0],pixels[3])),pixel);
-        }
-    }
-  else
-    {
-      /*
-        Diagonal 1-2 NE-SW.
-      */
-      if (delta.x <= (1.0-delta.y))
-        {
-          /*
-            Top-left triangle (pixel: 0, diagonal: 1-2).
-          */
-          gamma=MeshInterpolate(&delta,alpha[0],alpha[1],alpha[2]);
-          gamma=MagickSafeReciprocal(gamma);
-          SetPixelChannel(grid->destination,channel,ClampToQuantum(gamma*
-            MeshInterpolate(&delta,pixels[0],pixels[1],pixels[2])),pixel);
-        }
-      else
-        {
-          /*
-            Bottom-right triangle (pixel: 3, diagonal: 1-2).
-          */
-          delta.x=1.0-delta.x;
-          delta.y=1.0-delta.y;
-          gamma=MeshInterpolate(&delta,alpha[3],alpha[2],alpha[1]);
-          gamma=MagickSafeReciprocal(gamma);
-          SetPixelChannel(grid->destination,channel,ClampToQuantum(gamma*
-            MeshInterpolate(&delta,pixels[3],pixels[2],pixels[1])),pixel);
-        }
-    }
+  corner=SelectMeshTriangle(&delta,luminance.x < luminance.y);
+  gamma=MeshInterpolate(&delta,alpha[corner[0]],alpha[corner[1]],
+    alpha[corner[2]]);
+  gamma=MagickSafeReciprocal(gamma);
+  SetPixelChannel(grid->destination,channel,ClampToQuantum(gamma*
+    MeshInterpolate(&delta,pixels[corner[0]],pixels[corner[1]],
+    pixels[corner[2]])),pixel);
 }
 
 static MagickBooleanType InterpolateCubicChannels(
