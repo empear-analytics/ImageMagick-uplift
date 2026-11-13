@@ -3388,6 +3388,81 @@ static void XTrackInfoWidget(Display *display,XWindows *windows,const int x,
       (void) XMapWindow(display,windows->info.id);
 }
 
+static void XClampChopSegment(const XWindows *windows,XSegment *segment_info)
+{
+  /*
+    Check boundary conditions.
+  */
+  if ((*segment_info).x2 < 0)
+    (*segment_info).x2=0;
+  else
+    if ((*segment_info).x2 > windows->image.ximage->width)
+      (*segment_info).x2=windows->image.ximage->width;
+  if ((*segment_info).y2 < 0)
+    (*segment_info).y2=0;
+  else
+    if ((*segment_info).y2 > windows->image.ximage->height)
+      (*segment_info).y2=windows->image.ximage->height;
+}
+
+static void XChopHorizontalGeometry(const XWindows *windows,
+  const XSegment *segment_info,RectangleInfo *chop_info)
+{
+  (*chop_info).width=(size_t) ((*segment_info).x2-(*segment_info).x1+1);
+  (*chop_info).height=0;
+  (*chop_info).x=(ssize_t) windows->image.x+(*segment_info).x1;
+  (*chop_info).y=0;
+  if ((*segment_info).x1 > (*segment_info).x2)
+    {
+      (*chop_info).width=(size_t) ((*segment_info).x1-(*segment_info).x2+1);
+      (*chop_info).x=(ssize_t) windows->image.x+(*segment_info).x2;
+    }
+}
+
+static void XChopVerticalGeometry(const XWindows *windows,
+  const XSegment *segment_info,RectangleInfo *chop_info)
+{
+  (*chop_info).width=0;
+  (*chop_info).height=(size_t) ((*segment_info).y2-(*segment_info).y1+1);
+  (*chop_info).x=0;
+  (*chop_info).y=(ssize_t) windows->image.y+(*segment_info).y1;
+  if ((*segment_info).y1 > (*segment_info).y2)
+    {
+      (*chop_info).height=(size_t) ((*segment_info).y1-(*segment_info).y2+1);
+      (*chop_info).y=(ssize_t) windows->image.y+(*segment_info).y2;
+    }
+}
+
+static void XScaleChopInfo(const XWindows *windows,Image **image,
+  RectangleInfo *chop_info)
+{
+  double
+    scale_factor;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    height,
+    width;
+
+  width=(unsigned int) (*image)->columns;
+  height=(unsigned int) (*image)->rows;
+  x=0;
+  y=0;
+  if (windows->image.crop_geometry != (char *) NULL)
+    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
+  scale_factor=(double) width/windows->image.ximage->width;
+  (*chop_info).x+=x;
+  (*chop_info).x=(ssize_t) (scale_factor*(*chop_info).x+0.5);
+  (*chop_info).width=(unsigned int) (scale_factor*(*chop_info).width+0.5);
+  scale_factor=(double) height/windows->image.ximage->height;
+  (*chop_info).y+=y;
+  (*chop_info).y=(ssize_t) (scale_factor*(*chop_info).y+0.5);
+  (*chop_info).height=(unsigned int) (scale_factor*(*chop_info).height+0.5);
+}
+
 static MagickBooleanType XChopImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -3420,9 +3495,6 @@ static MagickBooleanType XChopImage(Display *display,
   char
     text[MagickPathExtent];
 
-  double
-    scale_factor;
-
   Image
     *chop_image;
 
@@ -3438,9 +3510,7 @@ static MagickBooleanType XChopImage(Display *display,
     state;
 
   unsigned int
-    distance,
-    height,
-    width;
+    distance;
 
   XEvent
     event;
@@ -3678,19 +3748,7 @@ static MagickBooleanType XChopImage(Display *display,
       default:
         break;
     }
-    /*
-      Check boundary conditions.
-    */
-    if (segment_info.x2 < 0)
-      segment_info.x2=0;
-    else
-      if (segment_info.x2 > windows->image.ximage->width)
-        segment_info.x2=windows->image.ximage->width;
-    if (segment_info.y2 < 0)
-      segment_info.y2=0;
-    else
-      if (segment_info.y2 > windows->image.ximage->height)
-        segment_info.y2=windows->image.ximage->height;
+    XClampChopSegment(windows,&segment_info);
     distance=(unsigned int)
       (((segment_info.x2-segment_info.x1)*(segment_info.x2-segment_info.x1))+
        ((segment_info.y2-segment_info.y1)*(segment_info.y2-segment_info.y1)));
@@ -3698,29 +3756,9 @@ static MagickBooleanType XChopImage(Display *display,
       Compute chopping geometry.
     */
     if (direction == HorizontalChopCommand)
-      {
-        chop_info.width=(size_t) (segment_info.x2-segment_info.x1+1);
-        chop_info.height=0;
-        chop_info.x=(ssize_t) windows->image.x+segment_info.x1;
-        chop_info.y=0;
-        if (segment_info.x1 > segment_info.x2)
-          {
-            chop_info.width=(size_t) (segment_info.x1-segment_info.x2+1);
-            chop_info.x=(ssize_t) windows->image.x+segment_info.x2;
-          }
-      }
+      XChopHorizontalGeometry(windows,&segment_info,&chop_info);
     else
-      {
-        chop_info.width=0;
-        chop_info.height=(size_t) (segment_info.y2-segment_info.y1+1);
-        chop_info.x=0;
-        chop_info.y=(ssize_t) windows->image.y+segment_info.y1;
-        if (segment_info.y1 > segment_info.y2)
-          {
-            chop_info.height=(size_t) (segment_info.y1-segment_info.y2+1);
-            chop_info.y=(ssize_t) windows->image.y+segment_info.y2;
-          }
-      }
+      XChopVerticalGeometry(windows,&segment_info,&chop_info);
   } while ((state & ExitState) == 0);
   (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
   (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
@@ -3737,20 +3775,7 @@ static MagickBooleanType XChopImage(Display *display,
     (int) chop_info.width;
   windows->image.window_changes.height=windows->image.ximage->height-
     (int) chop_info.height;
-  width=(unsigned int) (*image)->columns;
-  height=(unsigned int) (*image)->rows;
-  x=0;
-  y=0;
-  if (windows->image.crop_geometry != (char *) NULL)
-    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
-  scale_factor=(double) width/windows->image.ximage->width;
-  chop_info.x+=x;
-  chop_info.x=(ssize_t) (scale_factor*chop_info.x+0.5);
-  chop_info.width=(unsigned int) (scale_factor*chop_info.width+0.5);
-  scale_factor=(double) height/windows->image.ximage->height;
-  chop_info.y+=y;
-  chop_info.y=(ssize_t) (scale_factor*chop_info.y+0.5);
-  chop_info.height=(unsigned int) (scale_factor*chop_info.height+0.5);
+  XScaleChopInfo(windows,image,&chop_info);
   /*
     Chop image.
   */
@@ -4806,6 +4831,59 @@ static void XSelectDisplaceGeometry(Display *display,XWindows *windows,
   (*compose)=DisplaceCompositeOp;
 }
 
+static void XSetBlendAlpha(Image *image,CacheView *image_view,
+  const Quantum opacity,ExceptionInfo *exception)
+{
+  int
+    x,
+    y;
+
+  Quantum
+    *q;
+
+  for (y=0; y < (int) image->rows; y++)
+  {
+    q=GetCacheViewAuthenticPixels(image_view,0,(ssize_t) y,image->columns,1,
+      exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (int) image->columns; x++)
+    {
+      SetPixelAlpha(image,opacity,q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      break;
+  }
+}
+
+static MagickBooleanType XCreateBlendMattes(Image *image,Image *composite_image,
+  const double blend,ExceptionInfo *exception)
+{
+  if (blend != 0.0)
+    {
+      CacheView
+        *image_view;
+
+      Quantum
+        opacity;
+
+      /*
+        Create mattes for blending.
+      */
+      (void) SetImageAlphaChannel(composite_image,OpaqueAlphaChannel,exception);
+      opacity=(Quantum) (ScaleQuantumToChar(QuantumRange)-
+        ((ssize_t) ScaleQuantumToChar(QuantumRange)*blend)/100);
+      if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+        return(MagickFalse);
+      image->alpha_trait=BlendPixelTrait;
+      image_view=AcquireAuthenticCacheView(image,exception);
+      XSetBlendAlpha(image,image_view,opacity,exception);
+      image_view=DestroyCacheView(image_view);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType XCompositeImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -5160,49 +5238,8 @@ static MagickBooleanType XCompositeImage(Display *display,
   if (compose == DisplaceCompositeOp)
     (void) SetImageArtifact(composite_image,"compose:args",
       displacement_geometry);
-  if (blend != 0.0)
-    {
-      CacheView
-        *image_view;
-
-      int
-        y;
-
-      Quantum
-        opacity;
-
-      int
-        x;
-
-      Quantum
-        *q;
-
-      /*
-        Create mattes for blending.
-      */
-      (void) SetImageAlphaChannel(composite_image,OpaqueAlphaChannel,exception);
-      opacity=(Quantum) (ScaleQuantumToChar(QuantumRange)-
-        ((ssize_t) ScaleQuantumToChar(QuantumRange)*blend)/100);
-      if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-        return(MagickFalse);
-      image->alpha_trait=BlendPixelTrait;
-      image_view=AcquireAuthenticCacheView(image,exception);
-      for (y=0; y < (int) image->rows; y++)
-      {
-        q=GetCacheViewAuthenticPixels(image_view,0,(ssize_t) y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          break;
-        for (x=0; x < (int) image->columns; x++)
-        {
-          SetPixelAlpha(image,opacity,q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-          break;
-      }
-      image_view=DestroyCacheView(image_view);
-    }
+  if (XCreateBlendMattes(image,composite_image,blend,exception) == MagickFalse)
+    return(MagickFalse);
   /*
     Composite image with X Image window.
   */
@@ -15356,86 +15393,9 @@ static inline MagickBooleanType IsPostscriptFormat(
     MagickFalse);
 }
 
-static MagickBooleanType XSaveImage(Display *display,
-  XResourceInfo *resource_info,XWindows *windows,Image *image,
-  ExceptionInfo *exception)
+static void XSelectPageGeometry(Display *display,XWindows *windows,
+  ImageInfo *image_info)
 {
-  char
-    filename[MagickPathExtent],
-    geometry[MagickPathExtent];
-
-  Image
-    *save_image;
-
-  ImageInfo
-    *image_info;
-
-  MagickStatusType
-    status;
-
-  /*
-    Request file name from user.
-  */
-  if (resource_info->write_filename != (char *) NULL)
-    (void) CopyMagickString(filename,resource_info->write_filename,
-      MagickPathExtent);
-  else
-    {
-      char
-        path[MagickPathExtent];
-
-      int
-        status;
-
-      GetPathComponent(image->filename,HeadPath,path);
-      GetPathComponent(image->filename,TailPath,filename);
-      if (*path != '\0')
-        {
-          status=chdir(path);
-          if (status == -1)
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              FileOpenError,"UnableToOpenFile","%s",path);
-        }
-    }
-  XFileBrowserWidget(display,windows,"Save",filename);
-  if (*filename == '\0')
-    return(MagickTrue);
-  if (IsPathAccessible(filename) != MagickFalse)
-    {
-      int
-        status;
-
-      /*
-        File exists-- seek user's permission before overwriting.
-      */
-      status=XConfirmWidget(display,windows,"Overwrite",filename);
-      if (status <= 0)
-        return(MagickTrue);
-    }
-  image_info=CloneImageInfo(resource_info->image_info);
-  (void) CopyMagickString(image_info->filename,filename,MagickPathExtent);
-  (void) SetImageInfo(image_info,1,exception);
-  if ((LocaleCompare(image_info->magick,"JPEG") == 0) ||
-      (LocaleCompare(image_info->magick,"JPG") == 0))
-    {
-      char
-        quality[MagickPathExtent];
-
-      int
-        status;
-
-      /*
-        Request JPEG quality from user.
-      */
-      (void) FormatLocaleString(quality,MagickPathExtent,"%.17g",(double)
-        image->quality);
-      status=XDialogWidget(display,windows,"Save","Enter JPEG quality:",
-        quality);
-      if (*quality == '\0')
-        return(MagickTrue);
-      image->quality=StringToUnsignedLong(quality);
-      image_info->interlace=status != 0 ? NoInterlace : PlaneInterlace;
-    }
   if (IsPostscriptFormat(image_info) != MagickFalse)
     {
       char
@@ -15474,6 +15434,111 @@ static MagickBooleanType XSaveImage(Display *display,
       if (*geometry != '\0')
         image_info->page=GetPageGeometry(geometry);
     }
+}
+
+static MagickBooleanType XRequestJPEGQuality(Display *display,
+  XWindows *windows,Image *image,ImageInfo *image_info)
+{
+  if ((LocaleCompare(image_info->magick,"JPEG") == 0) ||
+      (LocaleCompare(image_info->magick,"JPG") == 0))
+    {
+      char
+        quality[MagickPathExtent];
+
+      int
+        status;
+
+      /*
+        Request JPEG quality from user.
+      */
+      (void) FormatLocaleString(quality,MagickPathExtent,"%.17g",(double)
+        image->quality);
+      status=XDialogWidget(display,windows,"Save","Enter JPEG quality:",
+        quality);
+      if (*quality == '\0')
+        return(MagickFalse);
+      image->quality=StringToUnsignedLong(quality);
+      image_info->interlace=status != 0 ? NoInterlace : PlaneInterlace;
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType XSeekOverwritePermission(Display *display,
+  XWindows *windows,const char *filename)
+{
+  if (IsPathAccessible(filename) != MagickFalse)
+    {
+      int
+        status;
+
+      /*
+        File exists-- seek user's permission before overwriting.
+      */
+      status=XConfirmWidget(display,windows,"Overwrite",filename);
+      if (status <= 0)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static void XGetSaveFilename(const XResourceInfo *resource_info,
+  const Image *image,char *filename,ExceptionInfo *exception)
+{
+  if (resource_info->write_filename != (char *) NULL)
+    (void) CopyMagickString(filename,resource_info->write_filename,
+      MagickPathExtent);
+  else
+    {
+      char
+        path[MagickPathExtent];
+
+      int
+        status;
+
+      GetPathComponent(image->filename,HeadPath,path);
+      GetPathComponent(image->filename,TailPath,filename);
+      if (*path != '\0')
+        {
+          status=chdir(path);
+          if (status == -1)
+            (void) ThrowMagickException(exception,GetMagickModule(),
+              FileOpenError,"UnableToOpenFile","%s",path);
+        }
+    }
+}
+
+static MagickBooleanType XSaveImage(Display *display,
+  XResourceInfo *resource_info,XWindows *windows,Image *image,
+  ExceptionInfo *exception)
+{
+  char
+    filename[MagickPathExtent],
+    geometry[MagickPathExtent];
+
+  Image
+    *save_image;
+
+  ImageInfo
+    *image_info;
+
+  MagickStatusType
+    status;
+
+  /*
+    Request file name from user.
+  */
+  XGetSaveFilename(resource_info,image,filename,exception);
+  XFileBrowserWidget(display,windows,"Save",filename);
+  if (*filename == '\0')
+    return(MagickTrue);
+  if (XSeekOverwritePermission(display,windows,filename) == MagickFalse)
+    return(MagickTrue);
+  image_info=CloneImageInfo(resource_info->image_info);
+  (void) CopyMagickString(image_info->filename,filename,MagickPathExtent);
+  (void) SetImageInfo(image_info,1,exception);
+  if (XRequestJPEGQuality(display,windows,image,image_info) == MagickFalse)
+    return(MagickTrue);
+  XSelectPageGeometry(display,windows,image_info);
   /*
     Apply image transforms.
   */
@@ -16438,6 +16503,92 @@ static void XTranslateImage(Display *display,XWindows *windows,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void XTrimLeftEdge(const XWindows *windows,RectangleInfo *trim_info)
+{
+  int
+    x,
+    y;
+
+  size_t
+    background,
+    pixel;
+
+  /*
+    Crop the left edge.
+  */
+  background=XGetPixel(windows->image.ximage,0,0);
+  (*trim_info).width=(size_t) windows->image.ximage->width;
+  for (x=0; x < windows->image.ximage->width; x++)
+  {
+    for (y=0; y < windows->image.ximage->height; y++)
+    {
+      pixel=XGetPixel(windows->image.ximage,x,y);
+      if (pixel != background)
+        break;
+    }
+    if (y < windows->image.ximage->height)
+      break;
+  }
+  (*trim_info).x=(ssize_t) x;
+}
+
+static void XTrimRightEdge(const XWindows *windows,RectangleInfo *trim_info)
+{
+  int
+    x,
+    y;
+
+  size_t
+    background,
+    pixel;
+
+  /*
+    Crop the right edge.
+  */
+  background=XGetPixel(windows->image.ximage,windows->image.ximage->width-1,0);
+  for (x=windows->image.ximage->width-1; x != 0; x--)
+  {
+    for (y=0; y < windows->image.ximage->height; y++)
+    {
+      pixel=XGetPixel(windows->image.ximage,x,y);
+      if (pixel != background)
+        break;
+    }
+    if (y < windows->image.ximage->height)
+      break;
+  }
+  (*trim_info).width=(size_t) (x-(*trim_info).x+1);
+}
+
+static void XTrimTopEdge(const XWindows *windows,RectangleInfo *trim_info)
+{
+  int
+    x,
+    y;
+
+  size_t
+    background,
+    pixel;
+
+  /*
+    Crop the top edge.
+  */
+  background=XGetPixel(windows->image.ximage,0,0);
+  (*trim_info).height=(size_t) windows->image.ximage->height;
+  for (y=0; y < windows->image.ximage->height; y++)
+  {
+    for (x=0; x < windows->image.ximage->width; x++)
+    {
+      pixel=XGetPixel(windows->image.ximage,x,y);
+      if (pixel != background)
+        break;
+    }
+    if (x < windows->image.ximage->width)
+      break;
+  }
+  (*trim_info).y=(ssize_t) y;
+}
+
 static MagickBooleanType XTrimImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -16461,20 +16612,7 @@ static MagickBooleanType XTrimImage(Display *display,
   /*
     Crop the left edge.
   */
-  background=XGetPixel(windows->image.ximage,0,0);
-  trim_info.width=(size_t) windows->image.ximage->width;
-  for (x=0; x < windows->image.ximage->width; x++)
-  {
-    for (y=0; y < windows->image.ximage->height; y++)
-    {
-      pixel=XGetPixel(windows->image.ximage,x,y);
-      if (pixel != background)
-        break;
-    }
-    if (y < windows->image.ximage->height)
-      break;
-  }
-  trim_info.x=(ssize_t) x;
+  XTrimLeftEdge(windows,&trim_info);
   if (trim_info.x == (ssize_t) windows->image.ximage->width)
     {
       XSetCursorState(display,windows,MagickFalse);
@@ -16483,36 +16621,11 @@ static MagickBooleanType XTrimImage(Display *display,
   /*
     Crop the right edge.
   */
-  background=XGetPixel(windows->image.ximage,windows->image.ximage->width-1,0);
-  for (x=windows->image.ximage->width-1; x != 0; x--)
-  {
-    for (y=0; y < windows->image.ximage->height; y++)
-    {
-      pixel=XGetPixel(windows->image.ximage,x,y);
-      if (pixel != background)
-        break;
-    }
-    if (y < windows->image.ximage->height)
-      break;
-  }
-  trim_info.width=(size_t) (x-trim_info.x+1);
+  XTrimRightEdge(windows,&trim_info);
   /*
     Crop the top edge.
   */
-  background=XGetPixel(windows->image.ximage,0,0);
-  trim_info.height=(size_t) windows->image.ximage->height;
-  for (y=0; y < windows->image.ximage->height; y++)
-  {
-    for (x=0; x < windows->image.ximage->width; x++)
-    {
-      pixel=XGetPixel(windows->image.ximage,x,y);
-      if (pixel != background)
-        break;
-    }
-    if (x < windows->image.ximage->width)
-      break;
-  }
-  trim_info.y=(ssize_t) y;
+  XTrimTopEdge(windows,&trim_info);
   /*
     Crop the bottom edge.
   */
