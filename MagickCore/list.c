@@ -223,6 +223,23 @@ static MagickBooleanType CloneSceneToList(const Image *images,
   return(match);
 }
 
+static ssize_t ParseCloneSceneEnd(char **p,const ssize_t first,
+  const size_t length)
+{
+  ssize_t
+    last;
+
+  last=first;
+  while (isspace((int) ((unsigned char) **p)) != 0)
+    (*p)++;
+  if (**p == '-')
+    {
+      last=(ssize_t) strtol((*p)+1,p,10);
+      last=ClampSceneIndex(last,length);
+    }
+  return(last);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -303,14 +320,7 @@ MagickExport Image *CloneImages(const Image *images,const char *scenes,
     offset=first;
     first=ClampSceneIndex(first,length);
     first%=(ssize_t) (length << 1);
-    last=first;
-    while (isspace((int) ((unsigned char) *p)) != 0)
-      p++;
-    if (*p == '-')
-      {
-        last=(ssize_t) strtol(p+1,&p,10);
-        last=ClampSceneIndex(last,length);
-      }
+    last=ParseCloneSceneEnd(&p,first,length);
     last%=(ssize_t) (length << 1);
     match=MagickFalse;
     step=GetFrameStep(artifact);
