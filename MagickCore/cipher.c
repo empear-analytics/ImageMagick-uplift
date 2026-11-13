@@ -971,13 +971,15 @@ MagickExport MagickBooleanType PasskeyEncipherImage(Image *image,
     y;
 
   StringInfo
-    *key,
     *nonce;
 
   unsigned char
     input_block[AESBlocksize],
     output_block[AESBlocksize],
     *pixels;
+
+  const CipherKeyTargets
+    targets = { &aes_info, &nonce };
 
   /*
     Generate encipher key and nonce.
@@ -992,24 +994,9 @@ MagickExport MagickBooleanType PasskeyEncipherImage(Image *image,
     return(MagickTrue);
   if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
     return(MagickFalse);
-  aes_info=AcquireAESInfo();
-  key=CloneStringInfo(passkey);
-  if (key == (StringInfo *) NULL)
-    {
-      aes_info=DestroyAESInfo(aes_info);
-      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-        image->filename);
-    }
-  nonce=SplitStringInfo(key,GetStringInfoLength(key)/2);
-  if (nonce == (StringInfo *) NULL)
-    {
-      key=DestroyStringInfo(key);
-      aes_info=DestroyAESInfo(aes_info);
-      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-        image->filename);
-    }
-  SetAESKey(aes_info,key);
-  key=DestroyStringInfo(key);
+  if (AcquireCipherKeyAndNonce(image,passkey,exception,&targets) ==
+      MagickFalse)
+    return(MagickFalse);
   signature_info=AcquireNonceSignature(image,nonce);
   signature=StringInfoToHexString(GetSignatureDigest(signature_info));
   (void) SetImageProperty(image,"cipher:type","AES",exception);
