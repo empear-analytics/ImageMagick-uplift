@@ -2751,6 +2751,14 @@ static inline MagickBooleanType IsTokenCharacter(const char *p,
     (*p != '\0')) ? MagickTrue : MagickFalse);
 }
 
+static inline ssize_t MergeOptionValue(const ssize_t option_types,
+  const ssize_t value,const MagickBooleanType negate)
+{
+  if (negate != MagickFalse)
+    return(option_types &~ value);
+  return(option_types | value);
+}
+
 static const char *ReadOptionToken(const char *p,const int sentinel,
   char *token,MagickBooleanType *negate)
 {
@@ -2810,10 +2818,7 @@ MagickExport ssize_t GetCommandOptionFlags(const CommandOption option,
     command_info=FindCommandOptionInfo(option_info,token);
     if (command_info->mnemonic == (const char *) NULL)
       return(-1);
-    if (negate != MagickFalse)
-      option_types=option_types &~ command_info->flags;
-    else
-      option_types=option_types | command_info->flags;
+    option_types=MergeOptionValue(option_types,command_info->flags,negate);
     if (list == MagickFalse)
       break;
   }
@@ -3342,10 +3347,7 @@ MagickExport ssize_t ParseCommandOption(const CommandOption option,
     command_info=FindCommandOptionInfo(option_info,token);
     if (command_info->mnemonic == (const char *) NULL)
       return(-1);
-    if (negate != MagickFalse)
-      option_types=option_types &~ command_info->type;
-    else
-      option_types=option_types | command_info->type;
+    option_types=MergeOptionValue(option_types,command_info->type,negate);
     if (list == MagickFalse)
       break;
   }
