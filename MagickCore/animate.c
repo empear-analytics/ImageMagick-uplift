@@ -5273,6 +5273,19 @@ static MagickBooleanType IsAnimationStep(Display *display,
     (IsAnimationPlaying(state) != MagickFalse)) ? MagickTrue : MagickFalse);
 }
 
+static void XNextAnimateEvent(Display *display,XWindows *windows,
+  XEvent *event)
+{
+  time_t
+    timestamp;
+
+  timestamp=GetMagickTime();
+  (void) XNextEvent(display,event);
+  if (windows->image.stasis == MagickFalse)
+    windows->image.stasis=(GetMagickTime()-timestamp) > 0 ?
+      MagickTrue : MagickFalse;
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -5303,9 +5316,6 @@ MagickExport Image *XAnimateImages(Display *display,
 
   static XWindowInfo
     *magick_windows[MaXWindows];
-
-  time_t
-    timestamp;
 
   size_t
     number_scenes;
@@ -5521,11 +5531,7 @@ MagickExport Image *XAnimateImages(Display *display,
     /*
       Handle a window event.
     */
-    timestamp=GetMagickTime();
-    (void) XNextEvent(display,&event);
-    if (windows->image.stasis == MagickFalse)
-      windows->image.stasis=(GetMagickTime()-timestamp) > 0 ?
-        MagickTrue : MagickFalse;
+    XNextAnimateEvent(display,windows,&event);
     if (event.xany.window == windows->command.id)
       {
         AnimateCommandWidget
