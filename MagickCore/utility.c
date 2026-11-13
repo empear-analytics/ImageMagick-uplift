@@ -770,6 +770,24 @@ static void FormatExpandedPath(char *file_path,const char *magick,
     }
 }
 
+static char *AcquireCommandLine(char **vector,const ssize_t count)
+{
+  char
+    *command_line;
+
+  ssize_t
+    i;
+
+  command_line=AcquireString(vector[0]);
+  for (i=1; i < count; i++)
+  {
+    (void) ConcatenateString(&command_line," {");
+    (void) ConcatenateString(&command_line,vector[i]);
+    (void) ConcatenateString(&command_line,"}");
+  }
+  return(command_line);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1202,13 +1220,7 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
       char
         *command_line;
 
-      command_line=AcquireString(vector[0]);
-      for (i=1; i < count; i++)
-      {
-        (void) ConcatenateString(&command_line," {");
-        (void) ConcatenateString(&command_line,vector[i]);
-        (void) ConcatenateString(&command_line,"}");
-      }
+      command_line=AcquireCommandLine(vector,count);
       (void) LogMagickEvent(ConfigureEvent,GetMagickModule(),
         "Command line: %s",command_line);
       command_line=DestroyString(command_line);
