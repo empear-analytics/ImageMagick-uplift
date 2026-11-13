@@ -135,6 +135,22 @@ static MagickBooleanType AppendPolicyPathRoot(char *partial,
   return(MagickTrue);
 }
 
+static MagickBooleanType AppendPolicyPathSeparator(char *partial,
+  const size_t extent,ssize_t *offset)
+{
+  if (((*offset) > 0) && (partial[(*offset)-1] != *DirectorySeparator))
+    {
+      /*
+        Append separator if needed.
+      */
+      if (((*offset)+1) >= (ssize_t) extent)
+        return MagickFalse;
+      partial[(*offset)++]=(*DirectorySeparator);
+      partial[(*offset)]='\0';
+    }
+  return(MagickTrue);
+}
+
 static inline MagickBooleanType IsPathContainsSymlink(const char *path)
 {
   char
@@ -176,16 +192,8 @@ static inline MagickBooleanType IsPathContainsSymlink(const char *path)
           p++;
         continue;
       }
-    if ((offset > 0) && (partial[offset-1] != *DirectorySeparator))
-      {
-        /*
-          Append separator if needed.
-        */
-        if ((offset+1) >= (ssize_t) sizeof(partial))
-          return MagickFalse;
-        partial[offset++]=(*DirectorySeparator);
-        partial[offset]='\0';
-      }
+    if (AppendPolicyPathSeparator(partial,sizeof(partial),&offset) == MagickFalse)
+      return MagickFalse;
     /*
       Append component.
     */
