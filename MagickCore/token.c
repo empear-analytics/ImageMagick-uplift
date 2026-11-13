@@ -567,8 +567,8 @@ static MagickBooleanType TokenizeQuoteChar(const TokenizerState *tokenizer,
   return(MagickTrue);
 }
 
-static MagickBooleanType TokenizeEscapeChar(const TokenizerState *tokenizer,
-  int c)
+static MagickBooleanType EndEscapedToken(const TokenizerState *tokenizer,
+  const int c)
 {
   TokenInfo
     *const token_info = tokenizer->token_info;
@@ -596,6 +596,29 @@ static MagickBooleanType TokenizeEscapeChar(const TokenizerState *tokenizer,
       token[token_info->offset]='\0';
       return(MagickFalse);
     }
+  return(MagickTrue);
+}
+
+static MagickBooleanType TokenizeEscapeChar(const TokenizerState *tokenizer,
+  int c)
+{
+  TokenInfo
+    *const token_info = tokenizer->token_info;
+
+  char
+    *const token = tokenizer->token;
+
+  const size_t
+    max_token_length = tokenizer->max_token_length;
+
+  const char
+    *const line = tokenizer->line;
+
+  int
+    *const next = tokenizer->next;
+
+  if (EndEscapedToken(tokenizer,c) == MagickFalse)
+    return(MagickFalse);
   switch (token_info->state)
   {
     case IN_WHITE:
