@@ -110,6 +110,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/coder.c \
   MagickCore/coder.h \
   MagickCore/color.c \
+  MagickCore/color-tuple.c \
   MagickCore/color-equivalent.c \
   MagickCore/color.h \
   MagickCore/color-private.h \

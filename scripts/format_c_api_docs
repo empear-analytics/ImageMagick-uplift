@@ -37,6 +37,7 @@ if ( ! GetOptions(
 	 'cache.c',
 	 'cache-view.c',
 	 'color.c',
+	 'color-tuple.c',
 	 'color-equivalent.c',
 	 'colorspace.c',
 	 'colorspace-transform.c',
