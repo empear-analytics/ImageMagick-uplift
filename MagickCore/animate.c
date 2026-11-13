@@ -1661,6 +1661,14 @@ static Image *XPrepareBackgroundImages(Display *display,Image *images,
   return(images);
 }
 
+static void XReleaseBackgroundImages(Display *display,Image *images,
+  Image **image_list)
+{
+  (void) XSync(display,MagickFalse);
+  image_list=(Image **) RelinquishMagickMemory(image_list);
+  images=DestroyImageList(images);
+}
+
 MagickExport void XAnimateBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *images,ExceptionInfo *exception)
 {
@@ -1772,9 +1780,7 @@ MagickExport void XAnimateBackgroundImage(Display *display,
     Display pixmap on the window.
   */
   XRunBackgroundAnimation(&setup,&targets);
-  (void) XSync(display,MagickFalse);
-  image_list=(Image **) RelinquishMagickMemory(image_list);
-  images=DestroyImageList(images);
+  XReleaseBackgroundImages(display,images,image_list);
 }
 
 /*
