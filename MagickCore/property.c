@@ -1626,8 +1626,22 @@ static MagickBooleanType PushEXIFDirectory(const EXIFWalkInfo *walk,
   return(MagickTrue);
 }
 
-static void GetEXIFDirectory(const EXIFWalkInfo *walk,
-  const EXIFWalkTargets *targets)
+typedef struct _EXIFEntryTargets
+{
+  unsigned char
+    **q;
+
+  size_t
+    *tag_value,
+    *format;
+
+  ssize_t
+    *components,
+    *number_bytes;
+} EXIFEntryTargets;
+
+static MagickBooleanType ReadEXIFEntry(const EXIFWalkInfo *walk,
+  const size_t entry,const EXIFEntryTargets *targets)
 {
   const EndianType
     endian = walk->endian;
@@ -1646,6 +1660,54 @@ static void GetEXIFDirectory(const EXIFWalkInfo *walk,
 
   SplayTreeInfo
     *const exif_resources = walk->exif_resources;
+
+  unsigned char
+    **const q = targets->q;
+
+  size_t
+    *const tag_value = targets->tag_value,
+    *const format = targets->format;
+
+  ssize_t
+    *const components = targets->components,
+    *const number_bytes = targets->number_bytes;
+
+  (*q)=(unsigned char *) (directory+(12*entry)+2);
+  if ((*q) > (exif+length-12))
+    return(MagickFalse);  /* corrupt EXIF */
+  if (GetValueFromSplayTree(exif_resources,(*q)) == (*q))
+    return(MagickFalse);
+  (void) AddValueToSplayTree(exif_resources,(*q),(*q));
+  (*tag_value)=(size_t) (ReadPropertyUnsignedShort(endian,(*q))+(ssize_t)
+    tag_offset);
+  (*format)=(size_t) ReadPropertyUnsignedShort(endian,(*q)+2);
+  if ((*format) >= (sizeof(tag_bytes)/sizeof(*tag_bytes)))
+    return(MagickFalse);
+  if ((*format) == 0)
+    return(MagickFalse);  /* corrupt EXIF */
+  (*components)=(ssize_t) ReadPropertySignedLong(endian,(*q)+4);
+  if ((*components) < 0)
+    return(MagickFalse);  /* corrupt EXIF */
+  (*number_bytes)=(*components)*(ssize_t) tag_bytes[(*format)];
+  if ((*number_bytes) < (*components))
+    return(MagickFalse);  /* prevent overflow */
+  return(MagickTrue);
+}
+
+static void GetEXIFDirectory(const EXIFWalkInfo *walk,
+  const EXIFWalkTargets *targets)
+{
+  const EndianType
+    endian = walk->endian;
+
+  const unsigned char
+    *const exif = walk->exif;
+
+  const size_t
+    length = walk->length;
+
+  const unsigned char
+    *const directory = walk->directory;
 
   ssize_t
     *const level = targets->level;
@@ -1677,25 +1739,11 @@ static void GetEXIFDirectory(const EXIFWalkInfo *walk,
       *p,
       *q;
 
-    q=(unsigned char *) (directory+(12*(*entry))+2);
-    if (q > (exif+length-12))
-      break;  /* corrupt EXIF */
-    if (GetValueFromSplayTree(exif_resources,q) == q)
+    const EXIFEntryTargets
+      entry_targets = { &q, &tag_value, &format, &components, &number_bytes };
+
+    if (ReadEXIFEntry(walk,(*entry),&entry_targets) == MagickFalse)
       break;
-    (void) AddValueToSplayTree(exif_resources,q,q);
-    tag_value=(size_t) (ReadPropertyUnsignedShort(endian,q)+(ssize_t)
-      tag_offset);
-    format=(size_t) ReadPropertyUnsignedShort(endian,q+2);
-    if (format >= (sizeof(tag_bytes)/sizeof(*tag_bytes)))
-      break;
-    if (format == 0)
-      break;  /* corrupt EXIF */
-    components=(ssize_t) ReadPropertySignedLong(endian,q+4);
-    if (components < 0)
-      break;  /* corrupt EXIF */
-    number_bytes=components*(ssize_t) tag_bytes[format];
-    if (number_bytes < components)
-      break;  /* prevent overflow */
     if (number_bytes <= 4)
       p=q+8;
     else
