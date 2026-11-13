@@ -4402,6 +4402,15 @@ typedef struct _ColorEditContext
 
   const ModeType
     *ColorEditCommands;
+
+  const char
+    *const *ColorEditMenu;
+
+  char
+    *command;
+
+  ColorBorderTargets
+    border_targets;
 } ColorEditContext;
 
 static void XColorEditCommandAction(const ColorEditContext *context,
@@ -4429,6 +4438,58 @@ static void XColorEditCommandAction(const ColorEditContext *context,
       */
       (*state)|=EscapeState;
       (*state)|=ExitState;
+      break;
+    }
+  }
+}
+
+static void XColorEditMenuAction(const ColorEditContext *context,
+  const int id,size_t *state)
+{
+  EditMenuInput
+    menu_input;
+
+  switch (context->ColorEditCommands[id])
+  {
+    case ColorEditBorderCommand:
+    {
+      menu_input.display=context->display;
+      menu_input.windows=context->windows;
+      menu_input.MatteEditMenu=context->ColorEditMenu;
+      menu_input.id=id;
+      menu_input.command=context->command;
+      XSelectColorBorder(&menu_input,context->resource_info,
+        &context->border_targets);
+      break;
+    }
+    case ColorEditFuzzCommand:
+    {
+      const char
+        *const FuzzMenu[] =
+        {
+          "0%",
+          "2%",
+          "5%",
+          "10%",
+          "15%",
+          "Dialog...",
+          (char *) NULL,
+        };
+
+      static char
+        fuzz[MagickPathExtent];
+
+      menu_input.display=context->display;
+      menu_input.windows=context->windows;
+      menu_input.MatteEditMenu=context->ColorEditMenu;
+      menu_input.id=id;
+      menu_input.command=context->command;
+      XSelectFuzzFactor(&menu_input,FuzzMenu,fuzz,context->image);
+      break;
+    }
+    default:
+    {
+      XColorEditCommandAction(context,id,state);
       break;
     }
   }
@@ -4514,6 +4575,9 @@ static MagickBooleanType XColorEditImage(Display *display,
   context.image=image;
   context.exception=exception;
   context.ColorEditCommands=ColorEditCommands;
+  context.ColorEditMenu=ColorEditMenu;
+  context.command=command;
+  context.border_targets=border_targets;
   do
   {
     if (windows->info.mapped != MagickFalse)
@@ -4565,44 +4629,9 @@ static MagickBooleanType XColorEditImage(Display *display,
             XSelectPenColor(&menu_input,resource_info,&pen_targets);
             break;
           }
-          case ColorEditBorderCommand:
-          {
-            menu_input.display=display;
-            menu_input.windows=windows;
-            menu_input.MatteEditMenu=ColorEditMenu;
-            menu_input.id=id;
-            menu_input.command=command;
-            XSelectColorBorder(&menu_input,resource_info,&border_targets);
-            break;
-          }
-          case ColorEditFuzzCommand:
-          {
-            const char
-              *const FuzzMenu[] =
-              {
-                "0%",
-                "2%",
-                "5%",
-                "10%",
-                "15%",
-                "Dialog...",
-                (char *) NULL,
-              };
-
-            static char
-              fuzz[MagickPathExtent];
-
-            menu_input.display=display;
-            menu_input.windows=windows;
-            menu_input.MatteEditMenu=ColorEditMenu;
-            menu_input.id=id;
-            menu_input.command=command;
-            XSelectFuzzFactor(&menu_input,FuzzMenu,fuzz,image);
-            break;
-          }
           default:
           {
-            XColorEditCommandAction(&context,id,&state);
+            XColorEditMenuAction(&context,id,&state);
             break;
           }
         }
