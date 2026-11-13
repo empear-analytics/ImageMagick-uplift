@@ -575,6 +575,23 @@ MagickExport MagickBooleanType DeleteNodeByValueFromSplayTree(
   return(MagickFalse);
 }
 
+static MagickBooleanType SplayToKey(SplayTreeInfo *splay_tree,const void *key)
+{
+  int
+    compare;
+
+  LockSemaphoreInfo(splay_tree->semaphore);
+  SplaySplayTree(splay_tree,key);
+  splay_tree->key=(void *) NULL;
+  compare=CompareNodeKey(splay_tree,splay_tree->root,key);
+  if (compare != 0)
+    {
+      UnlockSemaphoreInfo(splay_tree->semaphore);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -605,9 +622,6 @@ MagickExport MagickBooleanType DeleteNodeByValueFromSplayTree(
 MagickExport MagickBooleanType DeleteNodeFromSplayTree(
   SplayTreeInfo *splay_tree,const void *key)
 {
-  int
-    compare;
-
   NodeInfo
     *left,
     *right;
@@ -618,15 +632,8 @@ MagickExport MagickBooleanType DeleteNodeFromSplayTree(
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
   if (splay_tree->root == (NodeInfo *) NULL)
     return(MagickFalse);
-  LockSemaphoreInfo(splay_tree->semaphore);
-  SplaySplayTree(splay_tree,key);
-  splay_tree->key=(void *) NULL;
-  compare=CompareNodeKey(splay_tree,splay_tree->root,key);
-  if (compare != 0)
-    {
-      UnlockSemaphoreInfo(splay_tree->semaphore);
-      return(MagickFalse);
-    }
+  if (SplayToKey(splay_tree,key) == MagickFalse)
+    return(MagickFalse);
   left=splay_tree->root->left;
   right=splay_tree->root->right;
   RelinquishNodeContents(splay_tree,splay_tree->root);
