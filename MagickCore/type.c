@@ -1342,6 +1342,18 @@ static MagickBooleanType LoadTypeIncludes(const TypeIncludeScan *scan,
   return(MagickTrue);
 }
 
+static TypeInfo *AcquireTypeNode(const char *filename)
+{
+  TypeInfo
+    *type_info;
+
+  type_info=(TypeInfo *) AcquireCriticalMemory(sizeof(*type_info));
+  (void) memset(type_info,0,sizeof(*type_info));
+  type_info->path=ConstantString(filename);
+  type_info->signature=MagickCoreSignature;
+  return(type_info);
+}
+
 static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1418,10 +1430,7 @@ static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
         /*
           Type element.
         */
-        type_info=(TypeInfo *) AcquireCriticalMemory(sizeof(*type_info));
-        (void) memset(type_info,0,sizeof(*type_info));
-        type_info->path=ConstantString(filename);
-        type_info->signature=MagickCoreSignature;
+        type_info=AcquireTypeNode(filename);
         continue;
       }
     if (type_info == (TypeInfo *) NULL)
