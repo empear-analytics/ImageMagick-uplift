@@ -437,7 +437,11 @@ typedef struct _TokenizerState
   const char
     *line,
     *break_set,
-    *quote;
+    *quote,
+    *white;
+
+  char
+    escape;
 
   char
     *breaker;
@@ -631,17 +635,58 @@ static MagickBooleanType TokenizeTokenChar(const TokenizerState *tokenizer,
   return(MagickTrue);
 }
 
-MagickExport int Tokenizer(TokenInfo *token_info,const unsigned flag,
-  char *token,const size_t max_token_length,const char *line,const char *white,
-  const char *break_set,const char *quote,const char escape,char *breaker,
-  int *next,char *quoted)
+static MagickBooleanType TokenizeChar(const TokenizerState *tokenizer)
 {
+  TokenInfo
+    *const token_info = tokenizer->token_info;
+
+  char
+    *const token = tokenizer->token;
+
+  const size_t
+    max_token_length = tokenizer->max_token_length;
+
+  const char
+    *const line = tokenizer->line,
+    *const break_set = tokenizer->break_set,
+    *const quote = tokenizer->quote,
+    *const white = tokenizer->white;
+
+  const char
+    escape = tokenizer->escape;
+
+  int
+    *const next = tokenizer->next;
+
   int
     c;
 
   ssize_t
     i;
 
+  c=(int) line[*next];
+  i=sindex(c,break_set);
+  if (i >= 0)
+    return(TokenizeBreakChar(tokenizer,c,i));
+  i=sindex(c,quote);
+  if (i >= 0)
+    return(TokenizeQuoteChar(tokenizer,c,i));
+  i=sindex(c,white);
+  if (i >= 0)
+    {
+      HandleWhiteSpace(token_info,token,max_token_length,c);
+      return(MagickTrue);
+    }
+  if (c == (int) escape)
+    return(TokenizeEscapeChar(tokenizer,c));
+  return(TokenizeTokenChar(tokenizer,c));
+}
+
+MagickExport int Tokenizer(TokenInfo *token_info,const unsigned flag,
+  char *token,const size_t max_token_length,const char *line,const char *white,
+  const char *break_set,const char *quote,const char escape,char *breaker,
+  int *next,char *quoted)
+{
   TokenizerState
     tokenizer;
 
@@ -658,41 +703,14 @@ MagickExport int Tokenizer(TokenInfo *token_info,const unsigned flag,
   tokenizer.line=line;
   tokenizer.break_set=break_set;
   tokenizer.quote=quote;
+  tokenizer.white=white;
+  tokenizer.escape=escape;
   tokenizer.breaker=breaker;
   tokenizer.next=next;
   tokenizer.quoted=quoted;
   for (token_info->offset=0; (int) line[*next] != 0; (*next)++)
-  {
-    c=(int) line[*next];
-    i=sindex(c,break_set);
-    if (i >= 0)
-      {
-        if (TokenizeBreakChar(&tokenizer,c,i) == MagickFalse)
-          return(0);
-        continue;
-      }
-    i=sindex(c,quote);
-    if (i >= 0)
-      {
-        if (TokenizeQuoteChar(&tokenizer,c,i) == MagickFalse)
-          return(0);
-        continue;
-      }
-    i=sindex(c,white);
-    if (i >= 0)
-      {
-        HandleWhiteSpace(token_info,token,max_token_length,c);
-        continue;
-      }
-    if (c == (int) escape)
-      {
-        if (TokenizeEscapeChar(&tokenizer,c) == MagickFalse)
-          return(0);
-        continue;
-      }
-    if (TokenizeTokenChar(&tokenizer,c) == MagickFalse)
+    if (TokenizeChar(&tokenizer) == MagickFalse)
       return(0);
-  }
   token[token_info->offset]='\0';
   return(0);
 }
