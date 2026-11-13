@@ -413,6 +413,24 @@ static MagickBooleanType CopyLiteralFilename(const char *format,
   return(MagickFalse);
 }
 
+static MagickBooleanType CopyFilenameCharacter(char **p,
+  const char **cursor,const char **start)
+{
+  if (*(*cursor) != '%')
+    {
+      *(*p)++=(*(*cursor)++);
+      return(MagickTrue);
+    }
+  (*start)=(*cursor)++;  /* Skip '%' */
+  if (*(*cursor) == '%')
+    {
+      *(*p)++='%';
+      (*cursor)++;
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 MagickExport size_t InterpretImageFilename(const ImageInfo *image_info,
   Image *image,const char *format,int value,char *filename,
   ExceptionInfo *exception)
@@ -442,18 +460,8 @@ MagickExport size_t InterpretImageFilename(const ImageInfo *image_info,
     FilenameExpansion
       expansion;
 
-    if (*cursor != '%')
-      {
-        *p++=(*cursor++);
-        continue;
-      }
-    start=cursor++;  /* Skip '%' */
-    if (*cursor == '%')
-      {
-        *p++='%';
-        cursor++;
-        continue;
-      }
+    if (CopyFilenameCharacter(&p,&cursor,&start) != MagickFalse)
+      continue;
     specifier_start=cursor;
     while (isdigit((int) ((unsigned char) *cursor)) != 0)
       cursor++;
