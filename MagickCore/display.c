@@ -3463,6 +3463,75 @@ static void XScaleChopInfo(const XWindows *windows,Image **image,
   (*chop_info).height=(unsigned int) (scale_factor*(*chop_info).height+0.5);
 }
 
+typedef struct _ChopEventInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+} ChopEventInput;
+
+static size_t XChopKeyPress(const ChopEventInput *input,XEvent *event,
+  size_t state)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  if ((*event).xkey.window != windows->image.id)
+    return(state);
+  /*
+    Respond to a user key press.
+  */
+  (void) XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  switch ((int) key_symbol)
+  {
+    case XK_Escape:
+    case XK_F20:
+    {
+      /*
+        Prematurely exit.
+      */
+      state|=EscapeState;
+      state|=ExitState;
+      break;
+    }
+    case XK_F1:
+    case XK_Help:
+    {
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXcopy);
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Chop",ImageChopHelp);
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXinvert);
+      break;
+    }
+    default:
+    {
+      (void) XBell(display,0);
+      break;
+    }
+  }
+  return(state);
+}
+
 static MagickBooleanType XChopImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -3517,6 +3586,9 @@ static MagickBooleanType XChopImage(Display *display,
 
   XSegment
     segment_info;
+
+  const ChopEventInput
+    input = { display, resource_info, windows };
 
   /*
     Map Command widget.
@@ -3624,48 +3696,7 @@ static MagickBooleanType XChopImage(Display *display,
         break;
       case KeyPress:
       {
-        char
-          command[MagickPathExtent];
-
-        KeySym
-          key_symbol;
-
-        if (event.xkey.window != windows->image.id)
-          break;
-        /*
-          Respond to a user key press.
-        */
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        switch ((int) key_symbol)
-        {
-          case XK_Escape:
-          case XK_F20:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-          case XK_F1:
-          case XK_Help:
-          {
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXcopy);
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Image Chop",ImageChopHelp);
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXinvert);
-            break;
-          }
-          default:
-          {
-            (void) XBell(display,0);
-            break;
-          }
-        }
+        state=XChopKeyPress(&input,&event,state);
         break;
       }
       case MotionNotify:
