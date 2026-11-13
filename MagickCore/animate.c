@@ -4404,13 +4404,89 @@ static void XCreateIconContext(const AnimateWindowSetup *setup,
   windows->icon.annotate_context=icon_pixel->annotate_context;
 }
 
+static void XCreateImageWindowInfo(const AnimateWindowSetup *setup,
+  ExceptionInfo *exception)
+{
+  char
+    geometry[MagickPathExtent];
+
+  Display
+    *const display = setup->display;
+
+  XResourceInfo
+    *const resource_info = setup->resource_info;
+
+  XWindows
+    *const windows = setup->windows;
+
+  XVisualInfo
+    *const visual_info = setup->visual_info;
+
+  Image
+    *const display_image = setup->display_image;
+
+  RectangleInfo
+    geometry_info;
+
+  XGetWindowInfo(display,visual_info,setup->map_info,setup->pixel,
+    setup->font_info,resource_info,&windows->image);
+  windows->image.shape=MagickTrue;  /* non-rectangular shape hint */
+  if (resource_info->use_shared_memory == MagickFalse)
+    windows->image.shared_memory=MagickFalse;
+  if (resource_info->title != (char *) NULL)
+    {
+      char
+        *title;
+
+      title=InterpretImageProperties(resource_info->image_info,display_image,
+        resource_info->title,exception);
+      (void) CloneString(&windows->image.name,title);
+      (void) CloneString(&windows->image.icon_name,title);
+      title=DestroyString(title);
+    }
+  else
+    {
+      char
+        filename[MagickPathExtent],
+        window_name[MagickPathExtent];
+
+      /*
+        Window name is the base of the filename.
+      */
+      GetPathComponent(display_image->magick_filename,TailPath,filename);
+      (void) FormatLocaleString(window_name,MagickPathExtent,
+        "%s: %s[scene: %.17g frames: %.17g]",MagickPackageName,filename,(double)
+        display_image->scene,(double) setup->number_scenes);
+      (void) CloneString(&windows->image.name,window_name);
+      (void) CloneString(&windows->image.icon_name,filename);
+    }
+  if (resource_info->immutable != MagickFalse)
+    windows->image.immutable=MagickTrue;
+  windows->image.shape=MagickTrue;
+  windows->image.geometry=resource_info->image_geometry;
+  (void) FormatLocaleString(geometry,MagickPathExtent,"%ux%u+0+0>!",
+    XDisplayWidth(display,visual_info->screen),
+    XDisplayHeight(display,visual_info->screen));
+  geometry_info.width=display_image->columns;
+  geometry_info.height=display_image->rows;
+  geometry_info.x=0;
+  geometry_info.y=0;
+  (void) ParseMetaGeometry(geometry,&geometry_info.x,&geometry_info.y,
+    &geometry_info.width,&geometry_info.height);
+  windows->image.width=(unsigned int) geometry_info.width;
+  windows->image.height=(unsigned int) geometry_info.height;
+  windows->image.attributes.event_mask=ButtonMotionMask | ButtonPressMask |
+    ButtonReleaseMask | EnterWindowMask | ExposureMask | KeyPressMask |
+    KeyReleaseMask | LeaveWindowMask | OwnerGrabButtonMask |
+    PropertyChangeMask | StructureNotifyMask | SubstructureNotifyMask;
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
 {
   char
     command[MagickPathExtent],
-    geometry[MagickPathExtent],
     resource_name[MagickPathExtent];
 
   Image
@@ -4422,9 +4498,6 @@ MagickExport Image *XAnimateImages(Display *display,
   MagickStatusType
     context_mask,
     state;
-
-  RectangleInfo
-    geometry_info;
 
   ssize_t
     first_scene,
@@ -4595,57 +4668,7 @@ MagickExport Image *XAnimateImages(Display *display,
   /*
     Initialize Image window.
   */
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->image);
-  windows->image.shape=MagickTrue;  /* non-rectangular shape hint */
-  if (resource_info->use_shared_memory == MagickFalse)
-    windows->image.shared_memory=MagickFalse;
-  if (resource_info->title != (char *) NULL)
-    {
-      char
-        *title;
-
-      title=InterpretImageProperties(resource_info->image_info,display_image,
-        resource_info->title,exception);
-      (void) CloneString(&windows->image.name,title);
-      (void) CloneString(&windows->image.icon_name,title);
-      title=DestroyString(title);
-    }
-  else
-    {
-      char
-        filename[MagickPathExtent],
-        window_name[MagickPathExtent];
-
-      /*
-        Window name is the base of the filename.
-      */
-      GetPathComponent(display_image->magick_filename,TailPath,filename);
-      (void) FormatLocaleString(window_name,MagickPathExtent,
-        "%s: %s[scene: %.17g frames: %.17g]",MagickPackageName,filename,(double)
-        display_image->scene,(double) number_scenes);
-      (void) CloneString(&windows->image.name,window_name);
-      (void) CloneString(&windows->image.icon_name,filename);
-    }
-  if (resource_info->immutable != MagickFalse)
-    windows->image.immutable=MagickTrue;
-  windows->image.shape=MagickTrue;
-  windows->image.geometry=resource_info->image_geometry;
-  (void) FormatLocaleString(geometry,MagickPathExtent,"%ux%u+0+0>!",
-    XDisplayWidth(display,visual_info->screen),
-    XDisplayHeight(display,visual_info->screen));
-  geometry_info.width=display_image->columns;
-  geometry_info.height=display_image->rows;
-  geometry_info.x=0;
-  geometry_info.y=0;
-  (void) ParseMetaGeometry(geometry,&geometry_info.x,&geometry_info.y,
-    &geometry_info.width,&geometry_info.height);
-  windows->image.width=(unsigned int) geometry_info.width;
-  windows->image.height=(unsigned int) geometry_info.height;
-  windows->image.attributes.event_mask=ButtonMotionMask | ButtonPressMask |
-    ButtonReleaseMask | EnterWindowMask | ExposureMask | KeyPressMask |
-    KeyReleaseMask | LeaveWindowMask | OwnerGrabButtonMask |
-    PropertyChangeMask | StructureNotifyMask | SubstructureNotifyMask;
+  XCreateImageWindowInfo(&setup,exception);
   XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
     resource_info,&windows->backdrop);
   if ((resource_info->backdrop) || (windows->backdrop.id != (Window) NULL))
