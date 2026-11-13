@@ -1242,6 +1242,33 @@ static void GetNSExecutablePath(char *path,const size_t extent)
 }
 #endif
 
+#if defined(MAGICKCORE_HAVE_GETPID) && defined(MAGICKCORE_HAVE_READLINK) && defined(PATH_MAX)
+static void GetProcExecutionPath(char *path,const size_t extent)
+{
+  char
+    execution_path[PATH_MAX+1],
+    link_path[MagickPathExtent];
+
+  ssize_t
+    count;
+
+  (void) FormatLocaleString(link_path,MagickPathExtent,"/proc/%.17g/exe",
+    (double) getpid());
+  count=readlink(link_path,execution_path,PATH_MAX);
+  if (count == -1)
+    {
+      (void) FormatLocaleString(link_path,MagickPathExtent,"/proc/%.17g/file",
+        (double) getpid());
+      count=readlink(link_path,execution_path,PATH_MAX);
+    }
+  if ((count > 0) && (count <= (ssize_t) PATH_MAX))
+    {
+      execution_path[count]='\0';
+      (void) CopyMagickString(path,execution_path,extent);
+    }
+}
+#endif
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1276,29 +1303,7 @@ MagickPrivate MagickBooleanType GetExecutionPath(char *path,const size_t extent)
   directory=getcwd(path,(unsigned long) extent);
   (void) directory;
 #if defined(MAGICKCORE_HAVE_GETPID) && defined(MAGICKCORE_HAVE_READLINK) && defined(PATH_MAX)
-  {
-    char
-      execution_path[PATH_MAX+1],
-      link_path[MagickPathExtent];
-
-    ssize_t
-      count;
-
-    (void) FormatLocaleString(link_path,MagickPathExtent,"/proc/%.17g/exe",
-      (double) getpid());
-    count=readlink(link_path,execution_path,PATH_MAX);
-    if (count == -1)
-      {
-        (void) FormatLocaleString(link_path,MagickPathExtent,"/proc/%.17g/file",
-          (double) getpid());
-        count=readlink(link_path,execution_path,PATH_MAX);
-      }
-    if ((count > 0) && (count <= (ssize_t) PATH_MAX))
-      {
-        execution_path[count]='\0';
-        (void) CopyMagickString(path,execution_path,extent);
-      }
-  }
+  GetProcExecutionPath(path,extent);
 #endif
 #if defined(MAGICKCORE_HAVE__NSGETEXECUTABLEPATH)
   GetNSExecutablePath(path,extent);
