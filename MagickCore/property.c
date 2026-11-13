@@ -1323,6 +1323,138 @@ typedef struct _EXIFWalkTargets
     *directory_stack;
 } EXIFWalkTargets;
 
+typedef struct _EXIFTagInfo
+{
+  size_t
+    tag_value,
+    format;
+
+  ssize_t
+    components,
+    number_bytes;
+
+  unsigned char
+    *p;
+} EXIFTagInfo;
+
+static char *AcquireEXIFTagValue(const EXIFWalkInfo *walk,
+  const EXIFTagInfo *exif_tag)
+{
+  const EndianType
+    endian = walk->endian;
+
+  const unsigned char
+    *const exif = walk->exif;
+
+  const size_t
+    length = walk->length;
+
+  const size_t
+    tag_value = exif_tag->tag_value,
+    format = exif_tag->format;
+
+  ssize_t
+    components = exif_tag->components;
+
+  const ssize_t
+    number_bytes = exif_tag->number_bytes;
+
+  unsigned char
+    *const p = exif_tag->p;
+
+  char
+    buffer[6*sizeof(double)+MagickPathExtent],
+    *value;
+
+  value=(char *) NULL;
+  *buffer='\0';
+  switch (format)
+  {
+    case EXIF_FMT_BYTE:
+    {
+      value=AcquireEXIFByteValue(p,number_bytes);
+      break;
+    }
+    case EXIF_FMT_SBYTE:
+    {
+      EXIFMultipleValues("%.17g",(double) (*(signed char *) p));
+      break;
+    }
+    case EXIF_FMT_SSHORT:
+    {
+      EXIFMultipleValues("%hd",ReadPropertySignedShort(endian,p));
+      break;
+    }
+    case EXIF_FMT_USHORT:
+    {
+      EXIFMultipleValues("%hu",ReadPropertyUnsignedShort(endian,p));
+      break;
+    }
+    case EXIF_FMT_ULONG:
+    {
+      EXIFMultipleValues("%.17g",(double)
+        ReadPropertyUnsignedLong(endian,p));
+      break;
+    }
+    case EXIF_FMT_SLONG:
+    {
+      EXIFMultipleValues("%.17g",(double)
+        ReadPropertySignedLong(endian,p));
+      break;
+    }
+    case EXIF_FMT_URATIONAL:
+    {
+      if (IsGPSFractionTag(tag_value) != MagickFalse)
+        {
+          if (number_bytes < 24)
+            break;  /* reads three rationals */
+          components=1;
+          EXIFGPSFractions("%.17g/%.17g,%.17g/%.17g,%.17g/%.17g",
+            (double) ReadPropertyUnsignedLong(endian,p),
+            (double) ReadPropertyUnsignedLong(endian,p+4),
+            (double) ReadPropertyUnsignedLong(endian,p+8),
+            (double) ReadPropertyUnsignedLong(endian,p+12),
+            (double) ReadPropertyUnsignedLong(endian,p+16),
+            (double) ReadPropertyUnsignedLong(endian,p+20));
+          break;
+        }
+      EXIFMultipleFractions("%.17g/%.17g",(double)
+        ReadPropertyUnsignedLong(endian,p),(double)
+        ReadPropertyUnsignedLong(endian,p+4));
+      break;
+    }
+    case EXIF_FMT_SRATIONAL:
+    {
+      EXIFMultipleFractions("%.17g/%.17g",(double)
+        ReadPropertySignedLong(endian,p),(double)
+        ReadPropertySignedLong(endian,p+4));
+      break;
+    }
+    case EXIF_FMT_SINGLE:
+    {
+      EXIFMultipleValues("%.17g",(double)
+        ReadPropertySignedLong(endian,p));
+      break;
+    }
+    case EXIF_FMT_DOUBLE:
+    {
+      EXIFMultipleValues("%.17g",(double)
+        ReadPropertySignedLong(endian,p));
+      break;
+    }
+    case EXIF_FMT_STRING:
+    case EXIF_FMT_UNDEFINED:
+    default:
+    {
+      if ((p < exif) || (p > (exif+length-number_bytes)))
+        break;
+      value=AcquireEXIFStringValue(p,number_bytes);
+      break;
+    }
+  }
+  return(value);
+}
+
 static void GetEXIFDirectory(const EXIFWalkInfo *walk,
   const EXIFWalkTargets *targets)
 {
@@ -1384,6 +1516,9 @@ static void GetEXIFDirectory(const EXIFWalkInfo *walk,
   number_entries=(size_t) ReadPropertyUnsignedShort(endian,directory);
   for ( ; (*entry) < number_entries; (*entry)++)
   {
+    EXIFTagInfo
+      exif_tag;
+
     size_t
       format;
 
@@ -1433,100 +1568,19 @@ static void GetEXIFDirectory(const EXIFWalkInfo *walk,
           continue;
         p=(unsigned char *) (exif+dir_offset);
       }
+    exif_tag.tag_value=tag_value;
+    exif_tag.format=format;
+    exif_tag.components=components;
+    exif_tag.number_bytes=number_bytes;
+    exif_tag.p=p;
     if ((all != 0) || (tag == (size_t) tag_value))
       {
         char
-          buffer[6*sizeof(double)+MagickPathExtent],
           *value;
 
         if ((p < exif) || (p > (exif+length-tag_bytes[format])))
           break;
-        value=(char *) NULL;
-        *buffer='\0';
-        switch (format)
-        {
-          case EXIF_FMT_BYTE:
-          {
-            value=AcquireEXIFByteValue(p,number_bytes);
-            break;
-          }
-          case EXIF_FMT_SBYTE:
-          {
-            EXIFMultipleValues("%.17g",(double) (*(signed char *) p));
-            break;
-          }
-          case EXIF_FMT_SSHORT:
-          {
-            EXIFMultipleValues("%hd",ReadPropertySignedShort(endian,p));
-            break;
-          }
-          case EXIF_FMT_USHORT:
-          {
-            EXIFMultipleValues("%hu",ReadPropertyUnsignedShort(endian,p));
-            break;
-          }
-          case EXIF_FMT_ULONG:
-          {
-            EXIFMultipleValues("%.17g",(double)
-              ReadPropertyUnsignedLong(endian,p));
-            break;
-          }
-          case EXIF_FMT_SLONG:
-          {
-            EXIFMultipleValues("%.17g",(double)
-              ReadPropertySignedLong(endian,p));
-            break;
-          }
-          case EXIF_FMT_URATIONAL:
-          {
-            if (IsGPSFractionTag(tag_value) != MagickFalse)
-              {
-                if (number_bytes < 24)
-                  break;  /* reads three rationals */
-                components=1;
-                EXIFGPSFractions("%.17g/%.17g,%.17g/%.17g,%.17g/%.17g",
-                  (double) ReadPropertyUnsignedLong(endian,p),
-                  (double) ReadPropertyUnsignedLong(endian,p+4),
-                  (double) ReadPropertyUnsignedLong(endian,p+8),
-                  (double) ReadPropertyUnsignedLong(endian,p+12),
-                  (double) ReadPropertyUnsignedLong(endian,p+16),
-                  (double) ReadPropertyUnsignedLong(endian,p+20));
-                break;
-              }
-            EXIFMultipleFractions("%.17g/%.17g",(double)
-              ReadPropertyUnsignedLong(endian,p),(double)
-              ReadPropertyUnsignedLong(endian,p+4));
-            break;
-          }
-          case EXIF_FMT_SRATIONAL:
-          {
-            EXIFMultipleFractions("%.17g/%.17g",(double)
-              ReadPropertySignedLong(endian,p),(double)
-              ReadPropertySignedLong(endian,p+4));
-            break;
-          }
-          case EXIF_FMT_SINGLE:
-          {
-            EXIFMultipleValues("%.17g",(double)
-              ReadPropertySignedLong(endian,p));
-            break;
-          }
-          case EXIF_FMT_DOUBLE:
-          {
-            EXIFMultipleValues("%.17g",(double)
-              ReadPropertySignedLong(endian,p));
-            break;
-          }
-          case EXIF_FMT_STRING:
-          case EXIF_FMT_UNDEFINED:
-          default:
-          {
-            if ((p < exif) || (p > (exif+length-number_bytes)))
-              break;
-            value=AcquireEXIFStringValue(p,number_bytes);
-            break;
-          }
-        }
+        value=AcquireEXIFTagValue(walk,&exif_tag);
         if (value != (char *) NULL)
           {
             char
