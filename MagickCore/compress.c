@@ -802,6 +802,18 @@ static void OutputHuffmanEndOfLine(const ImageInfo *image_info,Image *image,
   (*caller_bit)=bit;
 }
 
+static void FlushHuffmanBits(const ImageInfo *image_info,Image *image,
+  const unsigned char byte,const unsigned char bit)
+{
+  if (((int) bit != 0x80) != 0)
+    {
+      if (LocaleCompare(image_info->magick,"FAX") == 0)
+        (void) WriteBlobByte(image,byte);
+      else
+        Ascii85Encode(image,byte);
+    }
+}
+
 MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
   Image *image,Image *inject_image,ExceptionInfo *exception)
 {
@@ -946,13 +958,7 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
   /*
     Flush bits.
   */
-  if (((int) bit != 0x80) != 0)
-    {
-      if (LocaleCompare(image_info->magick,"FAX") == 0)
-        (void) WriteBlobByte(image,byte);
-      else
-        Ascii85Encode(image,byte);
-    }
+  FlushHuffmanBits(image_info,image,byte,bit);
   if (LocaleCompare(image_info->magick,"FAX") != 0)
     Ascii85Flush(image);
   huffman_image=DestroyImage(huffman_image);
