@@ -178,24 +178,15 @@ static void *DestroyTypeNode(void *type_info)
     *p;
 
   p=(TypeInfo *) type_info;
-  if (p->path != (char *) NULL)
-    p->path=DestroyString(p->path);
-  if (p->name != (char *) NULL)
-    p->name=DestroyString(p->name);
-  if (p->description != (char *) NULL)
-    p->description=DestroyString(p->description);
-  if (p->family != (char *) NULL)
-    p->family=DestroyString(p->family);
-  if (p->encoding != (char *) NULL)
-    p->encoding=DestroyString(p->encoding);
-  if (p->foundry != (char *) NULL)
-    p->foundry=DestroyString(p->foundry);
-  if (p->format != (char *) NULL)
-    p->format=DestroyString(p->format);
-  if (p->metrics != (char *) NULL)
-    p->metrics=DestroyString(p->metrics);
-  if (p->glyphs != (char *) NULL)
-    p->glyphs=DestroyString(p->glyphs);
+  p->path=DestroyString(p->path);
+  p->name=DestroyString(p->name);
+  p->description=DestroyString(p->description);
+  p->family=DestroyString(p->family);
+  p->encoding=DestroyString(p->encoding);
+  p->foundry=DestroyString(p->foundry);
+  p->format=DestroyString(p->format);
+  p->metrics=DestroyString(p->metrics);
+  p->glyphs=DestroyString(p->glyphs);
   return(RelinquishMagickMemory(p));
 }
 
@@ -339,22 +330,22 @@ MagickExport const TypeInfo *GetTypeInfo(const char *name,
 static inline MagickBooleanType IsStyleMismatch(const TypeInfo *p,
   const StyleType style)
 {
-  return(((style != UndefinedStyle) && (style != AnyStyle) &&
-    (p->style != style)) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((style != UndefinedStyle) &&
+    (style != AnyStyle) && (p->style != style)));
 }
 
 static inline MagickBooleanType IsStretchMismatch(const TypeInfo *p,
   const StretchType stretch)
 {
-  return(((stretch != UndefinedStretch) && (stretch != AnyStretch) &&
-    (p->stretch != stretch)) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((stretch != UndefinedStretch) &&
+    (stretch != AnyStretch) && (p->stretch != stretch)));
 }
 
 static inline MagickBooleanType IsStyleMatch(const TypeInfo *p,
   const StyleType style)
 {
-  return(((style == UndefinedStyle) || (style == AnyStyle) ||
-    (p->style == style)) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((style == UndefinedStyle) ||
+    (style == AnyStyle) || (p->style == style)));
 }
 
 static inline MagickBooleanType IsSlantedStyleMatch(const TypeInfo *p,
@@ -397,9 +388,9 @@ static size_t GetTypeScore(const TypeInfo *p,const StyleType style,
 static MagickBooleanType IsFamilyMismatch(const char *name,const char *family)
 {
   if (family == (const char *) NULL)
-    return(((LocaleCompare(name,"arial") != 0) &&
-      (LocaleCompare(name,"helvetica") != 0)) ? MagickTrue : MagickFalse);
-  return(LocaleCompare(name,family) != 0 ? MagickTrue : MagickFalse);
+    return((MagickBooleanType) ((LocaleCompare(name,"arial") != 0) &&
+      (LocaleCompare(name,"helvetica") != 0)));
+  return((MagickBooleanType) (LocaleCompare(name,family) != 0));
 }
 
 static MagickBooleanType IsFaceMismatch(const TypeInfo *p,
@@ -409,7 +400,7 @@ static MagickBooleanType IsFaceMismatch(const TypeInfo *p,
     return(MagickTrue);
   if (IsStretchMismatch(p,stretch) != MagickFalse)
     return(MagickTrue);
-  return(p->weight != font_weight ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (p->weight != font_weight));
 }
 
 static const TypeInfo *GetExactTypeInfo(const char *family,
@@ -487,6 +478,15 @@ static const TypeInfo *GetBestFamilyTypeInfo(const char *family,
   return(type_info);
 }
 
+static inline size_t GetDefaultFontWeight(const size_t weight)
+{
+  size_t
+    font_weight;
+
+  font_weight=(size_t) (weight == 0 ? 400 : weight);
+  return(font_weight);
+}
+
 MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
   const StyleType style,const StretchType stretch,const size_t weight,
   ExceptionInfo *exception)
@@ -525,7 +525,7 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
   (void) GetTypeInfo("*",exception);
   if (type_cache == (SplayTreeInfo *) NULL)
     return((TypeInfo *) NULL);
-  font_weight=(size_t) (weight == 0 ? 400 : weight);
+  font_weight=GetDefaultFontWeight(weight);
   type_info=GetExactTypeInfo(family,style,stretch,font_weight);
   if (type_info != (const TypeInfo *) NULL)
     return(type_info);
@@ -926,12 +926,40 @@ static MagickBooleanType GetFontConfigFile(FcPattern *font,FcChar8 **family,
   return(MagickTrue);
 }
 
-MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
-  ExceptionInfo *exception)
+static void SetFontConfigTypeInfo(TypeInfo *type_info,FcPattern *font,
+  FcChar8 *family,FcChar8 *file)
 {
   char
     name[MagickPathExtent];
 
+  FcResult
+    status;
+
+  int
+    index,
+    slant,
+    width,
+    weight;
+
+  GetFontConfigName(font,family,name);
+  type_info->name=ConstantString(name);
+  (void) SubstituteString(&type_info->name," ","-");
+  type_info->family=ConstantString((const char *) family);
+  status=FcPatternGetInteger(font,FC_INDEX,0,&index);
+  if (status == FcResultMatch)
+    type_info->face=(size_t) index;
+  status=FcPatternGetInteger(font,FC_SLANT,0,&slant);
+  type_info->style=GetFontConfigStyle(slant);
+  status=FcPatternGetInteger(font,FC_WIDTH,0,&width);
+  type_info->stretch=GetFontConfigStretch(width);
+  status=FcPatternGetInteger(font,FC_WEIGHT,0,&weight);
+  type_info->weight=GetFontConfigWeight(weight);
+  type_info->glyphs=ConstantString((const char *) file);
+}
+
+MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
+  ExceptionInfo *exception)
+{
   FcBool
     result;
 
@@ -944,15 +972,6 @@ MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
 
   FcFontSet
     *font_set;
-
-  FcResult
-    status;
-
-  int
-    index,
-    slant,
-    width,
-    weight;
 
   ssize_t
     i;
@@ -987,20 +1006,7 @@ MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
     (void) memset(type_info,0,sizeof(*type_info));
     type_info->path=ConstantString("System Fonts");
     type_info->signature=MagickCoreSignature;
-    GetFontConfigName(font_set->fonts[i],family,name);
-    type_info->name=ConstantString(name);
-    (void) SubstituteString(&type_info->name," ","-");
-    type_info->family=ConstantString((const char *) family);
-    status=FcPatternGetInteger(font_set->fonts[i],FC_INDEX,0,&index);
-    if (status == FcResultMatch)
-      type_info->face=(size_t) index;
-    status=FcPatternGetInteger(font_set->fonts[i],FC_SLANT,0,&slant);
-    type_info->style=GetFontConfigStyle(slant);
-    status=FcPatternGetInteger(font_set->fonts[i],FC_WIDTH,0,&width);
-    type_info->stretch=GetFontConfigStretch(width);
-    status=FcPatternGetInteger(font_set->fonts[i],FC_WEIGHT,0,&weight);
-    type_info->weight=GetFontConfigWeight(weight);
-    type_info->glyphs=ConstantString((const char *) file);
+    SetFontConfigTypeInfo(type_info,font_set->fonts[i],family,file);
     (void) AddValueToSplayTree(type_cache,type_info->name,type_info);
   }
   FcFontSetDestroy(font_set);
@@ -1032,7 +1038,7 @@ static MagickBooleanType IsTypeTreeInstantiated(ExceptionInfo *exception)
         }
       UnlockSemaphoreInfo(type_semaphore);
     }
-  return(type_cache != (SplayTreeInfo *) NULL ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (type_cache != (SplayTreeInfo *) NULL));
 }
 
 /*
@@ -1062,21 +1068,52 @@ static MagickBooleanType IsTypeTreeInstantiated(ExceptionInfo *exception)
 static inline MagickBooleanType IsNewTypePath(const char *path,
   const TypeInfo **type_info,const ssize_t i)
 {
-  return((((path == (const char *) NULL) ||
+  return((MagickBooleanType) (((path == (const char *) NULL) ||
     (LocaleCompare(path,type_info[i]->path) != 0)) &&
-    (type_info[i]->path != (char *) NULL)) ? MagickTrue : MagickFalse);
+    (type_info[i]->path != (char *) NULL)));
 }
 
-MagickExport MagickBooleanType ListTypeInfo(FILE *file,ExceptionInfo *exception)
+static void PrintTypeInfo(FILE *file,const TypeInfo **type_info,
+  const ssize_t i)
 {
   const char
     *family,
     *glyphs,
     *metrics,
     *name,
-    *path,
     *stretch,
     *style;
+
+  name="not defined";
+  if (type_info[i]->name != (char *) NULL)
+    name=type_info[i]->name;
+  family="not defined";
+  if (type_info[i]->family != (char *) NULL)
+    family=type_info[i]->family;
+  style=CommandOptionToMnemonic(MagickStyleOptions,type_info[i]->style);
+  stretch=CommandOptionToMnemonic(MagickStretchOptions,type_info[i]->stretch);
+  metrics="not defined";
+  if (type_info[i]->metrics != (char *) NULL)
+    metrics=type_info[i]->metrics;
+  glyphs="not defined";
+  if (type_info[i]->glyphs != (char *) NULL)
+    glyphs=type_info[i]->glyphs;
+  (void) FormatLocaleFile(file,"  Font: %s\n",name);
+  (void) FormatLocaleFile(file,"    family: %s\n",family);
+  (void) FormatLocaleFile(file,"    style: %s\n",style);
+  (void) FormatLocaleFile(file,"    stretch: %s\n",stretch);
+  (void) FormatLocaleFile(file,"    weight: %.17g\n",(double)
+    type_info[i]->weight);
+  (void) FormatLocaleFile(file,"    metrics: %s\n",metrics);
+  (void) FormatLocaleFile(file,"    glyphs: %s\n",glyphs);
+  (void) FormatLocaleFile(file,"    index: %d\n",(int)
+    type_info[i]->face);
+}
+
+MagickExport MagickBooleanType ListTypeInfo(FILE *file,ExceptionInfo *exception)
+{
+  const char
+    *path;
 
   const TypeInfo
     **type_info;
@@ -1101,30 +1138,7 @@ MagickExport MagickBooleanType ListTypeInfo(FILE *file,ExceptionInfo *exception)
     if (IsNewTypePath(path,type_info,i) != MagickFalse)
       (void) FormatLocaleFile(file,"\nPath: %s\n",type_info[i]->path);
     path=type_info[i]->path;
-    name="not defined";
-    if (type_info[i]->name != (char *) NULL)
-      name=type_info[i]->name;
-    family="not defined";
-    if (type_info[i]->family != (char *) NULL)
-      family=type_info[i]->family;
-    style=CommandOptionToMnemonic(MagickStyleOptions,type_info[i]->style);
-    stretch=CommandOptionToMnemonic(MagickStretchOptions,type_info[i]->stretch);
-    metrics="not defined";
-    if (type_info[i]->metrics != (char *) NULL)
-      metrics=type_info[i]->metrics;
-    glyphs="not defined";
-    if (type_info[i]->glyphs != (char *) NULL)
-      glyphs=type_info[i]->glyphs;
-    (void) FormatLocaleFile(file,"  Font: %s\n",name);
-    (void) FormatLocaleFile(file,"    family: %s\n",family);
-    (void) FormatLocaleFile(file,"    style: %s\n",style);
-    (void) FormatLocaleFile(file,"    stretch: %s\n",stretch);
-    (void) FormatLocaleFile(file,"    weight: %.17g\n",(double)
-      type_info[i]->weight);
-    (void) FormatLocaleFile(file,"    metrics: %s\n",metrics);
-    (void) FormatLocaleFile(file,"    glyphs: %s\n",glyphs);
-    (void) FormatLocaleFile(file,"    index: %d\n",(int)
-      type_info[i]->face);
+    PrintTypeInfo(file,type_info,i);
   }
   (void) fflush(file);
   type_info=(const TypeInfo **) RelinquishMagickMemory((void *) type_info);
@@ -1251,10 +1265,30 @@ static MagickBooleanType SetTypeInfoText(TypeInfo *type_info,
   return(MagickTrue);
 }
 
+static MagickBooleanType SetTypeInfoStyle(TypeInfo *type_info,
+  const char *keyword,const char *token)
+{
+  if (LocaleCompare((char *) keyword,"stealth") == 0)
+    type_info->stealth=IsStringTrue(token);
+  else if (LocaleCompare((char *) keyword,"stretch") == 0)
+    type_info->stretch=(StretchType) ParseCommandOption(
+      MagickStretchOptions,MagickFalse,token);
+  else if (LocaleCompare((char *) keyword,"style") == 0)
+    type_info->style=(StyleType) ParseCommandOption(MagickStyleOptions,
+      MagickFalse,token);
+  else if (LocaleCompare((char *) keyword,"weight") == 0)
+    type_info->weight=ParseTypeWeight(token);
+  else
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static TypeInfo *SetTypeInfoAttribute(TypeInfo *type_info,const char *keyword,
   const char *token,const char *filename,char *font_path)
 {
   if (SetTypeInfoText(type_info,keyword,token) != MagickFalse)
+    return(type_info);
+  if (SetTypeInfoStyle(type_info,keyword,token) != MagickFalse)
     return(type_info);
   if (LocaleCompare((char *) keyword,"face") == 0)
     type_info->face=StringToUnsignedLong(token);
@@ -1266,16 +1300,6 @@ static TypeInfo *SetTypeInfoAttribute(TypeInfo *type_info,const char *keyword,
            (SetTypeNodePath(filename,font_path,token,&type_info->metrics) ==
             MagickFalse))
     type_info=(TypeInfo *) DestroyTypeNode(type_info);
-  else if (LocaleCompare((char *) keyword,"stealth") == 0)
-    type_info->stealth=IsStringTrue(token);
-  else if (LocaleCompare((char *) keyword,"stretch") == 0)
-    type_info->stretch=(StretchType) ParseCommandOption(
-      MagickStretchOptions,MagickFalse,token);
-  else if (LocaleCompare((char *) keyword,"style") == 0)
-    type_info->style=(StyleType) ParseCommandOption(MagickStyleOptions,
-      MagickFalse,token);
-  else if (LocaleCompare((char *) keyword,"weight") == 0)
-    type_info->weight=ParseTypeWeight(token);
   return(type_info);
 }
 
@@ -1330,7 +1354,7 @@ static MagickBooleanType IsIncludeFileAttribute(const char **q,
   if (*token != '=')
     return(MagickFalse);
   (void) GetNextToken(*q,q,extent,token);
-  return(LocaleCompare(keyword,"file") == 0 ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (LocaleCompare(keyword,"file") == 0));
 }
 
 static MagickBooleanType LoadTypeInclude(const TypeLoadTarget *target,
@@ -1357,6 +1381,34 @@ static MagickBooleanType LoadTypeInclude(const TypeLoadTarget *target,
       file_xml=(char *) RelinquishMagickMemory(file_xml);
     }
   return(status);
+}
+
+static inline MagickBooleanType IsElementEnd(const char *keyword)
+{
+  return(((LocaleCompare(keyword,"/>") == 0) ||
+    (LocaleCompare(keyword,"</policy>") == 0)) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType SkipMarkupElement(const char *keyword,
+  const char **q,const size_t extent,char *token)
+{
+  if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
+    {
+      /*
+        DOCTYPE element.
+      */
+      (*q)=SkipDoctypeElement((*q));
+      return(MagickTrue);
+    }
+  if (LocaleNCompare(keyword,"<!--",4) == 0)
+    {
+      /*
+        Comment element.
+      */
+      (*q)=SkipCommentElement((*q),extent,token);
+      return(MagickTrue);
+    }
+  return(MagickFalse);
 }
 
 static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
@@ -1415,22 +1467,8 @@ static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
     if (*token == '\0')
       break;
     (void) CopyMagickString(keyword,token,MagickPathExtent);
-    if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
-      {
-        /*
-          DOCTYPE element.
-        */
-        q=SkipDoctypeElement(q);
-        continue;
-      }
-    if (LocaleNCompare(keyword,"<!--",4) == 0)
-      {
-        /*
-          Comment element.
-        */
-        q=SkipCommentElement(q,extent,token);
-        continue;
-      }
+    if (SkipMarkupElement(keyword,&q,extent,token) != MagickFalse)
+      continue;
     if (LocaleCompare(keyword,"<include") == 0)
       {
         /*
@@ -1462,8 +1500,7 @@ static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
       }
     if (type_info == (TypeInfo *) NULL)
       continue;
-    if ((LocaleCompare(keyword,"/>") == 0) ||
-        (LocaleCompare(keyword,"</policy>") == 0))
+    if (IsElementEnd(keyword) != MagickFalse)
       {
         status=AddValueToSplayTree(cache,type_info->name,type_info);
         if (status == MagickFalse)
@@ -1481,7 +1518,7 @@ static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
       font_path);
   }
   token=(char *) RelinquishMagickMemory(token);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (status != 0));
 }
 
 /*

@@ -466,6 +466,22 @@ static MagickBooleanType VerifyBase64Padding(const char *p,const int state,
   return(MagickTrue);
 }
 
+static MagickBooleanType VerifyBase64Terminal(const char *p,const int state,
+  unsigned char *decode,const size_t i)
+{
+  if (*p != '=')
+    {
+      if (state != 0)
+        {
+          decode=(unsigned char *) RelinquishMagickMemory(decode);
+          return(MagickFalse);
+        }
+    }
+  else if (VerifyBase64Padding(p,state,decode,i) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport unsigned char *Base64Decode(const char *source,size_t *length)
 {
   int
@@ -509,19 +525,8 @@ MagickExport unsigned char *Base64Decode(const char *source,size_t *length)
   /*
     Verify Base-64 string has proper terminal characters.
   */
-  if (*p != '=')
-    {
-      if (state != 0)
-        {
-          decode=(unsigned char *) RelinquishMagickMemory(decode);
-          return((unsigned char *) NULL);
-        }
-    }
-  else
-    {
-      if (VerifyBase64Padding(p,state,decode,i) == MagickFalse)
-        return((unsigned char *) NULL);
-    }
+  if (VerifyBase64Terminal(p,state,decode,i) == MagickFalse)
+    return((unsigned char *) NULL);
   *length=i;
   return(decode);
 }
@@ -1062,6 +1067,76 @@ static void ComposeListedFilename(char *filename,const char *path,
   filelist[j]=DestroyString(filelist[j]);
 }
 
+typedef struct _FileListTransfer
+{
+  char
+    **vector,
+    **filelist;
+
+  size_t
+    number_files;
+
+  const char
+    *path,
+    *magick,
+    *subimage;
+} FileListTransfer;
+
+static void TransferFileList(const FileListTransfer *transfer,char *filename,
+  ssize_t *count,MagickBooleanType *destroy)
+{
+  char
+    **const vector = transfer->vector,
+    **const filelist = transfer->filelist,
+    *option;
+
+  const size_t
+    number_files = transfer->number_files;
+
+  const char
+    *const path = transfer->path,
+    *const magick = transfer->magick,
+    *const subimage = transfer->subimage;
+
+  ssize_t
+    j,
+    parameters;
+
+  for (j=0; j < (ssize_t) number_files; j++)
+  {
+    option=filelist[j];
+    parameters=ParseCommandOption(MagickCommandOptions,MagickFalse,option);
+    if (parameters > 0)
+      {
+        FileListParameters
+          list;
+
+        /*
+          Do not expand command option parameters.
+        */
+        vector[(*count)++]=ConstantString(option);
+        list.vector=vector;
+        list.filelist=filelist;
+        list.number_files=number_files;
+        list.parameters=parameters;
+        CopyFileListParameters(&list,&j,&(*count));
+        continue;
+      }
+    ComposeListedFilename(filename,path,filelist,j);
+    CheckFilenameLength(filename);
+    if (IsPathDirectory(filename) <= 0)
+      {
+        char
+          file_path[MagickPathExtent];
+
+        FormatExpandedPath(file_path,magick,filename,subimage);
+        CheckFilenameLength(file_path);
+        DestroyOriginalArgument(vector,&(*count),&(*destroy));
+        vector[(*count)++]=ConstantString(file_path);
+      }
+  }
+}
+
 MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
   char ***arguments)
 {
@@ -1106,6 +1181,9 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
       path[MagickPathExtent],
       subimage[MagickPathExtent];
 
+    FileListTransfer
+      transfer;
+
     MagickBooleanType
       destroy;
 
@@ -1120,16 +1198,12 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
     parameters=ParseCommandOption(MagickCommandOptions,MagickFalse,option);
     if (parameters > 0)
       {
-        ArgumentParameters
-          list;
+        const ArgumentParameters
+          list = { number_arguments, arguments, vector, parameters };
 
         /*
           Do not expand command option parameters.
         */
-        list.number_arguments=number_arguments;
-        list.arguments=arguments;
-        list.vector=vector;
-        list.parameters=parameters;
         CopyArgumentParameters(&list,&i,&count);
         continue;
       }
@@ -1179,39 +1253,13 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
         filelist=DestroyFileList(filelist,number_files);
         return(MagickFalse);
       }
-    for (j=0; j < (ssize_t) number_files; j++)
-    {
-      option=filelist[j];
-      parameters=ParseCommandOption(MagickCommandOptions,MagickFalse,option);
-      if (parameters > 0)
-        {
-          FileListParameters
-            list;
-
-          /*
-            Do not expand command option parameters.
-          */
-          vector[count++]=ConstantString(option);
-          list.vector=vector;
-          list.filelist=filelist;
-          list.number_files=number_files;
-          list.parameters=parameters;
-          CopyFileListParameters(&list,&j,&count);
-          continue;
-        }
-      ComposeListedFilename(filename,path,filelist,j);
-      CheckFilenameLength(filename);
-      if (IsPathDirectory(filename) <= 0)
-        {
-          char
-            file_path[MagickPathExtent];
-
-          FormatExpandedPath(file_path,magick,filename,subimage);
-          CheckFilenameLength(file_path);
-          DestroyOriginalArgument(vector,&count,&destroy);
-          vector[count++]=ConstantString(file_path);
-        }
-    }
+    transfer.vector=vector;
+    transfer.filelist=filelist;
+    transfer.number_files=number_files;
+    transfer.path=path;
+    transfer.magick=magick;
+    transfer.subimage=subimage;
+    TransferFileList(&transfer,filename,&count,&destroy);
     filelist=(char **) RelinquishMagickMemory(filelist);
   }
   vector[count]=(char *) NULL;
@@ -1697,6 +1745,65 @@ static void GetBasePathSansCompressExtension(const char *path,
     GetPathComponent(path,BasePath,component);
 }
 
+static void SelectPathHeadComponent(char *component,PathType type,char *p)
+{
+  switch (type)
+  {
+    case RootPath:
+    {
+      if (*component != '\0')
+        {
+          RemoveRootExtension(component);
+          break;
+        }
+      magick_fallthrough;
+    }
+    case HeadPath:
+    {
+      *p='\0';
+      break;
+    }
+    case TailPath:
+    {
+      if (IsBasenameSeparator(*p) != MagickFalse)
+        (void) CopyMagickString(component,p+1,MagickPathExtent);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void SelectPathTailComponent(const char *path,PathType type,
+  char *component,char *p)
+{
+  switch (type)
+  {
+    case BasePath:
+    {
+      if (IsBasenameSeparator(*p) != MagickFalse)
+        (void) CopyMagickString(component,p+1,MagickPathExtent);
+      RemoveBaseExtension(component);
+      break;
+    }
+    case BasePathSansCompressExtension:
+    {
+      GetBasePathSansCompressExtension(path,component);
+      break;
+    }
+    case ExtensionPath:
+    {
+      GetExtensionComponent(component,p);
+      break;
+    }
+    default:
+    {
+      SelectPathHeadComponent(component,type,p);
+      break;
+    }
+  }
+}
+
 MagickExport void GetPathComponent(const char *path,PathType type,
   char *component)
 {
@@ -1739,41 +1846,9 @@ MagickExport void GetPathComponent(const char *path,PathType type,
         *component='\0';
       break;
     }
-    case RootPath:
+    default:
     {
-      if (*component != '\0')
-        {
-          RemoveRootExtension(component);
-          break;
-        }
-      magick_fallthrough;
-    }
-    case HeadPath:
-    {
-      *p='\0';
-      break;
-    }
-    case TailPath:
-    {
-      if (IsBasenameSeparator(*p) != MagickFalse)
-        (void) CopyMagickString(component,p+1,MagickPathExtent);
-      break;
-    }
-    case BasePath:
-    {
-      if (IsBasenameSeparator(*p) != MagickFalse)
-        (void) CopyMagickString(component,p+1,MagickPathExtent);
-      RemoveBaseExtension(component);
-      break;
-    }
-    case BasePathSansCompressExtension:
-    {
-      GetBasePathSansCompressExtension(path,component);
-      break;
-    }
-    case ExtensionPath:
-    {
-      GetExtensionComponent(component,p);
+      SelectPathTailComponent(path,type,component,p);
       break;
     }
     case SubimagePath:
@@ -1783,10 +1858,6 @@ MagickExport void GetPathComponent(const char *path,PathType type,
         (void) CopyMagickString(component,path+subimage_offset,subimage_length);
       break;
     }
-    case SubcanonicalPath:
-    case CanonicalPath:
-    case UndefinedPath:
-      break;
   }
 }
 
@@ -1946,11 +2017,33 @@ static MagickBooleanType ValidateTemporaryDirectory(char *directory)
   return(MagickTrue);
 }
 
+static void ApplyTemporaryPathPolicy(char **directory)
+{
+  char
+    *value;
+
+  value=GetPolicyValue("resource:temporary-path");
+  if (value != (char *) NULL)
+    {
+      (void) CloneString(&(*directory),value);
+      value=DestroyString(value);
+    }
+}
+
+static void FormatPathTemplate(char *path,const char *directory)
+{
+  if (directory[strlen(directory)-1] == *DirectorySeparator)
+    (void) FormatLocaleString(path,MagickPathExtent,"%smagick-"
+      MagickPathTemplate,directory);
+  else
+    (void) FormatLocaleString(path,MagickPathExtent,
+      "%s%smagick-" MagickPathTemplate,directory,DirectorySeparator);
+}
+
 MagickExport MagickBooleanType GetPathTemplate(char *path)
 {
   char
-    *directory,
-    *value;
+    *directory;
 
   (void) FormatLocaleString(path,MagickPathExtent,"magick-"
     MagickPathTemplate);
@@ -1971,20 +2064,10 @@ MagickExport MagickBooleanType GetPathTemplate(char *path)
 #endif
   if (directory == (char *) NULL)
     return(MagickFalse);
-  value=GetPolicyValue("resource:temporary-path");
-  if (value != (char *) NULL)
-    {
-      (void) CloneString(&directory,value);
-      value=DestroyString(value);
-    }
+  ApplyTemporaryPathPolicy(&directory);
   if (ValidateTemporaryDirectory(directory) == MagickFalse)
     return(MagickFalse);
-  if (directory[strlen(directory)-1] == *DirectorySeparator)
-    (void) FormatLocaleString(path,MagickPathExtent,"%smagick-"
-      MagickPathTemplate,directory);
-  else
-    (void) FormatLocaleString(path,MagickPathExtent,
-      "%s%smagick-" MagickPathTemplate,directory,DirectorySeparator);
+  FormatPathTemplate(path,directory);
   directory=DestroyString(directory);
 #if defined(MAGICKCORE_WINDOWS_SUPPORT)
   {
@@ -2175,6 +2258,12 @@ static MagickBooleanType ExtendFileList(const size_t *number_entries,
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsDotDirectoryEntry(const char *name)
+{
+  return(((LocaleCompare(name,".") == 0) ||
+    (LocaleCompare(name,"..") == 0)) ? MagickTrue : MagickFalse);
+}
+
 MagickPrivate char **ListFiles(const char *directory,const char *pattern,
   size_t *number_entries)
 {
@@ -2227,8 +2316,7 @@ MagickPrivate char **ListFiles(const char *directory,const char *pattern,
   while ((MagickReadDirectory(current_directory,buffer,&entry) == 0) &&
          (entry != (struct dirent *) NULL))
   {
-    if ((LocaleCompare(entry->d_name,".") == 0) ||
-        (LocaleCompare(entry->d_name,"..") == 0))
+    if (IsDotDirectoryEntry(entry->d_name) != MagickFalse)
       continue;
     if ((IsPathDirectory(entry->d_name) > 0) ||
 #if defined(MAGICKCORE_WINDOWS_SUPPORT)
