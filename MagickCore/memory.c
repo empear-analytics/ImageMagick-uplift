@@ -1321,13 +1321,8 @@ MagickExport void SetMagickAlignedMemoryMethods(
 %        ResizeMemoryHandler resize_memory_handler,
 %        DestroyMemoryHandler destroy_memory_handler)
 %
-%  A description of each parameter follows:
-%
-%    o acquire_memory_handler: method to acquire memory (e.g. malloc).
-%
-%    o resize_memory_handler: method to resize memory (e.g. realloc).
-%
-%    o destroy_memory_handler: method to destroy memory (e.g. free).
+%  Its parameters are the methods to acquire (e.g. malloc), resize (e.g.
+%  realloc) and destroy (e.g. free) memory.
 %
 */
 MagickExport void SetMagickMemoryMethods(
