@@ -4545,6 +4545,62 @@ const int
     }
 }
 
+static void XCreateImageWindow(const AnimateWindowSetup *setup)
+{
+Display
+    *const display = setup->display;
+
+XResourceInfo
+    *const resource_info = setup->resource_info;
+
+XWindows
+    *const windows = setup->windows;
+
+const Window
+    root_window = setup->root_window;
+
+XClassHint
+    *const class_hints = setup->class_hints;
+
+XWMHints
+    *const manager_hints = setup->manager_hints;
+
+char
+    **const argv = setup->argv;
+
+const int
+    argc = setup->argc;
+
+  manager_hints->flags=IconWindowHint | InputHint | StateHint;
+  manager_hints->icon_window=windows->icon.id;
+  manager_hints->input=MagickTrue;
+  manager_hints->initial_state=
+    resource_info->iconic ? IconicState : NormalState;
+  if (windows->group_leader.id != (Window) NULL)
+    {
+      /*
+        Follow the leader.
+      */
+      manager_hints->flags|=(MagickStatusType) WindowGroupHint;
+      manager_hints->window_group=windows->group_leader.id;
+      (void) XSelectInput(display,windows->group_leader.id,StructureNotifyMask);
+      if (resource_info->debug != MagickFalse)
+        (void) LogMagickEvent(X11Event,GetMagickModule(),
+          "Window id: 0x%lx (group leader)",windows->group_leader.id);
+    }
+  XMakeWindow(display,
+    (Window) (resource_info->backdrop ? windows->backdrop.id : root_window),
+    argv,argc,class_hints,manager_hints,&windows->image);
+  (void) XChangeProperty(display,windows->image.id,windows->im_protocols,
+    XA_STRING,8,PropModeReplace,(unsigned char *) NULL,0);
+  if (windows->group_leader.id != (Window) NULL)
+    (void) XSetTransientForHint(display,windows->image.id,
+      windows->group_leader.id);
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),"Window id: 0x%lx (image)",
+      windows->image.id);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4734,34 +4790,7 @@ MagickExport Image *XAnimateImages(Display *display,
   */
   XCreateImageWindowInfo(&setup,exception);
   XCreateBackdropWindow(&setup);
-  manager_hints->flags=IconWindowHint | InputHint | StateHint;
-  manager_hints->icon_window=windows->icon.id;
-  manager_hints->input=MagickTrue;
-  manager_hints->initial_state=
-    resource_info->iconic ? IconicState : NormalState;
-  if (windows->group_leader.id != (Window) NULL)
-    {
-      /*
-        Follow the leader.
-      */
-      manager_hints->flags|=(MagickStatusType) WindowGroupHint;
-      manager_hints->window_group=windows->group_leader.id;
-      (void) XSelectInput(display,windows->group_leader.id,StructureNotifyMask);
-      if (resource_info->debug != MagickFalse)
-        (void) LogMagickEvent(X11Event,GetMagickModule(),
-          "Window id: 0x%lx (group leader)",windows->group_leader.id);
-    }
-  XMakeWindow(display,
-    (Window) (resource_info->backdrop ? windows->backdrop.id : root_window),
-    argv,argc,class_hints,manager_hints,&windows->image);
-  (void) XChangeProperty(display,windows->image.id,windows->im_protocols,
-    XA_STRING,8,PropModeReplace,(unsigned char *) NULL,0);
-  if (windows->group_leader.id != (Window) NULL)
-    (void) XSetTransientForHint(display,windows->image.id,
-      windows->group_leader.id);
-  if (resource_info->debug != MagickFalse)
-    (void) LogMagickEvent(X11Event,GetMagickModule(),"Window id: 0x%lx (image)",
-      windows->image.id);
+  XCreateImageWindow(&setup);
   XCreateInfoWindow(&setup);
   XCreateCommandWindow(&setup);
   /*
