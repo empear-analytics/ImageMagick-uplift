@@ -5841,6 +5841,35 @@ static unsigned short XBitmapPolarity(const Image *image,const Image *canvas)
   return(polarity);
 }
 
+static void XPackColormappedLSB(const XImage *ximage,
+  const XImageRowSource row_source,unsigned char *q)
+{
+  switch (ximage->bits_per_pixel)
+  {
+    case 2:
+    {
+      XPackColormapped2BitLSB(&row_source,q);
+      break;
+    }
+    case 4:
+    {
+      XPackColormapped4BitLSB(&row_source,q);
+      break;
+    }
+    case 6:
+    case 8:
+    {
+      XPackColormapped8BitLSB(&row_source,q);
+      break;
+    }
+    default:
+    {
+      XPackColormappedMultiByteLSB(&row_source,q);
+      break;
+    }
+  }
+}
+
 static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -5953,30 +5982,7 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
     }
   else
     if (window->pixel_info->colors != 0)
-      switch (ximage->bits_per_pixel)
-      {
-        case 2:
-        {
-          XPackColormapped2BitLSB(&row_source,q);
-          break;
-        }
-        case 4:
-        {
-          XPackColormapped4BitLSB(&row_source,q);
-          break;
-        }
-        case 6:
-        case 8:
-        {
-          XPackColormapped8BitLSB(&row_source,q);
-          break;
-        }
-        default:
-        {
-          XPackColormappedMultiByteLSB(&row_source,q);
-          break;
-        }
-      }
+      XPackColormappedLSB(ximage,row_source,q);
     else
       switch (ximage->bits_per_pixel)
       {
