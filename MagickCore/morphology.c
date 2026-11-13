@@ -6291,6 +6291,20 @@ static void DiscardMorphologyResult(Image **curr_image,Image **rslt_image)
     (*rslt_image) = DestroyImage((*rslt_image));
 }
 
+static size_t SelectMorphologyStageLimit(const MorphologyMethod method,
+  size_t stage_limit,const MorphologyIteratedLimits limits)
+{
+  const MorphologyStageLimit
+    *entry;
+
+  entry=FindMorphologyStageLimit(method);
+  if (entry != (const MorphologyStageLimit *) NULL)
+    stage_limit=entry->limit;
+  else
+    SetIteratedMorphologyLimits(method,&limits);
+  return(stage_limit);
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -6330,9 +6344,6 @@ MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyApplyTargets
     targets = { &curr_image, &rslt_image, &save_image, &work_image, &count };
 
-  const MorphologyStageLimit
-    *entry;
-
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   assert(kernel != (KernelInfo *) NULL);
@@ -6364,11 +6375,7 @@ MagickPrivate Image *MorphologyApply(const Image *image,
   stage_limit = 1;        /* assume method is not a compound */
   special = MagickFalse;   /* assume it is NOT a direct modify primitive */
   rslt_compose = compose; /* and we are composing multi-kernels as given */
-  entry=FindMorphologyStageLimit(method);
-  if (entry != (const MorphologyStageLimit *) NULL)
-    stage_limit=entry->limit;
-  else
-    SetIteratedMorphologyLimits(method,&limits);
+  stage_limit=SelectMorphologyStageLimit(method,stage_limit,limits);
 
   /* Apply special methods with special requirements
   ** For example, single run only, or post-processing requirements
