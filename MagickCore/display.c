@@ -15042,6 +15042,12 @@ typedef struct _RotateLineTargets
 
   size_t
     *state;
+
+  unsigned int
+    *distance;
+
+  double
+    *degrees;
 } RotateLineTargets;
 
 static void XStartRotateLine(Display *display,XWindows *windows,
@@ -15413,6 +15419,73 @@ static void XRotateAngle(const XSegment *rotate_info,double *degrees,
       (*rotate_info).y1),(double) ((*rotate_info).x2-(*rotate_info).x1)));
 }
 
+static void XRotateDragLine(const RotateLoopInput *loop_input,
+  const RotateLineTargets *line_targets,const ModeType direction)
+{
+  Display
+    *const display = loop_input->display;
+
+  XWindows
+    *const windows = loop_input->windows;
+
+  ExceptionInfo
+    *const exception = loop_input->exception;
+
+  XSegment
+    *const rotate_info = line_targets->rotate_info;
+
+  size_t
+    *const state = line_targets->state;
+
+  unsigned int
+    *const distance = line_targets->distance;
+
+  double
+    *const degrees = line_targets->degrees;
+
+  char
+    text[MagickPathExtent];
+
+  XEvent
+    event;
+
+  (*distance)=0;
+  (void) XSetFunction(display,windows->image.highlight_context,GXinvert);
+  (*state)=DefaultState;
+  do
+  {
+    if ((*distance) > 9)
+      {
+        RotateInfoInput
+          show;
+
+        show.display=display;
+        show.windows=windows;
+        show.text=text;
+        show.direction=direction;
+        show.degrees=(*degrees);
+        show.rotate_info=(*rotate_info);
+        XShowRotateInfo(&show);
+      }
+    else
+      if (windows->info.mapped != MagickFalse)
+        (void) XWithdrawWindow(display,windows->info.id,
+          windows->info.screen);
+    /*
+      Wait for next event.
+    */
+    XScreenEvent(display,windows,&event,exception);
+    if ((*distance) > 9)
+      XHighlightLine(display,windows->image.id,
+        windows->image.highlight_context,rotate_info);
+    XRotateDragEvent(event,line_targets);
+    XClampRotateSegment(windows,rotate_info);
+    XRotateAngle(rotate_info,degrees,distance);
+  } while (((*state) & ExitState) == 0);
+  (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
+  (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+}
+
 static MagickBooleanType XRotateImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,double degrees,Image **image,
   ExceptionInfo *exception)
@@ -15448,8 +15521,7 @@ static MagickBooleanType XRotateImage(Display *display,
     pen_id = 0;
 
   char
-    command[MagickPathExtent],
-    text[MagickPathExtent];
+    command[MagickPathExtent];
 
   Image
     *rotate_image;
@@ -15477,14 +15549,11 @@ static MagickBooleanType XRotateImage(Display *display,
       size_t
         state;
 
-      XEvent
-        event;
-
       XSegment
         rotate_info;
 
       const RotateLineTargets
-        line_targets = { &rotate_info, &state };
+        line_targets = { &rotate_info, &state, &distance, &degrees };
 
       const RotateLoopInput
         loop_input = { display, resource_info, windows, RotateMenu,
@@ -15520,41 +15589,7 @@ static MagickBooleanType XRotateImage(Display *display,
       /*
         Draw line as pointer moves until the mouse button is released.
       */
-      distance=0;
-      (void) XSetFunction(display,windows->image.highlight_context,GXinvert);
-      state=DefaultState;
-      do
-      {
-        if (distance > 9)
-          {
-            RotateInfoInput
-              show;
-
-            show.display=display;
-            show.windows=windows;
-            show.text=text;
-            show.direction=direction;
-            show.degrees=degrees;
-            show.rotate_info=rotate_info;
-            XShowRotateInfo(&show);
-          }
-        else
-          if (windows->info.mapped != MagickFalse)
-            (void) XWithdrawWindow(display,windows->info.id,
-              windows->info.screen);
-        /*
-          Wait for next event.
-        */
-        XScreenEvent(display,windows,&event,exception);
-        if (distance > 9)
-          XHighlightLine(display,windows->image.id,
-            windows->image.highlight_context,&rotate_info);
-        XRotateDragEvent(event,&line_targets);
-        XClampRotateSegment(windows,&rotate_info);
-        XRotateAngle(&rotate_info,&degrees,&distance);
-      } while ((state & ExitState) == 0);
-      (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
-      (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+      XRotateDragLine(&loop_input,&line_targets,direction);
       if (distance <= 9)
         return(MagickTrue);
     }
