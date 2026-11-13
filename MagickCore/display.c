@@ -6393,6 +6393,55 @@ static void XCropPointerPress(const CropContext *context,
   (*state)|=ExitState;
 }
 
+static void XCropPointerKey(const CropContext *context,
+  const CropTargets *targets)
+{
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  if ((*event).xkey.window != context->windows->image.id)
+    return;
+  /*
+    Respond to a user key press.
+  */
+  (void) XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  switch ((int) key_symbol)
+  {
+    case XK_Escape:
+    case XK_F20:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    case XK_F1:
+    case XK_Help:
+    {
+      XShowCropHelp(context->display,context->resource_info,context->windows,
+        context->mode);
+      break;
+    }
+    default:
+    {
+      (void) XBell(context->display,0);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -6416,7 +6465,6 @@ static MagickBooleanType XCropImage(Display *display,
     *image_view;
 
   char
-    command[MagickPathExtent],
     text[MagickPathExtent];
 
   Cursor
@@ -6425,9 +6473,6 @@ static MagickBooleanType XCropImage(Display *display,
   int
     x,
     y;
-
-  KeySym
-    key_symbol;
 
   Image
     *crop_image;
@@ -6536,37 +6581,7 @@ static MagickBooleanType XCropImage(Display *display,
         break;
       case KeyPress:
       {
-        if (event.xkey.window != windows->image.id)
-          break;
-        /*
-          Respond to a user key press.
-        */
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        switch ((int) key_symbol)
-        {
-          case XK_Escape:
-          case XK_F20:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-          case XK_F1:
-          case XK_Help:
-          {
-            XShowCropHelp(display,resource_info,windows,mode);
-            break;
-          }
-          default:
-          {
-            (void) XBell(display,0);
-            break;
-          }
-        }
+        XCropPointerKey(&context,&targets);
         break;
       }
       case MotionNotify:
