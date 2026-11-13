@@ -1222,6 +1222,26 @@ static void FormatScaledComponent(const PixelInfo *pixel,const double scale,
       GetMagickPrecision(),scale*QuantumScale*color);
 }
 
+static void SelectIndexComponent(const PixelInfo *pixel,
+  const PixelChannel channel,double *color)
+{
+  switch (channel)
+  {
+    case BlackPixelChannel:
+    {
+      *color=pixel->black;
+      break;
+    }
+    case IndexPixelChannel:
+    {
+      *color=pixel->index;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
   const PixelChannel channel,const ComplianceType compliance,char *tuple)
 {
@@ -1284,18 +1304,11 @@ MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
         scale=1.0;
       break;
     }
-    case BlackPixelChannel:
-    {
-      color=pixel->black;
-      break;
-    }
-    case IndexPixelChannel:
-    {
-      color=pixel->index;
-      break;
-    }
     default:
+    {
+      SelectIndexComponent(pixel,channel,&color);
       break;
+    }
   }
   if ((pixel->colorspace == OklchColorspace) && (channel == BluePixelChannel))
     (void) FormatLocaleString(component,MagickPathExtent,"%.*g",
