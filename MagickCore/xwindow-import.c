@@ -1850,6 +1850,19 @@ static void XCheckCropBoundary(RectangleInfo *crop_info,const int x_offset,
     }
 }
 
+static Window XSelectCropWindow(const Window root_window,
+  RectangleInfo *crop_info,Window target_window)
+{
+  if ((crop_info->width*crop_info->height) < MinimumCropArea)
+    {
+      crop_info->width=0;
+      crop_info->height=0;
+    }
+  if ((crop_info->width != 0) && (crop_info->height != 0))
+    target_window=root_window;
+  return(target_window);
+}
+
 static Window XSelectWindow(Display *display,RectangleInfo *crop_info)
 {
   Cursor
@@ -1949,13 +1962,7 @@ static Window XSelectWindow(Display *display,RectangleInfo *crop_info)
   (void) XUngrabPointer(display,CurrentTime);
   (void) XFreeCursor(display,target_cursor);
   (void) XFreeGC(display,annotate_context);
-  if ((crop_info->width*crop_info->height) < MinimumCropArea)
-    {
-      crop_info->width=0;
-      crop_info->height=0;
-    }
-  if ((crop_info->width != 0) && (crop_info->height != 0))
-    target_window=root_window;
+  target_window=XSelectCropWindow(root_window,crop_info,target_window);
   if (event.xbutton.button == Button3)
     target_window=(Window) NULL;
   return(target_window);
