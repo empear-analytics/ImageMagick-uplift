@@ -742,6 +742,8 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
         (void) CopyMagickString(p,p+1,MagickPathExtent);
         continue;
       }
+    if ((c == '(') && (*(p+1) == ')'))
+      return(flags);
     if (IsGeometryAdvanceCharacter(c) != MagickFalse)
       {
         p++;
@@ -792,12 +794,6 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
         break;
       }
       case '(':
-      {
-        if (*(p+1) == ')')
-          return(flags);
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
       case ')':
       {
         (void) CopyMagickString(p,p+1,MagickPathExtent);
