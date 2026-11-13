@@ -1242,6 +1242,34 @@ static void SelectIndexComponent(const PixelInfo *pixel,
   }
 }
 
+static void SelectBlueComponent(const PixelInfo *pixel,
+  const PixelChannel channel,double *color,double *scale)
+{
+  switch (channel)
+  {
+    case BluePixelChannel:
+    {
+      *color=pixel->blue;
+      if (IsHueCompatibleColorspace(pixel->colorspace) != MagickFalse)
+        *scale=100.0f;
+      if (pixel->colorspace == LabColorspace)
+        (*color)-=QuantumRange/2.0;
+      if (IsLCHColorspace(pixel->colorspace) != MagickFalse)
+        (*color)*=360.0/255.0;
+      if (pixel->colorspace == XYZColorspace)
+        (*color)/=2.55;
+      if (pixel->colorspace == OklchColorspace)
+        *scale=1.0;
+      break;
+    }
+    default:
+    {
+      SelectIndexComponent(pixel,channel,color);
+      break;
+    }
+  }
+}
+
 MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
   const PixelChannel channel,const ComplianceType compliance,char *tuple)
 {
@@ -1282,21 +1310,6 @@ MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
         scale=1.0;
       break;
     }
-    case BluePixelChannel:
-    {
-      color=pixel->blue;
-      if (IsHueCompatibleColorspace(pixel->colorspace) != MagickFalse)
-        scale=100.0f;
-      if (pixel->colorspace == LabColorspace)
-        color-=QuantumRange/2.0;
-      if (IsLCHColorspace(pixel->colorspace) != MagickFalse)
-        color*=360.0/255.0;
-      if (pixel->colorspace == XYZColorspace)
-        color/=2.55;
-      if (pixel->colorspace == OklchColorspace)
-        scale=1.0;
-      break;
-    }
     case AlphaPixelChannel:
     {
       color=pixel->alpha;
@@ -1306,7 +1319,7 @@ MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
     }
     default:
     {
-      SelectIndexComponent(pixel,channel,&color);
+      SelectBlueComponent(pixel,channel,&color,&scale);
       break;
     }
   }
