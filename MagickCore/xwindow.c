@@ -4617,6 +4617,12 @@ static void XAcquireXImageData(XImage *ximage)
     XAcquireZPixmapData(ximage);
 }
 
+static inline MagickBooleanType IsShapedImageWindow(const XWindowInfo *window)
+{
+  return(((window->shape != MagickFalse) && (window->image != (Image *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
@@ -4762,7 +4768,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
 #endif
   window->ximage=ximage;
   matte_image=(XImage *) NULL;
-  if ((window->shape != MagickFalse) && (window->image != (Image *) NULL))
+  if (IsShapedImageWindow(window) != MagickFalse)
     if (IsShapeWithinDisplay(display,window,width,height) != MagickFalse)
       matte_image=XCreateMatteXImage(display,window,width,height);
   if (window->matte_image != (XImage *) NULL)
