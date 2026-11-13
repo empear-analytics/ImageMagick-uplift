@@ -1235,7 +1235,6 @@ static size_t GetStreamPacketSize(const StreamInfo *stream_info)
   switch (stream_info->storage_type)
   {
     default: packet_size=sizeof(unsigned char); break;
-    case CharPixel: packet_size=sizeof(unsigned char); break;
     case DoublePixel: packet_size=sizeof(double); break;
     case FloatPixel: packet_size=sizeof(float); break;
     case LongPixel: packet_size=sizeof(unsigned int); break;
