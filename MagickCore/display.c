@@ -10014,6 +10014,60 @@ static void XUndoImageCache(const XImageCacheContext *cache_context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XRedoOrShowImageCache(const XImageCacheContext *cache_context,
+  const DisplayCommand command,Image **redo_image,Image *undo_image)
+{
+  Display
+    *const display = cache_context->display;
+
+  XResourceInfo
+    *const resource_info = cache_context->resource_info;
+
+  XWindows
+    *const windows = cache_context->windows;
+
+  Image
+    **const image = cache_context->image;
+
+  ExceptionInfo
+    *const exception = cache_context->exception;
+
+  if (command == RedoCommand)
+    {
+      /*
+        Redo the last image transformation.
+      */
+      if ((*redo_image) == (Image *) NULL)
+        {
+          (void) XBell(display,0);
+          return;
+        }
+      windows->image.window_changes.width=(int) (*redo_image)->columns;
+      windows->image.window_changes.height=(int) (*redo_image)->rows;
+      if (windows->image.crop_geometry != (char *) NULL)
+        windows->image.crop_geometry=(char *)
+          RelinquishMagickMemory(windows->image.crop_geometry);
+      windows->image.crop_geometry=(*redo_image)->geometry;
+      *image=DestroyImage(*image);
+      *image=(*redo_image);
+      (*redo_image)=NewImageList();
+      if (windows->image.orphan != MagickFalse)
+        return;
+      XConfigureImageColormap(display,resource_info,windows,*image,exception);
+      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      return;
+    }
+  if (command != InfoCommand)
+    return;
+  /*
+    Display image info.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  XDisplayImageInfo(display,resource_info,windows,undo_image,*image,exception);
+  XSetCursorState(display,windows,MagickFalse);
+}
+
 static void XImageCache(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -10063,40 +10117,7 @@ static void XImageCache(Display *display,XResourceInfo *resource_info,
   }
   if (IsUndoCacheCommand(command) != MagickFalse)
     undo_image=XSaveUndoImage(&cache_context,undo_image);
-  if (command == RedoCommand)
-    {
-      /*
-        Redo the last image transformation.
-      */
-      if (redo_image == (Image *) NULL)
-        {
-          (void) XBell(display,0);
-          return;
-        }
-      windows->image.window_changes.width=(int) redo_image->columns;
-      windows->image.window_changes.height=(int) redo_image->rows;
-      if (windows->image.crop_geometry != (char *) NULL)
-        windows->image.crop_geometry=(char *)
-          RelinquishMagickMemory(windows->image.crop_geometry);
-      windows->image.crop_geometry=redo_image->geometry;
-      *image=DestroyImage(*image);
-      *image=redo_image;
-      redo_image=NewImageList();
-      if (windows->image.orphan != MagickFalse)
-        return;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
-      return;
-    }
-  if (command != InfoCommand)
-    return;
-  /*
-    Display image info.
-  */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  XDisplayImageInfo(display,resource_info,windows,undo_image,*image,exception);
-  XSetCursorState(display,windows,MagickFalse);
+  XRedoOrShowImageCache(&cache_context,command,&redo_image,undo_image);
 }
 
 /*
