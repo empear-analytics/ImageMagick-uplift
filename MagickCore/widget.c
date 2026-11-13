@@ -12455,6 +12455,52 @@ static void PressListBrowserList(const ListBrowserContext *context,
   PressListBrowserButtons(context,event,widgets);
 }
 
+static void PressListBrowserScroll(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserTargets *targets,
+  const ListBrowserWidgets *widgets)
+{
+  const unsigned int
+    entries = context->entries;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  unsigned int
+    *const visible_entries = widgets->visible_entries;
+
+  if ((MatteIsActive((*south_info),event.xbutton)) &&
+      ((*slider_info).id < (int) entries))
+    {
+      /*
+        Move slider down.
+      */
+      (*south_info).raised=MagickFalse;
+      (*slider_info).id++;
+      (*state)|=RedrawListState;
+      return;
+    }
+  if (MatteIsActive((*scroll_info),event.xbutton))
+    {
+      /*
+        Move slider.
+      */
+      (*slider_info)=PageListBrowserSlider((*slider_info),event,
+        (*visible_entries));
+      (*state)|=RedrawListState;
+      return;
+    }
+  PressListBrowserList(context,event,targets,widgets);
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -12823,28 +12869,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
             state|=RedrawListState;
             break;
           }
-        if ((MatteIsActive(south_info,event.xbutton)) &&
-            (slider_info.id < (int) entries))
-          {
-            /*
-              Move slider down.
-            */
-            south_info.raised=MagickFalse;
-            slider_info.id++;
-            state|=RedrawListState;
-            break;
-          }
-        if (MatteIsActive(scroll_info,event.xbutton))
-          {
-            /*
-              Move slider.
-            */
-            slider_info=PageListBrowserSlider(slider_info,event,
-              visible_entries);
-            state|=RedrawListState;
-            break;
-          }
-        PressListBrowserList(&list_context,event,&targets,&list_widgets);
+        PressListBrowserScroll(&list_context,event,&targets,&list_widgets);
         break;
       }
       case ButtonRelease:
