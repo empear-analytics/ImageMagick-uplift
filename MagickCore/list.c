@@ -617,14 +617,21 @@ MagickExport Image *DuplicateImages(Image *images,
 %    o images: the image list.
 %
 */
+static MagickBooleanType IsImageListMember(const Image *images)
+{
+  if (images == (Image *) NULL)
+    return(MagickFalse);
+  assert(images->signature == MagickCoreSignature);
+  return(MagickTrue);
+}
+
 MagickExport Image *GetFirstImageInList(const Image *images)
 {
   const Image
     *p;
 
-  if (images == (Image *) NULL)
+  if (IsImageListMember(images) == MagickFalse)
     return((Image *) NULL);
-  assert(images->signature == MagickCoreSignature);
   for (p=images; p->previous != (Image *) NULL; p=p->previous) ;
   return((Image *) p);
 }
