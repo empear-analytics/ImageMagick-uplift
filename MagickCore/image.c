@@ -2340,21 +2340,27 @@ static void AddRelativePageOffset(Image *image,const MagickStatusType flags,
     image->page.y+=geometry.y;
 }
 
+static void SetAbsolutePageX(Image *image,const ssize_t x)
+{
+  image->page.x=x;
+  if ((image->page.width == 0) && (x > 0))
+    image->page.width=(size_t) ((ssize_t) image->columns+x);
+}
+
+static void SetAbsolutePageY(Image *image,const ssize_t y)
+{
+  image->page.y=y;
+  if ((image->page.height == 0) && (y > 0))
+    image->page.height=(size_t) ((ssize_t) image->rows+y);
+}
+
 static void SetAbsolutePageOffset(Image *image,const MagickStatusType flags,
   const RectangleInfo geometry)
 {
   if ((flags & XValue) != 0)
-    {
-      image->page.x=geometry.x;
-      if ((image->page.width == 0) && (geometry.x > 0))
-        image->page.width=(size_t) ((ssize_t) image->columns+geometry.x);
-    }
+    SetAbsolutePageX(image,geometry.x);
   if ((flags & YValue) != 0)
-    {
-      image->page.y=geometry.y;
-      if ((image->page.height == 0) && (geometry.y > 0))
-        image->page.height=(size_t) ((ssize_t) image->rows+geometry.y);
-    }
+    SetAbsolutePageY(image,geometry.y);
 }
 
 MagickExport MagickBooleanType ResetImagePage(Image *image,const char *page)
