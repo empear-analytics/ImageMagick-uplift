@@ -1106,18 +1106,25 @@ MagickExport void PrependImageToList(Image **images,Image *prepend)
 %    o images: the image list.
 %
 */
+static MagickBooleanType IsImageListHead(Image **images)
+{
+  assert(images != (Image **) NULL);
+  if ((*images) == (Image *) NULL)
+    return(MagickFalse);
+  assert((*images)->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
+      (*images)->filename);
+  return(MagickTrue);
+}
+
 MagickExport Image *RemoveImageFromList(Image **images)
 {
   Image
     *p;
 
-  assert(images != (Image **) NULL);
-  if ((*images) == (Image *) NULL)
+  if (IsImageListHead(images) == MagickFalse)
     return((Image *) NULL);
-  assert((*images)->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      (*images)->filename);
   p=(*images);
   if ((p->previous == (Image *) NULL) && (p->next == (Image *) NULL))
     *images=(Image *) NULL;
