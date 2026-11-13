@@ -1694,8 +1694,8 @@ static MagickBooleanType ReadEXIFEntry(const EXIFWalkInfo *walk,
   return(MagickTrue);
 }
 
-static void GetEXIFDirectory(const EXIFWalkInfo *walk,
-  const EXIFWalkTargets *targets)
+static MagickBooleanType LocateEXIFEntryValue(const EXIFWalkInfo *walk,
+  unsigned char *q,const ssize_t number_bytes,unsigned char **p)
 {
   const EndianType
     endian = walk->endian;
@@ -1705,6 +1705,34 @@ static void GetEXIFDirectory(const EXIFWalkInfo *walk,
 
   const size_t
     length = walk->length;
+
+  if (number_bytes <= 4)
+    (*p)=q+8;
+  else
+    {
+      ssize_t
+        dir_offset;
+
+      /*
+        The directory entry contains an offset.
+      */
+      dir_offset=(ssize_t) ReadPropertySignedLong(endian,q+8);
+      if ((dir_offset < 0) || (size_t) dir_offset >= length)
+        return(MagickFalse);
+      if (((size_t) dir_offset+(size_t) number_bytes) < (size_t) dir_offset)
+        return(MagickFalse);  /* prevent overflow */
+      if ((size_t) (dir_offset+(ssize_t) number_bytes) > length)
+        return(MagickFalse);
+      (*p)=(unsigned char *) (exif+dir_offset);
+    }
+  return(MagickTrue);
+}
+
+static void GetEXIFDirectory(const EXIFWalkInfo *walk,
+  const EXIFWalkTargets *targets)
+{
+  const EndianType
+    endian = walk->endian;
 
   const unsigned char
     *const directory = walk->directory;
@@ -1744,25 +1772,8 @@ static void GetEXIFDirectory(const EXIFWalkInfo *walk,
 
     if (ReadEXIFEntry(walk,(*entry),&entry_targets) == MagickFalse)
       break;
-    if (number_bytes <= 4)
-      p=q+8;
-    else
-      {
-        ssize_t
-          dir_offset;
-
-        /*
-          The directory entry contains an offset.
-        */
-        dir_offset=(ssize_t) ReadPropertySignedLong(endian,q+8);
-        if ((dir_offset < 0) || (size_t) dir_offset >= length)
-          continue;
-        if (((size_t) dir_offset+(size_t) number_bytes) < (size_t) dir_offset)
-          continue;  /* prevent overflow */
-        if ((size_t) (dir_offset+(ssize_t) number_bytes) > length)
-          continue;
-        p=(unsigned char *) (exif+dir_offset);
-      }
+    if (LocateEXIFEntryValue(walk,q,number_bytes,&p) == MagickFalse)
+      continue;
     exif_tag.tag_value=tag_value;
     exif_tag.format=format;
     exif_tag.components=components;
