@@ -6609,6 +6609,41 @@ static void XCropDrawRegion(const CropContext *context,
         context->windows->info.screen);
 }
 
+static void XCropSizeRegion(const CropContext *context,
+  const CropTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  RectangleInfo
+    highlight_info;
+
+  do
+  {
+    XCropDrawRegion(context,targets,&highlight_info);
+    /*
+      Wait for next event.
+    */
+    XScreenEvent(context->display,context->windows,event,context->exception);
+    if ((highlight_info.width > 3) && (highlight_info.height > 3))
+      XHighlightRectangle(context->display,context->windows->image.id,
+        context->windows->image.highlight_context,&highlight_info);
+    XCropSizeEvent(context,targets);
+    if (IsSelectionMovedOrDone((*crop_info),(*x),(*y),(*state)) != MagickFalse)
+      XCheckSelectionBounds(context->windows,(*x),(*y),crop_info);
+  } while (((*state) & ExitState) == 0);
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -6741,20 +6776,7 @@ static MagickBooleanType XCropImage(Display *display,
     crop_info.width=0;
     crop_info.height=0;
     state=DefaultState;
-    do
-    {
-      XCropDrawRegion(&context,&targets,&highlight_info);
-      /*
-        Wait for next event.
-      */
-      XScreenEvent(display,windows,&event,exception);
-      if ((highlight_info.width > 3) && (highlight_info.height > 3))
-        XHighlightRectangle(display,windows->image.id,
-          windows->image.highlight_context,&highlight_info);
-      XCropSizeEvent(&context,&targets);
-      if (IsSelectionMovedOrDone(crop_info,x,y,state) != MagickFalse)
-        XCheckSelectionBounds(windows,x,y,&crop_info);
-    } while ((state & ExitState) == 0);
+    XCropSizeRegion(&context,&targets);
     /*
       Wait for user to grab a corner of the rectangle or press return.
     */
