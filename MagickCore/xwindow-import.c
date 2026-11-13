@@ -2500,12 +2500,33 @@ MagickPrivate Window XWindowByID(Display *display,const Window root_window,
 %    o name: Specifies the name of the window to locate.
 %
 */
-MagickPrivate Window XWindowByName(Display *display,const Window root_window,
-  const char *name)
+static Window XSearchChildrenByName(Display *display,Window *children,
+  const unsigned int number_children,const char *name)
 {
   int
     i;
 
+  Window
+    window;
+
+  window=(Window) NULL;
+  for (i=0; i < (int) number_children; i++)
+  {
+    /*
+      Search each child and their children.
+    */
+    window=XWindowByName(display,children[i],name);
+    if (window != (Window) NULL)
+      break;
+  }
+  if (children != (Window *) NULL)
+    (void) XFree((void *) children);
+  return(window);
+}
+
+MagickPrivate Window XWindowByName(Display *display,const Window root_window,
+  const char *name)
+{
   Status
     status;
 
@@ -2514,8 +2535,7 @@ MagickPrivate Window XWindowByName(Display *display,const Window root_window,
 
   Window
     *children,
-    child,
-    window;
+    child;
 
   XTextProperty
     window_name;
@@ -2532,19 +2552,7 @@ MagickPrivate Window XWindowByName(Display *display,const Window root_window,
     &number_children);
   if (status == False)
     return((Window) NULL);
-  window=(Window) NULL;
-  for (i=0; i < (int) number_children; i++)
-  {
-    /*
-      Search each child and their children.
-    */
-    window=XWindowByName(display,children[i],name);
-    if (window != (Window) NULL)
-      break;
-  }
-  if (children != (Window *) NULL)
-    (void) XFree((void *) children);
-  return(window);
+  return(XSearchChildrenByName(display,children,number_children,name));
 }
 
 /*
