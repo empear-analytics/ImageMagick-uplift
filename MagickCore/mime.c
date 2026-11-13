@@ -1006,6 +1006,23 @@ static MimeInfo *AcquireMimeElement(XMLTreeInfo *mime,
 %    o depth: depth of <include /> statements.
 %
 */
+static MagickStatusType AppendMimeElement(LinkedListInfo *cache,
+  XMLTreeInfo *mime,const char *filename,ExceptionInfo *exception)
+{
+  MimeInfo
+    *mime_info = (MimeInfo *) NULL;
+
+  MagickStatusType
+    status;
+
+  mime_info=AcquireMimeElement(mime,filename);
+  status=AppendValueToLinkedList(cache,mime_info);
+  if (status == MagickFalse)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ResourceLimitError,"MemoryAllocationFailed","`%s'",filename);
+  return(status);
+}
+
 static MagickBooleanType LoadMimeCache(const MimeLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1017,9 +1034,6 @@ static MagickBooleanType LoadMimeCache(const MimeLoadTarget *target,
 
   const char
     *attribute;
-
-  MimeInfo
-    *mime_info = (MimeInfo *) NULL;
 
   MagickStatusType
     status;
@@ -1064,11 +1078,7 @@ static MagickBooleanType LoadMimeCache(const MimeLoadTarget *target,
     /*
       Process mime element.
     */
-    mime_info=AcquireMimeElement(mime,filename);
-    status=AppendValueToLinkedList(cache,mime_info);
-    if (status == MagickFalse)
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",filename);
+    status=AppendMimeElement(cache,mime,filename,exception);
     mime=GetNextXMLTreeTag(mime);
   }
   mime_map=DestroyXMLTree(mime_map);
