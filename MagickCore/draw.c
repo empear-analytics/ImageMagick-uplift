@@ -9299,10 +9299,8 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
     sizeof(*stroke_q));
   if ((stroke_p == (PointInfo *) NULL) || (stroke_q == (PointInfo *) NULL))
     {
-      if (stroke_p != (PointInfo *) NULL)
-        stroke_p=(PointInfo *) RelinquishMagickMemory(stroke_p);
-      if (stroke_q != (PointInfo *) NULL)
-        stroke_q=(PointInfo *) RelinquishMagickMemory(stroke_q);
+      stroke_p=(PointInfo *) RelinquishMagickMemory(stroke_p);
+      stroke_q=(PointInfo *) RelinquishMagickMemory(stroke_q);
       polygon_primitive=(PrimitiveInfo *)
         RelinquishMagickMemory(polygon_primitive);
       (void) ThrowMagickException(exception,GetMagickModule(),
