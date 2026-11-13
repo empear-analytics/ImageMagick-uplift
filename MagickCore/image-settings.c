@@ -812,6 +812,17 @@ static void SyncImageColorAndCodecSettings(const ImageInfo *image_info,
       MagickFalse,option);
 }
 
+static void SyncUnsignedLongOption(const ImageInfo *image_info,
+  const char *key,size_t *value)
+{
+  const char
+    *option;
+
+  option=GetImageOption(image_info,key);
+  if (option != (const char *) NULL)
+    (*value)=StringToUnsignedLong(option);
+}
+
 static void SyncImageDepthAndFilterSettings(const ImageInfo *image_info,
   Image *image)
 {
@@ -888,17 +899,13 @@ static void SyncImagePageAndQualitySettings(const ImageInfo *image_info,
   option=GetImageOption(image_info,"page");
   if (option != (const char *) NULL)
     (void) ParsePageGeometryOption(option,&image->page);
-  option=GetImageOption(image_info,"quality");
-  if (option != (const char *) NULL)
-    image->quality=StringToUnsignedLong(option);
+  SyncUnsignedLongOption(image_info,"quality",&image->quality);
   option=GetImageOption(image_info,"red-primary");
   if (option != (const char *) NULL)
     ParseChromaticityPrimary(option,&image->chromaticity.red_primary);
   if (image_info->quality != UndefinedCompressionQuality)
     image->quality=image_info->quality;
-  option=GetImageOption(image_info,"scene");
-  if (option != (const char *) NULL)
-    image->scene=StringToUnsignedLong(option);
+  SyncUnsignedLongOption(image_info,"scene",&image->scene);
   option=GetImageOption(image_info,"taint");
   if (option != (const char *) NULL)
     image->taint=(MagickBooleanType) ParseCommandOption(MagickBooleanOptions,
