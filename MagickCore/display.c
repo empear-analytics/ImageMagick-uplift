@@ -5365,6 +5365,66 @@ static void XCompositeRelease(const CompositeCommandInput *input,
     }
 }
 
+static void XCompositeEvent(const CompositeCommandInput *input,XEvent *event,
+  const Cursor cursor,const CompositeEventTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  RectangleInfo
+    *const composite_info = targets->composite_info;
+
+  int
+    x,
+    y;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      XCompositePress(input,event,cursor,targets);
+      break;
+    }
+    case ButtonRelease:
+    {
+      XCompositeRelease(input,event,targets);
+      break;
+    }
+    case Expose:
+      break;
+    case KeyPress:
+    {
+      XCompositeKeyPress(input,event,targets);
+      break;
+    }
+    case MotionNotify:
+    {
+      /*
+        Map and unmap Info widget as text cursor crosses its boundaries.
+      */
+      x=(*event).xmotion.x;
+      y=(*event).xmotion.y;
+      XTrackInfoWidget(display,windows,x,y);
+      (*composite_info).x=(ssize_t) windows->image.x+x;
+      (*composite_info).y=(ssize_t) windows->image.y+y;
+      break;
+    }
+    default:
+    {
+      if (resource_info->debug != MagickFalse)
+        (void) LogMagickEvent(X11Event,GetMagickModule(),"Event type: %d",
+          (*event).type);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType XCompositeImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -5503,45 +5563,7 @@ static MagickBooleanType XCompositeImage(Display *display,
       windows->image.highlight_context,&highlight_info);
     if (XCompositeCommandBlock(&command_input,&event,&compose,&state) != MagickFalse)
       continue;
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        XCompositePress(&command_input,&event,cursor,&event_targets);
-        break;
-      }
-      case ButtonRelease:
-      {
-        XCompositeRelease(&command_input,&event,&event_targets);
-        break;
-      }
-      case Expose:
-        break;
-      case KeyPress:
-      {
-        XCompositeKeyPress(&command_input,&event,&event_targets);
-        break;
-      }
-      case MotionNotify:
-      {
-        /*
-          Map and unmap Info widget as text cursor crosses its boundaries.
-        */
-        x=event.xmotion.x;
-        y=event.xmotion.y;
-        XTrackInfoWidget(display,windows,x,y);
-        composite_info.x=(ssize_t) windows->image.x+x;
-        composite_info.y=(ssize_t) windows->image.y+y;
-        break;
-      }
-      default:
-      {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),"Event type: %d",
-            event.type);
-        break;
-      }
-    }
+    XCompositeEvent(&command_input,&event,cursor,&event_targets);
   } while ((state & ExitState) == 0);
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask);
