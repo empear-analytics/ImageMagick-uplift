@@ -7422,6 +7422,35 @@ static void MagnifyBitRowsMSB(const MagnifyBitRows *bit_rows)
   }
 }
 
+static unsigned int XGetMagnifyFactor(const XWindows *windows,
+  const unsigned int previous_magnify)
+{
+  ssize_t
+    n;
+
+  unsigned int
+    magnify;
+
+  magnify=1;
+  for (n=1; n < (ssize_t) windows->magnify.data; n++)
+    magnify<<=1;
+  while ((magnify*(unsigned int) windows->image.ximage->width) < windows->magnify.width)
+    magnify<<=1;
+  while ((magnify*(unsigned int) windows->image.ximage->height) < windows->magnify.height)
+    magnify<<=1;
+  while (magnify > windows->magnify.width)
+    magnify>>=1;
+  while (magnify > windows->magnify.height)
+    magnify>>=1;
+  if (magnify == 0)
+    {
+      magnify=1;
+      if (previous_magnify != 0)
+        magnify=previous_magnify;
+    }
+  return(magnify);
+}
+
 MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   ExceptionInfo *exception)
 {
@@ -7442,9 +7471,6 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
 
   unsigned char
     *q;
-
-  ssize_t
-    n;
 
   static unsigned int
     previous_magnify = 0;
@@ -7468,23 +7494,7 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   assert(windows != (XWindows *) NULL);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  magnify=1;
-  for (n=1; n < (ssize_t) windows->magnify.data; n++)
-    magnify<<=1;
-  while ((magnify*(unsigned int) windows->image.ximage->width) < windows->magnify.width)
-    magnify<<=1;
-  while ((magnify*(unsigned int) windows->image.ximage->height) < windows->magnify.height)
-    magnify<<=1;
-  while (magnify > windows->magnify.width)
-    magnify>>=1;
-  while (magnify > windows->magnify.height)
-    magnify>>=1;
-  if (magnify == 0)
-    {
-      magnify=1;
-      if (previous_magnify != 0)
-        magnify=previous_magnify;
-    }
+  magnify=XGetMagnifyFactor(windows,previous_magnify);
   if (magnify != previous_magnify)
     {
       Status
