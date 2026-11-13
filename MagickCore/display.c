@@ -13597,6 +13597,9 @@ typedef struct _ROITargets
 
   DisplayCommand
     *display_command;
+
+  RectangleInfo
+    *crop_info;
 } ROITargets;
 
 static void XROIButtonPress(const CropEventInput *event_input,
@@ -14457,6 +14460,12 @@ typedef struct _ROIContext
 
   char
     *text;
+
+  Image
+    **image;
+
+  ROIKeyTargets
+    key_targets;
 } ROIContext;
 
 static void XROIPointerCommand(const ROIContext *context,
@@ -14785,6 +14794,71 @@ static void XROIWaitCommand(const ROIContext *context,const ROITargets *targets,
   XROICommand(&command_input,event,display_command,state);
 }
 
+static void XROIWaitEvent(const ROIContext *context,const ROITargets *targets,
+  const RectangleInfo highlight_info)
+{
+  CropEventInput
+    event_input;
+
+  ROIKeyInput
+    key_input;
+
+  XEvent
+    *const event = targets->event;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  event_input.display=context->display;
+  event_input.windows=context->windows;
+  event_input.event=(event);
+  event_input.highlight_info=highlight_info;
+  event_input.text=context->text;
+  key_input.display=context->display;
+  key_input.resource_info=context->resource_info;
+  key_input.windows=context->windows;
+  key_input.event=(event);
+  key_input.image=context->image;
+  key_input.exception=context->exception;
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      XROIButtonPress(&event_input,(*crop_info),targets);
+      break;
+    }
+    case ButtonRelease:
+    {
+      XCropButtonRelease(&event_input,(*crop_info));
+      break;
+    }
+    case Expose:
+    {
+      XCropExpose(&event_input,event);
+      break;
+    }
+    case KeyPress:
+    {
+      XROIKeyPress(&key_input,event,&context->key_targets);
+      break;
+    }
+    case MotionNotify:
+    {
+      XROIMotion(&event_input,targets);
+      break;
+    }
+    case SelectionRequest:
+    {
+      XCropSelectionRequest(event,(*roi_info),context->text);
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -14817,7 +14891,8 @@ static MagickBooleanType XROIImage(Display *display,
     context;
 
   const ROITargets
-    targets = { &x, &y, &roi_info, &state, &event, &display_command };
+    targets = { &x, &y, &roi_info, &state, &event, &display_command,
+      &crop_info };
 
   const ROIKeyTargets
     key_targets = { &roi_info, &display_command, &state };
@@ -14849,6 +14924,8 @@ static MagickBooleanType XROIImage(Display *display,
   context.cursor=cursor;
   context.exception=exception;
   context.text=text;
+  context.image=image;
+  context.key_targets=key_targets;
   XROITrackPointer(&context,&targets);
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask);
@@ -14883,14 +14960,8 @@ static MagickBooleanType XROIImage(Display *display,
     (void) XMapWindow(display,windows->info.id);
     do
     {
-      CropEventInput
-        event_input;
-
       ROIRegionInput
         region_input;
-
-      ROIKeyInput
-        key_input;
 
       if (windows->info.mapped != MagickFalse)
         {
@@ -14931,51 +15002,7 @@ static MagickBooleanType XROIImage(Display *display,
         }
       XHighlightRectangle(display,windows->image.id,
         windows->image.highlight_context,&highlight_info);
-      event_input.display=display;
-      event_input.windows=windows;
-      event_input.event=(&event);
-      event_input.highlight_info=highlight_info;
-      event_input.text=text;
-      key_input.display=display;
-      key_input.resource_info=resource_info;
-      key_input.windows=windows;
-      key_input.event=(&event);
-      key_input.image=image;
-      key_input.exception=exception;
-      switch (event.type)
-      {
-        case ButtonPress:
-        {
-          XROIButtonPress(&event_input,crop_info,&targets);
-          break;
-        }
-        case ButtonRelease:
-        {
-          XCropButtonRelease(&event_input,crop_info);
-          break;
-        }
-        case Expose:
-        {
-          XCropExpose(&event_input,&event);
-          break;
-        }
-        case KeyPress:
-        {
-          XROIKeyPress(&key_input,&event,&key_targets);
-          break;
-        }
-        case MotionNotify:
-        {
-          XROIMotion(&event_input,&targets);
-          break;
-        }
-        case SelectionRequest:
-        {
-          XCropSelectionRequest(&event,roi_info,text);
-        }
-        default:
-          break;
-      }
+      XROIWaitEvent(&context,&targets,highlight_info);
       if ((state & UpdateConfigurationState) != 0)
         {
           (void) XPutBackEvent(display,&event);
