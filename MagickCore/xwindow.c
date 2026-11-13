@@ -4609,6 +4609,14 @@ static void XAcquireZPixmapData(XImage *ximage)
       (ximage->bytes_per_line*ximage->height));
 }
 
+static void XAcquireXImageData(XImage *ximage)
+{
+  if (ximage->format == XYBitmap)
+    XAcquireXYBitmapData(ximage);
+  else
+    XAcquireZPixmapData(ximage);
+}
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
@@ -4729,12 +4737,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
   if ((GetLogEventMask() & X11Event) != 0)
     XLogXImage(ximage);
   if (window->shared_memory == MagickFalse)
-    {
-      if (ximage->format == XYBitmap)
-        XAcquireXYBitmapData(ximage);
-      else
-        XAcquireZPixmapData(ximage);
-    }
+    XAcquireXImageData(ximage);
   if (ximage->data == (char *) NULL)
     {
       /*
