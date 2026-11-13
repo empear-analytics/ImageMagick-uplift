@@ -911,6 +911,49 @@ static MagickBooleanType InterpolateMeshPixelChannel(
   return(status);
 }
 
+static double BlendInterpolateSamples(double *alpha,double *pixels,
+  const PointInfo *delta,const MagickBooleanType color)
+{
+  double
+    gamma;
+
+  ssize_t
+    i;
+
+  gamma=1.0;  /* number of pixels blended together (its variable) */
+  for (i=0; i <= 1L; i++) {
+    if (delta->y >= 0.75)
+      {
+        alpha[i]=alpha[i+2];  /* take right pixels */
+        pixels[i]=pixels[i+2];
+      }
+    else
+      if (delta->y > 0.25)
+        {
+          gamma=2.0;  /* blend both pixels in row */
+          alpha[i]+=alpha[i+2];  /* add up alpha weights */
+          pixels[i]+=pixels[i+2];
+        }
+  }
+  if (delta->x >= 0.75)
+    {
+      alpha[0]=alpha[1];  /* take bottom row blend */
+      pixels[0]=pixels[1];
+    }
+  else
+    if (delta->x > 0.25)
+      {
+        gamma*=2.0;  /* blend both rows */
+        alpha[0]+=alpha[1];  /* add up alpha weights */
+        pixels[0]+=pixels[1];
+      }
+  if (color != MagickFalse)
+    gamma=MagickSafeReciprocal(alpha[0]);  /* (color) 1/alpha_weights */
+  else
+    gamma=MagickSafeReciprocal(gamma);  /* (alpha) 1/number_of_pixels */
+  return(gamma*pixels[0]);
+}
+
 static MagickBooleanType InterpolateBlendPixelChannel(
   const ChannelInterpolation *grid,double *pixel,MagickBooleanType status)
 {
@@ -919,11 +962,10 @@ static MagickBooleanType InterpolateBlendPixelChannel(
 
   double
     alpha[16],
-    gamma,
     pixels[16];
 
-  ssize_t
-    i;
+  PointInfo
+    delta;
 
   p=GetCacheViewVirtualPixels(grid->image_view,grid->x_offset,grid->y_offset,
     2,2,grid->exception);
@@ -934,38 +976,10 @@ static MagickBooleanType InterpolateBlendPixelChannel(
     }
   LoadInterpolatePixels(grid->image,grid->channel,grid->traits,p,4,alpha,
     pixels);
-  gamma=1.0;  /* number of pixels blended together (its variable) */
-  for (i=0; i <= 1L; i++) {
-    if ((grid->y-grid->y_offset) >= 0.75)
-      {
-        alpha[i]=alpha[i+2];  /* take right pixels */
-        pixels[i]=pixels[i+2];
-      }
-    else
-      if ((grid->y-grid->y_offset) > 0.25)
-        {
-          gamma=2.0;  /* blend both pixels in row */
-          alpha[i]+=alpha[i+2];  /* add up alpha weights */
-          pixels[i]+=pixels[i+2];
-        }
-  }
-  if ((grid->x-grid->x_offset) >= 0.75)
-    {
-      alpha[0]=alpha[1];  /* take bottom row blend */
-      pixels[0]=pixels[1];
-    }
-  else
-    if ((grid->x-grid->x_offset) > 0.25)
-      {
-        gamma*=2.0;  /* blend both rows */
-        alpha[0]+=alpha[1];  /* add up alpha weights */
-        pixels[0]+=pixels[1];
-      }
-  if (grid->channel != AlphaPixelChannel)
-    gamma=MagickSafeReciprocal(alpha[0]);  /* (color) 1/alpha_weights */
-  else
-    gamma=MagickSafeReciprocal(gamma);  /* (alpha) 1/number_of_pixels */
-  *pixel=gamma*pixels[0];
+  delta.x=grid->x-grid->x_offset;
+  delta.y=grid->y-grid->y_offset;
+  *pixel=BlendInterpolateSamples(alpha,pixels,&delta,
+    grid->channel != AlphaPixelChannel);
   return(status);
 }
 
@@ -1564,8 +1578,10 @@ static void InterpolateBlendChannel(const ChannelsInterpolation *grid,
 {
   double
     alpha[16],
-    gamma,
     pixels[16];
+
+  PointInfo
+    delta;
 
   ssize_t
     j;
@@ -1592,39 +1608,10 @@ static void InterpolateBlendChannel(const ChannelsInterpolation *grid,
       if (channel != AlphaPixelChannel)
         pixels[j]*=alpha[j];
     }
-  gamma=1.0;  /* number of pixels blended together (its variable) */
-  for (j=0; j <= 1L; j++)
-  {
-    if ((grid->y-grid->y_offset) >= 0.75)
-      {
-        alpha[j]=alpha[j+2];  /* take right pixels */
-        pixels[j]=pixels[j+2];
-      }
-    else
-      if ((grid->y-grid->y_offset) > 0.25)
-        {
-          gamma=2.0;  /* blend both pixels in row */
-          alpha[j]+=alpha[j+2];  /* add up alpha weights */
-          pixels[j]+=pixels[j+2];
-        }
-  }
-  if ((grid->x-grid->x_offset) >= 0.75)
-    {
-      alpha[0]=alpha[1];  /* take bottom row blend */
-      pixels[0]=pixels[1];
-    }
-  else
-     if ((grid->x-grid->x_offset) > 0.25)
-       {
-         gamma*=2.0;  /* blend both rows */
-         alpha[0]+=alpha[1];  /* add up alpha weights */
-         pixels[0]+=pixels[1];
-       }
-  if (channel != AlphaPixelChannel)
-    gamma=MagickSafeReciprocal(alpha[0]);  /* (color) 1/alpha_weights */
-  else
-    gamma=MagickSafeReciprocal(gamma);  /* (alpha) 1/number_of_pixels */
-  SetPixelChannel(grid->destination,channel,ClampToQuantum(gamma*pixels[0]),
+  delta.x=grid->x-grid->x_offset;
+  delta.y=grid->y-grid->y_offset;
+  SetPixelChannel(grid->destination,channel,ClampToQuantum(
+    BlendInterpolateSamples(alpha,pixels,&delta,channel != AlphaPixelChannel)),
     pixel);
 }
 
