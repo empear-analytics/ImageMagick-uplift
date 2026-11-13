@@ -15141,6 +15141,15 @@ success and leaves the caller to repeat the early return; Recipe RV, whose block
    argument fills the parameter it names.
 5. Run `tools/ci_warnings.sh <file>` and `tools/cxx_warnings.sh <file>` (both `OK`) and
    the oracle for the function.
+6. *An `else` arm* (2026-11-13, lane b). The `if` may have an `else` whose arm also
+   leaves through `return(...)` on some paths and falls through to `return(R);` on
+   others (`color.c`'s `QueryHexColor`). The `else` arm alone moves by steps 2 and 3,
+   and the `else` becomes `else` followed by `return(Helper(...));`; the `if` arm stays.
+   A local that only the moved arm and `R` read, declared with an initialiser that no
+   statement between its declaration and the `if` changes (`PixelPacket pixel = { 0,
+   0, 0, 0, 0 };`, filled by the arm through `&pixel`), is declared in the new function
+   with the same declaration (Recipe E step 4), not passed. Only one arm moves: with
+   both moved, the caller's `return(R);` could not be reached.
 
 **Before:**
 
@@ -15200,6 +15209,9 @@ static size_t CopyMagickStringTail(char *magick_restrict q,
 lane b round 5): cc 9 and two bumps; Recipe E step 7 on the `if` and the tail gave a
 five-argument helper (9.61 to 9.68); this recipe gave 9.61 to 10.0. Added by Claude Code
 (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
+Step 6 (2026-11-13, same lane): `color.c`'s `QueryHexColor`, whose RGBA arm moved
+(Bumpy Road gone, 8.15 to 8.21). Added by Claude Code (Claude Opus 5.5).
 Lane: b
 
 ---
@@ -15727,3 +15739,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | AT | Extract a Selection Arm with a Copy of the Return Tail: in a value-returning function ending `if (c) <arm> return(R);`, the arm (returning on some paths, falling through on others) moves to a `static` function of the caller's return type followed by a copy of `return(R);`; the `if` becomes `if (c) return(Helper(...));`; locals the arm writes are read after it only by `R` and go by value; evidence oracle; Lane: b | `string-copy.c`'s `CopyMagickString` (cc 9, two bumps; E step 7 on the whole tail left a five-argument helper, 9.68; this recipe 9.61 to 10.0) | mandate (2026-10-24) |
 | 2026-11-13 | NEW | BF | Drop the Blank Frame Rows of Doc-Comment Banners: the six rows of `%`, 77 spaces and `%` around a banner's name row are deleted in every banner of a file, nothing else; evidence guard (`obj_identical.sh` IDENTICAL); Lane: b | `locale.c`: eight functions in *Code Duplication* through their banners (CodeScene counts the banner into the function's span); probe 7.09 to 8.01, every duplication finding gone | owner |
 | 2026-11-13 | NEW | TM | Merge Twin Function Tails Differing in the Member They Read: two functions of a file whose returning tails differ only in the member of one read `e->m.f` share a `static` function taking `const T *value`; each twin keeps its opening block and returns the call with `&e->m`; evidence oracle; Lane: b | `timer.c`'s `GetElapsedTime` and `GetUserTime` (*Code Duplication*; 9.38 to 10.0) | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | AT | Step 6: the `if` may have an `else` arm of the same kind; that arm alone moves (`else return(Helper(...));`), a local only it and `R` read is declared in the helper with its initialiser; Lane: b | `color.c`'s `QueryHexColor` (two bumps, one per arm) | mandate (2026-10-24) |
