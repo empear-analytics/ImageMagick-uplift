@@ -3433,6 +3433,36 @@ static void XChopVerticalGeometry(const XWindows *windows,
     }
 }
 
+static void XScaleChopInfo(const XWindows *windows,Image **image,
+  RectangleInfo *chop_info)
+{
+  double
+    scale_factor;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    height,
+    width;
+
+  width=(unsigned int) (*image)->columns;
+  height=(unsigned int) (*image)->rows;
+  x=0;
+  y=0;
+  if (windows->image.crop_geometry != (char *) NULL)
+    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
+  scale_factor=(double) width/windows->image.ximage->width;
+  (*chop_info).x+=x;
+  (*chop_info).x=(ssize_t) (scale_factor*(*chop_info).x+0.5);
+  (*chop_info).width=(unsigned int) (scale_factor*(*chop_info).width+0.5);
+  scale_factor=(double) height/windows->image.ximage->height;
+  (*chop_info).y+=y;
+  (*chop_info).y=(ssize_t) (scale_factor*(*chop_info).y+0.5);
+  (*chop_info).height=(unsigned int) (scale_factor*(*chop_info).height+0.5);
+}
+
 static MagickBooleanType XChopImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -3465,9 +3495,6 @@ static MagickBooleanType XChopImage(Display *display,
   char
     text[MagickPathExtent];
 
-  double
-    scale_factor;
-
   Image
     *chop_image;
 
@@ -3483,9 +3510,7 @@ static MagickBooleanType XChopImage(Display *display,
     state;
 
   unsigned int
-    distance,
-    height,
-    width;
+    distance;
 
   XEvent
     event;
@@ -3750,20 +3775,7 @@ static MagickBooleanType XChopImage(Display *display,
     (int) chop_info.width;
   windows->image.window_changes.height=windows->image.ximage->height-
     (int) chop_info.height;
-  width=(unsigned int) (*image)->columns;
-  height=(unsigned int) (*image)->rows;
-  x=0;
-  y=0;
-  if (windows->image.crop_geometry != (char *) NULL)
-    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
-  scale_factor=(double) width/windows->image.ximage->width;
-  chop_info.x+=x;
-  chop_info.x=(ssize_t) (scale_factor*chop_info.x+0.5);
-  chop_info.width=(unsigned int) (scale_factor*chop_info.width+0.5);
-  scale_factor=(double) height/windows->image.ximage->height;
-  chop_info.y+=y;
-  chop_info.y=(ssize_t) (scale_factor*chop_info.y+0.5);
-  chop_info.height=(unsigned int) (scale_factor*chop_info.height+0.5);
+  XScaleChopInfo(windows,image,&chop_info);
   /*
     Chop image.
   */
