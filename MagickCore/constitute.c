@@ -865,6 +865,17 @@ static MagickBooleanType InvokeDecodeDelegate(ImageInfo *read_info,
   return(status);
 }
 
+static void SetReadEndian(const ImageInfo *image_info,ImageInfo *read_info,
+  const MagickInfo *magick_info)
+{
+  if (GetMagickEndianSupport(magick_info) == MagickFalse)
+    read_info->endian=UndefinedEndian;
+  else
+    if ((image_info->endian == UndefinedEndian) &&
+        (GetMagickRawSupport(magick_info) != MagickFalse))
+      read_info->endian=GetHostEndian();
+}
+
 MagickExport Image *ReadImage(const ImageInfo *image_info,
   ExceptionInfo *exception)
 {
@@ -922,14 +933,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
     InheritException(exception,sans_exception);
   sans_exception=DestroyExceptionInfo(sans_exception);
   if (magick_info != (const MagickInfo *) NULL)
-    {
-      if (GetMagickEndianSupport(magick_info) == MagickFalse)
-        read_info->endian=UndefinedEndian;
-      else
-        if ((image_info->endian == UndefinedEndian) &&
-            (GetMagickRawSupport(magick_info) != MagickFalse))
-          read_info->endian=GetHostEndian();
-    }
+    SetReadEndian(image_info,read_info,magick_info);
   if (OpenSeekableReadStream(image_info,read_info,magick_info,exception) ==
       MagickFalse)
     return((Image *) NULL);
