@@ -1182,6 +1182,32 @@ static void XEditTextCursorRight(XWidgetInfo *text_info)
   text_info->cursor++;
 }
 
+static void XEditTextBackspace(XWidgetInfo *text_info)
+{
+  if (text_info->highlight)
+    {
+      /*
+        Erase the entire line of text.
+      */
+      *text_info->text='\0';
+      text_info->cursor=text_info->text;
+      text_info->marker=text_info->text;
+      text_info->highlight=MagickFalse;
+    }
+  /*
+    Erase one character.
+  */
+  if (text_info->cursor != text_info->text)
+    {
+      text_info->cursor--;
+      (void) memmove(text_info->cursor,text_info->cursor+1,
+        strlen(text_info->cursor+1)+1);
+      text_info->highlight=MagickFalse;
+      return;
+    }
+  XEditTextCursorLeft(text_info);
+}
+
 static void XEditText(Display *display,XWidgetInfo *text_info,
   const KeySym key_symbol,char *text,const size_t state)
 {
@@ -1190,28 +1216,7 @@ static void XEditText(Display *display,XWidgetInfo *text_info,
     case XK_BackSpace:
     case XK_Delete:
     {
-      if (text_info->highlight)
-        {
-          /*
-            Erase the entire line of text.
-          */
-          *text_info->text='\0';
-          text_info->cursor=text_info->text;
-          text_info->marker=text_info->text;
-          text_info->highlight=MagickFalse;
-        }
-      /*
-        Erase one character.
-      */
-      if (text_info->cursor != text_info->text)
-        {
-          text_info->cursor--;
-          (void) memmove(text_info->cursor,text_info->cursor+1,
-            strlen(text_info->cursor+1)+1);
-          text_info->highlight=MagickFalse;
-          break;
-        }
-      XEditTextCursorLeft(text_info);
+      XEditTextBackspace(text_info);
       break;
     }
     case XK_Left:
