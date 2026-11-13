@@ -7051,6 +7051,12 @@ typedef struct _FileBrowserContext
 
   unsigned int
     height;
+
+  char
+    *format;
+
+  unsigned int
+    anomaly;
 } FileBrowserContext;
 
 static void ClientFileBrowserMessage(const FileBrowserContext *context,
@@ -7556,6 +7562,74 @@ static void PressFileBrowserScroll(const FileBrowserContext *context,
   PressFileBrowserButtons(context,event,widgets);
 }
 
+static void ReleaseFileBrowserActions(const FileBrowserContext *context,
+  const XEvent event,const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const reply = context->reply,
+    *const working_path = context->working_path,
+    *const format = context->format;
+
+  const unsigned int
+    anomaly = context->anomaly;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const special_info = widgets->special_info,
+    *const action_info = widgets->action_info,
+    *const cancel_info = widgets->cancel_info;
+
+  FileBrowserSpecial
+    special;
+
+  ListBrowserRelease
+    release;
+
+  const FileBrowserFormatTargets
+    format_targets = { reply_info, special_info };
+
+  const FileBrowserSpecialTargets
+    special_targets = { state, special_info };
+
+  special.anomaly=anomaly;
+  special.display=display;
+  special.windows=windows;
+  special.format=format;
+  special.format_targets=format_targets;
+  special.event=event;
+  special.working_path=working_path;
+  if (ReleaseFileBrowserSpecial(&special,&special_targets) == MagickFalse)
+    return;
+  release.display=display;
+  release.window_info=(&windows->widget);
+  release.event=event;
+  ReleaseListBrowserAction(&release,(*reply_info),action_info,state);
+  if ((*cancel_info).raised == MagickFalse)
+    {
+      FileBrowserCancel
+        cancel;
+
+      cancel.windows=windows;
+      cancel.event=event;
+      cancel.reply=reply;
+      (*state)=ReleaseFileBrowserCancel(&cancel,(*cancel_info),(*reply_info),
+        (*state));
+      (*cancel_info).raised=MagickTrue;
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+    }
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -7634,12 +7708,6 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
 
   const FileBrowserTargets
     targets = { &reply_info, &state, &selection_info, &list_info };
-
-  const FileBrowserFormatTargets
-    format_targets = { &reply_info, &special_info };
-
-  const FileBrowserSpecialTargets
-    special_targets = { &state, &special_info };
 
   const FileBrowserWidgets
     file_widgets = { &reply_info, &state,
@@ -7754,6 +7822,8 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   file_context.primary_selection=primary_selection;
   file_context.font_info=font_info;
   file_context.height=height;
+  file_context.format=format;
+  file_context.anomaly=anomaly;
   do
   {
     if (state & UpdateConfigurationState)
@@ -8091,12 +8161,6 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
       }
       case ButtonRelease:
       {
-        FileBrowserSpecial
-          special;
-
-        ListBrowserRelease
-          release;
-
         if (windows->widget.mapped == MagickFalse)
           break;
         if (north_info.raised == MagickFalse)
@@ -8151,31 +8215,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
             home_info.raised=MagickTrue;
             XDrawBeveledButton(display,&windows->widget,&home_info);
           }
-        special.anomaly=anomaly;
-        special.display=display;
-        special.windows=windows;
-        special.format=format;
-        special.format_targets=format_targets;
-        special.event=event;
-        special.working_path=working_path;
-        if (ReleaseFileBrowserSpecial(&special,&special_targets) == MagickFalse)
-          break;
-        release.display=display;
-        release.window_info=(&windows->widget);
-        release.event=event;
-        ReleaseListBrowserAction(&release,reply_info,&action_info,&state);
-        if (cancel_info.raised == MagickFalse)
-          {
-            FileBrowserCancel
-              cancel;
-
-            cancel.windows=windows;
-            cancel.event=event;
-            cancel.reply=reply;
-            state=ReleaseFileBrowserCancel(&cancel,cancel_info,reply_info,state);
-            cancel_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-          }
+        ReleaseFileBrowserActions(&file_context,event,&file_widgets);
         break;
       }
       case ClientMessage:
