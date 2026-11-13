@@ -4085,6 +4085,84 @@ static inline MagickBooleanType IsCacheSourcePending(
     MagickTrue : MagickFalse);
 }
 
+typedef struct _PixelCacheOpenInfo
+{
+  Image
+    *image;
+
+  MapMode
+    mode;
+
+  MagickSizeType
+    number_pixels;
+
+  ExceptionInfo
+    *exception;
+} PixelCacheOpenInfo;
+
+static MagickBooleanType CreateMemoryPixelCache(CacheInfo *cache_info,
+  const PixelCacheOpenInfo *open_info,CacheInfo source_info,
+  MagickBooleanType status)
+{
+  Image
+    *const image = open_info->image;
+
+  const MapMode
+    mode = open_info->mode;
+
+  const MagickSizeType
+    number_pixels = open_info->number_pixels;
+
+  ExceptionInfo
+    *const exception = open_info->exception;
+
+  char
+    format[MagickPathExtent],
+    message[MagickPathExtent];
+
+  const char
+    *type;
+
+  /*
+    Create memory pixel cache.
+  */
+  cache_info->type=MemoryCache;
+  cache_info->metacontent=(void *) NULL;
+  if (cache_info->metacontent_extent != 0)
+    cache_info->metacontent=(void *) (cache_info->pixels+
+      cache_info->number_channels*number_pixels);
+  if (IsCacheSourcePending(source_info,mode) != MagickFalse)
+    {
+      status=ClonePixelCacheRepository(cache_info,&source_info,
+        exception);
+      RelinquishPixelCachePixels(&source_info);
+    }
+  if (cache_info->debug != MagickFalse)
+    {
+      (void) FormatMagickSize(cache_info->length,MagickTrue,"B",
+        MagickPathExtent,format);
+      type=CommandOptionToMnemonic(MagickCacheOptions,(ssize_t)
+        cache_info->type);
+      (void) FormatLocaleString(message,MagickPathExtent,
+        "open %s (%s %s, %.17gx%.17gx%.17g %s)",
+        cache_info->filename,cache_info->mapped != MagickFalse ?
+        "Anonymous" : "Heap",type,(double) cache_info->columns,
+        (double) cache_info->rows,(double)
+        cache_info->number_channels,format);
+      (void) LogMagickEvent(CacheEvent,GetMagickModule(),"%s",
+        message);
+    }
+  cache_info->storage_class=image->storage_class;
+  if (status == 0)
+    {
+      if (IsCacheSourcePending(source_info,mode) != MagickFalse)
+        RelinquishPixelCachePixels(&source_info);
+      cache_info->type=UndefinedCache;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
   ExceptionInfo *exception)
 {
@@ -4110,6 +4188,9 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
   size_t
     columns,
     packet_size;
+
+  PixelCacheOpenInfo
+    open_info;
 
   assert(image != (const Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -4218,6 +4299,10 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
     status=MagickFalse;
   length=number_pixels*(cache_info->number_channels*sizeof(Quantum)+
     cache_info->metacontent_extent);
+  open_info.image=image;
+  open_info.mode=mode;
+  open_info.number_pixels=number_pixels;
+  open_info.exception=exception;
   if (IsMemoryCacheCandidate(status,length,cache_info) != MagickFalse)
     {
       status=AcquireMagickResource(MemoryResource,cache_info->length);
@@ -4243,46 +4328,8 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
               cache_info->pixels=source_info.pixels;
             }
           else
-            {
-              /*
-                Create memory pixel cache.
-              */
-              cache_info->type=MemoryCache;
-              cache_info->metacontent=(void *) NULL;
-              if (cache_info->metacontent_extent != 0)
-                cache_info->metacontent=(void *) (cache_info->pixels+
-                  cache_info->number_channels*number_pixels);
-              if (IsCacheSourcePending(source_info,mode) != MagickFalse)
-                {
-                  status=ClonePixelCacheRepository(cache_info,&source_info,
-                    exception);
-                  RelinquishPixelCachePixels(&source_info);
-                }
-              if (cache_info->debug != MagickFalse)
-                {
-                  (void) FormatMagickSize(cache_info->length,MagickTrue,"B",
-                    MagickPathExtent,format);
-                  type=CommandOptionToMnemonic(MagickCacheOptions,(ssize_t)
-                    cache_info->type);
-                  (void) FormatLocaleString(message,MagickPathExtent,
-                    "open %s (%s %s, %.17gx%.17gx%.17g %s)",
-                    cache_info->filename,cache_info->mapped != MagickFalse ?
-                    "Anonymous" : "Heap",type,(double) cache_info->columns,
-                    (double) cache_info->rows,(double)
-                    cache_info->number_channels,format);
-                  (void) LogMagickEvent(CacheEvent,GetMagickModule(),"%s",
-                    message);
-                }
-              cache_info->storage_class=image->storage_class;
-              if (status == 0)
-                {
-                  if (IsCacheSourcePending(source_info,mode) != MagickFalse)
-                    RelinquishPixelCachePixels(&source_info);
-                  cache_info->type=UndefinedCache;
-                  return(MagickFalse);
-                }
-              return(MagickTrue);
-            }
+            return(CreateMemoryPixelCache(cache_info,&open_info,source_info,
+              status));
         }
     }
   status=AcquireMagickResource(DiskResource,cache_info->length);
