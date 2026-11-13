@@ -1961,6 +1961,13 @@ static ssize_t CountXMLEntities(char **entities)
   return(i);
 }
 
+static MagickBooleanType IsNonCircularEntity(char *n,char *v,char **entities)
+{
+  return(((ValidateEntities(n,v,'%',0,entities) != MagickFalse) &&
+    (ValidateEntities(n,v,'&',0,entities) != MagickFalse)) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
   size_t length,ExceptionInfo *exception)
 {
@@ -2022,8 +2029,7 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
         TerminateEntityValue(&xml,v,q);
         entities[i+1]=ParseEntities(v,predefined_entities,'%');
         entities[i+2]=(char *) NULL;
-        if ((ValidateEntities(n,entities[i+1],'%',0,entities) != MagickFalse) &&
-            (ValidateEntities(n,entities[i+1],'&',0,entities) != MagickFalse))
+        if (IsNonCircularEntity(n,entities[i+1],entities) != MagickFalse)
           entities[i]=n;
         else
           {
