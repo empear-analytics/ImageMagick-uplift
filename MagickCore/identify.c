@@ -2177,6 +2177,19 @@ static MagickBooleanType PrintImageSummary(Image *image,FILE *file,
   return(ferror(file) != 0 ? MagickFalse : MagickTrue);
 }
 
+static void PrintImageHeader(FILE *file,const Image *image,
+  ExceptionInfo *exception)
+{
+  struct stat
+    properties;
+
+  (void) FormatLocaleFile(file,"Image:\n  Filename: %s\n",image->filename);
+  PrintImageBaseFilename(file,image);
+  properties=(*GetBlobProperties(image));
+  PrintImagePermissions(file,&properties);
+  PrintImageFormat(file,image,exception);
+}
+
 static void PrintImageClassToEndianness(FILE *file,Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -2244,9 +2257,6 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   size_t
     depth;
 
-  struct stat
-    properties;
-
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
@@ -2280,11 +2290,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
       GetRequestedMoments(image,&channel_moments,&channel_phash,exception);
       GetRequestedFeatures(image,&channel_features,exception);
     }
-  (void) FormatLocaleFile(file,"Image:\n  Filename: %s\n",image->filename);
-  PrintImageBaseFilename(file,image);
-  properties=(*GetBlobProperties(image));
-  PrintImagePermissions(file,&properties);
-  PrintImageFormat(file,image,exception);
+  PrintImageHeader(file,image,exception);
   PrintImageClassToEndianness(file,image,colorspace,exception);
   PrintImageDepth(file,image,depth);
   (void) FormatLocaleFile(file,"  Channels: %g.%g\n",(double)
