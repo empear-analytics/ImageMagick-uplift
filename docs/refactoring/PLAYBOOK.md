@@ -12893,6 +12893,97 @@ Before pushing a branch: `python3 tools/oracle/oracle.py run`, the whole catalog
 
 ---
 
+## Recipe PA - Peel an Advancing Label Set out of a Loop's Switch as a Predicate
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Brain Method* on a
+function whose loop body ends in a `switch (c)` over a character, one of whose groups is
+many labels with the body `p++; break;` (advance one character and go round again), as in
+`geometry-parse.c`'s `GetGeometry` and `ParseGeometry`: the digits, the signs, `e`, `E`
+and `215` are seventeen labels of cc 50 and 52.
+
+**Not covered by:** Recipes LP and PL, whose peeled group leaves the function and whose
+labels are enumeration constants or integers returned from; Recipe SD, which keeps the
+labels in a `switch` of the new function; Recipe EC, which names an equality chain, not a
+`switch`; Recipe TB, which replaces a `switch` of constants.
+
+**How:**
+
+1. The `switch (c)` is the last statement of the body of a `for` or `while` loop outside
+   every OpenMP region; `c` is a local `int` that nothing in the `switch` assigns; the
+   statements of the body before the `switch` do not depend on the `switch`'s groups.
+   The peeled group `G` has labels `L1 ... Ln` (character constants or integer literals)
+   and exactly the body `p++; break;` (the group's braces and comments aside); no label
+   of `G` occurs in another group, and no group falls into `G` or out of it. No `#` line
+   stands inside the `switch`.
+2. Directly above the first function that uses it write `static inline
+   MagickBooleanType Name(const int c)` whose body is `switch (c) { <L1 ... Ln in the
+   original order> return(MagickTrue); default: break; } return(MagickFalse);`.
+3. Delete `G` from the `switch`, and directly before the `switch` write `if (Name(c) !=
+   MagickFalse) { p++; continue; }`, with the `p++` text of `G`.
+4. *Several sites.* A loop in another function whose group has the same labels as a set
+   uses the same predicate. A group with some further label keeps that label alone as a
+   group of the same body in its `switch` (`ParseGeometry`'s `/`).
+5. Check by script that the predicate's labels are exactly the peeled labels, each once,
+   and that nothing else in the `switch` changed.
+
+**Before:**
+
+```c
+    c=(int) *p;
+    switch (c)
+    {
+      case '%':
+        ...
+      case '-':
+      case ',':
+      case '+':
+      case '0':
+      ...
+      case 'E':
+      {
+        p++;
+        break;
+      }
+      case '.':
+```
+
+**After:**
+
+```c
+    c=(int) *p;
+    if (IsGeometryAdvanceCharacter(c) != MagickFalse)
+      {
+        p++;
+        continue;
+      }
+    switch (c)
+    {
+      case '%':
+        ...
+      case '.':
+```
+
+**Careful:**
+
+- The `switch` selects by the value of `c`, and the groups' label sets are disjoint
+  (step 1), so removing `G` leaves every other value going to the group it went to. The
+  predicate returns `MagickTrue` exactly for the labels of `G` (step 5), each compared
+  with the same `int` the `switch` promoted, so `G`'s body runs on the same values.
+- `G`'s `break;` leaves the `switch`, and the `switch` is the last statement of the loop
+  body (step 1), so control goes to the loop's next test; `continue;` goes to the same
+  place (a `for` loop's increment expression is empty in the loops this recipe meets; a
+  non-empty one would run in both forms, as after the `break`).
+- The predicate is a label run, allowed as a *Complex Method* by the owner's ruling of
+  2026-11-07; the `default: break;` keeps `-Wswitch` quiet.
+
+**Evidence level:** oracle (the cases that reach each loop's function).
+
+**Provenance:** 2026-11-13, from `geometry-parse.c`'s `GetGeometry` and `ParseGeometry`
+(campaign B, M121): 6.80 to 6.99, cc 50 and 52 to 36 and 38. Added by Claude Code (Claude
+Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -13207,3 +13298,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | NEW | DL | Drop `case` labels that fall straight into `default:`; proof `obj_identical.sh` | `policy.c`'s `SetMagickSecurityPolicyValue` (five enumerator labels; 6.02 to 6.21, object code identical) | mandate (2026-10-24) |
 | 2026-11-12 | NEW | DT | Drop `? MagickTrue : MagickFalse` after a comparison or a chain of them; proof `obj_identical.sh` and `ci_warnings.sh` | `policy.c` (seven sites in seven functions; 6.21 to 6.38, object code identical); P writes the ternary and nothing removes it | mandate (2026-10-24) |
 | 2026-11-12 | NEW | LL | Replace an ascending `if (x >= L) var=V;` ladder by descending returns in a helper; proof oracle plus the monotone-limits reading | `type.c` `LoadFontConfigFonts` (stretch and weight ladders; cc 41 to 23, 5.08 to 5.16); E keeps the ladder's cc | mandate (2026-10-24) |
+| 2026-11-13 | NEW | PA | Peel an advancing label group (`p++; break;` under many labels) out of a loop's `switch` into a membership predicate and an `if (...) { p++; continue; }`; evidence oracle | `geometry-parse.c`'s `GetGeometry` and `ParseGeometry` (seventeen labels in each; cc 50 and 52 to 36 and 38, 6.80 to 6.99); LP and PL peel groups that return, SD keeps the labels in a switch | mandate (2026-10-24) |
