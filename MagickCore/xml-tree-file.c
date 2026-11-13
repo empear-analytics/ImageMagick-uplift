@@ -155,6 +155,15 @@ static size_t GetXMLReadQuantum(int file)
   return(quantum);
 }
 
+static char *CloseXMLFile(const char *filename,int file,char *xml)
+{
+  if (LocaleCompare(filename,"-") != 0)
+    file=close_utf8(file);
+  if (file == -1)
+    xml=(char *) RelinquishMagickMemory(xml);
+  return(xml);
+}
+
 MagickPrivate char *FileToXML(const char *filename,const size_t extent)
 {
   char
@@ -232,9 +241,5 @@ MagickPrivate char *FileToXML(const char *filename,const size_t extent)
   if (ReadXMLFileContent(file,xml,length) == MagickFalse)
     return((char *) NULL);
   xml[length]='\0';
-  if (LocaleCompare(filename,"-") != 0)
-    file=close_utf8(file);
-  if (file == -1)
-    xml=(char *) RelinquishMagickMemory(xml);
-  return(xml);
+  return(CloseXMLFile(filename,file,xml));
 }
