@@ -1802,6 +1802,9 @@ typedef struct _AnnotateTargets
 
   size_t
     *state;
+
+  XEvent
+    *event;
 } AnnotateTargets;
 
 static void XGoToPreviousTextLine(const AnnotateTargets *targets)
@@ -2666,44 +2669,484 @@ static void XSetPenPixelIndex(XWindows *windows,const unsigned int pen_id)
 static void
   XTrackInfoWidget(Display *,XWindows *,const int,const int);
 
+static const char
+  *const AnnotateMenu[] =
+  {
+    "Font Name",
+    "Font Color",
+    "Box Color",
+    "Rotate Text",
+    "Help",
+    "Dismiss",
+    (char *) NULL
+  },
+  *const TextMenu[] =
+  {
+    "Help",
+    "Apply",
+    (char *) NULL
+  };
+
+static const ModeType
+  AnnotateCommands[] =
+  {
+    AnnotateNameCommand,
+    AnnotateFontColorCommand,
+    AnnotateBackgroundColorCommand,
+    AnnotateRotateCommand,
+    AnnotateHelpCommand,
+    AnnotateDismissCommand
+  },
+  TextCommands[] =
+  {
+    TextHelpCommand,
+    TextApplyCommand
+  };
+
+typedef struct _AnnotateContext
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  char
+    *command;
+
+  const AnnotateFontTargets
+    *font_targets;
+
+  const AnnotateFontColorTargets
+    *font_color_targets;
+
+  const AnnotateBoxColorTargets
+    *box_color_targets;
+
+  const AnnotateRotateTargets
+    *rotate_targets;
+
+  Cursor
+    cursor;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    *text;
+
+  GC
+    annotate_context;
+
+  XFontStruct
+    *font_info;
+
+  unsigned int
+    box_id;
+
+  unsigned int
+    pen_id;
+} AnnotateContext;
+
+static void XSetAnnotateMenuInput(const AnnotateContext *context,const int id,
+  AnnotateMenuInput *annotate_input)
+{
+  (*annotate_input).display=context->display;
+  (*annotate_input).resource_info=context->resource_info;
+  (*annotate_input).windows=context->windows;
+  (*annotate_input).AnnotateMenu=AnnotateMenu;
+  (*annotate_input).id=id;
+  (*annotate_input).command=context->command;
+}
+
+static void XAnnotatePointerCommand(const AnnotateContext *context,
+  const AnnotateTargets *targets,const int id)
+{
+  size_t
+    *const state = targets->state;
+
+  switch (AnnotateCommands[id])
+  {
+    case AnnotateNameCommand:
+    {
+      AnnotateMenuInput
+        annotate_input;
+
+      XSetAnnotateMenuInput(context,id,&annotate_input);
+      XSelectAnnotateFont(&annotate_input,context->font_targets);
+      break;
+    }
+    case AnnotateFontColorCommand:
+    {
+      AnnotateMenuInput
+        annotate_input;
+
+      XSetAnnotateMenuInput(context,id,&annotate_input);
+      XSelectAnnotateFontColor(&annotate_input,context->font_color_targets);
+      break;
+    }
+    case AnnotateBackgroundColorCommand:
+    {
+      AnnotateMenuInput
+        annotate_input;
+
+      XSetAnnotateMenuInput(context,id,&annotate_input);
+      XSelectAnnotateBoxColor(&annotate_input,context->box_color_targets);
+      break;
+    }
+    case AnnotateRotateCommand:
+    {
+      AnnotateMenuInput
+        annotate_input;
+
+      XSetAnnotateMenuInput(context,id,&annotate_input);
+      XSelectAnnotateRotation(&annotate_input,context->rotate_targets);
+      break;
+    }
+    case AnnotateHelpCommand:
+    {
+      XTextViewHelp(context->display,context->resource_info,context->windows,
+        MagickFalse,
+        "Help Viewer - Image Annotation",ImageAnnotateHelp);
+      break;
+    }
+    case AnnotateDismissCommand:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void XAnnotatePointerPress(const AnnotateContext *context,
+  const AnnotateTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  if ((*event).xbutton.button != Button1)
+    return;
+  if ((*event).xbutton.window != context->windows->image.id)
+    return;
+  /*
+    Change to text entering mode.
+  */
+  (*x)=(*event).xbutton.x;
+  (*y)=(*event).xbutton.y;
+  (*state)|=ExitState;
+}
+
+static void XAnnotatePointerKey(const AnnotateContext *context,
+  const AnnotateTargets *targets)
+{
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  if ((*event).xkey.window != context->windows->image.id)
+    return;
+  /*
+    Respond to a user key press.
+  */
+  (void) XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  switch ((int) key_symbol)
+  {
+    case XK_Escape:
+    case XK_F20:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    case XK_F1:
+    case XK_Help:
+    {
+      XTextViewHelp(context->display,context->resource_info,context->windows,
+        MagickFalse,
+        "Help Viewer - Image Annotation",ImageAnnotateHelp);
+      break;
+    }
+    default:
+    {
+      (void) XBell(context->display,0);
+      break;
+    }
+  }
+}
+
+static void XAnnotatePointerEvent(const AnnotateContext *context,
+  const AnnotateTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      XAnnotatePointerPress(context,targets);
+      break;
+    }
+    case ButtonRelease:
+      break;
+    case Expose:
+      break;
+    case KeyPress:
+    {
+      XAnnotatePointerKey(context,targets);
+      break;
+    }
+    case MotionNotify:
+    {
+      /*
+        Map and unmap Info widget as cursor crosses its boundaries.
+      */
+      (*x)=(*event).xmotion.x;
+      (*y)=(*event).xmotion.y;
+      XTrackInfoWidget(context->display,context->windows,(*x),(*y));
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void XAnnotateCommandBranch(const AnnotateContext *context,
+  const AnnotateTargets *targets)
+{
+  int
+    id;
+
+  XEvent
+    *const event = targets->event;
+
+  /*
+    Select a command from the Command widget.
+  */
+  id=XCommandWidget(context->display,context->windows,AnnotateMenu,event);
+  (void) XCheckDefineCursor(context->display,context->windows->image.id,
+    context->cursor);
+  if (id < 0)
+    return;
+  XAnnotatePointerCommand(context,targets,id);
+}
+
+static void XAnnotateTrackPointer(const AnnotateContext *context,
+  const AnnotateTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  do
+  {
+    if (context->windows->info.mapped != MagickFalse)
+      {
+        /*
+          Display pointer position.
+        */
+        (void) FormatLocaleString(context->text,MagickPathExtent," %+d%+d ",
+          (*x)+context->windows->image.x,(*y)+context->windows->image.y);
+        XInfoWidget(context->display,context->windows,context->text);
+      }
+    /*
+      Wait for next event.
+    */
+    XScreenEvent(context->display,context->windows,event,context->exception);
+    if ((*event).xany.window == context->windows->command.id)
+      {
+        XAnnotateCommandBranch(context,targets);
+        continue;
+      }
+    XAnnotatePointerEvent(context,targets);
+  } while (((*state) & ExitState) == 0);
+}
+
+static void XAnnotateTextCommand(const AnnotateContext *context,
+  const AnnotateTargets *targets)
+{
+  int
+    id;
+
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+
+  XEvent
+    *const text_event = targets->text_event;
+
+  /*
+    Select a command from the Command widget.
+  */
+  (void) XSetBackground(context->display,context->annotate_context,
+    context->windows->pixel_info->background_color.pixel);
+  (void) XSetForeground(context->display,context->annotate_context,
+    context->windows->pixel_info->foreground_color.pixel);
+  id=XCommandWidget(context->display,context->windows,AnnotateMenu,event);
+  (void) XSetBackground(context->display,context->annotate_context,
+    context->windows->pixel_info->pen_colors[context->box_id].pixel);
+  (void) XSetForeground(context->display,context->annotate_context,
+    context->windows->pixel_info->pen_colors[context->pen_id].pixel);
+  if (id < 0)
+    return;
+  switch (TextCommands[id])
+  {
+    case TextHelpCommand:
+    {
+      XTextViewHelp(context->display,context->resource_info,context->windows,
+        MagickFalse,
+        "Help Viewer - Image Annotation",ImageAnnotateHelp);
+      (void) XCheckDefineCursor(context->display,context->windows->image.id,
+        context->cursor);
+      break;
+    }
+    case TextApplyCommand:
+    {
+      /*
+        Finished annotating.
+      */
+      (*annotate_info)->width=(unsigned int) XTextWidth(context->font_info,
+        (*annotate_info)->text,(int) strlen((*annotate_info)->text));
+      XRefreshWindow(context->display,&context->windows->image,text_event);
+      (*state)|=ExitState;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static MagickBooleanType XAnnotateTextKey(const AnnotateContext *context,
+  const AnnotateTargets *targets)
+{
+  AnnotateTextInput
+    text_input;
+
+  char
+    command[MagickPathExtent];
+
+  int
+    length;
+
+  KeySym
+    key_symbol;
+
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  /*
+    Respond to a user key press.
+  */
+  length=XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  *(command+length)='\0';
+  if ((((*event).xkey.state & ControlMask) != 0) ||
+      (((*event).xkey.state & Mod1Mask) != 0))
+    (*state)|=ModifierState;
+  key_symbol=XModifyKeySymbol((*state),key_symbol);
+  text_input.display=context->display;
+  text_input.windows=context->windows;
+  text_input.annotate_context=context->annotate_context;
+  text_input.font_info=context->font_info;
+  text_input.command=command;
+  text_input.state=(*state);
+  if (XAnnotateKeyPress(&text_input,targets,key_symbol) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static MagickBooleanType XAnnotateTextPaste(const AnnotateContext *context,
+  const AnnotateTargets *targets)
+{
+  AnnotateTextInput
+    text_input;
+
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  text_input.display=context->display;
+  text_input.windows=context->windows;
+  text_input.annotate_context=context->annotate_context;
+  text_input.font_info=context->font_info;
+  text_input.command=context->command;
+  text_input.state=(*state);
+  if (XPasteSelectionText(&text_input,event,targets) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static void XAnnotateTextPress(const AnnotateContext *context,
+  const AnnotateTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  if ((*event).xbutton.window != context->windows->image.id)
+    return;
+  if ((*event).xbutton.button == Button2)
+    {
+      /*
+        Request primary selection.
+      */
+      (void) XConvertSelection(context->display,XA_PRIMARY,XA_STRING,XA_STRING,
+        context->windows->image.id,CurrentTime);
+      return;
+    }
+}
+
 static MagickBooleanType XAnnotateEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
 {
-  const char
-    *const AnnotateMenu[] =
-    {
-      "Font Name",
-      "Font Color",
-      "Box Color",
-      "Rotate Text",
-      "Help",
-      "Dismiss",
-      (char *) NULL
-    },
-    *const TextMenu[] =
-    {
-      "Help",
-      "Apply",
-      (char *) NULL
-    };
-
-  static const ModeType
-    AnnotateCommands[] =
-    {
-      AnnotateNameCommand,
-      AnnotateFontColorCommand,
-      AnnotateBackgroundColorCommand,
-      AnnotateRotateCommand,
-      AnnotateHelpCommand,
-      AnnotateDismissCommand
-    },
-    TextCommands[] =
-    {
-      TextHelpCommand,
-      TextApplyCommand
-    };
-
   static MagickBooleanType
     transparent_box = MagickTrue,
     transparent_pen = MagickFalse;
@@ -2728,7 +3171,6 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
     annotate_context;
 
   int
-    id,
     status,
     x,
     y;
@@ -2757,8 +3199,11 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
     event,
     text_event;
 
+  AnnotateContext
+    context;
+
   const AnnotateTargets
-    targets = { &annotate_info, &p, &x, &y, &text_event, &state };
+    targets = { &annotate_info, &p, &x, &y, &text_event, &state, &event };
 
   const AnnotateRotateTargets
     rotate_targets = { &degrees };
@@ -2790,178 +3235,18 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
   cursor=XCreateFontCursor(display,XC_left_side);
   (void) XCheckDefineCursor(display,windows->image.id,cursor);
   state=DefaultState;
-  do
-  {
-    if (windows->info.mapped != MagickFalse)
-      {
-        /*
-          Display pointer position.
-        */
-        (void) FormatLocaleString(text,MagickPathExtent," %+d%+d ",
-          x+windows->image.x,y+windows->image.y);
-        XInfoWidget(display,windows,text);
-      }
-    /*
-      Wait for next event.
-    */
-    XScreenEvent(display,windows,&event,exception);
-    if (event.xany.window == windows->command.id)
-      {
-        /*
-          Select a command from the Command widget.
-        */
-        id=XCommandWidget(display,windows,AnnotateMenu,&event);
-        (void) XCheckDefineCursor(display,windows->image.id,cursor);
-        if (id < 0)
-          continue;
-        switch (AnnotateCommands[id])
-        {
-          case AnnotateNameCommand:
-          {
-            AnnotateMenuInput
-              annotate_input;
-
-            annotate_input.display=display;
-            annotate_input.resource_info=resource_info;
-            annotate_input.windows=windows;
-            annotate_input.AnnotateMenu=AnnotateMenu;
-            annotate_input.id=id;
-            annotate_input.command=command;
-            XSelectAnnotateFont(&annotate_input,&font_targets);
-            break;
-          }
-          case AnnotateFontColorCommand:
-          {
-            AnnotateMenuInput
-              annotate_input;
-
-            annotate_input.display=display;
-            annotate_input.resource_info=resource_info;
-            annotate_input.windows=windows;
-            annotate_input.AnnotateMenu=AnnotateMenu;
-            annotate_input.id=id;
-            annotate_input.command=command;
-            XSelectAnnotateFontColor(&annotate_input,&font_color_targets);
-            break;
-          }
-          case AnnotateBackgroundColorCommand:
-          {
-            AnnotateMenuInput
-              annotate_input;
-
-            annotate_input.display=display;
-            annotate_input.resource_info=resource_info;
-            annotate_input.windows=windows;
-            annotate_input.AnnotateMenu=AnnotateMenu;
-            annotate_input.id=id;
-            annotate_input.command=command;
-            XSelectAnnotateBoxColor(&annotate_input,&box_color_targets);
-            break;
-          }
-          case AnnotateRotateCommand:
-          {
-            AnnotateMenuInput
-              annotate_input;
-
-            annotate_input.display=display;
-            annotate_input.resource_info=resource_info;
-            annotate_input.windows=windows;
-            annotate_input.AnnotateMenu=AnnotateMenu;
-            annotate_input.id=id;
-            annotate_input.command=command;
-            XSelectAnnotateRotation(&annotate_input,&rotate_targets);
-            break;
-          }
-          case AnnotateHelpCommand:
-          {
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Image Annotation",ImageAnnotateHelp);
-            break;
-          }
-          case AnnotateDismissCommand:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-          default:
-            break;
-        }
-        continue;
-      }
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        if (event.xbutton.button != Button1)
-          break;
-        if (event.xbutton.window != windows->image.id)
-          break;
-        /*
-          Change to text entering mode.
-        */
-        x=event.xbutton.x;
-        y=event.xbutton.y;
-        state|=ExitState;
-        break;
-      }
-      case ButtonRelease:
-        break;
-      case Expose:
-        break;
-      case KeyPress:
-      {
-        if (event.xkey.window != windows->image.id)
-          break;
-        /*
-          Respond to a user key press.
-        */
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        switch ((int) key_symbol)
-        {
-          case XK_Escape:
-          case XK_F20:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-          case XK_F1:
-          case XK_Help:
-          {
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Image Annotation",ImageAnnotateHelp);
-            break;
-          }
-          default:
-          {
-            (void) XBell(display,0);
-            break;
-          }
-        }
-        break;
-      }
-      case MotionNotify:
-      {
-        /*
-          Map and unmap Info widget as cursor crosses its boundaries.
-        */
-        x=event.xmotion.x;
-        y=event.xmotion.y;
-        XTrackInfoWidget(display,windows,x,y);
-        break;
-      }
-      default:
-        break;
-    }
-  } while ((state & ExitState) == 0);
+  context.display=display;
+  context.resource_info=resource_info;
+  context.windows=windows;
+  context.command=command;
+  context.font_targets=&font_targets;
+  context.font_color_targets=&font_color_targets;
+  context.box_color_targets=&box_color_targets;
+  context.rotate_targets=&rotate_targets;
+  context.exception=exception;
+  context.text=text;
+  context.cursor=cursor;
+  XAnnotateTrackPointer(&context,&targets);
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask);
   (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
@@ -3031,6 +3316,11 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
   text_event.xexpose.height=font_info->max_bounds.ascent+
     font_info->max_bounds.descent;
   p=annotate_info->text;
+  context.cursor=cursor;
+  context.annotate_context=annotate_context;
+  context.font_info=font_info;
+  context.box_id=box_id;
+  context.pen_id=pen_id;
   do
   {
     /*
@@ -3044,43 +3334,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
     XScreenEvent(display,windows,&event,exception);
     if (event.xany.window == windows->command.id)
       {
-        /*
-          Select a command from the Command widget.
-        */
-        (void) XSetBackground(display,annotate_context,
-          windows->pixel_info->background_color.pixel);
-        (void) XSetForeground(display,annotate_context,
-          windows->pixel_info->foreground_color.pixel);
-        id=XCommandWidget(display,windows,AnnotateMenu,&event);
-        (void) XSetBackground(display,annotate_context,
-          windows->pixel_info->pen_colors[box_id].pixel);
-        (void) XSetForeground(display,annotate_context,
-          windows->pixel_info->pen_colors[pen_id].pixel);
-        if (id < 0)
-          continue;
-        switch (TextCommands[id])
-        {
-          case TextHelpCommand:
-          {
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Image Annotation",ImageAnnotateHelp);
-            (void) XCheckDefineCursor(display,windows->image.id,cursor);
-            break;
-          }
-          case TextApplyCommand:
-          {
-            /*
-              Finished annotating.
-            */
-            annotate_info->width=(unsigned int) XTextWidth(font_info,
-              annotate_info->text,(int) strlen(annotate_info->text));
-            XRefreshWindow(display,&windows->image,&text_event);
-            state|=ExitState;
-            break;
-          }
-          default:
-            break;
-        }
+        XAnnotateTextCommand(&context,&targets);
         continue;
       }
     /*
@@ -3096,17 +3350,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
     {
       case ButtonPress:
       {
-        if (event.xbutton.window != windows->image.id)
-          break;
-        if (event.xbutton.button == Button2)
-          {
-            /*
-              Request primary selection.
-            */
-            (void) XConvertSelection(display,XA_PRIMARY,XA_STRING,XA_STRING,
-              windows->image.id,CurrentTime);
-            break;
-          }
+        XAnnotateTextPress(&context,&targets);
         break;
       }
       case Expose:
@@ -3125,31 +3369,9 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
       }
       case KeyPress:
       {
-        AnnotateTextInput
-          text_input;
-
-        int
-          length;
-
         if (event.xkey.window != windows->image.id)
           break;
-        /*
-          Respond to a user key press.
-        */
-        length=XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        *(command+length)='\0';
-        if (((event.xkey.state & ControlMask) != 0) ||
-            ((event.xkey.state & Mod1Mask) != 0))
-          state|=ModifierState;
-        key_symbol=XModifyKeySymbol(state,key_symbol);
-        text_input.display=display;
-        text_input.windows=windows;
-        text_input.annotate_context=annotate_context;
-        text_input.font_info=font_info;
-        text_input.command=command;
-        text_input.state=state;
-        if (XAnnotateKeyPress(&text_input,&targets,key_symbol) == MagickFalse)
+        if (XAnnotateTextKey(&context,&targets) == MagickFalse)
           return(MagickFalse);
         break;
       }
@@ -3165,16 +3387,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
       }
       case SelectionNotify:
       {
-        AnnotateTextInput
-          text_input;
-
-        text_input.display=display;
-        text_input.windows=windows;
-        text_input.annotate_context=annotate_context;
-        text_input.font_info=font_info;
-        text_input.command=command;
-        text_input.state=state;
-        if (XPasteSelectionText(&text_input,&event,&targets) == MagickFalse)
+        if (XAnnotateTextPaste(&context,&targets) == MagickFalse)
           return(MagickFalse);
         break;
       }
@@ -4358,35 +4571,521 @@ static void
 static void
   XDiscardMagnifyKeys(Display *,XWindows *,XEvent *);
 
+static const char
+  *const ColorEditMenu[] =
+  {
+    "Method",
+    "Pixel Color",
+    "Border Color",
+    "Fuzz",
+    "Undo",
+    "Help",
+    "Dismiss",
+    (char *) NULL
+  };
+
+static const ModeType
+  ColorEditCommands[] =
+  {
+    ColorEditMethodCommand,
+    ColorEditColorCommand,
+    ColorEditBorderCommand,
+    ColorEditFuzzCommand,
+    ColorEditUndoCommand,
+    ColorEditHelpCommand,
+    ColorEditDismissCommand
+  };
+
+typedef struct _ColorEditContext
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    **image;
+
+  ExceptionInfo
+    *exception;
+
+  const ModeType
+    *ColorEditCommands;
+
+  const char
+    *const *ColorEditMenu;
+
+  char
+    *command;
+
+  Cursor
+    cursor;
+
+  PaintMethodTargets
+    method_targets;
+
+  PenColorTargets
+    pen_targets;
+
+  ColorBorderTargets
+    border_targets;
+
+  char
+    *text;
+} ColorEditContext;
+
+static void XColorEditCommandAction(const ColorEditContext *context,
+  const int id,size_t *state)
+{
+  switch (context->ColorEditCommands[id])
+  {
+    case ColorEditUndoCommand:
+    {
+      (void) XMagickCommand(context->display,context->resource_info,
+        context->windows,UndoCommand,context->image,context->exception);
+      break;
+    }
+    case ColorEditHelpCommand:
+    default:
+    {
+      XTextViewHelp(context->display,context->resource_info,context->windows,
+        MagickFalse,"Help Viewer - Image Annotation",ImageColorEditHelp);
+      break;
+    }
+    case ColorEditDismissCommand:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+  }
+}
+
+static void XColorEditMenuAction(const ColorEditContext *context,
+  const int id,size_t *state)
+{
+  EditMenuInput
+    menu_input;
+
+  switch (context->ColorEditCommands[id])
+  {
+    case ColorEditBorderCommand:
+    {
+      menu_input.display=context->display;
+      menu_input.windows=context->windows;
+      menu_input.MatteEditMenu=context->ColorEditMenu;
+      menu_input.id=id;
+      menu_input.command=context->command;
+      XSelectColorBorder(&menu_input,context->resource_info,
+        &context->border_targets);
+      break;
+    }
+    case ColorEditFuzzCommand:
+    {
+      const char
+        *const FuzzMenu[] =
+        {
+          "0%",
+          "2%",
+          "5%",
+          "10%",
+          "15%",
+          "Dialog...",
+          (char *) NULL,
+        };
+
+      static char
+        fuzz[MagickPathExtent];
+
+      menu_input.display=context->display;
+      menu_input.windows=context->windows;
+      menu_input.MatteEditMenu=context->ColorEditMenu;
+      menu_input.id=id;
+      menu_input.command=context->command;
+      XSelectFuzzFactor(&menu_input,FuzzMenu,fuzz,context->image);
+      break;
+    }
+    default:
+    {
+      XColorEditCommandAction(context,id,state);
+      break;
+    }
+  }
+}
+
+typedef struct _ColorEditTargets
+{
+  XEvent
+    *event;
+
+  size_t
+    *state;
+
+  int
+    *x,
+    *y;
+
+  PaintMethod
+    *method;
+
+  unsigned int
+    *pen_id;
+
+  XColor
+    *border_color,
+    *color;
+} ColorEditTargets;
+
+static void XColorEditCommand(const ColorEditContext *context,
+  const ColorEditTargets *targets)
+{
+  EditMenuInput
+    menu_input;
+
+  int
+    id;
+
+  /*
+    Select a command from the Command widget.
+  */
+  id=XCommandWidget(context->display,context->windows,context->ColorEditMenu,
+    targets->event);
+  if (id < 0)
+    {
+      (void) XCheckDefineCursor(context->display,context->windows->image.id,
+        context->cursor);
+      return;
+    }
+  switch (context->ColorEditCommands[id])
+  {
+    case ColorEditMethodCommand:
+    {
+      menu_input.display=context->display;
+      menu_input.windows=context->windows;
+      menu_input.MatteEditMenu=context->ColorEditMenu;
+      menu_input.id=id;
+      menu_input.command=context->command;
+      XSelectPaintMethod(&menu_input,&context->method_targets);
+      break;
+    }
+    case ColorEditColorCommand:
+    {
+      menu_input.display=context->display;
+      menu_input.windows=context->windows;
+      menu_input.MatteEditMenu=context->ColorEditMenu;
+      menu_input.id=id;
+      menu_input.command=context->command;
+      XSelectPenColor(&menu_input,context->resource_info,&context->pen_targets);
+      break;
+    }
+    default:
+    {
+      XColorEditMenuAction(context,id,targets->state);
+      break;
+    }
+  }
+  (void) XCheckDefineCursor(context->display,context->windows->image.id,
+    context->cursor);
+}
+
+static void XColorEditPress(const ColorEditContext *context,
+  const ColorEditTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  if ((*event).xbutton.button != Button1)
+    return;
+  if (((*event).xbutton.window != context->windows->image.id) &&
+      ((*event).xbutton.window != context->windows->magnify.id))
+    return;
+  /*
+    exit loop.
+  */
+  (*x)=(*event).xbutton.x;
+  (*y)=(*event).xbutton.y;
+  (void) XMagickCommand(context->display,context->resource_info,
+    context->windows,
+    SaveToUndoBufferCommand,context->image,context->exception);
+  (*state)|=UpdateConfigurationState;
+}
+
+static void XColorEditRelease(const ColorEditContext *context,
+  const ColorEditTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  if ((*event).xbutton.button != Button1)
+    return;
+  if (((*event).xbutton.window != context->windows->image.id) &&
+      ((*event).xbutton.window != context->windows->magnify.id))
+    return;
+  /*
+    Update colormap information.
+  */
+  (*x)=(*event).xbutton.x;
+  (*y)=(*event).xbutton.y;
+  XConfigureImageColormap(context->display,context->resource_info,
+    context->windows,*context->image,context->exception);
+  (void) XConfigureImage(context->display,context->resource_info,
+    context->windows,*context->image,context->exception);
+  XInfoWidget(context->display,context->windows,context->text);
+  (void) XCheckDefineCursor(context->display,context->windows->image.id,
+    context->cursor);
+  (*state)&=(size_t) (~UpdateConfigurationState);
+}
+
+static void XColorEditKey(const ColorEditContext *context,
+  const ColorEditTargets *targets)
+{
+  char
+    command[MagickPathExtent];
+
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  KeySym
+    key_symbol;
+
+  XDiscardMagnifyKeys(context->display,context->windows,event);
+  if ((*event).xkey.window != context->windows->image.id)
+    return;
+  /*
+    Respond to a user key press.
+  */
+  (void) XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  switch ((int) key_symbol)
+  {
+    case XK_Escape:
+    case XK_F20:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=ExitState;
+      break;
+    }
+    case XK_F1:
+    case XK_Help:
+    {
+      XTextViewHelp(context->display,context->resource_info,context->windows,
+        MagickFalse,"Help Viewer - Image Annotation",ImageColorEditHelp);
+      break;
+    }
+    default:
+    {
+      (void) XBell(context->display,0);
+      break;
+    }
+  }
+}
+
+static void XColorEditEvent(const ColorEditContext *context,
+  const ColorEditTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      XColorEditPress(context,targets);
+      break;
+    }
+    case ButtonRelease:
+    {
+      XColorEditRelease(context,targets);
+      break;
+    }
+    case Expose:
+      break;
+    case KeyPress:
+    {
+      XColorEditKey(context,targets);
+      break;
+    }
+    case MotionNotify:
+    {
+      /*
+        Map and unmap Info widget as cursor crosses its boundaries.
+      */
+      (*x)=(*event).xmotion.x;
+      (*y)=(*event).xmotion.y;
+      XTrackInfoWidget(context->display,context->windows,(*x),(*y));
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static MagickBooleanType XColorEditUpdate(const ColorEditContext *context,
+  const ColorEditTargets *targets,int x_offset,int y_offset)
+{
+  PaintMethod
+    *const method = targets->method;
+
+  size_t
+    *const state = targets->state;
+
+  unsigned int
+    *const pen_id = targets->pen_id;
+
+  unsigned int
+    height,
+    width;
+
+  XColor
+    *const border_color = targets->border_color;
+
+  XColor
+    *const color = targets->color;
+
+  if (((*state) & UpdateConfigurationState) != 0)
+    {
+      CacheView
+        *image_view;
+
+      ColorEditPixelInput
+        pixel_input;
+
+      int
+        x,
+        y;
+
+      /*
+        Pixel edit is relative to image configuration.
+      */
+      (void) XClearArea(context->display,context->windows->image.id,x_offset,
+        y_offset,1,1,MagickTrue);
+      (*color)=context->windows->pixel_info->pen_colors[(*pen_id)];
+      XPutPixel(context->windows->image.ximage,x_offset,y_offset,
+        (*color).pixel);
+      width=(unsigned int) (*context->image)->columns;
+      height=(unsigned int) (*context->image)->rows;
+      x=0;
+      y=0;
+      if (context->windows->image.crop_geometry != (char *) NULL)
+        (void) XParseGeometry(context->windows->image.crop_geometry,&x,&y,
+          &width,&height);
+      x_offset=((int) width*(context->windows->image.x+x_offset)/(int)
+        context->windows->image.ximage->width+x);
+      y_offset=((int) height*(context->windows->image.y+y_offset)/(int)
+        context->windows->image.ximage->height+y);
+      if ((x_offset < 0) || (y_offset < 0))
+        return(MagickTrue);
+      if ((x_offset >= (int) (*context->image)->columns) ||
+          (y_offset >= (int) (*context->image)->rows))
+        return(MagickTrue);
+      image_view=AcquireAuthenticCacheView(*context->image,context->exception);
+      pixel_input.image=context->image;
+      pixel_input.image_view=image_view;
+      pixel_input.x_offset=x_offset;
+      pixel_input.y_offset=y_offset;
+      pixel_input.exception=context->exception;
+      pixel_input.resource_info=context->resource_info;
+      pixel_input.method=(*method);
+      pixel_input.color=(*color);
+      pixel_input.border_color=(*border_color);
+      pixel_input.pen_id=(*pen_id);
+      if (XColorEditPixels(&pixel_input) == MagickFalse)
+        return(MagickFalse);
+      image_view=DestroyCacheView(image_view);
+      (*state)&=(~0x0080U);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType XColorEditStep(const ColorEditContext *context,
+  const ColorEditTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  int
+    x_offset,
+    y_offset;
+
+  if (context->windows->info.mapped != MagickFalse)
+    {
+      /*
+        Display pointer position.
+      */
+      (void) FormatLocaleString(context->text,MagickPathExtent," %+d%+d ",
+        (*x)+context->windows->image.x,(*y)+context->windows->image.y);
+      XInfoWidget(context->display,context->windows,context->text);
+    }
+  /*
+    Wait for next event.
+  */
+  XScreenEvent(context->display,context->windows,event,context->exception);
+  if ((*event).xany.window == context->windows->command.id)
+    {
+      XColorEditCommand(context,targets);
+      return(MagickTrue);
+    }
+  XColorEditEvent(context,targets);
+  if ((*event).xany.window == context->windows->magnify.id)
+    {
+      (*x)=context->windows->magnify.x-context->windows->image.x;
+      (*y)=context->windows->magnify.y-context->windows->image.y;
+    }
+  x_offset=(*x);
+  y_offset=(*y);
+  if (XColorEditUpdate(context,targets,x_offset,y_offset) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static void XMapColorEditCommand(Display *display,XWindows *windows)
+{
+  (void) CloneString(&windows->command.name,"Color Edit");
+  windows->command.data=4;
+  (void) XCommandWidget(display,windows,ColorEditMenu,(XEvent *) NULL);
+  (void) XMapRaised(display,windows->command.id);
+  XClientMessage(display,windows->image.id,windows->im_protocols,
+    windows->im_update_widget,CurrentTime);
+}
+
 static MagickBooleanType XColorEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
 {
-  const char
-    *const ColorEditMenu[] =
-    {
-      "Method",
-      "Pixel Color",
-      "Border Color",
-      "Fuzz",
-      "Undo",
-      "Help",
-      "Dismiss",
-      (char *) NULL
-    };
-
-  static const ModeType
-    ColorEditCommands[] =
-    {
-      ColorEditMethodCommand,
-      ColorEditColorCommand,
-      ColorEditBorderCommand,
-      ColorEditFuzzCommand,
-      ColorEditUndoCommand,
-      ColorEditHelpCommand,
-      ColorEditDismissCommand
-    };
-
   static PaintMethod
     method = PointMethod;
 
@@ -4404,24 +5103,20 @@ static MagickBooleanType XColorEditImage(Display *display,
     cursor;
 
   int
-    id,
     x,
-    x_offset,
-    y,
-    y_offset;
+    y;
 
   size_t
     state;
-
-  unsigned int
-    height,
-    width;
 
   XColor
     color;
 
   XEvent
     event;
+
+  ColorEditContext
+    context;
 
   const PaintMethodTargets
     method_targets = { &method };
@@ -4432,15 +5127,14 @@ static MagickBooleanType XColorEditImage(Display *display,
   const ColorBorderTargets
     border_targets = { &border_color };
 
+  const ColorEditTargets
+    targets = { &event, &state, &x, &y, &method, &pen_id, &border_color,
+      &color };
+
   /*
     Map Command widget.
   */
-  (void) CloneString(&windows->command.name,"Color Edit");
-  windows->command.data=4;
-  (void) XCommandWidget(display,windows,ColorEditMenu,(XEvent *) NULL);
-  (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
+  XMapColorEditCommand(display,windows);
   /*
     Make cursor.
   */
@@ -4454,268 +5148,23 @@ static MagickBooleanType XColorEditImage(Display *display,
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask | PointerMotionMask);
   state=DefaultState;
+  context.display=display;
+  context.resource_info=resource_info;
+  context.windows=windows;
+  context.image=image;
+  context.exception=exception;
+  context.ColorEditCommands=ColorEditCommands;
+  context.ColorEditMenu=ColorEditMenu;
+  context.command=command;
+  context.cursor=cursor;
+  context.method_targets=method_targets;
+  context.pen_targets=pen_targets;
+  context.border_targets=border_targets;
+  context.text=text;
   do
   {
-    if (windows->info.mapped != MagickFalse)
-      {
-        /*
-          Display pointer position.
-        */
-        (void) FormatLocaleString(text,MagickPathExtent," %+d%+d ",
-          x+windows->image.x,y+windows->image.y);
-        XInfoWidget(display,windows,text);
-      }
-    /*
-      Wait for next event.
-    */
-    XScreenEvent(display,windows,&event,exception);
-    if (event.xany.window == windows->command.id)
-      {
-        EditMenuInput
-          menu_input;
-
-        /*
-          Select a command from the Command widget.
-        */
-        id=XCommandWidget(display,windows,ColorEditMenu,&event);
-        if (id < 0)
-          {
-            (void) XCheckDefineCursor(display,windows->image.id,cursor);
-            continue;
-          }
-        switch (ColorEditCommands[id])
-        {
-          case ColorEditMethodCommand:
-          {
-            menu_input.display=display;
-            menu_input.windows=windows;
-            menu_input.MatteEditMenu=ColorEditMenu;
-            menu_input.id=id;
-            menu_input.command=command;
-            XSelectPaintMethod(&menu_input,&method_targets);
-            break;
-          }
-          case ColorEditColorCommand:
-          {
-            menu_input.display=display;
-            menu_input.windows=windows;
-            menu_input.MatteEditMenu=ColorEditMenu;
-            menu_input.id=id;
-            menu_input.command=command;
-            XSelectPenColor(&menu_input,resource_info,&pen_targets);
-            break;
-          }
-          case ColorEditBorderCommand:
-          {
-            menu_input.display=display;
-            menu_input.windows=windows;
-            menu_input.MatteEditMenu=ColorEditMenu;
-            menu_input.id=id;
-            menu_input.command=command;
-            XSelectColorBorder(&menu_input,resource_info,&border_targets);
-            break;
-          }
-          case ColorEditFuzzCommand:
-          {
-            const char
-              *const FuzzMenu[] =
-              {
-                "0%",
-                "2%",
-                "5%",
-                "10%",
-                "15%",
-                "Dialog...",
-                (char *) NULL,
-              };
-
-            static char
-              fuzz[MagickPathExtent];
-
-            menu_input.display=display;
-            menu_input.windows=windows;
-            menu_input.MatteEditMenu=ColorEditMenu;
-            menu_input.id=id;
-            menu_input.command=command;
-            XSelectFuzzFactor(&menu_input,FuzzMenu,fuzz,image);
-            break;
-          }
-          case ColorEditUndoCommand:
-          {
-            (void) XMagickCommand(display,resource_info,windows,UndoCommand,
-              image,exception);
-            break;
-          }
-          case ColorEditHelpCommand:
-          default:
-          {
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Image Annotation",ImageColorEditHelp);
-            break;
-          }
-          case ColorEditDismissCommand:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-        }
-        (void) XCheckDefineCursor(display,windows->image.id,cursor);
-        continue;
-      }
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        if (event.xbutton.button != Button1)
-          break;
-        if ((event.xbutton.window != windows->image.id) &&
-            (event.xbutton.window != windows->magnify.id))
-          break;
-        /*
-          exit loop.
-        */
-        x=event.xbutton.x;
-        y=event.xbutton.y;
-        (void) XMagickCommand(display,resource_info,windows,
-          SaveToUndoBufferCommand,image,exception);
-        state|=UpdateConfigurationState;
-        break;
-      }
-      case ButtonRelease:
-      {
-        if (event.xbutton.button != Button1)
-          break;
-        if ((event.xbutton.window != windows->image.id) &&
-            (event.xbutton.window != windows->magnify.id))
-          break;
-        /*
-          Update colormap information.
-        */
-        x=event.xbutton.x;
-        y=event.xbutton.y;
-        XConfigureImageColormap(display,resource_info,windows,*image,exception);
-        (void) XConfigureImage(display,resource_info,windows,*image,exception);
-        XInfoWidget(display,windows,text);
-        (void) XCheckDefineCursor(display,windows->image.id,cursor);
-        state&=(size_t) (~UpdateConfigurationState);
-        break;
-      }
-      case Expose:
-        break;
-      case KeyPress:
-      {
-        KeySym
-          key_symbol;
-
-        XDiscardMagnifyKeys(display,windows,&event);
-        if (event.xkey.window != windows->image.id)
-          break;
-        /*
-          Respond to a user key press.
-        */
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        switch ((int) key_symbol)
-        {
-          case XK_Escape:
-          case XK_F20:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=ExitState;
-            break;
-          }
-          case XK_F1:
-          case XK_Help:
-          {
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Image Annotation",ImageColorEditHelp);
-            break;
-          }
-          default:
-          {
-            (void) XBell(display,0);
-            break;
-          }
-        }
-        break;
-      }
-      case MotionNotify:
-      {
-        /*
-          Map and unmap Info widget as cursor crosses its boundaries.
-        */
-        x=event.xmotion.x;
-        y=event.xmotion.y;
-        XTrackInfoWidget(display,windows,x,y);
-        break;
-      }
-      default:
-        break;
-    }
-    if (event.xany.window == windows->magnify.id)
-      {
-        x=windows->magnify.x-windows->image.x;
-        y=windows->magnify.y-windows->image.y;
-      }
-    x_offset=x;
-    y_offset=y;
-    if ((state & UpdateConfigurationState) != 0)
-      {
-        CacheView
-          *image_view;
-
-        ColorEditPixelInput
-          pixel_input;
-
-        int
-          x,
-          y;
-
-        /*
-          Pixel edit is relative to image configuration.
-        */
-        (void) XClearArea(display,windows->image.id,x_offset,y_offset,1,1,
-          MagickTrue);
-        color=windows->pixel_info->pen_colors[pen_id];
-        XPutPixel(windows->image.ximage,x_offset,y_offset,color.pixel);
-        width=(unsigned int) (*image)->columns;
-        height=(unsigned int) (*image)->rows;
-        x=0;
-        y=0;
-        if (windows->image.crop_geometry != (char *) NULL)
-          (void) XParseGeometry(windows->image.crop_geometry,&x,&y,
-            &width,&height);
-        x_offset=((int) width*(windows->image.x+x_offset)/(int)
-          windows->image.ximage->width+x);
-        y_offset=((int) height*(windows->image.y+y_offset)/(int)
-          windows->image.ximage->height+y);
-        if ((x_offset < 0) || (y_offset < 0))
-          continue;
-        if ((x_offset >= (int) (*image)->columns) ||
-            (y_offset >= (int) (*image)->rows))
-          continue;
-        image_view=AcquireAuthenticCacheView(*image,exception);
-        pixel_input.image=image;
-        pixel_input.image_view=image_view;
-        pixel_input.x_offset=x_offset;
-        pixel_input.y_offset=y_offset;
-        pixel_input.exception=exception;
-        pixel_input.resource_info=resource_info;
-        pixel_input.method=method;
-        pixel_input.color=color;
-        pixel_input.border_color=border_color;
-        pixel_input.pen_id=pen_id;
-        if (XColorEditPixels(&pixel_input) == MagickFalse)
-          return(MagickFalse);
-        image_view=DestroyCacheView(image_view);
-        state&=(~0x0080U);
-      }
+    if (XColorEditStep(&context,&targets) == MagickFalse)
+      return(MagickFalse);
   } while ((state & ExitState) == 0);
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask);
@@ -5725,6 +6174,9 @@ typedef struct _CropTargets
 
   size_t
     *state;
+
+  XEvent
+    *event;
 } CropTargets;
 
 static void XCropSelectionRequest(XEvent *event,const RectangleInfo crop_info,
@@ -6053,6 +6505,719 @@ static void XCropKeyPress(const CropEventInput *event_input,XEvent *event,
     (*event).xkey.time);
 }
 
+static const ModeType
+  CropCommands[] =
+  {
+    CropHelpCommand,
+    CropDismissCommand
+  },
+  RectifyCommands[] =
+  {
+    RectifyCopyCommand,
+    RectifyHelpCommand,
+    RectifyDismissCommand
+  };
+
+typedef struct _CropContext
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  ClipboardMode
+    mode;
+
+  const char
+    *const *CropModeMenu;
+
+  Cursor
+    cursor;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    *text;
+
+  const char
+    **RectifyModeMenu;
+} CropContext;
+
+static void XCropPointerCommand(const CropContext *context,
+  const CropTargets *targets)
+{
+  int
+    id;
+
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  /*
+    Select a command from the Command widget.
+  */
+  id=XCommandWidget(context->display,context->windows,context->CropModeMenu,
+    event);
+  if (id < 0)
+    return;
+  switch (CropCommands[id])
+  {
+    case CropHelpCommand:
+    {
+      XShowCropHelp(context->display,context->resource_info,context->windows,
+        context->mode);
+      break;
+    }
+    case CropDismissCommand:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void XCropPointerPress(const CropContext *context,
+  const CropTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  if ((*event).xbutton.button != Button1)
+    return;
+  if ((*event).xbutton.window != context->windows->image.id)
+    return;
+  /*
+    Note first corner of cropping rectangle-- exit loop.
+  */
+  (void) XCheckDefineCursor(context->display,context->windows->image.id,
+    context->cursor);
+  (*crop_info).x=(ssize_t) context->windows->image.x+(*event).xbutton.x;
+  (*crop_info).y=(ssize_t) context->windows->image.y+(*event).xbutton.y;
+  (*state)|=ExitState;
+}
+
+static void XCropPointerKey(const CropContext *context,
+  const CropTargets *targets)
+{
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  if ((*event).xkey.window != context->windows->image.id)
+    return;
+  /*
+    Respond to a user key press.
+  */
+  (void) XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  switch ((int) key_symbol)
+  {
+    case XK_Escape:
+    case XK_F20:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    case XK_F1:
+    case XK_Help:
+    {
+      XShowCropHelp(context->display,context->resource_info,context->windows,
+        context->mode);
+      break;
+    }
+    default:
+    {
+      (void) XBell(context->display,0);
+      break;
+    }
+  }
+}
+
+static void XCropPointerEvent(const CropContext *context,
+  const CropTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      XCropPointerPress(context,targets);
+      break;
+    }
+    case ButtonRelease:
+      break;
+    case Expose:
+      break;
+    case KeyPress:
+    {
+      XCropPointerKey(context,targets);
+      break;
+    }
+    case MotionNotify:
+    {
+      if ((*event).xmotion.window != context->windows->image.id)
+        break;
+      /*
+        Map and unmap Info widget as text cursor crosses its boundaries.
+      */
+      (*x)=(*event).xmotion.x;
+      (*y)=(*event).xmotion.y;
+      XTrackInfoWidget(context->display,context->windows,(*x),(*y));
+      (*crop_info).x=(ssize_t) context->windows->image.x+(*x);
+      (*crop_info).y=(ssize_t) context->windows->image.y+(*y);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void XCropTrackPointer(const CropContext *context,
+  const CropTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  do
+  {
+    if (context->windows->info.mapped != MagickFalse)
+      {
+        /*
+          Display pointer position.
+        */
+        (void) FormatLocaleString(context->text,MagickPathExtent," %+ld%+ld ",
+          (long) (*crop_info).x,(long) (*crop_info).y);
+        XInfoWidget(context->display,context->windows,context->text);
+      }
+    /*
+      Wait for next event.
+    */
+    XScreenEvent(context->display,context->windows,event,context->exception);
+    if ((*event).xany.window == context->windows->command.id)
+      {
+        XCropPointerCommand(context,targets);
+        continue;
+      }
+    XCropPointerEvent(context,targets);
+  } while (((*state) & ExitState) == 0);
+}
+
+static void XCropSizeEvent(const CropContext *context,
+  const CropTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      (*crop_info).x=(ssize_t) context->windows->image.x+(*event).xbutton.x;
+      (*crop_info).y=(ssize_t) context->windows->image.y+(*event).xbutton.y;
+      break;
+    }
+    case ButtonRelease:
+    {
+      /*
+        User has committed to cropping rectangle.
+      */
+      (*crop_info).x=(ssize_t) context->windows->image.x+(*event).xbutton.x;
+      (*crop_info).y=(ssize_t) context->windows->image.y+(*event).xbutton.y;
+      XSetCursorState(context->display,context->windows,MagickFalse);
+      (*state)|=ExitState;
+      context->windows->command.data=0;
+      (void) XCommandWidget(context->display,context->windows,
+        context->RectifyModeMenu,(XEvent *) NULL);
+      break;
+    }
+    case Expose:
+      break;
+    case MotionNotify:
+    {
+      (*crop_info).x=(ssize_t) context->windows->image.x+(*event).xmotion.x;
+      (*crop_info).y=(ssize_t) context->windows->image.y+(*event).xmotion.y;
+    }
+    default:
+      break;
+  }
+}
+
+static void XCropDrawRegion(const CropContext *context,
+  const CropTargets *targets,RectangleInfo *highlight_info)
+{
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  (*highlight_info)=(*crop_info);
+  (*highlight_info).x=(*crop_info).x-context->windows->image.x;
+  (*highlight_info).y=(*crop_info).y-context->windows->image.y;
+  if (((*highlight_info).width > 3) && ((*highlight_info).height > 3))
+    {
+      /*
+        Display info and draw cropping rectangle.
+      */
+      XMapInfoWidget(context->display,context->windows);
+      (void) FormatLocaleString(context->text,MagickPathExtent,
+        " %.17gx%.17g%+.20g%+.20g",(double) (*crop_info).width,(double)
+        (*crop_info).height,(double) (*crop_info).x,(double) (*crop_info).y);
+      XInfoWidget(context->display,context->windows,context->text);
+      XHighlightRectangle(context->display,context->windows->image.id,
+        context->windows->image.highlight_context,highlight_info);
+    }
+  else
+    if (context->windows->info.mapped != MagickFalse)
+      (void) XWithdrawWindow(context->display,context->windows->info.id,
+        context->windows->info.screen);
+}
+
+static void XCropSizeRegion(const CropContext *context,
+  const CropTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  RectangleInfo
+    highlight_info;
+
+  do
+  {
+    XCropDrawRegion(context,targets,&highlight_info);
+    /*
+      Wait for next event.
+    */
+    XScreenEvent(context->display,context->windows,event,context->exception);
+    if ((highlight_info.width > 3) && (highlight_info.height > 3))
+      XHighlightRectangle(context->display,context->windows->image.id,
+        context->windows->image.highlight_context,&highlight_info);
+    XCropSizeEvent(context,targets);
+    if (IsSelectionMovedOrDone((*crop_info),(*x),(*y),(*state)) != MagickFalse)
+      XCheckSelectionBounds(context->windows,(*x),(*y),crop_info);
+  } while (((*state) & ExitState) == 0);
+}
+
+static void XCropWaitCommand(const CropContext *context,
+  const CropTargets *targets,const RectangleInfo highlight_info)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  CropCommandInput
+    command_input;
+
+  command_input.display=context->display;
+  command_input.resource_info=context->resource_info;
+  command_input.windows=context->windows;
+  command_input.mode=context->mode;
+  command_input.highlight_info=highlight_info;
+  command_input.RectifyModeMenu=context->RectifyModeMenu;
+  command_input.RectifyCommands=RectifyCommands;
+  XCropRectifyCommand(&command_input,event,state);
+}
+
+static void XCropWaitEvent(const CropContext *context,
+  const CropTargets *targets,const RectangleInfo highlight_info)
+{
+  CropEventInput
+    event_input;
+
+  XEvent
+    *const event = targets->event;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  event_input.display=context->display;
+  event_input.windows=context->windows;
+  event_input.event=(event);
+  event_input.highlight_info=highlight_info;
+  event_input.text=context->text;
+  event_input.resource_info=context->resource_info;
+  event_input.mode=context->mode;
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      XCropButtonPress(&event_input,targets);
+      break;
+    }
+    case ButtonRelease:
+    {
+      XCropButtonRelease(&event_input,(*crop_info));
+      break;
+    }
+    case Expose:
+    {
+      XCropExpose(&event_input,event);
+      break;
+    }
+    case KeyPress:
+    {
+      XCropKeyPress(&event_input,event,targets);
+      break;
+    }
+    case MotionNotify:
+    {
+      XCropMotion(&event_input,targets);
+      break;
+    }
+    case SelectionRequest:
+    {
+      XCropSelectionRequest(event,(*crop_info),context->text);
+    }
+    default:
+      break;
+  }
+}
+
+static MagickBooleanType XCropWaitHead(const CropContext *context,
+  const CropTargets *targets,RectangleInfo *highlight_info)
+{
+  size_t
+    *const state = targets->state;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  if (context->windows->info.mapped != MagickFalse)
+    {
+      /*
+        Display pointer position.
+      */
+      (void) FormatLocaleString(context->text,MagickPathExtent,
+        " %.17gx%.17g%+.20g%+.20g",(double) (*crop_info).width,(double)
+        (*crop_info).height,(double) (*crop_info).x,(double) (*crop_info).y);
+      XInfoWidget(context->display,context->windows,context->text);
+    }
+  (*highlight_info)=(*crop_info);
+  (*highlight_info).x=(*crop_info).x-context->windows->image.x;
+  (*highlight_info).y=(*crop_info).y-context->windows->image.y;
+  if (((*highlight_info).width <= 3) || ((*highlight_info).height <= 3))
+    {
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static void XCropWaitCorner(const CropContext *context,
+  const CropTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  RectangleInfo
+    highlight_info;
+
+  do
+  {
+    if (XCropWaitHead(context,targets,&highlight_info) == MagickFalse)
+      break;
+    XHighlightRectangle(context->display,context->windows->image.id,
+      context->windows->image.highlight_context,&highlight_info);
+    XScreenEvent(context->display,context->windows,event,context->exception);
+    if ((*event).xany.window == context->windows->command.id)
+      {
+        XCropWaitCommand(context,targets,highlight_info);
+        continue;
+      }
+    XHighlightRectangle(context->display,context->windows->image.id,
+      context->windows->image.highlight_context,&highlight_info);
+    XCropWaitEvent(context,targets,highlight_info);
+    if (((*state) & UpdateConfigurationState) != 0)
+      {
+        (void) XPutBackEvent(context->display,event);
+        (void) XCheckDefineCursor(context->display,context->windows->image.id,
+          context->cursor);
+        break;
+      }
+  } while (((*state) & ExitState) == 0);
+}
+
+static void XCropSelectRegion(const CropContext *context,
+  const CropTargets *targets)
+{
+  size_t
+    *const state = targets->state;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  do
+  {
+    /*
+      Size rectangle as pointer moves until the mouse button is released.
+    */
+    (*x)=(int) (*crop_info).x;
+    (*y)=(int) (*crop_info).y;
+    (*crop_info).width=0;
+    (*crop_info).height=0;
+    (*state)=DefaultState;
+    XCropSizeRegion(context,targets);
+    /*
+      Wait for user to grab a corner of the rectangle or press return.
+    */
+    (*state)=DefaultState;
+    (void) XMapWindow(context->display,context->windows->info.id);
+    XCropWaitCorner(context,targets);
+  } while (((*state) & ExitState) == 0);
+}
+
+static void XCropCutPixels(Image *image,const RectangleInfo crop_info,
+  ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  int
+    x,
+    y;
+
+  Quantum
+    *q;
+
+  image_view=AcquireAuthenticCacheView(image,exception);
+  for (y=0; y < (int) crop_info.height; y++)
+  {
+    q=GetCacheViewAuthenticPixels(image_view,crop_info.x,y+crop_info.y,
+      crop_info.width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (int) crop_info.width; x++)
+    {
+      SetPixelAlpha(image,TransparentAlpha,q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      break;
+  }
+  image_view=DestroyCacheView(image_view);
+}
+
+static MagickBooleanType XCropCopyImage(const CropContext *context,Image *image,
+  RectangleInfo crop_info)
+{
+  Image
+    *crop_image;
+
+  double
+    scale_factor;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    height,
+    width;
+
+  /*
+    Copy image before applying image transforms.
+  */
+  XSetCursorState(context->display,context->windows,MagickTrue);
+  XCheckRefreshWindows(context->display,context->windows);
+  width=(unsigned int) image->columns;
+  height=(unsigned int) image->rows;
+  x=0;
+  y=0;
+  if (context->windows->image.crop_geometry != (char *) NULL)
+    (void) XParseGeometry(context->windows->image.crop_geometry,&x,&y,&width,
+      &height);
+  scale_factor=(double) width/context->windows->image.ximage->width;
+  crop_info.x+=x;
+  crop_info.x=(ssize_t) (scale_factor*crop_info.x+0.5);
+  crop_info.width=(unsigned int) (scale_factor*crop_info.width+0.5);
+  scale_factor=(double) height/context->windows->image.ximage->height;
+  crop_info.y+=y;
+  crop_info.y=(ssize_t) (scale_factor*crop_info.y+0.5);
+  crop_info.height=(unsigned int) (scale_factor*crop_info.height+0.5);
+  crop_info.x+=image->page.x;
+  crop_info.y+=image->page.y;
+  crop_image=CropImage(image,&crop_info,context->exception);
+  XSetCursorState(context->display,context->windows,MagickFalse);
+  if (crop_image == (Image *) NULL)
+    return(MagickFalse);
+  if (context->resource_info->copy_image != (Image *) NULL)
+    context->resource_info->copy_image=DestroyImage(
+      context->resource_info->copy_image);
+  context->resource_info->copy_image=crop_image;
+  if (context->mode == CopyMode)
+    {
+      (void) XConfigureImage(context->display,context->resource_info,
+        context->windows,image,context->exception);
+      return(MagickTrue);
+    }
+  /*
+    Cut image.
+  */
+  if (SetImageStorageClass(image,DirectClass,context->exception) == MagickFalse)
+    return(MagickFalse);
+  image->alpha_trait=BlendPixelTrait;
+  XCropCutPixels(image,crop_info,context->exception);
+  /*
+    Update image configuration.
+  */
+  XConfigureImageColormap(context->display,context->resource_info,
+    context->windows,image,context->exception);
+  (void) XConfigureImage(context->display,context->resource_info,
+    context->windows,image,context->exception);
+  return(MagickTrue);
+}
+
+static void XCropSelectArea(const CropContext *context,
+  const CropTargets *targets)
+{
+  (void) XSetFunction(context->display,
+    context->windows->image.highlight_context,GXinvert);
+  XCropSelectRegion(context,targets);
+  (void) XSetFunction(context->display,
+    context->windows->image.highlight_context,GXcopy);
+  XSetCursorState(context->display,context->windows,MagickFalse);
+}
+
+static MagickBooleanType XCropEscaped(const CropContext *context,
+  const CropTargets *targets)
+{
+  size_t
+    *const state = targets->state;
+
+  if (((*state) & EscapeState) != 0)
+    {
+      /*
+        User want to exit without cropping.
+      */
+      (void) XWithdrawWindow(context->display,context->windows->info.id,
+        context->windows->info.screen);
+      (void) XFreeCursor(context->display,context->cursor);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static void XMapCropCommand(Display *display,XWindows *windows,
+  const char *const *CropModeMenu)
+{
+  windows->command.data=0;
+  (void) XCommandWidget(display,windows,CropModeMenu,(XEvent *) NULL);
+  (void) XMapRaised(display,windows->command.id);
+  XClientMessage(display,windows->image.id,windows->im_protocols,
+    windows->im_update_widget,CurrentTime);
+}
+
+static void XSetCropCommandName(XWindows *windows,const ClipboardMode mode)
+{
+  switch (mode)
+  {
+    case CopyMode:
+    {
+      (void) CloneString(&windows->command.name,"Copy");
+      break;
+    }
+    case CropMode:
+    {
+      (void) CloneString(&windows->command.name,"Crop");
+      break;
+    }
+    case CutMode:
+    {
+      (void) CloneString(&windows->command.name,"Cut");
+      break;
+    }
+  }
+}
+
+static MagickBooleanType XCropReconfigure(const CropContext *context,
+  Image *image,RectangleInfo crop_info)
+{
+  if (context->mode == CropMode)
+    if (((int) crop_info.width != context->windows->image.ximage->width) ||
+        ((int) crop_info.height != context->windows->image.ximage->height))
+      {
+        /*
+          Reconfigure Image window as defined by cropping rectangle.
+        */
+        XSetCropGeometry(context->display,context->windows,&crop_info,image);
+        context->windows->image.window_changes.width=(int) crop_info.width;
+        context->windows->image.window_changes.height=(int) crop_info.height;
+        (void) XConfigureImage(context->display,context->resource_info,
+          context->windows,image,context->exception);
+        return(MagickFalse);
+      }
+  return(MagickTrue);
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -6072,53 +7237,18 @@ static MagickBooleanType XCropImage(Display *display,
       (char *) NULL
     };
 
-  static const ModeType
-    CropCommands[] =
-    {
-      CropHelpCommand,
-      CropDismissCommand
-    },
-    RectifyCommands[] =
-    {
-      RectifyCopyCommand,
-      RectifyHelpCommand,
-      RectifyDismissCommand
-    };
-
-  CacheView
-    *image_view;
-
   char
-    command[MagickPathExtent],
     text[MagickPathExtent];
 
   Cursor
     cursor;
 
   int
-    id,
     x,
     y;
 
-  KeySym
-    key_symbol;
-
-  Image
-    *crop_image;
-
-  double
-    scale_factor;
-
   RectangleInfo
-    crop_info,
-    highlight_info;
-
-  Quantum
-    *q;
-
-  unsigned int
-    height,
-    width;
+    crop_info;
 
   size_t
     state;
@@ -6126,36 +7256,18 @@ static MagickBooleanType XCropImage(Display *display,
   XEvent
     event;
 
+  CropContext
+    context;
+
   const CropTargets
-    targets = { &x, &y, &crop_info, &state };
+    targets = { &x, &y, &crop_info, &state, &event };
 
   /*
     Map Command widget.
   */
-  switch (mode)
-  {
-    case CopyMode:
-    {
-      (void) CloneString(&windows->command.name,"Copy");
-      break;
-    }
-    case CropMode:
-    {
-      (void) CloneString(&windows->command.name,"Crop");
-      break;
-    }
-    case CutMode:
-    {
-      (void) CloneString(&windows->command.name,"Cut");
-      break;
-    }
-  }
+  XSetCropCommandName(windows,mode);
   RectifyModeMenu[0]=windows->command.name;
-  windows->command.data=0;
-  (void) XCommandWidget(display,windows,CropModeMenu,(XEvent *) NULL);
-  (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
+  XMapCropCommand(display,windows,CropModeMenu);
   /*
     Track pointer until button 1 is pressed.
   */
@@ -6168,387 +7280,26 @@ static MagickBooleanType XCropImage(Display *display,
   crop_info.height=0;
   cursor=XCreateFontCursor(display,XC_fleur);
   state=DefaultState;
-  do
-  {
-    if (windows->info.mapped != MagickFalse)
-      {
-        /*
-          Display pointer position.
-        */
-        (void) FormatLocaleString(text,MagickPathExtent," %+ld%+ld ",
-          (long) crop_info.x,(long) crop_info.y);
-        XInfoWidget(display,windows,text);
-      }
-    /*
-      Wait for next event.
-    */
-    XScreenEvent(display,windows,&event,exception);
-    if (event.xany.window == windows->command.id)
-      {
-        /*
-          Select a command from the Command widget.
-        */
-        id=XCommandWidget(display,windows,CropModeMenu,&event);
-        if (id < 0)
-          continue;
-        switch (CropCommands[id])
-        {
-          case CropHelpCommand:
-          {
-            XShowCropHelp(display,resource_info,windows,mode);
-            break;
-          }
-          case CropDismissCommand:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-          default:
-            break;
-        }
-        continue;
-      }
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        if (event.xbutton.button != Button1)
-          break;
-        if (event.xbutton.window != windows->image.id)
-          break;
-        /*
-          Note first corner of cropping rectangle-- exit loop.
-        */
-        (void) XCheckDefineCursor(display,windows->image.id,cursor);
-        crop_info.x=(ssize_t) windows->image.x+event.xbutton.x;
-        crop_info.y=(ssize_t) windows->image.y+event.xbutton.y;
-        state|=ExitState;
-        break;
-      }
-      case ButtonRelease:
-        break;
-      case Expose:
-        break;
-      case KeyPress:
-      {
-        if (event.xkey.window != windows->image.id)
-          break;
-        /*
-          Respond to a user key press.
-        */
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        switch ((int) key_symbol)
-        {
-          case XK_Escape:
-          case XK_F20:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-          case XK_F1:
-          case XK_Help:
-          {
-            XShowCropHelp(display,resource_info,windows,mode);
-            break;
-          }
-          default:
-          {
-            (void) XBell(display,0);
-            break;
-          }
-        }
-        break;
-      }
-      case MotionNotify:
-      {
-        if (event.xmotion.window != windows->image.id)
-          break;
-        /*
-          Map and unmap Info widget as text cursor crosses its boundaries.
-        */
-        x=event.xmotion.x;
-        y=event.xmotion.y;
-        XTrackInfoWidget(display,windows,x,y);
-        crop_info.x=(ssize_t) windows->image.x+x;
-        crop_info.y=(ssize_t) windows->image.y+y;
-        break;
-      }
-      default:
-        break;
-    }
-  } while ((state & ExitState) == 0);
+  context.display=display;
+  context.resource_info=resource_info;
+  context.windows=windows;
+  context.mode=mode;
+  context.CropModeMenu=CropModeMenu;
+  context.exception=exception;
+  context.text=text;
+  context.RectifyModeMenu=RectifyModeMenu;
+  context.cursor=cursor;
+  XCropTrackPointer(&context,&targets);
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask);
-  if ((state & EscapeState) != 0)
-    {
-      /*
-        User want to exit without cropping.
-      */
-      (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
-      (void) XFreeCursor(display,cursor);
-      return(MagickTrue);
-    }
-  (void) XSetFunction(display,windows->image.highlight_context,GXinvert);
-  do
-  {
-    /*
-      Size rectangle as pointer moves until the mouse button is released.
-    */
-    x=(int) crop_info.x;
-    y=(int) crop_info.y;
-    crop_info.width=0;
-    crop_info.height=0;
-    state=DefaultState;
-    do
-    {
-      highlight_info=crop_info;
-      highlight_info.x=crop_info.x-windows->image.x;
-      highlight_info.y=crop_info.y-windows->image.y;
-      if ((highlight_info.width > 3) && (highlight_info.height > 3))
-        {
-          /*
-            Display info and draw cropping rectangle.
-          */
-          XMapInfoWidget(display,windows);
-          (void) FormatLocaleString(text,MagickPathExtent,
-            " %.17gx%.17g%+.20g%+.20g",(double) crop_info.width,(double)
-            crop_info.height,(double) crop_info.x,(double) crop_info.y);
-          XInfoWidget(display,windows,text);
-          XHighlightRectangle(display,windows->image.id,
-            windows->image.highlight_context,&highlight_info);
-        }
-      else
-        if (windows->info.mapped != MagickFalse)
-          (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
-      /*
-        Wait for next event.
-      */
-      XScreenEvent(display,windows,&event,exception);
-      if ((highlight_info.width > 3) && (highlight_info.height > 3))
-        XHighlightRectangle(display,windows->image.id,
-          windows->image.highlight_context,&highlight_info);
-      switch (event.type)
-      {
-        case ButtonPress:
-        {
-          crop_info.x=(ssize_t) windows->image.x+event.xbutton.x;
-          crop_info.y=(ssize_t) windows->image.y+event.xbutton.y;
-          break;
-        }
-        case ButtonRelease:
-        {
-          /*
-            User has committed to cropping rectangle.
-          */
-          crop_info.x=(ssize_t) windows->image.x+event.xbutton.x;
-          crop_info.y=(ssize_t) windows->image.y+event.xbutton.y;
-          XSetCursorState(display,windows,MagickFalse);
-          state|=ExitState;
-          windows->command.data=0;
-          (void) XCommandWidget(display,windows,RectifyModeMenu,
-            (XEvent *) NULL);
-          break;
-        }
-        case Expose:
-          break;
-        case MotionNotify:
-        {
-          crop_info.x=(ssize_t) windows->image.x+event.xmotion.x;
-          crop_info.y=(ssize_t) windows->image.y+event.xmotion.y;
-        }
-        default:
-          break;
-      }
-      if (IsSelectionMovedOrDone(crop_info,x,y,state) != MagickFalse)
-        XCheckSelectionBounds(windows,x,y,&crop_info);
-    } while ((state & ExitState) == 0);
-    /*
-      Wait for user to grab a corner of the rectangle or press return.
-    */
-    state=DefaultState;
-    (void) XMapWindow(display,windows->info.id);
-    do
-    {
-      CropEventInput
-        event_input;
-
-      if (windows->info.mapped != MagickFalse)
-        {
-          /*
-            Display pointer position.
-          */
-          (void) FormatLocaleString(text,MagickPathExtent,
-            " %.17gx%.17g%+.20g%+.20g",(double) crop_info.width,(double)
-            crop_info.height,(double) crop_info.x,(double) crop_info.y);
-          XInfoWidget(display,windows,text);
-        }
-      highlight_info=crop_info;
-      highlight_info.x=crop_info.x-windows->image.x;
-      highlight_info.y=crop_info.y-windows->image.y;
-      if ((highlight_info.width <= 3) || (highlight_info.height <= 3))
-        {
-          state|=EscapeState;
-          state|=ExitState;
-          break;
-        }
-      XHighlightRectangle(display,windows->image.id,
-        windows->image.highlight_context,&highlight_info);
-      XScreenEvent(display,windows,&event,exception);
-      if (event.xany.window == windows->command.id)
-        {
-          CropCommandInput
-            command_input;
-
-          command_input.display=display;
-          command_input.resource_info=resource_info;
-          command_input.windows=windows;
-          command_input.mode=mode;
-          command_input.highlight_info=highlight_info;
-          command_input.RectifyModeMenu=RectifyModeMenu;
-          command_input.RectifyCommands=RectifyCommands;
-          XCropRectifyCommand(&command_input,&event,&state);
-          continue;
-        }
-      XHighlightRectangle(display,windows->image.id,
-        windows->image.highlight_context,&highlight_info);
-      event_input.display=display;
-      event_input.windows=windows;
-      event_input.event=(&event);
-      event_input.highlight_info=highlight_info;
-      event_input.text=text;
-      event_input.resource_info=resource_info;
-      event_input.mode=mode;
-      switch (event.type)
-      {
-        case ButtonPress:
-        {
-          XCropButtonPress(&event_input,&targets);
-          break;
-        }
-        case ButtonRelease:
-        {
-          XCropButtonRelease(&event_input,crop_info);
-          break;
-        }
-        case Expose:
-        {
-          XCropExpose(&event_input,&event);
-          break;
-        }
-        case KeyPress:
-        {
-          XCropKeyPress(&event_input,&event,&targets);
-          break;
-        }
-        case KeyRelease:
-          break;
-        case MotionNotify:
-        {
-          XCropMotion(&event_input,&targets);
-          break;
-        }
-        case SelectionRequest:
-        {
-          XCropSelectionRequest(&event,crop_info,text);
-        }
-        default:
-          break;
-      }
-      if ((state & UpdateConfigurationState) != 0)
-        {
-          (void) XPutBackEvent(display,&event);
-          (void) XCheckDefineCursor(display,windows->image.id,cursor);
-          break;
-        }
-    } while ((state & ExitState) == 0);
-  } while ((state & ExitState) == 0);
-  (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
-  XSetCursorState(display,windows,MagickFalse);
+  if (XCropEscaped(&context,&targets) == MagickFalse)
+    return(MagickTrue);
+  XCropSelectArea(&context,&targets);
   if ((state & EscapeState) != 0)
     return(MagickTrue);
-  if (mode == CropMode)
-    if (((int) crop_info.width != windows->image.ximage->width) ||
-        ((int) crop_info.height != windows->image.ximage->height))
-      {
-        /*
-          Reconfigure Image window as defined by cropping rectangle.
-        */
-        XSetCropGeometry(display,windows,&crop_info,image);
-        windows->image.window_changes.width=(int) crop_info.width;
-        windows->image.window_changes.height=(int) crop_info.height;
-        (void) XConfigureImage(display,resource_info,windows,image,exception);
-        return(MagickTrue);
-      }
-  /*
-    Copy image before applying image transforms.
-  */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  width=(unsigned int) image->columns;
-  height=(unsigned int) image->rows;
-  x=0;
-  y=0;
-  if (windows->image.crop_geometry != (char *) NULL)
-    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
-  scale_factor=(double) width/windows->image.ximage->width;
-  crop_info.x+=x;
-  crop_info.x=(ssize_t) (scale_factor*crop_info.x+0.5);
-  crop_info.width=(unsigned int) (scale_factor*crop_info.width+0.5);
-  scale_factor=(double) height/windows->image.ximage->height;
-  crop_info.y+=y;
-  crop_info.y=(ssize_t) (scale_factor*crop_info.y+0.5);
-  crop_info.height=(unsigned int) (scale_factor*crop_info.height+0.5);
-  crop_info.x+=image->page.x;
-  crop_info.y+=image->page.y;
-  crop_image=CropImage(image,&crop_info,exception);
-  XSetCursorState(display,windows,MagickFalse);
-  if (crop_image == (Image *) NULL)
-    return(MagickFalse);
-  if (resource_info->copy_image != (Image *) NULL)
-    resource_info->copy_image=DestroyImage(resource_info->copy_image);
-  resource_info->copy_image=crop_image;
-  if (mode == CopyMode)
-    {
-      (void) XConfigureImage(display,resource_info,windows,image,exception);
-      return(MagickTrue);
-    }
-  /*
-    Cut image.
-  */
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-    return(MagickFalse);
-  image->alpha_trait=BlendPixelTrait;
-  image_view=AcquireAuthenticCacheView(image,exception);
-  for (y=0; y < (int) crop_info.height; y++)
-  {
-    q=GetCacheViewAuthenticPixels(image_view,crop_info.x,y+crop_info.y,
-      crop_info.width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (int) crop_info.width; x++)
-    {
-      SetPixelAlpha(image,TransparentAlpha,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      break;
-  }
-  image_view=DestroyCacheView(image_view);
-  /*
-    Update image configuration.
-  */
-  XConfigureImageColormap(display,resource_info,windows,image,exception);
-  (void) XConfigureImage(display,resource_info,windows,image,exception);
-  return(MagickTrue);
+  if (XCropReconfigure(&context,image,crop_info) == MagickFalse)
+    return(MagickTrue);
+  return(XCropCopyImage(&context,image,crop_info));
 }
 
 /*
@@ -13320,6 +14071,15 @@ typedef struct _ROITargets
 
   size_t
     *state;
+
+  XEvent
+    *event;
+
+  DisplayCommand
+    *display_command;
+
+  RectangleInfo
+    *crop_info;
 } ROITargets;
 
 static void XROIButtonPress(const CropEventInput *event_input,
@@ -13954,219 +14714,766 @@ static void XROICommand(const ROICommandInput *command_input,XEvent *event,
     (*state)|=UpdateRegionState;
 }
 
+static const char
+  *const ROIMenu[] =
+  {
+    "Help",
+    "Dismiss",
+    (char *) NULL
+  },
+  *const ApplyMenu[] =
+  {
+    "File",
+    "Edit",
+    "Transform",
+    "Enhance",
+    "Effects",
+    "F/X",
+    "Miscellany",
+    "Help",
+    "Dismiss",
+    (char *) NULL
+  },
+  *const ROIFileMenu[] =
+  {
+    "Save...",
+    "Print...",
+    (char *) NULL
+  },
+  *const ROIEditMenu[] =
+  {
+    "Undo",
+    "Redo",
+    (char *) NULL
+  },
+  *const ROITransformMenu[] =
+  {
+    "Flop",
+    "Flip",
+    "Rotate Right",
+    "Rotate Left",
+    (char *) NULL
+  },
+  *const ROIEnhanceMenu[] =
+  {
+    "Hue...",
+    "Saturation...",
+    "Brightness...",
+    "Gamma...",
+    "Spiff",
+    "Dull",
+    "Contrast Stretch...",
+    "Sigmoidal Contrast...",
+    "Normalize",
+    "Equalize",
+    "Negate",
+    "Grayscale",
+    "Map...",
+    "Quantize...",
+    (char *) NULL
+  },
+  *const ROIEffectsMenu[] =
+  {
+    "Despeckle",
+    "Emboss",
+    "Reduce Noise",
+    "Add Noise",
+    "Sharpen...",
+    "Blur...",
+    "Threshold...",
+    "Edge Detect...",
+    "Spread...",
+    "Shade...",
+    "Raise...",
+    "Segment...",
+    (char *) NULL
+  },
+  *const ROIFXMenu[] =
+  {
+    "Solarize...",
+    "Sepia Tone...",
+    "Swirl...",
+    "Implode...",
+    "Vignette...",
+    "Wave...",
+    "Oil Paint...",
+    "Charcoal Draw...",
+    (char *) NULL
+  },
+  *const ROIMiscellanyMenu[] =
+  {
+    "Image Info",
+    "Zoom Image",
+    "Show Preview...",
+    "Show Histogram",
+    "Show Matte",
+    (char *) NULL
+  };
+
+static const char
+  *const *ROIMenus[ApplyMenus] =
+  {
+    ROIFileMenu,
+    ROIEditMenu,
+    ROITransformMenu,
+    ROIEnhanceMenu,
+    ROIEffectsMenu,
+    ROIFXMenu,
+    ROIMiscellanyMenu
+  };
+
+static const DisplayCommand
+  ApplyCommands[] =
+  {
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    HelpCommand,
+    QuitCommand
+  },
+  ROIFileCommands[] =
+  {
+    SaveCommand,
+    PrintCommand
+  },
+  ROIEditCommands[] =
+  {
+    UndoCommand,
+    RedoCommand
+  },
+  ROITransformCommands[] =
+  {
+    FlopCommand,
+    FlipCommand,
+    RotateRightCommand,
+    RotateLeftCommand
+  },
+  ROIEnhanceCommands[] =
+  {
+    HueCommand,
+    SaturationCommand,
+    BrightnessCommand,
+    GammaCommand,
+    SpiffCommand,
+    DullCommand,
+    ContrastStretchCommand,
+    SigmoidalContrastCommand,
+    NormalizeCommand,
+    EqualizeCommand,
+    NegateCommand,
+    GrayscaleCommand,
+    MapCommand,
+    QuantizeCommand
+  },
+  ROIEffectsCommands[] =
+  {
+    DespeckleCommand,
+    EmbossCommand,
+    ReduceNoiseCommand,
+    AddNoiseCommand,
+    SharpenCommand,
+    BlurCommand,
+    ThresholdCommand,
+    EdgeDetectCommand,
+    SpreadCommand,
+    ShadeCommand,
+    RaiseCommand,
+    SegmentCommand
+  },
+  ROIFXCommands[] =
+  {
+    SolarizeCommand,
+    SepiaToneCommand,
+    SwirlCommand,
+    ImplodeCommand,
+    VignetteCommand,
+    WaveCommand,
+    OilPaintCommand,
+    CharcoalDrawCommand
+  },
+  ROIMiscellanyCommands[] =
+  {
+    InfoCommand,
+    ZoomCommand,
+    ShowPreviewCommand,
+    ShowHistogramCommand,
+    ShowMatteCommand
+  },
+  ROICommands[] =
+  {
+    ROIHelpCommand,
+    ROIDismissCommand
+  };
+
+static const DisplayCommand
+  *ROIMenuCommands[ApplyMenus] =
+  {
+    ROIFileCommands,
+    ROIEditCommands,
+    ROITransformCommands,
+    ROIEnhanceCommands,
+    ROIEffectsCommands,
+    ROIFXCommands,
+    ROIMiscellanyCommands
+  };
+
+typedef struct _ROIContext
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Cursor
+    cursor;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    *text;
+
+  Image
+    **image;
+
+  ROIKeyTargets
+    key_targets;
+} ROIContext;
+
+static void XROIPointerCommand(const ROIContext *context,
+  const ROITargets *targets)
+{
+  int
+    id;
+
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  /*
+    Select a command from the Command widget.
+  */
+  id=XCommandWidget(context->display,context->windows,ROIMenu,event);
+  if (id < 0)
+    return;
+  switch (ROICommands[id])
+  {
+    case ROIHelpCommand:
+    {
+      XTextViewHelp(context->display,context->resource_info,context->windows,
+        MagickFalse,"Help Viewer - Region of Interest",ImageROIHelp);
+      break;
+    }
+    case ROIDismissCommand:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void XROIPointerPress(const ROIContext *context,
+  const ROITargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  if ((*event).xbutton.button != Button1)
+    return;
+  if ((*event).xbutton.window != context->windows->image.id)
+    return;
+  /*
+    Note first corner of region of interest rectangle-- exit loop.
+  */
+  (void) XCheckDefineCursor(context->display,context->windows->image.id,
+    context->cursor);
+  (*roi_info).x=(ssize_t) context->windows->image.x+(*event).xbutton.x;
+  (*roi_info).y=(ssize_t) context->windows->image.y+(*event).xbutton.y;
+  (*state)|=ExitState;
+}
+
+static void XROIPointerKey(const ROIContext *context,
+  const ROITargets *targets)
+{
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  if ((*event).xkey.window != context->windows->image.id)
+    return;
+  /*
+    Respond to a user key press.
+  */
+  (void) XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  switch ((int) key_symbol)
+  {
+    case XK_Escape:
+    case XK_F20:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    case XK_F1:
+    case XK_Help:
+    {
+      XTextViewHelp(context->display,context->resource_info,context->windows,
+        MagickFalse,"Help Viewer - Region of Interest",ImageROIHelp);
+      break;
+    }
+    default:
+    {
+      (void) XBell(context->display,0);
+      break;
+    }
+  }
+}
+
+static void XROIPointerEvent(const ROIContext *context,
+  const ROITargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      XROIPointerPress(context,targets);
+      break;
+    }
+    case ButtonRelease:
+      break;
+    case Expose:
+      break;
+    case KeyPress:
+    {
+      XROIPointerKey(context,targets);
+      break;
+    }
+    case MotionNotify:
+    {
+      /*
+        Map and unmap Info widget as text cursor crosses its boundaries.
+      */
+      (*x)=(*event).xmotion.x;
+      (*y)=(*event).xmotion.y;
+      XTrackInfoWidget(context->display,context->windows,(*x),(*y));
+      (*roi_info).x=(ssize_t) context->windows->image.x+(*x);
+      (*roi_info).y=(ssize_t) context->windows->image.y+(*y);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void XROITrackPointer(const ROIContext *context,
+  const ROITargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  do
+  {
+    if (context->windows->info.mapped != MagickFalse)
+      {
+        /*
+          Display pointer position.
+        */
+        (void) FormatLocaleString(context->text,MagickPathExtent," %+ld%+ld ",
+          (long) (*roi_info).x,(long) (*roi_info).y);
+        XInfoWidget(context->display,context->windows,context->text);
+      }
+    /*
+      Wait for next event.
+    */
+    XScreenEvent(context->display,context->windows,event,context->exception);
+    if ((*event).xany.window == context->windows->command.id)
+      {
+        XROIPointerCommand(context,targets);
+        continue;
+      }
+    XROIPointerEvent(context,targets);
+  } while (((*state) & ExitState) == 0);
+}
+
+static void XROISizeEvent(const ROIContext *context,
+  const ROITargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      (*roi_info).x=(ssize_t) context->windows->image.x+(*event).xbutton.x;
+      (*roi_info).y=(ssize_t) context->windows->image.y+(*event).xbutton.y;
+      break;
+    }
+    case ButtonRelease:
+    {
+      ROIApplyInput
+        apply_input;
+
+      apply_input.display=context->display;
+      apply_input.windows=context->windows;
+      apply_input.event=(event);
+      apply_input.ApplyMenu=ApplyMenu;
+      XROIButtonRelease(&apply_input,targets);
+      break;
+    }
+    case Expose:
+      break;
+    case MotionNotify:
+    {
+      (*roi_info).x=(ssize_t) context->windows->image.x+(*event).xmotion.x;
+      (*roi_info).y=(ssize_t) context->windows->image.y+(*event).xmotion.y;
+    }
+    default:
+      break;
+  }
+}
+
+static void XROIDrawRegion(const ROIContext *context,const ROITargets *targets,
+  RectangleInfo *highlight_info)
+{
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  (*highlight_info)=(*roi_info);
+  (*highlight_info).x=(*roi_info).x-context->windows->image.x;
+  (*highlight_info).y=(*roi_info).y-context->windows->image.y;
+  if (((*highlight_info).width > 3) && ((*highlight_info).height > 3))
+    {
+      /*
+        Display info and draw region of interest rectangle.
+      */
+      XMapInfoWidget(context->display,context->windows);
+      (void) FormatLocaleString(context->text,MagickPathExtent,
+        " %.17gx%.17g%+.20g%+.20g",(double) (*roi_info).width,(double)
+        (*roi_info).height,(double) (*roi_info).x,(double) (*roi_info).y);
+      XInfoWidget(context->display,context->windows,context->text);
+      XHighlightRectangle(context->display,context->windows->image.id,
+        context->windows->image.highlight_context,highlight_info);
+    }
+  else
+    if (context->windows->info.mapped != MagickFalse)
+      (void) XWithdrawWindow(context->display,context->windows->info.id,
+        context->windows->info.screen);
+}
+
+static void XROISizeRegion(const ROIContext *context,const ROITargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  RectangleInfo
+    highlight_info;
+
+  do
+  {
+    XROIDrawRegion(context,targets,&highlight_info);
+    /*
+      Wait for next event.
+    */
+    XScreenEvent(context->display,context->windows,event,context->exception);
+    if ((highlight_info.width > 3) && (highlight_info.height > 3))
+      XHighlightRectangle(context->display,context->windows->image.id,
+        context->windows->image.highlight_context,&highlight_info);
+    XROISizeEvent(context,targets);
+    if (IsSelectionMovedOrDone((*roi_info),(*x),(*y),(*state)) != MagickFalse)
+      XCheckSelectionBounds(context->windows,(*x),(*y),roi_info);
+  } while (((*state) & ExitState) == 0);
+}
+
+static void XROIWaitCommand(const ROIContext *context,const ROITargets *targets,
+  const RectangleInfo highlight_info)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  DisplayCommand
+    *const display_command = targets->display_command;
+
+  ROICommandInput
+    command_input;
+
+  command_input.display=context->display;
+  command_input.resource_info=context->resource_info;
+  command_input.windows=context->windows;
+  command_input.highlight_info=highlight_info;
+  command_input.ApplyMenu=ApplyMenu;
+  command_input.ApplyCommands=ApplyCommands;
+  command_input.Menus=ROIMenus;
+  command_input.Commands=ROIMenuCommands;
+  XROICommand(&command_input,event,display_command,state);
+}
+
+static void XROIWaitEvent(const ROIContext *context,const ROITargets *targets,
+  const RectangleInfo highlight_info)
+{
+  CropEventInput
+    event_input;
+
+  ROIKeyInput
+    key_input;
+
+  XEvent
+    *const event = targets->event;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  event_input.display=context->display;
+  event_input.windows=context->windows;
+  event_input.event=(event);
+  event_input.highlight_info=highlight_info;
+  event_input.text=context->text;
+  key_input.display=context->display;
+  key_input.resource_info=context->resource_info;
+  key_input.windows=context->windows;
+  key_input.event=(event);
+  key_input.image=context->image;
+  key_input.exception=context->exception;
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      XROIButtonPress(&event_input,(*crop_info),targets);
+      break;
+    }
+    case ButtonRelease:
+    {
+      XCropButtonRelease(&event_input,(*crop_info));
+      break;
+    }
+    case Expose:
+    {
+      XCropExpose(&event_input,event);
+      break;
+    }
+    case KeyPress:
+    {
+      XROIKeyPress(&key_input,event,&context->key_targets);
+      break;
+    }
+    case MotionNotify:
+    {
+      XROIMotion(&event_input,targets);
+      break;
+    }
+    case SelectionRequest:
+    {
+      XCropSelectionRequest(event,(*roi_info),context->text);
+    }
+    default:
+      break;
+  }
+}
+
+static MagickBooleanType XROIWaitHead(const ROIContext *context,
+  const ROITargets *targets,RectangleInfo *highlight_info)
+{
+  size_t
+    *const state = targets->state;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  if (context->windows->info.mapped != MagickFalse)
+    {
+      /*
+        Display pointer position.
+      */
+      (void) FormatLocaleString(context->text,MagickPathExtent,
+        " %.17gx%.17g%+.20g%+.20g",(double) (*roi_info).width,(double)
+        (*roi_info).height,(double) (*roi_info).x,(double) (*roi_info).y);
+      XInfoWidget(context->display,context->windows,context->text);
+    }
+  (*highlight_info)=(*roi_info);
+  (*highlight_info).x=(*roi_info).x-context->windows->image.x;
+  (*highlight_info).y=(*roi_info).y-context->windows->image.y;
+  if (((*highlight_info).width <= 3) || ((*highlight_info).height <= 3))
+    {
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static void XROIWaitCorner(const ROIContext *context,const ROITargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  DisplayCommand
+    *const display_command = targets->display_command;
+
+  RectangleInfo
+    highlight_info;
+
+  do
+  {
+    ROIRegionInput
+      region_input;
+
+    if (XROIWaitHead(context,targets,&highlight_info) == MagickFalse)
+      break;
+    region_input.display=context->display;
+    region_input.resource_info=context->resource_info;
+    region_input.windows=context->windows;
+    region_input.image=context->image;
+    region_input.exception=context->exception;
+    region_input.roi_info=(*roi_info);
+    region_input.display_command=(*display_command);
+    region_input.text=context->text;
+    if (XROIUpdateRegion(&region_input,state,crop_info) != MagickFalse)
+      continue;
+    XHighlightRectangle(context->display,context->windows->image.id,
+      context->windows->image.highlight_context,&highlight_info);
+    XScreenEvent(context->display,context->windows,event,context->exception);
+    if ((*event).xany.window == context->windows->command.id)
+      {
+        XROIWaitCommand(context,targets,highlight_info);
+        continue;
+      }
+    XHighlightRectangle(context->display,context->windows->image.id,
+      context->windows->image.highlight_context,&highlight_info);
+    XROIWaitEvent(context,targets,highlight_info);
+    if (((*state) & UpdateConfigurationState) != 0)
+      {
+        (void) XPutBackEvent(context->display,event);
+        (void) XCheckDefineCursor(context->display,context->windows->image.id,
+          context->cursor);
+        break;
+      }
+  } while (((*state) & ExitState) == 0);
+}
+
+static void XROISelectRegion(const ROIContext *context,const ROITargets *targets)
+{
+  size_t
+    *const state = targets->state;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  DisplayCommand
+    *const display_command = targets->display_command;
+
+  do
+  {
+    /*
+      Size rectangle as pointer moves until the mouse button is released.
+    */
+    (*x)=(int) (*roi_info).x;
+    (*y)=(int) (*roi_info).y;
+    (*roi_info).width=0;
+    (*roi_info).height=0;
+    (*state)=DefaultState;
+    XROISizeRegion(context,targets);
+    /*
+      Wait for user to grab a corner of the rectangle or press return.
+    */
+    (*state)=DefaultState;
+    (*display_command)=NullCommand;
+    (*crop_info).x=0;
+    (*crop_info).y=0;
+    (void) XMapWindow(context->display,context->windows->info.id);
+    XROIWaitCorner(context,targets);
+  } while (((*state) & ExitState) == 0);
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
 {
-  const char
-    *const ROIMenu[] =
-    {
-      "Help",
-      "Dismiss",
-      (char *) NULL
-    },
-    *const ApplyMenu[] =
-    {
-      "File",
-      "Edit",
-      "Transform",
-      "Enhance",
-      "Effects",
-      "F/X",
-      "Miscellany",
-      "Help",
-      "Dismiss",
-      (char *) NULL
-    },
-    *const FileMenu[] =
-    {
-      "Save...",
-      "Print...",
-      (char *) NULL
-    },
-    *const EditMenu[] =
-    {
-      "Undo",
-      "Redo",
-      (char *) NULL
-    },
-    *const TransformMenu[] =
-    {
-      "Flop",
-      "Flip",
-      "Rotate Right",
-      "Rotate Left",
-      (char *) NULL
-    },
-    *const EnhanceMenu[] =
-    {
-      "Hue...",
-      "Saturation...",
-      "Brightness...",
-      "Gamma...",
-      "Spiff",
-      "Dull",
-      "Contrast Stretch...",
-      "Sigmoidal Contrast...",
-      "Normalize",
-      "Equalize",
-      "Negate",
-      "Grayscale",
-      "Map...",
-      "Quantize...",
-      (char *) NULL
-    },
-    *const EffectsMenu[] =
-    {
-      "Despeckle",
-      "Emboss",
-      "Reduce Noise",
-      "Add Noise",
-      "Sharpen...",
-      "Blur...",
-      "Threshold...",
-      "Edge Detect...",
-      "Spread...",
-      "Shade...",
-      "Raise...",
-      "Segment...",
-      (char *) NULL
-    },
-    *const FXMenu[] =
-    {
-      "Solarize...",
-      "Sepia Tone...",
-      "Swirl...",
-      "Implode...",
-      "Vignette...",
-      "Wave...",
-      "Oil Paint...",
-      "Charcoal Draw...",
-      (char *) NULL
-    },
-    *const MiscellanyMenu[] =
-    {
-      "Image Info",
-      "Zoom Image",
-      "Show Preview...",
-      "Show Histogram",
-      "Show Matte",
-      (char *) NULL
-    };
-
-  const char
-    *const *Menus[ApplyMenus] =
-    {
-      FileMenu,
-      EditMenu,
-      TransformMenu,
-      EnhanceMenu,
-      EffectsMenu,
-      FXMenu,
-      MiscellanyMenu
-    };
-
-  static const DisplayCommand
-    ApplyCommands[] =
-    {
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      HelpCommand,
-      QuitCommand
-    },
-    FileCommands[] =
-    {
-      SaveCommand,
-      PrintCommand
-    },
-    EditCommands[] =
-    {
-      UndoCommand,
-      RedoCommand
-    },
-    TransformCommands[] =
-    {
-      FlopCommand,
-      FlipCommand,
-      RotateRightCommand,
-      RotateLeftCommand
-    },
-    EnhanceCommands[] =
-    {
-      HueCommand,
-      SaturationCommand,
-      BrightnessCommand,
-      GammaCommand,
-      SpiffCommand,
-      DullCommand,
-      ContrastStretchCommand,
-      SigmoidalContrastCommand,
-      NormalizeCommand,
-      EqualizeCommand,
-      NegateCommand,
-      GrayscaleCommand,
-      MapCommand,
-      QuantizeCommand
-    },
-    EffectsCommands[] =
-    {
-      DespeckleCommand,
-      EmbossCommand,
-      ReduceNoiseCommand,
-      AddNoiseCommand,
-      SharpenCommand,
-      BlurCommand,
-      ThresholdCommand,
-      EdgeDetectCommand,
-      SpreadCommand,
-      ShadeCommand,
-      RaiseCommand,
-      SegmentCommand
-    },
-    FXCommands[] =
-    {
-      SolarizeCommand,
-      SepiaToneCommand,
-      SwirlCommand,
-      ImplodeCommand,
-      VignetteCommand,
-      WaveCommand,
-      OilPaintCommand,
-      CharcoalDrawCommand
-    },
-    MiscellanyCommands[] =
-    {
-      InfoCommand,
-      ZoomCommand,
-      ShowPreviewCommand,
-      ShowHistogramCommand,
-      ShowMatteCommand
-    },
-    ROICommands[] =
-    {
-      ROIHelpCommand,
-      ROIDismissCommand
-    };
-
-  static const DisplayCommand
-    *Commands[ApplyMenus] =
-    {
-      FileCommands,
-      EditCommands,
-      TransformCommands,
-      EnhanceCommands,
-      EffectsCommands,
-      FXCommands,
-      MiscellanyCommands
-    };
-
   char
-    command[MagickPathExtent],
     text[MagickPathExtent];
 
   DisplayCommand
@@ -14176,13 +15483,11 @@ static MagickBooleanType XROIImage(Display *display,
     cursor;
 
   int
-    id,
     x,
     y;
 
   RectangleInfo
     crop_info,
-    highlight_info,
     roi_info;
 
   size_t
@@ -14191,8 +15496,12 @@ static MagickBooleanType XROIImage(Display *display,
   XEvent
     event;
 
+  ROIContext
+    context;
+
   const ROITargets
-    targets = { &x, &y, &roi_info, &state };
+    targets = { &x, &y, &roi_info, &state, &event, &display_command,
+      &crop_info };
 
   const ROIKeyTargets
     key_targets = { &roi_info, &display_command, &state };
@@ -14218,127 +15527,15 @@ static MagickBooleanType XROIImage(Display *display,
   roi_info.height=0;
   cursor=XCreateFontCursor(display,XC_fleur);
   state=DefaultState;
-  do
-  {
-    if (windows->info.mapped != MagickFalse)
-      {
-        /*
-          Display pointer position.
-        */
-        (void) FormatLocaleString(text,MagickPathExtent," %+ld%+ld ",
-          (long) roi_info.x,(long) roi_info.y);
-        XInfoWidget(display,windows,text);
-      }
-    /*
-      Wait for next event.
-    */
-    XScreenEvent(display,windows,&event,exception);
-    if (event.xany.window == windows->command.id)
-      {
-        /*
-          Select a command from the Command widget.
-        */
-        id=XCommandWidget(display,windows,ROIMenu,&event);
-        if (id < 0)
-          continue;
-        switch (ROICommands[id])
-        {
-          case ROIHelpCommand:
-          {
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Region of Interest",ImageROIHelp);
-            break;
-          }
-          case ROIDismissCommand:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-          default:
-            break;
-        }
-        continue;
-      }
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        if (event.xbutton.button != Button1)
-          break;
-        if (event.xbutton.window != windows->image.id)
-          break;
-        /*
-          Note first corner of region of interest rectangle-- exit loop.
-        */
-        (void) XCheckDefineCursor(display,windows->image.id,cursor);
-        roi_info.x=(ssize_t) windows->image.x+event.xbutton.x;
-        roi_info.y=(ssize_t) windows->image.y+event.xbutton.y;
-        state|=ExitState;
-        break;
-      }
-      case ButtonRelease:
-        break;
-      case Expose:
-        break;
-      case KeyPress:
-      {
-        KeySym
-          key_symbol;
-
-        if (event.xkey.window != windows->image.id)
-          break;
-        /*
-          Respond to a user key press.
-        */
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        switch ((int) key_symbol)
-        {
-          case XK_Escape:
-          case XK_F20:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-          case XK_F1:
-          case XK_Help:
-          {
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Region of Interest",ImageROIHelp);
-            break;
-          }
-          default:
-          {
-            (void) XBell(display,0);
-            break;
-          }
-        }
-        break;
-      }
-      case MotionNotify:
-      {
-        /*
-          Map and unmap Info widget as text cursor crosses its boundaries.
-        */
-        x=event.xmotion.x;
-        y=event.xmotion.y;
-        XTrackInfoWidget(display,windows,x,y);
-        roi_info.x=(ssize_t) windows->image.x+x;
-        roi_info.y=(ssize_t) windows->image.y+y;
-        break;
-      }
-      default:
-        break;
-    }
-  } while ((state & ExitState) == 0);
+  context.display=display;
+  context.resource_info=resource_info;
+  context.windows=windows;
+  context.cursor=cursor;
+  context.exception=exception;
+  context.text=text;
+  context.image=image;
+  context.key_targets=key_targets;
+  XROITrackPointer(&context,&targets);
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask);
   if ((state & EscapeState) != 0)
@@ -14351,201 +15548,7 @@ static MagickBooleanType XROIImage(Display *display,
       return(MagickTrue);
     }
   (void) XSetFunction(display,windows->image.highlight_context,GXinvert);
-  do
-  {
-    /*
-      Size rectangle as pointer moves until the mouse button is released.
-    */
-    x=(int) roi_info.x;
-    y=(int) roi_info.y;
-    roi_info.width=0;
-    roi_info.height=0;
-    state=DefaultState;
-    do
-    {
-      highlight_info=roi_info;
-      highlight_info.x=roi_info.x-windows->image.x;
-      highlight_info.y=roi_info.y-windows->image.y;
-      if ((highlight_info.width > 3) && (highlight_info.height > 3))
-        {
-          /*
-            Display info and draw region of interest rectangle.
-          */
-          XMapInfoWidget(display,windows);
-          (void) FormatLocaleString(text,MagickPathExtent,
-            " %.17gx%.17g%+.20g%+.20g",(double) roi_info.width,(double)
-            roi_info.height,(double) roi_info.x,(double) roi_info.y);
-          XInfoWidget(display,windows,text);
-          XHighlightRectangle(display,windows->image.id,
-            windows->image.highlight_context,&highlight_info);
-        }
-      else
-        if (windows->info.mapped != MagickFalse)
-          (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
-      /*
-        Wait for next event.
-      */
-      XScreenEvent(display,windows,&event,exception);
-      if ((highlight_info.width > 3) && (highlight_info.height > 3))
-        XHighlightRectangle(display,windows->image.id,
-          windows->image.highlight_context,&highlight_info);
-      switch (event.type)
-      {
-        case ButtonPress:
-        {
-          roi_info.x=(ssize_t) windows->image.x+event.xbutton.x;
-          roi_info.y=(ssize_t) windows->image.y+event.xbutton.y;
-          break;
-        }
-        case ButtonRelease:
-        {
-          ROIApplyInput
-            apply_input;
-
-          apply_input.display=display;
-          apply_input.windows=windows;
-          apply_input.event=(&event);
-          apply_input.ApplyMenu=ApplyMenu;
-          XROIButtonRelease(&apply_input,&targets);
-          break;
-        }
-        case Expose:
-          break;
-        case MotionNotify:
-        {
-          roi_info.x=(ssize_t) windows->image.x+event.xmotion.x;
-          roi_info.y=(ssize_t) windows->image.y+event.xmotion.y;
-        }
-        default:
-          break;
-      }
-      if (IsSelectionMovedOrDone(roi_info,x,y,state) != MagickFalse)
-        XCheckSelectionBounds(windows,x,y,&roi_info);
-    } while ((state & ExitState) == 0);
-    /*
-      Wait for user to grab a corner of the rectangle or press return.
-    */
-    state=DefaultState;
-    display_command=NullCommand;
-    crop_info.x=0;
-    crop_info.y=0;
-    (void) XMapWindow(display,windows->info.id);
-    do
-    {
-      CropEventInput
-        event_input;
-
-      ROIRegionInput
-        region_input;
-
-      ROIKeyInput
-        key_input;
-
-      if (windows->info.mapped != MagickFalse)
-        {
-          /*
-            Display pointer position.
-          */
-          (void) FormatLocaleString(text,MagickPathExtent,
-            " %.17gx%.17g%+.20g%+.20g",(double) roi_info.width,(double)
-            roi_info.height,(double) roi_info.x,(double) roi_info.y);
-          XInfoWidget(display,windows,text);
-        }
-      highlight_info=roi_info;
-      highlight_info.x=roi_info.x-windows->image.x;
-      highlight_info.y=roi_info.y-windows->image.y;
-      if ((highlight_info.width <= 3) || (highlight_info.height <= 3))
-        {
-          state|=EscapeState;
-          state|=ExitState;
-          break;
-        }
-      region_input.display=display;
-      region_input.resource_info=resource_info;
-      region_input.windows=windows;
-      region_input.image=image;
-      region_input.exception=exception;
-      region_input.roi_info=roi_info;
-      region_input.display_command=display_command;
-      region_input.text=text;
-      if (XROIUpdateRegion(&region_input,&state,&crop_info) != MagickFalse)
-        continue;
-      XHighlightRectangle(display,windows->image.id,
-        windows->image.highlight_context,&highlight_info);
-      XScreenEvent(display,windows,&event,exception);
-      if (event.xany.window == windows->command.id)
-        {
-          ROICommandInput
-            command_input;
-
-          command_input.display=display;
-          command_input.resource_info=resource_info;
-          command_input.windows=windows;
-          command_input.highlight_info=highlight_info;
-          command_input.ApplyMenu=ApplyMenu;
-          command_input.ApplyCommands=ApplyCommands;
-          command_input.Menus=Menus;
-          command_input.Commands=Commands;
-          XROICommand(&command_input,&event,&display_command,&state);
-          continue;
-        }
-      XHighlightRectangle(display,windows->image.id,
-        windows->image.highlight_context,&highlight_info);
-      event_input.display=display;
-      event_input.windows=windows;
-      event_input.event=(&event);
-      event_input.highlight_info=highlight_info;
-      event_input.text=text;
-      key_input.display=display;
-      key_input.resource_info=resource_info;
-      key_input.windows=windows;
-      key_input.event=(&event);
-      key_input.image=image;
-      key_input.exception=exception;
-      switch (event.type)
-      {
-        case ButtonPress:
-        {
-          XROIButtonPress(&event_input,crop_info,&targets);
-          break;
-        }
-        case ButtonRelease:
-        {
-          XCropButtonRelease(&event_input,crop_info);
-          break;
-        }
-        case Expose:
-        {
-          XCropExpose(&event_input,&event);
-          break;
-        }
-        case KeyPress:
-        {
-          XROIKeyPress(&key_input,&event,&key_targets);
-          break;
-        }
-        case KeyRelease:
-          break;
-        case MotionNotify:
-        {
-          XROIMotion(&event_input,&targets);
-          break;
-        }
-        case SelectionRequest:
-        {
-          XCropSelectionRequest(&event,roi_info,text);
-        }
-        default:
-          break;
-      }
-      if ((state & UpdateConfigurationState) != 0)
-        {
-          (void) XPutBackEvent(display,&event);
-          (void) XCheckDefineCursor(display,windows->image.id,cursor);
-          break;
-        }
-    } while ((state & ExitState) == 0);
-  } while ((state & ExitState) == 0);
+  XROISelectRegion(&context,&targets);
   (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
   XSetCursorState(display,windows,MagickFalse);
   if ((state & EscapeState) != 0)
@@ -18483,354 +19486,354 @@ static MagickBooleanType XSelectCommandMenuEntry(
   return(MagickFalse);
 }
 
+static const char
+  *const CommandMenu[] =
+  {
+    "File",
+    "Edit",
+    "View",
+    "Transform",
+    "Enhance",
+    "Effects",
+    "F/X",
+    "Image Edit",
+    "Miscellany",
+    "Help",
+    (char *) NULL
+  },
+  *const FileMenu[] =
+  {
+    "Open...",
+    "Next",
+    "Former",
+    "Select...",
+    "Save...",
+    "Print...",
+    "Delete...",
+    "New...",
+    "Visual Directory...",
+    "Quit",
+    (char *) NULL
+  },
+  *const EditMenu[] =
+  {
+    "Undo",
+    "Redo",
+    "Cut",
+    "Copy",
+    "Paste",
+    (char *) NULL
+  },
+  *const ViewMenu[] =
+  {
+    "Half Size",
+    "Original Size",
+    "Double Size",
+    "Resize...",
+    "Apply",
+    "Refresh",
+    "Restore",
+    (char *) NULL
+  },
+  *const TransformMenu[] =
+  {
+    "Crop",
+    "Chop",
+    "Flop",
+    "Flip",
+    "Rotate Right",
+    "Rotate Left",
+    "Rotate...",
+    "Shear...",
+    "Roll...",
+    "Trim Edges",
+    (char *) NULL
+  },
+  *const EnhanceMenu[] =
+  {
+    "Hue...",
+    "Saturation...",
+    "Brightness...",
+    "Gamma...",
+    "Spiff",
+    "Dull",
+    "Contrast Stretch...",
+    "Sigmoidal Contrast...",
+    "Normalize",
+    "Equalize",
+    "Negate",
+    "Grayscale",
+    "Map...",
+    "Quantize...",
+    (char *) NULL
+  },
+  *const EffectsMenu[] =
+  {
+    "Despeckle",
+    "Emboss",
+    "Reduce Noise",
+    "Add Noise...",
+    "Sharpen...",
+    "Blur...",
+    "Threshold...",
+    "Edge Detect...",
+    "Spread...",
+    "Shade...",
+    "Raise...",
+    "Segment...",
+    (char *) NULL
+  },
+  *const FXMenu[] =
+  {
+    "Solarize...",
+    "Sepia Tone...",
+    "Swirl...",
+    "Implode...",
+    "Vignette...",
+    "Wave...",
+    "Oil Paint...",
+    "Charcoal Draw...",
+    (char *) NULL
+  },
+  *const ImageEditMenu[] =
+  {
+    "Annotate...",
+    "Draw...",
+    "Color...",
+    "Matte...",
+    "Composite...",
+    "Add Border...",
+    "Add Frame...",
+    "Comment...",
+    "Launch...",
+    "Region of Interest...",
+    (char *) NULL
+  },
+  *const MiscellanyMenu[] =
+  {
+    "Image Info",
+    "Zoom Image",
+    "Show Preview...",
+    "Show Histogram",
+    "Show Matte",
+    "Background...",
+    "Slide Show...",
+    "Preferences...",
+    (char *) NULL
+  },
+  *const HelpMenu[] =
+  {
+    "Overview",
+    "Browse Documentation",
+    "About Display",
+    (char *) NULL
+  },
+  *const ShortCutsMenu[] =
+  {
+    "Next",
+    "Former",
+    "Open...",
+    "Save...",
+    "Print...",
+    "Undo",
+    "Restore",
+    "Image Info",
+    "Quit",
+    (char *) NULL
+  },
+  *const VirtualMenu[] =
+  {
+    "Image Info",
+    "Print",
+    "Next",
+    "Quit",
+    (char *) NULL
+  };
+
+static const char
+  *const *Menus[MagickMenus] =
+  {
+    FileMenu,
+    EditMenu,
+    ViewMenu,
+    TransformMenu,
+    EnhanceMenu,
+    EffectsMenu,
+    FXMenu,
+    ImageEditMenu,
+    MiscellanyMenu,
+    HelpMenu
+  };
+
+static DisplayCommand
+  CommandMenus[] =
+  {
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    NullCommand,
+  },
+  FileCommands[] =
+  {
+    OpenCommand,
+    NextCommand,
+    FormerCommand,
+    SelectCommand,
+    SaveCommand,
+    PrintCommand,
+    DeleteCommand,
+    NewCommand,
+    VisualDirectoryCommand,
+    QuitCommand
+  },
+  EditCommands[] =
+  {
+    UndoCommand,
+    RedoCommand,
+    CutCommand,
+    CopyCommand,
+    PasteCommand
+  },
+  ViewCommands[] =
+  {
+    HalfSizeCommand,
+    OriginalSizeCommand,
+    DoubleSizeCommand,
+    ResizeCommand,
+    ApplyCommand,
+    RefreshCommand,
+    RestoreCommand
+  },
+  TransformCommands[] =
+  {
+    CropCommand,
+    ChopCommand,
+    FlopCommand,
+    FlipCommand,
+    RotateRightCommand,
+    RotateLeftCommand,
+    RotateCommand,
+    ShearCommand,
+    RollCommand,
+    TrimCommand
+  },
+  EnhanceCommands[] =
+  {
+    HueCommand,
+    SaturationCommand,
+    BrightnessCommand,
+    GammaCommand,
+    SpiffCommand,
+    DullCommand,
+    ContrastStretchCommand,
+    SigmoidalContrastCommand,
+    NormalizeCommand,
+    EqualizeCommand,
+    NegateCommand,
+    GrayscaleCommand,
+    MapCommand,
+    QuantizeCommand
+  },
+  EffectsCommands[] =
+  {
+    DespeckleCommand,
+    EmbossCommand,
+    ReduceNoiseCommand,
+    AddNoiseCommand,
+    SharpenCommand,
+    BlurCommand,
+    ThresholdCommand,
+    EdgeDetectCommand,
+    SpreadCommand,
+    ShadeCommand,
+    RaiseCommand,
+    SegmentCommand
+  },
+  FXCommands[] =
+  {
+    SolarizeCommand,
+    SepiaToneCommand,
+    SwirlCommand,
+    ImplodeCommand,
+    VignetteCommand,
+    WaveCommand,
+    OilPaintCommand,
+    CharcoalDrawCommand
+  },
+  ImageEditCommands[] =
+  {
+    AnnotateCommand,
+    DrawCommand,
+    ColorCommand,
+    MatteCommand,
+    CompositeCommand,
+    AddBorderCommand,
+    AddFrameCommand,
+    CommentCommand,
+    LaunchCommand,
+    RegionOfInterestCommand
+  },
+  MiscellanyCommands[] =
+  {
+    InfoCommand,
+    ZoomCommand,
+    ShowPreviewCommand,
+    ShowHistogramCommand,
+    ShowMatteCommand,
+    BackgroundCommand,
+    SlideShowCommand,
+    PreferencesCommand
+  },
+  HelpCommands[] =
+  {
+    HelpCommand,
+    BrowseDocumentationCommand,
+    VersionCommand
+  },
+  ShortCutsCommands[] =
+  {
+    NextCommand,
+    FormerCommand,
+    OpenCommand,
+    SaveCommand,
+    PrintCommand,
+    UndoCommand,
+    RestoreCommand,
+    InfoCommand,
+    QuitCommand
+  },
+  VirtualCommands[] =
+  {
+    InfoCommand,
+    PrintCommand,
+    NextCommand,
+    QuitCommand
+  };
+
+static DisplayCommand
+  *Commands[MagickMenus] =
+  {
+    FileCommands,
+    EditCommands,
+    ViewCommands,
+    TransformCommands,
+    EnhanceCommands,
+    EffectsCommands,
+    FXCommands,
+    ImageEditCommands,
+    MiscellanyCommands,
+    HelpCommands
+  };
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
-  const char
-    *const CommandMenu[] =
-    {
-      "File",
-      "Edit",
-      "View",
-      "Transform",
-      "Enhance",
-      "Effects",
-      "F/X",
-      "Image Edit",
-      "Miscellany",
-      "Help",
-      (char *) NULL
-    },
-    *const FileMenu[] =
-    {
-      "Open...",
-      "Next",
-      "Former",
-      "Select...",
-      "Save...",
-      "Print...",
-      "Delete...",
-      "New...",
-      "Visual Directory...",
-      "Quit",
-      (char *) NULL
-    },
-    *const EditMenu[] =
-    {
-      "Undo",
-      "Redo",
-      "Cut",
-      "Copy",
-      "Paste",
-      (char *) NULL
-    },
-    *const ViewMenu[] =
-    {
-      "Half Size",
-      "Original Size",
-      "Double Size",
-      "Resize...",
-      "Apply",
-      "Refresh",
-      "Restore",
-      (char *) NULL
-    },
-    *const TransformMenu[] =
-    {
-      "Crop",
-      "Chop",
-      "Flop",
-      "Flip",
-      "Rotate Right",
-      "Rotate Left",
-      "Rotate...",
-      "Shear...",
-      "Roll...",
-      "Trim Edges",
-      (char *) NULL
-    },
-    *const EnhanceMenu[] =
-    {
-      "Hue...",
-      "Saturation...",
-      "Brightness...",
-      "Gamma...",
-      "Spiff",
-      "Dull",
-      "Contrast Stretch...",
-      "Sigmoidal Contrast...",
-      "Normalize",
-      "Equalize",
-      "Negate",
-      "Grayscale",
-      "Map...",
-      "Quantize...",
-      (char *) NULL
-    },
-    *const EffectsMenu[] =
-    {
-      "Despeckle",
-      "Emboss",
-      "Reduce Noise",
-      "Add Noise...",
-      "Sharpen...",
-      "Blur...",
-      "Threshold...",
-      "Edge Detect...",
-      "Spread...",
-      "Shade...",
-      "Raise...",
-      "Segment...",
-      (char *) NULL
-    },
-    *const FXMenu[] =
-    {
-      "Solarize...",
-      "Sepia Tone...",
-      "Swirl...",
-      "Implode...",
-      "Vignette...",
-      "Wave...",
-      "Oil Paint...",
-      "Charcoal Draw...",
-      (char *) NULL
-    },
-    *const ImageEditMenu[] =
-    {
-      "Annotate...",
-      "Draw...",
-      "Color...",
-      "Matte...",
-      "Composite...",
-      "Add Border...",
-      "Add Frame...",
-      "Comment...",
-      "Launch...",
-      "Region of Interest...",
-      (char *) NULL
-    },
-    *const MiscellanyMenu[] =
-    {
-      "Image Info",
-      "Zoom Image",
-      "Show Preview...",
-      "Show Histogram",
-      "Show Matte",
-      "Background...",
-      "Slide Show...",
-      "Preferences...",
-      (char *) NULL
-    },
-    *const HelpMenu[] =
-    {
-      "Overview",
-      "Browse Documentation",
-      "About Display",
-      (char *) NULL
-    },
-    *const ShortCutsMenu[] =
-    {
-      "Next",
-      "Former",
-      "Open...",
-      "Save...",
-      "Print...",
-      "Undo",
-      "Restore",
-      "Image Info",
-      "Quit",
-      (char *) NULL
-    },
-    *const VirtualMenu[] =
-    {
-      "Image Info",
-      "Print",
-      "Next",
-      "Quit",
-      (char *) NULL
-    };
-
-  const char
-    *const *Menus[MagickMenus] =
-    {
-      FileMenu,
-      EditMenu,
-      ViewMenu,
-      TransformMenu,
-      EnhanceMenu,
-      EffectsMenu,
-      FXMenu,
-      ImageEditMenu,
-      MiscellanyMenu,
-      HelpMenu
-    };
-
-  static DisplayCommand
-    CommandMenus[] =
-    {
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      NullCommand,
-    },
-    FileCommands[] =
-    {
-      OpenCommand,
-      NextCommand,
-      FormerCommand,
-      SelectCommand,
-      SaveCommand,
-      PrintCommand,
-      DeleteCommand,
-      NewCommand,
-      VisualDirectoryCommand,
-      QuitCommand
-    },
-    EditCommands[] =
-    {
-      UndoCommand,
-      RedoCommand,
-      CutCommand,
-      CopyCommand,
-      PasteCommand
-    },
-    ViewCommands[] =
-    {
-      HalfSizeCommand,
-      OriginalSizeCommand,
-      DoubleSizeCommand,
-      ResizeCommand,
-      ApplyCommand,
-      RefreshCommand,
-      RestoreCommand
-    },
-    TransformCommands[] =
-    {
-      CropCommand,
-      ChopCommand,
-      FlopCommand,
-      FlipCommand,
-      RotateRightCommand,
-      RotateLeftCommand,
-      RotateCommand,
-      ShearCommand,
-      RollCommand,
-      TrimCommand
-    },
-    EnhanceCommands[] =
-    {
-      HueCommand,
-      SaturationCommand,
-      BrightnessCommand,
-      GammaCommand,
-      SpiffCommand,
-      DullCommand,
-      ContrastStretchCommand,
-      SigmoidalContrastCommand,
-      NormalizeCommand,
-      EqualizeCommand,
-      NegateCommand,
-      GrayscaleCommand,
-      MapCommand,
-      QuantizeCommand
-    },
-    EffectsCommands[] =
-    {
-      DespeckleCommand,
-      EmbossCommand,
-      ReduceNoiseCommand,
-      AddNoiseCommand,
-      SharpenCommand,
-      BlurCommand,
-      ThresholdCommand,
-      EdgeDetectCommand,
-      SpreadCommand,
-      ShadeCommand,
-      RaiseCommand,
-      SegmentCommand
-    },
-    FXCommands[] =
-    {
-      SolarizeCommand,
-      SepiaToneCommand,
-      SwirlCommand,
-      ImplodeCommand,
-      VignetteCommand,
-      WaveCommand,
-      OilPaintCommand,
-      CharcoalDrawCommand
-    },
-    ImageEditCommands[] =
-    {
-      AnnotateCommand,
-      DrawCommand,
-      ColorCommand,
-      MatteCommand,
-      CompositeCommand,
-      AddBorderCommand,
-      AddFrameCommand,
-      CommentCommand,
-      LaunchCommand,
-      RegionOfInterestCommand
-    },
-    MiscellanyCommands[] =
-    {
-      InfoCommand,
-      ZoomCommand,
-      ShowPreviewCommand,
-      ShowHistogramCommand,
-      ShowMatteCommand,
-      BackgroundCommand,
-      SlideShowCommand,
-      PreferencesCommand
-    },
-    HelpCommands[] =
-    {
-      HelpCommand,
-      BrowseDocumentationCommand,
-      VersionCommand
-    },
-    ShortCutsCommands[] =
-    {
-      NextCommand,
-      FormerCommand,
-      OpenCommand,
-      SaveCommand,
-      PrintCommand,
-      UndoCommand,
-      RestoreCommand,
-      InfoCommand,
-      QuitCommand
-    },
-    VirtualCommands[] =
-    {
-      InfoCommand,
-      PrintCommand,
-      NextCommand,
-      QuitCommand
-    };
-
-  static DisplayCommand
-    *Commands[MagickMenus] =
-    {
-      FileCommands,
-      EditCommands,
-      ViewCommands,
-      TransformCommands,
-      EnhanceCommands,
-      EffectsCommands,
-      FXCommands,
-      ImageEditCommands,
-      MiscellanyCommands,
-      HelpCommands
-    };
-
   char
     command[MagickPathExtent],
     *directory,

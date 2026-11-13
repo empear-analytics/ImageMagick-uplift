@@ -6849,6 +6849,12 @@ statements, never declarations. No other recipe moves a variable.
    once) does not move. A non-`const` array counts as never written when every use of
    its name is an element read or an argument to a `const`-qualified pointer parameter;
    check each use by `grep`. It moves as written, without adding `const`.
+   A `static` array may also have a use that stores its address into a member of a local
+   struct the function only fills, when every function that reads that member only reads
+   through it, by subscript (checked by reading each reader; `event_context.Commands=Commands;`
+   with `Commands[id][entry]` read in `XSelectCommandMenuEntry`): the declaration is already
+   `static`, so its storage, initial bytes and section stay as they were (the data-section
+   comparison is identical), nothing writes it, and only the scope of its name widens.
    no statement assigns, or every use of it is `sizeof`, an argument to a parameter of
    pointer-to-`const` type (`SetsRGBImageProfile`'s `sRGBProfile`, passed only as
    `const void *blob`), or an element read by subscript that is not assigned, incremented
@@ -6936,7 +6942,12 @@ W22 lane d, wide build): its menu label arrays and the `Menus` array of arrays a
 lines of string literals and addresses at the top of a function of 726 lines, read only
 by the Command widget calls; the `static const` command tables above them had already
 moved by this recipe. Added by Claude Code (Claude Sonnet 5.5) under the owner's OK of
-2026-11-10 to evolve the recipes.
+2026-11-10 to evolve the recipes. Step 2's `static` array stored into a member of a local
+struct (2026-11-13, W23 round eight lane b, wide build): `display.c`'s `XDisplayImage`, whose
+thirteen `static DisplayCommand` tables and the `Commands` table over them (about 110 lines of
+the function) are named by `event_context.VirtualCommands`, `.ShortCutsCommands` and `.Commands`,
+members of a local struct that the helpers read by subscript only. Added by Claude Code (Claude
+Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
@@ -16218,3 +16229,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | E | Step 3: a block-scope `static` struct (not an array) that the block passes by address only to callees keeping no copy, or reads members of, goes as a pointer parameter like a struct local (`&v` written `v`, `v.m` written `(*v).m`, the call passing `&v`). *Careful*-style argument in the text: the static is one object at a fixed address with block scope, so the helper's pointer designates the object the block named and each access is the one the block made, at the same point | `xwindow.c`'s `XMakeWindow` (campaign A, W22 round seven lane b, wide build): the `XStringListToTextProperty` pair fills `static XTextProperty icon_name, window_name`; with the size-hints and icon-geometry helpers the function leaves Complex Method and Large Method, 3.76 to 3.88 in a probe | owner |
 | 2026-11-13 | AMEND | I | Step 2: a block-scope `static` of structure type may be a written variable on Recipe CT step 2's terms (member a pointer to the structure, `v.m` written `(*v).m`, `&v` written `v`), and when every written variable of the targets struct is such a `static` the limit of six rises to ten. The text gives the argument (one object at a fixed address, block scope, distinct objects, nothing to alias) | `xwindow.c`'s `XRenderImage` (campaign A, W22 round seven lane b, wide build): the `if (display == NULL)` init block writes eight statics, three of them structures, and leaves through `return(MagickFalse);` four times; Recipe I stopped at six variables and refused structure statics | owner |
 | 2026-11-13 | NEW | KM | Replace a Key Switch Selecting by Modifier Masks with a Table of Rules: the groups of a key `switch` that return a constant command after at most two non-Control mask tests and the Control test become rows `{ key, mask, command, mask, command, plain, control }` of a `static const` table (a missing pair filled with `ControlMask` and the control command) read by one lookup function that the caller returns from after `default: break;`. *Careful* gives the argument (same value, same tests in the same order, the filler pair returns what the next test would, `break` meant the closing return) | `display.c`'s `XImageWindowCommand` (campaign A, W23 round eight lane a, wide build): cc 132 to 41, 342 to 129 lines, the lookup finding-free; KR, KT, KC and KE refuse groups that test masks | owner |
+| 2026-11-13 | AMEND | F | Step 2: a `static` array that the function stores into a member of a local struct it only fills may move as written, when every reader of the member only reads through it by subscript (checked by reading each reader). The declaration is already `static`, so its storage, bytes and section do not change (data sections compare identical); only the scope of its name widens, which steps 4 and 5 check | `display.c`'s `XDisplayImage` (campaign A, W23 round eight lane b, wide build): the thirteen `static DisplayCommand` tables and `Commands` are stored into `event_context.VirtualCommands`, `.ShortCutsCommands` and `.Commands` and read by subscript in `XSelectCommandMenuEntry`, `XSelectVirtualCommand` and `XPressImageButton3`; Recipe F's text covered element reads and `const` pointer arguments only | owner |
