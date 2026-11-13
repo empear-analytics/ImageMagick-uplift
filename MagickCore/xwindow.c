@@ -2028,6 +2028,45 @@ static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void XDrawLineOrRectangle(Display *display,const Pixmap draw_pixmap,
+  const GC draw_context,const XDrawInfo *draw_info)
+{
+  switch (draw_info->element)
+  {
+    case PointElement:
+    default:
+    {
+      (void) XDrawLines(display,draw_pixmap,draw_context,
+        draw_info->coordinate_info,(int) draw_info->number_coordinates,
+        CoordModeOrigin);
+      break;
+    }
+    case LineElement:
+    {
+      (void) XDrawLine(display,draw_pixmap,draw_context,draw_info->line_info.x1,
+        draw_info->line_info.y1,draw_info->line_info.x2,
+        draw_info->line_info.y2);
+      break;
+    }
+    case RectangleElement:
+    {
+      (void) XDrawRectangle(display,draw_pixmap,draw_context,
+        (int) draw_info->rectangle_info.x,(int) draw_info->rectangle_info.y,
+        (unsigned int) draw_info->rectangle_info.width,
+        (unsigned int) draw_info->rectangle_info.height);
+      break;
+    }
+    case FillRectangleElement:
+    {
+      (void) XFillRectangle(display,draw_pixmap,draw_context,
+        (int) draw_info->rectangle_info.x,(int) draw_info->rectangle_info.y,
+        (unsigned int) draw_info->rectangle_info.width,
+        (unsigned int) draw_info->rectangle_info.height);
+      break;
+    }
+  }
+}
+
 MagickPrivate MagickBooleanType XDrawImage(Display *display,
   const XPixelInfo *pixel,XDrawInfo *draw_info,Image *image,
   ExceptionInfo *exception)
@@ -2110,35 +2149,9 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
     }
   switch (draw_info->element)
   {
-    case PointElement:
     default:
     {
-      (void) XDrawLines(display,draw_pixmap,draw_context,
-        draw_info->coordinate_info,(int) draw_info->number_coordinates,
-        CoordModeOrigin);
-      break;
-    }
-    case LineElement:
-    {
-      (void) XDrawLine(display,draw_pixmap,draw_context,draw_info->line_info.x1,
-        draw_info->line_info.y1,draw_info->line_info.x2,
-        draw_info->line_info.y2);
-      break;
-    }
-    case RectangleElement:
-    {
-      (void) XDrawRectangle(display,draw_pixmap,draw_context,
-        (int) draw_info->rectangle_info.x,(int) draw_info->rectangle_info.y,
-        (unsigned int) draw_info->rectangle_info.width,
-        (unsigned int) draw_info->rectangle_info.height);
-      break;
-    }
-    case FillRectangleElement:
-    {
-      (void) XFillRectangle(display,draw_pixmap,draw_context,
-        (int) draw_info->rectangle_info.x,(int) draw_info->rectangle_info.y,
-        (unsigned int) draw_info->rectangle_info.width,
-        (unsigned int) draw_info->rectangle_info.height);
+      XDrawLineOrRectangle(display,draw_pixmap,draw_context,draw_info);
       break;
     }
     case CircleElement:
