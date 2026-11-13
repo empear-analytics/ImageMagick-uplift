@@ -2031,33 +2031,37 @@ static MagickStatusType LoadIncludedColorFile(const ColorLoadTarget *target,
   return(status);
 }
 
+static const char *SkipQuotedText(const char *q)
+{
+  const char
+    quote = (*q),
+    *p = q+1;
+
+  /*
+    Return the last character of the quoted text: the closing quote, or the
+    last character of the string if the quote is not closed.
+  */
+  while ((*p != '\0') && (*p != quote))
+    p++;
+  return(*p == '\0' ? p-1 : p);
+}
+
 static const char *SkipDoctypeElement(const char *q)
 {
   int
-    bracket_depth = 0,
-    quote = 0;
+    bracket_depth = 0;
 
-  for ( ; *q != '\0'; q++)
+  while (*q != '\0')
   {
-    if (quote != 0)
-      {
-        if (*q == quote)
-          quote=0;
-      }
-    else if ((*q == '"') || (*q == '\''))
-      quote=(*q);
+    if (strchr("\"'",*q) != (char *) NULL)
+      q=SkipQuotedText(q);
     else if (*q == '[')
       bracket_depth++;
-    else if (*q == ']')
-      {
-        if (bracket_depth > 0)
-          bracket_depth--;
-      }
+    else if ((*q == ']') && (bracket_depth > 0))
+      bracket_depth--;
     else if ((*q == '>') && (bracket_depth == 0))
-      {
-        q++;   /* consume final '>' */
-        break;
-      }
+      return(q+1);   /* consume final '>' */
+    q++;
   }
   return(q);
 }
