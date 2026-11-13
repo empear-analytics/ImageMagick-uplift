@@ -140,59 +140,6 @@ MagickExport TokenInfo *DestroyTokenInfo(TokenInfo *token_info)
 
 
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-+     I s G l o b                                                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  IsGlob() returns MagickTrue if the path specification contains a globbing
-%  pattern.
-%
-%  The format of the IsGlob method is:
-%
-%      MagickBooleanType IsGlob(const char *geometry)
-%
-%  A description of each parameter follows:
-%
-%    o path: the path.
-%
-*/
-MagickPrivate MagickBooleanType IsGlob(const char *path)
-{
-  MagickBooleanType
-    status = MagickFalse;
-
-  const char
-    *p;
-
-  if (IsPathAccessible(path) != MagickFalse)
-    return(MagickFalse);
-  for (p=path; *p != '\0'; p++)
-  {
-    switch (*p)
-    {
-      case '*':
-      case '?':
-      case '{':
-      case '}':
-      case '[':
-      case ']':
-      {
-        status=MagickTrue;
-        break;
-      }
-      default:
-        break;
-    }
-  }
-  return(status);
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

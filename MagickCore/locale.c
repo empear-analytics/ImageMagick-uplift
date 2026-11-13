@@ -397,20 +397,6 @@ MagickPrivate ssize_t FormatLocaleFileList(FILE *file,
   return(n);
 }
 
-MagickExport ssize_t FormatLocaleFile(FILE *file,
-  const char *magick_restrict format,...)
-{
-  ssize_t
-    n;
-
-  va_list
-    operands;
-
-  va_start(operands,format);
-  n=FormatLocaleFileList(file,format,operands);
-  va_end(operands);
-  return(n);
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -495,20 +481,6 @@ MagickPrivate ssize_t FormatLocaleStringList(char *magick_restrict string,
   return(n);
 }
 
-MagickExport ssize_t FormatLocaleString(char *magick_restrict string,
-  const size_t length,const char *magick_restrict format,...)
-{
-  ssize_t
-    n;
-
-  va_list
-    operands;
-
-  va_start(operands,format);
-  n=FormatLocaleStringList(string,length,format,operands);
-  va_end(operands);
-  return(n);
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
