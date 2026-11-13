@@ -2666,28 +2666,28 @@ static void XSetPenPixelIndex(XWindows *windows,const unsigned int pen_id)
 static void
   XTrackInfoWidget(Display *,XWindows *,const int,const int);
 
+static const char
+  *const AnnotateMenu[] =
+  {
+    "Font Name",
+    "Font Color",
+    "Box Color",
+    "Rotate Text",
+    "Help",
+    "Dismiss",
+    (char *) NULL
+  },
+  *const TextMenu[] =
+  {
+    "Help",
+    "Apply",
+    (char *) NULL
+  };
+
 static MagickBooleanType XAnnotateEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
 {
-  const char
-    *const AnnotateMenu[] =
-    {
-      "Font Name",
-      "Font Color",
-      "Box Color",
-      "Rotate Text",
-      "Help",
-      "Dismiss",
-      (char *) NULL
-    },
-    *const TextMenu[] =
-    {
-      "Help",
-      "Apply",
-      (char *) NULL
-    };
-
   static const ModeType
     AnnotateCommands[] =
     {
