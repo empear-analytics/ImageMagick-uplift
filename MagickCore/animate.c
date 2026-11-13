@@ -1071,6 +1071,10 @@ typedef struct _AnimateBackgroundTargets
 
   XWindowAttributes
     *window_attributes;
+
+  unsigned int
+    *width,
+    *height;
 } AnimateBackgroundTargets;
 
 static void XCreateBackgroundXImage(const AnimateBackgroundSetup *setup,
@@ -1139,6 +1143,71 @@ static void XCreateBackgroundXImage(const AnimateBackgroundSetup *setup,
     }
 }
 
+static void XAdjustBackgroundSize(const AnimateBackgroundSetup *setup,
+  const AnimateBackgroundTargets *targets)
+{
+  unsigned int
+    *const height = targets->height,
+    *const width = targets->width;
+
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XWindowAttributes
+    *const window_attributes = targets->window_attributes;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  (*width)=(*window_info).width;
+  (*height)=(*window_info).height;
+  if ((*resources).backdrop != MagickFalse)
+    {
+      /*
+        Center image on window.
+      */
+      (*window_info).x=(int) ((*window_attributes).width/2)-
+        ((*window_info).ximage->width/2);
+      (*window_info).y=(int) ((*window_attributes).height/2)-
+        ((*window_info).ximage->height/2);
+      (*width)=(unsigned int) (*window_attributes).width;
+      (*height)=(unsigned int) (*window_attributes).height;
+    }
+  if ((*resources).image_geometry != (char *) NULL)
+    {
+      char
+        default_geometry[MagickPathExtent];
+
+      int
+        flags,
+        gravity;
+
+      XSizeHints
+        *size_hints;
+
+      /*
+        User specified geometry.
+      */
+      size_hints=XAllocSizeHints();
+      if (size_hints == (XSizeHints *) NULL)
+        ThrowXWindowFatalException(ResourceLimitFatalError,
+          "MemoryAllocationFailed",setup->images->filename);
+      size_hints->flags=0L;
+      (void) FormatLocaleString(default_geometry,MagickPathExtent,"%ux%u",
+        (*width),(*height));
+      flags=XWMGeometry(setup->display,setup->visual_info->screen,
+        (*resources).image_geometry,default_geometry,
+        (*window_info).border_width,size_hints,&(*window_info).x,
+        &(*window_info).y,(int *) width,(int *) height,&gravity);
+      if (((flags & (XValue | YValue))) != 0)
+        {
+          (*width)=(unsigned int) (*window_attributes).width;
+          (*height)=(unsigned int) (*window_attributes).height;
+        }
+      (void) XFree((void *) size_hints);
+    }
+}
+
 MagickExport void XAnimateBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *images,ExceptionInfo *exception)
 {
@@ -1198,7 +1267,8 @@ MagickExport void XAnimateBackgroundImage(Display *display,
     setup;
 
   const AnimateBackgroundTargets
-    targets = { &window_info, &resources, &window_attributes };
+    targets = { &window_info, &resources, &window_attributes, &width,
+      &height };
 
   /*
     Determine target window.
@@ -1338,52 +1408,7 @@ MagickExport void XAnimateBackgroundImage(Display *display,
   /*
     Adjust image dimensions as specified by backdrop or geometry options.
   */
-  width=window_info.width;
-  height=window_info.height;
-  if (resources.backdrop != MagickFalse)
-    {
-      /*
-        Center image on window.
-      */
-      window_info.x=(int) (window_attributes.width/2)-
-        (window_info.ximage->width/2);
-      window_info.y=(int) (window_attributes.height/2)-
-        (window_info.ximage->height/2);
-      width=(unsigned int) window_attributes.width;
-      height=(unsigned int) window_attributes.height;
-    }
-  if (resources.image_geometry != (char *) NULL)
-    {
-      char
-        default_geometry[MagickPathExtent];
-
-      int
-        flags,
-        gravity;
-
-      XSizeHints
-        *size_hints;
-
-      /*
-        User specified geometry.
-      */
-      size_hints=XAllocSizeHints();
-      if (size_hints == (XSizeHints *) NULL)
-        ThrowXWindowFatalException(ResourceLimitFatalError,
-          "MemoryAllocationFailed",images->filename);
-      size_hints->flags=0L;
-      (void) FormatLocaleString(default_geometry,MagickPathExtent,"%ux%u",width,
-        height);
-      flags=XWMGeometry(display,visual_info->screen,resources.image_geometry,
-        default_geometry,window_info.border_width,size_hints,&window_info.x,
-        &window_info.y,(int *) &width,(int *) &height,&gravity);
-      if (((flags & (XValue | YValue))) != 0)
-        {
-          width=(unsigned int) window_attributes.width;
-          height=(unsigned int) window_attributes.height;
-        }
-      (void) XFree((void *) size_hints);
-    }
+  XAdjustBackgroundSize(&setup,&targets);
   /*
     Create the X pixmap.
   */
