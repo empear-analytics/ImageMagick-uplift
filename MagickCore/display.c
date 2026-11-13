@@ -5486,6 +5486,38 @@ static void XCompositeStep(const CompositeCommandInput *input,
   XCompositeEvent(input,&event,cursor,targets);
 }
 
+static void XCompositeScaleLocation(const Image *image,
+  const XWindows *windows,RectangleInfo *composite_info)
+{
+  double
+    scale_factor;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    height,
+    width;
+
+  width=(unsigned int) image->columns;
+  height=(unsigned int) image->rows;
+  x=0;
+  y=0;
+  if (windows->image.crop_geometry != (char *) NULL)
+    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
+  scale_factor=(double) width/windows->image.ximage->width;
+  (*composite_info).x+=x;
+  (*composite_info).x=(ssize_t) (scale_factor*(*composite_info).x+0.5);
+  (*composite_info).width=(unsigned int) (scale_factor*
+    (*composite_info).width+0.5);
+  scale_factor=(double) height/windows->image.ximage->height;
+  (*composite_info).y+=y;
+  (*composite_info).y=(ssize_t) (scale_factor*(*composite_info).y+0.5);
+  (*composite_info).height=(unsigned int) (scale_factor*
+    (*composite_info).height+0.5);
+}
+
 static MagickBooleanType XCompositeImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -5529,15 +5561,10 @@ static MagickBooleanType XCompositeImage(Display *display,
     y;
 
   double
-    blend,
-    scale_factor;
+    blend;
 
   RectangleInfo
     composite_info;
-
-  unsigned int
-    height,
-    width;
 
   size_t
     state;
@@ -5610,20 +5637,7 @@ static MagickBooleanType XCompositeImage(Display *display,
   */
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
-  width=(unsigned int) image->columns;
-  height=(unsigned int) image->rows;
-  x=0;
-  y=0;
-  if (windows->image.crop_geometry != (char *) NULL)
-    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
-  scale_factor=(double) width/windows->image.ximage->width;
-  composite_info.x+=x;
-  composite_info.x=(ssize_t) (scale_factor*composite_info.x+0.5);
-  composite_info.width=(unsigned int) (scale_factor*composite_info.width+0.5);
-  scale_factor=(double) height/windows->image.ximage->height;
-  composite_info.y+=y;
-  composite_info.y=(ssize_t) (scale_factor*composite_info.y+0.5);
-  composite_info.height=(unsigned int) (scale_factor*composite_info.height+0.5);
+  XCompositeScaleLocation(image,windows,&composite_info);
   if ((composite_info.width != composite_image->columns) ||
       (composite_info.height != composite_image->rows))
     {
