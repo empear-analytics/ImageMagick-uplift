@@ -1931,6 +1931,28 @@ static MagickBooleanType TryBackgroundDisposal(
   return(MagickTrue);
 }
 
+static void RecordInterimDisposal(const Image *prev_image,
+  DisposeType *disposals,const ssize_t i)
+{
+  assert(prev_image != (Image *) NULL);
+  disposals[i]=disposals[i-1];
+#if DEBUG_OPT_FRAME
+    (void) FormatLocaleFile(stderr, "final   %.17g : %s  %.17gx%.17g%+.20g%+.20g\n",
+         (double) i-1,
+         CommandOptionToMnemonic(MagickDisposeOptions,disposals[i-1]),
+         (double) bounds[i-1].width,(double) bounds[i-1].height,
+         (double) bounds[i-1].x,(double) bounds[i-1].y );
+#endif
+#if DEBUG_OPT_FRAME
+    (void) FormatLocaleFile(stderr, "interim %.17g : %s  %.17gx%.17g%+.20g%+.20g\n",
+         (double) i,
+         CommandOptionToMnemonic(MagickDisposeOptions,disposals[i]),
+         (double) bounds[i].width,(double) bounds[i].height,
+         (double) bounds[i].x,(double) bounds[i].y );
+    (void) FormatLocaleFile(stderr,"\n");
+#endif
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -2083,23 +2105,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
       if (FinaliseDisposeChoice(&choice,&choice_targets) == MagickFalse)
         return(ReleaseFrameLists(bounds,disposals));
     }
-    assert(prev_image != (Image *) NULL);
-    disposals[i]=disposals[i-1];
-#if DEBUG_OPT_FRAME
-    (void) FormatLocaleFile(stderr, "final   %.17g : %s  %.17gx%.17g%+.20g%+.20g\n",
-         (double) i-1,
-         CommandOptionToMnemonic(MagickDisposeOptions,disposals[i-1]),
-         (double) bounds[i-1].width,(double) bounds[i-1].height,
-         (double) bounds[i-1].x,(double) bounds[i-1].y );
-#endif
-#if DEBUG_OPT_FRAME
-    (void) FormatLocaleFile(stderr, "interim %.17g : %s  %.17gx%.17g%+.20g%+.20g\n",
-         (double) i,
-         CommandOptionToMnemonic(MagickDisposeOptions,disposals[i]),
-         (double) bounds[i].width,(double) bounds[i].height,
-         (double) bounds[i].x,(double) bounds[i].y );
-    (void) FormatLocaleFile(stderr,"\n");
-#endif
+    RecordInterimDisposal(prev_image,disposals,i);
     i++;
   }
   prev_image=DestroyImage(prev_image);
