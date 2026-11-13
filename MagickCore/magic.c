@@ -312,11 +312,33 @@ static void FindMagicElement(const unsigned char *magic,const size_t length,
   }
 }
 
+static MagickBooleanType FindCachedMagic(const unsigned char *magic,
+  const size_t length,const MagicInfo *magic_info,const MagicInfo **result)
+{
+  ElementInfo
+    *p;
+
+  if (magic != (const unsigned char *) NULL)
+    {
+      LockSemaphoreInfo(magic_cache_semaphore);
+      p=GetHeadElementInLinkedList(magic_cache);
+      FindMagicElement(magic,length,&p,&magic_info);
+      UnlockSemaphoreInfo(magic_cache_semaphore);
+      if (p != (ElementInfo *) NULL)
+        {
+          (*result)=magic_info;
+          return(MagickTrue);
+        }
+    }
+  return(MagickFalse);
+}
+
 MagickExport const MagicInfo *GetMagicInfo(const unsigned char *magic,
   const size_t length,ExceptionInfo *exception)
 {
   const MagicInfo *
-    magic_info;
+    magic_info,
+    *returned;
 
   ElementInfo
     *p;
@@ -330,15 +352,8 @@ MagickExport const MagicInfo *GetMagicInfo(const unsigned char *magic,
     Search for cached entries.
   */
   magic_info=(const MagicInfo *) NULL;
-  if (magic != (const unsigned char *) NULL)
-    {
-      LockSemaphoreInfo(magic_cache_semaphore);
-      p=GetHeadElementInLinkedList(magic_cache);
-      FindMagicElement(magic,length,&p,&magic_info);
-      UnlockSemaphoreInfo(magic_cache_semaphore);
-      if (p != (ElementInfo *) NULL)
-        return(magic_info);
-    }
+  if (FindCachedMagic(magic,length,magic_info,&returned) != MagickFalse)
+    return(returned);
   /*
     Search for magic tag.
   */
