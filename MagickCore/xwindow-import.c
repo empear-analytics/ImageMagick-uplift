@@ -1492,6 +1492,15 @@ static Window XSelectNamedWindow(Display *display,const Window root,
   return(target);
 }
 
+static void XAlertImportStart(Display *display,const XImportInfo *ximage_info)
+{
+  /*
+    Alert the user not to alter the screen.
+  */
+  if (ximage_info->silent == MagickFalse)
+    (void) XBell(display,0);
+}
+
 static void XAlertImportDone(Display *display,const XImportInfo *ximage_info)
 {
   if (ximage_info->silent == MagickFalse)
@@ -1715,11 +1724,7 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
       return((Image *) NULL);
     }
   XSetDescendForColormaps(display,target,ximage_info);
-  /*
-    Alert the user not to alter the screen.
-  */
-  if (ximage_info->silent == MagickFalse)
-    (void) XBell(display,0);
+  XAlertImportStart(display,ximage_info);
   /*
     Get image by window id.
   */
