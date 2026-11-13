@@ -12020,6 +12020,9 @@ typedef struct _ListBrowserContext
 
   unsigned int
     width;
+
+  char
+    *reply;
 } ListBrowserContext;
 
 static void ClientListBrowserMessage(const ListBrowserContext *context,
@@ -12815,6 +12818,40 @@ static void InitializeListBrowserButtons(const ListBrowserContext *context,
   (*action_info).y=(*cancel_info).y;
 }
 
+static void InitializeListBrowserReply(const ListBrowserContext *context,
+  const ListBrowserWidgets *widgets)
+{
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    height = context->height;
+
+  char
+    *const reply = context->reply;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  XWidgetInfo
+    *const action_info = widgets->action_info;
+
+  /*
+    Initialize reply information.
+  */
+  XGetWidgetInfo(reply,reply_info);
+  (*reply_info).raised=MagickFalse;
+  (*reply_info).bevel_width--;
+  (*reply_info).width=(unsigned int) ((int) window_info->width-
+    (((4*QuantumMargin) >> 1)));
+  (*reply_info).height=height << 1;
+  (*reply_info).x=QuantumMargin;
+  (*reply_info).y=(*action_info).y-(int) (*reply_info).height-QuantumMargin;
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -12962,6 +12999,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   list_context.height=height;
   list_context.action=action;
   list_context.width=width;
+  list_context.reply=reply;
   do
   {
     if (state & UpdateConfigurationState)
@@ -12970,17 +13008,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
           id;
 
         InitializeListBrowserButtons(&list_context,&list_widgets);
-        /*
-          Initialize reply information.
-        */
-        XGetWidgetInfo(reply,&reply_info);
-        reply_info.raised=MagickFalse;
-        reply_info.bevel_width--;
-        reply_info.width=(unsigned int) ((int) window_info->width-
-          (((4*QuantumMargin) >> 1)));
-        reply_info.height=height << 1;
-        reply_info.x=QuantumMargin;
-        reply_info.y=action_info.y-(int) reply_info.height-QuantumMargin;
+        InitializeListBrowserReply(&list_context,&list_widgets);
         /*
           Initialize scroll information.
         */
