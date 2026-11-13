@@ -2669,6 +2669,43 @@ MagickExport MagickBooleanType IsFuzzyEquivalencePixelInfo(const PixelInfo *p,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static ssize_t SetColorChannelAttributes(const Image *image,
+  const PixelTrait trait,ssize_t n)
+{
+  if ((image->colorspace == LinearGRAYColorspace) ||
+      (image->colorspace == GRAYColorspace))
+    {
+      SetPixelChannelAttributes(image,BluePixelChannel,trait,n);
+      SetPixelChannelAttributes(image,GreenPixelChannel,trait,n);
+      SetPixelChannelAttributes(image,RedPixelChannel,trait,n++);
+    }
+  else
+    {
+      SetPixelChannelAttributes(image,RedPixelChannel,trait,n++);
+      SetPixelChannelAttributes(image,GreenPixelChannel,trait,n++);
+      SetPixelChannelAttributes(image,BluePixelChannel,trait,n++);
+    }
+  if (image->colorspace == CMYKColorspace)
+    SetPixelChannelAttributes(image,BlackPixelChannel,trait,n++);
+  return(n);
+}
+
+static ssize_t SetExtraChannelAttributes(const Image *image,ssize_t n)
+{
+  if (image->alpha_trait != UndefinedPixelTrait)
+    SetPixelChannelAttributes(image,AlphaPixelChannel,CopyPixelTrait,n++);
+  if (image->storage_class == PseudoClass)
+    SetPixelChannelAttributes(image,IndexPixelChannel,CopyPixelTrait,n++);
+  if ((image->channels & ReadMaskChannel) != 0)
+    SetPixelChannelAttributes(image,ReadMaskPixelChannel,CopyPixelTrait,n++);
+  if ((image->channels & WriteMaskChannel) != 0)
+    SetPixelChannelAttributes(image,WriteMaskPixelChannel,CopyPixelTrait,n++);
+  if ((image->channels & CompositeMaskChannel) != 0)
+    SetPixelChannelAttributes(image,CompositeMaskPixelChannel,CopyPixelTrait,
+      n++);
+  return(n);
+}
+
 MagickPrivate MagickBooleanType ResetPixelChannelMap(Image *image,
   ExceptionInfo *exception)
 {
@@ -2686,32 +2723,8 @@ MagickPrivate MagickBooleanType ResetPixelChannelMap(Image *image,
   if (image->alpha_trait != UndefinedPixelTrait)
     trait=(PixelTrait) (trait | BlendPixelTrait);
   n=0;
-  if ((image->colorspace == LinearGRAYColorspace) ||
-      (image->colorspace == GRAYColorspace))
-    {
-      SetPixelChannelAttributes(image,BluePixelChannel,trait,n);
-      SetPixelChannelAttributes(image,GreenPixelChannel,trait,n);
-      SetPixelChannelAttributes(image,RedPixelChannel,trait,n++);
-    }
-  else
-    {
-      SetPixelChannelAttributes(image,RedPixelChannel,trait,n++);
-      SetPixelChannelAttributes(image,GreenPixelChannel,trait,n++);
-      SetPixelChannelAttributes(image,BluePixelChannel,trait,n++);
-    }
-  if (image->colorspace == CMYKColorspace)
-    SetPixelChannelAttributes(image,BlackPixelChannel,trait,n++);
-  if (image->alpha_trait != UndefinedPixelTrait)
-    SetPixelChannelAttributes(image,AlphaPixelChannel,CopyPixelTrait,n++);
-  if (image->storage_class == PseudoClass)
-    SetPixelChannelAttributes(image,IndexPixelChannel,CopyPixelTrait,n++);
-  if ((image->channels & ReadMaskChannel) != 0)
-    SetPixelChannelAttributes(image,ReadMaskPixelChannel,CopyPixelTrait,n++);
-  if ((image->channels & WriteMaskChannel) != 0)
-    SetPixelChannelAttributes(image,WriteMaskPixelChannel,CopyPixelTrait,n++);
-  if ((image->channels & CompositeMaskChannel) != 0)
-    SetPixelChannelAttributes(image,CompositeMaskPixelChannel,CopyPixelTrait,
-      n++);
+  n=SetColorChannelAttributes(image,trait,n);
+  n=SetExtraChannelAttributes(image,n);
   if (image->number_meta_channels != 0)
     {
       PixelChannel
