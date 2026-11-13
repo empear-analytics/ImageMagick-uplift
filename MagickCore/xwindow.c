@@ -2820,6 +2820,36 @@ MagickPrivate void XGetMapInfo(const XVisualInfo *visual_info,
 %    o pixel: Specifies a pointer to a XPixelInfo structure.
 %
 */
+static void XSetDisplayGamma(const XResourceInfo *resource_info,
+  const Image *image)
+{
+  if ((resource_info->gamma_correct != MagickFalse) &&
+      (image->gamma != 0.0))
+    {
+      GeometryInfo
+        geometry_info;
+
+      MagickStatusType
+        flags;
+
+      /*
+        Initialize map relative to display and image gamma.
+      */
+      flags=ParseGeometry(resource_info->display_gamma,&geometry_info);
+      if ((flags & RhoValue) != 0)
+        red_gamma=geometry_info.rho;
+      green_gamma=red_gamma;
+      if ((flags & SigmaValue) != 0)
+        green_gamma=geometry_info.sigma;
+      blue_gamma=red_gamma;
+      if ((flags & XiValue) != 0)
+        blue_gamma=geometry_info.xi;
+      red_gamma*=image->gamma;
+      green_gamma*=image->gamma;
+      blue_gamma*=image->gamma;
+    }
+}
+
 MagickPrivate void XGetPixelInfo(Display *display,
   const XVisualInfo *visual_info,const XStandardColormap *map_info,
   const XResourceInfo *resource_info,Image *image,XPixelInfo *pixel)
@@ -2998,31 +3028,7 @@ MagickPrivate void XGetPixelInfo(Display *display,
   pixel->pen_index=1;
   if (image != (Image *) NULL)
     {
-      if ((resource_info->gamma_correct != MagickFalse) &&
-          (image->gamma != 0.0))
-        {
-          GeometryInfo
-            geometry_info;
-
-          MagickStatusType
-            flags;
-
-          /*
-            Initialize map relative to display and image gamma.
-          */
-          flags=ParseGeometry(resource_info->display_gamma,&geometry_info);
-          if ((flags & RhoValue) != 0)
-            red_gamma=geometry_info.rho;
-          green_gamma=red_gamma;
-          if ((flags & SigmaValue) != 0)
-            green_gamma=geometry_info.sigma;
-          blue_gamma=red_gamma;
-          if ((flags & XiValue) != 0)
-            blue_gamma=geometry_info.xi;
-          red_gamma*=image->gamma;
-          green_gamma*=image->gamma;
-          blue_gamma*=image->gamma;
-        }
+      XSetDisplayGamma(resource_info,image);
       if (image->storage_class == PseudoClass)
         {
           /*
