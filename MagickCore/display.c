@@ -14516,12 +14516,60 @@ static void XROIPointerPress(const ROIContext *context,
   (*state)|=ExitState;
 }
 
+static void XROIPointerKey(const ROIContext *context,
+  const ROITargets *targets)
+{
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  if ((*event).xkey.window != context->windows->image.id)
+    return;
+  /*
+    Respond to a user key press.
+  */
+  (void) XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  switch ((int) key_symbol)
+  {
+    case XK_Escape:
+    case XK_F20:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    case XK_F1:
+    case XK_Help:
+    {
+      XTextViewHelp(context->display,context->resource_info,context->windows,
+        MagickFalse,"Help Viewer - Region of Interest",ImageROIHelp);
+      break;
+    }
+    default:
+    {
+      (void) XBell(context->display,0);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
 {
   char
-    command[MagickPathExtent],
     text[MagickPathExtent];
 
   DisplayCommand
@@ -14612,41 +14660,7 @@ static MagickBooleanType XROIImage(Display *display,
         break;
       case KeyPress:
       {
-        KeySym
-          key_symbol;
-
-        if (event.xkey.window != windows->image.id)
-          break;
-        /*
-          Respond to a user key press.
-        */
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        switch ((int) key_symbol)
-        {
-          case XK_Escape:
-          case XK_F20:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-          case XK_F1:
-          case XK_Help:
-          {
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Region of Interest",ImageROIHelp);
-            break;
-          }
-          default:
-          {
-            (void) XBell(display,0);
-            break;
-          }
-        }
+        XROIPointerKey(&context,&targets);
         break;
       }
       case MotionNotify:
