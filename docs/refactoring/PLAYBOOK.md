@@ -15107,6 +15107,103 @@ Lane: b
 
 ---
 
+## Recipe AT - Extract a Selection Arm with a Copy of the Return Tail
+
+**Use when:** CodeScene reports *Complex Method* or *Bumpy Road Ahead* on a
+value-returning function that ends in `if (c) { <arm> } return(R);`, where the arm leaves
+through `return(...)` on some paths and falls through to the final `return(R);` on
+others, as `string-copy.c`'s `CopyMagickString` ends: its tail `if (length != 0)` copies
+the last bytes, returning early on a NUL, and otherwise terminates the buffer and falls
+through to `return((size_t) (p-source));`.
+
+**Not covered by:** Recipe E step 7, which moves the whole `if` and the tail into one
+function: the new function then needs the condition's operand as one more parameter
+(five in `CopyMagickString`, an *Excess Number of Function Arguments*); Recipe ST, which
+splits a `switch` at its `default:`, not the arm of an `if`; Recipe W, which returns
+success and leaves the caller to repeat the early return; Recipe RV, whose block holds no
+`return`.
+
+**How:**
+
+1. The function returns a value and its last two statements, in its outermost block, are
+   `if (c) <arm>` (no `else`) and `return(R);`. The arm lies outside every OpenMP region
+   and holds no `#pragma` line, `goto`, or `break`/`continue` that leaves it; every
+   `return` in it has the form `return(<expr>);`.
+2. The plain locals of the caller that the arm writes are read after the arm by nothing
+   but `R`; they go by value, like everything the arm and `R` read, keeping their
+   declared types and qualifiers (`magick_restrict` included), at most four parameters.
+   Writes through pointers the arm already uses stay as they are.
+3. Cut the arm's statements into a new `static` function of the caller's return type
+   directly above the caller, followed by a copy of `return(R);`. Nothing else in the
+   text changes; the arm's own braces go.
+4. The `if` becomes `if (c)` followed by `return(Helper(...));`, in the caller's
+   indentation. The caller's `return(R);` stays as it was. Check by reading that every
+   argument fills the parameter it names.
+5. Run `tools/ci_warnings.sh <file>` and `tools/cxx_warnings.sh <file>` (both `OK`) and
+   the oracle for the function.
+
+**Before:**
+
+```c
+  for (n=length; n > 4; n-=4)
+  {
+    ...
+  }
+  if (length != 0)
+    {
+      while (--n != 0)
+        if (((*q++)=(*p++)) == '\0')
+          return((size_t) (p-source-1));
+      *q='\0';
+    }
+  return((size_t) (p-source));
+}
+```
+
+**After:**
+
+```c
+static size_t CopyMagickStringTail(char *magick_restrict q,
+  const char *magick_restrict p,const char *magick_restrict source,size_t n)
+{
+  while (--n != 0)
+    if (((*q++)=(*p++)) == '\0')
+      return((size_t) (p-source-1));
+  *q='\0';
+  return((size_t) (p-source));
+}
+...
+  if (length != 0)
+    return(CopyMagickStringTail(q,p,source,n));
+  return((size_t) (p-source));
+}
+```
+
+**Careful:**
+
+- Why the behaviour is the same. When `c` is false, the caller runs `return(R);` as
+  before. When it is true, the helper runs the arm's statements on copies holding the
+  values the caller's locals held at the `if`; a path that returned inside the arm
+  returns the same expression, read from copies that went through the same writes; a path
+  that fell through reaches the copy of `return(R);`, whose locals hold what the caller's
+  would have held, since only the arm wrote them (step 2). Writes through pointers land in
+  the same objects, in the same order. The caller returns what the helper returned.
+- A local that the arm writes and something other than `R` reads after the `if` refuses
+  the step: nothing after the call can see the copy's value.
+- `R` is evaluated in one of two places, never both, so a call or side effect in it still
+  happens once.
+
+**Evidence level:** oracle (the cases that reach the function), with
+`tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`.
+
+**Provenance:** 2026-11-13, from `string-copy.c`'s `CopyMagickString` (campaign B, M127
+lane b round 5): cc 9 and two bumps; Recipe E step 7 on the `if` and the tail gave a
+five-argument helper (9.61 to 9.68); this recipe gave 9.61 to 10.0. Added by Claude Code
+(Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -15459,3 +15556,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | RT | Step 8: copies differing in a numeric and a string literal (a table of two-member records), each writing its own renamed local, in a `void` caller whose exits are `return;`; Lane: b | `resource.c`'s `FormatTimeToLive` (six unit copies); with it the file's line budget admits the helpers of `AcquireMagickResource` (probe 8.46 to 8.97 over three steps) | mandate (2026-10-24) |
 | 2026-11-13 | NEW | IX | Inline a Constant Extent Local into Its Loop Bound: a local set once from an integer constant expression of `sizeof`s and read only in `for` bounds is replaced by the parenthesised expression; evidence guard (`obj_identical.sh`); Lane: b | `static.c`'s `UnregisterStaticModules` (after Recipe D, *Code Duplication* with `UnregisterStaticModule` left; probe 9.09 to 9.68, object code identical) | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | KC | Step 1: a label may be a character constant (type `int`; `key` of type `int`); Lane: b | `string-si.c`'s `GetSiPrefixExponent` (twenty-four letter labels each assigning a `double` exponent, cc 26; probe 8.50 to 9.09) | mandate (2026-10-24) |
+| 2026-11-13 | NEW | AT | Extract a Selection Arm with a Copy of the Return Tail: in a value-returning function ending `if (c) <arm> return(R);`, the arm (returning on some paths, falling through on others) moves to a `static` function of the caller's return type followed by a copy of `return(R);`; the `if` becomes `if (c) return(Helper(...));`; locals the arm writes are read after it only by `R` and go by value; evidence oracle; Lane: b | `string-copy.c`'s `CopyMagickString` (cc 9, two bumps; E step 7 on the whole tail left a five-argument helper, 9.68; this recipe 9.61 to 10.0) | mandate (2026-10-24) |
