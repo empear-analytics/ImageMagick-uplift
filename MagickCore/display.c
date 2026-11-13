@@ -3676,6 +3676,448 @@ static void XScaleChopInfo(const XWindows *windows,Image **image,
   (*chop_info).height=(unsigned int) (scale_factor*(*chop_info).height+0.5);
 }
 
+typedef struct _ChopEventInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  const char
+    *const *ChopMenu;
+
+  const ModeType
+    *ChopCommands,
+    *DirectionCommands;
+
+  ExceptionInfo
+    *exception;
+} ChopEventInput;
+
+static size_t XChopKeyPress(const ChopEventInput *input,XEvent *event,
+  size_t state)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  if ((*event).xkey.window != windows->image.id)
+    return(state);
+  /*
+    Respond to a user key press.
+  */
+  (void) XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  switch ((int) key_symbol)
+  {
+    case XK_Escape:
+    case XK_F20:
+    {
+      /*
+        Prematurely exit.
+      */
+      state|=EscapeState;
+      state|=ExitState;
+      break;
+    }
+    case XK_F1:
+    case XK_Help:
+    {
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXcopy);
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Chop",ImageChopHelp);
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXinvert);
+      break;
+    }
+    default:
+    {
+      (void) XBell(display,0);
+      break;
+    }
+  }
+  return(state);
+}
+
+typedef struct _ChopTargets
+{
+  XSegment
+    *segment_info;
+
+  size_t
+    *state;
+
+  ModeType
+    *direction;
+} ChopTargets;
+
+static void XChopStartPress(const ChopEventInput *input,const XEvent *event,
+  const ChopTargets *targets)
+{
+  XWindows
+    *const windows = input->windows;
+
+  XSegment
+    *const segment_info = targets->segment_info;
+
+  size_t
+    *const state = targets->state;
+
+  if ((*event).xbutton.button != Button1)
+    return;
+  if ((*event).xbutton.window != windows->image.id)
+    return;
+  /*
+    User has committed to start point of chopping line.
+  */
+  (*segment_info).x1=(short int) (*event).xbutton.x;
+  (*segment_info).x2=(short int) (*event).xbutton.x;
+  (*segment_info).y1=(short int) (*event).xbutton.y;
+  (*segment_info).y2=(short int) (*event).xbutton.y;
+  (*state)|=ExitState;
+}
+
+static void XShowChopPointer(Display *display,XWindows *windows,const int x,
+  const int y)
+{
+  char
+    text[MagickPathExtent];
+
+  if (windows->info.mapped != MagickFalse)
+    {
+      /*
+        Display pointer position.
+      */
+      (void) FormatLocaleString(text,MagickPathExtent," %+d%+d ",
+        x+windows->image.x,y+windows->image.y);
+      XInfoWidget(display,windows,text);
+    }
+}
+
+static MagickBooleanType XChopCommand(const ChopEventInput *input,XEvent *event,
+  ModeType *direction,size_t *state)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  const char
+    *const *const ChopMenu = input->ChopMenu;
+
+  const ModeType
+    *const ChopCommands = input->ChopCommands,
+    *const DirectionCommands = input->DirectionCommands;
+
+  int
+    id;
+
+  if ((*event).xany.window == windows->command.id)
+    {
+      /*
+        Select a command from the Command widget.
+      */
+      id=XCommandWidget(display,windows,ChopMenu,event);
+      if (id < 0)
+        return(MagickTrue);
+      switch (ChopCommands[id])
+      {
+        case ChopDirectionCommand:
+        {
+          char
+            command[MagickPathExtent];
+
+          const char
+            *const Directions[] =
+            {
+              "horizontal",
+              "vertical",
+              (char *) NULL,
+            };
+
+          /*
+            Select a command from the pop-up menu.
+          */
+          id=XMenuWidget(display,windows,ChopMenu[id],Directions,command);
+          (*direction)=XSelectChopDirection(id,DirectionCommands,(*direction));
+          break;
+        }
+        case ChopHelpCommand:
+        {
+          XTextViewHelp(display,resource_info,windows,MagickFalse,
+            "Help Viewer - Image Chop",ImageChopHelp);
+          break;
+        }
+        case ChopDismissCommand:
+        {
+          /*
+            Prematurely exit.
+          */
+          (*state)|=EscapeState;
+          (*state)|=ExitState;
+          break;
+        }
+        default:
+          break;
+      }
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
+static void XChopSelectStep(const ChopEventInput *input,
+  const ChopTargets *targets,int *x,int *y)
+{
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  XWindows
+    *const windows = input->windows;
+
+  ModeType
+    *const direction = targets->direction;
+
+  size_t
+    *const state = targets->state;
+
+  XEvent
+    event;
+
+  XShowChopPointer(display,windows,(*x),(*y));
+  /*
+    Wait for next event.
+  */
+  XScreenEvent(display,windows,&event,exception);
+  if (XChopCommand(input,&event,direction,state) != MagickFalse)
+    return;
+  switch (event.type)
+  {
+    case ButtonPress:
+    {
+      XChopStartPress(input,&event,targets);
+      break;
+    }
+    case ButtonRelease:
+      break;
+    case Expose:
+      break;
+    case KeyPress:
+    {
+      (*state)=XChopKeyPress(input,&event,(*state));
+      break;
+    }
+    case MotionNotify:
+    {
+      /*
+        Map and unmap Info widget as text cursor crosses its boundaries.
+      */
+      (*x)=event.xmotion.x;
+      (*y)=event.xmotion.y;
+      XTrackInfoWidget(display,windows,(*x),(*y));
+    }
+  }
+}
+
+static MagickBooleanType XChopApply(const ChopEventInput *input,Image **image,
+  RectangleInfo chop_info)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  Image
+    *chop_image;
+
+  /*
+    Image chopping is relative to image configuration.
+  */
+  (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
+    exception);
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  windows->image.window_changes.width=windows->image.ximage->width-
+    (int) chop_info.width;
+  windows->image.window_changes.height=windows->image.ximage->height-
+    (int) chop_info.height;
+  XScaleChopInfo(windows,image,&chop_info);
+  /*
+    Chop image.
+  */
+  chop_image=ChopImage(*image,&chop_info,exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (chop_image == (Image *) NULL)
+    return(MagickFalse);
+  *image=DestroyImage(*image);
+  *image=chop_image;
+  /*
+    Update image configuration.
+  */
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+  return(MagickTrue);
+}
+
+static void XShowChopSelection(const ChopEventInput *input,
+  const unsigned int distance,const RectangleInfo chop_info,
+  const XSegment *segment_info)
+{
+  Display
+    *const display = input->display;
+
+  XWindows
+    *const windows = input->windows;
+
+  char
+    text[MagickPathExtent];
+
+  if (distance > 9)
+    {
+      /*
+        Display info and draw chopping line.
+      */
+      if (windows->info.mapped == MagickFalse)
+        (void) XMapWindow(display,windows->info.id);
+      (void) FormatLocaleString(text,MagickPathExtent,
+        " %.17gx%.17g%+.20g%+.20g",(double) chop_info.width,(double)
+        chop_info.height,(double) chop_info.x,(double) chop_info.y);
+      XInfoWidget(display,windows,text);
+      XHighlightLine(display,windows->image.id,
+        windows->image.highlight_context,segment_info);
+    }
+  else
+    if (windows->info.mapped != MagickFalse)
+      (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+}
+
+static void XChopDragEvent(const XEvent *event,const ChopTargets *targets)
+{
+  XSegment
+    *const segment_info = targets->segment_info;
+
+  size_t
+    *const state = targets->state;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      (*segment_info).x2=(short int) (*event).xmotion.x;
+      (*segment_info).y2=(short int) (*event).xmotion.y;
+      break;
+    }
+    case ButtonRelease:
+    {
+      /*
+        User has committed to chopping line.
+      */
+      (*segment_info).x2=(short int) (*event).xbutton.x;
+      (*segment_info).y2=(short int) (*event).xbutton.y;
+      (*state)|=ExitState;
+      break;
+    }
+    case Expose:
+      break;
+    case MotionNotify:
+    {
+      (*segment_info).x2=(short int) (*event).xmotion.x;
+      (*segment_info).y2=(short int) (*event).xmotion.y;
+    }
+    default:
+      break;
+  }
+}
+
+static void XChopDragLine(const ChopEventInput *input,
+  const ChopTargets *targets,RectangleInfo *chop_info,unsigned int *distance)
+{
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  XWindows
+    *const windows = input->windows;
+
+  XSegment
+    *const segment_info = targets->segment_info;
+
+  size_t
+    *const state = targets->state;
+
+  ModeType
+    *const direction = targets->direction;
+
+  XEvent
+    event;
+
+  (*chop_info).width=0;
+  (*chop_info).height=0;
+  (*chop_info).x=0;
+  (*chop_info).y=0;
+  (*distance)=0;
+  (void) XSetFunction(display,windows->image.highlight_context,GXinvert);
+  (*state)=DefaultState;
+  do
+  {
+    XShowChopSelection(input,(*distance),(*chop_info),segment_info);
+    /*
+      Wait for next event.
+    */
+    XScreenEvent(display,windows,&event,exception);
+    if ((*distance) > 9)
+      XHighlightLine(display,windows->image.id,
+        windows->image.highlight_context,segment_info);
+    XChopDragEvent(&event,targets);
+    XClampChopSegment(windows,segment_info);
+    (*distance)=(unsigned int)
+      ((((*segment_info).x2-(*segment_info).x1)*
+        ((*segment_info).x2-(*segment_info).x1))+
+       (((*segment_info).y2-(*segment_info).y1)*
+        ((*segment_info).y2-(*segment_info).y1)));
+    /*
+      Compute chopping geometry.
+    */
+    if ((*direction) == HorizontalChopCommand)
+      XChopHorizontalGeometry(windows,segment_info,chop_info);
+    else
+      XChopVerticalGeometry(windows,segment_info,chop_info);
+  } while (((*state) & ExitState) == 0);
+  (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
+  (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+}
+
 static MagickBooleanType XChopImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -3705,14 +4147,7 @@ static MagickBooleanType XChopImage(Display *display,
       VerticalChopCommand
     };
 
-  char
-    text[MagickPathExtent];
-
-  Image
-    *chop_image;
-
   int
-    id,
     x,
     y;
 
@@ -3725,11 +4160,15 @@ static MagickBooleanType XChopImage(Display *display,
   unsigned int
     distance;
 
-  XEvent
-    event;
-
   XSegment
     segment_info;
+
+  const ChopEventInput
+    input = { display, resource_info, windows, ChopMenu, ChopCommands,
+      DirectionCommands, exception };
+
+  const ChopTargets
+    targets = { &segment_info, &state, &direction };
 
   /*
     Map Command widget.
@@ -3750,147 +4189,7 @@ static MagickBooleanType XChopImage(Display *display,
   (void) memset(&segment_info,0,sizeof(segment_info));
   do
   {
-    if (windows->info.mapped != MagickFalse)
-      {
-        /*
-          Display pointer position.
-        */
-        (void) FormatLocaleString(text,MagickPathExtent," %+d%+d ",
-          x+windows->image.x,y+windows->image.y);
-        XInfoWidget(display,windows,text);
-      }
-    /*
-      Wait for next event.
-    */
-    XScreenEvent(display,windows,&event,exception);
-    if (event.xany.window == windows->command.id)
-      {
-        /*
-          Select a command from the Command widget.
-        */
-        id=XCommandWidget(display,windows,ChopMenu,&event);
-        if (id < 0)
-          continue;
-        switch (ChopCommands[id])
-        {
-          case ChopDirectionCommand:
-          {
-            char
-              command[MagickPathExtent];
-
-            const char
-              *const Directions[] =
-              {
-                "horizontal",
-                "vertical",
-                (char *) NULL,
-              };
-
-            /*
-              Select a command from the pop-up menu.
-            */
-            id=XMenuWidget(display,windows,ChopMenu[id],Directions,command);
-            direction=XSelectChopDirection(id,DirectionCommands,direction);
-            break;
-          }
-          case ChopHelpCommand:
-          {
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Image Chop",ImageChopHelp);
-            break;
-          }
-          case ChopDismissCommand:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-          default:
-            break;
-        }
-        continue;
-      }
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        if (event.xbutton.button != Button1)
-          break;
-        if (event.xbutton.window != windows->image.id)
-          break;
-        /*
-          User has committed to start point of chopping line.
-        */
-        segment_info.x1=(short int) event.xbutton.x;
-        segment_info.x2=(short int) event.xbutton.x;
-        segment_info.y1=(short int) event.xbutton.y;
-        segment_info.y2=(short int) event.xbutton.y;
-        state|=ExitState;
-        break;
-      }
-      case ButtonRelease:
-        break;
-      case Expose:
-        break;
-      case KeyPress:
-      {
-        char
-          command[MagickPathExtent];
-
-        KeySym
-          key_symbol;
-
-        if (event.xkey.window != windows->image.id)
-          break;
-        /*
-          Respond to a user key press.
-        */
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        switch ((int) key_symbol)
-        {
-          case XK_Escape:
-          case XK_F20:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-          case XK_F1:
-          case XK_Help:
-          {
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXcopy);
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Image Chop",ImageChopHelp);
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXinvert);
-            break;
-          }
-          default:
-          {
-            (void) XBell(display,0);
-            break;
-          }
-        }
-        break;
-      }
-      case MotionNotify:
-      {
-        /*
-          Map and unmap Info widget as text cursor crosses its boundaries.
-        */
-        x=event.xmotion.x;
-        y=event.xmotion.y;
-        XTrackInfoWidget(display,windows,x,y);
-      }
-    }
+    XChopSelectStep(&input,&targets,&x,&y);
   } while ((state & ExitState) == 0);
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask);
@@ -3900,110 +4199,10 @@ static MagickBooleanType XChopImage(Display *display,
   /*
     Draw line as pointer moves until the mouse button is released.
   */
-  chop_info.width=0;
-  chop_info.height=0;
-  chop_info.x=0;
-  chop_info.y=0;
-  distance=0;
-  (void) XSetFunction(display,windows->image.highlight_context,GXinvert);
-  state=DefaultState;
-  do
-  {
-    if (distance > 9)
-      {
-        /*
-          Display info and draw chopping line.
-        */
-        if (windows->info.mapped == MagickFalse)
-          (void) XMapWindow(display,windows->info.id);
-        (void) FormatLocaleString(text,MagickPathExtent,
-          " %.17gx%.17g%+.20g%+.20g",(double) chop_info.width,(double)
-          chop_info.height,(double) chop_info.x,(double) chop_info.y);
-        XInfoWidget(display,windows,text);
-        XHighlightLine(display,windows->image.id,
-          windows->image.highlight_context,&segment_info);
-      }
-    else
-      if (windows->info.mapped != MagickFalse)
-        (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
-    /*
-      Wait for next event.
-    */
-    XScreenEvent(display,windows,&event,exception);
-    if (distance > 9)
-      XHighlightLine(display,windows->image.id,
-        windows->image.highlight_context,&segment_info);
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        segment_info.x2=(short int) event.xmotion.x;
-        segment_info.y2=(short int) event.xmotion.y;
-        break;
-      }
-      case ButtonRelease:
-      {
-        /*
-          User has committed to chopping line.
-        */
-        segment_info.x2=(short int) event.xbutton.x;
-        segment_info.y2=(short int) event.xbutton.y;
-        state|=ExitState;
-        break;
-      }
-      case Expose:
-        break;
-      case MotionNotify:
-      {
-        segment_info.x2=(short int) event.xmotion.x;
-        segment_info.y2=(short int) event.xmotion.y;
-      }
-      default:
-        break;
-    }
-    XClampChopSegment(windows,&segment_info);
-    distance=(unsigned int)
-      (((segment_info.x2-segment_info.x1)*(segment_info.x2-segment_info.x1))+
-       ((segment_info.y2-segment_info.y1)*(segment_info.y2-segment_info.y1)));
-    /*
-      Compute chopping geometry.
-    */
-    if (direction == HorizontalChopCommand)
-      XChopHorizontalGeometry(windows,&segment_info,&chop_info);
-    else
-      XChopVerticalGeometry(windows,&segment_info,&chop_info);
-  } while ((state & ExitState) == 0);
-  (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
-  (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+  XChopDragLine(&input,&targets,&chop_info,&distance);
   if (distance <= 9)
     return(MagickTrue);
-  /*
-    Image chopping is relative to image configuration.
-  */
-  (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
-    exception);
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  windows->image.window_changes.width=windows->image.ximage->width-
-    (int) chop_info.width;
-  windows->image.window_changes.height=windows->image.ximage->height-
-    (int) chop_info.height;
-  XScaleChopInfo(windows,image,&chop_info);
-  /*
-    Chop image.
-  */
-  chop_image=ChopImage(*image,&chop_info,exception);
-  XSetCursorState(display,windows,MagickFalse);
-  if (chop_image == (Image *) NULL)
-    return(MagickFalse);
-  *image=DestroyImage(*image);
-  *image=chop_image;
-  /*
-    Update image configuration.
-  */
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
-  (void) XConfigureImage(display,resource_info,windows,*image,exception);
-  return(MagickTrue);
+  return(XChopApply(&input,image,chop_info));
 }
 
 /*
@@ -5333,6 +5532,441 @@ static MagickBooleanType XCreateBlendMattes(Image *image,Image *composite_image,
   return(MagickTrue);
 }
 
+typedef struct _CompositeCommandInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  const ModeType
+    *CompositeCommands;
+
+  const char
+    *const *CompositeMenu;
+
+  char
+    *displacement_geometry;
+
+  CompositeTargets
+    targets;
+
+  ExceptionInfo
+    *exception;
+} CompositeCommandInput;
+
+static void XCompositeControl(const CompositeCommandInput *input,const int id,
+  size_t *state)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  const ModeType
+    *const CompositeCommands = input->CompositeCommands;
+
+  switch (CompositeCommands[id])
+  {
+    case CompositeHelpCommand:
+    {
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXcopy);
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Composite",ImageCompositeHelp);
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXinvert);
+      break;
+    }
+    case CompositeDismissCommand:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static MagickBooleanType XCompositeCommandBlock(
+  const CompositeCommandInput *input,XEvent *event,CompositeOperator *compose,
+  size_t *state)
+{
+  Display
+    *const display = input->display;
+
+  XWindows
+    *const windows = input->windows;
+
+  const char
+    *const *const CompositeMenu = input->CompositeMenu;
+
+  const ModeType
+    *const CompositeCommands = input->CompositeCommands;
+
+  const CompositeTargets
+    targets = input->targets;
+
+  int
+    id;
+
+  if ((*event).xany.window == windows->command.id)
+    {
+      /*
+        Select a command from the Command widget.
+      */
+      id=XCommandWidget(display,windows,CompositeMenu,event);
+      if (id < 0)
+        return(MagickTrue);
+      switch (CompositeCommands[id])
+      {
+        case CompositeOperatorsCommand:
+        {
+          ComposeMenuInfo
+            menu_info;
+
+          menu_info.display=display;
+          menu_info.windows=windows;
+          menu_info.id=id;
+          (*compose)=XSelectPasteOperator(&menu_info,CompositeMenu,(*compose));
+          break;
+        }
+        case CompositeDissolveCommand:
+        {
+          XSelectDissolveBlend(display,windows,&targets);
+          break;
+        }
+        case CompositeDisplaceCommand:
+        {
+          XSelectDisplaceGeometry(display,windows,input->displacement_geometry,
+            &targets);
+          break;
+        }
+        default:
+        {
+          XCompositeControl(input,id,state);
+          break;
+        }
+      }
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
+typedef struct _CompositeEventTargets
+{
+  Image
+    **composite_image;
+
+  size_t
+    *state;
+
+  RectangleInfo
+    *composite_info;
+
+  CompositeOperator
+    *compose;
+} CompositeEventTargets;
+
+static void XCompositeKeyPress(const CompositeCommandInput *input,
+  XEvent *event,const CompositeEventTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  Image
+    **const composite_image = targets->composite_image;
+
+  size_t
+    *const state = targets->state;
+
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  int
+    length;
+
+  if ((*event).xkey.window != windows->image.id)
+    return;
+  /*
+    Respond to a user key press.
+  */
+  length=XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  *(command+length)='\0';
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Key press: 0x%lx (%s)",(unsigned long) key_symbol,command);
+  switch ((int) key_symbol)
+  {
+    case XK_Escape:
+    case XK_F20:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*composite_image)=DestroyImage((*composite_image));
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    case XK_F1:
+    case XK_Help:
+    {
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXcopy);
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Composite",ImageCompositeHelp);
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXinvert);
+      break;
+    }
+    default:
+    {
+      (void) XBell(display,0);
+      break;
+    }
+  }
+}
+
+static void XCompositePress(const CompositeCommandInput *input,
+  const XEvent *event,const Cursor cursor,const CompositeEventTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  Image
+    **const composite_image = targets->composite_image;
+
+  RectangleInfo
+    *const composite_info = targets->composite_info;
+
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Button Press: 0x%lx %u +%d+%d",(*event).xbutton.window,
+      (*event).xbutton.button,(*event).xbutton.x,(*event).xbutton.y);
+  if ((*event).xbutton.button != Button1)
+    return;
+  if ((*event).xbutton.window != windows->image.id)
+    return;
+  /*
+    Change cursor.
+  */
+  (*composite_info).width=(*composite_image)->columns;
+  (*composite_info).height=(*composite_image)->rows;
+  (void) XCheckDefineCursor(display,windows->image.id,cursor);
+  (*composite_info).x=(ssize_t) windows->image.x+(*event).xbutton.x;
+  (*composite_info).y=(ssize_t) windows->image.y+(*event).xbutton.y;
+}
+
+static void XCompositeRelease(const CompositeCommandInput *input,
+  const XEvent *event,const CompositeEventTargets *targets)
+{
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  RectangleInfo
+    *const composite_info = targets->composite_info;
+
+  size_t
+    *const state = targets->state;
+
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Button Release: 0x%lx %u +%d+%d",(*event).xbutton.window,
+      (*event).xbutton.button,(*event).xbutton.x,(*event).xbutton.y);
+  if ((*event).xbutton.button != Button1)
+    return;
+  if ((*event).xbutton.window != windows->image.id)
+    return;
+  if (((*composite_info).width != 0) && ((*composite_info).height != 0))
+    {
+      /*
+        User has selected the location of the composite image.
+      */
+      (*composite_info).x=(ssize_t) windows->image.x+(*event).xbutton.x;
+      (*composite_info).y=(ssize_t) windows->image.y+(*event).xbutton.y;
+      (*state)|=ExitState;
+    }
+}
+
+static void XCompositeEvent(const CompositeCommandInput *input,XEvent *event,
+  const Cursor cursor,const CompositeEventTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  RectangleInfo
+    *const composite_info = targets->composite_info;
+
+  int
+    x,
+    y;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      XCompositePress(input,event,cursor,targets);
+      break;
+    }
+    case ButtonRelease:
+    {
+      XCompositeRelease(input,event,targets);
+      break;
+    }
+    case Expose:
+      break;
+    case KeyPress:
+    {
+      XCompositeKeyPress(input,event,targets);
+      break;
+    }
+    case MotionNotify:
+    {
+      /*
+        Map and unmap Info widget as text cursor crosses its boundaries.
+      */
+      x=(*event).xmotion.x;
+      y=(*event).xmotion.y;
+      XTrackInfoWidget(display,windows,x,y);
+      (*composite_info).x=(ssize_t) windows->image.x+x;
+      (*composite_info).y=(ssize_t) windows->image.y+y;
+      break;
+    }
+    default:
+    {
+      if (resource_info->debug != MagickFalse)
+        (void) LogMagickEvent(X11Event,GetMagickModule(),"Event type: %d",
+          (*event).type);
+      break;
+    }
+  }
+}
+
+static void XCompositeStep(const CompositeCommandInput *input,
+  const Cursor cursor,const CompositeEventTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  XWindows
+    *const windows = input->windows;
+
+  CompositeOperator
+    *const compose = targets->compose;
+
+  RectangleInfo
+    *const composite_info = targets->composite_info;
+
+  size_t
+    *const state = targets->state;
+
+  char
+    text[MagickPathExtent];
+
+  RectangleInfo
+    highlight_info;
+
+  XEvent
+    event;
+
+  if (windows->info.mapped != MagickFalse)
+    {
+      /*
+        Display pointer position.
+      */
+      (void) FormatLocaleString(text,MagickPathExtent," %+ld%+ld ",
+        (long) (*composite_info).x,(long) (*composite_info).y);
+      XInfoWidget(display,windows,text);
+    }
+  highlight_info=(*composite_info);
+  highlight_info.x=(*composite_info).x-windows->image.x;
+  highlight_info.y=(*composite_info).y-windows->image.y;
+  XHighlightRectangle(display,windows->image.id,
+    windows->image.highlight_context,&highlight_info);
+  /*
+    Wait for next event.
+  */
+  XScreenEvent(display,windows,&event,exception);
+  XHighlightRectangle(display,windows->image.id,
+    windows->image.highlight_context,&highlight_info);
+  if (XCompositeCommandBlock(input,&event,compose,state) != MagickFalse)
+    return;
+  XCompositeEvent(input,&event,cursor,targets);
+}
+
+static void XCompositeScaleLocation(const Image *image,
+  const XWindows *windows,RectangleInfo *composite_info)
+{
+  double
+    scale_factor;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    height,
+    width;
+
+  width=(unsigned int) image->columns;
+  height=(unsigned int) image->rows;
+  x=0;
+  y=0;
+  if (windows->image.crop_geometry != (char *) NULL)
+    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
+  scale_factor=(double) width/windows->image.ximage->width;
+  (*composite_info).x+=x;
+  (*composite_info).x=(ssize_t) (scale_factor*(*composite_info).x+0.5);
+  (*composite_info).width=(unsigned int) (scale_factor*
+    (*composite_info).width+0.5);
+  scale_factor=(double) height/windows->image.ximage->height;
+  (*composite_info).y+=y;
+  (*composite_info).y=(ssize_t) (scale_factor*(*composite_info).y+0.5);
+  (*composite_info).height=(unsigned int) (scale_factor*
+    (*composite_info).height+0.5);
+}
+
 static MagickBooleanType XCompositeImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -5365,9 +5999,6 @@ static MagickBooleanType XCompositeImage(Display *display,
       CompositeDismissCommand
     };
 
-  char
-    text[MagickPathExtent];
-
   Cursor
     cursor;
 
@@ -5375,30 +6006,28 @@ static MagickBooleanType XCompositeImage(Display *display,
     *composite_image;
 
   int
-    id,
     x,
     y;
 
   double
-    blend,
-    scale_factor;
+    blend;
 
   RectangleInfo
-    highlight_info,
     composite_info;
-
-  unsigned int
-    height,
-    width;
 
   size_t
     state;
 
-  XEvent
-    event;
-
   const CompositeTargets
     targets = { &blend, &compose };
+
+  const CompositeEventTargets
+    event_targets = { &composite_image, &state, &composite_info,
+      &compose };
+
+  const CompositeCommandInput
+    command_input = { display, resource_info, windows, CompositeCommands,
+      CompositeMenu, displacement_geometry, targets, exception };
 
   /*
     Request image file name from user.
@@ -5443,201 +6072,7 @@ static MagickBooleanType XCompositeImage(Display *display,
   state=DefaultState;
   do
   {
-    if (windows->info.mapped != MagickFalse)
-      {
-        /*
-          Display pointer position.
-        */
-        (void) FormatLocaleString(text,MagickPathExtent," %+ld%+ld ",
-          (long) composite_info.x,(long) composite_info.y);
-        XInfoWidget(display,windows,text);
-      }
-    highlight_info=composite_info;
-    highlight_info.x=composite_info.x-windows->image.x;
-    highlight_info.y=composite_info.y-windows->image.y;
-    XHighlightRectangle(display,windows->image.id,
-      windows->image.highlight_context,&highlight_info);
-    /*
-      Wait for next event.
-    */
-    XScreenEvent(display,windows,&event,exception);
-    XHighlightRectangle(display,windows->image.id,
-      windows->image.highlight_context,&highlight_info);
-    if (event.xany.window == windows->command.id)
-      {
-        /*
-          Select a command from the Command widget.
-        */
-        id=XCommandWidget(display,windows,CompositeMenu,&event);
-        if (id < 0)
-          continue;
-        switch (CompositeCommands[id])
-        {
-          case CompositeOperatorsCommand:
-          {
-            ComposeMenuInfo
-              menu_info;
-
-            menu_info.display=display;
-            menu_info.windows=windows;
-            menu_info.id=id;
-            compose=XSelectPasteOperator(&menu_info,CompositeMenu,compose);
-            break;
-          }
-          case CompositeDissolveCommand:
-          {
-            XSelectDissolveBlend(display,windows,&targets);
-            break;
-          }
-          case CompositeDisplaceCommand:
-          {
-            XSelectDisplaceGeometry(display,windows,displacement_geometry,
-              &targets);
-            break;
-          }
-          case CompositeHelpCommand:
-          {
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXcopy);
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Image Composite",ImageCompositeHelp);
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXinvert);
-            break;
-          }
-          case CompositeDismissCommand:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-          default:
-            break;
-        }
-        continue;
-      }
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Button Press: 0x%lx %u +%d+%d",event.xbutton.window,
-            event.xbutton.button,event.xbutton.x,event.xbutton.y);
-        if (event.xbutton.button != Button1)
-          break;
-        if (event.xbutton.window != windows->image.id)
-          break;
-        /*
-          Change cursor.
-        */
-        composite_info.width=composite_image->columns;
-        composite_info.height=composite_image->rows;
-        (void) XCheckDefineCursor(display,windows->image.id,cursor);
-        composite_info.x=(ssize_t) windows->image.x+event.xbutton.x;
-        composite_info.y=(ssize_t) windows->image.y+event.xbutton.y;
-        break;
-      }
-      case ButtonRelease:
-      {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Button Release: 0x%lx %u +%d+%d",event.xbutton.window,
-            event.xbutton.button,event.xbutton.x,event.xbutton.y);
-        if (event.xbutton.button != Button1)
-          break;
-        if (event.xbutton.window != windows->image.id)
-          break;
-        if ((composite_info.width != 0) && (composite_info.height != 0))
-          {
-            /*
-              User has selected the location of the composite image.
-            */
-            composite_info.x=(ssize_t) windows->image.x+event.xbutton.x;
-            composite_info.y=(ssize_t) windows->image.y+event.xbutton.y;
-            state|=ExitState;
-          }
-        break;
-      }
-      case Expose:
-        break;
-      case KeyPress:
-      {
-        char
-          command[MagickPathExtent];
-
-        KeySym
-          key_symbol;
-
-        int
-          length;
-
-        if (event.xkey.window != windows->image.id)
-          break;
-        /*
-          Respond to a user key press.
-        */
-        length=XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        *(command+length)='\0';
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Key press: 0x%lx (%s)",(unsigned long) key_symbol,command);
-        switch ((int) key_symbol)
-        {
-          case XK_Escape:
-          case XK_F20:
-          {
-            /*
-              Prematurely exit.
-            */
-            composite_image=DestroyImage(composite_image);
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-          case XK_F1:
-          case XK_Help:
-          {
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXcopy);
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Image Composite",ImageCompositeHelp);
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXinvert);
-            break;
-          }
-          default:
-          {
-            (void) XBell(display,0);
-            break;
-          }
-        }
-        break;
-      }
-      case MotionNotify:
-      {
-        /*
-          Map and unmap Info widget as text cursor crosses its boundaries.
-        */
-        x=event.xmotion.x;
-        y=event.xmotion.y;
-        XTrackInfoWidget(display,windows,x,y);
-        composite_info.x=(ssize_t) windows->image.x+x;
-        composite_info.y=(ssize_t) windows->image.y+y;
-        break;
-      }
-      default:
-      {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),"Event type: %d",
-            event.type);
-        break;
-      }
-    }
+    XCompositeStep(&command_input,cursor,&event_targets);
   } while ((state & ExitState) == 0);
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask);
@@ -5651,20 +6086,7 @@ static MagickBooleanType XCompositeImage(Display *display,
   */
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
-  width=(unsigned int) image->columns;
-  height=(unsigned int) image->rows;
-  x=0;
-  y=0;
-  if (windows->image.crop_geometry != (char *) NULL)
-    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
-  scale_factor=(double) width/windows->image.ximage->width;
-  composite_info.x+=x;
-  composite_info.x=(ssize_t) (scale_factor*composite_info.x+0.5);
-  composite_info.width=(unsigned int) (scale_factor*composite_info.width+0.5);
-  scale_factor=(double) height/windows->image.ximage->height;
-  composite_info.y+=y;
-  composite_info.y=(ssize_t) (scale_factor*composite_info.y+0.5);
-  composite_info.height=(unsigned int) (scale_factor*composite_info.height+0.5);
+  XCompositeScaleLocation(image,windows,&composite_info);
   if ((composite_info.width != composite_image->columns) ||
       (composite_info.height != composite_image->rows))
     {
@@ -12704,6 +13126,590 @@ static void XSelectMatteValue(const EditMenuInput *menu,
     return;
 }
 
+typedef struct _MatteCommandInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  const ModeType
+    *MatteEditCommands;
+
+  Image
+    **image;
+
+  ExceptionInfo
+    *exception;
+
+  const char
+    *const *MatteEditMenu;
+
+  char
+    *command,
+    *matte;
+
+  PaintMethodTargets
+    method_targets;
+
+  BorderColorTargets
+    border_targets;
+
+  char
+    *text;
+} MatteCommandInput;
+
+static void XMatteEditControl(const MatteCommandInput *input,const int id,
+  size_t *state)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  const ModeType
+    *const MatteEditCommands = input->MatteEditCommands;
+
+  Image
+    **const image = input->image;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  switch (MatteEditCommands[id])
+  {
+    case MatteEditUndoCommand:
+    {
+      (void) XMagickCommand(display,resource_info,windows,UndoCommand,
+        image,exception);
+      break;
+    }
+    case MatteEditHelpCommand:
+    {
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Matte Edit",ImageMatteEditHelp);
+      break;
+    }
+    case MatteEditDismissCommand:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void XMatteEditValues(const MatteCommandInput *input,const int id,
+  size_t *state)
+{
+  Display
+    *const display = input->display;
+
+  XWindows
+    *const windows = input->windows;
+
+  const ModeType
+    *const MatteEditCommands = input->MatteEditCommands;
+
+  Image
+    **const image = input->image;
+
+  const char
+    *const *const MatteEditMenu = input->MatteEditMenu;
+
+  EditMenuInput
+    menu_input;
+
+  switch (MatteEditCommands[id])
+  {
+    case MatteEditFuzzCommand:
+    {
+      const char
+        *const FuzzMenu[] =
+        {
+          "0%",
+          "2%",
+          "5%",
+          "10%",
+          "15%",
+          "Dialog...",
+          (char *) NULL,
+        };
+
+      static char
+        fuzz[MagickPathExtent];
+
+      menu_input.display=display;
+      menu_input.windows=windows;
+      menu_input.MatteEditMenu=MatteEditMenu;
+      menu_input.id=id;
+      menu_input.command=input->command;
+      XSelectFuzzFactor(&menu_input,FuzzMenu,fuzz,image);
+      break;
+    }
+    case MatteEditValueCommand:
+    {
+      const char
+        *const MatteMenu[] =
+        {
+          "Opaque",
+          "Transparent",
+          "Dialog...",
+          (char *) NULL,
+        };
+
+      static char
+        message[MagickPathExtent];
+
+      menu_input.display=display;
+      menu_input.windows=windows;
+      menu_input.MatteEditMenu=MatteEditMenu;
+      menu_input.id=id;
+      menu_input.command=input->command;
+      XSelectMatteValue(&menu_input,MatteMenu,message,input->matte);
+      break;
+    }
+    default:
+    {
+      XMatteEditControl(input,id,state);
+      break;
+    }
+  }
+}
+
+static MagickBooleanType XMatteCommandBlock(const MatteCommandInput *input,
+  XEvent *event,const Cursor cursor,size_t *state)
+{
+  Display
+    *const display = input->display;
+
+  XWindows
+    *const windows = input->windows;
+
+  const char
+    *const *const MatteEditMenu = input->MatteEditMenu;
+
+  const ModeType
+    *const MatteEditCommands = input->MatteEditCommands;
+
+  const PaintMethodTargets
+    method_targets = input->method_targets;
+
+  const BorderColorTargets
+    border_targets = input->border_targets;
+
+  int
+    id;
+
+  if ((*event).xany.window == windows->command.id)
+    {
+      EditMenuInput
+        menu_input;
+
+      /*
+        Select a command from the Command widget.
+      */
+      id=XCommandWidget(display,windows,MatteEditMenu,event);
+      if (id < 0)
+        {
+          (void) XCheckDefineCursor(display,windows->image.id,cursor);
+          return(MagickTrue);
+        }
+      switch (MatteEditCommands[id])
+      {
+        case MatteEditMethod:
+        {
+          menu_input.display=display;
+          menu_input.windows=windows;
+          menu_input.MatteEditMenu=MatteEditMenu;
+          menu_input.id=id;
+          menu_input.command=input->command;
+          XSelectPaintMethod(&menu_input,&method_targets);
+          break;
+        }
+        case MatteEditBorderCommand:
+        {
+          menu_input.display=display;
+          menu_input.windows=windows;
+          menu_input.MatteEditMenu=MatteEditMenu;
+          menu_input.id=id;
+          menu_input.command=input->command;
+          XSelectBorderColor(&menu_input,input->resource_info,&border_targets);
+          break;
+        }
+        default:
+        {
+          XMatteEditValues(input,id,state);
+          break;
+        }
+      }
+      (void) XCheckDefineCursor(display,windows->image.id,cursor);
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
+static MagickBooleanType XMatteWritePixels(const MatteCommandInput *input,
+  const int x_offset,const int y_offset)
+{
+  Image
+    **const image = input->image;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  const PaintMethod
+    method = *input->method_targets.method;
+
+  const XColor
+    border_color = *input->border_targets.border_color;
+
+  CacheView
+    *image_view;
+
+  MatteEditPixelInput
+    pixel_input;
+
+  if (SetImageStorageClass(*image,DirectClass,exception) == MagickFalse)
+    return(MagickFalse);
+  if ((*image)->alpha_trait == UndefinedPixelTrait)
+    (void) SetImageAlphaChannel(*image,OpaqueAlphaChannel,exception);
+  image_view=AcquireAuthenticCacheView(*image,exception);
+  pixel_input.image=image;
+  pixel_input.image_view=image_view;
+  pixel_input.x_offset=x_offset;
+  pixel_input.y_offset=y_offset;
+  pixel_input.matte=input->matte;
+  pixel_input.exception=exception;
+  pixel_input.resource_info=input->resource_info;
+  pixel_input.method=method;
+  pixel_input.border_color=border_color;
+  if (XMatteEditPixels(pixel_input,method,image,exception) == MagickFalse)
+    return(MagickFalse);
+  image_view=DestroyCacheView(image_view);
+  return(MagickTrue);
+}
+
+static MagickBooleanType XMatteUpdatePixels(const MatteCommandInput *input,
+  int x_offset,int y_offset,size_t *state)
+{
+  XWindows
+    *const windows = input->windows;
+
+  Image
+    **const image = input->image;
+
+  unsigned int
+    height,
+    width;
+
+  if (((*state) & UpdateConfigurationState) != 0)
+    {
+      int
+        x,
+        y;
+
+      /*
+        Matte edit is relative to image configuration.
+      */
+      (void) XClearArea(input->display,windows->image.id,x_offset,y_offset,1,1,
+        MagickTrue);
+      XPutPixel(windows->image.ximage,x_offset,y_offset,
+        windows->pixel_info->background_color.pixel);
+      width=(unsigned int) (*image)->columns;
+      height=(unsigned int) (*image)->rows;
+      x=0;
+      y=0;
+      if (windows->image.crop_geometry != (char *) NULL)
+        (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,
+          &height);
+      x_offset=((int) width*(windows->image.x+x_offset)/
+        windows->image.ximage->width+x);
+      y_offset=((int) height*(windows->image.y+y_offset)/
+        windows->image.ximage->height+y);
+      if ((x_offset < 0) || (y_offset < 0))
+        return(MagickTrue);
+      if ((x_offset >= (int) (*image)->columns) ||
+          (y_offset >= (int) (*image)->rows))
+        return(MagickTrue);
+      if (XMatteWritePixels(input,x_offset,y_offset) == MagickFalse)
+        return(MagickFalse);
+      (*state)&=(unsigned int) (~UpdateConfigurationState);
+    }
+  return(MagickTrue);
+}
+
+static size_t XMatteKeyPress(const MatteCommandInput *input,XEvent *event,
+  size_t state)
+{
+  Display
+    *const display = input->display;
+
+  XWindows
+    *const windows = input->windows;
+
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  XDiscardMagnifyKeys(display,windows,event);
+  if ((*event).xkey.window != windows->image.id)
+    return(state);
+  /*
+    Respond to a user key press.
+  */
+  (void) XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  switch ((int) key_symbol)
+  {
+    case XK_Escape:
+    case XK_F20:
+    {
+      /*
+        Prematurely exit.
+      */
+      state|=ExitState;
+      break;
+    }
+    case XK_F1:
+    case XK_Help:
+    {
+      XTextViewHelp(display,input->resource_info,windows,MagickFalse,
+        "Help Viewer - Matte Edit",ImageMatteEditHelp);
+      break;
+    }
+    default:
+    {
+      (void) XBell(display,0);
+      break;
+    }
+  }
+  return(state);
+}
+
+typedef struct _MatteEventTargets
+{
+  int
+    *x,
+    *y;
+
+  size_t
+    *state;
+} MatteEventTargets;
+
+static void XMattePress(const MatteCommandInput *input,const XEvent *event,
+  const MatteEventTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  Image
+    **const image = input->image;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  size_t
+    *const state = targets->state;
+
+  if ((*event).xbutton.button != Button1)
+    return;
+  if (((*event).xbutton.window != windows->image.id) &&
+      ((*event).xbutton.window != windows->magnify.id))
+    return;
+  /*
+    Update matte data.
+  */
+  (*x)=(*event).xbutton.x;
+  (*y)=(*event).xbutton.y;
+  (void) XMagickCommand(display,resource_info,windows,
+    SaveToUndoBufferCommand,image,exception);
+  (*state)|=UpdateConfigurationState;
+}
+
+static void XMatteRelease(const MatteCommandInput *input,const XEvent *event,
+  const Cursor cursor,const MatteEventTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  Image
+    **const image = input->image;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  size_t
+    *const state = targets->state;
+
+  if ((*event).xbutton.button != Button1)
+    return;
+  if (((*event).xbutton.window != windows->image.id) &&
+      ((*event).xbutton.window != windows->magnify.id))
+    return;
+  /*
+    Update colormap information.
+  */
+  (*x)=(*event).xbutton.x;
+  (*y)=(*event).xbutton.y;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+  XInfoWidget(display,windows,input->text);
+  (void) XCheckDefineCursor(display,windows->image.id,cursor);
+  (*state)&=(unsigned int) (~UpdateConfigurationState);
+}
+
+static void XMatteEditEvent(const MatteCommandInput *input,XEvent *event,
+  const Cursor cursor,const MatteEventTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  XWindows
+    *const windows = input->windows;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  size_t
+    *const state = targets->state;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      XMattePress(input,event,targets);
+      break;
+    }
+    case ButtonRelease:
+    {
+      XMatteRelease(input,event,cursor,targets);
+      break;
+    }
+    case Expose:
+      break;
+    case KeyPress:
+    {
+      (*state)=XMatteKeyPress(input,event,(*state));
+      break;
+    }
+    case MotionNotify:
+    {
+      /*
+        Map and unmap Info widget as cursor crosses its boundaries.
+      */
+      (*x)=(*event).xmotion.x;
+      (*y)=(*event).xmotion.y;
+      XTrackInfoWidget(display,windows,(*x),(*y));
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static MagickBooleanType XMatteEditStep(const MatteCommandInput *input,
+  const Cursor cursor,const MatteEventTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  XWindows
+    *const windows = input->windows;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  size_t
+    *const state = targets->state;
+
+  int
+    x_offset,
+    y_offset;
+
+  XEvent
+    event;
+
+  if (windows->info.mapped != MagickFalse)
+    {
+      /*
+        Display pointer position.
+      */
+      (void) FormatLocaleString(input->text,MagickPathExtent," %+d%+d ",
+        (*x)+windows->image.x,(*y)+windows->image.y);
+      XInfoWidget(display,windows,input->text);
+    }
+  /*
+    Wait for next event.
+  */
+  XScreenEvent(display,windows,&event,exception);
+  if (XMatteCommandBlock(input,&event,cursor,state) != MagickFalse)
+    return(MagickTrue);
+  XMatteEditEvent(input,&event,cursor,targets);
+  if (event.xany.window == windows->magnify.id)
+    {
+      (*x)=windows->magnify.x-windows->image.x;
+      (*y)=windows->magnify.y-windows->image.y;
+    }
+  x_offset=(*x);
+  y_offset=(*y);
+  if (XMatteUpdatePixels(input,x_offset,y_offset,state) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static const ModeType
+  MatteEditCommandTable[] =
+  {
+    MatteEditMethod,
+    MatteEditBorderCommand,
+    MatteEditFuzzCommand,
+    MatteEditValueCommand,
+    MatteEditUndoCommand,
+    MatteEditHelpCommand,
+    MatteEditDismissCommand
+  };
+
 static MagickBooleanType XMatteEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -12724,18 +13730,6 @@ static MagickBooleanType XMatteEditImage(Display *display,
   static char
     matte[MagickPathExtent] = "0";
 
-  static const ModeType
-    MatteEditCommands[] =
-    {
-      MatteEditMethod,
-      MatteEditBorderCommand,
-      MatteEditFuzzCommand,
-      MatteEditValueCommand,
-      MatteEditUndoCommand,
-      MatteEditHelpCommand,
-      MatteEditDismissCommand
-    };
-
   static PaintMethod
     method = PointMethod;
 
@@ -12750,27 +13744,25 @@ static MagickBooleanType XMatteEditImage(Display *display,
     cursor;
 
   int
-    id,
     x,
-    x_offset,
-    y,
-    y_offset;
-
-  unsigned int
-    height,
-    width;
+    y;
 
   size_t
     state;
-
-  XEvent
-    event;
 
   const PaintMethodTargets
     method_targets = { &method };
 
   const BorderColorTargets
     border_targets = { &border_color };
+
+  const MatteEventTargets
+    event_targets = { &x, &y, &state };
+
+  const MatteCommandInput
+    command_input = { display, resource_info, windows, MatteEditCommandTable,
+      image, exception, MatteEditMenu, command, matte, method_targets,
+      border_targets, text };
 
   /*
     Map Command widget.
@@ -12796,285 +13788,8 @@ static MagickBooleanType XMatteEditImage(Display *display,
   state=DefaultState;
   do
   {
-    if (windows->info.mapped != MagickFalse)
-      {
-        /*
-          Display pointer position.
-        */
-        (void) FormatLocaleString(text,MagickPathExtent," %+d%+d ",
-          x+windows->image.x,y+windows->image.y);
-        XInfoWidget(display,windows,text);
-      }
-    /*
-      Wait for next event.
-    */
-    XScreenEvent(display,windows,&event,exception);
-    if (event.xany.window == windows->command.id)
-      {
-        EditMenuInput
-          menu_input;
-
-        /*
-          Select a command from the Command widget.
-        */
-        id=XCommandWidget(display,windows,MatteEditMenu,&event);
-        if (id < 0)
-          {
-            (void) XCheckDefineCursor(display,windows->image.id,cursor);
-            continue;
-          }
-        switch (MatteEditCommands[id])
-        {
-          case MatteEditMethod:
-          {
-            menu_input.display=display;
-            menu_input.windows=windows;
-            menu_input.MatteEditMenu=MatteEditMenu;
-            menu_input.id=id;
-            menu_input.command=command;
-            XSelectPaintMethod(&menu_input,&method_targets);
-            break;
-          }
-          case MatteEditBorderCommand:
-          {
-            menu_input.display=display;
-            menu_input.windows=windows;
-            menu_input.MatteEditMenu=MatteEditMenu;
-            menu_input.id=id;
-            menu_input.command=command;
-            XSelectBorderColor(&menu_input,resource_info,&border_targets);
-            break;
-          }
-          case MatteEditFuzzCommand:
-          {
-            const char
-              *const FuzzMenu[] =
-              {
-                "0%",
-                "2%",
-                "5%",
-                "10%",
-                "15%",
-                "Dialog...",
-                (char *) NULL,
-              };
-
-            static char
-              fuzz[MagickPathExtent];
-
-            menu_input.display=display;
-            menu_input.windows=windows;
-            menu_input.MatteEditMenu=MatteEditMenu;
-            menu_input.id=id;
-            menu_input.command=command;
-            XSelectFuzzFactor(&menu_input,FuzzMenu,fuzz,image);
-            break;
-          }
-          case MatteEditValueCommand:
-          {
-            const char
-              *const MatteMenu[] =
-              {
-                "Opaque",
-                "Transparent",
-                "Dialog...",
-                (char *) NULL,
-              };
-
-            static char
-              message[MagickPathExtent];
-
-            menu_input.display=display;
-            menu_input.windows=windows;
-            menu_input.MatteEditMenu=MatteEditMenu;
-            menu_input.id=id;
-            menu_input.command=command;
-            XSelectMatteValue(&menu_input,MatteMenu,message,matte);
-            break;
-          }
-          case MatteEditUndoCommand:
-          {
-            (void) XMagickCommand(display,resource_info,windows,UndoCommand,
-              image,exception);
-            break;
-          }
-          case MatteEditHelpCommand:
-          {
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Matte Edit",ImageMatteEditHelp);
-            break;
-          }
-          case MatteEditDismissCommand:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-          default:
-            break;
-        }
-        (void) XCheckDefineCursor(display,windows->image.id,cursor);
-        continue;
-      }
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        if (event.xbutton.button != Button1)
-          break;
-        if ((event.xbutton.window != windows->image.id) &&
-            (event.xbutton.window != windows->magnify.id))
-          break;
-        /*
-          Update matte data.
-        */
-        x=event.xbutton.x;
-        y=event.xbutton.y;
-        (void) XMagickCommand(display,resource_info,windows,
-          SaveToUndoBufferCommand,image,exception);
-        state|=UpdateConfigurationState;
-        break;
-      }
-      case ButtonRelease:
-      {
-        if (event.xbutton.button != Button1)
-          break;
-        if ((event.xbutton.window != windows->image.id) &&
-            (event.xbutton.window != windows->magnify.id))
-          break;
-        /*
-          Update colormap information.
-        */
-        x=event.xbutton.x;
-        y=event.xbutton.y;
-        XConfigureImageColormap(display,resource_info,windows,*image,exception);
-        (void) XConfigureImage(display,resource_info,windows,*image,exception);
-        XInfoWidget(display,windows,text);
-        (void) XCheckDefineCursor(display,windows->image.id,cursor);
-        state&=(unsigned int) (~UpdateConfigurationState);
-        break;
-      }
-      case Expose:
-        break;
-      case KeyPress:
-      {
-        char
-          command[MagickPathExtent];
-
-        KeySym
-          key_symbol;
-
-        XDiscardMagnifyKeys(display,windows,&event);
-        if (event.xkey.window != windows->image.id)
-          break;
-        /*
-          Respond to a user key press.
-        */
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        switch ((int) key_symbol)
-        {
-          case XK_Escape:
-          case XK_F20:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=ExitState;
-            break;
-          }
-          case XK_F1:
-          case XK_Help:
-          {
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Matte Edit",ImageMatteEditHelp);
-            break;
-          }
-          default:
-          {
-            (void) XBell(display,0);
-            break;
-          }
-        }
-        break;
-      }
-      case MotionNotify:
-      {
-        /*
-          Map and unmap Info widget as cursor crosses its boundaries.
-        */
-        x=event.xmotion.x;
-        y=event.xmotion.y;
-        XTrackInfoWidget(display,windows,x,y);
-        break;
-      }
-      default:
-        break;
-    }
-    if (event.xany.window == windows->magnify.id)
-      {
-        x=windows->magnify.x-windows->image.x;
-        y=windows->magnify.y-windows->image.y;
-      }
-    x_offset=x;
-    y_offset=y;
-    if ((state & UpdateConfigurationState) != 0)
-      {
-        CacheView
-          *image_view;
-
-        int
-          x,
-          y;
-
-        MatteEditPixelInput
-          pixel_input;
-
-        /*
-          Matte edit is relative to image configuration.
-        */
-        (void) XClearArea(display,windows->image.id,x_offset,y_offset,1,1,
-          MagickTrue);
-        XPutPixel(windows->image.ximage,x_offset,y_offset,
-          windows->pixel_info->background_color.pixel);
-        width=(unsigned int) (*image)->columns;
-        height=(unsigned int) (*image)->rows;
-        x=0;
-        y=0;
-        if (windows->image.crop_geometry != (char *) NULL)
-          (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,
-            &height);
-        x_offset=((int) width*(windows->image.x+x_offset)/
-          windows->image.ximage->width+x);
-        y_offset=((int) height*(windows->image.y+y_offset)/
-          windows->image.ximage->height+y);
-        if ((x_offset < 0) || (y_offset < 0))
-          continue;
-        if ((x_offset >= (int) (*image)->columns) ||
-            (y_offset >= (int) (*image)->rows))
-          continue;
-        if (SetImageStorageClass(*image,DirectClass,exception) == MagickFalse)
-          return(MagickFalse);
-        if ((*image)->alpha_trait == UndefinedPixelTrait)
-          (void) SetImageAlphaChannel(*image,OpaqueAlphaChannel,exception);
-        image_view=AcquireAuthenticCacheView(*image,exception);
-        pixel_input.image=image;
-        pixel_input.image_view=image_view;
-        pixel_input.x_offset=x_offset;
-        pixel_input.y_offset=y_offset;
-        pixel_input.matte=matte;
-        pixel_input.exception=exception;
-        pixel_input.resource_info=resource_info;
-        pixel_input.method=method;
-        pixel_input.border_color=border_color;
-        if (XMatteEditPixels(pixel_input,method,image,exception) == MagickFalse)
-          return(MagickFalse);
-        image_view=DestroyCacheView(image_view);
-        state&=(unsigned int) (~UpdateConfigurationState);
-      }
+    if (XMatteEditStep(&command_input,cursor,&event_targets) == MagickFalse)
+      return(MagickFalse);
   } while ((state & ExitState) == 0);
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask);
@@ -13563,284 +14278,171 @@ static CompositeOperator XSelectPasteOperator(const ComposeMenuInfo *menu_info,
   return(compose);
 }
 
-static MagickBooleanType XPasteImage(Display *display,
-  XResourceInfo *resource_info,XWindows *windows,Image *image,
-  ExceptionInfo *exception)
+typedef struct _PasteCommandInput
 {
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
   const char
-    *const PasteMenu[] =
+    *const *PasteMenu;
+
+  const ModeType
+    *PasteCommands;
+
+  Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+} PasteCommandInput;
+
+static MagickBooleanType XPasteCommand(const PasteCommandInput *input,
+  XEvent *event,CompositeOperator *compose,size_t *state)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  const char
+    *const *const PasteMenu = input->PasteMenu;
+
+  const ModeType
+    *const PasteCommands = input->PasteCommands;
+
+  int
+    id;
+
+  if ((*event).xany.window == windows->command.id)
     {
-      "Operator",
-      "Help",
-      "Dismiss",
-      (char *) NULL
-    };
+      /*
+        Select a command from the Command widget.
+      */
+      id=XCommandWidget(display,windows,PasteMenu,event);
+      if (id < 0)
+        return(MagickTrue);
+      switch (PasteCommands[id])
+      {
+        case PasteOperatorsCommand:
+        {
+          ComposeMenuInfo
+            menu_info;
 
-  static const ModeType
-    PasteCommands[] =
-    {
-      PasteOperatorsCommand,
-      PasteHelpCommand,
-      PasteDismissCommand
-    };
+          menu_info.display=display;
+          menu_info.windows=windows;
+          menu_info.id=id;
+          (*compose)=XSelectPasteOperator(&menu_info,PasteMenu,(*compose));
+          break;
+        }
+        case PasteHelpCommand:
+        {
+          XTextViewHelp(display,resource_info,windows,MagickFalse,
+            "Help Viewer - Image Composite",ImagePasteHelp);
+          break;
+        }
+        case PasteDismissCommand:
+        {
+          /*
+            Prematurely exit.
+          */
+          (*state)|=EscapeState;
+          (*state)|=ExitState;
+          break;
+        }
+        default:
+          break;
+      }
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
 
-  static CompositeOperator
-    compose = CopyCompositeOp;
+typedef struct _PasteFinishInput
+{
+  Display
+    *display;
 
-  char
-    text[MagickPathExtent];
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    *image;
+
+  ExceptionInfo
+    *exception;
 
   Cursor
     cursor;
 
+  size_t
+    state;
+
   Image
     *paste_image;
 
-  int
-    id,
-    x,
-    y;
+  RectangleInfo
+    paste_info;
+
+  CompositeOperator
+    compose;
+} PasteFinishInput;
+
+static MagickBooleanType XPasteFinish(const PasteFinishInput *input)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  Image
+    *const image = input->image;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  const Cursor
+    cursor = input->cursor;
+
+  const size_t
+    state = input->state;
+
+  const CompositeOperator
+    compose = input->compose;
+
+  Image
+    *paste_image = input->paste_image;
+
+  RectangleInfo
+    paste_info = input->paste_info;
 
   double
     scale_factor;
 
-  RectangleInfo
-    highlight_info,
-    paste_info;
+  int
+    x,
+    y;
 
   unsigned int
     height,
     width;
 
-  size_t
-    state;
-
-  XEvent
-    event;
-
-  /*
-    Copy image.
-  */
-  if (resource_info->copy_image == (Image *) NULL)
-    return(MagickFalse);
-  paste_image=CloneImage(resource_info->copy_image,0,0,MagickTrue,exception);
-  if (paste_image == (Image *) NULL)
-    return(MagickFalse);
-  /*
-    Map Command widget.
-  */
-  (void) CloneString(&windows->command.name,"Paste");
-  windows->command.data=1;
-  (void) XCommandWidget(display,windows,PasteMenu,(XEvent *) NULL);
-  (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
-  /*
-    Track pointer until button 1 is pressed.
-  */
-  XSetCursorState(display,windows,MagickFalse);
-  XQueryPosition(display,windows->image.id,&x,&y);
-  (void) XSelectInput(display,windows->image.id,
-    windows->image.attributes.event_mask | PointerMotionMask);
-  paste_info.x=(ssize_t) windows->image.x+x;
-  paste_info.y=(ssize_t) windows->image.y+y;
-  paste_info.width=0;
-  paste_info.height=0;
-  cursor=XCreateFontCursor(display,XC_ul_angle);
-  (void) XSetFunction(display,windows->image.highlight_context,GXinvert);
-  state=DefaultState;
-  do
-  {
-    if (windows->info.mapped != MagickFalse)
-      {
-        /*
-          Display pointer position.
-        */
-        (void) FormatLocaleString(text,MagickPathExtent," %+ld%+ld ",
-          (long) paste_info.x,(long) paste_info.y);
-        XInfoWidget(display,windows,text);
-      }
-    highlight_info=paste_info;
-    highlight_info.x=paste_info.x-windows->image.x;
-    highlight_info.y=paste_info.y-windows->image.y;
-    XHighlightRectangle(display,windows->image.id,
-      windows->image.highlight_context,&highlight_info);
-    /*
-      Wait for next event.
-    */
-    XScreenEvent(display,windows,&event,exception);
-    XHighlightRectangle(display,windows->image.id,
-      windows->image.highlight_context,&highlight_info);
-    if (event.xany.window == windows->command.id)
-      {
-        /*
-          Select a command from the Command widget.
-        */
-        id=XCommandWidget(display,windows,PasteMenu,&event);
-        if (id < 0)
-          continue;
-        switch (PasteCommands[id])
-        {
-          case PasteOperatorsCommand:
-          {
-            ComposeMenuInfo
-              menu_info;
-
-            menu_info.display=display;
-            menu_info.windows=windows;
-            menu_info.id=id;
-            compose=XSelectPasteOperator(&menu_info,PasteMenu,compose);
-            break;
-          }
-          case PasteHelpCommand:
-          {
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Image Composite",ImagePasteHelp);
-            break;
-          }
-          case PasteDismissCommand:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-          default:
-            break;
-        }
-        continue;
-      }
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Button Press: 0x%lx %u +%d+%d",event.xbutton.window,
-            event.xbutton.button,event.xbutton.x,event.xbutton.y);
-        if (event.xbutton.button != Button1)
-          break;
-        if (event.xbutton.window != windows->image.id)
-          break;
-        /*
-          Paste rectangle is relative to image configuration.
-        */
-        width=(unsigned int) image->columns;
-        height=(unsigned int) image->rows;
-        x=0;
-        y=0;
-        if (windows->image.crop_geometry != (char *) NULL)
-          (void) XParseGeometry(windows->image.crop_geometry,&x,&y,
-            &width,&height);
-        scale_factor=(double) windows->image.ximage->width/width;
-        paste_info.width=(unsigned int) (scale_factor*paste_image->columns+0.5);
-        scale_factor=(double) windows->image.ximage->height/height;
-        paste_info.height=(unsigned int) (scale_factor*paste_image->rows+0.5);
-        (void) XCheckDefineCursor(display,windows->image.id,cursor);
-        paste_info.x=(ssize_t) windows->image.x+event.xbutton.x;
-        paste_info.y=(ssize_t) windows->image.y+event.xbutton.y;
-        break;
-      }
-      case ButtonRelease:
-      {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Button Release: 0x%lx %u +%d+%d",event.xbutton.window,
-            event.xbutton.button,event.xbutton.x,event.xbutton.y);
-        if (event.xbutton.button != Button1)
-          break;
-        if (event.xbutton.window != windows->image.id)
-          break;
-        if ((paste_info.width != 0) && (paste_info.height != 0))
-          {
-            /*
-              User has selected the location of the paste image.
-            */
-            paste_info.x=(ssize_t) windows->image.x+event.xbutton.x;
-            paste_info.y=(ssize_t) windows->image.y+event.xbutton.y;
-            state|=ExitState;
-          }
-        break;
-      }
-      case Expose:
-        break;
-      case KeyPress:
-      {
-        char
-          command[MagickPathExtent];
-
-        KeySym
-          key_symbol;
-
-        int
-          length;
-
-        if (event.xkey.window != windows->image.id)
-          break;
-        /*
-          Respond to a user key press.
-        */
-        length=XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        *(command+length)='\0';
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Key press: 0x%lx (%s)",(long) key_symbol,command);
-        switch ((int) key_symbol)
-        {
-          case XK_Escape:
-          case XK_F20:
-          {
-            /*
-              Prematurely exit.
-            */
-            paste_image=DestroyImage(paste_image);
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-          case XK_F1:
-          case XK_Help:
-          {
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXcopy);
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Image Composite",ImagePasteHelp);
-            (void) XSetFunction(display,windows->image.highlight_context,
-              GXinvert);
-            break;
-          }
-          default:
-          {
-            (void) XBell(display,0);
-            break;
-          }
-        }
-        break;
-      }
-      case MotionNotify:
-      {
-        /*
-          Map and unmap Info widget as text cursor crosses its boundaries.
-        */
-        x=event.xmotion.x;
-        y=event.xmotion.y;
-        XTrackInfoWidget(display,windows,x,y);
-        paste_info.x=(ssize_t) windows->image.x+x;
-        paste_info.y=(ssize_t) windows->image.y+y;
-        break;
-      }
-      default:
-      {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),"Event type: %d",
-            event.type);
-        break;
-      }
-    }
-  } while ((state & ExitState) == 0);
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask);
   (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
@@ -13880,6 +14482,392 @@ static MagickBooleanType XPasteImage(Display *display,
   XConfigureImageColormap(display,resource_info,windows,image,exception);
   (void) XConfigureImage(display,resource_info,windows,image,exception);
   return(MagickTrue);
+}
+
+typedef struct _PasteTargets
+{
+  Image
+    **paste_image;
+
+  size_t
+    *state;
+
+  RectangleInfo
+    *paste_info;
+
+  CompositeOperator
+    *compose;
+} PasteTargets;
+
+static void XPasteKeyPress(const PasteCommandInput *input,XEvent *event,
+  const PasteTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  Image
+    **const paste_image = targets->paste_image;
+
+  size_t
+    *const state = targets->state;
+
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  int
+    length;
+
+  if ((*event).xkey.window != windows->image.id)
+    return;
+  /*
+    Respond to a user key press.
+  */
+  length=XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  *(command+length)='\0';
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Key press: 0x%lx (%s)",(long) key_symbol,command);
+  switch ((int) key_symbol)
+  {
+    case XK_Escape:
+    case XK_F20:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*paste_image)=DestroyImage((*paste_image));
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    case XK_F1:
+    case XK_Help:
+    {
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXcopy);
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Image Composite",ImagePasteHelp);
+      (void) XSetFunction(display,windows->image.highlight_context,
+        GXinvert);
+      break;
+    }
+    default:
+    {
+      (void) XBell(display,0);
+      break;
+    }
+  }
+}
+
+static void XPastePress(const PasteCommandInput *input,const XEvent *event,
+  const Cursor cursor,const PasteTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  Image
+    *const image = input->image;
+
+  Image
+    **const paste_image = targets->paste_image;
+
+  RectangleInfo
+    *const paste_info = targets->paste_info;
+
+  double
+    scale_factor;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    height,
+    width;
+
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Button Press: 0x%lx %u +%d+%d",(*event).xbutton.window,
+      (*event).xbutton.button,(*event).xbutton.x,(*event).xbutton.y);
+  if ((*event).xbutton.button != Button1)
+    return;
+  if ((*event).xbutton.window != windows->image.id)
+    return;
+  /*
+    Paste rectangle is relative to image configuration.
+  */
+  width=(unsigned int) image->columns;
+  height=(unsigned int) image->rows;
+  x=0;
+  y=0;
+  if (windows->image.crop_geometry != (char *) NULL)
+    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,
+      &width,&height);
+  scale_factor=(double) windows->image.ximage->width/width;
+  (*paste_info).width=(unsigned int) (scale_factor*(*paste_image)->columns+
+    0.5);
+  scale_factor=(double) windows->image.ximage->height/height;
+  (*paste_info).height=(unsigned int) (scale_factor*(*paste_image)->rows+
+    0.5);
+  (void) XCheckDefineCursor(display,windows->image.id,cursor);
+  (*paste_info).x=(ssize_t) windows->image.x+(*event).xbutton.x;
+  (*paste_info).y=(ssize_t) windows->image.y+(*event).xbutton.y;
+}
+
+static void XPasteRelease(const PasteCommandInput *input,const XEvent *event,
+  const PasteTargets *targets)
+{
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  RectangleInfo
+    *const paste_info = targets->paste_info;
+
+  size_t
+    *const state = targets->state;
+
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Button Release: 0x%lx %u +%d+%d",(*event).xbutton.window,
+      (*event).xbutton.button,(*event).xbutton.x,(*event).xbutton.y);
+  if ((*event).xbutton.button != Button1)
+    return;
+  if ((*event).xbutton.window != windows->image.id)
+    return;
+  if (((*paste_info).width != 0) && ((*paste_info).height != 0))
+    {
+      /*
+        User has selected the location of the paste image.
+      */
+      (*paste_info).x=(ssize_t) windows->image.x+(*event).xbutton.x;
+      (*paste_info).y=(ssize_t) windows->image.y+(*event).xbutton.y;
+      (*state)|=ExitState;
+    }
+}
+
+static void XPasteEvent(const PasteCommandInput *input,XEvent *event,
+  const Cursor cursor,const PasteTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  RectangleInfo
+    *const paste_info = targets->paste_info;
+
+  int
+    x,
+    y;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      XPastePress(input,event,cursor,targets);
+      break;
+    }
+    case ButtonRelease:
+    {
+      XPasteRelease(input,event,targets);
+      break;
+    }
+    case Expose:
+      break;
+    case KeyPress:
+    {
+      XPasteKeyPress(input,event,targets);
+      break;
+    }
+    case MotionNotify:
+    {
+      /*
+        Map and unmap Info widget as text cursor crosses its boundaries.
+      */
+      x=(*event).xmotion.x;
+      y=(*event).xmotion.y;
+      XTrackInfoWidget(display,windows,x,y);
+      (*paste_info).x=(ssize_t) windows->image.x+x;
+      (*paste_info).y=(ssize_t) windows->image.y+y;
+      break;
+    }
+    default:
+    {
+      if (resource_info->debug != MagickFalse)
+        (void) LogMagickEvent(X11Event,GetMagickModule(),"Event type: %d",
+          (*event).type);
+      break;
+    }
+  }
+}
+
+static void XPasteStep(const PasteCommandInput *input,const Cursor cursor,
+  const PasteTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  XWindows
+    *const windows = input->windows;
+
+  CompositeOperator
+    *const compose = targets->compose;
+
+  RectangleInfo
+    *const paste_info = targets->paste_info;
+
+  size_t
+    *const state = targets->state;
+
+  char
+    text[MagickPathExtent];
+
+  RectangleInfo
+    highlight_info;
+
+  XEvent
+    event;
+
+  if (windows->info.mapped != MagickFalse)
+    {
+      /*
+        Display pointer position.
+      */
+      (void) FormatLocaleString(text,MagickPathExtent," %+ld%+ld ",
+        (long) (*paste_info).x,(long) (*paste_info).y);
+      XInfoWidget(display,windows,text);
+    }
+  highlight_info=(*paste_info);
+  highlight_info.x=(*paste_info).x-windows->image.x;
+  highlight_info.y=(*paste_info).y-windows->image.y;
+  XHighlightRectangle(display,windows->image.id,
+    windows->image.highlight_context,&highlight_info);
+  /*
+    Wait for next event.
+  */
+  XScreenEvent(display,windows,&event,exception);
+  XHighlightRectangle(display,windows->image.id,
+    windows->image.highlight_context,&highlight_info);
+  if (XPasteCommand(input,&event,compose,state) != MagickFalse)
+    return;
+  XPasteEvent(input,&event,cursor,targets);
+}
+
+static const ModeType
+  PasteCommandTable[] =
+  {
+    PasteOperatorsCommand,
+    PasteHelpCommand,
+    PasteDismissCommand
+  };
+
+static MagickBooleanType XPasteImage(Display *display,
+  XResourceInfo *resource_info,XWindows *windows,Image *image,
+  ExceptionInfo *exception)
+{
+  const char
+    *const PasteMenu[] =
+    {
+      "Operator",
+      "Help",
+      "Dismiss",
+      (char *) NULL
+    };
+
+  static CompositeOperator
+    compose = CopyCompositeOp;
+
+  Cursor
+    cursor;
+
+  Image
+    *paste_image;
+
+  int
+    x,
+    y;
+
+  RectangleInfo
+    paste_info;
+
+  size_t
+    state;
+
+  const PasteTargets
+    paste_targets = { &paste_image, &state, &paste_info, &compose };
+
+  const PasteCommandInput
+    command_input = { display, resource_info, windows, PasteMenu,
+      PasteCommandTable, image, exception };
+
+  /*
+    Copy image.
+  */
+  if (resource_info->copy_image == (Image *) NULL)
+    return(MagickFalse);
+  paste_image=CloneImage(resource_info->copy_image,0,0,MagickTrue,exception);
+  if (paste_image == (Image *) NULL)
+    return(MagickFalse);
+  /*
+    Map Command widget.
+  */
+  (void) CloneString(&windows->command.name,"Paste");
+  windows->command.data=1;
+  (void) XCommandWidget(display,windows,PasteMenu,(XEvent *) NULL);
+  (void) XMapRaised(display,windows->command.id);
+  XClientMessage(display,windows->image.id,windows->im_protocols,
+    windows->im_update_widget,CurrentTime);
+  /*
+    Track pointer until button 1 is pressed.
+  */
+  XSetCursorState(display,windows,MagickFalse);
+  XQueryPosition(display,windows->image.id,&x,&y);
+  (void) XSelectInput(display,windows->image.id,
+    windows->image.attributes.event_mask | PointerMotionMask);
+  paste_info.x=(ssize_t) windows->image.x+x;
+  paste_info.y=(ssize_t) windows->image.y+y;
+  paste_info.width=0;
+  paste_info.height=0;
+  cursor=XCreateFontCursor(display,XC_ul_angle);
+  (void) XSetFunction(display,windows->image.highlight_context,GXinvert);
+  state=DefaultState;
+  do
+  {
+    XPasteStep(&command_input,cursor,&paste_targets);
+  } while ((state & ExitState) == 0);
+  {
+    const PasteFinishInput
+      finish = { display, resource_info, windows, image, exception, cursor,
+        state, paste_image, paste_info, compose };
+
+    return(XPasteFinish(&finish));
+  }
 }
 
 /*
@@ -15811,6 +16799,12 @@ typedef struct _RotateLineTargets
 
   size_t
     *state;
+
+  unsigned int
+    *distance;
+
+  double
+    *degrees;
 } RotateLineTargets;
 
 static void XStartRotateLine(Display *display,XWindows *windows,
@@ -15966,63 +16960,325 @@ static void XShowRotateInfo(const RotateInfoInput *show)
     windows->image.highlight_context,&rotate_info);
 }
 
-static MagickBooleanType XRotateImage(Display *display,
-  XResourceInfo *resource_info,XWindows *windows,double degrees,Image **image,
-  ExceptionInfo *exception)
+typedef struct _RotateLoopInput
 {
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
   const char
-    *const RotateMenu[] =
-    {
-      "Pixel Color",
-      "Direction",
-      "Help",
-      "Dismiss",
-      (char *) NULL
-    };
+    *const *RotateMenu;
 
-  static ModeType
-    direction = HorizontalRotateCommand;
-
-  static const ModeType
-    DirectionCommands[] =
-    {
-      HorizontalRotateCommand,
-      VerticalRotateCommand
-    },
-    RotateCommands[] =
-    {
-      RotateColorCommand,
-      RotateDirectionCommand,
-      RotateHelpCommand,
-      RotateDismissCommand
-    };
-
-  static unsigned int
-    pen_id = 0;
+  const ModeType
+    *RotateCommands,
+    *DirectionCommands;
 
   char
-    command[MagickPathExtent],
-    text[MagickPathExtent];
+    *command;
 
-  Image
-    *rotate_image;
+  RotateTargets
+    targets;
 
-  int
-    x,
-    y;
+  ExceptionInfo
+    *exception;
+} RotateLoopInput;
 
-  double
-    normalized_degrees;
+static MagickBooleanType XRotateLoopCommand(
+  const RotateLoopInput *loop_input,const XEvent event,ModeType *direction,
+  size_t *state)
+{
+  Display
+    *const display = loop_input->display;
 
-  unsigned int
-    height,
-    rotations,
-    width;
+  XResourceInfo
+    *const resource_info = loop_input->resource_info;
+
+  XWindows
+    *const windows = loop_input->windows;
+
+  const char
+    *const *const RotateMenu = loop_input->RotateMenu;
+
+  const ModeType
+    *const RotateCommands = loop_input->RotateCommands,
+    *const DirectionCommands = loop_input->DirectionCommands;
+
+  char
+    *const command = loop_input->command;
 
   const RotateTargets
-    targets = { &pen_id };
+    targets = loop_input->targets;
 
-  if (degrees == 0.0)
+  if (event.xany.window == windows->command.id)
+    {
+      RotateCommandInput
+        input;
+
+      input.display=display;
+      input.resource_info=resource_info;
+      input.windows=windows;
+      input.event=event;
+      input.RotateMenu=RotateMenu;
+      input.RotateCommands=RotateCommands;
+      input.DirectionCommands=DirectionCommands;
+      input.command=command;
+      input.targets=targets;
+      XRotateCommand(&input,direction,state);
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
+static void XRotateSelectStep(const RotateLoopInput *loop_input,
+  const RotateLineTargets *line_targets,ModeType *direction)
+{
+  Display
+    *const display = loop_input->display;
+
+  XResourceInfo
+    *const resource_info = loop_input->resource_info;
+
+  XWindows
+    *const windows = loop_input->windows;
+
+  ExceptionInfo
+    *const exception = loop_input->exception;
+
+  XSegment
+    *const rotate_info = line_targets->rotate_info;
+
+  size_t
+    *const state = line_targets->state;
+
+  XEvent
+    event;
+
+  XHighlightLine(display,windows->image.id,
+    windows->image.highlight_context,rotate_info);
+  /*
+    Wait for next event.
+  */
+  XScreenEvent(display,windows,&event,exception);
+  XHighlightLine(display,windows->image.id,
+    windows->image.highlight_context,rotate_info);
+  if (XRotateLoopCommand(loop_input,event,direction,state) !=
+      MagickFalse)
+    return;
+  switch (event.type)
+  {
+    case ButtonPress:
+    {
+      XStartRotateLine(display,windows,event,line_targets);
+      break;
+    }
+    case ButtonRelease:
+      break;
+    case Expose:
+      break;
+    case KeyPress:
+    {
+      RotateKeyInput
+        key_input;
+
+      key_input.display=display;
+      key_input.resource_info=resource_info;
+      key_input.windows=windows;
+      key_input.event=event;
+      XRotateKeyPress(&key_input,line_targets);
+      break;
+    }
+    case MotionNotify:
+    {
+      (*rotate_info).x1=event.xmotion.x;
+      (*rotate_info).y1=event.xmotion.y;
+    }
+  }
+  (*rotate_info).x2=(*rotate_info).x1;
+  (*rotate_info).y2=(*rotate_info).y1;
+  if ((*direction) == HorizontalRotateCommand)
+    (*rotate_info).x2+=32;
+  else
+    (*rotate_info).y2-=32;
+}
+
+static void XRotateDragEvent(const XEvent event,
+  const RotateLineTargets *targets)
+{
+  XSegment
+    *const rotate_info = targets->rotate_info;
+
+  size_t
+    *const state = targets->state;
+
+  switch (event.type)
+  {
+    case ButtonPress:
+      break;
+    case ButtonRelease:
+    {
+      /*
+        User has committed to rotation line.
+      */
+      (*rotate_info).x2=event.xbutton.x;
+      (*rotate_info).y2=event.xbutton.y;
+      (*state)|=ExitState;
+      break;
+    }
+    case Expose:
+      break;
+    case MotionNotify:
+    {
+      (*rotate_info).x2=event.xmotion.x;
+      (*rotate_info).y2=event.xmotion.y;
+    }
+    default:
+      break;
+  }
+}
+
+static void XClampRotateSegment(const XWindows *windows,
+  XSegment *rotate_info)
+{
+  /*
+    Check boundary conditions.
+  */
+  if ((*rotate_info).x2 < 0)
+    (*rotate_info).x2=0;
+  else
+    if ((*rotate_info).x2 > (int) windows->image.width)
+      (*rotate_info).x2=(short) windows->image.width;
+  if ((*rotate_info).y2 < 0)
+    (*rotate_info).y2=0;
+  else
+    if ((*rotate_info).y2 > (int) windows->image.height)
+      (*rotate_info).y2=(short) windows->image.height;
+}
+
+static void XRotateAngle(const XSegment *rotate_info,double *degrees,
+  unsigned int *distance)
+{
+  /*
+    Compute rotation angle from the slope of the line.
+  */
+  (*degrees)=0.0;
+  (*distance)=(unsigned int)
+    ((((*rotate_info).x2-(*rotate_info).x1+1)*
+      ((*rotate_info).x2-(*rotate_info).x1+1))+
+     (((*rotate_info).y2-(*rotate_info).y1+1)*
+      ((*rotate_info).y2-(*rotate_info).y1+1)));
+  if ((*distance) > 9)
+    (*degrees)=RadiansToDegrees(-atan2((double) ((*rotate_info).y2-
+      (*rotate_info).y1),(double) ((*rotate_info).x2-(*rotate_info).x1)));
+}
+
+static void XRotateDragLine(const RotateLoopInput *loop_input,
+  const RotateLineTargets *line_targets,const ModeType direction)
+{
+  Display
+    *const display = loop_input->display;
+
+  XWindows
+    *const windows = loop_input->windows;
+
+  ExceptionInfo
+    *const exception = loop_input->exception;
+
+  XSegment
+    *const rotate_info = line_targets->rotate_info;
+
+  size_t
+    *const state = line_targets->state;
+
+  unsigned int
+    *const distance = line_targets->distance;
+
+  double
+    *const degrees = line_targets->degrees;
+
+  char
+    text[MagickPathExtent];
+
+  XEvent
+    event;
+
+  (*distance)=0;
+  (void) XSetFunction(display,windows->image.highlight_context,GXinvert);
+  (*state)=DefaultState;
+  do
+  {
+    if ((*distance) > 9)
+      {
+        RotateInfoInput
+          show;
+
+        show.display=display;
+        show.windows=windows;
+        show.text=text;
+        show.direction=direction;
+        show.degrees=(*degrees);
+        show.rotate_info=(*rotate_info);
+        XShowRotateInfo(&show);
+      }
+    else
+      if (windows->info.mapped != MagickFalse)
+        (void) XWithdrawWindow(display,windows->info.id,
+          windows->info.screen);
+    /*
+      Wait for next event.
+    */
+    XScreenEvent(display,windows,&event,exception);
+    if ((*distance) > 9)
+      XHighlightLine(display,windows->image.id,
+        windows->image.highlight_context,rotate_info);
+    XRotateDragEvent(event,line_targets);
+    XClampRotateSegment(windows,rotate_info);
+    XRotateAngle(rotate_info,degrees,distance);
+  } while (((*state) & ExitState) == 0);
+  (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
+  (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+}
+
+typedef struct _RotateAngleTargets
+{
+  int
+    *x,
+    *y;
+
+  ModeType
+    *direction;
+
+  double
+    *degrees;
+} RotateAngleTargets;
+
+static MagickBooleanType XSelectRotateAngle(
+  const RotateLoopInput *loop_input,const RotateAngleTargets *targets)
+{
+  Display
+    *const display = loop_input->display;
+
+  XWindows
+    *const windows = loop_input->windows;
+
+  const char
+    *const *const RotateMenu = loop_input->RotateMenu;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  ModeType
+    *const direction = targets->direction;
+
+  double
+    *const degrees = targets->degrees;
+
+  if ((*degrees) == 0.0)
     {
       unsigned int
         distance;
@@ -16030,14 +17286,11 @@ static MagickBooleanType XRotateImage(Display *display,
       size_t
         state;
 
-      XEvent
-        event;
-
       XSegment
         rotate_info;
 
       const RotateLineTargets
-        line_targets = { &rotate_info, &state };
+        line_targets = { &rotate_info, &state, &distance, degrees };
 
       /*
         Map Command widget.
@@ -16052,176 +17305,247 @@ static MagickBooleanType XRotateImage(Display *display,
         Wait for first button press.
       */
       (void) XSetFunction(display,windows->image.highlight_context,GXinvert);
-      XQueryPosition(display,windows->image.id,&x,&y);
-      rotate_info.x1=x;
-      rotate_info.y1=y;
-      rotate_info.x2=x;
-      rotate_info.y2=y;
+      XQueryPosition(display,windows->image.id,x,y);
+      rotate_info.x1=(*x);
+      rotate_info.y1=(*y);
+      rotate_info.x2=(*x);
+      rotate_info.y2=(*y);
       state=DefaultState;
       do
       {
-        XHighlightLine(display,windows->image.id,
-          windows->image.highlight_context,&rotate_info);
-        /*
-          Wait for next event.
-        */
-        XScreenEvent(display,windows,&event,exception);
-        XHighlightLine(display,windows->image.id,
-          windows->image.highlight_context,&rotate_info);
-        if (event.xany.window == windows->command.id)
-          {
-            RotateCommandInput
-              input;
-
-            input.display=display;
-            input.resource_info=resource_info;
-            input.windows=windows;
-            input.event=event;
-            input.RotateMenu=RotateMenu;
-            input.RotateCommands=RotateCommands;
-            input.DirectionCommands=DirectionCommands;
-            input.command=command;
-            input.targets=targets;
-            XRotateCommand(&input,&direction,&state);
-            continue;
-          }
-        switch (event.type)
-        {
-          case ButtonPress:
-          {
-            XStartRotateLine(display,windows,event,&line_targets);
-            break;
-          }
-          case ButtonRelease:
-            break;
-          case Expose:
-            break;
-          case KeyPress:
-          {
-            RotateKeyInput
-              key_input;
-
-            key_input.display=display;
-            key_input.resource_info=resource_info;
-            key_input.windows=windows;
-            key_input.event=event;
-            XRotateKeyPress(&key_input,&line_targets);
-            break;
-          }
-          case MotionNotify:
-          {
-            rotate_info.x1=event.xmotion.x;
-            rotate_info.y1=event.xmotion.y;
-          }
-        }
-        rotate_info.x2=rotate_info.x1;
-        rotate_info.y2=rotate_info.y1;
-        if (direction == HorizontalRotateCommand)
-          rotate_info.x2+=32;
-        else
-          rotate_info.y2-=32;
+        XRotateSelectStep(loop_input,&line_targets,direction);
       } while ((state & ExitState) == 0);
       (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
       (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
       if ((state & EscapeState) != 0)
-        return(MagickTrue);
+        return(MagickFalse);
       /*
         Draw line as pointer moves until the mouse button is released.
       */
-      distance=0;
-      (void) XSetFunction(display,windows->image.highlight_context,GXinvert);
-      state=DefaultState;
-      do
-      {
-        if (distance > 9)
-          {
-            RotateInfoInput
-              show;
-
-            show.display=display;
-            show.windows=windows;
-            show.text=text;
-            show.direction=direction;
-            show.degrees=degrees;
-            show.rotate_info=rotate_info;
-            XShowRotateInfo(&show);
-          }
-        else
-          if (windows->info.mapped != MagickFalse)
-            (void) XWithdrawWindow(display,windows->info.id,
-              windows->info.screen);
-        /*
-          Wait for next event.
-        */
-        XScreenEvent(display,windows,&event,exception);
-        if (distance > 9)
-          XHighlightLine(display,windows->image.id,
-            windows->image.highlight_context,&rotate_info);
-        switch (event.type)
-        {
-          case ButtonPress:
-            break;
-          case ButtonRelease:
-          {
-            /*
-              User has committed to rotation line.
-            */
-            rotate_info.x2=event.xbutton.x;
-            rotate_info.y2=event.xbutton.y;
-            state|=ExitState;
-            break;
-          }
-          case Expose:
-            break;
-          case MotionNotify:
-          {
-            rotate_info.x2=event.xmotion.x;
-            rotate_info.y2=event.xmotion.y;
-          }
-          default:
-            break;
-        }
-        /*
-          Check boundary conditions.
-        */
-        if (rotate_info.x2 < 0)
-          rotate_info.x2=0;
-        else
-          if (rotate_info.x2 > (int) windows->image.width)
-            rotate_info.x2=(short) windows->image.width;
-        if (rotate_info.y2 < 0)
-          rotate_info.y2=0;
-        else
-          if (rotate_info.y2 > (int) windows->image.height)
-            rotate_info.y2=(short) windows->image.height;
-        /*
-          Compute rotation angle from the slope of the line.
-        */
-        degrees=0.0;
-        distance=(unsigned int)
-          (((rotate_info.x2-rotate_info.x1+1)*(rotate_info.x2-rotate_info.x1+1))+
-          ((rotate_info.y2-rotate_info.y1+1)*(rotate_info.y2-rotate_info.y1+1)));
-        if (distance > 9)
-          degrees=RadiansToDegrees(-atan2((double) (rotate_info.y2-
-            rotate_info.y1),(double) (rotate_info.x2-rotate_info.x1)));
-      } while ((state & ExitState) == 0);
-      (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
-      (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+      XRotateDragLine(loop_input,&line_targets,(*direction));
       if (distance <= 9)
-        return(MagickTrue);
+        return(MagickFalse);
     }
-  if (direction == VerticalRotateCommand)
-    degrees-=90.0;
-  if (degrees == 0.0)
+  return(MagickTrue);
+}
+
+typedef struct _RotateCropInput
+{
+  XWindows
+    *windows;
+
+  Image
+    **image;
+
+  unsigned int
+    rotations;
+
+  int
+    x,
+    y;
+} RotateCropInput;
+
+static void XRotateCropGeometry(const RotateCropInput *crop,
+  unsigned int *width,unsigned int *height)
+{
+  XWindows
+    *const windows = crop->windows;
+
+  Image
+    **const image = crop->image;
+
+  const unsigned int
+    rotations = crop->rotations;
+
+  int
+    x = crop->x,
+    y = crop->y;
+
+  if (windows->image.crop_geometry != (char *) NULL)
+    {
+      /*
+        Rotate crop geometry.
+      */
+      (*width)=(unsigned int) (*image)->columns;
+      (*height)=(unsigned int) (*image)->rows;
+      (void) XParseGeometry(windows->image.crop_geometry,&x,&y,width,height);
+      switch (rotations % 4)
+      {
+        default:
+        case 0:
+          break;
+        case 1:
+        {
+          /*
+            Rotate 90 degrees.
+          */
+          (void) FormatLocaleString(windows->image.crop_geometry,
+            MagickPathExtent,"%ux%u%+d%+d",(*height),(*width),
+            (int) (*image)->columns-(int) (*height)-y,x);
+          break;
+        }
+        case 2:
+        {
+          /*
+            Rotate 180 degrees.
+          */
+          (void) FormatLocaleString(windows->image.crop_geometry,
+            MagickPathExtent,"%ux%u%+d%+d",(*width),(*height),
+            (int) (*width)-x,(int) (*height)-y);
+          break;
+        }
+        case 3:
+        {
+          /*
+            Rotate 270 degrees.
+          */
+          (void) FormatLocaleString(windows->image.crop_geometry,
+            MagickPathExtent,"%ux%u%+d%+d",(*height),(*width),y,
+            (int) (*image)->rows-(int) (*width)-x);
+          break;
+        }
+      }
+    }
+}
+
+typedef struct _RotateUpdateInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    **image;
+
+  ExceptionInfo
+    *exception;
+
+  double
+    normalized_degrees;
+
+  unsigned int
+    rotations;
+} RotateUpdateInput;
+
+static MagickBooleanType XRotateUpdate(const RotateUpdateInput *update,
+  unsigned int *width,unsigned int *height)
+{
+  Display
+    *const display = update->display;
+
+  XResourceInfo
+    *const resource_info = update->resource_info;
+
+  XWindows
+    *const windows = update->windows;
+
+  Image
+    **const image = update->image;
+
+  ExceptionInfo
+    *const exception = update->exception;
+
+  const double
+    normalized_degrees = update->normalized_degrees;
+
+  const unsigned int
+    rotations = update->rotations;
+
+  int
+    x,
+    y;
+
+  if (windows->image.orphan != MagickFalse)
     return(MagickTrue);
+  if (normalized_degrees != 0.0)
+    {
+      /*
+        Update image colormap.
+      */
+      windows->image.window_changes.width=(int) (*image)->columns;
+      windows->image.window_changes.height=(int) (*image)->rows;
+      if (windows->image.crop_geometry != (char *) NULL)
+        {
+          /*
+            Obtain dimensions of image from crop geometry.
+          */
+          (void) XParseGeometry(windows->image.crop_geometry,&x,&y,
+            width,height);
+          windows->image.window_changes.width=(int) (*width);
+          windows->image.window_changes.height=(int) (*height);
+        }
+      XConfigureImageColormap(display,resource_info,windows,*image,exception);
+    }
+  else
+    if (((rotations % 4) == 1) || ((rotations % 4) == 3))
+      {
+        windows->image.window_changes.width=windows->image.ximage->height;
+        windows->image.window_changes.height=windows->image.ximage->width;
+      }
   /*
-    Rotate image.
+    Update image configuration.
   */
-  normalized_degrees=degrees;
-  while (normalized_degrees < -45.0)
-    normalized_degrees+=360.0;
-  for (rotations=0; normalized_degrees > 45.0; rotations++)
-    normalized_degrees-=90.0;
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+  return(MagickTrue);
+}
+
+typedef struct _RotateApplyInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    **image;
+
+  ExceptionInfo
+    *exception;
+
+  double
+    degrees,
+    normalized_degrees;
+
+  unsigned int
+    pen_id;
+} RotateApplyInput;
+
+static MagickBooleanType XRotateApply(const RotateApplyInput *apply)
+{
+  Display
+    *const display = apply->display;
+
+  XResourceInfo
+    *const resource_info = apply->resource_info;
+
+  XWindows
+    *const windows = apply->windows;
+
+  Image
+    **const image = apply->image;
+
+  ExceptionInfo
+    *const exception = apply->exception;
+
+  const double
+    degrees = apply->degrees,
+    normalized_degrees = apply->normalized_degrees;
+
+  const unsigned int
+    pen_id = apply->pen_id;
+
+  Image
+    *rotate_image;
+
   if (normalized_degrees != 0.0)
     (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
       exception);
@@ -16239,83 +17563,103 @@ static MagickBooleanType XRotateImage(Display *display,
     return(MagickFalse);
   *image=DestroyImage(*image);
   *image=rotate_image;
-  if (windows->image.crop_geometry != (char *) NULL)
-    {
-      /*
-        Rotate crop geometry.
-      */
-      width=(unsigned int) (*image)->columns;
-      height=(unsigned int) (*image)->rows;
-      (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
-      switch (rotations % 4)
-      {
-        default:
-        case 0:
-          break;
-        case 1:
-        {
-          /*
-            Rotate 90 degrees.
-          */
-          (void) FormatLocaleString(windows->image.crop_geometry,
-            MagickPathExtent,"%ux%u%+d%+d",height,width,(int) (*image)->columns-
-            (int) height-y,x);
-          break;
-        }
-        case 2:
-        {
-          /*
-            Rotate 180 degrees.
-          */
-          (void) FormatLocaleString(windows->image.crop_geometry,
-            MagickPathExtent,"%ux%u%+d%+d",width,height,(int) width-x,(int)
-            height-y);
-          break;
-        }
-        case 3:
-        {
-          /*
-            Rotate 270 degrees.
-          */
-          (void) FormatLocaleString(windows->image.crop_geometry,
-            MagickPathExtent,"%ux%u%+d%+d",height,width,y,(int) (*image)->rows-
-            (int) width-x);
-          break;
-        }
-      }
-    }
-  if (windows->image.orphan != MagickFalse)
-    return(MagickTrue);
-  if (normalized_degrees != 0.0)
-    {
-      /*
-        Update image colormap.
-      */
-      windows->image.window_changes.width=(int) (*image)->columns;
-      windows->image.window_changes.height=(int) (*image)->rows;
-      if (windows->image.crop_geometry != (char *) NULL)
-        {
-          /*
-            Obtain dimensions of image from crop geometry.
-          */
-          (void) XParseGeometry(windows->image.crop_geometry,&x,&y,
-            &width,&height);
-          windows->image.window_changes.width=(int) width;
-          windows->image.window_changes.height=(int) height;
-        }
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-    }
-  else
-    if (((rotations % 4) == 1) || ((rotations % 4) == 3))
-      {
-        windows->image.window_changes.width=windows->image.ximage->height;
-        windows->image.window_changes.height=windows->image.ximage->width;
-      }
-  /*
-    Update image configuration.
-  */
-  (void) XConfigureImage(display,resource_info,windows,*image,exception);
   return(MagickTrue);
+}
+
+static const ModeType
+  RotateDirectionTable[] =
+  {
+    HorizontalRotateCommand,
+    VerticalRotateCommand
+  },
+  RotateCommandTable[] =
+  {
+    RotateColorCommand,
+    RotateDirectionCommand,
+    RotateHelpCommand,
+    RotateDismissCommand
+  };
+
+static MagickBooleanType XRotateImage(Display *display,
+  XResourceInfo *resource_info,XWindows *windows,double degrees,Image **image,
+  ExceptionInfo *exception)
+{
+  const char
+    *const RotateMenu[] =
+    {
+      "Pixel Color",
+      "Direction",
+      "Help",
+      "Dismiss",
+      (char *) NULL
+    };
+
+  static ModeType
+    direction = HorizontalRotateCommand;
+
+  static unsigned int
+    pen_id = 0;
+
+  char
+    command[MagickPathExtent];
+
+  int
+    x,
+    y;
+
+  double
+    normalized_degrees;
+
+  unsigned int
+    height,
+    rotations,
+    width;
+
+  const RotateTargets
+    targets = { &pen_id };
+
+  const RotateLoopInput
+    loop_input = { display, resource_info, windows, RotateMenu,
+      RotateCommandTable, RotateDirectionTable, command, targets, exception };
+
+  const RotateAngleTargets
+    angle_targets = { &x, &y, &direction, &degrees };
+
+  if (XSelectRotateAngle(&loop_input,&angle_targets) == MagickFalse)
+    return(MagickTrue);
+  if (direction == VerticalRotateCommand)
+    degrees-=90.0;
+  if (degrees == 0.0)
+    return(MagickTrue);
+  /*
+    Rotate image.
+  */
+  normalized_degrees=degrees;
+  while (normalized_degrees < -45.0)
+    normalized_degrees+=360.0;
+  for (rotations=0; normalized_degrees > 45.0; rotations++)
+    normalized_degrees-=90.0;
+  {
+    const RotateApplyInput
+      apply = { display, resource_info, windows, image, exception, degrees,
+        normalized_degrees, pen_id };
+
+    if (XRotateApply(&apply) == MagickFalse)
+      return(MagickFalse);
+  }
+  {
+    const RotateCropInput
+      crop = { windows, image, rotations, x, y };
+
+    XRotateCropGeometry(&crop,&width,&height);
+  }
+  {
+    const RotateUpdateInput
+      update = { display, resource_info, windows, image, exception,
+        normalized_degrees, rotations };
+
+    return(XRotateUpdate(&update,&width,&height));
+  }
 }
 
 /*
