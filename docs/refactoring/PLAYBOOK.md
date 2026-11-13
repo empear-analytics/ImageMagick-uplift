@@ -13443,6 +13443,63 @@ mandate of 2026-10-24.
 
 ---
 
+## Recipe KD - Replace a Dispatch Ladder by a Table of Function Pointers
+
+**Use when:** CodeScene reports *Complex Method* on a function whose complexity is a run
+of `if (LocaleCompare(map,"K") == 0) return(F(args));` statements, one per key, each
+calling a different function of one signature, followed by a fallback that is not part of
+the run. `pixel-import.c`'s `ImportCharPixel` (nine maps, cc 10).
+
+**Not covered by:** Recipe KT, whose groups assign one call's result under integer labels;
+Recipe KR, whose groups return string literals; Recipe KE, whose groups assign an
+enumerator.
+
+**How:**
+
+1. The run lies outside every OpenMP region. Every statement is `if (LocaleCompare(v,"K")
+   == 0)` returning `F(a,b,...)` with the same arguments and `v` the same variable; keys
+   distinct; the `F` are `static` functions of one signature (parameter qualifiers that
+   are top-level, such as `magick_restrict`, may differ); the run is followed by the
+   fallback, which stays.
+2. Directly above the function write a `typedef struct` of the key (`const char *`) and
+   a pointer to a function of that signature, and a `static const` array of it with one
+   element `{ "K", F }` per statement, in order.
+3. Declare `size_t i;` at the function's top and replace the run by `for (i=0; i <
+   (sizeof(T)/sizeof(*T)); i++) if (LocaleCompare(v,T[i].key) == 0)
+   return(T[i].fn(a,b,...));`. Every `ThrowMagickException` stays where it was.
+4. Run `tools/ci_warnings.sh <file>` (must print `OK`) and the oracle for the function.
+
+**Before:**
+
+```c
+  if (LocaleCompare(map,"BGR") == 0)
+    return(ImportCharBGRPixels(image,roi,p,exception));
+  if (LocaleCompare(map,"BGRA") == 0)
+    return(ImportCharBGRAPixels(image,roi,p,exception));
+```
+
+**After:**
+
+```c
+  for (i=0; i < (sizeof(ImportCharMaps)/sizeof(*ImportCharMaps)); i++)
+    if (LocaleCompare(map,ImportCharMaps[i].map) == 0)
+      return(ImportCharMaps[i].import_pixels(image,roi,p,exception));
+```
+
+**Careful:**
+
+- Keys are distinct and tested in the original order, so the first match is the same
+  call with the same arguments; a map outside the table reaches the fallback as before.
+- The table is `static const`; the lookup scans at most nine elements once per import.
+
+**Evidence level:** oracle (the cases that reach the function).
+
+**Provenance:** 2026-11-13, from `pixel-import.c`'s `ImportCharPixel` (campaign B, M124):
+6.69 to 6.89 for the file. Added by Claude Code (Claude Sonnet 5.5) under the mandate of
+2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -13765,3 +13822,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | DD | Drop a `case` whose statements repeat the `default:` group; proof `obj_identical.sh` | `stream.c`'s `GetStreamPacketSize` (cc 9 to 8, 5.84 to 5.98, object code identical); DL refuses a label with its own statements | mandate (2026-10-24) |
 | 2026-11-13 | NEW | KE | Replace a letter-keyed `switch` that assigns an enumerator (and for some letters tests then exits) by a `static const` table of records and a lookup helper; evidence oracle | `stream.c`'s `StreamImagePixels` map parser (cc 39 to 16, 5.98 to 6.12); KS assigns strings and returns, SR keeps the labels | mandate (2026-10-24) |
 | 2026-11-13 | NEW | DV | Drop a `static` function's parameter that every caller fills with a member of another argument; the callee reads the member into a local; evidence oracle | `stream.c`'s `StreamDoublePixels` and `StreamFloatPixels` (five arguments to four; 6.12 to 6.13); M merges identical arguments only | mandate (2026-10-24) |
+| 2026-11-13 | NEW | KD | Replace a run of `if (LocaleCompare(v,"K") == 0) return(F(...));` calls of one signature by a `static const` table of key/function-pointer records and a lookup loop; evidence oracle | `pixel-import.c` `ImportCharPixel` (cc 10, file 6.69 to 6.89); KT assigns, KR returns strings, KE assigns enumerators | mandate (2026-10-24) |
