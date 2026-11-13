@@ -1137,6 +1137,21 @@ static void LoadLogIncludes(const LogIncludeInput *include,const char **q,
   }
 }
 
+static MagickBooleanType ReadLogMarkupElement(
+  const LogIncludeInput *include,const char **q,MagickStatusType *status)
+{
+  if (SkipMarkupElement(include->keyword,q,include->extent,include->token) !=
+      MagickFalse)
+    return(MagickTrue);
+  if (LocaleCompare(include->keyword,"<include") != 0)
+    return(MagickFalse);
+  /*
+    Include element.
+  */
+  LoadLogIncludes(include,q,status);
+  return(MagickTrue);
+}
+
 typedef struct _LogElementInput
 {
   LinkedListInfo
@@ -1268,6 +1283,9 @@ static MagickBooleanType LoadLogCache(const LogLoadTarget *target,
     LogElementInput
       element;
 
+    LogIncludeInput
+      include;
+
     /*
       Interpret XML.
     */
@@ -1275,25 +1293,14 @@ static MagickBooleanType LoadLogCache(const LogLoadTarget *target,
     if (*token == '\0')
       break;
     (void) CopyMagickString(keyword,token,MagickPathExtent);
-    if (SkipMarkupElement(keyword,&q,extent,token) != MagickFalse)
+    include.target=target;
+    include.filename=filename;
+    include.keyword=keyword;
+    include.token=token;
+    include.extent=extent;
+    include.depth=depth;
+    if (ReadLogMarkupElement(&include,&q,&status) != MagickFalse)
       continue;
-    if (LocaleCompare(keyword,"<include") == 0)
-      {
-        /*
-          Include element.
-        */
-        LogIncludeInput
-          include;
-
-        include.target=target;
-        include.filename=filename;
-        include.keyword=keyword;
-        include.token=token;
-        include.extent=extent;
-        include.depth=depth;
-        LoadLogIncludes(&include,&q,&status);
-        continue;
-      }
     element.cache=cache;
     element.exception=exception;
     element.keyword=keyword;
