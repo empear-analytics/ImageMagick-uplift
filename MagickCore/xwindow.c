@@ -5828,6 +5828,19 @@ static Image *XReadTexturePattern(const XResourceInfo *resource_info,
   return(pattern);
 }
 
+static unsigned short XBitmapPolarity(const Image *image,const Image *canvas)
+{
+  unsigned short
+    polarity;
+
+  polarity=(unsigned short) ((GetPixelInfoIntensity(image,
+    &canvas->colormap[0])) < ((double) QuantumRange/2.0) ? 1 : 0);
+  if (canvas->colors == 2)
+    polarity=GetPixelInfoIntensity(image,&canvas->colormap[0]) <
+      GetPixelInfoIntensity(image,&canvas->colormap[1]);
+  return(polarity);
+}
+
 static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -5928,11 +5941,7 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
       foreground=(unsigned char)
         (XPixelIntensity(&window->pixel_info->background_color) <
          XPixelIntensity(&window->pixel_info->foreground_color) ? 0x80 : 0x00);
-      polarity=(unsigned short) ((GetPixelInfoIntensity(image,
-        &canvas->colormap[0])) < ((double) QuantumRange/2.0) ? 1 : 0);
-      if (canvas->colors == 2)
-        polarity=GetPixelInfoIntensity(image,&canvas->colormap[0]) <
-          GetPixelInfoIntensity(image,&canvas->colormap[1]);
+      polarity=XBitmapPolarity(image,canvas);
       bitmap.canvas=canvas;
       bitmap.polarity=polarity;
       bitmap.background=background;
