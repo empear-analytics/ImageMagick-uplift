@@ -15703,6 +15703,164 @@ evolve the recipes.
 
 ---
 
+## Recipe KM - Replace a Key Switch Selecting by Modifier Masks with a Table of Rules
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead* on a
+function whose complexity is one `switch` on a key code in which most groups only return
+a constant command, either at once or after testing modifier bits of one state value
+(`if ((state & Mod1Mask) != 0) return(SwirlCommand); if ((state & ControlMask) == 0)
+return(ShearCommand); return(SaveCommand);`), while a few other groups do more and stay:
+`display.c`'s `XImageWindowCommand` (65 such labels among 79, cc 132, 342 lines).
+
+**Not covered by:** Recipe KR, whose function is the `switch` alone and whose groups
+each return one constant without a test; Recipe KT and KC, whose groups call or assign
+one constant; Recipe KE, whose groups assign and share one flag test; Recipes SD, SR, SW
+and ST, which split the run into shorter runs that keep every label and every test;
+Recipe LP, which names a set of labels sharing one body. No recipe turns a test of a
+mask into data.
+
+**How:**
+
+1. The `switch (e)` lies outside every OpenMP region and holds no `#` line; `e` is an
+   integer expression with no call, assignment or increment (a cast of a parameter,
+   `(int) key_symbol`), and nothing before or in the `switch` that the moved groups
+   reach writes what it reads. The `switch` ends the function: its `default:` group is
+   `return(c_d);` of a constant, and the statement after the `switch` is
+   `return(c_d);` of the same constant (reached by a group that `break`s).
+2. A group moves when its body, braces aside, is a sequence of statements of the forms
+   `if ((s & M) != 0) return(c);`, `if ((s & M) == 0) return(c);` (or `break;` in place
+   of that `return`, which means `return(c_d);`) and a final `return(c);`, where `s` is
+   one parameter, every `M` is a modifier mask macro, every `c` an enumeration constant,
+   and the masks are tested in this order: at most two masks other than `ControlMask`
+   by `!= 0` (each returning its command), then `ControlMask` (by `== 0` returning the
+   *plain* command, the final `return` giving the *control* command), or a single
+   `if ((s & M) == 0) return(c_d);` before the final `return(c);`. A group of one
+   `return(c);` has `c` as both commands. A group that tests any other mask, calls,
+   assigns or holds a comment stays.
+3. Directly above the function, declare `typedef struct` with `key` of `int` (the type
+   of `e`), `first_mask` and `second_mask` of the type of `s`, and `first_command`,
+   `second_command`, `plain_command`, `control_command` of the function's return type;
+   then a `static const` array of it with no size, one element per label of a moved
+   group, in the `switch`'s order: `{ L, M1, c1, M2, c2, plain, control }`. A group with
+   fewer than two non-Control masks fills each missing pair with `ControlMask` and the
+   control command, which is the next test the group would make. The `== 0` form of
+   a non-Control mask (`if ((s & Mod1Mask) == 0) return(c_d); return(c);`) is the pair
+   `Mod1Mask, c` with `c_d` as both plain and control commands.
+4. Write a `static` lookup function of the return type, directly above the function,
+   taking `const int key` and `const` `s`: a `for` over the array that `continue`s past
+   elements whose `key` differs, and for the first that matches returns `first_command`
+   when `(s & first_mask) != 0`, else `second_command` when `(s & second_mask) != 0`,
+   else `plain_command` when `(s & ControlMask) == 0`, else `control_command`; after the
+   loop `return(c_d);`.
+5. Delete the moved groups from the `switch`, write its `default:` group as `break;`,
+   and replace the statement after the `switch` by `return(Lookup(e,s));` (the text of
+   `e`). The groups that stay are not touched.
+6. Check by script, for every moved label and every combination of the masks the
+   function tests, that the original group's statements and the lookup give the same
+   command (an interpreter of step 2's forms against a simulation of step 4's), that
+   each label is in the table or the `switch` exactly once, and that nothing else in the
+   file changed.
+7. `refactor_guard.py`: `OK` (enumeration constants and masks are not literals);
+   `--calls` adds the lookup twice and moves nothing else. The function is not on a
+   per-pixel path (check its callers by reading).
+
+**Before:**
+
+```c
+  switch ((int) key_symbol)
+  {
+    case XK_s:
+    {
+      if ((state & Mod1Mask) != 0)
+        return(SwirlCommand);
+      if ((state & ControlMask) == 0)
+        return(ShearCommand);
+      return(SaveCommand);
+    }
+    ...
+    case XK_less:
+      return(HalfSizeCommand);
+    ...
+    case XK_Menu:
+    {
+      (void) XMapRaised(display,windows->command.id);
+      return(NullCommand);
+    }
+    ...
+    default:
+      return(NullCommand);
+  }
+  return(NullCommand);
+```
+
+**After:**
+
+```c
+static const XKeyCommandInfo
+  ImageWindowKeyCommands[] =
+  {
+    ...
+    { XK_s, Mod1Mask, SwirlCommand, ControlMask, SaveCommand, ShearCommand,
+      SaveCommand },
+    ...
+    { XK_less, ControlMask, HalfSizeCommand, ControlMask, HalfSizeCommand,
+      HalfSizeCommand, HalfSizeCommand },
+    ...
+  };
+...
+  switch ((int) key_symbol)
+  {
+    case XK_Menu:
+    {
+      (void) XMapRaised(display,windows->command.id);
+      return(NullCommand);
+    }
+    ...
+    default:
+      break;
+  }
+  return(XLookupKeyCommand((int) key_symbol,state));
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The lookup receives the value the `switch` evaluated
+  (the same text, of the same type, with nothing run in between) and the same `state`.
+  A value equal to a label that stays selects that group as before, and it returns
+  before the lookup. Any other value used to select a moved group or `default:`; now it
+  reaches `default: break;` and the lookup. Labels are distinct (a `switch` cannot hold
+  two equal ones), so the first element whose key matches is the moved label's own.
+  For that element the lookup makes the group's tests in the group's order: a
+  non-Control mask set gives that mask's command, as the group's `!= 0` test returned
+  it; with none set, `ControlMask` decides between the plain and the control command as
+  the group did. A filler pair `ControlMask, control` (step 3) returns the control
+  command exactly when `ControlMask` is set, which is what the following tests would
+  return, so it changes no result. A value matching no element returns `c_d`, what
+  `default:` returned.
+- A group's `break;` led to the statement after the `switch`, `return(c_d);` (step 1);
+  its element holds `c_d` in that place.
+- A mask test reads `state`, which nothing writes; the order in which the tests run
+  matters only for which `return` is taken, and step 6 checks every combination.
+- The tables are `static const`, written once by their initialisers; no existing table
+  changes. Every element lists every member, so `-Wmissing-field-initializers` stays
+  quiet and no literal is added.
+- Searching up to some sixty elements replaces a jump, once per key press.
+- No statement follows a `switch` whose every path returns (MSVC C4702): the caller's
+  `switch` now breaks in `default:` into the lookup's `return`.
+
+**Evidence level:** oracle (the cases that reach the function), with step 6's script and
+step 7's guard fingerprint.
+
+**Provenance:** 2026-11-13, from `display.c`'s `XImageWindowCommand` (campaign A, W23
+round eight lane a, wide build): the key dispatch of the Image window, cc 132 and 342
+lines, of which 65 labels return a command after at most three mask tests. A probe
+leaves the function at cc 41 and 129 lines with the lookup finding-free; the file stays
+at 2.71 while `XMagickCommand` holds it (with the other lanes' functions stubbed, the
+whole lane plan reaches 5.91). Added by Claude Code (Claude Opus 5.5) under the owner's
+OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -16059,3 +16217,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | F | Step 1 (*Automatic form*): an automatic array of `const` string pointers, or of pointers to such arrays, whose initialiser holds only string literals, a null pointer and the names of other moved arrays, moves as `static` when every use is an element read, an argument to a pointer-to-`const` parameter whose callee keeps no copy past the call, or a member of a local struct the function only reads. *Careful* gives the argument (const-valued data nothing writes, the same address to the same callees, lifetimes distinguishable only by a use after return, which step 1 refuses); the evidence is the oracle plus the data-section comparison, since the caller's code loses the stores that built the array | `animate.c`'s `XAnimateImages` (campaign A, W22 lane d, wide build): `CommandMenu`, `AnimateMenu`, `SpeedMenu`, `DirectionMenu`, `HelpMenu` and `Menus` are 48 lines of the function's 726; Recipe F handled only `static` declarations | owner |
 | 2026-11-13 | AMEND | E | Step 3: a block-scope `static` struct (not an array) that the block passes by address only to callees keeping no copy, or reads members of, goes as a pointer parameter like a struct local (`&v` written `v`, `v.m` written `(*v).m`, the call passing `&v`). *Careful*-style argument in the text: the static is one object at a fixed address with block scope, so the helper's pointer designates the object the block named and each access is the one the block made, at the same point | `xwindow.c`'s `XMakeWindow` (campaign A, W22 round seven lane b, wide build): the `XStringListToTextProperty` pair fills `static XTextProperty icon_name, window_name`; with the size-hints and icon-geometry helpers the function leaves Complex Method and Large Method, 3.76 to 3.88 in a probe | owner |
 | 2026-11-13 | AMEND | I | Step 2: a block-scope `static` of structure type may be a written variable on Recipe CT step 2's terms (member a pointer to the structure, `v.m` written `(*v).m`, `&v` written `v`), and when every written variable of the targets struct is such a `static` the limit of six rises to ten. The text gives the argument (one object at a fixed address, block scope, distinct objects, nothing to alias) | `xwindow.c`'s `XRenderImage` (campaign A, W22 round seven lane b, wide build): the `if (display == NULL)` init block writes eight statics, three of them structures, and leaves through `return(MagickFalse);` four times; Recipe I stopped at six variables and refused structure statics | owner |
+| 2026-11-13 | NEW | KM | Replace a Key Switch Selecting by Modifier Masks with a Table of Rules: the groups of a key `switch` that return a constant command after at most two non-Control mask tests and the Control test become rows `{ key, mask, command, mask, command, plain, control }` of a `static const` table (a missing pair filled with `ControlMask` and the control command) read by one lookup function that the caller returns from after `default: break;`. *Careful* gives the argument (same value, same tests in the same order, the filler pair returns what the next test would, `break` meant the closing return) | `display.c`'s `XImageWindowCommand` (campaign A, W23 round eight lane a, wide build): cc 132 to 41, 342 to 129 lines, the lookup finding-free; KR, KT, KC and KE refuse groups that test masks | owner |
