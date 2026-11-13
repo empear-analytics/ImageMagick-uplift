@@ -15423,6 +15423,48 @@ static void HandlePreferencesKeyEvent(const PreferencesContext *context,
   }
 }
 
+static void HandlePreferencesWindowEvent(const PreferencesContext *context,
+  const XEvent event,const PreferencesWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  switch (event.type)
+  {
+    case ClientMessage:
+    {
+      (*state)=ClientWidgetMessage(display,windows,event,(*state));
+      break;
+    }
+    case ConfigureNotify:
+    {
+      (*state)=ConfigureWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case EnterNotify:
+    {
+      (*state)=EnterWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case Expose:
+    {
+      (*state)=ExposeWidgetWindow(windows,event,(*state));
+      break;
+    }
+    default:
+    {
+      HandlePreferencesKeyEvent(context,event,widgets);
+      break;
+    }
+  }
+}
+
 MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XResourceInfo *resource_info,XWindows *windows)
 {
@@ -15509,29 +15551,9 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
         ReleasePreferencesButtons(&context,event,&widgets);
         break;
       }
-      case ClientMessage:
-      {
-        state=ClientWidgetMessage(display,windows,event,state);
-        break;
-      }
-      case ConfigureNotify:
-      {
-        state=ConfigureWidgetWindow(windows,event,state);
-        break;
-      }
-      case EnterNotify:
-      {
-        state=EnterWidgetWindow(windows,event,state);
-        break;
-      }
-      case Expose:
-      {
-        state=ExposeWidgetWindow(windows,event,state);
-        break;
-      }
       default:
       {
-        HandlePreferencesKeyEvent(&context,event,&widgets);
+        HandlePreferencesWindowEvent(&context,event,&widgets);
         break;
       }
     }
