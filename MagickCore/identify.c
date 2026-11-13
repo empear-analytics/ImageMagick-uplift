@@ -503,14 +503,11 @@ static ssize_t PrintPerceptualHashRows(FILE *file,
   return(n);
 }
 
-static ssize_t PrintChannelPerceptualHash(Image *image,FILE *file,
+static void PrintPerceptualHashColorspaces(FILE *file,
   const ChannelPerceptualHash *channel_phash)
 {
   ssize_t
     i;
-
-  ssize_t
-    n;
 
   (void) FormatLocaleFile(file,"  Channel perceptual hash: ");
   for (i=0; i < (ssize_t) channel_phash[0].number_colorspaces; i++)
@@ -521,6 +518,18 @@ static ssize_t PrintChannelPerceptualHash(Image *image,FILE *file,
       (void) FormatLocaleFile(file,", ");
   }
   (void) FormatLocaleFile(file,"\n");
+}
+
+static ssize_t PrintChannelPerceptualHash(Image *image,FILE *file,
+  const ChannelPerceptualHash *channel_phash)
+{
+  ssize_t
+    i;
+
+  ssize_t
+    n;
+
+  PrintPerceptualHashColorspaces(file,channel_phash);
   n=0;
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
   {
