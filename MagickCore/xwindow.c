@@ -4850,6 +4850,69 @@ static XImage *XReplaceWindowMatteImage(Display *display,XWindowInfo *window,
   return(matte_image);
 }
 
+typedef struct _XMakeImageSource
+{
+  Display
+    *display;
+
+  XWindowInfo
+    *window;
+
+  int
+    depth,
+    format;
+
+  unsigned int
+    width,
+    height;
+} XMakeImageSource;
+
+static MagickBooleanType XCreateWindowXImage(const XMakeImageSource *source,
+  XImage **ximage)
+{
+  Display
+    *const display = source->display;
+
+  XWindowInfo
+    *const window = source->window;
+
+  const int
+    depth = source->depth,
+    format = source->format;
+
+  const unsigned int
+    width = source->width,
+    height = source->height;
+
+  *ximage=XAttachSharedXImage(display,window,*ximage);
+  if (window->shared_memory == MagickFalse)
+    *ximage=XCreateImage(display,window->visual,(unsigned int) depth,format,0,
+      (char *) NULL,width,height,XBitmapPad(display),0);
+  if (*ximage == (XImage *) NULL)
+    {
+      /*
+        Unable to create X image.
+      */
+      (void) XCheckDefineCursor(display,window->id,window->cursor);
+      return(MagickFalse);
+    }
+  if ((GetLogEventMask() & X11Event) != 0)
+    XLogXImage(*ximage);
+  if (window->shared_memory == MagickFalse)
+    XAcquireXImageData(*ximage);
+  if ((*ximage)->data == (char *) NULL)
+    {
+      /*
+        Unable to allocate pixel data.
+      */
+      XDestroyImage(*ximage);
+      *ximage=(XImage *) NULL;
+      (void) XCheckDefineCursor(display,window->id,window->cursor);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
@@ -4861,6 +4924,9 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
   XImage
     *matte_image,
     *ximage;
+
+  XMakeImageSource
+    source;
 
   XWindowTransform
     transform;
@@ -4917,32 +4983,14 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
       ximage=XAllocateSharedSegment(window,segment_info,ximage);
     }
 #endif
-  ximage=XAttachSharedXImage(display,window,ximage);
-  if (window->shared_memory == MagickFalse)
-    ximage=XCreateImage(display,window->visual,(unsigned int) depth,format,0,
-      (char *) NULL,width,height,XBitmapPad(display),0);
-  if (ximage == (XImage *) NULL)
-    {
-      /*
-        Unable to create X image.
-      */
-      (void) XCheckDefineCursor(display,window->id,window->cursor);
-      return(MagickFalse);
-    }
-  if ((GetLogEventMask() & X11Event) != 0)
-    XLogXImage(ximage);
-  if (window->shared_memory == MagickFalse)
-    XAcquireXImageData(ximage);
-  if (ximage->data == (char *) NULL)
-    {
-      /*
-        Unable to allocate pixel data.
-      */
-      XDestroyImage(ximage);
-      ximage=(XImage *) NULL;
-      (void) XCheckDefineCursor(display,window->id,window->cursor);
-      return(MagickFalse);
-    }
+  source.display=display;
+  source.window=window;
+  source.depth=depth;
+  source.format=format;
+  source.width=width;
+  source.height=height;
+  if (XCreateWindowXImage(&source,&ximage) == MagickFalse)
+    return(MagickFalse);
   XReplaceWindowXImage(display,window,ximage);
   matte_image=XReplaceWindowMatteImage(display,window,width,height);
   /*
