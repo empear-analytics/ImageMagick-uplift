@@ -439,8 +439,7 @@ static void MarkScenesForDeletion(MagickBooleanType *delete_list,
     char
       *q;
 
-    while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == ','))
-      p++;
+    p=SkipSceneSeparators(p);
     first=strtol(p,&q,10);
     if (p == q)
       break;
