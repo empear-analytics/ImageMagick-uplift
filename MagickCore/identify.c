@@ -236,7 +236,6 @@ static ChannelStatistics *GetLocationStatistics(const Image *image,
   {
     switch (type)
     {
-      case MaximumStatistic:
       default:
       {
         channel_statistics[i].maxima=(-MagickMaximumValue);
