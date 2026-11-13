@@ -97,6 +97,7 @@ if ( ! GetOptions(
 	 'shear-deskew.c',
 	 'signature.c',
 	 'stream.c',
+	 'stream-read.c',
 	 'transform.c',
 	 'transform-region.c',
 	 'transform-tiles.c',

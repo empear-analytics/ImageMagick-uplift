@@ -169,6 +169,7 @@ $call Make statistic-function.c
 $call Make statistic-moments.c
 $call Make statistic-image.c
 $call Make stream.c
+$call Make stream-read.c
 $call Make string.c
 $call Make string-copy.c
 $call Make string-info.c
