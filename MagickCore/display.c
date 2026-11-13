@@ -5220,6 +5220,9 @@ typedef struct _CompositeEventTargets
 
   size_t
     *state;
+
+  RectangleInfo
+    *composite_info;
 } CompositeEventTargets;
 
 static void XCompositeKeyPress(const CompositeCommandInput *input,
@@ -5292,6 +5295,42 @@ static void XCompositeKeyPress(const CompositeCommandInput *input,
   }
 }
 
+static void XCompositePress(const CompositeCommandInput *input,
+  const XEvent *event,const Cursor cursor,const CompositeEventTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  Image
+    **const composite_image = targets->composite_image;
+
+  RectangleInfo
+    *const composite_info = targets->composite_info;
+
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Button Press: 0x%lx %u +%d+%d",(*event).xbutton.window,
+      (*event).xbutton.button,(*event).xbutton.x,(*event).xbutton.y);
+  if ((*event).xbutton.button != Button1)
+    return;
+  if ((*event).xbutton.window != windows->image.id)
+    return;
+  /*
+    Change cursor.
+  */
+  (*composite_info).width=(*composite_image)->columns;
+  (*composite_info).height=(*composite_image)->rows;
+  (void) XCheckDefineCursor(display,windows->image.id,cursor);
+  (*composite_info).x=(ssize_t) windows->image.x+(*event).xbutton.x;
+  (*composite_info).y=(ssize_t) windows->image.y+(*event).xbutton.y;
+}
+
 static MagickBooleanType XCompositeImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -5359,7 +5398,7 @@ static MagickBooleanType XCompositeImage(Display *display,
     targets = { &blend, &compose };
 
   const CompositeEventTargets
-    event_targets = { &composite_image, &state };
+    event_targets = { &composite_image, &state, &composite_info };
 
   const CompositeCommandInput
     command_input = { display, resource_info, windows, CompositeCommands,
@@ -5434,22 +5473,7 @@ static MagickBooleanType XCompositeImage(Display *display,
     {
       case ButtonPress:
       {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Button Press: 0x%lx %u +%d+%d",event.xbutton.window,
-            event.xbutton.button,event.xbutton.x,event.xbutton.y);
-        if (event.xbutton.button != Button1)
-          break;
-        if (event.xbutton.window != windows->image.id)
-          break;
-        /*
-          Change cursor.
-        */
-        composite_info.width=composite_image->columns;
-        composite_info.height=composite_image->rows;
-        (void) XCheckDefineCursor(display,windows->image.id,cursor);
-        composite_info.x=(ssize_t) windows->image.x+event.xbutton.x;
-        composite_info.y=(ssize_t) windows->image.y+event.xbutton.y;
+        XCompositePress(&command_input,&event,cursor,&event_targets);
         break;
       }
       case ButtonRelease:
