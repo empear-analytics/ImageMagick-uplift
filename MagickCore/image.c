@@ -3355,6 +3355,21 @@ static MagickBooleanType SetImageMagickFromContent(ImageInfo *image_info,
   return(MagickTrue);
 }
 
+static void DisableUnsupportedAdjoin(ImageInfo *image_info,const char *magic,
+  ExceptionInfo *exception)
+{
+  const MagickInfo
+    *magick_info;
+
+  /*
+    Some image formats do not support multiple frames per file.
+  */
+  magick_info=GetMagickInfo(magic,exception);
+  if (magick_info != (const MagickInfo *) NULL)
+    if (GetMagickAdjoin(magick_info) == MagickFalse)
+      image_info->adjoin=MagickFalse;
+}
+
 MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
   const unsigned int frames,ExceptionInfo *exception)
 {
@@ -3422,15 +3437,7 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
   if ((image_info->adjoin != MagickFalse) && (frames > 1))
     TestMultipleImageSupport(image_info,component,exception);
   if ((image_info->adjoin != MagickFalse) && (frames > 0))
-    {
-      /*
-        Some image formats do not support multiple frames per file.
-      */
-      magick_info=GetMagickInfo(magic,exception);
-      if (magick_info != (const MagickInfo *) NULL)
-        if (GetMagickAdjoin(magick_info) == MagickFalse)
-          image_info->adjoin=MagickFalse;
-    }
+    DisableUnsupportedAdjoin(image_info,magic,exception);
   if (image_info->affirm != MagickFalse)
     return(MagickTrue);
   if (frames == 0)
