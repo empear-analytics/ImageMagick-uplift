@@ -1257,6 +1257,12 @@ MagickExport Image *ReadImages(ImageInfo *image_info,const char *filename,
 %
 */
 
+static inline MagickBooleanType IsDataTypeChar(const char *p)
+{
+  return(((*p != '\0') && (*p != ';') && (*p != ',')) ? MagickTrue :
+    MagickFalse);
+}
+
 static void NormalizeDataImageType(char *magick)
 {
   char
@@ -1289,7 +1295,7 @@ static MagickBooleanType GetImplicitDataImageType(const char *data_url,
     return(MagickFalse);
   type=data_url+5;
   p=type;
-  while ((*p != '\0') && (*p != ';') && (*p != ','))
+  while (IsDataTypeChar(p) != MagickFalse)
     p++;
   if (p == type)
     return(MagickFalse);
