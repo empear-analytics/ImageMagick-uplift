@@ -2737,6 +2737,18 @@ typedef struct _AnnotateContext
 
   char
     *text;
+
+  GC
+    annotate_context;
+
+  XFontStruct
+    *font_info;
+
+  unsigned int
+    box_id;
+
+  unsigned int
+    pen_id;
 } AnnotateContext;
 
 static void XSetAnnotateMenuInput(const AnnotateContext *context,const int id,
@@ -2988,6 +3000,65 @@ static void XAnnotateTrackPointer(const AnnotateContext *context,
   } while (((*state) & ExitState) == 0);
 }
 
+static void XAnnotateTextCommand(const AnnotateContext *context,
+  const AnnotateTargets *targets)
+{
+  int
+    id;
+
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+
+  XEvent
+    *const text_event = targets->text_event;
+
+  /*
+    Select a command from the Command widget.
+  */
+  (void) XSetBackground(context->display,context->annotate_context,
+    context->windows->pixel_info->background_color.pixel);
+  (void) XSetForeground(context->display,context->annotate_context,
+    context->windows->pixel_info->foreground_color.pixel);
+  id=XCommandWidget(context->display,context->windows,AnnotateMenu,event);
+  (void) XSetBackground(context->display,context->annotate_context,
+    context->windows->pixel_info->pen_colors[context->box_id].pixel);
+  (void) XSetForeground(context->display,context->annotate_context,
+    context->windows->pixel_info->pen_colors[context->pen_id].pixel);
+  if (id < 0)
+    return;
+  switch (TextCommands[id])
+  {
+    case TextHelpCommand:
+    {
+      XTextViewHelp(context->display,context->resource_info,context->windows,
+        MagickFalse,
+        "Help Viewer - Image Annotation",ImageAnnotateHelp);
+      (void) XCheckDefineCursor(context->display,context->windows->image.id,
+        context->cursor);
+      break;
+    }
+    case TextApplyCommand:
+    {
+      /*
+        Finished annotating.
+      */
+      (*annotate_info)->width=(unsigned int) XTextWidth(context->font_info,
+        (*annotate_info)->text,(int) strlen((*annotate_info)->text));
+      XRefreshWindow(context->display,&context->windows->image,text_event);
+      (*state)|=ExitState;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType XAnnotateEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -3016,7 +3087,6 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
     annotate_context;
 
   int
-    id,
     status,
     x,
     y;
@@ -3162,6 +3232,11 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
   text_event.xexpose.height=font_info->max_bounds.ascent+
     font_info->max_bounds.descent;
   p=annotate_info->text;
+  context.cursor=cursor;
+  context.annotate_context=annotate_context;
+  context.font_info=font_info;
+  context.box_id=box_id;
+  context.pen_id=pen_id;
   do
   {
     /*
@@ -3175,43 +3250,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
     XScreenEvent(display,windows,&event,exception);
     if (event.xany.window == windows->command.id)
       {
-        /*
-          Select a command from the Command widget.
-        */
-        (void) XSetBackground(display,annotate_context,
-          windows->pixel_info->background_color.pixel);
-        (void) XSetForeground(display,annotate_context,
-          windows->pixel_info->foreground_color.pixel);
-        id=XCommandWidget(display,windows,AnnotateMenu,&event);
-        (void) XSetBackground(display,annotate_context,
-          windows->pixel_info->pen_colors[box_id].pixel);
-        (void) XSetForeground(display,annotate_context,
-          windows->pixel_info->pen_colors[pen_id].pixel);
-        if (id < 0)
-          continue;
-        switch (TextCommands[id])
-        {
-          case TextHelpCommand:
-          {
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Image Annotation",ImageAnnotateHelp);
-            (void) XCheckDefineCursor(display,windows->image.id,cursor);
-            break;
-          }
-          case TextApplyCommand:
-          {
-            /*
-              Finished annotating.
-            */
-            annotate_info->width=(unsigned int) XTextWidth(font_info,
-              annotate_info->text,(int) strlen(annotate_info->text));
-            XRefreshWindow(display,&windows->image,&text_event);
-            state|=ExitState;
-            break;
-          }
-          default:
-            break;
-        }
+        XAnnotateTextCommand(&context,&targets);
         continue;
       }
     /*
