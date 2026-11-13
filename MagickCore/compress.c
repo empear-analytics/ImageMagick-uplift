@@ -1049,12 +1049,7 @@ MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
   number_bits=0;
   last_code=0;
   OutputCode(LZWClr);
-  for (index=0; index < 256; index++)
-  {
-    table[index].prefix=(-1);
-    table[index].suffix=(ssize_t) index;
-    table[index].next=(-1);
-  }
+  ResetLZWTable(table);
   next_index=LZWEod+1;
   code_width=9;
   last_code=(size_t) pixels[0];
