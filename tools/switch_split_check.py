@@ -425,152 +425,255 @@ class Walk:
                                      (name, nxt, " ".join(a), p))
 
 
-def check(old_text, new_text, caller, helpers):
+DEFAULT = ("default :",)
+EXITS = ("return", "continue", "goto")
+
+
+def inventory_problems(old, new, caller, helpers):
+    """Problems with the set of functions: the caller missing, the added ones not the helpers."""
+    if caller not in old.funcs or caller not in new.funcs:
+        return ["%s not found on both sides" % caller]
     problems = []
-    old, new = parse(old_text), parse(new_text)
-    otoks, ntoks = old.toks, new.toks
-    ofuncs, nfuncs = old.funcs, new.funcs
-    if caller not in ofuncs or caller not in nfuncs:
-        return ["%s not found on both sides" % caller], ""
-    added = sorted(set(nfuncs) - set(ofuncs))
+    added = sorted(set(new.funcs) - set(old.funcs))
     if added != sorted(helpers):
         problems.append("functions added: %s, expected %s" % (added, sorted(helpers)))
-    gone = sorted(set(ofuncs) - set(nfuncs))
+    gone = sorted(set(old.funcs) - set(new.funcs))
     if gone:
         problems.append("functions removed: %s" % gone)
+    return problems
+
+
+def leaf_groups(flat):
+    """The groups of a flattened chain that are not links."""
+    return [g for g in flat if g.labels is not None]
+
+
+def doubled_labels(tag, leaves):
+    """A problem for each label that is in a second group of the flattened chain."""
+    seen = {}
+    out = []
+    for label, function in ((lab, g.function) for g in leaves for lab in g.labels):
+        if label in seen:
+            out.append("%s: label `%s` in two groups (%s and %s)" %
+                       (tag, label, seen[label], function))
+        seen[label] = function
+    return out
+
+
+def exit_problems(group):
+    """A problem for each way out of the switch, other than break, that a moved group holds."""
+    return ["%s: group %s holds `%s`" % (group.function, " ".join(group.labels), bad)
+            for bad in EXITS if bad in group.body]
+
+
+def kept_group_edited(labels, body, original):
+    """Whether a group the caller keeps differs from the original's group of those labels."""
+    if labels == DEFAULT or labels not in original:
+        return False
+    return original[labels] != body
+
+
+def type_name(declaration):
+    """The type of a parameter declaration: the token before its name, or before its `*`."""
+    return declaration[-2] if declaration[-2] != "*" else declaration[-3]
+
+
+def parameter_type(src, function, param):
+    """The type name of the parameter param of function, None when it has none by that name."""
+    fn = src.funcs[function]
+    types = [type_name(a) for a in parameters(src.toks, fn) if a[-1] == param]
+    return types[-1] if types else None
+
+
+def typedef_members(text, ptype):
+    """The members of `typedef struct _X { ... } ptype;` in text, in order."""
+    td = re.search(r"typedef struct _\w+\s*\{([^{}]*)\}\s*" + re.escape(ptype) + r"\s*;", text)
+    if td is None:
+        return []
+    parts = (part for decl in td.group(1).split(";") for part in decl.split(","))
+    words = (re.findall(r"\w+", part) for part in parts)
+    return [w[-1] for w in words if w]
+
+
+def initialiser_problems(text, ptype, members):
+    """Problems with the `const ptype x = { &m1, &m2, ... };` that fills the members."""
+    init = re.findall(r"const\s+" + re.escape(ptype) + r"\s+\w+\s*=\s*\{([^}]*)\}", text)
+    if not init:
+        return ["no const %s initialiser in the file" % ptype]
+    if [x.strip() for x in init[0].split(",")] != ["&" + m for m in members]:
+        return ["the %s initialiser does not name its members by address in order" % ptype]
+    return []
+
+
+def cut_spans(src, caller, drop):
+    """The spans to cut: the functions dropped (marker None) and the caller's switches."""
+    spans = [(src.funcs[name].start, src.funcs[name].body_close, None)
+             for name in drop if name in src.funcs]
+    fn = src.funcs[caller]
+    spans += [(i, bclose, "SWITCH")
+              for (i, pc, bopen, bclose) in switches(src.toks, fn.body_open + 1, fn.body_close)]
+    return sorted(spans)
+
+
+def residue(src, caller, drop):
+    """The tokens left once the dropped functions and the caller's switches are cut out."""
+    out = []
+    pos = 0
+    for start, end, marker in cut_spans(src, caller, drop):
+        out.extend(src.toks[pos:start])
+        if marker:
+            out.append(marker)
+        pos = end + 1
+    out.extend(src.toks[pos:])
+    return out
+
+
+def residue_difference(ores, nres):
+    """Where two different residues first differ, as a problem."""
+    for k, (a, b) in enumerate(zip(ores, nres)):
+        if a != b:
+            return ("the file differs outside the helpers and the switch near `%s` / `%s`" %
+                    (" ".join(ores[max(0, k - 4):k + 4]), " ".join(nres[max(0, k - 4):k + 4])))
+    return ("the file differs outside the helpers and the switch "
+            "(length %d / %d)" % (len(ores), len(nres)))
+
+
+class StepCheck:
+    """An original source against the same source after a Recipe SD step: the checks of the
+    module docstring, in order, collecting their problems."""
+
+    def __init__(self, old, new, caller, helpers):
+        self.old = old
+        self.new = new
+        self.caller = caller
+        self.helpers = helpers
+        self.problems = []
+
+    def run(self):
+        """(problems, summary); the summary is empty when the caller has no switch."""
+        self.caller_chain = Chain(self.new, self.caller, self.problems, False)
+        if not self.caller_chain.ok:
+            return self.problems, ""
+        self.flatten_both()
+        for step in (self.check_reached, self.check_doubled_labels, self.check_labels,
+                     self.check_bodies, self.check_kept_groups, self.check_exits,
+                     self.check_order, self.check_bindings, self.check_residue):
+            step()
+        return self.problems, self.summary()
+
+    def flatten_side(self, src, tag):
+        walk = Walk(src, self.problems, self.names, self.ptr_all, tag)
+        return walk.flatten(self.caller, self.caller_chain.expr)
+
+    def flatten_both(self):
+        """Flatten the chain of each side, and read its groups and labels."""
+        self.names = set(self.helpers) | set(self.old.funcs)
+        self.ptr_all = set().union(*[Chain(self.new, h, [], False).ptr_params
+                                     for h in self.helpers])
+        new_flat, self.new_chains = self.flatten_side(self.new, "new")
+        old_flat, self.old_chains = self.flatten_side(self.old, "old")
+        self.old_leaves, self.new_leaves = leaf_groups(old_flat), leaf_groups(new_flat)
+        self.old_map = {g.labels: g.body for g in self.old_leaves}
+        self.new_map = {g.labels: g.body for g in self.new_leaves}
+        self.old_labels = {lab for labels in self.old_map for lab in labels}
+        self.new_labels = {lab for labels in self.new_map for lab in labels}
+
+    def check_reached(self):
+        """Every helper must be reached by the chain."""
+        reached = {c.name for c in self.new_chains}
+        self.problems.extend("%s is not in the chain of %s" % (h, self.caller)
+                             for h in self.helpers if h not in reached)
+
+    def check_doubled_labels(self):
+        """The label partition: every label in exactly one group, before and after."""
+        for tag, leaves in (("original", self.old_leaves), ("result", self.new_leaves)):
+            self.problems.extend(doubled_labels(tag, leaves))
+
+    def check_labels(self):
+        self.problems.extend("label `%s` lost" % lab
+                             for lab in sorted(self.old_labels - self.new_labels))
+        self.problems.extend("label `%s` added" % lab
+                             for lab in sorted(self.new_labels - self.old_labels))
+
+    def check_bodies(self):
+        found = (self.group_problem(labels) for labels in self.old_map)
+        self.problems.extend(p for p in found if p)
+
+    def group_problem(self, labels):
+        """The problem with the original's group of these labels, None when it is intact."""
+        if labels in self.new_map:
+            return self.body_difference(labels)
+        if set(labels) <= self.new_labels:
+            return "group %s: its labels are split across groups" % " ".join(labels)
+        return None
+
+    def body_difference(self, labels):
+        was, now = self.old_map[labels], self.new_map[labels]
+        if was == now:
+            return None
+        return "group %s: body differs\n    was: %s\n    now: %s" % (
+            " ".join(labels), " ".join(was), " ".join(now))
+
+    def check_kept_groups(self):
+        """A group the caller keeps is unchanged as written (moved ones are normalised)."""
+        original = {lab: body for (lab, body) in Chain(self.old, self.caller, [], False).groups}
+        self.problems.extend("kept group %s was edited" % " ".join(lab)
+                             for lab, body in self.caller_chain.groups
+                             if kept_group_edited(lab, body, original))
+
+    def check_exits(self):
+        """No moved group may leave the switch other than by break."""
+        for group in self.new_leaves:
+            if group.function != self.caller:
+                self.problems.extend(exit_problems(group))
+
+    def check_order(self):
+        """Within each switch the groups keep their original order."""
+        order = {g.labels: n for n, g in enumerate(self.old_leaves)}
+        by_function = {}
+        for g in self.new_leaves:
+            by_function.setdefault(g.function, []).append(order.get(g.labels, -1))
+        self.problems.extend("%s: groups are not in their original order" % function
+                             for function, index in by_function.items()
+                             if index != sorted(index))
+
+    def check_bindings(self):
+        """The members of the targets typedef, filled by the caller's initialiser."""
+        bindings = [(c.name, param, member)
+                    for c in self.new_chains for param, member in c.bound.values()]
+        for binding in bindings:
+            self.check_binding(*binding)
+
+    def check_binding(self, function, param, member):
+        ptype = parameter_type(self.new, function, param)
+        if ptype is None:
+            self.problems.append("%s: parameter %s has no type" % (function, param))
+            return
+        members = typedef_members(self.new.text, ptype)
+        if member not in members:
+            self.problems.append("%s: %s is not a member of %s" % (function, member, ptype))
+            return
+        self.problems.extend(initialiser_problems(self.new.text, ptype, members))
+
+    def check_residue(self):
+        """Nothing else changed: cut the helpers and the caller's switches, compare the rest."""
+        ores = residue(self.old, self.caller, [])
+        nres = residue(self.new, self.caller, self.helpers)
+        if ores != nres:
+            self.problems.append(residue_difference(ores, nres))
+
+    def summary(self):
+        return ("%d labels in %d groups before, %d labels in %d groups across %d switches "
+                "after" % (len(self.old_labels), len(self.old_leaves), len(self.new_labels),
+                           len(self.new_leaves), len(self.new_chains)))
+
+
+def check(old_text, new_text, caller, helpers):
+    old, new = parse(old_text), parse(new_text)
+    problems = inventory_problems(old, new, caller, helpers)
     if problems:
         return problems, ""
-    names = set(helpers) | set(ofuncs)
-    # the typedef initialiser of the targets struct is read from the caller
-    chain_names = [caller] + list(helpers)
-    # the controlling expression: the new caller's switch that holds the call of the first helper
-    nch = Chain(new, caller, problems, False)
-    if not nch.ok:
-        return problems, ""
-    expr = nch.expr
-    ptr_all = set()
-    for h in helpers:
-        ptr_all |= Chain(new, h, [], False).ptr_params
-    new_flat, new_chains = Walk(new, problems, names, ptr_all, "new").flatten(caller, expr)
-    old_flat, old_chains = Walk(old, problems, names, ptr_all, "old").flatten(caller, expr)
-    # every helper must be reached by the chain
-    reached = {c.name for c in new_chains}
-    for h in helpers:
-        if h not in reached:
-            problems.append("%s is not in the chain of %s" % (h, caller))
-    # the label partition: flattened leaf groups, label for label
-    def leaves(flat):
-        return [(f, k, lab, b) for (f, k, lab, b) in flat if lab is not None]
-    old_leaves, new_leaves = leaves(old_flat), leaves(new_flat)
-    for tag, lv in (("original", old_leaves), ("result", new_leaves)):
-        seen = {}
-        for f, k, lab, b in lv:
-            for l in lab:
-                if l in seen:
-                    problems.append("%s: label `%s` in two groups (%s and %s)" %
-                                    (tag, l, seen[l], f))
-                seen[l] = f
-    old_map = {lab: b for (f, k, lab, b) in old_leaves}
-    new_map = {lab: b for (f, k, lab, b) in new_leaves}
-    old_labels = {l for lab in old_map for l in lab}
-    new_labels = {l for lab in new_map for l in lab}
-    for l in sorted(old_labels - new_labels):
-        problems.append("label `%s` lost" % l)
-    for l in sorted(new_labels - old_labels):
-        problems.append("label `%s` added" % l)
-    for lab in old_map:
-        if lab in new_map and old_map[lab] != new_map[lab]:
-            problems.append("group %s: body differs\n    was: %s\n    now: %s" %
-                            (" ".join(lab), " ".join(old_map[lab]), " ".join(new_map[lab])))
-        elif lab not in new_map and set(lab) <= new_labels:
-            problems.append("group %s: its labels are split across groups" % " ".join(lab))
-    # a group the caller keeps is unchanged, as written (the normalisation above is for moved ones)
-    oraw = {lab: body for (lab, body) in Chain(old, caller, [], False).groups}
-    for lab, body in nch.groups:
-        if lab != ("default :",) and lab in oraw and oraw[lab] != body:
-            problems.append("kept group %s was edited" % " ".join(lab))
-    # no moved group may leave the switch other than by break
-    for f, k, lab, b in new_leaves:
-        if f == caller:
-            continue
-        for bad in ("return", "continue", "goto"):
-            if bad in b:
-                problems.append("%s: group %s holds `%s`" % (f, " ".join(lab), bad))
-    # source order within each switch
-    order = {lab: n for n, (f, k, lab, b) in enumerate(old_leaves)}
-    by_fn = {}
-    for f, k, lab, b in new_leaves:
-        by_fn.setdefault(f, []).append(order.get(lab, -1))
-    for f, idx in by_fn.items():
-        if idx != sorted(idx):
-            problems.append("%s: groups are not in their original order" % f)
-    # the bindings: the members of the targets typedef, filled by the caller's initialiser
-    for c in new_chains:
-        for v, (p, member) in c.bound.items():
-            ps = param_names(ntoks, nfuncs[c.name])
-            s, pss, pe, bo, bc = nfuncs[c.name]
-            ptype = None
-            for a in split_args(ntoks[pss + 1:pe]):
-                if a[-1] == p:
-                    ptype = a[-2] if a[-2] != "*" else a[-3]
-            if ptype is None:
-                problems.append("%s: parameter %s has no type" % (c.name, p))
-                continue
-            td = re.search(r"typedef struct _\w+\s*\{([^{}]*)\}\s*" + re.escape(ptype) + r"\s*;",
-                           strip_comments(new_text))
-            members = []
-            if td:
-                for decl in td.group(1).split(";"):
-                    for part in decl.split(","):
-                        w = re.findall(r"\w+", part)
-                        if w:
-                            members.append(w[-1])
-            if member not in members:
-                problems.append("%s: %s is not a member of %s" % (c.name, member, ptype))
-                continue
-            init = re.findall(r"const\s+" + re.escape(ptype) + r"\s+\w+\s*=\s*\{([^}]*)\}",
-                              strip_comments(new_text))
-            if not init:
-                problems.append("no const %s initialiser in the file" % ptype)
-            elif [x.strip() for x in init[0].split(",")] != ["&" + m for m in members]:
-                problems.append("the %s initialiser does not name its members by address in "
-                                "order" % ptype)
-    # nothing else changed: cut the helpers and the caller's switches, compare the rest
-    def residue(toks, funcs, drop):
-        t = list(toks)
-        spans = []
-        for name in drop:
-            if name in funcs:
-                s, ps, pe, bo, bc = funcs[name]
-                spans.append((s, bc, None))
-        s, ps, pe, bo, bc = funcs[caller]
-        for (i, pc, bopen, bclose) in switches(toks, bo + 1, bc):
-            spans.append((i, bclose, "SWITCH"))
-        out = []
-        pos = 0
-        for a, b, mk in sorted(spans):
-            out.extend(t[pos:a])
-            if mk:
-                out.append(mk)
-            pos = b + 1
-        out.extend(t[pos:])
-        return out
-    ores = residue(otoks, ofuncs, [])
-    nres = residue(ntoks, nfuncs, helpers)
-    if ores != nres:
-        for k, (a, b) in enumerate(zip(ores, nres)):
-            if a != b:
-                problems.append("the file differs outside the helpers and the switch near "
-                                "`%s` / `%s`" % (" ".join(ores[max(0, k - 4):k + 4]),
-                                                 " ".join(nres[max(0, k - 4):k + 4])))
-                break
-        else:
-            problems.append("the file differs outside the helpers and the switch "
-                            "(length %d / %d)" % (len(ores), len(nres)))
-    summary = ("%d labels in %d groups before, %d labels in %d groups across %d switches "
-               "after" % (len(old_labels), len(old_leaves), len(new_labels), len(new_leaves),
-                          len(new_chains)))
-    return problems, summary
+    return StepCheck(old, new, caller, helpers).run()
 
 
 def main(argv):
