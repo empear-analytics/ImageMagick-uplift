@@ -169,23 +169,21 @@ MagickExport char **StringToArgv(const char *text,int *argc)
   p=text;
   for (i=1; i < (ssize_t) *argc; i++)
   {
-    while (isspace((int) ((unsigned char) *p)) != 0)
-      p++;
+    p=SkipArgvSpaces(p);
     q=p;
     if (*q == '"')
       {
         p++;
-        for (q++; (*q != '"') && (*q != '\0'); q++) ;
+        q=SkipArgvQuoted(q,'"');
       }
     else
       if (*q == '\'')
         {
           p++;
-          for (q++; (*q != '\'') && (*q != '\0'); q++) ;
+          q=SkipArgvQuoted(q,'\'');
         }
       else
-        while ((isspace((int) ((unsigned char) *q)) == 0) && (*q != '\0'))
-          q++;
+        q=SkipArgvWord(q);
     argv[i]=(char *) AcquireQuantumMemory((size_t) (q-p)+MagickPathExtent,
       sizeof(**argv));
     if (argv[i] == (char *) NULL)
@@ -199,8 +197,7 @@ MagickExport char **StringToArgv(const char *text,int *argc)
     (void) memcpy(argv[i],p,(size_t) (q-p));
     argv[i][q-p]='\0';
     p=q;
-    while ((isspace((int) ((unsigned char) *p)) == 0) && (*p != '\0'))
-      p++;
+    p=SkipArgvWord(p);
   }
   argv[i]=(char *) NULL;
   return(argv);
