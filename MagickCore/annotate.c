@@ -2890,6 +2890,35 @@ static MagickBooleanType IsValidPostscriptFontname(const char *font)
   return(MagickTrue);
 }
 
+static PointInfo GetPostscriptExtent(const DrawInfo *draw_info)
+{
+  PointInfo
+    extent,
+    point;
+
+  ssize_t
+    i;
+
+  size_t
+    length;
+
+  extent.x=0.0;
+  extent.y=0.0;
+  length=strlen(draw_info->text);
+  for (i=0; i <= (ssize_t) (length+2); i++)
+  {
+    point.x=fabs(draw_info->affine.sx*i*draw_info->pointsize+
+      draw_info->affine.ry*2.0*draw_info->pointsize);
+    point.y=fabs(draw_info->affine.rx*i*draw_info->pointsize+
+      draw_info->affine.sy*2.0*draw_info->pointsize);
+    if (point.x > extent.x)
+      extent.x=point.x;
+    if (point.y > extent.y)
+      extent.y=point.y;
+  }
+  return(extent);
+}
+
 static MagickBooleanType RenderPostscript(Image *image,
   const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
   ExceptionInfo *exception)
@@ -2917,14 +2946,7 @@ static MagickBooleanType RenderPostscript(Image *image,
 
   PointInfo
     extent,
-    point,
     resolution;
-
-  ssize_t
-    i;
-
-  size_t
-    length;
 
   ssize_t
     y;
@@ -2960,20 +2982,7 @@ static MagickBooleanType RenderPostscript(Image *image,
   identity=(fabs(draw_info->affine.sx-draw_info->affine.sy) < MagickEpsilon) &&
     (fabs(draw_info->affine.rx) < MagickEpsilon) &&
     (fabs(draw_info->affine.ry) < MagickEpsilon) ? MagickTrue : MagickFalse;
-  extent.x=0.0;
-  extent.y=0.0;
-  length=strlen(draw_info->text);
-  for (i=0; i <= (ssize_t) (length+2); i++)
-  {
-    point.x=fabs(draw_info->affine.sx*i*draw_info->pointsize+
-      draw_info->affine.ry*2.0*draw_info->pointsize);
-    point.y=fabs(draw_info->affine.rx*i*draw_info->pointsize+
-      draw_info->affine.sy*2.0*draw_info->pointsize);
-    if (point.x > extent.x)
-      extent.x=point.x;
-    if (point.y > extent.y)
-      extent.y=point.y;
-  }
+  extent=GetPostscriptExtent(draw_info);
   (void) FormatLocaleFile(file,"%g %g moveto\n",identity  != MagickFalse ? 0.0 :
     extent.x/2.0,extent.y/2.0);
   (void) FormatLocaleFile(file,"%g %g scale\n",draw_info->pointsize,
