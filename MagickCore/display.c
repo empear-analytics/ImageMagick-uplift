@@ -12219,6 +12219,9 @@ typedef struct _MatteCommandInput
 
   BorderColorTargets
     border_targets;
+
+  char
+    *text;
 } MatteCommandInput;
 
 static void XMatteEditControl(const MatteCommandInput *input,const int id,
@@ -12610,6 +12613,48 @@ static void XMattePress(const MatteCommandInput *input,const XEvent *event,
   (*state)|=UpdateConfigurationState;
 }
 
+static void XMatteRelease(const MatteCommandInput *input,const XEvent *event,
+  const Cursor cursor,const MatteEventTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  Image
+    **const image = input->image;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  size_t
+    *const state = targets->state;
+
+  if ((*event).xbutton.button != Button1)
+    return;
+  if (((*event).xbutton.window != windows->image.id) &&
+      ((*event).xbutton.window != windows->magnify.id))
+    return;
+  /*
+    Update colormap information.
+  */
+  (*x)=(*event).xbutton.x;
+  (*y)=(*event).xbutton.y;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+  XInfoWidget(display,windows,input->text);
+  (void) XCheckDefineCursor(display,windows->image.id,cursor);
+  (*state)&=(unsigned int) (~UpdateConfigurationState);
+}
+
 static MagickBooleanType XMatteEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -12679,7 +12724,7 @@ static MagickBooleanType XMatteEditImage(Display *display,
   const MatteCommandInput
     command_input = { display, resource_info, windows, MatteEditCommands,
       image, exception, MatteEditMenu, command, matte, method_targets,
-      border_targets };
+      border_targets, text };
 
   /*
     Map Command widget.
@@ -12729,21 +12774,7 @@ static MagickBooleanType XMatteEditImage(Display *display,
       }
       case ButtonRelease:
       {
-        if (event.xbutton.button != Button1)
-          break;
-        if ((event.xbutton.window != windows->image.id) &&
-            (event.xbutton.window != windows->magnify.id))
-          break;
-        /*
-          Update colormap information.
-        */
-        x=event.xbutton.x;
-        y=event.xbutton.y;
-        XConfigureImageColormap(display,resource_info,windows,*image,exception);
-        (void) XConfigureImage(display,resource_info,windows,*image,exception);
-        XInfoWidget(display,windows,text);
-        (void) XCheckDefineCursor(display,windows->image.id,cursor);
-        state&=(unsigned int) (~UpdateConfigurationState);
+        XMatteRelease(&command_input,&event,cursor,&event_targets);
         break;
       }
       case Expose:
