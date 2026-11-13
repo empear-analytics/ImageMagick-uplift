@@ -1257,12 +1257,21 @@ MagickExport Image *ReadImages(ImageInfo *image_info,const char *filename,
 %
 */
 
-static MagickBooleanType GetImplicitDataImageType(const char *data_url,
-  char *magick,ExceptionInfo *exception)
+static void NormalizeDataImageType(char *magick)
 {
   char
     *plus;
 
+  plus=strchr(magick,'+');
+  if (plus != (char *) NULL)
+    *plus='\0';
+  if (LocaleNCompare(magick,"x-",2) == 0)
+    (void) memmove(magick,magick+2,strlen(magick+2)+1);
+}
+
+static MagickBooleanType GetImplicitDataImageType(const char *data_url,
+  char *magick,ExceptionInfo *exception)
+{
   const char
     *p,
     *type,
@@ -1292,11 +1301,7 @@ static MagickBooleanType GetImplicitDataImageType(const char *data_url,
     return(MagickFalse);
   (void) memcpy(magick,slash+1,offset);
   magick[offset]='\0';
-  plus=strchr(magick,'+');
-  if (plus != (char *) NULL)
-    *plus='\0';
-  if (LocaleNCompare(magick,"x-",2) == 0)
-    (void) memmove(magick,magick+2,strlen(magick+2)+1);
+  NormalizeDataImageType(magick);
   magick_info=GetMagickInfo(magick,exception);
   if ((magick_info == (const MagickInfo *) NULL) ||
       (magick_info->format_type == ImplicitFormatType))
