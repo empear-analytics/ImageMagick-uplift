@@ -1423,12 +1423,44 @@ static void XFindFrameWindow(Display *display,Window *root,Window *target)
   }
 }
 
-MagickExport Image *XImportImage(const ImageInfo *image_info,
-  XImportInfo *ximage_info,ExceptionInfo *exception)
+static void XSetDescendForColormaps(Display *display,const Window target,
+  XImportInfo *ximage_info)
 {
   Colormap
     *colormaps;
 
+  int
+    number_colormaps,
+    number_windows;
+
+  Status
+    status;
+
+  Window
+    *children;
+
+  /*
+    If WM_COLORMAP_WINDOWS property is set or multiple colormaps, descend.
+  */
+  number_windows=0;
+  status=XGetWMColormapWindows(display,target,&children,&number_windows);
+  if ((status == True) && (number_windows > 0))
+    {
+      ximage_info->descend=MagickTrue;
+      (void) XFree ((char *) children);
+    }
+  colormaps=XListInstalledColormaps(display,target,&number_colormaps);
+  if (number_colormaps > 0)
+    {
+      if (number_colormaps > 1)
+        ximage_info->descend=MagickTrue;
+      (void) XFree((char *) colormaps);
+    }
+}
+
+MagickExport Image *XImportImage(const ImageInfo *image_info,
+  XImportInfo *ximage_info,ExceptionInfo *exception)
+{
   Display
     *display;
 
@@ -1436,8 +1468,6 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
     *image;
 
   int
-    number_colormaps,
-    number_windows,
     x;
 
   RectangleInfo
@@ -1447,7 +1477,6 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
     status;
 
   Window
-    *children,
     client,
     prior_target,
     root,
@@ -1576,23 +1605,7 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
         }
       target=root;
     }
-  /*
-    If WM_COLORMAP_WINDOWS property is set or multiple colormaps, descend.
-  */
-  number_windows=0;
-  status=XGetWMColormapWindows(display,target,&children,&number_windows);
-  if ((status == True) && (number_windows > 0))
-    {
-      ximage_info->descend=MagickTrue;
-      (void) XFree ((char *) children);
-    }
-  colormaps=XListInstalledColormaps(display,target,&number_colormaps);
-  if (number_colormaps > 0)
-    {
-      if (number_colormaps > 1)
-        ximage_info->descend=MagickTrue;
-      (void) XFree((char *) colormaps);
-    }
+  XSetDescendForColormaps(display,target,ximage_info);
   /*
     Alert the user not to alter the screen.
   */
