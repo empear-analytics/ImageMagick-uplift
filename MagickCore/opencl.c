@@ -975,6 +975,34 @@ static inline MagickBooleanType IsDoctypeEnd(const char *q,
   return(((*q == '>') && (bracket_depth == 0)) ? MagickTrue : MagickFalse);
 }
 
+static const char *SkipOpenCLBenchmarkDoctype(const char *q)
+{
+  int
+    bracket_depth = 0,
+    quote = 0;
+
+  /*
+    DOCTYPE element.
+  */
+  for ( ; *q != '\0'; q++)
+  {
+    if (quote != 0)
+      quote=EndDoctypeQuote(q,quote);
+    else if (IsDoctypeQuote(q) != MagickFalse)
+      quote=(*q);
+    else if (*q == '[')
+      bracket_depth++;
+    else if (*q == ']')
+      bracket_depth=CloseDoctypeBracket(bracket_depth);
+    else if (IsDoctypeEnd(q,bracket_depth) != MagickFalse)
+      {
+        q++;   /* consume final '>' */
+        break;
+      }
+  }
+  return(q);
+}
+
 static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
 {
   char
@@ -1006,29 +1034,7 @@ static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
     (void) CopyMagickString(keyword,token,MagickPathExtent);
     if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
       {
-        int
-          bracket_depth = 0,
-          quote = 0;
-
-        /*
-          DOCTYPE element.
-        */
-        for ( ; *q != '\0'; q++)
-        {
-          if (quote != 0)
-            quote=EndDoctypeQuote(q,quote);
-          else if (IsDoctypeQuote(q) != MagickFalse)
-            quote=(*q);
-          else if (*q == '[')
-            bracket_depth++;
-          else if (*q == ']')
-            bracket_depth=CloseDoctypeBracket(bracket_depth);
-          else if (IsDoctypeEnd(q,bracket_depth) != MagickFalse)
-            {
-              q++;   /* consume final '>' */
-              break;
-            }
-        }
+        q=SkipOpenCLBenchmarkDoctype(q);
         continue;
       }
     if (LocaleNCompare(keyword,"<!--",4) == 0)
