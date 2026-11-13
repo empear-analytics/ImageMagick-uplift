@@ -14960,6 +14960,17 @@ static void PositionPreferencesWidth(XWindows *windows,XFontStruct *font_info,
     windows->widget.width=windows->widget.min_width;
 }
 
+static void PositionPreferencesHeight(XWindows *windows,
+  XFontStruct *font_info,unsigned int height)
+{
+  windows->widget.height=(unsigned int) (7*(int) height+NumberPreferences*
+    ((int) height+(QuantumMargin >> 1)));
+  windows->widget.min_height=(unsigned int) (7*(int) height+NumberPreferences*
+    ((int) height+(QuantumMargin >> 1)));
+  if (windows->widget.height < windows->widget.min_height)
+    windows->widget.height=windows->widget.min_height;
+}
+
 MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XResourceInfo *resource_info,XWindows *windows)
 {
@@ -15010,12 +15021,7 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
     Position Preferences widget.
   */
   PositionPreferencesWidth(windows,font_info,width,text_width);
-  windows->widget.height=(unsigned int) (7*(int) height+NumberPreferences*
-    ((int) height+(QuantumMargin >> 1)));
-  windows->widget.min_height=(unsigned int) (7*(int) height+NumberPreferences*
-    ((int) height+(QuantumMargin >> 1)));
-  if (windows->widget.height < windows->widget.min_height)
-    windows->widget.height=windows->widget.min_height;
+  PositionPreferencesHeight(windows,font_info,height);
   XConstrainWindowPosition(display,&windows->widget);
   /*
     Map Preferences widget.
