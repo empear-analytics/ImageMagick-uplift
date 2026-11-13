@@ -92,6 +92,32 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void AppendConfigurePathList(LinkedListInfo *paths,char *path,
+  char *configure_path)
+{
+  if (configure_path != (char *) NULL)
+    {
+      char
+        *p,
+        *q;
+
+      for (p=configure_path-1; p != (char *) NULL; )
+      {
+        (void) CopyMagickString(path,p+1,MagickPathExtent);
+        q=strchr(path,DirectoryListSeparator);
+        if (q != (char *) NULL)
+          *q='\0';
+        q=path+strlen(path)-1;
+        if ((q >= path) && (*q != *DirectorySeparator))
+          (void) ConcatenateMagickString(path,DirectorySeparator,
+            MagickPathExtent);
+        (void) AppendValueToLinkedList(paths,ConstantString(path));
+        p=strchr(p+1,DirectoryListSeparator);
+      }
+      configure_path=DestroyString(configure_path);
+    }
+}
+
 MagickExport LinkedListInfo *GetConfigurePaths(const char *filename,
   ExceptionInfo *exception)
 {
@@ -115,27 +141,7 @@ MagickExport LinkedListInfo *GetConfigurePaths(const char *filename,
       Search $MAGICK_CONFIGURE_PATH.
     */
     configure_path=GetEnvironmentValue("MAGICK_CONFIGURE_PATH");
-    if (configure_path != (char *) NULL)
-      {
-        char
-          *p,
-          *q;
-
-        for (p=configure_path-1; p != (char *) NULL; )
-        {
-          (void) CopyMagickString(path,p+1,MagickPathExtent);
-          q=strchr(path,DirectoryListSeparator);
-          if (q != (char *) NULL)
-            *q='\0';
-          q=path+strlen(path)-1;
-          if ((q >= path) && (*q != *DirectorySeparator))
-            (void) ConcatenateMagickString(path,DirectorySeparator,
-              MagickPathExtent);
-          (void) AppendValueToLinkedList(paths,ConstantString(path));
-          p=strchr(p+1,DirectoryListSeparator);
-        }
-        configure_path=DestroyString(configure_path);
-      }
+    AppendConfigurePathList(paths,path,configure_path);
   }
 #if defined(MAGICKCORE_INSTALLED_SUPPORT)
 #if defined(MAGICKCORE_SHARE_PATH)
