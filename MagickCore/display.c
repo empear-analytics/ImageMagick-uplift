@@ -7954,7 +7954,7 @@ static void XWaitForDrawStart(const DrawEditContext *context,
   (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
 }
 
-static void XPreviewElement(const DrawEditContext *context,
+static void XPreviewPointLineBox(const DrawEditContext *context,
   const DrawPreviewInput *preview,const ElementType element,double *degrees)
 {
   switch (element)
@@ -7974,6 +7974,19 @@ static void XPreviewElement(const DrawEditContext *context,
     case FillRectangleElement:
     {
       XPreviewRectangle(context,preview);
+      break;
+    }
+  }
+}
+
+static void XPreviewElement(const DrawEditContext *context,
+  const DrawPreviewInput *preview,const ElementType element,double *degrees)
+{
+  switch (element)
+  {
+    default:
+    {
+      XPreviewPointLineBox(context,preview,element,degrees);
       break;
     }
     case CircleElement:
