@@ -11947,6 +11947,66 @@ static XWidgetInfo TrackListBrowserSlider(XWidgetInfo slider_info,
 
 #define CancelButtonText  "Cancel"
 
+typedef struct _ListBrowserWidgets
+{
+  XWidgetInfo
+    *reply_info;
+
+  size_t
+    *state;
+} ListBrowserWidgets;
+
+typedef struct _ListBrowserContext
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  XWindowInfo
+    *window_info;
+} ListBrowserContext;
+
+static void ClientListBrowserMessage(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  /*
+    If client window delete message, exit.
+  */
+  if (event.xclient.message_type != windows->wm_protocols)
+    return;
+  if (*event.xclient.data.l == (int) windows->wm_take_focus)
+    {
+      (void) XSetInputFocus(display,event.xclient.window,RevertToParent,
+        (Time) event.xclient.data.l[1]);
+      return;
+    }
+  if (*event.xclient.data.l != (int) windows->wm_delete_window)
+    return;
+  if (event.xclient.window == window_info->id)
+    {
+      *(*reply_info).text='\0';
+      (*state)|=ExitState;
+      return;
+    }
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -12005,6 +12065,12 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   const ListBrowserTargets
     targets = { &reply_info, &selection_info, &action_info, &state,
       &list_info };
+
+  const ListBrowserWidgets
+    list_widgets = { &reply_info, &state };
+
+  ListBrowserContext
+    list_context;
 
   /*
     Count the number of entries in the list.
@@ -12082,6 +12148,9 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   visible_entries=0;
   delay=SuspendTime << 2;
   state=UpdateConfigurationState;
+  list_context.display=display;
+  list_context.windows=windows;
+  list_context.window_info=window_info;
   do
   {
     if (state & UpdateConfigurationState)
@@ -12439,25 +12508,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
       }
       case ClientMessage:
       {
-        /*
-          If client window delete message, exit.
-        */
-        if (event.xclient.message_type != windows->wm_protocols)
-          break;
-        if (*event.xclient.data.l == (int) windows->wm_take_focus)
-          {
-            (void) XSetInputFocus(display,event.xclient.window,RevertToParent,
-              (Time) event.xclient.data.l[1]);
-            break;
-          }
-        if (*event.xclient.data.l != (int) windows->wm_delete_window)
-          break;
-        if (event.xclient.window == window_info->id)
-          {
-            *reply_info.text='\0';
-            state|=ExitState;
-            break;
-          }
+        ClientListBrowserMessage(&list_context,event,&list_widgets);
         break;
       }
       case ConfigureNotify:
