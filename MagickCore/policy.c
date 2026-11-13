@@ -1209,14 +1209,13 @@ static MagickBooleanType LoadPolicyIncludes(const PolicyIncludeScan *scan,
     if (*scan->token != '=')
       continue;
     (void) GetNextToken(*q,q,scan->extent,scan->token);
-    if (LocaleCompare(scan->keyword,"file") == 0)
-      {
-        if (scan->depth >= MagickMaxRecursionDepth)
-          return(MagickFalse);
-        else
-          *status&=(MagickStatusType) LoadPolicyInclude(scan->target,
-            scan->filename,scan->token,scan->depth);
-      }
+    if (LocaleCompare(scan->keyword,"file") != 0)
+      continue;
+    if (scan->depth >= MagickMaxRecursionDepth)
+      return(MagickFalse);
+    else
+      *status&=(MagickStatusType) LoadPolicyInclude(scan->target,
+        scan->filename,scan->token,scan->depth);
   }
   return(MagickTrue);
 }
