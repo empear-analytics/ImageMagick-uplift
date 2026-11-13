@@ -173,8 +173,34 @@ MagickExport size_t GetQuantumExtent(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _AlphaQuantumTypes
+{
+  QuantumType
+    opaque_type,
+    alpha_type;
+} AlphaQuantumTypes;
+
+static QuantumType SelectAlphaQuantumType(const Image *image,
+  const AlphaQuantumTypes *types)
+{
+  const QuantumType
+    alpha_type = types->alpha_type,
+    opaque_type = types->opaque_type;
+
+  QuantumType
+    quantum_type;
+
+  quantum_type=opaque_type;
+  if (image->alpha_trait != UndefinedPixelTrait)
+    quantum_type=alpha_type;
+  return(quantum_type);
+}
+
 MagickExport QuantumType GetQuantumType(Image *image,ExceptionInfo *exception)
 {
+  const AlphaQuantumTypes
+    rgb_types = { RGBQuantum, RGBAQuantum };
+
   QuantumType
     quantum_type;
 
@@ -183,26 +209,27 @@ MagickExport QuantumType GetQuantumType(Image *image,ExceptionInfo *exception)
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   (void) exception;
-  quantum_type=RGBQuantum;
-  if (image->alpha_trait != UndefinedPixelTrait)
-    quantum_type=RGBAQuantum;
+  quantum_type=SelectAlphaQuantumType(image,&rgb_types);
   if (image->colorspace == CMYKColorspace)
     {
-      quantum_type=CMYKQuantum;
-      if (image->alpha_trait != UndefinedPixelTrait)
-        quantum_type=CMYKAQuantum;
+      const AlphaQuantumTypes
+        cmyk_types = { CMYKQuantum, CMYKAQuantum };
+
+      quantum_type=SelectAlphaQuantumType(image,&cmyk_types);
     }
   if (IsGrayColorspace(image->colorspace) != MagickFalse)
     {
-      quantum_type=GrayQuantum;
-      if (image->alpha_trait != UndefinedPixelTrait)
-        quantum_type=GrayAlphaQuantum;
+      const AlphaQuantumTypes
+        gray_types = { GrayQuantum, GrayAlphaQuantum };
+
+      quantum_type=SelectAlphaQuantumType(image,&gray_types);
     }
   if (image->storage_class == PseudoClass)
     {
-      quantum_type=IndexQuantum;
-      if (image->alpha_trait != UndefinedPixelTrait)
-        quantum_type=IndexAlphaQuantum;
+      const AlphaQuantumTypes
+        index_types = { IndexQuantum, IndexAlphaQuantum };
+
+      quantum_type=SelectAlphaQuantumType(image,&index_types);
     }
   if (image->number_meta_channels != 0)
     quantum_type=MultispectralQuantum;
