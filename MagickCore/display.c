@@ -15197,6 +15197,77 @@ static void XShowRotateInfo(const RotateInfoInput *show)
     windows->image.highlight_context,&rotate_info);
 }
 
+typedef struct _RotateLoopInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  const char
+    *const *RotateMenu;
+
+  const ModeType
+    *RotateCommands,
+    *DirectionCommands;
+
+  char
+    *command;
+
+  RotateTargets
+    targets;
+} RotateLoopInput;
+
+static MagickBooleanType XRotateLoopCommand(
+  const RotateLoopInput *loop_input,const XEvent event,ModeType *direction,
+  size_t *state)
+{
+  Display
+    *const display = loop_input->display;
+
+  XResourceInfo
+    *const resource_info = loop_input->resource_info;
+
+  XWindows
+    *const windows = loop_input->windows;
+
+  const char
+    *const *const RotateMenu = loop_input->RotateMenu;
+
+  const ModeType
+    *const RotateCommands = loop_input->RotateCommands,
+    *const DirectionCommands = loop_input->DirectionCommands;
+
+  char
+    *const command = loop_input->command;
+
+  const RotateTargets
+    targets = loop_input->targets;
+
+  if (event.xany.window == windows->command.id)
+    {
+      RotateCommandInput
+        input;
+
+      input.display=display;
+      input.resource_info=resource_info;
+      input.windows=windows;
+      input.event=event;
+      input.RotateMenu=RotateMenu;
+      input.RotateCommands=RotateCommands;
+      input.DirectionCommands=DirectionCommands;
+      input.command=command;
+      input.targets=targets;
+      XRotateCommand(&input,direction,state);
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 static MagickBooleanType XRotateImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,double degrees,Image **image,
   ExceptionInfo *exception)
@@ -15270,6 +15341,10 @@ static MagickBooleanType XRotateImage(Display *display,
       const RotateLineTargets
         line_targets = { &rotate_info, &state };
 
+      const RotateLoopInput
+        loop_input = { display, resource_info, windows, RotateMenu,
+          RotateCommands, DirectionCommands, command, targets };
+
       /*
         Map Command widget.
       */
@@ -15299,23 +15374,9 @@ static MagickBooleanType XRotateImage(Display *display,
         XScreenEvent(display,windows,&event,exception);
         XHighlightLine(display,windows->image.id,
           windows->image.highlight_context,&rotate_info);
-        if (event.xany.window == windows->command.id)
-          {
-            RotateCommandInput
-              input;
-
-            input.display=display;
-            input.resource_info=resource_info;
-            input.windows=windows;
-            input.event=event;
-            input.RotateMenu=RotateMenu;
-            input.RotateCommands=RotateCommands;
-            input.DirectionCommands=DirectionCommands;
-            input.command=command;
-            input.targets=targets;
-            XRotateCommand(&input,&direction,&state);
-            continue;
-          }
+        if (XRotateLoopCommand(&loop_input,event,&direction,&state) !=
+            MagickFalse)
+          continue;
         switch (event.type)
         {
           case ButtonPress:
