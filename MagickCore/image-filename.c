@@ -153,6 +153,15 @@ static inline MagickBooleanType IsUnknownFormatSpecifier(const char specifier)
     MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType AreDigitsFrom(const char *start,
+  const size_t length,size_t i)
+{
+  for ( ; i < (length-1); i++)
+    if (isdigit((int) ((unsigned char) start[i])) == 0)
+      return(MagickFalse);
+  return(MagickTrue);
+}
+
 static inline MagickBooleanType IsValidDigitSpecifier(const char *start,
   const size_t length)
 {
@@ -165,10 +174,7 @@ static inline MagickBooleanType IsValidDigitSpecifier(const char *start,
         return(MagickFalse);
       i=1;
     }
-  for ( ; i < (length-1); i++)
-    if (isdigit((int) ((unsigned char) start[i])) == 0)
-      return(MagickFalse);
-  return(MagickTrue);
+  return(AreDigitsFrom(start,length,i));
 }
 
 static inline MagickBooleanType IsValidFormatSpecifier(const char *start,
