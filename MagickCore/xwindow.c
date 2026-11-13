@@ -4187,6 +4187,17 @@ static void XCopyMatteToPixmap(Display *display,
 #endif
 }
 
+static void XCreateWindowMattePixmap(Display *display,
+  XWindowInfo *window,const unsigned int width,const unsigned int height)
+{
+  /*
+    Create matte pixmap.
+  */
+  window->matte_pixmap=XCreatePixmap(display,window->id,width,height,1);
+  if (window->matte_pixmap != (Pixmap) NULL)
+    XCopyMatteToPixmap(display,window,width,height);
+}
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
@@ -4432,14 +4443,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
         XMakeImageMSBFirst(&make_context,window->image,ximage,matte_image);
     }
   if (window->matte_image != (XImage *) NULL)
-    {
-      /*
-        Create matte pixmap.
-      */
-      window->matte_pixmap=XCreatePixmap(display,window->id,width,height,1);
-      if (window->matte_pixmap != (Pixmap) NULL)
-        XCopyMatteToPixmap(display,window,width,height);
-      }
+    XCreateWindowMattePixmap(display,window,width,height);
   (void) XMakePixmap(display,resource_info,window);
   /*
     Restore cursor.
