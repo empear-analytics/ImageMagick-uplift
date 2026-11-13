@@ -16337,6 +16337,21 @@ static void InitializeTextViewSelection(const TextViewContext *context,
   (*state)&=(unsigned int) (~UpdateConfigurationState);
 }
 
+static void UpdateTextViewLayout(const TextViewContext *context,
+  const TextViewWidgets *widgets)
+{
+  size_t
+    *const state = widgets->state;
+
+  if ((*state) & UpdateConfigurationState)
+    {
+      InitializeTextViewButtons(context,widgets);
+      InitializeTextViewScroll(context,widgets);
+      InitializeTextViewList(context,widgets);
+      InitializeTextViewSelection(context,widgets);
+    }
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -16490,13 +16505,7 @@ MagickPrivate void XTextViewWidget(Display *display,
   view_context.text_info=text_info;
   do
   {
-    if (state & UpdateConfigurationState)
-      {
-        InitializeTextViewButtons(&view_context,&view_widgets);
-        InitializeTextViewScroll(&view_context,&view_widgets);
-        InitializeTextViewList(&view_context,&view_widgets);
-        InitializeTextViewSelection(&view_context,&view_widgets);
-      }
+    UpdateTextViewLayout(&view_context,&view_widgets);
     if (state & RedrawWidgetState)
       {
         /*
