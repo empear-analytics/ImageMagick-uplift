@@ -7358,6 +7358,75 @@ static void XPackMatteImageMSB(const MakeImageContext *make_context,
     }
 }
 
+static void XPackBitmapImageMSB(const MakeImageContext *make_context,
+  const XCanvasPacking *packing,unsigned char *q)
+{
+  const XWindowInfo
+    *const window = make_context->window;
+
+  ExceptionInfo
+    *const exception = make_context->exception;
+
+  Image
+    *const image = packing->image;
+
+  Image
+    *const canvas = packing->canvas;
+
+  CacheView
+    *const canvas_view = packing->canvas_view;
+
+  const unsigned int
+    scanline_pad = packing->scanline_pad;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  unsigned short
+    polarity;
+
+  unsigned char
+    background,
+    foreground;
+
+  XBitmapPacking
+    bitmap;
+
+  /*
+    Convert canvas to big-endian bitmap.
+  */
+  background=(unsigned char)
+    (XPixelIntensity(&window->pixel_info->foreground_color) <
+     XPixelIntensity(&window->pixel_info->background_color) ?  0x01 : 0x00);
+  foreground=(unsigned char)
+    (XPixelIntensity(&window->pixel_info->background_color) <
+     XPixelIntensity(&window->pixel_info->foreground_color) ?  0x01 : 0x00);
+  polarity=(unsigned short) ((GetPixelInfoIntensity(image,
+    &canvas->colormap[0])) < ((double) QuantumRange/2.0) ? 1 : 0);
+  if (canvas->colors == 2)
+    polarity=GetPixelInfoIntensity(image,&canvas->colormap[0]) <
+      GetPixelInfoIntensity(image,&canvas->colormap[1]);
+  bitmap.canvas=canvas;
+  bitmap.polarity=polarity;
+  bitmap.background=background;
+  bitmap.foreground=foreground;
+  bitmap.canvas_view=canvas_view;
+  bitmap.exception=exception;
+  bitmap.scanline_pad=scanline_pad;
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,canvas->columns,1,
+      exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    q=XPackBitmapRowMSB(&bitmap,p,q);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
 static void XMakeImageMSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -7377,13 +7446,7 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
     *canvas;
 
   int
-    y;
-
-  int
     x;
-
-  const Quantum
-    *p;
 
   unsigned char
     *q;
@@ -7462,48 +7525,7 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
   packing.scanline_pad=scanline_pad;
   packing.x=x;
   if (ximage->format == XYBitmap)
-    {
-      unsigned short
-        polarity;
-
-      unsigned char
-        background,
-        foreground;
-
-      XBitmapPacking
-        bitmap;
-
-      /*
-        Convert canvas to big-endian bitmap.
-      */
-      background=(unsigned char)
-        (XPixelIntensity(&window->pixel_info->foreground_color) <
-         XPixelIntensity(&window->pixel_info->background_color) ?  0x01 : 0x00);
-      foreground=(unsigned char)
-        (XPixelIntensity(&window->pixel_info->background_color) <
-         XPixelIntensity(&window->pixel_info->foreground_color) ?  0x01 : 0x00);
-      polarity=(unsigned short) ((GetPixelInfoIntensity(image,
-        &canvas->colormap[0])) < ((double) QuantumRange/2.0) ? 1 : 0);
-      if (canvas->colors == 2)
-        polarity=GetPixelInfoIntensity(image,&canvas->colormap[0]) <
-          GetPixelInfoIntensity(image,&canvas->colormap[1]);
-      bitmap.canvas=canvas;
-      bitmap.polarity=polarity;
-      bitmap.background=background;
-      bitmap.foreground=foreground;
-      bitmap.canvas_view=canvas_view;
-      bitmap.exception=exception;
-      bitmap.scanline_pad=scanline_pad;
-      for (y=0; y < (int) canvas->rows; y++)
-      {
-        p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,canvas->columns,1,
-          exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        q=XPackBitmapRowMSB(&bitmap,p,q);
-        q+=(ptrdiff_t) scanline_pad;
-      }
-    }
+    XPackBitmapImageMSB(make_context,&packing,q);
   else
     if (window->pixel_info->colors != 0)
       XPackColormappedMSB(ximage,row_source,q);
