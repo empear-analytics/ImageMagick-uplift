@@ -4623,13 +4623,13 @@ static inline MagickBooleanType IsShapedImageWindow(const XWindowInfo *window)
     MagickTrue : MagickFalse);
 }
 
+#define CheckOverflowException(length,width,height) \
+  (((height) != 0) && ((length)/((size_t) height) != ((size_t) width)))
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
 {
-#define CheckOverflowException(length,width,height) \
-  (((height) != 0) && ((length)/((size_t) height) != ((size_t) width)))
-
   int
     depth,
     format;
