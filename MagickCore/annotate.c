@@ -2939,6 +2939,19 @@ static void SetPostscriptMetrics(const DrawInfo *draw_info,
   metrics->underline_thickness=1.0;
 }
 
+static void WritePostscriptPrologue(FILE *file)
+{
+  (void) FormatLocaleFile(file,"%%!PS-Adobe-3.0\n");
+  (void) FormatLocaleFile(file,"/ReencodeType\n");
+  (void) FormatLocaleFile(file,"{\n");
+  (void) FormatLocaleFile(file,"  findfont dup length\n");
+  (void) FormatLocaleFile(file,
+    "  dict begin { 1 index /FID ne {def} {pop pop} ifelse } forall\n");
+  (void) FormatLocaleFile(file,
+    "  /Encoding ISOLatin1Encoding def currentdict end definefont pop\n");
+  (void) FormatLocaleFile(file,"} bind def\n");
+}
+
 static void WritePostscriptFont(FILE *file,const DrawInfo *draw_info)
 {
   if (IsValidPostscriptFontname(draw_info->font) == MagickFalse)
@@ -3023,15 +3036,7 @@ static MagickBooleanType RenderPostscript(Image *image,
       ThrowFileException(exception,FileOpenError,"UnableToOpenFile",filename);
       return(MagickFalse);
     }
-  (void) FormatLocaleFile(file,"%%!PS-Adobe-3.0\n");
-  (void) FormatLocaleFile(file,"/ReencodeType\n");
-  (void) FormatLocaleFile(file,"{\n");
-  (void) FormatLocaleFile(file,"  findfont dup length\n");
-  (void) FormatLocaleFile(file,
-    "  dict begin { 1 index /FID ne {def} {pop pop} ifelse } forall\n");
-  (void) FormatLocaleFile(file,
-    "  /Encoding ISOLatin1Encoding def currentdict end definefont pop\n");
-  (void) FormatLocaleFile(file,"} bind def\n");
+  WritePostscriptPrologue(file);
   /*
     Sample to compute bounding box.
   */
