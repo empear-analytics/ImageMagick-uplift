@@ -5096,6 +5096,15 @@ typedef struct _CompositeCommandInput
 
   const ModeType
     *CompositeCommands;
+
+  const char
+    *const *CompositeMenu;
+
+  char
+    *displacement_geometry;
+
+  CompositeTargets
+    targets;
 } CompositeCommandInput;
 
 static void XCompositeControl(const CompositeCommandInput *input,const int id,
@@ -5137,6 +5146,71 @@ static void XCompositeControl(const CompositeCommandInput *input,const int id,
     default:
       break;
   }
+}
+
+static MagickBooleanType XCompositeCommandBlock(
+  const CompositeCommandInput *input,XEvent *event,CompositeOperator *compose,
+  size_t *state)
+{
+  Display
+    *const display = input->display;
+
+  XWindows
+    *const windows = input->windows;
+
+  const char
+    *const *const CompositeMenu = input->CompositeMenu;
+
+  const ModeType
+    *const CompositeCommands = input->CompositeCommands;
+
+  const CompositeTargets
+    targets = input->targets;
+
+  int
+    id;
+
+  if ((*event).xany.window == windows->command.id)
+    {
+      /*
+        Select a command from the Command widget.
+      */
+      id=XCommandWidget(display,windows,CompositeMenu,event);
+      if (id < 0)
+        return(MagickTrue);
+      switch (CompositeCommands[id])
+      {
+        case CompositeOperatorsCommand:
+        {
+          ComposeMenuInfo
+            menu_info;
+
+          menu_info.display=display;
+          menu_info.windows=windows;
+          menu_info.id=id;
+          (*compose)=XSelectPasteOperator(&menu_info,CompositeMenu,(*compose));
+          break;
+        }
+        case CompositeDissolveCommand:
+        {
+          XSelectDissolveBlend(display,windows,&targets);
+          break;
+        }
+        case CompositeDisplaceCommand:
+        {
+          XSelectDisplaceGeometry(display,windows,input->displacement_geometry,
+            &targets);
+          break;
+        }
+        default:
+        {
+          XCompositeControl(input,id,state);
+          break;
+        }
+      }
+      return(MagickTrue);
+    }
+  return(MagickFalse);
 }
 
 static MagickBooleanType XCompositeImage(Display *display,
@@ -5181,7 +5255,6 @@ static MagickBooleanType XCompositeImage(Display *display,
     *composite_image;
 
   int
-    id,
     x,
     y;
 
@@ -5207,7 +5280,8 @@ static MagickBooleanType XCompositeImage(Display *display,
     targets = { &blend, &compose };
 
   const CompositeCommandInput
-    command_input = { display, resource_info, windows, CompositeCommands };
+    command_input = { display, resource_info, windows, CompositeCommands,
+      CompositeMenu, displacement_geometry, targets };
 
   /*
     Request image file name from user.
@@ -5272,46 +5346,8 @@ static MagickBooleanType XCompositeImage(Display *display,
     XScreenEvent(display,windows,&event,exception);
     XHighlightRectangle(display,windows->image.id,
       windows->image.highlight_context,&highlight_info);
-    if (event.xany.window == windows->command.id)
-      {
-        /*
-          Select a command from the Command widget.
-        */
-        id=XCommandWidget(display,windows,CompositeMenu,&event);
-        if (id < 0)
-          continue;
-        switch (CompositeCommands[id])
-        {
-          case CompositeOperatorsCommand:
-          {
-            ComposeMenuInfo
-              menu_info;
-
-            menu_info.display=display;
-            menu_info.windows=windows;
-            menu_info.id=id;
-            compose=XSelectPasteOperator(&menu_info,CompositeMenu,compose);
-            break;
-          }
-          case CompositeDissolveCommand:
-          {
-            XSelectDissolveBlend(display,windows,&targets);
-            break;
-          }
-          case CompositeDisplaceCommand:
-          {
-            XSelectDisplaceGeometry(display,windows,displacement_geometry,
-              &targets);
-            break;
-          }
-          default:
-          {
-            XCompositeControl(&command_input,id,&state);
-            break;
-          }
-        }
-        continue;
-      }
+    if (XCompositeCommandBlock(&command_input,&event,&compose,&state) != MagickFalse)
+      continue;
     switch (event.type)
     {
       case ButtonPress:
