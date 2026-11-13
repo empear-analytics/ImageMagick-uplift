@@ -483,6 +483,16 @@ static const char *GetImageInfoProperty(const ImageInfo *image_info,
   }
 }
 
+static void OpenMagickPropertyLetter(const ImageInfo *image_info,
+  const Image *image)
+{
+  if ((image != (Image *) NULL) && (IsEventLogging() != MagickFalse))
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  else
+    if ((image_info != (ImageInfo *) NULL) && (IsEventLogging() != MagickFalse))
+      (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no-images");
+}
+
 static char *GetMagickPropertyLetter(ImageInfo *image_info,Image *image,
   const char letter,ExceptionInfo *exception)
 {
@@ -492,11 +502,7 @@ static char *GetMagickPropertyLetter(ImageInfo *image_info,Image *image,
   const char
     *string;
 
-  if ((image != (Image *) NULL) && (IsEventLogging() != MagickFalse))
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  else
-    if ((image_info != (ImageInfo *) NULL) && (IsEventLogging() != MagickFalse))
-      (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no-images");
+  OpenMagickPropertyLetter(image_info,image);
   /*
     Get properties that are directly defined by images.
   */
