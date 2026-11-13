@@ -8571,6 +8571,31 @@ static void HandleFileBrowserKeyEvent(
   }
 }
 
+static unsigned int GetFileBrowserWidth(XFontStruct *font_info,
+  const char *action)
+{
+  unsigned int
+    width;
+
+  width=WidgetTextWidth(font_info,(char *) action);
+  if (WidgetTextWidth(font_info,GrabButtonText) > width)
+    width=WidgetTextWidth(font_info,GrabButtonText);
+  if (WidgetTextWidth(font_info,FormatButtonText) > width)
+    width=WidgetTextWidth(font_info,FormatButtonText);
+  if (WidgetTextWidth(font_info,CancelButtonText) > width)
+    width=WidgetTextWidth(font_info,CancelButtonText);
+  if (WidgetTextWidth(font_info,HomeButtonText) > width)
+    width=WidgetTextWidth(font_info,HomeButtonText);
+  if (WidgetTextWidth(font_info,UpButtonText) > width)
+    width=WidgetTextWidth(font_info,UpButtonText);
+  width+=(unsigned int) QuantumMargin;
+  if (WidgetTextWidth(font_info,DirectoryText) > width)
+    width=WidgetTextWidth(font_info,DirectoryText);
+  if (WidgetTextWidth(font_info,FilenameText) > width)
+    width=WidgetTextWidth(font_info,FilenameText);
+  return(width);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8680,22 +8705,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   for (i=0; i < (ssize_t) files; i++)
     if (WidgetTextWidth(font_info,filelist[i]) > text_width)
       text_width=WidgetTextWidth(font_info,filelist[i]);
-  width=WidgetTextWidth(font_info,(char *) action);
-  if (WidgetTextWidth(font_info,GrabButtonText) > width)
-    width=WidgetTextWidth(font_info,GrabButtonText);
-  if (WidgetTextWidth(font_info,FormatButtonText) > width)
-    width=WidgetTextWidth(font_info,FormatButtonText);
-  if (WidgetTextWidth(font_info,CancelButtonText) > width)
-    width=WidgetTextWidth(font_info,CancelButtonText);
-  if (WidgetTextWidth(font_info,HomeButtonText) > width)
-    width=WidgetTextWidth(font_info,HomeButtonText);
-  if (WidgetTextWidth(font_info,UpButtonText) > width)
-    width=WidgetTextWidth(font_info,UpButtonText);
-  width+=(unsigned int) QuantumMargin;
-  if (WidgetTextWidth(font_info,DirectoryText) > width)
-    width=WidgetTextWidth(font_info,DirectoryText);
-  if (WidgetTextWidth(font_info,FilenameText) > width)
-    width=WidgetTextWidth(font_info,FilenameText);
+  width=GetFileBrowserWidth(font_info,action);
   height=(unsigned int) (font_info->ascent+font_info->descent);
   /*
     Position File Browser widget.
