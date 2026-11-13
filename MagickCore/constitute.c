@@ -681,6 +681,13 @@ static void DeleteResolutionProperties(Image *image,
     }
 }
 
+static inline MagickBooleanType HasResolutionPair(const char *resolution_x,
+  const char *resolution_y)
+{
+  return(((resolution_x != (const char *) NULL) &&
+    (resolution_y != (const char *) NULL)) ? MagickTrue : MagickFalse);
+}
+
 static void SetResolutionUnitsFromString(Image *image,
   const char *resolution_units)
 {
@@ -712,8 +719,7 @@ static void SyncResolutionFromProperties(Image *image,
     {
       resolution_x=GetImageProperty(image,"exif:XResolution",exception);
       resolution_y=GetImageProperty(image,"exif:YResolution",exception);
-      if ((resolution_x != (const char *) NULL) &&
-          (resolution_y != (const char *) NULL))
+      if (HasResolutionPair(resolution_x,resolution_y) != MagickFalse)
         resolution_units=GetImageProperty(image,"exif:ResolutionUnit",
           exception);
     }
@@ -722,16 +728,14 @@ static void SyncResolutionFromProperties(Image *image,
     {
       resolution_x=GetImageProperty(image,"tiff:XResolution",exception);
       resolution_y=GetImageProperty(image,"tiff:YResolution",exception);
-      if ((resolution_x != (const char *) NULL) &&
-          (resolution_y != (const char *) NULL))
+      if (HasResolutionPair(resolution_x,resolution_y) != MagickFalse)
         {
           used_tiff=MagickTrue;
           resolution_units=GetImageProperty(image,"tiff:ResolutionUnit",
             exception);
         }
     }
-  if ((resolution_x != (const char *) NULL) &&
-      (resolution_y != (const char *) NULL))
+  if (HasResolutionPair(resolution_x,resolution_y) != MagickFalse)
     {
       SetResolutionFromStrings(image,resolution_x,resolution_y);
       if (resolution_units != (char *) NULL)
