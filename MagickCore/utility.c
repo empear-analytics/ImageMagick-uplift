@@ -1198,16 +1198,12 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
     parameters=ParseCommandOption(MagickCommandOptions,MagickFalse,option);
     if (parameters > 0)
       {
-        ArgumentParameters
-          list;
+        const ArgumentParameters
+          list = { number_arguments, arguments, vector, parameters };
 
         /*
           Do not expand command option parameters.
         */
-        list.number_arguments=number_arguments;
-        list.arguments=arguments;
-        list.vector=vector;
-        list.parameters=parameters;
         CopyArgumentParameters(&list,&i,&count);
         continue;
       }
