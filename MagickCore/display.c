@@ -6953,6 +6953,16 @@ static MagickBooleanType XCropEscaped(const CropContext *context,
   return(MagickTrue);
 }
 
+static void XMapCropCommand(Display *display,XWindows *windows,
+  const char *const *CropModeMenu)
+{
+  windows->command.data=0;
+  (void) XCommandWidget(display,windows,CropModeMenu,(XEvent *) NULL);
+  (void) XMapRaised(display,windows->command.id);
+  XClientMessage(display,windows->image.id,windows->im_protocols,
+    windows->im_update_widget,CurrentTime);
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -7019,11 +7029,7 @@ static MagickBooleanType XCropImage(Display *display,
     }
   }
   RectifyModeMenu[0]=windows->command.name;
-  windows->command.data=0;
-  (void) XCommandWidget(display,windows,CropModeMenu,(XEvent *) NULL);
-  (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
+  XMapCropCommand(display,windows,CropModeMenu);
   /*
     Track pointer until button 1 is pressed.
   */
