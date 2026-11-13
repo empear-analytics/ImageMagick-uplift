@@ -1404,6 +1404,22 @@ static void XScreenConvertAltButton(XEvent *event)
     }
 }
 
+static int XScreenInputEvent(const XEvent *event)
+{
+  switch (event->type)
+  {
+    case ButtonRelease:
+    case KeyPress:
+    case KeyRelease:
+    case MotionNotify:
+    case SelectionNotify:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
 static int XScreenEvent(Display *display,XEvent *event,char *data)
 {
   XWindows
@@ -1442,14 +1458,8 @@ static int XScreenEvent(Display *display,XEvent *event,char *data)
           CurrentTime);
       return(MagickTrue);
     }
-    case ButtonRelease:
-    case KeyPress:
-    case KeyRelease:
-    case MotionNotify:
-    case SelectionNotify:
-      return(MagickTrue);
     default:
-      break;
+      return(XScreenInputEvent(event));
   }
   return(MagickFalse);
 }
