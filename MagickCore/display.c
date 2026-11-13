@@ -14445,6 +14445,9 @@ typedef struct _ROIContext
 
   XWindows
     *windows;
+
+  Cursor
+    cursor;
 } ROIContext;
 
 static void XROIPointerCommand(const ROIContext *context,
@@ -14485,6 +14488,32 @@ static void XROIPointerCommand(const ROIContext *context,
     default:
       break;
   }
+}
+
+static void XROIPointerPress(const ROIContext *context,
+  const ROITargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  if ((*event).xbutton.button != Button1)
+    return;
+  if ((*event).xbutton.window != context->windows->image.id)
+    return;
+  /*
+    Note first corner of region of interest rectangle-- exit loop.
+  */
+  (void) XCheckDefineCursor(context->display,context->windows->image.id,
+    context->cursor);
+  (*roi_info).x=(ssize_t) context->windows->image.x+(*event).xbutton.x;
+  (*roi_info).y=(ssize_t) context->windows->image.y+(*event).xbutton.y;
+  (*state)|=ExitState;
 }
 
 static MagickBooleanType XROIImage(Display *display,
@@ -14549,6 +14578,7 @@ static MagickBooleanType XROIImage(Display *display,
   context.display=display;
   context.resource_info=resource_info;
   context.windows=windows;
+  context.cursor=cursor;
   do
   {
     if (windows->info.mapped != MagickFalse)
@@ -14573,17 +14603,7 @@ static MagickBooleanType XROIImage(Display *display,
     {
       case ButtonPress:
       {
-        if (event.xbutton.button != Button1)
-          break;
-        if (event.xbutton.window != windows->image.id)
-          break;
-        /*
-          Note first corner of region of interest rectangle-- exit loop.
-        */
-        (void) XCheckDefineCursor(display,windows->image.id,cursor);
-        roi_info.x=(ssize_t) windows->image.x+event.xbutton.x;
-        roi_info.y=(ssize_t) windows->image.y+event.xbutton.y;
-        state|=ExitState;
+        XROIPointerPress(&context,&targets);
         break;
       }
       case ButtonRelease:
