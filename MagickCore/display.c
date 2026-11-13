@@ -6723,6 +6723,37 @@ static void XCropWaitEvent(const CropContext *context,
   }
 }
 
+static MagickBooleanType XCropWaitHead(const CropContext *context,
+  const CropTargets *targets,RectangleInfo *highlight_info)
+{
+  size_t
+    *const state = targets->state;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  if (context->windows->info.mapped != MagickFalse)
+    {
+      /*
+        Display pointer position.
+      */
+      (void) FormatLocaleString(context->text,MagickPathExtent,
+        " %.17gx%.17g%+.20g%+.20g",(double) (*crop_info).width,(double)
+        (*crop_info).height,(double) (*crop_info).x,(double) (*crop_info).y);
+      XInfoWidget(context->display,context->windows,context->text);
+    }
+  (*highlight_info)=(*crop_info);
+  (*highlight_info).x=(*crop_info).x-context->windows->image.x;
+  (*highlight_info).y=(*crop_info).y-context->windows->image.y;
+  if (((*highlight_info).width <= 3) || ((*highlight_info).height <= 3))
+    {
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -6863,25 +6894,8 @@ static MagickBooleanType XCropImage(Display *display,
     (void) XMapWindow(display,windows->info.id);
     do
     {
-      if (windows->info.mapped != MagickFalse)
-        {
-          /*
-            Display pointer position.
-          */
-          (void) FormatLocaleString(text,MagickPathExtent,
-            " %.17gx%.17g%+.20g%+.20g",(double) crop_info.width,(double)
-            crop_info.height,(double) crop_info.x,(double) crop_info.y);
-          XInfoWidget(display,windows,text);
-        }
-      highlight_info=crop_info;
-      highlight_info.x=crop_info.x-windows->image.x;
-      highlight_info.y=crop_info.y-windows->image.y;
-      if ((highlight_info.width <= 3) || (highlight_info.height <= 3))
-        {
-          state|=EscapeState;
-          state|=ExitState;
-          break;
-        }
+      if (XCropWaitHead(&context,&targets,&highlight_info) == MagickFalse)
+        break;
       XHighlightRectangle(display,windows->image.id,
         windows->image.highlight_context,&highlight_info);
       XScreenEvent(display,windows,&event,exception);
