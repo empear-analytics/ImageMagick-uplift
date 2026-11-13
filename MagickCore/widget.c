@@ -7820,6 +7820,39 @@ static void InitializeFileBrowserButtons(const FileBrowserContext *context,
   (*home_info).y=(*up_info).y+(int) (*up_info).height+QuantumMargin;
 }
 
+static void InitializeFileBrowserReply(const FileBrowserContext *context,
+  const FileBrowserWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const reply = context->reply;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    height = context->height,
+    width = context->width;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info,
+    *const action_info = widgets->action_info;
+
+  /*
+    Initialize reply information.
+  */
+  XGetWidgetInfo(reply,reply_info);
+  (*reply_info).raised=MagickFalse;
+  (*reply_info).bevel_width--;
+  (*reply_info).width=windows->widget.width-width-(unsigned int)
+    ((6*QuantumMargin) >> 1);
+  (*reply_info).height=height << 1;
+  (*reply_info).x=(int) width+(QuantumMargin << 1);
+  (*reply_info).y=(*action_info).y-(int) (*reply_info).height-QuantumMargin;
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8017,17 +8050,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
           id;
 
         InitializeFileBrowserButtons(&file_context,&file_widgets);
-        /*
-          Initialize reply information.
-        */
-        XGetWidgetInfo(reply,&reply_info);
-        reply_info.raised=MagickFalse;
-        reply_info.bevel_width--;
-        reply_info.width=windows->widget.width-width-(unsigned int)
-          ((6*QuantumMargin) >> 1);
-        reply_info.height=height << 1;
-        reply_info.x=(int) width+(QuantumMargin << 1);
-        reply_info.y=action_info.y-(int) reply_info.height-QuantumMargin;
+        InitializeFileBrowserReply(&file_context,&file_widgets);
         /*
           Initialize scroll information.
         */
