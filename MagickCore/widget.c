@@ -8697,6 +8697,51 @@ static unsigned int GetFileBrowserAnomaly(const char *action)
   return(anomaly);
 }
 
+typedef struct _FileBrowserLayout
+{
+  Display
+    *display;
+
+  XFontStruct
+    *font_info;
+
+  unsigned int
+    width,
+    height,
+    text_width;
+} FileBrowserLayout;
+
+static void PositionFileBrowserWidget(XWindows *windows,
+  const FileBrowserLayout *layout)
+{
+  Display
+    *const display = layout->display;
+
+  XFontStruct
+    *const font_info = layout->font_info;
+
+  const unsigned int
+    width = layout->width,
+    height = layout->height,
+    text_width = layout->text_width;
+
+  /*
+    Position File Browser widget.
+  */
+  windows->widget.width=width+MagickMin(text_width,MaxTextWidth)+
+    (unsigned int) (6*QuantumMargin);
+  windows->widget.min_width=width+MinTextWidth+(unsigned int) (4*QuantumMargin);
+  if (windows->widget.width < windows->widget.min_width)
+    windows->widget.width=windows->widget.min_width;
+  windows->widget.height=(unsigned int)
+    (((81*height) >> 2)+(unsigned int) ((13*QuantumMargin) >> 1)+4);
+  windows->widget.min_height=(unsigned int)
+    (((23*height) >> 1)+(unsigned int) ((13*QuantumMargin) >> 1)+4);
+  if (windows->widget.height < windows->widget.min_height)
+    windows->widget.height=windows->widget.min_height;
+  XConstrainWindowPosition(display,&windows->widget);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8765,6 +8810,9 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   FileBrowserContext
     file_context;
 
+  FileBrowserLayout
+    layout;
+
   /*
     Read filelist from current directory.
   */
@@ -8799,18 +8847,12 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   /*
     Position File Browser widget.
   */
-  windows->widget.width=width+MagickMin(text_width,MaxTextWidth)+
-    (unsigned int) (6*QuantumMargin);
-  windows->widget.min_width=width+MinTextWidth+(unsigned int) (4*QuantumMargin);
-  if (windows->widget.width < windows->widget.min_width)
-    windows->widget.width=windows->widget.min_width;
-  windows->widget.height=(unsigned int)
-    (((81*height) >> 2)+(unsigned int) ((13*QuantumMargin) >> 1)+4);
-  windows->widget.min_height=(unsigned int)
-    (((23*height) >> 1)+(unsigned int) ((13*QuantumMargin) >> 1)+4);
-  if (windows->widget.height < windows->widget.min_height)
-    windows->widget.height=windows->widget.min_height;
-  XConstrainWindowPosition(display,&windows->widget);
+  layout.display=display;
+  layout.font_info=font_info;
+  layout.width=width;
+  layout.height=height;
+  layout.text_width=text_width;
+  PositionFileBrowserWidget(windows,&layout);
   MapFileBrowserWidget(display,windows,mask);
   /*
     Respond to X events.
