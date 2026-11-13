@@ -3608,12 +3608,80 @@ static void SkipClipPathRecord(const ssize_t selector,unsigned char **blob,
   }
 }
 
+typedef struct _ClipPathTargets
+{
+  unsigned char
+    **blob;
+
+  size_t
+    *length;
+
+  ssize_t
+    *knot_count;
+} ClipPathTargets;
+
+static void ReadClipPathSubpathLength(const ClipPathTargets *targets)
+{
+  unsigned char
+    **const blob = targets->blob;
+
+  size_t
+    *const length = targets->length;
+
+  ssize_t
+    *const knot_count = targets->knot_count;
+
+  if ((*knot_count) != 0)
+    {
+      (*blob)+=24;
+      (*length)-=(size_t) MagickMin((*length),24U);
+      return;
+    }
+  /*
+    Expected subpath length record.
+  */
+  (*knot_count)=(ssize_t) ReadProfileMSBShort(blob,length);
+  (*blob)+=22;
+  (*length)-=(size_t) MagickMin((*length),22);
+}
+
+static void UpdateClipPathSubpathKnot(const ClipPathResizeInfo *resize,
+  const ClipPathTargets *targets)
+{
+  unsigned char
+    **const blob = targets->blob;
+
+  size_t
+    *const length = targets->length;
+
+  ssize_t
+    *const knot_count = targets->knot_count;
+
+  if ((*knot_count) == 0)
+    {
+      /*
+        Unexpected subpath knot.
+      */
+      (*blob)+=24;
+      (*length)-=(size_t) MagickMin((*length),24);
+      return;
+    }
+  /*
+    Add sub-path knot
+  */
+  UpdateClipPathKnot(resize,blob,length);
+  (*knot_count)--;
+}
+
 static void UpdateClipPath(unsigned char *blob,size_t length,
   const ClipPathResizeInfo *resize)
 {
   ssize_t
     knot_count,
     selector;
+
+  const ClipPathTargets
+    targets = { &blob, &length, &knot_count };
 
   knot_count=0;
   while (length != 0)
@@ -3624,18 +3692,7 @@ static void UpdateClipPath(unsigned char *blob,size_t length,
       case 0:
       case 3:
       {
-        if (knot_count != 0)
-          {
-            blob+=24;
-            length-=(size_t) MagickMin(length,24U);
-            break;
-          }
-        /*
-          Expected subpath length record.
-        */
-        knot_count=(ssize_t) ReadProfileMSBShort(&blob,&length);
-        blob+=22;
-        length-=(size_t) MagickMin(length,22);
+        ReadClipPathSubpathLength(&targets);
         break;
       }
       case 1:
@@ -3643,20 +3700,7 @@ static void UpdateClipPath(unsigned char *blob,size_t length,
       case 4:
       case 5:
       {
-        if (knot_count == 0)
-          {
-            /*
-              Unexpected subpath knot.
-            */
-            blob+=24;
-            length-=(size_t) MagickMin(length,24);
-            break;
-          }
-        /*
-          Add sub-path knot
-        */
-        UpdateClipPathKnot(resize,&blob,&length);
-        knot_count--;
+        UpdateClipPathSubpathKnot(resize,&targets);
         break;
       }
       default:
