@@ -3767,26 +3767,11 @@ static void ExportAnyDepthGrayAlphaQuantum(const Image *image,
   }
 }
 
-static void ExportGrayAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
-  const QuantumPixelSpan *span)
+static void ExportOtherDepthGrayAlphaQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
 {
   switch (quantum_info->depth)
   {
-    case 1:
-    {
-      Export1BitGrayAlphaQuantum(image,quantum_info,span);
-      break;
-    }
-    case 4:
-    {
-      Export4BitGrayAlphaQuantum(image,span);
-      break;
-    }
-    case 8:
-    {
-      Export8BitGrayAlphaQuantum(image,quantum_info,span);
-      break;
-    }
     case 16:
     {
       Export16BitGrayAlphaQuantum(image,quantum_info,span);
@@ -3809,6 +3794,34 @@ static void ExportGrayAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
     default:
     {
       ExportAnyDepthGrayAlphaQuantum(image,quantum_info,span);
+      break;
+    }
+  }
+}
+
+static void ExportGrayAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span)
+{
+  switch (quantum_info->depth)
+  {
+    case 1:
+    {
+      Export1BitGrayAlphaQuantum(image,quantum_info,span);
+      break;
+    }
+    case 4:
+    {
+      Export4BitGrayAlphaQuantum(image,span);
+      break;
+    }
+    case 8:
+    {
+      Export8BitGrayAlphaQuantum(image,quantum_info,span);
+      break;
+    }
+    default:
+    {
+      ExportOtherDepthGrayAlphaQuantum(image,quantum_info,span);
       break;
     }
   }
