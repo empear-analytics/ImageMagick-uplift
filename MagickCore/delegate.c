@@ -518,6 +518,20 @@ static int ReadDelegateOutput(const char *sanitize_command,char *message)
 }
 #endif
 
+static MagickBooleanType AcceptDelegateArguments(char **arguments,
+  const int number_arguments,ExceptionInfo *exception)
+{
+  if (*arguments[1] == '\0')
+    {
+      DestroyDelegateArguments(arguments,number_arguments);
+      return(MagickFalse);
+    }
+  if (AuthorizeDelegateArguments(arguments,number_arguments,exception) ==
+      MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static char *PrepareDelegateCommand(const MagickBooleanType asynchronous,
   const MagickBooleanType verbose,const char *command,char *message)
 {
@@ -553,12 +567,7 @@ MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
   arguments=StringToArgv(command,&number_arguments);
   if (arguments == (char **) NULL)
     return(status);
-  if (*arguments[1] == '\0')
-    {
-      DestroyDelegateArguments(arguments,number_arguments);
-      return(-1);
-    }
-  if (AuthorizeDelegateArguments(arguments,number_arguments,exception) ==
+  if (AcceptDelegateArguments(arguments,number_arguments,exception) ==
       MagickFalse)
     return(-1);
   sanitize_command=PrepareDelegateCommand(asynchronous,verbose,command,
