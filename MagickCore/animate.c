@@ -5810,17 +5810,10 @@ MagickExport Image *XAnimateImages(Display *display,
         icon_resources, icon_visual, icon_map, icon_pixel, display_image,
         number_scenes };
 
-    AnimateRunInputs
-      inputs;
+    const AnimateRunInputs
+      inputs = { image_list, exception, images, nexus, warning_handler,
+        working_directory, magick_windows, number_windows };
 
-    inputs.image_list=image_list;
-    inputs.exception=exception;
-    inputs.images=images;
-    inputs.nexus=nexus;
-    inputs.warning_handler=warning_handler;
-    inputs.working_directory=working_directory;
-    inputs.magick_windows=magick_windows;
-    inputs.number_windows=number_windows;
     return(XRunAnimateSession(&setup,&inputs));
   }
 }
