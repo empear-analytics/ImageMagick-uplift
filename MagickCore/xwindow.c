@@ -8968,6 +8968,19 @@ static void XCreateOrConfigureWindow(Display *display,const Window parent,
     }
 }
 
+static void XSetUserGeometryHints(const int flags,XSizeHints *size_hints,
+  XWindowInfo *window_info)
+{
+  if ((flags & WidthValue) && (flags & HeightValue))
+    size_hints->flags|=USSize;
+  if ((flags & XValue) && (flags & YValue))
+    {
+      size_hints->flags|=USPosition;
+      window_info->x=size_hints->x;
+      window_info->y=size_hints->y;
+    }
+}
+
 MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
   int argc,XClassHint *class_hint,XWMHints *manager_hints,
   XWindowInfo *window_info)
@@ -9053,14 +9066,7 @@ MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
       flags=XWMGeometry(display,window_info->screen,geometry,default_geometry,
         window_info->border_width,size_hints,&size_hints->x,&size_hints->y,
         &size_hints->width,&size_hints->height,&gravity);
-      if ((flags & WidthValue) && (flags & HeightValue))
-        size_hints->flags|=USSize;
-      if ((flags & XValue) && (flags & YValue))
-        {
-          size_hints->flags|=USPosition;
-          window_info->x=size_hints->x;
-          window_info->y=size_hints->y;
-        }
+      XSetUserGeometryHints(flags,size_hints,window_info);
     }
 #if !defined(PRE_R4_ICCCM)
   size_hints->win_gravity=gravity;
