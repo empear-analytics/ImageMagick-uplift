@@ -727,49 +727,11 @@ MagickExport MagickBooleanType IsFileResourceIdentityValid(const char *path)
   return(status);
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   G e t M a g i c k R e s o u r c e L i m i t                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  GetMagickResourceLimit() returns the specified resource limit.
-%
-%  The format of the GetMagickResourceLimit() method is:
-%
-%      MagickSizeType GetMagickResourceLimit(const ResourceType type)
-%
-%  A description of each parameter follows:
-%
-%    o type: the type of resource.
-%
-*/
-MagickExport MagickSizeType GetMagickResourceLimit(const ResourceType type)
+static MagickSizeType GetLockedResourceLimit(const ResourceType type)
 {
   MagickSizeType
     resource;
 
-  switch (type)
-  {
-    case AreaResource:
-      return(resource_info.area_limit);
-    case HeightResource:
-      return(resource_info.height_limit);
-    case ListLengthResource:
-      return(resource_info.list_length_limit);
-    case ThreadResource:
-      return(resource_info.thread_limit);
-    case ThrottleResource:
-      return(resource_info.throttle_limit);
-    case WidthResource:
-      return(resource_info.width_limit);
-    default: ;
-  }
   resource=0;
   if (resource_semaphore[type] == (SemaphoreInfo *) NULL)
     ActivateSemaphoreInfo(&resource_semaphore[type]);
@@ -806,6 +768,49 @@ MagickExport MagickSizeType GetMagickResourceLimit(const ResourceType type)
   }
   UnlockSemaphoreInfo(resource_semaphore[type]);
   return(resource);
+}
+
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%   G e t M a g i c k R e s o u r c e L i m i t                               %
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  GetMagickResourceLimit() returns the specified resource limit.
+%
+%  The format of the GetMagickResourceLimit() method is:
+%
+%      MagickSizeType GetMagickResourceLimit(const ResourceType type)
+%
+%  A description of each parameter follows:
+%
+%    o type: the type of resource.
+%
+*/
+MagickExport MagickSizeType GetMagickResourceLimit(const ResourceType type)
+{
+  switch (type)
+  {
+    case AreaResource:
+      return(resource_info.area_limit);
+    case HeightResource:
+      return(resource_info.height_limit);
+    case ListLengthResource:
+      return(resource_info.list_length_limit);
+    case ThreadResource:
+      return(resource_info.thread_limit);
+    case ThrottleResource:
+      return(resource_info.throttle_limit);
+    case WidthResource:
+      return(resource_info.width_limit);
+    default: ;
+  }
+  return(GetLockedResourceLimit(type));
 }
 
 /*
