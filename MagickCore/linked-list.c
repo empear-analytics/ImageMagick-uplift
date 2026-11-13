@@ -803,6 +803,18 @@ static ElementInfo *UnlinkNextElement(LinkedListInfo *list_info,
 %    o value: the value.
 %
 */
+static void UnlinkHeadElement(LinkedListInfo *list_info)
+{
+  ElementInfo
+    *next;
+
+  if (list_info->next == list_info->head)
+    list_info->next=list_info->head->next;
+  next=list_info->head;
+  list_info->head=list_info->head->next;
+  next=(ElementInfo *) RelinquishMagickMemory(next);
+}
+
 MagickExport void *RemoveElementByValueFromLinkedList(LinkedListInfo *list_info,
   const void *value)
 {
@@ -815,13 +827,7 @@ MagickExport void *RemoveElementByValueFromLinkedList(LinkedListInfo *list_info,
     return((void *) NULL);
   LockSemaphoreInfo(list_info->semaphore);
   if (value == list_info->head->value)
-    {
-      if (list_info->next == list_info->head)
-        list_info->next=list_info->head->next;
-      next=list_info->head;
-      list_info->head=list_info->head->next;
-      next=(ElementInfo *) RelinquishMagickMemory(next);
-    }
+    UnlinkHeadElement(list_info);
   else
     {
       ElementInfo

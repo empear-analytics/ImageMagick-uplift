@@ -66,6 +66,26 @@
 #include "MagickCore/string-private.h"
 #include "MagickCore/utility-private.h"
 
+static const char *SkipArgvSpaces(const char *p)
+{
+  while (isspace((int) ((unsigned char) *p)) != 0)
+    p++;
+  return(p);
+}
+
+static const char *SkipArgvQuoted(const char *p,const int quote)
+{
+  for (p++; (*p != quote) && (*p != '\0'); p++) ;
+  return(p);
+}
+
+static const char *SkipArgvWord(const char *p)
+{
+  while ((isspace((int) ((unsigned char) *p)) == 0) && (*p != '\0'))
+    p++;
+  return(p);
+}
+
 static void CountArgvArguments(const char *text,int *argc)
 {
   const char
@@ -73,17 +93,15 @@ static void CountArgvArguments(const char *text,int *argc)
 
   for (p=text; *p != '\0'; )
   {
-    while (isspace((int) ((unsigned char) *p)) != 0)
-      p++;
+    p=SkipArgvSpaces(p);
     if (*p == '\0')
       break;
     (*argc)++;
     if (*p == '"')
-      for (p++; (*p != '"') && (*p != '\0'); p++) ;
+      p=SkipArgvQuoted(p,'"');
     if (*p == '\'')
-      for (p++; (*p != '\'') && (*p != '\0'); p++) ;
-    while ((isspace((int) ((unsigned char) *p)) == 0) && (*p != '\0'))
-      p++;
+      p=SkipArgvQuoted(p,'\'');
+    p=SkipArgvWord(p);
   }
 }
 
@@ -121,6 +139,24 @@ static void CountArgvArguments(const char *text,int *argc)
 %      list.
 %
 */
+static void ScanArgvToken(const char **p,const char **q)
+{
+  *q=(*p);
+  if (**q == '"')
+    {
+      (*p)++;
+      *q=SkipArgvQuoted(*q,'"');
+    }
+  else
+    if (**q == '\'')
+      {
+        (*p)++;
+        *q=SkipArgvQuoted(*q,'\'');
+      }
+    else
+      *q=SkipArgvWord(*q);
+}
+
 MagickExport char **StringToArgv(const char *text,int *argc)
 {
   char
@@ -151,23 +187,8 @@ MagickExport char **StringToArgv(const char *text,int *argc)
   p=text;
   for (i=1; i < (ssize_t) *argc; i++)
   {
-    while (isspace((int) ((unsigned char) *p)) != 0)
-      p++;
-    q=p;
-    if (*q == '"')
-      {
-        p++;
-        for (q++; (*q != '"') && (*q != '\0'); q++) ;
-      }
-    else
-      if (*q == '\'')
-        {
-          p++;
-          for (q++; (*q != '\'') && (*q != '\0'); q++) ;
-        }
-      else
-        while ((isspace((int) ((unsigned char) *q)) == 0) && (*q != '\0'))
-          q++;
+    p=SkipArgvSpaces(p);
+    ScanArgvToken(&p,&q);
     argv[i]=(char *) AcquireQuantumMemory((size_t) (q-p)+MagickPathExtent,
       sizeof(**argv));
     if (argv[i] == (char *) NULL)
@@ -181,8 +202,7 @@ MagickExport char **StringToArgv(const char *text,int *argc)
     (void) memcpy(argv[i],p,(size_t) (q-p));
     argv[i][q-p]='\0';
     p=q;
-    while ((isspace((int) ((unsigned char) *p)) == 0) && (*p != '\0'))
-      p++;
+    p=SkipArgvWord(p);
   }
   argv[i]=(char *) NULL;
   return(argv);

@@ -164,12 +164,17 @@ MagickPrivate SignatureInfo *AcquireSignatureInfo(void)
 %    o signature_info: the cipher signature_info.
 %
 */
-MagickPrivate SignatureInfo *DestroySignatureInfo(SignatureInfo *signature_info)
+static void CheckSignatureInfo(const SignatureInfo *signature_info)
 {
   assert(signature_info != (SignatureInfo *) NULL);
   assert(signature_info->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+}
+
+MagickPrivate SignatureInfo *DestroySignatureInfo(SignatureInfo *signature_info)
+{
+  CheckSignatureInfo(signature_info);
   if (signature_info->accumulator != (unsigned int *) NULL)
     signature_info->accumulator=(unsigned int *) RelinquishMagickMemory(
       signature_info->accumulator);
@@ -326,10 +331,7 @@ MagickPrivate unsigned int GetSignatureBlocksize(
 MagickPrivate const StringInfo *GetSignatureDigest(
   const SignatureInfo *signature_info)
 {
-  assert(signature_info != (SignatureInfo *) NULL);
-  assert(signature_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  CheckSignatureInfo(signature_info);
   return(signature_info->digest);
 }
 
@@ -358,10 +360,7 @@ MagickPrivate const StringInfo *GetSignatureDigest(
 MagickPrivate unsigned int GetSignatureDigestsize(
   const SignatureInfo *signature_info)
 {
-  assert(signature_info != (SignatureInfo *) NULL);
-  assert(signature_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  CheckSignatureInfo(signature_info);
   return(signature_info->digestsize);
 }
 
@@ -389,10 +388,7 @@ MagickPrivate unsigned int GetSignatureDigestsize(
 */
 MagickPrivate void InitializeSignature(SignatureInfo *signature_info)
 {
-  assert(signature_info != (SignatureInfo *) NULL);
-  assert(signature_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  CheckSignatureInfo(signature_info);
   signature_info->accumulator[0]=0x6a09e667U;
   signature_info->accumulator[1]=0xbb67ae85U;
   signature_info->accumulator[2]=0x3c6ef372U;
@@ -442,18 +438,35 @@ MagickPrivate void SetSignatureDigest(SignatureInfo *signature_info,
   SetStringInfo(signature_info->digest,digest);
 }
 
-static unsigned char *AppendPixelBytes(unsigned char *q,const float pixel,
-  const SignatureInfo *signature_info)
+static unsigned char *AppendPixelBytesReversed(unsigned char *q,
+  const float pixel)
 {
   ssize_t
     j;
 
+  for (j=(ssize_t) sizeof(pixel)-1; j >= 0; j--)
+    *q++=(unsigned char) ((unsigned char *) &pixel)[j];
+  return(q);
+}
+
+static unsigned char *AppendPixelBytesInOrder(unsigned char *q,
+  const float pixel)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) sizeof(pixel); j++)
+    *q++=(unsigned char) ((unsigned char *) &pixel)[j];
+  return(q);
+}
+
+static unsigned char *AppendPixelBytes(unsigned char *q,const float pixel,
+  const SignatureInfo *signature_info)
+{
   if (signature_info->lsb_first == MagickFalse)
-    for (j=(ssize_t) sizeof(pixel)-1; j >= 0; j--)
-      *q++=(unsigned char) ((unsigned char *) &pixel)[j];
+    q=AppendPixelBytesReversed(q,pixel);
   else
-    for (j=0; j < (ssize_t) sizeof(pixel); j++)
-      *q++=(unsigned char) ((unsigned char *) &pixel)[j];
+    q=AppendPixelBytesInOrder(q,pixel);
   return(q);
 }
 
@@ -505,6 +518,25 @@ static unsigned char *AppendPixelChannels(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static unsigned char *AppendSignatureRow(const Image *image,const Quantum *p,
+  unsigned char *q,const SignatureInfo *signature_info)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    if (GetPixelReadMask(image,p) <= (QuantumRange/2))
+      {
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        continue;
+      }
+    q=AppendPixelChannels(image,p,q,signature_info);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(q);
+}
+
 MagickExport MagickBooleanType SignatureImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -545,9 +577,6 @@ MagickExport MagickBooleanType SignatureImage(Image *image,
   image_view=AcquireVirtualCacheView(image,exception);
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ssize_t
-      x;
-
     unsigned char
       *q;
 
@@ -558,16 +587,7 @@ MagickExport MagickBooleanType SignatureImage(Image *image,
       sizeof(pixel));
     pixels=GetStringInfoDatum(signature);
     q=pixels;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      if (GetPixelReadMask(image,p) <= (QuantumRange/2))
-        {
-          p+=(ptrdiff_t) GetPixelChannels(image);
-          continue;
-        }
-      q=AppendPixelChannels(image,p,q,signature_info);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    q=AppendSignatureRow(image,p,q,signature_info);
     SetStringInfoLength(signature,(size_t) (q-pixels));
     UpdateSignature(signature_info,signature);
   }
@@ -643,11 +663,62 @@ static const unsigned int
     0x90befffaU, 0xa4506cebU, 0xbef9a3f7U, 0xc67178f2U
   };  /* 32-bit fractional part of the cube root of the first 64 primes */
 
-static void TransformSignature(SignatureInfo *signature_info)
+static void LoadSignatureWords(unsigned char *p,const unsigned int shift,
+  unsigned int *T,unsigned int *W)
 {
   ssize_t
     i;
 
+DisableMSCWarning(4127)
+  if (sizeof(unsigned int) <= 4)
+RestoreMSCWarning
+    for (i=0; i < 16; i++)
+    {
+      (*T)=(*((unsigned int *) p));
+      p+=(ptrdiff_t) 4;
+      W[i]=Trunc32(*T);
+    }
+  else
+    for (i=0; i < 16; i+=2)
+    {
+      (*T)=(*((unsigned int *) p));
+      p+=(ptrdiff_t) 8;
+      W[i]=Trunc32((*T) >> shift);
+      W[i+1]=Trunc32(*T);
+    }
+}
+
+static void LoadSwappedSignatureWords(unsigned char *p,const unsigned int shift,
+  unsigned int *T,unsigned int *W)
+{
+  ssize_t
+    i;
+
+DisableMSCWarning(4127)
+  if (sizeof(unsigned int) <= 4)
+RestoreMSCWarning
+    for (i=0; i < 16; i++)
+    {
+      (*T)=(*((unsigned int *) p));
+      p+=(ptrdiff_t) 4;
+      W[i]=(((*T) << 24) & 0xff000000) | (((*T) << 8) & 0x00ff0000) |
+        (((*T) >> 8) & 0x0000ff00) | (((*T) >> 24) & 0x000000ff);
+    }
+  else
+    for (i=0; i < 16; i+=2)
+    {
+      (*T)=(*((unsigned int *) p));
+      p+=(ptrdiff_t) 8;
+      W[i]=(((*T) << 24) & 0xff000000) | (((*T) << 8) & 0x00ff0000) |
+        (((*T) >> 8) & 0x0000ff00) | (((*T) >> 24) & 0x000000ff);
+      (*T)>>=shift;
+      W[i+1]=(((*T) << 24) & 0xff000000) | (((*T) << 8) & 0x00ff0000) |
+        (((*T) >> 8) & 0x0000ff00) | (((*T) >> 24) & 0x000000ff);
+    }
+}
+
+static void TransformSignature(SignatureInfo *signature_info)
+{
   unsigned char
     *p;
 
@@ -672,47 +743,9 @@ static void TransformSignature(SignatureInfo *signature_info)
   shift=32;
   p=GetStringInfoDatum(signature_info->message);
   if (signature_info->lsb_first == MagickFalse)
-    {
-DisableMSCWarning(4127)
-      if (sizeof(unsigned int) <= 4)
-RestoreMSCWarning
-        for (i=0; i < 16; i++)
-        {
-          T=(*((unsigned int *) p));
-          p+=(ptrdiff_t) 4;
-          W[i]=Trunc32(T);
-        }
-      else
-        for (i=0; i < 16; i+=2)
-        {
-          T=(*((unsigned int *) p));
-          p+=(ptrdiff_t) 8;
-          W[i]=Trunc32(T >> shift);
-          W[i+1]=Trunc32(T);
-        }
-    }
+    LoadSignatureWords(p,shift,&T,W);
   else
-DisableMSCWarning(4127)
-    if (sizeof(unsigned int) <= 4)
-RestoreMSCWarning
-      for (i=0; i < 16; i++)
-      {
-        T=(*((unsigned int *) p));
-        p+=(ptrdiff_t) 4;
-        W[i]=((T << 24) & 0xff000000) | ((T << 8) & 0x00ff0000) |
-          ((T >> 8) & 0x0000ff00) | ((T >> 24) & 0x000000ff);
-      }
-    else
-      for (i=0; i < 16; i+=2)
-      {
-        T=(*((unsigned int *) p));
-        p+=(ptrdiff_t) 8;
-        W[i]=((T << 24) & 0xff000000) | ((T << 8) & 0x00ff0000) |
-          ((T >> 8) & 0x0000ff00) | ((T >> 24) & 0x000000ff);
-        T>>=shift;
-        W[i+1]=((T << 24) & 0xff000000) | ((T << 8) & 0x00ff0000) |
-          ((T >> 8) & 0x0000ff00) | ((T >> 24) & 0x000000ff);
-      }
+    LoadSwappedSignatureWords(p,shift,&T,W);
   /*
     Copy accumulator to registers.
   */
