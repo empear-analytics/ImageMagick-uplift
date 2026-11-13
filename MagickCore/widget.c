@@ -15024,23 +15024,17 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
           preferences_info[i].y=y;
           y+=(int) height+(QuantumMargin >> 1);
         }
-        preferences_info[0].raised=resource_info->backdrop ==
-          MagickFalse ? MagickTrue : MagickFalse;
-        preferences_info[1].raised=resource_info->confirm_exit ==
-          MagickFalse ? MagickTrue : MagickFalse;
-        preferences_info[2].raised=resource_info->confirm_edit ==
-          MagickFalse ? MagickTrue : MagickFalse;
+        preferences_info[0].raised=resource_info->backdrop == MagickFalse;
+        preferences_info[1].raised=resource_info->confirm_exit == MagickFalse;
+        preferences_info[2].raised=resource_info->confirm_edit == MagickFalse;
         preferences_info[3].raised=resource_info->gamma_correct ==
-          MagickFalse ? MagickTrue : MagickFalse;
+          MagickFalse;
         preferences_info[4].raised=resource_info->display_warnings ==
-          MagickFalse ? MagickTrue : MagickFalse;
+          MagickFalse;
         preferences_info[5].raised=
-          resource_info->quantize_info->dither_method == NoDitherMethod ?
-          MagickTrue : MagickFalse;
-        preferences_info[6].raised=resource_info->colormap !=
-          SharedColormap ? MagickTrue : MagickFalse;
-        preferences_info[7].raised=resource_info->use_pixmap ==
-          MagickFalse ? MagickTrue : MagickFalse;
+          resource_info->quantize_info->dither_method == NoDitherMethod;
+        preferences_info[6].raised=resource_info->colormap != SharedColormap;
+        preferences_info[7].raised=resource_info->use_pixmap == MagickFalse;
         (void) FormatLocaleString(cache,MagickPathExtent,CacheButtonText,
           (unsigned long) resource_info->undo_cache);
         XGetWidgetInfo(cache,&cache_info);
@@ -15197,8 +15191,7 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
             /*
               Apply button status changed.
             */
-            apply_info.raised=
-              apply_info.raised == MagickFalse ? MagickTrue : MagickFalse;
+            apply_info.raised=apply_info.raised == MagickFalse;
             XDrawBeveledButton(display,&windows->widget,&apply_info);
             break;
           }
@@ -15207,8 +15200,7 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
             /*
               Cancel button status changed.
             */
-            cancel_info.raised=
-              cancel_info.raised == MagickFalse ? MagickTrue : MagickFalse;
+            cancel_info.raised=cancel_info.raised == MagickFalse;
             XDrawBeveledButton(display,&windows->widget,&cancel_info);
             break;
           }
@@ -15226,24 +15218,18 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   /*
     Save user preferences to the client configuration file.
   */
-  resource_info->backdrop=
-    preferences_info[0].raised == MagickFalse ? MagickTrue : MagickFalse;
-  resource_info->confirm_exit=
-    preferences_info[1].raised == MagickFalse ? MagickTrue : MagickFalse;
-  resource_info->confirm_edit=
-    preferences_info[2].raised == MagickFalse ? MagickTrue : MagickFalse;
-  resource_info->gamma_correct=
-    preferences_info[3].raised == MagickFalse ? MagickTrue : MagickFalse;
-  resource_info->display_warnings=
-     preferences_info[4].raised == MagickFalse ? MagickTrue : MagickFalse;
+  resource_info->backdrop=preferences_info[0].raised == MagickFalse;
+  resource_info->confirm_exit=preferences_info[1].raised == MagickFalse;
+  resource_info->confirm_edit=preferences_info[2].raised == MagickFalse;
+  resource_info->gamma_correct=preferences_info[3].raised == MagickFalse;
+  resource_info->display_warnings=preferences_info[4].raised == MagickFalse;
   resource_info->quantize_info->dither_method=
     preferences_info[5].raised == MagickFalse ?
     RiemersmaDitherMethod : NoDitherMethod;
   resource_info->colormap=SharedColormap;
   if (preferences_info[6].raised)
     resource_info->colormap=PrivateColormap;
-  resource_info->use_pixmap=
-    preferences_info[7].raised == MagickFalse ? MagickTrue : MagickFalse;
+  resource_info->use_pixmap=preferences_info[7].raised == MagickFalse;
   XUserPreferences(resource_info);
   return(MagickTrue);
 }
