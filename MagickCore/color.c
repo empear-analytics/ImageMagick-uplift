@@ -2830,6 +2830,23 @@ static MagickBooleanType QueryHexColor(const char *name,PixelInfo *color,
   return(SetHexColor(color,&pixel,depth,n));
 }
 
+static void SetNamedColor(PixelInfo *color,const char *name,
+  const ColorInfo *p)
+{
+  color->colorspace=sRGBColorspace;
+  if ((LocaleNCompare(name,"gray",4) == 0) ||
+      (LocaleNCompare(name,"grey",4) == 0))
+    color->colorspace=GRAYColorspace;
+  color->depth=8;
+  color->alpha_trait=p->color.alpha != (double) OpaqueAlpha ? BlendPixelTrait :
+    UndefinedPixelTrait;
+  color->red=(double) p->color.red;
+  color->green=(double) p->color.green;
+  color->blue=(double) p->color.blue;
+  color->alpha=(double) p->color.alpha;
+  color->black=0.0;
+}
+
 MagickExport MagickBooleanType QueryColorCompliance(const char *name,
   const ComplianceType compliance,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2867,18 +2884,7 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
   p=GetColorCompliance(name,compliance,exception);
   if (p == (const ColorInfo *) NULL)
     return(MagickFalse);
-  color->colorspace=sRGBColorspace;
-  if ((LocaleNCompare(name,"gray",4) == 0) ||
-      (LocaleNCompare(name,"grey",4) == 0))
-    color->colorspace=GRAYColorspace;
-  color->depth=8;
-  color->alpha_trait=p->color.alpha != (double) OpaqueAlpha ? BlendPixelTrait :
-    UndefinedPixelTrait;
-  color->red=(double) p->color.red;
-  color->green=(double) p->color.green;
-  color->blue=(double) p->color.blue;
-  color->alpha=(double) p->color.alpha;
-  color->black=0.0;
+  SetNamedColor(color,name,p);
   return(MagickTrue);
 }
 
