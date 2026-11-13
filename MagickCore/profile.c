@@ -2803,6 +2803,216 @@ static MagickBooleanType ReadExifHeader(unsigned char **exif,size_t *length,
   return(MagickTrue);
 }
 
+typedef struct _ExifWalkInfo
+{
+  const Image
+    *image;
+
+  EndianType
+    endian;
+
+  unsigned char
+    *exif;
+
+  size_t
+    length;
+
+  unsigned char
+    *directory,
+    *ifd0;
+
+  SplayTreeInfo
+    *exif_resources;
+} ExifWalkInfo;
+
+typedef struct _ExifWalkTargets
+{
+  ssize_t
+    *level;
+
+  size_t
+    *entry;
+
+  unsigned char
+    **exif_directory;
+
+  DirectoryInfo
+    *directory_stack;
+} ExifWalkTargets;
+
+static void SyncExifDirectory(const ExifWalkInfo *walk,
+  const ExifWalkTargets *targets)
+{
+  const Image
+    *const image = walk->image;
+
+  const EndianType
+    endian = walk->endian;
+
+  unsigned char
+    *const exif = walk->exif;
+
+  const size_t
+    length = walk->length;
+
+  unsigned char
+    *const directory = walk->directory,
+    *const ifd0 = walk->ifd0;
+
+  SplayTreeInfo
+    *const exif_resources = walk->exif_resources;
+
+  ssize_t
+    *const level = targets->level;
+
+  size_t
+    *const entry = targets->entry;
+
+  unsigned char
+    **const exif_directory = targets->exif_directory;
+
+  DirectoryInfo
+    *const directory_stack = targets->directory_stack;
+
+  size_t
+    directory_length,
+    number_entries;
+
+  ssize_t
+    offset;
+
+  static int
+    format_bytes[] = {0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8};
+
+  /*
+    Determine how many entries there are in the current IFD.
+  */
+  directory_length=length-(size_t) (directory-exif);
+  if (directory_length < 6)
+    return;
+  number_entries=(size_t) (unsigned short) ReadProfileShort(endian,
+    directory);
+  if (number_entries > ((directory_length-6)/12))
+    return;
+  for ( ; (*entry) < number_entries; (*entry)++)
+  {
+    ExifEntryInfo
+      exif_entry;
+
+    ExifTagInfo
+      exif_tag;
+
+    int
+      components;
+
+    unsigned char
+      *p,
+      *q;
+
+    size_t
+      number_bytes;
+
+    ssize_t
+      format;
+
+    unsigned short
+      tag_value;
+
+    q=(unsigned char *) (directory+2+(12*(*entry)));
+    if (q > (exif+length-12))
+      break;  /* corrupt EXIF */
+    if (GetValueFromSplayTree(exif_resources,q) == q)
+      break;
+    (void) AddValueToSplayTree(exif_resources,q,q);
+    tag_value=(unsigned short) ReadProfileShort(endian,q);
+    format=(ssize_t) ReadProfileShort(endian,q+2);
+    if ((format < 0) || ((format-1) >= EXIF_NUM_FORMATS))
+      break;
+    components=(int) ReadProfileLong(endian,q+4);
+    if (components < 0)
+      break;  /* corrupt EXIF */
+    number_bytes=(size_t) components*(size_t) format_bytes[format];
+    if ((ssize_t) number_bytes < components)
+      break;  /* prevent overflow */
+    exif_entry.endian=endian;
+    exif_entry.exif=exif;
+    exif_entry.length=length;
+    exif_entry.number_bytes=number_bytes;
+    exif_entry.q=q;
+    if (LocateExifEntryValue(&exif_entry,&p) == MagickFalse)
+      continue;
+    exif_tag.image=image;
+    exif_tag.endian=endian;
+    exif_tag.directory=directory;
+    exif_tag.ifd0=ifd0;
+    exif_tag.tag_value=tag_value;
+    exif_tag.format=format;
+    exif_tag.components=components;
+    exif_tag.number_bytes=number_bytes;
+    exif_tag.q=q;
+    exif_tag.p=p;
+    switch (tag_value)
+    {
+      case TAG_IMAGE_WIDTH:
+      case TAG_IMAGE_LENGTH:
+      {
+        SyncExifDimension(&exif_tag,ifd0,TAG_IMAGE_WIDTH);
+        break;
+      }
+      case TAG_PIXEL_X_DIMENSION:
+      case TAG_PIXEL_Y_DIMENSION:
+      {
+        SyncExifDimension(&exif_tag,(*exif_directory),TAG_PIXEL_X_DIMENSION);
+        break;
+      }
+      case 0x0128:
+      {
+        if (directory != ifd0)
+          break;
+        if (number_bytes == 4)
+          {
+            (void) WriteProfileLong(endian,((size_t) image->units)+1,p);
+            break;
+          }
+        (void) WriteProfileShort(endian,(unsigned short) (image->units+1),p);
+        break;
+      }
+      default:
+      {
+        SyncExifIfd0Tag(tag_value,exif_tag,image);
+        break;
+      }
+    }
+    if (IsExifDirectoryOffset(tag_value,format,components,number_bytes) ==
+        MagickFalse)
+      continue;
+    offset=(ssize_t) ReadProfileLong(endian,p);
+    if (((size_t) offset >= (length-1)) ||
+        ((*level) >= (MaxDirectoryStack-2)))
+      continue;
+    if ((directory == ifd0) && (tag_value == TAG_EXIF_OFFSET))
+      (*exif_directory)=exif+offset;
+    directory_stack[(*level)].directory=directory;
+    (*entry)++;
+    directory_stack[(*level)].entry=(*entry);
+    (*level)++;
+    directory_stack[(*level)].directory=exif+offset;
+    directory_stack[(*level)].entry=0;
+    (*level)++;
+    if ((directory+2+(12*number_entries)) > (exif+length))
+      break;
+    offset=(ssize_t) ReadProfileLong(endian,directory+2+(12*
+      number_entries));
+    if (IsNextDirectoryOffset(offset,length,(*level)) != MagickFalse)
+      {
+        directory_stack[(*level)].directory=exif+offset;
+        directory_stack[(*level)].entry=0;
+        (*level)++;
+      }
+    break;
+  }
+}
+
 static void SyncExifProfile(const Image *image,unsigned char *exif,
   size_t length)
 {
@@ -2812,10 +3022,11 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
   EndianType
     endian;
 
+  ExifWalkInfo
+    walk;
+
   size_t
-    directory_length,
-    entry,
-    number_entries;
+    entry;
 
   SplayTreeInfo
     *exif_resources;
@@ -2824,13 +3035,13 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
     level,
     offset;
 
-  static int
-    format_bytes[] = {0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8};
-
   unsigned char
     *directory,
     *exif_directory,
     *ifd0;
+
+  const ExifWalkTargets
+    targets = { &level, &entry, &exif_directory, directory_stack };
 
   if (ReadExifHeader(&exif,&length,&endian) == MagickFalse)
     return;
@@ -2857,133 +3068,14 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
       }
     if ((directory < exif) || (directory > (exif+length-2)))
       break;
-    /*
-      Determine how many entries there are in the current IFD.
-    */
-    directory_length=length-(size_t) (directory-exif);
-    if (directory_length < 6)
-      continue;
-    number_entries=(size_t) (unsigned short) ReadProfileShort(endian,
-      directory);
-    if (number_entries > ((directory_length-6)/12))
-      continue;
-    for ( ; entry < number_entries; entry++)
-    {
-      ExifEntryInfo
-        exif_entry;
-
-      ExifTagInfo
-        exif_tag;
-
-      int
-        components;
-
-      unsigned char
-        *p,
-        *q;
-
-      size_t
-        number_bytes;
-
-      ssize_t
-        format;
-
-      unsigned short
-        tag_value;
-
-      q=(unsigned char *) (directory+2+(12*entry));
-      if (q > (exif+length-12))
-        break;  /* corrupt EXIF */
-      if (GetValueFromSplayTree(exif_resources,q) == q)
-        break;
-      (void) AddValueToSplayTree(exif_resources,q,q);
-      tag_value=(unsigned short) ReadProfileShort(endian,q);
-      format=(ssize_t) ReadProfileShort(endian,q+2);
-      if ((format < 0) || ((format-1) >= EXIF_NUM_FORMATS))
-        break;
-      components=(int) ReadProfileLong(endian,q+4);
-      if (components < 0)
-        break;  /* corrupt EXIF */
-      number_bytes=(size_t) components*(size_t) format_bytes[format];
-      if ((ssize_t) number_bytes < components)
-        break;  /* prevent overflow */
-      exif_entry.endian=endian;
-      exif_entry.exif=exif;
-      exif_entry.length=length;
-      exif_entry.number_bytes=number_bytes;
-      exif_entry.q=q;
-      if (LocateExifEntryValue(&exif_entry,&p) == MagickFalse)
-        continue;
-      exif_tag.image=image;
-      exif_tag.endian=endian;
-      exif_tag.directory=directory;
-      exif_tag.ifd0=ifd0;
-      exif_tag.tag_value=tag_value;
-      exif_tag.format=format;
-      exif_tag.components=components;
-      exif_tag.number_bytes=number_bytes;
-      exif_tag.q=q;
-      exif_tag.p=p;
-      switch (tag_value)
-      {
-        case TAG_IMAGE_WIDTH:
-        case TAG_IMAGE_LENGTH:
-        {
-          SyncExifDimension(&exif_tag,ifd0,TAG_IMAGE_WIDTH);
-          break;
-        }
-        case TAG_PIXEL_X_DIMENSION:
-        case TAG_PIXEL_Y_DIMENSION:
-        {
-          SyncExifDimension(&exif_tag,exif_directory,TAG_PIXEL_X_DIMENSION);
-          break;
-        }
-        case 0x0128:
-        {
-          if (directory != ifd0)
-            break;
-          if (number_bytes == 4)
-            {
-              (void) WriteProfileLong(endian,((size_t) image->units)+1,p);
-              break;
-            }
-          (void) WriteProfileShort(endian,(unsigned short) (image->units+1),p);
-          break;
-        }
-        default:
-        {
-          SyncExifIfd0Tag(tag_value,exif_tag,image);
-          break;
-        }
-      }
-      if (IsExifDirectoryOffset(tag_value,format,components,number_bytes) ==
-          MagickFalse)
-        continue;
-      offset=(ssize_t) ReadProfileLong(endian,p);
-      if (((size_t) offset >= (length-1)) ||
-          (level >= (MaxDirectoryStack-2)))
-        continue;
-      if ((directory == ifd0) && (tag_value == TAG_EXIF_OFFSET))
-        exif_directory=exif+offset;
-      directory_stack[level].directory=directory;
-      entry++;
-      directory_stack[level].entry=entry;
-      level++;
-      directory_stack[level].directory=exif+offset;
-      directory_stack[level].entry=0;
-      level++;
-      if ((directory+2+(12*number_entries)) > (exif+length))
-        break;
-      offset=(ssize_t) ReadProfileLong(endian,directory+2+(12*
-        number_entries));
-      if (IsNextDirectoryOffset(offset,length,level) != MagickFalse)
-        {
-          directory_stack[level].directory=exif+offset;
-          directory_stack[level].entry=0;
-          level++;
-        }
-      break;
-    }
+    walk.image=image;
+    walk.endian=endian;
+    walk.exif=exif;
+    walk.length=length;
+    walk.directory=directory;
+    walk.ifd0=ifd0;
+    walk.exif_resources=exif_resources;
+    SyncExifDirectory(&walk,&targets);
   } while (level > 0);
   exif_resources=DestroySplayTree(exif_resources);
   return;
