@@ -17239,6 +17239,22 @@ static MagickBooleanType XFindBackgroundWindow(Display *display,
   return(MagickTrue);
 }
 
+static void XGetBackgroundVisualType(Display *display,
+  const XWindowInfo *window_info,XWindowAttributes *window_attributes,
+  char *visual_type)
+{
+  int
+    status;
+
+  (*window_attributes).width=XDisplayWidth(display,XDefaultScreen(display));
+  (*window_attributes).height=XDisplayHeight(display,XDefaultScreen(display));
+  (void) CopyMagickString(visual_type,"default",MagickPathExtent);
+  status=XGetWindowAttributes(display,(*window_info).id,window_attributes);
+  if (status != 0)
+    (void) FormatLocaleString(visual_type,MagickPathExtent,"0x%lx",
+      XVisualIDFromVisual((*window_attributes).visual));
+}
+
 MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *image,ExceptionInfo *exception)
 {
@@ -17297,13 +17313,7 @@ MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
   /*
     Determine window visual id.
   */
-  window_attributes.width=XDisplayWidth(display,XDefaultScreen(display));
-  window_attributes.height=XDisplayHeight(display,XDefaultScreen(display));
-  (void) CopyMagickString(visual_type,"default",MagickPathExtent);
-  status=XGetWindowAttributes(display,window_info.id,&window_attributes);
-  if (status != 0)
-    (void) FormatLocaleString(visual_type,MagickPathExtent,"0x%lx",
-      XVisualIDFromVisual(window_attributes.visual));
+  XGetBackgroundVisualType(display,&window_info,&window_attributes,visual_type);
   if (visual_info == (XVisualInfo *) NULL)
     {
       /*
