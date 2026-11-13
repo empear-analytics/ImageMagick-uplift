@@ -4371,22 +4371,22 @@ static const char
     (char *) NULL
   };
 
+static const ModeType
+  ColorEditCommands[] =
+  {
+    ColorEditMethodCommand,
+    ColorEditColorCommand,
+    ColorEditBorderCommand,
+    ColorEditFuzzCommand,
+    ColorEditUndoCommand,
+    ColorEditHelpCommand,
+    ColorEditDismissCommand
+  };
+
 static MagickBooleanType XColorEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
 {
-  static const ModeType
-    ColorEditCommands[] =
-    {
-      ColorEditMethodCommand,
-      ColorEditColorCommand,
-      ColorEditBorderCommand,
-      ColorEditFuzzCommand,
-      ColorEditUndoCommand,
-      ColorEditHelpCommand,
-      ColorEditDismissCommand
-    };
-
   static PaintMethod
     method = PointMethod;
 
