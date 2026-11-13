@@ -2869,6 +2869,13 @@ static void SetNamedColor(PixelInfo *color,const char *name,
   color->black=0.0;
 }
 
+static const char *GetQueryColorName(const char *name)
+{
+  if ((name == (char *) NULL) || (*name == '\0'))
+    name=BackgroundColor;
+  return(name);
+}
+
 MagickExport MagickBooleanType QueryColorCompliance(const char *name,
   const ComplianceType compliance,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2882,8 +2889,7 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
     Initialize color return value.
   */
   assert(color != (PixelInfo *) NULL);
-  if ((name == (char *) NULL) || (*name == '\0'))
-    name=BackgroundColor;
+  name=GetQueryColorName(name);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",name);
   if (strlen(name) > MagickPathExtent)
