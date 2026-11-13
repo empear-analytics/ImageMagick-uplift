@@ -2939,6 +2939,31 @@ static void SetPostscriptMetrics(const DrawInfo *draw_info,
   metrics->underline_thickness=1.0;
 }
 
+static PointInfo GetPostscriptResolution(const DrawInfo *draw_info)
+{
+  PointInfo
+    resolution;
+
+  resolution.x=DefaultResolution;
+  resolution.y=DefaultResolution;
+  if (draw_info->density != (char *) NULL)
+    {
+      GeometryInfo
+        geometry_info;
+
+      MagickStatusType
+        flags;
+
+      flags=ParseGeometry(draw_info->density,&geometry_info);
+      if ((flags & RhoValue) != 0)
+        resolution.x=geometry_info.rho;
+      resolution.y=resolution.x;
+      if ((flags & SigmaValue) != 0)
+        resolution.y=geometry_info.sigma;
+    }
+  return(resolution);
+}
+
 static MagickBooleanType RenderPostscript(Image *image,
   const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
   ExceptionInfo *exception)
@@ -3041,23 +3066,7 @@ static MagickBooleanType RenderPostscript(Image *image,
   if (annotate_image == (Image *) NULL)
     return(MagickFalse);
   (void) NegateImage(annotate_image,MagickFalse,exception);
-  resolution.x=DefaultResolution;
-  resolution.y=DefaultResolution;
-  if (draw_info->density != (char *) NULL)
-    {
-      GeometryInfo
-        geometry_info;
-
-      MagickStatusType
-        flags;
-
-      flags=ParseGeometry(draw_info->density,&geometry_info);
-      if ((flags & RhoValue) != 0)
-        resolution.x=geometry_info.rho;
-      resolution.y=resolution.x;
-      if ((flags & SigmaValue) != 0)
-        resolution.y=geometry_info.sigma;
-    }
+  resolution=GetPostscriptResolution(draw_info);
   if (identity == MagickFalse)
     (void) TransformImage(&annotate_image,"0x0",(char *) NULL,exception);
   else
