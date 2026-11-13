@@ -21,7 +21,9 @@ calls what the macro's definitions name, in every branch and through further mac
 (`#define ScaledSig(x) ... ScaledSigmoidal(...)`), so a static reached only through a macro
 moves with its callers, and one the kept part also calls is shared. --copy-macro NAME (repeatable) defines a one-line
 `#define NAME "literal"` of the kept part again in NEW (Recipe S step 2). A file-scope
-`static const` table between the moved functions moves with them, and a one-line
+`static const` table between the moved functions moves with them, as does a file-scope `static`
+variable or array that is not const (one declaration, any number of plain declarators, with or
+without initialisers) when the kept part names none of its declarators (2026-11-13), and a one-line
 `#define` of the original that only the family uses moves to NEW (step 2 as amended
 2026-11-11), each refused when the kept part names it; a two-line forward declaration
 of a moved static at the top of FILE moves to NEW. A trailing run of conditional lines
@@ -147,13 +149,36 @@ def function_pointer_typedef(L, e):
     if not re.fullmatch(r"typedef[^;{}]*\(\*\w+\)\([^;{}]*\);", text): return None
     return s, re.findall(r"\(\*(\w+)\)", text)
 
+def split_top_level(text):
+    """TEXT cut at every comma outside braces, parentheses, brackets and string or character literals."""
+    pieces = []; depth = 0; start = 0; i = 0
+    while i < len(text):
+        ch = text[i]
+        if ch in "\"'":
+            i += 1
+            while i < len(text) and text[i] != ch: i += 2 if text[i] == "\\" else 1
+        elif ch in "({[": depth += 1
+        elif ch in ")}]": depth -= 1
+        elif ch == "," and depth == 0: pieces.append(text[start:i]); start = i + 1
+        i += 1
+    pieces.append(text[start:])
+    return pieces
+
 def static_table(L, n):
-    """(last line, name) of a file-scope `static const` table declared from L[n], else None."""
-    if not re.match(r"^static const\b[^(]*$", L[n]): return None
-    e = next(k for k in range(n, len(L)) if re.match(r"^[^{]*;\s*$|^\s*\};\s*$", L[k]))
-    decl = " ".join(x.strip() for x in L[n:e + 1]).split("=")[0].strip()
-    named = re.findall(r"(\w+)\s*(?:\[[^\]]*\])?$", decl)
-    return (e, named[0]) if named else None
+    """(last line, names) of a file-scope `static` declaration of constant tables, variables or arrays declared from
+    L[n]: every declarator is a plain name with optional array dimensions (no function declarator), else None."""
+    if not re.match(r"^static\b[^(]*$", L[n]): return None
+    e = next((k for k in range(n, len(L)) if re.match(r"^[^{]*;\s*$|^\s*\};\s*$", L[k])), None)
+    if e is None: return None
+    full = " ".join(x.strip() for x in L[n:e + 1]).rstrip().rstrip(";")
+    names = []
+    for piece in split_top_level(full):
+        decl = piece.split("=")[0].strip()
+        if re.search(r"[({]", decl): return None
+        named = re.findall(r"(\w+)\s*(?:\[[^\]]*\])*$", decl)
+        if not named: return None
+        names.append(named[0])
+    return e, names
 
 def family_only_define(lines, name):
     """The one-line `#define NAME ...` of LINES when no other line of LINES names NAME, else None."""
@@ -169,7 +194,7 @@ def drop_empty_banner(lines, banner):
 def take_forward_declarations(lines, statics):
     """Remove from LINES the two-line forward declarations `static T` / `  Name(...);` (or `  *Name(...);`) of STATICS; return them."""
     text = "\n".join(lines)
-    found = re.findall(r"(?m)^(static [\w \*]+\n  \*?(\w+)\([^;]*\);)\n", text)
+    found = re.findall(r"(?m)^(static [\w \*]+\n[ ]*\*?(\w+)\([^;{]*\);)\n", text)
     taken = [decl for decl, name in found if name in statics]
     for decl in taken:
         before = text[:text.index(decl)].split("\n")
@@ -224,7 +249,7 @@ path, new, title, roots = args[0], args[1], args[2], args[3:]
 src = open(path).read(); L = src.split("\n")
 defs = []; i = 0
 while i < len(L):
-    m = re.match(r"^(static\s+(?:inline\s+)?|MagickExport\s+|MagickPrivate\s+)?[A-Za-z_][\w \*]*?\b([A-Za-z_]\w*)\s*\(", L[i])
+    m = re.match(r"^((?:inline\s+)?static\s+(?:inline\s+)?|MagickExport\s+|MagickPrivate\s+)?[A-Za-z_][\w \*]*?\b([A-Za-z_]\w*)\s*\(", L[i])
     if m and not L[i].rstrip().endswith(";") and not L[i].startswith((" ", "#", "%", "/*")):
         j = i
         while j < len(L) and L[j] != "{" and not L[j].rstrip().endswith(";"): j += 1
@@ -244,7 +269,7 @@ while i < len(L):
                 elif not any(alt): depth += brace_delta(L[k])
                 if L[k] == "}" and not L[k - 1].rstrip().endswith("\\") and depth == 0: break
                 k += 1
-            defs.append((m.group(2), i, k, bool(m.group(1) and m.group(1).startswith("static"))))
+            defs.append((m.group(2), i, k, bool(m.group(1) and "static" in m.group(1))))
             i = k + 1; continue
     i += 1
 names = {d[0] for d in defs}
@@ -292,7 +317,7 @@ for k in idx:
     if runs and k == runs[-1][-1] + 1: runs[-1].append(k)
     else: runs.append([k])
 spans = [(d[1], d[2]) for d in order if d[0] in moved]
-cuts = []; typedefs = []; tables = []
+cuts = []; typedefs = []; tables = []; region_types = []
 recs = conditional_records(L)
 for run in runs:
     first, last = order[run[0]], order[run[-1]]
@@ -331,7 +356,7 @@ for run in runs:
             inproto = not t.endswith(";"); continue
         # a two-line forward declaration `static T` / `  Name(...);` of a moved static stands between the moved
         # functions and moves with them (2026-11-12)
-        m2 = re.match(r"^\s+\*?\s*([A-Za-z_]\w*)\s*\(", L[n + 1]) if re.match(r"^static\s+[\w \*]+$", L[n]) else None
+        m2 = re.match(r"^\s*\*?\s*([A-Za-z_]\w*)\s*\(", L[n + 1]) if re.match(r"^static\s+[\w \*]+$", L[n]) else None
         if m2 and m2.group(1) in moved and m2.group(1) in static:
             inproto = True; continue
         # the `extern "C" {` ... `}` pair that a C++ compiler sees around a callback moves with the function it holds
@@ -348,8 +373,8 @@ for run in runs:
         if n <= table_end: continue
         table = static_table(L, n)
         if table:
-            table_end = table[0]; tables.append(table[1]); continue
-        if re.match(r"^typedef struct( _\w+)?$", L[n]):
+            table_end = table[0]; tables.extend(table[1]); continue
+        if re.match(r"^typedef (struct|enum)( _\w+)?$", L[n]):
             intype = True; inner.append(n); continue
         if t.startswith("#define") or (n > 0 and L[n - 1].rstrip().endswith("\\")):
             continue
@@ -367,7 +392,7 @@ for run in runs:
     # a file-level #if opened in the region whose #endif follows its last function moves whole, #endif included
     while depth and b < len(L) and re.match(r"#\s*endif\b", L[b].strip()): depth -= 1; b += 1
     if depth: bad.append(("unbalanced conditional", depth))
-    typedefs.extend(typedef_names(L, inner))
+    typedefs.extend(typedef_names(L, inner)); region_types.extend(inner)
     if bad: sys.exit("refused: top-level code in the region: %s" % bad[:5])
     cuts.append((a, b))
 first = order[idx[0]]
@@ -412,7 +437,7 @@ while k < len(rest_lines):
     if not tb: k += 1; continue
     e = tb[0]
     block = "\n".join(rest_lines[k:e + 1])
-    tnames = re.findall(r"(?m)^  \*?(\w+)(?:\[[^\]]*\])*\s*=", block)
+    tnames = tb[1]
     others = "\n".join(rest_lines[:k] + rest_lines[e + 1:])
     if tnames and any(re.search(r"\b%s\b" % n, region) for n in tnames) and \
         not any(re.search(r"\b%s\b" % n, others) for n in tnames):
@@ -449,6 +474,13 @@ for tname in sorted(set(re.findall(r"^\}\s*(\w+)\s*;", rest, re.M))):
 # a `/* Title. */` banner whose declarations all moved goes too, when another banner follows it
 for banner in moved_banners: drop_banner_if_empty(rest_lines, banner)
 rest = "\n".join(rest_lines)
+# the enumerators of a moved enumeration (in the region or moved from elsewhere) must not be named by the kept part
+for block in moved_types + ["\n".join(L[n:next(k for k in range(n, len(L)) if re.match(r"^} \w+;$", L[k])) + 1]) for n in region_types]:
+    em = re.match(r"typedef enum[^{]*\{(.*)\}\s*\w+;", block, re.S)
+    if not em: continue
+    body = re.sub(r"/\*.*?\*/|//[^\n]*|(?m:^\s*#[^\n]*)", "", em.group(1), flags=re.S)
+    for member in re.findall(r"(?:^|,)\s*([A-Za-z_]\w*)\s*(?:=[^,]*)?", body):
+        if re.search(r"\b%s\b" % member, rest): sys.exit("refused: %s, an enumerator of a moved enumeration, is used by the kept part" % member)
 # a type the original defines and keeps must not be used by the region
 types = set(re.findall(r"^typedef\s+(?:struct|enum|union)\s+(\w+)", rest, re.M)) | \
     set(re.findall(r"^\}\s*(\w+)\s*;", rest, re.M)) | \
