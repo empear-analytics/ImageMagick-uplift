@@ -10897,6 +10897,56 @@ static void XApplySaveCommand(const XMagickCommandContext *context)
     }
 }
 
+static Image *XApplyNewCommand(const XMagickCommandContext *context,
+  Image *nexus)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  ImageInfo
+    *const image_info = context->image_info;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  int
+    status;
+
+  static char
+    color[MagickPathExtent] = "gray",
+    geometry[MagickPathExtent] = "640x480";
+
+  static const char
+    *format = "gradient";
+
+  /*
+    Query user for canvas geometry.
+  */
+  status=XDialogWidget(display,windows,"New","Enter image geometry:",
+    geometry);
+  if (*geometry == '\0')
+    return(nexus);
+  if (status == 0)
+    format="xc";
+  XColorBrowserWidget(display,windows,"Select",color);
+  if (*color == '\0')
+    return(nexus);
+  /*
+    Create canvas.
+  */
+  (void) FormatLocaleString(image_info->filename,MagickPathExtent,
+    "%s:%s",format,color);
+  (void) CloneString(&image_info->size,geometry);
+  nexus=ReadImage(image_info,exception);
+  CatchException(exception);
+  XClientMessage(display,windows->image.id,windows->im_protocols,
+    windows->im_next_image,CurrentTime);
+  return(nexus);
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -11048,41 +11098,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       break;
     }
     case NewCommand:
-    {
-      int
-        status;
-
-      static char
-        color[MagickPathExtent] = "gray",
-        geometry[MagickPathExtent] = "640x480";
-
-      static const char
-        *format = "gradient";
-
-      /*
-        Query user for canvas geometry.
-      */
-      status=XDialogWidget(display,windows,"New","Enter image geometry:",
-        geometry);
-      if (*geometry == '\0')
-        break;
-      if (status == 0)
-        format="xc";
-      XColorBrowserWidget(display,windows,"Select",color);
-      if (*color == '\0')
-        break;
-      /*
-        Create canvas.
-      */
-      (void) FormatLocaleString(image_info->filename,MagickPathExtent,
-        "%s:%s",format,color);
-      (void) CloneString(&image_info->size,geometry);
-      nexus=ReadImage(image_info,exception);
-      CatchException(exception);
-      XClientMessage(display,windows->image.id,windows->im_protocols,
-        windows->im_next_image,CurrentTime);
+      nexus=XApplyNewCommand(&context,nexus);
       break;
-    }
     case VisualDirectoryCommand:
     {
       /*
