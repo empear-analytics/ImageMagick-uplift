@@ -146,13 +146,6 @@ static inline MagickBooleanType IsTokenDelimiter(const char *magick_restrict p)
     (*(p-1) != '\\')) ? MagickTrue : MagickFalse);
 }
 
-static inline void AppendTokenChar(char *magick_restrict token,
-  const size_t extent,const char *magick_restrict p,ssize_t *i)
-{
-  if ((*i) < (ssize_t) (extent-1))
-    token[(*i)++]=(*p);
-}
-
 typedef struct _NextTokenInput
 {
   const char
@@ -174,6 +167,19 @@ typedef struct _NextTokenTargets
     *i;
 } NextTokenTargets;
 
+static inline void AppendTokenChar(const NextTokenInput *input,
+  const char *magick_restrict p,ssize_t *i)
+{
+  const size_t
+    extent = input->extent;
+
+  char
+    *const token = input->token;
+
+  if ((*i) < (ssize_t) (extent-1))
+    token[(*i)++]=(*p);
+}
+
 static void ScanQuotedToken(const NextTokenInput *input,
   const NextTokenTargets *targets)
 {
@@ -182,9 +188,6 @@ static void ScanQuotedToken(const NextTokenInput *input,
 
   const size_t
     extent = input->extent;
-
-  char
-    *const token = input->token;
 
   const char
     *magick_restrict *const p = targets->p;
@@ -206,7 +209,7 @@ static void ScanQuotedToken(const NextTokenInput *input,
           (*p)++;
           break;
         }
-    AppendTokenChar(token,extent,(*p),i);
+    AppendTokenChar(input,(*p),i);
     if ((size_t) ((*p)-start) >= (extent-1))
       break;
   }
@@ -215,23 +218,17 @@ static void ScanQuotedToken(const NextTokenInput *input,
 static void ScanSlashToken(const NextTokenInput *input,
   const NextTokenTargets *targets)
 {
-  const size_t
-    extent = input->extent;
-
-  char
-    *const token = input->token;
-
   const char
     *magick_restrict *const p = targets->p;
 
   ssize_t
     *const i = targets->i;
 
-  AppendTokenChar(token,extent,(*p),i);
+  AppendTokenChar(input,(*p),i);
   (*p)++;
   if ((*(*p) == '>') || (*(*p) == '/'))
     {
-      AppendTokenChar(token,extent,(*p),i);
+      AppendTokenChar(input,(*p),i);
       (*p)++;
     }
 }
@@ -244,9 +241,6 @@ static MagickBooleanType ScanNumberToken(const NextTokenInput *input,
 
   const size_t
     extent = input->extent;
-
-  char
-    *const token = input->token;
 
   const char
     *magick_restrict *const p = targets->p;
@@ -266,13 +260,13 @@ static MagickBooleanType ScanNumberToken(const NextTokenInput *input,
     {
       for ( ; ((*p) < q) && (*(*p) != ','); (*p)++)
       {
-        AppendTokenChar(token,extent,(*p),i);
+        AppendTokenChar(input,(*p),i);
         if ((size_t) ((*p)-start) >= (extent-1))
           break;
       }
       if (*(*p) == '%')
         {
-          AppendTokenChar(token,extent,(*p),i);
+          AppendTokenChar(input,(*p),i);
           (*p)++;
         }
       return(MagickFalse);
@@ -289,9 +283,6 @@ static MagickBooleanType ScanParenthesizedToken(const NextTokenInput *input,
   const size_t
     extent = input->extent;
 
-  char
-    *const token = input->token;
-
   const char
     *magick_restrict *const p = targets->p;
 
@@ -302,7 +293,7 @@ static MagickBooleanType ScanParenthesizedToken(const NextTokenInput *input,
     {
       for ((*p)++; *(*p) != '\0'; (*p)++)
       {
-        AppendTokenChar(token,extent,(*p),i);
+        AppendTokenChar(input,(*p),i);
         if ((*(*p) == ')') && (*((*p)-1) != '\\'))
           break;
         if ((size_t) ((*p)-start) >= (extent-1))
@@ -323,9 +314,6 @@ static void ScanWordToken(const NextTokenInput *input,
   const size_t
     extent = input->extent;
 
-  char
-    *const token = input->token;
-
   const char
     *magick_restrict *const p = targets->p;
 
@@ -338,7 +326,7 @@ static void ScanWordToken(const NextTokenInput *input,
       break;
     if (((*i) > 0) && (*(*p) == '<'))
       break;
-    AppendTokenChar(token,extent,(*p),i);
+    AppendTokenChar(input,(*p),i);
     if (*(*p) == '>')
       break;
     if (ScanParenthesizedToken(input,targets) == MagickFalse)
@@ -351,12 +339,6 @@ static void ScanWordToken(const NextTokenInput *input,
 static void ScanDefaultToken(const NextTokenInput *input,
   const NextTokenTargets *targets)
 {
-  const size_t
-    extent = input->extent;
-
-  char
-    *const token = input->token;
-
   const char
     *magick_restrict *const p = targets->p;
 
@@ -367,7 +349,7 @@ static void ScanDefaultToken(const NextTokenInput *input,
     return;
   if (IsSingleCharToken((*p)) != MagickFalse)
     {
-      AppendTokenChar(token,extent,(*p),i);
+      AppendTokenChar(input,(*p),i);
       (*p)++;
       return;
     }
