@@ -1172,6 +1172,16 @@ static void XEditTextCursorLeft(XWidgetInfo *text_info)
   text_info->cursor--;
 }
 
+static void XEditTextCursorRight(XWidgetInfo *text_info)
+{
+  /*
+    Move cursor one position right.
+  */
+  if (text_info->cursor == (text_info->text+Extent(text_info->text)))
+    return;
+  text_info->cursor++;
+}
+
 static void XEditText(Display *display,XWidgetInfo *text_info,
   const KeySym key_symbol,char *text,const size_t state)
 {
@@ -1212,12 +1222,7 @@ static void XEditText(Display *display,XWidgetInfo *text_info,
     case XK_Right:
     case XK_KP_Right:
     {
-      /*
-        Move cursor one position right.
-      */
-      if (text_info->cursor == (text_info->text+Extent(text_info->text)))
-        break;
-      text_info->cursor++;
+      XEditTextCursorRight(text_info);
       break;
     }
     default:
