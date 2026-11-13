@@ -494,6 +494,23 @@ static void *CloneRegistryString(const char *key,const void *value)
   return((void *) ConstantString(string));
 }
 
+static MagickBooleanType AddRegistryValue(const RegistryType type,
+  const char *key,void *clone_value)
+{
+  RegistryInfo
+    *registry_info;
+
+  if (clone_value == (void *) NULL)
+    return(MagickFalse);
+  registry_info=(RegistryInfo *) AcquireCriticalMemory(sizeof(*registry_info));
+  (void) memset(registry_info,0,sizeof(*registry_info));
+  registry_info->type=type;
+  registry_info->value=clone_value;
+  registry_info->signature=MagickCoreSignature;
+  InstantiateRegistry();
+  return(AddValueToSplayTree(registry,ConstantString(key),registry_info));
+}
+
 static inline MagickBooleanType IsInvalidRegistryImage(const Image *image)
 {
   return(((image == (const Image *) NULL) ||
@@ -510,9 +527,6 @@ static inline MagickBooleanType IsInvalidRegistryImageInfo(
 MagickExport MagickBooleanType SetImageRegistry(const RegistryType type,
   const char *key,const void *value,ExceptionInfo *exception)
 {
-  RegistryInfo
-    *registry_info;
-
   void
     *clone_value;
 
@@ -560,13 +574,5 @@ MagickExport MagickBooleanType SetImageRegistry(const RegistryType type,
       break;
     }
   }
-  if (clone_value == (void *) NULL)
-    return(MagickFalse);
-  registry_info=(RegistryInfo *) AcquireCriticalMemory(sizeof(*registry_info));
-  (void) memset(registry_info,0,sizeof(*registry_info));
-  registry_info->type=type;
-  registry_info->value=clone_value;
-  registry_info->signature=MagickCoreSignature;
-  InstantiateRegistry();
-  return(AddValueToSplayTree(registry,ConstantString(key),registry_info));
+  return(AddRegistryValue(type,key,clone_value));
 }
