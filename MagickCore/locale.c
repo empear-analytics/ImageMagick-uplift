@@ -1081,6 +1081,22 @@ static void PrintLocaleHeader(FILE *file,const char *path)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static const char *ListLocaleEntry(FILE *file,const LocaleInfo **locale_info,
+  const ssize_t i,const char *path)
+{
+  if ((path == (const char *) NULL) ||
+      (LocaleCompare(path,locale_info[i]->path) != 0))
+    {
+      PrintLocaleHeader(file,locale_info[i]->path);
+    }
+  path=locale_info[i]->path;
+  (void) FormatLocaleFile(file,"%s\n",locale_info[i]->tag);
+  if (locale_info[i]->message != (char *) NULL)
+    (void) FormatLocaleFile(file,"  %s",locale_info[i]->message);
+  (void) FormatLocaleFile(file,"\n");
+  return(path);
+}
+
 MagickExport MagickBooleanType ListLocaleInfo(FILE *file,
   ExceptionInfo *exception)
 {
@@ -1107,16 +1123,7 @@ MagickExport MagickBooleanType ListLocaleInfo(FILE *file,
   {
     if (locale_info[i]->stealth != MagickFalse)
       continue;
-    if ((path == (const char *) NULL) ||
-        (LocaleCompare(path,locale_info[i]->path) != 0))
-      {
-        PrintLocaleHeader(file,locale_info[i]->path);
-      }
-    path=locale_info[i]->path;
-    (void) FormatLocaleFile(file,"%s\n",locale_info[i]->tag);
-    if (locale_info[i]->message != (char *) NULL)
-      (void) FormatLocaleFile(file,"  %s",locale_info[i]->message);
-    (void) FormatLocaleFile(file,"\n");
+    path=ListLocaleEntry(file,locale_info,i,path);
   }
   (void) fflush(file);
   locale_info=(const LocaleInfo **)
