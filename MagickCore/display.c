@@ -14722,6 +14722,40 @@ static void XROIDrawRegion(const ROIContext *context,const ROITargets *targets,
         context->windows->info.screen);
 }
 
+static void XROISizeRegion(const ROIContext *context,const ROITargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  RectangleInfo
+    highlight_info;
+
+  do
+  {
+    XROIDrawRegion(context,targets,&highlight_info);
+    /*
+      Wait for next event.
+    */
+    XScreenEvent(context->display,context->windows,event,context->exception);
+    if ((highlight_info.width > 3) && (highlight_info.height > 3))
+      XHighlightRectangle(context->display,context->windows->image.id,
+        context->windows->image.highlight_context,&highlight_info);
+    XROISizeEvent(context,targets);
+    if (IsSelectionMovedOrDone((*roi_info),(*x),(*y),(*state)) != MagickFalse)
+      XCheckSelectionBounds(context->windows,(*x),(*y),roi_info);
+  } while (((*state) & ExitState) == 0);
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -14809,20 +14843,7 @@ static MagickBooleanType XROIImage(Display *display,
     roi_info.width=0;
     roi_info.height=0;
     state=DefaultState;
-    do
-    {
-      XROIDrawRegion(&context,&targets,&highlight_info);
-      /*
-        Wait for next event.
-      */
-      XScreenEvent(display,windows,&event,exception);
-      if ((highlight_info.width > 3) && (highlight_info.height > 3))
-        XHighlightRectangle(display,windows->image.id,
-          windows->image.highlight_context,&highlight_info);
-      XROISizeEvent(&context,&targets);
-      if (IsSelectionMovedOrDone(roi_info,x,y,state) != MagickFalse)
-        XCheckSelectionBounds(windows,x,y,&roi_info);
-    } while ((state & ExitState) == 0);
+    XROISizeRegion(&context,&targets);
     /*
       Wait for user to grab a corner of the rectangle or press return.
     */
