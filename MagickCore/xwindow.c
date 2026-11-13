@@ -7615,6 +7615,24 @@ static int XGetMagnifyOriginX(XWindows *windows,const XImage *ximage,
   return(x);
 }
 
+static int XGetMagnifyOriginY(XWindows *windows,const XImage *ximage,
+  const unsigned int height,const unsigned int magnify)
+{
+  int
+    y;
+
+  if ((windows->magnify.y < 0) ||
+      (windows->magnify.y >= windows->image.ximage->height))
+    windows->magnify.y=windows->image.ximage->height >> 1;
+  y=windows->magnify.y-(int) ((height/magnify) >> 1);
+  if (y < 0)
+    y=0;
+  else
+    if (y > (ximage->height-(int) (height/magnify)))
+      y=ximage->height-(int) (height/magnify);
+  return(y);
+}
+
 MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   ExceptionInfo *exception)
 {
@@ -7659,15 +7677,7 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   width=(unsigned int) windows->magnify.ximage->width;
   height=(unsigned int) windows->magnify.ximage->height;
   x=XGetMagnifyOriginX(windows,ximage,width,magnify);
-  if ((windows->magnify.y < 0) ||
-      (windows->magnify.y >= windows->image.ximage->height))
-    windows->magnify.y=windows->image.ximage->height >> 1;
-  y=windows->magnify.y-(int) ((height/magnify) >> 1);
-  if (y < 0)
-    y=0;
-  else
-    if (y > (ximage->height-(int) (height/magnify)))
-      y=ximage->height-(int) (height/magnify);
+  y=XGetMagnifyOriginY(windows,ximage,height,magnify);
   q=(unsigned char *) windows->magnify.ximage->data;
   scanline_pad=(unsigned int) (windows->magnify.ximage->bytes_per_line-
     (((int) width*windows->magnify.ximage->bits_per_pixel) >> 3));
