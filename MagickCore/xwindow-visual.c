@@ -753,6 +753,16 @@ static void XWriteGammaInfo(FILE *file,const XResourceInfo *resource_info)
         resource_info->display_gamma);
 }
 
+static void DestroyXTextList(char **textlist)
+{
+  ssize_t
+    i;
+
+  for (i=0; textlist[i] != (char *) NULL; i++)
+    textlist[i]=DestroyString(textlist[i]);
+  textlist=(char **) RelinquishMagickMemory(textlist);
+}
+
 MagickPrivate void XDisplayImageInfo(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,Image *undo_image,
   Image *image,ExceptionInfo *exception)
@@ -767,9 +777,6 @@ MagickPrivate void XDisplayImageInfo(Display *display,
 
   int
     unique_file;
-
-  ssize_t
-    i;
 
   /*
     Write info about the X server to a file.
@@ -826,9 +833,7 @@ MagickPrivate void XDisplayImageInfo(Display *display,
         image->filename);
       XTextViewWidget(display,resource_info,windows,MagickTrue,title,
         (char const **) textlist);
-      for (i=0; textlist[i] != (char *) NULL; i++)
-        textlist[i]=DestroyString(textlist[i]);
-      textlist=(char **) RelinquishMagickMemory(textlist);
+      DestroyXTextList(textlist);
     }
   text=DestroyString(text);
 }
