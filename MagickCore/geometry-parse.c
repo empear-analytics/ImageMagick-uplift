@@ -165,12 +165,23 @@ static void ParseGeometryXOffset(char **p,MagickStatusType *flags,ssize_t *x)
     }
 }
 
-static MagickStatusType ParseGeometryWidth(char **p,const char *q,
-  MagickStatusType flags,size_t *width)
+static MagickStatusType ParseGeometryWidth(char **p,MagickStatusType flags,
+  size_t *width)
 {
+  char
+    *q;
+
+  double
+    value;
+
   int
     c;
 
+  q=(*p);
+  value=StringToDouble(*p,&q);
+  (void) value;
+  if (LocaleNCompare(*p,"0x",2) == 0)
+    value=(double) strtol(*p,&q,10);
   if ((**p == '+') || (**p == '-'))
     return(flags);
   c=(int) ((unsigned char) *q);
@@ -272,11 +283,7 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
 {
   char
     *p,
-    pedantic_geometry[MagickPathExtent],
-    *q;
-
-  double
-    value;
+    pedantic_geometry[MagickPathExtent];
 
   int
     c;
@@ -385,12 +392,7 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
   p=pedantic_geometry;
   if (*p == '\0')
     return(flags);
-  q=p;
-  value=StringToDouble(p,&q);
-  (void) value;
-  if (LocaleNCompare(p,"0x",2) == 0)
-    value=(double) strtol(p,&q,10);
-  flags=ParseGeometryWidth(&p,q,flags,width);
+  flags=ParseGeometryWidth(&p,flags,width);
   flags=ParseGeometryHeight(&p,flags,height);
   if ((*p == '+') || (*p == '-'))
     ParseGeometryXOffset(&p,&flags,x);
