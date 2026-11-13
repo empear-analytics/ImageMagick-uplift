@@ -638,6 +638,67 @@ static Image *DecodeLockedImage(const MagickInfo *magick_info,
   return(image);
 }
 
+static MagickBooleanType DecodeDelegateImage(ImageInfo *read_info,
+  Image **image,ExceptionInfo *exception)
+{
+  const DelegateInfo
+    *delegate_info;
+
+  const MagickInfo
+    *magick_info;
+
+  DecodeImageHandler
+    *decoder;
+
+  MagickBooleanType
+    status;
+
+  delegate_info=GetDelegateInfo(read_info->magick,(char *) NULL,exception);
+  if (delegate_info == (const DelegateInfo *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        MissingDelegateError,"NoDecodeDelegateForThisImageFormat","`%s'",
+        read_info->filename);
+      if (read_info->temporary != MagickFalse)
+        (void) RelinquishUniqueFileResource(read_info->filename);
+      read_info=DestroyImageInfo(read_info);
+      return(MagickFalse);
+    }
+  /*
+    Let our decoding delegate process the image.
+  */
+  *image=AcquireImage(read_info,exception);
+  if ((*image) == (Image *) NULL)
+    {
+      read_info=DestroyImageInfo(read_info);
+      return(MagickFalse);
+    }
+  status=InvokeDecodeDelegate(read_info,(*image),delegate_info,exception);
+  *image=DestroyImageList((*image));
+  read_info->temporary=MagickTrue;
+  if (status != MagickFalse)
+    (void) SetImageInfo(read_info,0,exception);
+  magick_info=GetMagickInfo(read_info->magick,exception);
+  decoder=GetImageDecoder(magick_info);
+  if (decoder == (DecodeImageHandler *) NULL)
+    {
+      if (IsPathAccessible(read_info->filename) != MagickFalse)
+        (void) ThrowMagickException(exception,GetMagickModule(),
+          MissingDelegateError,"NoDecodeDelegateForThisImageFormat","`%s'",
+          read_info->magick);
+      else
+        ThrowFileException(exception,FileOpenError,"UnableToOpenFile",
+          read_info->filename);
+      read_info=DestroyImageInfo(read_info);
+      return(MagickFalse);
+    }
+  /*
+    Call appropriate image reader based on image type.
+  */
+  *image=DecodeLockedImage(magick_info,decoder,read_info,exception);
+  return(MagickTrue);
+}
+
 MagickExport Image *ReadImage(const ImageInfo *image_info,
   ExceptionInfo *exception)
 {
@@ -667,9 +728,6 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
 
   ImageInfo
     *read_info;
-
-  MagickBooleanType
-    status;
 
   /*
     Determine image type from filename prefix or suffix (e.g. image.jpg).
@@ -721,51 +779,8 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
       image=DecodeLockedImage(magick_info,decoder,read_info,exception);
     }
   else
-    {
-      delegate_info=GetDelegateInfo(read_info->magick,(char *) NULL,exception);
-      if (delegate_info == (const DelegateInfo *) NULL)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            MissingDelegateError,"NoDecodeDelegateForThisImageFormat","`%s'",
-            read_info->filename);
-          if (read_info->temporary != MagickFalse)
-            (void) RelinquishUniqueFileResource(read_info->filename);
-          read_info=DestroyImageInfo(read_info);
-          return((Image *) NULL);
-        }
-      /*
-        Let our decoding delegate process the image.
-      */
-      image=AcquireImage(read_info,exception);
-      if (image == (Image *) NULL)
-        {
-          read_info=DestroyImageInfo(read_info);
-          return((Image *) NULL);
-        }
-      status=InvokeDecodeDelegate(read_info,image,delegate_info,exception);
-      image=DestroyImageList(image);
-      read_info->temporary=MagickTrue;
-      if (status != MagickFalse)
-        (void) SetImageInfo(read_info,0,exception);
-      magick_info=GetMagickInfo(read_info->magick,exception);
-      decoder=GetImageDecoder(magick_info);
-      if (decoder == (DecodeImageHandler *) NULL)
-        {
-          if (IsPathAccessible(read_info->filename) != MagickFalse)
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              MissingDelegateError,"NoDecodeDelegateForThisImageFormat","`%s'",
-              read_info->magick);
-          else
-            ThrowFileException(exception,FileOpenError,"UnableToOpenFile",
-              read_info->filename);
-          read_info=DestroyImageInfo(read_info);
-          return((Image *) NULL);
-        }
-      /*
-        Call appropriate image reader based on image type.
-      */
-      image=DecodeLockedImage(magick_info,decoder,read_info,exception);
-    }
+    if (DecodeDelegateImage(read_info,&image,exception) == MagickFalse)
+      return((Image *) NULL);
   if (read_info->temporary != MagickFalse)
     ReleaseTemporaryReadFile(read_info,image,filename);
   if (image == (Image *) NULL)
