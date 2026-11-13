@@ -11015,6 +11015,49 @@ static void XApplyShearCommand(const XMagickCommandContext *context,char *color)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyApplyCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  char
+    image_geometry[MagickPathExtent];
+
+  if (IsImageWindowUncropped(windows,image) != MagickFalse)
+    return;
+  /*
+    Apply size transforms to image.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  /*
+    Crop and/or scale displayed image.
+  */
+  (void) FormatLocaleString(image_geometry,MagickPathExtent,"%dx%d!",
+    windows->image.ximage->width,windows->image.ximage->height);
+  (void) TransformImage(image,windows->image.crop_geometry,image_geometry,
+    exception);
+  if (windows->image.crop_geometry != (char *) NULL)
+    windows->image.crop_geometry=(char *) RelinquishMagickMemory(
+      windows->image.crop_geometry);
+  windows->image.x=0;
+  windows->image.y=0;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -11244,33 +11287,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyResizeCommand(&context);
       break;
     case ApplyCommand:
-    {
-      char
-        image_geometry[MagickPathExtent];
-
-      if (IsImageWindowUncropped(windows,image) != MagickFalse)
-        break;
-      /*
-        Apply size transforms to image.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      /*
-        Crop and/or scale displayed image.
-      */
-      (void) FormatLocaleString(image_geometry,MagickPathExtent,"%dx%d!",
-        windows->image.ximage->width,windows->image.ximage->height);
-      (void) TransformImage(image,windows->image.crop_geometry,image_geometry,
-        exception);
-      if (windows->image.crop_geometry != (char *) NULL)
-        windows->image.crop_geometry=(char *) RelinquishMagickMemory(
-          windows->image.crop_geometry);
-      windows->image.x=0;
-      windows->image.y=0;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyApplyCommand(&context);
       break;
-    }
     case RefreshCommand:
     {
       (void) XConfigureImage(display,resource_info,windows,*image,exception);
