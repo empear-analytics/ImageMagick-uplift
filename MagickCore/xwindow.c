@@ -7771,6 +7771,34 @@ static void XMagnifyBitmapMSB(const XMagnifyContext *context,
   MagnifyBitRowsMSB(&bit_rows);
 }
 
+static void XMagnifyBitmap(const XMagnifyContext *context)
+{
+  XImage
+    *const ximage = context->ximage;
+
+  XWindows
+    *const windows = context->windows;
+
+  XPixelInfo
+    *pixel_info;
+
+  pixel_info=windows->magnify.pixel_info;
+  switch (ximage->bitmap_bit_order)
+  {
+    case LSBFirst:
+    {
+      XMagnifyBitmapLSB(context,pixel_info);
+      break;
+    }
+    case MSBFirst:
+    default:
+    {
+      XMagnifyBitmapMSB(context,pixel_info);
+      break;
+    }
+  }
+}
+
 MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   ExceptionInfo *exception)
 {
@@ -7833,24 +7861,7 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   context.q=q;
   if (ximage->bits_per_pixel < 8)
     {
-      XPixelInfo
-        *pixel_info;
-
-      pixel_info=windows->magnify.pixel_info;
-      switch (ximage->bitmap_bit_order)
-      {
-        case LSBFirst:
-        {
-          XMagnifyBitmapLSB(&context,pixel_info);
-          break;
-        }
-        case MSBFirst:
-        default:
-        {
-          XMagnifyBitmapMSB(&context,pixel_info);
-          break;
-        }
-      }
+      XMagnifyBitmap(&context);
     }
   else
     switch (ximage->bits_per_pixel)
