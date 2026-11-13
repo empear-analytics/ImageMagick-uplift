@@ -13339,6 +13339,89 @@ static CompositeOperator XSelectPasteOperator(const ComposeMenuInfo *menu_info,
   return(compose);
 }
 
+typedef struct _PasteCommandInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  const char
+    *const *PasteMenu;
+
+  const ModeType
+    *PasteCommands;
+} PasteCommandInput;
+
+static MagickBooleanType XPasteCommand(const PasteCommandInput *input,
+  XEvent *event,CompositeOperator *compose,size_t *state)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  const char
+    *const *const PasteMenu = input->PasteMenu;
+
+  const ModeType
+    *const PasteCommands = input->PasteCommands;
+
+  int
+    id;
+
+  if ((*event).xany.window == windows->command.id)
+    {
+      /*
+        Select a command from the Command widget.
+      */
+      id=XCommandWidget(display,windows,PasteMenu,event);
+      if (id < 0)
+        return(MagickTrue);
+      switch (PasteCommands[id])
+      {
+        case PasteOperatorsCommand:
+        {
+          ComposeMenuInfo
+            menu_info;
+
+          menu_info.display=display;
+          menu_info.windows=windows;
+          menu_info.id=id;
+          (*compose)=XSelectPasteOperator(&menu_info,PasteMenu,(*compose));
+          break;
+        }
+        case PasteHelpCommand:
+        {
+          XTextViewHelp(display,resource_info,windows,MagickFalse,
+            "Help Viewer - Image Composite",ImagePasteHelp);
+          break;
+        }
+        case PasteDismissCommand:
+        {
+          /*
+            Prematurely exit.
+          */
+          (*state)|=EscapeState;
+          (*state)|=ExitState;
+          break;
+        }
+        default:
+          break;
+      }
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 static MagickBooleanType XPasteImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -13373,7 +13456,6 @@ static MagickBooleanType XPasteImage(Display *display,
     *paste_image;
 
   int
-    id,
     x,
     y;
 
@@ -13393,6 +13475,10 @@ static MagickBooleanType XPasteImage(Display *display,
 
   XEvent
     event;
+
+  const PasteCommandInput
+    command_input = { display, resource_info, windows, PasteMenu,
+      PasteCommands };
 
   /*
     Copy image.
@@ -13447,47 +13533,8 @@ static MagickBooleanType XPasteImage(Display *display,
     XScreenEvent(display,windows,&event,exception);
     XHighlightRectangle(display,windows->image.id,
       windows->image.highlight_context,&highlight_info);
-    if (event.xany.window == windows->command.id)
-      {
-        /*
-          Select a command from the Command widget.
-        */
-        id=XCommandWidget(display,windows,PasteMenu,&event);
-        if (id < 0)
-          continue;
-        switch (PasteCommands[id])
-        {
-          case PasteOperatorsCommand:
-          {
-            ComposeMenuInfo
-              menu_info;
-
-            menu_info.display=display;
-            menu_info.windows=windows;
-            menu_info.id=id;
-            compose=XSelectPasteOperator(&menu_info,PasteMenu,compose);
-            break;
-          }
-          case PasteHelpCommand:
-          {
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Image Composite",ImagePasteHelp);
-            break;
-          }
-          case PasteDismissCommand:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
-          default:
-            break;
-        }
-        continue;
-      }
+    if (XPasteCommand(&command_input,&event,&compose,&state) != MagickFalse)
+      continue;
     switch (event.type)
     {
       case ButtonPress:
