@@ -15486,6 +15486,92 @@ static void XRotateDragLine(const RotateLoopInput *loop_input,
   (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
 }
 
+typedef struct _RotateAngleTargets
+{
+  int
+    *x,
+    *y;
+
+  ModeType
+    *direction;
+
+  double
+    *degrees;
+} RotateAngleTargets;
+
+static MagickBooleanType XSelectRotateAngle(
+  const RotateLoopInput *loop_input,const RotateAngleTargets *targets)
+{
+  Display
+    *const display = loop_input->display;
+
+  XWindows
+    *const windows = loop_input->windows;
+
+  const char
+    *const *const RotateMenu = loop_input->RotateMenu;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  ModeType
+    *const direction = targets->direction;
+
+  double
+    *const degrees = targets->degrees;
+
+  if ((*degrees) == 0.0)
+    {
+      unsigned int
+        distance;
+
+      size_t
+        state;
+
+      XSegment
+        rotate_info;
+
+      const RotateLineTargets
+        line_targets = { &rotate_info, &state, &distance, degrees };
+
+      /*
+        Map Command widget.
+      */
+      (void) CloneString(&windows->command.name,"Rotate");
+      windows->command.data=2;
+      (void) XCommandWidget(display,windows,RotateMenu,(XEvent *) NULL);
+      (void) XMapRaised(display,windows->command.id);
+      XClientMessage(display,windows->image.id,windows->im_protocols,
+        windows->im_update_widget,CurrentTime);
+      /*
+        Wait for first button press.
+      */
+      (void) XSetFunction(display,windows->image.highlight_context,GXinvert);
+      XQueryPosition(display,windows->image.id,x,y);
+      rotate_info.x1=(*x);
+      rotate_info.y1=(*y);
+      rotate_info.x2=(*x);
+      rotate_info.y2=(*y);
+      state=DefaultState;
+      do
+      {
+        XRotateSelectStep(loop_input,&line_targets,direction);
+      } while ((state & ExitState) == 0);
+      (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
+      (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+      if ((state & EscapeState) != 0)
+        return(MagickFalse);
+      /*
+        Draw line as pointer moves until the mouse button is released.
+      */
+      XRotateDragLine(loop_input,&line_targets,(*direction));
+      if (distance <= 9)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType XRotateImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,double degrees,Image **image,
   ExceptionInfo *exception)
@@ -15541,58 +15627,15 @@ static MagickBooleanType XRotateImage(Display *display,
   const RotateTargets
     targets = { &pen_id };
 
-  if (degrees == 0.0)
-    {
-      unsigned int
-        distance;
+  const RotateLoopInput
+    loop_input = { display, resource_info, windows, RotateMenu,
+      RotateCommands, DirectionCommands, command, targets, exception };
 
-      size_t
-        state;
+  const RotateAngleTargets
+    angle_targets = { &x, &y, &direction, &degrees };
 
-      XSegment
-        rotate_info;
-
-      const RotateLineTargets
-        line_targets = { &rotate_info, &state, &distance, &degrees };
-
-      const RotateLoopInput
-        loop_input = { display, resource_info, windows, RotateMenu,
-          RotateCommands, DirectionCommands, command, targets, exception };
-
-      /*
-        Map Command widget.
-      */
-      (void) CloneString(&windows->command.name,"Rotate");
-      windows->command.data=2;
-      (void) XCommandWidget(display,windows,RotateMenu,(XEvent *) NULL);
-      (void) XMapRaised(display,windows->command.id);
-      XClientMessage(display,windows->image.id,windows->im_protocols,
-        windows->im_update_widget,CurrentTime);
-      /*
-        Wait for first button press.
-      */
-      (void) XSetFunction(display,windows->image.highlight_context,GXinvert);
-      XQueryPosition(display,windows->image.id,&x,&y);
-      rotate_info.x1=x;
-      rotate_info.y1=y;
-      rotate_info.x2=x;
-      rotate_info.y2=y;
-      state=DefaultState;
-      do
-      {
-        XRotateSelectStep(&loop_input,&line_targets,&direction);
-      } while ((state & ExitState) == 0);
-      (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
-      (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
-      if ((state & EscapeState) != 0)
-        return(MagickTrue);
-      /*
-        Draw line as pointer moves until the mouse button is released.
-      */
-      XRotateDragLine(&loop_input,&line_targets,direction);
-      if (distance <= 9)
-        return(MagickTrue);
-    }
+  if (XSelectRotateAngle(&loop_input,&angle_targets) == MagickFalse)
+    return(MagickTrue);
   if (direction == VerticalRotateCommand)
     degrees-=90.0;
   if (degrees == 0.0)
