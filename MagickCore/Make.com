@@ -119,6 +119,7 @@ $call Make option.c
 $call Make paint.c
 $call Make paint-floodfill.c
 $call Make pixel.c
+$call Make pixel-gamma.c
 $call Make pixel-import.c
 $call Make pixel-export.c
 $call Make policy.c
