@@ -1218,6 +1218,30 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
   return(MagickTrue);
 }
 
+#if defined(MAGICKCORE_HAVE__NSGETEXECUTABLEPATH)
+static void GetNSExecutablePath(char *path,const size_t extent)
+{
+  char
+    executable_path[PATH_MAX << 1];
+
+  uint32_t
+    length;
+
+  length=sizeof(executable_path);
+  if (_NSGetExecutablePath(executable_path,&length) == 0)
+    {
+      char
+        *real_path = realpath_utf8(executable_path);
+
+      if (real_path != (char *) NULL)
+        {
+          (void) CopyMagickString(path,real_path,extent);
+          real_path=DestroyString(real_path);
+        }
+    }
+}
+#endif
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1277,26 +1301,7 @@ MagickPrivate MagickBooleanType GetExecutionPath(char *path,const size_t extent)
   }
 #endif
 #if defined(MAGICKCORE_HAVE__NSGETEXECUTABLEPATH)
-  {
-    char
-      executable_path[PATH_MAX << 1];
-
-    uint32_t
-      length;
-
-    length=sizeof(executable_path);
-    if (_NSGetExecutablePath(executable_path,&length) == 0)
-      {
-        char
-          *real_path = realpath_utf8(executable_path);
-
-        if (real_path != (char *) NULL)
-          {
-            (void) CopyMagickString(path,real_path,extent);
-            real_path=DestroyString(real_path);
-          }
-      }
-  }
+  GetNSExecutablePath(path,extent);
 #endif
 #if defined(MAGICKCORE_HAVE_GETEXECNAME)
   {
