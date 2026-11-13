@@ -17255,20 +17255,39 @@ static void XGetBackgroundVisualType(Display *display,
       XVisualIDFromVisual((*window_attributes).visual));
 }
 
+static void XFitBackgroundWindow(const XWindowAttributes *window_attributes,
+  XWindowInfo *window_info)
+{
+  char
+    geometry[MagickPathExtent];
+
+  RectangleInfo
+    geometry_info;
+
+  (void) FormatLocaleString(geometry,MagickPathExtent,"%ux%u+0+0>",
+    (*window_attributes).width,(*window_attributes).height);
+  geometry_info.width=(*window_info).width;
+  geometry_info.height=(*window_info).height;
+  geometry_info.x=(ssize_t) (*window_info).x;
+  geometry_info.y=(ssize_t) (*window_info).y;
+  (void) ParseMetaGeometry(geometry,&geometry_info.x,&geometry_info.y,
+    &geometry_info.width,&geometry_info.height);
+  (*window_info).width=(unsigned int) geometry_info.width;
+  (*window_info).height=(unsigned int) geometry_info.height;
+  (*window_info).x=(int) geometry_info.x;
+  (*window_info).y=(int) geometry_info.y;
+}
+
 MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *image,ExceptionInfo *exception)
 {
   char
-    geometry[MagickPathExtent],
     visual_type[MagickPathExtent];
 
   int
     height,
     status,
     width;
-
-  RectangleInfo
-    geometry_info;
 
   static XPixelInfo
     pixel;
@@ -17379,18 +17398,7 @@ MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
       (image->rows != window_info.height))
     ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
       image->filename);
-  (void) FormatLocaleString(geometry,MagickPathExtent,"%ux%u+0+0>",
-    window_attributes.width,window_attributes.height);
-  geometry_info.width=window_info.width;
-  geometry_info.height=window_info.height;
-  geometry_info.x=(ssize_t) window_info.x;
-  geometry_info.y=(ssize_t) window_info.y;
-  (void) ParseMetaGeometry(geometry,&geometry_info.x,&geometry_info.y,
-    &geometry_info.width,&geometry_info.height);
-  window_info.width=(unsigned int) geometry_info.width;
-  window_info.height=(unsigned int) geometry_info.height;
-  window_info.x=(int) geometry_info.x;
-  window_info.y=(int) geometry_info.y;
+  XFitBackgroundWindow(&window_attributes,&window_info);
   status=XMakeImage(display,&resources,&window_info,image,window_info.width,
     window_info.height,exception) == MagickFalse ? 0 : 1;
   if (status == MagickFalse)
