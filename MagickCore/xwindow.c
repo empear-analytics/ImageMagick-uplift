@@ -7874,6 +7874,32 @@ static void XMagnify8BitPixels(const XMagnifyContext *context)
   MagnifyRows8Bit(&magnify_rows);
 }
 
+static void XMagnifyRows(const XMagnifyContext *context)
+{
+  XImage
+    *const ximage = context->ximage;
+
+  if (ximage->bits_per_pixel < 8)
+    {
+      XMagnifyBitmap(context);
+    }
+  else
+    switch (ximage->bits_per_pixel)
+    {
+      case 6:
+      case 8:
+      {
+        XMagnify8BitPixels(context);
+        break;
+      }
+      default:
+      {
+        XMagnifyMultiBytePixels(context);
+        break;
+      }
+    }
+}
+
 MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   ExceptionInfo *exception)
 {
@@ -7934,25 +7960,7 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   context.x=x;
   context.y=y;
   context.q=q;
-  if (ximage->bits_per_pixel < 8)
-    {
-      XMagnifyBitmap(&context);
-    }
-  else
-    switch (ximage->bits_per_pixel)
-    {
-      case 6:
-      case 8:
-      {
-        XMagnify8BitPixels(&context);
-        break;
-      }
-      default:
-      {
-        XMagnifyMultiBytePixels(&context);
-        break;
-      }
-    }
+  XMagnifyRows(&context);
   /*
     Copy X image to magnify pixmap.
   */
