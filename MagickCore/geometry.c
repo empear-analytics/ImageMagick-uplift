@@ -756,6 +756,24 @@ static MagickStatusType SetRelativeRegion(const Image *image,
   return(flags);
 }
 
+static MagickBooleanType CheckGravityRegionLimits(const Image *image,
+  RectangleInfo *region_info,const MagickStatusType flags)
+{
+  if (((flags & LessValue) != 0) &&
+      (IsRegionSmallerThanImage(image,region_info) != MagickFalse))
+    {
+      SetGeometry(image,region_info);
+      return(MagickFalse);
+    }
+  if (((flags & GreaterValue) != 0) &&
+      (IsRegionLargerThanImage(image,region_info) != MagickFalse))
+    {
+      SetGeometry(image,region_info);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickStatusType AdjustGravityRegion(const Image *image,
   RectangleInfo *region_info,const MagickStatusType flags)
 {
@@ -773,18 +791,8 @@ static MagickStatusType AdjustGravityRegion(const Image *image,
   if (height == 0)
     region_info->height=image->page.height | image->rows;
   GravityAdjustGeometry(image->columns,image->rows,image->gravity,region_info);
-  if (((flags & LessValue) != 0) &&
-      (IsRegionSmallerThanImage(image,region_info) != MagickFalse))
-    {
-      SetGeometry(image,region_info);
-      return(NoValue);
-    }
-  if (((flags & GreaterValue) != 0) &&
-      (IsRegionLargerThanImage(image,region_info) != MagickFalse))
-    {
-      SetGeometry(image,region_info);
-      return(NoValue);
-    }
+  if (CheckGravityRegionLimits(image,region_info,flags) == MagickFalse)
+    return(NoValue);
   region_info->width=width;
   region_info->height=height;
   return(flags);
