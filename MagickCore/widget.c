@@ -16662,6 +16662,20 @@ static void MapTextViewWidget(Display *display,XWindows *windows,
   windows->widget.mapped=MagickFalse;
 }
 
+static XFontStruct *SelectTextViewFont(Display *display,
+  const XResourceInfo *resource_info,XWindows *windows,const MagickBooleanType mono)
+{
+  XFontStruct
+    *text_info;
+
+  text_info=(XFontStruct *) NULL;
+  if (mono != MagickFalse)
+    text_info=XBestFont(display,resource_info,MagickTrue);
+  if (text_info == (XFontStruct *) NULL)
+    text_info=windows->widget.font_info;
+  return(text_info);
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -16735,11 +16749,7 @@ MagickPrivate void XTextViewWidget(Display *display,
     Determine Text View widget attributes.
   */
   font_info=windows->widget.font_info;
-  text_info=(XFontStruct *) NULL;
-  if (mono != MagickFalse)
-    text_info=XBestFont(display,resource_info,MagickTrue);
-  if (text_info == (XFontStruct *) NULL)
-    text_info=windows->widget.font_info;
+  text_info=SelectTextViewFont(display,resource_info,windows,mono);
   text_width=0;
   for (i=0; textlist[i] != (char *) NULL; i++)
     if (WidgetTextWidth(text_info,(char *) textlist[i]) > text_width)
