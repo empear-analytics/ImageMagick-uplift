@@ -4682,6 +4682,24 @@ static XImage *XAllocateSharedSegment(XWindowInfo *window,
 }
 #endif
 
+static void XReplaceWindowXImage(Display *display,XWindowInfo *window,
+  XImage *ximage)
+{
+  if (window->ximage != (XImage *) NULL)
+    XDestroyWindowXImage(display,window);
+#if defined(MAGICKCORE_HAVE_SHARED_MEMORY)
+  if (window->segment_info != (XShmSegmentInfo *) NULL)
+    {
+      XShmSegmentInfo
+        *segment_info;
+
+      segment_info=(XShmSegmentInfo *) window->segment_info;
+      segment_info[0]=segment_info[1];
+    }
+#endif
+  window->ximage=ximage;
+}
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
@@ -4775,19 +4793,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
       (void) XCheckDefineCursor(display,window->id,window->cursor);
       return(MagickFalse);
     }
-  if (window->ximage != (XImage *) NULL)
-    XDestroyWindowXImage(display,window);
-#if defined(MAGICKCORE_HAVE_SHARED_MEMORY)
-  if (window->segment_info != (XShmSegmentInfo *) NULL)
-    {
-      XShmSegmentInfo
-        *segment_info;
-
-      segment_info=(XShmSegmentInfo *) window->segment_info;
-      segment_info[0]=segment_info[1];
-    }
-#endif
-  window->ximage=ximage;
+  XReplaceWindowXImage(display,window,ximage);
   matte_image=(XImage *) NULL;
   if ((IsShapedImageWindow(window) != MagickFalse) &&
       (IsShapeWithinDisplay(display,window,width,height) != MagickFalse))
