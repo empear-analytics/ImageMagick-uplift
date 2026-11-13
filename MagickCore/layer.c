@@ -1938,6 +1938,7 @@ static void RecordInterimDisposal(const Image *prev_image,
   DisposeType *disposals,const ssize_t i)
 {
   assert(prev_image != (Image *) NULL);
+  magick_unreferenced(prev_image);
   disposals[i]=disposals[i-1];
 #if DEBUG_OPT_FRAME
     (void) FormatLocaleFile(stderr, "final   %.17g : %s  %.17gx%.17g%+.20g%+.20g\n",
