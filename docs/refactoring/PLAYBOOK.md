@@ -6648,7 +6648,12 @@ functions between files. No other recipe changes where a preprocessor line sits.
    (`output_scaling` in `DistortImage`'s `ScaleFilter`) are resolved where it is used.
    Use it only to unblock an extraction that follows, as step 5 says.
 2. Move the run, unchanged, to directly above the function's signature: below its
-   comment banner and below any helper already placed there.
+   comment banner and below any helper already placed there. When the helpers above
+   the function stand inside a conditional block (`#if !defined(...)` ... `#endif`)
+   and the helper the run unblocks must join them, because it uses what only that
+   block's configurations have, the run goes directly above that block's `#if`
+   instead (`random.c`'s `MaxEntropyExtent` above `ReadRandom`'s
+   `#if !defined(MAGICKCORE_WINDOWS_SUPPORT)`); step 4's proof is the same.
 3. Leave every `#undef` and any `#define` further down the body where it is, except the
    single `#define` of step 1's last form.
 4. Run `sh tools/pp_identical.sh <file>`. It must print `IDENTICAL`: the preprocessed
@@ -6715,6 +6720,10 @@ Added by Claude Code (Claude Opus 5.5) during task M84, under the mandate of 202
 Step 1's last form (2026-11-01, task W11): `distort.c`'s `ScaleFilter`, defined in the middle
 of `DistortImage`'s body and used by nine pixel cases that Recipes Z, N and O move to helpers
 above the function, where the macro is not yet defined.
+Step 2's conditional-block form (2026-11-13, campaign B, M127 lane b round 6): `random.c`'s
+`GenerateEntropicChaos`, whose device-entropy block (the `#else` side of
+`MAGICKCORE_WINDOWS_SUPPORT`) moves to helpers that must sit beside `ReadRandom` in its
+`#if !defined(MAGICKCORE_WINDOWS_SUPPORT)` block. Lane: b
 
 ---
 
@@ -17225,3 +17234,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | AT | Step 6: the `if` may have an `else` arm of the same kind; that arm alone moves (`else return(Helper(...));`), a local only it and `R` read is declared in the helper with its initialiser; Lane: b | `color.c`'s `QueryHexColor` (two bumps, one per arm) | mandate (2026-10-24) |
 | 2026-11-13 | NEW | IC | Inline Cast-Only Locals into Their One Use: a local assigned once from a cast of an unassigned parameter to its own type, and read once, is replaced at that read by the cast; declaration and assignment go; the grouped copies in one commit; evidence guard (`obj_identical.sh`); Lane: b | `splay-tree.c`'s `CompareSplayTreeString` and `CompareSplayTreeStringInfo` (*Code Duplication*; probe 9.38 to 10.0) | mandate (2026-10-24) |
 | 2026-11-13 | NEW | OS | Share an Option-Sync Block Through a Helper Keyed by the Option Name: copies of `option=GetImageOption(image_info,"K"); if (option != NULL) S;` whose `S` stores into one member become calls of a `static void` helper taking the key and a pointer to the member; one function per commit; targets *Overall Code Complexity*; evidence oracle; Lane: b | `image-settings.c`'s `SyncImage...Settings` (`quality`, `scene`, `depth`, `loop`, `page`, `tile-offset`, colours) | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | H | Step 2: when the helpers above the function stand in a conditional block that the unblocked helper must join, the run goes directly above that block's `#if`; proof unchanged (`pp_identical.sh`); Lane: b | `random.c`'s `GenerateEntropicChaos`: `MaxEntropyExtent`, used by the device-entropy block that joins `ReadRandom` under `#if !defined(MAGICKCORE_WINDOWS_SUPPORT)` | mandate (2026-10-24) |
