@@ -10456,13 +10456,85 @@ static inline MagickBooleanType IsImageWindowOriginalSize(
     MagickFalse);
 }
 
+typedef struct _XMagickCommandContext
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    **image;
+
+  ImageInfo
+    *image_info;
+
+  ExceptionInfo
+    *exception;
+} XMagickCommandContext;
+
+static void XApplyResizeCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  char
+    geometry[MagickPathExtent];
+
+  int
+    status;
+
+  size_t
+    height,
+    width;
+
+  ssize_t
+    x,
+    y;
+
+  /*
+    Resize image.
+  */
+  width=(size_t) windows->image.ximage->width;
+  height=(size_t) windows->image.ximage->height;
+  x=0;
+  y=0;
+  (void) FormatLocaleString(geometry,MagickPathExtent,"%.17gx%.17g+0+0",
+    (double) width,(double) height);
+  status=XDialogWidget(display,windows,"Resize",
+    "Enter resize geometry (e.g. 640x480, 200%):",geometry);
+  if (*geometry == '\0')
+    return;
+  if (status == 0)
+    (void) ConcatenateMagickString(geometry,"!",MagickPathExtent);
+  (void) ParseMetaGeometry(geometry,&x,&y,&width,&height);
+  windows->image.window_changes.width=(int) width;
+  windows->image.window_changes.height=(int) height;
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
 {
   char
     filename[MagickPathExtent],
-    geometry[MagickPathExtent],
     modulate_factors[MagickPathExtent];
 
   GeometryInfo
@@ -10498,6 +10570,9 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
     height,
     width;
 
+  XMagickCommandContext
+    context;
+
   /*
     Process user command.
   */
@@ -10509,6 +10584,12 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   image_info=CloneImageInfo(resource_info->image_info);
   SetGeometryInfo(&geometry_info);
   GetQuantizeInfo(&quantize_info);
+  context.display=display;
+  context.resource_info=resource_info;
+  context.windows=windows;
+  context.image=image;
+  context.image_info=image_info;
+  context.exception=exception;
   switch (command)
   {
     case OpenCommand:
@@ -10745,39 +10826,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       break;
     }
     case ResizeCommand:
-    {
-      int
-        status;
-
-      size_t
-        height,
-        width;
-
-      ssize_t
-        x,
-        y;
-
-      /*
-        Resize image.
-      */
-      width=(size_t) windows->image.ximage->width;
-      height=(size_t) windows->image.ximage->height;
-      x=0;
-      y=0;
-      (void) FormatLocaleString(geometry,MagickPathExtent,"%.17gx%.17g+0+0",
-        (double) width,(double) height);
-      status=XDialogWidget(display,windows,"Resize",
-        "Enter resize geometry (e.g. 640x480, 200%):",geometry);
-      if (*geometry == '\0')
-        break;
-      if (status == 0)
-        (void) ConcatenateMagickString(geometry,"!",MagickPathExtent);
-      (void) ParseMetaGeometry(geometry,&x,&y,&width,&height);
-      windows->image.window_changes.width=(int) width;
-      windows->image.window_changes.height=(int) height;
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyResizeCommand(&context);
       break;
-    }
     case ApplyCommand:
     {
       char
