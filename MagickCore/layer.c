@@ -1953,6 +1953,53 @@ static void RecordInterimDisposal(const Image *prev_image,
 #endif
 }
 
+typedef struct _FrameListTargets
+{
+  const Image
+    **curr;
+
+  RectangleInfo
+    **bounds;
+
+  DisposeType
+    **disposals;
+} FrameListTargets;
+
+static MagickBooleanType AcquireFrameLists(const Image *image,
+  const MagickBooleanType add_frames,ExceptionInfo *exception,
+  const FrameListTargets *targets)
+{
+  const Image
+    **const curr = targets->curr;
+
+  RectangleInfo
+    **const bounds = targets->bounds;
+
+  DisposeType
+    **const disposals = targets->disposals;
+
+  /*
+    Allocate memory (times 2 if we allow the use of frame duplications)
+  */
+  (*curr)=GetFirstImageInList(image);
+  (*bounds)=AcquireFrameBounds((*curr),add_frames);
+  if ((*bounds) == (RectangleInfo *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+      return(MagickFalse);
+    }
+  (*disposals)=AcquireFrameDisposals(image,add_frames);
+  if ((*disposals) == (DisposeType *) NULL)
+    {
+      (*bounds)=(RectangleInfo *) RelinquishMagickMemory((*bounds));
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1984,6 +2031,9 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   const DuplicateFrameTargets
     targets = { &dup_image, &dup_bounds, &cleared, &bgnd_image };
 
+  const FrameListTargets
+    lists = { &curr, &bounds, &disposals };
+
   assert(image != (const Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   assert(exception != (ExceptionInfo *) NULL);
@@ -1999,19 +2049,8 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   add_frames=method == OptimizePlusLayer ? MagickTrue : MagickFalse;
   if (AreFramesCoalesced(image,exception) == MagickFalse)
     return((Image *) NULL);
-  /*
-    Allocate memory (times 2 if we allow the use of frame duplications)
-  */
-  curr=GetFirstImageInList(image);
-  bounds=AcquireFrameBounds(curr,add_frames);
-  if (bounds == (RectangleInfo *) NULL)
-    ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-  disposals=AcquireFrameDisposals(image,add_frames);
-  if (disposals == (DisposeType *) NULL)
-    {
-      bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
-      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-    }
+  if (AcquireFrameLists(image,add_frames,exception,&lists) == MagickFalse)
+    return((Image *) NULL);
   /*
     Initialise Previous Image as fully transparent
   */
