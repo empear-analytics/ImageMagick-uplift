@@ -12510,6 +12510,56 @@ static MagickBooleanType XMatteUpdatePixels(const MatteCommandInput *input,
   return(MagickTrue);
 }
 
+static size_t XMatteKeyPress(const MatteCommandInput *input,XEvent *event,
+  size_t state)
+{
+  Display
+    *const display = input->display;
+
+  XWindows
+    *const windows = input->windows;
+
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  XDiscardMagnifyKeys(display,windows,event);
+  if ((*event).xkey.window != windows->image.id)
+    return(state);
+  /*
+    Respond to a user key press.
+  */
+  (void) XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+    sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  switch ((int) key_symbol)
+  {
+    case XK_Escape:
+    case XK_F20:
+    {
+      /*
+        Prematurely exit.
+      */
+      state|=ExitState;
+      break;
+    }
+    case XK_F1:
+    case XK_Help:
+    {
+      XTextViewHelp(display,input->resource_info,windows,MagickFalse,
+        "Help Viewer - Matte Edit",ImageMatteEditHelp);
+      break;
+    }
+    default:
+    {
+      (void) XBell(display,0);
+      break;
+    }
+  }
+  return(state);
+}
+
 static MagickBooleanType XMatteEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -12659,44 +12709,7 @@ static MagickBooleanType XMatteEditImage(Display *display,
         break;
       case KeyPress:
       {
-        char
-          command[MagickPathExtent];
-
-        KeySym
-          key_symbol;
-
-        XDiscardMagnifyKeys(display,windows,&event);
-        if (event.xkey.window != windows->image.id)
-          break;
-        /*
-          Respond to a user key press.
-        */
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        switch ((int) key_symbol)
-        {
-          case XK_Escape:
-          case XK_F20:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=ExitState;
-            break;
-          }
-          case XK_F1:
-          case XK_Help:
-          {
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Matte Edit",ImageMatteEditHelp);
-            break;
-          }
-          default:
-          {
-            (void) XBell(display,0);
-            break;
-          }
-        }
+        state=XMatteKeyPress(&command_input,&event,state);
         break;
       }
       case MotionNotify:
