@@ -16733,6 +16733,24 @@ static void XClampImageOffset(XWindows *windows)
 %      to trim.
 %
 */
+static MagickBooleanType XOffsetImageWindowDown(XWindows *windows,
+  const KeySym key_symbol,const unsigned int y_offset)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_Prior:
+    case XK_Down:
+    case XK_KP_Down:
+    {
+      windows->image.y+=(int) y_offset;
+      break;
+    }
+    default:
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType XOffsetImageWindow(XWindows *windows,
   const KeySym key_symbol,const unsigned int x_offset,
   const unsigned int y_offset)
@@ -16765,15 +16783,10 @@ static MagickBooleanType XOffsetImageWindow(XWindows *windows,
       windows->image.x+=(int) x_offset;
       break;
     }
-    case XK_Prior:
-    case XK_Down:
-    case XK_KP_Down:
-    {
-      windows->image.y+=(int) y_offset;
-      break;
-    }
     default:
-      return(MagickFalse);
+    {
+      return(XOffsetImageWindowDown(windows,key_symbol,y_offset));
+    }
   }
   return(MagickTrue);
 }
