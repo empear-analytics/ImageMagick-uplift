@@ -435,7 +435,7 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/coder.h MagickCore/color.c MagickCore/color-equivalent.c MagickCore/color.h \
 	MagickCore/color-private.h MagickCore/colormap.c \
 	MagickCore/colormap.h MagickCore/colormap-private.h \
-	MagickCore/colorspace.c MagickCore/colorspace-transform.c MagickCore/colorspace-convert.c MagickCore/colorspace-generic-rgb.c MagickCore/colorspace.h \
+	MagickCore/colorspace.c MagickCore/colorspace-transform.c MagickCore/colorspace-transform-image.c MagickCore/colorspace-convert.c MagickCore/colorspace-generic-rgb.c MagickCore/colorspace.h \
 	MagickCore/colorspace-private.h MagickCore/compare.c MagickCore/compare-similarity.c \
 	MagickCore/compare.h MagickCore/compare-private.h \
 	MagickCore/composite.c MagickCore/composite.h \
@@ -452,7 +452,7 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/distribute-cache.h \
 	MagickCore/distribute-cache-private.h MagickCore/draw.c \
 	MagickCore/draw.h MagickCore/draw-private.h \
-	MagickCore/effect.c MagickCore/effect-filter.c MagickCore/effect-preview.c MagickCore/effect-blur.c MagickCore/effect-blur-adaptive.c MagickCore/effect.h MagickCore/enhance.c MagickCore/enhance-clahe.c MagickCore/enhance-tone.c MagickCore/enhance-level-colors.c \
+	MagickCore/effect.c MagickCore/effect-filter.c MagickCore/effect-preview.c MagickCore/effect-blur.c MagickCore/effect-blur-adaptive.c MagickCore/effect-blur-adaptive-filters.c MagickCore/effect.h MagickCore/enhance.c MagickCore/enhance-color.c MagickCore/enhance-clahe.c MagickCore/enhance-tone.c MagickCore/enhance-level-colors.c \
 	MagickCore/enhance.h MagickCore/exception.c \
 	MagickCore/exception.h MagickCore/exception-private.h \
 	MagickCore/feature.c MagickCore/feature-texture.c MagickCore/feature.h MagickCore/fourier.c MagickCore/fourier-complex.c \
@@ -481,7 +481,7 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/morphology.h MagickCore/morphology-private.h \
 	MagickCore/mutex.h MagickCore/nt-base.h \
 	MagickCore/nt-base-private.h MagickCore/nt-feature.h \
-	MagickCore/opencl.c MagickCore/opencl.h \
+	MagickCore/opencl.c MagickCore/opencl-device.c MagickCore/opencl.h \
 	MagickCore/opencl-private.h MagickCore/option.c \
 	MagickCore/option.h MagickCore/option-private.h \
 	MagickCore/paint.c MagickCore/paint-floodfill.c MagickCore/paint.h MagickCore/pixel.c MagickCore/pixel-import.c MagickCore/pixel-export.c \
@@ -524,11 +524,11 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/utility.c MagickCore/utility.h \
 	MagickCore/utility-private.h MagickCore/version.c \
 	MagickCore/version.h MagickCore/version-private.h \
-	MagickCore/visual-effects.c MagickCore/visual-effects-pixel.c MagickCore/visual-effects-wavelet.c MagickCore/visual-effects-plasma.c MagickCore/visual-effects-stegano.c MagickCore/visual-effects.h \
+	MagickCore/visual-effects.c MagickCore/visual-effects-pixel.c MagickCore/visual-effects-pixel-methods.c MagickCore/visual-effects-wavelet.c MagickCore/visual-effects-plasma.c MagickCore/visual-effects-stegano.c MagickCore/visual-effects.h \
 	MagickCore/vision.c MagickCore/vision-components.c MagickCore/vision.h MagickCore/widget.c \
 	MagickCore/widget.h MagickCore/widget-private.h \
 	MagickCore/xml-tree.c MagickCore/xml-tree.h \
-	MagickCore/xml-tree-private.h MagickCore/xwindow.c \
+	MagickCore/xml-tree-private.h MagickCore/xwindow.c MagickCore/xwindow-visual.c MagickCore/xwindow-import.c \
 	MagickCore/xwindow.h MagickCore/nt-feature.c \
 	MagickCore/nt-base.c coders/aai.c coders/aai.h coders/art.c \
 	coders/art.h coders/ase.c coders/ase.h coders/ashlar.c \
@@ -630,6 +630,7 @@ am__objects_1 = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFF
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colormap.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-transform.lo \
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-transform-image.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-convert.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-generic-rgb.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare.lo \
@@ -654,7 +655,9 @@ am__objects_1 = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFF
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-preview.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur-adaptive.lo \
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur-adaptive-filters.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance.lo \
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-color.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-clahe.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-tone.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-level-colors.lo \
@@ -691,6 +694,7 @@ am__objects_1 = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFF
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-montage-info.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-morphology.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-opencl.lo \
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-opencl-device.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-option.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-paint.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-paint-floodfill.lo \
@@ -751,6 +755,7 @@ am__objects_1 = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFF
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-version.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-pixel.lo \
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-pixel-methods.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-wavelet.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-plasma.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stegano.lo \
@@ -758,7 +763,9 @@ am__objects_1 = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFF
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-vision-components.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-widget.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xml-tree.lo \
-	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow.lo
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow.lo \
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.lo \
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.lo
 @CYGWIN_BUILD_TRUE@@WIN32_NATIVE_BUILD_FALSE@am__objects_2 = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-feature.lo
 @WIN32_NATIVE_BUILD_TRUE@am__objects_2 = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-base.lo \
 @WIN32_NATIVE_BUILD_TRUE@	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-feature.lo
@@ -2332,6 +2339,7 @@ am__depfiles_remade = ./$(DEPDIR)/dummy.Po \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colormap.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-transform.Plo \
+	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-transform-image.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-convert.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-generic-rgb.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare.Plo \
@@ -2356,7 +2364,9 @@ am__depfiles_remade = ./$(DEPDIR)/dummy.Po \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-preview.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur-adaptive.Plo \
+	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur-adaptive-filters.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance.Plo \
+	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-color.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-clahe.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-tone.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-level-colors.Plo \
@@ -2395,6 +2405,7 @@ am__depfiles_remade = ./$(DEPDIR)/dummy.Po \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-base.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-feature.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-opencl.Plo \
+	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-opencl-device.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-option.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-paint.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-paint-floodfill.Plo \
@@ -2457,12 +2468,15 @@ am__depfiles_remade = ./$(DEPDIR)/dummy.Po \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-vision-components.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-pixel.Plo \
+	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-pixel-methods.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-wavelet.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-plasma.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stegano.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-widget.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xml-tree.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow.Plo \
+	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.Plo \
+	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.Plo \
 	MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-animate.Plo \
 	MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare.Plo \
 	MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite.Plo \
@@ -5536,6 +5550,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/colormap-private.h \
   MagickCore/colorspace.c \
   MagickCore/colorspace-transform.c \
+  MagickCore/colorspace-transform-image.c \
   MagickCore/colorspace-convert.c \
   MagickCore/colorspace-generic-rgb.c \
   MagickCore/colorspace.h \
@@ -5580,8 +5595,10 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/effect-preview.c \
   MagickCore/effect-blur.c \
   MagickCore/effect-blur-adaptive.c \
+  MagickCore/effect-blur-adaptive-filters.c \
   MagickCore/effect.h \
   MagickCore/enhance.c \
+  MagickCore/enhance-color.c \
   MagickCore/enhance-clahe.c \
   MagickCore/enhance-tone.c \
   MagickCore/enhance-level-colors.c \
@@ -5661,6 +5678,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/nt-base-private.h \
   MagickCore/nt-feature.h \
   MagickCore/opencl.c \
+  MagickCore/opencl-device.c \
   MagickCore/opencl.h \
   MagickCore/opencl-private.h \
   MagickCore/option.c \
@@ -5775,6 +5793,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/version-private.h \
   MagickCore/visual-effects.c \
   MagickCore/visual-effects-pixel.c \
+  MagickCore/visual-effects-pixel-methods.c \
   MagickCore/visual-effects-wavelet.c \
   MagickCore/visual-effects-plasma.c \
   MagickCore/visual-effects-stegano.c \
@@ -5789,6 +5808,8 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/xml-tree.h \
   MagickCore/xml-tree-private.h \
   MagickCore/xwindow.c \
+  MagickCore/xwindow-visual.c \
+  MagickCore/xwindow-import.c \
   MagickCore/xwindow.h
 
 @CYGWIN_BUILD_FALSE@@WIN32_NATIVE_BUILD_FALSE@MAGICKCORE_PLATFORM_SRCS = 
@@ -7013,6 +7034,9 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspac
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-transform.lo:  \
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-transform-image.lo:  \
+	MagickCore/$(am__dirstamp) \
+	MagickCore/$(DEPDIR)/$(am__dirstamp)
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-convert.lo:  \
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
@@ -7085,7 +7109,13 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-bl
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur-adaptive.lo:  \
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur-adaptive-filters.lo:  \
+	MagickCore/$(am__dirstamp) \
+	MagickCore/$(DEPDIR)/$(am__dirstamp)
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance.lo:  \
+	MagickCore/$(am__dirstamp) \
+	MagickCore/$(DEPDIR)/$(am__dirstamp)
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-color.lo:  \
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-clahe.lo:  \
@@ -7194,6 +7224,9 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-morpholog
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-opencl.lo:  \
+	MagickCore/$(am__dirstamp) \
+	MagickCore/$(DEPDIR)/$(am__dirstamp)
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-opencl-device.lo:  \
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-option.lo:  \
@@ -7376,6 +7409,9 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-ef
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-pixel.lo:  \
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-pixel-methods.lo:  \
+	MagickCore/$(am__dirstamp) \
+	MagickCore/$(DEPDIR)/$(am__dirstamp)
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-wavelet.lo:  \
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
@@ -7398,6 +7434,12 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xml-tree.
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow.lo:  \
+	MagickCore/$(am__dirstamp) \
+	MagickCore/$(DEPDIR)/$(am__dirstamp)
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.lo:  \
+	MagickCore/$(am__dirstamp) \
+	MagickCore/$(DEPDIR)/$(am__dirstamp)
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.lo:  \
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-feature.lo:  \
@@ -8841,6 +8883,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colormap.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-transform.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-transform-image.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-convert.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-generic-rgb.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare.Plo@am__quote@ # am--include-marker
@@ -8865,7 +8908,9 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-preview.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur-adaptive.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur-adaptive-filters.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-color.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-clahe.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-tone.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-level-colors.Plo@am__quote@ # am--include-marker
@@ -8904,6 +8949,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-base.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-feature.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-opencl.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-opencl-device.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-option.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-paint.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-paint-floodfill.Plo@am__quote@ # am--include-marker
@@ -8966,12 +9012,15 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-vision-components.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-pixel.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-pixel-methods.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-wavelet.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-plasma.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stegano.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-widget.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xml-tree.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-animate.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite.Plo@am__quote@ # am--include-marker
@@ -9485,6 +9534,13 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspac
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-transform.lo `test -f 'MagickCore/colorspace-transform.c' || echo '$(srcdir)/'`MagickCore/colorspace-transform.c
 
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-transform-image.lo: MagickCore/colorspace-transform-image.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-transform-image.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-transform-image.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-transform-image.lo `test -f 'MagickCore/colorspace-transform-image.c' || echo '$(srcdir)/'`MagickCore/colorspace-transform-image.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-transform-image.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-transform-image.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/colorspace-transform-image.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-transform-image.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-transform-image.lo `test -f 'MagickCore/colorspace-transform-image.c' || echo '$(srcdir)/'`MagickCore/colorspace-transform-image.c
+
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-convert.lo: MagickCore/colorspace-convert.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-convert.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-convert.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-convert.lo `test -f 'MagickCore/colorspace-convert.c' || echo '$(srcdir)/'`MagickCore/colorspace-convert.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-convert.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-convert.Plo
@@ -9653,12 +9709,26 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-bl
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur-adaptive.lo `test -f 'MagickCore/effect-blur-adaptive.c' || echo '$(srcdir)/'`MagickCore/effect-blur-adaptive.c
 
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur-adaptive-filters.lo: MagickCore/effect-blur-adaptive-filters.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur-adaptive-filters.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur-adaptive-filters.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur-adaptive-filters.lo `test -f 'MagickCore/effect-blur-adaptive-filters.c' || echo '$(srcdir)/'`MagickCore/effect-blur-adaptive-filters.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur-adaptive-filters.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur-adaptive-filters.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/effect-blur-adaptive-filters.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur-adaptive-filters.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur-adaptive-filters.lo `test -f 'MagickCore/effect-blur-adaptive-filters.c' || echo '$(srcdir)/'`MagickCore/effect-blur-adaptive-filters.c
+
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance.lo: MagickCore/enhance.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance.lo `test -f 'MagickCore/enhance.c' || echo '$(srcdir)/'`MagickCore/enhance.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance.Plo
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/enhance.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance.lo `test -f 'MagickCore/enhance.c' || echo '$(srcdir)/'`MagickCore/enhance.c
+
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-color.lo: MagickCore/enhance-color.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-color.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-color.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-color.lo `test -f 'MagickCore/enhance-color.c' || echo '$(srcdir)/'`MagickCore/enhance-color.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-color.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-color.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/enhance-color.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-color.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-color.lo `test -f 'MagickCore/enhance-color.c' || echo '$(srcdir)/'`MagickCore/enhance-color.c
 
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-clahe.lo: MagickCore/enhance-clahe.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-clahe.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-clahe.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-clahe.lo `test -f 'MagickCore/enhance-clahe.c' || echo '$(srcdir)/'`MagickCore/enhance-clahe.c
@@ -9911,6 +9981,13 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-opencl.lo
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/opencl.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-opencl.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-opencl.lo `test -f 'MagickCore/opencl.c' || echo '$(srcdir)/'`MagickCore/opencl.c
+
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-opencl-device.lo: MagickCore/opencl-device.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-opencl-device.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-opencl-device.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-opencl-device.lo `test -f 'MagickCore/opencl-device.c' || echo '$(srcdir)/'`MagickCore/opencl-device.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-opencl-device.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-opencl-device.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/opencl-device.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-opencl-device.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-opencl-device.lo `test -f 'MagickCore/opencl-device.c' || echo '$(srcdir)/'`MagickCore/opencl-device.c
 
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-option.lo: MagickCore/option.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-option.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-option.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-option.lo `test -f 'MagickCore/option.c' || echo '$(srcdir)/'`MagickCore/option.c
@@ -10332,6 +10409,13 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-ef
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-pixel.lo `test -f 'MagickCore/visual-effects-pixel.c' || echo '$(srcdir)/'`MagickCore/visual-effects-pixel.c
 
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-pixel-methods.lo: MagickCore/visual-effects-pixel-methods.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-pixel-methods.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-pixel-methods.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-pixel-methods.lo `test -f 'MagickCore/visual-effects-pixel-methods.c' || echo '$(srcdir)/'`MagickCore/visual-effects-pixel-methods.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-pixel-methods.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-pixel-methods.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/visual-effects-pixel-methods.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-pixel-methods.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-pixel-methods.lo `test -f 'MagickCore/visual-effects-pixel-methods.c' || echo '$(srcdir)/'`MagickCore/visual-effects-pixel-methods.c
+
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-wavelet.lo: MagickCore/visual-effects-wavelet.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-wavelet.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-wavelet.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-wavelet.lo `test -f 'MagickCore/visual-effects-wavelet.c' || echo '$(srcdir)/'`MagickCore/visual-effects-wavelet.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-wavelet.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-wavelet.Plo
@@ -10387,6 +10471,20 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow.l
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/xwindow.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow.lo `test -f 'MagickCore/xwindow.c' || echo '$(srcdir)/'`MagickCore/xwindow.c
+
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.lo: MagickCore/xwindow-visual.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.lo `test -f 'MagickCore/xwindow-visual.c' || echo '$(srcdir)/'`MagickCore/xwindow-visual.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/xwindow-visual.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.lo `test -f 'MagickCore/xwindow-visual.c' || echo '$(srcdir)/'`MagickCore/xwindow-visual.c
+
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.lo: MagickCore/xwindow-import.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.lo `test -f 'MagickCore/xwindow-import.c' || echo '$(srcdir)/'`MagickCore/xwindow-import.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/xwindow-import.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.lo `test -f 'MagickCore/xwindow-import.c' || echo '$(srcdir)/'`MagickCore/xwindow-import.c
 
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-feature.lo: MagickCore/nt-feature.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-feature.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-feature.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-feature.lo `test -f 'MagickCore/nt-feature.c' || echo '$(srcdir)/'`MagickCore/nt-feature.c
@@ -14027,6 +14125,7 @@ distclean: distclean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colormap.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-transform.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-transform-image.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-convert.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-generic-rgb.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare.Plo
@@ -14051,7 +14150,9 @@ distclean: distclean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-preview.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur-adaptive.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur-adaptive-filters.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-color.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-clahe.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-tone.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-level-colors.Plo
@@ -14090,6 +14191,7 @@ distclean: distclean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-base.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-feature.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-opencl.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-opencl-device.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-option.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-paint.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-paint-floodfill.Plo
@@ -14152,12 +14254,15 @@ distclean: distclean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-vision-components.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-pixel.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-pixel-methods.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-wavelet.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-plasma.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stegano.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-widget.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xml-tree.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.Plo
 	-rm -f MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-animate.Plo
 	-rm -f MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare.Plo
 	-rm -f MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite.Plo
@@ -14599,6 +14704,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colormap.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-transform.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-transform-image.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-convert.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-colorspace-generic-rgb.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare.Plo
@@ -14623,7 +14729,9 @@ maintainer-clean: maintainer-clean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-preview.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur-adaptive.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-effect-blur-adaptive-filters.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-color.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-clahe.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-tone.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-enhance-level-colors.Plo
@@ -14662,6 +14770,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-base.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-nt-feature.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-opencl.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-opencl-device.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-option.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-paint.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-paint-floodfill.Plo
@@ -14724,12 +14833,15 @@ maintainer-clean: maintainer-clean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-vision-components.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-pixel.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-pixel-methods.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-wavelet.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-plasma.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-visual-effects-stegano.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-widget.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xml-tree.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-visual.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-xwindow-import.Plo
 	-rm -f MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-animate.Plo
 	-rm -f MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare.Plo
 	-rm -f MagickWand/$(DEPDIR)/libMagickWand_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite.Plo

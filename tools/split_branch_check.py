@@ -14,6 +14,21 @@ functions out in does not matter), line by line. Allowed differences, each count
   - a string-literal label number (clang's .L.str.<n>), when both labels hold the same bytes: each
     reference is resolved to the NUL-terminated string the label points at (the path the object was
     compiled from reads as __FILE__ in both), so a changed literal still prints DIFFERENT.
+  - a `.data.rel.ro` reference (a table of string pointers a `switch` was turned into): the offset in the
+    section differs when other tables stand before it, so each reference is resolved to the strings the
+    consecutive pointer slots from that offset point at (to the end of the run of slots), and a changed
+    string or slot count still prints DIFFERENT,
+  - a `.bss` or `.data` reference (a function's `static` variable): the offset in the section differs when
+    other variables stand before it, so each reference is resolved to the symbol (name and size) it points
+    into, plus the offset inside it, and a reference to another variable still prints DIFFERENT,
+  - the label objdump prints for a `call` or `jmp` whose target a relocation names (the line after it, which
+    is compared): the placeholder address resolves to whatever symbol stands at it in each object,
+  - the address of a function taken from another object: `lea F(%rip),%r` with an R_X86_64_PC32 relocation
+    when F stands in the same object, `mov F@GOTPCREL(%rip),%r` with an R_X86_64_REX_GOTPCRELX relocation
+    when it does not (the moved code takes the address of XError, which stays in the original); both are
+    read as the lea form and the symbol and addend are compared,
+and the alignment padding after a function's last instruction (nop forms), which depends on what follows
+the function in its object, is not compared.
 Prints IDENTICAL-MODULO-LAYOUT or DIFFERENT (with the first differing lines) and exits 0 or 1.
 """
 import os, re, subprocess, sys, tempfile
@@ -36,24 +51,86 @@ def string_labels(obj, src):
     texts = {label: sections[sec][int(at, 16):].split(b"\0", 1)[0] for at, sec, label in symbols}
     return {label: "__FILE__" if text == src.encode() else text.hex() for label, text in texts.items()}
 
+def pointer_slots(obj, strs, src):
+    """Map each slot offset of .data.rel.ro of OBJ to what its 64-bit relocation points at: the hex of the
+    NUL-terminated string (a string-literal label or a .rodata.str section), else symbol and addend."""
+    sections = {}
+    slots = {}
+    for off, sym, add in re.findall(r"(?m)^([0-9a-f]+) R_X86_64_64\s+(\S+?)\+0x([0-9a-f]+)$",
+                                    sh("objdump", "-r", "-j", ".data.rel.ro", obj, text=True).stdout):
+        if sym.startswith(".rodata.str"):
+            if sym not in sections: sections[sym] = section_bytes(obj, sym)
+            text = sections[sym][int(add, 16):].split(b"\0", 1)[0]
+            slots[int(off, 16)] = "__FILE__" if text == src.encode() else text.hex()
+        elif sym.startswith(".L.str"): slots[int(off, 16)] = strs.get(sym, "?")
+        else: slots[int(off, 16)] = "%s+%s" % (sym, add)
+    return slots
+
+def data_symbols(obj):
+    """Map a section (.bss, .data) of OBJ to its (value, size, name) object symbols."""
+    syms = {}
+    for value, sec, size, name in re.findall(r"(?m)^([0-9a-f]+) .{7} (\.bss|\.data)\s+([0-9a-f]+) (\S+)$",
+                                             sh("objdump", "-t", obj, text=True).stdout):
+        if name != sec: syms.setdefault(sec, []).append((int(value, 16), int(size, 16), name))
+    return syms
+
+def symbol_at(syms, sec, target):
+    """`sec[name:size+offset]` for the symbol of section SEC that the address TARGET (in the section) falls in, or None."""
+    for value, size, name in syms.get(sec, []):
+        if value <= target < value + size: return "%s[%s:%d+%d]" % (sec, name, size, target - value)
+    return None
+
+def table_at(slots, off):
+    """The run of resolved pointer slots of SLOTS from offset OFF to the first gap, joined, or None."""
+    run = []
+    while off in slots: run.append(slots[off]); off += 8
+    return ",".join(run) if run else None
+
+def drop_padding(lines):
+    """LINES without the alignment padding (nop forms) after the last instruction."""
+    while len(lines) > 1 and re.match(r"^(cs |data16 )*(nop[wlq]?\b|xchg\s+%ax,%ax)", lines[-1]): lines = lines[:-1]
+    return lines
+
 def disasm(obj, names, src):
     ro = sh("objcopy", "-O", "binary", "--only-section=.rodata", obj, "/dev/stdout").stdout
     strs = string_labels(obj, src)
-    out, keep, cur = {}, False, None
+    slots = pointer_slots(obj, strs, src)
+    syms = data_symbols(obj)
+    out, at, keep, cur = {}, {}, False, None
     for line in sh("objdump", "-d", "--no-show-raw-insn", "-r", obj, text=True).stdout.splitlines():
         m = re.match(r"^[0-9a-f]+ <(.*)>:$", line)
         if m:
             keep = m.group(1) in names
             cur = m.group(1)
-            if keep: out[cur] = ["<%s>" % cur]
+            if keep: out[cur] = ["<%s>" % cur]; at[cur] = [None]
             continue
         if not keep or not line.strip(): continue
+        addr = int(re.match(r"^\s*([0-9a-f]+):", line).group(1), 16)
         line = re.sub(r"^\s*[0-9a-f]+:\s*", "", line)
         line = re.sub(r"\b[0-9a-f]+ <([A-Za-z_0-9.]+)(\+0x[0-9a-f]+)?>", r"<\1>", line)
         line = re.sub(r"\.rodata\+0x([0-9a-f]+)", lambda mm: ".rodata[%s]" % ro[int(mm.group(1), 16):int(mm.group(1), 16) + 16].hex(), line)
         line = re.sub(r"(\.L\.str(?:\.\d+)?)(?=[-+\s]|$)", lambda mm: "%s[%s]" % (mm.group(1), strs.get(mm.group(1), "?")), line)
-        out[cur].append(line)
-    return out
+        def resolve(mm):
+            table = table_at(slots, int(mm.group(2), 16) * (1 if mm.group(1) == "+" else -1) + 4)
+            return mm.group(0) if table is None else ".data.rel.ro[%s]" % table
+        line = re.sub(r"\.data\.rel\.ro([+-])0x([0-9a-f]+)", resolve, line)
+        out[cur].append(line); at[cur].append(addr)
+    for name, lines in out.items():
+        for k in range(len(lines) - 1):
+            # a PC-relative reference to a variable: the target is the addend plus 4 plus the bytes of any
+            # immediate between the displacement and the end of the instruction, found from the addresses
+            m = re.match(r"^R_X86_64_PC32\s+(\.bss|\.data)(?:([+-])0x([0-9a-f]+))?\s*$", lines[k])
+            if m:
+                nxt = next((at[name][j] for j in range(k + 1, len(lines)) if not lines[j].startswith("R_X86_64_")), None)
+                addend = int(m.group(3) or "0", 16) * (-1 if m.group(2) == "-" else 1)
+                ref = symbol_at(syms, m.group(1), addend + 4 + (0 if nxt is None else nxt - at[name][k] - 4))
+                if ref: lines[k] = "R_X86_64_PC32\t" + ref
+            if re.match(r"^(call|jmp)\s+<", lines[k]) and lines[k + 1].startswith("R_X86_64_"):
+                lines[k] = re.sub(r"<.*>", "<RELOC>", lines[k])
+            if re.match(r"^mov\s+0x0\(%rip\),%\w+", lines[k]) and re.match(r"^R_X86_64_REX_GOTPCRELX\s", lines[k + 1]):
+                lines[k] = re.sub(r"^mov(\s+)", r"lea\1", lines[k])
+                lines[k + 1] = lines[k + 1].replace("R_X86_64_REX_GOTPCRELX", "R_X86_64_PC32", 1)
+    return {name: drop_padding(lines) for name, lines in out.items()}
 
 def label_kind(x, y):
     """The kind of label number X and Y differ in alone, or None."""

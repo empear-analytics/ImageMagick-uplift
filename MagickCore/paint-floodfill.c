@@ -517,11 +517,6 @@ static MagickBooleanType TileFloodplaneImage(const FloodfillPlane *plane)
   return(status);
 }
 
-MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
-  const DrawInfo *draw_info,const PixelInfo *target,const ssize_t x_offset,
-  const ssize_t y_offset,const MagickBooleanType invert,
-  ExceptionInfo *exception)
-{
 #define MaxStacksize  524288UL
 #define PushSegmentStack(up,left,right,delta) \
 { \
@@ -546,6 +541,348 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
     } \
 }
 
+typedef struct _FloodfillStack
+{
+  Image
+    *image,
+    *floodplane_image;
+
+  CacheView
+    *floodplane_view,
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+
+  MemoryInfo
+    *segment_info;
+
+  SegmentInfo
+    *segment_stack,
+    **top;
+} FloodfillStack;
+
+typedef struct _FloodfillSegment
+{
+  ssize_t
+    up,
+    left,
+    right,
+    delta;
+} FloodfillSegment;
+
+static MagickBooleanType PushFloodfillSegment(const FloodfillStack *stack,
+  const FloodfillSegment *segment)
+{
+  CacheView
+    *floodplane_view = stack->floodplane_view,
+    *image_view = stack->image_view;
+
+  const ssize_t
+    delta = segment->delta,
+    left = segment->left,
+    right = segment->right,
+    up = segment->up;
+
+  ExceptionInfo
+    *const exception = stack->exception;
+
+  Image
+    *floodplane_image = stack->floodplane_image,
+    *const image = stack->image;
+
+  MemoryInfo
+    *segment_info = stack->segment_info;
+
+  SegmentInfo
+    *s = *stack->top;
+
+  SegmentInfo
+    *const segment_stack = stack->segment_stack;
+
+  PushSegmentStack(up,left,right,delta);
+  *stack->top=s;
+  return(MagickTrue);
+}
+
+typedef struct _FloodfillRunPush
+{
+  FloodfillStack
+    stack;
+
+  ssize_t
+    offset,
+    start,
+    x,
+    x2,
+    y;
+} FloodfillRunPush;
+
+static MagickBooleanType PushFloodfillRun(const FloodfillRunPush *push)
+{
+  const FloodfillStack
+    stack = push->stack;
+
+  const ssize_t
+    offset = push->offset,
+    start = push->start,
+    x = push->x,
+    x2 = push->x2,
+    y = push->y;
+
+  {
+    const FloodfillSegment
+      segment = { y, start, x-1, offset };
+
+    if (PushFloodfillSegment(&stack,&segment) == MagickFalse)
+      return(MagickFalse);
+  }
+  if (x > (x2+1))
+    {
+      const FloodfillSegment
+        segment = { y, x2+1, x-1, -offset };
+
+      if (PushFloodfillSegment(&stack,&segment) == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+typedef struct _FloodfillSegmentScan
+{
+  FloodfillAdvance
+    advance;
+
+  FloodfillRow
+    row;
+
+  FloodfillStack
+    stack;
+
+  ssize_t
+    offset,
+    x1,
+    x2,
+    y;
+} FloodfillSegmentScan;
+
+static MagickBooleanType PushFloodfillLeft(const FloodfillSegmentScan *scan,
+  const FloodfillAdvance *advance)
+{
+  const FloodfillStack
+    stack = scan->stack;
+
+  const ssize_t
+    offset = scan->offset,
+    x1 = scan->x1,
+    y = scan->y;
+
+  MagickBooleanType
+    *const skip = advance->skip;
+
+  ssize_t
+    *const start = advance->start,
+    *const x = advance->x;
+
+  (*skip)=(*x) >= x1 ? MagickTrue : MagickFalse;
+  if ((*skip) == MagickFalse)
+    {
+      (*start)=(*x)+1;
+      if ((*start) < x1)
+        {
+          const FloodfillSegment
+            segment = { y, (*start), x1-1, -offset };
+
+          if (PushFloodfillSegment(&stack,&segment) == MagickFalse)
+            return(MagickFalse);
+        }
+      (*x)=x1+1;
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType FillFloodplaneRuns(const FloodfillSegmentScan *scan,
+  const FloodfillAdvance *targets)
+{
+  const FloodfillAdvance
+    advance = scan->advance;
+
+  const FloodfillRow
+    row = scan->row;
+
+  const FloodfillStack
+    stack = scan->stack;
+
+  const ssize_t
+    offset = scan->offset,
+    x2 = scan->x2,
+    y = scan->y;
+
+  MagickBooleanType
+    *const skip = targets->skip;
+
+  ssize_t
+    *const start = targets->start,
+    *const x = targets->x;
+
+  do
+  {
+    if ((*skip) == MagickFalse)
+      {
+        if (FillFloodplaneRun(&row,x) == MagickFalse)
+          break;
+        {
+          const FloodfillRunPush
+            push = { stack, offset, (*start), (*x), x2, y };
+
+          if (PushFloodfillRun(&push) == MagickFalse)
+            return(MagickFalse);
+        }
+      }
+    if (AdvanceFloodfillRun(&row,x2,&advance) == MagickFalse)
+      break;
+  } while ((*x) <= x2);
+  return(MagickTrue);
+}
+
+typedef struct _FloodfillSegments
+{
+  Image
+    *image,
+    *floodplane_image;
+
+  CacheView
+    *floodplane_view,
+    *image_view;
+
+  const PixelInfo
+    *target;
+
+  MagickBooleanType
+    invert;
+
+  ExceptionInfo
+    *exception;
+
+  MemoryInfo
+    *segment_info;
+
+  SegmentInfo
+    *segment_stack,
+    *s;
+
+  ssize_t
+    start,
+    x_offset,
+    y_offset;
+} FloodfillSegments;
+
+static MagickBooleanType PushFloodfillSeeds(const FloodfillSegments *segments,
+  const FloodfillStack *stack)
+{
+  {
+    const FloodfillSegment
+      segment = { segments->y_offset, segments->x_offset, segments->x_offset,
+        1 };
+
+    if (PushFloodfillSegment(stack,&segment) == MagickFalse)
+      return(MagickFalse);
+  }
+  {
+    const FloodfillSegment
+      segment = { segments->y_offset+1, segments->x_offset,
+        segments->x_offset, -1 };
+
+    if (PushFloodfillSegment(stack,&segment) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType FillFloodplaneSegments(
+  const FloodfillSegments *segments)
+{
+  FloodfillStack
+    stack;
+
+  MagickBooleanType
+    skip;
+
+  SegmentInfo
+    *s = segments->s;
+
+  ssize_t
+    offset,
+    start = segments->start,
+    x1,
+    x2,
+    y;
+
+  stack.image=segments->image;
+  stack.floodplane_image=segments->floodplane_image;
+  stack.floodplane_view=segments->floodplane_view;
+  stack.image_view=segments->image_view;
+  stack.exception=segments->exception;
+  stack.segment_info=segments->segment_info;
+  stack.segment_stack=segments->segment_stack;
+  stack.top=&s;
+  if (PushFloodfillSeeds(segments,&stack) == MagickFalse)
+    return(MagickFalse);
+  while (s > segments->segment_stack)
+  {
+    FloodfillRow
+      row;
+
+    FloodfillSegmentScan
+      scan;
+
+    ssize_t
+      x;
+
+    const FloodfillAdvance
+      advance = { &skip, &start, &x };
+
+    /*
+      Pop segment off stack.
+    */
+    s--;
+    x1=(ssize_t) s->x1;
+    x2=(ssize_t) s->x2;
+    offset=(ssize_t) s->y2;
+    y=(ssize_t) s->y1+offset;
+    /*
+      Recolor neighboring pixels.
+    */
+    row.image=segments->image;
+    row.floodplane_image=segments->floodplane_image;
+    row.image_view=segments->image_view;
+    row.floodplane_view=segments->floodplane_view;
+    row.target=segments->target;
+    row.invert=segments->invert;
+    row.y=y;
+    row.exception=segments->exception;
+    scan.advance=advance;
+    scan.row=row;
+    scan.stack=stack;
+    scan.offset=offset;
+    scan.x1=x1;
+    scan.x2=x2;
+    scan.y=y;
+    if (FillFloodplaneLeft(&row,x1,&x) == MagickFalse)
+      break;
+    if (PushFloodfillLeft(&scan,&advance) == MagickFalse)
+      return(MagickFalse);
+    if (FillFloodplaneRuns(&scan,&advance) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
+  const DrawInfo *draw_info,const PixelInfo *target,const ssize_t x_offset,
+  const ssize_t y_offset,const MagickBooleanType invert,
+  ExceptionInfo *exception)
+{
   CacheView
     *floodplane_view,
     *image_view;
@@ -554,11 +891,7 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
     *floodplane_image;
 
   MagickBooleanType
-    skip,
     status;
-
-  FloodfillPlane
-    plane;
 
   MemoryInfo
     *segment_info;
@@ -573,11 +906,7 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
     *segment_stack;
 
   ssize_t
-    offset,
-    start,
-    x1,
-    x2,
-    y;
+    start;
 
   /*
     Check boundary conditions.
@@ -614,69 +943,22 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
   GetPixelInfo(image,&pixel);
   image_view=AcquireVirtualCacheView(image,exception);
   floodplane_view=AcquireAuthenticCacheView(floodplane_image,exception);
-  PushSegmentStack(y_offset,x_offset,x_offset,1);
-  PushSegmentStack(y_offset+1,x_offset,x_offset,-1);
-  while (s > segment_stack)
   {
-    FloodfillRow
-      row;
+    const FloodfillSegments
+      segments = { image, floodplane_image, floodplane_view, image_view,
+        target, invert, exception, segment_info, segment_stack, s, start,
+        x_offset, y_offset };
 
-    ssize_t
-      x;
-
-    const FloodfillAdvance
-      advance = { &skip, &start, &x };
-
-    /*
-      Pop segment off stack.
-    */
-    s--;
-    x1=(ssize_t) s->x1;
-    x2=(ssize_t) s->x2;
-    offset=(ssize_t) s->y2;
-    y=(ssize_t) s->y1+offset;
-    /*
-      Recolor neighboring pixels.
-    */
-    row.image=image;
-    row.floodplane_image=floodplane_image;
-    row.image_view=image_view;
-    row.floodplane_view=floodplane_view;
-    row.target=target;
-    row.invert=invert;
-    row.y=y;
-    row.exception=exception;
-    if (FillFloodplaneLeft(&row,x1,&x) == MagickFalse)
-      break;
-    skip=x >= x1 ? MagickTrue : MagickFalse;
-    if (skip == MagickFalse)
-      {
-        start=x+1;
-        if (start < x1)
-          PushSegmentStack(y,start,x1-1,-offset);
-        x=x1+1;
-      }
-    do
-    {
-      if (skip == MagickFalse)
-        {
-          if (FillFloodplaneRun(&row,&x) == MagickFalse)
-            break;
-          PushSegmentStack(y,start,x-1,offset);
-          if (x > (x2+1))
-            PushSegmentStack(y,x2+1,x-1,-offset);
-        }
-      if (AdvanceFloodfillRun(&row,x2,&advance) == MagickFalse)
-        break;
-    } while (x <= x2);
+    if (FillFloodplaneSegments(&segments) == MagickFalse)
+      return(MagickFalse);
   }
-  plane.image=image;
-  plane.floodplane_image=floodplane_image;
-  plane.floodplane_view=floodplane_view;
-  plane.image_view=image_view;
-  plane.draw_info=draw_info;
-  plane.exception=exception;
-  status=TileFloodplaneImage(&plane);
+  {
+    const FloodfillPlane
+      plane = { image, floodplane_image, floodplane_view, image_view,
+        draw_info, exception };
+
+    status=TileFloodplaneImage(&plane);
+  }
   floodplane_view=DestroyCacheView(floodplane_view);
   image_view=DestroyCacheView(image_view);
   segment_info=RelinquishVirtualMemory(segment_info);

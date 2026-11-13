@@ -1459,6 +1459,9 @@ typedef struct _DuplicateFrameTrial
 
   ExceptionInfo
     *exception;
+
+  Image
+    *prev_image;
 } DuplicateFrameTrial;
 
 typedef struct _DuplicateFrameTargets
@@ -1471,6 +1474,12 @@ typedef struct _DuplicateFrameTargets
 
   MagickBooleanType
     *cleared;
+
+  Image
+    **bgnd_image;
+
+  ssize_t
+    *i;
 } DuplicateFrameTargets;
 
 static MagickBooleanType TryDuplicateFrame(const DuplicateFrameTrial *trial,
@@ -1704,6 +1713,401 @@ static DisposeType *AcquireFrameDisposals(const Image *image,
   return(disposals);
 }
 
+static MagickBooleanType AreFramesCoalesced(const Image *image,
+  ExceptionInfo *exception)
+{
+  const Image
+    *curr;
+
+  /*
+    Ensure  all the images are the same size.
+  */
+  curr=GetFirstImageInList(image);
+  for (; curr != (Image *) NULL; curr=GetNextImageInList(curr))
+  {
+    if ((curr->columns != image->columns) || (curr->rows != image->rows))
+      {
+        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+          "ImagesAreNotTheSameSize","`%s'",image->filename);
+        return(MagickFalse);
+      }
+
+    if (IsPartialPageFrame(curr,image) != MagickFalse)
+      {
+        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+          "ImagePagesAreNotCoalesced","`%s'",image->filename);
+        return(MagickFalse);
+      }
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType TryPreviousDisposal(
+  const DuplicateFrameTrial *trial,MagickBooleanType cleared)
+{
+  const Image
+    *const curr = trial->curr;
+
+  RectangleInfo
+    *const bounds = trial->bounds;
+
+  DisposeType
+    *const disposals = trial->disposals;
+
+  const ssize_t
+    i = trial->i;
+
+  ExceptionInfo
+    *const exception = trial->exception;
+
+  Image
+    *const prev_image = trial->prev_image;
+
+  const FrameBoundsEntry
+    entry = { bounds, i };
+
+  RectangleInfo
+    try_bounds;
+
+  MagickBooleanType
+    try_cleared;
+
+  /*
+    Compare a none disposal against a previous disposal
+  */
+  try_bounds=CompareImagesBounds(prev_image,curr,CompareAnyLayer,exception);
+  try_cleared=IsBoundsCleared(prev_image,curr,&try_bounds,exception);
+#if DEBUG_OPT_FRAME
+    (void) FormatLocaleFile(stderr, "test_prev: %.17gx%.17g%+.20g%+.20g%s\n",
+         (double) try_bounds.width,(double) try_bounds.height,
+         (double) try_bounds.x,(double) try_bounds.y,
+         try_cleared?"  (pixels were cleared)":"");
+#endif
+  if (IsBetterFrameBounds(try_cleared,cleared,try_bounds,&entry) !=
+      MagickFalse)
+    {
+      cleared=try_cleared;
+      bounds[i]=try_bounds;
+      disposals[i-1]=PreviousDispose;
+#if DEBUG_OPT_FRAME
+            (void) FormatLocaleFile(stderr,"previous: accepted\n");
+          } else {
+            (void) FormatLocaleFile(stderr,"previous: rejected\n");
+#endif
+    }
+  return(cleared);
+}
+
+typedef struct _BackgroundBoundsTargets
+{
+  RectangleInfo
+    *bgnd_bounds,
+    *try_bounds;
+} BackgroundBoundsTargets;
+
+static void ExpandBackgroundBounds(const Image *curr,Image *bgnd_image,
+  ExceptionInfo *exception,const BackgroundBoundsTargets *targets)
+{
+  RectangleInfo
+    *const bgnd_bounds = targets->bgnd_bounds,
+    *const try_bounds = targets->try_bounds;
+
+  /*
+    Straight background disposal failed to clear pixels needed!
+    Lets try expanding the disposal area of the previous frame, to
+    include the pixels that are cleared.  This guaranteed
+    to work, though may not be the most optimized solution.
+  */
+  (*try_bounds)=CompareImagesBounds(curr->previous,curr,CompareClearLayer,exception);
+#if DEBUG_OPT_FRAME
+            (void) FormatLocaleFile(stderr, "expand_clear: %.17gx%.17g%+.20g%+.20g%s\n",
+                (double) try_bounds.width,(double) try_bounds.height,
+                (double) try_bounds.x,(double) try_bounds.y,
+                try_bounds.x<0?"  (no expand necessary)":"");
+#endif
+  (*bgnd_bounds)=ExpandDisposalBounds((*bgnd_bounds),(*try_bounds));
+  ClearBounds(bgnd_image,bgnd_bounds,exception);
+#if DEBUG_OPT_FRAME
+/* Something strange is happening with a specific animation
+ * CompareAnyLayers (normal method) and CompareClearLayers returns the whole
+ * image, which is not possibly correct!  As verified by previous tests.
+ * Something changed beyond the bgnd_bounds clearing.  But without being able
+ * to see, or writet he image at this point it is hard to tell what is wrong!
+ * Only CompareOverlay seemed to return something sensible.
+ */
+            try_bounds=CompareImagesBounds(bgnd_image,curr,CompareClearLayer,exception);
+            (void) FormatLocaleFile(stderr, "expand_ctst: %.17gx%.17g%+.20g%+.20g\n",
+                (double) try_bounds.width,(double) try_bounds.height,
+                (double) try_bounds.x,(double) try_bounds.y );
+            try_bounds=CompareImagesBounds(bgnd_image,curr,CompareAnyLayer,exception);
+            try_cleared=IsBoundsCleared(bgnd_image,curr,&try_bounds,exception);
+            (void) FormatLocaleFile(stderr, "expand_any : %.17gx%.17g%+.20g%+.20g%s\n",
+                (double) try_bounds.width,(double) try_bounds.height,
+                (double) try_bounds.x,(double) try_bounds.y,
+                try_cleared?"   (pixels cleared)":"");
+#endif
+  (*try_bounds)=CompareImagesBounds(bgnd_image,curr,CompareOverlayLayer,exception);
+#if DEBUG_OPT_FRAME
+            try_cleared=IsBoundsCleared(bgnd_image,curr,&try_bounds,exception);
+            (void) FormatLocaleFile(stderr, "expand_test: %.17gx%.17g%+.20g%+.20g%s\n",
+                (double) try_bounds.width,(double) try_bounds.height,
+                (double) try_bounds.x,(double) try_bounds.y,
+                try_cleared?"   (pixels cleared)":"");
+#endif
+}
+
+static MagickBooleanType TryBackgroundDisposal(
+  const DuplicateFrameTrial *trial,const RectangleInfo dup_bounds,
+  const DuplicateFrameTargets *targets)
+{
+  const Image
+    *const curr = trial->curr;
+
+  RectangleInfo
+    *const bounds = trial->bounds;
+
+  DisposeType
+    *const disposals = trial->disposals;
+
+  const ssize_t
+    i = trial->i;
+
+  ExceptionInfo
+    *const exception = trial->exception;
+
+  Image
+    **const bgnd_image = targets->bgnd_image,
+    **const dup_image = targets->dup_image;
+
+  MagickBooleanType
+    *const cleared = targets->cleared;
+
+  RectangleInfo
+    bgnd_bounds,
+    try_bounds;
+
+  MagickBooleanType
+    try_cleared;
+
+  const BackgroundBoundsTargets
+    bgnd_targets = { &bgnd_bounds, &try_bounds };
+
+  /*
+    Now compare against a simple background disposal
+  */
+  if (AcquireBackgroundFrame(curr,bgnd_image,exception) == MagickFalse)
+    return(MagickFalse);
+  bgnd_bounds=bounds[i-1]; /* interim bounds of the previous image */
+  ClearBounds((*bgnd_image),&bgnd_bounds,exception);
+  try_bounds=CompareImagesBounds((*bgnd_image),curr,CompareAnyLayer,exception);
+  try_cleared=IsBoundsCleared((*bgnd_image),curr,&try_bounds,exception);
+#if DEBUG_OPT_FRAME
+    (void) FormatLocaleFile(stderr, "background: %s\n",
+         try_cleared?"(pixels cleared)":"");
+#endif
+  if ( try_cleared )
+    {
+      ExpandBackgroundBounds(curr,(*bgnd_image),exception,&bgnd_targets);
+    }
+  /*
+    Test if this background dispose is smaller than any of the
+    other methods we tried before this (including duplicated frame)
+  */
+  if ( (*cleared) ||
+        bgnd_bounds.width*bgnd_bounds.height
+          +try_bounds.width*try_bounds.height
+        < bounds[i-1].width*bounds[i-1].height
+            +dup_bounds.width*dup_bounds.height
+            +bounds[i].width*bounds[i].height )
+    {
+      (*cleared)=MagickFalse;
+      bounds[i-1]=bgnd_bounds;
+      bounds[i]=try_bounds;
+      (*dup_image)=DestroyDuplicateImage(disposals,i,(*dup_image));
+      disposals[i-1]=BackgroundDispose;
+#if DEBUG_OPT_FRAME
+    (void) FormatLocaleFile(stderr,"expand_bgnd: accepted\n");
+          } else {
+    (void) FormatLocaleFile(stderr,"expand_bgnd: reject\n");
+#endif
+    }
+  return(MagickTrue);
+}
+
+static void RecordInterimDisposal(const Image *prev_image,
+  DisposeType *disposals,const ssize_t i)
+{
+  assert(prev_image != (Image *) NULL);
+  disposals[i]=disposals[i-1];
+#if DEBUG_OPT_FRAME
+    (void) FormatLocaleFile(stderr, "final   %.17g : %s  %.17gx%.17g%+.20g%+.20g\n",
+         (double) i-1,
+         CommandOptionToMnemonic(MagickDisposeOptions,disposals[i-1]),
+         (double) bounds[i-1].width,(double) bounds[i-1].height,
+         (double) bounds[i-1].x,(double) bounds[i-1].y );
+#endif
+#if DEBUG_OPT_FRAME
+    (void) FormatLocaleFile(stderr, "interim %.17g : %s  %.17gx%.17g%+.20g%+.20g\n",
+         (double) i,
+         CommandOptionToMnemonic(MagickDisposeOptions,disposals[i]),
+         (double) bounds[i].width,(double) bounds[i].height,
+         (double) bounds[i].x,(double) bounds[i].y );
+    (void) FormatLocaleFile(stderr,"\n");
+#endif
+}
+
+typedef struct _FrameListTargets
+{
+  const Image
+    **curr;
+
+  RectangleInfo
+    **bounds;
+
+  DisposeType
+    **disposals;
+} FrameListTargets;
+
+static MagickBooleanType AcquireFrameLists(const Image *image,
+  const MagickBooleanType add_frames,ExceptionInfo *exception,
+  const FrameListTargets *targets)
+{
+  const Image
+    **const curr = targets->curr;
+
+  RectangleInfo
+    **const bounds = targets->bounds;
+
+  DisposeType
+    **const disposals = targets->disposals;
+
+  /*
+    Allocate memory (times 2 if we allow the use of frame duplications)
+  */
+  (*curr)=GetFirstImageInList(image);
+  (*bounds)=AcquireFrameBounds((*curr),add_frames);
+  if ((*bounds) == (RectangleInfo *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+      return(MagickFalse);
+    }
+  (*disposals)=AcquireFrameDisposals(image,add_frames);
+  if ((*disposals) == (DisposeType *) NULL)
+    {
+      (*bounds)=(RectangleInfo *) RelinquishMagickMemory((*bounds));
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType AssumeNoneDisposal(
+  const DuplicateFrameTrial *trial)
+{
+  const Image
+    *const curr = trial->curr;
+
+  RectangleInfo
+    *const bounds = trial->bounds;
+
+  DisposeType
+    *const disposals = trial->disposals;
+
+  const ssize_t
+    i = trial->i;
+
+  ExceptionInfo
+    *const exception = trial->exception;
+
+  MagickBooleanType
+    cleared;
+
+#if DEBUG_OPT_FRAME
+    (void) FormatLocaleFile(stderr,"frame %.17g :-\n",(double) i);
+#endif
+  /*
+    Assume none disposal is the best
+  */
+  bounds[i]=CompareImagesBounds(curr->previous,curr,CompareAnyLayer,exception);
+  cleared=IsBoundsCleared(curr->previous,curr,&bounds[i],exception);
+  disposals[i-1]=NoneDispose;
+#if DEBUG_OPT_FRAME
+    (void) FormatLocaleFile(stderr, "overlay: %.17gx%.17g%+.20g%+.20g%s%s\n",
+         (double) bounds[i].width,(double) bounds[i].height,
+         (double) bounds[i].x,(double) bounds[i].y,
+         bounds[i].x < 0?"  (unchanged)":"",
+         cleared?"  (pixels cleared)":"");
+#endif
+  return(cleared);
+}
+
+typedef enum
+{
+  FrameDisposalChosen,
+  FrameDisposalSkipped,
+  FrameDisposalPreviousFailed,
+  FrameDisposalImagesFailed
+} FrameDisposalExit;
+
+static FrameDisposalExit TryFrameTrials(const DuplicateFrameTrial *trial,
+  const DuplicateFrameTargets *targets)
+{
+  MagickBooleanType
+    *const cleared = targets->cleared;
+
+  RectangleInfo
+    *const dup_bounds = targets->dup_bounds;
+
+  (*cleared)=TryPreviousDisposal(trial,(*cleared));
+
+  /*
+    If we are allowed lets try a complex frame duplication.
+    It is useless if the previous image already clears pixels correctly.
+    This method will always clear all the pixels that need to be cleared.
+  */
+  (*dup_bounds).width=(*dup_bounds).height=0; /* no dup, no pixel added */
+  if (TryDuplicateFrame(trial,targets) == MagickFalse)
+    return(FrameDisposalPreviousFailed);
+  if (TryBackgroundDisposal(trial,(*dup_bounds),targets) == MagickFalse)
+    return(FrameDisposalImagesFailed);
+  return(FrameDisposalChosen);
+}
+
+static FrameDisposalExit SelectFrameDisposal(const DuplicateFrameTrial *trial,
+  const DuplicateFrameTargets *targets)
+{
+  const MagickBooleanType
+    add_frames = trial->add_frames;
+
+  RectangleInfo
+    *const bounds = trial->bounds;
+
+  DisposeType
+    *const disposals = trial->disposals;
+
+  ssize_t
+    *const i = targets->i;
+
+  if ( bounds[(*i)].x < 0 ) {
+    /*
+      Image frame is exactly the same as the previous frame!
+      If not adding frames leave it to be cropped down to a null image.
+      Otherwise mark previous image for deleted, transfering its crop bounds
+      to the current image.
+    */
+    if (MarkDeletedFrame(add_frames,(*i),disposals,bounds) == MagickFalse)
+      {
+        (*i)++;
+        return(FrameDisposalSkipped);
+      }
+  }
+  else
+    return(TryFrameTrials(trial,targets));
+  return(FrameDisposalChosen);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1719,14 +2123,11 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     *bgnd_image;
 
   RectangleInfo
-    try_bounds,
-    bgnd_bounds,
     dup_bounds,
     *bounds;
 
   MagickBooleanType
     add_frames,
-    try_cleared,
     cleared;
 
   ssize_t
@@ -1736,7 +2137,10 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     choice_targets = { &bgnd_image, &prev_image, &dup_image, &i };
 
   const DuplicateFrameTargets
-    targets = { &dup_image, &dup_bounds, &cleared };
+    targets = { &dup_image, &dup_bounds, &cleared, &bgnd_image, &i };
+
+  const FrameListTargets
+    lists = { &curr, &bounds, &disposals };
 
   assert(image != (const Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -1751,31 +2155,10 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     Are we allowed to add/remove frames from animation?
   */
   add_frames=method == OptimizePlusLayer ? MagickTrue : MagickFalse;
-  /*
-    Ensure  all the images are the same size.
-  */
-  curr=GetFirstImageInList(image);
-  for (; curr != (Image *) NULL; curr=GetNextImageInList(curr))
-  {
-    if ((curr->columns != image->columns) || (curr->rows != image->rows))
-      ThrowImageException(OptionError,"ImagesAreNotTheSameSize");
-
-    if (IsPartialPageFrame(curr,image) != MagickFalse)
-      ThrowImageException(OptionError,"ImagePagesAreNotCoalesced");
-  }
-  /*
-    Allocate memory (times 2 if we allow the use of frame duplications)
-  */
-  curr=GetFirstImageInList(image);
-  bounds=AcquireFrameBounds(curr,add_frames);
-  if (bounds == (RectangleInfo *) NULL)
-    ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-  disposals=AcquireFrameDisposals(image,add_frames);
-  if (disposals == (DisposeType *) NULL)
-    {
-      bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
-      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-    }
+  if (AreFramesCoalesced(image,exception) == MagickFalse)
+    return((Image *) NULL);
+  if (AcquireFrameLists(image,add_frames,exception,&lists) == MagickFalse)
+    return((Image *) NULL);
   /*
     Initialise Previous Image as fully transparent
   */
@@ -1809,156 +2192,23 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   curr=GetNextImageInList(curr);
   for ( ; curr != (const Image *) NULL; curr=GetNextImageInList(curr))
   {
-#if DEBUG_OPT_FRAME
-    (void) FormatLocaleFile(stderr,"frame %.17g :-\n",(double) i);
-#endif
-    /*
-      Assume none disposal is the best
-    */
-    bounds[i]=CompareImagesBounds(curr->previous,curr,CompareAnyLayer,exception);
-    cleared=IsBoundsCleared(curr->previous,curr,&bounds[i],exception);
-    disposals[i-1]=NoneDispose;
-#if DEBUG_OPT_FRAME
-    (void) FormatLocaleFile(stderr, "overlay: %.17gx%.17g%+.20g%+.20g%s%s\n",
-         (double) bounds[i].width,(double) bounds[i].height,
-         (double) bounds[i].x,(double) bounds[i].y,
-         bounds[i].x < 0?"  (unchanged)":"",
-         cleared?"  (pixels cleared)":"");
-#endif
-    if ( bounds[i].x < 0 ) {
-      /*
-        Image frame is exactly the same as the previous frame!
-        If not adding frames leave it to be cropped down to a null image.
-        Otherwise mark previous image for deleted, transfering its crop bounds
-        to the current image.
-      */
-      if (MarkDeletedFrame(add_frames,i,disposals,bounds) == MagickFalse)
-        {
-          i++;
-          continue;
-        }
+    const DuplicateFrameTrial
+      trial = { add_frames, curr, bounds, disposals, i, exception,
+        prev_image };
+
+    cleared=AssumeNoneDisposal(&trial);
+    switch (SelectFrameDisposal(&trial,&targets))
+    {
+      case FrameDisposalSkipped:
+        continue;
+      case FrameDisposalPreviousFailed:
+        return(ReleaseFrameListsAndPrevious(bounds,disposals,prev_image));
+      case FrameDisposalImagesFailed:
+        return(ReleaseFrameListsAndImages(bounds,disposals,prev_image,
+          dup_image));
+      default:
+        break;
     }
-    else
-      {
-        const DuplicateFrameTrial
-          trial = { add_frames, curr, bounds, disposals, i, exception };
-
-        const FrameBoundsEntry
-          entry = { bounds, i };
-
-        /*
-          Compare a none disposal against a previous disposal
-        */
-        try_bounds=CompareImagesBounds(prev_image,curr,CompareAnyLayer,exception);
-        try_cleared=IsBoundsCleared(prev_image,curr,&try_bounds,exception);
-#if DEBUG_OPT_FRAME
-    (void) FormatLocaleFile(stderr, "test_prev: %.17gx%.17g%+.20g%+.20g%s\n",
-         (double) try_bounds.width,(double) try_bounds.height,
-         (double) try_bounds.x,(double) try_bounds.y,
-         try_cleared?"  (pixels were cleared)":"");
-#endif
-        if (IsBetterFrameBounds(try_cleared,cleared,try_bounds,&entry) !=
-            MagickFalse)
-          {
-            cleared=try_cleared;
-            bounds[i]=try_bounds;
-            disposals[i-1]=PreviousDispose;
-#if DEBUG_OPT_FRAME
-            (void) FormatLocaleFile(stderr,"previous: accepted\n");
-          } else {
-            (void) FormatLocaleFile(stderr,"previous: rejected\n");
-#endif
-          }
-
-        /*
-          If we are allowed lets try a complex frame duplication.
-          It is useless if the previous image already clears pixels correctly.
-          This method will always clear all the pixels that need to be cleared.
-        */
-        dup_bounds.width=dup_bounds.height=0; /* no dup, no pixel added */
-        if (TryDuplicateFrame(&trial,&targets) == MagickFalse)
-          return(ReleaseFrameListsAndPrevious(bounds,disposals,prev_image));
-        /*
-          Now compare against a simple background disposal
-        */
-        if (AcquireBackgroundFrame(curr,&bgnd_image,exception) == MagickFalse)
-          return(ReleaseFrameListsAndImages(bounds,disposals,prev_image,dup_image));
-        bgnd_bounds=bounds[i-1]; /* interim bounds of the previous image */
-        ClearBounds(bgnd_image,&bgnd_bounds,exception);
-        try_bounds=CompareImagesBounds(bgnd_image,curr,CompareAnyLayer,exception);
-        try_cleared=IsBoundsCleared(bgnd_image,curr,&try_bounds,exception);
-#if DEBUG_OPT_FRAME
-    (void) FormatLocaleFile(stderr, "background: %s\n",
-         try_cleared?"(pixels cleared)":"");
-#endif
-        if ( try_cleared )
-          {
-            /*
-              Straight background disposal failed to clear pixels needed!
-              Lets try expanding the disposal area of the previous frame, to
-              include the pixels that are cleared.  This guaranteed
-              to work, though may not be the most optimized solution.
-            */
-            try_bounds=CompareImagesBounds(curr->previous,curr,CompareClearLayer,exception);
-#if DEBUG_OPT_FRAME
-            (void) FormatLocaleFile(stderr, "expand_clear: %.17gx%.17g%+.20g%+.20g%s\n",
-                (double) try_bounds.width,(double) try_bounds.height,
-                (double) try_bounds.x,(double) try_bounds.y,
-                try_bounds.x<0?"  (no expand necessary)":"");
-#endif
-            bgnd_bounds=ExpandDisposalBounds(bgnd_bounds,try_bounds);
-            ClearBounds(bgnd_image,&bgnd_bounds,exception);
-#if DEBUG_OPT_FRAME
-/* Something strange is happening with a specific animation
- * CompareAnyLayers (normal method) and CompareClearLayers returns the whole
- * image, which is not possibly correct!  As verified by previous tests.
- * Something changed beyond the bgnd_bounds clearing.  But without being able
- * to see, or writet he image at this point it is hard to tell what is wrong!
- * Only CompareOverlay seemed to return something sensible.
- */
-            try_bounds=CompareImagesBounds(bgnd_image,curr,CompareClearLayer,exception);
-            (void) FormatLocaleFile(stderr, "expand_ctst: %.17gx%.17g%+.20g%+.20g\n",
-                (double) try_bounds.width,(double) try_bounds.height,
-                (double) try_bounds.x,(double) try_bounds.y );
-            try_bounds=CompareImagesBounds(bgnd_image,curr,CompareAnyLayer,exception);
-            try_cleared=IsBoundsCleared(bgnd_image,curr,&try_bounds,exception);
-            (void) FormatLocaleFile(stderr, "expand_any : %.17gx%.17g%+.20g%+.20g%s\n",
-                (double) try_bounds.width,(double) try_bounds.height,
-                (double) try_bounds.x,(double) try_bounds.y,
-                try_cleared?"   (pixels cleared)":"");
-#endif
-            try_bounds=CompareImagesBounds(bgnd_image,curr,CompareOverlayLayer,exception);
-#if DEBUG_OPT_FRAME
-            try_cleared=IsBoundsCleared(bgnd_image,curr,&try_bounds,exception);
-            (void) FormatLocaleFile(stderr, "expand_test: %.17gx%.17g%+.20g%+.20g%s\n",
-                (double) try_bounds.width,(double) try_bounds.height,
-                (double) try_bounds.x,(double) try_bounds.y,
-                try_cleared?"   (pixels cleared)":"");
-#endif
-          }
-        /*
-          Test if this background dispose is smaller than any of the
-          other methods we tried before this (including duplicated frame)
-        */
-        if ( cleared ||
-              bgnd_bounds.width*bgnd_bounds.height
-                +try_bounds.width*try_bounds.height
-              < bounds[i-1].width*bounds[i-1].height
-                  +dup_bounds.width*dup_bounds.height
-                  +bounds[i].width*bounds[i].height )
-          {
-            cleared=MagickFalse;
-            bounds[i-1]=bgnd_bounds;
-            bounds[i]=try_bounds;
-            dup_image=DestroyDuplicateImage(disposals,i,dup_image);
-            disposals[i-1]=BackgroundDispose;
-#if DEBUG_OPT_FRAME
-    (void) FormatLocaleFile(stderr,"expand_bgnd: accepted\n");
-          } else {
-    (void) FormatLocaleFile(stderr,"expand_bgnd: reject\n");
-#endif
-          }
-      }
     /*
        Finalise choice of dispose, set new prev_image,
        and junk any extra images as appropriate,
@@ -1970,23 +2220,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
       if (FinaliseDisposeChoice(&choice,&choice_targets) == MagickFalse)
         return(ReleaseFrameLists(bounds,disposals));
     }
-    assert(prev_image != (Image *) NULL);
-    disposals[i]=disposals[i-1];
-#if DEBUG_OPT_FRAME
-    (void) FormatLocaleFile(stderr, "final   %.17g : %s  %.17gx%.17g%+.20g%+.20g\n",
-         (double) i-1,
-         CommandOptionToMnemonic(MagickDisposeOptions,disposals[i-1]),
-         (double) bounds[i-1].width,(double) bounds[i-1].height,
-         (double) bounds[i-1].x,(double) bounds[i-1].y );
-#endif
-#if DEBUG_OPT_FRAME
-    (void) FormatLocaleFile(stderr, "interim %.17g : %s  %.17gx%.17g%+.20g%+.20g\n",
-         (double) i,
-         CommandOptionToMnemonic(MagickDisposeOptions,disposals[i]),
-         (double) bounds[i].width,(double) bounds[i].height,
-         (double) bounds[i].x,(double) bounds[i].y );
-    (void) FormatLocaleFile(stderr,"\n");
-#endif
+    RecordInterimDisposal(prev_image,disposals,i);
     i++;
   }
   prev_image=DestroyImage(prev_image);

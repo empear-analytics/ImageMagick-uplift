@@ -46,6 +46,7 @@ $call Make color-equivalent.c
 $call Make colormap.c
 $call Make colorspace.c
 $call Make colorspace-transform.c
+$call Make colorspace-transform-image.c
 $call Make colorspace-convert.c
 $call Make colorspace-generic-rgb.c
 $call Make compare.c
@@ -70,7 +71,9 @@ $call Make effect-filter.c
 $call Make effect-preview.c
 $call Make effect-blur.c
 $call Make effect-blur-adaptive.c
+$call Make effect-blur-adaptive-filters.c
 $call Make enhance.c
+$call Make enhance-color.c
 $call Make enhance-clahe.c
 $call Make enhance-tone.c
 $call Make enhance-level-colors.c
@@ -107,6 +110,7 @@ $call Make montage.c
 $call Make montage-info.c
 $call Make morphology.c
 $call Make opencl.c
+$call Make opencl-device.c
 $call Make option.c
 $call Make paint.c
 $call Make paint-floodfill.c
@@ -172,6 +176,8 @@ $call Make vms.c
 $call Make widget.c
 $call Make xml-tree.c
 $call Make xwindow.c
+$call Make xwindow-visual.c
+$call Make xwindow-import.c
 $ set default [-.filters]
 $ call Make analyze.c
 $ set default [-.magickwand]

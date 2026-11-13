@@ -975,6 +975,127 @@ static inline MagickBooleanType IsDoctypeEnd(const char *q,
   return(((*q == '>') && (bracket_depth == 0)) ? MagickTrue : MagickFalse);
 }
 
+static const char *SkipOpenCLBenchmarkDoctype(const char *q)
+{
+  int
+    bracket_depth = 0,
+    quote = 0;
+
+  /*
+    DOCTYPE element.
+  */
+  for ( ; *q != '\0'; q++)
+  {
+    if (quote != 0)
+      quote=EndDoctypeQuote(q,quote);
+    else if (IsDoctypeQuote(q) != MagickFalse)
+      quote=(*q);
+    else if (*q == '[')
+      bracket_depth++;
+    else if (*q == ']')
+      bracket_depth=CloseDoctypeBracket(bracket_depth);
+    else if (IsDoctypeEnd(q,bracket_depth) != MagickFalse)
+      {
+        q++;   /* consume final '>' */
+        break;
+      }
+  }
+  return(q);
+}
+
+typedef struct _OpenCLBenchmarkTokens
+{
+  MagickCLEnv
+    clEnv;
+
+  char
+    *keyword,
+    *token;
+
+  size_t
+    extent;
+} OpenCLBenchmarkTokens;
+
+static void ReadOpenCLBenchmarkAttribute(const OpenCLBenchmarkTokens *tokens,
+  MagickCLDeviceBenchmark **device_benchmark,const char **q)
+{
+  const MagickCLEnv
+    clEnv = tokens->clEnv;
+
+  char
+    *const keyword = tokens->keyword,
+    *const token = tokens->token;
+
+  const size_t
+    extent = tokens->extent;
+
+  if ((*device_benchmark) == (MagickCLDeviceBenchmark *) NULL)
+    return;
+  if (LocaleCompare(keyword,"/>") == 0)
+    {
+      (*device_benchmark)=EndOpenCLDeviceBenchmark(clEnv,(*device_benchmark));
+      return;
+    }
+  (void) GetNextToken((*q),(const char **) NULL,extent,token);
+  if (*token != '=')
+    return;
+  (void) GetNextToken((*q),q,extent,token);
+  (void) GetNextToken((*q),q,extent,token);
+  SetOpenCLBenchmarkAttribute((*device_benchmark),keyword,token);
+}
+
+static MagickBooleanType SkipOpenCLBenchmarkMarkup(const char *keyword,
+  const size_t extent,char *token,const char **q)
+{
+  if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
+    {
+      (*q)=SkipOpenCLBenchmarkDoctype((*q));
+      return(MagickTrue);
+    }
+  if (LocaleNCompare(keyword,"<!--",4) == 0)
+    {
+      /*
+        Comment element.
+      */
+      (*q)=SkipOpenCLBenchmarkComment((*q),extent,token);
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
+static MagickBooleanType ReadOpenCLBenchmarkMarkup(
+  const OpenCLBenchmarkTokens *tokens,const char **q,
+  MagickCLDeviceBenchmark **device_benchmark,MagickBooleanType *broke)
+{
+  char
+    *const keyword = tokens->keyword,
+    *const token = tokens->token;
+
+  const size_t
+    extent = tokens->extent;
+
+  (*broke)=MagickFalse;
+  if (SkipOpenCLBenchmarkMarkup(keyword,extent,token,q) != MagickFalse)
+    return(MagickFalse);
+  if (LocaleCompare(keyword,"<device") == 0)
+    {
+      /*
+        Device element.
+      */
+      (*device_benchmark)=(MagickCLDeviceBenchmark *) AcquireQuantumMemory(1,
+        sizeof(**device_benchmark));
+      if ((*device_benchmark) == (MagickCLDeviceBenchmark *) NULL)
+        {
+          (*broke)=MagickTrue;
+          return(MagickTrue);
+        }
+      (void) memset((*device_benchmark),0,sizeof(**device_benchmark));
+      (*device_benchmark)->score=MAGICKCORE_OPENCL_UNDEFINED_SCORE;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
 {
   char
@@ -983,6 +1104,9 @@ static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
 
   const char
     *q;
+
+  MagickBooleanType
+    broke = MagickFalse;
 
   MagickCLDeviceBenchmark
     *device_benchmark;
@@ -997,6 +1121,9 @@ static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
   extent=strlen(token)+MagickPathExtent;
   for (q=(char *) xml; *q != '\0'; )
   {
+    OpenCLBenchmarkTokens
+      tokens;
+
     /*
       Interpret XML.
     */
@@ -1004,73 +1131,16 @@ static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
     if (*token == '\0')
       break;
     (void) CopyMagickString(keyword,token,MagickPathExtent);
-    if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
-      {
-        int
-          bracket_depth = 0,
-          quote = 0;
-
-        /*
-          DOCTYPE element.
-        */
-        for ( ; *q != '\0'; q++)
-        {
-          if (quote != 0)
-            quote=EndDoctypeQuote(q,quote);
-          else
-            {
-              if (IsDoctypeQuote(q) != MagickFalse)
-                quote=(*q);
-              else
-                if (*q == '[')
-                  bracket_depth++;
-                else
-                  if (*q == ']')
-                    bracket_depth=CloseDoctypeBracket(bracket_depth);
-                  else
-                    if (IsDoctypeEnd(q,bracket_depth) != MagickFalse)
-                      {
-                        q++;   /* consume final '>' */
-                        break;
-                      }
-            }
-        }
-        continue;
-      }
-    if (LocaleNCompare(keyword,"<!--",4) == 0)
-      {
-        /*
-          Comment element.
-        */
-        q=SkipOpenCLBenchmarkComment(q,extent,token);
-        continue;
-      }
-    if (LocaleCompare(keyword,"<device") == 0)
-      {
-        /*
-          Device element.
-        */
-        device_benchmark=(MagickCLDeviceBenchmark *) AcquireQuantumMemory(1,
-          sizeof(*device_benchmark));
-        if (device_benchmark == (MagickCLDeviceBenchmark *) NULL)
-          break;
-        (void) memset(device_benchmark,0,sizeof(*device_benchmark));
-        device_benchmark->score=MAGICKCORE_OPENCL_UNDEFINED_SCORE;
-        continue;
-      }
-    if (device_benchmark == (MagickCLDeviceBenchmark *) NULL)
+    tokens.clEnv=clEnv;
+    tokens.keyword=keyword;
+    tokens.token=token;
+    tokens.extent=extent;
+    if (ReadOpenCLBenchmarkMarkup(&tokens,&q,&device_benchmark,&broke) ==
+        MagickFalse)
       continue;
-    if (LocaleCompare(keyword,"/>") == 0)
-      {
-        device_benchmark=EndOpenCLDeviceBenchmark(clEnv,device_benchmark);
-        continue;
-      }
-    (void) GetNextToken(q,(const char **) NULL,extent,token);
-    if (*token != '=')
-      continue;
-    (void) GetNextToken(q,&q,extent,token);
-    (void) GetNextToken(q,&q,extent,token);
-    SetOpenCLBenchmarkAttribute(device_benchmark,keyword,token);
+    if (broke != MagickFalse)
+      break;
+    ReadOpenCLBenchmarkAttribute(&tokens,&device_benchmark,&q);
   }
   token=(char *) RelinquishMagickMemory(token);
   device_benchmark=RelinquishDeviceBenchmark(device_benchmark);
@@ -1377,17 +1447,38 @@ static void CacheOpenCLBenchmarks(MagickCLEnv clEnv)
   fclose(cache_file);
 }
 
-static void BenchmarkOpenCLDevices(MagickCLEnv clEnv)
+static void BenchmarkOpenCLDevice(MagickCLEnv clEnv,MagickCLEnv testEnv,
+  const size_t i)
 {
   MagickCLDevice
     device;
 
+  size_t
+    j;
+
+  device=clEnv->devices[i];
+  if (device->score == MAGICKCORE_OPENCL_UNDEFINED_SCORE)
+    RunDeviceBenchmark(clEnv,testEnv,device);
+
+  /* Set the score on all the other devices that are the same */
+  for (j = i+1; j < clEnv->number_devices; j++)
+  {
+    MagickCLDevice
+      other_device;
+
+    other_device=clEnv->devices[j];
+    if (IsSameOpenCLDevice(device,other_device))
+      other_device->score=device->score;
+  }
+}
+
+static void BenchmarkOpenCLDevices(MagickCLEnv clEnv)
+{
   MagickCLEnv
     testEnv;
 
   size_t
-    i,
-    j;
+    i;
 
   (void) LogMagickEvent(AccelerateEvent,GetMagickModule(),
     "Starting benchmark");
@@ -1403,22 +1494,7 @@ static void BenchmarkOpenCLDevices(MagickCLEnv clEnv)
     clEnv->devices[i]->score=MAGICKCORE_OPENCL_UNDEFINED_SCORE;
 
   for (i = 0; i < clEnv->number_devices; i++)
-  {
-    device=clEnv->devices[i];
-    if (device->score == MAGICKCORE_OPENCL_UNDEFINED_SCORE)
-      RunDeviceBenchmark(clEnv,testEnv,device);
-
-    /* Set the score on all the other devices that are the same */
-    for (j = i+1; j < clEnv->number_devices; j++)
-    {
-      MagickCLDevice
-        other_device;
-
-      other_device=clEnv->devices[j];
-      if (IsSameOpenCLDevice(device,other_device))
-        other_device->score=device->score;
-    }
-  }
+    BenchmarkOpenCLDevice(clEnv,testEnv,i);
 
   testEnv->enabled=MagickFalse;
   default_CLEnv=testEnv;
@@ -2039,319 +2115,6 @@ MagickPrivate MagickCLEnv GetCurrentOpenCLEnv(void)
   return(default_CLEnv);
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   G e t O p e n C L D e v i c e B e n c h m a r k D u r a t i o n           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  GetOpenCLDeviceBenchmarkScore() returns the score of the benchmark for the
-%  device. The score is determined by the duration of the micro benchmark so
-%  that means a lower score is better than a higher score.
-%
-%  The format of the GetOpenCLDeviceBenchmarkScore method is:
-%
-%      double GetOpenCLDeviceBenchmarkScore(const MagickCLDevice device)
-%
-%  A description of each parameter follows:
-%
-%    o device: the OpenCL device.
-*/
-
-MagickExport double GetOpenCLDeviceBenchmarkScore(
-  const MagickCLDevice device)
-{
-  if (device == (MagickCLDevice) NULL)
-    return(MAGICKCORE_OPENCL_UNDEFINED_SCORE);
-  return(device->score);
-}
-
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   G e t O p e n C L D e v i c e E n a b l e d                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  GetOpenCLDeviceEnabled() returns true if the device is enabled.
-%
-%  The format of the GetOpenCLDeviceEnabled method is:
-%
-%      MagickBooleanType GetOpenCLDeviceEnabled(const MagickCLDevice device)
-%
-%  A description of each parameter follows:
-%
-%    o device: the OpenCL device.
-*/
-
-MagickExport MagickBooleanType GetOpenCLDeviceEnabled(
-  const MagickCLDevice device)
-{
-  if (device == (MagickCLDevice) NULL)
-    return(MagickFalse);
-  return(device->enabled);
-}
-
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   G e t O p e n C L D e v i c e N a m e                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  GetOpenCLDeviceName() returns the name of the device.
-%
-%  The format of the GetOpenCLDeviceName method is:
-%
-%      const char *GetOpenCLDeviceName(const MagickCLDevice device)
-%
-%  A description of each parameter follows:
-%
-%    o device: the OpenCL device.
-*/
-
-MagickExport const char *GetOpenCLDeviceName(const MagickCLDevice device)
-{
-  if (device == (MagickCLDevice) NULL)
-    return((const char *) NULL);
-  return(device->name);
-}
-
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   G e t O p e n C L D e v i c e V e n d o r N a m e                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  GetOpenCLDeviceVendorName() returns the vendor name of the device.
-%
-%  The format of the GetOpenCLDeviceVendorName method is:
-%
-%      const char *GetOpenCLDeviceVendorName(const MagickCLDevice device)
-%
-%  A description of each parameter follows:
-%
-%    o device: the OpenCL device.
-*/
-
-MagickExport const char *GetOpenCLDeviceVendorName(const MagickCLDevice device)
-{
-  if (device == (MagickCLDevice) NULL)
-    return((const char *) NULL);
-  return(device->vendor_name);
-}
-
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   G e t O p e n C L D e v i c e s                                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  GetOpenCLDevices() returns the devices of the OpenCL environment at sets the
-%  value of length to the number of devices that are available.
-%
-%  The format of the GetOpenCLDevices method is:
-%
-%      const MagickCLDevice *GetOpenCLDevices(size_t *length,
-%        ExceptionInfo *exception)
-%
-%  A description of each parameter follows:
-%
-%    o length: the number of device.
-%
-%    o exception: return any errors or warnings in this structure.
-%
-*/
-
-MagickExport MagickCLDevice *GetOpenCLDevices(size_t *length,
-  ExceptionInfo *exception)
-{
-  MagickCLEnv
-    clEnv;
-
-  clEnv=GetCurrentOpenCLEnv();
-  if (clEnv == (MagickCLEnv) NULL)
-    {
-      if (length != (size_t *) NULL)
-        *length=0;
-      return((MagickCLDevice *) NULL);
-    }
-  InitializeOpenCL(clEnv,exception);
-  if (length != (size_t *) NULL)
-    *length=clEnv->number_devices;
-  return(clEnv->devices);
-}
-
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   G e t O p e n C L D e v i c e T y p e                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  GetOpenCLDeviceType() returns the type of the device.
-%
-%  The format of the GetOpenCLDeviceType method is:
-%
-%      MagickCLDeviceType GetOpenCLDeviceType(const MagickCLDevice device)
-%
-%  A description of each parameter follows:
-%
-%    o device: the OpenCL device.
-*/
-
-MagickExport MagickCLDeviceType GetOpenCLDeviceType(
-  const MagickCLDevice device)
-{
-  if (device == (MagickCLDevice) NULL)
-    return(UndefinedCLDeviceType);
-  if (device->type == CL_DEVICE_TYPE_GPU)
-    return(GpuCLDeviceType);
-  if (device->type == CL_DEVICE_TYPE_CPU)
-    return(CpuCLDeviceType);
-  return(UndefinedCLDeviceType);
-}
-
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   G e t O p e n C L D e v i c e V e r s i o n                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  GetOpenCLDeviceVersion() returns the version of the device.
-%
-%  The format of the GetOpenCLDeviceName method is:
-%
-%      const char *GetOpenCLDeviceVersion(MagickCLDevice device)
-%
-%  A description of each parameter follows:
-%
-%    o device: the OpenCL device.
-*/
-
-MagickExport const char *GetOpenCLDeviceVersion(const MagickCLDevice device)
-{
-  if (device == (MagickCLDevice) NULL)
-    return((const char *) NULL);
-  return(device->version);
-}
-
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   G e t O p e n C L E n a b l e d                                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  GetOpenCLEnabled() returns true if OpenCL acceleration is enabled.
-%
-%  The format of the GetOpenCLEnabled method is:
-%
-%      MagickBooleanType GetOpenCLEnabled()
-%
-*/
-
-static MagickBooleanType HasCurrentOpenCLEnv(MagickCLEnv *clEnv)
-{
-  *clEnv=GetCurrentOpenCLEnv();
-  if (*clEnv == (MagickCLEnv) NULL)
-    return(MagickFalse);
-  return(MagickTrue);
-}
-
-MagickExport MagickBooleanType GetOpenCLEnabled(void)
-{
-  MagickCLEnv
-    clEnv;
-
-  if (HasCurrentOpenCLEnv(&clEnv) == MagickFalse)
-    return(MagickFalse);
-  return(clEnv->enabled);
-}
-
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   G e t O p e n C L K e r n e l P r o f i l e R e c o r d s                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  GetOpenCLKernelProfileRecords() returns the profile records for the
-%  specified device and sets length to the number of profile records.
-%
-%  The format of the GetOpenCLKernelProfileRecords method is:
-%
-%      const KernelProfileRecord *GetOpenCLKernelProfileRecords(size *length)
-%
-%  A description of each parameter follows:
-%
-%    o length: the number of profiles records.
-*/
-
-static void CountKernelProfileRecords(const MagickCLDevice device,
-  size_t *length)
-{
-  *length=0;
-  LockSemaphoreInfo(device->lock);
-  while (device->profile_records[*length] != (KernelProfileRecord) NULL)
-    *length=*length+1;
-  UnlockSemaphoreInfo(device->lock);
-}
-
-MagickExport const KernelProfileRecord *GetOpenCLKernelProfileRecords(
-  const MagickCLDevice device,size_t *length)
-{
-  if ((device == (const MagickCLDevice) NULL) || (device->profile_records ==
-      (KernelProfileRecord *) NULL))
-  {
-    if (length != (size_t *) NULL)
-      *length=0;
-    return((const KernelProfileRecord *) NULL);
-  }
-  if (length != (size_t *) NULL)
-    CountKernelProfileRecords(device,length);
-  return(device->profile_records);
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3603,188 +3366,5 @@ MagickPrivate MagickCLDevice RequestOpenCLDevice(MagickCLEnv clEnv)
   return(device);
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   S e t O p e n C L D e v i c e E n a b l e d                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  SetOpenCLDeviceEnabled() can be used to enable or disabled the device.
-%
-%  The format of the SetOpenCLDeviceEnabled method is:
-%
-%      void SetOpenCLDeviceEnabled(MagickCLDevice device,
-%        MagickBooleanType value)
-%
-%  A description of each parameter follows:
-%
-%    o device: the OpenCL device.
-%
-%    o value: determines if the device should be enabled or disabled.
-*/
-
-MagickExport void SetOpenCLDeviceEnabled(MagickCLDevice device,
-  const MagickBooleanType value)
-{
-  if (device == (MagickCLDevice) NULL)
-    return;
-  device->enabled=value;
-}
-
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   S e t O p e n C L K e r n e l P r o f i l e E n a b l e d                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  SetOpenCLKernelProfileEnabled() can be used to enable or disabled the
-%  kernel profiling of a device.
-%
-%  The format of the SetOpenCLKernelProfileEnabled method is:
-%
-%      void SetOpenCLKernelProfileEnabled(MagickCLDevice device,
-%        MagickBooleanType value)
-%
-%  A description of each parameter follows:
-%
-%    o device: the OpenCL device.
-%
-%    o value: determines if kernel profiling for the device should be enabled
-%             or disabled.
-*/
-
-MagickExport void SetOpenCLKernelProfileEnabled(MagickCLDevice device,
-  const MagickBooleanType value)
-{
-  if (device == (MagickCLDevice) NULL)
-    return;
-  device->profile_kernels=value;
-}
-
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   S e t O p e n C L E n a b l e d                                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  SetOpenCLEnabled() can be used to enable or disable OpenCL acceleration.
-%
-%  The format of the SetOpenCLEnabled method is:
-%
-%      void SetOpenCLEnabled(MagickBooleanType)
-%
-%  A description of each parameter follows:
-%
-%    o value: specify true to enable OpenCL acceleration
-*/
-
-MagickExport MagickBooleanType SetOpenCLEnabled(const MagickBooleanType value)
-{
-  MagickCLEnv
-    clEnv;
-
-  clEnv=GetCurrentOpenCLEnv();
-  if (clEnv == (MagickCLEnv) NULL)
-    return(MagickFalse);
-  clEnv->enabled=value;
-  return(clEnv->enabled);
-}
-
 #else
-
-MagickExport double GetOpenCLDeviceBenchmarkScore(
-  const MagickCLDevice magick_unused(device))
-{
-  magick_unreferenced(device);
-  return(0.0);
-}
-
-MagickExport MagickBooleanType GetOpenCLDeviceEnabled(
-  const MagickCLDevice magick_unused(device))
-{
-  magick_unreferenced(device);
-  return(MagickFalse);
-}
-
-MagickExport const char *GetOpenCLDeviceName(
-  const MagickCLDevice magick_unused(device))
-{
-  magick_unreferenced(device);
-  return((const char *) NULL);
-}
-
-MagickExport MagickCLDevice *GetOpenCLDevices(size_t *length,
-  ExceptionInfo *magick_unused(exception))
-{
-  magick_unreferenced(exception);
-  if (length != (size_t *) NULL)
-    *length=0;
-  return((MagickCLDevice *) NULL);
-}
-
-MagickExport MagickCLDeviceType GetOpenCLDeviceType(
-  const MagickCLDevice magick_unused(device))
-{
-  magick_unreferenced(device);
-  return(UndefinedCLDeviceType);
-}
-
-MagickExport const KernelProfileRecord *GetOpenCLKernelProfileRecords(
-  const MagickCLDevice magick_unused(device),size_t *length)
-{
-  magick_unreferenced(device);
-  if (length != (size_t *) NULL)
-    *length=0;
-  return((const KernelProfileRecord *) NULL);
-}
-
-MagickExport const char *GetOpenCLDeviceVersion(
-  const MagickCLDevice magick_unused(device))
-{
-  magick_unreferenced(device);
-  return((const char *) NULL);
-}
-
-MagickExport MagickBooleanType GetOpenCLEnabled(void)
-{
-  return(MagickFalse);
-}
-
-MagickExport void SetOpenCLDeviceEnabled(
-  MagickCLDevice magick_unused(device),
-  const MagickBooleanType magick_unused(value))
-{
-  magick_unreferenced(device);
-  magick_unreferenced(value);
-}
-
-MagickExport MagickBooleanType SetOpenCLEnabled(
-  const MagickBooleanType magick_unused(value))
-{
-  magick_unreferenced(value);
-  return(MagickFalse);
-}
-
-MagickExport void SetOpenCLKernelProfileEnabled(
-  MagickCLDevice magick_unused(device),
-  const MagickBooleanType magick_unused(value))
-{
-  magick_unreferenced(device);
-  magick_unreferenced(value);
-}
 #endif

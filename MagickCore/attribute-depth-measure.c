@@ -303,6 +303,175 @@ static void RaiseImageRowDepthStatus(MagickBooleanType *status,
     (*status)=MagickFalse;
 }
 
+#if !defined(MAGICKCORE_HDRI_SUPPORT)
+typedef struct _DepthMapScan
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  size_t
+    *depth_map;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
+    *current_depth;
+} DepthMapScan;
+
+static void RaiseMappedPixelDepth(const DepthMapScan *scan,const Quantum *p,
+  const int id)
+{
+  const Image
+    *const image = scan->image;
+
+  size_t
+    *const current_depth = scan->current_depth,
+    *const depth_map = scan->depth_map;
+
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,j);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    if (depth_map[ScaleQuantumToMap(p[j])] > current_depth[id])
+      current_depth[id]=depth_map[ScaleQuantumToMap(p[j])];
+  }
+}
+
+static size_t *AcquireDepthMap(void)
+{
+  size_t
+    *depth_map,
+    depth;
+
+  ssize_t
+    i;
+
+  depth_map=(size_t *) AcquireQuantumMemory(MaxMap+1,sizeof(*depth_map));
+  if (depth_map == (size_t *) NULL)
+    ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
+  for (i=0; i <= (ssize_t) MaxMap; i++)
+  {
+    for (depth=1; depth < (size_t) MAGICKCORE_QUANTUM_DEPTH; depth++)
+    {
+      Quantum
+        pixel;
+
+      QuantumAny
+        range;
+
+      range=GetQuantumRange(depth);
+      pixel=(Quantum) i;
+      if (pixel == ScaleAnyToQuantum(ScaleQuantumToAny(pixel,range),range))
+        break;
+    }
+    depth_map[i]=depth;
+  }
+  return(depth_map);
+}
+
+static void RaiseMappedRowDepth(MagickBooleanType *status,
+  const DepthMapScan *scan,const ssize_t y)
+{
+  const int
+    id = GetOpenMPThreadId();
+
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(scan->image_view,0,y,scan->image->columns,1,
+    scan->exception);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) scan->image->columns; x++)
+  {
+    RaiseMappedPixelDepth(scan,p,id);
+    p+=(ptrdiff_t) GetPixelChannels(scan->image);
+  }
+  if (scan->current_depth[id] == MAGICKCORE_QUANTUM_DEPTH)
+    (*status)=MagickFalse;
+}
+
+typedef struct _DepthMapImage
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
+    *current_depth,
+    number_threads;
+
+  MagickBooleanType
+    status;
+} DepthMapImage;
+
+static size_t GetMappedImageDepth(const DepthMapImage *map_image)
+{
+  CacheView
+    *image_view = map_image->image_view;
+
+  const Image
+    *const image = map_image->image;
+
+  ExceptionInfo
+    *const exception = map_image->exception;
+
+  MagickBooleanType
+    status = map_image->status;
+
+  const size_t
+    number_threads = map_image->number_threads;
+
+  size_t
+    *current_depth = map_image->current_depth,
+    *depth_map,
+    depth;
+
+  ssize_t
+    y;
+
+  /*
+    Scale pixels to desired (optimized with depth map).
+  */
+  depth_map=AcquireDepthMap();
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const DepthMapScan
+      scan = { image, image_view, depth_map, exception, current_depth };
+
+    RaiseMappedRowDepth(&status,&scan,y);
+  }
+  image_view=DestroyCacheView(image_view);
+  depth=GetMaximumDepth(current_depth,number_threads);
+  depth_map=(size_t *) RelinquishMagickMemory(depth_map);
+  current_depth=(size_t *) RelinquishMagickMemory(current_depth);
+  return(depth);
+}
+#endif
+
 MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -347,79 +516,11 @@ MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
   if ((1UL*QuantumRange) <= MaxMap)
   RestoreMSCWarning
     {
-      size_t
-        *depth_map;
+      const DepthMapImage
+        map_image = { image, image_view, exception, current_depth,
+          number_threads, status };
 
-      /*
-        Scale pixels to desired (optimized with depth map).
-      */
-      depth_map=(size_t *) AcquireQuantumMemory(MaxMap+1,sizeof(*depth_map));
-      if (depth_map == (size_t *) NULL)
-        ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
-      for (i=0; i <= (ssize_t) MaxMap; i++)
-      {
-        for (depth=1; depth < (size_t) MAGICKCORE_QUANTUM_DEPTH; depth++)
-        {
-          Quantum
-            pixel;
-
-          QuantumAny
-            range;
-
-          range=GetQuantumRange(depth);
-          pixel=(Quantum) i;
-          if (pixel == ScaleAnyToQuantum(ScaleQuantumToAny(pixel,range),range))
-            break;
-        }
-        depth_map[i]=depth;
-      }
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,1)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        const int
-          id = GetOpenMPThreadId();
-
-        const Quantum
-          *magick_restrict p;
-
-        ssize_t
-          x;
-
-        if (status == MagickFalse)
-          continue;
-        p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-        if (p == (const Quantum *) NULL)
-          continue;
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          ssize_t
-            j;
-
-          for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-          {
-            PixelChannel channel = GetPixelChannelChannel(image,j);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            if ((traits & UpdatePixelTrait) == 0)
-              continue;
-            if (depth_map[ScaleQuantumToMap(p[j])] > current_depth[id])
-              current_depth[id]=depth_map[ScaleQuantumToMap(p[j])];
-          }
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (current_depth[id] == MAGICKCORE_QUANTUM_DEPTH)
-          status=MagickFalse;
-      }
-      image_view=DestroyCacheView(image_view);
-      depth=current_depth[0];
-      for (i=1; i < (ssize_t) number_threads; i++)
-        if (depth < current_depth[i])
-          depth=current_depth[i];
-      depth_map=(size_t *) RelinquishMagickMemory(depth_map);
-      current_depth=(size_t *) RelinquishMagickMemory(current_depth);
-      return(depth);
+      return(GetMappedImageDepth(&map_image));
     }
 #endif
   /*

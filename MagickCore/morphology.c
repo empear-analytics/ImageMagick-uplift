@@ -414,6 +414,34 @@ static KernelInfo *FinishKernelArray(KernelInfo *kernel,
   return(kernel);
 }
 
+static MagickBooleanType IsKernelArrayComplete(KernelInfo *kernel,
+  const char *p,const ssize_t i)
+{
+  char
+    token[MagickPathExtent];
+
+  /* sanity check -- no more values in kernel definition */
+  (void) GetNextToken(p,&p,MagickPathExtent,token);
+  if (IsKernelArrayTokenLeft(token) != MagickFalse)
+    return(MagickFalse);
+
+#if 0
+  /* this was the old method of handling a incomplete kernel */
+  if ( i < (ssize_t) (kernel->width*kernel->height) ) {
+    Minimize(kernel->minimum, kernel->values[i]);
+    Maximize(kernel->maximum, kernel->values[i]);
+    for ( ; i < (ssize_t) (kernel->width*kernel->height); i++)
+      kernel->values[i]=0.0;
+  }
+#else
+  /* Number of values for kernel was not enough - Report Error */
+  if ( i < (ssize_t) (kernel->width*kernel->height) )
+    return(MagickFalse);
+#endif
+
+  return(MagickTrue);
+}
+
 static KernelInfo *ParseKernelArray(const char *kernel_string)
 {
   KernelInfo
@@ -477,24 +505,8 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
     SetKernelArrayValue(kernel,i,token,nan);
   }
 
-  /* sanity check -- no more values in kernel definition */
-  (void) GetNextToken(p,&p,MagickPathExtent,token);
-  if (IsKernelArrayTokenLeft(token) != MagickFalse)
+  if (IsKernelArrayComplete(kernel,p,i) == MagickFalse)
     return(DestroyKernelInfo(kernel));
-
-#if 0
-  /* this was the old method of handling a incomplete kernel */
-  if ( i < (ssize_t) (kernel->width*kernel->height) ) {
-    Minimize(kernel->minimum, kernel->values[i]);
-    Maximize(kernel->maximum, kernel->values[i]);
-    for ( ; i < (ssize_t) (kernel->width*kernel->height); i++)
-      kernel->values[i]=0.0;
-  }
-#else
-  /* Number of values for kernel was not enough - Report Error */
-  if ( i < (ssize_t) (kernel->width*kernel->height) )
-    return(DestroyKernelInfo(kernel));
-#endif
 
   return(FinishKernelArray(kernel,flags));
 }
@@ -1480,12 +1492,60 @@ static KernelInfo *AcquireFreiChenEdgeBasisKernel(KernelInfo *kernel,
   return(RotateFreiChenKernel(kernel,args));
 }
 
+typedef struct _FreiChenScaledKernel
+{
+  int
+    key;
+
+  const char
+    *definition;
+
+  double
+    scale;
+} FreiChenScaledKernel;
+
+static const FreiChenScaledKernel
+  FreiChenScaledKernels[] =
+  {
+    { 15, "3: 0,-1,0  1,0,1  0,-1,0", 1.0/2.0 },
+    { 16, "3: 1,0,-1  0,0,0  -1,0,1", 1.0/2.0 },
+    { 17, "3: 1,-2,1  -2,4,-2  -1,-2,1", 1.0/6.0 },
+    { 18, "3: -2,1,-2  1,4,1  -2,1,-2", 1.0/6.0 },
+    { 19, "3: 1,1,1  1,1,1  1,1,1", 1.0/3.0 }
+  };
+
+static const FreiChenScaledKernel *FindFreiChenScaledKernel(const int key)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(FreiChenScaledKernels)/
+       sizeof(*FreiChenScaledKernels)); i++)
+    if (FreiChenScaledKernels[i].key == key)
+      return(FreiChenScaledKernels+i);
+  return((const FreiChenScaledKernel *) NULL);
+}
+
 static KernelInfo *AcquireFreiChenKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
 {
-  switch ( (int) args->rho ) {
+  const FreiChenScaledKernel
+    *scaled;
+
+  const int
+    key = (int) args->rho;
+
+  switch ( key ) {
     default:
-      return(AcquireFreiChenEdgeBasisKernel(kernel,type,args,exception));
+      scaled=FindFreiChenScaledKernel(key);
+      if (scaled == (const FreiChenScaledKernel *) NULL)
+        return(AcquireFreiChenEdgeBasisKernel(kernel,type,args,exception));
+      kernel=ParseKernelArray(scaled->definition);
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      ScaleKernelInfo(kernel, scaled->scale, NoValue);
+      break;
     case 13:
       kernel=ParseKernelArray("3: 2,-1,0  -1,0,1  0,1,-2");
       if (kernel == (KernelInfo *) NULL)
@@ -1505,41 +1565,6 @@ static KernelInfo *AcquireFreiChenKernel(KernelInfo *kernel,
       kernel->values[6] = +(MagickRealType) MagickSQ2;
       CalcKernelMetaData(kernel);
       ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
-      break;
-    case 15:
-      kernel=ParseKernelArray("3: 0,-1,0  1,0,1  0,-1,0");
-      if (kernel == (KernelInfo *) NULL)
-        return(kernel);
-      kernel->type = type;
-      ScaleKernelInfo(kernel, 1.0/2.0, NoValue);
-      break;
-    case 16:
-      kernel=ParseKernelArray("3: 1,0,-1  0,0,0  -1,0,1");
-      if (kernel == (KernelInfo *) NULL)
-        return(kernel);
-      kernel->type = type;
-      ScaleKernelInfo(kernel, 1.0/2.0, NoValue);
-      break;
-    case 17:
-      kernel=ParseKernelArray("3: 1,-2,1  -2,4,-2  -1,-2,1");
-      if (kernel == (KernelInfo *) NULL)
-        return(kernel);
-      kernel->type = type;
-      ScaleKernelInfo(kernel, 1.0/6.0, NoValue);
-      break;
-    case 18:
-      kernel=ParseKernelArray("3: -2,1,-2  1,4,1  -2,1,-2");
-      if (kernel == (KernelInfo *) NULL)
-        return(kernel);
-      kernel->type = type;
-      ScaleKernelInfo(kernel, 1.0/6.0, NoValue);
-      break;
-    case 19:
-      kernel=ParseKernelArray("3: 1,1,1  1,1,1  1,1,1");
-      if (kernel == (KernelInfo *) NULL)
-        return(kernel);
-      kernel->type = type;
-      ScaleKernelInfo(kernel, 1.0/3.0, NoValue);
       break;
   }
   return(RotateFreiChenKernel(kernel,args));
@@ -6210,6 +6235,41 @@ static void SetIteratedMorphologyLimits(const MorphologyMethod method,
   }
 }
 
+typedef struct _MorphologyStageLimit
+{
+  MorphologyMethod
+    method;
+
+  size_t
+    limit;
+} MorphologyStageLimit;
+
+static const MorphologyStageLimit
+  MorphologyStageLimits[] =
+  {
+    { SmoothMorphology, 4 },  /* 4 primitive compound morphology */
+    { OpenMorphology, 2 },    /* 2 primitive compound morphology */
+    { OpenIntensityMorphology, 2 },
+    { TopHatMorphology, 2 },
+    { CloseMorphology, 2 },
+    { CloseIntensityMorphology, 2 },
+    { BottomHatMorphology, 2 },
+    { EdgeMorphology, 2 }
+  };
+
+static const MorphologyStageLimit *FindMorphologyStageLimit(
+  const MorphologyMethod method)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(MorphologyStageLimits)/
+       sizeof(*MorphologyStageLimits)); i++)
+    if (MorphologyStageLimits[i].method == method)
+      return(MorphologyStageLimits+i);
+  return((const MorphologyStageLimit *) NULL);
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -6249,6 +6309,9 @@ MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyApplyTargets
     targets = { &curr_image, &rslt_image, &save_image, &work_image, &count };
 
+  const MorphologyStageLimit
+    *entry;
+
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   assert(kernel != (KernelInfo *) NULL);
@@ -6280,23 +6343,11 @@ MagickPrivate Image *MorphologyApply(const Image *image,
   stage_limit = 1;        /* assume method is not a compound */
   special = MagickFalse;   /* assume it is NOT a direct modify primitive */
   rslt_compose = compose; /* and we are composing multi-kernels as given */
-  switch( method ) {
-    case SmoothMorphology:  /* 4 primitive compound morphology */
-      stage_limit = 4;
-      break;
-    case OpenMorphology:    /* 2 primitive compound morphology */
-    case OpenIntensityMorphology:
-    case TopHatMorphology:
-    case CloseMorphology:
-    case CloseIntensityMorphology:
-    case BottomHatMorphology:
-    case EdgeMorphology:
-      stage_limit = 2;
-      break;
-    default:
-      SetIteratedMorphologyLimits(method,&limits);
-      break;
-  }
+  entry=FindMorphologyStageLimit(method);
+  if (entry != (const MorphologyStageLimit *) NULL)
+    stage_limit=entry->limit;
+  else
+    SetIteratedMorphologyLimits(method,&limits);
 
   /* Apply special methods with special requirements
   ** For example, single run only, or post-processing requirements

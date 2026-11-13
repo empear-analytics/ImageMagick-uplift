@@ -6995,9 +6995,764 @@ static MagickBooleanType ReleaseFileBrowserSpecial(
   return(MagickTrue);
 }
 
-MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
-  const char *action,char *reply)
+typedef struct _FileBrowserWidgets
 {
+  XWidgetInfo
+    *reply_info;
+
+  size_t
+    *state;
+
+  XWidgetInfo
+    *scroll_info,
+    *slider_info;
+
+  unsigned int
+    *visible_files;
+
+  size_t
+    *files;
+
+  XWidgetInfo
+    *up_info,
+    *home_info,
+    *special_info,
+    *action_info,
+    *cancel_info;
+
+  ssize_t
+    *i;
+
+  char
+    ***filelist;
+
+  XWidgetInfo
+    *north_info,
+    *south_info,
+    *list_info;
+
+  size_t
+    *delay;
+
+  XWidgetInfo
+    *expose_info,
+    *text_info,
+    *selection_info;
+
+  XEvent
+    *event;
+
+  MagickStatusType
+    *mask;
+} FileBrowserWidgets;
+
+typedef struct _FileBrowserContext
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  char
+    *reply,
+    *glob_pattern,
+    *working_path,
+    *primary_selection;
+
+  XFontStruct
+    *font_info;
+
+  unsigned int
+    height;
+
+  char
+    *format;
+
+  unsigned int
+    anomaly;
+
+  char
+    *home_directory;
+
+  const char
+    *action;
+
+  unsigned int
+    width;
+
+  char
+    *text;
+} FileBrowserContext;
+
+static void ClientFileBrowserMessage(const FileBrowserContext *context,
+  const XEvent event,const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  /*
+    If client window delete message, exit.
+  */
+  if (event.xclient.message_type != windows->wm_protocols)
+    return;
+  if (*event.xclient.data.l == (int) windows->wm_take_focus)
+    {
+      (void) XSetInputFocus(display,event.xclient.window,RevertToParent,
+        (Time) event.xclient.data.l[1]);
+      return;
+    }
+  if (*event.xclient.data.l != (int) windows->wm_delete_window)
+    return;
+  if (event.xclient.window == windows->widget.id)
+    {
+      *(*reply_info).text='\0';
+      (*state)|=ExitState;
+      return;
+    }
+}
+
+static void SelectFileBrowserReply(const FileBrowserContext *context,
+  const XEvent event,const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  Status
+    status;
+
+  Atom
+    type;
+
+  int
+    format;
+
+  unsigned char
+    *data;
+
+  unsigned long
+    after,
+    length;
+
+  /*
+    Obtain response from primary selection.
+  */
+  if (event.xselection.property == (Atom) None)
+    return;
+  status=XGetWindowProperty(display,event.xselection.requestor,
+    event.xselection.property,0L,2047L,MagickTrue,XA_STRING,&type,
+    &format,&length,&after,&data);
+  if (IsUnusableSelection(status,type,format,length) != MagickFalse)
+    return;
+  if ((Extent((*reply_info).text)+(int) length) >= (MagickPathExtent-1))
+    (void) XBell(display,0);
+  else
+    {
+      /*
+        Insert primary selection in reply text.
+      */
+      *(data+length)='\0';
+      XEditText(display,reply_info,(KeySym) XK_Insert,(char *) data,
+        (*state));
+      XDrawMatteText(display,&windows->widget,reply_info);
+      (*state)|=JumpListState;
+      (*state)|=RedrawActionState;
+    }
+  (void) XFree((void *) data);
+}
+
+static void PressFileBrowserKey(const FileBrowserContext *context,
+  const XEvent event,const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const reply = context->reply,
+    *const glob_pattern = context->glob_pattern,
+    *const working_path = context->working_path;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info,
+    *const slider_info = widgets->slider_info;
+
+  unsigned int
+    *const visible_files = widgets->visible_files;
+
+  size_t
+    *const files = widgets->files;
+
+  static char
+    command[MagickPathExtent];
+
+  static int
+    length;
+
+  static KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key press.
+  */
+  if (event.xkey.window != windows->widget.id)
+    return;
+  length=XLookupString((XKeyEvent *) &event.xkey,command,
+    (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  *(command+length)='\0';
+  if (AreaIsActive((*scroll_info),event.xkey))
+    {
+      /*
+        Move slider.
+      */
+      (*slider_info)=MoveFontBrowserSlider((*slider_info),key_symbol,
+        (*visible_files),(int) (*files));
+      (*state)|=RedrawListState;
+      return;
+    }
+  if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
+    {
+      FileBrowserPaths
+        paths;
+
+      paths.glob_pattern=glob_pattern;
+      paths.working_path=working_path;
+      paths.reply=reply;
+      (*state)=ReadFileBrowserPath(&paths,(*reply_info),(*state));
+      return;
+    }
+  if (key_symbol == XK_Control_L)
+    {
+      (*state)|=ControlState;
+      return;
+    }
+  (*reply_info)=ApplyListBrowserControlKey((*reply_info),key_symbol,(*state));
+  XEditText(display,reply_info,key_symbol,command,(*state));
+  XDrawMatteText(display,&windows->widget,reply_info);
+  (*state)|=JumpListState;
+}
+
+static void ToggleFileBrowserButtons(const FileBrowserContext *context,
+  const XEvent event,const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const up_info = widgets->up_info,
+    *const home_info = widgets->home_info,
+    *const special_info = widgets->special_info,
+    *const action_info = widgets->action_info,
+    *const cancel_info = widgets->cancel_info;
+
+  if ((*up_info).raised == MatteIsActive((*up_info),event.xmotion))
+    {
+      /*
+        Up button status changed.
+      */
+      (*up_info).raised=!(*up_info).raised;
+      XDrawBeveledButton(display,&windows->widget,up_info);
+      return;
+    }
+  if ((*home_info).raised == MatteIsActive((*home_info),event.xmotion))
+    {
+      /*
+        Home button status changed.
+      */
+      (*home_info).raised=!(*home_info).raised;
+      XDrawBeveledButton(display,&windows->widget,home_info);
+      return;
+    }
+  if ((*special_info).raised == MatteIsActive((*special_info),event.xmotion))
+    {
+      /*
+        Grab button status changed.
+      */
+      (*special_info).raised=!(*special_info).raised;
+      XDrawBeveledButton(display,&windows->widget,special_info);
+      return;
+    }
+  if ((*action_info).raised == MatteIsActive((*action_info),event.xmotion))
+    {
+      /*
+        Action button status changed.
+      */
+      (*action_info).raised=(*action_info).raised == MagickFalse ?
+        MagickTrue : MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,action_info);
+      return;
+    }
+  if ((*cancel_info).raised == MatteIsActive((*cancel_info),event.xmotion))
+    {
+      /*
+        Cancel button status changed.
+      */
+      (*cancel_info).raised=(*cancel_info).raised == MagickFalse ?
+        MagickTrue : MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      return;
+    }
+}
+
+static void MoveFileBrowserButtons(const FileBrowserContext *context,
+  XEvent event,const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  size_t
+    *const files = widgets->files;
+
+  /*
+    Discard pending button motion events.
+  */
+  while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
+  if ((*slider_info).active)
+    {
+      /*
+        Move slider matte.
+      */
+      (*slider_info)=TrackFontBrowserSlider((*slider_info),event,
+        (int) (*files));
+      (*state)|=RedrawListState;
+      return;
+    }
+  if ((*state) & InactiveWidgetState)
+    return;
+  ToggleFileBrowserButtons(context,event,widgets);
+}
+
+static void PressFileBrowserReply(const FileBrowserContext *context,
+  const XEvent event,const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const primary_selection = context->primary_selection;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  ssize_t
+    *const i = widgets->i;
+
+  int
+    x;
+
+  if (MatteIsActive((*reply_info),event.xbutton) == MagickFalse)
+    return;
+  if (event.xbutton.button != Button2)
+    {
+      static Time
+        click_time;
+
+      ListBrowserClick
+        click;
+
+      /*
+        Move text cursor to position of button press.
+      */
+      x=event.xbutton.x-(*reply_info).x-(int) (QuantumMargin >> 2);
+      (*i)=FindFileBrowserCursor(font_info,(*reply_info),x);
+      (*reply_info).cursor=(*reply_info).marker+(*i)-1;
+      click.display=display;
+      click.window_info=(&windows->widget);
+      click.event=event;
+      click.click_time=click_time;
+      (*reply_info)=HighlightListBrowserReply(&click,primary_selection,
+        (*reply_info));
+      XDrawMatteText(display,&windows->widget,reply_info);
+      click_time=event.xbutton.time;
+      return;
+    }
+  /*
+    Request primary selection.
+  */
+  (void) XConvertSelection(display,XA_PRIMARY,XA_STRING,XA_STRING,
+    windows->widget.id,event.xbutton.time);
+}
+
+static void PressFileBrowserButtons(const FileBrowserContext *context,
+  const XEvent event,const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const up_info = widgets->up_info,
+    *const home_info = widgets->home_info,
+    *const special_info = widgets->special_info,
+    *const action_info = widgets->action_info,
+    *const cancel_info = widgets->cancel_info;
+
+  if (MatteIsActive((*up_info),event.xbutton))
+    {
+      /*
+        User pressed Up button.
+      */
+      (*up_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,up_info);
+      return;
+    }
+  if (MatteIsActive((*home_info),event.xbutton))
+    {
+      /*
+        User pressed Home button.
+      */
+      (*home_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,home_info);
+      return;
+    }
+  if (MatteIsActive((*special_info),event.xbutton))
+    {
+      /*
+        User pressed Special button.
+      */
+      (*special_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,special_info);
+      return;
+    }
+  if (MatteIsActive((*action_info),event.xbutton))
+    {
+      /*
+        User pressed action button.
+      */
+      (*action_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,action_info);
+      return;
+    }
+  if (MatteIsActive((*cancel_info),event.xbutton))
+    {
+      /*
+        User pressed Cancel button.
+      */
+      (*cancel_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      return;
+    }
+  PressFileBrowserReply(context,event,widgets);
+}
+
+static void ChooseFileBrowserEntry(const FileBrowserContext *context,
+  const XEvent event,const FileBrowserTargets *targets,
+  const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const reply = context->reply,
+    *const working_path = context->working_path;
+
+  const unsigned int
+    height = context->height;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  size_t
+    *const files = widgets->files;
+
+  char
+    ***const filelist = widgets->filelist;
+
+  FileBrowserPress
+    entry;
+
+  entry.display=display;
+  entry.windows=windows;
+  entry.filelist=(*filelist);
+  entry.files=(*files);
+  entry.height=height;
+  entry.event=event;
+  entry.slider_info=(*slider_info);
+  entry.working_path=working_path;
+  entry.reply=reply;
+  SelectFileBrowserEntry(&entry,targets);
+}
+
+static void PressFileBrowserScroll(const FileBrowserContext *context,
+  const XEvent event,const FileBrowserTargets *targets,
+  const FileBrowserWidgets *widgets)
+{
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info,
+    *const slider_info = widgets->slider_info;
+
+  unsigned int
+    *const visible_files = widgets->visible_files;
+
+  size_t
+    *const files = widgets->files;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info,
+    *const south_info = widgets->south_info,
+    *const list_info = widgets->list_info;
+
+  if (MatteIsActive((*slider_info),event.xbutton))
+    {
+      /*
+        Track slider.
+      */
+      (*slider_info).active=MagickTrue;
+      return;
+    }
+  if ((MatteIsActive((*north_info),event.xbutton)) && ((*slider_info).id > 0))
+    {
+      /*
+        Move slider up.
+      */
+      (*north_info).raised=MagickFalse;
+      (*slider_info).id--;
+      (*state)|=RedrawListState;
+      return;
+    }
+  if ((MatteIsActive((*south_info),event.xbutton)) &&
+      ((*slider_info).id < (int) (*files)))
+    {
+      /*
+        Move slider down.
+      */
+      (*south_info).raised=MagickFalse;
+      (*slider_info).id++;
+      (*state)|=RedrawListState;
+      return;
+    }
+  if (MatteIsActive((*scroll_info),event.xbutton))
+    {
+      /*
+        Move slider.
+      */
+      (*slider_info)=PageListBrowserSlider((*slider_info),event,
+        (*visible_files));
+      (*state)|=RedrawListState;
+      return;
+    }
+  if (MatteIsActive((*list_info),event.xbutton))
+    {
+      ChooseFileBrowserEntry(context,event,targets,widgets);
+      return;
+    }
+  PressFileBrowserButtons(context,event,widgets);
+}
+
+static void ReleaseFileBrowserActions(const FileBrowserContext *context,
+  const XEvent event,const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const reply = context->reply,
+    *const working_path = context->working_path,
+    *const format = context->format;
+
+  const unsigned int
+    anomaly = context->anomaly;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const special_info = widgets->special_info,
+    *const action_info = widgets->action_info,
+    *const cancel_info = widgets->cancel_info;
+
+  FileBrowserSpecial
+    special;
+
+  ListBrowserRelease
+    release;
+
+  const FileBrowserFormatTargets
+    format_targets = { reply_info, special_info };
+
+  const FileBrowserSpecialTargets
+    special_targets = { state, special_info };
+
+  special.anomaly=anomaly;
+  special.display=display;
+  special.windows=windows;
+  special.format=format;
+  special.format_targets=format_targets;
+  special.event=event;
+  special.working_path=working_path;
+  if (ReleaseFileBrowserSpecial(&special,&special_targets) == MagickFalse)
+    return;
+  release.display=display;
+  release.window_info=(&windows->widget);
+  release.event=event;
+  ReleaseListBrowserAction(&release,(*reply_info),action_info,state);
+  if ((*cancel_info).raised == MagickFalse)
+    {
+      FileBrowserCancel
+        cancel;
+
+      cancel.windows=windows;
+      cancel.event=event;
+      cancel.reply=reply;
+      (*state)=ReleaseFileBrowserCancel(&cancel,(*cancel_info),(*reply_info),
+        (*state));
+      (*cancel_info).raised=MagickTrue;
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+    }
+}
+
+static void ReleaseFileBrowserButtons(const FileBrowserContext *context,
+  const XEvent event,const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const working_path = context->working_path,
+    *const home_directory = context->home_directory;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const up_info = widgets->up_info,
+    *const home_info = widgets->home_info;
+
+  if ((*up_info).raised == MagickFalse)
+    {
+      FileBrowserPathRelease
+        up;
+
+      up.windows=windows;
+      up.event=event;
+      up.working_path=working_path;
+      (*state)=ReleaseFileBrowserUp(&up,(*up_info),(*state));
+      (*up_info).raised=MagickTrue;
+      XDrawBeveledButton(display,&windows->widget,up_info);
+    }
+  if ((*home_info).raised == MagickFalse)
+    {
+      FontBrowserBack
+        back;
+
+      back.windows=windows;
+      back.event=event;
+      back.back_info=(*home_info);
+      back.glob_pattern=working_path;
+      back.back_pattern=home_directory;
+      (*state)=ReleaseFontBrowserBack(&back,(*state));
+      (*home_info).raised=MagickTrue;
+      XDrawBeveledButton(display,&windows->widget,home_info);
+    }
+  ReleaseFileBrowserActions(context,event,widgets);
+}
+
+static void ReleaseFileBrowserScroll(const FileBrowserContext *context,
+  const XEvent event,const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info,
+    *const north_info = widgets->north_info,
+    *const south_info = widgets->south_info;
+
+  size_t
+    *const delay = widgets->delay;
+
+  if (windows->widget.mapped == MagickFalse)
+    return;
+  if ((*north_info).raised == MagickFalse)
+    {
+      /*
+        User released up button.
+      */
+      (*delay)=SuspendTime << 2;
+      (*north_info).raised=MagickTrue;
+      XDrawTriangleNorth(display,&windows->widget,north_info);
+    }
+  if ((*south_info).raised == MagickFalse)
+    {
+      /*
+        User released down button.
+      */
+      (*delay)=SuspendTime << 2;
+      (*south_info).raised=MagickTrue;
+      XDrawTriangleSouth(display,&windows->widget,south_info);
+    }
+  if ((*slider_info).active)
+    {
+      /*
+        Stop tracking slider.
+      */
+      (*slider_info).active=MagickFalse;
+      return;
+    }
+  ReleaseFileBrowserButtons(context,event,widgets);
+}
+
 #define CancelButtonText  "Cancel"
 #define DirectoryText  "Directory:"
 #define FilenameText  "File name:"
@@ -7006,51 +7761,1026 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
 #define HomeButtonText  "Home"
 #define UpButtonText  "Up"
 
+static void InitializeFileBrowserButtons(const FileBrowserContext *context,
+  const FileBrowserWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
   char
-    *directory,
-    **filelist,
-    home_directory[MagickPathExtent],
-    primary_selection[MagickPathExtent],
-    text[MagickPathExtent],
-    working_path[MagickPathExtent];
+    *const reply = context->reply;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    height = context->height;
+
+  char
+    *const format = context->format;
+
+  const unsigned int
+    anomaly = context->anomaly;
+
+  const char
+    *const action = context->action;
+
+  const unsigned int
+    width = context->width;
+
+  XWidgetInfo
+    *const up_info = widgets->up_info,
+    *const home_info = widgets->home_info,
+    *const special_info = widgets->special_info,
+    *const action_info = widgets->action_info,
+    *const cancel_info = widgets->cancel_info;
+
+  /*
+    Initialize button information.
+  */
+  XGetWidgetInfo(CancelButtonText,cancel_info);
+  (*cancel_info).width=width;
+  (*cancel_info).height=(unsigned int) ((3*height) >> 1);
+  (*cancel_info).x=(int) windows->widget.width-(int) (*cancel_info).width-
+    QuantumMargin-2;
+  (*cancel_info).y=(int) windows->widget.height-(int) (*cancel_info).height-
+    QuantumMargin;
+  XGetWidgetInfo(action,action_info);
+  (*action_info).width=width;
+  (*action_info).height=(unsigned int) ((3*height) >> 1);
+  (*action_info).x=(*cancel_info).x-((int) (*cancel_info).width+
+    (QuantumMargin >> 1)+(int) ((*action_info).bevel_width << 1));
+  (*action_info).y=(*cancel_info).y;
+  XGetWidgetInfo(GrabButtonText,special_info);
+  (*special_info).width=width;
+  (*special_info).height=(unsigned int) ((3*height) >> 1);
+  (*special_info).x=(*action_info).x-((int) (*action_info).width+
+    (QuantumMargin >> 1)+(int) ((*special_info).bevel_width << 1));
+  (*special_info).y=(*action_info).y;
+  if (anomaly == MagickFalse)
+    {
+      (*special_info).text=(char *) FormatButtonText;
+      CopyFileBrowserFormat(reply,format);
+    }
+  XGetWidgetInfo(UpButtonText,up_info);
+  (*up_info).width=width;
+  (*up_info).height=(unsigned int) ((3*height) >> 1);
+  (*up_info).x=QuantumMargin;
+  (*up_info).y=(int) ((5*QuantumMargin) >> 1)+(int) height;
+  XGetWidgetInfo(HomeButtonText,home_info);
+  (*home_info).width=width;
+  (*home_info).height=(unsigned int) ((3*height) >> 1);
+  (*home_info).x=QuantumMargin;
+  (*home_info).y=(*up_info).y+(int) (*up_info).height+QuantumMargin;
+}
+
+static void InitializeFileBrowserReply(const FileBrowserContext *context,
+  const FileBrowserWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const reply = context->reply;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    height = context->height,
+    width = context->width;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info,
+    *const action_info = widgets->action_info;
+
+  /*
+    Initialize reply information.
+  */
+  XGetWidgetInfo(reply,reply_info);
+  (*reply_info).raised=MagickFalse;
+  (*reply_info).bevel_width--;
+  (*reply_info).width=windows->widget.width-width-(unsigned int)
+    ((6*QuantumMargin) >> 1);
+  (*reply_info).height=height << 1;
+  (*reply_info).x=(int) width+(QuantumMargin << 1);
+  (*reply_info).y=(*action_info).y-(int) (*reply_info).height-QuantumMargin;
+}
+
+static void InitializeFileBrowserScroll(const FileBrowserContext *context,
+  const FileBrowserWidgets *widgets)
+{
+  const unsigned int
+    height = context->height;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info,
+    *const up_info = widgets->up_info,
+    *const slider_info = widgets->slider_info,
+    *const scroll_info = widgets->scroll_info,
+    *const north_info = widgets->north_info,
+    *const south_info = widgets->south_info,
+    *const expose_info = widgets->expose_info;
+
+  size_t
+    *const files = widgets->files;
+
+  unsigned int
+    *const visible_files = widgets->visible_files;
+
+  int
+    id;
+
+  XGetWidgetInfo((char *) NULL,scroll_info);
+  (*scroll_info).bevel_width--;
+  (*scroll_info).width=height;
+  (*scroll_info).height=(unsigned int)
+    ((*reply_info).y-(*up_info).y-(int) (QuantumMargin >> 1));
+  (*scroll_info).x=(*reply_info).x+(int) ((*reply_info).width-
+    (*scroll_info).width);
+  (*scroll_info).y=(*up_info).y-(int) (*reply_info).bevel_width;
+  (*scroll_info).raised=MagickFalse;
+  (*scroll_info).trough=MagickTrue;
+  (*north_info)=(*scroll_info);
+  (*north_info).raised=MagickTrue;
+  (*north_info).width-=((*north_info).bevel_width << 1);
+  (*north_info).height=(*north_info).width-1;
+  (*north_info).x+=(int) (*north_info).bevel_width;
+  (*north_info).y+=(int) (*north_info).bevel_width;
+  (*south_info)=(*north_info);
+  (*south_info).y=(*scroll_info).y+(int) (*scroll_info).height-(int)
+    (*scroll_info).bevel_width-(int) (*south_info).height;
+  id=(*slider_info).id;
+  (*slider_info)=(*north_info);
+  (*slider_info).id=id;
+  (*slider_info).width-=2;
+  (*slider_info).min_y=(*north_info).y+(int) (*north_info).height+(int)
+    (*north_info).bevel_width+(int) (*slider_info).bevel_width+2;
+  (*slider_info).height=(unsigned int) ((int) (*scroll_info).height-
+    (((*slider_info).min_y-(*scroll_info).y+1) << 1)+4);
+  (*visible_files)=(unsigned int) ((*scroll_info).height*
+    MagickSafeReciprocal((double) height+(height >> 3)));
+  if ((*files) > (*visible_files))
+    (*slider_info).height=(unsigned int)
+      (((*visible_files)*(*slider_info).height)/(*files));
+  (*slider_info).max_y=(*south_info).y-(int) (*south_info).bevel_width-(int)
+    (*slider_info).bevel_width-2;
+  (*slider_info).x=(*scroll_info).x+(int) (*slider_info).bevel_width+1;
+  (*slider_info).y=(*slider_info).min_y;
+  (*expose_info)=(*scroll_info);
+  (*expose_info).y=(*slider_info).y;
+}
+
+static void InitializeFileBrowserList(const FileBrowserContext *context,
+  const FileBrowserWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info,
+    *const list_info = widgets->list_info;
+
+  /*
+    Initialize list information.
+  */
+  XGetWidgetInfo((char *) NULL,list_info);
+  (*list_info).raised=MagickFalse;
+  (*list_info).bevel_width--;
+  (*list_info).width=(unsigned int)
+    ((*scroll_info).x-(*reply_info).x-(int) (QuantumMargin >> 1));
+  (*list_info).height=(*scroll_info).height;
+  (*list_info).x=(*reply_info).x;
+  (*list_info).y=(*scroll_info).y;
+  if (windows->widget.mapped == MagickFalse)
+    (*state)|=JumpListState;
+}
+
+static void InitializeFileBrowserText(const FileBrowserContext *context,
+  const FileBrowserWidgets *widgets)
+{
+  const unsigned int
+    height = context->height;
+
+  char
+    *const text = context->text;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info,
+    *const list_info = widgets->list_info,
+    *const text_info = widgets->text_info,
+    *const selection_info = widgets->selection_info;
+
+  /*
+    Initialize text information.
+  */
+  *text='\0';
+  XGetWidgetInfo(text,text_info);
+  (*text_info).center=MagickFalse;
+  (*text_info).width=(*reply_info).width;
+  (*text_info).height=height;
+  (*text_info).x=(*list_info).x-(int) (QuantumMargin >> 1);
+  (*text_info).y=QuantumMargin;
+  /*
+    Initialize selection information.
+  */
+  XGetWidgetInfo((char *) NULL,selection_info);
+  (*selection_info).center=MagickFalse;
+  (*selection_info).width=(*list_info).width;
+  (*selection_info).height=(unsigned int) ((9*height) >> 3);
+  (*selection_info).x=(*list_info).x;
+}
+
+static void RedrawFileBrowserWidget(const FileBrowserContext *context,
+  const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const glob_pattern = context->glob_pattern,
+    *const working_path = context->working_path;
+
+  const unsigned int
+    height = context->height;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info,
+    *const up_info = widgets->up_info,
+    *const home_info = widgets->home_info,
+    *const special_info = widgets->special_info,
+    *const action_info = widgets->action_info,
+    *const cancel_info = widgets->cancel_info,
+    *const slider_info = widgets->slider_info,
+    *const scroll_info = widgets->scroll_info,
+    *const north_info = widgets->north_info,
+    *const south_info = widgets->south_info,
+    *const list_info = widgets->list_info,
+    *const text_info = widgets->text_info,
+    *const selection_info = widgets->selection_info;
 
   int
     x,
     y;
 
-  static char
-    glob_pattern[MagickPathExtent] = "*",
-    format[MagickPathExtent] = "miff";
+  /*
+    Redraw File Browser window.
+  */
+  x=QuantumMargin;
+  y=(*text_info).y+(int) (((*text_info).height-height) >> 1)+
+    font_info->ascent;
+  (void) XDrawString(display,windows->widget.id,
+    windows->widget.annotate_context,x,y,DirectoryText,
+    Extent(DirectoryText));
+  (void) CopyMagickString((*text_info).text,working_path,MagickPathExtent);
+  (void) ConcatenateMagickString((*text_info).text,DirectorySeparator,
+    MagickPathExtent);
+  (void) ConcatenateMagickString((*text_info).text,glob_pattern,
+    MagickPathExtent);
+  XDrawWidgetText(display,&windows->widget,text_info);
+  XDrawBeveledButton(display,&windows->widget,up_info);
+  XDrawBeveledButton(display,&windows->widget,home_info);
+  XDrawBeveledMatte(display,&windows->widget,list_info);
+  XDrawBeveledMatte(display,&windows->widget,scroll_info);
+  XDrawTriangleNorth(display,&windows->widget,north_info);
+  XDrawBeveledButton(display,&windows->widget,slider_info);
+  XDrawTriangleSouth(display,&windows->widget,south_info);
+  x=QuantumMargin;
+  y=(*reply_info).y+(int) (((*reply_info).height-height) >> 1)+
+    font_info->ascent;
+  (void) XDrawString(display,windows->widget.id,
+    windows->widget.annotate_context,x,y,FilenameText,
+    Extent(FilenameText));
+  XDrawBeveledMatte(display,&windows->widget,reply_info);
+  XDrawMatteText(display,&windows->widget,reply_info);
+  XDrawBeveledButton(display,&windows->widget,special_info);
+  XDrawBeveledButton(display,&windows->widget,action_info);
+  XDrawBeveledButton(display,&windows->widget,cancel_info);
+  XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
+  (*selection_info).id=(~0);
+  (*state)|=RedrawListState;
+  (*state)&=(unsigned int) (~RedrawWidgetState);
+}
 
-  static MagickStatusType
-    mask = (MagickStatusType) (CWWidth | CWHeight | CWX | CWY);
+static MagickBooleanType ReplaceFileBrowserList(
+  const FileBrowserContext *context,const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
 
-  Status
-    status;
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const glob_pattern = context->glob_pattern,
+    *const working_path = context->working_path;
+
+  XWidgetInfo
+    *const action_info = widgets->action_info;
 
   size_t
-    delay,
-    files,
-    state;
+    *const files = widgets->files;
 
+  ssize_t
+    *const i = widgets->i;
+
+  char
+    ***const filelist = widgets->filelist;
+
+  char
+    **checklist;
+
+  size_t
+    number_files;
+
+  /*
+    Update file list.
+  */
+  checklist=ListFiles(working_path,glob_pattern,&number_files);
+  if (checklist == (char **) NULL)
+    {
+      /*
+        Reply is a filename, exit.
+      */
+      (*action_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,action_info);
+      return(MagickFalse);
+    }
+  for ((*i)=0; (*i) < (ssize_t) (*files); (*i)++)
+    (*filelist)[(*i)]=DestroyString((*filelist)[(*i)]);
+  if ((*filelist) != (char **) NULL)
+    (*filelist)=(char **) RelinquishMagickMemory((*filelist));
+  (*filelist)=checklist;
+  (*files)=number_files;
+  return(MagickTrue);
+}
+
+static void RefreshFileBrowserList(const FileBrowserContext *context,
+  const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const glob_pattern = context->glob_pattern,
+    *const working_path = context->working_path;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info,
+    *const scroll_info = widgets->scroll_info,
+    *const slider_info = widgets->slider_info,
+    *const north_info = widgets->north_info,
+    *const south_info = widgets->south_info,
+    *const list_info = widgets->list_info,
+    *const expose_info = widgets->expose_info,
+    *const text_info = widgets->text_info,
+    *const selection_info = widgets->selection_info;
+
+  size_t
+    *const files = widgets->files;
+
+  unsigned int
+    *const visible_files = widgets->visible_files;
+
+  /*
+    Update file list.
+  */
+  (*slider_info).height=(unsigned int) ((int) (*scroll_info).height-
+    (((*slider_info).min_y-(*scroll_info).y+1) << 1)+1);
+  if ((*files) > (*visible_files))
+    (*slider_info).height=(unsigned int)
+      (((*visible_files)*(*slider_info).height)/(*files));
+  (*slider_info).max_y=(*south_info).y-(int) (*south_info).bevel_width-
+    (int) (*slider_info).bevel_width-2;
+  (*slider_info).id=0;
+  (*slider_info).y=(*slider_info).min_y;
+  (*expose_info).y=(*slider_info).y;
+  (*selection_info).id=(~0);
+  (*list_info).id=(~0);
+  (*state)|=RedrawListState;
+  /*
+    Redraw directory name & reply.
+  */
+  if (IsGlob((*reply_info).text) == MagickFalse)
+    {
+      *(*reply_info).text='\0';
+      (*reply_info).cursor=(*reply_info).text;
+    }
+  (void) CopyMagickString((*text_info).text,working_path,MagickPathExtent);
+  (void) ConcatenateMagickString((*text_info).text,DirectorySeparator,
+    MagickPathExtent);
+  (void) ConcatenateMagickString((*text_info).text,glob_pattern,
+    MagickPathExtent);
+  XDrawWidgetText(display,&windows->widget,text_info);
+  XDrawMatteText(display,&windows->widget,reply_info);
+  XDrawBeveledMatte(display,&windows->widget,scroll_info);
+  XDrawTriangleNorth(display,&windows->widget,north_info);
+  XDrawBeveledButton(display,&windows->widget,slider_info);
+  XDrawTriangleSouth(display,&windows->widget,south_info);
+  XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
+  (*state)&=(unsigned int) (~UpdateListState);
+}
+
+static void JumpFileBrowserList(const FileBrowserContext *context,
+  const FileBrowserWidgets *widgets)
+{
+  char
+    *const reply = context->reply;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info,
+    *const list_info = widgets->list_info,
+    *const selection_info = widgets->selection_info;
+
+  unsigned int
+    *const visible_files = widgets->visible_files;
+
+  size_t
+    *const files = widgets->files;
+
+  ssize_t
+    *const i = widgets->i;
+
+  char
+    ***const filelist = widgets->filelist;
+
+  FileBrowserMatch
+    match;
+
+  /*
+    Jump scroll to match user filename.
+  */
+  (*list_info).id=(~0);
+  match.filelist=(*filelist);
+  match.files=(*files);
+  match.reply=reply;
+  MatchFileBrowserReply(&match,list_info,i);
+  if (((*i) < (ssize_t) (*slider_info).id) ||
+      ((*i) >= ((*slider_info).id+(ssize_t) (*visible_files))))
+    (*slider_info).id=(*i)-(int) ((*visible_files) >> 1);
+  (*selection_info).id=(~0);
+  (*state)|=RedrawListState;
+  (*state)&=(unsigned int) (~JumpListState);
+}
+
+static void RedrawFileBrowserList(const FileBrowserContext *context,
+  const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    height = context->height;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info,
+    *const north_info = widgets->north_info,
+    *const south_info = widgets->south_info,
+    *const list_info = widgets->list_info,
+    *const expose_info = widgets->expose_info,
+    *const selection_info = widgets->selection_info;
+
+  unsigned int
+    *const visible_files = widgets->visible_files;
+
+  size_t
+    *const files = widgets->files;
+
+  char
+    ***const filelist = widgets->filelist;
+
+  /*
+    Determine slider id and position.
+  */
+  if ((*slider_info).id >= (int) ((*files)-(*visible_files)))
+    (*slider_info).id=(int) ((*files)-(*visible_files));
+  if (((*slider_info).id < 0) || ((*files) <= (*visible_files)))
+    (*slider_info).id=0;
+  (*slider_info).y=(*slider_info).min_y;
+  if ((*files) > 0)
+    (*slider_info).y+=((int) (*slider_info).id*((*slider_info).max_y-
+      (*slider_info).min_y+1)/(int) (*files));
+  if ((*slider_info).id != (*selection_info).id)
+    {
+      FileBrowserNames
+        names;
+
+      /*
+        Redraw scroll bar and file names.
+      */
+      (*selection_info).id=(*slider_info).id;
+      (*selection_info).y=(*list_info).y+(int) (height >> 3)+2;
+      names.display=display;
+      names.windows=windows;
+      names.filelist=(*filelist);
+      names.files=(*files);
+      names.visible_files=(*visible_files);
+      names.list_info=(*list_info);
+      names.slider_info=(*slider_info);
+      DrawFileBrowserNames(&names,selection_info);
+      /*
+        Update slider.
+      */
+      (*expose_info)=PlaceTextViewExpose((*expose_info),(*slider_info));
+      XDrawTriangleNorth(display,&windows->widget,north_info);
+      XDrawMatte(display,&windows->widget,expose_info);
+      XDrawBeveledButton(display,&windows->widget,slider_info);
+      XDrawTriangleSouth(display,&windows->widget,south_info);
+      (*expose_info).y=(*slider_info).y;
+    }
+  (*state)&=(unsigned int) (~RedrawListState);
+}
+
+static MagickBooleanType WaitForFileBrowserEvent(
+  const FileBrowserContext *context,const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info,
+    *const north_info = widgets->north_info,
+    *const south_info = widgets->south_info;
+
+  size_t
+    *const files = widgets->files,
+    *const delay = widgets->delay;
+
+  XEvent
+    *const event = widgets->event;
+
+  if ((*north_info).raised && (*south_info).raised)
+    (void) XIfEvent(display,event,XScreenEvent,(char *) windows);
+  else
+    {
+      /*
+        Brief delay before advancing scroll bar.
+      */
+      XDelay(display,(*delay));
+      (*delay)=SuspendTime;
+      (void) XCheckIfEvent(display,event,XScreenEvent,(char *) windows);
+      if (((*north_info).raised == MagickFalse) && ((*slider_info).id > 0))
+        {
+          /*
+            Move slider up.
+          */
+          (*slider_info).id--;
+          (*state)|=RedrawListState;
+        }
+      if (((*south_info).raised == MagickFalse) &&
+          ((*slider_info).id < (int) (*files)))
+        {
+          /*
+            Move slider down.
+          */
+          (*slider_info).id++;
+          (*state)|=RedrawListState;
+        }
+      if ((*event).type != ButtonRelease)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType UpdateFileBrowserState(
+  const FileBrowserContext *context,const FileBrowserWidgets *widgets)
+{
+  size_t
+    *const state = widgets->state;
+
+  if ((*state) & UpdateConfigurationState)
+    {
+      InitializeFileBrowserButtons(context,widgets);
+      InitializeFileBrowserReply(context,widgets);
+      /*
+        Initialize scroll information.
+      */
+      InitializeFileBrowserScroll(context,widgets);
+      InitializeFileBrowserList(context,widgets);
+      InitializeFileBrowserText(context,widgets);
+      (*state)&=(unsigned int) (~UpdateConfigurationState);
+    }
+  if ((*state) & RedrawWidgetState)
+    RedrawFileBrowserWidget(context,widgets);
+  if ((*state) & UpdateListState)
+    {
+      if (ReplaceFileBrowserList(context,widgets) == MagickFalse)
+        return(MagickFalse);
+      RefreshFileBrowserList(context,widgets);
+    }
+  if ((*state) & JumpListState)
+    JumpFileBrowserList(context,widgets);
+  if ((*state) & RedrawListState)
+    RedrawFileBrowserList(context,widgets);
+  return(MagickTrue);
+}
+
+static void HandleFileBrowserSelectionEvent(
+  const FileBrowserContext *context,XEvent event,
+  const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const primary_selection = context->primary_selection;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  switch (event.type)
+  {
+    case MotionNotify:
+    {
+      MoveFileBrowserButtons(context,event,widgets);
+      break;
+    }
+    case SelectionClear:
+    {
+      (*reply_info).highlight=MagickFalse;
+      XDrawMatteText(display,&windows->widget,reply_info);
+      break;
+    }
+    case SelectionNotify:
+    {
+      SelectFileBrowserReply(context,event,widgets);
+      break;
+    }
+    case SelectionRequest:
+    {
+      XSelectionEvent
+        notify;
+
+      XSelectionRequestEvent
+        *request;
+
+      if ((*reply_info).highlight == MagickFalse)
+        break;
+      /*
+        Set primary selection.
+      */
+      request=(&(event.xselectionrequest));
+      (void) XChangeProperty(request->display,request->requestor,
+        request->property,request->target,8,PropModeReplace,
+        (unsigned char *) primary_selection,Extent(primary_selection));
+      notify.type=SelectionNotify;
+      notify.display=request->display;
+      notify.requestor=request->requestor;
+      notify.selection=request->selection;
+      notify.target=request->target;
+      notify.time=request->time;
+      if (request->property == None)
+        notify.property=request->target;
+      else
+        notify.property=request->property;
+      (void) XSendEvent(request->display,request->requestor,False,0,
+        (XEvent *) &notify);
+    }
+    default:
+      break;
+  }
+}
+
+static void HandleFileBrowserWindowEvent(
+  const FileBrowserContext *context,const XEvent event,
+  const FileBrowserTargets *targets,const FileBrowserWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  switch (event.type)
+  {
+    case ButtonPress:
+    {
+      PressFileBrowserScroll(context,event,targets,widgets);
+      break;
+    }
+    case ButtonRelease:
+    {
+      ReleaseFileBrowserScroll(context,event,widgets);
+      break;
+    }
+    case ClientMessage:
+    {
+      ClientFileBrowserMessage(context,event,widgets);
+      break;
+    }
+    case ConfigureNotify:
+    {
+      (*state)=ConfigureWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case EnterNotify:
+    {
+      (*state)=EnterWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case Expose:
+    {
+      (*state)=ExposeWidgetWindow(windows,event,(*state));
+      break;
+    }
+    default:
+    {
+      HandleFileBrowserSelectionEvent(context,event,widgets);
+      break;
+    }
+  }
+}
+
+static void HandleFileBrowserKeyEvent(
+  const FileBrowserContext *context,const XEvent event,
+  const FileBrowserTargets *targets,const FileBrowserWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  switch (event.type)
+  {
+    case KeyPress:
+    {
+      PressFileBrowserKey(context,event,widgets);
+      break;
+    }
+    case KeyRelease:
+    {
+      (*state)=ReleaseWidgetKey(windows,event,(*state));
+      break;
+    }
+    case LeaveNotify:
+    {
+      (*state)=LeaveWidgetWindow(windows,event,(*state));
+      break;
+    }
+    default:
+    {
+      HandleFileBrowserWindowEvent(context,event,targets,widgets);
+      break;
+    }
+  }
+}
+
+static unsigned int GetFileBrowserWidth(XFontStruct *font_info,
+  const char *action)
+{
+  unsigned int
+    width;
+
+  width=WidgetTextWidth(font_info,(char *) action);
+  if (WidgetTextWidth(font_info,GrabButtonText) > width)
+    width=WidgetTextWidth(font_info,GrabButtonText);
+  if (WidgetTextWidth(font_info,FormatButtonText) > width)
+    width=WidgetTextWidth(font_info,FormatButtonText);
+  if (WidgetTextWidth(font_info,CancelButtonText) > width)
+    width=WidgetTextWidth(font_info,CancelButtonText);
+  if (WidgetTextWidth(font_info,HomeButtonText) > width)
+    width=WidgetTextWidth(font_info,HomeButtonText);
+  if (WidgetTextWidth(font_info,UpButtonText) > width)
+    width=WidgetTextWidth(font_info,UpButtonText);
+  width+=(unsigned int) QuantumMargin;
+  if (WidgetTextWidth(font_info,DirectoryText) > width)
+    width=WidgetTextWidth(font_info,DirectoryText);
+  if (WidgetTextWidth(font_info,FilenameText) > width)
+    width=WidgetTextWidth(font_info,FilenameText);
+  return(width);
+}
+
+static unsigned int WidestFileBrowserName(XFontStruct *font_info,
+  char **filelist,size_t files)
+{
   ssize_t
     i;
 
   unsigned int
-    anomaly,
-    height,
-    text_width,
-    visible_files,
-    width;
+    text_width;
+
+  text_width=0;
+  for (i=0; i < (ssize_t) files; i++)
+    if (WidgetTextWidth(font_info,filelist[i]) > text_width)
+      text_width=WidgetTextWidth(font_info,filelist[i]);
+  return(text_width);
+}
+
+static void MapFileBrowserWidget(Display *display,XWindows *windows,
+  MagickStatusType mask)
+{
+  Status
+    status;
+
+  XTextProperty
+    window_name;
+
+  XWindowChanges
+    window_changes;
+
+  /*
+    Map File Browser widget.
+  */
+  (void) CopyMagickString(windows->widget.name,"Browse and Select a File",
+    MagickPathExtent);
+  status=XStringListToTextProperty(&windows->widget.name,1,&window_name);
+  if (status != False)
+    {
+      XSetWMName(display,windows->widget.id,&window_name);
+      XSetWMIconName(display,windows->widget.id,&window_name);
+      (void) XFree((void *) window_name.value);
+    }
+  window_changes.width=(int) windows->widget.width;
+  window_changes.height=(int) windows->widget.height;
+  window_changes.x=windows->widget.x;
+  window_changes.y=windows->widget.y;
+  (void) XReconfigureWMWindow(display,windows->widget.id,
+    windows->widget.screen,mask,&window_changes);
+  (void) XMapRaised(display,windows->widget.id);
+  windows->widget.mapped=MagickFalse;
+}
+
+static void RespondToFileBrowserEvents(const FileBrowserContext *context,
+  const FileBrowserTargets *targets,const FileBrowserWidgets *widgets)
+{
+  size_t
+    *const state = widgets->state;
 
   XEvent
-    event;
+    *const event = widgets->event;
+
+  MagickStatusType
+    *const mask = widgets->mask;
+
+  do
+  {
+    if (UpdateFileBrowserState(context,widgets) == MagickFalse)
+      break;
+    /*
+      Wait for next event.
+    */
+    if (WaitForFileBrowserEvent(context,widgets) == MagickFalse)
+      continue;
+    switch ((*event).type)
+    {
+      case MapNotify:
+      {
+        (*mask)&=(unsigned int) (~CWX);
+        (*mask)&=(unsigned int) (~CWY);
+        break;
+      }
+      default:
+      {
+        HandleFileBrowserKeyEvent(context,(*event),targets,widgets);
+        break;
+      }
+    }
+  } while (((*state) & ExitState) == 0);
+}
+
+static unsigned int GetFileBrowserAnomaly(const char *action)
+{
+  unsigned int
+    anomaly;
+
+  anomaly=(LocaleCompare(action,"Composite") == 0) ||
+    (LocaleCompare(action,"Open") == 0) || (LocaleCompare(action,"Map") == 0);
+  return(anomaly);
+}
+
+typedef struct _FileBrowserLayout
+{
+  Display
+    *display;
 
   XFontStruct
     *font_info;
 
-  XTextProperty
-    window_name;
+  unsigned int
+    width,
+    height,
+    text_width;
+} FileBrowserLayout;
+
+static void PositionFileBrowserWidget(XWindows *windows,
+  const FileBrowserLayout *layout)
+{
+  Display
+    *const display = layout->display;
+
+  XFontStruct
+    *const font_info = layout->font_info;
+
+  const unsigned int
+    width = layout->width,
+    height = layout->height,
+    text_width = layout->text_width;
+
+  /*
+    Position File Browser widget.
+  */
+  windows->widget.width=width+MagickMin(text_width,MaxTextWidth)+
+    (unsigned int) (6*QuantumMargin);
+  windows->widget.min_width=width+MinTextWidth+(unsigned int) (4*QuantumMargin);
+  if (windows->widget.width < windows->widget.min_width)
+    windows->widget.width=windows->widget.min_width;
+  windows->widget.height=(unsigned int)
+    (((81*height) >> 2)+(unsigned int) ((13*QuantumMargin) >> 1)+4);
+  windows->widget.min_height=(unsigned int)
+    (((23*height) >> 1)+(unsigned int) ((13*QuantumMargin) >> 1)+4);
+  if (windows->widget.height < windows->widget.min_height)
+    windows->widget.height=windows->widget.min_height;
+  XConstrainWindowPosition(display,&windows->widget);
+}
+
+typedef struct _FileBrowserRunTargets
+{
+  size_t
+    *files;
+
+  ssize_t
+    *i;
+
+  char
+    ***filelist;
+
+  MagickStatusType
+    *mask;
+} FileBrowserRunTargets;
+
+static void RunFileBrowser(const FileBrowserContext *context,
+  const FileBrowserRunTargets *run_targets)
+{
+  size_t
+    *const files = run_targets->files;
+
+  ssize_t
+    *const i = run_targets->i;
+
+  char
+    ***const filelist = run_targets->filelist;
+
+  MagickStatusType
+    *const mask = run_targets->mask;
+
+  size_t
+    delay,
+    state;
+
+  unsigned int
+    visible_files;
+
+  XEvent
+    event;
 
   XWidgetInfo
     action_info,
@@ -7068,17 +8798,91 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
     text_info,
     up_info;
 
-  XWindowChanges
-    window_changes;
-
   const FileBrowserTargets
     targets = { &reply_info, &state, &selection_info, &list_info };
 
-  const FileBrowserFormatTargets
-    format_targets = { &reply_info, &special_info };
+  const FileBrowserWidgets
+    file_widgets = { &reply_info, &state,
+      &scroll_info, &slider_info, &visible_files, files, &up_info, &home_info,
+      &special_info, &action_info, &cancel_info, i, filelist, &north_info,
+      &south_info, &list_info, &delay, &expose_info, &text_info,
+      &selection_info, &event, mask };
 
-  const FileBrowserSpecialTargets
-    special_targets = { &state, &special_info };
+  /*
+    Respond to X events.
+  */
+  XGetWidgetInfo((char *) NULL,&slider_info);
+  XGetWidgetInfo((char *) NULL,&north_info);
+  XGetWidgetInfo((char *) NULL,&south_info);
+  XGetWidgetInfo((char *) NULL,&expose_info);
+  visible_files=0;
+  delay=SuspendTime << 2;
+  state=UpdateConfigurationState;
+  RespondToFileBrowserEvents(context,&targets,&file_widgets);
+}
+
+static void SetFileBrowserReply(char *reply,char *working_path)
+{
+  if (*reply != '\0')
+    {
+      (void) ConcatenateMagickString(working_path,DirectorySeparator,
+        MagickPathExtent);
+      (void) ConcatenateMagickString(working_path,reply,MagickPathExtent);
+    }
+  (void) CopyMagickString(reply,working_path,MagickPathExtent);
+  if (*reply == '~')
+    ExpandFilename(reply);
+}
+
+static void FreeFileBrowserList(char **filelist,size_t files)
+{
+  ssize_t
+    i;
+
+  /*
+    Free file list.
+  */
+  for (i=0; i < (ssize_t) files; i++)
+    filelist[i]=DestroyString(filelist[i]);
+  if (filelist != (char **) NULL)
+    filelist=(char **) RelinquishMagickMemory(filelist);
+}
+
+MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
+  const char *action,char *reply)
+{
+  char
+    *directory,
+    **filelist,
+    home_directory[MagickPathExtent],
+    primary_selection[MagickPathExtent],
+    text[MagickPathExtent],
+    working_path[MagickPathExtent];
+
+  static char
+    glob_pattern[MagickPathExtent] = "*",
+    format[MagickPathExtent] = "miff";
+
+  static MagickStatusType
+    mask = (MagickStatusType) (CWWidth | CWHeight | CWX | CWY);
+
+  size_t
+    files;
+
+  ssize_t
+    i;
+
+  unsigned int
+    anomaly,
+    height,
+    text_width,
+    width;
+
+  XFontStruct
+    *font_info;
+
+  const FileBrowserRunTargets
+    run_targets = { &files, &i, &filelist, &mask };
 
   /*
     Read filelist from current directory.
@@ -7108,914 +8912,34 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
     Determine File Browser widget attributes.
   */
   font_info=windows->widget.font_info;
-  text_width=0;
-  for (i=0; i < (ssize_t) files; i++)
-    if (WidgetTextWidth(font_info,filelist[i]) > text_width)
-      text_width=WidgetTextWidth(font_info,filelist[i]);
-  width=WidgetTextWidth(font_info,(char *) action);
-  if (WidgetTextWidth(font_info,GrabButtonText) > width)
-    width=WidgetTextWidth(font_info,GrabButtonText);
-  if (WidgetTextWidth(font_info,FormatButtonText) > width)
-    width=WidgetTextWidth(font_info,FormatButtonText);
-  if (WidgetTextWidth(font_info,CancelButtonText) > width)
-    width=WidgetTextWidth(font_info,CancelButtonText);
-  if (WidgetTextWidth(font_info,HomeButtonText) > width)
-    width=WidgetTextWidth(font_info,HomeButtonText);
-  if (WidgetTextWidth(font_info,UpButtonText) > width)
-    width=WidgetTextWidth(font_info,UpButtonText);
-  width+=(unsigned int) QuantumMargin;
-  if (WidgetTextWidth(font_info,DirectoryText) > width)
-    width=WidgetTextWidth(font_info,DirectoryText);
-  if (WidgetTextWidth(font_info,FilenameText) > width)
-    width=WidgetTextWidth(font_info,FilenameText);
+  text_width=WidestFileBrowserName(font_info,filelist,files);
+  width=GetFileBrowserWidth(font_info,action);
   height=(unsigned int) (font_info->ascent+font_info->descent);
   /*
     Position File Browser widget.
   */
-  windows->widget.width=width+MagickMin(text_width,MaxTextWidth)+
-    (unsigned int) (6*QuantumMargin);
-  windows->widget.min_width=width+MinTextWidth+(unsigned int) (4*QuantumMargin);
-  if (windows->widget.width < windows->widget.min_width)
-    windows->widget.width=windows->widget.min_width;
-  windows->widget.height=(unsigned int)
-    (((81*height) >> 2)+(unsigned int) ((13*QuantumMargin) >> 1)+4);
-  windows->widget.min_height=(unsigned int)
-    (((23*height) >> 1)+(unsigned int) ((13*QuantumMargin) >> 1)+4);
-  if (windows->widget.height < windows->widget.min_height)
-    windows->widget.height=windows->widget.min_height;
-  XConstrainWindowPosition(display,&windows->widget);
-  /*
-    Map File Browser widget.
-  */
-  (void) CopyMagickString(windows->widget.name,"Browse and Select a File",
-    MagickPathExtent);
-  status=XStringListToTextProperty(&windows->widget.name,1,&window_name);
-  if (status != False)
-    {
-      XSetWMName(display,windows->widget.id,&window_name);
-      XSetWMIconName(display,windows->widget.id,&window_name);
-      (void) XFree((void *) window_name.value);
-    }
-  window_changes.width=(int) windows->widget.width;
-  window_changes.height=(int) windows->widget.height;
-  window_changes.x=windows->widget.x;
-  window_changes.y=windows->widget.y;
-  (void) XReconfigureWMWindow(display,windows->widget.id,
-    windows->widget.screen,mask,&window_changes);
-  (void) XMapRaised(display,windows->widget.id);
-  windows->widget.mapped=MagickFalse;
+  {
+    const FileBrowserLayout
+      layout = { display, font_info, width, height, text_width };
+
+    PositionFileBrowserWidget(windows,&layout);
+  }
+  MapFileBrowserWidget(display,windows,mask);
   /*
     Respond to X events.
   */
-  XGetWidgetInfo((char *) NULL,&slider_info);
-  XGetWidgetInfo((char *) NULL,&north_info);
-  XGetWidgetInfo((char *) NULL,&south_info);
-  XGetWidgetInfo((char *) NULL,&expose_info);
-  visible_files=0;
-  anomaly=(LocaleCompare(action,"Composite") == 0) ||
-    (LocaleCompare(action,"Open") == 0) || (LocaleCompare(action,"Map") == 0);
-  delay=SuspendTime << 2;
-  state=UpdateConfigurationState;
-  do
+  anomaly=GetFileBrowserAnomaly(action);
   {
-    if (state & UpdateConfigurationState)
-      {
-        int
-          id;
+    const FileBrowserContext
+      file_context = { display, windows, reply, glob_pattern, working_path,
+        primary_selection, font_info, height, format, anomaly, home_directory,
+        action, width, text };
 
-        /*
-          Initialize button information.
-        */
-        XGetWidgetInfo(CancelButtonText,&cancel_info);
-        cancel_info.width=width;
-        cancel_info.height=(unsigned int) ((3*height) >> 1);
-        cancel_info.x=(int) windows->widget.width-(int) cancel_info.width-
-          QuantumMargin-2;
-        cancel_info.y=(int) windows->widget.height-(int) cancel_info.height-
-          QuantumMargin;
-        XGetWidgetInfo(action,&action_info);
-        action_info.width=width;
-        action_info.height=(unsigned int) ((3*height) >> 1);
-        action_info.x=cancel_info.x-((int) cancel_info.width+
-          (QuantumMargin >> 1)+(int) (action_info.bevel_width << 1));
-        action_info.y=cancel_info.y;
-        XGetWidgetInfo(GrabButtonText,&special_info);
-        special_info.width=width;
-        special_info.height=(unsigned int) ((3*height) >> 1);
-        special_info.x=action_info.x-((int) action_info.width+
-          (QuantumMargin >> 1)+(int) (special_info.bevel_width << 1));
-        special_info.y=action_info.y;
-        if (anomaly == MagickFalse)
-          {
-            special_info.text=(char *) FormatButtonText;
-            CopyFileBrowserFormat(reply,format);
-          }
-        XGetWidgetInfo(UpButtonText,&up_info);
-        up_info.width=width;
-        up_info.height=(unsigned int) ((3*height) >> 1);
-        up_info.x=QuantumMargin;
-        up_info.y=(int) ((5*QuantumMargin) >> 1)+(int) height;
-        XGetWidgetInfo(HomeButtonText,&home_info);
-        home_info.width=width;
-        home_info.height=(unsigned int) ((3*height) >> 1);
-        home_info.x=QuantumMargin;
-        home_info.y=up_info.y+(int) up_info.height+QuantumMargin;
-        /*
-          Initialize reply information.
-        */
-        XGetWidgetInfo(reply,&reply_info);
-        reply_info.raised=MagickFalse;
-        reply_info.bevel_width--;
-        reply_info.width=windows->widget.width-width-(unsigned int)
-          ((6*QuantumMargin) >> 1);
-        reply_info.height=height << 1;
-        reply_info.x=(int) width+(QuantumMargin << 1);
-        reply_info.y=action_info.y-(int) reply_info.height-QuantumMargin;
-        /*
-          Initialize scroll information.
-        */
-        XGetWidgetInfo((char *) NULL,&scroll_info);
-        scroll_info.bevel_width--;
-        scroll_info.width=height;
-        scroll_info.height=(unsigned int)
-          (reply_info.y-up_info.y-(int) (QuantumMargin >> 1));
-        scroll_info.x=reply_info.x+(int) (reply_info.width-scroll_info.width);
-        scroll_info.y=up_info.y-(int) reply_info.bevel_width;
-        scroll_info.raised=MagickFalse;
-        scroll_info.trough=MagickTrue;
-        north_info=scroll_info;
-        north_info.raised=MagickTrue;
-        north_info.width-=(north_info.bevel_width << 1);
-        north_info.height=north_info.width-1;
-        north_info.x+=(int) north_info.bevel_width;
-        north_info.y+=(int) north_info.bevel_width;
-        south_info=north_info;
-        south_info.y=scroll_info.y+(int) scroll_info.height-(int)
-          scroll_info.bevel_width-(int) south_info.height;
-        id=slider_info.id;
-        slider_info=north_info;
-        slider_info.id=id;
-        slider_info.width-=2;
-        slider_info.min_y=north_info.y+(int) north_info.height+(int)
-          north_info.bevel_width+(int) slider_info.bevel_width+2;
-        slider_info.height=(unsigned int) ((int) scroll_info.height-
-          ((slider_info.min_y-scroll_info.y+1) << 1)+4);
-        visible_files=(unsigned int) (scroll_info.height*
-          MagickSafeReciprocal((double) height+(height >> 3)));
-        if (files > visible_files)
-          slider_info.height=(unsigned int)
-            ((visible_files*slider_info.height)/files);
-        slider_info.max_y=south_info.y-(int) south_info.bevel_width-(int)
-          slider_info.bevel_width-2;
-        slider_info.x=scroll_info.x+(int) slider_info.bevel_width+1;
-        slider_info.y=slider_info.min_y;
-        expose_info=scroll_info;
-        expose_info.y=slider_info.y;
-        /*
-          Initialize list information.
-        */
-        XGetWidgetInfo((char *) NULL,&list_info);
-        list_info.raised=MagickFalse;
-        list_info.bevel_width--;
-        list_info.width=(unsigned int)
-          (scroll_info.x-reply_info.x-(int) (QuantumMargin >> 1));
-        list_info.height=scroll_info.height;
-        list_info.x=reply_info.x;
-        list_info.y=scroll_info.y;
-        if (windows->widget.mapped == MagickFalse)
-          state|=JumpListState;
-        /*
-          Initialize text information.
-        */
-        *text='\0';
-        XGetWidgetInfo(text,&text_info);
-        text_info.center=MagickFalse;
-        text_info.width=reply_info.width;
-        text_info.height=height;
-        text_info.x=list_info.x-(int) (QuantumMargin >> 1);
-        text_info.y=QuantumMargin;
-        /*
-          Initialize selection information.
-        */
-        XGetWidgetInfo((char *) NULL,&selection_info);
-        selection_info.center=MagickFalse;
-        selection_info.width=list_info.width;
-        selection_info.height=(unsigned int) ((9*height) >> 3);
-        selection_info.x=list_info.x;
-        state&=(unsigned int) (~UpdateConfigurationState);
-      }
-    if (state & RedrawWidgetState)
-      {
-        /*
-          Redraw File Browser window.
-        */
-        x=QuantumMargin;
-        y=text_info.y+(int) ((text_info.height-height) >> 1)+font_info->ascent;
-        (void) XDrawString(display,windows->widget.id,
-          windows->widget.annotate_context,x,y,DirectoryText,
-          Extent(DirectoryText));
-        (void) CopyMagickString(text_info.text,working_path,MagickPathExtent);
-        (void) ConcatenateMagickString(text_info.text,DirectorySeparator,
-          MagickPathExtent);
-        (void) ConcatenateMagickString(text_info.text,glob_pattern,
-          MagickPathExtent);
-        XDrawWidgetText(display,&windows->widget,&text_info);
-        XDrawBeveledButton(display,&windows->widget,&up_info);
-        XDrawBeveledButton(display,&windows->widget,&home_info);
-        XDrawBeveledMatte(display,&windows->widget,&list_info);
-        XDrawBeveledMatte(display,&windows->widget,&scroll_info);
-        XDrawTriangleNorth(display,&windows->widget,&north_info);
-        XDrawBeveledButton(display,&windows->widget,&slider_info);
-        XDrawTriangleSouth(display,&windows->widget,&south_info);
-        x=QuantumMargin;
-        y=reply_info.y+(int) ((reply_info.height-height) >> 1)+
-          font_info->ascent;
-        (void) XDrawString(display,windows->widget.id,
-          windows->widget.annotate_context,x,y,FilenameText,
-          Extent(FilenameText));
-        XDrawBeveledMatte(display,&windows->widget,&reply_info);
-        XDrawMatteText(display,&windows->widget,&reply_info);
-        XDrawBeveledButton(display,&windows->widget,&special_info);
-        XDrawBeveledButton(display,&windows->widget,&action_info);
-        XDrawBeveledButton(display,&windows->widget,&cancel_info);
-        XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
-        selection_info.id=(~0);
-        state|=RedrawListState;
-        state&=(unsigned int) (~RedrawWidgetState);
-      }
-    if (state & UpdateListState)
-      {
-        char
-          **checklist;
-
-        size_t
-          number_files;
-
-        /*
-          Update file list.
-        */
-        checklist=ListFiles(working_path,glob_pattern,&number_files);
-        if (checklist == (char **) NULL)
-          {
-            /*
-              Reply is a filename, exit.
-            */
-            action_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&action_info);
-            break;
-          }
-        for (i=0; i < (ssize_t) files; i++)
-          filelist[i]=DestroyString(filelist[i]);
-        if (filelist != (char **) NULL)
-          filelist=(char **) RelinquishMagickMemory(filelist);
-        filelist=checklist;
-        files=number_files;
-        /*
-          Update file list.
-        */
-        slider_info.height=(unsigned int) ((int) scroll_info.height-
-          ((slider_info.min_y-scroll_info.y+1) << 1)+1);
-        if (files > visible_files)
-          slider_info.height=(unsigned int)
-            ((visible_files*slider_info.height)/files);
-        slider_info.max_y=south_info.y-(int) south_info.bevel_width-
-          (int) slider_info.bevel_width-2;
-        slider_info.id=0;
-        slider_info.y=slider_info.min_y;
-        expose_info.y=slider_info.y;
-        selection_info.id=(~0);
-        list_info.id=(~0);
-        state|=RedrawListState;
-        /*
-          Redraw directory name & reply.
-        */
-        if (IsGlob(reply_info.text) == MagickFalse)
-          {
-            *reply_info.text='\0';
-            reply_info.cursor=reply_info.text;
-          }
-        (void) CopyMagickString(text_info.text,working_path,MagickPathExtent);
-        (void) ConcatenateMagickString(text_info.text,DirectorySeparator,
-          MagickPathExtent);
-        (void) ConcatenateMagickString(text_info.text,glob_pattern,
-          MagickPathExtent);
-        XDrawWidgetText(display,&windows->widget,&text_info);
-        XDrawMatteText(display,&windows->widget,&reply_info);
-        XDrawBeveledMatte(display,&windows->widget,&scroll_info);
-        XDrawTriangleNorth(display,&windows->widget,&north_info);
-        XDrawBeveledButton(display,&windows->widget,&slider_info);
-        XDrawTriangleSouth(display,&windows->widget,&south_info);
-        XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
-        state&=(unsigned int) (~UpdateListState);
-      }
-    if (state & JumpListState)
-      {
-        FileBrowserMatch
-          match;
-
-        /*
-          Jump scroll to match user filename.
-        */
-        list_info.id=(~0);
-        match.filelist=filelist;
-        match.files=files;
-        match.reply=reply;
-        MatchFileBrowserReply(&match,&list_info,&i);
-        if ((i < (ssize_t) slider_info.id) ||
-            (i >= (slider_info.id+(ssize_t) visible_files)))
-          slider_info.id=i-(int) (visible_files >> 1);
-        selection_info.id=(~0);
-        state|=RedrawListState;
-        state&=(unsigned int) (~JumpListState);
-      }
-    if (state & RedrawListState)
-      {
-        /*
-          Determine slider id and position.
-        */
-        if (slider_info.id >= (int) (files-visible_files))
-          slider_info.id=(int) (files-visible_files);
-        if ((slider_info.id < 0) || (files <= visible_files))
-          slider_info.id=0;
-        slider_info.y=slider_info.min_y;
-        if (files > 0)
-          slider_info.y+=((int) slider_info.id*(slider_info.max_y-
-            slider_info.min_y+1)/(int) files);
-        if (slider_info.id != selection_info.id)
-          {
-            FileBrowserNames
-              names;
-
-            /*
-              Redraw scroll bar and file names.
-            */
-            selection_info.id=slider_info.id;
-            selection_info.y=list_info.y+(int) (height >> 3)+2;
-            names.display=display;
-            names.windows=windows;
-            names.filelist=filelist;
-            names.files=files;
-            names.visible_files=visible_files;
-            names.list_info=list_info;
-            names.slider_info=slider_info;
-            DrawFileBrowserNames(&names,&selection_info);
-            /*
-              Update slider.
-            */
-            expose_info=PlaceTextViewExpose(expose_info,slider_info);
-            XDrawTriangleNorth(display,&windows->widget,&north_info);
-            XDrawMatte(display,&windows->widget,&expose_info);
-            XDrawBeveledButton(display,&windows->widget,&slider_info);
-            XDrawTriangleSouth(display,&windows->widget,&south_info);
-            expose_info.y=slider_info.y;
-          }
-        state&=(unsigned int) (~RedrawListState);
-      }
-    /*
-      Wait for next event.
-    */
-    if (north_info.raised && south_info.raised)
-      (void) XIfEvent(display,&event,XScreenEvent,(char *) windows);
-    else
-      {
-        /*
-          Brief delay before advancing scroll bar.
-        */
-        XDelay(display,delay);
-        delay=SuspendTime;
-        (void) XCheckIfEvent(display,&event,XScreenEvent,(char *) windows);
-        if ((north_info.raised == MagickFalse) && (slider_info.id > 0))
-          {
-            /*
-              Move slider up.
-            */
-            slider_info.id--;
-            state|=RedrawListState;
-          }
-        if ((south_info.raised == MagickFalse) &&
-            (slider_info.id < (int) files))
-          {
-            /*
-              Move slider down.
-            */
-            slider_info.id++;
-            state|=RedrawListState;
-          }
-        if (event.type != ButtonRelease)
-          continue;
-      }
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        if (MatteIsActive(slider_info,event.xbutton))
-          {
-            /*
-              Track slider.
-            */
-            slider_info.active=MagickTrue;
-            break;
-          }
-        if ((MatteIsActive(north_info,event.xbutton)) && (slider_info.id > 0))
-          {
-            /*
-              Move slider up.
-            */
-            north_info.raised=MagickFalse;
-            slider_info.id--;
-            state|=RedrawListState;
-            break;
-          }
-        if ((MatteIsActive(south_info,event.xbutton)) &&
-            (slider_info.id < (int) files))
-          {
-            /*
-              Move slider down.
-            */
-            south_info.raised=MagickFalse;
-            slider_info.id++;
-            state|=RedrawListState;
-            break;
-          }
-        if (MatteIsActive(scroll_info,event.xbutton))
-          {
-            /*
-              Move slider.
-            */
-            slider_info=PageListBrowserSlider(slider_info,event,visible_files);
-            state|=RedrawListState;
-            break;
-          }
-        if (MatteIsActive(list_info,event.xbutton))
-          {
-            FileBrowserPress
-              entry;
-
-            entry.display=display;
-            entry.windows=windows;
-            entry.filelist=filelist;
-            entry.files=files;
-            entry.height=height;
-            entry.event=event;
-            entry.slider_info=slider_info;
-            entry.working_path=working_path;
-            entry.reply=reply;
-            SelectFileBrowserEntry(&entry,&targets);
-            break;
-          }
-        if (MatteIsActive(up_info,event.xbutton))
-          {
-            /*
-              User pressed Up button.
-            */
-            up_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&up_info);
-            break;
-          }
-        if (MatteIsActive(home_info,event.xbutton))
-          {
-            /*
-              User pressed Home button.
-            */
-            home_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&home_info);
-            break;
-          }
-        if (MatteIsActive(special_info,event.xbutton))
-          {
-            /*
-              User pressed Special button.
-            */
-            special_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&special_info);
-            break;
-          }
-        if (MatteIsActive(action_info,event.xbutton))
-          {
-            /*
-              User pressed action button.
-            */
-            action_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&action_info);
-            break;
-          }
-        if (MatteIsActive(cancel_info,event.xbutton))
-          {
-            /*
-              User pressed Cancel button.
-            */
-            cancel_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-            break;
-          }
-        if (MatteIsActive(reply_info,event.xbutton) == MagickFalse)
-          break;
-        if (event.xbutton.button != Button2)
-          {
-            static Time
-              click_time;
-
-            ListBrowserClick
-              click;
-
-            /*
-              Move text cursor to position of button press.
-            */
-            x=event.xbutton.x-reply_info.x-(int) (QuantumMargin >> 2);
-            i=FindFileBrowserCursor(font_info,reply_info,x);
-            reply_info.cursor=reply_info.marker+i-1;
-            click.display=display;
-            click.window_info=(&windows->widget);
-            click.event=event;
-            click.click_time=click_time;
-            reply_info=HighlightListBrowserReply(&click,primary_selection,
-              reply_info);
-            XDrawMatteText(display,&windows->widget,&reply_info);
-            click_time=event.xbutton.time;
-            break;
-          }
-        /*
-          Request primary selection.
-        */
-        (void) XConvertSelection(display,XA_PRIMARY,XA_STRING,XA_STRING,
-          windows->widget.id,event.xbutton.time);
-        break;
-      }
-      case ButtonRelease:
-      {
-        FileBrowserSpecial
-          special;
-
-        ListBrowserRelease
-          release;
-
-        if (windows->widget.mapped == MagickFalse)
-          break;
-        if (north_info.raised == MagickFalse)
-          {
-            /*
-              User released up button.
-            */
-            delay=SuspendTime << 2;
-            north_info.raised=MagickTrue;
-            XDrawTriangleNorth(display,&windows->widget,&north_info);
-          }
-        if (south_info.raised == MagickFalse)
-          {
-            /*
-              User released down button.
-            */
-            delay=SuspendTime << 2;
-            south_info.raised=MagickTrue;
-            XDrawTriangleSouth(display,&windows->widget,&south_info);
-          }
-        if (slider_info.active)
-          {
-            /*
-              Stop tracking slider.
-            */
-            slider_info.active=MagickFalse;
-            break;
-          }
-        if (up_info.raised == MagickFalse)
-          {
-            FileBrowserPathRelease
-              up;
-
-            up.windows=windows;
-            up.event=event;
-            up.working_path=working_path;
-            state=ReleaseFileBrowserUp(&up,up_info,state);
-            up_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&up_info);
-          }
-        if (home_info.raised == MagickFalse)
-          {
-            FontBrowserBack
-              back;
-
-            back.windows=windows;
-            back.event=event;
-            back.back_info=home_info;
-            back.glob_pattern=working_path;
-            back.back_pattern=home_directory;
-            state=ReleaseFontBrowserBack(&back,state);
-            home_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&home_info);
-          }
-        special.anomaly=anomaly;
-        special.display=display;
-        special.windows=windows;
-        special.format=format;
-        special.format_targets=format_targets;
-        special.event=event;
-        special.working_path=working_path;
-        if (ReleaseFileBrowserSpecial(&special,&special_targets) == MagickFalse)
-          break;
-        release.display=display;
-        release.window_info=(&windows->widget);
-        release.event=event;
-        ReleaseListBrowserAction(&release,reply_info,&action_info,&state);
-        if (cancel_info.raised == MagickFalse)
-          {
-            FileBrowserCancel
-              cancel;
-
-            cancel.windows=windows;
-            cancel.event=event;
-            cancel.reply=reply;
-            state=ReleaseFileBrowserCancel(&cancel,cancel_info,reply_info,state);
-            cancel_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-          }
-        break;
-      }
-      case ClientMessage:
-      {
-        /*
-          If client window delete message, exit.
-        */
-        if (event.xclient.message_type != windows->wm_protocols)
-          break;
-        if (*event.xclient.data.l == (int) windows->wm_take_focus)
-          {
-            (void) XSetInputFocus(display,event.xclient.window,RevertToParent,
-              (Time) event.xclient.data.l[1]);
-            break;
-          }
-        if (*event.xclient.data.l != (int) windows->wm_delete_window)
-          break;
-        if (event.xclient.window == windows->widget.id)
-          {
-            *reply_info.text='\0';
-            state|=ExitState;
-            break;
-          }
-        break;
-      }
-      case ConfigureNotify:
-      {
-        state=ConfigureWidgetWindow(windows,event,state);
-        break;
-      }
-      case EnterNotify:
-      {
-        state=EnterWidgetWindow(windows,event,state);
-        break;
-      }
-      case Expose:
-      {
-        state=ExposeWidgetWindow(windows,event,state);
-        break;
-      }
-      case KeyPress:
-      {
-        static char
-          command[MagickPathExtent];
-
-        static int
-          length;
-
-        static KeySym
-          key_symbol;
-
-        /*
-          Respond to a user key press.
-        */
-        if (event.xkey.window != windows->widget.id)
-          break;
-        length=XLookupString((XKeyEvent *) &event.xkey,command,
-          (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        *(command+length)='\0';
-        if (AreaIsActive(scroll_info,event.xkey))
-          {
-            /*
-              Move slider.
-            */
-            slider_info=MoveFontBrowserSlider(slider_info,key_symbol,
-              visible_files,(int) files);
-            state|=RedrawListState;
-            break;
-          }
-        if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
-          {
-            FileBrowserPaths
-              paths;
-
-            paths.glob_pattern=glob_pattern;
-            paths.working_path=working_path;
-            paths.reply=reply;
-            state=ReadFileBrowserPath(&paths,reply_info,state);
-            break;
-          }
-        if (key_symbol == XK_Control_L)
-          {
-            state|=ControlState;
-            break;
-          }
-        reply_info=ApplyListBrowserControlKey(reply_info,key_symbol,state);
-        XEditText(display,&reply_info,key_symbol,command,state);
-        XDrawMatteText(display,&windows->widget,&reply_info);
-        state|=JumpListState;
-        break;
-      }
-      case KeyRelease:
-      {
-        static char
-          command[MagickPathExtent];
-
-        static KeySym
-          key_symbol;
-
-        /*
-          Respond to a user key release.
-        */
-        if (event.xkey.window != windows->widget.id)
-          break;
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,
-          (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        if (key_symbol == XK_Control_L)
-          state&=(unsigned int) (~ControlState);
-        break;
-      }
-      case LeaveNotify:
-      {
-        state=LeaveWidgetWindow(windows,event,state);
-        break;
-      }
-      case MapNotify:
-      {
-        mask&=(unsigned int) (~CWX);
-        mask&=(unsigned int) (~CWY);
-        break;
-      }
-      case MotionNotify:
-      {
-        /*
-          Discard pending button motion events.
-        */
-        while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
-        if (slider_info.active)
-          {
-            /*
-              Move slider matte.
-            */
-            slider_info=TrackFontBrowserSlider(slider_info,event,(int) files);
-            state|=RedrawListState;
-            break;
-          }
-        if (state & InactiveWidgetState)
-          break;
-        if (up_info.raised == MatteIsActive(up_info,event.xmotion))
-          {
-            /*
-              Up button status changed.
-            */
-            up_info.raised=!up_info.raised;
-            XDrawBeveledButton(display,&windows->widget,&up_info);
-            break;
-          }
-        if (home_info.raised == MatteIsActive(home_info,event.xmotion))
-          {
-            /*
-              Home button status changed.
-            */
-            home_info.raised=!home_info.raised;
-            XDrawBeveledButton(display,&windows->widget,&home_info);
-            break;
-          }
-        if (special_info.raised == MatteIsActive(special_info,event.xmotion))
-          {
-            /*
-              Grab button status changed.
-            */
-            special_info.raised=!special_info.raised;
-            XDrawBeveledButton(display,&windows->widget,&special_info);
-            break;
-          }
-        if (action_info.raised == MatteIsActive(action_info,event.xmotion))
-          {
-            /*
-              Action button status changed.
-            */
-            action_info.raised=action_info.raised == MagickFalse ?
-              MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&action_info);
-            break;
-          }
-        if (cancel_info.raised == MatteIsActive(cancel_info,event.xmotion))
-          {
-            /*
-              Cancel button status changed.
-            */
-            cancel_info.raised=cancel_info.raised == MagickFalse ?
-              MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-            break;
-          }
-        break;
-      }
-      case SelectionClear:
-      {
-        reply_info.highlight=MagickFalse;
-        XDrawMatteText(display,&windows->widget,&reply_info);
-        break;
-      }
-      case SelectionNotify:
-      {
-        Atom
-          type;
-
-        int
-          format;
-
-        unsigned char
-          *data;
-
-        unsigned long
-          after,
-          length;
-
-        /*
-          Obtain response from primary selection.
-        */
-        if (event.xselection.property == (Atom) None)
-          break;
-        status=XGetWindowProperty(display,event.xselection.requestor,
-          event.xselection.property,0L,2047L,MagickTrue,XA_STRING,&type,
-          &format,&length,&after,&data);
-        if (IsUnusableSelection(status,type,format,length) != MagickFalse)
-          break;
-        if ((Extent(reply_info.text)+(int) length) >= (MagickPathExtent-1))
-          (void) XBell(display,0);
-        else
-          {
-            /*
-              Insert primary selection in reply text.
-            */
-            *(data+length)='\0';
-            XEditText(display,&reply_info,(KeySym) XK_Insert,(char *) data,
-              state);
-            XDrawMatteText(display,&windows->widget,&reply_info);
-            state|=JumpListState;
-            state|=RedrawActionState;
-          }
-        (void) XFree((void *) data);
-        break;
-      }
-      case SelectionRequest:
-      {
-        XSelectionEvent
-          notify;
-
-        XSelectionRequestEvent
-          *request;
-
-        if (reply_info.highlight == MagickFalse)
-          break;
-        /*
-          Set primary selection.
-        */
-        request=(&(event.xselectionrequest));
-        (void) XChangeProperty(request->display,request->requestor,
-          request->property,request->target,8,PropModeReplace,
-          (unsigned char *) primary_selection,Extent(primary_selection));
-        notify.type=SelectionNotify;
-        notify.display=request->display;
-        notify.requestor=request->requestor;
-        notify.selection=request->selection;
-        notify.target=request->target;
-        notify.time=request->time;
-        if (request->property == None)
-          notify.property=request->target;
-        else
-          notify.property=request->property;
-        (void) XSendEvent(request->display,request->requestor,False,0,
-          (XEvent *) &notify);
-      }
-      default:
-        break;
-    }
-  } while ((state & ExitState) == 0);
-  XSetCursorState(display,windows,MagickFalse);
-  (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
-  XCheckRefreshWindows(display,windows);
-  /*
-    Free file list.
-  */
-  for (i=0; i < (ssize_t) files; i++)
-    filelist[i]=DestroyString(filelist[i]);
-  if (filelist != (char **) NULL)
-    filelist=(char **) RelinquishMagickMemory(filelist);
-  if (*reply != '\0')
-    {
-      (void) ConcatenateMagickString(working_path,DirectorySeparator,
-        MagickPathExtent);
-      (void) ConcatenateMagickString(working_path,reply,MagickPathExtent);
-    }
-  (void) CopyMagickString(reply,working_path,MagickPathExtent);
-  if (*reply == '~')
-    ExpandFilename(reply);
+    RunFileBrowser(&file_context,&run_targets);
+  }
+  WithdrawBrowserWidget(display,windows);
+  FreeFileBrowserList(filelist,files);
+  SetFileBrowserReply(reply,working_path);
 }
 
 /*
@@ -11021,14 +11945,421 @@ static XWidgetInfo TrackListBrowserSlider(XWidgetInfo slider_info,
   return(slider_info);
 }
 
-MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
-  XWindowInfo *window_info,const char *const *list,const char *action,
-  const char *query,char *reply)
-{
 #define CancelButtonText  "Cancel"
 
+typedef struct _ListBrowserWidgets
+{
+  XWidgetInfo
+    *reply_info;
+
+  size_t
+    *state;
+
+  XWidgetInfo
+    *slider_info;
+
+  XWidgetInfo
+    *action_info;
+
+  XWidgetInfo
+    *cancel_info;
+
+  XWidgetInfo
+    *north_info;
+
+  XWidgetInfo
+    *south_info;
+
+  size_t
+    *delay;
+
+  XWidgetInfo
+    *scroll_info;
+
+  unsigned int
+    *visible_entries;
+
+  XEvent
+    *event;
+
+  XWidgetInfo
+    *list_info;
+
+  MagickStatusType
+    *mask;
+
+  XWidgetInfo
+    *expose_info;
+
+  XWidgetInfo
+    *text_info;
+
+  XWidgetInfo
+    *selection_info;
+} ListBrowserWidgets;
+
+typedef struct _ListBrowserContext
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  XWindowInfo
+    *window_info;
+
+  unsigned int
+    entries;
+
   char
-    primary_selection[MagickPathExtent];
+    *primary_selection;
+
+  XFontStruct
+    *font_info;
+
+  const char
+    *const *list;
+
+  unsigned int
+    height;
+
+  const char
+    *action;
+
+  unsigned int
+    width;
+
+  char
+    *reply;
+
+  const char
+    *query;
+} ListBrowserContext;
+
+static void ClientListBrowserMessage(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  /*
+    If client window delete message, exit.
+  */
+  if (event.xclient.message_type != windows->wm_protocols)
+    return;
+  if (*event.xclient.data.l == (int) windows->wm_take_focus)
+    {
+      (void) XSetInputFocus(display,event.xclient.window,RevertToParent,
+        (Time) event.xclient.data.l[1]);
+      return;
+    }
+  if (*event.xclient.data.l != (int) windows->wm_delete_window)
+    return;
+  if (event.xclient.window == window_info->id)
+    {
+      *(*reply_info).text='\0';
+      (*state)|=ExitState;
+      return;
+    }
+}
+
+static void ReleaseListBrowserScroll(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const action_info = widgets->action_info;
+
+  XWidgetInfo
+    *const cancel_info = widgets->cancel_info;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  size_t
+    *const delay = widgets->delay;
+
+  ListBrowserRelease
+    release;
+
+  if (window_info->mapped == MagickFalse)
+    return;
+  if ((*north_info).raised == MagickFalse)
+    {
+      /*
+        User released up button.
+      */
+      (*delay)=SuspendTime << 2;
+      (*north_info).raised=MagickTrue;
+      XDrawTriangleNorth(display,window_info,north_info);
+    }
+  if ((*south_info).raised == MagickFalse)
+    {
+      /*
+        User released down button.
+      */
+      (*delay)=SuspendTime << 2;
+      (*south_info).raised=MagickTrue;
+      XDrawTriangleSouth(display,window_info,south_info);
+    }
+  if ((*slider_info).active)
+    {
+      /*
+        Stop tracking slider.
+      */
+      (*slider_info).active=MagickFalse;
+      return;
+    }
+  release.display=display;
+  release.window_info=window_info;
+  release.event=event;
+  ReleaseListBrowserAction(&release,(*reply_info),action_info,state);
+  release.display=display;
+  release.window_info=window_info;
+  release.event=event;
+  ReleaseListBrowserCancel(&release,(*reply_info),cancel_info,state);
+  if (MatteIsActive((*reply_info),event.xbutton) == MagickFalse)
+    return;
+}
+
+static void PressListBrowserKey(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserTargets *targets,
+  const ListBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  const unsigned int
+    entries = context->entries;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  unsigned int
+    *const visible_entries = widgets->visible_entries;
+
+  static char
+    command[MagickPathExtent];
+
+  static int
+    length;
+
+  static KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key press.
+  */
+  if (event.xkey.window != window_info->id)
+    return;
+  length=XLookupString((XKeyEvent *) &event.xkey,command,
+    (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  *(command+length)='\0';
+  if (AreaIsActive((*scroll_info),event.xkey))
+    {
+      /*
+        Move slider.
+      */
+      (*slider_info)=MoveListBrowserSlider((*slider_info),key_symbol,
+        (*visible_entries),entries);
+      (*state)|=RedrawListState;
+      return;
+    }
+  if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
+    {
+      ReadListBrowserEntry(display,window_info,(*reply_info),targets);
+      return;
+    }
+  if (key_symbol == XK_Control_L)
+    {
+      (*state)|=ControlState;
+      return;
+    }
+  (*reply_info)=ApplyListBrowserControlKey((*reply_info),key_symbol,(*state));
+  XEditText(display,reply_info,key_symbol,command,(*state));
+  XDrawMatteText(display,window_info,reply_info);
+}
+
+static void MoveListBrowserPointer(const ListBrowserContext *context,
+  const ListBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  const unsigned int
+    entries = context->entries;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const action_info = widgets->action_info;
+
+  XWidgetInfo
+    *const cancel_info = widgets->cancel_info;
+
+  XEvent
+    *const event = widgets->event;
+
+  /*
+    Discard pending button motion events.
+  */
+  while (XCheckMaskEvent(display,ButtonMotionMask,event)) ;
+  if ((*slider_info).active)
+    {
+      /*
+        Move slider matte.
+      */
+      (*slider_info)=TrackListBrowserSlider((*slider_info),(*event),entries);
+      (*state)|=RedrawListState;
+      return;
+    }
+  if ((*state) & InactiveWidgetState)
+    return;
+  if ((*action_info).raised == MatteIsActive((*action_info),(*event).xmotion))
+    {
+      /*
+        Action button status changed.
+      */
+      (*action_info).raised=(*action_info).raised == MagickFalse ?
+        MagickTrue : MagickFalse;
+      XDrawBeveledButton(display,window_info,action_info);
+      return;
+    }
+  if ((*cancel_info).raised == MatteIsActive((*cancel_info),(*event).xmotion))
+    {
+      /*
+        Cancel button status changed.
+      */
+      (*cancel_info).raised=(*cancel_info).raised == MagickFalse ?
+        MagickTrue : MagickFalse;
+      XDrawBeveledButton(display,window_info,cancel_info);
+      return;
+    }
+}
+
+static void InsertListBrowserSelection(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  Status
+    status;
+
+  Atom
+    type;
+
+  int
+    format;
+
+  unsigned char
+    *data;
+
+  unsigned long
+    after,
+    length;
+
+  /*
+    Obtain response from primary selection.
+  */
+  if (event.xselection.property == (Atom) None)
+    return;
+  status=XGetWindowProperty(display,
+    event.xselection.requestor,event.xselection.property,0L,2047L,
+    MagickTrue,XA_STRING,&type,&format,&length,&after,&data);
+  if (IsUnusableSelection(status,type,format,length) != MagickFalse)
+    return;
+  if ((Extent((*reply_info).text)+(int) length) >= (MagickPathExtent-1))
+    (void) XBell(display,0);
+  else
+    {
+      /*
+        Insert primary selection in reply text.
+      */
+      *(data+length)='\0';
+      XEditText(display,reply_info,(KeySym) XK_Insert,(char *) data,
+        (*state));
+      XDrawMatteText(display,window_info,reply_info);
+      (*state)|=RedrawActionState;
+    }
+  (void) XFree((void *) data);
+}
+
+static void ClickListBrowserReply(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  char
+    *const primary_selection = context->primary_selection;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
 
   int
     x;
@@ -11036,18 +12367,1012 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   int
     i;
 
-  static MagickStatusType
-    mask = (MagickStatusType) (CWWidth | CWHeight | CWX | CWY);
+  if (MatteIsActive((*reply_info),event.xbutton) == MagickFalse)
+    return;
+  if (event.xbutton.button != Button2)
+    {
+      static Time
+        click_time;
 
+      ListBrowserClick
+        click;
+
+      /*
+        Move text cursor to position of button press.
+      */
+      x=event.xbutton.x-(*reply_info).x-(int) (QuantumMargin >> 2);
+      i=FindListBrowserCursor(font_info,(*reply_info),x);
+      (*reply_info).cursor=(*reply_info).marker+i-1;
+      click.display=display;
+      click.window_info=window_info;
+      click.event=event;
+      click.click_time=click_time;
+      (*reply_info)=HighlightListBrowserReply(&click,primary_selection,
+        (*reply_info));
+      XDrawMatteText(display,window_info,reply_info);
+      click_time=event.xbutton.time;
+      return;
+    }
+  /*
+    Request primary selection.
+  */
+  (void) XConvertSelection(display,XA_PRIMARY,XA_STRING,XA_STRING,
+    window_info->id,event.xbutton.time);
+}
+
+static void PressListBrowserButtons(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  XWidgetInfo
+    *const action_info = widgets->action_info;
+
+  XWidgetInfo
+    *const cancel_info = widgets->cancel_info;
+
+  if (MatteIsActive((*action_info),event.xbutton))
+    {
+      /*
+        User pressed action button.
+      */
+      (*action_info).raised=MagickFalse;
+      XDrawBeveledButton(display,window_info,action_info);
+      return;
+    }
+  if (MatteIsActive((*cancel_info),event.xbutton))
+    {
+      /*
+        User pressed Cancel button.
+      */
+      (*cancel_info).raised=MagickFalse;
+      XDrawBeveledButton(display,window_info,cancel_info);
+      return;
+    }
+  ClickListBrowserReply(context,event,widgets);
+}
+
+static void PressListBrowserList(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserTargets *targets,
+  const ListBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  const unsigned int
+    entries = context->entries;
+
+  const char
+    *const *const list = context->list;
+
+  const unsigned int
+    height = context->height;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info;
+
+  if (MatteIsActive((*list_info),event.xbutton))
+    {
+      ListBrowserPress
+        press;
+
+      press.display=display;
+      press.window_info=window_info;
+      press.list=list;
+      press.entries=entries;
+      press.height=height;
+      press.event=event;
+      press.slider_info=(*slider_info);
+      SelectListBrowserEntry(&press,targets);
+      return;
+    }
+  PressListBrowserButtons(context,event,widgets);
+}
+
+static void PressListBrowserScroll(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserTargets *targets,
+  const ListBrowserWidgets *widgets)
+{
+  const unsigned int
+    entries = context->entries;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  unsigned int
+    *const visible_entries = widgets->visible_entries;
+
+  if ((MatteIsActive((*south_info),event.xbutton)) &&
+      ((*slider_info).id < (int) entries))
+    {
+      /*
+        Move slider down.
+      */
+      (*south_info).raised=MagickFalse;
+      (*slider_info).id++;
+      (*state)|=RedrawListState;
+      return;
+    }
+  if (MatteIsActive((*scroll_info),event.xbutton))
+    {
+      /*
+        Move slider.
+      */
+      (*slider_info)=PageListBrowserSlider((*slider_info),event,
+        (*visible_entries));
+      (*state)|=RedrawListState;
+      return;
+    }
+  PressListBrowserList(context,event,targets,widgets);
+}
+
+static void PressListBrowserSlider(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserTargets *targets,
+  const ListBrowserWidgets *widgets)
+{
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  if (MatteIsActive((*slider_info),event.xbutton))
+    {
+      /*
+        Track slider.
+      */
+      (*slider_info).active=MagickTrue;
+      return;
+    }
+  if ((MatteIsActive((*north_info),event.xbutton)) &&
+      ((*slider_info).id > 0))
+    {
+      /*
+        Move slider up.
+      */
+      (*north_info).raised=MagickFalse;
+      (*slider_info).id--;
+      (*state)|=RedrawListState;
+      return;
+    }
+  PressListBrowserScroll(context,event,targets,widgets);
+}
+
+static void ConfigureListBrowserWindow(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserWidgets *widgets)
+{
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  size_t
+    *const state = widgets->state;
+
+  /*
+    Update widget configuration.
+  */
+  if (event.xconfigure.window != window_info->id)
+    return;
+  if ((event.xconfigure.width == (int) window_info->width) &&
+      (event.xconfigure.height == (int) window_info->height))
+    return;
+  window_info->width=(unsigned int)
+    MagickMax(event.xconfigure.width,(int) window_info->min_width);
+  window_info->height=(unsigned int)
+    MagickMax(event.xconfigure.height,(int) window_info->min_height);
+  (*state)|=UpdateConfigurationState;
+}
+
+static void ExposeListBrowserWindow(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserWidgets *widgets)
+{
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  size_t
+    *const state = widgets->state;
+
+  if (event.xexpose.window != window_info->id)
+    return;
+  if (event.xexpose.count != 0)
+    return;
+  (*state)|=RedrawWidgetState;
+}
+
+static void ReleaseListBrowserKey(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserWidgets *widgets)
+{
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  size_t
+    *const state = widgets->state;
+
+  static char
+    command[MagickPathExtent];
+
+  static KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key release.
+  */
+  if (event.xkey.window != window_info->id)
+    return;
+  (void) XLookupString((XKeyEvent *) &event.xkey,command,
+    (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  if (key_symbol == XK_Control_L)
+    (*state)&=(unsigned int) (~ControlState);
+}
+
+static void HandleListBrowserSelectionEvent(const ListBrowserContext *context,
+  XEvent event,const ListBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  char
+    *const primary_selection = context->primary_selection;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  switch (event.type)
+  {
+    case MotionNotify:
+    {
+      MoveListBrowserPointer(context,widgets);
+      break;
+    }
+    case SelectionClear:
+    {
+      (*reply_info).highlight=MagickFalse;
+      XDrawMatteText(display,window_info,reply_info);
+      break;
+    }
+    case SelectionNotify:
+    {
+      InsertListBrowserSelection(context,event,widgets);
+      break;
+    }
+    case SelectionRequest:
+    {
+      XSelectionEvent
+        notify;
+
+      XSelectionRequestEvent
+        *request;
+
+      if ((*reply_info).highlight == MagickFalse)
+        break;
+      /*
+        Set primary selection.
+      */
+      request=(&(event.xselectionrequest));
+      (void) XChangeProperty(request->display,request->requestor,
+        request->property,request->target,8,PropModeReplace,
+        (unsigned char *) primary_selection,Extent(primary_selection));
+      notify.type=SelectionNotify;
+      notify.send_event=MagickTrue;
+      notify.display=request->display;
+      notify.requestor=request->requestor;
+      notify.selection=request->selection;
+      notify.target=request->target;
+      notify.time=request->time;
+      if (request->property == None)
+        notify.property=request->target;
+      else
+        notify.property=request->property;
+      (void) XSendEvent(request->display,request->requestor,False,NoEventMask,
+        (XEvent *) &notify);
+    }
+    default:
+      break;
+  }
+}
+
+static void HandleListBrowserKeyEvent(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserTargets *targets,
+  const ListBrowserWidgets *widgets)
+{
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  size_t
+    *const state = widgets->state;
+
+  MagickStatusType
+    *const mask = widgets->mask;
+
+  switch (event.type)
+  {
+    case KeyPress:
+    {
+      PressListBrowserKey(context,event,targets,widgets);
+      break;
+    }
+    case KeyRelease:
+    {
+      ReleaseListBrowserKey(context,event,widgets);
+      break;
+    }
+    case LeaveNotify:
+    {
+      if (event.xcrossing.window != window_info->id)
+        break;
+      (*state)|=InactiveWidgetState;
+      break;
+    }
+    case MapNotify:
+    {
+      (*mask)&=(unsigned int) (~CWX);
+      (*mask)&=(unsigned int) (~CWY);
+      break;
+    }
+    default:
+    {
+      HandleListBrowserSelectionEvent(context,event,widgets);
+      break;
+    }
+  }
+}
+
+static void HandleListBrowserWindowEvent(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserTargets *targets,
+  const ListBrowserWidgets *widgets)
+{
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  size_t
+    *const state = widgets->state;
+
+  switch (event.type)
+  {
+    case ButtonRelease:
+    {
+      ReleaseListBrowserScroll(context,event,widgets);
+      break;
+    }
+    case ClientMessage:
+    {
+      ClientListBrowserMessage(context,event,widgets);
+      break;
+    }
+    case ConfigureNotify:
+    {
+      ConfigureListBrowserWindow(context,event,widgets);
+      break;
+    }
+    case EnterNotify:
+    {
+      if (event.xcrossing.window != window_info->id)
+        break;
+      (*state)&=(unsigned int) (~InactiveWidgetState);
+      break;
+    }
+    case Expose:
+    {
+      ExposeListBrowserWindow(context,event,widgets);
+      break;
+    }
+    default:
+    {
+      HandleListBrowserKeyEvent(context,event,targets,widgets);
+      break;
+    }
+  }
+}
+
+static void InitializeListBrowserButtons(const ListBrowserContext *context,
+  const ListBrowserWidgets *widgets)
+{
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    height = context->height;
+
+  const char
+    *const action = context->action;
+
+  const unsigned int
+    width = context->width;
+
+  XWidgetInfo
+    *const action_info = widgets->action_info;
+
+  XWidgetInfo
+    *const cancel_info = widgets->cancel_info;
+
+  /*
+    Initialize button information.
+  */
+  XGetWidgetInfo(CancelButtonText,cancel_info);
+  (*cancel_info).width=width;
+  (*cancel_info).height=(unsigned int) ((3*height) >> 1);
+  (*cancel_info).x=(int) window_info->width-(int) (*cancel_info).width-
+    QuantumMargin-2;
+  (*cancel_info).y=(int) window_info->height-(int) (*cancel_info).height-
+    QuantumMargin;
+  XGetWidgetInfo(action,action_info);
+  (*action_info).width=width;
+  (*action_info).height=(unsigned int) ((3*height) >> 1);
+  (*action_info).x=(*cancel_info).x-((int) (*cancel_info).width+
+    (QuantumMargin >> 1)+(int) ((*action_info).bevel_width << 1));
+  (*action_info).y=(*cancel_info).y;
+}
+
+static void InitializeListBrowserReply(const ListBrowserContext *context,
+  const ListBrowserWidgets *widgets)
+{
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    height = context->height;
+
+  char
+    *const reply = context->reply;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  XWidgetInfo
+    *const action_info = widgets->action_info;
+
+  /*
+    Initialize reply information.
+  */
+  XGetWidgetInfo(reply,reply_info);
+  (*reply_info).raised=MagickFalse;
+  (*reply_info).bevel_width--;
+  (*reply_info).width=(unsigned int) ((int) window_info->width-
+    (((4*QuantumMargin) >> 1)));
+  (*reply_info).height=height << 1;
+  (*reply_info).x=QuantumMargin;
+  (*reply_info).y=(*action_info).y-(int) (*reply_info).height-QuantumMargin;
+}
+
+static void InitializeListBrowserScroll(const ListBrowserContext *context,
+  const ListBrowserWidgets *widgets)
+{
+  const unsigned int
+    entries = context->entries;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    height = context->height;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  unsigned int
+    *const visible_entries = widgets->visible_entries;
+
+  XWidgetInfo
+    *const expose_info = widgets->expose_info;
+
+  int
+    id;
+
+  /*
+    Initialize scroll information.
+  */
+  XGetWidgetInfo((char *) NULL,scroll_info);
+  (*scroll_info).bevel_width--;
+  (*scroll_info).width=height;
+  (*scroll_info).height=(unsigned int)
+    ((*reply_info).y-((6*QuantumMargin) >> 1)-(int) height);
+  (*scroll_info).x=(*reply_info).x+(int) ((*reply_info).width-
+    (*scroll_info).width);
+  (*scroll_info).y=((5*QuantumMargin) >> 1)+(int) height-(int)
+    (*reply_info).bevel_width;
+  (*scroll_info).raised=MagickFalse;
+  (*scroll_info).trough=MagickTrue;
+  (*north_info)=(*scroll_info);
+  (*north_info).raised=MagickTrue;
+  (*north_info).width-=((*north_info).bevel_width << 1);
+  (*north_info).height=(*north_info).width-1;
+  (*north_info).x+=(int) (*north_info).bevel_width;
+  (*north_info).y+=(int) (*north_info).bevel_width;
+  (*south_info)=(*north_info);
+  (*south_info).y=(*scroll_info).y+(int) (*scroll_info).height-(int)
+    (*scroll_info).bevel_width-(int) (*south_info).height;
+  id=(*slider_info).id;
+  (*slider_info)=(*north_info);
+  (*slider_info).id=id;
+  (*slider_info).width-=2;
+  (*slider_info).min_y=(*north_info).y+(int) (*north_info).height+(int)
+    (*north_info).bevel_width+(int) (*slider_info).bevel_width+2;
+  (*slider_info).height=(unsigned int) ((int) (*scroll_info).height-
+    (((*slider_info).min_y-(*scroll_info).y+1) << 1)+4);
+  (*visible_entries)=(unsigned int) ((*scroll_info).height*
+    MagickSafeReciprocal((double) height+(height >> 3)));
+  if (entries > (*visible_entries))
+    (*slider_info).height=((*visible_entries)*(*slider_info).height)/entries;
+  (*slider_info).max_y=(*south_info).y-(int) (*south_info).bevel_width-(int)
+    (*slider_info).bevel_width-2;
+  (*slider_info).x=(*scroll_info).x+(int) (*slider_info).bevel_width+1;
+  (*slider_info).y=(*slider_info).min_y;
+  (*expose_info)=(*scroll_info);
+  (*expose_info).y=(*slider_info).y;
+}
+
+static void InitializeListBrowserList(const ListBrowserContext *context,
+  const ListBrowserWidgets *widgets)
+{
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  const unsigned int
+    entries = context->entries;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const char
+    *const *const list = context->list;
+
+  char
+    *const reply = context->reply;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  unsigned int
+    *const visible_entries = widgets->visible_entries;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info;
+
+  /*
+    Initialize list information.
+  */
+  XGetWidgetInfo((char *) NULL,list_info);
+  (*list_info).raised=MagickFalse;
+  (*list_info).bevel_width--;
+  (*list_info).width=(unsigned int)
+    ((*scroll_info).x-(*reply_info).x-(int) (QuantumMargin >> 1));
+  (*list_info).height=(*scroll_info).height;
+  (*list_info).x=(*reply_info).x;
+  (*list_info).y=(*scroll_info).y;
+  if (window_info->mapped == MagickFalse)
+    {
+      ListBrowserReplyMatch
+        match;
+
+      match.list=list;
+      match.reply=reply;
+      match.entries=entries;
+      match.visible_entries=(*visible_entries);
+      MatchListBrowserReply(&match,list_info,slider_info);
+    }
+}
+
+static void InitializeListBrowserText(const ListBrowserContext *context,
+  const ListBrowserWidgets *widgets)
+{
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    height = context->height;
+
+  const char
+    *const query = context->query;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info;
+
+  XWidgetInfo
+    *const text_info = widgets->text_info;
+
+  XWidgetInfo
+    *const selection_info = widgets->selection_info;
+
+  /*
+    Initialize text information.
+  */
+  XGetWidgetInfo(query,text_info);
+  (*text_info).width=(*reply_info).width;
+  (*text_info).height=height;
+  (*text_info).x=(*list_info).x-(int) (QuantumMargin >> 1);
+  (*text_info).y=QuantumMargin;
+  /*
+    Initialize selection information.
+  */
+  XGetWidgetInfo((char *) NULL,selection_info);
+  (*selection_info).center=MagickFalse;
+  (*selection_info).width=(*list_info).width;
+  (*selection_info).height=(unsigned int) ((9*height) >> 3);
+  (*selection_info).x=(*list_info).x;
+  (*state)&=(unsigned int) (~UpdateConfigurationState);
+}
+
+static void UpdateListBrowserLayout(const ListBrowserContext *context,
+  const ListBrowserWidgets *widgets)
+{
+  size_t
+    *const state = widgets->state;
+
+  if ((*state) & UpdateConfigurationState)
+    {
+      InitializeListBrowserButtons(context,widgets);
+      InitializeListBrowserReply(context,widgets);
+      InitializeListBrowserScroll(context,widgets);
+      InitializeListBrowserList(context,widgets);
+      InitializeListBrowserText(context,widgets);
+    }
+}
+
+static void RedrawListBrowserWidget(const ListBrowserContext *context,
+  const ListBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const action_info = widgets->action_info;
+
+  XWidgetInfo
+    *const cancel_info = widgets->cancel_info;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info;
+
+  XWidgetInfo
+    *const text_info = widgets->text_info;
+
+  XWidgetInfo
+    *const selection_info = widgets->selection_info;
+
+  if ((*state) & RedrawWidgetState)
+    {
+      /*
+        Redraw List Browser window.
+      */
+      XDrawWidgetText(display,window_info,text_info);
+      XDrawBeveledMatte(display,window_info,list_info);
+      XDrawBeveledMatte(display,window_info,scroll_info);
+      XDrawTriangleNorth(display,window_info,north_info);
+      XDrawBeveledButton(display,window_info,slider_info);
+      XDrawTriangleSouth(display,window_info,south_info);
+      XDrawBeveledMatte(display,window_info,reply_info);
+      XDrawMatteText(display,window_info,reply_info);
+      XDrawBeveledButton(display,window_info,action_info);
+      XDrawBeveledButton(display,window_info,cancel_info);
+      XHighlightWidget(display,window_info,BorderOffset,BorderOffset);
+      (*selection_info).id=(~0);
+      (*state)|=RedrawActionState;
+      (*state)|=RedrawListState;
+      (*state)&=(unsigned int) (~RedrawWidgetState);
+    }
+}
+
+static void RedrawListBrowserEntries(const ListBrowserContext *context,
+  const ListBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  const unsigned int
+    entries = context->entries;
+
+  const char
+    *const *const list = context->list;
+
+  const unsigned int
+    height = context->height;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  unsigned int
+    *const visible_entries = widgets->visible_entries;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info;
+
+  XWidgetInfo
+    *const expose_info = widgets->expose_info;
+
+  XWidgetInfo
+    *const selection_info = widgets->selection_info;
+
+  if ((*state) & RedrawListState)
+    {
+      /*
+        Determine slider id and position.
+      */
+      if ((*slider_info).id >= (int) (entries-(*visible_entries)))
+        (*slider_info).id=(int) (entries-(*visible_entries));
+      if (((*slider_info).id < 0) || (entries <= (*visible_entries)))
+        (*slider_info).id=0;
+      (*slider_info).y=(*slider_info).min_y;
+      if (entries > 0)
+        (*slider_info).y+=(*slider_info).id*((*slider_info).max_y-
+          (*slider_info).min_y+1)/(int) entries;
+      if ((*slider_info).id != (*selection_info).id)
+        {
+          ListBrowserRedraw
+            redraw;
+
+          redraw.display=display;
+          redraw.window_info=window_info;
+          redraw.list=list;
+          redraw.entries=entries;
+          redraw.height=height;
+          redraw.visible_entries=(*visible_entries);
+          redraw.list_info=(list_info);
+          redraw.north_info=(*north_info);
+          redraw.slider_info=(*slider_info);
+          redraw.south_info=(*south_info);
+          RedrawListBrowserList(&redraw,selection_info,expose_info);
+        }
+      (*state)&=(unsigned int) (~RedrawListState);
+    }
+}
+
+static MagickBooleanType WaitForListBrowserEvent(
+  const ListBrowserContext *context,const ListBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    entries = context->entries;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  size_t
+    *const delay = widgets->delay;
+
+  XEvent
+    *const event = widgets->event;
+
+  /*
+    Wait for next event.
+  */
+  if ((*north_info).raised && (*south_info).raised)
+    (void) XIfEvent(display,event,XScreenEvent,(char *) windows);
+  else
+    {
+      /*
+        Brief delay before advancing scroll bar.
+      */
+      XDelay(display,(*delay));
+      (*delay)=SuspendTime;
+      (void) XCheckIfEvent(display,event,XScreenEvent,(char *) windows);
+      if (((*north_info).raised == MagickFalse) && ((*slider_info).id > 0))
+        {
+          /*
+            Move slider up.
+          */
+          (*slider_info).id--;
+          (*state)|=RedrawListState;
+        }
+      if (((*south_info).raised == MagickFalse) &&
+          ((*slider_info).id < (int) entries))
+        {
+          /*
+            Move slider down.
+          */
+          (*slider_info).id++;
+          (*state)|=RedrawListState;
+        }
+      if ((*event).type != ButtonRelease)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static unsigned int GetListBrowserWidth(XFontStruct *font_info,
+  const char *action)
+{
+  unsigned int
+    width;
+
+  width=WidgetTextWidth(font_info,(char *) action);
+  if (WidgetTextWidth(font_info,CancelButtonText) > width)
+    width=WidgetTextWidth(font_info,CancelButtonText);
+  width+=(unsigned int) QuantumMargin;
+  return(width);
+}
+
+static void PositionListBrowserWidget(XWindowInfo *window_info,
+  XFontStruct *font_info,unsigned int text_width,unsigned int height)
+{
+  window_info->width=MagickMin(text_width,MaxTextWidth)+(unsigned int)
+    ((9*QuantumMargin) >> 1);
+  window_info->min_width=(MinTextWidth+4*(unsigned int) QuantumMargin);
+  if (window_info->width < window_info->min_width)
+    window_info->width=window_info->min_width;
+  window_info->height=(((81*height) >> 2)+(unsigned int)
+    ((13*QuantumMargin) >> 1)+4);
+  window_info->min_height=(((23*height) >> 1)+(unsigned int)
+    ((13*QuantumMargin) >> 1)+4);
+  if (window_info->height < window_info->min_height)
+    window_info->height=window_info->min_height;
+}
+
+static void MapListBrowserWidget(Display *display,XWindows *windows,
+  XWindowInfo *window_info,MagickStatusType mask)
+{
   Status
     status;
 
+  XTextProperty
+    window_name;
+
+  XWindowChanges
+    window_changes;
+
+  (void) CopyMagickString(window_info->name,"Browse",MagickPathExtent);
+  status=XStringListToTextProperty(&window_info->name,1,&window_name);
+  if (status != False)
+    {
+      XSetWMName(display,window_info->id,&window_name);
+      XSetWMIconName(display,windows->widget.id,&window_name);
+      (void) XFree((void *) window_name.value);
+    }
+  window_changes.width=(int) window_info->width;
+  window_changes.height=(int) window_info->height;
+  window_changes.x=window_info->x;
+  window_changes.y=window_info->y;
+  (void) XReconfigureWMWindow(display,window_info->id,window_info->screen,mask,
+    &window_changes);
+  (void) XMapRaised(display,window_info->id);
+  window_info->mapped=MagickFalse;
+}
+
+static void WithdrawListBrowserWidget(Display *display,XWindows *windows,
+  XWindowInfo *window_info)
+{
+  XSetCursorState(display,windows,MagickFalse);
+  (void) XWithdrawWindow(display,window_info->id,window_info->screen);
+  XCheckRefreshWindows(display,windows);
+}
+
+static void RespondToListBrowserEvents(const ListBrowserContext *context,
+  const ListBrowserTargets *targets,const ListBrowserWidgets *widgets)
+{
+  size_t
+    *const state = widgets->state;
+
+  XEvent
+    *const event = widgets->event;
+
+  do
+  {
+    UpdateListBrowserLayout(context,widgets);
+    RedrawListBrowserWidget(context,widgets);
+    RedrawListBrowserEntries(context,widgets);
+    if (WaitForListBrowserEvent(context,widgets) == MagickFalse)
+      continue;
+    switch ((*event).type)
+    {
+      case ButtonPress:
+      {
+        PressListBrowserSlider(context,(*event),targets,widgets);
+        break;
+      }
+      default:
+      {
+        HandleListBrowserWindowEvent(context,(*event),targets,widgets);
+        break;
+      }
+    }
+  } while (((*state) & ExitState) == 0);
+}
+
+static void RunListBrowser(const ListBrowserContext *context,
+  MagickStatusType *mask)
+{
   unsigned int
-    entries,
-    height,
-    text_width,
-    visible_entries,
-    width;
+    visible_entries;
 
   size_t
     delay,
@@ -11055,12 +13380,6 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
 
   XEvent
     event;
-
-  XFontStruct
-    *font_info;
-
-  XTextProperty
-    window_name;
 
   XWidgetInfo
     action_info,
@@ -11075,12 +13394,48 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
     south_info,
     text_info;
 
-  XWindowChanges
-    window_changes;
-
   const ListBrowserTargets
     targets = { &reply_info, &selection_info, &action_info, &state,
       &list_info };
+
+  const ListBrowserWidgets
+    list_widgets = { &reply_info, &state, &slider_info, &action_info,
+      &cancel_info, &north_info, &south_info, &delay, &scroll_info,
+      &visible_entries, &event, &list_info, mask, &expose_info, &text_info,
+      &selection_info };
+
+  XGetWidgetInfo((char *) NULL,&slider_info);
+  XGetWidgetInfo((char *) NULL,&north_info);
+  XGetWidgetInfo((char *) NULL,&south_info);
+  XGetWidgetInfo((char *) NULL,&expose_info);
+  XGetWidgetInfo((char *) NULL,&selection_info);
+  visible_entries=0;
+  delay=SuspendTime << 2;
+  state=UpdateConfigurationState;
+  RespondToListBrowserEvents(context,&targets,&list_widgets);
+}
+
+MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
+  XWindowInfo *window_info,const char *const *list,const char *action,
+  const char *query,char *reply)
+{
+  char
+    primary_selection[MagickPathExtent];
+
+  static MagickStatusType
+    mask = (MagickStatusType) (CWWidth | CWHeight | CWX | CWY);
+
+  unsigned int
+    entries,
+    height,
+    text_width,
+    width;
+
+  XFontStruct
+    *font_info;
+
+  ListBrowserContext
+    list_context;
 
   /*
     Count the number of entries in the list.
@@ -11108,667 +13463,34 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   font_info=window_info->font_info;
   text_width=WidgetTextWidth(font_info,(char *) query);
   text_width=WidestListBrowserEntry(font_info,list,entries,text_width);
-  width=WidgetTextWidth(font_info,(char *) action);
-  if (WidgetTextWidth(font_info,CancelButtonText) > width)
-    width=WidgetTextWidth(font_info,CancelButtonText);
-  width+=(unsigned int) QuantumMargin;
+  width=GetListBrowserWidth(font_info,action);
   height=(unsigned int) (font_info->ascent+font_info->descent);
   /*
     Position List Browser widget.
   */
-  window_info->width=MagickMin(text_width,MaxTextWidth)+(unsigned int)
-    ((9*QuantumMargin) >> 1);
-  window_info->min_width=(MinTextWidth+4*(unsigned int) QuantumMargin);
-  if (window_info->width < window_info->min_width)
-    window_info->width=window_info->min_width;
-  window_info->height=(((81*height) >> 2)+(unsigned int)
-    ((13*QuantumMargin) >> 1)+4);
-  window_info->min_height=(((23*height) >> 1)+(unsigned int)
-    ((13*QuantumMargin) >> 1)+4);
-  if (window_info->height < window_info->min_height)
-    window_info->height=window_info->min_height;
+  PositionListBrowserWidget(window_info,font_info,text_width,height);
   XConstrainWindowPosition(display,window_info);
   /*
     Map List Browser widget.
   */
-  (void) CopyMagickString(window_info->name,"Browse",MagickPathExtent);
-  status=XStringListToTextProperty(&window_info->name,1,&window_name);
-  if (status != False)
-    {
-      XSetWMName(display,window_info->id,&window_name);
-      XSetWMIconName(display,windows->widget.id,&window_name);
-      (void) XFree((void *) window_name.value);
-    }
-  window_changes.width=(int) window_info->width;
-  window_changes.height=(int) window_info->height;
-  window_changes.x=window_info->x;
-  window_changes.y=window_info->y;
-  (void) XReconfigureWMWindow(display,window_info->id,window_info->screen,mask,
-    &window_changes);
-  (void) XMapRaised(display,window_info->id);
-  window_info->mapped=MagickFalse;
+  MapListBrowserWidget(display,windows,window_info,mask);
   /*
     Respond to X events.
   */
-  XGetWidgetInfo((char *) NULL,&slider_info);
-  XGetWidgetInfo((char *) NULL,&north_info);
-  XGetWidgetInfo((char *) NULL,&south_info);
-  XGetWidgetInfo((char *) NULL,&expose_info);
-  XGetWidgetInfo((char *) NULL,&selection_info);
-  visible_entries=0;
-  delay=SuspendTime << 2;
-  state=UpdateConfigurationState;
-  do
-  {
-    if (state & UpdateConfigurationState)
-      {
-        int
-          id;
-
-        /*
-          Initialize button information.
-        */
-        XGetWidgetInfo(CancelButtonText,&cancel_info);
-        cancel_info.width=width;
-        cancel_info.height=(unsigned int) ((3*height) >> 1);
-        cancel_info.x=(int) window_info->width-(int) cancel_info.width-
-          QuantumMargin-2;
-        cancel_info.y=(int) window_info->height-(int) cancel_info.height-
-          QuantumMargin;
-        XGetWidgetInfo(action,&action_info);
-        action_info.width=width;
-        action_info.height=(unsigned int) ((3*height) >> 1);
-        action_info.x=cancel_info.x-((int) cancel_info.width+
-          (QuantumMargin >> 1)+(int) (action_info.bevel_width << 1));
-        action_info.y=cancel_info.y;
-        /*
-          Initialize reply information.
-        */
-        XGetWidgetInfo(reply,&reply_info);
-        reply_info.raised=MagickFalse;
-        reply_info.bevel_width--;
-        reply_info.width=(unsigned int) ((int) window_info->width-
-          (((4*QuantumMargin) >> 1)));
-        reply_info.height=height << 1;
-        reply_info.x=QuantumMargin;
-        reply_info.y=action_info.y-(int) reply_info.height-QuantumMargin;
-        /*
-          Initialize scroll information.
-        */
-        XGetWidgetInfo((char *) NULL,&scroll_info);
-        scroll_info.bevel_width--;
-        scroll_info.width=height;
-        scroll_info.height=(unsigned int)
-          (reply_info.y-((6*QuantumMargin) >> 1)-(int) height);
-        scroll_info.x=reply_info.x+(int) (reply_info.width-scroll_info.width);
-        scroll_info.y=((5*QuantumMargin) >> 1)+(int) height-(int)
-          reply_info.bevel_width;
-        scroll_info.raised=MagickFalse;
-        scroll_info.trough=MagickTrue;
-        north_info=scroll_info;
-        north_info.raised=MagickTrue;
-        north_info.width-=(north_info.bevel_width << 1);
-        north_info.height=north_info.width-1;
-        north_info.x+=(int) north_info.bevel_width;
-        north_info.y+=(int) north_info.bevel_width;
-        south_info=north_info;
-        south_info.y=scroll_info.y+(int) scroll_info.height-(int)
-          scroll_info.bevel_width-(int) south_info.height;
-        id=slider_info.id;
-        slider_info=north_info;
-        slider_info.id=id;
-        slider_info.width-=2;
-        slider_info.min_y=north_info.y+(int) north_info.height+(int)
-          north_info.bevel_width+(int) slider_info.bevel_width+2;
-        slider_info.height=(unsigned int) ((int) scroll_info.height-
-          ((slider_info.min_y-scroll_info.y+1) << 1)+4);
-        visible_entries=(unsigned int) (scroll_info.height*
-          MagickSafeReciprocal((double) height+(height >> 3)));
-        if (entries > visible_entries)
-          slider_info.height=(visible_entries*slider_info.height)/entries;
-        slider_info.max_y=south_info.y-(int) south_info.bevel_width-(int)
-          slider_info.bevel_width-2;
-        slider_info.x=scroll_info.x+(int) slider_info.bevel_width+1;
-        slider_info.y=slider_info.min_y;
-        expose_info=scroll_info;
-        expose_info.y=slider_info.y;
-        /*
-          Initialize list information.
-        */
-        XGetWidgetInfo((char *) NULL,&list_info);
-        list_info.raised=MagickFalse;
-        list_info.bevel_width--;
-        list_info.width=(unsigned int)
-          (scroll_info.x-reply_info.x-(int) (QuantumMargin >> 1));
-        list_info.height=scroll_info.height;
-        list_info.x=reply_info.x;
-        list_info.y=scroll_info.y;
-        if (window_info->mapped == MagickFalse)
-          {
-            ListBrowserReplyMatch
-              match;
-
-            match.list=list;
-            match.reply=reply;
-            match.entries=entries;
-            match.visible_entries=visible_entries;
-            MatchListBrowserReply(&match,&list_info,&slider_info);
-          }
-        /*
-          Initialize text information.
-        */
-        XGetWidgetInfo(query,&text_info);
-        text_info.width=reply_info.width;
-        text_info.height=height;
-        text_info.x=list_info.x-(int) (QuantumMargin >> 1);
-        text_info.y=QuantumMargin;
-        /*
-          Initialize selection information.
-        */
-        XGetWidgetInfo((char *) NULL,&selection_info);
-        selection_info.center=MagickFalse;
-        selection_info.width=list_info.width;
-        selection_info.height=(unsigned int) ((9*height) >> 3);
-        selection_info.x=list_info.x;
-        state&=(unsigned int) (~UpdateConfigurationState);
-      }
-    if (state & RedrawWidgetState)
-      {
-        /*
-          Redraw List Browser window.
-        */
-        XDrawWidgetText(display,window_info,&text_info);
-        XDrawBeveledMatte(display,window_info,&list_info);
-        XDrawBeveledMatte(display,window_info,&scroll_info);
-        XDrawTriangleNorth(display,window_info,&north_info);
-        XDrawBeveledButton(display,window_info,&slider_info);
-        XDrawTriangleSouth(display,window_info,&south_info);
-        XDrawBeveledMatte(display,window_info,&reply_info);
-        XDrawMatteText(display,window_info,&reply_info);
-        XDrawBeveledButton(display,window_info,&action_info);
-        XDrawBeveledButton(display,window_info,&cancel_info);
-        XHighlightWidget(display,window_info,BorderOffset,BorderOffset);
-        selection_info.id=(~0);
-        state|=RedrawActionState;
-        state|=RedrawListState;
-        state&=(unsigned int) (~RedrawWidgetState);
-      }
-    if (state & RedrawListState)
-      {
-        /*
-          Determine slider id and position.
-        */
-        if (slider_info.id >= (int) (entries-visible_entries))
-          slider_info.id=(int) (entries-visible_entries);
-        if ((slider_info.id < 0) || (entries <= visible_entries))
-          slider_info.id=0;
-        slider_info.y=slider_info.min_y;
-        if (entries > 0)
-          slider_info.y+=slider_info.id*(slider_info.max_y-
-            slider_info.min_y+1)/(int) entries;
-        if (slider_info.id != selection_info.id)
-          {
-            ListBrowserRedraw
-              redraw;
-
-            redraw.display=display;
-            redraw.window_info=window_info;
-            redraw.list=list;
-            redraw.entries=entries;
-            redraw.height=height;
-            redraw.visible_entries=visible_entries;
-            redraw.list_info=(&list_info);
-            redraw.north_info=north_info;
-            redraw.slider_info=slider_info;
-            redraw.south_info=south_info;
-            RedrawListBrowserList(&redraw,&selection_info,&expose_info);
-          }
-        state&=(unsigned int) (~RedrawListState);
-      }
-    /*
-      Wait for next event.
-    */
-    if (north_info.raised && south_info.raised)
-      (void) XIfEvent(display,&event,XScreenEvent,(char *) windows);
-    else
-      {
-        /*
-          Brief delay before advancing scroll bar.
-        */
-        XDelay(display,delay);
-        delay=SuspendTime;
-        (void) XCheckIfEvent(display,&event,XScreenEvent,(char *) windows);
-        if ((north_info.raised == MagickFalse) && (slider_info.id > 0))
-          {
-            /*
-              Move slider up.
-            */
-            slider_info.id--;
-            state|=RedrawListState;
-          }
-        if ((south_info.raised == MagickFalse) &&
-            (slider_info.id < (int) entries))
-          {
-            /*
-              Move slider down.
-            */
-            slider_info.id++;
-            state|=RedrawListState;
-          }
-        if (event.type != ButtonRelease)
-          continue;
-      }
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        if (MatteIsActive(slider_info,event.xbutton))
-          {
-            /*
-              Track slider.
-            */
-            slider_info.active=MagickTrue;
-            break;
-          }
-        if ((MatteIsActive(north_info,event.xbutton)) &&
-            (slider_info.id > 0))
-          {
-            /*
-              Move slider up.
-            */
-            north_info.raised=MagickFalse;
-            slider_info.id--;
-            state|=RedrawListState;
-            break;
-          }
-        if ((MatteIsActive(south_info,event.xbutton)) &&
-            (slider_info.id < (int) entries))
-          {
-            /*
-              Move slider down.
-            */
-            south_info.raised=MagickFalse;
-            slider_info.id++;
-            state|=RedrawListState;
-            break;
-          }
-        if (MatteIsActive(scroll_info,event.xbutton))
-          {
-            /*
-              Move slider.
-            */
-            slider_info=PageListBrowserSlider(slider_info,event,
-              visible_entries);
-            state|=RedrawListState;
-            break;
-          }
-        if (MatteIsActive(list_info,event.xbutton))
-          {
-            ListBrowserPress
-              press;
-
-            press.display=display;
-            press.window_info=window_info;
-            press.list=list;
-            press.entries=entries;
-            press.height=height;
-            press.event=event;
-            press.slider_info=slider_info;
-            SelectListBrowserEntry(&press,&targets);
-            break;
-          }
-        if (MatteIsActive(action_info,event.xbutton))
-          {
-            /*
-              User pressed action button.
-            */
-            action_info.raised=MagickFalse;
-            XDrawBeveledButton(display,window_info,&action_info);
-            break;
-          }
-        if (MatteIsActive(cancel_info,event.xbutton))
-          {
-            /*
-              User pressed Cancel button.
-            */
-            cancel_info.raised=MagickFalse;
-            XDrawBeveledButton(display,window_info,&cancel_info);
-            break;
-          }
-        if (MatteIsActive(reply_info,event.xbutton) == MagickFalse)
-          break;
-        if (event.xbutton.button != Button2)
-          {
-            static Time
-              click_time;
-
-            ListBrowserClick
-              click;
-
-            /*
-              Move text cursor to position of button press.
-            */
-            x=event.xbutton.x-reply_info.x-(int) (QuantumMargin >> 2);
-            i=FindListBrowserCursor(font_info,reply_info,x);
-            reply_info.cursor=reply_info.marker+i-1;
-            click.display=display;
-            click.window_info=window_info;
-            click.event=event;
-            click.click_time=click_time;
-            reply_info=HighlightListBrowserReply(&click,primary_selection,
-              reply_info);
-            XDrawMatteText(display,window_info,&reply_info);
-            click_time=event.xbutton.time;
-            break;
-          }
-        /*
-          Request primary selection.
-        */
-        (void) XConvertSelection(display,XA_PRIMARY,XA_STRING,XA_STRING,
-          window_info->id,event.xbutton.time);
-        break;
-      }
-      case ButtonRelease:
-      {
-        ListBrowserRelease
-          release;
-
-        if (window_info->mapped == MagickFalse)
-          break;
-        if (north_info.raised == MagickFalse)
-          {
-            /*
-              User released up button.
-            */
-            delay=SuspendTime << 2;
-            north_info.raised=MagickTrue;
-            XDrawTriangleNorth(display,window_info,&north_info);
-          }
-        if (south_info.raised == MagickFalse)
-          {
-            /*
-              User released down button.
-            */
-            delay=SuspendTime << 2;
-            south_info.raised=MagickTrue;
-            XDrawTriangleSouth(display,window_info,&south_info);
-          }
-        if (slider_info.active)
-          {
-            /*
-              Stop tracking slider.
-            */
-            slider_info.active=MagickFalse;
-            break;
-          }
-        release.display=display;
-        release.window_info=window_info;
-        release.event=event;
-        ReleaseListBrowserAction(&release,reply_info,&action_info,&state);
-        release.display=display;
-        release.window_info=window_info;
-        release.event=event;
-        ReleaseListBrowserCancel(&release,reply_info,&cancel_info,&state);
-        if (MatteIsActive(reply_info,event.xbutton) == MagickFalse)
-          break;
-        break;
-      }
-      case ClientMessage:
-      {
-        /*
-          If client window delete message, exit.
-        */
-        if (event.xclient.message_type != windows->wm_protocols)
-          break;
-        if (*event.xclient.data.l == (int) windows->wm_take_focus)
-          {
-            (void) XSetInputFocus(display,event.xclient.window,RevertToParent,
-              (Time) event.xclient.data.l[1]);
-            break;
-          }
-        if (*event.xclient.data.l != (int) windows->wm_delete_window)
-          break;
-        if (event.xclient.window == window_info->id)
-          {
-            *reply_info.text='\0';
-            state|=ExitState;
-            break;
-          }
-        break;
-      }
-      case ConfigureNotify:
-      {
-        /*
-          Update widget configuration.
-        */
-        if (event.xconfigure.window != window_info->id)
-          break;
-        if ((event.xconfigure.width == (int) window_info->width) &&
-            (event.xconfigure.height == (int) window_info->height))
-          break;
-        window_info->width=(unsigned int)
-          MagickMax(event.xconfigure.width,(int) window_info->min_width);
-        window_info->height=(unsigned int)
-          MagickMax(event.xconfigure.height,(int) window_info->min_height);
-        state|=UpdateConfigurationState;
-        break;
-      }
-      case EnterNotify:
-      {
-        if (event.xcrossing.window != window_info->id)
-          break;
-        state&=(unsigned int) (~InactiveWidgetState);
-        break;
-      }
-      case Expose:
-      {
-        if (event.xexpose.window != window_info->id)
-          break;
-        if (event.xexpose.count != 0)
-          break;
-        state|=RedrawWidgetState;
-        break;
-      }
-      case KeyPress:
-      {
-        static char
-          command[MagickPathExtent];
-
-        static int
-          length;
-
-        static KeySym
-          key_symbol;
-
-        /*
-          Respond to a user key press.
-        */
-        if (event.xkey.window != window_info->id)
-          break;
-        length=XLookupString((XKeyEvent *) &event.xkey,command,
-          (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        *(command+length)='\0';
-        if (AreaIsActive(scroll_info,event.xkey))
-          {
-            /*
-              Move slider.
-            */
-            slider_info=MoveListBrowserSlider(slider_info,key_symbol,
-              visible_entries,entries);
-            state|=RedrawListState;
-            break;
-          }
-        if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
-          {
-            ReadListBrowserEntry(display,window_info,reply_info,&targets);
-            break;
-          }
-        if (key_symbol == XK_Control_L)
-          {
-            state|=ControlState;
-            break;
-          }
-        reply_info=ApplyListBrowserControlKey(reply_info,key_symbol,state);
-        XEditText(display,&reply_info,key_symbol,command,state);
-        XDrawMatteText(display,window_info,&reply_info);
-        break;
-      }
-      case KeyRelease:
-      {
-        static char
-          command[MagickPathExtent];
-
-        static KeySym
-          key_symbol;
-
-        /*
-          Respond to a user key release.
-        */
-        if (event.xkey.window != window_info->id)
-          break;
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,
-          (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        if (key_symbol == XK_Control_L)
-          state&=(unsigned int) (~ControlState);
-        break;
-      }
-      case LeaveNotify:
-      {
-        if (event.xcrossing.window != window_info->id)
-          break;
-        state|=InactiveWidgetState;
-        break;
-      }
-      case MapNotify:
-      {
-        mask&=(unsigned int) (~CWX);
-        mask&=(unsigned int) (~CWY);
-        break;
-      }
-      case MotionNotify:
-      {
-        /*
-          Discard pending button motion events.
-        */
-        while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
-        if (slider_info.active)
-          {
-            /*
-              Move slider matte.
-            */
-            slider_info=TrackListBrowserSlider(slider_info,event,entries);
-            state|=RedrawListState;
-            break;
-          }
-        if (state & InactiveWidgetState)
-          break;
-        if (action_info.raised == MatteIsActive(action_info,event.xmotion))
-          {
-            /*
-              Action button status changed.
-            */
-            action_info.raised=action_info.raised == MagickFalse ?
-              MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,window_info,&action_info);
-            break;
-          }
-        if (cancel_info.raised == MatteIsActive(cancel_info,event.xmotion))
-          {
-            /*
-              Cancel button status changed.
-            */
-            cancel_info.raised=cancel_info.raised == MagickFalse ?
-              MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,window_info,&cancel_info);
-            break;
-          }
-        break;
-      }
-      case SelectionClear:
-      {
-        reply_info.highlight=MagickFalse;
-        XDrawMatteText(display,window_info,&reply_info);
-        break;
-      }
-      case SelectionNotify:
-      {
-        Atom
-          type;
-
-        int
-          format;
-
-        unsigned char
-          *data;
-
-        unsigned long
-          after,
-          length;
-
-        /*
-          Obtain response from primary selection.
-        */
-        if (event.xselection.property == (Atom) None)
-          break;
-        status=XGetWindowProperty(display,
-          event.xselection.requestor,event.xselection.property,0L,2047L,
-          MagickTrue,XA_STRING,&type,&format,&length,&after,&data);
-        if (IsUnusableSelection(status,type,format,length) != MagickFalse)
-          break;
-        if ((Extent(reply_info.text)+(int) length) >= (MagickPathExtent-1))
-          (void) XBell(display,0);
-        else
-          {
-            /*
-              Insert primary selection in reply text.
-            */
-            *(data+length)='\0';
-            XEditText(display,&reply_info,(KeySym) XK_Insert,(char *) data,
-              state);
-            XDrawMatteText(display,window_info,&reply_info);
-            state|=RedrawActionState;
-          }
-        (void) XFree((void *) data);
-        break;
-      }
-      case SelectionRequest:
-      {
-        XSelectionEvent
-          notify;
-
-        XSelectionRequestEvent
-          *request;
-
-        if (reply_info.highlight == MagickFalse)
-          break;
-        /*
-          Set primary selection.
-        */
-        request=(&(event.xselectionrequest));
-        (void) XChangeProperty(request->display,request->requestor,
-          request->property,request->target,8,PropModeReplace,
-          (unsigned char *) primary_selection,Extent(primary_selection));
-        notify.type=SelectionNotify;
-        notify.send_event=MagickTrue;
-        notify.display=request->display;
-        notify.requestor=request->requestor;
-        notify.selection=request->selection;
-        notify.target=request->target;
-        notify.time=request->time;
-        if (request->property == None)
-          notify.property=request->target;
-        else
-          notify.property=request->property;
-        (void) XSendEvent(request->display,request->requestor,False,NoEventMask,
-          (XEvent *) &notify);
-      }
-      default:
-        break;
-    }
-  } while ((state & ExitState) == 0);
-  XSetCursorState(display,windows,MagickFalse);
-  (void) XWithdrawWindow(display,window_info->id,window_info->screen);
-  XCheckRefreshWindows(display,windows);
+  list_context.display=display;
+  list_context.windows=windows;
+  list_context.window_info=window_info;
+  list_context.entries=entries;
+  list_context.primary_selection=primary_selection;
+  list_context.font_info=font_info;
+  list_context.list=list;
+  list_context.height=height;
+  list_context.action=action;
+  list_context.width=width;
+  list_context.reply=reply;
+  list_context.query=query;
+  RunListBrowser(&list_context,&mask);
+  WithdrawListBrowserWidget(display,windows,window_info);
 }
 
 /*
@@ -13909,30 +15631,1059 @@ static XWidgetInfo MoveTextViewSlider(XWidgetInfo slider_info,
   return(slider_info);
 }
 
-MagickPrivate void XTextViewWidget(Display *display,
-  const XResourceInfo *resource_info,XWindows *windows,
-  const MagickBooleanType mono,const char *title,const char **textlist)
-{
 #define DismissButtonText  "Dismiss"
 
+typedef struct _TextViewWidgets
+{
+  XWidgetInfo
+    *north_info;
+
+  XWidgetInfo
+    *south_info;
+
+  size_t
+    *delay;
+
+  XWidgetInfo
+    *slider_info;
+
+  XWidgetInfo
+    *dismiss_info;
+
+  size_t
+    *state;
+
+  XWidgetInfo
+    *scroll_info;
+
+  unsigned int
+    *visible_lines;
+
+  XEvent
+    *event;
+
+  XWidgetInfo
+    *list_info;
+
+  XWidgetInfo
+    *selection_info;
+
+  MagickStatusType
+    *mask;
+
+  XWidgetInfo
+    *expose_info;
+} TextViewWidgets;
+
+typedef struct _TextViewContext
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  unsigned int
+    lines;
+
+  const char
+    **textlist;
+
+  unsigned int
+    height;
+
   char
-    primary_selection[MagickPathExtent];
+    *primary_selection;
+
+  unsigned int
+    width;
+
+  XFontStruct
+    *font_info;
+
+  XFontStruct
+    *text_info;
+} TextViewContext;
+
+static void ReleaseTextViewScroll(const TextViewContext *context,
+  const XEvent event,const TextViewWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  size_t
+    *const delay = widgets->delay;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const dismiss_info = widgets->dismiss_info;
+
+  size_t
+    *const state = widgets->state;
+
+  DialogRelease
+    release;
+
+  if (windows->widget.mapped == MagickFalse)
+    return;
+  if ((*north_info).raised == MagickFalse)
+    {
+      /*
+        User released up button.
+      */
+      (*delay)=SuspendTime << 2;
+      (*north_info).raised=MagickTrue;
+      XDrawTriangleNorth(display,&windows->widget,north_info);
+    }
+  if ((*south_info).raised == MagickFalse)
+    {
+      /*
+        User released down button.
+      */
+      (*delay)=SuspendTime << 2;
+      (*south_info).raised=MagickTrue;
+      XDrawTriangleSouth(display,&windows->widget,south_info);
+    }
+  if ((*slider_info).active)
+    {
+      /*
+        Stop tracking slider.
+      */
+      (*slider_info).active=MagickFalse;
+      return;
+    }
+  release.display=display;
+  release.windows=windows;
+  release.event=event;
+  ReleaseTextViewDismiss(&release,dismiss_info,state);
+}
+
+static void PressTextViewKey(const TextViewContext *context,const XEvent event,
+  const TextViewWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    lines = context->lines;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const dismiss_info = widgets->dismiss_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  unsigned int
+    *const visible_lines = widgets->visible_lines;
+
+  static char
+    command[MagickPathExtent];
+
+  static int
+    length;
+
+  static KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key press.
+  */
+  if (event.xkey.window != windows->widget.id)
+    return;
+  length=XLookupString((XKeyEvent *) &event.xkey,command,
+    (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  *(command+length)='\0';
+  if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
+    {
+      (*dismiss_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,dismiss_info);
+      (*state)|=ExitState;
+      return;
+    }
+  if (AreaIsActive((*scroll_info),event.xkey))
+    {
+      /*
+        Move slider.
+      */
+      (*slider_info)=MoveTextViewSlider((*slider_info),key_symbol,
+        (*visible_lines),lines);
+      (*state)|=RedrawListState;
+      return;
+    }
+}
+
+static void MoveTextViewPointer(const TextViewContext *context,
+  const TextViewWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    lines = context->lines;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const dismiss_info = widgets->dismiss_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XEvent
+    *const event = widgets->event;
+
+  /*
+    Discard pending button motion events.
+  */
+  while (XCheckMaskEvent(display,ButtonMotionMask,event)) ;
+  if ((*slider_info).active)
+    {
+      /*
+        Move slider matte.
+      */
+      (*slider_info)=TrackListBrowserSlider((*slider_info),(*event),lines);
+      (*state)|=RedrawListState;
+      return;
+    }
+  if ((*state) & InactiveWidgetState)
+    return;
+  if ((*dismiss_info).raised == MatteIsActive((*dismiss_info),(*event).xmotion))
+    {
+      /*
+        Dismiss button status changed.
+      */
+      (*dismiss_info).raised=
+        (*dismiss_info).raised == MagickFalse ? MagickTrue : MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,dismiss_info);
+      return;
+    }
+}
+
+static void PressTextViewList(const TextViewContext *context,const XEvent event,
+  const TextViewTargets *targets,const TextViewWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    lines = context->lines;
+
+  const char
+    **const textlist = context->textlist;
+
+  const unsigned int
+    height = context->height;
+
+  char
+    *const primary_selection = context->primary_selection;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const dismiss_info = widgets->dismiss_info;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info;
+
+  if (MatteIsActive((*dismiss_info),event.xbutton))
+    {
+      /*
+        User pressed Dismiss button.
+      */
+      (*dismiss_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,dismiss_info);
+      return;
+    }
+  if (MatteIsActive((*list_info),event.xbutton))
+    {
+      TextViewPress
+        press;
+
+      press.display=display;
+      press.windows=windows;
+      press.textlist=textlist;
+      press.lines=lines;
+      press.height=height;
+      press.event=event;
+      press.slider_info=(*slider_info);
+      SelectTextViewLine(&press,primary_selection,targets);
+      return;
+    }
+}
+
+static void PressTextViewScroll(const TextViewContext *context,
+  const XEvent event,const TextViewTargets *targets,
+  const TextViewWidgets *widgets)
+{
+  const unsigned int
+    lines = context->lines;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  unsigned int
+    *const visible_lines = widgets->visible_lines;
+
+  if ((MatteIsActive((*south_info),event.xbutton)) &&
+      ((*slider_info).id < (int) lines))
+    {
+      /*
+        Move slider down.
+      */
+      (*south_info).raised=MagickFalse;
+      (*slider_info).id++;
+      (*state)|=RedrawListState;
+      return;
+    }
+  if (MatteIsActive((*scroll_info),event.xbutton))
+    {
+      /*
+        Move slider.
+      */
+      (*slider_info)=PageListBrowserSlider((*slider_info),event,
+        (*visible_lines));
+      (*state)|=RedrawListState;
+      return;
+    }
+  PressTextViewList(context,event,targets,widgets);
+}
+
+static void PressTextViewSlider(const TextViewContext *context,
+  const XEvent event,const TextViewTargets *targets,
+  const TextViewWidgets *widgets)
+{
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  size_t
+    *const state = widgets->state;
+
+  if (MatteIsActive((*slider_info),event.xbutton))
+    {
+      /*
+        Track slider.
+      */
+      (*slider_info).active=MagickTrue;
+      return;
+    }
+  if ((MatteIsActive((*north_info),event.xbutton)) &&
+      ((*slider_info).id > 0))
+    {
+      /*
+        Move slider up.
+      */
+      (*north_info).raised=MagickFalse;
+      (*slider_info).id--;
+      (*state)|=RedrawListState;
+      return;
+    }
+  PressTextViewScroll(context,event,targets,widgets);
+}
+
+static void HandleTextViewSelectionEvent(const TextViewContext *context,
+  XEvent event,const TextViewWidgets *widgets)
+{
+  char
+    *const primary_selection = context->primary_selection;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info;
+
+  XWidgetInfo
+    *const selection_info = widgets->selection_info;
+
+  switch (event.type)
+  {
+    case MotionNotify:
+    {
+      MoveTextViewPointer(context,widgets);
+      break;
+    }
+    case SelectionClear:
+    {
+      (*list_info).id=(~0);
+      (*selection_info).id=(~0);
+      (*state)|=RedrawListState;
+      break;
+    }
+    case SelectionRequest:
+    {
+      XSelectionEvent
+        notify;
+
+      XSelectionRequestEvent
+        *request;
+
+      if ((*list_info).id == (~0))
+        break;
+      /*
+        Set primary selection.
+      */
+      request=(&(event.xselectionrequest));
+      (void) XChangeProperty(request->display,request->requestor,
+        request->property,request->target,8,PropModeReplace,
+        (unsigned char *) primary_selection,Extent(primary_selection));
+      notify.type=SelectionNotify;
+      notify.send_event=MagickTrue;
+      notify.display=request->display;
+      notify.requestor=request->requestor;
+      notify.selection=request->selection;
+      notify.target=request->target;
+      notify.time=request->time;
+      if (request->property == None)
+        notify.property=request->target;
+      else
+        notify.property=request->property;
+      (void) XSendEvent(request->display,request->requestor,False,NoEventMask,
+        (XEvent *) &notify);
+    }
+    default:
+      break;
+  }
+}
+
+static void HandleTextViewKeyEvent(const TextViewContext *context,
+  const XEvent event,const TextViewWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  MagickStatusType
+    *const mask = widgets->mask;
+
+  switch (event.type)
+  {
+    case KeyPress:
+    {
+      PressTextViewKey(context,event,widgets);
+      break;
+    }
+    case KeyRelease:
+      break;
+    case LeaveNotify:
+    {
+      (*state)=LeaveWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case MapNotify:
+    {
+      (*mask)&=(unsigned int) (~CWX);
+      (*mask)&=(unsigned int) (~CWY);
+      break;
+    }
+    default:
+    {
+      HandleTextViewSelectionEvent(context,event,widgets);
+      break;
+    }
+  }
+}
+
+static void HandleTextViewWindowEvent(const TextViewContext *context,
+  const XEvent event,const TextViewWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  switch (event.type)
+  {
+    case ButtonRelease:
+    {
+      ReleaseTextViewScroll(context,event,widgets);
+      break;
+    }
+    case ClientMessage:
+    {
+      (*state)=ClientWidgetMessage(display,windows,event,(*state));
+      break;
+    }
+    case ConfigureNotify:
+    {
+      (*state)=ConfigureWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case EnterNotify:
+    {
+      (*state)=EnterWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case Expose:
+    {
+      (*state)=ExposeWidgetWindow(windows,event,(*state));
+      break;
+    }
+    default:
+    {
+      HandleTextViewKeyEvent(context,event,widgets);
+      break;
+    }
+  }
+}
+
+static void InitializeTextViewButtons(const TextViewContext *context,
+  const TextViewWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    height = context->height;
+
+  const unsigned int
+    width = context->width;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  XWidgetInfo
+    *const dismiss_info = widgets->dismiss_info;
+
+  /*
+    Initialize button information.
+  */
+  XGetWidgetInfo(DismissButtonText,dismiss_info);
+  (*dismiss_info).width=width;
+  (*dismiss_info).height=(unsigned int) ((3*height) >> 1);
+  (*dismiss_info).x=(int) windows->widget.width-(int) (*dismiss_info).width-
+    QuantumMargin-2;
+  (*dismiss_info).y=(int) windows->widget.height-(int) (*dismiss_info).height-
+    QuantumMargin;
+}
+
+static void InitializeTextViewScroll(const TextViewContext *context,
+  const TextViewWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    lines = context->lines;
+
+  const unsigned int
+    height = context->height;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  XFontStruct
+    *const text_info = context->text_info;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const dismiss_info = widgets->dismiss_info;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  unsigned int
+    *const visible_lines = widgets->visible_lines;
+
+  XWidgetInfo
+    *const expose_info = widgets->expose_info;
 
   int
-    i;
+    id;
 
-  static MagickStatusType
-    mask = (MagickStatusType) (CWWidth | CWHeight | CWX | CWY);
+  /*
+    Initialize scroll information.
+  */
+  XGetWidgetInfo((char *) NULL,scroll_info);
+  (*scroll_info).bevel_width--;
+  (*scroll_info).width=height;
+  (*scroll_info).height=(unsigned int) ((*dismiss_info).y-((5*QuantumMargin) >>
+    1));
+  (*scroll_info).x=(int) windows->widget.width-QuantumMargin-(int)
+    (*scroll_info).width;
+  (*scroll_info).y=(3*QuantumMargin) >> 1;
+  (*scroll_info).raised=MagickFalse;
+  (*scroll_info).trough=MagickTrue;
+  (*north_info)=(*scroll_info);
+  (*north_info).raised=MagickTrue;
+  (*north_info).width-=((*north_info).bevel_width << 1);
+  (*north_info).height=(*north_info).width-1;
+  (*north_info).x+=(int) (*north_info).bevel_width;
+  (*north_info).y+=(int) (*north_info).bevel_width;
+  (*south_info)=(*north_info);
+  (*south_info).y=(*scroll_info).y+(int) (*scroll_info).height-(int)
+    (*scroll_info).bevel_width-(int) (*south_info).height;
+  id=(*slider_info).id;
+  (*slider_info)=(*north_info);
+  (*slider_info).id=id;
+  (*slider_info).width-=2;
+  (*slider_info).min_y=(*north_info).y+(int) (*north_info).height+(int)
+    (*north_info).bevel_width+(int) (*slider_info).bevel_width+2;
+  (*slider_info).height=(unsigned int) ((int) (*scroll_info).height-
+    (((*slider_info).min_y-(*scroll_info).y+1) << 1)+4);
+  (*visible_lines)=(unsigned int) ((*scroll_info).height*MagickSafeReciprocal(
+    (double) text_info->ascent+text_info->descent+((text_info->ascent+
+    text_info->descent) >> 3)));
+  if (lines > (*visible_lines))
+    (*slider_info).height=(unsigned int)
+      ((*visible_lines)*(*slider_info).height)/lines;
+  (*slider_info).max_y=(*south_info).y-(int) (*south_info).bevel_width-(int)
+    (*slider_info).bevel_width-2;
+  (*slider_info).x=(*scroll_info).x+(int) (*slider_info).bevel_width+1;
+  (*slider_info).y=(*slider_info).min_y;
+  (*expose_info)=(*scroll_info);
+  (*expose_info).y=(*slider_info).y;
+}
 
+static void InitializeTextViewList(const TextViewContext *context,
+  const TextViewWidgets *widgets)
+{
+  XFontStruct
+    *const font_info = context->font_info;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info;
+
+  /*
+    Initialize list information.
+  */
+  XGetWidgetInfo((char *) NULL,list_info);
+  (*list_info).raised=MagickFalse;
+  (*list_info).bevel_width--;
+  (*list_info).width=(unsigned int) ((*scroll_info).x-((3*QuantumMargin) >> 1));
+  (*list_info).height=(*scroll_info).height;
+  (*list_info).x=QuantumMargin;
+  (*list_info).y=(*scroll_info).y;
+}
+
+static void InitializeTextViewSelection(const TextViewContext *context,
+  const TextViewWidgets *widgets)
+{
+  XFontStruct
+    *const text_info = context->text_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info;
+
+  XWidgetInfo
+    *const selection_info = widgets->selection_info;
+
+  /*
+    Initialize selection information.
+  */
+  XGetWidgetInfo((char *) NULL,selection_info);
+  (*selection_info).center=MagickFalse;
+  (*selection_info).width=(*list_info).width;
+  (*selection_info).height=(unsigned int)
+    (9*(text_info->ascent+text_info->descent)) >> 3;
+  (*selection_info).x=(*list_info).x;
+  (*state)&=(unsigned int) (~UpdateConfigurationState);
+}
+
+static void UpdateTextViewLayout(const TextViewContext *context,
+  const TextViewWidgets *widgets)
+{
+  size_t
+    *const state = widgets->state;
+
+  if ((*state) & UpdateConfigurationState)
+    {
+      InitializeTextViewButtons(context,widgets);
+      InitializeTextViewScroll(context,widgets);
+      InitializeTextViewList(context,widgets);
+      InitializeTextViewSelection(context,widgets);
+    }
+}
+
+static void RedrawTextViewWidget(const TextViewContext *context,
+  const TextViewWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const dismiss_info = widgets->dismiss_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info;
+
+  XWidgetInfo
+    *const selection_info = widgets->selection_info;
+
+  if ((*state) & RedrawWidgetState)
+    {
+      /*
+        Redraw Text View window.
+      */
+      XDrawBeveledMatte(display,&windows->widget,list_info);
+      XDrawBeveledMatte(display,&windows->widget,scroll_info);
+      XDrawTriangleNorth(display,&windows->widget,north_info);
+      XDrawBeveledButton(display,&windows->widget,slider_info);
+      XDrawTriangleSouth(display,&windows->widget,south_info);
+      XDrawBeveledButton(display,&windows->widget,dismiss_info);
+      XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
+      (*selection_info).id=(~0);
+      (*state)|=RedrawListState;
+      (*state)&=(unsigned int) (~RedrawWidgetState);
+    }
+}
+
+static void RedrawTextViewText(const TextViewContext *context,
+  const TextViewWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    lines = context->lines;
+
+  const char
+    **const textlist = context->textlist;
+
+  const unsigned int
+    height = context->height;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  XFontStruct
+    *const text_info = context->text_info;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  unsigned int
+    *const visible_lines = widgets->visible_lines;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info;
+
+  XWidgetInfo
+    *const selection_info = widgets->selection_info;
+
+  XWidgetInfo
+    *const expose_info = widgets->expose_info;
+
+  TextViewLines
+    view;
+
+  /*
+    Redraw scroll bar and text.
+  */
+  windows->widget.font_info=text_info;
+  (void) XSetFont(display,windows->widget.annotate_context,
+    text_info->fid);
+  (void) XSetFont(display,windows->widget.highlight_context,
+    text_info->fid);
+  (*selection_info).id=(*slider_info).id;
+  (*selection_info).y=(*list_info).y+(int) (height >> 3)+2;
+  view.display=display;
+  view.windows=windows;
+  view.textlist=textlist;
+  view.lines=lines;
+  view.visible_lines=(*visible_lines);
+  view.list_info=(list_info);
+  view.slider_info=(*slider_info);
+  DrawTextViewLines(&view,selection_info);
+  windows->widget.font_info=font_info;
+  (void) XSetFont(display,windows->widget.annotate_context,
+    font_info->fid);
+  (void) XSetFont(display,windows->widget.highlight_context,
+    font_info->fid);
+  /*
+    Update slider.
+  */
+  (*expose_info)=PlaceTextViewExpose((*expose_info),(*slider_info));
+  XDrawTriangleNorth(display,&windows->widget,north_info);
+  XDrawMatte(display,&windows->widget,expose_info);
+  XDrawBeveledButton(display,&windows->widget,slider_info);
+  XDrawTriangleSouth(display,&windows->widget,south_info);
+  (*expose_info).y=(*slider_info).y;
+}
+
+static void RedrawTextViewLines(const TextViewContext *context,
+  const TextViewWidgets *widgets)
+{
+  const unsigned int
+    lines = context->lines;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  size_t
+    *const state = widgets->state;
+
+  unsigned int
+    *const visible_lines = widgets->visible_lines;
+
+  XWidgetInfo
+    *const selection_info = widgets->selection_info;
+
+  if ((*state) & RedrawListState)
+    {
+      /*
+        Determine slider id and position.
+      */
+      if ((*slider_info).id >= (int) (lines-(*visible_lines)))
+        (*slider_info).id=(int) (lines-(*visible_lines));
+      if (((*slider_info).id < 0) || (lines <= (*visible_lines)))
+        (*slider_info).id=0;
+      (*slider_info).y=(*slider_info).min_y;
+      if (lines != 0)
+        (*slider_info).y+=(*slider_info).id*((*slider_info).max_y-
+          (*slider_info).min_y+1)/(int) lines;
+      if ((*slider_info).id != (*selection_info).id)
+        {
+          RedrawTextViewText(context,widgets);
+        }
+      (*state)&=(unsigned int) (~RedrawListState);
+    }
+}
+
+static MagickBooleanType WaitForTextViewEvent(const TextViewContext *context,
+  const TextViewWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    lines = context->lines;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  size_t
+    *const delay = widgets->delay;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XEvent
+    *const event = widgets->event;
+
+  /*
+    Wait for next event.
+  */
+  if ((*north_info).raised && (*south_info).raised)
+    (void) XIfEvent(display,event,XScreenEvent,(char *) windows);
+  else
+    {
+      /*
+        Brief delay before advancing scroll bar.
+      */
+      XDelay(display,(*delay));
+      (*delay)=SuspendTime;
+      (void) XCheckIfEvent(display,event,XScreenEvent,(char *) windows);
+      if (((*north_info).raised == MagickFalse) && ((*slider_info).id > 0))
+        {
+          /*
+            Move slider up.
+          */
+          (*slider_info).id--;
+          (*state)|=RedrawListState;
+        }
+      if (((*south_info).raised == MagickFalse) &&
+          ((*slider_info).id < (int) lines))
+        {
+          /*
+            Move slider down.
+          */
+          (*slider_info).id++;
+          (*state)|=RedrawListState;
+        }
+      if ((*event).type != ButtonRelease)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static void RespondToTextViewEvents(const TextViewContext *context,
+  const TextViewTargets *targets,const TextViewWidgets *widgets)
+{
+  size_t
+    *const state = widgets->state;
+
+  XEvent
+    *const event = widgets->event;
+
+  do
+  {
+    UpdateTextViewLayout(context,widgets);
+    RedrawTextViewWidget(context,widgets);
+    RedrawTextViewLines(context,widgets);
+    if (WaitForTextViewEvent(context,widgets) == MagickFalse)
+      continue;
+    switch ((*event).type)
+    {
+      case ButtonPress:
+      {
+        PressTextViewSlider(context,(*event),targets,widgets);
+        break;
+      }
+      default:
+      {
+        HandleTextViewWindowEvent(context,(*event),widgets);
+        break;
+      }
+    }
+  } while (((*state) & ExitState) == 0);
+}
+
+static void WithdrawTextViewWidget(Display *display,XWindows *windows,
+  XFontStruct *text_info)
+{
+  if (text_info != windows->widget.font_info)
+    (void) XFreeFont(display,text_info);
+  XSetCursorState(display,windows,MagickFalse);
+  (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
+  XCheckRefreshWindows(display,windows);
+}
+
+static void MapTextViewWidget(Display *display,XWindows *windows,
+  const char *title,MagickStatusType mask)
+{
   Status
     status;
 
+  XTextProperty
+    window_name;
+
+  XWindowChanges
+    window_changes;
+
+  (void) CopyMagickString(windows->widget.name,title,MagickPathExtent);
+  status=XStringListToTextProperty(&windows->widget.name,1,&window_name);
+  if (status != False)
+    {
+      XSetWMName(display,windows->widget.id,&window_name);
+      XSetWMIconName(display,windows->widget.id,&window_name);
+      (void) XFree((void *) window_name.value);
+    }
+  window_changes.width=(int) windows->widget.width;
+  window_changes.height=(int) windows->widget.height;
+  window_changes.x=windows->widget.x;
+  window_changes.y=windows->widget.y;
+  (void) XReconfigureWMWindow(display,windows->widget.id,
+    windows->widget.screen,(unsigned int) mask,&window_changes);
+  (void) XMapRaised(display,windows->widget.id);
+  windows->widget.mapped=MagickFalse;
+}
+
+static XFontStruct *SelectTextViewFont(Display *display,
+  const XResourceInfo *resource_info,XWindows *windows,
+  const MagickBooleanType mono)
+{
+  XFontStruct
+    *text_info;
+
+  text_info=(XFontStruct *) NULL;
+  if (mono != MagickFalse)
+    text_info=XBestFont(display,resource_info,MagickTrue);
+  if (text_info == (XFontStruct *) NULL)
+    text_info=windows->widget.font_info;
+  return(text_info);
+}
+
+static void RunTextView(const TextViewContext *context,
+  MagickStatusType *mask)
+{
   unsigned int
-    height,
-    lines,
-    text_width,
-    visible_lines,
-    width;
+    visible_lines;
 
   size_t
     delay,
@@ -13940,13 +16691,6 @@ MagickPrivate void XTextViewWidget(Display *display,
 
   XEvent
     event;
-
-  XFontStruct
-    *font_info,
-    *text_info;
-
-  XTextProperty
-    window_name;
 
   XWidgetInfo
     dismiss_info,
@@ -13958,11 +16702,47 @@ MagickPrivate void XTextViewWidget(Display *display,
     slider_info,
     south_info;
 
-  XWindowChanges
-    window_changes;
-
   const TextViewTargets
     targets = { &list_info, &selection_info, &state };
+
+  const TextViewWidgets
+    view_widgets = { &north_info, &south_info, &delay, &slider_info,
+      &dismiss_info, &state, &scroll_info, &visible_lines, &event, &list_info,
+      &selection_info, mask, &expose_info };
+
+  XGetWidgetInfo((char *) NULL,&slider_info);
+  XGetWidgetInfo((char *) NULL,&north_info);
+  XGetWidgetInfo((char *) NULL,&south_info);
+  XGetWidgetInfo((char *) NULL,&expose_info);
+  XGetWidgetInfo((char *) NULL,&selection_info);
+  visible_lines=0;
+  delay=SuspendTime << 2;
+  state=UpdateConfigurationState;
+  RespondToTextViewEvents(context,&targets,&view_widgets);
+}
+
+MagickPrivate void XTextViewWidget(Display *display,
+  const XResourceInfo *resource_info,XWindows *windows,
+  const MagickBooleanType mono,const char *title,const char **textlist)
+{
+  char
+    primary_selection[MagickPathExtent];
+
+  int
+    i;
+
+  static MagickStatusType
+    mask = (MagickStatusType) (CWWidth | CWHeight | CWX | CWY);
+
+  unsigned int
+    height,
+    lines,
+    text_width,
+    width;
+
+  XFontStruct
+    *font_info,
+    *text_info;
 
   /*
     Convert text string to a text list.
@@ -13985,11 +16765,7 @@ MagickPrivate void XTextViewWidget(Display *display,
     Determine Text View widget attributes.
   */
   font_info=windows->widget.font_info;
-  text_info=(XFontStruct *) NULL;
-  if (mono != MagickFalse)
-    text_info=XBestFont(display,resource_info,MagickTrue);
-  if (text_info == (XFontStruct *) NULL)
-    text_info=windows->widget.font_info;
+  text_info=SelectTextViewFont(display,resource_info,windows,mono);
   text_width=0;
   for (i=0; textlist[i] != (char *) NULL; i++)
     if (WidgetTextWidth(text_info,(char *) textlist[i]) > text_width)
@@ -14017,470 +16793,18 @@ MagickPrivate void XTextViewWidget(Display *display,
   /*
     Map Text View widget.
   */
-  (void) CopyMagickString(windows->widget.name,title,MagickPathExtent);
-  status=XStringListToTextProperty(&windows->widget.name,1,&window_name);
-  if (status != False)
-    {
-      XSetWMName(display,windows->widget.id,&window_name);
-      XSetWMIconName(display,windows->widget.id,&window_name);
-      (void) XFree((void *) window_name.value);
-    }
-  window_changes.width=(int) windows->widget.width;
-  window_changes.height=(int) windows->widget.height;
-  window_changes.x=windows->widget.x;
-  window_changes.y=windows->widget.y;
-  (void) XReconfigureWMWindow(display,windows->widget.id,
-    windows->widget.screen,(unsigned int) mask,&window_changes);
-  (void) XMapRaised(display,windows->widget.id);
-  windows->widget.mapped=MagickFalse;
+  MapTextViewWidget(display,windows,title,mask);
   /*
     Respond to X events.
   */
-  XGetWidgetInfo((char *) NULL,&slider_info);
-  XGetWidgetInfo((char *) NULL,&north_info);
-  XGetWidgetInfo((char *) NULL,&south_info);
-  XGetWidgetInfo((char *) NULL,&expose_info);
-  XGetWidgetInfo((char *) NULL,&selection_info);
-  visible_lines=0;
-  delay=SuspendTime << 2;
   height=(unsigned int) (font_info->ascent+font_info->descent);
-  state=UpdateConfigurationState;
-  do
   {
-    if (state & UpdateConfigurationState)
-      {
-        int
-          id;
+    const TextViewContext
+      view_context = { display, windows, lines, textlist, height,
+        primary_selection, width, font_info, text_info };
 
-        /*
-          Initialize button information.
-        */
-        XGetWidgetInfo(DismissButtonText,&dismiss_info);
-        dismiss_info.width=width;
-        dismiss_info.height=(unsigned int) ((3*height) >> 1);
-        dismiss_info.x=(int) windows->widget.width-(int) dismiss_info.width-
-          QuantumMargin-2;
-        dismiss_info.y=(int) windows->widget.height-(int) dismiss_info.height-
-          QuantumMargin;
-        /*
-          Initialize scroll information.
-        */
-        XGetWidgetInfo((char *) NULL,&scroll_info);
-        scroll_info.bevel_width--;
-        scroll_info.width=height;
-        scroll_info.height=(unsigned int) (dismiss_info.y-((5*QuantumMargin) >>
-          1));
-        scroll_info.x=(int) windows->widget.width-QuantumMargin-(int)
-          scroll_info.width;
-        scroll_info.y=(3*QuantumMargin) >> 1;
-        scroll_info.raised=MagickFalse;
-        scroll_info.trough=MagickTrue;
-        north_info=scroll_info;
-        north_info.raised=MagickTrue;
-        north_info.width-=(north_info.bevel_width << 1);
-        north_info.height=north_info.width-1;
-        north_info.x+=(int) north_info.bevel_width;
-        north_info.y+=(int) north_info.bevel_width;
-        south_info=north_info;
-        south_info.y=scroll_info.y+(int) scroll_info.height-(int)
-          scroll_info.bevel_width-(int) south_info.height;
-        id=slider_info.id;
-        slider_info=north_info;
-        slider_info.id=id;
-        slider_info.width-=2;
-        slider_info.min_y=north_info.y+(int) north_info.height+(int)
-          north_info.bevel_width+(int) slider_info.bevel_width+2;
-        slider_info.height=(unsigned int) ((int) scroll_info.height-
-          ((slider_info.min_y-scroll_info.y+1) << 1)+4);
-        visible_lines=(unsigned int) (scroll_info.height*MagickSafeReciprocal(
-          (double) text_info->ascent+text_info->descent+((text_info->ascent+
-          text_info->descent) >> 3)));
-        if (lines > visible_lines)
-          slider_info.height=(unsigned int) (visible_lines*slider_info.height)/
-            lines;
-        slider_info.max_y=south_info.y-(int) south_info.bevel_width-(int)
-          slider_info.bevel_width-2;
-        slider_info.x=scroll_info.x+(int) slider_info.bevel_width+1;
-        slider_info.y=slider_info.min_y;
-        expose_info=scroll_info;
-        expose_info.y=slider_info.y;
-        /*
-          Initialize list information.
-        */
-        XGetWidgetInfo((char *) NULL,&list_info);
-        list_info.raised=MagickFalse;
-        list_info.bevel_width--;
-        list_info.width=(unsigned int) (scroll_info.x-((3*QuantumMargin) >> 1));
-        list_info.height=scroll_info.height;
-        list_info.x=QuantumMargin;
-        list_info.y=scroll_info.y;
-        /*
-          Initialize selection information.
-        */
-        XGetWidgetInfo((char *) NULL,&selection_info);
-        selection_info.center=MagickFalse;
-        selection_info.width=list_info.width;
-        selection_info.height=(unsigned int)
-          (9*(text_info->ascent+text_info->descent)) >> 3;
-        selection_info.x=list_info.x;
-        state&=(unsigned int) (~UpdateConfigurationState);
-      }
-    if (state & RedrawWidgetState)
-      {
-        /*
-          Redraw Text View window.
-        */
-        XDrawBeveledMatte(display,&windows->widget,&list_info);
-        XDrawBeveledMatte(display,&windows->widget,&scroll_info);
-        XDrawTriangleNorth(display,&windows->widget,&north_info);
-        XDrawBeveledButton(display,&windows->widget,&slider_info);
-        XDrawTriangleSouth(display,&windows->widget,&south_info);
-        XDrawBeveledButton(display,&windows->widget,&dismiss_info);
-        XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
-        selection_info.id=(~0);
-        state|=RedrawListState;
-        state&=(unsigned int) (~RedrawWidgetState);
-      }
-    if (state & RedrawListState)
-      {
-        /*
-          Determine slider id and position.
-        */
-        if (slider_info.id >= (int) (lines-visible_lines))
-          slider_info.id=(int) (lines-visible_lines);
-        if ((slider_info.id < 0) || (lines <= visible_lines))
-          slider_info.id=0;
-        slider_info.y=slider_info.min_y;
-        if (lines != 0)
-          slider_info.y+=slider_info.id*(slider_info.max_y-
-            slider_info.min_y+1)/(int) lines;
-        if (slider_info.id != selection_info.id)
-          {
-            TextViewLines
-              view;
-
-            /*
-              Redraw scroll bar and text.
-            */
-            windows->widget.font_info=text_info;
-            (void) XSetFont(display,windows->widget.annotate_context,
-              text_info->fid);
-            (void) XSetFont(display,windows->widget.highlight_context,
-              text_info->fid);
-            selection_info.id=slider_info.id;
-            selection_info.y=list_info.y+(int) (height >> 3)+2;
-            view.display=display;
-            view.windows=windows;
-            view.textlist=textlist;
-            view.lines=lines;
-            view.visible_lines=visible_lines;
-            view.list_info=(&list_info);
-            view.slider_info=slider_info;
-            DrawTextViewLines(&view,&selection_info);
-            windows->widget.font_info=font_info;
-            (void) XSetFont(display,windows->widget.annotate_context,
-              font_info->fid);
-            (void) XSetFont(display,windows->widget.highlight_context,
-              font_info->fid);
-            /*
-              Update slider.
-            */
-            expose_info=PlaceTextViewExpose(expose_info,slider_info);
-            XDrawTriangleNorth(display,&windows->widget,&north_info);
-            XDrawMatte(display,&windows->widget,&expose_info);
-            XDrawBeveledButton(display,&windows->widget,&slider_info);
-            XDrawTriangleSouth(display,&windows->widget,&south_info);
-            expose_info.y=slider_info.y;
-          }
-        state&=(unsigned int) (~RedrawListState);
-      }
-    /*
-      Wait for next event.
-    */
-    if (north_info.raised && south_info.raised)
-      (void) XIfEvent(display,&event,XScreenEvent,(char *) windows);
-    else
-      {
-        /*
-          Brief delay before advancing scroll bar.
-        */
-        XDelay(display,delay);
-        delay=SuspendTime;
-        (void) XCheckIfEvent(display,&event,XScreenEvent,(char *) windows);
-        if ((north_info.raised == MagickFalse) && (slider_info.id > 0))
-          {
-            /*
-              Move slider up.
-            */
-            slider_info.id--;
-            state|=RedrawListState;
-          }
-        if ((south_info.raised == MagickFalse) &&
-            (slider_info.id < (int) lines))
-          {
-            /*
-              Move slider down.
-            */
-            slider_info.id++;
-            state|=RedrawListState;
-          }
-        if (event.type != ButtonRelease)
-          continue;
-      }
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        if (MatteIsActive(slider_info,event.xbutton))
-          {
-            /*
-              Track slider.
-            */
-            slider_info.active=MagickTrue;
-            break;
-          }
-        if ((MatteIsActive(north_info,event.xbutton)) &&
-            (slider_info.id > 0))
-          {
-            /*
-              Move slider up.
-            */
-            north_info.raised=MagickFalse;
-            slider_info.id--;
-            state|=RedrawListState;
-            break;
-          }
-        if ((MatteIsActive(south_info,event.xbutton)) &&
-            (slider_info.id < (int) lines))
-          {
-            /*
-              Move slider down.
-            */
-            south_info.raised=MagickFalse;
-            slider_info.id++;
-            state|=RedrawListState;
-            break;
-          }
-        if (MatteIsActive(scroll_info,event.xbutton))
-          {
-            /*
-              Move slider.
-            */
-            slider_info=PageListBrowserSlider(slider_info,event,visible_lines);
-            state|=RedrawListState;
-            break;
-          }
-        if (MatteIsActive(dismiss_info,event.xbutton))
-          {
-            /*
-              User pressed Dismiss button.
-            */
-            dismiss_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&dismiss_info);
-            break;
-          }
-        if (MatteIsActive(list_info,event.xbutton))
-          {
-            TextViewPress
-              press;
-
-            press.display=display;
-            press.windows=windows;
-            press.textlist=textlist;
-            press.lines=lines;
-            press.height=height;
-            press.event=event;
-            press.slider_info=slider_info;
-            SelectTextViewLine(&press,primary_selection,&targets);
-            break;
-          }
-        break;
-      }
-      case ButtonRelease:
-      {
-        DialogRelease
-          release;
-
-        if (windows->widget.mapped == MagickFalse)
-          break;
-        if (north_info.raised == MagickFalse)
-          {
-            /*
-              User released up button.
-            */
-            delay=SuspendTime << 2;
-            north_info.raised=MagickTrue;
-            XDrawTriangleNorth(display,&windows->widget,&north_info);
-          }
-        if (south_info.raised == MagickFalse)
-          {
-            /*
-              User released down button.
-            */
-            delay=SuspendTime << 2;
-            south_info.raised=MagickTrue;
-            XDrawTriangleSouth(display,&windows->widget,&south_info);
-          }
-        if (slider_info.active)
-          {
-            /*
-              Stop tracking slider.
-            */
-            slider_info.active=MagickFalse;
-            break;
-          }
-        release.display=display;
-        release.windows=windows;
-        release.event=event;
-        ReleaseTextViewDismiss(&release,&dismiss_info,&state);
-        break;
-      }
-      case ClientMessage:
-      {
-        state=ClientWidgetMessage(display,windows,event,state);
-        break;
-      }
-      case ConfigureNotify:
-      {
-        state=ConfigureWidgetWindow(windows,event,state);
-        break;
-      }
-      case EnterNotify:
-      {
-        state=EnterWidgetWindow(windows,event,state);
-        break;
-      }
-      case Expose:
-      {
-        state=ExposeWidgetWindow(windows,event,state);
-        break;
-      }
-      case KeyPress:
-      {
-        static char
-          command[MagickPathExtent];
-
-        static int
-          length;
-
-        static KeySym
-          key_symbol;
-
-        /*
-          Respond to a user key press.
-        */
-        if (event.xkey.window != windows->widget.id)
-          break;
-        length=XLookupString((XKeyEvent *) &event.xkey,command,
-          (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        *(command+length)='\0';
-        if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
-          {
-            dismiss_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&dismiss_info);
-            state|=ExitState;
-            break;
-          }
-        if (AreaIsActive(scroll_info,event.xkey))
-          {
-            /*
-              Move slider.
-            */
-            slider_info=MoveTextViewSlider(slider_info,key_symbol,visible_lines,
-              lines);
-            state|=RedrawListState;
-            break;
-          }
-        break;
-      }
-      case KeyRelease:
-        break;
-      case LeaveNotify:
-      {
-        state=LeaveWidgetWindow(windows,event,state);
-        break;
-      }
-      case MapNotify:
-      {
-        mask&=(unsigned int) (~CWX);
-        mask&=(unsigned int) (~CWY);
-        break;
-      }
-      case MotionNotify:
-      {
-        /*
-          Discard pending button motion events.
-        */
-        while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
-        if (slider_info.active)
-          {
-            /*
-              Move slider matte.
-            */
-            slider_info=TrackListBrowserSlider(slider_info,event,lines);
-            state|=RedrawListState;
-            break;
-          }
-        if (state & InactiveWidgetState)
-          break;
-        if (dismiss_info.raised == MatteIsActive(dismiss_info,event.xmotion))
-          {
-            /*
-              Dismiss button status changed.
-            */
-            dismiss_info.raised=
-              dismiss_info.raised == MagickFalse ? MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&dismiss_info);
-            break;
-          }
-        break;
-      }
-      case SelectionClear:
-      {
-        list_info.id=(~0);
-        selection_info.id=(~0);
-        state|=RedrawListState;
-        break;
-      }
-      case SelectionRequest:
-      {
-        XSelectionEvent
-          notify;
-
-        XSelectionRequestEvent
-          *request;
-
-        if (list_info.id == (~0))
-          break;
-        /*
-          Set primary selection.
-        */
-        request=(&(event.xselectionrequest));
-        (void) XChangeProperty(request->display,request->requestor,
-          request->property,request->target,8,PropModeReplace,
-          (unsigned char *) primary_selection,Extent(primary_selection));
-        notify.type=SelectionNotify;
-        notify.send_event=MagickTrue;
-        notify.display=request->display;
-        notify.requestor=request->requestor;
-        notify.selection=request->selection;
-        notify.target=request->target;
-        notify.time=request->time;
-        if (request->property == None)
-          notify.property=request->target;
-        else
-          notify.property=request->property;
-        (void) XSendEvent(request->display,request->requestor,False,NoEventMask,
-          (XEvent *) &notify);
-      }
-      default:
-        break;
-    }
-  } while ((state & ExitState) == 0);
-  if (text_info != windows->widget.font_info)
-    (void) XFreeFont(display,text_info);
-  XSetCursorState(display,windows,MagickFalse);
-  (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
-  XCheckRefreshWindows(display,windows);
+    RunTextView(&view_context,&mask);
+  }
+  WithdrawTextViewWidget(display,windows,text_info);
 }
 #endif

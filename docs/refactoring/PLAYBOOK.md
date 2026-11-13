@@ -986,6 +986,12 @@ is worth it.
    block (a delegate's headers and the macros it supplies, as `fourier.c`'s FFTW and
    `complex.h` block) is left out of the copy when no line of the family, comments and
    strings aside, names one of those macros. The original keeps the run unchanged.
+   A second exception (2026-11-12): a quoted `#include` of a header of the same directory
+   that *defines objects* (a file-scope initialised variable in column 0, as
+   `accelerate-kernels-private.h`'s `const char *accelerateKernels =`) is left out of the
+   copy as well, when no line of the family, comments and strings aside, names an object
+   or a macro that header defines. Both files including it would define the object twice
+   (a link error); the split is refused when the family names one.
 3. The public function keeps its declaration in the header it already has.
 4. List the new file wherever the original is listed: `tools/register_source.py` does it
    for `MagickCore/Makefile.am`, `Makefile.in` (by hand, mirroring what automake
@@ -1003,6 +1009,11 @@ is worth it.
   expands to the same tokens in the one file that uses it, and the kept file used none.
   `refactor_guard.py --combined` therefore counts every literal once, as before; say in
   the message which tables and macros moved.
+- An include left out under step 2's second exception is neither moved nor edited either:
+  the original keeps the line, and the header's objects stay defined once, in the original's
+  object. The family names none of them (the tool checks, with the header's macros), so every
+  token of the moved text means what it meant, and the object code of every moved function
+  is compared unchanged (`tools/split_branch_check.py`, as for the run below).
 - An include run left out under step 2 is neither moved nor edited: the original keeps
   it, uncompiled branches included, as it stood. The family compiles without it, so it
   needs nothing the run declares: a call of a function only a dropped header declares
@@ -1064,6 +1075,13 @@ needs two copies of the block.
    too (2026-11-11), on Recipe CT step 2's terms: it passes as a pointer like any
    written variable, never as a copy. CT step 2's structure form (a `static XColor`)
    counts in the same way, `v.m` written `(*v).m` and `&v` written `v`.
+   Such a block-scope `static` may also have its address passed elsewhere in the caller,
+   outside the block, as an argument of calls that keep no copy of it (2026-11-13), on the
+   terms a plain local has above (checked by reading the callee): while the new function
+   runs none of those calls is running, and none of them stores the pointer, so the
+   helper's pointer is the only one in use (`XBestVisualInfo`'s `static XVisualInfo
+   visual_template`, whose address goes to the library's `XGetVisualInfo`, which reads the
+   template and stores no pointer to it).
    A parameter the caller receives by value, of a struct or arithmetic type (not a
    pointer, and not an array parameter, which is one), counts as a plain local
    (`ApplySpliceGravity`'s `RectangleInfo splice_geometry`): it is the caller's own
@@ -1907,6 +1925,14 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    (`x_offset = grid->x_offset`), and leave the block's text unchanged; the other
    members keep step 4's form. Its writes land in that local, as they would in a
    by-value parameter.
+   A variable the block writes before it reads it, whose only other use is a write the
+   caller made before the block (`FloodfillPaintImage`'s `start=0;`, which the block's loop
+   overwrites before any read), is carried in the same way (2026-11-13): leaving it
+   to the new function would make the caller's write a variable set and never used, which
+   clang's `-Wunused-but-set-variable` turns into an error in the CI jobs (Recipe I
+   step 2 gives the same reason for a written variable). The new function's local starts
+   with the value the caller wrote, which the block never reads, so no value anyone sees
+   changes.
    An array of the caller's (a local, a `static` or an array parameter) that the
    block names only as an argument of calls, where it converts to a pointer to its
    first element, and whose contents the block writes, if at all, only through calls
@@ -12191,10 +12217,14 @@ early exits and changes the text of the tests.
 **How:**
 
 1. Find `else` followed by exactly one statement that is an `if` statement (with or
-   without `else` of its own), with no braces around it and no comment between.
+   without `else` of its own), with no comment between. The `if` statement may stand in
+   a pair of braces that holds nothing else: `else`, `{`, the `if` statement with its
+   own `else` chain, `}` (2026-11-13).
 2. Write `else if (...)` on one line, the `if` and everything after it in the text as it
    was, each line of the joined `if` moved one indent level less (and, with it, the lines
-   of its own `else` chain).
+   of its own `else` chain). When the `if` stood in braces, the pair is removed (the
+   opening brace line and the matching closing brace line go, and the lines of the
+   `if` statement move out of it, one indent level less each, as above).
 3. Repeat down the chain; every such chain of one function may go in one commit (one
    recipe, one function).
 4. Run `sh tools/obj_identical.sh <file>`. It must print `IDENTICAL`; otherwise revert
@@ -12235,7 +12265,11 @@ early exits and changes the text of the tests.
 - Why the behaviour is the same. `else` followed by one statement and `else if` are the
   same tokens; only the line breaks and the indentation change. The compiler sees the
   same program, which the object file proves.
-- A comment between the `else` and the `if`, or braces around the `if`, are not covered: step 1 refuses them.
+- A comment between the `else` and the `if`, or braces that hold anything besides the
+  one `if` statement, are not covered: step 1 refuses them. A pair of braces that holds
+  exactly one statement and nothing else (a compound statement of one statement) makes
+  no difference to the program: the `else` governs the same `if` statement, with the
+  same `else` chain inside it, before and after, and the object file proves it.
 - No test, statement or literal changes; only whitespace and the `else`/`if` line join.
 
 **Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
@@ -12245,7 +12279,12 @@ early exits and changes the text of the tests.
 `QueryColorCompliance`'s hex-digit loops (campaign B, M120): extracting the loop
 verbatim into a helper dropped the file 4.24 to 4.09, because the helper is itself
 Deep, Nested; the same chain joined with `else if` gave 4.42 after the extraction. Added
-by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24. Step 1's braced
+form: 2026-11-13, from `opencl.c`'s `LoadOpenCLDeviceBenchmark` DOCTYPE loop (campaign A,
+W21 lane c, wide build), whose `else { if (IsDoctypeQuote(q) ...) }` chain is braced as a
+whole, so the extracted helper kept Bumpy Road (2 bumps) after the unbraced levels were
+joined (added by Claude Code, Claude Sonnet 5.5, under the owner's OK of 2026-11-10 to
+evolve the recipes).
 
 ---
 
@@ -12717,6 +12756,757 @@ tests. Neither removes one.
 **Provenance:** 2026-11-12, from `policy.c` (campaign B, M120): seven ternaries, the
 file 6.21 to 6.38, object code identical. Added by Claude Code (Claude Sonnet 5.5) under
 the mandate of 2026-10-24.
+
+---
+
+## Recipe KL - Replace Case Groups Sharing a Tail with a Keyed Lookup
+
+**Use when:** CodeScene reports *Complex Method* (or *Large Method*) on a function whose
+complexity is one `switch` on an integer holding a run of groups that are the same
+statements once a string literal and a numeric literal are replaced by names, each group
+under one integer label and ending in `break;`, as `morphology.c`'s
+`AcquireFreiChenKernel` does for the labels `15` to `19`
+(`kernel=ParseKernelArray("...");`, the NULL test, `kernel->type = type;`,
+`ScaleKernelInfo(kernel, 1.0/6.0, NoValue);`), while other groups of the same `switch`
+differ and stay.
+
+**Not covered by:** Recipe KT, whose groups are one call each and nothing more (here every
+group goes on with a NULL test, an assignment and a second call on a second constant);
+Recipe SC and SV, which keep one group per label and pass the constants to a helper;
+Recipe TB, whose function is the `switch` alone; Recipes SD, SR, SW and ST, which split
+the run into shorter runs that clone each other; Recipe LP, which names a set of labels
+sharing one body.
+
+**How:**
+
+1. The `switch (e)` lies outside every OpenMP region and holds no `#` line; `e` is an
+   integer expression with no call, assignment or increment (a cast of a member of a
+   `const` parameter), and nothing in the `switch` writes what it reads. Every label is
+   an integer literal or `default:`. The run is two or more groups of one label each,
+   none falling through, whose texts are the same token sequence once each of two
+   literal roles is replaced by a name: a string literal `d` and a numeric literal `c`,
+   each at one place of the group (declaration-free, no `goto`, `continue` or `break`
+   but the closing one; a `return` is fine). The `default:` group leaves the function on
+   every path (`return(...);`), with no `break`.
+2. Directly above the function write `typedef struct` with the members `key` (of `e`'s
+   type), then one member per role, of the type of the object the literal is passed to
+   (`const char *definition`, `double scale`); a later use of the recipe reuses the
+   type when its roles match. Then, directly above it, a `static const` array of that
+   type with no size, one element `{ L, d, c }` per group of the run in the `switch`'s
+   order, `L` the group's label; a comment of a group stands on its element.
+3. Write a `static const` lookup function above the function: it takes `const T key`,
+   walks the array with `for (i=0; i < (sizeof(K)/sizeof(*K)); i++)`, returns `K+i` for
+   the first element whose `key` equals `key`, and ends `return((const E *) NULL);`.
+4. In the function declare `const E *entry;` and `const T key = e;` (the text of `e`) and
+   write `switch ( key ) {`. Delete the run's groups. In the `default:` group, before
+   its statements, write `entry=Lookup(key);` and `if (entry == (const E *) NULL)`
+   followed by the group's own statements unchanged, in braces if there are several.
+   Then write one copy of the run's statements with `d` replaced by `entry->definition`
+   and `c` by `entry->scale` (the members' names), ending `break;`, all inside the
+   `default:` group. The groups that stay are not touched.
+5. Check by script that every deleted label is the key of exactly one element, that
+   its element holds the two literals the group held at the roles' places, that the one
+   copy equals the deleted groups' common text with the roles replaced, and that nothing
+   else in the file changed.
+6. `refactor_guard.py`: the literals moved into the table are each present once more
+   than the deleted copies took away, and none vanishes; `--calls` shows the calls of
+   the deleted groups reduced to one copy and the lookup added once. The function is
+   not on a per-pixel path (check its callers by reading); otherwise time the step.
+
+**Before:**
+
+```c
+  switch ( (int) args->rho ) {
+    default:
+      return(AcquireFreiChenEdgeBasisKernel(kernel,type,args,exception));
+    case 13:
+      ...
+    case 15:
+      kernel=ParseKernelArray("3: 0,-1,0  1,0,1  0,-1,0");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      ScaleKernelInfo(kernel, 1.0/2.0, NoValue);
+      break;
+    case 16:
+      kernel=ParseKernelArray("3: 1,0,-1  0,0,0  -1,0,1");
+      ...
+```
+
+**After:**
+
+```c
+  const FreiChenScaledKernel
+    *scaled;
+
+  const int
+    key = (int) args->rho;
+
+  switch ( key ) {
+    default:
+      scaled=FindFreiChenScaledKernel(key);
+      if (scaled == (const FreiChenScaledKernel *) NULL)
+        return(AcquireFreiChenEdgeBasisKernel(kernel,type,args,exception));
+      kernel=ParseKernelArray(scaled->definition);
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      ScaleKernelInfo(kernel, scaled->scale, NoValue);
+      break;
+    case 13:
+      ...
+```
+
+**Careful:**
+
+- Why the behaviour is the same. `key` holds the value the `switch` evaluated (the same
+  text, once, of the same type, with nothing in the `switch` writing what it reads). A
+  value equal to the label of a group that stays selects that group, as before. Any other
+  value selects `default:` as before; the lookup finds the element whose key equals it
+  exactly when a deleted group carried that label (step 5; the labels are distinct, so
+  the first match is the only one) and then runs the group's text once with the literals
+  of that group, where the `switch` ran that group's copy; when no element matches
+  it runs the `default:` group's own statements, which leave the function.
+- A numeric literal or a constant expression of literals (`1.0/6.0`) in an initialiser is
+  converted to the member's type as the call argument was converted to the parameter's
+  (C11 6.7.9, 6.5.2.2), at translation time in both; the value is the same. A string
+  literal becomes a `const char *` to the same characters, which the callee only reads
+  (check by reading).
+- The tables are `static const`, written once by their initialisers; no existing table
+  changes. A deleted group that carried a comment keeps it on its element.
+- The lookup walks at most the run's length (five here), once per kernel built.
+
+**Evidence level:** oracle (the cases that reach the function), with step 5's script and
+step 6's guard fingerprint, and the caller check by reading.
+
+**Provenance:** 2026-11-12, from `morphology.c`'s `AcquireFreiChenKernel` (campaign A, W19
+lane d): cases 15 to 19 are the same five statements on two literals; Recipe KT refuses
+the tail, Recipe SC leaves five labels, and a helper per run clones
+`AcquireFreiChenEdgeBasisKernel` (5.91 in a W17 probe). Probe: the function goes from
+cc 16 to 8 and leaves *Complex Method*, with no finding on the lookup function; the file
+6.35 to 6.63. Added by Claude Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10
+to evolve the recipes.
+
+---
+
+## Recipe KC - Replace a Constant-Assigning Label Run with a Table Lookup
+
+(This recipe was called KD in commit 1d7e3897a (`morphology.c` `MorphologyApply`) and in the W19b report; it was renamed KC when merging main, where Recipe KD (a table of function pointers) had taken the code first.)
+
+**Use when:** CodeScene reports *Complex Method* (or *Large Method*) on a function whose
+complexity includes a `switch` on an integer or enumeration whose every group but the
+`default:` one is `v=c;` and `break;`, one variable `v` and a numeric literal `c` per group,
+several labels sharing a group, with a `default:` group that does something else and
+falls out of the `switch` (a call, say), as `morphology.c`'s `MorphologyApply` has for
+the stage count of a compound method (`SmoothMorphology` 4, seven labels 2, `default:`
+calling `SetIteratedMorphologyLimits`).
+
+**Not covered by:** Recipe KT, whose groups assign the result of a call on a constant and
+whose `default:` shares a group or leaves the function; Recipe TB, whose function is the
+`switch` alone and whose cases return the constant; Recipe LP, which names the labels of
+one body as a predicate and keeps the labels in a new function (here two bodies, so two
+runs of labels); Recipes SD, SR, SW and ST, which move runs of groups into functions that
+keep every label.
+
+**How:**
+
+1. The `switch (e)` lies outside every OpenMP region and holds no `#` line; `e` is a
+   variable or parameter of an integer or enumeration type, or an expression with no call,
+   assignment or increment, and nothing in the `switch` writes what it reads. Every label
+   is an integer literal or an enumeration constant, or `default:`. Each group but the
+   `default:` one is one or more labels followed by `v=c;` and `break;`, the same variable
+   `v` in every group, `c` a numeric literal (comments aside); no group falls through. The
+   `default:` group, whatever its statements, ends with `break;` or falls out of the
+   `switch`'s closing brace and holds no `continue`, `goto` or `return`.
+2. Directly above the function write a `typedef struct` of two members: `key`, of `e`'s
+   type, and `value`, of `v`'s type (a later use reuses it when both types match). Directly
+   above that function write a `static const` array of it with no size, one element
+   `{ L, c }` per label in the `switch`'s source order, `L` the label and `c` its group's
+   literal; a comment of a label or group stands on its element.
+3. Write a `static const` lookup function above the function, taking the key by value:
+   `for (i=0; i < (sizeof(K)/sizeof(*K)); i++)`, `if (K[i].key == key) return(K+i);`,
+   and a final `return((const E *) NULL);`.
+4. Declare `const E *entry;` in the function and replace the `switch`, from `switch` to its
+   closing brace, with `entry=Lookup(e);`, then `if (entry != (const E *) NULL)` followed
+   by `v=entry->value;` and `else` followed by the `default:` group's statements, its
+   comments and text unchanged but for indentation and for losing the trailing `break;`
+   (braces when there are several statements). Nothing else changes.
+5. Check by script that every label but `default:` is the key of exactly one element,
+   whose value is the literal of its group, that no element exists for another label,
+   that the `else` branch is the `default:` group's text, and that nothing else changed.
+6. `refactor_guard.py`: each literal of the deleted groups stands in the table (a
+   `WARN` for a count that dropped with every value present is the expected one);
+   `--calls` shows the lookup added once. The function is not on a per-pixel path (check
+   its callers by reading); otherwise time the step.
+
+**Before:**
+
+```c
+  switch( method ) {
+    case SmoothMorphology:  /* 4 primitive compound morphology */
+      stage_limit = 4;
+      break;
+    case OpenMorphology:    /* 2 primitive compound morphology */
+    case OpenIntensityMorphology:
+    ...
+    case EdgeMorphology:
+      stage_limit = 2;
+      break;
+    default:
+      SetIteratedMorphologyLimits(method,&limits);
+      break;
+  }
+```
+
+**After:**
+
+```c
+  stage=FindMorphologyStage(method);
+  if (stage != (const MorphologyStage *) NULL)
+    stage_limit=stage->limit;
+  else
+    SetIteratedMorphologyLimits(method,&limits);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The `switch` evaluated `e` once and ran the group of the
+  label equal to it, or `default:`. `Lookup(e)` evaluates the same text once at the same
+  point (nothing between the `switch` and the old position runs, and `e` is a plain value)
+  and finds the element whose key equals it exactly when a label of a deleted group was
+  that value (step 5; labels are distinct, so the first match is the only one); then
+  `v=entry->value;` stores the literal the group stored, converted to `v`'s type as the
+  assignment converted it (the member has `v`'s type, so the initialiser converts it the
+  same way). A value no label names gives no element, and the `else` branch runs the
+  `default:` group, as before.
+- Comparing an enumeration constant with `==` compares the same values the `case` labels
+  did (`switch` on an enumeration converts it to its integer type as `==` does).
+- The tables are `static const`, written once by their initialisers; no existing table
+  changes.
+- The lookup walks at most as many elements as there were labels, once per call, which
+  step 6 requires to be outside every pixel loop.
+
+**Evidence level:** oracle (the cases that reach the function), with step 5's script and
+step 6's guard fingerprint, and the caller check by reading.
+
+**Provenance:** 2026-11-12, from `morphology.c`'s `MorphologyApply` (campaign A, W19 lane
+d): the eight-label stage-count `switch` is 9 of its cc 22; Recipe KT refuses it (no call
+on a constant, a `default:` that falls out), Recipe LP keeps the labels in a new function
+(a helper holding them was cc 9 in a W17 probe). Probe: cc 22 to 14, 101 to 91 lines, the
+file 6.63 to 6.70, no finding on the lookup. Added by Claude Code (Claude Sonnet 5.5) under
+the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
+## Recipe CQ - Name a Selection of Calls Over Its Condition
+
+**Use when:** CodeScene reports *Complex Method* (or *Overall Code Complexity*) on a function
+that holds a run of selections `if (C) F(...); else G(...);`, each branch one call, the sites
+the same text except for `C` and a few argument values, as `magnify.c`'s `Scale3X` does: eight
+`if (C) CopyPixels(&magnify,a,d); else CopyPixels(&magnify,4,d);` pairs, eight of the
+function's twelve decisions. The condition `C` calls other functions, so Recipe NS (which
+needs a condition of identifiers) does not reach it.
+
+**Not covered by:** Recipe NS, whose helper takes the condition's variables and returns one
+of two constants; here the selection chooses between calls and `C` holds calls. Recipe P,
+which names `C` and leaves the `if` and its decision in the caller. Recipes E and O, which
+move the `if` with `C` and so pass every variable `C` reads. Recipes SV and D, which merge
+copies of blocks and leave a block's `if` where it is.
+
+**How:**
+
+1. Each site is `if (C) F(x1,...,xn); else G(y1,...,ym);` with one call statement in each
+   branch (no braces, no `else if`). At least three sites in the file are of one shape: the
+   same `F` and `G` (they may be one function) and the same arguments except in positions
+   that differ between sites. `C` has type `int` (a comparison, a `&&`/`||` of those, or a
+   call returning `int`) and contains no assignment, increment or decrement; any call in `C`
+   is to a function that writes nothing.
+2. Every argument of `F` and `G` is an identifier, a literal, the address of an identifier,
+   or a cast or an operator expression of those, with no call, assignment, increment,
+   decrement, division, modulo or dereference: evaluating it when its branch is not taken
+   changes nothing and cannot trap. A position that holds the same literal at every site
+   in its branch stays in the helper; every other position is one parameter, an argument
+   that stands in both branches is one parameter, and the parameters, `C`'s value included,
+   number at most four.
+3. Write a `static inline void` function directly above the first function that holds a
+   site, with `const int selected` and one `const` parameter for each remaining position,
+   of the type `F` or `G` declares for it, whose body is `if (selected != 0) F(...); else
+   G(...);` with the parameters substituted and the shared literals written out. When `F`
+   and `G` are one function and the branches differ in one argument position only, the body
+   is the single call `F(...)` with that argument written `selected != 0 ? a : b` (`a` the
+   parameter, `b` the literal): one inlined copy of `F` instead of two, which the timing of
+   step 6 showed is the form that runs as fast as the sites did.
+4. Replace each site by a call passing `C` for `selected`, written as `C` was, and the
+   site's other arguments. Check by script that every site becomes the helper's body with
+   those arguments substituted, character for character apart from line breaks, and that
+   no site was left or altered.
+5. All sites in one function go in one commit; a site in another function is its own
+   commit, which adds no helper.
+6. The helper is called on a per-pixel path in the function that motivated this recipe: check
+   with `nm` that it is inlined in the candidate build, then time the baseline binary and the
+   candidate on images that take every branch (several interleaved runs, median CPU time),
+   and count instructions under `valgrind --tool=callgrind`. A step more than 3% slower is
+   not taken.
+7. A site may instead be one call `F(x1,...,(T) (C ? a : k),...)` of the helper's callee, in
+   which one argument is a parenthesised selection between `a` and the literal `k` that
+   the helper's else branch passes at that position, with `C` of step 1's kind or a plain
+   identifier tested as `C ? ...`; `(T)` is the cast to the parameter's own type. It
+   becomes the helper's call with `C` for `selected` (`C != 0` when `C` is not an `int`,
+   so that no wider value is narrowed), `a`, and the call's other arguments, which step 2
+   restricts as before. The helper is the one step 3 gave a function of the file's
+   if/else sites, or the same helper written for these sites alone; the script check of
+   step 4 distributes the selection over the two calls.
+
+**Before:**
+
+```c
+  if (IsScale3XTopEdge(pixels,channels) != MagickFalse)
+    CopyPixels(&magnify,1,1);
+  else
+    CopyPixels(&magnify,4,1);
+  if (PixelsEqual(pixels,5,1,channels))
+    CopyPixels(&magnify,5,2);
+  else
+    CopyPixels(&magnify,4,2);
+```
+
+**After:**
+
+```c
+static inline void CopyPixelsIf(const MagnifyPixels *magnify,
+  const int selected,const ssize_t source_offset,
+  const ssize_t destination_offset)
+{
+  CopyPixels(magnify,selected != 0 ? source_offset : 4,destination_offset);
+}
+...
+  CopyPixelsIf(&magnify,IsScale3XTopEdge(pixels,channels) != MagickFalse,1,1);
+  CopyPixelsIf(&magnify,PixelsEqual(pixels,5,1,channels),5,2);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. `C` is evaluated once, before either branch, as the `if`
+  evaluated it: it has no side effect and the function it calls writes nothing, so its place
+  among the other arguments does not matter, and every argument is evaluated before the call
+  runs, as the branch's statement ran after `C`. The helper tests the value as `if (C)`
+  did (`C` is `0` or `1` of type `int`; `!= 0` is the same test) and then makes the call the
+  taken branch made. The other arguments are now evaluated in the branch not taken too:
+  they are side-effect free and cannot trap (step 2), so the extra evaluation changes no
+  state.
+- The sites' shared literal (`4`) stays one literal in the helper, and each call keeps the
+  value it passed; no constant changes.
+- Step 7's form is the same argument read the other way: `F(m,(C ? a : k),d)` evaluates
+  `C` once, then calls `F` with `a` or `k`, which is what the helper's `if` does with the
+  call written twice; `C != 0` of an `ssize_t` that holds a comparison's `0` or `1` is the
+  same test, passed as an `int`.
+- Not a licence to merge sites that differ in the callee: `F` and `G` stay as written.
+- Compiler output differs (`tools/obj_identical.sh` prints `DIFFERENT`), which is why the
+  evidence is the oracle and the timing, and the step the owner admitted for `magnify.c`
+  on 2026-11-12 (the `?:` fold, with a reached function whose object code differs).
+
+**Evidence level:** oracle on the cases that reach the function (`casemap.py`), with
+`refactor_guard.py --calls` (the new function and one call per site added, the callee's
+calls removed, each by its count) and step 6's timing quoted in the commit.
+
+**Provenance:** 2026-11-13, from `magnify.c`'s `Scale3X` (campaign A, W21 lane d): eight
+selections of `CopyPixels` over a call condition, cc 12; the file 8.84 to 9.09, beside
+Recipe NS on one site of `Xbr2X`. Step 7 (2026-11-13): `Eagle3X` and `Eagle3XB`, whose
+`(ssize_t) (corner_tl ? 0 : 4)` arguments are the same selection written in the call.
+Added by Claude Code (Claude Sonnet 5.5) under the owner's leave to evolve the recipes
+(2026-11-10).
+
+---
+
+## Recipe EX - Dispatch the Exits of an Extracted Block Through a Result Code
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Complex Method* or *Large Method*, and
+the block that would fix it stands in the body of a sequential loop, is followed by
+statements that stay, and leaves through several different exits besides falling off its end:
+`continue;` of the loop and two or more `return(R);` whose expressions differ, as
+`layer.c`'s `OptimizeLayerFrames` does for its choice of disposal (an unchanged frame
+`continue`s, a failed duplicate trial returns one cleanup call, a failed background trial
+returns another).
+
+**Not covered by:** Recipe CR, whose returns are one constant; Recipe BR, whose `return`s
+share one expression and whose other exit is `break;`; Recipe LC, whose block has no
+`return`; Recipes I, V, W and RV, whose block has one `return(R);` or one `goto`.
+
+**How:**
+
+1. The block lies outside every OpenMP region and contains no `#pragma` line; the innermost
+   loop around it is a sequential loop `Lp`; it contains no `goto` and no `break` that leaves
+   it, every `continue;` that leaves it continues `Lp`, and every `return` in it is `return(R);`.
+   A `break` or `continue` of a loop or `switch` nested inside it stays as it is. List its
+   exits: each `continue;` is one, each distinct text of `R` is one, and falling off its end
+   is the last. At least two of the first kind must stand.
+2. Each `R` names only variables of the caller and constants, never a local the block
+   declares, and has no operand the block writes by copy: a variable the block writes is
+   written through a pointer (step 3), so that the caller, evaluating `R` after the call,
+   reads what the `return` would have read. Nothing runs between the exit and the caller's
+   copy of it but the helper's own return.
+3. The variables of the caller that the block writes and the caller (or an `R`) reads
+   afterwards go by pointer under the rules of Recipe I step 2 (plain locals whose address
+   the caller takes only for the `const` targets struct, read by nothing else) in the
+   members of a `const` targets struct of Recipe I, LB step 8 or CT step 3 that the caller
+   already declares, each member bound once and every use written `(*v)`, an `&v` handed on
+   written `v`; a variable the block writes before it reads it and nothing reads after is
+   declared in the new function (Recipe E step 4); variables the block declares move with it.
+   A `continue;` that follows `i++;` takes that write with it, through the pointer.
+4. Declare a `typedef enum` directly above the new function with one enumerator per exit
+   and one for falling off the end, named for what the exit does. Cut the block into a new
+   `static` function of that type, directly above the caller. Each `continue;` and each
+   `return(R);` becomes `return(<its enumerator>);`, the function ends with `return(<the
+   fall-through enumerator>);`, and nothing else in the text changes. Inputs come from the
+   `const` input struct the caller already fills (Recipe N step 8's siblings, `&name` in
+   the block becoming `name`) and the targets struct: at most four parameters.
+5. Where the block stood, write `switch (Helper(...))` with one `case` per exit that is not
+   the fall-through, holding the exit's original statement unchanged (`continue;`,
+   `return(R);`), and `default: break;`. `continue;` in the `switch` continues `Lp`, as it did.
+6. Check by reading that every exit has its enumerator, that each `case` holds the text of
+   its exit, and every argument against its parameter.
+7. Pass-through (2026-11-13, the helper's own branch). When the block is the whole body of
+   the last branch of an `if`/`else` that ends a function made under this recipe, the
+   function's closing statement is `return(<fall-through enumerator>);`, and every exit of the
+   block is a `return(<enumerator>);` of that function's own enumeration type, the new
+   function (made under steps 3 and 4, with the same enumerators for the same exits, and the
+   fall-through enumerator for falling off) is called as `return(Helper(...));` in place of
+   the block, and step 5's `switch` is not written: each path returns the enumerator it
+   returned before.
+8. Evidence: the oracle, with the lines of each exit that the whole catalogue reaches named
+   from the coverage run, and each exit it does not reach checked by reading;
+   `refactor_guard.py --calls` and `ci_linux_warnings.sh` (MSVC C4702: no statement follows a
+   `switch` whose every path returns, and none follows here).
+
+**Before:**
+
+```c
+    if ( bounds[i].x < 0 ) {
+      if (MarkDeletedFrame(add_frames,i,disposals,bounds) == MagickFalse)
+        {
+          i++;
+          continue;
+        }
+    }
+    else
+      {
+        cleared=TryPreviousDisposal(&trial,cleared);
+        dup_bounds.width=dup_bounds.height=0;
+        if (TryDuplicateFrame(&trial,&targets) == MagickFalse)
+          return(ReleaseFrameListsAndPrevious(bounds,disposals,prev_image));
+        if (TryBackgroundDisposal(&trial,dup_bounds,&targets) == MagickFalse)
+          return(ReleaseFrameListsAndImages(bounds,disposals,prev_image,
+            dup_image));
+      }
+```
+
+**After:**
+
+```c
+    switch (SelectFrameDisposal(&trial,&targets))
+    {
+      case FrameDisposalSkipped:
+        continue;
+      case FrameDisposalPreviousFailed:
+        return(ReleaseFrameListsAndPrevious(bounds,disposals,prev_image));
+      case FrameDisposalImagesFailed:
+        return(ReleaseFrameListsAndImages(bounds,disposals,prev_image,
+          dup_image));
+      default:
+        break;
+    }
+```
+
+**Careful:**
+
+- Every path through the block ends at one of its exits or falls off its end. After, the
+  helper runs the same statements in the same order up to that exit and returns its code;
+  the caller then runs the exit's own statement. No statement runs between the two, so the
+  caller's `continue;` or `return(R);` is the one the block would have run.
+- `R` is evaluated in the caller instead of inside the block: step 2 requires it to name only
+  caller variables and constants, and every variable the block wrote is written through a
+  pointer, so the value `R` reads is the one it read in the block.
+- A `return` that leaves the function ends the iteration and the loop in the caller as before;
+  the caller's `continue;` sits inside a `switch`, and `continue` ignores a `switch`.
+- The exits that no case reaches (allocation failures, here) are checked by reading, one
+  enumerator against one `case`.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` and steps 2, 3 and 6 checked by
+reading.
+
+**Provenance:** 2026-11-13, from `layer.c`'s `OptimizeLayerFrames` (campaign A, W21 lane b):
+the `if (bounds[i].x < 0) {...} else {...}` choice holds both of the function's remaining
+bumps (a nested `if` with `i++; continue;`, and two failure returns with different
+cleanups inside the `else`), and BR, CR, I and LC each refuse it. The choice as a helper
+with the dispatch in the caller keeps the two bumps in the helper, 8.82 to 8.85; its `else`
+body as a second helper under step 7, called as `return(TryFrameTrials(...));`, 8.85 to 8.92,
+no finding on either helper. Added by Claude Code (Claude
+Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
+## Recipe MF - Make a Hoisted Statement Macro a Function
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Deep, Nested Complexity*, *Complex
+Method* or *Large Method* on a function whose blocks all use one function-like macro that
+expands to a compound statement with its own branches, and Recipe H has hoisted the macro
+so that a helper can use it: every block that would move holds a use, and a helper that
+holds a use carries the macro's branches itself (a probe of `paint-floodfill.c`:
+`FloodfillPaintImage` with `PushSegmentStack` hoisted and nothing else changed, 8.35 to
+7.03, because each helper holding a use still holds the whole `if`/`else`/`if`). The
+typical case is a push on a stack that overflows through `ThrowBinaryException`, used at
+five sites: `PushSegmentStack`.
+
+**Not covered by:** Recipe H, which moves the macro and keeps its uses; Recipe E, whose
+step 7 moves a macro only together with a block that is its sole user; Recipes W, Y and I,
+which move a block and leave its text unchanged, while here the block is the macro's body
+with its parameters bound to the argument values, and their steps 3 and 4 give a variable
+the block advances (`s++`) no way through a struct when the macro's text names it plainly;
+Recipe D, whose copies are blocks of the function's own text.
+
+**How:**
+
+1. The macro `M` is defined at file scope, hoisted under Recipe H, directly above the
+   caller; its body is one compound statement without `#`, `##`, `goto`, `break` or
+   `continue`, whose only exit is `ThrowBinaryException(...)` (or another of
+   `exception-private.h`'s throw macros), that is `return(c);` of one constant `c`. Every
+   use of `M` in the file is a statement `M(a1,...,ak);` in the one caller, outside every
+   OpenMP region, with no `#pragma` line in the macro. Every argument is a side-effect-free
+   expression of locals, parameters and literals (identifiers, literals, unary `-`, `+`
+   and `-`), has the type `ssize_t` or is an integer literal, and reads no variable the
+   macro writes.
+2. List the caller's variables that `M`'s body names besides its parameters. Those it only
+   reads are the group of Recipe N step 2 (here `image`, `exception`, `segment_stack`).
+   Those it writes only on the paths that end in its `return(c);` (here the cleanup
+   `segment_info=RelinquishVirtualMemory(segment_info);` and the three that follow) the
+   helper keeps as non-`const` locals of its own (Recipe W step 3: by value); the caller
+   returns `c` at once and reads none of them. At most one variable `p` is written on the
+   path that falls through: a plain pointer local of the caller (`s`, advanced by `s++` and
+   stored through) whose address the caller takes only to fill the struct of step 3.
+3. Declare `typedef struct _Stack { ... } Stack;` with one member per variable of step 2
+   (the exact type and name, a top-level `const` left off) and last a member `T **top` for
+   `p` (`T *p`); and `typedef struct _Segment { ... } Segment;` with one member per
+   parameter of `M` (`ssize_t up, left, right, delta`), in the macro's order.
+4. Directly above the caller, below the hoisted macro, write `static MagickBooleanType
+   Helper(const Stack *stack,const Segment *segment)`. Its body declares a local of every
+   name step 2 lists, initialised from `stack` (non-`const` for the names `M` writes,
+   `T *p = *stack->top;`), a `const` local per parameter of `M` initialised from `segment`
+   and named as the parameter, then `M(<the parameters>);`, then `*stack->top=p;` and
+   `return(MagickTrue);`. The macro's `return(c);` is the helper's failure exit.
+5. In the caller declare a `Stack` local with the other locals and fill it by assignments
+   before the first use, in member order, `stack.top=&p;` last, at a point every use
+   follows, with nothing from it to a use writing a member's variable. Where `M(a1,...,ak);`
+   stood write a compound statement `{ const Segment segment = { a1,...,ak };` blank line
+   `if (Helper(&stack,&segment) == MagickFalse) return(c); }`, with the caller's own `c`.
+6. Check by reading each of the five: (a) every argument is evaluated once at the call
+   where the macro evaluated it up to three times, to the same value, since it reads no
+   variable the macro writes and no memory behind `p`; (b) the cleanup and the throw run
+   on the helper's copies of the objects the caller held, before the caller returns `c`, so
+   the same objects are released and the same value returned; (c) on the fall-through path
+   `*stack->top=p;` stores the value the macro left in `p`, and the caller reads `p` only
+   after the helper returned; (d) the exception the throw makes names the helper in
+   `GetMagickModule()` (owner, 2026-11-12), its text unchanged.
+7. Run `tools/refactor_guard.py --calls`: the macro's name drops by its use count and the
+   helper appears; run the oracle on the caller's cases.
+
+**Before:**
+
+```c
+#define PushSegmentStack(up,left,right,delta) \
+{ \
+  if (s >= (segment_stack+MaxStacksize)) \
+    { \
+      ...cleanup... \
+      ThrowBinaryException(DrawError,"SegmentStackOverflow",image->filename) \
+    } \
+  else \
+    { \
+      if ((((up)+(delta)) >= 0) && (((up)+(delta)) < (ssize_t) image->rows)) \
+        { s->x1=(double) (left); ... s++; } \
+    } \
+}
+  ...
+          PushSegmentStack(y,start,x1-1,-offset);
+```
+
+**After:**
+
+```c
+static MagickBooleanType PushFloodfillSegment(const FloodfillStack *stack,
+  const FloodfillSegment *segment)
+{
+  ...
+  SegmentInfo
+    *s = *stack->top;
+  ...
+  PushSegmentStack(up,left,right,delta);
+  *stack->top=s;
+  return(MagickTrue);
+}
+  ...
+          {
+            const FloodfillSegment
+              segment = { y, start, x1-1, -offset };
+
+            if (PushFloodfillSegment(&stack,&segment) == MagickFalse)
+              return(MagickFalse);
+          }
+```
+
+**Careful:**
+
+- The macro's text is not edited: the hoisted `#define` stays as it stands and the helper
+  names the same identifiers, which is why step 4 binds each name as a local of the same
+  name. `pp_identical.sh` proves the hoist (Recipe H); this recipe's proof is the oracle.
+- The overflow branch (`s >= segment_stack+MaxStacksize`) is reached by no case: it is
+  checked by reading step 6 (b) and the `--calls` guard, and the helper's text of it is
+  the macro's, unchanged.
+- The helper is a call per use where the macro was inline code; a use inside a per-pixel
+  loop must be timed against the baseline binary (several runs, median) and the step taken
+  only if the slowdown is at most 3%. `PushSegmentStack` runs once per row segment.
+- Several uses of one macro in one helper are not this recipe's result: each expansion is a
+  bump, so one helper holds one use.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` and steps 1, 2 and 6 checked by
+reading; the throw branch by reading only.
+
+**Provenance:** 2026-11-13, from `paint-floodfill.c`'s `FloodfillPaintImage` (campaign A,
+W21 lane b): the five `PushSegmentStack` uses held every bump of the function and Recipe H
+alone probed 7.03; the helper of this recipe with the loop split into helpers under
+Recipes Y and I, the seed pushes in a helper of their own and Recipe FB on the last
+struct, probed 9.09. The copy-in and copy-out of `s` is Recipe MB's form (a local of the
+macro-bound name, initialised from a pointer and stored back). Added by Claude Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10 to
+evolve the recipes.
+
+---
+
+## Recipe LX - Extract Block Returning Whether the Iteration Went On, Flagging a Break
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Complex Method* or *Large Method*, and the
+block that would fix it stands in the body of a sequential loop, is followed by statements that
+stay, and leaves through all three exits a loop body has: `continue;` of the loop on some paths,
+`break;` of the loop on others, and falling off its end on the rest, as `opencl.c`'s
+`LoadOpenCLDeviceBenchmark` does for its element tests (`continue;` once a `<device` record is
+allocated, `break;` when the allocation fails, a fall-through for every other keyword).
+
+**Not covered by:** Recipe LC, whose block has no `break`; Recipe LB, whose block leaves only
+through `break;`; Recipe BR, whose second exit is a `return`, not a `continue`; Recipe EX, whose
+exits are a `continue;` and several `return(R);`; Recipe OC, whose every path ends the iteration.
+A helper cannot leave its caller's loop, and one result cannot say "continue", "break" and "go
+on", so this recipe returns a result and sets a flag, as Recipe BR does for a break and a return.
+
+**How:**
+
+1. The block lies outside every OpenMP region and contains no `#pragma` line. The innermost loop
+   or `switch` around it is a sequential loop `Lp`; every `continue;` in the block that leaves it
+   continues `Lp`, and every `break;` in it that leaves it ends `Lp`. It holds at least one of
+   each, no `return` and no `goto`. A `break` or `continue` of a loop or `switch` nested inside
+   it stays as it is. The block may be a whole `if` statement or a run of sibling statements (the
+   commit names the run).
+2. The variables of the caller it writes and that the caller reads afterwards meet Recipe O
+   step 2 (plain locals whose address the caller passes elsewhere only to calls that keep no
+   copy of it): each goes by pointer, written `(*v)` at every use, `&v` passed on written `v`
+   (Recipe LC step 2). A variable it writes before it reads it on every path, and that nothing
+   after the block reads, is declared in the new function (Recipe E step 4).
+3. Cut the block into a new `static MagickBooleanType` function directly above the caller, whose
+   last parameter is `MagickBooleanType *broke` and whose first statement is
+   `(*broke)=MagickFalse;`. Each `continue;` that continued `Lp` becomes `return(MagickFalse);`,
+   one for one; each `break;` that ended `Lp` becomes `(*broke)=MagickTrue;` followed by
+   `return(MagickTrue);`, in braces when it stood as the body of an `if`; the function ends
+   with `return(MagickTrue);`. A call of an earlier helper of Recipe LC inside the block
+   (`if (H(...,&v) != MagickFalse) continue;`) is written under the same rule: its `continue;`
+   becomes `return(MagickFalse);` and its `&v` becomes `v`. Nothing else in the text changes.
+4. Pass what the block only reads as Recipe LC step 4 does (parameters, or the `const`-read
+   input struct the caller fills directly before its first helper call; a later helper of the
+   same iteration reads the same struct, since nothing between the fill and that call writes
+   a member's variable), then the written variables by pointer in the order the block first
+   writes them, then `broke`: at most four parameters.
+5. The caller declares `MagickBooleanType broke = MagickFalse;` once among the declarations at
+   the top of its body (Recipe BR step 5). Where the block stood write, as two statements at the
+   level where the block stood, `if (Helper(...,&broke) == MagickFalse) continue;` and directly
+   after it `if (broke != MagickFalse) break;`, so that `continue` and `break` act on `Lp` as the
+   block's own statements did. Check every argument against its parameter by reading.
+
+**Before:**
+
+```c
+    if (SkipOpenCLBenchmarkMarkup(keyword,extent,token,&q) != MagickFalse)
+      continue;
+    if (LocaleCompare(keyword,"<device") == 0)
+      {
+        device_benchmark=(MagickCLDeviceBenchmark *) AcquireQuantumMemory(1,
+          sizeof(*device_benchmark));
+        if (device_benchmark == (MagickCLDeviceBenchmark *) NULL)
+          break;
+        (void) memset(device_benchmark,0,sizeof(*device_benchmark));
+        device_benchmark->score=MAGICKCORE_OPENCL_UNDEFINED_SCORE;
+        continue;
+      }
+```
+
+**After:**
+
+```c
+static MagickBooleanType ReadOpenCLBenchmarkMarkup(
+  const OpenCLBenchmarkTokens *tokens,const char **q,
+  MagickCLDeviceBenchmark **device_benchmark,MagickBooleanType *broke)
+{
+  ...
+  (*broke)=MagickFalse;
+  if (SkipOpenCLBenchmarkMarkup(keyword,extent,token,q) != MagickFalse)
+    return(MagickFalse);
+  if (LocaleCompare(keyword,"<device") == 0)
+    {
+      (*device_benchmark)=(MagickCLDeviceBenchmark *) AcquireQuantumMemory(1,
+        sizeof(**device_benchmark));
+      if ((*device_benchmark) == (MagickCLDeviceBenchmark *) NULL)
+        {
+          (*broke)=MagickTrue;
+          return(MagickTrue);
+        }
+      (void) memset((*device_benchmark),0,sizeof(**device_benchmark));
+      (*device_benchmark)->score=MAGICKCORE_OPENCL_UNDEFINED_SCORE;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+...
+    if (ReadOpenCLBenchmarkMarkup(&tokens,&q,&device_benchmark,&broke) ==
+        MagickFalse)
+      continue;
+    if (broke != MagickFalse)
+      break;
+```
+
+**Careful:**
+
+- Three kinds of path leave the block. A `continue;` path runs the same statements up to the
+  `continue;` and the helper returns `MagickFalse` with `broke` clear: the caller's first test
+  runs the `continue;` the block would have run, and nothing runs between the two. A `break;`
+  path runs the same statements, sets the flag and returns `MagickTrue`: the first test does
+  not fire, the second does, and the `break;` ends `Lp` at the same point, after the same
+  writes. A path that falls off the block's end returns `MagickTrue` with the flag clear (the
+  first statement cleared it, and only the `break;` paths set it): both tests fall through
+  and the statements after the block run as they ran after it.
+- The flag is cleared at each call, so a value left by another helper of the loop that shares
+  `broke` is never read; after a `break;` the loop has ended.
+- Every write the block made lands in the caller's variable through its pointer, at the same
+  point and in the same order; what the block only reads is the same value at the call.
+- The `continue;` and the `break;` stand in the caller as plain statements, not inside a
+  `switch`, so both act on `Lp`.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` and steps 1, 2 and 5 checked by
+reading; the exits that no case reaches (an allocation failure, here) one by one against the
+text.
+
+**Provenance:** 2026-11-13, from `opencl.c`'s `LoadOpenCLDeviceBenchmark` (campaign A, W21 round
+three, lane c): after Recipes OC and LC the function held one bump and cc 9 in the `<device`
+branch (`if (NULL) break;` inside the branch that ends in `continue;`); LB refuses the
+`continue;`, SG refuses the guard that holds a call, BR needs a `return`. The `<device` branch
+together with the earlier LC helper's call as one helper of this form, 7.89 to 8.15: the function
+leaves Bumpy Road Ahead and Complex Method (as a helper of its own, without the LC call, the
+branch measured 7.95 and the function kept cc 9). Added by Claude Code (Claude Sonnet 5.5) under
+the owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
@@ -13813,6 +14603,17 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | NEW | LF | Move a loop's leading run of `if (<test>) continue;` into one `Is<Name>` predicate; evidence oracle | `policy.c`'s `IsRightsAuthorizedByName` (5.88 to 5.93); P names one expression and keeps its `if` | mandate (2026-10-24) |
 | 2026-11-12 | NEW | DL | Drop `case` labels that fall straight into `default:`; proof `obj_identical.sh` | `policy.c`'s `SetMagickSecurityPolicyValue` (five enumerator labels; 6.02 to 6.21, object code identical) | mandate (2026-10-24) |
 | 2026-11-12 | NEW | DT | Drop `? MagickTrue : MagickFalse` after a comparison or a chain of them; proof `obj_identical.sh` and `ci_warnings.sh` | `policy.c` (seven sites in seven functions; 6.21 to 6.38, object code identical); P writes the ternary and nothing removes it | mandate (2026-10-24) |
+| 2026-11-12 | NEW | KL | Replace Case Groups Sharing a Tail with a Keyed Lookup: a run of one-label groups of a `switch` that are the same statements on a string literal and a numeric literal become one copy in the `default:` group, reading both from a `static const` table found by a lookup function; the groups that differ stay. *Careful* gives the argument (the `switch` value held once, the lookup finds an element exactly when a deleted group carried the label, constants converted as before) | `morphology.c`'s `AcquireFreiChenKernel` (campaign A, W19 lane d): cases 15 to 19; Recipe KT refuses the tail, SC leaves five labels, a helper clones `AcquireFreiChenEdgeBasisKernel`; probe 6.35 to 6.63, cc 16 to 8 | owner |
+| 2026-11-12 | NEW | KC | Replace a Constant-Assigning Label Run with a Table Lookup: the groups of a `switch` that are `v=c;` `break;` (several labels to a group) become a `static const` table of `{label, literal}` read through a lookup function, `if (entry != NULL) v=entry->value; else` the `default:` group's text; *Careful* gives the argument (`e` evaluated once, the lookup finds an element exactly when a deleted group carried the label, the literal converted to `v`'s type as before) | `morphology.c`'s `MorphologyApply` (campaign A, W19 lane d): the stage-count `switch` (`SmoothMorphology` 4, seven labels 2, `default:` calling `SetIteratedMorphologyLimits`); probe cc 22 to 14, 6.63 to 6.70 | owner |
+| 2026-11-12 | AMEND | S | Step 2: a quoted `#include` of a header that defines objects (a file-scope initialised variable in column 0) is left out of the new file's include block, when no line of the family names an object or macro of that header; the split is refused when one does. *Careful* gives the argument | `opencl.c`'s device-property family (campaign A, W19 lane a, wide build): the copied include block included `accelerate-kernels-private.h`, which defines `accelerateKernels` and `accelerateKernels2`, and the pair failed to link (multiple definition); the family names neither, and the moved functions' object code compares unchanged | owner |
+| 2026-11-13 | AMEND | EJ | Step 1: the sole `if` of the `else` may stand in a pair of braces that holds nothing else; the pair goes with the join (`else {` newline `if (...)` ... `}` becomes `else if (...)`); proof `obj_identical.sh` as before | `opencl.c`'s `LoadOpenCLDeviceBenchmark` DOCTYPE loop (campaign A, W21 lane c, wide build): the chain sits in `else { ... }`, so the helper extracted from it kept 2 bumps after the unbraced levels were joined | owner |
+| 2026-11-13 | AMEND | O | Step 2: a block-scope `static` that the static clause admits (arithmetic, enumeration, pointer or structure type) may also have its address passed elsewhere in the caller, outside the block, to calls that keep no copy of it, as a plain local may; the helper's pointer is then the only one in use while it runs | `xwindow-visual.c`'s `XBestVisualInfo` (campaign A, W21 lane c, wide build): the visual-type ladder writes `visual_mask` and the members `klass` and `visualid` of `static XVisualInfo visual_template`, whose address also goes to `XGetVisualInfo` (reads the template, stores no pointer); the clause as written (address taken nowhere else) refused it | owner |
+| 2026-11-13 | NEW | CQ | Name a Selection of Calls Over Its Condition: sites `if (C) F(...); else G(...);` (one call per branch, `C` an `int` condition that may call read-only functions, the other arguments free of side effects and traps) become calls of one `static inline void` helper taking `C`'s value as `const int selected` and the sites' differing arguments; *Careful* gives the argument (`C` evaluated once before either branch, the other arguments evaluated in the branch not taken too with no effect); proof: the oracle, `--calls`, `nm` for inlining, and a timing (at most 3% slower) | `magnify.c`'s `Scale3X` (campaign A, W21 lane d): eight `if (C) CopyPixels(&magnify,a,d); else CopyPixels(&magnify,4,d);` over `PixelsEqual` and `IsScale3X*Edge` conditions, cc 12; Recipe NS refuses a call in the condition and the owner's `?:` fold for magnify (2026-11-12) leaves the decisions in place. A probe: 8.84 to 9.09 | owner |
+| 2026-11-13 | AMEND | CQ | Step 7: a site that is one call whose argument is a parenthesised `(C ? a : k)`, `k` the literal the helper's else branch passes, becomes the helper's call (`C != 0` for a `C` that is not an `int`); *Careful* gives the argument (the same selection with the call written once; `C` evaluated once) | `magnify.c`'s `Eagle3X` (three sites) and `Eagle3XB` (four): `CopyPixels(&magnify,(ssize_t) (corner_tr ? 1 : 4),2);` with `corner_tr` a `ssize_t` holding a comparison, beside `Scale3X`'s if/else sites; a probe: the file 9.38 to 10.0 together with `Scale2X` and Recipe P on `IsEpbx2XBlendable` | owner |
+| 2026-11-13 | NEW | EX | Dispatch the Exits of an Extracted Block Through a Result Code: a block in a sequential loop body that leaves by `continue;` and by `return(R);` with different `R` (or by several `return`s) becomes a function returning an enumerator per exit, and the caller's `switch` runs each exit's original statement. *Careful* gives the argument (same statements up to the exit, nothing between the helper's return and the caller's exit, `R` read from caller variables written through pointers) | `layer.c`'s `OptimizeLayerFrames` (campaign A, W21 lane b): the `bounds[i].x < 0` choice with its two cleanup returns and its `i++; continue;`; BR, CR, I and LC refuse it; 8.82 to 8.85 with the choice as one helper, 8.92 with step 7's pass-through on its `else` body | owner |
+| 2026-11-13 | NEW | MF | Make a Hoisted Statement Macro a Function: the uses of a hoisted function-like statement macro (`M(a1,...,ak);`, side-effect-free arguments, one `ThrowBinaryException` exit, at most one pointer local advanced on the fall-through path) become calls of one `static MagickBooleanType` helper that holds the one remaining use, taking a struct of the macro's free variables with `T **top` for the advanced pointer and a struct of the arguments; *Careful* gives the argument (arguments evaluated once to the same value, cleanup on copies of objects the caller releases before returning, the pointer stored back on the success path); proof: the oracle, `--calls`, reading | `paint-floodfill.c`'s `PushSegmentStack` (campaign A, W21 lane b): five uses in `FloodfillPaintImage`, the file 8.35; with the helper and the loop split under Recipes Y and I, probed 9.09 | owner |
+| 2026-11-13 | AMEND | N | Step 2: a variable the block writes before it reads it, whose only other use is the caller's earlier write of it, may be carried in by value like a read-then-written one (a non-`const` local of the member's name initialised from the member), since declaring it in the new function would leave the caller's write set but never used (`-Wunused-but-set-variable`, an error in the CI jobs) | `paint-floodfill.c`'s `FloodfillPaintImage` (campaign A, W21 lane b): `start=0;` before the stack loop, which the loop overwrites before reading; the loop as a helper under Recipe Y with `start` declared in it leaves `start` set and unused in the caller | owner |
+| 2026-11-13 | NEW | LX | Extract Block Returning Whether the Iteration Went On, Flagging a Break: a block in a sequential loop body that leaves by `continue;`, by `break;` and by falling off its end becomes a function returning `MagickFalse` for each `continue;` and `MagickTrue` otherwise, with a `MagickBooleanType *broke` out-parameter set by each `break;`; the caller writes `if (Helper(...,&broke) == MagickFalse) continue;` and `if (broke != MagickFalse) break;`. *Careful* gives the argument for the three kinds of path | `opencl.c`'s `LoadOpenCLDeviceBenchmark` (campaign A, W21 round three, lane c): the `<device` branch's `if (NULL) break;` before its `continue;`, which LB, SG and BR refuse; 7.89 to 8.15 with the run of the LC helper's call and the branch as one helper | owner |
 | 2026-11-12 | NEW | LL | Replace an ascending `if (x >= L) var=V;` ladder by descending returns in a helper; proof oracle plus the monotone-limits reading | `type.c` `LoadFontConfigFonts` (stretch and weight ladders; cc 41 to 23, 5.08 to 5.16); E keeps the ladder's cc | mandate (2026-10-24) |
 | 2026-11-13 | NEW | PA | Peel an advancing label group (`p++; break;` under many labels) out of a loop's `switch` into a membership predicate and an `if (...) { p++; continue; }`; evidence oracle | `geometry-parse.c`'s `GetGeometry` and `ParseGeometry` (seventeen labels in each; cc 50 and 52 to 36 and 38, 6.80 to 6.99); LP and PL peel groups that return, SD keeps the labels in a switch | mandate (2026-10-24) |
 | 2026-11-13 | NEW | HE | Hoist a case's exit test (`case L: { if (T) return(R); S break; }`) to an `if ((c == L) && (T)) return(R);` before the loop's `switch`; evidence oracle | `geometry-parse.c`'s `ParseGeometry` (bump gone, 7.01 to 7.04); HT, SG and PL do not reach a test inside a case | mandate (2026-10-24) |

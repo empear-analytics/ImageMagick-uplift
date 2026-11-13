@@ -127,3 +127,61 @@ lines each), `cand-wide` (10, 5,232), `ci-gcc-min` and `ci-gcc-dlg` (98 function
 the moved code (`MagickSigma` doubling `MagickEpsilon`) prints DIFFERENT again; the tree was restored. `ci_linux_warnings.sh
 --campaign-a` OK on 85 files in six configurations; whole catalogue 15,955 cases, 0 diverged (164 s). The open question on
 splits that relabel most of a file is still the owner's; this one went in under the OK given for it.
+
+## W19b: four lanes after the owner's OK and PR #95 ready (2026-11-12 afternoon)
+
+Scores measured with `tools/ch.py` (cs-mcp 1.5.16) on the merged tree. Campaign sweep before this batch: mean 8.89, 37 files at 10.0.
+
+**Lane a, splits of the wide files (merged).** Tool work first (each a `tools:` commit with a planted-defect test): 07c956457
+`split_source.py` carries the enclosing file-level `#if`/`#else`/`#endif` into the new file verbatim and balance-checked
+(`tools/test_split_source.py` is new; the effect-blur-adaptive and resize-rescale splits regenerate byte-identically); 4394b4701,
+7b4f5a8f7, 226a3b17f and 45d09512a (forward declarations, adjacent stubs, a header that defines objects, the object-list
+backslash in `register_source.py`); ea03cf4a2 and 28cf6ac17 teach `split_branch_check.py` `.data.rel.ro` pointer tables,
+`.bss`/`.data` static references, trailing nop padding and call/jmp placeholder labels (planted changes still print DIFFERENT,
+earlier splits still IDENTICAL-MODULO-LAYOUT). **One rule change, for the owner to confirm:** eb4731c83, Recipe S step 2, a
+second exception: a quoted `#include` of a same-directory header that defines objects (`accelerate-kernels-private.h`) is left
+out of the new file's includes when the family names nothing that header defines; the split is refused when it does. Splits:
+1c539bd0d `xwindow.c` -> `xwindow-visual.c` (XBestVisualInfo, XDisplayImageInfo, XInitializeWindows): xwindow.c 2.47 -> 2.53, new
+7.28; 554c87f9b `xwindow-import.c` (XImportImage and the window lookups, the stub carried under `#else`): xwindow.c 2.53 ->
+**2.55**, new 6.37; 150bca3bd `opencl.c` -> `opencl-device.c` (12 device getters and setters with their 12 stubs): opencl.c 7.36
+-> **7.59**, new 10.00. Each passes `split_branch_check.py` in cand-wide and in the three stub-side builds, `refactor_guard
+--combined` and `--calls`, and the oracle on the reaching groups (xwindow-import: 4 xevents cases diverged under load, 0 on a
+rerun alone). Plateaus: xwindow.c stops at 2.55 (the other families are flat or lower; `XMakeImage` and the large functions hold
+the score); opencl's kernel/queue family drops the kept file to 7.14; widget, display, animate and accelerate close only on whole-file
+relabels and the tool still refuses them on two-line forward declarations of statics, an `extern "C" {` block and a typedef of the
+kept part.
+
+**Lane b, enhance.c (tool merged, split held).** a952bfe17 `split_source.py` follows function-pointer typedefs and calls through
+macros: over every public root of the 126 MagickCore files over 400 lines, 7 roots differ (CloneImageArtifacts, CloneImageOptions and
+CloneImageProfiles were accepted before while leaving `CloneKeyFunc`/`CloneValueFunc` behind: invalid output; now they move); planted
+defects refused. **Held on local branch `w19b-enhance-split-held` (392a6d9e1):** moves AutoGamma, Contrast, Enhance, Modulate,
+SigmoidalContrast and WhiteBalance (50 functions, 1,731 lines) to `enhance-color.c`: **enhance.c 9.09 -> 10.00**, new file 9.09 (the
+original's score); AutoGammaImage has to move with the family (kept first after the includes it reads as one block with them: 8.95).
+Whole catalogue 15,955 cases, 0 diverged, guard unchanged. Held for two reasons: (1) the `#if defined(MAGICKCORE_HAVE_ATANH)` / `#else`
+blocks around Sigmoidal and InverseScaledSigmoidal: every build the 2026-11-11 ruling names defines atanh, so the `#else` side is compiled
+nowhere; a scratch `ci-gcc-noatanh` configuration (ci-gcc-min with `ac_cv_func_atanh=no`) prints IDENTICAL-MODULO-LAYOUT (110 functions,
+17,089 lines each). Does a no-atanh configuration count as an available build? (2) in cand-wide the check prints DIFFERENT for one pair that is
+not code: the `call __assert_fail` ending ModulateImage is labelled with whichever function follows it in the object, with an identical
+relocation (the other three builds are identical). enhance-tone.c: every public root refused on shared statics; enhance-clahe.c (9.68): only
+Excess Arguments, a split would not lower them.
+
+**Lane c, composite.c 3.69, fx.c, compare-similarity.c (nothing merged).** Six flat commits parked on `w19c-composite-rowflags` plus two:
+new Recipe RH (hoist a label run into a row flag, 0ad9191ab, with step 8, the if/else form, 8eb9546b8) applied to `SetCompositeCoverage`,
+`CompositeAlphaChannel` and `CompositeImagePixel`, three SD steps; callgrind over the composite phase -0.8% to +1.3%. Table loops (TB)
+on the per-pixel path cost +4% to +9% instructions, which RH avoids by filling the flag once per row. composite.c stays 3.69: the stub of
+the remaining Complex Methods measures 3.83, but `SaliencyBlendImage` and `SeamlessBlendImage` each peel flat (3.59) and together clone
+(ten duplicated functions, 3.17); merging the twin loops would fold one function into the other (the Recipe FT question). fx.c: only
+`ExecuteRPN` matters (stub 8.28), a nested SD chain measured 17% slower on the per-pixel path (owner question). compare-similarity.c: stubs
+3.70 for the eleven `Get*Similarity` and every real peel clones its skeleton; the `omp critical` and `shared(...)` lists keep 4 bumps.
+
+**Lane d, 7.x-8.x files.** `morphology.c` 6.19 -> **6.70** (ee2df2f23 V step 7 on `ParseKernelArray`, 802ae10b0 new Recipe KL on
+`AcquireFreiChenKernel`, 1d7e3897a new Recipe KD on `MorphologyApply`, with the two `playbook:` commits a7e66a823 and 85d530c4d; whole
+catalogue 15,955, 0 diverged). **Flag for the owner:** ee2df2f23 moves a dead `#if 0` text verbatim under the 2026-11-01 exception, the
+`#else` side being rewritten as step 7 says; earlier lanes had classed that block as pinned; if the ruling reads narrowly, revert that
+commit alone. Blockers: `MorphologyApply` stays Complex and Large (cc 14, 7-argument `MagickPrivate` signature); `AcquireKernelBuiltIn`
+(`#if 0` labels and the `#if 1`/`#else` Blur block, stub ceiling +1.06) is an owner question; plasma, floodfill (Recipe H hoist drops the
+score to 7.03 first), layer, resample (`#if DEBUG`, `#if EWA`, `#if FILTER_LUT` in every movable block), attribute-depth (`#if !HDRI`),
+fourier (`omp parallel sections`), feature-texture, distort (hot path, label deletion), magnify (`?:` fold) and quantize all end at
+owner questions.
+
+New recipes in this tree, written under the 2026-11-10 OK and awaiting confirmation: KL and KD. Recipe RH (with step 8) exists only on the parked branch w19c-composite-rowflags, not in the playbook of this tree.

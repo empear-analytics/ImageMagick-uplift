@@ -117,6 +117,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/colormap-private.h \
   MagickCore/colorspace.c \
   MagickCore/colorspace-transform.c \
+  MagickCore/colorspace-transform-image.c \
   MagickCore/colorspace-convert.c \
   MagickCore/colorspace-generic-rgb.c \
   MagickCore/colorspace.h \
@@ -161,8 +162,10 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/effect-preview.c \
   MagickCore/effect-blur.c \
   MagickCore/effect-blur-adaptive.c \
+  MagickCore/effect-blur-adaptive-filters.c \
   MagickCore/effect.h \
   MagickCore/enhance.c \
+  MagickCore/enhance-color.c \
   MagickCore/enhance-clahe.c \
   MagickCore/enhance-tone.c \
   MagickCore/enhance-level-colors.c \
@@ -242,6 +245,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/nt-base-private.h \
   MagickCore/nt-feature.h \
   MagickCore/opencl.c \
+  MagickCore/opencl-device.c \
   MagickCore/opencl.h \
   MagickCore/opencl-private.h \
   MagickCore/option.c \
@@ -356,6 +360,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/version-private.h \
   MagickCore/visual-effects.c \
   MagickCore/visual-effects-pixel.c \
+  MagickCore/visual-effects-pixel-methods.c \
   MagickCore/visual-effects-wavelet.c \
   MagickCore/visual-effects-plasma.c \
   MagickCore/visual-effects-stegano.c \
@@ -370,6 +375,8 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/xml-tree.h \
   MagickCore/xml-tree-private.h \
   MagickCore/xwindow.c \
+  MagickCore/xwindow-visual.c \
+  MagickCore/xwindow-import.c \
   MagickCore/xwindow.h
 
 if WIN32_NATIVE_BUILD

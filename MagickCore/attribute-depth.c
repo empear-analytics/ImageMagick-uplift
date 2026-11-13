@@ -294,6 +294,38 @@ typedef struct _DitherImageInfo
     *exception;
 } DitherImageInfo;
 
+static void DitherImageRowStatus(const DitherImageInfo *rows,const ssize_t y,
+  MagickBooleanType *status)
+{
+  Quantum
+    *magick_restrict q;
+
+  DitherRow
+    row;
+
+  if (*status == MagickFalse)
+    return;
+  q=GetCacheViewAuthenticPixels(rows->image_view,0,y,rows->image->columns,1,
+    rows->exception);
+  if (q == (Quantum *) NULL)
+    {
+      *status=MagickFalse;
+      return;
+    }
+  row.image=rows->image;
+  row.distortion=rows->distortion;
+  row.range=rows->range;
+  row.channels=rows->channels;
+  row.y=y;
+  DitherImageRow(&row,q);
+  if (SyncCacheViewAuthenticPixels(rows->image_view,rows->exception) ==
+      MagickFalse)
+    {
+      *status=MagickFalse;
+      return;
+    }
+}
+
 static void DitherImageRows(const DitherImageInfo *rows,
   MagickBooleanType *status)
 {
@@ -301,35 +333,7 @@ static void DitherImageRows(const DitherImageInfo *rows,
     y;
 
   for (y=0; y < (ssize_t) rows->image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    DitherRow
-      row;
-
-    if (*status == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(rows->image_view,0,y,rows->image->columns,1,
-      rows->exception);
-    if (q == (Quantum *) NULL)
-      {
-        *status=MagickFalse;
-        continue;
-      }
-    row.image=rows->image;
-    row.distortion=rows->distortion;
-    row.range=rows->range;
-    row.channels=rows->channels;
-    row.y=y;
-    DitherImageRow(&row,q);
-    if (SyncCacheViewAuthenticPixels(rows->image_view,rows->exception) ==
-        MagickFalse)
-      {
-        *status=MagickFalse;
-        continue;
-      }
-  }
+    DitherImageRowStatus(rows,y,status);
 }
 
 static MagickBooleanType FloydSteinbergImageDepth(Image *image,
@@ -496,6 +500,162 @@ static MagickBooleanType FinishImageDepth(Image *image,const size_t depth,
   return(status);
 }
 
+#if !defined(MAGICKCORE_HDRI_SUPPORT)
+static void MapPixelToDepth(const Image *image,const Quantum *depth_map,
+  Quantum *q)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+  {
+    PixelChannel
+      channel;
+
+    PixelTrait
+      traits;
+
+    channel=GetPixelChannelChannel(image,j);
+    traits=GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    q[j]=depth_map[ScaleQuantumToMap(q[j])];
+  }
+}
+
+static Quantum *AcquireDepthMap(const QuantumAny range)
+{
+  Quantum
+    *depth_map;
+
+  ssize_t
+    i;
+
+  depth_map=(Quantum *) AcquireQuantumMemory(MaxMap+1,sizeof(*depth_map));
+  if (depth_map == (Quantum *) NULL)
+    ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
+  for (i=0; i <= (ssize_t) MaxMap; i++)
+    depth_map[i]=ScaleAnyToQuantum(ScaleQuantumToAny((Quantum) i,range),
+      range);
+  return(depth_map);
+}
+
+typedef struct _DepthMapRows
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  Quantum
+    *depth_map;
+
+  ExceptionInfo
+    *exception;
+} DepthMapRows;
+
+static void MapImageRowToDepth(MagickBooleanType *status,
+  const DepthMapRows *rows,const ssize_t y)
+{
+  ssize_t
+    x;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return;
+  q=GetCacheViewAuthenticPixels(rows->image_view,0,y,rows->image->columns,1,
+    rows->exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  for (x=0; x < (ssize_t) rows->image->columns; x++)
+  {
+    MapPixelToDepth(rows->image,rows->depth_map,q);
+    q+=(ptrdiff_t) GetPixelChannels(rows->image);
+  }
+  if (SyncCacheViewAuthenticPixels(rows->image_view,rows->exception) ==
+      MagickFalse)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+}
+
+typedef struct _DepthMapImage
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  size_t
+    depth;
+
+  QuantumAny
+    range;
+
+  ExceptionInfo
+    *exception;
+
+  MagickBooleanType
+    status;
+} DepthMapImage;
+
+static MagickBooleanType SetImageDepthWithMap(const DepthMapImage *map_image)
+{
+  CacheView
+    *image_view = map_image->image_view;
+
+  const QuantumAny
+    range = map_image->range;
+
+  const size_t
+    depth = map_image->depth;
+
+  ExceptionInfo
+    *const exception = map_image->exception;
+
+  Image
+    *const image = map_image->image;
+
+  MagickBooleanType
+    status = map_image->status;
+
+  Quantum
+    *depth_map;
+
+  ssize_t
+    y;
+
+  /*
+    Scale pixels to desired (optimized with depth map).
+  */
+  depth_map=AcquireDepthMap(range);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,2)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const DepthMapRows
+      rows = { image, image_view, depth_map, exception };
+
+    MapImageRowToDepth(&status,&rows,y);
+  }
+  image_view=DestroyCacheView(image_view);
+  depth_map=(Quantum *) RelinquishMagickMemory(depth_map);
+  if (status != MagickFalse)
+    image->depth=depth;
+  return(status);
+}
+#endif
+
 MagickExport MagickBooleanType SetImageDepth(Image *image,
   const size_t depth,ExceptionInfo *exception)
 {
@@ -548,74 +708,10 @@ MagickExport MagickBooleanType SetImageDepth(Image *image,
   if ((1UL*QuantumRange) <= MaxMap)
   RestoreMSCWarning
     {
-      Quantum
-        *depth_map;
+      const DepthMapImage
+        map_image = { image, image_view, depth, range, exception, status };
 
-      ssize_t
-        i;
-
-      /*
-        Scale pixels to desired (optimized with depth map).
-      */
-      depth_map=(Quantum *) AcquireQuantumMemory(MaxMap+1,sizeof(*depth_map));
-      if (depth_map == (Quantum *) NULL)
-        ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
-      for (i=0; i <= (ssize_t) MaxMap; i++)
-        depth_map[i]=ScaleAnyToQuantum(ScaleQuantumToAny((Quantum) i,range),
-          range);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(image,image,image->rows,2)
-#endif
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        ssize_t
-          x;
-
-        Quantum
-          *magick_restrict q;
-
-        if (status == MagickFalse)
-          continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          ssize_t
-            j;
-
-          for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-          {
-            PixelChannel
-              channel;
-
-            PixelTrait
-              traits;
-
-            channel=GetPixelChannelChannel(image,j);
-            traits=GetPixelChannelTraits(image,channel);
-            if ((traits & UpdatePixelTrait) == 0)
-              continue;
-            q[j]=depth_map[ScaleQuantumToMap(q[j])];
-          }
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-          {
-            status=MagickFalse;
-            continue;
-          }
-      }
-      image_view=DestroyCacheView(image_view);
-      depth_map=(Quantum *) RelinquishMagickMemory(depth_map);
-      if (status != MagickFalse)
-        image->depth=depth;
-      return(status);
+      return(SetImageDepthWithMap(&map_image));
     }
 #endif
   /*
