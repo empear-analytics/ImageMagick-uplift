@@ -1417,6 +1417,39 @@ static void SetMagickResourceLimitTail(const ResourceType type,
   }
 }
 
+static void SetMagickResourceLimitMiddle(const ResourceType type,
+  const MagickSizeType limit,char **value,MagickBooleanType *status)
+{
+  switch (type)
+  {
+    case MapResource:
+    {
+      resource_info.map_limit=GetPolicyLimit("resource:map",limit);
+      break;
+    }
+    case MemoryResource:
+    {
+      resource_info.memory_limit=GetPolicyLimit("resource:memory",limit);
+      break;
+    }
+    case ThreadResource:
+    {
+      resource_info.thread_limit=GetPolicyLimit("resource:thread",limit);
+      if (resource_info.thread_limit > GetOpenMPMaximumThreads())
+        resource_info.thread_limit=GetOpenMPMaximumThreads();
+      else
+        if (resource_info.thread_limit == 0)
+          resource_info.thread_limit=1;
+      break;
+    }
+    default:
+    {
+      SetMagickResourceLimitTail(type,limit,value,status);
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType SetMagickResourceLimit(const ResourceType type,
   const MagickSizeType limit)
 {
@@ -1458,29 +1491,9 @@ MagickExport MagickBooleanType SetMagickResourceLimit(const ResourceType type,
       resource_info.list_length_limit=GetPolicyLimit("resource:list-length",limit);
       break;
     }
-    case MapResource:
-    {
-      resource_info.map_limit=GetPolicyLimit("resource:map",limit);
-      break;
-    }
-    case MemoryResource:
-    {
-      resource_info.memory_limit=GetPolicyLimit("resource:memory",limit);
-      break;
-    }
-    case ThreadResource:
-    {
-      resource_info.thread_limit=GetPolicyLimit("resource:thread",limit);
-      if (resource_info.thread_limit > GetOpenMPMaximumThreads())
-        resource_info.thread_limit=GetOpenMPMaximumThreads();
-      else
-        if (resource_info.thread_limit == 0)
-          resource_info.thread_limit=1;
-      break;
-    }
     default:
     {
-      SetMagickResourceLimitTail(type,limit,&value,&status);
+      SetMagickResourceLimitMiddle(type,limit,&value,&status);
       break;
     }
   }
