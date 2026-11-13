@@ -3148,6 +3148,52 @@ MagickExport MagickBooleanType ListCommandOptions(FILE *file,
   return(MagickTrue);
 }
 
+typedef struct _ChannelLetter
+{
+  char
+    letter;
+
+  ChannelType
+    channel;
+} ChannelLetter;
+
+static const ChannelLetter
+  ChannelLetters[] =
+  {
+    { 'A', AlphaChannel },
+    { 'a', AlphaChannel },
+    { 'B', BlueChannel },
+    { 'b', BlueChannel },
+    { 'C', CyanChannel },
+    { 'c', CyanChannel },
+    { 'g', GreenChannel },
+    { 'G', GreenChannel },
+    { 'K', BlackChannel },
+    { 'k', BlackChannel },
+    { 'M', MagentaChannel },
+    { 'm', MagentaChannel },
+    { 'o', AlphaChannel },
+    { 'O', AlphaChannel }, /* depreciate */
+    { 'R', RedChannel },
+    { 'r', RedChannel },
+    { 'Y', YellowChannel },
+    { 'y', YellowChannel }
+  };
+
+static MagickBooleanType MergeChannelLetter(const char letter,ssize_t *channel)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(ChannelLetters)/sizeof(*ChannelLetters)); i++)
+    if (ChannelLetters[i].letter == letter)
+      {
+        *channel|=ChannelLetters[i].channel;
+        return(MagickTrue);
+      }
+  return(MagickFalse);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -3189,62 +3235,10 @@ MagickExport ssize_t ParseChannelOption(const char *channels)
   length=strlen(channels);
   for (i=0; i < (ssize_t) length; i++)
   {
+    if (MergeChannelLetter(channels[i],&channel) != MagickFalse)
+      continue;
     switch (channels[i])
     {
-      case 'A':
-      case 'a':
-      {
-        channel|=AlphaChannel;
-        break;
-      }
-      case 'B':
-      case 'b':
-      {
-        channel|=BlueChannel;
-        break;
-      }
-      case 'C':
-      case 'c':
-      {
-        channel|=CyanChannel;
-        break;
-      }
-      case 'g':
-      case 'G':
-      {
-        channel|=GreenChannel;
-        break;
-      }
-      case 'K':
-      case 'k':
-      {
-        channel|=BlackChannel;
-        break;
-      }
-      case 'M':
-      case 'm':
-      {
-        channel|=MagentaChannel;
-        break;
-      }
-      case 'o':
-      case 'O':
-      {
-        channel|=AlphaChannel; /* depreciate */
-        break;
-      }
-      case 'R':
-      case 'r':
-      {
-        channel|=RedChannel;
-        break;
-      }
-      case 'Y':
-      case 'y':
-      {
-        channel|=YellowChannel;
-        break;
-      }
       case ',':
       {
         ssize_t
