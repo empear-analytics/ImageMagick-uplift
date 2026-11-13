@@ -14085,22 +14085,22 @@ static const char
     (char *) NULL
   };
 
+static const char
+  *const *ROIMenus[ApplyMenus] =
+  {
+    ROIFileMenu,
+    ROIEditMenu,
+    ROITransformMenu,
+    ROIEnhanceMenu,
+    ROIEffectsMenu,
+    ROIFXMenu,
+    ROIMiscellanyMenu
+  };
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
 {
-  const char
-    *const *Menus[ApplyMenus] =
-    {
-      ROIFileMenu,
-      ROIEditMenu,
-      ROITransformMenu,
-      ROIEnhanceMenu,
-      ROIEffectsMenu,
-      ROIFXMenu,
-      ROIMiscellanyMenu
-    };
-
   static const DisplayCommand
     ApplyCommands[] =
     {
@@ -14519,7 +14519,7 @@ static MagickBooleanType XROIImage(Display *display,
           command_input.highlight_info=highlight_info;
           command_input.ApplyMenu=ApplyMenu;
           command_input.ApplyCommands=ApplyCommands;
-          command_input.Menus=Menus;
+          command_input.Menus=ROIMenus;
           command_input.Commands=Commands;
           XROICommand(&command_input,&event,&display_command,&state);
           continue;
