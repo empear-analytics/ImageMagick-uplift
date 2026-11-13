@@ -2434,6 +2434,27 @@ static MagickBooleanType RasterizeGlyphBitmap(const GlyphBitmapTarget *target,
   return(status);
 }
 
+static FT_Int32 GetFreetypeLoadFlags(const DrawInfo *draw_info)
+{
+  FT_Int32
+    flags;
+
+  flags=FT_LOAD_DEFAULT;
+  if (draw_info->render == MagickFalse)
+    flags=FT_LOAD_NO_BITMAP;
+  if (draw_info->text_antialias == MagickFalse)
+    flags|=FT_LOAD_TARGET_MONO;
+  else
+    {
+#if defined(FT_LOAD_TARGET_LIGHT)
+      flags|=FT_LOAD_TARGET_LIGHT;
+#elif defined(FT_LOAD_TARGET_LCD)
+      flags|=FT_LOAD_TARGET_LCD;
+#endif
+    }
+  return(flags);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2681,19 +2702,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
       encoding != (char *) NULL ? encoding : "none",
       draw_info->encoding != (char *) NULL ? draw_info->encoding : "none",
       draw_info->pointsize);
-  flags=FT_LOAD_DEFAULT;
-  if (draw_info->render == MagickFalse)
-    flags=FT_LOAD_NO_BITMAP;
-  if (draw_info->text_antialias == MagickFalse)
-    flags|=FT_LOAD_TARGET_MONO;
-  else
-    {
-#if defined(FT_LOAD_TARGET_LIGHT)
-      flags|=FT_LOAD_TARGET_LIGHT;
-#elif defined(FT_LOAD_TARGET_LCD)
-      flags|=FT_LOAD_TARGET_LCD;
-#endif
-    }
+  flags=GetFreetypeLoadFlags(draw_info);
   flags=GetFreetypeHintingFlags(image,flags,exception);
   glyph.id=0;
   glyph.image=(FT_Glyph) NULL;
