@@ -14890,6 +14890,64 @@ static MagickBooleanType XROIWaitHead(const ROIContext *context,
   return(MagickTrue);
 }
 
+static void XROIWaitCorner(const ROIContext *context,const ROITargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  DisplayCommand
+    *const display_command = targets->display_command;
+
+  RectangleInfo
+    highlight_info;
+
+  do
+  {
+    ROIRegionInput
+      region_input;
+
+    if (XROIWaitHead(context,targets,&highlight_info) == MagickFalse)
+      break;
+    region_input.display=context->display;
+    region_input.resource_info=context->resource_info;
+    region_input.windows=context->windows;
+    region_input.image=context->image;
+    region_input.exception=context->exception;
+    region_input.roi_info=(*roi_info);
+    region_input.display_command=(*display_command);
+    region_input.text=context->text;
+    if (XROIUpdateRegion(&region_input,state,crop_info) != MagickFalse)
+      continue;
+    XHighlightRectangle(context->display,context->windows->image.id,
+      context->windows->image.highlight_context,&highlight_info);
+    XScreenEvent(context->display,context->windows,event,context->exception);
+    if ((*event).xany.window == context->windows->command.id)
+      {
+        XROIWaitCommand(context,targets,highlight_info);
+        continue;
+      }
+    XHighlightRectangle(context->display,context->windows->image.id,
+      context->windows->image.highlight_context,&highlight_info);
+    XROIWaitEvent(context,targets,highlight_info);
+    if (((*state) & UpdateConfigurationState) != 0)
+      {
+        (void) XPutBackEvent(context->display,event);
+        (void) XCheckDefineCursor(context->display,context->windows->image.id,
+          context->cursor);
+        break;
+      }
+  } while (((*state) & ExitState) == 0);
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -14909,7 +14967,6 @@ static MagickBooleanType XROIImage(Display *display,
 
   RectangleInfo
     crop_info,
-    highlight_info,
     roi_info;
 
   size_t
@@ -14989,41 +15046,7 @@ static MagickBooleanType XROIImage(Display *display,
     crop_info.x=0;
     crop_info.y=0;
     (void) XMapWindow(display,windows->info.id);
-    do
-    {
-      ROIRegionInput
-        region_input;
-
-      if (XROIWaitHead(&context,&targets,&highlight_info) == MagickFalse)
-        break;
-      region_input.display=display;
-      region_input.resource_info=resource_info;
-      region_input.windows=windows;
-      region_input.image=image;
-      region_input.exception=exception;
-      region_input.roi_info=roi_info;
-      region_input.display_command=display_command;
-      region_input.text=text;
-      if (XROIUpdateRegion(&region_input,&state,&crop_info) != MagickFalse)
-        continue;
-      XHighlightRectangle(display,windows->image.id,
-        windows->image.highlight_context,&highlight_info);
-      XScreenEvent(display,windows,&event,exception);
-      if (event.xany.window == windows->command.id)
-        {
-          XROIWaitCommand(&context,&targets,highlight_info);
-          continue;
-        }
-      XHighlightRectangle(display,windows->image.id,
-        windows->image.highlight_context,&highlight_info);
-      XROIWaitEvent(&context,&targets,highlight_info);
-      if ((state & UpdateConfigurationState) != 0)
-        {
-          (void) XPutBackEvent(display,&event);
-          (void) XCheckDefineCursor(display,windows->image.id,cursor);
-          break;
-        }
-    } while ((state & ExitState) == 0);
+    XROIWaitCorner(&context,&targets);
   } while ((state & ExitState) == 0);
   (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
   XSetCursorState(display,windows,MagickFalse);
