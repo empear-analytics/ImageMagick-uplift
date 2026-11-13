@@ -14392,6 +14392,30 @@ static void RespondToMenuEvents(const MenuEventContext *context,
   } while (((*state) & ExitState) == 0);
 }
 
+static void PlaceMenuWidget(Display *display,XWindows *windows,
+  XFontStruct *font_info,const unsigned int title_height)
+{
+  int
+    x,
+    y;
+
+  windows->widget.min_width=windows->widget.width;
+  windows->widget.min_height=windows->widget.height;
+  XQueryPosition(display,windows->widget.root,&x,&y);
+  windows->widget.x=x-(int) (QuantumMargin >> 1);
+  if (submenu_info.active != 0)
+    {
+      windows->widget.x=windows->command.x+(int) windows->command.width-
+        QuantumMargin;
+      toggle_info.raised=MagickTrue;
+      XDrawTriangleEast(display,&windows->command,&toggle_info);
+    }
+  windows->widget.y=submenu_info.active == 0 ? y-(int) (title_height >> 2) : y;
+  if (submenu_info.active != 0)
+    windows->widget.y=windows->command.y+submenu_info.y;
+  XConstrainWindowPosition(display,&windows->widget);
+}
+
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   const char *title,const char *const *selections,char *item)
 {
@@ -14399,9 +14423,7 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
     cursor;
 
   int
-    id,
-    x,
-    y;
+    id;
 
   unsigned int
     height,
@@ -14459,21 +14481,7 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
     (menu_info.bevel_width << 1);
   top_offset=title_height+menu_info.bevel_width-1;
   windows->widget.height=top_offset+number_selections*height+4;
-  windows->widget.min_width=windows->widget.width;
-  windows->widget.min_height=windows->widget.height;
-  XQueryPosition(display,windows->widget.root,&x,&y);
-  windows->widget.x=x-(int) (QuantumMargin >> 1);
-  if (submenu_info.active != 0)
-    {
-      windows->widget.x=windows->command.x+(int) windows->command.width-
-        QuantumMargin;
-      toggle_info.raised=MagickTrue;
-      XDrawTriangleEast(display,&windows->command,&toggle_info);
-    }
-  windows->widget.y=submenu_info.active == 0 ? y-(int) (title_height >> 2) : y;
-  if (submenu_info.active != 0)
-    windows->widget.y=windows->command.y+submenu_info.y;
-  XConstrainWindowPosition(display,&windows->widget);
+  PlaceMenuWidget(display,windows,font_info,title_height);
   /*
     Map Menu widget.
   */
