@@ -66,6 +66,20 @@
 #include "MagickCore/string-private.h"
 #include "MagickCore/utility-private.h"
 
+static const char *SkipArgvSpaces(const char *p)
+{
+  while (isspace((int) ((unsigned char) *p)) != 0)
+    p++;
+  return(p);
+}
+
+static const char *SkipArgvWord(const char *p)
+{
+  while ((isspace((int) ((unsigned char) *p)) == 0) && (*p != '\0'))
+    p++;
+  return(p);
+}
+
 static void CountArgvArguments(const char *text,int *argc)
 {
   const char
@@ -73,8 +87,7 @@ static void CountArgvArguments(const char *text,int *argc)
 
   for (p=text; *p != '\0'; )
   {
-    while (isspace((int) ((unsigned char) *p)) != 0)
-      p++;
+    p=SkipArgvSpaces(p);
     if (*p == '\0')
       break;
     (*argc)++;
@@ -82,8 +95,7 @@ static void CountArgvArguments(const char *text,int *argc)
       for (p++; (*p != '"') && (*p != '\0'); p++) ;
     if (*p == '\'')
       for (p++; (*p != '\'') && (*p != '\0'); p++) ;
-    while ((isspace((int) ((unsigned char) *p)) == 0) && (*p != '\0'))
-      p++;
+    p=SkipArgvWord(p);
   }
 }
 
