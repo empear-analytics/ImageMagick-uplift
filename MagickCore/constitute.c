@@ -605,6 +605,21 @@ static void InitializeConstituteInfo(const ImageInfo *image_info,
     }
 }
 
+static const char *SyncOrientationProperty(Image *image,
+  const char *property,ExceptionInfo *exception)
+{
+  const char
+    *orientation;
+
+  orientation=GetImageProperty(image,property,exception);
+  if (orientation != (const char *) NULL)
+    {
+      image->orientation=(OrientationType) StringToLong(orientation);
+      (void) DeleteImageProperty(image,property);
+    }
+  return(orientation);
+}
+
 static void SyncOrientationFromProperties(Image *image,
   ConstituteInfo *constitute_info,ExceptionInfo *exception)
 {
@@ -614,22 +629,14 @@ static void SyncOrientationFromProperties(Image *image,
   orientation=(const char *) NULL;
   if (constitute_info->sync_from_exif != MagickFalse)
     {
-      orientation=GetImageProperty(image,"exif:Orientation",exception);
-      if (orientation != (const char *) NULL)
-        {
-          image->orientation=(OrientationType) StringToLong(orientation);
-          (void) DeleteImageProperty(image,"exif:Orientation");
-        }
+      orientation=SyncOrientationProperty(image,"exif:Orientation",
+        exception);
     }
   if ((orientation == (const char *) NULL) &&
       (constitute_info->sync_from_tiff != MagickFalse))
     {
-      orientation=GetImageProperty(image,"tiff:Orientation",exception);
-      if (orientation != (const char *) NULL)
-        {
-          image->orientation=(OrientationType) StringToLong(orientation);
-          (void) DeleteImageProperty(image,"tiff:Orientation");
-        }
+      orientation=SyncOrientationProperty(image,"tiff:Orientation",
+        exception);
     }
 }
 
