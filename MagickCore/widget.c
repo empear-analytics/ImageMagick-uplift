@@ -15920,6 +15920,51 @@ static void PressTextViewList(const TextViewContext *context,const XEvent event,
     }
 }
 
+static void PressTextViewScroll(const TextViewContext *context,
+  const XEvent event,const TextViewTargets *targets,
+  const TextViewWidgets *widgets)
+{
+  const unsigned int
+    lines = context->lines;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  unsigned int
+    *const visible_lines = widgets->visible_lines;
+
+  if ((MatteIsActive((*south_info),event.xbutton)) &&
+      ((*slider_info).id < (int) lines))
+    {
+      /*
+        Move slider down.
+      */
+      (*south_info).raised=MagickFalse;
+      (*slider_info).id++;
+      (*state)|=RedrawListState;
+      return;
+    }
+  if (MatteIsActive((*scroll_info),event.xbutton))
+    {
+      /*
+        Move slider.
+      */
+      (*slider_info)=PageListBrowserSlider((*slider_info),event,(*visible_lines));
+      (*state)|=RedrawListState;
+      return;
+    }
+  PressTextViewList(context,event,targets,widgets);
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -16272,27 +16317,7 @@ MagickPrivate void XTextViewWidget(Display *display,
             state|=RedrawListState;
             break;
           }
-        if ((MatteIsActive(south_info,event.xbutton)) &&
-            (slider_info.id < (int) lines))
-          {
-            /*
-              Move slider down.
-            */
-            south_info.raised=MagickFalse;
-            slider_info.id++;
-            state|=RedrawListState;
-            break;
-          }
-        if (MatteIsActive(scroll_info,event.xbutton))
-          {
-            /*
-              Move slider.
-            */
-            slider_info=PageListBrowserSlider(slider_info,event,visible_lines);
-            state|=RedrawListState;
-            break;
-          }
-        PressTextViewList(&view_context,event,&targets,&view_widgets);
+        PressTextViewScroll(&view_context,event,&targets,&view_widgets);
         break;
       }
       case ButtonRelease:
