@@ -14859,6 +14859,37 @@ static void XROIWaitEvent(const ROIContext *context,const ROITargets *targets,
   }
 }
 
+static MagickBooleanType XROIWaitHead(const ROIContext *context,
+  const ROITargets *targets,RectangleInfo *highlight_info)
+{
+  size_t
+    *const state = targets->state;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  if (context->windows->info.mapped != MagickFalse)
+    {
+      /*
+        Display pointer position.
+      */
+      (void) FormatLocaleString(context->text,MagickPathExtent,
+        " %.17gx%.17g%+.20g%+.20g",(double) (*roi_info).width,(double)
+        (*roi_info).height,(double) (*roi_info).x,(double) (*roi_info).y);
+      XInfoWidget(context->display,context->windows,context->text);
+    }
+  (*highlight_info)=(*roi_info);
+  (*highlight_info).x=(*roi_info).x-context->windows->image.x;
+  (*highlight_info).y=(*roi_info).y-context->windows->image.y;
+  if (((*highlight_info).width <= 3) || ((*highlight_info).height <= 3))
+    {
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -14963,25 +14994,8 @@ static MagickBooleanType XROIImage(Display *display,
       ROIRegionInput
         region_input;
 
-      if (windows->info.mapped != MagickFalse)
-        {
-          /*
-            Display pointer position.
-          */
-          (void) FormatLocaleString(text,MagickPathExtent,
-            " %.17gx%.17g%+.20g%+.20g",(double) roi_info.width,(double)
-            roi_info.height,(double) roi_info.x,(double) roi_info.y);
-          XInfoWidget(display,windows,text);
-        }
-      highlight_info=roi_info;
-      highlight_info.x=roi_info.x-windows->image.x;
-      highlight_info.y=roi_info.y-windows->image.y;
-      if ((highlight_info.width <= 3) || (highlight_info.height <= 3))
-        {
-          state|=EscapeState;
-          state|=ExitState;
-          break;
-        }
+      if (XROIWaitHead(&context,&targets,&highlight_info) == MagickFalse)
+        break;
       region_input.display=display;
       region_input.resource_info=resource_info;
       region_input.windows=windows;
