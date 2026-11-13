@@ -16403,6 +16403,88 @@ static void RedrawTextViewWidget(const TextViewContext *context,
     }
 }
 
+static void RedrawTextViewText(const TextViewContext *context,
+  const TextViewWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    lines = context->lines;
+
+  const char
+    **const textlist = context->textlist;
+
+  const unsigned int
+    height = context->height;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  XFontStruct
+    *const text_info = context->text_info;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  unsigned int
+    *const visible_lines = widgets->visible_lines;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info;
+
+  XWidgetInfo
+    *const selection_info = widgets->selection_info;
+
+  XWidgetInfo
+    *const expose_info = widgets->expose_info;
+
+  TextViewLines
+    view;
+
+  /*
+    Redraw scroll bar and text.
+  */
+  windows->widget.font_info=text_info;
+  (void) XSetFont(display,windows->widget.annotate_context,
+    text_info->fid);
+  (void) XSetFont(display,windows->widget.highlight_context,
+    text_info->fid);
+  (*selection_info).id=(*slider_info).id;
+  (*selection_info).y=(*list_info).y+(int) (height >> 3)+2;
+  view.display=display;
+  view.windows=windows;
+  view.textlist=textlist;
+  view.lines=lines;
+  view.visible_lines=(*visible_lines);
+  view.list_info=(list_info);
+  view.slider_info=(*slider_info);
+  DrawTextViewLines(&view,selection_info);
+  windows->widget.font_info=font_info;
+  (void) XSetFont(display,windows->widget.annotate_context,
+    font_info->fid);
+  (void) XSetFont(display,windows->widget.highlight_context,
+    font_info->fid);
+  /*
+    Update slider.
+  */
+  (*expose_info)=PlaceTextViewExpose((*expose_info),(*slider_info));
+  XDrawTriangleNorth(display,&windows->widget,north_info);
+  XDrawMatte(display,&windows->widget,expose_info);
+  XDrawBeveledButton(display,&windows->widget,slider_info);
+  XDrawTriangleSouth(display,&windows->widget,south_info);
+  (*expose_info).y=(*slider_info).y;
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -16573,41 +16655,7 @@ MagickPrivate void XTextViewWidget(Display *display,
             slider_info.min_y+1)/(int) lines;
         if (slider_info.id != selection_info.id)
           {
-            TextViewLines
-              view;
-
-            /*
-              Redraw scroll bar and text.
-            */
-            windows->widget.font_info=text_info;
-            (void) XSetFont(display,windows->widget.annotate_context,
-              text_info->fid);
-            (void) XSetFont(display,windows->widget.highlight_context,
-              text_info->fid);
-            selection_info.id=slider_info.id;
-            selection_info.y=list_info.y+(int) (height >> 3)+2;
-            view.display=display;
-            view.windows=windows;
-            view.textlist=textlist;
-            view.lines=lines;
-            view.visible_lines=visible_lines;
-            view.list_info=(&list_info);
-            view.slider_info=slider_info;
-            DrawTextViewLines(&view,&selection_info);
-            windows->widget.font_info=font_info;
-            (void) XSetFont(display,windows->widget.annotate_context,
-              font_info->fid);
-            (void) XSetFont(display,windows->widget.highlight_context,
-              font_info->fid);
-            /*
-              Update slider.
-            */
-            expose_info=PlaceTextViewExpose(expose_info,slider_info);
-            XDrawTriangleNorth(display,&windows->widget,&north_info);
-            XDrawMatte(display,&windows->widget,&expose_info);
-            XDrawBeveledButton(display,&windows->widget,&slider_info);
-            XDrawTriangleSouth(display,&windows->widget,&south_info);
-            expose_info.y=slider_info.y;
+            RedrawTextViewText(&view_context,&view_widgets);
           }
         state&=(unsigned int) (~RedrawListState);
       }
