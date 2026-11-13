@@ -10859,6 +10859,44 @@ static void XApplyRestoreCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplySaveCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  MagickStatusType
+    status;
+
+  /*
+    Save image.
+  */
+  status=XSaveImage(display,resource_info,windows,*image,exception);
+  if (status == MagickFalse)
+    {
+      char
+        message[MagickPathExtent];
+
+      (void) FormatLocaleString(message,MagickPathExtent,"%s:%s",
+        exception->reason != (char *) NULL ? exception->reason : "",
+        exception->description != (char *) NULL ? exception->description :
+        "");
+      XNoticeWidget(display,windows,"Unable to save file:",message);
+      return;
+    }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -10969,25 +11007,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       break;
     }
     case SaveCommand:
-    {
-      /*
-        Save image.
-      */
-      status=XSaveImage(display,resource_info,windows,*image,exception);
-      if (status == MagickFalse)
-        {
-          char
-            message[MagickPathExtent];
-
-          (void) FormatLocaleString(message,MagickPathExtent,"%s:%s",
-            exception->reason != (char *) NULL ? exception->reason : "",
-            exception->description != (char *) NULL ? exception->description :
-            "");
-          XNoticeWidget(display,windows,"Unable to save file:",message);
-          break;
-        }
+      XApplySaveCommand(&context);
       break;
-    }
     case PrintCommand:
     {
       /*
