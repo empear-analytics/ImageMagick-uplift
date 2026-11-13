@@ -259,6 +259,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/paint-floodfill.c \
   MagickCore/paint.h \
   MagickCore/pixel.c \
+  MagickCore/pixel-fuzzy.c \
   MagickCore/pixel-gamma.c \
   MagickCore/pixel-import.c \
   MagickCore/pixel-export.c \
