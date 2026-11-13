@@ -3775,6 +3775,38 @@ static MagickBooleanType XChopApply(const ChopEventInput *input,Image **image,
   return(MagickTrue);
 }
 
+static void XShowChopSelection(const ChopEventInput *input,
+  const unsigned int distance,const RectangleInfo chop_info,
+  const XSegment *segment_info)
+{
+  Display
+    *const display = input->display;
+
+  XWindows
+    *const windows = input->windows;
+
+  char
+    text[MagickPathExtent];
+
+  if (distance > 9)
+    {
+      /*
+        Display info and draw chopping line.
+      */
+      if (windows->info.mapped == MagickFalse)
+        (void) XMapWindow(display,windows->info.id);
+      (void) FormatLocaleString(text,MagickPathExtent,
+        " %.17gx%.17g%+.20g%+.20g",(double) chop_info.width,(double)
+        chop_info.height,(double) chop_info.x,(double) chop_info.y);
+      XInfoWidget(display,windows,text);
+      XHighlightLine(display,windows->image.id,
+        windows->image.highlight_context,segment_info);
+    }
+  else
+    if (windows->info.mapped != MagickFalse)
+      (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+}
+
 static MagickBooleanType XChopImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -3803,9 +3835,6 @@ static MagickBooleanType XChopImage(Display *display,
       HorizontalChopCommand,
       VerticalChopCommand
     };
-
-  char
-    text[MagickPathExtent];
 
   int
     x,
@@ -3871,23 +3900,7 @@ static MagickBooleanType XChopImage(Display *display,
   state=DefaultState;
   do
   {
-    if (distance > 9)
-      {
-        /*
-          Display info and draw chopping line.
-        */
-        if (windows->info.mapped == MagickFalse)
-          (void) XMapWindow(display,windows->info.id);
-        (void) FormatLocaleString(text,MagickPathExtent,
-          " %.17gx%.17g%+.20g%+.20g",(double) chop_info.width,(double)
-          chop_info.height,(double) chop_info.x,(double) chop_info.y);
-        XInfoWidget(display,windows,text);
-        XHighlightLine(display,windows->image.id,
-          windows->image.highlight_context,&segment_info);
-      }
-    else
-      if (windows->info.mapped != MagickFalse)
-        (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+    XShowChopSelection(&input,distance,chop_info,&segment_info);
     /*
       Wait for next event.
     */
