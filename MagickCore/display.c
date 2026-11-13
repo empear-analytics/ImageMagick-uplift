@@ -9881,74 +9881,79 @@ static Image *XSaveUndoImage(const XImageCacheContext *cache_context,
   return(undo_image);
 }
 
+static const DisplayCommand
+  UndoCacheCommands[] =
+  {
+    CutCommand,
+    PasteCommand,
+    ApplyCommand,
+    HalfSizeCommand,
+    OriginalSizeCommand,
+    DoubleSizeCommand,
+    ResizeCommand,
+    TrimCommand,
+    CropCommand,
+    ChopCommand,
+    FlipCommand,
+    FlopCommand,
+    RotateRightCommand,
+    RotateLeftCommand,
+    RotateCommand,
+    ShearCommand,
+    RollCommand,
+    NegateCommand,
+    ContrastStretchCommand,
+    SigmoidalContrastCommand,
+    NormalizeCommand,
+    EqualizeCommand,
+    HueCommand,
+    SaturationCommand,
+    BrightnessCommand,
+    GammaCommand,
+    SpiffCommand,
+    DullCommand,
+    GrayscaleCommand,
+    MapCommand,
+    QuantizeCommand,
+    DespeckleCommand,
+    EmbossCommand,
+    ReduceNoiseCommand,
+    AddNoiseCommand,
+    SharpenCommand,
+    BlurCommand,
+    ThresholdCommand,
+    EdgeDetectCommand,
+    SpreadCommand,
+    ShadeCommand,
+    RaiseCommand,
+    SegmentCommand,
+    SolarizeCommand,
+    SepiaToneCommand,
+    SwirlCommand,
+    ImplodeCommand,
+    VignetteCommand,
+    WaveCommand,
+    OilPaintCommand,
+    CharcoalDrawCommand,
+    AnnotateCommand,
+    AddBorderCommand,
+    AddFrameCommand,
+    CompositeCommand,
+    CommentCommand,
+    LaunchCommand,
+    RegionOfInterestCommand,
+    SaveToUndoBufferCommand,
+    RedoCommand
+  };
+
 static MagickBooleanType IsUndoCacheCommand(const DisplayCommand command)
 {
-  switch (command)
-  {
-    case CutCommand:
-    case PasteCommand:
-    case ApplyCommand:
-    case HalfSizeCommand:
-    case OriginalSizeCommand:
-    case DoubleSizeCommand:
-    case ResizeCommand:
-    case TrimCommand:
-    case CropCommand:
-    case ChopCommand:
-    case FlipCommand:
-    case FlopCommand:
-    case RotateRightCommand:
-    case RotateLeftCommand:
-    case RotateCommand:
-    case ShearCommand:
-    case RollCommand:
-    case NegateCommand:
-    case ContrastStretchCommand:
-    case SigmoidalContrastCommand:
-    case NormalizeCommand:
-    case EqualizeCommand:
-    case HueCommand:
-    case SaturationCommand:
-    case BrightnessCommand:
-    case GammaCommand:
-    case SpiffCommand:
-    case DullCommand:
-    case GrayscaleCommand:
-    case MapCommand:
-    case QuantizeCommand:
-    case DespeckleCommand:
-    case EmbossCommand:
-    case ReduceNoiseCommand:
-    case AddNoiseCommand:
-    case SharpenCommand:
-    case BlurCommand:
-    case ThresholdCommand:
-    case EdgeDetectCommand:
-    case SpreadCommand:
-    case ShadeCommand:
-    case RaiseCommand:
-    case SegmentCommand:
-    case SolarizeCommand:
-    case SepiaToneCommand:
-    case SwirlCommand:
-    case ImplodeCommand:
-    case VignetteCommand:
-    case WaveCommand:
-    case OilPaintCommand:
-    case CharcoalDrawCommand:
-    case AnnotateCommand:
-    case AddBorderCommand:
-    case AddFrameCommand:
-    case CompositeCommand:
-    case CommentCommand:
-    case LaunchCommand:
-    case RegionOfInterestCommand:
-    case SaveToUndoBufferCommand:
-    case RedoCommand:
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(UndoCacheCommands)/sizeof(*UndoCacheCommands)); i++)
+    if (UndoCacheCommands[i] == command)
       return(MagickTrue);
-    default:
-      break;
-  }
   return(MagickFalse);
 }
 
