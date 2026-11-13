@@ -266,6 +266,30 @@ static void DetachXShmSegment(XShmSegmentInfo *segment_info)
 }
 #endif
 
+static void FreeXWindowCursors(Display *display,XWindowInfo *window)
+{
+  if (window->cursor != (Cursor) NULL)
+    {
+      (void) XFreeCursor(display,window->cursor);
+      window->cursor=(Cursor) NULL;
+    }
+  if (window->busy_cursor != (Cursor) NULL)
+    {
+      (void) XFreeCursor(display,window->busy_cursor);
+      window->busy_cursor=(Cursor) NULL;
+    }
+  if (window->highlight_stipple != (Pixmap) NULL)
+    {
+      (void) XFreePixmap(display,window->highlight_stipple);
+      window->highlight_stipple=(Pixmap) NULL;
+    }
+  if (window->shadow_stipple != (Pixmap) NULL)
+    {
+      (void) XFreePixmap(display,window->shadow_stipple);
+      window->shadow_stipple=(Pixmap) NULL;
+    }
+}
+
 MagickExport void DestroyXResources(void)
 {
   int
@@ -310,27 +334,7 @@ MagickExport void DestroyXResources(void)
     if (magick_windows[i]->icon_name != (char *) NULL)
       magick_windows[i]->icon_name=(char *)
         RelinquishMagickMemory(magick_windows[i]->icon_name);
-    if (magick_windows[i]->cursor != (Cursor) NULL)
-      {
-        (void) XFreeCursor(windows->display,magick_windows[i]->cursor);
-        magick_windows[i]->cursor=(Cursor) NULL;
-      }
-    if (magick_windows[i]->busy_cursor != (Cursor) NULL)
-      {
-        (void) XFreeCursor(windows->display,magick_windows[i]->busy_cursor);
-        magick_windows[i]->busy_cursor=(Cursor) NULL;
-      }
-    if (magick_windows[i]->highlight_stipple != (Pixmap) NULL)
-      {
-        (void) XFreePixmap(windows->display,
-          magick_windows[i]->highlight_stipple);
-        magick_windows[i]->highlight_stipple=(Pixmap) NULL;
-      }
-    if (magick_windows[i]->shadow_stipple != (Pixmap) NULL)
-      {
-        (void) XFreePixmap(windows->display,magick_windows[i]->shadow_stipple);
-        magick_windows[i]->shadow_stipple=(Pixmap) NULL;
-      }
+    FreeXWindowCursors(windows->display,magick_windows[i]);
     if (magick_windows[i]->matte_image != (XImage *) NULL)
       {
         XDestroyImage(magick_windows[i]->matte_image);
