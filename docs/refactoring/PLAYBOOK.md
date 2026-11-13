@@ -13761,6 +13761,119 @@ Lane: b
 
 ---
 
+## Recipe LW - Merge Twin List Walks Differing in the Link Member
+
+**Use when:** CodeScene reports *Code Duplication* on two `static` functions (or blocks)
+that walk a linked list, detaching and handling each node, and differ only in the link
+member they follow, which is read from the start object and then from each node in turn:
+`xml-tree.c`'s `DestroyXMLTreeChild` and `DestroyXMLTreeOrdered`, which unlink and destroy
+the nodes along `child` and along `ordered`. In a file over the function-count threshold
+the twin also costs the score a function.
+
+**Not covered by:** Recipe MA, whose differing member belongs to one lvalue `e.m` with
+the same base in every copy, so that the caller can pass `&e.m`; here the base is the
+node the walk has reached, so no address exists before the walk. Recipe LS, which
+handles linear searches over an array (`a[u].m != e`, advancing an index), not a walk
+along a pointer member that also writes it. Recipe D, SV and SC, whose copies differ in a
+value, not a member designator; Recipe CF, which differs in the function called; Recipe
+TI and MT, which select between whole-expression runs.
+
+**How:**
+
+1. Copies. Two `static void` functions of one file (outside every OpenMP region) whose
+   bodies align token for token after renaming each one's walk variable to one name, and
+   differ only in the member designator `m` of every `e->m` they name, where `e` is a
+   pointer to one struct type `S` and every such member has one declared type `T`, a
+   pointer type. Each is called from one place and its address is never taken (`grep`).
+2. Write one `static void` function in place of the first: the copy's parameters, then
+   `const size_t member`. Its body is the copy's text with each `e->m` written
+   `(*(T *) ((char *) e+member))`, the walk variable under a neutral name, nothing else
+   changed.
+3. Delete the second function. Replace each call by a call of the new function passing
+   the same arguments and `offsetof(S,m)` of that copy's member, in the original order.
+   `offsetof` comes from `<stddef.h>`, which `studio.h` includes.
+4. Check by script that substituting each copy's member back (`(*(T *) ((char *) e+
+   member))` to `e->m`) and its names gives that copy's token sequence.
+5. Run `tools/ci_warnings.sh` and `tools/cxx_warnings.sh` (both `OK`) and the oracle for
+   the function that holds the calls.
+
+**Before:**
+
+```c
+static void DestroyXMLTreeChild(XMLTreeInfo *xml_info,
+  const size_t depth)
+{
+  XMLTreeInfo
+    *child,
+    *node;
+
+  child=xml_info->child;
+  while (child != (XMLTreeInfo *) NULL)
+  {
+    node=child;
+    child=node->child;
+    node->child=(XMLTreeInfo *) NULL;
+    (void) DestroyXMLTree_(node,depth+1);
+  }
+}
+/* DestroyXMLTreeOrdered: the same with ordered */
+...
+  DestroyXMLTreeChild(xml_info,depth+1);
+  DestroyXMLTreeOrdered(xml_info,depth+1);
+```
+
+**After:**
+
+```c
+static void DestroyXMLTreeList(XMLTreeInfo *xml_info,
+  const size_t depth,const size_t member)
+{
+  XMLTreeInfo
+    *next,
+    *node;
+
+  next=(*(XMLTreeInfo **) ((char *) xml_info+member));
+  while (next != (XMLTreeInfo *) NULL)
+  {
+    node=next;
+    next=(*(XMLTreeInfo **) ((char *) node+member));
+    (*(XMLTreeInfo **) ((char *) node+member))=(XMLTreeInfo *) NULL;
+    (void) DestroyXMLTree_(node,depth+1);
+  }
+}
+...
+  DestroyXMLTreeList(xml_info,depth+1,offsetof(XMLTreeInfo,child));
+  DestroyXMLTreeList(xml_info,depth+1,offsetof(XMLTreeInfo,ordered));
+```
+
+**Careful:**
+
+- The member. `offsetof(S,m)` is the byte offset of `m` in `S` (C11 7.19p3); `(char *) e`
+  addresses the first byte of `*e`, adding the offset stays inside it, and the result
+  converted to `T *` points at the member object itself, which an lvalue of its declared
+  type `T` reads and writes (C11 6.3.2.3p7, 6.5p7). Every read and write therefore lands
+  on the object the copy's `e->m` named, in the same order.
+- The writes through `node` and the reads through `next` are of one member of different
+  objects, as before; the recursion in the loop body sees the same state.
+- The calls stay in their order, so the first list is walked and destroyed before the
+  second, as before. The struct has no bit-field member to name (`offsetof` refuses one).
+- `refactor_guard.py --calls --renamed A=New --renamed B=New` reports the merged name
+  down by one (the deleted definition), each callee of the walk's body down by one (the
+  copy that left) and `offsetof` up by one per call (`WARN`); anything else stops the
+  step. Step 4's script may find the locals of one declaration listed in another order
+  (`*node,*ordered` against `*next,*node`), which declares the same objects.
+
+**Evidence level:** oracle (the function holding the calls reached by a case), with
+`refactor_guard.py --calls` and step 4 checked by script.
+
+**Provenance:** 2026-11-13, from `xml-tree.c`'s `DestroyXMLTreeChild` and
+`DestroyXMLTreeOrdered` (campaign B, M127): a probe 4.56 to 4.68, one *Code Duplication*
+pair and one function leaving a file over the function-count threshold. Added by Claude
+Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: a
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -14994,3 +15107,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | GD | Step 1: the exit `X` may be `break;` or `continue;`; every guard stands where the `if` stood, so each leaves the same loop or `switch` the original left, after the same operands were evaluated in the same order | `profile.c`'s `GetXMPContinuedFraction` (lane c, M127): a three-operand disjunction (two failed `TryAccumulate` calls, a zero `new_den`) ending in `break;`, the file's only *Complex Conditional*; 4.60 to 4.72 in a probe | mandate (2026-10-24) |
 | 2026-11-13 | NEW | KF | Replace an enumerator-keyed `switch` whose groups each call a different function of one signature with the same arguments by a `static const` key/function-pointer table, a lookup function and one call, the `default` statements kept as the else branch; evidence oracle | `stream.c`'s `StreamImagePixels` (cc 16 to 9, 6.15 to 6.31); KD needs a `LocaleCompare` ladder of returns | mandate (2026-10-24) |
 | 2026-11-13 | NEW | SP | Split a predicate whose body returns a disjunction of pure comparisons at a leading run: the run becomes a `static inline` predicate, called as the first operand; evidence oracle | `stream.c`'s `IsCacheMorphologyChanged` (cc 10, 6.31 to 6.44); P names an `if` expression, GD needs an `if ... return` | mandate (2026-10-24) |
+| 2026-11-13 | NEW | LW | Merge two `static` list walks that differ only in the link member they follow into one function taking the member's `offsetof`; evidence oracle | `xml-tree.c`'s `DestroyXMLTreeChild` and `DestroyXMLTreeOrdered` (probe 4.56 to 4.68); MA needs one base, LS walks arrays | mandate (2026-10-24) |
