@@ -635,6 +635,20 @@ static inline MagickBooleanType IsSceneSelection(const ImageInfo *read_info,
     (GetImageListLength(image) != 1)) ? MagickTrue : MagickFalse);
 }
 
+static void FinishReadImageMetadata(const ImageInfo *read_info,Image *next,
+  const ConstituteInfo *constitute_info,ExceptionInfo *exception)
+{
+  LookupReadImageProfiles(next);
+  if (IsSourceDataEpochSet() == MagickFalse)
+    SetImageDateProperties(next,exception);
+  if (constitute_info->delay_flags != NoValue)
+    SyncDelayFromConstituteInfo(next,constitute_info);
+  if (constitute_info->dispose != (const char *) NULL)
+    SyncDisposeFromConstituteInfo(next,constitute_info);
+  if (read_info->verbose != MagickFalse)
+    (void) IdentifyImage(next,stderr,MagickFalse,exception);
+}
+
 static Image *DecodeLockedImage(const MagickInfo *magick_info,
   DecodeImageHandler *decoder,ImageInfo *read_info,ExceptionInfo *exception)
 {
@@ -835,15 +849,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
     SyncReadImageMetadata(read_info,next,&constitute_info,exception);
     if (IsExtractRequested(read_info) != MagickFalse)
       next=ApplyExtractGeometry(read_info,next,exception);
-    LookupReadImageProfiles(next);
-    if (IsSourceDataEpochSet() == MagickFalse)
-      SetImageDateProperties(next,exception);
-    if (constitute_info.delay_flags != NoValue)
-      SyncDelayFromConstituteInfo(next,&constitute_info);
-    if (constitute_info.dispose != (const char *) NULL)
-      SyncDisposeFromConstituteInfo(next,&constitute_info);
-    if (read_info->verbose != MagickFalse)
-      (void) IdentifyImage(next,stderr,MagickFalse,exception);
+    FinishReadImageMetadata(read_info,next,&constitute_info,exception);
     image=next;
   }
   read_info=DestroyImageInfo(read_info);
