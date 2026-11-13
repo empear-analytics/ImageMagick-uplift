@@ -8566,6 +8566,22 @@ static size_t XAllocSharedColors(const XSharedColormapSource *shared_source,
   return(number_colors);
 }
 
+static void LogXStandardColormap(const XStandardColormap *map_info)
+{
+  if ((GetLogEventMask() & X11Event) != 0)
+    {
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"Standard Colormap:");
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"  colormap id: 0x%lx",
+        map_info->colormap);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),
+        "  red, green, blue max: %lu %lu %lu",map_info->red_max,
+        map_info->green_max,map_info->blue_max);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),
+        "  red, green, blue mult: %lu %lu %lu",map_info->red_mult,
+        map_info->green_mult,map_info->blue_mult);
+    }
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -8638,19 +8654,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
           (void) SetImageStorageClass(image,DirectClass,exception);
           affinity_image=DestroyImage(affinity_image);
         }
-      if ((GetLogEventMask() & X11Event) != 0)
-        {
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Standard Colormap:");
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "  colormap id: 0x%lx",map_info->colormap);
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "  red, green, blue max: %lu %lu %lu",map_info->red_max,
-            map_info->green_max,map_info->blue_max);
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "  red, green, blue mult: %lu %lu %lu",map_info->red_mult,
-            map_info->green_mult,map_info->blue_mult);
-        }
+      LogXStandardColormap(map_info);
       return;
     }
   if ((visual_info->klass != DirectColor) &&
@@ -8870,18 +8874,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
       XSetVisualPixels(&best_source,pixel);
     }
   colors=(XColor *) RelinquishMagickMemory(colors);
-  if ((GetLogEventMask() & X11Event) != 0)
-    {
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"Standard Colormap:");
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"  colormap id: 0x%lx",
-        map_info->colormap);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),
-        "  red, green, blue max: %lu %lu %lu",map_info->red_max,
-        map_info->green_max,map_info->blue_max);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),
-        "  red, green, blue mult: %lu %lu %lu",map_info->red_mult,
-        map_info->green_mult,map_info->blue_mult);
-    }
+  LogXStandardColormap(map_info);
 }
 
 /*
