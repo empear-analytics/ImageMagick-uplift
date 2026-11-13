@@ -3545,6 +3545,13 @@ static const StreamStorageMethod *GetStreamStorageMethod(
   return((const StreamStorageMethod *) NULL);
 }
 
+static inline MagickBooleanType IsStreamMapChannelAvailable(
+  const StreamMapInfo *map_info,const Image *image)
+{
+  return(((map_info->separation == MagickFalse) ||
+    (image->colorspace == CMYKColorspace)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
   const Image *image,ExceptionInfo *exception)
 {
@@ -3589,8 +3596,7 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
         return(MagickFalse);
       }
     quantum_map[i]=map_info->quantum;
-    if ((map_info->separation == MagickFalse) ||
-        (image->colorspace == CMYKColorspace))
+    if (IsStreamMapChannelAvailable(map_info,image) != MagickFalse)
       continue;
     quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
     (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
