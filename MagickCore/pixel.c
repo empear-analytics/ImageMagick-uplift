@@ -3043,6 +3043,40 @@ static void SortRowPixels(const Image *image,Quantum *magick_restrict q)
   }
 }
 
+typedef struct _SortPixelsRow
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+} SortPixelsRow;
+
+static MagickBooleanType SortPixelsLine(const SortPixelsRow *row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(row->image_view,0,y,row->image->columns,1,
+    row->exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  SortRowPixels(row->image,q);
+  if (SyncCacheViewAuthenticPixels(row->image_view,row->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType SortImagePixels(Image *image,
   ExceptionInfo *exception)
 {
@@ -3076,20 +3110,11 @@ MagickExport MagickBooleanType SortImagePixels(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
+    const SortPixelsRow
+      row = { image, image_view, exception };
 
-    if (status == MagickFalse)
+    if (SortPixelsLine(&row,y,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    SortRowPixels(image,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
