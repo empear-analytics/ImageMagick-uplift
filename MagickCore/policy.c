@@ -1284,6 +1284,12 @@ static MagickBooleanType SkipPolicyElement(const char **q,
   return(MagickFalse);
 }
 
+static inline MagickBooleanType IsPolicyEnd(const char *keyword)
+{
+  return((MagickBooleanType) ((LocaleCompare(keyword,"/>") == 0) ||
+    (LocaleCompare(keyword,"</policy>") == 0)));
+}
+
 static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
   const char *policy,const char *filename,const size_t depth);
 
@@ -1392,8 +1398,7 @@ static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
       }
     if (policy_info == (PolicyInfo *) NULL)
       continue;
-    if ((LocaleCompare(keyword,"/>") == 0) ||
-        (LocaleCompare(keyword,"</policy>") == 0))
+    if (IsPolicyEnd(keyword) != MagickFalse)
       {
         status=AppendValueToLinkedList(cache,policy_info);
         if (status == MagickFalse)
