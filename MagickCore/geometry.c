@@ -232,6 +232,15 @@ MagickExport char *GetPageGeometry(const char *page_geometry)
   return(AcquireString(page));
 }
 
+static void SetDefaultRegionSize(const size_t width,const size_t height,
+  RectangleInfo *region)
+{
+  if (region->height == 0)
+    region->height=height;
+  if (region->width == 0)
+    region->width=width;
+}
+
 static void GravityAdjustX(const size_t width,const GravityType gravity,
   RectangleInfo *region)
 {
@@ -291,10 +300,7 @@ static void GravityAdjustX(const size_t width,const GravityType gravity,
 MagickExport void GravityAdjustGeometry(const size_t width,
   const size_t height,const GravityType gravity,RectangleInfo *region)
 {
-  if (region->height == 0)
-    region->height=height;
-  if (region->width == 0)
-    region->width=width;
+  SetDefaultRegionSize(width,height,region);
   GravityAdjustX(width,gravity,region);
   switch (gravity)
   {
