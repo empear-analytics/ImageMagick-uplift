@@ -653,6 +653,59 @@ static void Read8BIMResourceName(char **resource,const unsigned char **info,
     }
 }
 
+typedef struct _AttributeInfo8BIM
+{
+  const Image
+    *image;
+
+  const char
+    *key;
+
+  char
+    *format;
+
+  ssize_t
+    count,
+    id;
+
+  ExceptionInfo
+    *exception;
+} AttributeInfo8BIM;
+
+static void Set8BIMAttribute(const AttributeInfo8BIM *attribute_info,
+  char *attribute)
+{
+  const Image
+    *const image = attribute_info->image;
+
+  const char
+    *const key = attribute_info->key;
+
+  char
+    *const format = attribute_info->format;
+
+  const ssize_t
+    count = attribute_info->count,
+    id = attribute_info->id;
+
+  ExceptionInfo
+    *const exception = attribute_info->exception;
+
+  if ((id <= 1999) || (id >= 2999))
+    (void) SetImageProperty((Image *) image,key,(const char *) attribute,
+      exception);
+  else
+    {
+      char
+        *path;
+
+      path=Trace8BIMClippath(image,format,attribute,count);
+      (void) SetImageProperty((Image *) image,key,(const char *) path,
+        exception);
+      path=DestroyString(path);
+    }
+}
+
 static void Get8BIMProperty(const Image *image,const char *key,
   ExceptionInfo *exception)
 {
@@ -766,23 +819,20 @@ static void Get8BIMProperty(const Image *image,const char *key,
         sizeof(*attribute));
     if (attribute != (char *) NULL)
       {
+        AttributeInfo8BIM
+          attribute_info;
+
         (void) memcpy(attribute,(char *) info,(size_t) count);
         attribute[count]='\0';
         info+=count;
         length=(size_t) ((ssize_t) length-MagickMin(count,(ssize_t) length));
-        if ((id <= 1999) || (id >= 2999))
-          (void) SetImageProperty((Image *) image,key,(const char *) attribute,
-            exception);
-        else
-          {
-            char
-              *path;
-
-            path=Trace8BIMClippath(image,format,attribute,count);
-            (void) SetImageProperty((Image *) image,key,(const char *) path,
-              exception);
-            path=DestroyString(path);
-          }
+        attribute_info.image=image;
+        attribute_info.key=key;
+        attribute_info.format=format;
+        attribute_info.count=count;
+        attribute_info.id=id;
+        attribute_info.exception=exception;
+        Set8BIMAttribute(&attribute_info,attribute);
         attribute=DestroyString(attribute);
         status=MagickTrue;
       }
