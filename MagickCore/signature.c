@@ -164,12 +164,17 @@ MagickPrivate SignatureInfo *AcquireSignatureInfo(void)
 %    o signature_info: the cipher signature_info.
 %
 */
-MagickPrivate SignatureInfo *DestroySignatureInfo(SignatureInfo *signature_info)
+static void CheckSignatureInfo(const SignatureInfo *signature_info)
 {
   assert(signature_info != (SignatureInfo *) NULL);
   assert(signature_info->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+}
+
+MagickPrivate SignatureInfo *DestroySignatureInfo(SignatureInfo *signature_info)
+{
+  CheckSignatureInfo(signature_info);
   if (signature_info->accumulator != (unsigned int *) NULL)
     signature_info->accumulator=(unsigned int *) RelinquishMagickMemory(
       signature_info->accumulator);
@@ -326,10 +331,7 @@ MagickPrivate unsigned int GetSignatureBlocksize(
 MagickPrivate const StringInfo *GetSignatureDigest(
   const SignatureInfo *signature_info)
 {
-  assert(signature_info != (SignatureInfo *) NULL);
-  assert(signature_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  CheckSignatureInfo(signature_info);
   return(signature_info->digest);
 }
 
@@ -358,10 +360,7 @@ MagickPrivate const StringInfo *GetSignatureDigest(
 MagickPrivate unsigned int GetSignatureDigestsize(
   const SignatureInfo *signature_info)
 {
-  assert(signature_info != (SignatureInfo *) NULL);
-  assert(signature_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  CheckSignatureInfo(signature_info);
   return(signature_info->digestsize);
 }
 
@@ -389,10 +388,7 @@ MagickPrivate unsigned int GetSignatureDigestsize(
 */
 MagickPrivate void InitializeSignature(SignatureInfo *signature_info)
 {
-  assert(signature_info != (SignatureInfo *) NULL);
-  assert(signature_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  CheckSignatureInfo(signature_info);
   signature_info->accumulator[0]=0x6a09e667U;
   signature_info->accumulator[1]=0xbb67ae85U;
   signature_info->accumulator[2]=0x3c6ef372U;
