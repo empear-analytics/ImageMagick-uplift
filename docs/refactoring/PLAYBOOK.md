@@ -13437,6 +13437,15 @@ on", so this recipe returns a result and sets a flag, as Recipe BR does for a br
    same iteration reads the same struct, since nothing between the fill and that call writes
    a member's variable), then the written variables by pointer in the order the block first
    writes them, then `broke`: at most four parameters.
+   When the written variables, one pointer each, would take the call past four
+   parameters (2026-11-13), their addresses go in one `const` targets struct, Recipe LB
+   step 8's form (Recipe I steps 3, 5 and 6): a `typedef struct` directly above the new
+   function with one pointer member per written variable, in the order the block first
+   writes them, under its name and holding addresses only; the caller declares it
+   `const` with the addresses as its initialiser among the declarations at the top of
+   the block that holds the call, the function takes it after the input struct and
+   before `broke`, binds each member once (`T *const v = targets->v;`) and writes `(*v)`
+   as step 2 says. Each written variable still meets step 2.
 5. The caller declares `MagickBooleanType broke = MagickFalse;` once among the declarations at
    the top of its body (Recipe BR step 5). Where the block stood write, as two statements at the
    level where the block stood, `if (Helper(...,&broke) == MagickFalse) continue;` and directly
@@ -14959,3 +14968,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | SP | Split a predicate whose body returns a disjunction of pure comparisons at a leading run: the run becomes a `static inline` predicate, called as the first operand; evidence oracle | `stream.c`'s `IsCacheMorphologyChanged` (cc 10, 6.31 to 6.44); P names an `if` expression, GD needs an `if ... return` | mandate (2026-10-24) |
 | 2026-11-13 | NEW | UR | Unnest a repeated test of the guard's own condition: `if (C) { S if (C) X }` becomes `if (C) { S }` and `if (C) X` for a side-effect-free `C`, even when `S` writes what `C` reads (the forms can differ only when `C` was false, and then nothing runs between the two tests); evidence oracle | `draw.c`'s `ConvertPathToPolygon` (the new-subpath allocation and its failure test, the last depth-4 site; chain probe 2.62 to 2.68); SG requires `S` not to write `G`'s reads, UX needs a disjunction | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | I | Step 8: V step 7's `S return(<expr>);` with a calling expression may be left in the caller, and `S` and the expression may read and write the written variables, as the macro form may (the writes land through the members before the helper returns) | `draw.c`'s `ConvertPathToPolygon`: the subpath flush writes `number_edges`, `points`, `ghostline` and `edge`, and its exit releases `points` before `return(DestroyPolygonInfo(polygon_info));`; chain probe 2.62 to 2.68 | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | LX | Step 4: written variables whose pointers would take the call past four parameters go in one `const` targets struct (Recipe LB step 8's form), taken after the input struct and before `broke` | `cache.c`'s `GetVirtualPixelRows`: the single-pixel transfer writes `length`, `q` and `s`, continues the column loop and breaks it when the fetch fails; with the input struct and `broke` the pointers would give six parameters | mandate (2026-10-24) |
