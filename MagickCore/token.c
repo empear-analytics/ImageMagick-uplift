@@ -423,6 +423,68 @@ static void HandleWhiteSpace(TokenInfo *token_info,char *token,
   }
 }
 
+typedef struct _TokenizerState
+{
+  TokenInfo
+    *token_info;
+
+  char
+    *token;
+
+  size_t
+    max_token_length;
+
+  const char
+    *break_set;
+
+  char
+    *breaker;
+
+  int
+    *next;
+} TokenizerState;
+
+static MagickBooleanType TokenizeBreakChar(const TokenizerState *tokenizer,
+  const int c,const ssize_t i)
+{
+  TokenInfo
+    *const token_info = tokenizer->token_info;
+
+  char
+    *const token = tokenizer->token;
+
+  const size_t
+    max_token_length = tokenizer->max_token_length;
+
+  const char
+    *const break_set = tokenizer->break_set;
+
+  char
+    *const breaker = tokenizer->breaker;
+
+  int
+    *const next = tokenizer->next;
+
+  switch (token_info->state)
+  {
+    case IN_WHITE:
+    case IN_TOKEN:
+    case IN_OZONE:
+    {
+      (*next)++;
+      *breaker=break_set[i];
+      token[token_info->offset]='\0';
+      return(MagickFalse);
+    }
+    case IN_QUOTE:
+    {
+      StoreToken(token_info,token,max_token_length,c);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
 MagickExport int Tokenizer(TokenInfo *token_info,const unsigned flag,
   char *token,const size_t max_token_length,const char *line,const char *white,
   const char *break_set,const char *quote,const char escape,char *breaker,
@@ -434,6 +496,9 @@ MagickExport int Tokenizer(TokenInfo *token_info,const unsigned flag,
   ssize_t
     i;
 
+  TokenizerState
+    tokenizer;
+
   *breaker='\0';
   *quoted='\0';
   if (line[*next] == '\0')
@@ -441,29 +506,20 @@ MagickExport int Tokenizer(TokenInfo *token_info,const unsigned flag,
   token_info->state=IN_WHITE;
   token_info->quote=(char) MagickFalse;
   token_info->flag=flag;
+  tokenizer.token_info=token_info;
+  tokenizer.token=token;
+  tokenizer.max_token_length=max_token_length;
+  tokenizer.break_set=break_set;
+  tokenizer.breaker=breaker;
+  tokenizer.next=next;
   for (token_info->offset=0; (int) line[*next] != 0; (*next)++)
   {
     c=(int) line[*next];
     i=sindex(c,break_set);
     if (i >= 0)
       {
-        switch (token_info->state)
-        {
-          case IN_WHITE:
-          case IN_TOKEN:
-          case IN_OZONE:
-          {
-            (*next)++;
-            *breaker=break_set[i];
-            token[token_info->offset]='\0';
-            return(0);
-          }
-          case IN_QUOTE:
-          {
-            StoreToken(token_info,token,max_token_length,c);
-            break;
-          }
-        }
+        if (TokenizeBreakChar(&tokenizer,c,i) == MagickFalse)
+          return(0);
         continue;
       }
     i=sindex(c,quote);
