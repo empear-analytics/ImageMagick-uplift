@@ -398,8 +398,8 @@ typedef struct _LocationRowScan
     y;
 } LocationRowScan;
 
-static void PrintRowLocations(const LocationRowScan *scan,ssize_t *x,
-  ssize_t *n,const Quantum **p)
+static MagickBooleanType PrintLocationMatch(const LocationRowScan *scan,
+  const ssize_t *x,ssize_t *n,const Quantum **p)
 {
   const ChannelLocationsReport
     *report = scan->report;
@@ -419,28 +419,39 @@ static void PrintRowLocations(const LocationRowScan *scan,ssize_t *x,
   const ssize_t
     y = scan->y;
 
+  MagickBooleanType
+    match;
+
   ssize_t
     offset;
 
+  PixelTrait traits = GetPixelChannelTraits(image,channel);
+  if (traits == UndefinedPixelTrait)
+    return(MagickFalse);
+  offset=GetPixelChannelOffset(image,channel);
+  match=(MagickBooleanType) (fabs((double) (*p)[offset]-target) < MagickEpsilon);
+  if (match != MagickFalse)
+    {
+      if ((report->locations != 0) &&
+          (*n >= (ssize_t) report->locations))
+        return(MagickTrue);
+      (void) FormatLocaleFile(file," %.17g,%.17g",(double) *x,(double) y);
+      (*n)++;
+    }
+  *p+=(ptrdiff_t) GetPixelChannels(image);
+  return(MagickFalse);
+}
+
+static void PrintRowLocations(const LocationRowScan *scan,ssize_t *x,
+  ssize_t *n,const Quantum **p)
+{
+  const Image
+    *image = scan->image;
+
   for (*x=0; *x < (ssize_t) image->columns; (*x)++)
   {
-    MagickBooleanType
-      match;
-
-    PixelTrait traits = GetPixelChannelTraits(image,channel);
-    if (traits == UndefinedPixelTrait)
-      continue;
-    offset=GetPixelChannelOffset(image,channel);
-    match=(MagickBooleanType) (fabs((double) (*p)[offset]-target) < MagickEpsilon);
-    if (match != MagickFalse)
-      {
-        if ((report->locations != 0) &&
-            (*n >= (ssize_t) report->locations))
-          break;
-        (void) FormatLocaleFile(file," %.17g,%.17g",(double) *x,(double) y);
-        (*n)++;
-      }
-    *p+=(ptrdiff_t) GetPixelChannels(image);
+    if (PrintLocationMatch(scan,x,n,p) != MagickFalse)
+      break;
   }
 }
 
