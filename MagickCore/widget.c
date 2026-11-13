@@ -15660,6 +15660,9 @@ typedef struct _TextViewWidgets
 
   XEvent
     *event;
+
+  XWidgetInfo
+    *list_info;
 } TextViewWidgets;
 
 typedef struct _TextViewContext
@@ -15672,6 +15675,15 @@ typedef struct _TextViewContext
 
   unsigned int
     lines;
+
+  const char
+    **textlist;
+
+  unsigned int
+    height;
+
+  char
+    *primary_selection;
 } TextViewContext;
 
 static void ReleaseTextViewScroll(const TextViewContext *context,
@@ -15852,6 +15864,62 @@ static void MoveTextViewPointer(const TextViewContext *context,
     }
 }
 
+static void PressTextViewList(const TextViewContext *context,const XEvent event,
+  const TextViewTargets *targets,const TextViewWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    lines = context->lines;
+
+  const char
+    **const textlist = context->textlist;
+
+  const unsigned int
+    height = context->height;
+
+  char
+    *const primary_selection = context->primary_selection;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const dismiss_info = widgets->dismiss_info;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info;
+
+  if (MatteIsActive((*dismiss_info),event.xbutton))
+    {
+      /*
+        User pressed Dismiss button.
+      */
+      (*dismiss_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,dismiss_info);
+      return;
+    }
+  if (MatteIsActive((*list_info),event.xbutton))
+    {
+      TextViewPress
+        press;
+
+      press.display=display;
+      press.windows=windows;
+      press.textlist=textlist;
+      press.lines=lines;
+      press.height=height;
+      press.event=event;
+      press.slider_info=(*slider_info);
+      SelectTextViewLine(&press,primary_selection,targets);
+      return;
+    }
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -15907,7 +15975,7 @@ MagickPrivate void XTextViewWidget(Display *display,
 
   const TextViewWidgets
     view_widgets = { &north_info, &south_info, &delay, &slider_info,
-      &dismiss_info, &state, &scroll_info, &visible_lines, &event };
+      &dismiss_info, &state, &scroll_info, &visible_lines, &event, &list_info };
 
   TextViewContext
     view_context;
@@ -15996,6 +16064,9 @@ MagickPrivate void XTextViewWidget(Display *display,
   view_context.display=display;
   view_context.windows=windows;
   view_context.lines=lines;
+  view_context.textlist=textlist;
+  view_context.height=height;
+  view_context.primary_selection=primary_selection;
   do
   {
     if (state & UpdateConfigurationState)
@@ -16221,30 +16292,7 @@ MagickPrivate void XTextViewWidget(Display *display,
             state|=RedrawListState;
             break;
           }
-        if (MatteIsActive(dismiss_info,event.xbutton))
-          {
-            /*
-              User pressed Dismiss button.
-            */
-            dismiss_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&dismiss_info);
-            break;
-          }
-        if (MatteIsActive(list_info,event.xbutton))
-          {
-            TextViewPress
-              press;
-
-            press.display=display;
-            press.windows=windows;
-            press.textlist=textlist;
-            press.lines=lines;
-            press.height=height;
-            press.event=event;
-            press.slider_info=slider_info;
-            SelectTextViewLine(&press,primary_selection,&targets);
-            break;
-          }
+        PressTextViewList(&view_context,event,&targets,&view_widgets);
         break;
       }
       case ButtonRelease:
