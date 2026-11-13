@@ -16438,6 +16438,35 @@ static void XTranslateImage(Display *display,XWindows *windows,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void XTrimLeftEdge(const XWindows *windows,RectangleInfo *trim_info)
+{
+  int
+    x,
+    y;
+
+  size_t
+    background,
+    pixel;
+
+  /*
+    Crop the left edge.
+  */
+  background=XGetPixel(windows->image.ximage,0,0);
+  (*trim_info).width=(size_t) windows->image.ximage->width;
+  for (x=0; x < windows->image.ximage->width; x++)
+  {
+    for (y=0; y < windows->image.ximage->height; y++)
+    {
+      pixel=XGetPixel(windows->image.ximage,x,y);
+      if (pixel != background)
+        break;
+    }
+    if (y < windows->image.ximage->height)
+      break;
+  }
+  (*trim_info).x=(ssize_t) x;
+}
+
 static MagickBooleanType XTrimImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -16461,20 +16490,7 @@ static MagickBooleanType XTrimImage(Display *display,
   /*
     Crop the left edge.
   */
-  background=XGetPixel(windows->image.ximage,0,0);
-  trim_info.width=(size_t) windows->image.ximage->width;
-  for (x=0; x < windows->image.ximage->width; x++)
-  {
-    for (y=0; y < windows->image.ximage->height; y++)
-    {
-      pixel=XGetPixel(windows->image.ximage,x,y);
-      if (pixel != background)
-        break;
-    }
-    if (y < windows->image.ximage->height)
-      break;
-  }
-  trim_info.x=(ssize_t) x;
+  XTrimLeftEdge(windows,&trim_info);
   if (trim_info.x == (ssize_t) windows->image.ximage->width)
     {
       XSetCursorState(display,windows,MagickFalse);
