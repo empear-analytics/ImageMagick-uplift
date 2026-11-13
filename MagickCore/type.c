@@ -1411,6 +1411,40 @@ static MagickBooleanType SkipMarkupElement(const char *keyword,
   return(MagickFalse);
 }
 
+typedef struct _TypeIncludeScan
+{
+  const TypeLoadTarget
+    *target;
+
+  const char
+    *filename;
+
+  size_t
+    depth,
+    extent;
+
+  char
+    *keyword,
+    *token;
+} TypeIncludeScan;
+
+static MagickBooleanType LoadTypeIncludes(const TypeIncludeScan *scan,
+  const char **q,MagickStatusType *status)
+{
+  while (IsIncludeElementOpen(scan->token,*q) != MagickFalse)
+  {
+    if (IsIncludeFileAttribute(q,scan->extent,scan->keyword,scan->token) ==
+        MagickFalse)
+      continue;
+    if (scan->depth >= MagickMaxRecursionDepth)
+      return(MagickFalse);
+    else
+      *status&=(MagickStatusType) LoadTypeInclude(scan->target,
+        scan->filename,scan->token,scan->depth);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1471,20 +1505,15 @@ static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
       continue;
     if (LocaleCompare(keyword,"<include") == 0)
       {
+        const TypeIncludeScan
+          scan = { target, filename, depth, extent, keyword, token };
+
         /*
           Include element.
         */
-        while (IsIncludeElementOpen(token,q) != MagickFalse)
-        {
-          if (IsIncludeFileAttribute(&q,extent,keyword,token) == MagickFalse)
-            continue;
-          if (depth >= MagickMaxRecursionDepth)
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ConfigureError,"IncludeNodeNestedTooDeeply","`%s'",token);
-          else
-            status&=(MagickStatusType) LoadTypeInclude(target,filename,token,
-              depth);
-        }
+        while (LoadTypeIncludes(&scan,&q,&status) == MagickFalse)
+          (void) ThrowMagickException(exception,GetMagickModule(),
+            ConfigureError,"IncludeNodeNestedTooDeeply","`%s'",token);
         continue;
       }
     if (LocaleCompare(keyword,"<type") == 0)
