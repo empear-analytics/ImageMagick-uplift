@@ -2684,26 +2684,26 @@ static const char
     (char *) NULL
   };
 
+static const ModeType
+  AnnotateCommands[] =
+  {
+    AnnotateNameCommand,
+    AnnotateFontColorCommand,
+    AnnotateBackgroundColorCommand,
+    AnnotateRotateCommand,
+    AnnotateHelpCommand,
+    AnnotateDismissCommand
+  },
+  TextCommands[] =
+  {
+    TextHelpCommand,
+    TextApplyCommand
+  };
+
 static MagickBooleanType XAnnotateEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
 {
-  static const ModeType
-    AnnotateCommands[] =
-    {
-      AnnotateNameCommand,
-      AnnotateFontColorCommand,
-      AnnotateBackgroundColorCommand,
-      AnnotateRotateCommand,
-      AnnotateHelpCommand,
-      AnnotateDismissCommand
-    },
-    TextCommands[] =
-    {
-      TextHelpCommand,
-      TextApplyCommand
-    };
-
   static MagickBooleanType
     transparent_box = MagickTrue,
     transparent_pen = MagickFalse;
