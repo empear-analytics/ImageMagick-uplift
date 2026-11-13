@@ -208,30 +208,12 @@ static void AccumulateLocationExtrema(const Image *image,
   }
 }
 
-static ChannelStatistics *GetLocationStatistics(const Image *image,
-  const StatisticType type,ExceptionInfo *exception)
+static void InitializeLocationExtrema(const StatisticType type,
+  ChannelStatistics *channel_statistics)
 {
-  ChannelStatistics
-    *channel_statistics;
-
   ssize_t
-    i,
-    y;
+    i;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  channel_statistics=(ChannelStatistics *) AcquireQuantumMemory(
-    MaxPixelChannels+1,sizeof(*channel_statistics));
-  if (channel_statistics == (ChannelStatistics *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
-      return(channel_statistics);
-    }
-  (void) memset(channel_statistics,0,(MaxPixelChannels+1)*
-    sizeof(*channel_statistics));
   for (i=0; i <= (ssize_t) MaxPixelChannels; i++)
   {
     switch (type)
@@ -248,6 +230,32 @@ static ChannelStatistics *GetLocationStatistics(const Image *image,
       }
     }
   }
+}
+
+static ChannelStatistics *GetLocationStatistics(const Image *image,
+  const StatisticType type,ExceptionInfo *exception)
+{
+  ChannelStatistics
+    *channel_statistics;
+
+  ssize_t
+    y;
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  channel_statistics=(ChannelStatistics *) AcquireQuantumMemory(
+    MaxPixelChannels+1,sizeof(*channel_statistics));
+  if (channel_statistics == (ChannelStatistics *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+      return(channel_statistics);
+    }
+  (void) memset(channel_statistics,0,(MaxPixelChannels+1)*
+    sizeof(*channel_statistics));
+  InitializeLocationExtrema(type,channel_statistics);
   for (y=0; y < (ssize_t) image->rows; y++)
   {
     const Quantum
