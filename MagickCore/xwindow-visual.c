@@ -989,6 +989,16 @@ static void InitializeXWindowAtoms(Display *display,XWindows *windows)
   windows->dnd_protocols=XInternAtom(display,"DndProtocol",MagickFalse);
 }
 
+static void AllocateXWindowHints(XWindows *windows)
+{
+  windows->class_hints=XAllocClassHint();
+  windows->manager_hints=XAllocWMHints();
+  if ((windows->class_hints == (XClassHint *) NULL) ||
+      (windows->manager_hints == (XWMHints *) NULL))
+    ThrowXWindowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed",
+      "...");
+}
+
 MagickPrivate XWindows *XInitializeWindows(Display *display,
   XResourceInfo *resource_info)
 {
@@ -1050,12 +1060,7 @@ MagickPrivate XWindows *XInitializeWindows(Display *display,
   /*
     Allocate class and manager hints.
   */
-  windows->class_hints=XAllocClassHint();
-  windows->manager_hints=XAllocWMHints();
-  if ((windows->class_hints == (XClassHint *) NULL) ||
-      (windows->manager_hints == (XWMHints *) NULL))
-    ThrowXWindowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed",
-      "...");
+  AllocateXWindowHints(windows);
   /*
     Determine group leader if we have one.
   */
