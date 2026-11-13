@@ -7019,6 +7019,9 @@ typedef struct _FileBrowserWidgets
     *special_info,
     *action_info,
     *cancel_info;
+
+  ssize_t
+    *i;
 } FileBrowserWidgets;
 
 typedef struct _FileBrowserContext
@@ -7032,7 +7035,11 @@ typedef struct _FileBrowserContext
   char
     *reply,
     *glob_pattern,
-    *working_path;
+    *working_path,
+    *primary_selection;
+
+  XFontStruct
+    *font_info;
 } FileBrowserContext;
 
 static void ClientFileBrowserMessage(const FileBrowserContext *context,
@@ -7307,6 +7314,63 @@ static void MoveFileBrowserButtons(const FileBrowserContext *context,
   ToggleFileBrowserButtons(context,event,widgets);
 }
 
+static void PressFileBrowserReply(const FileBrowserContext *context,
+  const XEvent event,const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const primary_selection = context->primary_selection;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  ssize_t
+    *const i = widgets->i;
+
+  int
+    x;
+
+  if (MatteIsActive((*reply_info),event.xbutton) == MagickFalse)
+    return;
+  if (event.xbutton.button != Button2)
+    {
+      static Time
+        click_time;
+
+      ListBrowserClick
+        click;
+
+      /*
+        Move text cursor to position of button press.
+      */
+      x=event.xbutton.x-(*reply_info).x-(int) (QuantumMargin >> 2);
+      (*i)=FindFileBrowserCursor(font_info,(*reply_info),x);
+      (*reply_info).cursor=(*reply_info).marker+(*i)-1;
+      click.display=display;
+      click.window_info=(&windows->widget);
+      click.event=event;
+      click.click_time=click_time;
+      (*reply_info)=HighlightListBrowserReply(&click,primary_selection,
+        (*reply_info));
+      XDrawMatteText(display,&windows->widget,reply_info);
+      click_time=event.xbutton.time;
+      return;
+    }
+  /*
+    Request primary selection.
+  */
+  (void) XConvertSelection(display,XA_PRIMARY,XA_STRING,XA_STRING,
+    windows->widget.id,event.xbutton.time);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -7395,7 +7459,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const FileBrowserWidgets
     file_widgets = { &reply_info, &state,
       &scroll_info, &slider_info, &visible_files, &files, &up_info, &home_info,
-      &special_info, &action_info, &cancel_info };
+      &special_info, &action_info, &cancel_info, &i };
 
   FileBrowserContext
     file_context;
@@ -7501,6 +7565,8 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   file_context.reply=reply;
   file_context.glob_pattern=glob_pattern;
   file_context.working_path=working_path;
+  file_context.primary_selection=primary_selection;
+  file_context.font_info=font_info;
   do
   {
     if (state & UpdateConfigurationState)
@@ -7933,37 +7999,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
             XDrawBeveledButton(display,&windows->widget,&cancel_info);
             break;
           }
-        if (MatteIsActive(reply_info,event.xbutton) == MagickFalse)
-          break;
-        if (event.xbutton.button != Button2)
-          {
-            static Time
-              click_time;
-
-            ListBrowserClick
-              click;
-
-            /*
-              Move text cursor to position of button press.
-            */
-            x=event.xbutton.x-reply_info.x-(int) (QuantumMargin >> 2);
-            i=FindFileBrowserCursor(font_info,reply_info,x);
-            reply_info.cursor=reply_info.marker+i-1;
-            click.display=display;
-            click.window_info=(&windows->widget);
-            click.event=event;
-            click.click_time=click_time;
-            reply_info=HighlightListBrowserReply(&click,primary_selection,
-              reply_info);
-            XDrawMatteText(display,&windows->widget,&reply_info);
-            click_time=event.xbutton.time;
-            break;
-          }
-        /*
-          Request primary selection.
-        */
-        (void) XConvertSelection(display,XA_PRIMARY,XA_STRING,XA_STRING,
-          windows->widget.id,event.xbutton.time);
+        PressFileBrowserReply(&file_context,event,&file_widgets);
         break;
       }
       case ButtonRelease:
