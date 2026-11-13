@@ -1050,6 +1050,19 @@ static void SetLogInfoAttribute(LogInfo *log_info,const char *keyword,
       (log_info->handler_mask | ParseLogHandlers(token));
 }
 
+static MagickStatusType AppendLogElement(LinkedListInfo *cache,
+  LogInfo *log_info,const char *filename,ExceptionInfo *exception)
+{
+  MagickStatusType
+    status;
+
+  status=AppendValueToLinkedList(cache,log_info);
+  if (status == MagickFalse)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ResourceLimitError,"MemoryAllocationFailed","`%s'",filename);
+  return(status);
+}
+
 typedef struct _LogIncludeInput
 {
   const LogLoadTarget
@@ -1222,10 +1235,7 @@ static MagickBooleanType LoadLogCache(const LogLoadTarget *target,
       continue;
     if (LocaleCompare(keyword,"</logmap>") == 0)
       {
-        status=AppendValueToLinkedList(cache,log_info);
-        if (status == MagickFalse)
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            ResourceLimitError,"MemoryAllocationFailed","`%s'",filename);
+        status=AppendLogElement(cache,log_info,filename,exception);
         log_info=(LogInfo *) NULL;
         continue;
       }
