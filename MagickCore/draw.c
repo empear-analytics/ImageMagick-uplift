@@ -6344,6 +6344,467 @@ static MagickStatusType ResetColorPixels(const PrimitiveScanInfo *scan,
   return(status);
 }
 
+typedef struct _DrawPrimitiveContext
+{
+  Image
+    *image;
+
+  const DrawInfo
+    *draw_info;
+
+  const PrimitiveInfo
+    *primitive_info;
+
+  CacheView
+    *image_view;
+
+  ssize_t
+    x,
+    y;
+
+  ExceptionInfo
+    *exception;
+} DrawPrimitiveContext;
+
+static MagickStatusType DrawAlphaPrimitive(const DrawPrimitiveContext *context,
+  MagickStatusType status)
+{
+  Image
+    *image = context->image;
+
+  const DrawInfo
+    *draw_info = context->draw_info;
+
+  const PrimitiveInfo
+    *primitive_info = context->primitive_info;
+
+  CacheView
+    *image_view = context->image_view;
+
+  const ssize_t
+    x = context->x,
+    y = context->y;
+
+  ExceptionInfo
+    *exception = context->exception;
+
+  if ((image->alpha_trait & BlendPixelTrait) == 0)
+    status&=(MagickStatusType) SetImageAlphaChannel(image,
+      OpaqueAlphaChannel,exception);
+  switch (primitive_info->method)
+  {
+    case PointMethod:
+    default:
+    {
+      PixelInfo
+        pixel;
+
+      Quantum
+        *q;
+
+      q=GetCacheViewAuthenticPixels(image_view,x,y,1,1,exception);
+      if (q == (Quantum *) NULL)
+        break;
+      GetFillColor(draw_info,x,y,&pixel,exception);
+      SetPixelAlpha(image,ClampToQuantum(pixel.alpha),q);
+      status&=(MagickStatusType) SyncCacheViewAuthenticPixels(image_view,
+        exception);
+      break;
+    }
+    case ReplaceMethod:
+    {
+      PixelInfo
+        target;
+
+      PrimitiveScanInfo
+        scan;
+
+      status&=(MagickStatusType) GetOneCacheViewVirtualPixelInfo(image_view,
+        x,y,&target,exception);
+      scan.image=image;
+      scan.image_view=image_view;
+      scan.draw_info=draw_info;
+      scan.exception=exception;
+      status=ReplaceAlphaPixels(&scan,target,status);
+      break;
+    }
+    case FloodfillMethod:
+    case FillToBorderMethod:
+    {
+      ChannelType
+        channel_mask;
+
+      PixelInfo
+        target;
+
+      status&=(MagickStatusType) GetOneVirtualPixelInfo(image,
+        TileVirtualPixelMethod,x,y,&target,exception);
+      if (primitive_info->method == FillToBorderMethod)
+        {
+          target.red=(double) draw_info->border_color.red;
+          target.green=(double) draw_info->border_color.green;
+          target.blue=(double) draw_info->border_color.blue;
+        }
+      channel_mask=SetImageChannelMask(image,AlphaChannel);
+      status&=(MagickStatusType) FloodfillPaintImage(image,draw_info,
+        &target,x,y,primitive_info->method == FloodfillMethod ?
+        MagickFalse : MagickTrue,exception);
+      (void) SetImageChannelMask(image,channel_mask);
+      break;
+    }
+    case ResetMethod:
+    {
+      PrimitiveScanInfo
+        scan;
+
+      scan.image=image;
+      scan.image_view=image_view;
+      scan.draw_info=draw_info;
+      scan.exception=exception;
+      status=ResetAlphaPixels(&scan,status);
+      break;
+    }
+  }
+  return(status);
+}
+
+static MagickStatusType DrawColorPrimitive(const DrawPrimitiveContext *context,
+  MagickStatusType status)
+{
+  Image
+    *image = context->image;
+
+  const DrawInfo
+    *draw_info = context->draw_info;
+
+  const PrimitiveInfo
+    *primitive_info = context->primitive_info;
+
+  CacheView
+    *image_view = context->image_view;
+
+  const ssize_t
+    x = context->x,
+    y = context->y;
+
+  ExceptionInfo
+    *exception = context->exception;
+
+  switch (primitive_info->method)
+  {
+    case PointMethod:
+    default:
+    {
+      PixelInfo
+        pixel;
+
+      Quantum
+        *q;
+
+      q=GetCacheViewAuthenticPixels(image_view,x,y,1,1,exception);
+      if (q == (Quantum *) NULL)
+        break;
+      GetPixelInfo(image,&pixel);
+      GetFillColor(draw_info,x,y,&pixel,exception);
+      SetPixelViaPixelInfo(image,&pixel,q);
+      status&=(MagickStatusType) SyncCacheViewAuthenticPixels(image_view,
+        exception);
+      break;
+    }
+    case ReplaceMethod:
+    {
+      PixelInfo
+        target;
+
+      PrimitiveScanInfo
+        scan;
+
+      status&=(MagickStatusType) GetOneCacheViewVirtualPixelInfo(image_view,
+        x,y,&target,exception);
+      scan.image=image;
+      scan.image_view=image_view;
+      scan.draw_info=draw_info;
+      scan.exception=exception;
+      status=ReplaceColorPixels(&scan,target,status);
+      break;
+    }
+    case FloodfillMethod:
+    case FillToBorderMethod:
+    {
+      PixelInfo
+        target;
+
+      status&=(MagickStatusType) GetOneVirtualPixelInfo(image,
+        TileVirtualPixelMethod,x,y,&target,exception);
+      if (primitive_info->method == FillToBorderMethod)
+        {
+          target.red=(double) draw_info->border_color.red;
+          target.green=(double) draw_info->border_color.green;
+          target.blue=(double) draw_info->border_color.blue;
+        }
+      status&=(MagickStatusType) FloodfillPaintImage(image,draw_info,
+        &target,x,y,primitive_info->method == FloodfillMethod ?
+        MagickFalse : MagickTrue,exception);
+      break;
+    }
+    case ResetMethod:
+    {
+      PrimitiveScanInfo
+        scan;
+
+      scan.image=image;
+      scan.image_view=image_view;
+      scan.draw_info=draw_info;
+      scan.exception=exception;
+      status=ResetColorPixels(&scan,status);
+      break;
+    }
+  }
+  return(status);
+}
+
+static MagickStatusType DrawImagePrimitive(const DrawPrimitiveContext *context,
+  MagickStatusType status)
+{
+  Image
+    *image = context->image;
+
+  const DrawInfo
+    *draw_info = context->draw_info;
+
+  const PrimitiveInfo
+    *primitive_info = context->primitive_info;
+
+  const ssize_t
+    x = context->x,
+    y = context->y;
+
+  ExceptionInfo
+    *exception = context->exception;
+
+  AffineMatrix
+    affine;
+
+  char
+    composite_geometry[MagickPathExtent];
+
+  Image
+    *composite_image,
+    *composite_images;
+
+  ImageInfo
+    *clone_info;
+
+  RectangleInfo
+    geometry;
+
+  ssize_t
+    x1,
+    y1;
+
+  if (primitive_info->text == (char *) NULL)
+    return(status);
+  clone_info=AcquireImageInfo();
+  composite_images=(Image *) NULL;
+  if (LocaleNCompare(primitive_info->text,"data:",5) == 0)
+    composite_images=ReadInlineImage(clone_info,primitive_info->text,
+      exception);
+  else
+    if (*primitive_info->text != '\0')
+      {
+        /*
+          Read composite image.
+        */
+        (void) CopyMagickString(clone_info->filename,primitive_info->text,
+          MagickPathExtent);
+        (void) SetImageInfo(clone_info,1,exception);
+        (void) CopyMagickString(clone_info->filename,primitive_info->text,
+          MagickPathExtent);
+        if (clone_info->size != (char *) NULL)
+          clone_info->size=DestroyString(clone_info->size);
+        if (clone_info->extract != (char *) NULL)
+          clone_info->extract=DestroyString(clone_info->extract);
+        clone_info->coder_depth=draw_info->image_info->coder_depth;
+        composite_images=StrictReadImage(clone_info,exception);
+        draw_info->image_info->coder_depth=clone_info->coder_depth;
+      }
+  clone_info=DestroyImageInfo(clone_info);
+  if (composite_images == (Image *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  composite_image=RemoveFirstImageFromList(&composite_images);
+  composite_images=DestroyImageList(composite_images);
+  (void) SetImageProgressMonitor(composite_image,(MagickProgressMonitor)
+    NULL,(void *) NULL);
+  x1=CastDoubleToSsizeT(ceil(primitive_info[1].point.x-0.5));
+  y1=CastDoubleToSsizeT(ceil(primitive_info[1].point.y-0.5));
+  if (IsCompositeOffset(x1,y1,composite_image) != MagickFalse)
+    {
+      /*
+        Resize image.
+      */
+      (void) FormatLocaleString(composite_geometry,MagickPathExtent,
+        "%gx%g!",primitive_info[1].point.x,primitive_info[1].point.y);
+      composite_image->filter=image->filter;
+      status&=(MagickStatusType) TransformImage(&composite_image,
+        (char *) NULL,composite_geometry,exception);
+    }
+  if (composite_image->alpha_trait == UndefinedPixelTrait)
+    status&=(MagickStatusType) SetImageAlphaChannel(composite_image,
+      OpaqueAlphaChannel,exception);
+  if (draw_info->alpha != OpaqueAlpha)
+    status&=(MagickStatusType) SetImageAlpha(composite_image,
+      draw_info->alpha,exception);
+  SetGeometry(image,&geometry);
+  image->gravity=draw_info->gravity;
+  geometry.x=x;
+  geometry.y=y;
+  (void) FormatLocaleString(composite_geometry,MagickPathExtent,
+    "%.17gx%.17g%+.20g%+.20g",(double) composite_image->columns,(double)
+    composite_image->rows,(double) geometry.x,(double) geometry.y);
+  (void) ParseGravityGeometry(image,composite_geometry,&geometry,exception);
+  affine=draw_info->affine;
+  affine.tx=(double) geometry.x;
+  affine.ty=(double) geometry.y;
+  composite_image->interpolate=image->interpolate;
+  if ((draw_info->compose == OverCompositeOp) ||
+      (draw_info->compose == SrcOverCompositeOp))
+    status&=(MagickStatusType) DrawAffineImage(image,composite_image,
+      &affine,exception);
+  else
+    status&=(MagickStatusType) CompositeImage(image,composite_image,
+      draw_info->compose,MagickTrue,geometry.x,geometry.y,exception);
+  composite_image=DestroyImage(composite_image);
+  return(status);
+}
+
+static MagickStatusType DrawPointPrimitive(const DrawPrimitiveContext *context,
+  MagickStatusType status)
+{
+  Image
+    *image = context->image;
+
+  const DrawInfo
+    *draw_info = context->draw_info;
+
+  CacheView
+    *image_view = context->image_view;
+
+  const ssize_t
+    x = context->x,
+    y = context->y;
+
+  ExceptionInfo
+    *exception = context->exception;
+
+  PixelInfo
+    fill_color;
+
+  Quantum
+    *q;
+
+  if ((y < 0) || (y >= (ssize_t) image->rows))
+    return(status);
+  if ((x < 0) || (x >= (ssize_t) image->columns))
+    return(status);
+  q=GetCacheViewAuthenticPixels(image_view,x,y,1,1,exception);
+  if (q == (Quantum *) NULL)
+    return(status);
+  GetFillColor(draw_info,x,y,&fill_color,exception);
+  CompositePixelOver(image,&fill_color,(double) fill_color.alpha,q,(double)
+    GetPixelAlpha(image,q),q);
+  status&=(MagickStatusType) SyncCacheViewAuthenticPixels(image_view,
+    exception);
+  return(status);
+}
+
+static MagickStatusType DrawStrokedPrimitive(const DrawPrimitiveContext *context,
+  MagickStatusType status)
+{
+  Image
+    *image = context->image;
+
+  const DrawInfo
+    *draw_info = context->draw_info;
+
+  const PrimitiveInfo
+    *primitive_info = context->primitive_info;
+
+  ExceptionInfo
+    *exception = context->exception;
+
+  ssize_t
+    i;
+
+  double
+    mid,
+    scale;
+
+  DrawInfo
+    *clone_info;
+
+  if (IsEventLogging() != MagickFalse)
+    LogPrimitiveInfo(primitive_info);
+  scale=ExpandAffine(&draw_info->affine);
+  if (IsVisibleDashedStroke(draw_info,scale) != MagickFalse)
+    {
+      /*
+        Draw dash polygon.
+      */
+      clone_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
+      clone_info->stroke_width=0.0;
+      clone_info->stroke.alpha=(MagickRealType) TransparentAlpha;
+      status&=(MagickStatusType) DrawPolygonPrimitive(image,clone_info,
+        primitive_info,exception);
+      clone_info=DestroyDrawInfo(clone_info);
+      if (status != MagickFalse)
+        status&=(MagickStatusType) DrawDashPolygon(draw_info,primitive_info,
+          image,exception);
+      return(status);
+    }
+  mid=ExpandAffine(&draw_info->affine)*draw_info->stroke_width/2.0;
+  if (IsVisibleWideStroke(mid,draw_info) != MagickFalse)
+    {
+      double
+        point_x,
+        point_y;
+
+      MagickBooleanType
+        closed_path;
+
+      /*
+        Draw strokes while respecting line cap/join attributes.
+      */
+      closed_path=primitive_info[0].closed_subpath;
+      i=(ssize_t) primitive_info[0].coordinates;
+      point_x=fabs(primitive_info[i-1].point.x-primitive_info[0].point.x);
+      point_y=fabs(primitive_info[i-1].point.y-primitive_info[0].point.y);
+      if ((point_x < MagickEpsilon) && (point_y < MagickEpsilon))
+        closed_path=MagickTrue;
+      if (IsRoundStrokeOrPrimitive(draw_info,closed_path,primitive_info,i) !=
+          MagickFalse)
+        {
+          status&=(MagickStatusType) DrawPolygonPrimitive(image,draw_info,
+            primitive_info,exception);
+          return(status);
+        }
+      clone_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
+      clone_info->stroke_width=0.0;
+      clone_info->stroke.alpha=(MagickRealType) TransparentAlpha;
+      status&=(MagickStatusType) DrawPolygonPrimitive(image,clone_info,
+        primitive_info,exception);
+      clone_info=DestroyDrawInfo(clone_info);
+      if (status != MagickFalse)
+        status&=(MagickStatusType) DrawStrokePolygon(image,draw_info,
+          primitive_info,exception);
+      return(status);
+    }
+  status&=(MagickStatusType) DrawPolygonPrimitive(image,draw_info,
+    primitive_info,exception);
+  return(status);
+}
 MagickExport MagickBooleanType DrawPrimitive(Image *image,
   const DrawInfo *draw_info,const PrimitiveInfo *primitive_info,
   ExceptionInfo *exception)
@@ -6351,11 +6812,13 @@ MagickExport MagickBooleanType DrawPrimitive(Image *image,
   CacheView
     *image_view;
 
+  DrawPrimitiveContext
+    context;
+
   MagickStatusType
     status;
 
   ssize_t
-    i,
     x;
 
   ssize_t
@@ -6384,282 +6847,33 @@ MagickExport MagickBooleanType DrawPrimitive(Image *image,
   x=CastDoubleToSsizeT(ceil(primitive_info->point.x-0.5));
   y=CastDoubleToSsizeT(ceil(primitive_info->point.y-0.5));
   image_view=AcquireAuthenticCacheView(image,exception);
+  context.image=image;
+  context.draw_info=draw_info;
+  context.primitive_info=primitive_info;
+  context.image_view=image_view;
+  context.x=x;
+  context.y=y;
+  context.exception=exception;
   switch (primitive_info->primitive)
   {
     case AlphaPrimitive:
     {
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        status&=(MagickStatusType) SetImageAlphaChannel(image,
-          OpaqueAlphaChannel,exception);
-      switch (primitive_info->method)
-      {
-        case PointMethod:
-        default:
-        {
-          PixelInfo
-            pixel;
-
-          Quantum
-            *q;
-
-          q=GetCacheViewAuthenticPixels(image_view,x,y,1,1,exception);
-          if (q == (Quantum *) NULL)
-            break;
-          GetFillColor(draw_info,x,y,&pixel,exception);
-          SetPixelAlpha(image,ClampToQuantum(pixel.alpha),q);
-          status&=(MagickStatusType) SyncCacheViewAuthenticPixels(image_view,
-            exception);
-          break;
-        }
-        case ReplaceMethod:
-        {
-          PixelInfo
-            target;
-
-          PrimitiveScanInfo
-            scan;
-
-          status&=(MagickStatusType) GetOneCacheViewVirtualPixelInfo(image_view,
-            x,y,&target,exception);
-          scan.image=image;
-          scan.image_view=image_view;
-          scan.draw_info=draw_info;
-          scan.exception=exception;
-          status=ReplaceAlphaPixels(&scan,target,status);
-          break;
-        }
-        case FloodfillMethod:
-        case FillToBorderMethod:
-        {
-          ChannelType
-            channel_mask;
-
-          PixelInfo
-            target;
-
-          status&=(MagickStatusType) GetOneVirtualPixelInfo(image,
-            TileVirtualPixelMethod,x,y,&target,exception);
-          if (primitive_info->method == FillToBorderMethod)
-            {
-              target.red=(double) draw_info->border_color.red;
-              target.green=(double) draw_info->border_color.green;
-              target.blue=(double) draw_info->border_color.blue;
-            }
-          channel_mask=SetImageChannelMask(image,AlphaChannel);
-          status&=(MagickStatusType) FloodfillPaintImage(image,draw_info,
-            &target,x,y,primitive_info->method == FloodfillMethod ?
-            MagickFalse : MagickTrue,exception);
-          (void) SetImageChannelMask(image,channel_mask);
-          break;
-        }
-        case ResetMethod:
-        {
-          PrimitiveScanInfo
-            scan;
-
-          scan.image=image;
-          scan.image_view=image_view;
-          scan.draw_info=draw_info;
-          scan.exception=exception;
-          status=ResetAlphaPixels(&scan,status);
-          break;
-        }
-      }
+      status=DrawAlphaPrimitive(&context,status);
       break;
     }
     case ColorPrimitive:
     {
-      switch (primitive_info->method)
-      {
-        case PointMethod:
-        default:
-        {
-          PixelInfo
-            pixel;
-
-          Quantum
-            *q;
-
-          q=GetCacheViewAuthenticPixels(image_view,x,y,1,1,exception);
-          if (q == (Quantum *) NULL)
-            break;
-          GetPixelInfo(image,&pixel);
-          GetFillColor(draw_info,x,y,&pixel,exception);
-          SetPixelViaPixelInfo(image,&pixel,q);
-          status&=(MagickStatusType) SyncCacheViewAuthenticPixels(image_view,
-            exception);
-          break;
-        }
-        case ReplaceMethod:
-        {
-          PixelInfo
-            target;
-
-          PrimitiveScanInfo
-            scan;
-
-          status&=(MagickStatusType) GetOneCacheViewVirtualPixelInfo(image_view,
-            x,y,&target,exception);
-          scan.image=image;
-          scan.image_view=image_view;
-          scan.draw_info=draw_info;
-          scan.exception=exception;
-          status=ReplaceColorPixels(&scan,target,status);
-          break;
-        }
-        case FloodfillMethod:
-        case FillToBorderMethod:
-        {
-          PixelInfo
-            target;
-
-          status&=(MagickStatusType) GetOneVirtualPixelInfo(image,
-            TileVirtualPixelMethod,x,y,&target,exception);
-          if (primitive_info->method == FillToBorderMethod)
-            {
-              target.red=(double) draw_info->border_color.red;
-              target.green=(double) draw_info->border_color.green;
-              target.blue=(double) draw_info->border_color.blue;
-            }
-          status&=(MagickStatusType) FloodfillPaintImage(image,draw_info,
-            &target,x,y,primitive_info->method == FloodfillMethod ?
-            MagickFalse : MagickTrue,exception);
-          break;
-        }
-        case ResetMethod:
-        {
-          PrimitiveScanInfo
-            scan;
-
-          scan.image=image;
-          scan.image_view=image_view;
-          scan.draw_info=draw_info;
-          scan.exception=exception;
-          status=ResetColorPixels(&scan,status);
-          break;
-        }
-      }
+      status=DrawColorPrimitive(&context,status);
       break;
     }
     case ImagePrimitive:
     {
-      AffineMatrix
-        affine;
-
-      char
-        composite_geometry[MagickPathExtent];
-
-      Image
-        *composite_image,
-        *composite_images;
-
-      ImageInfo
-        *clone_info;
-
-      RectangleInfo
-        geometry;
-
-      ssize_t
-        x1,
-        y1;
-
-      if (primitive_info->text == (char *) NULL)
-        break;
-      clone_info=AcquireImageInfo();
-      composite_images=(Image *) NULL;
-      if (LocaleNCompare(primitive_info->text,"data:",5) == 0)
-        composite_images=ReadInlineImage(clone_info,primitive_info->text,
-          exception);
-      else
-        if (*primitive_info->text != '\0')
-          {
-            /*
-              Read composite image.
-            */
-            (void) CopyMagickString(clone_info->filename,primitive_info->text,
-              MagickPathExtent);
-            (void) SetImageInfo(clone_info,1,exception);
-            (void) CopyMagickString(clone_info->filename,primitive_info->text,
-              MagickPathExtent);
-            if (clone_info->size != (char *) NULL)
-              clone_info->size=DestroyString(clone_info->size);
-            if (clone_info->extract != (char *) NULL)
-              clone_info->extract=DestroyString(clone_info->extract);
-            clone_info->coder_depth=draw_info->image_info->coder_depth;
-            composite_images=StrictReadImage(clone_info,exception);
-            draw_info->image_info->coder_depth=clone_info->coder_depth;
-          }
-      clone_info=DestroyImageInfo(clone_info);
-      if (composite_images == (Image *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      composite_image=RemoveFirstImageFromList(&composite_images);
-      composite_images=DestroyImageList(composite_images);
-      (void) SetImageProgressMonitor(composite_image,(MagickProgressMonitor)
-        NULL,(void *) NULL);
-      x1=CastDoubleToSsizeT(ceil(primitive_info[1].point.x-0.5));
-      y1=CastDoubleToSsizeT(ceil(primitive_info[1].point.y-0.5));
-      if (IsCompositeOffset(x1,y1,composite_image) != MagickFalse)
-        {
-          /*
-            Resize image.
-          */
-          (void) FormatLocaleString(composite_geometry,MagickPathExtent,
-            "%gx%g!",primitive_info[1].point.x,primitive_info[1].point.y);
-          composite_image->filter=image->filter;
-          status&=(MagickStatusType) TransformImage(&composite_image,
-            (char *) NULL,composite_geometry,exception);
-        }
-      if (composite_image->alpha_trait == UndefinedPixelTrait)
-        status&=(MagickStatusType) SetImageAlphaChannel(composite_image,
-          OpaqueAlphaChannel,exception);
-      if (draw_info->alpha != OpaqueAlpha)
-        status&=(MagickStatusType) SetImageAlpha(composite_image,
-          draw_info->alpha,exception);
-      SetGeometry(image,&geometry);
-      image->gravity=draw_info->gravity;
-      geometry.x=x;
-      geometry.y=y;
-      (void) FormatLocaleString(composite_geometry,MagickPathExtent,
-        "%.17gx%.17g%+.20g%+.20g",(double) composite_image->columns,(double)
-        composite_image->rows,(double) geometry.x,(double) geometry.y);
-      (void) ParseGravityGeometry(image,composite_geometry,&geometry,exception);
-      affine=draw_info->affine;
-      affine.tx=(double) geometry.x;
-      affine.ty=(double) geometry.y;
-      composite_image->interpolate=image->interpolate;
-      if ((draw_info->compose == OverCompositeOp) ||
-          (draw_info->compose == SrcOverCompositeOp))
-        status&=(MagickStatusType) DrawAffineImage(image,composite_image,
-          &affine,exception);
-      else
-        status&=(MagickStatusType) CompositeImage(image,composite_image,
-          draw_info->compose,MagickTrue,geometry.x,geometry.y,exception);
-      composite_image=DestroyImage(composite_image);
+      status=DrawImagePrimitive(&context,status);
       break;
     }
     case PointPrimitive:
     {
-      PixelInfo
-        fill_color;
-
-      Quantum
-        *q;
-
-      if ((y < 0) || (y >= (ssize_t) image->rows))
-        break;
-      if ((x < 0) || (x >= (ssize_t) image->columns))
-        break;
-      q=GetCacheViewAuthenticPixels(image_view,x,y,1,1,exception);
-      if (q == (Quantum *) NULL)
-        break;
-      GetFillColor(draw_info,x,y,&fill_color,exception);
-      CompositePixelOver(image,&fill_color,(double) fill_color.alpha,q,(double)
-        GetPixelAlpha(image,q),q);
-      status&=(MagickStatusType) SyncCacheViewAuthenticPixels(image_view,
-        exception);
+      status=DrawPointPrimitive(&context,status);
       break;
     }
     case TextPrimitive:
@@ -6683,71 +6897,7 @@ MagickExport MagickBooleanType DrawPrimitive(Image *image,
     }
     default:
     {
-      double
-        mid,
-        scale;
-
-      DrawInfo
-        *clone_info;
-
-      if (IsEventLogging() != MagickFalse)
-        LogPrimitiveInfo(primitive_info);
-      scale=ExpandAffine(&draw_info->affine);
-      if (IsVisibleDashedStroke(draw_info,scale) != MagickFalse)
-        {
-          /*
-            Draw dash polygon.
-          */
-          clone_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
-          clone_info->stroke_width=0.0;
-          clone_info->stroke.alpha=(MagickRealType) TransparentAlpha;
-          status&=(MagickStatusType) DrawPolygonPrimitive(image,clone_info,
-            primitive_info,exception);
-          clone_info=DestroyDrawInfo(clone_info);
-          if (status != MagickFalse)
-            status&=(MagickStatusType) DrawDashPolygon(draw_info,primitive_info,
-              image,exception);
-          break;
-        }
-      mid=ExpandAffine(&draw_info->affine)*draw_info->stroke_width/2.0;
-      if (IsVisibleWideStroke(mid,draw_info) != MagickFalse)
-        {
-          double
-            point_x,
-            point_y;
-
-          MagickBooleanType
-            closed_path;
-
-          /*
-            Draw strokes while respecting line cap/join attributes.
-          */
-          closed_path=primitive_info[0].closed_subpath;
-          i=(ssize_t) primitive_info[0].coordinates;
-          point_x=fabs(primitive_info[i-1].point.x-primitive_info[0].point.x);
-          point_y=fabs(primitive_info[i-1].point.y-primitive_info[0].point.y);
-          if ((point_x < MagickEpsilon) && (point_y < MagickEpsilon))
-            closed_path=MagickTrue;
-          if (IsRoundStrokeOrPrimitive(draw_info,closed_path,primitive_info,i) !=
-              MagickFalse)
-            {
-              status&=(MagickStatusType) DrawPolygonPrimitive(image,draw_info,
-                primitive_info,exception);
-              break;
-            }
-          clone_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
-          clone_info->stroke_width=0.0;
-          clone_info->stroke.alpha=(MagickRealType) TransparentAlpha;
-          status&=(MagickStatusType) DrawPolygonPrimitive(image,clone_info,
-            primitive_info,exception);
-          clone_info=DestroyDrawInfo(clone_info);
-          if (status != MagickFalse)
-            status&=(MagickStatusType) DrawStrokePolygon(image,draw_info,
-              primitive_info,exception);
-          break;
-        }
-      status&=(MagickStatusType) DrawPolygonPrimitive(image,draw_info,
-        primitive_info,exception);
+      status=DrawStrokedPrimitive(&context,status);
       break;
     }
   }
