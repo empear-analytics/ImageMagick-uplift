@@ -12759,6 +12759,18 @@ static MagickBooleanType XMatteEditStep(const MatteCommandInput *input,
   return(MagickTrue);
 }
 
+static const ModeType
+  MatteEditCommandTable[] =
+  {
+    MatteEditMethod,
+    MatteEditBorderCommand,
+    MatteEditFuzzCommand,
+    MatteEditValueCommand,
+    MatteEditUndoCommand,
+    MatteEditHelpCommand,
+    MatteEditDismissCommand
+  };
+
 static MagickBooleanType XMatteEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -12778,18 +12790,6 @@ static MagickBooleanType XMatteEditImage(Display *display,
 
   static char
     matte[MagickPathExtent] = "0";
-
-  static const ModeType
-    MatteEditCommands[] =
-    {
-      MatteEditMethod,
-      MatteEditBorderCommand,
-      MatteEditFuzzCommand,
-      MatteEditValueCommand,
-      MatteEditUndoCommand,
-      MatteEditHelpCommand,
-      MatteEditDismissCommand
-    };
 
   static PaintMethod
     method = PointMethod;
@@ -12821,7 +12821,7 @@ static MagickBooleanType XMatteEditImage(Display *display,
     event_targets = { &x, &y, &state };
 
   const MatteCommandInput
-    command_input = { display, resource_info, windows, MatteEditCommands,
+    command_input = { display, resource_info, windows, MatteEditCommandTable,
       image, exception, MatteEditMenu, command, matte, method_targets,
       border_targets, text };
 
