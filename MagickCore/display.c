@@ -14184,22 +14184,22 @@ static const DisplayCommand
     ROIDismissCommand
   };
 
+static const DisplayCommand
+  *ROIMenuCommands[ApplyMenus] =
+  {
+    ROIFileCommands,
+    ROIEditCommands,
+    ROITransformCommands,
+    ROIEnhanceCommands,
+    ROIEffectsCommands,
+    ROIFXCommands,
+    ROIMiscellanyCommands
+  };
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
 {
-  static const DisplayCommand
-    *Commands[ApplyMenus] =
-    {
-      ROIFileCommands,
-      ROIEditCommands,
-      ROITransformCommands,
-      ROIEnhanceCommands,
-      ROIEffectsCommands,
-      ROIFXCommands,
-      ROIMiscellanyCommands
-    };
-
   char
     command[MagickPathExtent],
     text[MagickPathExtent];
@@ -14520,7 +14520,7 @@ static MagickBooleanType XROIImage(Display *display,
           command_input.ApplyMenu=ApplyMenu;
           command_input.ApplyCommands=ApplyCommands;
           command_input.Menus=ROIMenus;
-          command_input.Commands=Commands;
+          command_input.Commands=ROIMenuCommands;
           XROICommand(&command_input,&event,&display_command,&state);
           continue;
         }
