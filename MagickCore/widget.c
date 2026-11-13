@@ -12536,6 +12536,30 @@ static void PressListBrowserSlider(const ListBrowserContext *context,
   PressListBrowserScroll(context,event,targets,widgets);
 }
 
+static void ConfigureListBrowserWindow(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserWidgets *widgets)
+{
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  size_t
+    *const state = widgets->state;
+
+  /*
+    Update widget configuration.
+  */
+  if (event.xconfigure.window != window_info->id)
+    return;
+  if ((event.xconfigure.width == (int) window_info->width) &&
+      (event.xconfigure.height == (int) window_info->height))
+    return;
+  window_info->width=(unsigned int)
+    MagickMax(event.xconfigure.width,(int) window_info->min_width);
+  window_info->height=(unsigned int)
+    MagickMax(event.xconfigure.height,(int) window_info->min_height);
+  (*state)|=UpdateConfigurationState;
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -12900,19 +12924,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
       }
       case ConfigureNotify:
       {
-        /*
-          Update widget configuration.
-        */
-        if (event.xconfigure.window != window_info->id)
-          break;
-        if ((event.xconfigure.width == (int) window_info->width) &&
-            (event.xconfigure.height == (int) window_info->height))
-          break;
-        window_info->width=(unsigned int)
-          MagickMax(event.xconfigure.width,(int) window_info->min_width);
-        window_info->height=(unsigned int)
-          MagickMax(event.xconfigure.height,(int) window_info->min_height);
-        state|=UpdateConfigurationState;
+        ConfigureListBrowserWindow(&list_context,event,&list_widgets);
         break;
       }
       case EnterNotify:
