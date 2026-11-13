@@ -362,6 +362,18 @@ MagickExport MagickBooleanType IsGeometry(const char *geometry)
   return(flags != NoValue ? MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType IsSceneGeometryText(const char *geometry,
+  const char *p,const MagickBooleanType pedantic)
+{
+  if (p == geometry)
+    return(MagickFalse);
+  if (strspn(geometry,"0123456789-, ") != strlen(geometry))
+    return(MagickFalse);
+  if ((pedantic != MagickFalse) && (strchr(geometry,',') != (char *) NULL))
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -408,13 +420,7 @@ MagickExport MagickBooleanType IsSceneGeometry(const char *geometry,
     return(MagickFalse);
   if (value < (double) MAGICK_SSIZE_MIN)
     return(MagickFalse);
-  if (p == geometry)
-    return(MagickFalse);
-  if (strspn(geometry,"0123456789-, ") != strlen(geometry))
-    return(MagickFalse);
-  if ((pedantic != MagickFalse) && (strchr(geometry,',') != (char *) NULL))
-    return(MagickFalse);
-  return(MagickTrue);
+  return(IsSceneGeometryText(geometry,p,pedantic));
 }
 
 /*
