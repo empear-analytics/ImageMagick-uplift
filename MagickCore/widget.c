@@ -14655,6 +14655,23 @@ static void MoveNoticeDismiss(Display *display,XWindows *windows,XEvent event,
 #define DismissButtonText  "Dismiss"
 #define Timeout  8
 
+static unsigned int GetNoticeReasonWidth(XFontStruct *font_info,
+  const char *reason)
+{
+  const char
+    *text;
+
+  unsigned int
+    width;
+
+  width=WidgetTextWidth(font_info,DismissButtonText);
+  text=GetLocaleExceptionMessage(XServerError,reason);
+  if (text != (char *) NULL)
+    if (WidgetTextWidth(font_info,(char *) text) > width)
+      width=WidgetTextWidth(font_info,(char *) text);
+  return(width);
+}
+
 MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -14708,11 +14725,7 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
   font_info=windows->widget.font_info;
-  width=WidgetTextWidth(font_info,DismissButtonText);
-  text=GetLocaleExceptionMessage(XServerError,reason);
-  if (text != (char *) NULL)
-    if (WidgetTextWidth(font_info,(char *) text) > width)
-      width=WidgetTextWidth(font_info,(char *) text);
+  width=GetNoticeReasonWidth(font_info,reason);
   if (description != (char *) NULL)
     {
       text=GetLocaleExceptionMessage(XServerError,description);
