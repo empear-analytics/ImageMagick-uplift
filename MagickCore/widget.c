@@ -14881,6 +14881,43 @@ static void RespondToNoticeWindowEvents(Display *display,XWindows *windows,
   }
 }
 
+static void DispatchNoticeEvent(Display *display,XWindows *windows,
+  const NoticeTargets targets)
+{
+  XEvent
+    event;
+
+  /*
+    Wait for next event.
+  */
+  if (XCheckIfEvent(display,&event,XScreenEvent,(char *) windows) == MagickFalse)
+    {
+      /*
+        Do not block if delay > 0.
+      */
+      XDelay(display,SuspendTime << 2);
+      return;
+    }
+  switch (event.type)
+  {
+    case ButtonPress:
+    {
+      PressNoticeDismiss(display,windows,event,&targets);
+      break;
+    }
+    case ButtonRelease:
+    {
+      ReleaseNoticeWidget(display,windows,event,targets);
+      break;
+    }
+    default:
+    {
+      RespondToNoticeWindowEvents(display,windows,event,&targets);
+      break;
+    }
+  }
+}
+
 MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -14893,9 +14930,6 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
 
   size_t
     state;
-
-  XEvent
-    event;
 
   XFontStruct
     *font_info;
@@ -14962,35 +14996,7 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
         XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
         state&=(unsigned int) (~RedrawWidgetState);
       }
-    /*
-      Wait for next event.
-    */
-    if (XCheckIfEvent(display,&event,XScreenEvent,(char *) windows) == MagickFalse)
-      {
-        /*
-          Do not block if delay > 0.
-        */
-        XDelay(display,SuspendTime << 2);
-        continue;
-      }
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        PressNoticeDismiss(display,windows,event,&targets);
-        break;
-      }
-      case ButtonRelease:
-      {
-        ReleaseNoticeWidget(display,windows,event,targets);
-        break;
-      }
-      default:
-      {
-        RespondToNoticeWindowEvents(display,windows,event,&targets);
-        break;
-      }
-    }
+    DispatchNoticeEvent(display,windows,targets);
   } while ((state & ExitState) == 0);
   XSetCursorState(display,windows,MagickFalse);
   (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
