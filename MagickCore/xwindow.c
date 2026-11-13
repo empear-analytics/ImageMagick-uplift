@@ -10630,6 +10630,33 @@ static MagickBooleanType XRenderFillColor(const XRenderRequest *request,
   return(MagickTrue);
 }
 
+static MagickBooleanType XChangeRenderFont(const DrawInfo *draw_info,
+  Display *display,char *font,const XRenderTargets *targets)
+{
+  XResourceInfo
+    *const resource_info = targets->resource_info;
+
+  XFontStruct
+    **const font_info = targets->font_info;
+
+  if (font != draw_info->font)
+    {
+      /*
+        Type name has changed.
+      */
+      (void) XFreeFont(display,(*font_info));
+      (void) CloneString(&(*resource_info).font,draw_info->font);
+      (*font_info)=XBestFont(display,resource_info,MagickFalse);
+      if ((*font_info) == (XFontStruct *) NULL)
+        {
+          ThrowXWindowException(XServerError,"UnableToLoadFont",
+            draw_info->font);
+          return(MagickFalse);
+        }
+    }
+  return(MagickTrue);
+}
+
 MagickPrivate MagickBooleanType XRenderImage(Image *image,
   const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
   ExceptionInfo *exception)
@@ -10691,21 +10718,8 @@ MagickPrivate MagickBooleanType XRenderImage(Image *image,
   */
   XGetAnnotateInfo(&annotate_info);
   annotate_info.stencil=ForegroundStencil;
-  if (cache_info.font != draw_info->font)
-    {
-      /*
-        Type name has changed.
-      */
-      (void) XFreeFont(display,font_info);
-      (void) CloneString(&resource_info.font,draw_info->font);
-      font_info=XBestFont(display,&resource_info,MagickFalse);
-      if (font_info == (XFontStruct *) NULL)
-        {
-          ThrowXWindowException(XServerError,"UnableToLoadFont",
-            draw_info->font);
-          return(MagickFalse);
-        }
-    }
+  if (XChangeRenderFont(draw_info,display,cache_info.font,&targets) == MagickFalse)
+    return(MagickFalse);
   if (draw_info->debug != MagickFalse)
     (void) LogMagickEvent(AnnotateEvent,GetMagickModule(),
       "Font %s; pointsize %g",draw_info->font != (char *) NULL ?
