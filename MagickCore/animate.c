@@ -5348,6 +5348,58 @@ static void XRunCommandWindow(const AnimateEventContext *event_context,
   XRunCommandWidget(&command_widget,command_targets);
 }
 
+typedef struct _AnimateEventInput
+{
+  const AnimateCommandTargets
+    *command_targets;
+
+  const AnimateClientTargets
+    *client_targets;
+
+  ssize_t
+    scene;
+} AnimateEventInput;
+
+static void XDispatchAnimateEvent(const AnimateEventContext *event_context,
+  XEvent event,const AnimateEventInput *input)
+{
+  const AnimateClientTargets
+    *const client_targets = input->client_targets;
+
+  const AnimateCommandTargets
+    *const command_targets = input->command_targets;
+
+  const ssize_t
+    scene = input->scene;
+
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+switch (event.type)
+{
+  case ButtonPress:
+  {
+    XHandleButtonPress(event_context,command_targets);
+    break;
+  }
+  case ButtonRelease:
+  {
+    XLogButtonRelease(resource_info,event);
+    break;
+  }
+  case ClientMessage:
+  {
+    XHandleClientMessage(event_context,event,client_targets);
+    break;
+  }
+  default:
+  {
+    XHandleAnimateWindowChange(event_context,event,scene,command_targets);
+    break;
+  }
+}
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -5429,6 +5481,9 @@ MagickExport Image *XAnimateImages(Display *display,
 
   AnimateWindowSetup
     setup;
+
+  AnimateEventInput
+    input;
 
   const AnimateCommandTargets
     command_targets = { &event, &image, &state, &nexus };
@@ -5599,29 +5654,10 @@ MagickExport Image *XAnimateImages(Display *display,
         XRunCommandWindow(&event_context,command,&command_targets);
         continue;
       }
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        XHandleButtonPress(&event_context,&command_targets);
-        break;
-      }
-      case ButtonRelease:
-      {
-        XLogButtonRelease(resource_info,event);
-        break;
-      }
-      case ClientMessage:
-      {
-        XHandleClientMessage(&event_context,event,&client_targets);
-        break;
-      }
-      default:
-      {
-        XHandleAnimateWindowChange(&event_context,event,scene,&command_targets);
-        break;
-      }
-    }
+    input.command_targets=&command_targets;
+    input.client_targets=&client_targets;
+    input.scene=scene;
+    XDispatchAnimateEvent(&event_context,event,&input);
   }
   while (!(state & ExitState));
   image_list=(Image **) RelinquishMagickMemory(image_list);
