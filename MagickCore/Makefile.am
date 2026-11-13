@@ -232,6 +232,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/matrix.h \
   MagickCore/matrix-private.h \
   MagickCore/memory.c \
+  MagickCore/memory-quantum.c \
   MagickCore/memory_.h \
   MagickCore/memory-private.h \
   MagickCore/method-attribute.h \

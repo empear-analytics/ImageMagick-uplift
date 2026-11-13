@@ -76,6 +76,7 @@ if ( ! GetOptions(
 	 'magick.c',
 	 'magick-wand.c',
 	 'memory.c',
+	 'memory-quantum.c',
 	 'monitor.c',
 	 'montage.c',
 	 'montage-info.c',
