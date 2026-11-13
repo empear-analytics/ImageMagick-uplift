@@ -16676,25 +16676,11 @@ static XFontStruct *SelectTextViewFont(Display *display,
   return(text_info);
 }
 
-MagickPrivate void XTextViewWidget(Display *display,
-  const XResourceInfo *resource_info,XWindows *windows,
-  const MagickBooleanType mono,const char *title,const char **textlist)
+static void RunTextView(const TextViewContext *context,
+  MagickStatusType *mask)
 {
-  char
-    primary_selection[MagickPathExtent];
-
-  int
-    i;
-
-  static MagickStatusType
-    mask = (MagickStatusType) (CWWidth | CWHeight | CWX | CWY);
-
   unsigned int
-    height,
-    lines,
-    text_width,
-    visible_lines,
-    width;
+    visible_lines;
 
   size_t
     delay,
@@ -16702,10 +16688,6 @@ MagickPrivate void XTextViewWidget(Display *display,
 
   XEvent
     event;
-
-  XFontStruct
-    *font_info,
-    *text_info;
 
   XWidgetInfo
     dismiss_info,
@@ -16723,7 +16705,41 @@ MagickPrivate void XTextViewWidget(Display *display,
   const TextViewWidgets
     view_widgets = { &north_info, &south_info, &delay, &slider_info,
       &dismiss_info, &state, &scroll_info, &visible_lines, &event, &list_info,
-      &selection_info, &mask, &expose_info };
+      &selection_info, mask, &expose_info };
+
+  XGetWidgetInfo((char *) NULL,&slider_info);
+  XGetWidgetInfo((char *) NULL,&north_info);
+  XGetWidgetInfo((char *) NULL,&south_info);
+  XGetWidgetInfo((char *) NULL,&expose_info);
+  XGetWidgetInfo((char *) NULL,&selection_info);
+  visible_lines=0;
+  delay=SuspendTime << 2;
+  state=UpdateConfigurationState;
+  RespondToTextViewEvents(context,&targets,&view_widgets);
+}
+
+MagickPrivate void XTextViewWidget(Display *display,
+  const XResourceInfo *resource_info,XWindows *windows,
+  const MagickBooleanType mono,const char *title,const char **textlist)
+{
+  char
+    primary_selection[MagickPathExtent];
+
+  int
+    i;
+
+  static MagickStatusType
+    mask = (MagickStatusType) (CWWidth | CWHeight | CWX | CWY);
+
+  unsigned int
+    height,
+    lines,
+    text_width,
+    width;
+
+  XFontStruct
+    *font_info,
+    *text_info;
 
   TextViewContext
     view_context;
@@ -16781,15 +16797,7 @@ MagickPrivate void XTextViewWidget(Display *display,
   /*
     Respond to X events.
   */
-  XGetWidgetInfo((char *) NULL,&slider_info);
-  XGetWidgetInfo((char *) NULL,&north_info);
-  XGetWidgetInfo((char *) NULL,&south_info);
-  XGetWidgetInfo((char *) NULL,&expose_info);
-  XGetWidgetInfo((char *) NULL,&selection_info);
-  visible_lines=0;
-  delay=SuspendTime << 2;
   height=(unsigned int) (font_info->ascent+font_info->descent);
-  state=UpdateConfigurationState;
   view_context.display=display;
   view_context.windows=windows;
   view_context.lines=lines;
@@ -16799,7 +16807,7 @@ MagickPrivate void XTextViewWidget(Display *display,
   view_context.width=width;
   view_context.font_info=font_info;
   view_context.text_info=text_info;
-  RespondToTextViewEvents(&view_context,&targets,&view_widgets);
+  RunTextView(&view_context,&mask);
   WithdrawTextViewWidget(display,windows,text_info);
 }
 #endif
