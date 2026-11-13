@@ -93,6 +93,16 @@ Never, in any commit:
   quoted in the commit, plus the cases that reach it run with `OMP_NUM_THREADS=1` and
   `=4` and compared; an NS step may accept a reached function whose object code differs;
   an error call moved into a helper may name the helper in `GetMagickModule()`.
+  Rulings of 2026-11-13 (owner, "2 and 5 sounds good to me. As long as the tests pass"):
+  a Recipe S split may move an `#if defined(__cplusplus)`/`extern "C" {` pair verbatim with the
+  family it wraps (the C++ side holds no code), when the split's other checks pass; a
+  `LogMagickEvent(...GetMagickModule()...)` call moved into a helper may name the helper, as an
+  error call may; a Recipe E (or N, O, Y, Z) step may move a nested `#if defined(...)` block
+  whole, directive lines included, into a helper, and may add an `#if defined(...)` pair around
+  the helper's definition when the caller keeps its own, if the block is compiled by an available
+  build (the wide build for the X11 and shared-memory blocks) and the object comparison there
+  (`tools/obj_modulo.sh` or `obj_identical.sh`) is IDENTICAL or MODULO-IDENTICAL. In every case the
+  whole catalogue, narrow and wide, must stay at 0 diverged and `ci_linux_warnings.sh` must pass.
 - Modify a `static const` data table.
 - Fix a bug you noticed. Report it.
 
