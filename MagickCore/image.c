@@ -992,13 +992,38 @@ static void CopyImageAttributes(Image *clone_image,const Image *image,
   clone_image->semaphore=AcquireSemaphoreInfo();
 }
 
-MagickExport Image *CloneImage(const Image *image,const size_t columns,
-  const size_t rows,const MagickBooleanType detach,ExceptionInfo *exception)
+static void ScaleClonePage(Image *clone_image,const Image *image,
+  const size_t columns,const size_t rows)
 {
   double
     scale_x,
     scale_y;
 
+  scale_x=1.0;
+  scale_y=1.0;
+  if (image->columns != 0)
+    scale_x=(double) columns/(double) image->columns;
+  if (image->rows != 0)
+    scale_y=(double) rows/(double) image->rows;
+  clone_image->page.width=(size_t) CastDoubleToSsizeT(floor((double) scale_x*
+    (double) image->page.width+0.5));
+  clone_image->page.height=(size_t) CastDoubleToSsizeT(floor((double) scale_y*
+    (double) image->page.height+0.5));
+  if (MagickAbsoluteValue(scale_x-scale_y) < 2.0)
+    scale_x=scale_y=MagickMin(scale_x,scale_y);
+  clone_image->page.x=CastDoubleToSsizeT(ceil((double) scale_x*
+    (double) image->page.x-0.5));
+  clone_image->tile_offset.x=CastDoubleToSsizeT(ceil((double) scale_x*
+    (double) image->tile_offset.x-0.5));
+  clone_image->page.y=CastDoubleToSsizeT(ceil((double) scale_y*(double)
+    (double) image->page.y-0.5));
+  clone_image->tile_offset.y=CastDoubleToSsizeT(ceil((double) scale_y*
+    (double) image->tile_offset.y-0.5));
+}
+
+MagickExport Image *CloneImage(const Image *image,const size_t columns,
+  const size_t rows,const MagickBooleanType detach,ExceptionInfo *exception)
+{
   Image
     *clone_image;
 
@@ -1031,26 +1056,7 @@ MagickExport Image *CloneImage(const Image *image,const size_t columns,
       clone_image->cache=ReferencePixelCache(image->cache);
       return(clone_image);
     }
-  scale_x=1.0;
-  scale_y=1.0;
-  if (image->columns != 0)
-    scale_x=(double) columns/(double) image->columns;
-  if (image->rows != 0)
-    scale_y=(double) rows/(double) image->rows;
-  clone_image->page.width=(size_t) CastDoubleToSsizeT(floor((double) scale_x*
-    (double) image->page.width+0.5));
-  clone_image->page.height=(size_t) CastDoubleToSsizeT(floor((double) scale_y*
-    (double) image->page.height+0.5));
-  if (MagickAbsoluteValue(scale_x-scale_y) < 2.0)
-    scale_x=scale_y=MagickMin(scale_x,scale_y);
-  clone_image->page.x=CastDoubleToSsizeT(ceil((double) scale_x*
-    (double) image->page.x-0.5));
-  clone_image->tile_offset.x=CastDoubleToSsizeT(ceil((double) scale_x*
-    (double) image->tile_offset.x-0.5));
-  clone_image->page.y=CastDoubleToSsizeT(ceil((double) scale_y*(double)
-    (double) image->page.y-0.5));
-  clone_image->tile_offset.y=CastDoubleToSsizeT(ceil((double) scale_y*
-    (double) image->tile_offset.y-0.5));
+  ScaleClonePage(clone_image,image,columns,rows);
   clone_image->cache=ClonePixelCache(image->cache);
   if (SetImageExtent(clone_image,columns,rows,exception) == MagickFalse)
     clone_image=DestroyImage(clone_image);
