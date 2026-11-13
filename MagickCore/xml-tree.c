@@ -1952,6 +1952,15 @@ static void TerminateEntityValue(char **xml,char *v,const char q)
     }
 }
 
+static ssize_t CountXMLEntities(char **entities)
+{
+  ssize_t
+    i;
+
+  for (i=0; entities[i] != (char *) NULL; i++) ;
+  return(i);
+}
+
 static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
   size_t length,ExceptionInfo *exception)
 {
@@ -2001,7 +2010,7 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
             continue;
           }
         entities=(*c == '%') ? predefined_entities : root->entities;
-        for (i=0; entities[i] != (char *) NULL; i++) ;
+        i=CountXMLEntities(entities);
         entities=(char **) ResizeQuantumMemory(entities,(size_t) (i+3),
           sizeof(*entities));
         if (entities == (char **) NULL)
