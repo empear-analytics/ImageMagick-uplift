@@ -16733,27 +16733,10 @@ static void XClampImageOffset(XWindows *windows)
 %      to trim.
 %
 */
-static void XTranslateImage(Display *display,XWindows *windows,
-  Image *image,const KeySym key_symbol)
+static MagickBooleanType XOffsetImageWindow(XWindows *windows,
+  const KeySym key_symbol,const unsigned int x_offset,
+  const unsigned int y_offset)
 {
-  char
-    text[MagickPathExtent];
-
-  int
-    x,
-    y;
-
-  unsigned int
-    x_offset,
-    y_offset;
-
-  /*
-    User specified a pan position offset.
-  */
-  x_offset=windows->image.width;
-  y_offset=windows->image.height;
-  if (image->montage != (char *) NULL)
-    (void) XParseGeometry(image->montage,&x,&y,&x_offset,&y_offset);
   switch ((int) key_symbol)
   {
     case XK_Home:
@@ -16790,8 +16773,34 @@ static void XTranslateImage(Display *display,XWindows *windows,
       break;
     }
     default:
-      return;
+      return(MagickFalse);
   }
+  return(MagickTrue);
+}
+
+static void XTranslateImage(Display *display,XWindows *windows,
+  Image *image,const KeySym key_symbol)
+{
+  char
+    text[MagickPathExtent];
+
+  int
+    x,
+    y;
+
+  unsigned int
+    x_offset,
+    y_offset;
+
+  /*
+    User specified a pan position offset.
+  */
+  x_offset=windows->image.width;
+  y_offset=windows->image.height;
+  if (image->montage != (char *) NULL)
+    (void) XParseGeometry(image->montage,&x,&y,&x_offset,&y_offset);
+  if (XOffsetImageWindow(windows,key_symbol,x_offset,y_offset) == MagickFalse)
+    return;
   /*
     Check boundary conditions.
   */
