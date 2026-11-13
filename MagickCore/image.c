@@ -3414,6 +3414,16 @@ static const MagickInfo *GetImplicitFormat(ImageInfo *image_info,char *magic,
   return(magick_info);
 }
 
+static void SetImageInfoFilename(ImageInfo *image_info,
+  const unsigned int frames,char *component)
+{
+  if (frames == 0)
+    GetPathComponent(image_info->filename,CanonicalPath,component);
+  else
+    GetPathComponent(image_info->filename,SubcanonicalPath,component);
+  (void) CopyMagickString(image_info->filename,component,MagickPathExtent);
+}
+
 MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
   const unsigned int frames,ExceptionInfo *exception)
 {
@@ -3450,11 +3460,7 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
   if (*magic == '\0')
     {
       magick_info=GetImplicitFormat(image_info,magic,sans_exception);
-      if (frames == 0)
-        GetPathComponent(image_info->filename,CanonicalPath,component);
-      else
-        GetPathComponent(image_info->filename,SubcanonicalPath,component);
-      (void) CopyMagickString(image_info->filename,component,MagickPathExtent);
+      SetImageInfoFilename(image_info,frames,component);
     }
   else
     magick_info=SetUserSpecifiedFormat(image_info,magic,component,
