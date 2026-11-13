@@ -108,6 +108,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/client.c \
   MagickCore/client.h \
   MagickCore/coder.c \
+  MagickCore/coder-list.c \
   MagickCore/coder.h \
   MagickCore/color.c \
   MagickCore/color-tuple.c \

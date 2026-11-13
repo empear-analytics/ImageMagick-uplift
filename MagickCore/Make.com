@@ -42,6 +42,7 @@ $call Make channel-alpha.c
 $call Make cipher.c
 $call Make client.c
 $call Make coder.c
+$call Make coder-list.c
 $call Make color.c
 $call Make color-tuple.c
 $call Make color-equivalent.c
