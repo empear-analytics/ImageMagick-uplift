@@ -994,6 +994,15 @@ static void ResetLZWTable(TableType *table)
   }
 }
 
+static void AddLZWString(TableType *table,const size_t last_code,
+  const unsigned char pixel,const size_t next_index)
+{
+  table[next_index].prefix=(ssize_t) last_code;
+  table[next_index].suffix=(ssize_t) pixel;
+  table[next_index].next=table[last_code].next;
+  table[last_code].next=(ssize_t) next_index;
+}
+
 #define LZWClr  256UL  /* Clear Table Marker */
 #define LZWEod  257UL  /* End of Data marker */
 #define OutputCode(code) \
@@ -1074,10 +1083,7 @@ MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
           Add string.
         */
         OutputCode(last_code);
-        table[next_index].prefix=(ssize_t) last_code;
-        table[next_index].suffix=(ssize_t) pixels[i];
-        table[next_index].next=table[last_code].next;
-        table[last_code].next=(ssize_t) next_index;
+        AddLZWString(table,last_code,pixels[i],next_index);
         next_index++;
         /*
           Did we just move up to next bit width?
