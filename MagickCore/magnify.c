@@ -774,6 +774,11 @@ static void Fish2X(const Image *source,const Quantum *pixels,Quantum *result,
   Fish2XBottomRightPixel(&magnify,pixels,channels,intensities);
 }
 
+static inline int Xbr2XTopLeftSource(const int first,const int second)
+{
+  return(first <= second ? 11 : 7);
+}
+
 #define WeightVar(M,N) const int w_##M##_##N = \
   PixelsEqual(pixels,M,N,channels) ? 0 : 1;
 
@@ -818,7 +823,7 @@ static void Xbr2X(const Image *magick_unused(source),const Quantum *pixels,
     w_12_16 + w_12_8 + w_6_10 + w_6_2 + (4 * w_11_7) <
     w_11_17 + w_11_5 + w_7_13 + w_7_1 + (4 * w_12_6)
   )
-    Mix2Pixels(&magnify,(ssize_t) (w_12_11 <= w_12_7 ? 11 : 7),12,0);
+    Mix2Pixels(&magnify,(ssize_t) Xbr2XTopLeftSource(w_12_11,w_12_7),12,0);
   else
     CopyPixels(&magnify,12,0);
   if (
