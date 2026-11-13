@@ -9973,6 +9973,10 @@ recipe turns control flow into data.
    The labels may instead all be character constants when `n` is a parameter of type
    `char` (a predicate Recipe EC made), each the value of a member of the basic
    character set (C11 5.2.1), so that it is representable in `char` and non-negative.
+   When `n` is a parameter of type `int`, the labels may be character constants and
+   integer literals mixed (2026-11-13; `geometry-parse.c`'s
+   `IsGeometryAdvanceCharacter`, `case '-': ... case 215: case 'e':`), and the table is
+   of `int`.
    Index form: the labels are the integer literals `0` to `k` in increasing order, one
    per case, each case's body is `return(vi);` of a constant `vi` (a string literal, a
    numeric literal or an enumeration constant), there is no `default:` or it is `break;`
@@ -10055,6 +10059,10 @@ static const char *poly_basis_str(ssize_t n)
   `char` (C11 6.2.5p3), so the element initialised from it holds the same value, and
   `T[i] == n` promotes both `char` operands to `int` and compares the values the `case`
   compared.
+- Integer labels on an `int` parameter. A `case` converts its constant to the promoted
+  type of `n`, here `int` itself (C11 6.8.4.2p5); a character constant and an integer
+  literal that fits in `int` are already `int` values, so the `int` element initialised
+  from each holds the value the `case` compared, and `T[i] == n` compares two `int`s.
 - Index form. For `0 <= n <= k` the `switch` returns `vn`; the table's element `n` is
   `vn` (step 5), of the return type, so `T[n]` is the value the `return` converted.
   Otherwise the `switch` falls through to `return(d);`. The count `sizeof(T)/sizeof(*T)`
@@ -15223,3 +15231,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | UR | Unnest a repeated test of the guard's own condition: `if (C) { S if (C) X }` becomes `if (C) { S }` and `if (C) X` for a side-effect-free `C`, even when `S` writes what `C` reads (the forms can differ only when `C` was false, and then nothing runs between the two tests); evidence oracle | `draw.c`'s `ConvertPathToPolygon` (the new-subpath allocation and its failure test, the last depth-4 site; chain probe 2.62 to 2.68); SG requires `S` not to write `G`'s reads, UX needs a disjunction | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | I | Step 8: V step 7's `S return(<expr>);` with a calling expression may be left in the caller, and `S` and the expression may read and write the written variables, as the macro form may (the writes land through the members before the helper returns) | `draw.c`'s `ConvertPathToPolygon`: the subpath flush writes `number_edges`, `points`, `ghostline` and `edge`, and its exit releases `points` before `return(DestroyPolygonInfo(polygon_info));`; chain probe 2.62 to 2.68 | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | LX | Step 4: written variables whose pointers would take the call past four parameters go in one `const` targets struct (Recipe LB step 8's form), taken after the input struct and before `broke` | `cache.c`'s `GetVirtualPixelRows`: the single-pixel transfer writes `length`, `q` and `s`, continues the column loop and breaks it when the fetch fails; with the input struct and `broke` the pointers would give six parameters | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | TB | Step 1: on a parameter of type `int`, the membership labels may be character constants and integer literals mixed, the table of `int` (*Careful*: integer labels); Lane: b | `geometry-parse.c`'s `IsGeometryAdvanceCharacter` (sixteen labels, `215` among them, cc 18; probe 7.04 to 7.40); the character form needs a `char` parameter | mandate (2026-10-24) |
