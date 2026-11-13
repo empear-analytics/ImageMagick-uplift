@@ -454,6 +454,20 @@ static size_t CountTextLines(const char *text)
   return(number_lines);
 }
 
+static size_t GetTextLineHeight(const TypeMetric *metrics,
+  const DrawInfo *draw_info)
+{
+  size_t
+    height;
+
+  height=CastDoubleToSizeT(metrics->ascent-metrics->descent+0.5);
+  if (height == 0)
+    height=(size_t) draw_info->pointsize;
+  height=CastDoubleToSizeT(floor((double) height+
+    draw_info->interline_spacing+0.5));
+  return(height);
+}
+
 MagickExport MagickBooleanType AnnotateImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -556,11 +570,7 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
     (void) CloneString(&annotate->text,textlist[i]);
     if ((metrics.width == 0) || (annotate->gravity != NorthWestGravity))
       (void) GetTypeMetrics(image,annotate,&metrics,exception);
-    height=CastDoubleToSizeT(metrics.ascent-metrics.descent+0.5);
-    if (height == 0)
-      height=(size_t) draw_info->pointsize;
-    height=CastDoubleToSizeT(floor((double) height+
-      draw_info->interline_spacing+0.5));
+    height=GetTextLineHeight(&metrics,draw_info);
     switch (annotate->gravity)
     {
       default:
