@@ -421,6 +421,31 @@ static void InitializeHuffmanHashes(HuffmanTable **mb_hash,
   InitializeHashTable(mb_hash,EXTable,MBHashA,MBHashB);
 }
 
+static const HuffmanTable *LookupHuffmanEntry(HuffmanTable **hash,
+  const unsigned int color,const size_t length,const size_t code)
+{
+  const HuffmanTable
+    *entry;
+
+  if (color != MagickFalse)
+    {
+      if (length < 4)
+        return((const HuffmanTable *) NULL);
+      entry=hash[((length+MWHashA)*(code+MWHashB)) % HashSize];
+    }
+  else
+    {
+      if (length < 2)
+        return((const HuffmanTable *) NULL);
+      entry=hash[((length+MBHashA)*(code+MBHashB)) % HashSize];
+    }
+  if (entry == (const HuffmanTable *) NULL)
+    return((const HuffmanTable *) NULL);
+  if ((entry->length != length) || (entry->code != code))
+    return((const HuffmanTable *) NULL);
+  return(entry);
+}
+
 MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -563,21 +588,9 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
           do { InputBit(bit); } while ((int) bit == 0);
           break;
         }
-      if (color != MagickFalse)
-        {
-          if (length < 4)
-            continue;
-          entry=mw_hash[((length+MWHashA)*(code+MWHashB)) % HashSize];
-        }
-      else
-        {
-          if (length < 2)
-            continue;
-          entry=mb_hash[((length+MBHashA)*(code+MBHashB)) % HashSize];
-        }
+      entry=LookupHuffmanEntry((color != MagickFalse) ? mw_hash : mb_hash,color,
+        length,code);
       if (entry == (const HuffmanTable *) NULL)
-        continue;
-      if ((entry->length != length) || (entry->code != code))
         continue;
       switch (entry->id)
       {
