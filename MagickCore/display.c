@@ -6791,6 +6791,39 @@ static void XCropWaitCorner(const CropContext *context,
   } while (((*state) & ExitState) == 0);
 }
 
+static void XCropSelectRegion(const CropContext *context,
+  const CropTargets *targets)
+{
+  size_t
+    *const state = targets->state;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  do
+  {
+    /*
+      Size rectangle as pointer moves until the mouse button is released.
+    */
+    (*x)=(int) (*crop_info).x;
+    (*y)=(int) (*crop_info).y;
+    (*crop_info).width=0;
+    (*crop_info).height=0;
+    (*state)=DefaultState;
+    XCropSizeRegion(context,targets);
+    /*
+      Wait for user to grab a corner of the rectangle or press return.
+    */
+    (*state)=DefaultState;
+    (void) XMapWindow(context->display,context->windows->info.id);
+    XCropWaitCorner(context,targets);
+  } while (((*state) & ExitState) == 0);
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -6912,24 +6945,7 @@ static MagickBooleanType XCropImage(Display *display,
       return(MagickTrue);
     }
   (void) XSetFunction(display,windows->image.highlight_context,GXinvert);
-  do
-  {
-    /*
-      Size rectangle as pointer moves until the mouse button is released.
-    */
-    x=(int) crop_info.x;
-    y=(int) crop_info.y;
-    crop_info.width=0;
-    crop_info.height=0;
-    state=DefaultState;
-    XCropSizeRegion(&context,&targets);
-    /*
-      Wait for user to grab a corner of the rectangle or press return.
-    */
-    state=DefaultState;
-    (void) XMapWindow(display,windows->info.id);
-    XCropWaitCorner(&context,&targets);
-  } while ((state & ExitState) == 0);
+  XCropSelectRegion(&context,&targets);
   (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
   XSetCursorState(display,windows,MagickFalse);
   if ((state & EscapeState) != 0)
