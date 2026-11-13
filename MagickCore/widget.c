@@ -8742,44 +8742,45 @@ static void PositionFileBrowserWidget(XWindows *windows,
   XConstrainWindowPosition(display,&windows->widget);
 }
 
-MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
-  const char *action,char *reply)
+typedef struct _FileBrowserRunTargets
 {
+  size_t
+    *files;
+
+  ssize_t
+    *i;
+
   char
-    *directory,
-    **filelist,
-    home_directory[MagickPathExtent],
-    primary_selection[MagickPathExtent],
-    text[MagickPathExtent],
-    working_path[MagickPathExtent];
+    ***filelist;
 
-  static char
-    glob_pattern[MagickPathExtent] = "*",
-    format[MagickPathExtent] = "miff";
+  MagickStatusType
+    *mask;
+} FileBrowserRunTargets;
 
-  static MagickStatusType
-    mask = (MagickStatusType) (CWWidth | CWHeight | CWX | CWY);
+static void RunFileBrowser(const FileBrowserContext *context,
+  const FileBrowserRunTargets *run_targets)
+{
+  size_t
+    *const files = run_targets->files;
+
+  ssize_t
+    *const i = run_targets->i;
+
+  char
+    ***const filelist = run_targets->filelist;
+
+  MagickStatusType
+    *const mask = run_targets->mask;
 
   size_t
     delay,
-    files,
     state;
 
-  ssize_t
-    i;
-
   unsigned int
-    anomaly,
-    height,
-    text_width,
-    visible_files,
-    width;
+    visible_files;
 
   XEvent
     event;
-
-  XFontStruct
-    *font_info;
 
   XWidgetInfo
     action_info,
@@ -8802,10 +8803,59 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
 
   const FileBrowserWidgets
     file_widgets = { &reply_info, &state,
-      &scroll_info, &slider_info, &visible_files, &files, &up_info, &home_info,
-      &special_info, &action_info, &cancel_info, &i, &filelist, &north_info,
+      &scroll_info, &slider_info, &visible_files, files, &up_info, &home_info,
+      &special_info, &action_info, &cancel_info, i, filelist, &north_info,
       &south_info, &list_info, &delay, &expose_info, &text_info,
-      &selection_info, &event, &mask };
+      &selection_info, &event, mask };
+
+  /*
+    Respond to X events.
+  */
+  XGetWidgetInfo((char *) NULL,&slider_info);
+  XGetWidgetInfo((char *) NULL,&north_info);
+  XGetWidgetInfo((char *) NULL,&south_info);
+  XGetWidgetInfo((char *) NULL,&expose_info);
+  visible_files=0;
+  delay=SuspendTime << 2;
+  state=UpdateConfigurationState;
+  RespondToFileBrowserEvents(context,&targets,&file_widgets);
+}
+
+MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
+  const char *action,char *reply)
+{
+  char
+    *directory,
+    **filelist,
+    home_directory[MagickPathExtent],
+    primary_selection[MagickPathExtent],
+    text[MagickPathExtent],
+    working_path[MagickPathExtent];
+
+  static char
+    glob_pattern[MagickPathExtent] = "*",
+    format[MagickPathExtent] = "miff";
+
+  static MagickStatusType
+    mask = (MagickStatusType) (CWWidth | CWHeight | CWX | CWY);
+
+  size_t
+    files;
+
+  ssize_t
+    i;
+
+  unsigned int
+    anomaly,
+    height,
+    text_width,
+    width;
+
+  XFontStruct
+    *font_info;
+
+  const FileBrowserRunTargets
+    run_targets = { &files, &i, &filelist, &mask };
 
   FileBrowserContext
     file_context;
@@ -8857,14 +8907,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   /*
     Respond to X events.
   */
-  XGetWidgetInfo((char *) NULL,&slider_info);
-  XGetWidgetInfo((char *) NULL,&north_info);
-  XGetWidgetInfo((char *) NULL,&south_info);
-  XGetWidgetInfo((char *) NULL,&expose_info);
-  visible_files=0;
   anomaly=GetFileBrowserAnomaly(action);
-  delay=SuspendTime << 2;
-  state=UpdateConfigurationState;
   file_context.display=display;
   file_context.windows=windows;
   file_context.reply=reply;
@@ -8879,7 +8922,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   file_context.action=action;
   file_context.width=width;
   file_context.text=text;
-  RespondToFileBrowserEvents(&file_context,&targets,&file_widgets);
+  RunFileBrowser(&file_context,&run_targets);
   WithdrawBrowserWidget(display,windows);
   /*
     Free file list.
