@@ -2259,11 +2259,40 @@ static char **AsciiTextList(const char *text,size_t *lines)
   return(textlist);
 }
 
-static char *FormatHexTextLine(char *q,const char **text)
+static char *PadHexTextLine(char *q,ssize_t j)
+{
+  for ( ; j <= CharsPerLine; j++)
+  {
+    *q++=' ';
+    *q++=' ';
+    if ((j % 0x04) == 0)
+      *q++=' ';
+  }
+  return(q);
+}
+
+static char *FormatHexDigits(char *q,const char *p,const size_t length)
 {
   char
     hex_string[MagickPathExtent];
 
+  ssize_t
+    j;
+
+  for (j=1; j <= (ssize_t) MagickMin(length,CharsPerLine); j++)
+  {
+    (void) FormatLocaleString(hex_string,MagickPathExtent,"%02x",*(p+j));
+    (void) CopyMagickString(q,hex_string,MagickPathExtent);
+    q+=(ptrdiff_t) 2;
+    if ((j % 0x04) == 0)
+      *q++=' ';
+  }
+  q=PadHexTextLine(q,j);
+  return(q);
+}
+
+static char *FormatHexTextLine(char *q,const char **text)
+{
   const char
     *p;
 
@@ -2275,21 +2304,7 @@ static char *FormatHexTextLine(char *q,const char **text)
 
   p=(*text);
   length=strlen(p);
-  for (j=1; j <= (ssize_t) MagickMin(length,CharsPerLine); j++)
-  {
-    (void) FormatLocaleString(hex_string,MagickPathExtent,"%02x",*(p+j));
-    (void) CopyMagickString(q,hex_string,MagickPathExtent);
-    q+=(ptrdiff_t) 2;
-    if ((j % 0x04) == 0)
-      *q++=' ';
-  }
-  for ( ; j <= CharsPerLine; j++)
-  {
-    *q++=' ';
-    *q++=' ';
-    if ((j % 0x04) == 0)
-      *q++=' ';
-  }
+  q=FormatHexDigits(q,p,length);
   *q++=' ';
   for (j=1; j <= (ssize_t) MagickMin(length,CharsPerLine); j++)
   {
