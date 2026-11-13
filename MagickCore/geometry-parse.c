@@ -240,6 +240,33 @@ static void ParseGeometryYOffset(char **p,MagickStatusType *flags,ssize_t *y)
     }
 }
 
+static inline MagickBooleanType IsGeometryAdvanceCharacter(const int c)
+{
+  switch (c)
+  {
+    case '-':
+    case ',':
+    case '+':
+    case '0':
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+    case '8':
+    case '9':
+    case 215:
+    case 'e':
+    case 'E':
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
 MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
   ssize_t *y,size_t *width,size_t *height)
 {
@@ -274,6 +301,11 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
         continue;
       }
     c=(int) *p;
+    if (IsGeometryAdvanceCharacter(c) != MagickFalse)
+      {
+        p++;
+        continue;
+      }
     switch (c)
     {
       case '%':
@@ -328,26 +360,6 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
       case 'X':
       {
         flags|=SeparatorValue;
-        p++;
-        break;
-      }
-      case '-':
-      case ',':
-      case '+':
-      case '0':
-      case '1':
-      case '2':
-      case '3':
-      case '4':
-      case '5':
-      case '6':
-      case '7':
-      case '8':
-      case '9':
-      case 215:
-      case 'e':
-      case 'E':
-      {
         p++;
         break;
       }
@@ -728,6 +740,11 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
         (void) CopyMagickString(p,p+1,MagickPathExtent);
         continue;
       }
+    if (IsGeometryAdvanceCharacter(c) != MagickFalse)
+      {
+        p++;
+        continue;
+      }
     switch (c)
     {
       case '%':
@@ -791,23 +808,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
         p++;
         break;
       }
-      case '-':
-      case '+':
-      case ',':
-      case '0':
-      case '1':
-      case '2':
-      case '3':
-      case '4':
-      case '5':
-      case '6':
-      case '7':
-      case '8':
-      case '9':
       case '/':
-      case 215:
-      case 'e':
-      case 'E':
       {
         p++;
         break;
