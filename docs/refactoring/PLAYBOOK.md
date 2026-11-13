@@ -13202,6 +13202,74 @@ Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
 
 ---
 
+## Recipe KR - Replace a Keyed Returning Switch by a Lookup Table
+
+**Use when:** CodeScene reports *Complex Method* on a `static` function whose body is one
+`switch` on an enumerated parameter in which every group is one label that returns a
+string literal (`case TypeWarning: return("Type/Warning/");`), with a `default: break;`
+and `return("");` after the `switch`. `exception.c`'s `ExceptionSeverityToTag` (sixty-three
+labels, cc 65).
+
+**Not covered by:** Recipe KS, whose groups assign to a local and `break`; Recipe KT,
+whose groups call; Recipe TB, whose labels are `0` to `k`; Recipe EM, which tests
+membership only.
+
+**How:**
+
+1. The function is `static`, outside every OpenMP region; its body is one `switch (n)`
+   followed by one `return("s");`. Every group is `case L: return("s");` with `L` an
+   enumerator or integer literal, all with distinct values, and the `default:` group is
+   `break;`. No `#if` line stands inside the `switch`.
+2. Every caller only reads the characters of the returned string (`%s`, `strlen`,
+   `strcmp`) and never compares or stores the pointer (check by `grep`). The function is
+   not called per pixel.
+3. Directly above the function write a `static const` array of a `typedef struct` of two
+   members (`key` of `n`'s type, `const char *name`), one element `{ L, "s" }` per group,
+   in the `switch`'s order.
+4. Replace the body by: `size_t i;`, a `for (i=0; i < (sizeof(T)/sizeof(*T)); i++)` with
+   `if (T[i].key == n) return(T[i].name);`, then the final `return("s");`.
+5. Check by script that each label is the key of exactly one element holding the string
+   its group returned, and that nothing else in the file changed.
+
+**Before:**
+
+```c
+  switch (severity)
+  {
+    case ResourceLimitWarning: return("Resource/Limit/Warning/");
+    ...
+    default: break;
+  }
+  return("");
+```
+
+**After:**
+
+```c
+  for (i=0; i < (sizeof(ExceptionTags)/sizeof(*ExceptionTags)); i++)
+    if (ExceptionTags[i].severity == severity)
+      return(ExceptionTags[i].tag);
+  return("");
+```
+
+**Careful:**
+
+- Labels have distinct values, so the first matching element is the only one and holds the
+  string its group returned; when none matches the final `return` gives what the
+  `default:` fell through to. `key` has `n`'s type, so the same values match.
+- The table is `static const` and never written; no existing table changes.
+- Searching up to sixty-three elements replaces a jump, for a call made once per
+  exception message lookup, outside every pixel loop (step 2).
+
+**Evidence level:** oracle (the cases that reach the function), with step 5's script and
+step 2 checked by reading.
+
+**Provenance:** 2026-11-13, from `exception.c` (campaign B, M122): `ExceptionSeverityToTag`,
+cc 65, the largest *Complex Method* of the file; KS assigns to a local. Added by Claude
+Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -13520,3 +13588,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | HE | Hoist a case's exit test (`case L: { if (T) return(R); S break; }`) to an `if ((c == L) && (T)) return(R);` before the loop's `switch`; evidence oracle | `geometry-parse.c`'s `ParseGeometry` (bump gone, 7.01 to 7.04); HT, SG and PL do not reach a test inside a case | mandate (2026-10-24) |
 | 2026-11-13 | NEW | FO | Open the file with the shortest `static` helper: move a one- or two-statement helper above a first function that the include-block span makes a *Large Method*; evidence `obj_identical.sh` IDENTICAL | `image.c` (`SetImageSize`, 76 lines for nine; 5.17 to 5.37); H moves preprocessor lines, E adds functions | mandate (2026-10-24) |
 | 2026-11-13 | NEW | KS | Replace a keyed `switch` whose groups assign string literals to one local by a `static const` key/name table and a lookup loop; evidence oracle | `identify.c` `GetIPTCTagName` (cc 55); KT needs a call per group, TB needs `0..k` labels | mandate (2026-10-24) |
+| 2026-11-13 | NEW | KR | Replace a keyed `switch` whose groups return string literals by a `static const` key/name table and a lookup loop; evidence oracle | `exception.c` `ExceptionSeverityToTag` (cc 65); KS assigns to a local, TB needs `0..k` labels | mandate (2026-10-24) |
