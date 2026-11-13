@@ -6283,6 +6283,14 @@ static const MorphologyStageLimit *FindMorphologyStageLimit(
   return((const MorphologyStageLimit *) NULL);
 }
 
+static void DiscardMorphologyResult(Image **curr_image,Image **rslt_image)
+{
+  if ( (*curr_image) == (*rslt_image) )
+    (*curr_image) = (Image *) NULL;
+  if ( (*rslt_image) != (Image *) NULL )
+    (*rslt_image) = DestroyImage((*rslt_image));
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -6400,10 +6408,7 @@ MagickPrivate Image *MorphologyApply(const Image *image,
 
   /* Yes goto's are bad, but it makes cleanup lot more efficient */
 error_cleanup:
-  if ( curr_image == rslt_image )
-    curr_image = (Image *) NULL;
-  if ( rslt_image != (Image *) NULL )
-    rslt_image = DestroyImage(rslt_image);
+  DiscardMorphologyResult(&curr_image,&rslt_image);
 exit_cleanup:
   {
     const MorphologyApplyRelease
