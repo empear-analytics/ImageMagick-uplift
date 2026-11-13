@@ -216,6 +216,13 @@ static void DestroyMultilineText(DrawInfo *annotate_info,char **textlist,
   textlist=(char **) RelinquishMagickMemory(textlist);
 }
 
+static void ResetMultilineMetrics(DrawInfo *annotate_info,TypeMetric *metrics)
+{
+  annotate_info->render=MagickFalse;
+  annotate_info->direction=UndefinedDirection;
+  (void) memset(metrics,0,sizeof(*metrics));
+}
+
 MagickExport MagickBooleanType GetMultilineTypeMetrics(Image *image,
   const DrawInfo *draw_info,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -267,9 +274,7 @@ MagickExport MagickBooleanType GetMultilineTypeMetrics(Image *image,
       annotate_info=DestroyDrawInfo(annotate_info);
       return(MagickFalse);
     }
-  annotate_info->render=MagickFalse;
-  annotate_info->direction=UndefinedDirection;
-  (void) memset(metrics,0,sizeof(*metrics));
+  ResetMultilineMetrics(annotate_info,metrics);
   (void) memset(&extent,0,sizeof(extent));
   /*
     Find the widest of the text lines.
