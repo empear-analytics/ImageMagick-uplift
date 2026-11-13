@@ -866,22 +866,10 @@ static void Scale2X(const Image *magick_unused(source),const Quantum *pixels,
         CopyPixels(&magnify,4,i);
       return;
     }
-    if (PixelsEqual(pixels,1,3,channels))
-      CopyPixels(&magnify,3,0);
-    else
-      CopyPixels(&magnify,4,0);
-    if (PixelsEqual(pixels,1,5,channels))
-      CopyPixels(&magnify,5,1);
-    else
-      CopyPixels(&magnify,4,1);
-    if (PixelsEqual(pixels,3,7,channels))
-      CopyPixels(&magnify,3,2);
-    else
-      CopyPixels(&magnify,4,2);
-    if (PixelsEqual(pixels,5,7,channels))
-      CopyPixels(&magnify,5,3);
-    else
-      CopyPixels(&magnify,4,3);
+  CopyPixelsIf(&magnify,PixelsEqual(pixels,1,3,channels),3,0);
+  CopyPixelsIf(&magnify,PixelsEqual(pixels,1,5,channels),5,1);
+  CopyPixelsIf(&magnify,PixelsEqual(pixels,3,7,channels),3,2);
+  CopyPixelsIf(&magnify,PixelsEqual(pixels,5,7,channels),5,3);
 }
 
 static inline MagickBooleanType IsEpbx2XCornerConsistent(
