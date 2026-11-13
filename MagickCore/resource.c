@@ -253,6 +253,20 @@ static MagickBooleanType AcquireResourceCounter(MagickOffsetType *counter,
   return(MagickFalse);
 }
 
+static void AcquireFileResourceCounter(const MagickOffsetType request,
+  MagickSizeType *limit,MagickBooleanType *status,MagickOffsetType *current)
+{
+  *limit=resource_info.file_limit;
+  if (resource_info.file <= (MagickOffsetMax-request))
+    {
+      resource_info.file+=request;
+      if ((*limit == MagickResourceInfinity) ||
+          (resource_info.file < (MagickOffsetType) *limit))
+        *status=MagickTrue;
+    }
+  *current=resource_info.file;
+}
+
 typedef struct _AcquireTargets
 {
   MagickSizeType
@@ -364,15 +378,7 @@ MagickExport MagickBooleanType AcquireMagickResource(const ResourceType type,
     }
     case FileResource:
     {
-      limit=resource_info.file_limit;
-      if (resource_info.file <= (MagickOffsetMax-request))
-        {
-          resource_info.file+=request;
-          if ((limit == MagickResourceInfinity) ||
-              (resource_info.file < (MagickOffsetType) limit))
-            status=MagickTrue;
-        }
-      current=resource_info.file;
+      AcquireFileResourceCounter(request,&limit,&status,&current);
       break;
     }
     case HeightResource:
