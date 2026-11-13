@@ -865,6 +865,23 @@ static MagickBooleanType InvokeDecodeDelegate(ImageInfo *read_info,
   return(status);
 }
 
+static Image *DecodeAuthorizedImage(const MagickInfo *magick_info,
+  DecodeImageHandler *decoder,ImageInfo *read_info,ExceptionInfo *exception)
+{
+  Image
+    *image;
+
+  MagickBooleanType
+    status;
+
+  status=IsCoderAuthorized(magick_info->magick_module,magick_info->name,
+    ReadPolicyRights,exception);
+  image=(Image *) NULL;
+  if (status != MagickFalse)
+    image=decoder(read_info,exception);
+  return(image);
+}
+
 static void SetReadEndian(const ImageInfo *image_info,ImageInfo *read_info,
   const MagickInfo *magick_info)
 {
@@ -958,11 +975,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
       */
       if (GetMagickDecoderThreadSupport(magick_info) == MagickFalse)
         LockSemaphoreInfo(magick_info->semaphore);
-      status=IsCoderAuthorized(magick_info->magick_module,magick_info->name,
-        ReadPolicyRights,exception);
-      image=(Image *) NULL;
-      if (status != MagickFalse)
-        image=decoder(read_info,exception);
+      image=DecodeAuthorizedImage(magick_info,decoder,read_info,exception);
       if (GetMagickDecoderThreadSupport(magick_info) == MagickFalse)
         UnlockSemaphoreInfo(magick_info->semaphore);
     }
@@ -1012,11 +1025,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
       */
       if (GetMagickDecoderThreadSupport(magick_info) == MagickFalse)
         LockSemaphoreInfo(magick_info->semaphore);
-      status=IsCoderAuthorized(magick_info->magick_module,magick_info->name,
-        ReadPolicyRights,exception);
-      image=(Image *) NULL;
-      if (status != MagickFalse)
-        image=(decoder)(read_info,exception);
+      image=DecodeAuthorizedImage(magick_info,decoder,read_info,exception);
       if (GetMagickDecoderThreadSupport(magick_info) == MagickFalse)
         UnlockSemaphoreInfo(magick_info->semaphore);
     }
