@@ -10947,6 +10947,74 @@ static Image *XApplyNewCommand(const XMagickCommandContext *context,
   return(nexus);
 }
 
+static void XApplyShearCommand(const XMagickCommandContext *context,char *color)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  Image
+    *shear_image;
+
+  static char
+    geometry[MagickPathExtent] = "45.0x45.0";
+
+  /*
+    Query user for shear color and geometry.
+  */
+  XColorBrowserWidget(display,windows,"Select",color);
+  if (*color == '\0')
+    return;
+  (void) XDialogWidget(display,windows,"Shear","Enter shear geometry:",
+    geometry);
+  if (*geometry == '\0')
+    return;
+  /*
+    Shear image.
+  */
+  (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
+    exception);
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) QueryColorCompliance(color,AllCompliance,
+    &(*image)->background_color,exception);
+  flags=ParseGeometry(geometry,&geometry_info);
+  if ((flags & SigmaValue) == 0)
+    geometry_info.sigma=geometry_info.rho;
+  shear_image=ShearImage(*image,geometry_info.rho,geometry_info.sigma,
+    exception);
+  if (shear_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=shear_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  windows->image.window_changes.width=(int) (*image)->columns;
+  windows->image.window_changes.height=(int) (*image)->rows;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -11349,52 +11417,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       break;
     }
     case ShearCommand:
-    {
-      Image
-        *shear_image;
-
-      static char
-        geometry[MagickPathExtent] = "45.0x45.0";
-
-      /*
-        Query user for shear color and geometry.
-      */
-      XColorBrowserWidget(display,windows,"Select",color);
-      if (*color == '\0')
-        break;
-      (void) XDialogWidget(display,windows,"Shear","Enter shear geometry:",
-        geometry);
-      if (*geometry == '\0')
-        break;
-      /*
-        Shear image.
-      */
-      (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
-        exception);
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      (void) QueryColorCompliance(color,AllCompliance,
-        &(*image)->background_color,exception);
-      flags=ParseGeometry(geometry,&geometry_info);
-      if ((flags & SigmaValue) == 0)
-        geometry_info.sigma=geometry_info.rho;
-      shear_image=ShearImage(*image,geometry_info.rho,geometry_info.sigma,
-        exception);
-      if (shear_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=shear_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      windows->image.window_changes.width=(int) (*image)->columns;
-      windows->image.window_changes.height=(int) (*image)->rows;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyShearCommand(&context,color);
       break;
-    }
     case RollCommand:
       XApplyRollCommand(&context);
       break;
