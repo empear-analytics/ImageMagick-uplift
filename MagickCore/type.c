@@ -1350,6 +1350,12 @@ static MagickBooleanType LoadTypeInclude(const TypeLoadTarget *target,
   return(status);
 }
 
+static inline MagickBooleanType IsElementEnd(const char *keyword)
+{
+  return(((LocaleCompare(keyword,"/>") == 0) ||
+    (LocaleCompare(keyword,"</policy>") == 0)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1453,8 +1459,7 @@ static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
       }
     if (type_info == (TypeInfo *) NULL)
       continue;
-    if ((LocaleCompare(keyword,"/>") == 0) ||
-        (LocaleCompare(keyword,"</policy>") == 0))
+    if (IsElementEnd(keyword) != MagickFalse)
       {
         status=AddValueToSplayTree(cache,type_info->name,type_info);
         if (status == MagickFalse)
