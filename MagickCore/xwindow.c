@@ -9700,32 +9700,11 @@ static void XSetIconGeometryHints(Display *display,
     }
 }
 
-MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
-  int argc,XClassHint *class_hint,XWMHints *manager_hints,
-  XWindowInfo *window_info)
+static XSizeHints *XCreateSizeHints(char **argv,const XWindowInfo *window_info)
 {
-#define MinWindowSize  64
-
-  int
-    gravity;
-
-  static XTextProperty
-    icon_name,
-    window_name;
-
-  Status
-    status;
-
   XSizeHints
     *size_hints;
 
-  /*
-    Set window info hints.
-  */
-  assert(display != (Display *) NULL);
-  assert(window_info != (XWindowInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
   size_hints=XAllocSizeHints();
   if (size_hints == (XSizeHints *) NULL)
     ThrowXWindowFatalException(XServerFatalError,"UnableToMakeXWindow",argv[0]);
@@ -9762,6 +9741,36 @@ MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
       size_hints->base_height=size_hints->height_inc;
 #endif
     }
+  return(size_hints);
+}
+
+MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
+  int argc,XClassHint *class_hint,XWMHints *manager_hints,
+  XWindowInfo *window_info)
+{
+#define MinWindowSize  64
+
+  int
+    gravity;
+
+  static XTextProperty
+    icon_name,
+    window_name;
+
+  Status
+    status;
+
+  XSizeHints
+    *size_hints;
+
+  /*
+    Set window info hints.
+  */
+  assert(display != (Display *) NULL);
+  assert(window_info != (XWindowInfo *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  size_hints=XCreateSizeHints(argv,window_info);
   gravity=NorthWestGravity;
   gravity=XSetUserGeometry(display,window_info,size_hints,gravity);
 #if !defined(PRE_R4_ICCCM)
