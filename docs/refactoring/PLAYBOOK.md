@@ -15459,6 +15459,102 @@ Lane: b
 
 ---
 
+## Recipe OS - Share an Option-Sync Block Through a Helper Keyed by the Option Name
+
+**Use when:** CodeScene reports *Overall Code Complexity* (the mean cyclomatic
+complexity of the file's functions) on a file whose functions copy one small block per
+option: look the option up by name, and when it is set, store what one call makes of it
+into one member, as `image-settings.c`'s `SyncImage...Settings` functions do
+(`option=GetImageOption(image_info,"quality"); if (option != (const char *) NULL)
+image->quality=StringToUnsignedLong(option);`, the same for `scene`, `depth` and `loop`,
+in three functions). Each copy is an `if` of its own, and the copies raise the mean.
+
+**Not covered by:** Recipe MA, whose copies are blocks of one function and whose finding
+is a function-level one; Recipe D, which needs a reported *Code Duplication* (these
+copies are three lines and not reported) and copies that differ in one value (here a
+string literal and a member); Recipe SV and SC, which pass only constants; Recipe E,
+which would keep the literal and the member in the helper, one helper per copy.
+
+**How:**
+
+1. Copies. Blocks of the form `option=GetImageOption(image_info,"K");` followed by
+   `if (option != (const char *) NULL)` and one statement `S` that reads `option` and
+   writes one lvalue `e.m` (`e.m=F(option);`, `F(option,&e.m);` or `(void) F(option,
+   &e.m,...);`), outside every OpenMP region, where `option` is a local `const char *`
+   that the caller writes again before any later read (Recipe E step 4's temporary).
+   Copies that share a helper have the same text once the literal `"K"` and the member
+   designator `m` are set aside, and their lvalues `e.m` have one declared type `T`.
+2. The first commit for a helper takes the copies in one function and writes, directly
+   above the first function of the file that will call it, `static void
+   Name(const ImageInfo *image_info,const char *key,T *value[, other inputs])` with at
+   most four parameters: a local `const char *option;`, then the copy's text with `"K"`
+   replaced by `key` and `e.m` by `(*value)` (`&e.m` by `value`), nothing else changed.
+3. Each copy becomes `Name(image_info,"K",&e.m[, the same other inputs]);` where it stood.
+   The caller's `option` local stays while other code uses it.
+4. Later commits replace the copies of one other function each with calls of the same
+   helper, under the same conditions; a copy whose text differs in anything but the
+   literal and the member is left alone.
+5. Check by script that substituting each call's arguments into the helper's text gives
+   the copy it replaced, token for token. Run `tools/ci_warnings.sh` and
+   `tools/cxx_warnings.sh` (`OK`) and the oracle for each changed function.
+
+**Before:**
+
+```c
+  option=GetImageOption(image_info,"quality");
+  if (option != (const char *) NULL)
+    image->quality=StringToUnsignedLong(option);
+  ...
+  option=GetImageOption(image_info,"scene");
+  if (option != (const char *) NULL)
+    image->scene=StringToUnsignedLong(option);
+```
+
+**After:**
+
+```c
+static void SyncUnsignedLongOption(const ImageInfo *image_info,
+  const char *key,size_t *value)
+{
+  const char
+    *option;
+
+  option=GetImageOption(image_info,key);
+  if (option != (const char *) NULL)
+    (*value)=StringToUnsignedLong(option);
+}
+...
+  SyncUnsignedLongOption(image_info,"quality",&image->quality);
+  ...
+  SyncUnsignedLongOption(image_info,"scene",&image->scene);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The helper looks up the same name (the literal is
+  passed unchanged), calls the same function on the same string, and stores the result
+  through a pointer to the member the copy named, so the same member receives the same
+  value, converted to its type `T` as the assignment converted it. When the option is
+  unset neither form writes anything. The caller's `option` held a value that the copy
+  overwrote and that nothing read afterwards, so its loss changes nothing.
+- The members of one helper must share one declared type (`size_t` for `quality`,
+  `scene`, `depth`, `iterations`): a member of another type, an enumeration cast through
+  `ParseCommandOption` say, needs its own helper or stays.
+- `e` is a pointer parameter the copies do not assign, so `&e.m` names the member the
+  copy wrote.
+
+**Evidence level:** oracle (the cases that reach each changed function), with
+`tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`.
+
+**Provenance:** 2026-11-13, from `image-settings.c` (campaign B, M127 lane b round 5):
+*Overall Code Complexity* held the file at 9.09 with one other finding; a probe of the
+size_t, geometry and colour option copies left the mean just above the threshold, and a
+probe with two more functions of complexity one cleared it (9.68). Added by Claude Code
+(Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -15816,3 +15912,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | TM | Merge Twin Function Tails Differing in the Member They Read: two functions of a file whose returning tails differ only in the member of one read `e->m.f` share a `static` function taking `const T *value`; each twin keeps its opening block and returns the call with `&e->m`; evidence oracle; Lane: b | `timer.c`'s `GetElapsedTime` and `GetUserTime` (*Code Duplication*; 9.38 to 10.0) | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | AT | Step 6: the `if` may have an `else` arm of the same kind; that arm alone moves (`else return(Helper(...));`), a local only it and `R` read is declared in the helper with its initialiser; Lane: b | `color.c`'s `QueryHexColor` (two bumps, one per arm) | mandate (2026-10-24) |
 | 2026-11-13 | NEW | IC | Inline Cast-Only Locals into Their One Use: a local assigned once from a cast of an unassigned parameter to its own type, and read once, is replaced at that read by the cast; declaration and assignment go; the grouped copies in one commit; evidence guard (`obj_identical.sh`); Lane: b | `splay-tree.c`'s `CompareSplayTreeString` and `CompareSplayTreeStringInfo` (*Code Duplication*; probe 9.38 to 10.0) | mandate (2026-10-24) |
+| 2026-11-13 | NEW | OS | Share an Option-Sync Block Through a Helper Keyed by the Option Name: copies of `option=GetImageOption(image_info,"K"); if (option != NULL) S;` whose `S` stores into one member become calls of a `static void` helper taking the key and a pointer to the member; one function per commit; targets *Overall Code Complexity*; evidence oracle; Lane: b | `image-settings.c`'s `SyncImage...Settings` (`quality`, `scene`, `depth`, `loop`, `page`, `tile-offset`, colours) | mandate (2026-10-24) |
