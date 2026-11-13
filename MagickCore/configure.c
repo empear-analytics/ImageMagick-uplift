@@ -1149,6 +1149,73 @@ static MagickStatusType AppendConfigureElement(LinkedListInfo *cache,
   return(status);
 }
 
+typedef struct _ConfigureElementInput
+{
+  LinkedListInfo
+    *cache;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    *keyword,
+    *token;
+
+  const char
+    *filename;
+
+  size_t
+    extent;
+} ConfigureElementInput;
+
+static void ParseConfigureElement(const ConfigureElementInput *element,
+  ConfigureInfo **configure_info,MagickStatusType *status,const char **q)
+{
+  LinkedListInfo
+    *const cache = element->cache;
+
+  ExceptionInfo
+    *const exception = element->exception;
+
+  char
+    *const keyword = element->keyword,
+    *const token = element->token;
+
+  const char
+    *const filename = element->filename;
+
+  const size_t
+    extent = element->extent;
+
+  if (LocaleCompare(keyword,"<configure") == 0)
+    {
+      /*
+        Configure element.
+      */
+      (*configure_info)=(ConfigureInfo *) AcquireCriticalMemory(
+        sizeof(*(*configure_info)));
+      (void) memset((*configure_info),0,sizeof(*(*configure_info)));
+      (*configure_info)->path=ConstantString(filename);
+      (*configure_info)->exempt=MagickFalse;
+      (*configure_info)->signature=MagickCoreSignature;
+      return;
+    }
+  if ((*configure_info) == (ConfigureInfo *) NULL)
+    return;
+  if ((LocaleCompare(keyword,"/>") == 0) ||
+      (LocaleCompare(keyword,"</policy>") == 0))
+    {
+      (*status)=AppendConfigureElement(cache,(*configure_info),exception);
+      (*configure_info)=(ConfigureInfo *) NULL;
+      return;
+    }
+  /*
+    Parse configure element.
+  */
+  if (ReadAttributeValue(q,extent,token) != MagickFalse)
+    SetConfigureAttribute((*configure_info),keyword,token);
+}
+
 static MagickBooleanType LoadConfigureCache(const ConfigureLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1185,6 +1252,9 @@ static MagickBooleanType LoadConfigureCache(const ConfigureLoadTarget *target,
   extent=strlen(token)+MagickPathExtent;
   for (q=(char *) xml; *q != '\0'; )
   {
+    ConfigureElementInput
+      element;
+
     /*
       Interpret XML.
     */
@@ -1210,33 +1280,13 @@ static MagickBooleanType LoadConfigureCache(const ConfigureLoadTarget *target,
         LoadConfigureIncludes(&include,&q,&status);
         continue;
       }
-    if (LocaleCompare(keyword,"<configure") == 0)
-      {
-        /*
-          Configure element.
-        */
-        configure_info=(ConfigureInfo *) AcquireCriticalMemory(
-          sizeof(*configure_info));
-        (void) memset(configure_info,0,sizeof(*configure_info));
-        configure_info->path=ConstantString(filename);
-        configure_info->exempt=MagickFalse;
-        configure_info->signature=MagickCoreSignature;
-        continue;
-      }
-    if (configure_info == (ConfigureInfo *) NULL)
-      continue;
-    if ((LocaleCompare(keyword,"/>") == 0) ||
-        (LocaleCompare(keyword,"</policy>") == 0))
-      {
-        status=AppendConfigureElement(cache,configure_info,exception);
-        configure_info=(ConfigureInfo *) NULL;
-        continue;
-      }
-    /*
-      Parse configure element.
-    */
-    if (ReadAttributeValue(&q,extent,token) != MagickFalse)
-      SetConfigureAttribute(configure_info,keyword,token);
+    element.cache=cache;
+    element.exception=exception;
+    element.keyword=keyword;
+    element.token=token;
+    element.filename=filename;
+    element.extent=extent;
+    ParseConfigureElement(&element,&configure_info,&status,&q);
   }
   token=(char *) RelinquishMagickMemory(token);
   return(status != 0 ? MagickTrue : MagickFalse);
