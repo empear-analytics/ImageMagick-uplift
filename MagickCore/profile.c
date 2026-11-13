@@ -2898,6 +2898,79 @@ typedef struct _ExifWalkTargets
     *directory_stack;
 } ExifWalkTargets;
 
+typedef struct _ExifEntryTargets
+{
+  unsigned char
+    **q;
+
+  unsigned short
+    *tag_value;
+
+  ssize_t
+    *format;
+
+  int
+    *components;
+
+  size_t
+    *number_bytes;
+} ExifEntryTargets;
+
+static MagickBooleanType ReadExifEntry(const ExifWalkInfo *walk,
+  const size_t entry,const ExifEntryTargets *targets)
+{
+  const EndianType
+    endian = walk->endian;
+
+  unsigned char
+    *const exif = walk->exif;
+
+  const size_t
+    length = walk->length;
+
+  unsigned char
+    *const directory = walk->directory;
+
+  SplayTreeInfo
+    *const exif_resources = walk->exif_resources;
+
+  unsigned char
+    **const q = targets->q;
+
+  unsigned short
+    *const tag_value = targets->tag_value;
+
+  ssize_t
+    *const format = targets->format;
+
+  int
+    *const components = targets->components;
+
+  size_t
+    *const number_bytes = targets->number_bytes;
+
+  static int
+    format_bytes[] = {0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8};
+
+  (*q)=(unsigned char *) (directory+2+(12*entry));
+  if ((*q) > (exif+length-12))
+    return(MagickFalse);  /* corrupt EXIF */
+  if (GetValueFromSplayTree(exif_resources,(*q)) == (*q))
+    return(MagickFalse);
+  (void) AddValueToSplayTree(exif_resources,(*q),(*q));
+  (*tag_value)=(unsigned short) ReadProfileShort(endian,(*q));
+  (*format)=(ssize_t) ReadProfileShort(endian,(*q)+2);
+  if (((*format) < 0) || (((*format)-1) >= EXIF_NUM_FORMATS))
+    return(MagickFalse);
+  (*components)=(int) ReadProfileLong(endian,(*q)+4);
+  if ((*components) < 0)
+    return(MagickFalse);  /* corrupt EXIF */
+  (*number_bytes)=(size_t) (*components)*(size_t) format_bytes[(*format)];
+  if ((ssize_t) (*number_bytes) < (*components))
+    return(MagickFalse);  /* prevent overflow */
+  return(MagickTrue);
+}
+
 static void SyncExifDirectory(const ExifWalkInfo *walk,
   const ExifWalkTargets *targets)
 {
@@ -2917,9 +2990,6 @@ static void SyncExifDirectory(const ExifWalkInfo *walk,
     *const directory = walk->directory,
     *const ifd0 = walk->ifd0;
 
-  SplayTreeInfo
-    *const exif_resources = walk->exif_resources;
-
   ssize_t
     *const level = targets->level;
 
@@ -2938,9 +3008,6 @@ static void SyncExifDirectory(const ExifWalkInfo *walk,
 
   ssize_t
     offset;
-
-  static int
-    format_bytes[] = {0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8};
 
   /*
     Determine how many entries there are in the current IFD.
@@ -2976,22 +3043,11 @@ static void SyncExifDirectory(const ExifWalkInfo *walk,
     unsigned short
       tag_value;
 
-    q=(unsigned char *) (directory+2+(12*(*entry)));
-    if (q > (exif+length-12))
-      break;  /* corrupt EXIF */
-    if (GetValueFromSplayTree(exif_resources,q) == q)
+    const ExifEntryTargets
+      entry_targets = { &q, &tag_value, &format, &components, &number_bytes };
+
+    if (ReadExifEntry(walk,(*entry),&entry_targets) == MagickFalse)
       break;
-    (void) AddValueToSplayTree(exif_resources,q,q);
-    tag_value=(unsigned short) ReadProfileShort(endian,q);
-    format=(ssize_t) ReadProfileShort(endian,q+2);
-    if ((format < 0) || ((format-1) >= EXIF_NUM_FORMATS))
-      break;
-    components=(int) ReadProfileLong(endian,q+4);
-    if (components < 0)
-      break;  /* corrupt EXIF */
-    number_bytes=(size_t) components*(size_t) format_bytes[format];
-    if ((ssize_t) number_bytes < components)
-      break;  /* prevent overflow */
     exif_entry.endian=endian;
     exif_entry.exif=exif;
     exif_entry.length=length;
