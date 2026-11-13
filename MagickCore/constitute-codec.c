@@ -635,6 +635,23 @@ static inline MagickBooleanType IsSceneSelection(const ImageInfo *read_info,
     (GetImageListLength(image) != 1)) ? MagickTrue : MagickFalse);
 }
 
+static const MagickInfo *GetReadMagickInfo(const ImageInfo *read_info,
+  ExceptionInfo *exception)
+{
+  const MagickInfo
+    *magick_info;
+
+  ExceptionInfo
+    *sans_exception;
+
+  sans_exception=AcquireExceptionInfo();
+  magick_info=GetMagickInfo(read_info->magick,sans_exception);
+  if (sans_exception->severity == PolicyError)
+    InheritException(exception,sans_exception);
+  sans_exception=DestroyExceptionInfo(sans_exception);
+  return(magick_info);
+}
+
 static void FinishReadImageMetadata(const ImageInfo *read_info,Image *next,
   const ConstituteInfo *constitute_info,ExceptionInfo *exception)
 {
@@ -744,9 +761,6 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
   DecodeImageHandler
     *decoder;
 
-  ExceptionInfo
-    *sans_exception;
-
   Image
     *image,
     *next;
@@ -772,11 +786,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
   /*
     Call appropriate image reader based on image type.
   */
-  sans_exception=AcquireExceptionInfo();
-  magick_info=GetMagickInfo(read_info->magick,sans_exception);
-  if (sans_exception->severity == PolicyError)
-    InheritException(exception,sans_exception);
-  sans_exception=DestroyExceptionInfo(sans_exception);
+  magick_info=GetReadMagickInfo(read_info,exception);
   if (magick_info != (const MagickInfo *) NULL)
     SetReadEndian(image_info,read_info,magick_info);
   if (OpenSeekableReadStream(image_info,read_info,magick_info,exception) ==
