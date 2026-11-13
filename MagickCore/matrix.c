@@ -218,6 +218,25 @@ static void AcquireMatrixMemory(MatrixInfo *matrix_info)
     }
 }
 
+static void MapMatrixFile(MatrixInfo *matrix_info)
+{
+  MagickBooleanType
+    status;
+
+  status=AcquireMagickResource(MapResource,matrix_info->length);
+  if (status != MagickFalse)
+    {
+      status=SetMatrixExtent(matrix_info,matrix_info->length);
+      if (status != MagickFalse)
+        matrix_info->elements=(void *) MapBlob(matrix_info->file,IOMode,0,
+          (size_t) matrix_info->length);
+      if (matrix_info->elements != NULL)
+        matrix_info->type=MapCache;
+      else
+        RelinquishMagickResource(MapResource,matrix_info->length);
+    }
+}
+
 MagickExport MatrixInfo *AcquireMatrixInfo(const size_t columns,
   const size_t rows,const size_t stride,ExceptionInfo *exception)
 {
@@ -270,18 +289,7 @@ MagickExport MatrixInfo *AcquireMatrixInfo(const size_t columns,
       matrix_info->file=AcquireUniqueFileResource(matrix_info->path);
       if (matrix_info->file == -1)
         return(DestroyMatrixInfo(matrix_info));
-      status=AcquireMagickResource(MapResource,matrix_info->length);
-      if (status != MagickFalse)
-        {
-          status=SetMatrixExtent(matrix_info,matrix_info->length);
-          if (status != MagickFalse)
-            matrix_info->elements=(void *) MapBlob(matrix_info->file,IOMode,0,
-              (size_t) matrix_info->length);
-          if (matrix_info->elements != NULL)
-            matrix_info->type=MapCache;
-          else
-            RelinquishMagickResource(MapResource,matrix_info->length);
-        }
+      MapMatrixFile(matrix_info);
     }
   return(matrix_info);
 }
