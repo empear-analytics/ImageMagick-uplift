@@ -372,6 +372,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/widget.h \
   MagickCore/widget-private.h \
   MagickCore/xml-tree.c \
+  MagickCore/xml-tree-file.c \
   MagickCore/xml-tree.h \
   MagickCore/xml-tree-private.h \
   MagickCore/xwindow.c \
