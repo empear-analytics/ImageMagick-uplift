@@ -1904,6 +1904,25 @@ static void SetBlueDitherEntry(const XDitherTables *tables,const int x)
     ((value < 0) ? 0 : (value > 255) ? 255 : value);
 }
 
+static void AcquireDitherMaps(unsigned char *red_map[2][16],
+  unsigned char *green_map[2][16],unsigned char *blue_map[2][16])
+{
+  int
+    i,
+    j;
+
+  for (i=0; i < 2; i++)
+    for (j=0; j < 16; j++)
+    {
+      red_map[i][j]=(unsigned char *) AcquireCriticalMemory(256UL*
+        sizeof(*red_map));
+      green_map[i][j]=(unsigned char *) AcquireCriticalMemory(256UL*
+        sizeof(*green_map));
+      blue_map[i][j]=(unsigned char *) AcquireCriticalMemory(256UL*
+        sizeof(*blue_map));
+    }
+}
+
 static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
 {
   static const short int
@@ -1958,16 +1977,7 @@ static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
   /*
     Allocate and initialize dither maps.
   */
-  for (i=0; i < 2; i++)
-    for (j=0; j < 16; j++)
-    {
-      red_map[i][j]=(unsigned char *) AcquireCriticalMemory(256UL*
-        sizeof(*red_map));
-      green_map[i][j]=(unsigned char *) AcquireCriticalMemory(256UL*
-        sizeof(*green_map));
-      blue_map[i][j]=(unsigned char *) AcquireCriticalMemory(256UL*
-        sizeof(*blue_map));
-    }
+  AcquireDitherMaps(red_map,green_map,blue_map);
   /*
     Initialize dither tables.
   */
