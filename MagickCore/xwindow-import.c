@@ -1492,6 +1492,18 @@ static Window XSelectNamedWindow(Display *display,const Window root,
   return(target);
 }
 
+static void XAlertImportDone(Display *display,const XImportInfo *ximage_info)
+{
+  if (ximage_info->silent == MagickFalse)
+    {
+      /*
+        Alert the user we're done.
+      */
+      (void) XBell(display,0);
+      (void) XBell(display,0);
+    }
+}
+
 static Image *XCropWindowImage(Image *image,const RectangleInfo crop_info,
   ExceptionInfo *exception)
 {
@@ -1724,14 +1736,7 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
       image=XCropWindowImage(image,crop_info,exception);
       XNameWindowImage(display,target,image_info,image);
     }
-  if (ximage_info->silent == MagickFalse)
-    {
-      /*
-        Alert the user we're done.
-      */
-      (void) XBell(display,0);
-      (void) XBell(display,0);
-    }
+  XAlertImportDone(display,ximage_info);
   (void) XCloseDisplay(display);
   return(image);
 }
