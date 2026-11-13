@@ -1940,6 +1940,18 @@ static MagickBooleanType ParseEntityDeclarationHead(
   return(MagickTrue);
 }
 
+static void TerminateEntityValue(char **xml,char *v,const char q)
+{
+  (*xml)++;
+  **xml='\0';
+  *xml=strchr(v,q);
+  if (*xml != (char *) NULL)
+    {
+      **xml='\0';
+      (*xml)++;
+    }
+}
+
 static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
   size_t length,ExceptionInfo *exception)
 {
@@ -1998,14 +2010,7 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
           predefined_entities=entities;
         else
           root->entities=entities;
-        xml++;
-        *xml='\0';
-        xml=strchr(v,q);
-        if (xml != (char *) NULL)
-          {
-            *xml='\0';
-            xml++;
-          }
+        TerminateEntityValue(&xml,v,q);
         entities[i+1]=ParseEntities(v,predefined_entities,'%');
         entities[i+2]=(char *) NULL;
         if ((ValidateEntities(n,entities[i+1],'%',0,entities) != MagickFalse) &&
