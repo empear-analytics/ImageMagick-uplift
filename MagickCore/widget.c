@@ -8000,6 +8000,86 @@ static void InitializeFileBrowserText(const FileBrowserContext *context,
   (*selection_info).x=(*list_info).x;
 }
 
+static void RedrawFileBrowserWidget(const FileBrowserContext *context,
+  const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const glob_pattern = context->glob_pattern,
+    *const working_path = context->working_path;
+
+  const unsigned int
+    height = context->height;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info,
+    *const up_info = widgets->up_info,
+    *const home_info = widgets->home_info,
+    *const special_info = widgets->special_info,
+    *const action_info = widgets->action_info,
+    *const cancel_info = widgets->cancel_info,
+    *const slider_info = widgets->slider_info,
+    *const scroll_info = widgets->scroll_info,
+    *const north_info = widgets->north_info,
+    *const south_info = widgets->south_info,
+    *const list_info = widgets->list_info,
+    *const text_info = widgets->text_info,
+    *const selection_info = widgets->selection_info;
+
+  int
+    x,
+    y;
+
+  /*
+    Redraw File Browser window.
+  */
+  x=QuantumMargin;
+  y=(*text_info).y+(int) (((*text_info).height-height) >> 1)+
+    font_info->ascent;
+  (void) XDrawString(display,windows->widget.id,
+    windows->widget.annotate_context,x,y,DirectoryText,
+    Extent(DirectoryText));
+  (void) CopyMagickString((*text_info).text,working_path,MagickPathExtent);
+  (void) ConcatenateMagickString((*text_info).text,DirectorySeparator,
+    MagickPathExtent);
+  (void) ConcatenateMagickString((*text_info).text,glob_pattern,
+    MagickPathExtent);
+  XDrawWidgetText(display,&windows->widget,text_info);
+  XDrawBeveledButton(display,&windows->widget,up_info);
+  XDrawBeveledButton(display,&windows->widget,home_info);
+  XDrawBeveledMatte(display,&windows->widget,list_info);
+  XDrawBeveledMatte(display,&windows->widget,scroll_info);
+  XDrawTriangleNorth(display,&windows->widget,north_info);
+  XDrawBeveledButton(display,&windows->widget,slider_info);
+  XDrawTriangleSouth(display,&windows->widget,south_info);
+  x=QuantumMargin;
+  y=(*reply_info).y+(int) (((*reply_info).height-height) >> 1)+
+    font_info->ascent;
+  (void) XDrawString(display,windows->widget.id,
+    windows->widget.annotate_context,x,y,FilenameText,
+    Extent(FilenameText));
+  XDrawBeveledMatte(display,&windows->widget,reply_info);
+  XDrawMatteText(display,&windows->widget,reply_info);
+  XDrawBeveledButton(display,&windows->widget,special_info);
+  XDrawBeveledButton(display,&windows->widget,action_info);
+  XDrawBeveledButton(display,&windows->widget,cancel_info);
+  XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
+  (*selection_info).id=(~0);
+  (*state)|=RedrawListState;
+  (*state)&=(unsigned int) (~RedrawWidgetState);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8010,10 +8090,6 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
     primary_selection[MagickPathExtent],
     text[MagickPathExtent],
     working_path[MagickPathExtent];
-
-  int
-    x,
-    y;
 
   static char
     glob_pattern[MagickPathExtent] = "*",
@@ -8206,44 +8282,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
         state&=(unsigned int) (~UpdateConfigurationState);
       }
     if (state & RedrawWidgetState)
-      {
-        /*
-          Redraw File Browser window.
-        */
-        x=QuantumMargin;
-        y=text_info.y+(int) ((text_info.height-height) >> 1)+font_info->ascent;
-        (void) XDrawString(display,windows->widget.id,
-          windows->widget.annotate_context,x,y,DirectoryText,
-          Extent(DirectoryText));
-        (void) CopyMagickString(text_info.text,working_path,MagickPathExtent);
-        (void) ConcatenateMagickString(text_info.text,DirectorySeparator,
-          MagickPathExtent);
-        (void) ConcatenateMagickString(text_info.text,glob_pattern,
-          MagickPathExtent);
-        XDrawWidgetText(display,&windows->widget,&text_info);
-        XDrawBeveledButton(display,&windows->widget,&up_info);
-        XDrawBeveledButton(display,&windows->widget,&home_info);
-        XDrawBeveledMatte(display,&windows->widget,&list_info);
-        XDrawBeveledMatte(display,&windows->widget,&scroll_info);
-        XDrawTriangleNorth(display,&windows->widget,&north_info);
-        XDrawBeveledButton(display,&windows->widget,&slider_info);
-        XDrawTriangleSouth(display,&windows->widget,&south_info);
-        x=QuantumMargin;
-        y=reply_info.y+(int) ((reply_info.height-height) >> 1)+
-          font_info->ascent;
-        (void) XDrawString(display,windows->widget.id,
-          windows->widget.annotate_context,x,y,FilenameText,
-          Extent(FilenameText));
-        XDrawBeveledMatte(display,&windows->widget,&reply_info);
-        XDrawMatteText(display,&windows->widget,&reply_info);
-        XDrawBeveledButton(display,&windows->widget,&special_info);
-        XDrawBeveledButton(display,&windows->widget,&action_info);
-        XDrawBeveledButton(display,&windows->widget,&cancel_info);
-        XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
-        selection_info.id=(~0);
-        state|=RedrawListState;
-        state&=(unsigned int) (~RedrawWidgetState);
-      }
+      RedrawFileBrowserWidget(&file_context,&file_widgets);
     if (state & UpdateListState)
       {
         char
