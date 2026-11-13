@@ -15444,26 +15444,9 @@ static MagickBooleanType XSeekOverwritePermission(Display *display,
   return(MagickTrue);
 }
 
-static MagickBooleanType XSaveImage(Display *display,
-  XResourceInfo *resource_info,XWindows *windows,Image *image,
-  ExceptionInfo *exception)
+static void XGetSaveFilename(const XResourceInfo *resource_info,
+  const Image *image,char *filename,ExceptionInfo *exception)
 {
-  char
-    filename[MagickPathExtent],
-    geometry[MagickPathExtent];
-
-  Image
-    *save_image;
-
-  ImageInfo
-    *image_info;
-
-  MagickStatusType
-    status;
-
-  /*
-    Request file name from user.
-  */
   if (resource_info->write_filename != (char *) NULL)
     (void) CopyMagickString(filename,resource_info->write_filename,
       MagickPathExtent);
@@ -15485,6 +15468,29 @@ static MagickBooleanType XSaveImage(Display *display,
               FileOpenError,"UnableToOpenFile","%s",path);
         }
     }
+}
+
+static MagickBooleanType XSaveImage(Display *display,
+  XResourceInfo *resource_info,XWindows *windows,Image *image,
+  ExceptionInfo *exception)
+{
+  char
+    filename[MagickPathExtent],
+    geometry[MagickPathExtent];
+
+  Image
+    *save_image;
+
+  ImageInfo
+    *image_info;
+
+  MagickStatusType
+    status;
+
+  /*
+    Request file name from user.
+  */
+  XGetSaveFilename(resource_info,image,filename,exception);
   XFileBrowserWidget(display,windows,"Save",filename);
   if (*filename == '\0')
     return(MagickTrue);
