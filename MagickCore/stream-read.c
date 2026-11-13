@@ -556,12 +556,25 @@ static inline MagickBooleanType IsOutsideStreamRegion(const Image *image,
     (columns == 0) || (rows == 0)) ? MagickTrue : MagickFalse);
 }
 
-static Quantum *AcquireStreamRegion(CacheInfo *cache_info,const size_t columns,
-  const size_t rows,ExceptionInfo *exception)
+static MagickBooleanType AcquireStreamLength(CacheInfo *cache_info,
+  const size_t length,ExceptionInfo *exception)
 {
   MagickBooleanType
     status;
 
+  cache_info->length=length;
+  status=AcquireStreamPixels(cache_info,exception);
+  if (status == MagickFalse)
+    {
+      cache_info->length=0;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static Quantum *AcquireStreamRegion(CacheInfo *cache_info,const size_t columns,
+  const size_t rows,ExceptionInfo *exception)
+{
   MagickSizeType
     number_pixels;
 
@@ -576,25 +589,15 @@ static Quantum *AcquireStreamRegion(CacheInfo *cache_info,const size_t columns,
     length+=(size_t) number_pixels*cache_info->metacontent_extent;
   if (cache_info->pixels == (Quantum *) NULL)
     {
-      cache_info->length=length;
-      status=AcquireStreamPixels(cache_info,exception);
-      if (status == MagickFalse)
-        {
-          cache_info->length=0;
-          return((Quantum *) NULL);
-        }
+      if (AcquireStreamLength(cache_info,length,exception) == MagickFalse)
+        return((Quantum *) NULL);
     }
   else
     if (cache_info->length < length)
       {
         RelinquishStreamPixels(cache_info);
-        cache_info->length=length;
-        status=AcquireStreamPixels(cache_info,exception);
-        if (status == MagickFalse)
-          {
-            cache_info->length=0;
-            return((Quantum *) NULL);
-          }
+        if (AcquireStreamLength(cache_info,length,exception) == MagickFalse)
+          return((Quantum *) NULL);
       }
   cache_info->metacontent=(void *) NULL;
   if (cache_info->metacontent_extent != 0)
