@@ -604,6 +604,71 @@ static void GetCenterGravityTextOffset(const GravityTextInfo *gravity,
   }
 }
 
+typedef struct _TextDecorationInfo
+{
+  Image
+    *image;
+
+  const DrawInfo
+    *draw_info;
+
+  DrawInfo
+    *annotate;
+
+  TypeMetric
+    metrics;
+
+  const char
+    *primitive;
+
+  ExceptionInfo
+    *exception;
+} TextDecorationInfo;
+
+static void DrawTextDecoration(const TextDecorationInfo *decoration,
+  DrawInfo *annotate_info)
+{
+  Image
+    *const image = decoration->image;
+
+  const DrawInfo
+    *const draw_info = decoration->draw_info;
+
+  DrawInfo
+    *const annotate = decoration->annotate;
+
+  const TypeMetric
+    metrics = decoration->metrics;
+
+  const char
+    *const primitive = decoration->primitive;
+
+  ExceptionInfo
+    *const exception = decoration->exception;
+
+  switch (annotate->decorate)
+  {
+    case OverlineDecoration:
+    {
+      annotate_info->affine.ty-=(draw_info->affine.sy*(metrics.ascent+
+        metrics.descent-metrics.underline_position));
+      (void) CloneString(&annotate_info->primitive,primitive);
+      (void) DrawImage(image,annotate_info,exception);
+      break;
+    }
+    case UnderlineDecoration:
+    {
+      annotate_info->affine.ty-=(draw_info->affine.sy*
+        metrics.underline_position);
+      (void) CloneString(&annotate_info->primitive,primitive);
+      (void) DrawImage(image,annotate_info,exception);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 MagickExport MagickBooleanType AnnotateImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -693,6 +758,9 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
     TextAlignInfo
       text_align;
 
+    TextDecorationInfo
+      decoration;
+
     GravityTextInfo
       gravity;
 
@@ -767,27 +835,13 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
     /*
       Annotate image with text.
     */
-    switch (annotate->decorate)
-    {
-      case OverlineDecoration:
-      {
-        annotate_info->affine.ty-=(draw_info->affine.sy*(metrics.ascent+
-          metrics.descent-metrics.underline_position));
-        (void) CloneString(&annotate_info->primitive,primitive);
-        (void) DrawImage(image,annotate_info,exception);
-        break;
-      }
-      case UnderlineDecoration:
-      {
-        annotate_info->affine.ty-=(draw_info->affine.sy*
-          metrics.underline_position);
-        (void) CloneString(&annotate_info->primitive,primitive);
-        (void) DrawImage(image,annotate_info,exception);
-        break;
-      }
-      default:
-        break;
-    }
+    decoration.image=image;
+    decoration.draw_info=draw_info;
+    decoration.annotate=annotate;
+    decoration.metrics=metrics;
+    decoration.primitive=primitive;
+    decoration.exception=exception;
+    DrawTextDecoration(&decoration,annotate_info);
     status=RenderType(&target,&offset,&metrics,exception);
     if (status == MagickFalse)
       break;
