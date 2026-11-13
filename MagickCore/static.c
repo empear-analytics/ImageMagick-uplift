@@ -366,13 +366,9 @@ MagickExport MagickBooleanType UnregisterStaticModule(const char *module)
 */
 MagickExport void UnregisterStaticModules(void)
 {
-  size_t
-    extent;
-
   ssize_t
     i;
 
-  extent=sizeof(MagickModules)/sizeof(MagickModules[0]);
-  for (i=0; i < (ssize_t) extent; i++)
+  for (i=0; i < (ssize_t) (sizeof(MagickModules)/sizeof(MagickModules[0])); i++)
     UnregisterStaticModuleEntry(i);
 }
