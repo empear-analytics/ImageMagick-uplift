@@ -5803,6 +5803,31 @@ static void XPackMatteRowLSB(const Image *canvas,const Quantum *p,
     *(*q)=byte >> (8-bit);
 }
 
+static Image *XReadTexturePattern(const XResourceInfo *resource_info,
+  const Image *image,ExceptionInfo *exception)
+{
+  char
+    size[MagickPathExtent];
+
+  Image
+    *pattern;
+
+  ImageInfo
+    *image_info;
+
+  image_info=AcquireImageInfo();
+  (void) CopyMagickString(image_info->filename,
+    resource_info->image_info->texture != (char *) NULL ?
+    resource_info->image_info->texture : "pattern:checkerboard",
+    MagickPathExtent);
+  (void) FormatLocaleString(size,MagickPathExtent,"%.17gx%.17g",(double)
+    image->columns,(double) image->rows);
+  image_info->size=ConstantString(size);
+  pattern=ReadImage(image_info,exception);
+  image_info=DestroyImageInfo(image_info);
+  return(pattern);
+}
+
 static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -5853,25 +5878,10 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   canvas=image;
   if (IsMutableAlphaImage(window,image) != MagickFalse)
     {
-      char
-        size[MagickPathExtent];
-
       Image
         *pattern;
 
-      ImageInfo
-        *image_info;
-
-      image_info=AcquireImageInfo();
-      (void) CopyMagickString(image_info->filename,
-        resource_info->image_info->texture != (char *) NULL ?
-        resource_info->image_info->texture : "pattern:checkerboard",
-        MagickPathExtent);
-      (void) FormatLocaleString(size,MagickPathExtent,"%.17gx%.17g",(double)
-        image->columns,(double) image->rows);
-      image_info->size=ConstantString(size);
-      pattern=ReadImage(image_info,exception);
-      image_info=DestroyImageInfo(image_info);
+      pattern=XReadTexturePattern(resource_info,image,exception);
       if (pattern != (Image *) NULL)
         {
           canvas=CloneImage(image,0,0,MagickTrue,exception);
