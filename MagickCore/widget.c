@@ -15306,6 +15306,43 @@ static void ReleasePreferencesButtons(const PreferencesContext *context,
     }
 }
 
+static void PressPreferencesKey(const PreferencesContext *context,
+  const XEvent event,const PreferencesWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const apply_info = widgets->apply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  static char
+    command[MagickPathExtent];
+
+  static KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key press.
+  */
+  if (event.xkey.window != windows->widget.id)
+    return;
+  (void) XLookupString((XKeyEvent *) &event.xkey,command,
+    (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
+    {
+      (*apply_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,apply_info);
+      (*state)|=ExitState;
+      return;
+    }
+}
+
 MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XResourceInfo *resource_info,XWindows *windows)
 {
@@ -15414,26 +15451,7 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
       }
       case KeyPress:
       {
-        static char
-          command[MagickPathExtent];
-
-        static KeySym
-          key_symbol;
-
-        /*
-          Respond to a user key press.
-        */
-        if (event.xkey.window != windows->widget.id)
-          break;
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,
-          (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
-          {
-            apply_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&apply_info);
-            state|=ExitState;
-            break;
-          }
+        PressPreferencesKey(&context,event,&widgets);
         break;
       }
       case LeaveNotify:
