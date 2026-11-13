@@ -3925,6 +3925,182 @@ static Image **XSortAnimateScenes(Image *images,const size_t number_scenes,
   return(image_list);
 }
 
+typedef struct _AnimateWindowSetup
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  XVisualInfo
+    *visual_info;
+
+  XStandardColormap
+    *map_info;
+
+  XPixelInfo
+    *pixel;
+
+  XFontStruct
+    *font_info;
+
+  Window
+    root_window;
+
+  XClassHint
+    *class_hints;
+
+  XWMHints
+    *manager_hints;
+
+  char
+    **argv;
+
+  int
+    argc;
+
+  XResourceInfo
+    *icon_resources;
+
+  XVisualInfo
+    *icon_visual;
+
+  XStandardColormap
+    *icon_map;
+
+  XPixelInfo
+    *icon_pixel;
+
+  Image
+    *display_image;
+
+  size_t
+    number_scenes;
+} AnimateWindowSetup;
+
+static void XCreateContextWindow(const AnimateWindowSetup *setup)
+{
+  Display
+    *const display = setup->display;
+
+  XResourceInfo
+    *const resource_info = setup->resource_info;
+
+  XWindows
+    *const windows = setup->windows;
+
+  XVisualInfo
+    *const visual_info = setup->visual_info;
+
+  XStandardColormap
+    *const map_info = setup->map_info;
+
+  XPixelInfo
+    *const pixel = setup->pixel;
+
+  XFontStruct
+    *const font_info = setup->font_info;
+
+  const Window
+    root_window = setup->root_window;
+
+  XClassHint
+    *const class_hints = setup->class_hints;
+
+  XWMHints
+    *const manager_hints = setup->manager_hints;
+
+  char
+    **const argv = setup->argv;
+
+  const int
+    argc = setup->argc;
+
+  /*
+    Initialize graphic context.
+  */
+  windows->context.id=(Window) NULL;
+  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
+    resource_info,&windows->context);
+  (void) CloneString(&class_hints->res_name,resource_info->client_name);
+  (void) CloneString(&class_hints->res_class,resource_info->client_name);
+  class_hints->res_class[0]=(char) LocaleToUppercase((int)
+    class_hints->res_class[0]);
+  manager_hints->flags=InputHint | StateHint;
+  manager_hints->input=MagickFalse;
+  manager_hints->initial_state=WithdrawnState;
+  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
+    &windows->context);
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Window id: 0x%lx (context)",windows->context.id);
+}
+
+static void XCreateIconWindow(const AnimateWindowSetup *setup)
+{
+  Display
+    *const display = setup->display;
+
+  XResourceInfo
+    *const resource_info = setup->resource_info;
+
+  XWindows
+    *const windows = setup->windows;
+
+  const Window
+    root_window = setup->root_window;
+
+  XClassHint
+    *const class_hints = setup->class_hints;
+
+  XWMHints
+    *const manager_hints = setup->manager_hints;
+
+  char
+    **const argv = setup->argv;
+
+  const int
+    argc = setup->argc;
+
+  XResourceInfo
+    *const icon_resources = setup->icon_resources;
+
+  XVisualInfo
+    *const icon_visual = setup->icon_visual;
+
+  XStandardColormap
+    *const icon_map = setup->icon_map;
+
+  XPixelInfo
+    *const icon_pixel = setup->icon_pixel;
+
+  Image
+    *const display_image = setup->display_image;
+
+  /*
+    Initialize icon window.
+  */
+  XGetWindowInfo(display,icon_visual,icon_map,icon_pixel,(XFontStruct *) NULL,
+    icon_resources,&windows->icon);
+  windows->icon.geometry=resource_info->icon_geometry;
+  XBestIconSize(display,&windows->icon,display_image);
+  windows->icon.attributes.colormap=
+    XDefaultColormap(display,icon_visual->screen);
+  windows->icon.attributes.event_mask=ExposureMask | StructureNotifyMask;
+  manager_hints->flags=InputHint | StateHint;
+  manager_hints->input=MagickFalse;
+  manager_hints->initial_state=IconicState;
+  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
+    &windows->icon);
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),"Window id: 0x%lx (icon)",
+      windows->icon.id);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4020,6 +4196,9 @@ MagickExport Image *XAnimateImages(Display *display,
   AnimateSceneList
     scene_list;
 
+  AnimateWindowSetup
+    setup;
+
   const AnimateCommandTargets
     command_targets = { &event, &image, &state, &nexus };
 
@@ -4088,24 +4267,25 @@ MagickExport Image *XAnimateImages(Display *display,
   XLogDisplayImage(resource_info,display_image);
   XMakeStandardColormap(display,visual_info,resource_info,display_image,
     map_info,pixel,exception);
-  /*
-    Initialize graphic context.
-  */
-  windows->context.id=(Window) NULL;
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->context);
-  (void) CloneString(&class_hints->res_name,resource_info->client_name);
-  (void) CloneString(&class_hints->res_class,resource_info->client_name);
-  class_hints->res_class[0]=(char) LocaleToUppercase((int)
-    class_hints->res_class[0]);
-  manager_hints->flags=InputHint | StateHint;
-  manager_hints->input=MagickFalse;
-  manager_hints->initial_state=WithdrawnState;
-  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-    &windows->context);
-  if (resource_info->debug != MagickFalse)
-    (void) LogMagickEvent(X11Event,GetMagickModule(),
-      "Window id: 0x%lx (context)",windows->context.id);
+  setup.display=display;
+  setup.resource_info=resource_info;
+  setup.windows=windows;
+  setup.visual_info=visual_info;
+  setup.map_info=map_info;
+  setup.pixel=pixel;
+  setup.font_info=font_info;
+  setup.root_window=root_window;
+  setup.class_hints=class_hints;
+  setup.manager_hints=manager_hints;
+  setup.argv=argv;
+  setup.argc=argc;
+  setup.icon_resources=icon_resources;
+  setup.icon_visual=icon_visual;
+  setup.icon_map=icon_map;
+  setup.icon_pixel=icon_pixel;
+  setup.display_image=display_image;
+  setup.number_scenes=number_scenes;
+  XCreateContextWindow(&setup);
   context_values.background=pixel->background_color.pixel;
   context_values.font=font_info->fid;
   context_values.foreground=pixel->foreground_color.pixel;
@@ -4139,24 +4319,7 @@ MagickExport Image *XAnimateImages(Display *display,
     ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
       images->filename);
   (void) XDestroyWindow(display,windows->context.id);
-  /*
-    Initialize icon window.
-  */
-  XGetWindowInfo(display,icon_visual,icon_map,icon_pixel,(XFontStruct *) NULL,
-    icon_resources,&windows->icon);
-  windows->icon.geometry=resource_info->icon_geometry;
-  XBestIconSize(display,&windows->icon,display_image);
-  windows->icon.attributes.colormap=
-    XDefaultColormap(display,icon_visual->screen);
-  windows->icon.attributes.event_mask=ExposureMask | StructureNotifyMask;
-  manager_hints->flags=InputHint | StateHint;
-  manager_hints->input=MagickFalse;
-  manager_hints->initial_state=IconicState;
-  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-    &windows->icon);
-  if (resource_info->debug != MagickFalse)
-    (void) LogMagickEvent(X11Event,GetMagickModule(),"Window id: 0x%lx (icon)",
-      windows->icon.id);
+  XCreateIconWindow(&setup);
   /*
     Initialize graphic context for icon window.
   */
