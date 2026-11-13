@@ -55,6 +55,7 @@ $call Make compare.c
 $call Make compare-similarity.c
 $call Make composite.c
 $call Make compress.c
+$call Make compress-lzw.c
 $call Make configure.c
 $call Make configure-paths.c
 $call Make constitute.c

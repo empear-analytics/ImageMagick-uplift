@@ -132,6 +132,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/composite.h \
   MagickCore/composite-private.h \
   MagickCore/compress.c \
+  MagickCore/compress-lzw.c \
   MagickCore/compress.h \
   MagickCore/configure.c \
   MagickCore/configure-paths.c \
