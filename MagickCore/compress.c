@@ -478,12 +478,9 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
     sizeof(*scanline));
   if (IsHuffmanBufferMissing(mb_hash,mw_hash,scanline) != MagickFalse)
     {
-      if (mb_hash != (HuffmanTable **) NULL)
-        mb_hash=(HuffmanTable **) RelinquishMagickMemory(mb_hash);
-      if (mw_hash != (HuffmanTable **) NULL)
-        mw_hash=(HuffmanTable **) RelinquishMagickMemory(mw_hash);
-      if (scanline != (unsigned char *) NULL)
-        scanline=(unsigned char *) RelinquishMagickMemory(scanline);
+      mb_hash=(HuffmanTable **) RelinquishMagickMemory(mb_hash);
+      mw_hash=(HuffmanTable **) RelinquishMagickMemory(mw_hash);
+      scanline=(unsigned char *) RelinquishMagickMemory(scanline);
       ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
         image->filename);
     }
