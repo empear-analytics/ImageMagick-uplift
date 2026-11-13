@@ -4358,23 +4358,23 @@ static void
 static void
   XDiscardMagnifyKeys(Display *,XWindows *,XEvent *);
 
+static const char
+  *const ColorEditMenu[] =
+  {
+    "Method",
+    "Pixel Color",
+    "Border Color",
+    "Fuzz",
+    "Undo",
+    "Help",
+    "Dismiss",
+    (char *) NULL
+  };
+
 static MagickBooleanType XColorEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
 {
-  const char
-    *const ColorEditMenu[] =
-    {
-      "Method",
-      "Pixel Color",
-      "Border Color",
-      "Fuzz",
-      "Undo",
-      "Help",
-      "Dismiss",
-      (char *) NULL
-    };
-
   static const ModeType
     ColorEditCommands[] =
     {
