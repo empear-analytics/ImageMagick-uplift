@@ -4160,6 +4160,33 @@ static void XFreeWindowMattePixmap(Display *display,XWindowInfo *window)
 #endif
 }
 
+static void XCopyMatteToPixmap(Display *display,
+  const XWindowInfo *window,const unsigned int width,
+  const unsigned int height)
+{
+  GC
+    graphics_context;
+
+  XGCValues
+    context_values;
+
+  /*
+    Copy matte image to matte pixmap.
+  */
+  context_values.background=0;
+  context_values.foreground=1;
+  graphics_context=XCreateGC(display,window->matte_pixmap,
+    (size_t) (GCBackground | GCForeground),&context_values);
+  (void) XPutImage(display,window->matte_pixmap,graphics_context,
+    window->matte_image,0,0,0,0,width,height);
+  (void) XFreeGC(display,graphics_context);
+#if defined(MAGICKCORE_HAVE_SHAPE)
+  if (window->shape != MagickFalse)
+    XShapeCombineMask(display,window->id,ShapeBounding,0,0,
+      window->matte_pixmap,ShapeSet);
+#endif
+}
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
@@ -4411,29 +4438,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
       */
       window->matte_pixmap=XCreatePixmap(display,window->id,width,height,1);
       if (window->matte_pixmap != (Pixmap) NULL)
-        {
-          GC
-            graphics_context;
-
-          XGCValues
-            context_values;
-
-          /*
-            Copy matte image to matte pixmap.
-          */
-          context_values.background=0;
-          context_values.foreground=1;
-          graphics_context=XCreateGC(display,window->matte_pixmap,
-            (size_t) (GCBackground | GCForeground),&context_values);
-          (void) XPutImage(display,window->matte_pixmap,graphics_context,
-            window->matte_image,0,0,0,0,width,height);
-          (void) XFreeGC(display,graphics_context);
-#if defined(MAGICKCORE_HAVE_SHAPE)
-          if (window->shape != MagickFalse)
-            XShapeCombineMask(display,window->id,ShapeBounding,0,0,
-              window->matte_pixmap,ShapeSet);
-#endif
-        }
+        XCopyMatteToPixmap(display,window,width,height);
       }
   (void) XMakePixmap(display,resource_info,window);
   /*
