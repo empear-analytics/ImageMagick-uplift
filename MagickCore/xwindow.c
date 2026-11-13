@@ -7555,6 +7555,24 @@ static int XGetMagnifyPixmapX(const XWindows *windows,const XImage *ximage,
   return(x);
 }
 
+static int XGetMagnifyPixmapY(const XWindows *windows,const XImage *ximage,
+  const unsigned int height,const unsigned int magnify)
+{
+  int
+    y;
+
+  y=windows->magnify.y-(int) ((height/magnify) >> 1);
+  if (y < 0)
+    y=((int) (height >> 1)-windows->magnify.y*(int) magnify);
+  else
+    if (y > (ximage->height-(int) (height/magnify)))
+      y=(int) ((ximage->height-windows->magnify.y)*(int) magnify-(int)
+        (height >> 1));
+    else
+      y=0;
+  return(y);
+}
+
 MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   ExceptionInfo *exception)
 {
@@ -7754,15 +7772,7 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
     Copy X image to magnify pixmap.
   */
   x=XGetMagnifyPixmapX(windows,ximage,width,magnify);
-  y=windows->magnify.y-(int) ((height/magnify) >> 1);
-  if (y < 0)
-    y=((int) (height >> 1)-windows->magnify.y*(int) magnify);
-  else
-    if (y > (ximage->height-(int) (height/magnify)))
-      y=(int) ((ximage->height-windows->magnify.y)*(int) magnify-(int)
-        (height >> 1));
-    else
-      y=0;
+  y=XGetMagnifyPixmapY(windows,ximage,height,magnify);
   if ((x != 0) || (y != 0))
     (void) XFillRectangle(display,windows->magnify.pixmap,
       windows->magnify.annotate_context,0,0,width,height);
