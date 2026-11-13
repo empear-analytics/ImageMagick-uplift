@@ -2366,6 +2366,36 @@ typedef struct _GlyphRows
     *exception;
 } GlyphRows;
 
+static Quantum *GetGlyphRowPixels(const GlyphRows *rows,
+  const ssize_t x_offset,const ssize_t y_offset,MagickBooleanType *active)
+{
+  Image
+    *const image = rows->image;
+
+  CacheView
+    *const image_view = rows->image_view;
+
+  const FT_BitmapGlyph
+    bitmap = rows->bitmap;
+
+  ExceptionInfo
+    *const exception = rows->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  q=(Quantum *) NULL;
+  if (IsColumnOutside(image,x_offset) != MagickFalse)
+    *active=MagickFalse;
+  else
+    {
+      q=GetCacheViewAuthenticPixels(image_view,x_offset,y_offset,
+        bitmap->bitmap.width,1,exception);
+      *active=q != (Quantum *) NULL ? MagickTrue : MagickFalse;
+    }
+  return(q);
+}
+
 static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
   MagickBooleanType *status)
 {
@@ -2420,15 +2450,7 @@ static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
   y_offset=CastDoubleToSsizeT(ceil(point.y+y-0.5));
   if (IsRowOutside(image,y_offset) != MagickFalse)
     return;
-  q=(Quantum *) NULL;
-  if (IsColumnOutside(image,x_offset) != MagickFalse)
-    active=MagickFalse;
-  else
-    {
-      q=GetCacheViewAuthenticPixels(image_view,x_offset,y_offset,
-        bitmap->bitmap.width,1,exception);
-      active=q != (Quantum *) NULL ? MagickTrue : MagickFalse;
-    }
+  q=GetGlyphRowPixels(rows,x_offset,y_offset,&active);
   n=y*bitmap->bitmap.pitch;
   for (x=0; x < (ssize_t) bitmap->bitmap.width; x++, n++)
   {
