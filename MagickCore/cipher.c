@@ -785,6 +785,17 @@ static MagickBooleanType AcquireCipherKeyAndNonce(Image *image,
   return(MagickTrue);
 }
 
+static void OpenCipherImage(const Image *image,
+  const ExceptionInfo *exception)
+{
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+}
+
 MagickExport MagickBooleanType PasskeyDecipherImage(Image *image,
   const StringInfo *passkey,ExceptionInfo *exception)
 {
@@ -828,12 +839,7 @@ MagickExport MagickBooleanType PasskeyDecipherImage(Image *image,
   /*
     Generate decipher key and nonce.
   */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  OpenCipherImage(image,exception);
   if (passkey == (const StringInfo *) NULL)
     return(MagickTrue);
   if (AcquireCipherKeyAndNonce(image,passkey,exception,&targets) ==
