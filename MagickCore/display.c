@@ -7891,6 +7891,69 @@ static void XDrawStartEvent(const DrawEditContext *context,
   }
 }
 
+static void XWaitForDrawStart(const DrawEditContext *context,
+  const DrawPointerTargets *pointer_targets,
+  const DrawStyleTargets *style_targets)
+{
+  const Cursor
+    cursor = context->cursor;
+
+  Display
+    *const display = context->display;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  XWindows
+    *const windows = context->windows;
+
+  int
+    *const x = pointer_targets->x;
+
+  int
+    *const y = pointer_targets->y;
+
+  size_t
+    *const state = pointer_targets->state;
+
+  XEvent
+    *const event = pointer_targets->event;
+
+  char
+    text[MagickPathExtent];
+
+  XQueryPosition(display,windows->image.id,x,y);
+  (void) XSelectInput(display,windows->image.id,
+    windows->image.attributes.event_mask | PointerMotionMask);
+  (void) XCheckDefineCursor(display,windows->image.id,cursor);
+  (*state)=DefaultState;
+  do
+  {
+    if (windows->info.mapped != MagickFalse)
+      {
+        /*
+          Display pointer position.
+        */
+        (void) FormatLocaleString(text,MagickPathExtent," %+d%+d ",
+          (*x)+windows->image.x,(*y)+windows->image.y);
+        XInfoWidget(display,windows,text);
+      }
+    /*
+      Wait for next event.
+    */
+    XScreenEvent(display,windows,event,exception);
+    if ((*event).xany.window == windows->command.id)
+      {
+        XDrawCommand(context,pointer_targets,style_targets);
+        continue;
+      }
+    XDrawStartEvent(context,pointer_targets);
+  } while (((*state) & ExitState) == 0);
+  (void) XSelectInput(display,windows->image.id,
+    windows->image.attributes.event_mask);
+  (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -7931,8 +7994,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
     line_width = 1;
 
   char
-    command[MagickPathExtent],
-    text[MagickPathExtent];
+    command[MagickPathExtent];
 
   Cursor
     cursor;
@@ -8032,36 +8094,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
   draw_context.DrawCommands=DrawCommands;
   for ( ; ; )
   {
-    XQueryPosition(display,windows->image.id,&x,&y);
-    (void) XSelectInput(display,windows->image.id,
-      windows->image.attributes.event_mask | PointerMotionMask);
-    (void) XCheckDefineCursor(display,windows->image.id,cursor);
-    state=DefaultState;
-    do
-    {
-      if (windows->info.mapped != MagickFalse)
-        {
-          /*
-            Display pointer position.
-          */
-          (void) FormatLocaleString(text,MagickPathExtent," %+d%+d ",
-            x+windows->image.x,y+windows->image.y);
-          XInfoWidget(display,windows,text);
-        }
-      /*
-        Wait for next event.
-      */
-      XScreenEvent(display,windows,&event,exception);
-      if (event.xany.window == windows->command.id)
-        {
-          XDrawCommand(&draw_context,&pointer_targets,&style_targets);
-          continue;
-        }
-      XDrawStartEvent(&draw_context,&pointer_targets);
-    } while ((state & ExitState) == 0);
-    (void) XSelectInput(display,windows->image.id,
-      windows->image.attributes.event_mask);
-    (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+    XWaitForDrawStart(&draw_context,&pointer_targets,&style_targets);
     if ((state & EscapeState) != 0)
       break;
     /*
