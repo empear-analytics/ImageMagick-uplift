@@ -4021,6 +4021,32 @@ static inline MagickBooleanType IsLSBFirstXImage(const XImage *ximage)
     (ximage->bitmap_bit_order == LSBFirst))) ? MagickTrue : MagickFalse);
 }
 
+static void XCropWindowImage(XWindowInfo *window,Image *image,
+  ExceptionInfo *exception)
+{
+  Image
+    *crop_image;
+
+  RectangleInfo
+    crop_info;
+
+  /*
+    Crop image.
+  */
+  window->image->page.x=0;
+  window->image->page.y=0;
+  (void) ParsePageGeometry(window->image,window->crop_geometry,
+    &crop_info,exception);
+  crop_image=CropImage(window->image,&crop_info,exception);
+  if (crop_image != (Image *) NULL)
+    {
+      if (window->image != image)
+        window->image=DestroyImage(window->image);
+      window->image=crop_image;
+      window->destroy=MagickTrue;
+    }
+}
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
@@ -4058,29 +4084,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
   if (window->image != (Image *) NULL)
     {
       if (window->crop_geometry != (char *) NULL)
-        {
-          Image
-            *crop_image;
-
-          RectangleInfo
-            crop_info;
-
-          /*
-            Crop image.
-          */
-          window->image->page.x=0;
-          window->image->page.y=0;
-          (void) ParsePageGeometry(window->image,window->crop_geometry,
-            &crop_info,exception);
-          crop_image=CropImage(window->image,&crop_info,exception);
-          if (crop_image != (Image *) NULL)
-            {
-              if (window->image != image)
-                window->image=DestroyImage(window->image);
-              window->image=crop_image;
-              window->destroy=MagickTrue;
-            }
-        }
+        XCropWindowImage(window,image,exception);
       if ((width != (unsigned int) window->image->columns) ||
           (height != (unsigned int) window->image->rows))
         {
