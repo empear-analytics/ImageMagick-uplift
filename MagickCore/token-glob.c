@@ -179,6 +179,23 @@ static MagickBooleanType GlobStar(const char *magick_restrict expression,
   return(MagickFalse);
 }
 
+static const char *FindGlobBraceEnd(const char *p)
+{
+  while ((GetUTFCode(p) != 0) && (GetUTFCode(p) != '}'))
+  {
+#if !defined(MAGICKCORE_WINDOWS_SUPPORT) || defined(__CYGWIN__)
+    if (GetUTFCode(p) == '\\')
+      {
+        p+=GetUTFOctets(p);
+        if (GetUTFCode(p) == 0)
+          break;
+      }
+#endif
+    p+=GetUTFOctets(p);
+  }
+  return(p);
+}
+
 static MagickBooleanType GlobExpression_(const char *magick_restrict expression,
   const char *magick_restrict pattern,const MagickBooleanType case_insensitive,
   const size_t depth)
@@ -276,19 +293,7 @@ static MagickBooleanType GlobExpression_(const char *magick_restrict expression,
         /*
           End of brace expression: append remaining pattern.
         */
-        p=pattern;
-        while ((GetUTFCode(p) != 0) && (GetUTFCode(p) != '}'))
-        {
-#if !defined(MAGICKCORE_WINDOWS_SUPPORT) || defined(__CYGWIN__)
-          if (GetUTFCode(p) == '\\')
-            {
-              p+=GetUTFOctets(p);
-              if (GetUTFCode(p) == 0)
-                break;
-            }
-#endif
-          p+=GetUTFOctets(p);
-        }
+        p=FindGlobBraceEnd(pattern);
         if (GetUTFCode(p) != '}')
           return(MagickFalse);  /* malformed */
         q=p+GetUTFOctets(p);
