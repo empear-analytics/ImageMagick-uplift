@@ -4963,6 +4963,14 @@ static MagickBooleanType XConvertWindowXImage(const XMakeImageSource *source,
   return(MagickTrue);
 }
 
+static void XAssignWindowImage(XWindowInfo *window,Image *image)
+{
+  if (window->destroy)
+    window->image=DestroyImage(window->image);
+  window->image=image;
+  window->destroy=MagickFalse;
+}
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
@@ -4995,10 +5003,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
   (void) XCheckDefineCursor(display,window->id,window->busy_cursor);
   (void) XFlush(display);
   depth=(int) window->depth;
-  if (window->destroy)
-    window->image=DestroyImage(window->image);
-  window->image=image;
-  window->destroy=MagickFalse;
+  XAssignWindowImage(window,image);
   if (window->image != (Image *) NULL)
     {
       transform.display=display;
