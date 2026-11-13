@@ -14151,6 +14151,15 @@ labels in a `switch` of the new function; Recipe EC, which names an equality cha
    predicate's parameter then has that type, `const ssize_t selector`), and `G`'s body may
    instead be one call statement `F(...);` and `break;`, whose call writes nothing the
    `switch` tests (step 3 then copies that call in place of `p++`).
+   Second widening (2026-11-13, lane b): `c` may be an element `a[i]` of an array or
+   pointer `a` indexed by a local `i`, neither of which the loop body writes before the
+   `incr` expression of its `for` (the predicate keeps `const int`, and the call passes
+   the same text `a[i]`: a `char` converts to `int` as an argument just as the `switch`
+   promoted it); and `G`'s body may instead be one assignment `x=K;` of an enumeration
+   constant to a variable or member that no label test reads (step 3 copies it in place
+   of `p++`). Two groups may be peeled one after the other, each its own commit; the
+   second `if` stands between the first and the `switch` (the label sets are disjoint,
+   so at most one predicate holds for a value).
 2. Directly above the first function that uses it write `static inline
    MagickBooleanType Name(const int c)` whose body is `switch (c) { <L1 ... Ln in the
    original order> return(MagickTrue); default: break; } return(MagickFalse);`.
@@ -14221,6 +14230,12 @@ Step 1's widening (2026-11-13, campaign B, M127 lane c): `profile.c`'s `UpdateCl
 whose knot group is a call on a `ssize_t` selector. Added by Claude Code (Claude Opus 5.5)
 under the mandate of 2026-10-24.
 Lane: c
+Step 1's second widening (2026-11-13, campaign B, M127 lane b round 5):
+`constitute-pixels.c`'s `SetImageTraitsFromMap`, whose `switch (map[i])` assigns
+`image->colorspace=CMYKColorspace;` under eight labels and `image->alpha_trait=
+BlendPixelTrait;` under four. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-10-24.
+Lane: b
 
 ---
 
@@ -15557,3 +15572,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | IX | Inline a Constant Extent Local into Its Loop Bound: a local set once from an integer constant expression of `sizeof`s and read only in `for` bounds is replaced by the parenthesised expression; evidence guard (`obj_identical.sh`); Lane: b | `static.c`'s `UnregisterStaticModules` (after Recipe D, *Code Duplication* with `UnregisterStaticModule` left; probe 9.09 to 9.68, object code identical) | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | KC | Step 1: a label may be a character constant (type `int`; `key` of type `int`); Lane: b | `string-si.c`'s `GetSiPrefixExponent` (twenty-four letter labels each assigning a `double` exponent, cc 26; probe 8.50 to 9.09) | mandate (2026-10-24) |
 | 2026-11-13 | NEW | AT | Extract a Selection Arm with a Copy of the Return Tail: in a value-returning function ending `if (c) <arm> return(R);`, the arm (returning on some paths, falling through on others) moves to a `static` function of the caller's return type followed by a copy of `return(R);`; the `if` becomes `if (c) return(Helper(...));`; locals the arm writes are read after it only by `R` and go by value; evidence oracle; Lane: b | `string-copy.c`'s `CopyMagickString` (cc 9, two bumps; E step 7 on the whole tail left a five-argument helper, 9.68; this recipe 9.61 to 10.0) | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | PA | Step 1, second widening: `c` may be an element `a[i]` that the loop body does not write before the increment (the call passes the same text to the `const int` parameter), and the peeled group's body may be one assignment of an enumeration constant to a variable or member no label test reads; two groups may be peeled in turn; Lane: b | `constitute-pixels.c`'s `SetImageTraitsFromMap` (`switch (map[i])`, eight CMYK labels and four alpha labels, cc 18) | mandate (2026-10-24) |
