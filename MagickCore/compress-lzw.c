@@ -214,34 +214,33 @@ MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
       Find string.
     */
     index=FindLZWString(table,&last_code,pixels[i]);
-    if (last_code != (size_t) index)
+    if (last_code == (size_t) index)
+      continue;
+    /*
+      Add string.
+    */
+    OutputCode(last_code);
+    AddLZWString(table,last_code,pixels[i],next_index);
+    next_index++;
+    /*
+      Did we just move up to next bit width?
+    */
+    if ((next_index >> code_width) != 0)
       {
-        /*
-          Add string.
-        */
-        OutputCode(last_code);
-        AddLZWString(table,last_code,pixels[i],next_index);
-        next_index++;
-        /*
-          Did we just move up to next bit width?
-        */
-        if ((next_index >> code_width) != 0)
+        code_width++;
+        if (code_width > 12)
           {
-            code_width++;
-            if (code_width > 12)
-              {
-                /*
-                  Did we overflow the max bit width?
-                */
-                code_width--;
-                OutputCode(LZWClr);
-                ResetLZWTable(table);
-                next_index=LZWEod+1;
-                code_width=9;
-              }
-            }
-          last_code=(size_t) pixels[i];
-      }
+            /*
+              Did we overflow the max bit width?
+            */
+            code_width--;
+            OutputCode(LZWClr);
+            ResetLZWTable(table);
+            next_index=LZWEod+1;
+            code_width=9;
+          }
+        }
+      last_code=(size_t) pixels[i];
   }
   /*
     Flush tables.
