@@ -2740,6 +2740,26 @@ static void SyncExifDimension(const ExifTagInfo *exif_tag,unsigned char *ifd,
       image->columns : image->rows,format,components,q,p);
 }
 
+static MagickBooleanType ReadExifMarker(unsigned char **exif,size_t *length,
+  MagickBooleanType *broke)
+{
+  (*broke)=MagickFalse;
+  if (ReadProfileByte(exif,length) != 0x45)
+    return(MagickFalse);
+  if (ReadProfileByte(exif,length) != 0x78)
+    return(MagickFalse);
+  if (ReadProfileByte(exif,length) != 0x69)
+    return(MagickFalse);
+  if (ReadProfileByte(exif,length) != 0x66)
+    return(MagickFalse);
+  if (ReadProfileByte(exif,length) != 0x00)
+    return(MagickFalse);
+  if (ReadProfileByte(exif,length) != 0x00)
+    return(MagickFalse);
+  (*broke)=MagickTrue;
+  return(MagickTrue);
+}
+
 static void SyncExifProfile(const Image *image,unsigned char *exif,
   size_t length)
 {
@@ -2748,6 +2768,9 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
 
   EndianType
     endian;
+
+  MagickBooleanType
+    broke = MagickFalse;
 
   size_t
     directory_length,
@@ -2777,19 +2800,10 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
     {
       while (length != 0)
       {
-        if (ReadProfileByte(&exif,&length) != 0x45)
+        if (ReadExifMarker(&exif,&length,&broke) == MagickFalse)
           continue;
-        if (ReadProfileByte(&exif,&length) != 0x78)
-          continue;
-        if (ReadProfileByte(&exif,&length) != 0x69)
-          continue;
-        if (ReadProfileByte(&exif,&length) != 0x66)
-          continue;
-        if (ReadProfileByte(&exif,&length) != 0x00)
-          continue;
-        if (ReadProfileByte(&exif,&length) != 0x00)
-          continue;
-        break;
+        if (broke != MagickFalse)
+          break;
       }
       if (length < 16)
         return;
