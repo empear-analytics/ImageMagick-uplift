@@ -1130,6 +1130,88 @@ static void SetProfileProgress(Image *image,const MagickOffsetType progress,
   if (proceed == MagickFalse)
     (*status)=MagickFalse;
 }
+
+typedef struct _ProfileTransformInputs
+{
+  MagickBooleanType
+    highres;
+
+  LCMSInfo
+    source_info,
+    target_info;
+
+  cmsHTRANSFORM
+    *transform;
+} ProfileTransformInputs;
+
+static MagickBooleanType TransformProfileImage(Image *image,
+  const ProfileTransformInputs *in,ExceptionInfo *exception)
+{
+  const MagickBooleanType
+    highres = in->highres;
+
+  const LCMSInfo
+    source_info = in->source_info,
+    target_info = in->target_info;
+
+  cmsHTRANSFORM
+    *const transform = in->transform;
+
+  CacheView
+    *image_view;
+
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  ssize_t
+    y;
+
+  status=MagickTrue;
+  progress=0;
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const int
+      id = GetOpenMPThreadId();
+
+    Quantum
+      *magick_restrict q;
+
+    if (status == MagickFalse)
+      continue;
+    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
+      exception);
+    if (q == (Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    if (highres != MagickFalse)
+      TransformDoublePixels(id,image,&source_info,&target_info,
+        transform,q);
+    else
+      TransformQuantumPixels(id,image,&source_info,&target_info,
+        transform,q);
+    SyncProfileView(image_view,exception,&status);
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetProfileProgress(image,progress,&status);
+      }
+  }
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
 #endif
 
 #define ThrowProfileException(severity,tag,context) \
@@ -1228,9 +1310,6 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
           status=SetImageProfilePrivate(image,profile,exception);
         else
           {
-            CacheView
-              *image_view;
-
             cmsColorSpaceSignature
               signature;
 
@@ -1243,11 +1322,8 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
             MagickBooleanType
               highres;
 
-            MagickOffsetType
-              progress;
-
-            ssize_t
-              y;
+            ProfileTransformInputs
+              transform_in;
 
             target_info.profile=(cmsHPROFILE) NULL;
             if (icc_profile != (StringInfo *) NULL)
@@ -1501,46 +1577,13 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
               }
             if (target_info.colorspace == CMYKColorspace)
               (void) SetImageColorspace(image,target_info.colorspace,exception);
-            progress=0;
-            image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-            #pragma omp parallel for schedule(static) shared(status) \
-              magick_number_threads(image,image,image->rows,1)
-#endif
-            for (y=0; y < (ssize_t) image->rows; y++)
-            {
-              const int
-                id = GetOpenMPThreadId();
-
-              Quantum
-                *magick_restrict q;
-
-              if (status == MagickFalse)
-                continue;
-              q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-                exception);
-              if (q == (Quantum *) NULL)
-                {
-                  status=MagickFalse;
-                  continue;
-                }
-              if (highres != MagickFalse)
-                TransformDoublePixels(id,image,&source_info,&target_info,
-                  transform,q);
-              else
-                TransformQuantumPixels(id,image,&source_info,&target_info,
-                  transform,q);
-              SyncProfileView(image_view,exception,&status);
-              if (image->progress_monitor != (MagickProgressMonitor) NULL)
-                {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-                  #pragma omp atomic
-#endif
-                  progress++;
-                  SetProfileProgress(image,progress,&status);
-                }
-            }
-            image_view=DestroyCacheView(image_view);
+            transform_in.highres=highres;
+            transform_in.source_info=source_info;
+            transform_in.target_info=target_info;
+            transform_in.transform=transform;
+            if (TransformProfileImage(image,&transform_in,exception) ==
+                MagickFalse)
+              status=MagickFalse;
             (void) SetImageColorspace(image,target_info.colorspace,exception);
             SetImageTypeFromSignature(image,signature);
             target_info.pixels=DestroyPixelTLS(target_info.pixels);
