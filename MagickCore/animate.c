@@ -4310,6 +4310,22 @@ static void XReleaseAnimateWindows(const AnimateWindowSetup *setup,
     }
 }
 
+static void XWithdrawBackdropWindows(Display *display,
+  XResourceInfo *resource_info,XWindows *windows)
+{
+  if ((resource_info->backdrop == MagickFalse) &&
+      (windows->backdrop.mapped))
+    {
+      (void) XWithdrawWindow(display,windows->backdrop.id,\
+        windows->backdrop.screen);
+      (void) XDestroyWindow(display,windows->backdrop.id);
+      windows->backdrop.id=(Window) NULL;
+      (void) XWithdrawWindow(display,windows->image.id,windows->image.screen);
+      (void) XDestroyWindow(display,windows->image.id);
+      windows->image.id=(Window) NULL;
+    }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4951,17 +4967,7 @@ MagickExport Image *XAnimateImages(Display *display,
   image_list=(Image **) RelinquishMagickMemory(image_list);
   images=DestroyImageList(images);
   XWithdrawColormapWindows(display,windows);
-  if ((resource_info->backdrop == MagickFalse) &&
-      (windows->backdrop.mapped))
-    {
-      (void) XWithdrawWindow(display,windows->backdrop.id,\
-        windows->backdrop.screen);
-      (void) XDestroyWindow(display,windows->backdrop.id);
-      windows->backdrop.id=(Window) NULL;
-      (void) XWithdrawWindow(display,windows->image.id,windows->image.screen);
-      (void) XDestroyWindow(display,windows->image.id);
-      windows->image.id=(Window) NULL;
-    }
+  XWithdrawBackdropWindows(display,resource_info,windows);
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
   XFreeScenePixmaps(display,windows,number_scenes);
