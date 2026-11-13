@@ -1252,7 +1252,7 @@ static MagickBooleanType SetTypeInfoText(TypeInfo *type_info,
 }
 
 static TypeInfo *SetTypeInfoAttribute(TypeInfo *type_info,const char *keyword,
-  const char *token,const char *filename,const char *font_path)
+  const char *token,const char *filename,char *font_path)
 {
   if (SetTypeInfoText(type_info,keyword,token) != MagickFalse)
     return(type_info);
