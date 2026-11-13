@@ -12420,6 +12420,47 @@ static MagickBooleanType XMatteCommandBlock(const MatteCommandInput *input,
   return(MagickFalse);
 }
 
+static MagickBooleanType XMatteWritePixels(const MatteCommandInput *input,
+  const int x_offset,const int y_offset)
+{
+  Image
+    **const image = input->image;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  const PaintMethod
+    method = *input->method_targets.method;
+
+  const XColor
+    border_color = *input->border_targets.border_color;
+
+  CacheView
+    *image_view;
+
+  MatteEditPixelInput
+    pixel_input;
+
+  if (SetImageStorageClass(*image,DirectClass,exception) == MagickFalse)
+    return(MagickFalse);
+  if ((*image)->alpha_trait == UndefinedPixelTrait)
+    (void) SetImageAlphaChannel(*image,OpaqueAlphaChannel,exception);
+  image_view=AcquireAuthenticCacheView(*image,exception);
+  pixel_input.image=image;
+  pixel_input.image_view=image_view;
+  pixel_input.x_offset=x_offset;
+  pixel_input.y_offset=y_offset;
+  pixel_input.matte=input->matte;
+  pixel_input.exception=exception;
+  pixel_input.resource_info=input->resource_info;
+  pixel_input.method=method;
+  pixel_input.border_color=border_color;
+  if (XMatteEditPixels(pixel_input,method,image,exception) == MagickFalse)
+    return(MagickFalse);
+  image_view=DestroyCacheView(image_view);
+  return(MagickTrue);
+}
+
 static MagickBooleanType XMatteEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -12635,15 +12676,9 @@ static MagickBooleanType XMatteEditImage(Display *display,
     y_offset=y;
     if ((state & UpdateConfigurationState) != 0)
       {
-        CacheView
-          *image_view;
-
         int
           x,
           y;
-
-        MatteEditPixelInput
-          pixel_input;
 
         /*
           Matte edit is relative to image configuration.
@@ -12668,23 +12703,8 @@ static MagickBooleanType XMatteEditImage(Display *display,
         if ((x_offset >= (int) (*image)->columns) ||
             (y_offset >= (int) (*image)->rows))
           continue;
-        if (SetImageStorageClass(*image,DirectClass,exception) == MagickFalse)
+        if (XMatteWritePixels(&command_input,x_offset,y_offset) == MagickFalse)
           return(MagickFalse);
-        if ((*image)->alpha_trait == UndefinedPixelTrait)
-          (void) SetImageAlphaChannel(*image,OpaqueAlphaChannel,exception);
-        image_view=AcquireAuthenticCacheView(*image,exception);
-        pixel_input.image=image;
-        pixel_input.image_view=image_view;
-        pixel_input.x_offset=x_offset;
-        pixel_input.y_offset=y_offset;
-        pixel_input.matte=matte;
-        pixel_input.exception=exception;
-        pixel_input.resource_info=resource_info;
-        pixel_input.method=method;
-        pixel_input.border_color=border_color;
-        if (XMatteEditPixels(pixel_input,method,image,exception) == MagickFalse)
-          return(MagickFalse);
-        image_view=DestroyCacheView(image_view);
         state&=(unsigned int) (~UpdateConfigurationState);
       }
   } while ((state & ExitState) == 0);
