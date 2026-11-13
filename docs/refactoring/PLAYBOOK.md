@@ -13061,6 +13061,77 @@ whole groups into a function; Recipe PL, whose peeled group is the exit alone.
 
 ---
 
+## Recipe FO - Open the File with the Shortest Static Helper
+
+**Use when:** CodeScene reports *Large Method* on a small `static` helper that is the first
+function of the file: CodeScene starts the first function's span at the `#include` block
+(`docs/cs-first-function-span-findings.md`), so its length counts about sixty lines of
+includes. `image.c`'s `SetImageSize`, nine lines long, reports 76 lines.
+
+**Not covered by:** Recipe H, which moves preprocessor lines and not functions; Recipe E,
+which adds a function, where this only reorders the definitions that are there.
+
+**How:**
+
+1. The file's first function is a `static` function `F` with a *Large Method* finding whose
+   own body is under 20 lines.
+2. Pick a `static` function `G` of the same file with the fewest lines (a body of one or
+   two statements, no more than `F`'s), defined later than `F` and not used by `F`.
+   `G` and every function it calls, if any, are declared above `G`'s new place or are
+   not `static`.
+3. Cut `G` whole, with its comment if it has one, and paste it directly above `F`. Nothing
+   else moves.
+
+**Before:**
+
+```c
+static void SetImageSize(Image *image,const char *size)
+{
+  ...nine lines...
+}
+...
+static void LimitImageDelay(Image *image,const double rho)
+{
+  if ((double) image->delay > floor(rho+0.5))
+    image->delay=(size_t) CastDoubleToSsizeT(floor(rho+0.5));
+}
+```
+
+**After:**
+
+```c
+static void LimitImageDelay(Image *image,const double rho)
+{
+  if ((double) image->delay > floor(rho+0.5))
+    image->delay=(size_t) CastDoubleToSsizeT(floor(rho+0.5));
+}
+
+static void SetImageSize(Image *image,const char *size)
+{
+  ...nine lines...
+}
+```
+
+**Careful:**
+
+- Only the order of definitions changes. A `static` function is called by name, and the
+  compiler needs a declaration above each call, which step 2 keeps true. The rule of
+  step 2's `G` having no `static` callee below its new place is the one way the move can
+  fail, and the build catches it.
+- Nothing is called differently, so the object file holds the same code; it is checked
+  with `sh tools/obj_identical.sh MagickCore/<file>.c`, which must print `IDENTICAL`.
+- A file whose first function is already the shortest one gains nothing; the step is for
+  a first function that the include span pushes over the threshold.
+
+**Evidence level:** guard (`obj_identical.sh` prints `IDENTICAL` for the whole object
+file; no oracle run is needed for an identical object).
+
+**Provenance:** 2026-11-13, from `image.c` (campaign B, M121): `SetImageSize`'s 76-line
+span cleared by opening the file with `LimitImageDelay`, 5.17 to 5.37. Added by Claude Code
+(Claude Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -13377,3 +13448,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | NEW | LL | Replace an ascending `if (x >= L) var=V;` ladder by descending returns in a helper; proof oracle plus the monotone-limits reading | `type.c` `LoadFontConfigFonts` (stretch and weight ladders; cc 41 to 23, 5.08 to 5.16); E keeps the ladder's cc | mandate (2026-10-24) |
 | 2026-11-13 | NEW | PA | Peel an advancing label group (`p++; break;` under many labels) out of a loop's `switch` into a membership predicate and an `if (...) { p++; continue; }`; evidence oracle | `geometry-parse.c`'s `GetGeometry` and `ParseGeometry` (seventeen labels in each; cc 50 and 52 to 36 and 38, 6.80 to 6.99); LP and PL peel groups that return, SD keeps the labels in a switch | mandate (2026-10-24) |
 | 2026-11-13 | NEW | HE | Hoist a case's exit test (`case L: { if (T) return(R); S break; }`) to an `if ((c == L) && (T)) return(R);` before the loop's `switch`; evidence oracle | `geometry-parse.c`'s `ParseGeometry` (bump gone, 7.01 to 7.04); HT, SG and PL do not reach a test inside a case | mandate (2026-10-24) |
+| 2026-11-13 | NEW | FO | Open the file with the shortest `static` helper: move a one- or two-statement helper above a first function that the include-block span makes a *Large Method*; evidence `obj_identical.sh` IDENTICAL | `image.c` (`SetImageSize`, 76 lines for nine; 5.17 to 5.37); H moves preprocessor lines, E adds functions | mandate (2026-10-24) |
