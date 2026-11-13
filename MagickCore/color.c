@@ -2618,6 +2618,21 @@ static void SetColorFromGeometry(PixelInfo *color,
     SetPsiColorFromGeometry(color,geometry_info,flags,scale);
 }
 
+static void SetColorChannelsFromGeometry(PixelInfo *color,
+  const GeometryInfo geometry_info,const MagickStatusType flags,
+  const char *colorspace)
+{
+  if (((flags & ChiValue) != 0) &&
+      (color->alpha_trait != UndefinedPixelTrait))
+    color->alpha=(double) ClampToQuantum((double) QuantumRange*
+      geometry_info.chi);
+  if ((LocaleCompare(colorspace,"gray") == 0) ||
+      (LocaleCompare(colorspace,"lineargray") == 0))
+    SetGrayColorFromGeometry(color,geometry_info,flags);
+  if (IsHueColorspaceName(colorspace) != MagickFalse)
+    SetHueColorFromGeometry(color,geometry_info);
+}
+
 static MagickBooleanType QueryColorFunction(const char *name,
   const char *q,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2680,15 +2695,7 @@ static MagickBooleanType QueryColorFunction(const char *name,
   if (flags == 0)
     return(QueryColorFromCSSName(name,i,color,exception));
   SetColorFromGeometry(color,geometry_info,flags,scale);
-  if (((flags & ChiValue) != 0) &&
-      (color->alpha_trait != UndefinedPixelTrait))
-    color->alpha=(double) ClampToQuantum((double) QuantumRange*
-      geometry_info.chi);
-  if ((LocaleCompare(colorspace,"gray") == 0) ||
-      (LocaleCompare(colorspace,"lineargray") == 0))
-    SetGrayColorFromGeometry(color,geometry_info,flags);
-  if (IsHueColorspaceName(colorspace) != MagickFalse)
-    SetHueColorFromGeometry(color,geometry_info);
+  SetColorChannelsFromGeometry(color,geometry_info,flags,colorspace);
   return(MagickTrue);
 }
 
