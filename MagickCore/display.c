@@ -13719,6 +13719,66 @@ static void XPasteRelease(const PasteCommandInput *input,const XEvent *event,
     }
 }
 
+static void XPasteEvent(const PasteCommandInput *input,XEvent *event,
+  const Cursor cursor,const PasteTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  RectangleInfo
+    *const paste_info = targets->paste_info;
+
+  int
+    x,
+    y;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      XPastePress(input,event,cursor,targets);
+      break;
+    }
+    case ButtonRelease:
+    {
+      XPasteRelease(input,event,targets);
+      break;
+    }
+    case Expose:
+      break;
+    case KeyPress:
+    {
+      XPasteKeyPress(input,event,targets);
+      break;
+    }
+    case MotionNotify:
+    {
+      /*
+        Map and unmap Info widget as text cursor crosses its boundaries.
+      */
+      x=(*event).xmotion.x;
+      y=(*event).xmotion.y;
+      XTrackInfoWidget(display,windows,x,y);
+      (*paste_info).x=(ssize_t) windows->image.x+x;
+      (*paste_info).y=(ssize_t) windows->image.y+y;
+      break;
+    }
+    default:
+    {
+      if (resource_info->debug != MagickFalse)
+        (void) LogMagickEvent(X11Event,GetMagickModule(),"Event type: %d",
+          (*event).type);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType XPasteImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -13828,45 +13888,7 @@ static MagickBooleanType XPasteImage(Display *display,
       windows->image.highlight_context,&highlight_info);
     if (XPasteCommand(&command_input,&event,&compose,&state) != MagickFalse)
       continue;
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        XPastePress(&command_input,&event,cursor,&paste_targets);
-        break;
-      }
-      case ButtonRelease:
-      {
-        XPasteRelease(&command_input,&event,&paste_targets);
-        break;
-      }
-      case Expose:
-        break;
-      case KeyPress:
-      {
-        XPasteKeyPress(&command_input,&event,&paste_targets);
-        break;
-      }
-      case MotionNotify:
-      {
-        /*
-          Map and unmap Info widget as text cursor crosses its boundaries.
-        */
-        x=event.xmotion.x;
-        y=event.xmotion.y;
-        XTrackInfoWidget(display,windows,x,y);
-        paste_info.x=(ssize_t) windows->image.x+x;
-        paste_info.y=(ssize_t) windows->image.y+y;
-        break;
-      }
-      default:
-      {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),"Event type: %d",
-            event.type);
-        break;
-      }
-    }
+    XPasteEvent(&command_input,&event,cursor,&paste_targets);
   } while ((state & ExitState) == 0);
   {
     const PasteFinishInput
