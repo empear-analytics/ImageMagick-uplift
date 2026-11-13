@@ -3673,6 +3673,21 @@ static void UpdateClipPathSubpathKnot(const ClipPathResizeInfo *resize,
   (*knot_count)--;
 }
 
+static inline MagickBooleanType IsClipPathKnotSelector(const ssize_t selector)
+{
+  switch (selector)
+  {
+    case 1:
+    case 2:
+    case 4:
+    case 5:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
 static void UpdateClipPath(unsigned char *blob,size_t length,
   const ClipPathResizeInfo *resize)
 {
@@ -3687,20 +3702,17 @@ static void UpdateClipPath(unsigned char *blob,size_t length,
   while (length != 0)
   {
     selector=(ssize_t) ReadProfileMSBShort(&blob,&length);
+    if (IsClipPathKnotSelector(selector) != MagickFalse)
+      {
+        UpdateClipPathSubpathKnot(resize,&targets);
+        continue;
+      }
     switch (selector)
     {
       case 0:
       case 3:
       {
         ReadClipPathSubpathLength(&targets);
-        break;
-      }
-      case 1:
-      case 2:
-      case 4:
-      case 5:
-      {
-        UpdateClipPathSubpathKnot(resize,&targets);
         break;
       }
       default:
