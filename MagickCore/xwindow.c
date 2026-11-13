@@ -4198,6 +4198,15 @@ static void XCreateWindowMattePixmap(Display *display,
     XCopyMatteToPixmap(display,window,width,height);
 }
 
+static void XMakeXImagePixels(const MakeImageContext make_context,
+  const XWindowInfo *window,XImage *ximage,XImage *matte_image)
+{
+  if (IsLSBFirstXImage(ximage) != MagickFalse)
+    XMakeImageLSBFirst(&make_context,window->image,ximage,matte_image);
+  else
+    XMakeImageMSBFirst(&make_context,window->image,ximage,matte_image);
+}
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
@@ -4437,10 +4446,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
       const MakeImageContext
         make_context = { resource_info, window, exception };
 
-      if (IsLSBFirstXImage(ximage) != MagickFalse)
-        XMakeImageLSBFirst(&make_context,window->image,ximage,matte_image);
-      else
-        XMakeImageMSBFirst(&make_context,window->image,ximage,matte_image);
+      XMakeXImagePixels(make_context,window,ximage,matte_image);
     }
   if (window->matte_image != (XImage *) NULL)
     XCreateWindowMattePixmap(display,window,width,height);
