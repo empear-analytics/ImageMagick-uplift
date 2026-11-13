@@ -1017,22 +1017,16 @@ static void LoadOpenCLDeviceBenchmark(MagickCLEnv clEnv,const char *xml)
         {
           if (quote != 0)
             quote=EndDoctypeQuote(q,quote);
-          else
+          else if (IsDoctypeQuote(q) != MagickFalse)
+            quote=(*q);
+          else if (*q == '[')
+            bracket_depth++;
+          else if (*q == ']')
+            bracket_depth=CloseDoctypeBracket(bracket_depth);
+          else if (IsDoctypeEnd(q,bracket_depth) != MagickFalse)
             {
-              if (IsDoctypeQuote(q) != MagickFalse)
-                quote=(*q);
-              else
-                if (*q == '[')
-                  bracket_depth++;
-                else
-                  if (*q == ']')
-                    bracket_depth=CloseDoctypeBracket(bracket_depth);
-                  else
-                    if (IsDoctypeEnd(q,bracket_depth) != MagickFalse)
-                      {
-                        q++;   /* consume final '>' */
-                        break;
-                      }
+              q++;   /* consume final '>' */
+              break;
             }
         }
         continue;
