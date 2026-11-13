@@ -7799,6 +7799,46 @@ static void XMagnifyBitmap(const XMagnifyContext *context)
   }
 }
 
+static void XMagnifyMultiBytePixels(const XMagnifyContext *context)
+{
+  XImage
+    *const ximage = context->ximage;
+
+  const unsigned int
+    height = context->height,
+    magnify = context->magnify,
+    width = context->width,
+    scanline_pad = context->scanline_pad;
+
+  const int
+    x = context->x,
+    y = context->y;
+
+  unsigned char
+    *const q = context->q;
+
+  unsigned int
+    bytes_per_pixel;
+
+  MagnifyMultiByte
+    multi_byte;
+
+  /*
+    Magnify multi-byte X image.
+  */
+  bytes_per_pixel=(unsigned int) ximage->bits_per_pixel >> 3;
+  multi_byte.width=width;
+  multi_byte.magnify=magnify;
+  multi_byte.bytes_per_pixel=bytes_per_pixel;
+  multi_byte.height=height;
+  multi_byte.ximage=ximage;
+  multi_byte.x=x;
+  multi_byte.y=y;
+  multi_byte.scanline_pad=scanline_pad;
+  multi_byte.q=q;
+  MagnifyRowsMultiByte(&multi_byte);
+}
+
 MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   ExceptionInfo *exception)
 {
@@ -7888,26 +7928,7 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
       }
       default:
       {
-        unsigned int
-          bytes_per_pixel;
-
-        MagnifyMultiByte
-          multi_byte;
-
-        /*
-          Magnify multi-byte X image.
-        */
-        bytes_per_pixel=(unsigned int) ximage->bits_per_pixel >> 3;
-        multi_byte.width=width;
-        multi_byte.magnify=magnify;
-        multi_byte.bytes_per_pixel=bytes_per_pixel;
-        multi_byte.height=height;
-        multi_byte.ximage=ximage;
-        multi_byte.x=x;
-        multi_byte.y=y;
-        multi_byte.scanline_pad=scanline_pad;
-        multi_byte.q=q;
-        MagnifyRowsMultiByte(&multi_byte);
+        XMagnifyMultiBytePixels(&context);
         break;
       }
     }
