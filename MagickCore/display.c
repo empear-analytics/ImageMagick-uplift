@@ -11712,33 +11712,11 @@ static void XSelectMagnifyDigit(XWindows *windows,const KeySym key_symbol)
   }
 }
 
-static void XMagnifyWindowCommand(Display *display,XWindows *windows,
-  const MagickStatusType state,const KeySym key_symbol,ExceptionInfo *exception)
+static void XMoveMagnifyPosition(XWindows *windows,const unsigned int quantum,
+  const KeySym key_symbol)
 {
-  unsigned int
-    quantum;
-
-  /*
-    User specified a magnify factor or position.
-  */
-  quantum=1;
-  if ((state & Mod1Mask) != 0)
-    quantum=10;
   switch ((int) key_symbol)
   {
-    case QuitCommand:
-    {
-      (void) XWithdrawWindow(display,windows->magnify.id,
-        windows->magnify.screen);
-      break;
-    }
-    case XK_Home:
-    case XK_KP_Home:
-    {
-      windows->magnify.x=(int) windows->image.width/2;
-      windows->magnify.y=(int) windows->image.height/2;
-      break;
-    }
     case XK_Left:
     case XK_KP_Left:
     {
@@ -11770,6 +11748,41 @@ static void XMagnifyWindowCommand(Display *display,XWindows *windows,
     default:
     {
       XSelectMagnifyDigit(windows,key_symbol);
+      break;
+    }
+  }
+}
+
+static void XMagnifyWindowCommand(Display *display,XWindows *windows,
+  const MagickStatusType state,const KeySym key_symbol,ExceptionInfo *exception)
+{
+  unsigned int
+    quantum;
+
+  /*
+    User specified a magnify factor or position.
+  */
+  quantum=1;
+  if ((state & Mod1Mask) != 0)
+    quantum=10;
+  switch ((int) key_symbol)
+  {
+    case QuitCommand:
+    {
+      (void) XWithdrawWindow(display,windows->magnify.id,
+        windows->magnify.screen);
+      break;
+    }
+    case XK_Home:
+    case XK_KP_Home:
+    {
+      windows->magnify.x=(int) windows->image.width/2;
+      windows->magnify.y=(int) windows->image.height/2;
+      break;
+    }
+    default:
+    {
+      XMoveMagnifyPosition(windows,quantum,key_symbol);
       break;
     }
   }
