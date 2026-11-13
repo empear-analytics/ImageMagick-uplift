@@ -324,6 +324,15 @@ static Quantum *GetAuthenticPixelsFromStream(const Image *image)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void SetStreamBackgroundPixel(const Image *image,Quantum *pixel)
+{
+  pixel[RedPixelChannel]=ClampToQuantum(image->background_color.red);
+  pixel[GreenPixelChannel]=ClampToQuantum(image->background_color.green);
+  pixel[BluePixelChannel]=ClampToQuantum(image->background_color.blue);
+  pixel[BlackPixelChannel]=ClampToQuantum(image->background_color.black);
+  pixel[AlphaPixelChannel]=ClampToQuantum(image->background_color.alpha);
+}
+
 static MagickBooleanType GetOneAuthenticPixelFromStream(Image *image,
   const ssize_t x,const ssize_t y,Quantum *pixel,ExceptionInfo *exception)
 {
@@ -339,11 +348,7 @@ static MagickBooleanType GetOneAuthenticPixelFromStream(Image *image,
   p=GetAuthenticPixelsStream(image,x,y,1,1,exception);
   if (p == (Quantum *) NULL)
     {
-      pixel[RedPixelChannel]=ClampToQuantum(image->background_color.red);
-      pixel[GreenPixelChannel]=ClampToQuantum(image->background_color.green);
-      pixel[BluePixelChannel]=ClampToQuantum(image->background_color.blue);
-      pixel[BlackPixelChannel]=ClampToQuantum(image->background_color.black);
-      pixel[AlphaPixelChannel]=ClampToQuantum(image->background_color.alpha);
+      SetStreamBackgroundPixel(image,pixel);
       return(MagickFalse);
     }
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
