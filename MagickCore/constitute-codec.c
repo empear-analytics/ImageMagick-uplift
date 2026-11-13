@@ -624,6 +624,20 @@ static inline MagickBooleanType IsSceneSelection(const ImageInfo *read_info,
     (GetImageListLength(image) != 1)) ? MagickTrue : MagickFalse);
 }
 
+static Image *DecodeLockedImage(const MagickInfo *magick_info,
+  DecodeImageHandler *decoder,ImageInfo *read_info,ExceptionInfo *exception)
+{
+  Image
+    *image;
+
+  if (GetMagickDecoderThreadSupport(magick_info) == MagickFalse)
+    LockSemaphoreInfo(magick_info->semaphore);
+  image=DecodeAuthorizedImage(magick_info,decoder,read_info,exception);
+  if (GetMagickDecoderThreadSupport(magick_info) == MagickFalse)
+    UnlockSemaphoreInfo(magick_info->semaphore);
+  return(image);
+}
+
 MagickExport Image *ReadImage(const ImageInfo *image_info,
   ExceptionInfo *exception)
 {
@@ -704,11 +718,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
       /*
         Call appropriate image reader based on image type.
       */
-      if (GetMagickDecoderThreadSupport(magick_info) == MagickFalse)
-        LockSemaphoreInfo(magick_info->semaphore);
-      image=DecodeAuthorizedImage(magick_info,decoder,read_info,exception);
-      if (GetMagickDecoderThreadSupport(magick_info) == MagickFalse)
-        UnlockSemaphoreInfo(magick_info->semaphore);
+      image=DecodeLockedImage(magick_info,decoder,read_info,exception);
     }
   else
     {
@@ -754,11 +764,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
       /*
         Call appropriate image reader based on image type.
       */
-      if (GetMagickDecoderThreadSupport(magick_info) == MagickFalse)
-        LockSemaphoreInfo(magick_info->semaphore);
-      image=DecodeAuthorizedImage(magick_info,decoder,read_info,exception);
-      if (GetMagickDecoderThreadSupport(magick_info) == MagickFalse)
-        UnlockSemaphoreInfo(magick_info->semaphore);
+      image=DecodeLockedImage(magick_info,decoder,read_info,exception);
     }
   if (read_info->temporary != MagickFalse)
     ReleaseTemporaryReadFile(read_info,image,filename);
