@@ -7975,21 +7975,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
       }
       case KeyRelease:
       {
-        static char
-          command[MagickPathExtent];
-
-        static KeySym
-          key_symbol;
-
-        /*
-          Respond to a user key release.
-        */
-        if (event.xkey.window != windows->widget.id)
-          break;
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,
-          (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        if (key_symbol == XK_Control_L)
-          state&=(unsigned int) (~ControlState);
+        state=ReleaseWidgetKey(windows,event,state);
         break;
       }
       case LeaveNotify:
