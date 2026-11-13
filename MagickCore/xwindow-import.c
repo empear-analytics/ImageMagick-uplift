@@ -1515,6 +1515,68 @@ static void XNameWindowImage(Display *display,const Window target,
     }
 }
 
+typedef struct _XImportTargets
+{
+  RectangleInfo
+    *crop_info;
+
+  Window
+    *target;
+} XImportTargets;
+
+static MagickBooleanType XGetScreenCrop(Display *display,
+  const XImportInfo *ximage_info,const Window root,
+  const XImportTargets *targets)
+{
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  Status
+    status;
+
+  Window
+    *const target = targets->target;
+
+  int
+    x;
+
+  if (ximage_info->screen != MagickFalse)
+    {
+      int
+        y;
+
+      Window
+        child;
+
+      XWindowAttributes
+        window_attributes;
+
+      /*
+        Obtain window image directly from screen.
+      */
+      status=XGetWindowAttributes(display,*target,&window_attributes);
+      if (status == False)
+        return(MagickFalse);
+      (void) XTranslateCoordinates(display,*target,root,0,0,&x,&y,&child);
+      (*crop_info).x=(ssize_t) x;
+      (*crop_info).y=(ssize_t) y;
+      (*crop_info).width=(size_t) window_attributes.width;
+      (*crop_info).height=(size_t) window_attributes.height;
+      if (ximage_info->borders != 0)
+        {
+          /*
+            Include border in image.
+          */
+          (*crop_info).x-=window_attributes.border_width;
+          (*crop_info).y-=window_attributes.border_width;
+          (*crop_info).width+=(size_t) (window_attributes.border_width << 1);
+          (*crop_info).height+=(size_t) (window_attributes.border_width << 1);
+        }
+      *target=root;
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *XImportImage(const ImageInfo *image_info,
   XImportInfo *ximage_info,ExceptionInfo *exception)
 {
@@ -1541,6 +1603,9 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
 
   WindowImageContext
     window_context;
+
+  const XImportTargets
+    targets = { &crop_info, &target };
 
   /*
     Open X server connection.
@@ -1608,44 +1673,12 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
             target=prior_target;
         }
     }
-  if (ximage_info->screen != MagickFalse)
+  if (XGetScreenCrop(display,ximage_info,root,&targets) == MagickFalse)
     {
-      int
-        y;
-
-      Window
-        child;
-
-      XWindowAttributes
-        window_attributes;
-
-      /*
-        Obtain window image directly from screen.
-      */
-      status=XGetWindowAttributes(display,target,&window_attributes);
-      if (status == False)
-        {
-          ThrowXWindowException(XServerError,"UnableToReadXWindowAttributes",
-            image_info->filename);
-          (void) XCloseDisplay(display);
-          return((Image *) NULL);
-        }
-      (void) XTranslateCoordinates(display,target,root,0,0,&x,&y,&child);
-      crop_info.x=(ssize_t) x;
-      crop_info.y=(ssize_t) y;
-      crop_info.width=(size_t) window_attributes.width;
-      crop_info.height=(size_t) window_attributes.height;
-      if (ximage_info->borders != 0)
-        {
-          /*
-            Include border in image.
-          */
-          crop_info.x-=window_attributes.border_width;
-          crop_info.y-=window_attributes.border_width;
-          crop_info.width+=(size_t) (window_attributes.border_width << 1);
-          crop_info.height+=(size_t) (window_attributes.border_width << 1);
-        }
-      target=root;
+      ThrowXWindowException(XServerError,"UnableToReadXWindowAttributes",
+        image_info->filename);
+      (void) XCloseDisplay(display);
+      return((Image *) NULL);
     }
   XSetDescendForColormaps(display,target,ximage_info);
   /*
