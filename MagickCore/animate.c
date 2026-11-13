@@ -4380,6 +4380,30 @@ static void XCreateGraphicContexts(const AnimateWindowSetup *setup,
   (void) XDestroyWindow(display,windows->context.id);
 }
 
+static void XCreateIconContext(const AnimateWindowSetup *setup,
+  const char *filename,XGCValues *context_values)
+{
+  Display
+    *const display = setup->display;
+
+  XWindows
+    *const windows = setup->windows;
+
+  XPixelInfo
+    *const icon_pixel = setup->icon_pixel;
+
+  if (icon_pixel->annotate_context != (GC) NULL)
+    (void) XFreeGC(display,icon_pixel->annotate_context);
+  (*context_values).background=icon_pixel->background_color.pixel;
+  (*context_values).foreground=icon_pixel->foreground_color.pixel;
+  icon_pixel->annotate_context=XCreateGC(display,windows->icon.id,
+    (size_t) (GCBackground | GCForeground),context_values);
+  if (icon_pixel->annotate_context == (GC) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
+      filename);
+  windows->icon.annotate_context=icon_pixel->annotate_context;
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4567,16 +4591,7 @@ MagickExport Image *XAnimateImages(Display *display,
   /*
     Initialize graphic context for icon window.
   */
-  if (icon_pixel->annotate_context != (GC) NULL)
-    (void) XFreeGC(display,icon_pixel->annotate_context);
-  context_values.background=icon_pixel->background_color.pixel;
-  context_values.foreground=icon_pixel->foreground_color.pixel;
-  icon_pixel->annotate_context=XCreateGC(display,windows->icon.id,
-    (size_t) (GCBackground | GCForeground),&context_values);
-  if (icon_pixel->annotate_context == (GC) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
-      images->filename);
-  windows->icon.annotate_context=icon_pixel->annotate_context;
+  XCreateIconContext(&setup,images->filename,&context_values);
   /*
     Initialize Image window.
   */
