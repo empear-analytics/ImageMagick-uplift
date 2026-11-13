@@ -8834,6 +8834,20 @@ static void SetFileBrowserReply(char *reply,char *working_path)
     ExpandFilename(reply);
 }
 
+static void FreeFileBrowserList(char **filelist,size_t files)
+{
+  ssize_t
+    i;
+
+  /*
+    Free file list.
+  */
+  for (i=0; i < (ssize_t) files; i++)
+    filelist[i]=DestroyString(filelist[i]);
+  if (filelist != (char **) NULL)
+    filelist=(char **) RelinquishMagickMemory(filelist);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8924,13 +8938,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
     RunFileBrowser(&file_context,&run_targets);
   }
   WithdrawBrowserWidget(display,windows);
-  /*
-    Free file list.
-  */
-  for (i=0; i < (ssize_t) files; i++)
-    filelist[i]=DestroyString(filelist[i]);
-  if (filelist != (char **) NULL)
-    filelist=(char **) RelinquishMagickMemory(filelist);
+  FreeFileBrowserList(filelist,files);
   SetFileBrowserReply(reply,working_path);
 }
 
