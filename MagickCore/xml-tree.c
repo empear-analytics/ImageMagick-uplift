@@ -498,36 +498,19 @@ static char **DestroyXMLTreeAttributes(char **attributes)
   return((char **) NULL);
 }
 
-static void DestroyXMLTreeChild(XMLTreeInfo *xml_info,
-  const size_t depth)
+static void DestroyXMLTreeList(XMLTreeInfo *xml_info,
+  const size_t depth,const size_t member)
 {
   XMLTreeInfo
-    *child,
+    *next,
     *node;
 
-  child=xml_info->child;
-  while (child != (XMLTreeInfo *) NULL)
+  next=(*(XMLTreeInfo **) ((char *) xml_info+member));
+  while (next != (XMLTreeInfo *) NULL)
   {
-    node=child;
-    child=node->child;
-    node->child=(XMLTreeInfo *) NULL;
-    (void) DestroyXMLTree_(node,depth+1);
-  }
-}
-
-static void DestroyXMLTreeOrdered(XMLTreeInfo *xml_info,
-  const size_t depth)
-{
-  XMLTreeInfo
-    *node,
-    *ordered;
-
-  ordered=xml_info->ordered;
-  while (ordered != (XMLTreeInfo *) NULL)
-  {
-    node=ordered;
-    ordered=node->ordered;
-    node->ordered=(XMLTreeInfo *) NULL;
+    node=next;
+    next=(*(XMLTreeInfo **) ((char *) node+member));
+    (*(XMLTreeInfo **) ((char *) node+member))=(XMLTreeInfo *) NULL;
     (void) DestroyXMLTree_(node,depth+1);
   }
 }
@@ -625,8 +608,8 @@ static XMLTreeInfo *DestroyXMLTree_(XMLTreeInfo *xml_info,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
   if (depth >= MagickMaxRecursionDepth)
     return((XMLTreeInfo *) NULL);
-  DestroyXMLTreeChild(xml_info,depth+1);
-  DestroyXMLTreeOrdered(xml_info,depth+1);
+  DestroyXMLTreeList(xml_info,depth+1,offsetof(XMLTreeInfo,child));
+  DestroyXMLTreeList(xml_info,depth+1,offsetof(XMLTreeInfo,ordered));
   DestroyXMLTreeRoot(xml_info);
   xml_info->attributes=DestroyXMLTreeAttributes(xml_info->attributes);
   xml_info->content=DestroyString(xml_info->content);
