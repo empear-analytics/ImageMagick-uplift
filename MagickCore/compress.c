@@ -495,6 +495,58 @@ static void SkipHuffmanToEndOfLine(Image *image,int *caller_byte,
   (*caller_runlength)=runlength;
 }
 
+typedef struct _HuffmanTransfer
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  unsigned char
+    *scanline;
+
+  ExceptionInfo
+    *exception;
+} HuffmanTransfer;
+
+static MagickBooleanType TransferHuffmanScanline(
+  const HuffmanTransfer *transfer,const ssize_t y)
+{
+  Image
+    *image = transfer->image;
+
+  CacheView
+    *image_view = transfer->image_view;
+
+  unsigned char
+    *scanline = transfer->scanline;
+
+  ExceptionInfo
+    *exception = transfer->exception;
+
+  MagickBooleanType
+    proceed;
+
+  Quantum
+    *magick_restrict q;
+
+  /*
+    Transfer scanline to image pixels.
+  */
+  q=QueueCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    return(MagickFalse);
+  SetHuffmanScanlinePixels(image,scanline,q);
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    return(MagickFalse);
+  proceed=SetImageProgress(image,LoadImageTag,(MagickOffsetType) y,
+    image->rows);
+  if (proceed == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -508,12 +560,12 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
     **mb_hash,
     **mw_hash;
 
+  HuffmanTransfer
+    transfer;
+
   int
     byte,
     mask;
-
-  MagickBooleanType
-    proceed;
 
   size_t
     bit,
@@ -570,11 +622,12 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   image->resolution.y=196.0;
   image->units=PixelsPerInchResolution;
   image_view=AcquireAuthenticCacheView(image,exception);
+  transfer.image=image;
+  transfer.image_view=image_view;
+  transfer.scanline=scanline;
+  transfer.exception=exception;
   for (y=0; ((y < (ssize_t) image->rows) && (null_lines < 3)); )
   {
-    Quantum
-      *magick_restrict q;
-
     ssize_t
       x;
 
@@ -665,18 +718,7 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
       code=0;
       length=0;
     }
-    /*
-      Transfer scanline to image pixels.
-    */
-    q=QueueCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    SetHuffmanScanlinePixels(image,scanline,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      break;
-    proceed=SetImageProgress(image,LoadImageTag,(MagickOffsetType) y,
-      image->rows);
-    if (proceed == MagickFalse)
+    if (TransferHuffmanScanline(&transfer,y) == MagickFalse)
       break;
     y++;
   }
