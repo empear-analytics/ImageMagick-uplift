@@ -17458,6 +17458,27 @@ static void XSizeBackgroundWindow(const Image *image,XWindowInfo *window_info)
       image->filename);
 }
 
+static void XMakeBackgroundXImage(Display *display,Image *image,
+  ExceptionInfo *exception,const BackgroundTargets *targets)
+{
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  int
+    status;
+
+  status=XMakeImage(display,resources,window_info,image,(*window_info).width,
+    (*window_info).height,exception) == MagickFalse ? 0 : 1;
+  if (status == MagickFalse)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
+      image->filename);
+  (*window_info).x=0;
+  (*window_info).y=0;
+}
+
 MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *image,ExceptionInfo *exception)
 {
@@ -17466,7 +17487,6 @@ MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
 
   int
     height,
-    status,
     width;
 
   static XPixelInfo
@@ -17526,13 +17546,7 @@ MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
   */
   XSizeBackgroundWindow(image,&window_info);
   XFitBackgroundWindow(&window_attributes,&window_info);
-  status=XMakeImage(display,&resources,&window_info,image,window_info.width,
-    window_info.height,exception) == MagickFalse ? 0 : 1;
-  if (status == MagickFalse)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
-      image->filename);
-  window_info.x=0;
-  window_info.y=0;
+  XMakeBackgroundXImage(display,image,exception,&targets);
   if (resource_info->debug != MagickFalse)
     {
       (void) LogMagickEvent(X11Event,GetMagickModule(),
