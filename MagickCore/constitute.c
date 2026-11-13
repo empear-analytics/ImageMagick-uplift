@@ -902,6 +902,19 @@ static void ReleaseTemporaryReadFile(ImageInfo *read_info,Image *image,
     (void) CopyMagickString(image->filename,filename,MagickPathExtent);
 }
 
+static void LookupReadImageProfiles(const Image *next)
+{
+  const StringInfo
+    *profile;
+
+  profile=GetImageProfile(next,"icc");
+  if (profile == (const StringInfo *) NULL)
+    profile=GetImageProfile(next,"icm");
+  profile=GetImageProfile(next,"iptc");
+  if (profile == (const StringInfo *) NULL)
+    profile=GetImageProfile(next,"8bim");
+}
+
 MagickExport Image *ReadImage(const ImageInfo *image_info,
   ExceptionInfo *exception)
 {
@@ -1075,9 +1088,6 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
   InitializeConstituteInfo(read_info,&constitute_info);
   for (next=image; next != (Image *) NULL; next=GetNextImageInList(next))
   {
-    const StringInfo
-      *profile;
-
     next->taint=MagickFalse;
     SetReadImageNames(next,magick,magick_filename);
     if (IsBlobTemporary(image) != MagickFalse)
@@ -1086,12 +1096,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
     if ((read_info->extract != (char *) NULL) &&
         (read_info->stream == (StreamHandler) NULL))
       next=ApplyExtractGeometry(read_info,next,exception);
-    profile=GetImageProfile(next,"icc");
-    if (profile == (const StringInfo *) NULL)
-      profile=GetImageProfile(next,"icm");
-    profile=GetImageProfile(next,"iptc");
-    if (profile == (const StringInfo *) NULL)
-      profile=GetImageProfile(next,"8bim");
+    LookupReadImageProfiles(next);
     if (IsSourceDataEpochSet() == MagickFalse)
       SetImageDateProperties(next,exception);
     if (constitute_info.delay_flags != NoValue)
