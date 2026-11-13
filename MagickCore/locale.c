@@ -1697,16 +1697,34 @@ MagickExport int LocaleLowercase(const int c)
 %    o length: the number of characters to compare in strings p and q.
 %
 */
-MagickExport int LocaleNCompare(const char *p,const char *q,const size_t length)
+static inline MagickBooleanType CompareNullLocaleStrings(const char *p,
+  const char *q,int *result)
 {
   if (p == (char *) NULL)
     {
       if (q == (char *) NULL)
-        return(0);
-      return(-1);
+        {
+          (*result)=0;
+          return(MagickTrue);
+        }
+      (*result)=(-1);
+      return(MagickTrue);
     }
   if (q == (char *) NULL)
-    return(1);
+    {
+      (*result)=1;
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
+MagickExport int LocaleNCompare(const char *p,const char *q,const size_t length)
+{
+  int
+    returned;
+
+  if (CompareNullLocaleStrings(p,q,&returned) != MagickFalse)
+    return(returned);
   if (length == 0)
     return(0);
   {
