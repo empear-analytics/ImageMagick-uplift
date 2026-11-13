@@ -2301,6 +2301,32 @@ static Quantum *GetGlyphRowPixels(const GlyphRows *rows,
   return(q);
 }
 
+static double GetGlyphPixelOpacity(const GlyphRows *rows,const ssize_t n,
+  const ssize_t x,const ssize_t y)
+{
+  const FT_BitmapGlyph
+    bitmap = rows->bitmap;
+
+  unsigned char
+    *const r = rows->r;
+
+  const DrawInfo
+    *const draw_info = rows->draw_info;
+
+  double
+    fill_opacity;
+
+  GlyphRasterInfo
+    raster;
+
+  raster.bitmap=bitmap;
+  raster.r=r;
+  fill_opacity=GetGlyphFillOpacity(&raster,n,x,y);
+  if (draw_info->text_antialias == MagickFalse)
+    fill_opacity=fill_opacity >= 0.5 ? 1.0 : 0.0;
+  return(fill_opacity);
+}
+
 static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
   MagickBooleanType *status)
 {
@@ -2315,9 +2341,6 @@ static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
 
   const PointInfo
     point = rows->point;
-
-  unsigned char
-    *const r = rows->r;
 
   const MagickBooleanType
     transparent_fill = rows->transparent_fill;
@@ -2359,20 +2382,13 @@ static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
   n=y*bitmap->bitmap.pitch;
   for (x=0; x < (ssize_t) bitmap->bitmap.width; x++, n++)
   {
-    GlyphRasterInfo
-      raster;
-
     x_offset=CastDoubleToSsizeT(ceil(point.x+x-0.5));
     if (IsColumnOutside(image,x_offset) != MagickFalse)
       {
         q=SkipGlyphPixel(image,q);
         continue;
       }
-    raster.bitmap=bitmap;
-    raster.r=r;
-    fill_opacity=GetGlyphFillOpacity(&raster,n,x,y);
-    if (draw_info->text_antialias == MagickFalse)
-      fill_opacity=fill_opacity >= 0.5 ? 1.0 : 0.0;
+    fill_opacity=GetGlyphPixelOpacity(rows,n,x,y);
     if (active == MagickFalse)
       q=GetCacheViewAuthenticPixels(image_view,x_offset,y_offset,1,1,
         exception);
