@@ -932,21 +932,8 @@ static MagickBooleanType InterpolateBlendPixelChannel(
       status=MagickFalse;
       return(status);
     }
-  if ((grid->traits & BlendPixelTrait) == 0)
-    for (i=0; i < 4; i++)
-    {
-      alpha[i]=1.0;
-      pixels[i]=(MagickRealType) p[i*(ssize_t) GetPixelChannels(grid->image)+
-        GetPixelChannelOffset(grid->image,grid->channel)];
-    }
-  else
-    for (i=0; i < 4; i++)
-    {
-      alpha[i]=QuantumScale*(double) GetPixelAlpha(grid->image,p+i*
-        (ssize_t) GetPixelChannels(grid->image));
-      pixels[i]=alpha[i]*(double) p[i*(ssize_t) GetPixelChannels(grid->image)+
-        GetPixelChannelOffset(grid->image,grid->channel)];
-    }
+  LoadInterpolatePixels(grid->image,grid->channel,grid->traits,p,4,alpha,
+    pixels);
   gamma=1.0;  /* number of pixels blended together (its variable) */
   for (i=0; i <= 1L; i++) {
     if ((grid->y-grid->y_offset) >= 0.75)
