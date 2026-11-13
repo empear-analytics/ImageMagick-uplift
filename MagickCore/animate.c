@@ -3884,6 +3884,20 @@ static XWindows *XCreateAnimateWindows(Display *display,
   return(windows);
 }
 
+static void XLoadAnimateFont(Display *display,XResourceInfo *resource_info,
+  XWindows *windows)
+{
+  /*
+    Initialize font info.
+  */
+  if (windows->font_info != (XFontStruct *) NULL)
+    (void) XFreeFont(display,windows->font_info);
+  windows->font_info=XBestFont(display,resource_info,MagickFalse);
+  if (windows->font_info == (XFontStruct *) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToLoadFont",
+      resource_info->font);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4013,15 +4027,7 @@ MagickExport Image *XAnimateImages(Display *display,
       magick_windows[number_windows++]=(&windows->popup);
       XClearMagickWindowIds(magick_windows,number_windows);
     }
-  /*
-    Initialize font info.
-  */
-  if (windows->font_info != (XFontStruct *) NULL)
-    (void) XFreeFont(display,windows->font_info);
-  windows->font_info=XBestFont(display,resource_info,MagickFalse);
-  if (windows->font_info == (XFontStruct *) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToLoadFont",
-      resource_info->font);
+  XLoadAnimateFont(display,resource_info,windows);
   /*
     Initialize Standard Colormap.
   */
