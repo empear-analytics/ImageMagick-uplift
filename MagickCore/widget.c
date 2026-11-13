@@ -11984,6 +11984,9 @@ typedef struct _ListBrowserWidgets
 
   XWidgetInfo
     *list_info;
+
+  MagickStatusType
+    *mask;
 } ListBrowserWidgets;
 
 typedef struct _ListBrowserContext
@@ -12671,6 +12674,52 @@ static void HandleListBrowserSelectionEvent(const ListBrowserContext *context,
   }
 }
 
+static void HandleListBrowserKeyEvent(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserTargets *targets,
+  const ListBrowserWidgets *widgets)
+{
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  size_t
+    *const state = widgets->state;
+
+  MagickStatusType
+    *const mask = widgets->mask;
+
+  switch (event.type)
+  {
+    case KeyPress:
+    {
+      PressListBrowserKey(context,event,targets,widgets);
+      break;
+    }
+    case KeyRelease:
+    {
+      ReleaseListBrowserKey(context,event,widgets);
+      break;
+    }
+    case LeaveNotify:
+    {
+      if (event.xcrossing.window != window_info->id)
+        break;
+      (*state)|=InactiveWidgetState;
+      break;
+    }
+    case MapNotify:
+    {
+      (*mask)&=(unsigned int) (~CWX);
+      (*mask)&=(unsigned int) (~CWY);
+      break;
+    }
+    default:
+    {
+      HandleListBrowserSelectionEvent(context,event,widgets);
+      break;
+    }
+  }
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -12727,7 +12776,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   const ListBrowserWidgets
     list_widgets = { &reply_info, &state, &slider_info, &action_info,
       &cancel_info, &north_info, &south_info, &delay, &scroll_info,
-      &visible_entries, &event, &list_info };
+      &visible_entries, &event, &list_info, &mask };
 
   ListBrowserContext
     list_context;
@@ -13050,32 +13099,9 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
         ExposeListBrowserWindow(&list_context,event,&list_widgets);
         break;
       }
-      case KeyPress:
-      {
-        PressListBrowserKey(&list_context,event,&targets,&list_widgets);
-        break;
-      }
-      case KeyRelease:
-      {
-        ReleaseListBrowserKey(&list_context,event,&list_widgets);
-        break;
-      }
-      case LeaveNotify:
-      {
-        if (event.xcrossing.window != window_info->id)
-          break;
-        state|=InactiveWidgetState;
-        break;
-      }
-      case MapNotify:
-      {
-        mask&=(unsigned int) (~CWX);
-        mask&=(unsigned int) (~CWY);
-        break;
-      }
       default:
       {
-        HandleListBrowserSelectionEvent(&list_context,event,&list_widgets);
+        HandleListBrowserKeyEvent(&list_context,event,&targets,&list_widgets);
         break;
       }
     }
