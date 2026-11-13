@@ -445,19 +445,22 @@ static void ConcatenateHexColor(const PixelInfo *pixel,char *tuple)
     ConcatenateHexColorComponent(pixel,AlphaPixelChannel,tuple);
 }
 
+static void ConcatenateRGBComponents(const PixelInfo *color,char *tuple)
+{
+  ConcatenateColorComponent(color,RedPixelChannel,SVGCompliance,tuple);
+  (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+  ConcatenateColorComponent(color,GreenPixelChannel,SVGCompliance,tuple);
+  (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+  ConcatenateColorComponent(color,BluePixelChannel,SVGCompliance,tuple);
+}
+
 static void ConcatenateColorComponents(const PixelInfo *color,char *tuple)
 {
   if ((color->colorspace == LinearGRAYColorspace) ||
       (color->colorspace == GRAYColorspace))
     ConcatenateColorComponent(color,GrayPixelChannel,SVGCompliance,tuple);
   else
-    {
-      ConcatenateColorComponent(color,RedPixelChannel,SVGCompliance,tuple);
-      (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-      ConcatenateColorComponent(color,GreenPixelChannel,SVGCompliance,tuple);
-      (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-      ConcatenateColorComponent(color,BluePixelChannel,SVGCompliance,tuple);
-    }
+    ConcatenateRGBComponents(color,tuple);
   if (color->colorspace == CMYKColorspace)
     {
       (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
