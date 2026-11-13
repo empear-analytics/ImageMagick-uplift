@@ -184,9 +184,30 @@ static void CopyBackMatrix(double **matrix,long double **hp_matrix,
   return(MagickFalse); \
 }
 
-static void FindPivot(long double **hp_matrix,const ssize_t *pivots,
-  const size_t rank,long double *max,ssize_t *row,ssize_t *column)
+typedef struct _PivotSearch
 {
+  long double
+    **hp_matrix;
+
+  const ssize_t
+    *pivots;
+
+  size_t
+    rank;
+} PivotSearch;
+
+static void FindPivot(const PivotSearch *search,long double *max,
+  ssize_t *row,ssize_t *column)
+{
+  long double
+    **const hp_matrix = search->hp_matrix;
+
+  const ssize_t
+    *const pivots = search->pivots;
+
+  const size_t
+    rank = search->rank;
+
   ssize_t
     j,
     k;
@@ -353,6 +374,9 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
     const GaussJordanSystem
       system = { hp_matrix, vectors, rank, number_vectors };
 
+    const PivotSearch
+      search = { hp_matrix, pivots, rank };
+
     long double
       max = 0.0;
 
@@ -360,7 +384,7 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
       Partial pivoting: find the largest absolute value in the unreduced
       submatrix.
     */
-    FindPivot(hp_matrix,pivots,rank,&max,&row,&column);
+    FindPivot(&search,&max,&row,&column);
     if (IsSingularPivot(column,row,max) != MagickFalse)
       ThrowGaussJordanException();  /* Singular or nearly singular matrix */
     pivots[column]++;
