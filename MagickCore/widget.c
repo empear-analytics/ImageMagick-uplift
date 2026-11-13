@@ -14736,6 +14736,19 @@ static void MapNoticeWidget(Display *display,XWindows *windows)
   windows->widget.mapped=MagickFalse;
 }
 
+static void InitializeNoticeDismiss(XWindows *windows,XFontStruct *font_info,
+  const unsigned int height,XWidgetInfo *dismiss_info)
+{
+  XGetWidgetInfo(DismissButtonText,dismiss_info);
+  (*dismiss_info).width=(unsigned int) QuantumMargin+
+    WidgetTextWidth(font_info,DismissButtonText);
+  (*dismiss_info).height=(unsigned int) ((3*height) >> 1);
+  (*dismiss_info).x=(int)
+    ((windows->widget.width >> 1)-((*dismiss_info).width >> 1));
+  (*dismiss_info).y=(int)
+    (windows->widget.height-((*dismiss_info).height << 1));
+}
+
 MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -14804,14 +14817,7 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
         /*
           Initialize Dismiss button information.
         */
-        XGetWidgetInfo(DismissButtonText,&dismiss_info);
-        dismiss_info.width=(unsigned int) QuantumMargin+
-          WidgetTextWidth(font_info,DismissButtonText);
-        dismiss_info.height=(unsigned int) ((3*height) >> 1);
-        dismiss_info.x=(int)
-          ((windows->widget.width >> 1)-(dismiss_info.width >> 1));
-        dismiss_info.y=(int)
-          (windows->widget.height-(dismiss_info.height << 1));
+        InitializeNoticeDismiss(windows,font_info,height,&dismiss_info);
         state&=(unsigned int) (~UpdateConfigurationState);
       }
     if (state & RedrawWidgetState)
