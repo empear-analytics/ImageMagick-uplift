@@ -6053,6 +6053,19 @@ static void XCropKeyPress(const CropEventInput *event_input,XEvent *event,
     (*event).xkey.time);
 }
 
+static const ModeType
+  CropCommands[] =
+  {
+    CropHelpCommand,
+    CropDismissCommand
+  },
+  RectifyCommands[] =
+  {
+    RectifyCopyCommand,
+    RectifyHelpCommand,
+    RectifyDismissCommand
+  };
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -6070,19 +6083,6 @@ static MagickBooleanType XCropImage(Display *display,
       "Help",
       "Dismiss",
       (char *) NULL
-    };
-
-  static const ModeType
-    CropCommands[] =
-    {
-      CropHelpCommand,
-      CropDismissCommand
-    },
-    RectifyCommands[] =
-    {
-      RectifyCopyCommand,
-      RectifyHelpCommand,
-      RectifyDismissCommand
     };
 
   CacheView
