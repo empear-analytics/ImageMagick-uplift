@@ -3282,19 +3282,11 @@ static MagickBooleanType SetImageMagickFromMagic(ImageInfo *image_info,
   return(MagickTrue);
 }
 
-MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
-  const unsigned int frames,ExceptionInfo *exception)
+static MagickBooleanType SetImageMagickFromContent(ImageInfo *image_info,
+  const MagickInfo *magick_info,char *component,ExceptionInfo *exception)
 {
-  char
-    component[MagickPathExtent],
-    magic[MagickPathExtent],
-    path[MagickPathExtent];
-
   const MagicInfo
     *magic_info;
-
-  const MagickInfo
-    *magick_info;
 
   ExceptionInfo
     *sans_exception;
@@ -3307,6 +3299,75 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
 
   ssize_t
     count;
+
+  unsigned char
+    *magick;
+
+  size_t
+    magick_size;
+
+  /*
+    Determine the image format from the first few bytes of the file.
+  */
+  magick_size=GetMagicPatternExtent(exception);
+  if (magick_size == 0)
+    return(MagickFalse);
+  image=AcquireImage(image_info,exception);
+  (void) CopyMagickString(image->filename,image_info->filename,
+    MagickPathExtent);
+  sans_exception=AcquireExceptionInfo();
+  status=OpenBlob(image_info,image,ReadBinaryBlobMode,sans_exception);
+  sans_exception=DestroyExceptionInfo(sans_exception);
+  if (status == MagickFalse)
+    {
+      image=DestroyImage(image);
+      return(MagickFalse);
+    }
+  if (CopyImageToSeekableFile(image_info,image,component,exception) ==
+      MagickFalse)
+    return(MagickFalse);
+  magick=(unsigned char *) AcquireQuantumMemory(1,magick_size);
+  if (magick == (unsigned char *) NULL)
+    {
+      (void) CloseBlob(image);
+      image=DestroyImage(image);
+      return(MagickFalse);
+    }
+  (void) memset(magick,0,magick_size);
+  count=ReadBlob(image,magick_size,magick);
+  (void) SeekBlob(image,-((MagickOffsetType) count),SEEK_CUR);
+  (void) CloseBlob(image);
+  image=DestroyImage(image);
+  /*
+    Check magic cache.
+  */
+  sans_exception=AcquireExceptionInfo();
+  magic_info=GetMagicInfo(magick,(size_t) count,sans_exception);
+  magick=(unsigned char *) RelinquishMagickMemory(magick);
+  if (SetImageMagickFromMagic(image_info,magick_info,magic_info,
+      sans_exception) == MagickFalse)
+    return(MagickTrue);
+  magick_info=GetMagickInfo(image_info->magick,sans_exception);
+  if ((magick_info == (const MagickInfo *) NULL) ||
+      (GetMagickEndianSupport(magick_info) == MagickFalse))
+    image_info->endian=UndefinedEndian;
+  sans_exception=DestroyExceptionInfo(sans_exception);
+  return(MagickTrue);
+}
+
+MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
+  const unsigned int frames,ExceptionInfo *exception)
+{
+  char
+    component[MagickPathExtent],
+    magic[MagickPathExtent],
+    path[MagickPathExtent];
+
+  const MagickInfo
+    *magick_info;
+
+  ExceptionInfo
+    *sans_exception;
 
   /*
     Look for 'image.format' in filename.
@@ -3373,60 +3434,8 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
   if (image_info->affirm != MagickFalse)
     return(MagickTrue);
   if (frames == 0)
-    {
-      unsigned char
-        *magick;
-
-      size_t
-        magick_size;
-
-      /*
-        Determine the image format from the first few bytes of the file.
-      */
-      magick_size=GetMagicPatternExtent(exception);
-      if (magick_size == 0)
-        return(MagickFalse);
-      image=AcquireImage(image_info,exception);
-      (void) CopyMagickString(image->filename,image_info->filename,
-        MagickPathExtent);
-      sans_exception=AcquireExceptionInfo();
-      status=OpenBlob(image_info,image,ReadBinaryBlobMode,sans_exception);
-      sans_exception=DestroyExceptionInfo(sans_exception);
-      if (status == MagickFalse)
-        {
-          image=DestroyImage(image);
-          return(MagickFalse);
-        }
-      if (CopyImageToSeekableFile(image_info,image,component,exception) ==
-          MagickFalse)
-        return(MagickFalse);
-      magick=(unsigned char *) AcquireQuantumMemory(1,magick_size);
-      if (magick == (unsigned char *) NULL)
-        {
-          (void) CloseBlob(image);
-          image=DestroyImage(image);
-          return(MagickFalse);
-        }
-      (void) memset(magick,0,magick_size);
-      count=ReadBlob(image,magick_size,magick);
-      (void) SeekBlob(image,-((MagickOffsetType) count),SEEK_CUR);
-      (void) CloseBlob(image);
-      image=DestroyImage(image);
-      /*
-        Check magic cache.
-      */
-      sans_exception=AcquireExceptionInfo();
-      magic_info=GetMagicInfo(magick,(size_t) count,sans_exception);
-      magick=(unsigned char *) RelinquishMagickMemory(magick);
-      if (SetImageMagickFromMagic(image_info,magick_info,magic_info,
-          sans_exception) == MagickFalse)
-        return(MagickTrue);
-      magick_info=GetMagickInfo(image_info->magick,sans_exception);
-      if ((magick_info == (const MagickInfo *) NULL) ||
-          (GetMagickEndianSupport(magick_info) == MagickFalse))
-        image_info->endian=UndefinedEndian;
-      sans_exception=DestroyExceptionInfo(sans_exception);
-    }
+    return(SetImageMagickFromContent(image_info,magick_info,component,
+      exception));
   return(MagickTrue);
 }
 
