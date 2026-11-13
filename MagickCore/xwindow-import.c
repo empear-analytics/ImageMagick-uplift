@@ -1488,6 +1488,14 @@ typedef struct _WindowDescendInput
     *window_info;
 } WindowDescendInput;
 
+static void XSetWindowVisual(WindowInfo *window_info,const int id,
+  const Window window,const XWindowAttributes window_attributes)
+{
+  window_info[id].window=window;
+  window_info[id].visual=window_attributes.visual;
+  window_info[id].colormap=window_attributes.colormap;
+}
+
 static void XSetWindowBounds(WindowInfo *window_info,const int id,
   const RectangleInfo crop_info)
 {
@@ -1637,9 +1645,7 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
       return((Image *) NULL);
     }
   id=number_windows++;
-  window_info[id].window=window;
-  window_info[id].visual=window_attributes.visual;
-  window_info[id].colormap=window_attributes.colormap;
+  XSetWindowVisual(window_info,id,window,window_attributes);
   XSetWindowBounds(window_info,id,crop_info);
   crop_info.x-=x_offset;
   crop_info.y-=y_offset;
