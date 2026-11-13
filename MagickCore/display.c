@@ -10529,6 +10529,39 @@ static void XApplyResizeCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyQuitCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  /*
+    exit program.
+  */
+  if (resource_info->confirm_exit == MagickFalse)
+    XClientMessage(display,windows->image.id,windows->im_protocols,
+      windows->im_exit,CurrentTime);
+  else
+    {
+      int
+        status;
+
+      /*
+        Confirm program exit.
+      */
+      status=XConfirmWidget(display,windows,"Do you really want to exit",
+        resource_info->client_name);
+      if (status > 0)
+        XClientMessage(display,windows->image.id,windows->im_protocols,
+          windows->im_exit,CurrentTime);
+    }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -10741,29 +10774,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       break;
     }
     case QuitCommand:
-    {
-      /*
-        exit program.
-      */
-      if (resource_info->confirm_exit == MagickFalse)
-        XClientMessage(display,windows->image.id,windows->im_protocols,
-          windows->im_exit,CurrentTime);
-      else
-        {
-          int
-            status;
-
-          /*
-            Confirm program exit.
-          */
-          status=XConfirmWidget(display,windows,"Do you really want to exit",
-            resource_info->client_name);
-          if (status > 0)
-            XClientMessage(display,windows->image.id,windows->im_protocols,
-              windows->im_exit,CurrentTime);
-        }
+      XApplyQuitCommand(&context);
       break;
-    }
     case CutCommand:
     {
       /*
