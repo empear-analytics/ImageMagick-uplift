@@ -2487,6 +2487,24 @@ static DrawInfo *CloneFreetypeAnnotateInfo(const DrawInfo *draw_info)
   return(annotate_info);
 }
 
+static FT_Encoding SelectFreetypeEncoding(const char *encoding,
+  FT_Encoding encoding_type)
+{
+  encoding_type=SelectAdobeBig5Encoding(encoding,encoding_type);
+  encoding_type=SelectCjkLatinEncoding(encoding,encoding_type);
+  if (LocaleCompare(encoding,"None") == 0)
+    encoding_type=FT_ENCODING_NONE;
+  if (LocaleCompare(encoding,"SJIScode") == 0)
+    encoding_type=FT_ENCODING_SJIS;
+  if (LocaleCompare(encoding,"Symbol") == 0)
+    encoding_type=FT_ENCODING_MS_SYMBOL;
+  if (LocaleCompare(encoding,"Unicode") == 0)
+    encoding_type=FT_ENCODING_UNICODE;
+  if (LocaleCompare(encoding,"Wansung") == 0)
+    encoding_type=FT_ENCODING_WANSUNG;
+  return(encoding_type);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2678,18 +2696,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   SelectFreetypeCharmap(face,encoding_type);
   if (encoding != (const char *) NULL)
     {
-      encoding_type=SelectAdobeBig5Encoding(encoding,encoding_type);
-      encoding_type=SelectCjkLatinEncoding(encoding,encoding_type);
-      if (LocaleCompare(encoding,"None") == 0)
-        encoding_type=FT_ENCODING_NONE;
-      if (LocaleCompare(encoding,"SJIScode") == 0)
-        encoding_type=FT_ENCODING_SJIS;
-      if (LocaleCompare(encoding,"Symbol") == 0)
-        encoding_type=FT_ENCODING_MS_SYMBOL;
-      if (LocaleCompare(encoding,"Unicode") == 0)
-        encoding_type=FT_ENCODING_UNICODE;
-      if (LocaleCompare(encoding,"Wansung") == 0)
-        encoding_type=FT_ENCODING_WANSUNG;
+      encoding_type=SelectFreetypeEncoding(encoding,encoding_type);
       ft_status=FT_Select_Charmap(face,encoding_type);
       if (ft_status != 0)
         {
