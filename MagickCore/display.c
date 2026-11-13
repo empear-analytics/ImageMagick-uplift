@@ -15396,6 +15396,23 @@ static void XClampRotateSegment(const XWindows *windows,
       (*rotate_info).y2=(short) windows->image.height;
 }
 
+static void XRotateAngle(const XSegment *rotate_info,double *degrees,
+  unsigned int *distance)
+{
+  /*
+    Compute rotation angle from the slope of the line.
+  */
+  (*degrees)=0.0;
+  (*distance)=(unsigned int)
+    ((((*rotate_info).x2-(*rotate_info).x1+1)*
+      ((*rotate_info).x2-(*rotate_info).x1+1))+
+     (((*rotate_info).y2-(*rotate_info).y1+1)*
+      ((*rotate_info).y2-(*rotate_info).y1+1)));
+  if ((*distance) > 9)
+    (*degrees)=RadiansToDegrees(-atan2((double) ((*rotate_info).y2-
+      (*rotate_info).y1),(double) ((*rotate_info).x2-(*rotate_info).x1)));
+}
+
 static MagickBooleanType XRotateImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,double degrees,Image **image,
   ExceptionInfo *exception)
@@ -15534,16 +15551,7 @@ static MagickBooleanType XRotateImage(Display *display,
             windows->image.highlight_context,&rotate_info);
         XRotateDragEvent(event,&line_targets);
         XClampRotateSegment(windows,&rotate_info);
-        /*
-          Compute rotation angle from the slope of the line.
-        */
-        degrees=0.0;
-        distance=(unsigned int)
-          (((rotate_info.x2-rotate_info.x1+1)*(rotate_info.x2-rotate_info.x1+1))+
-          ((rotate_info.y2-rotate_info.y1+1)*(rotate_info.y2-rotate_info.y1+1)));
-        if (distance > 9)
-          degrees=RadiansToDegrees(-atan2((double) (rotate_info.y2-
-            rotate_info.y1),(double) (rotate_info.x2-rotate_info.x1)));
+        XRotateAngle(&rotate_info,&degrees,&distance);
       } while ((state & ExitState) == 0);
       (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
       (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
