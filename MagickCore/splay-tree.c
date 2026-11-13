@@ -134,13 +134,7 @@ static void
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   A d d V a l u e T o S p l a y T r e e                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  AddValueToSplayTree() adds the given key and value to the splay-tree.  Both
@@ -220,13 +214,7 @@ MagickExport MagickBooleanType AddValueToSplayTree(SplayTreeInfo *splay_tree,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   B a l a n c e S p l a y T r e e                                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  BalanceSplayTree() balances the splay-tree.
@@ -301,13 +289,7 @@ static void BalanceSplayTree(SplayTreeInfo *splay_tree)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   C l o n e S p l a y T r e e                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  CloneSplayTree() clones the splay tree.
@@ -385,13 +367,7 @@ MagickExport SplayTreeInfo *CloneSplayTree(SplayTreeInfo *splay_tree,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   C o m p a r e S p l a y T r e e S t r i n g                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  CompareSplayTreeString() method finds a node in a splay-tree based on the
@@ -421,13 +397,7 @@ MagickExport int CompareSplayTreeString(const void *target,const void *source)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   C o m p a r e S p l a y T r e e S t r i n g I n f o                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  CompareSplayTreeStringInfo() finds a node in a splay-tree based on the
@@ -492,13 +462,7 @@ static void JoinSplayTreeSubtrees(SplayTreeInfo *splay_tree,NodeInfo *left,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   D e l e t e N o d e B y V a l u e F r o m S p l a y T r e e               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  DeleteNodeByValueFromSplayTree() deletes a node by value from the
@@ -594,13 +558,7 @@ static MagickBooleanType SplayToKey(SplayTreeInfo *splay_tree,const void *key)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   D e l e t e N o d e F r o m S p l a y T r e e                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  DeleteNodeFromSplayTree() deletes a node from the splay-tree.  It returns
@@ -702,13 +660,7 @@ static void RelinquishSplayTreeNodes(SplayTreeInfo *splay_tree)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   D e s t r o y S p l a y T r e e                                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  DestroySplayTree() destroys the splay-tree.
@@ -753,13 +705,7 @@ static void AdvanceSplayTreeIterator(SplayTreeInfo *splay_tree)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t N e x t K e y I n S p l a y T r e e                                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetNextKeyInSplayTree() gets the next key in the splay-tree.
@@ -795,13 +741,7 @@ MagickExport const void *GetNextKeyInSplayTree(SplayTreeInfo *splay_tree)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t N e x t V a l u e I n S p l a y T r e e                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetNextValueInSplayTree() gets the next value in the splay-tree.
@@ -837,13 +777,7 @@ MagickExport const void *GetNextValueInSplayTree(SplayTreeInfo *splay_tree)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t R o o t V a l u e F r o m S p l a y T r e e                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetRootValueFromSplayTree() gets the root value from the splay-tree.
@@ -878,13 +812,7 @@ MagickExport const void *GetRootValueFromSplayTree(SplayTreeInfo *splay_tree)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t V a l u e F r o m S p l a y T r e e                                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetValueFromSplayTree() gets a value from the splay-tree by its key.
@@ -933,13 +861,7 @@ MagickExport const void *GetValueFromSplayTree(SplayTreeInfo *splay_tree,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t N u m b e r O f N o d e s I n S p l a y T r e e                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetNumberOfNodesInSplayTree() returns the number of nodes in the splay-tree.
@@ -966,13 +888,7 @@ MagickExport size_t GetNumberOfNodesInSplayTree(
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   I t e r a t e O v e r S p l a y T r e e                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  IterateOverSplayTree() iterates over the splay-tree.
@@ -1087,13 +1003,7 @@ static int IterateOverSplayTree(SplayTreeInfo *splay_tree,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   N e w S p l a y T r e e                                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  NewSplayTree() returns a pointer to a SplayTreeInfo structure initialized
@@ -1142,13 +1052,7 @@ MagickExport SplayTreeInfo *NewSplayTree(
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   R e m o v e N o d e B y V a l u e F r o m S p l a y T r e e               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  RemoveNodeByValueFromSplayTree() removes a node by value from the splay-tree
@@ -1228,13 +1132,7 @@ MagickExport void *RemoveNodeByValueFromSplayTree(SplayTreeInfo *splay_tree,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   R e m o v e N o d e F r o m S p l a y T r e e                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  RemoveNodeFromSplayTree() removes a node from the splay-tree and returns its
@@ -1295,13 +1193,7 @@ MagickExport void *RemoveNodeFromSplayTree(SplayTreeInfo *splay_tree,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   R e s e t S p l a y T r e e                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  ResetSplayTree() resets the splay-tree.  That is, it deletes all the nodes
@@ -1335,13 +1227,7 @@ MagickExport void ResetSplayTree(SplayTreeInfo *splay_tree)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   R e s e t S p l a y T r e e I t e r a t o r                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  ResetSplayTreeIterator() resets the splay-tree iterator.  Use it in
@@ -1383,13 +1269,7 @@ static int CompareNodeKey(const SplayTreeInfo *splay_tree,const NodeInfo *n,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   S p l a y S p l a y T r e e                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SplaySplayTree() splays the splay-tree.
