@@ -659,6 +659,89 @@ static void CipherQuantumRow(const CipherRow *row,unsigned char *input_block,
     pixels,exception);
 }
 
+typedef struct _CipherRows
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  QuantumInfo
+    *quantum_info;
+
+  QuantumType
+    quantum_type;
+
+  unsigned char
+    *pixels;
+
+  AESInfo
+    *aes_info;
+
+  const char
+    *tag;
+} CipherRows;
+
+static ssize_t CipherImageRows(const CipherRows *rows,
+  unsigned char *input_block,unsigned char *output_block,
+  ExceptionInfo *exception)
+{
+  AESInfo
+    *const aes_info = rows->aes_info;
+
+  CacheView
+    *const image_view = rows->image_view;
+
+  const char
+    *const tag = rows->tag;
+
+  Image
+    *const image = rows->image;
+
+  MagickBooleanType
+    proceed;
+
+  QuantumInfo
+    *const quantum_info = rows->quantum_info;
+
+  const QuantumType
+    quantum_type = rows->quantum_type;
+
+  ssize_t
+    y;
+
+  unsigned char
+    *const pixels = rows->pixels;
+
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    CipherRow
+      row;
+
+    Quantum
+      *magick_restrict q;
+
+    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    row.image=image;
+    row.image_view=image_view;
+    row.quantum_info=quantum_info;
+    row.quantum_type=quantum_type;
+    row.pixels=pixels;
+    row.aes_info=aes_info;
+    CipherQuantumRow(&row,input_block,output_block,exception);
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      break;
+    proceed=SetImageProgress(image,tag,(MagickOffsetType) y,
+      image->rows);
+    if (proceed == MagickFalse)
+      break;
+  }
+  return(y);
+}
+
 MagickExport MagickBooleanType PasskeyDecipherImage(Image *image,
   const StringInfo *passkey,ExceptionInfo *exception)
 {
@@ -673,8 +756,8 @@ MagickExport MagickBooleanType PasskeyDecipherImage(Image *image,
   const unsigned char
     *digest;
 
-  MagickBooleanType
-    proceed;
+  CipherRows
+    rows;
 
   QuantumInfo
     *quantum_info;
@@ -745,31 +828,14 @@ MagickExport MagickBooleanType PasskeyDecipherImage(Image *image,
   quantum_type=GetQuantumType(image,exception);
   pixels=(unsigned char *) GetQuantumPixels(quantum_info);
   image_view=AcquireAuthenticCacheView(image,exception);
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    CipherRow
-      row;
-
-    Quantum
-      *magick_restrict q;
-
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    row.image=image;
-    row.image_view=image_view;
-    row.quantum_info=quantum_info;
-    row.quantum_type=quantum_type;
-    row.pixels=pixels;
-    row.aes_info=aes_info;
-    CipherQuantumRow(&row,input_block,output_block,exception);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      break;
-    proceed=SetImageProgress(image,DecipherImageTag,(MagickOffsetType) y,
-      image->rows);
-    if (proceed == MagickFalse)
-      break;
-  }
+  rows.image=image;
+  rows.image_view=image_view;
+  rows.quantum_info=quantum_info;
+  rows.quantum_type=quantum_type;
+  rows.pixels=pixels;
+  rows.aes_info=aes_info;
+  rows.tag=DecipherImageTag;
+  y=CipherImageRows(&rows,input_block,output_block,exception);
   image_view=DestroyCacheView(image_view);
   (void) DeleteImageProperty(image,"cipher:type");
   (void) DeleteImageProperty(image,"cipher:mode");
@@ -853,8 +919,8 @@ MagickExport MagickBooleanType PasskeyEncipherImage(Image *image,
   const unsigned char
     *digest;
 
-  MagickBooleanType
-    proceed;
+  CipherRows
+    rows;
 
   QuantumInfo
     *quantum_info;
@@ -932,31 +998,14 @@ MagickExport MagickBooleanType PasskeyEncipherImage(Image *image,
   quantum_type=GetQuantumType(image,exception);
   pixels=(unsigned char *) GetQuantumPixels(quantum_info);
   image_view=AcquireAuthenticCacheView(image,exception);
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    CipherRow
-      row;
-
-    Quantum
-      *magick_restrict q;
-
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    row.image=image;
-    row.image_view=image_view;
-    row.quantum_info=quantum_info;
-    row.quantum_type=quantum_type;
-    row.pixels=pixels;
-    row.aes_info=aes_info;
-    CipherQuantumRow(&row,input_block,output_block,exception);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      break;
-    proceed=SetImageProgress(image,EncipherImageTag,(MagickOffsetType) y,
-      image->rows);
-    if (proceed == MagickFalse)
-      break;
-  }
+  rows.image=image;
+  rows.image_view=image_view;
+  rows.quantum_info=quantum_info;
+  rows.quantum_type=quantum_type;
+  rows.pixels=pixels;
+  rows.aes_info=aes_info;
+  rows.tag=EncipherImageTag;
+  y=CipherImageRows(&rows,input_block,output_block,exception);
   image_view=DestroyCacheView(image_view);
   image->taint=MagickFalse;
   /*
