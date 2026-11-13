@@ -269,6 +269,43 @@ MagickExport QuantumType GetQuantumType(Image *image,ExceptionInfo *exception)
   return(quantum_type);
 }
 
+static MagickBooleanType IsIndexQuantum(const QuantumType quantum_type)
+{
+  switch (quantum_type)
+  {
+    case IndexQuantum:
+    case IndexAlphaQuantum:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
+static const QuantumType
+  ColorSeparationQuantums[] =
+  {
+    CyanQuantum,
+    MagentaQuantum,
+    YellowQuantum,
+    BlackQuantum,
+    CMYKQuantum,
+    CMYKAQuantum,
+    MultispectralQuantum
+  };
+
+static MagickBooleanType IsColorSeparationQuantum(
+  const QuantumType quantum_type)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(ColorSeparationQuantums)/sizeof(*ColorSeparationQuantums)); i++)
+    if (ColorSeparationQuantums[i] == quantum_type)
+      return(MagickTrue);
+  return(MagickFalse);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -302,31 +339,24 @@ MagickExport void SetQuantumImageType(Image *image,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  switch (quantum_type)
-  {
-    case IndexQuantum:
-    case IndexAlphaQuantum:
+  if (IsIndexQuantum(quantum_type) != MagickFalse)
     {
       image->type=PaletteType;
-      break;
+      return;
     }
+  if (IsColorSeparationQuantum(quantum_type) != MagickFalse)
+    {
+      image->type=ColorSeparationType;
+      return;
+    }
+  switch (quantum_type)
+  {
     case GrayQuantum:
     case GrayAlphaQuantum:
     {
       image->type=GrayscaleType;
       if (image->depth == 1)
         image->type=BilevelType;
-      break;
-    }
-    case CyanQuantum:
-    case MagentaQuantum:
-    case YellowQuantum:
-    case BlackQuantum:
-    case CMYKQuantum:
-    case CMYKAQuantum:
-    case MultispectralQuantum:
-    {
-      image->type=ColorSeparationType;
       break;
     }
     default:
