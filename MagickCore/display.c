@@ -17339,6 +17339,69 @@ static void XFitBackgroundWindow(const XWindowAttributes *window_attributes,
   (*window_info).y=(int) geometry_info.y;
 }
 
+typedef struct _BackgroundTargets
+{
+  XStandardColormap
+    **map_info;
+
+  XPixelInfo
+    *pixel;
+
+  XResourceInfo
+    *resources;
+
+  XVisualInfo
+    **visual_info;
+
+  XWindowInfo
+    *window_info;
+} BackgroundTargets;
+
+static void XInitializeBackgroundVisual(Display *display,const Image *image,
+  char *visual_type,const BackgroundTargets *targets)
+{
+  XStandardColormap
+    **const map_info = targets->map_info;
+
+  XPixelInfo
+    *const pixel = targets->pixel;
+
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XVisualInfo
+    **const visual_info = targets->visual_info;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  /*
+    Allocate standard colormap.
+  */
+  (*map_info)=XAllocStandardColormap();
+  if ((*map_info) == (XStandardColormap *) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"MemoryAllocationFailed",
+      image->filename);
+  (*map_info)->colormap=(Colormap) NULL;
+  (*pixel).pixels=(unsigned long *) NULL;
+  /*
+    Initialize visual info.
+  */
+  (*resources).map_type=(char *) NULL;
+  (*resources).visual_type=visual_type;
+  (*visual_info)=XBestVisualInfo(display,(*map_info),resources);
+  if ((*visual_info) == (XVisualInfo *) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToGetVisual",
+      (*resources).visual_type);
+  /*
+    Initialize window info.
+  */
+  (*window_info).ximage=(XImage *) NULL;
+  (*window_info).matte_image=(XImage *) NULL;
+  (*window_info).pixmap=(Pixmap) NULL;
+  (*window_info).matte_pixmap=(Pixmap) NULL;
+}
+
 MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *image,ExceptionInfo *exception)
 {
@@ -17374,6 +17437,9 @@ MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
   XResourceInfo
     resources;
 
+  const BackgroundTargets
+    targets = { &map_info, &pixel, &resources, &visual_info, &window_info };
+
   XWindowAttributes
     window_attributes;
 
@@ -17395,33 +17461,7 @@ MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
   */
   XGetBackgroundVisualType(display,&window_info,&window_attributes,visual_type);
   if (visual_info == (XVisualInfo *) NULL)
-    {
-      /*
-        Allocate standard colormap.
-      */
-      map_info=XAllocStandardColormap();
-      if (map_info == (XStandardColormap *) NULL)
-        ThrowXWindowFatalException(XServerFatalError,"MemoryAllocationFailed",
-          image->filename);
-      map_info->colormap=(Colormap) NULL;
-      pixel.pixels=(unsigned long *) NULL;
-      /*
-        Initialize visual info.
-      */
-      resources.map_type=(char *) NULL;
-      resources.visual_type=visual_type;
-      visual_info=XBestVisualInfo(display,map_info,&resources);
-      if (visual_info == (XVisualInfo *) NULL)
-        ThrowXWindowFatalException(XServerFatalError,"UnableToGetVisual",
-          resources.visual_type);
-      /*
-        Initialize window info.
-      */
-      window_info.ximage=(XImage *) NULL;
-      window_info.matte_image=(XImage *) NULL;
-      window_info.pixmap=(Pixmap) NULL;
-      window_info.matte_pixmap=(Pixmap) NULL;
-    }
+    XInitializeBackgroundVisual(display,image,visual_type,&targets);
   /*
     Free previous root colors.
   */
