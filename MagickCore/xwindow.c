@@ -2408,18 +2408,35 @@ static int XTransferDrawPixels(const DrawPixels *draw_pixels)
   return(y);
 }
 
-MagickPrivate MagickBooleanType XDrawImage(Display *display,
-  const XPixelInfo *pixel,XDrawInfo *draw_info,Image *image,
-  ExceptionInfo *exception)
+typedef struct _XDrawSource
 {
+  XImage
+    *draw_ximage;
+
+  const XPixelInfo
+    *pixel;
+
+  XDrawInfo
+    *draw_info;
+} XDrawSource;
+
+static MagickBooleanType XComposeDrawImage(const XDrawSource *source,
+  Image *image,ExceptionInfo *exception)
+{
+  XImage
+    *const draw_ximage = source->draw_ximage;
+
+  const XPixelInfo
+    *const pixel = source->pixel;
+
+  XDrawInfo
+    *const draw_info = source->draw_info;
+
   DrawPixels
     draw_pixels;
 
   DrawRotationTargets
     targets;
-
-  GC
-    draw_context;
 
   Image
     *draw_image;
@@ -2431,61 +2448,10 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
   PixelTrait
     alpha_trait;
 
-  Pixmap
-    draw_pixmap;
-
   unsigned int
-    depth,
     height,
     width;
 
-  Window
-    root_window;
-
-  XGCValues
-    context_values;
-
-  XImage
-    *draw_ximage;
-
-  /*
-    Initialize drawd image.
-  */
-  assert(display != (Display *) NULL);
-  assert(pixel != (XPixelInfo *) NULL);
-  assert(draw_info != (XDrawInfo *) NULL);
-  assert(image != (Image *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  /*
-    Initialize drawd pixmap.
-  */
-  root_window=XRootWindow(display,XDefaultScreen(display));
-  depth=(unsigned int) XDefaultDepth(display,XDefaultScreen(display));
-  draw_pixmap=XCreatePixmap(display,root_window,draw_info->width,
-    draw_info->height,depth);
-  if (draw_pixmap == (Pixmap) NULL)
-    return(MagickFalse);
-  /*
-    Initialize graphics info.
-  */
-  context_values.background=(size_t) (~0);
-  context_values.foreground=0;
-  context_values.line_width=(int) draw_info->line_width;
-  draw_context=XCreateGC(display,root_window,(size_t)
-    (GCBackground | GCForeground | GCLineWidth),&context_values);
-  if (draw_context == (GC) NULL)
-    return(MagickFalse);
-  XDrawElementToPixmap(display,draw_pixmap,draw_context,draw_info);
-  (void) XFreeGC(display,draw_context);
-  /*
-    Initialize X image.
-  */
-  draw_ximage=XGetImage(display,draw_pixmap,0,0,draw_info->width,
-    draw_info->height,AllPlanes,ZPixmap);
-  if (draw_ximage == (XImage *) NULL)
-    return(MagickFalse);
-  (void) XFreePixmap(display,draw_pixmap);
   /*
     Initialize draw image.
   */
@@ -2540,6 +2506,75 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
     }
   draw_image=DestroyImage(draw_image);
   return(MagickTrue);
+}
+
+MagickPrivate MagickBooleanType XDrawImage(Display *display,
+  const XPixelInfo *pixel,XDrawInfo *draw_info,Image *image,
+  ExceptionInfo *exception)
+{
+  GC
+    draw_context;
+
+  Pixmap
+    draw_pixmap;
+
+  unsigned int
+    depth;
+
+  Window
+    root_window;
+
+  XDrawSource
+    source;
+
+  XGCValues
+    context_values;
+
+  XImage
+    *draw_ximage;
+
+  /*
+    Initialize drawd image.
+  */
+  assert(display != (Display *) NULL);
+  assert(pixel != (XPixelInfo *) NULL);
+  assert(draw_info != (XDrawInfo *) NULL);
+  assert(image != (Image *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  /*
+    Initialize drawd pixmap.
+  */
+  root_window=XRootWindow(display,XDefaultScreen(display));
+  depth=(unsigned int) XDefaultDepth(display,XDefaultScreen(display));
+  draw_pixmap=XCreatePixmap(display,root_window,draw_info->width,
+    draw_info->height,depth);
+  if (draw_pixmap == (Pixmap) NULL)
+    return(MagickFalse);
+  /*
+    Initialize graphics info.
+  */
+  context_values.background=(size_t) (~0);
+  context_values.foreground=0;
+  context_values.line_width=(int) draw_info->line_width;
+  draw_context=XCreateGC(display,root_window,(size_t)
+    (GCBackground | GCForeground | GCLineWidth),&context_values);
+  if (draw_context == (GC) NULL)
+    return(MagickFalse);
+  XDrawElementToPixmap(display,draw_pixmap,draw_context,draw_info);
+  (void) XFreeGC(display,draw_context);
+  /*
+    Initialize X image.
+  */
+  draw_ximage=XGetImage(display,draw_pixmap,0,0,draw_info->width,
+    draw_info->height,AllPlanes,ZPixmap);
+  if (draw_ximage == (XImage *) NULL)
+    return(MagickFalse);
+  (void) XFreePixmap(display,draw_pixmap);
+  source.draw_ximage=draw_ximage;
+  source.pixel=pixel;
+  source.draw_info=draw_info;
+  return(XComposeDrawImage(&source,image,exception));
 }
 
 /*
