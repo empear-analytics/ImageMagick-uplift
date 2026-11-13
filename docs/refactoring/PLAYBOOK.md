@@ -1499,6 +1499,18 @@ merges code, not parameters.
 7. At each call, replace the group with `&name`, and check by reading that every member
    is initialised from the argument it replaces.
 8. Build: a call left with the old arguments does not compile.
+   Existing input struct (2026-11-13). When every caller is a helper that binds `const`
+   locals from the members of one `const Name *name` input struct of Recipe N (step 4's
+   form), and the group's arguments at every call are exactly such locals, each bound
+   from the member of its own name and type (`AppendTokenChar(token,extent,...)` in
+   helpers that bind `token = input->token` and `extent = input->extent`), the group
+   may be replaced by `const Name *name` itself instead of a new struct, although `Name`
+   has members the group lacks: the callee binds the group's members as `const` locals
+   of their old names (step 3), and each call passes `name` for the group. A caller's
+   local bound only for those calls, now unused, is deleted with its binding (Recipe DV
+   step 3's reasoning: `-Wunused-variable` shows it). The callee reads the same members
+   of the same struct the caller read, which nothing writes, so each use sees the value
+   the argument carried.
 
 **Before:**
 
@@ -15328,3 +15340,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | I | Step 8: V step 7's `S return(<expr>);` with a calling expression may be left in the caller, and `S` and the expression may read and write the written variables, as the macro form may (the writes land through the members before the helper returns) | `draw.c`'s `ConvertPathToPolygon`: the subpath flush writes `number_edges`, `points`, `ghostline` and `edge`, and its exit releases `points` before `return(DestroyPolygonInfo(polygon_info));`; chain probe 2.62 to 2.68 | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | LX | Step 4: written variables whose pointers would take the call past four parameters go in one `const` targets struct (Recipe LB step 8's form), taken after the input struct and before `broke` | `cache.c`'s `GetVirtualPixelRows`: the single-pixel transfer writes `length`, `q` and `s`, continues the column loop and breaks it when the fetch fails; with the input struct and `broke` the pointers would give six parameters | mandate (2026-10-24) |
 | 2026-11-13 | NEW | RS | Extract a Loop Body of Status-Call Exits, Returning the Calls' Status: a sequential loop's whole body whose exits are `continue;` and `return(c);` after status calls moves as in Recipe CR (b), and in the new function each `if (H(...) == MagickFalse) return(MagickFalse); return(MagickTrue);` pair becomes `return(H(...));` when `H` returns only `MagickTrue` or `MagickFalse`; evidence oracle | `token.c`'s `Tokenizer` (cc 15, three bumps after Recipe Y); CR alone keeps the bumps in the new function | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | B | Existing input struct: when every caller binds the group's arguments as `const` locals from one Recipe N input struct, the group may become that struct's pointer instead of a new struct (members the group lacks are allowed); the callers' bindings left unused are deleted | `token-next.c`'s `AppendTokenChar(token,extent,p,i)`, called only from the `Scan*Token` helpers that bind `token` and `extent` from `NextTokenInput`: *String Heavy Function Arguments* leaves the file, 9.09 to 9.38 in a probe | mandate (2026-10-24) |
