@@ -500,8 +500,8 @@ static MagickBooleanType TokenizeBreakChar(const TokenizerState *tokenizer,
   return(MagickTrue);
 }
 
-static MagickBooleanType TokenizeQuoteChar(const TokenizerState *tokenizer,
-  const int c,const ssize_t i)
+static void CloseOrStoreQuote(const TokenizerState *tokenizer,const int c,
+  const ssize_t i)
 {
   TokenInfo
     *const token_info = tokenizer->token_info;
@@ -511,6 +511,27 @@ static MagickBooleanType TokenizeQuoteChar(const TokenizerState *tokenizer,
 
   const size_t
     max_token_length = tokenizer->max_token_length;
+
+  const char
+    *const quote = tokenizer->quote;
+
+  if (quote[i] != token_info->quote)
+    StoreToken(token_info,token,max_token_length,c);
+  else
+    {
+      token_info->state=IN_OZONE;
+      token_info->quote='\0';
+    }
+}
+
+static MagickBooleanType TokenizeQuoteChar(const TokenizerState *tokenizer,
+  const int c,const ssize_t i)
+{
+  TokenInfo
+    *const token_info = tokenizer->token_info;
+
+  char
+    *const token = tokenizer->token;
 
   const char
     *const quote = tokenizer->quote;
@@ -532,13 +553,7 @@ static MagickBooleanType TokenizeQuoteChar(const TokenizerState *tokenizer,
     }
     case IN_QUOTE:
     {
-      if (quote[i] != token_info->quote)
-        StoreToken(token_info,token,max_token_length,c);
-      else
-        {
-          token_info->state=IN_OZONE;
-          token_info->quote='\0';
-        }
+      CloseOrStoreQuote(tokenizer,c,i);
       break;
     }
     case IN_TOKEN:
