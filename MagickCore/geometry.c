@@ -846,6 +846,15 @@ static inline MagickBooleanType IsPageSizeScaled(const MagickStatusType flags)
     MagickTrue : MagickFalse);
 }
 
+static void SetScaledPageSize(const MagickStatusType flags,
+  RectangleInfo *region_info)
+{
+  if ((flags & WidthValue) == 0)
+    region_info->width=region_info->height;
+  if ((flags & HeightValue) == 0)
+    region_info->height=region_info->width;
+}
+
 MagickExport MagickStatusType ParsePageGeometry(const Image *image,
   const char *geometry,RectangleInfo *region_info,ExceptionInfo *exception)
 {
@@ -868,12 +877,7 @@ MagickExport MagickStatusType ParsePageGeometry(const Image *image,
   flags=ParseMetaGeometry(geometry,&region_info->x,&region_info->y,
     &region_info->width,&region_info->height);
   if (IsPageSizeScaled(flags) != MagickFalse)
-    {
-      if ((flags & WidthValue) == 0)
-        region_info->width=region_info->height;
-      if ((flags & HeightValue) == 0)
-        region_info->height=region_info->width;
-    }
+    SetScaledPageSize(flags,region_info);
   return(flags);
 }
 
