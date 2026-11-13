@@ -1021,8 +1021,8 @@ MagickPrivate void ColorComponentTerminus(void)
 static inline MagickBooleanType IsColorNameCompliant(const ColorInfo *color,
   const ComplianceType compliance,const char *colorname)
 {
-  return((((color->compliance & compliance) != 0) &&
-    (LocaleCompare(colorname,color->name) == 0)) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (((color->compliance & compliance) != 0) &&
+    (LocaleCompare(colorname,color->name) == 0)));
 }
 
 static void StripColorNameWhitespace(char *colorname)
@@ -1183,16 +1183,16 @@ static inline MagickBooleanType IsSVGCompliant(const PixelInfo *pixel)
 static inline MagickBooleanType IsPercentColorComponent(
   const ComplianceType compliance,const PixelInfo *pixel)
 {
-  return(((compliance != NoCompliance) &&
+  return((MagickBooleanType) ((compliance != NoCompliance) &&
     (IssRGBCompatibleColorspace(pixel->colorspace) != MagickFalse) &&
-    (IsSVGCompliant(pixel) == MagickFalse)) ? MagickTrue : MagickFalse);
+    (IsSVGCompliant(pixel) == MagickFalse)));
 }
 
 static inline MagickBooleanType IsLCHColorspace(
   const ColorspaceType colorspace)
 {
-  return(((colorspace == LCHColorspace) || (colorspace == LCHabColorspace) ||
-    (colorspace == LCHuvColorspace)) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((colorspace == LCHColorspace) ||
+    (colorspace == LCHabColorspace) || (colorspace == LCHuvColorspace)));
 }
 
 static void SetRedComponent(const PixelInfo *pixel,
@@ -1715,7 +1715,7 @@ static MagickBooleanType IsColorCacheInstantiated(ExceptionInfo *exception)
         color_cache=AcquireColorCache(ColorFilename,exception);
       UnlockSemaphoreInfo(color_semaphore);
     }
-  return(color_cache != (LinkedListInfo *) NULL ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (color_cache != (LinkedListInfo *) NULL));
 }
 
 /*
@@ -2210,7 +2210,7 @@ static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
     q=ReadColorInfoAttribute(color_info,keyword,q,extent,token,exception);
   }
   token=(char *) RelinquishMagickMemory(token);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (status != 0));
 }
 #endif
 
@@ -2352,8 +2352,8 @@ static MagickStatusType ParseCSSColor(const char *magick_restrict color,
 
 static inline MagickBooleanType IsHexColorLength(const size_t n)
 {
-  return(((n == 3) || (n == 6) || (n == 9) || (n == 12) || (n == 24) ||
-    (n == 48)) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((n == 3) || (n == 6) || (n == 9) ||
+    (n == 12) || (n == 24) || (n == 48)));
 }
 
 static inline MagickBooleanType IsInvalidHexAlphaLength(const size_t n)
@@ -2364,26 +2364,26 @@ static inline MagickBooleanType IsInvalidHexAlphaLength(const size_t n)
 
 static inline MagickBooleanType IsDecimalDigitCharacter(const char c)
 {
-  return(((c >= '0') && (c <= '9')) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((c >= '0') && (c <= '9')));
 }
 
 static inline MagickBooleanType IsUpperHexLetter(const char c)
 {
-  return(((c >= 'A') && (c <= 'F')) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((c >= 'A') && (c <= 'F')));
 }
 
 static inline MagickBooleanType IsLowerHexLetter(const char c)
 {
-  return(((c >= 'a') && (c <= 'f')) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((c >= 'a') && (c <= 'f')));
 }
 
 static inline MagickBooleanType IsHueColorspaceName(const char *colorspace)
 {
-  return(((LocaleCompare(colorspace,"HCL") == 0) ||
+  return((MagickBooleanType) ((LocaleCompare(colorspace,"HCL") == 0) ||
     (LocaleCompare(colorspace,"HSB") == 0) ||
     (LocaleCompare(colorspace,"HSL") == 0) ||
     (LocaleCompare(colorspace,"HSV") == 0) ||
-    (LocaleCompare(colorspace,"HWB") == 0)) ? MagickTrue : MagickFalse);
+    (LocaleCompare(colorspace,"HWB") == 0)));
 }
 
 static void SetOklchColorFromGeometry(PixelInfo *color,
