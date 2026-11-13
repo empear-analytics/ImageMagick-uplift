@@ -1124,6 +1124,68 @@ static void LoadLogIncludes(const LogIncludeInput *include,const char **q,
   }
 }
 
+typedef struct _LogElementInput
+{
+  LinkedListInfo
+    *cache;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    *keyword,
+    *token;
+
+  const char
+    *filename;
+
+  size_t
+    extent;
+} LogElementInput;
+
+static void ParseLogElement(const LogElementInput *element,
+  LogInfo **log_info,MagickStatusType *status,const char **q)
+{
+  LinkedListInfo
+    *const cache = element->cache;
+
+  ExceptionInfo
+    *const exception = element->exception;
+
+  char
+    *const keyword = element->keyword,
+    *const token = element->token;
+
+  const char
+    *const filename = element->filename;
+
+  const size_t
+    extent = element->extent;
+
+  if (LocaleCompare(keyword,"<logmap>") == 0)
+    {
+      /*
+        Allocate memory for the log list.
+      */
+      (*log_info)=(LogInfo *) AcquireCriticalMemory(sizeof(*(*log_info)));
+      (void) memset((*log_info),0,sizeof(*(*log_info)));
+      (*log_info)->path=ConstantString(filename);
+      GetTimerInfo((TimerInfo *) &(*log_info)->timer);
+      (*log_info)->signature=MagickCoreSignature;
+      return;
+    }
+  if ((*log_info) == (LogInfo *) NULL)
+    return;
+  if (LocaleCompare(keyword,"</logmap>") == 0)
+    {
+      (*status)=AppendLogElement(cache,(*log_info),filename,exception);
+      (*log_info)=(LogInfo *) NULL;
+      return;
+    }
+  if (ReadLogAttributeValue(q,extent,token) != MagickFalse)
+    SetLogInfoAttribute((*log_info),keyword,token);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1190,6 +1252,9 @@ static MagickBooleanType LoadLogCache(const LogLoadTarget *target,
   extent=strlen(token)+MagickPathExtent;
   for (q=(const char *) xml; *q != '\0'; )
   {
+    LogElementInput
+      element;
+
     /*
       Interpret XML.
     */
@@ -1230,28 +1295,13 @@ static MagickBooleanType LoadLogCache(const LogLoadTarget *target,
         LoadLogIncludes(&include,&q,&status);
         continue;
       }
-    if (LocaleCompare(keyword,"<logmap>") == 0)
-      {
-        /*
-          Allocate memory for the log list.
-        */
-        log_info=(LogInfo *) AcquireCriticalMemory(sizeof(*log_info));
-        (void) memset(log_info,0,sizeof(*log_info));
-        log_info->path=ConstantString(filename);
-        GetTimerInfo((TimerInfo *) &log_info->timer);
-        log_info->signature=MagickCoreSignature;
-        continue;
-      }
-    if (log_info == (LogInfo *) NULL)
-      continue;
-    if (LocaleCompare(keyword,"</logmap>") == 0)
-      {
-        status=AppendLogElement(cache,log_info,filename,exception);
-        log_info=(LogInfo *) NULL;
-        continue;
-      }
-    if (ReadLogAttributeValue(&q,extent,token) != MagickFalse)
-      SetLogInfoAttribute(log_info,keyword,token);
+    element.cache=cache;
+    element.exception=exception;
+    element.keyword=keyword;
+    element.token=token;
+    element.filename=filename;
+    element.extent=extent;
+    ParseLogElement(&element,&log_info,&status,&q);
   }
   token=DestroyString(token);
   if (cache == (LinkedListInfo *) NULL)
