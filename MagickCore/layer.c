@@ -2000,6 +2000,46 @@ static MagickBooleanType AcquireFrameLists(const Image *image,
   return(MagickTrue);
 }
 
+static MagickBooleanType AssumeNoneDisposal(
+  const DuplicateFrameTrial *trial)
+{
+  const Image
+    *const curr = trial->curr;
+
+  RectangleInfo
+    *const bounds = trial->bounds;
+
+  DisposeType
+    *const disposals = trial->disposals;
+
+  const ssize_t
+    i = trial->i;
+
+  ExceptionInfo
+    *const exception = trial->exception;
+
+  MagickBooleanType
+    cleared;
+
+#if DEBUG_OPT_FRAME
+    (void) FormatLocaleFile(stderr,"frame %.17g :-\n",(double) i);
+#endif
+  /*
+    Assume none disposal is the best
+  */
+  bounds[i]=CompareImagesBounds(curr->previous,curr,CompareAnyLayer,exception);
+  cleared=IsBoundsCleared(curr->previous,curr,&bounds[i],exception);
+  disposals[i-1]=NoneDispose;
+#if DEBUG_OPT_FRAME
+    (void) FormatLocaleFile(stderr, "overlay: %.17gx%.17g%+.20g%+.20g%s%s\n",
+         (double) bounds[i].width,(double) bounds[i].height,
+         (double) bounds[i].x,(double) bounds[i].y,
+         bounds[i].x < 0?"  (unchanged)":"",
+         cleared?"  (pixels cleared)":"");
+#endif
+  return(cleared);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -2088,22 +2128,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
       trial = { add_frames, curr, bounds, disposals, i, exception,
         prev_image };
 
-#if DEBUG_OPT_FRAME
-    (void) FormatLocaleFile(stderr,"frame %.17g :-\n",(double) i);
-#endif
-    /*
-      Assume none disposal is the best
-    */
-    bounds[i]=CompareImagesBounds(curr->previous,curr,CompareAnyLayer,exception);
-    cleared=IsBoundsCleared(curr->previous,curr,&bounds[i],exception);
-    disposals[i-1]=NoneDispose;
-#if DEBUG_OPT_FRAME
-    (void) FormatLocaleFile(stderr, "overlay: %.17gx%.17g%+.20g%+.20g%s%s\n",
-         (double) bounds[i].width,(double) bounds[i].height,
-         (double) bounds[i].x,(double) bounds[i].y,
-         bounds[i].x < 0?"  (unchanged)":"",
-         cleared?"  (pixels cleared)":"");
-#endif
+    cleared=AssumeNoneDisposal(&trial);
     if ( bounds[i].x < 0 ) {
       /*
         Image frame is exactly the same as the previous frame!
