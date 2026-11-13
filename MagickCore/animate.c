@@ -5692,15 +5692,139 @@ static Image *XRunAnimateSession(const AnimateWindowSetup *setup,
   }
 }
 
+typedef struct _AnimateStartInputs
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  char
+    **argv;
+
+  int
+    argc;
+
+  XWindows
+    *windows;
+
+  Image
+    *images;
+
+  ExceptionInfo
+    *exception;
+
+  WarningHandler
+    warning_handler;
+
+  char
+    *working_directory;
+
+  XWindowInfo
+    **magick_windows;
+
+  size_t
+    number_windows;
+
+  XVisualInfo
+    *visual_info;
+
+  XStandardColormap
+    *map_info;
+
+  XPixelInfo
+    *pixel;
+
+  XFontStruct
+    *font_info;
+
+  Window
+    root_window;
+
+  XClassHint
+    *class_hints;
+
+  XWMHints
+    *manager_hints;
+
+  XResourceInfo
+    *icon_resources;
+
+  XVisualInfo
+    *icon_visual;
+
+  XStandardColormap
+    *icon_map;
+
+  XPixelInfo
+    *icon_pixel;
+} AnimateStartInputs;
+
+static Image *XStartAnimateSession(const AnimateStartInputs *start)
+{
+  Display
+    *const display = start->display;
+
+  ExceptionInfo
+    *const exception = start->exception;
+
+  Image
+    *display_image,
+    **image_list,
+    *images = start->images,
+    *nexus;
+
+  size_t
+    number_scenes;
+
+  XResourceInfo
+    *const resource_info = start->resource_info;
+
+  AnimateSceneList
+    scene_list;
+
+  images=XCoalesceAnimateImages(images,exception);
+  XRemapColormapMismatch(resource_info,start->visual_info,images,exception);
+  /*
+    Sort images by increasing scene number.
+  */
+  number_scenes=GetImageListLength(images);
+  image_list=XSortAnimateScenes(images,number_scenes,exception);
+  /*
+    Initialize Standard Colormap.
+  */
+  nexus=NewImageList();
+  scene_list.resource_info=resource_info;
+  scene_list.visual_info=start->visual_info;
+  scene_list.image_list=image_list;
+  scene_list.number_scenes=number_scenes;
+  scene_list.exception=exception;
+  display_image=XPrepareSceneImages(&scene_list);
+  XLogDisplayImage(resource_info,display_image);
+  XMakeStandardColormap(display,start->visual_info,resource_info,display_image,
+    start->map_info,start->pixel,exception);
+  {
+    const AnimateWindowSetup
+      setup = { display, resource_info, start->windows, start->visual_info,
+        start->map_info, start->pixel, start->font_info, start->root_window,
+        start->class_hints, start->manager_hints, start->argv, start->argc,
+        start->icon_resources, start->icon_visual, start->icon_map,
+        start->icon_pixel, display_image, number_scenes };
+
+    const AnimateRunInputs
+      inputs = { image_list, exception, images, nexus, start->warning_handler,
+        start->working_directory, start->magick_windows,
+        start->number_windows };
+
+    return(XRunAnimateSession(&setup,&inputs));
+  }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
 {
-  Image
-    *display_image,
-    **image_list,
-    *nexus;
-
   static char
     working_directory[MagickPathExtent];
 
@@ -5709,9 +5833,6 @@ MagickExport Image *XAnimateImages(Display *display,
 
   static XWindowInfo
     *magick_windows[MaXWindows];
-
-  size_t
-    number_scenes;
 
   WarningHandler
     warning_handler;
@@ -5746,8 +5867,8 @@ MagickExport Image *XAnimateImages(Display *display,
   XWMHints
     *manager_hints;
 
-  AnimateSceneList
-    scene_list;
+  AnimateStartInputs
+    start;
 
   assert(images != (Image *) NULL);
   assert(images->signature == MagickCoreSignature);
@@ -5783,39 +5904,29 @@ MagickExport Image *XAnimateImages(Display *display,
   class_hints=windows->class_hints;
   manager_hints=windows->manager_hints;
   root_window=XRootWindow(display,visual_info->screen);
-  images=XCoalesceAnimateImages(images,exception);
-  XRemapColormapMismatch(resource_info,visual_info,images,exception);
-  /*
-    Sort images by increasing scene number.
-  */
-  number_scenes=GetImageListLength(images);
-  image_list=XSortAnimateScenes(images,number_scenes,exception);
-  /*
-    Initialize Standard Colormap.
-  */
-  nexus=NewImageList();
-  scene_list.resource_info=resource_info;
-  scene_list.visual_info=visual_info;
-  scene_list.image_list=image_list;
-  scene_list.number_scenes=number_scenes;
-  scene_list.exception=exception;
-  display_image=XPrepareSceneImages(&scene_list);
-  XLogDisplayImage(resource_info,display_image);
-  XMakeStandardColormap(display,visual_info,resource_info,display_image,
-    map_info,pixel,exception);
-  {
-    const AnimateWindowSetup
-      setup = { display, resource_info, windows, visual_info, map_info, pixel,
-        font_info, root_window, class_hints, manager_hints, argv, argc,
-        icon_resources, icon_visual, icon_map, icon_pixel, display_image,
-        number_scenes };
-
-    const AnimateRunInputs
-      inputs = { image_list, exception, images, nexus, warning_handler,
-        working_directory, magick_windows, number_windows };
-
-    return(XRunAnimateSession(&setup,&inputs));
-  }
+  start.display=display;
+  start.resource_info=resource_info;
+  start.argv=argv;
+  start.argc=argc;
+  start.windows=windows;
+  start.images=images;
+  start.exception=exception;
+  start.warning_handler=warning_handler;
+  start.working_directory=working_directory;
+  start.magick_windows=magick_windows;
+  start.number_windows=number_windows;
+  start.visual_info=visual_info;
+  start.map_info=map_info;
+  start.pixel=pixel;
+  start.font_info=font_info;
+  start.root_window=root_window;
+  start.class_hints=class_hints;
+  start.manager_hints=manager_hints;
+  start.icon_resources=icon_resources;
+  start.icon_visual=icon_visual;
+  start.icon_map=icon_map;
+  start.icon_pixel=icon_pixel;
+  return(XStartAnimateSession(&start));
 }
 
 /*
