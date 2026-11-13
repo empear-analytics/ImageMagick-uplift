@@ -7713,6 +7713,64 @@ static void XMagnifyBitmapLSB(const XMagnifyContext *context,
   MagnifyBitRowsLSB(&bit_rows);
 }
 
+static void XMagnifyBitmapMSB(const XMagnifyContext *context,
+  const XPixelInfo *pixel_info)
+{
+  XImage
+    *const ximage = context->ximage;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    height = context->height,
+    magnify = context->magnify,
+    width = context->width,
+    scanline_pad = context->scanline_pad;
+
+  const int
+    x = context->x,
+    y = context->y;
+
+  unsigned char
+    *const q = context->q;
+
+  unsigned char
+    background,
+    foreground;
+
+  MagnifyBitRows
+    bit_rows;
+
+  /*
+    Magnify big-endian bitmap.
+  */
+  background=0x00;
+  foreground=0x01;
+  if (ximage->format == XYBitmap)
+    {
+      background=(unsigned char)
+        (XPixelIntensity(&pixel_info->foreground_color) <
+         XPixelIntensity(&pixel_info->background_color) ?  0x01 : 0x00);
+      foreground=(unsigned char)
+        (XPixelIntensity(&pixel_info->background_color) <
+         XPixelIntensity(&pixel_info->foreground_color) ?  0x01 : 0x00);
+    }
+  if ((ximage->format == XYBitmap) && (windows->magnify.depth > 1))
+    Swap(background,foreground);
+  bit_rows.height=height;
+  bit_rows.magnify=magnify;
+  bit_rows.ximage=ximage;
+  bit_rows.x=x;
+  bit_rows.y=y;
+  bit_rows.width=width;
+  bit_rows.scanline_pad=scanline_pad;
+  bit_rows.background=background;
+  bit_rows.foreground=foreground;
+  bit_rows.q=q;
+  MagnifyBitRowsMSB(&bit_rows);
+}
+
 MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   ExceptionInfo *exception)
 {
@@ -7775,10 +7833,6 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   context.q=q;
   if (ximage->bits_per_pixel < 8)
     {
-      unsigned char
-        background,
-        foreground;
-
       XPixelInfo
         *pixel_info;
 
@@ -7793,36 +7847,7 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
         case MSBFirst:
         default:
         {
-          MagnifyBitRows
-            bit_rows;
-
-          /*
-            Magnify big-endian bitmap.
-          */
-          background=0x00;
-          foreground=0x01;
-          if (ximage->format == XYBitmap)
-            {
-              background=(unsigned char)
-                (XPixelIntensity(&pixel_info->foreground_color) <
-                 XPixelIntensity(&pixel_info->background_color) ?  0x01 : 0x00);
-              foreground=(unsigned char)
-                (XPixelIntensity(&pixel_info->background_color) <
-                 XPixelIntensity(&pixel_info->foreground_color) ?  0x01 : 0x00);
-            }
-          if ((ximage->format == XYBitmap) && (windows->magnify.depth > 1))
-            Swap(background,foreground);
-          bit_rows.height=height;
-          bit_rows.magnify=magnify;
-          bit_rows.ximage=ximage;
-          bit_rows.x=x;
-          bit_rows.y=y;
-          bit_rows.width=width;
-          bit_rows.scanline_pad=scanline_pad;
-          bit_rows.background=background;
-          bit_rows.foreground=foreground;
-          bit_rows.q=q;
-          MagnifyBitRowsMSB(&bit_rows);
+          XMagnifyBitmapMSB(&context,pixel_info);
           break;
         }
       }
