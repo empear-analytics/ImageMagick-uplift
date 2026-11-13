@@ -391,6 +391,23 @@ static void MarkImagesForDeletion(MagickBooleanType *delete_list,
       delete_list[i]=MagickTrue;
 }
 
+static MagickBooleanType ParseSceneRangeEnd(char **p,long *last,
+  const size_t length)
+{
+  char
+    *q;
+
+  if (**p != '-')
+    return(MagickTrue);
+  *last=strtol((*p)+1,&q,10);
+  if (((*p)+1) == q)
+    return(MagickFalse);
+  *p=q;
+  if (*last < 0)
+    *last+=(long) length;
+  return(MagickTrue);
+}
+
 static void MarkScenesForDeletion(MagickBooleanType *delete_list,
   const char *scenes,const size_t length)
 {
@@ -417,15 +434,8 @@ static void MarkScenesForDeletion(MagickBooleanType *delete_list,
     last=first;
     while (isspace((int) ((unsigned char) *p)) != 0)
       p++;
-    if (*p == '-')
-      {
-        last=strtol(p+1,&q,10);
-        if ((p+1) == q)
-          break;
-        p=q;
-        if (last < 0)
-          last+=(long) length;
-      }
+    if (ParseSceneRangeEnd(&p,&last,length) == MagickFalse)
+      break;
     if (first > last)
       continue;
     MarkImagesForDeletion(delete_list,first,last,length);
