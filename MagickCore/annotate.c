@@ -2596,6 +2596,18 @@ static void SelectFreetypeFontPath(const DrawInfo *draw_info,
      }
 }
 
+static FT_UInt GetFreetypeGlyphId(const GraphemeInfo *grapheme,
+  const FT_UInt missing_glyph_id)
+{
+  FT_UInt
+    id;
+
+  id=(FT_UInt) grapheme->index;
+  if (id == 0)
+    id=missing_glyph_id;
+  return(id);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2845,9 +2857,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     /*
       Render UTF-8 sequence.
     */
-    glyph.id=(FT_UInt) grapheme[i].index;
-    if (glyph.id == 0)
-      glyph.id=missing_glyph_id;
+    glyph.id=GetFreetypeGlyphId(grapheme+i,missing_glyph_id);
     if ((glyph.id != 0) && (last_glyph_id != 0))
       origin.x+=(FT_Pos) (64.0*draw_info->kerning);
     glyph.origin=origin;
