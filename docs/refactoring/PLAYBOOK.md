@@ -534,6 +534,30 @@ blocks of nested logic). Each bump is a missing function.
    first form does for a block that ends a `void` function. The body's variables that
    only the block writes and reads move into it with their declarations (step 4); one
    the staying statements write and the block reads is an input.
+8. Whole parallel loops (2026-11-13). A block that lies outside every OpenMP region may
+   hold whole parallel loops on Recipe N step 1's terms, when its inputs fit this
+   recipe's parameters and N's *Use when* (five or more inputs) does not take it: each
+   loop moves whole and unchanged, the `#if defined(MAGICKCORE_OPENMP_SUPPORT)` line,
+   the pragma with its clauses, the `#endif` and the loop statement the pragma governs
+   all inside the block; every variable a region writes or a clause names (`status`
+   in `shared(status)`, the loop counter) is a parameter or a local of the new function
+   by the same name, never anything else. The single value step 3 returns may be such
+   a variable: `status`, which the block sets before the loop and the caller reads
+   after it, is declared in the new function and returned (`return(status);` as the
+   last statement), and the block becomes `status=Helper(...);`. Other locals of the
+   block follow step 4 (a view the block acquires and destroys, the loop counter, move
+   with their declarations when the caller has no other use of them). Why the
+   behaviour is the same: the caller's local was declared before the region and so
+   was shared by the region (by default or by its clause); the new function's local of
+   the same name is declared before the same unedited region and is shared in the same
+   way, one object for the region's threads, and the variables the region privatises
+   (its loop counter, the declarations of its body) are privatised as before. Each
+   thread runs the same iterations on the same values, and the value the region leaves
+   in the variable is the value returned to the caller, which reads it where it read
+   its own (Recipe N's *Careful* item for whole parallel loops). The oracle runs
+   without OpenMP, so the step also builds with OpenMP and compares the cases that
+   reach the block at `OMP_NUM_THREADS=1` and `=4` against the baseline (the owner's
+   ruling of 2026-11-12), and quotes the comparison.
 
 **Before:**
 
@@ -599,7 +623,12 @@ build, owner's OK of 2026-11-10 to evolve the recipes): `xwindow.c`'s `XMakeWind
 block of cc 2 and 8 lines that the function's Complex Method needs moved); the structs are
 structs, so Recipe I's static paragraph (arithmetic, enumeration and pointer types) does not take them, and
 the struct-local form refuses them because their addresses are taken elsewhere (`XSetWMProperties`,
-`XFreeTextProperty`). Added by Claude Code (Claude Sonnet 5.5).
+`XFreeTextProperty`). Added by Claude Code (Claude Sonnet 5.5). Step 8 (2026-11-13, W23 lane c):
+`feature-texture.c`'s `GetImageFeatures`, whose grays fill (`status=MagickTrue;`, the cache view, the
+whole parallel row loop with `shared(status)`, the view's release) reads only `image`, `grays` and
+`exception` and returns `status`; N step 1 admits the loop but N is for five or more inputs. A probe:
+`GetImageFeatures` cc 16 to 13, 205 to 186 lines, the file 7.86 to 7.94, no finding on the helper.
+Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
@@ -16404,3 +16433,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | LP | Step 6 (*fall-out form*): besides the label group `G` and `default: break;` the `switch` may hold other groups that end every path with a `return`, and `G`'s body `B` may end with its only `break;` of the `switch`; `e` is a parameter or local nothing in the `switch` writes. `G` leaves the `switch` and `B`, without the `break;`, stands under `if (<Name>(e) != MagickFalse)` directly after the `switch`. *Careful* gives the argument (disjoint labels; `default: break;` reaches the same point doing nothing; `e` side-effect free and unwritten, so the predicate sees the selected value; the returning groups never reach the `if`) | `display.c`'s `XImageCache` (campaign A, W23 round nine lane b, wide build): the sixty-label save-to-undo group breaks to the redo and info tests beside the free-buffers and undo groups, which return, so step 1's two-group form refused it; a probe of the chain (N on the save body, this step, TB, RC on the undo group, N on the tail) leaves `XImageCache` only its six arguments | owner |
 | 2026-11-13 | AMEND | RC | Step 6 (*void form*): in a `void` function a group whose every path ends with `return;` moves wherever the `switch` stands into a `static void` function, its last `return;` dropped and every other kept; the group holds `Helper(...); return;`. Written block-scope statics go by pointer on Recipe O step 2's terms, inputs past four in a Recipe N input struct. The step gives the argument (each `return;` ends the helper where it ended the caller, whose `return;` follows the call at once) | `display.c`'s `XImageCache` (campaign A, W23 round nine lane b, wide build): the undo group returns on its three paths and writes the static undo and redo lists; RC's value form (`return(F);` after the `switch`) refused it | owner |
 | 2026-11-13 | NEW | FU | Fill a Struct by Initialiser in a Block Running to its Last Use: a struct local declared at the top of a block, filled member by member in the middle of it (every member once, in order, from plain identifiers) and then passed as `&name` to pointer-to-`const` parameters of a run of calls reaching the end of the block, becomes a `const` initialiser at the run's place, opening a compound statement that holds the tail up to the last use (re-indented two columns). *Careful* gives the argument (declarations are initialised where execution reaches them, the same identifiers, every member set, the tail unchanged, no branch added) | `animate.c`'s `XAnimateImages` (campaign A, W23 round nine lane d, wide build): `setup` (18 members, 12 calls) and `event_context` (19 members, 3 calls) are filled after `display_image` and `context_mask` are written, so FI step 8 refuses and FB takes one call only. A probe of both: `IDENTICAL` object code, 156 to 129 lines, 8.01 to 8.13 | owner |
+| 2026-11-13 | AMEND | E | Step 8 (*whole parallel loops*): a block outside every OpenMP region may hold whole parallel loops on Recipe N step 1's terms when its inputs fit E's parameters (each loop moved whole and unchanged with its `#if`, pragma and `#endif`; what a region writes or a clause names is a parameter or local of the new function by the same name; `status` may be the returned value, declared in the new function). The data-sharing argument is N's; the step is also compared with OpenMP at `OMP_NUM_THREADS=1` and `=4`. Now eight steps | `feature-texture.c`'s `GetImageFeatures` (campaign A, W23 lane c): the grays fill reads three inputs and returns `status`; N's *Use when* needs five. A probe: 7.86 to 7.94, cc 16 to 13, no finding on the helper | owner |
