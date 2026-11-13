@@ -7633,6 +7633,86 @@ static int XGetMagnifyOriginY(XWindows *windows,const XImage *ximage,
   return(y);
 }
 
+typedef struct _XMagnifyContext
+{
+  XImage
+    *ximage;
+
+  XWindows
+    *windows;
+
+  unsigned int
+    height,
+    magnify,
+    width,
+    scanline_pad;
+
+  int
+    x,
+    y;
+
+  unsigned char
+    *q;
+} XMagnifyContext;
+
+static void XMagnifyBitmapLSB(const XMagnifyContext *context,
+  const XPixelInfo *pixel_info)
+{
+  XImage
+    *const ximage = context->ximage;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    height = context->height,
+    magnify = context->magnify,
+    width = context->width,
+    scanline_pad = context->scanline_pad;
+
+  const int
+    x = context->x,
+    y = context->y;
+
+  unsigned char
+    *const q = context->q;
+
+  unsigned char
+    background,
+    foreground;
+
+  MagnifyBitRows
+    bit_rows;
+
+  /*
+    Magnify little-endian bitmap.
+  */
+  background=0x00;
+  foreground=0x80;
+  if (ximage->format == XYBitmap)
+    {
+      background=(unsigned char)
+        (XPixelIntensity(&pixel_info->foreground_color) <
+         XPixelIntensity(&pixel_info->background_color) ?  0x80 : 0x00);
+      foreground=(unsigned char)
+        (XPixelIntensity(&pixel_info->background_color) <
+         XPixelIntensity(&pixel_info->foreground_color) ?  0x80 : 0x00);
+    }
+  if ((ximage->format == XYBitmap) && (windows->magnify.depth > 1))
+    Swap(background,foreground);
+  bit_rows.height=height;
+  bit_rows.magnify=magnify;
+  bit_rows.ximage=ximage;
+  bit_rows.x=x;
+  bit_rows.y=y;
+  bit_rows.width=width;
+  bit_rows.scanline_pad=scanline_pad;
+  bit_rows.background=background;
+  bit_rows.foreground=foreground;
+  bit_rows.q=q;
+  MagnifyBitRowsLSB(&bit_rows);
+}
+
 MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   ExceptionInfo *exception)
 {
@@ -7660,6 +7740,9 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   XImage
     *ximage;
 
+  XMagnifyContext
+    context;
+
   /*
     Check boundary conditions.
   */
@@ -7681,6 +7764,15 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   q=(unsigned char *) windows->magnify.ximage->data;
   scanline_pad=(unsigned int) (windows->magnify.ximage->bytes_per_line-
     (((int) width*windows->magnify.ximage->bits_per_pixel) >> 3));
+  context.ximage=ximage;
+  context.windows=windows;
+  context.height=height;
+  context.magnify=magnify;
+  context.width=width;
+  context.scanline_pad=scanline_pad;
+  context.x=x;
+  context.y=y;
+  context.q=q;
   if (ximage->bits_per_pixel < 8)
     {
       unsigned char
@@ -7695,36 +7787,7 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
       {
         case LSBFirst:
         {
-          MagnifyBitRows
-            bit_rows;
-
-          /*
-            Magnify little-endian bitmap.
-          */
-          background=0x00;
-          foreground=0x80;
-          if (ximage->format == XYBitmap)
-            {
-              background=(unsigned char)
-                (XPixelIntensity(&pixel_info->foreground_color) <
-                 XPixelIntensity(&pixel_info->background_color) ?  0x80 : 0x00);
-              foreground=(unsigned char)
-                (XPixelIntensity(&pixel_info->background_color) <
-                 XPixelIntensity(&pixel_info->foreground_color) ?  0x80 : 0x00);
-            }
-          if ((ximage->format == XYBitmap) && (windows->magnify.depth > 1))
-            Swap(background,foreground);
-          bit_rows.height=height;
-          bit_rows.magnify=magnify;
-          bit_rows.ximage=ximage;
-          bit_rows.x=x;
-          bit_rows.y=y;
-          bit_rows.width=width;
-          bit_rows.scanline_pad=scanline_pad;
-          bit_rows.background=background;
-          bit_rows.foreground=foreground;
-          bit_rows.q=q;
-          MagnifyBitRowsLSB(&bit_rows);
+          XMagnifyBitmapLSB(&context,pixel_info);
           break;
         }
         case MSBFirst:
