@@ -2084,6 +2084,10 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   curr=GetNextImageInList(curr);
   for ( ; curr != (const Image *) NULL; curr=GetNextImageInList(curr))
   {
+    const DuplicateFrameTrial
+      trial = { add_frames, curr, bounds, disposals, i, exception,
+        prev_image };
+
 #if DEBUG_OPT_FRAME
     (void) FormatLocaleFile(stderr,"frame %.17g :-\n",(double) i);
 #endif
@@ -2115,10 +2119,6 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     }
     else
       {
-        const DuplicateFrameTrial
-          trial = { add_frames, curr, bounds, disposals, i, exception,
-            prev_image };
-
         cleared=TryPreviousDisposal(&trial,cleared);
 
         /*
