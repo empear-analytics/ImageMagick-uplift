@@ -4243,13 +4243,31 @@ static void XCreateCommandWindow(const AnimateWindowSetup *setup)
       "Window id: 0x%lx (command)",windows->command.id);
 }
 
+static void XChangeToHomeDirectory(XResourceInfo *resource_info,
+  char *working_directory,ExceptionInfo *exception)
+{
+  char
+    *directory;
+
+  int
+    status;
+
+  directory=getcwd(working_directory,MagickPathExtent);
+  (void) directory;
+  if (*resource_info->home_directory == '\0')
+    (void) CopyMagickString(resource_info->home_directory,".",MagickPathExtent);
+  status=chdir(resource_info->home_directory);
+  if (status == -1)
+    (void) ThrowMagickException(exception,GetMagickModule(),FileOpenError,
+      "UnableToOpenFile","%s",resource_info->home_directory);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
 {
   char
     command[MagickPathExtent],
-    *directory,
     geometry[MagickPathExtent],
     resource_name[MagickPathExtent];
 
@@ -4258,9 +4276,6 @@ MagickExport Image *XAnimateImages(Display *display,
     *image,
     **image_list,
     *nexus;
-
-  int
-    status;
 
   MagickStatusType
     context_mask,
@@ -4932,14 +4947,7 @@ MagickExport Image *XAnimateImages(Display *display,
   /*
     Change to home directory.
   */
-  directory=getcwd(working_directory,MagickPathExtent);
-  (void) directory;
-  if (*resource_info->home_directory == '\0')
-    (void) CopyMagickString(resource_info->home_directory,".",MagickPathExtent);
-  status=chdir(resource_info->home_directory);
-  if (status == -1)
-    (void) ThrowMagickException(exception,GetMagickModule(),FileOpenError,
-      "UnableToOpenFile","%s",resource_info->home_directory);
+  XChangeToHomeDirectory(resource_info,working_directory,exception);
   return(nexus);
 }
 
