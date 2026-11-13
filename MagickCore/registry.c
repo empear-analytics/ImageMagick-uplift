@@ -218,23 +218,12 @@ static void *GetRegistryValueAsString(const RegistryInfo *registry_info)
 %    o exception: the exception.
 %
 */
-MagickExport void *GetImageRegistry(const RegistryType type,const char *key,
-  ExceptionInfo *exception)
+static void *CloneRegistryValue(const RegistryType type,
+  const RegistryInfo *registry_info,ExceptionInfo *exception)
 {
   void
     *value;
 
-  RegistryInfo
-    *registry_info;
-
-  assert(key != (const char *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",key);
-  if (registry == (void *) NULL)
-    return((void *) NULL);
-  registry_info=(RegistryInfo *) GetValueFromSplayTree(registry,key);
-  if (registry_info == (void *) NULL)
-    return((void *) NULL);
   value=(void *) NULL;
   switch (type)
   {
@@ -259,6 +248,23 @@ MagickExport void *GetImageRegistry(const RegistryType type,const char *key,
       break;
   }
   return(value);
+}
+
+MagickExport void *GetImageRegistry(const RegistryType type,const char *key,
+  ExceptionInfo *exception)
+{
+  RegistryInfo
+    *registry_info;
+
+  assert(key != (const char *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",key);
+  if (registry == (void *) NULL)
+    return((void *) NULL);
+  registry_info=(RegistryInfo *) GetValueFromSplayTree(registry,key);
+  if (registry_info == (void *) NULL)
+    return((void *) NULL);
+  return(CloneRegistryValue(type,registry_info,exception));
 }
 
 /*
