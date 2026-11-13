@@ -14757,13 +14757,69 @@ static void ReleaseNoticeWidget(Display *display,XWindows *windows,
   ReleaseNoticeDismiss(display,windows,event,&targets);
 }
 
-MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
-  const char *reason,const char *description)
+typedef struct _NoticeText
 {
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  XFontStruct
+    *font_info;
+
+  unsigned int
+    height;
+
+  const char
+    *reason,
+    *description;
+} NoticeText;
+
+static void DrawNoticeText(const NoticeText *notice)
+{
+  Display
+    *const display = notice->display;
+
+  XWindows
+    *const windows = notice->windows;
+
+  XFontStruct
+    *const font_info = notice->font_info;
+
+  const unsigned int
+    height = notice->height;
+
+  const char
+    *const reason = notice->reason,
+    *const description = notice->description;
+
   int
     x,
     y;
 
+  unsigned int
+    width;
+
+  width=WidgetTextWidth(font_info,(char *) reason);
+  x=(int) ((windows->widget.width >> 1)-(width >> 1));
+  y=(int) ((windows->widget.height >> 1)-(height << 1));
+  (void) XDrawString(display,windows->widget.id,
+    windows->widget.annotate_context,x,y,(char *) reason,Extent(reason));
+  if (description != (char *) NULL)
+    {
+      width=WidgetTextWidth(font_info,(char *) description);
+      x=(int) ((windows->widget.width >> 1)-(width >> 1));
+      y+=(int) height;
+      (void) XDrawString(display,windows->widget.id,
+        windows->widget.annotate_context,x,y,(char *) description,
+        Extent(description));
+    }
+}
+
+MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
+  const char *reason,const char *description)
+{
   time_t
     timer;
 
@@ -14830,23 +14886,19 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
       }
     if (state & RedrawWidgetState)
       {
+        NoticeText
+          notice;
+
         /*
           Redraw Notice widget.
         */
-        width=WidgetTextWidth(font_info,(char *) reason);
-        x=(int) ((windows->widget.width >> 1)-(width >> 1));
-        y=(int) ((windows->widget.height >> 1)-(height << 1));
-        (void) XDrawString(display,windows->widget.id,
-          windows->widget.annotate_context,x,y,(char *) reason,Extent(reason));
-        if (description != (char *) NULL)
-          {
-            width=WidgetTextWidth(font_info,(char *) description);
-            x=(int) ((windows->widget.width >> 1)-(width >> 1));
-            y+=(int) height;
-            (void) XDrawString(display,windows->widget.id,
-              windows->widget.annotate_context,x,y,(char *) description,
-              Extent(description));
-          }
+        notice.display=display;
+        notice.windows=windows;
+        notice.font_info=font_info;
+        notice.height=height;
+        notice.reason=reason;
+        notice.description=description;
+        DrawNoticeText(&notice);
         XDrawBeveledButton(display,&windows->widget,&dismiss_info);
         XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
         state&=(unsigned int) (~RedrawWidgetState);
