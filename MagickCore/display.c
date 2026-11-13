@@ -4511,6 +4511,10 @@ typedef struct _ColorEditTargets
 
   size_t
     *state;
+
+  int
+    *x,
+    *y;
 } ColorEditTargets;
 
 static void XColorEditCommand(const ColorEditContext *context,
@@ -4565,6 +4569,35 @@ static void XColorEditCommand(const ColorEditContext *context,
     context->cursor);
 }
 
+static void XColorEditPress(const ColorEditContext *context,
+  const ColorEditTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  if ((*event).xbutton.button != Button1)
+    return;
+  if (((*event).xbutton.window != context->windows->image.id) &&
+      ((*event).xbutton.window != context->windows->magnify.id))
+    return;
+  /*
+    exit loop.
+  */
+  (*x)=(*event).xbutton.x;
+  (*y)=(*event).xbutton.y;
+  (void) XMagickCommand(context->display,context->resource_info,
+    context->windows,
+    SaveToUndoBufferCommand,context->image,context->exception);
+  (*state)|=UpdateConfigurationState;
+}
+
 static MagickBooleanType XColorEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -4617,7 +4650,7 @@ static MagickBooleanType XColorEditImage(Display *display,
     border_targets = { &border_color };
 
   const ColorEditTargets
-    targets = { &event, &state };
+    targets = { &event, &state, &x, &y };
 
   /*
     Map Command widget.
@@ -4677,19 +4710,7 @@ static MagickBooleanType XColorEditImage(Display *display,
     {
       case ButtonPress:
       {
-        if (event.xbutton.button != Button1)
-          break;
-        if ((event.xbutton.window != windows->image.id) &&
-            (event.xbutton.window != windows->magnify.id))
-          break;
-        /*
-          exit loop.
-        */
-        x=event.xbutton.x;
-        y=event.xbutton.y;
-        (void) XMagickCommand(display,resource_info,windows,
-          SaveToUndoBufferCommand,image,exception);
-        state|=UpdateConfigurationState;
+        XColorEditPress(&context,&targets);
         break;
       }
       case ButtonRelease:
