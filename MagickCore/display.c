@@ -3480,6 +3480,9 @@ typedef struct _ChopEventInput
   const ModeType
     *ChopCommands,
     *DirectionCommands;
+
+  ExceptionInfo
+    *exception;
 } ChopEventInput;
 
 static size_t XChopKeyPress(const ChopEventInput *input,XEvent *event,
@@ -3546,6 +3549,9 @@ typedef struct _ChopTargets
 
   size_t
     *state;
+
+  ModeType
+    *direction;
 } ChopTargets;
 
 static void XChopStartPress(const ChopEventInput *input,const XEvent *event,
@@ -3666,6 +3672,62 @@ static MagickBooleanType XChopCommand(const ChopEventInput *input,XEvent *event,
   return(MagickFalse);
 }
 
+static void XChopSelectStep(const ChopEventInput *input,
+  const ChopTargets *targets,int *x,int *y)
+{
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  XWindows
+    *const windows = input->windows;
+
+  ModeType
+    *const direction = targets->direction;
+
+  size_t
+    *const state = targets->state;
+
+  XEvent
+    event;
+
+  XShowChopPointer(display,windows,(*x),(*y));
+  /*
+    Wait for next event.
+  */
+  XScreenEvent(display,windows,&event,exception);
+  if (XChopCommand(input,&event,direction,state) != MagickFalse)
+    return;
+  switch (event.type)
+  {
+    case ButtonPress:
+    {
+      XChopStartPress(input,&event,targets);
+      break;
+    }
+    case ButtonRelease:
+      break;
+    case Expose:
+      break;
+    case KeyPress:
+    {
+      (*state)=XChopKeyPress(input,&event,(*state));
+      break;
+    }
+    case MotionNotify:
+    {
+      /*
+        Map and unmap Info widget as text cursor crosses its boundaries.
+      */
+      (*x)=event.xmotion.x;
+      (*y)=event.xmotion.y;
+      XTrackInfoWidget(display,windows,(*x),(*y));
+    }
+  }
+}
+
 static MagickBooleanType XChopImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -3722,10 +3784,10 @@ static MagickBooleanType XChopImage(Display *display,
 
   const ChopEventInput
     input = { display, resource_info, windows, ChopMenu, ChopCommands,
-      DirectionCommands };
+      DirectionCommands, exception };
 
   const ChopTargets
-    targets = { &segment_info, &state };
+    targets = { &segment_info, &state, &direction };
 
   /*
     Map Command widget.
@@ -3746,39 +3808,7 @@ static MagickBooleanType XChopImage(Display *display,
   (void) memset(&segment_info,0,sizeof(segment_info));
   do
   {
-    XShowChopPointer(display,windows,x,y);
-    /*
-      Wait for next event.
-    */
-    XScreenEvent(display,windows,&event,exception);
-    if (XChopCommand(&input,&event,&direction,&state) != MagickFalse)
-      continue;
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        XChopStartPress(&input,&event,&targets);
-        break;
-      }
-      case ButtonRelease:
-        break;
-      case Expose:
-        break;
-      case KeyPress:
-      {
-        state=XChopKeyPress(&input,&event,state);
-        break;
-      }
-      case MotionNotify:
-      {
-        /*
-          Map and unmap Info widget as text cursor crosses its boundaries.
-        */
-        x=event.xmotion.x;
-        y=event.xmotion.y;
-        XTrackInfoWidget(display,windows,x,y);
-      }
-    }
+    XChopSelectStep(&input,&targets,&x,&y);
   } while ((state & ExitState) == 0);
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask);
