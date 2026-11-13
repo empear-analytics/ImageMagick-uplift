@@ -681,6 +681,18 @@ static void DeleteResolutionProperties(Image *image,
     }
 }
 
+static void SetResolutionUnitsFromString(Image *image,
+  const char *resolution_units)
+{
+  ssize_t
+    option_type;
+
+  option_type=ParseCommandOption(MagickResolutionOptions,MagickFalse,
+    resolution_units);
+  if (option_type >= 0)
+    image->units=(ResolutionType) option_type;
+}
+
 static void SyncResolutionFromProperties(Image *image,
   ConstituteInfo *constitute_info, ExceptionInfo *exception)
 {
@@ -721,17 +733,9 @@ static void SyncResolutionFromProperties(Image *image,
   if ((resolution_x != (const char *) NULL) &&
       (resolution_y != (const char *) NULL))
     {
-      ssize_t
-        option_type;
-
       SetResolutionFromStrings(image,resolution_x,resolution_y);
       if (resolution_units != (char *) NULL)
-        {
-          option_type=ParseCommandOption(MagickResolutionOptions,MagickFalse,
-            resolution_units);
-          if (option_type >= 0)
-            image->units=(ResolutionType) option_type;
-        }
+        SetResolutionUnitsFromString(image,resolution_units);
       DeleteResolutionProperties(image,used_tiff);
     }
 }
