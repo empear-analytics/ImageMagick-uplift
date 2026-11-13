@@ -4726,6 +4726,58 @@ static void XHandleAnimateWindowEvent(
   }
 }
 
+static void XHandleAnimateInputEvent(
+  const AnimateEventContext *event_context,XEvent event,const ssize_t scene,
+  const AnimateCommandTargets *command_targets)
+{
+  Display
+    *const display = event_context->display;
+
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+  XVisualInfo
+    *const visual_info = event_context->visual_info;
+
+  XStandardColormap
+    *const map_info = event_context->map_info;
+
+  switch (event.type)
+  {
+    case Expose:
+    {
+      XHandleExpose(event_context,event,scene);
+      break;
+    }
+    case KeyPress:
+    {
+      XHandleKeyPress(event_context,event,command_targets);
+      break;
+    }
+    case KeyRelease:
+    {
+      XHandleKeyRelease(resource_info,event);
+      break;
+    }
+    case LeaveNotify:
+    {
+      /*
+        Selectively uninstall colormap.
+      */
+      if ((map_info->colormap !=
+           XDefaultColormap(display,visual_info->screen)) &&
+          (event.xcrossing.mode != NotifyUngrab))
+        XUninstallColormap(display,map_info->colormap);
+      break;
+    }
+    default:
+    {
+      XHandleAnimateWindowEvent(event_context,event,command_targets);
+      break;
+    }
+  }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -5100,35 +5152,9 @@ MagickExport Image *XAnimateImages(Display *display,
         XHandleEnterNotify(&event_context,event);
         break;
       }
-      case Expose:
-      {
-        XHandleExpose(&event_context,event,scene);
-        break;
-      }
-      case KeyPress:
-      {
-        XHandleKeyPress(&event_context,event,&command_targets);
-        break;
-      }
-      case KeyRelease:
-      {
-        XHandleKeyRelease(resource_info,event);
-        break;
-      }
-      case LeaveNotify:
-      {
-        /*
-          Selectively uninstall colormap.
-        */
-        if ((map_info->colormap !=
-             XDefaultColormap(display,visual_info->screen)) &&
-            (event.xcrossing.mode != NotifyUngrab))
-          XUninstallColormap(display,map_info->colormap);
-        break;
-      }
       default:
       {
-        XHandleAnimateWindowEvent(&event_context,event,&command_targets);
+        XHandleAnimateInputEvent(&event_context,event,scene,&command_targets);
         break;
       }
     }
