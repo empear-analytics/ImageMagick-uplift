@@ -421,6 +421,14 @@ static void InitializeHuffmanHashes(HuffmanTable **mb_hash,
   InitializeHashTable(mb_hash,EXTable,MBHashA,MBHashB);
 }
 
+static void FillHuffmanBlackRun(unsigned char *scanline,const size_t columns,
+  ssize_t *x,ssize_t *count)
+{
+  for ( ; *count > 0; (*count)--)
+    if ((*x >= 0) && (*x < (ssize_t) columns))
+      scanline[(*x)++]=(unsigned char) 1;
+}
+
 static const HuffmanTable *LookupHuffmanEntry(HuffmanTable **hash,
   const unsigned int color,const size_t length,const size_t code)
 {
@@ -608,9 +616,7 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
                   count=0;
                 }
               else
-                for ( ; count > 0; count--)
-                  if ((x >= 0) && (x < (ssize_t) image->columns))
-                    scanline[x++]=(unsigned char) 1;
+                FillHuffmanBlackRun(scanline,image->columns,&x,&count);
             }
           color=(unsigned int)
             ((color == MagickFalse) ? MagickTrue : MagickFalse);
