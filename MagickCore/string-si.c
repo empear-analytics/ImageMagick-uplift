@@ -66,39 +66,68 @@
 #include "MagickCore/string-private.h"
 #include "MagickCore/utility-private.h"
 
+typedef struct _SiPrefixExponent
+{
+  int
+    key;
+
+  double
+    value;
+} SiPrefixExponent;
+
+static const SiPrefixExponent
+  SiPrefixExponents[] =
+  {
+    { 'q', (-30.0) },
+    { 'r', (-27.0) },
+    { 'y', (-24.0) },
+    { 'z', (-21.0) },
+    { 'a', (-18.0) },
+    { 'f', (-15.0) },
+    { 'p', (-12.0) },
+    { 'n', (-9.0) },
+    { 'u', (-6.0) },
+    { 'm', (-3.0) },
+    { 'c', (-2.0) },
+    { 'd', (-1.0) },
+    { 'h', 2.0 },
+    { 'k', 3.0 },
+    { 'K', 3.0 },
+    { 'M', 6.0 },
+    { 'G', 9.0 },
+    { 'T', 12.0 },
+    { 'P', 15.0 },
+    { 'E', 18.0 },
+    { 'Z', 21.0 },
+    { 'Y', 24.0 },
+    { 'R', 27.0 },
+    { 'Q', 30.0 }
+  };
+
+static const SiPrefixExponent *FindSiPrefixExponent(const int key)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(SiPrefixExponents)/sizeof(*SiPrefixExponents)); i++)
+    if (SiPrefixExponents[i].key == key)
+      return(SiPrefixExponents+i);
+  return((const SiPrefixExponent *) NULL);
+}
+
 static double GetSiPrefixExponent(const char *q)
 {
+  const SiPrefixExponent
+    *entry;
+
   double
     e;
 
-  switch ((int) ((unsigned char) *q))
-  {
-    case 'q': e=(-30.0); break;
-    case 'r': e=(-27.0); break;
-    case 'y': e=(-24.0); break;
-    case 'z': e=(-21.0); break;
-    case 'a': e=(-18.0); break;
-    case 'f': e=(-15.0); break;
-    case 'p': e=(-12.0); break;
-    case 'n': e=(-9.0); break;
-    case 'u': e=(-6.0); break;
-    case 'm': e=(-3.0); break;
-    case 'c': e=(-2.0); break;
-    case 'd': e=(-1.0); break;
-    case 'h': e=2.0; break;
-    case 'k': e=3.0; break;
-    case 'K': e=3.0; break;
-    case 'M': e=6.0; break;
-    case 'G': e=9.0; break;
-    case 'T': e=12.0; break;
-    case 'P': e=15.0; break;
-    case 'E': e=18.0; break;
-    case 'Z': e=21.0; break;
-    case 'Y': e=24.0; break;
-    case 'R': e=27.0; break;
-    case 'Q': e=30.0; break;
-    default: e=0.0; break;
-  }
+  entry=FindSiPrefixExponent((int) ((unsigned char) *q));
+  if (entry != (const SiPrefixExponent *) NULL)
+    e=entry->value;
+  else
+    e=0.0;
   return(e);
 }
 
