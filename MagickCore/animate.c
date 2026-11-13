@@ -1510,6 +1510,28 @@ static void XCreateBackgroundScenes(const AnimateBackgroundSetup *setup,
 static Image **
 XSortAnimateScenes(Image *,const size_t,ExceptionInfo *);
 
+static void XGetBackgroundVisualType(Display *display,
+  const AnimateBackgroundTargets *targets,char *visual_type)
+{
+  MagickStatusType
+    status;
+
+  XWindowAttributes
+    *const window_attributes = targets->window_attributes;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  (*window_attributes).width=XDisplayWidth(display,XDefaultScreen(display));
+  (*window_attributes).height=XDisplayHeight(display,XDefaultScreen(display));
+  (void) CopyMagickString(visual_type,"default",MagickPathExtent);
+  status=XGetWindowAttributes(display,(*window_info).id,
+    window_attributes) != 0 ? MagickTrue : MagickFalse;
+  if (status != MagickFalse)
+    (void) FormatLocaleString(visual_type,MagickPathExtent,"0x%lx",
+      XVisualIDFromVisual((*window_attributes).visual));
+}
+
 MagickExport void XAnimateBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *images,ExceptionInfo *exception)
 {
@@ -1519,9 +1541,6 @@ MagickExport void XAnimateBackgroundImage(Display *display,
   Image
     *coalesce_image,
     **image_list;
-
-  MagickStatusType
-    status;
 
   size_t
     number_scenes;
@@ -1588,14 +1607,7 @@ MagickExport void XAnimateBackgroundImage(Display *display,
   /*
     Determine window visual id.
   */
-  window_attributes.width=XDisplayWidth(display,XDefaultScreen(display));
-  window_attributes.height=XDisplayHeight(display,XDefaultScreen(display));
-  (void) CopyMagickString(visual_type,"default",MagickPathExtent);
-  status=XGetWindowAttributes(display,window_info.id,&window_attributes) != 0 ?
-    MagickTrue : MagickFalse;
-  if (status != MagickFalse)
-    (void) FormatLocaleString(visual_type,MagickPathExtent,"0x%lx",
-      XVisualIDFromVisual(window_attributes.visual));
+  XGetBackgroundVisualType(display,&targets,visual_type);
   if (visual_info == (XVisualInfo *) NULL)
     {
       /*
