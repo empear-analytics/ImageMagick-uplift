@@ -3419,6 +3419,20 @@ static void XChopHorizontalGeometry(const XWindows *windows,
     }
 }
 
+static void XChopVerticalGeometry(const XWindows *windows,
+  const XSegment *segment_info,RectangleInfo *chop_info)
+{
+  (*chop_info).width=0;
+  (*chop_info).height=(size_t) ((*segment_info).y2-(*segment_info).y1+1);
+  (*chop_info).x=0;
+  (*chop_info).y=(ssize_t) windows->image.y+(*segment_info).y1;
+  if ((*segment_info).y1 > (*segment_info).y2)
+    {
+      (*chop_info).height=(size_t) ((*segment_info).y1-(*segment_info).y2+1);
+      (*chop_info).y=(ssize_t) windows->image.y+(*segment_info).y2;
+    }
+}
+
 static MagickBooleanType XChopImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -3719,17 +3733,7 @@ static MagickBooleanType XChopImage(Display *display,
     if (direction == HorizontalChopCommand)
       XChopHorizontalGeometry(windows,&segment_info,&chop_info);
     else
-      {
-        chop_info.width=0;
-        chop_info.height=(size_t) (segment_info.y2-segment_info.y1+1);
-        chop_info.x=0;
-        chop_info.y=(ssize_t) windows->image.y+segment_info.y1;
-        if (segment_info.y1 > segment_info.y2)
-          {
-            chop_info.height=(size_t) (segment_info.y1-segment_info.y2+1);
-            chop_info.y=(ssize_t) windows->image.y+segment_info.y2;
-          }
-      }
+      XChopVerticalGeometry(windows,&segment_info,&chop_info);
   } while ((state & ExitState) == 0);
   (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
   (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
