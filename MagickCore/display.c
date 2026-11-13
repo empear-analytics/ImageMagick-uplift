@@ -6321,6 +6321,9 @@ typedef struct _CropContext
 
   const char
     *const *CropModeMenu;
+
+  Cursor
+    cursor;
 } CropContext;
 
 static void XCropPointerCommand(const CropContext *context,
@@ -6362,6 +6365,32 @@ static void XCropPointerCommand(const CropContext *context,
     default:
       break;
   }
+}
+
+static void XCropPointerPress(const CropContext *context,
+  const CropTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  if ((*event).xbutton.button != Button1)
+    return;
+  if ((*event).xbutton.window != context->windows->image.id)
+    return;
+  /*
+    Note first corner of cropping rectangle-- exit loop.
+  */
+  (void) XCheckDefineCursor(context->display,context->windows->image.id,
+    context->cursor);
+  (*crop_info).x=(ssize_t) context->windows->image.x+(*event).xbutton.x;
+  (*crop_info).y=(ssize_t) context->windows->image.y+(*event).xbutton.y;
+  (*state)|=ExitState;
 }
 
 static MagickBooleanType XCropImage(Display *display,
@@ -6473,6 +6502,7 @@ static MagickBooleanType XCropImage(Display *display,
   context.windows=windows;
   context.mode=mode;
   context.CropModeMenu=CropModeMenu;
+  context.cursor=cursor;
   do
   {
     if (windows->info.mapped != MagickFalse)
@@ -6497,17 +6527,7 @@ static MagickBooleanType XCropImage(Display *display,
     {
       case ButtonPress:
       {
-        if (event.xbutton.button != Button1)
-          break;
-        if (event.xbutton.window != windows->image.id)
-          break;
-        /*
-          Note first corner of cropping rectangle-- exit loop.
-        */
-        (void) XCheckDefineCursor(display,windows->image.id,cursor);
-        crop_info.x=(ssize_t) windows->image.x+event.xbutton.x;
-        crop_info.y=(ssize_t) windows->image.y+event.xbutton.y;
-        state|=ExitState;
+        XCropPointerPress(&context,&targets);
         break;
       }
       case ButtonRelease:
