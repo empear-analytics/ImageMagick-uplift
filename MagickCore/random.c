@@ -427,17 +427,52 @@ static void GatherDeviceEntropy(StringInfo *entropy,StringInfo *chaos)
 }
 #endif
 
-static StringInfo *GenerateEntropicChaos(RandomInfo *random_info)
+static void AppendProcessEntropy(StringInfo *entropy,StringInfo *chaos)
 {
   MagickThreadType
     tid;
 
+  ssize_t
+    pid;
+
+  pid=(ssize_t) getpid();
+  SetStringInfoLength(chaos,sizeof(pid));
+  SetStringInfoDatum(chaos,(unsigned char *) &pid);
+  ConcatenateStringInfo(entropy,chaos);
+  tid=GetMagickThreadId();
+  SetStringInfoLength(chaos,sizeof(tid));
+  SetStringInfoDatum(chaos,(unsigned char *) &tid);
+  ConcatenateStringInfo(entropy,chaos);
+#if defined(MAGICKCORE_HAVE_SYSCONF) && defined(_SC_PHYS_PAGES)
+  {
+    ssize_t
+      pages;
+
+    pages=(ssize_t) sysconf(_SC_PHYS_PAGES);
+    SetStringInfoLength(chaos,sizeof(pages));
+    SetStringInfoDatum(chaos,(unsigned char *) &pages);
+    ConcatenateStringInfo(entropy,chaos);
+  }
+#endif
+#if defined(MAGICKCORE_HAVE_GETRUSAGE) && defined(RUSAGE_SELF)
+  {
+    struct rusage
+      usage;
+
+    if (getrusage(RUSAGE_SELF,&usage) == 0)
+      {
+        SetStringInfoLength(chaos,sizeof(usage));
+        SetStringInfoDatum(chaos,(unsigned char *) &usage);
+      }
+  }
+#endif
+}
+
+static StringInfo *GenerateEntropicChaos(RandomInfo *random_info)
+{
   StringInfo
     *chaos,
     *entropy;
-
-  ssize_t
-    pid;
 
   time_t
     nanoseconds,
@@ -480,37 +515,7 @@ static StringInfo *GenerateEntropicChaos(RandomInfo *random_info)
   ConcatenateStringInfo(entropy,chaos);
   SetStringInfoDatum(chaos,(unsigned char *) entropy);
   ConcatenateStringInfo(entropy,chaos);
-  pid=(ssize_t) getpid();
-  SetStringInfoLength(chaos,sizeof(pid));
-  SetStringInfoDatum(chaos,(unsigned char *) &pid);
-  ConcatenateStringInfo(entropy,chaos);
-  tid=GetMagickThreadId();
-  SetStringInfoLength(chaos,sizeof(tid));
-  SetStringInfoDatum(chaos,(unsigned char *) &tid);
-  ConcatenateStringInfo(entropy,chaos);
-#if defined(MAGICKCORE_HAVE_SYSCONF) && defined(_SC_PHYS_PAGES)
-  {
-    ssize_t
-      pages;
-
-    pages=(ssize_t) sysconf(_SC_PHYS_PAGES);
-    SetStringInfoLength(chaos,sizeof(pages));
-    SetStringInfoDatum(chaos,(unsigned char *) &pages);
-    ConcatenateStringInfo(entropy,chaos);
-  }
-#endif
-#if defined(MAGICKCORE_HAVE_GETRUSAGE) && defined(RUSAGE_SELF)
-  {
-    struct rusage
-      usage;
-
-    if (getrusage(RUSAGE_SELF,&usage) == 0)
-      {
-        SetStringInfoLength(chaos,sizeof(usage));
-        SetStringInfoDatum(chaos,(unsigned char *) &usage);
-      }
-  }
-#endif
+  AppendProcessEntropy(entropy,chaos);
   seconds=time((time_t *) 0);
   nanoseconds=0;
 #if defined(MAGICKCORE_HAVE_GETTIMEOFDAY)
