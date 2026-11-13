@@ -1360,6 +1360,71 @@ static char **DestroyDelegateCommands(char **commands,ssize_t i)
   return((char **) RelinquishMagickMemory(commands));
 }
 
+typedef struct _DelegateCommandRun
+{
+  const DelegateInfo
+    *delegate_info;
+
+  ImageInfo
+    *image_info;
+
+  Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    **commands;
+} DelegateCommandRun;
+
+static void RunDelegateCommands(const DelegateCommandRun *run,
+  MagickBooleanType *status,ssize_t *i)
+{
+  const DelegateInfo
+    *const delegate_info = run->delegate_info;
+
+  ImageInfo
+    *const image_info = run->image_info;
+
+  Image
+    *const image = run->image;
+
+  ExceptionInfo
+    *const exception = run->exception;
+
+  char
+    **const commands = run->commands;
+
+  char
+    input_filename[MagickPathExtent],
+    output_filename[MagickPathExtent];
+
+  *status=MagickTrue;
+  (void) CopyMagickString(output_filename,image_info->filename,
+    MagickPathExtent);
+  (void) CopyMagickString(input_filename,image->filename,MagickPathExtent);
+  for (*i=0; commands[*i] != (char *) NULL; (*i)++)
+  {
+    const DelegateExecution
+      execution = { delegate_info, image_info, image, exception,
+        input_filename, output_filename, commands[*i] };
+
+    if (RunDelegateStep(&execution,status) == MagickFalse)
+      break;
+    if (*status == MagickFalse)
+      {
+        (void) ThrowMagickException(exception,GetMagickModule(),DelegateError,
+          "DelegateFailed","`%s'",commands[*i]);
+        break;
+      }
+    commands[*i]=DestroyString(commands[*i]);
+  }
+  (void) CopyMagickString(image_info->filename,output_filename,
+    MagickPathExtent);
+  (void) CopyMagickString(image->filename,input_filename,MagickPathExtent);
+}
+
 static void OpenInvokeDelegate(const ImageInfo *image_info,
   const Image *image)
 {
@@ -1375,12 +1440,13 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   Image *image,const char *decode,const char *encode,ExceptionInfo *exception)
 {
   char
-    **commands,
-    input_filename[MagickPathExtent],
-    output_filename[MagickPathExtent];
+    **commands;
 
   const DelegateInfo
     *delegate_info;
+
+  DelegateCommandRun
+    run;
 
   MagickBooleanType
     status,
@@ -1430,29 +1496,12 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
         decode ? decode : encode);
       return(MagickFalse);
     }
-  status=MagickTrue;
-  (void) CopyMagickString(output_filename,image_info->filename,
-    MagickPathExtent);
-  (void) CopyMagickString(input_filename,image->filename,MagickPathExtent);
-  for (i=0; commands[i] != (char *) NULL; i++)
-  {
-    const DelegateExecution
-      execution = { delegate_info, image_info, image, exception,
-        input_filename, output_filename, commands[i] };
-
-    if (RunDelegateStep(&execution,&status) == MagickFalse)
-      break;
-    if (status == MagickFalse)
-      {
-        (void) ThrowMagickException(exception,GetMagickModule(),DelegateError,
-          "DelegateFailed","`%s'",commands[i]);
-        break;
-      }
-    commands[i]=DestroyString(commands[i]);
-  }
-  (void) CopyMagickString(image_info->filename,output_filename,
-    MagickPathExtent);
-  (void) CopyMagickString(image->filename,input_filename,MagickPathExtent);
+  run.delegate_info=delegate_info;
+  run.image_info=image_info;
+  run.image=image;
+  run.exception=exception;
+  run.commands=commands;
+  RunDelegateCommands(&run,&status,&i);
   /*
     Relinquish resources.
   */
