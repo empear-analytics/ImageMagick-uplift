@@ -415,6 +415,37 @@ static MagickBooleanType FinishPlasmaSegment(const PlasmaMidpoint *midpoint,
   return(MagickFalse);
 }
 
+static MagickBooleanType SetPlasmaColumnPixels(const PlasmaMidpoint *midpoint,
+  MagickStatusType status)
+{
+  const SegmentInfo
+    *const segment = midpoint->segment;
+
+  const ssize_t
+    x_mid = midpoint->x_mid;
+
+  if ((fabs(segment->x1-x_mid) >= MagickEpsilon) ||
+      (fabs(segment->x2-x_mid) >= MagickEpsilon))
+    {
+      /*
+        Left pixel.
+      */
+      if (SetPlasmaEdgePixel(midpoint,PlasmaColumnEdge,segment->x1,
+          &status) == MagickFalse)
+        return(MagickTrue);
+      /*
+        Right pixel.
+      */
+      if ((fabs(segment->x1-segment->x2) >= MagickEpsilon) &&
+          (SetPlasmaEdgePixel(midpoint,PlasmaColumnEdge,segment->x2,
+              &status) == MagickFalse))
+        return(MagickFalse);
+    }
+  if (SetPlasmaRowPixels(midpoint,&status) == MagickFalse)
+    return(MagickTrue);
+  return(FinishPlasmaSegment(midpoint,status));
+}
+
 static MagickBooleanType PlasmaImageProxy(const PlasmaContext *context,
   const SegmentInfo *magick_restrict segment,size_t attenuate,size_t depth)
 {
@@ -450,26 +481,7 @@ static MagickBooleanType PlasmaImageProxy(const PlasmaContext *context,
   midpoint.x_mid=x_mid;
   midpoint.y_mid=y_mid;
   midpoint.plasma=plasma;
-  if ((fabs(segment->x1-x_mid) >= MagickEpsilon) ||
-      (fabs(segment->x2-x_mid) >= MagickEpsilon))
-    {
-      /*
-        Left pixel.
-      */
-      if (SetPlasmaEdgePixel(&midpoint,PlasmaColumnEdge,segment->x1,
-          &status) == MagickFalse)
-        return(MagickTrue);
-      /*
-        Right pixel.
-      */
-      if ((fabs(segment->x1-segment->x2) >= MagickEpsilon) &&
-          (SetPlasmaEdgePixel(&midpoint,PlasmaColumnEdge,segment->x2,
-              &status) == MagickFalse))
-        return(MagickFalse);
-    }
-  if (SetPlasmaRowPixels(&midpoint,&status) == MagickFalse)
-    return(MagickTrue);
-  return(FinishPlasmaSegment(&midpoint,status));
+  return(SetPlasmaColumnPixels(&midpoint,status));
 }
 
 MagickExport MagickBooleanType PlasmaImage(Image *image,
