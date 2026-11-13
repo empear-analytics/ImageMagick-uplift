@@ -66,6 +66,7 @@ if ( ! GetOptions(
 	 'exception.c',
 	 'fx.c',
 	 'image.c',
+	 'image-settings.c',
 	 'image-filename.c',
 	 'list.c',
 	 'magick.c',
