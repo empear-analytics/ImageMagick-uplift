@@ -5291,6 +5291,47 @@ static MagickBooleanType XCompositeImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void XResizePanWindow(Display *display,XWindows *windows,Image *image)
+{
+  XSizeHints
+    *size_hints;
+
+  XWindowChanges
+    window_changes;
+
+  windows->pan.crop_geometry=windows->image.crop_geometry;
+  XBestIconSize(display,&windows->pan,image);
+  while (((windows->pan.width << 1) < MaxIconSize) &&
+         ((windows->pan.height << 1) < MaxIconSize))
+  {
+    windows->pan.width<<=1;
+    windows->pan.height<<=1;
+  }
+  if (windows->pan.geometry != (char *) NULL)
+    (void) XParseGeometry(windows->pan.geometry,&windows->pan.x,&windows->pan.y,
+      &windows->pan.width,&windows->pan.height);
+  window_changes.width=(int) windows->pan.width;
+  window_changes.height=(int) windows->pan.height;
+  size_hints=XAllocSizeHints();
+  if (size_hints != (XSizeHints *) NULL)
+    {
+      /*
+        Set new size hints.
+      */
+      size_hints->flags=PSize | PMinSize | PMaxSize;
+      size_hints->width=window_changes.width;
+      size_hints->height=window_changes.height;
+      size_hints->min_width=size_hints->width;
+      size_hints->min_height=size_hints->height;
+      size_hints->max_width=size_hints->width;
+      size_hints->max_height=size_hints->height;
+      (void) XSetNormalHints(display,windows->pan.id,size_hints);
+      (void) XFree((void *) size_hints);
+    }
+  (void) XReconfigureWMWindow(display,windows->pan.id,windows->pan.screen,
+    (unsigned int) (CWWidth | CWHeight),&window_changes);
+}
+
 static MagickBooleanType XConfigureImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -5309,9 +5350,6 @@ static MagickBooleanType XConfigureImage(Display *display,
   ssize_t
     x,
     y;
-
-  XSizeHints
-    *size_hints;
 
   XWindowChanges
     window_changes;
@@ -5384,37 +5422,7 @@ static MagickBooleanType XConfigureImage(Display *display,
   */
   if (windows->magnify.mapped != MagickFalse)
     XMakeMagnifyImage(display,windows,exception);
-  windows->pan.crop_geometry=windows->image.crop_geometry;
-  XBestIconSize(display,&windows->pan,image);
-  while (((windows->pan.width << 1) < MaxIconSize) &&
-         ((windows->pan.height << 1) < MaxIconSize))
-  {
-    windows->pan.width<<=1;
-    windows->pan.height<<=1;
-  }
-  if (windows->pan.geometry != (char *) NULL)
-    (void) XParseGeometry(windows->pan.geometry,&windows->pan.x,&windows->pan.y,
-      &windows->pan.width,&windows->pan.height);
-  window_changes.width=(int) windows->pan.width;
-  window_changes.height=(int) windows->pan.height;
-  size_hints=XAllocSizeHints();
-  if (size_hints != (XSizeHints *) NULL)
-    {
-      /*
-        Set new size hints.
-      */
-      size_hints->flags=PSize | PMinSize | PMaxSize;
-      size_hints->width=window_changes.width;
-      size_hints->height=window_changes.height;
-      size_hints->min_width=size_hints->width;
-      size_hints->min_height=size_hints->height;
-      size_hints->max_width=size_hints->width;
-      size_hints->max_height=size_hints->height;
-      (void) XSetNormalHints(display,windows->pan.id,size_hints);
-      (void) XFree((void *) size_hints);
-    }
-  (void) XReconfigureWMWindow(display,windows->pan.id,windows->pan.screen,
-    (unsigned int) (CWWidth | CWHeight),&window_changes);
+  XResizePanWindow(display,windows,image);
   /*
     Update icon window configuration.
   */
