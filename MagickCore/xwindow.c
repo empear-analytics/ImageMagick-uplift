@@ -290,6 +290,14 @@ static void FreeXWindowCursors(Display *display,XWindowInfo *window)
     }
 }
 
+static void DestroyXWindowNames(XWindowInfo *window)
+{
+  if (window->name != (char *) NULL)
+    window->name=(char *) RelinquishMagickMemory(window->name);
+  if (window->icon_name != (char *) NULL)
+    window->icon_name=(char *) RelinquishMagickMemory(window->icon_name);
+}
+
 MagickExport void DestroyXResources(void)
 {
   int
@@ -328,12 +336,7 @@ MagickExport void DestroyXResources(void)
           magick_windows[i]->screen);
         magick_windows[i]->mapped=MagickFalse;
       }
-    if (magick_windows[i]->name != (char *) NULL)
-      magick_windows[i]->name=(char *)
-        RelinquishMagickMemory(magick_windows[i]->name);
-    if (magick_windows[i]->icon_name != (char *) NULL)
-      magick_windows[i]->icon_name=(char *)
-        RelinquishMagickMemory(magick_windows[i]->icon_name);
+    DestroyXWindowNames(magick_windows[i]);
     FreeXWindowCursors(windows->display,magick_windows[i]);
     if (magick_windows[i]->matte_image != (XImage *) NULL)
       {
