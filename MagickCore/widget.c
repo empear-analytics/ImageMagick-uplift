@@ -12720,6 +12720,53 @@ static void HandleListBrowserKeyEvent(const ListBrowserContext *context,
   }
 }
 
+static void HandleListBrowserWindowEvent(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserTargets *targets,
+  const ListBrowserWidgets *widgets)
+{
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  size_t
+    *const state = widgets->state;
+
+  switch (event.type)
+  {
+    case ButtonRelease:
+    {
+      ReleaseListBrowserScroll(context,event,widgets);
+      break;
+    }
+    case ClientMessage:
+    {
+      ClientListBrowserMessage(context,event,widgets);
+      break;
+    }
+    case ConfigureNotify:
+    {
+      ConfigureListBrowserWindow(context,event,widgets);
+      break;
+    }
+    case EnterNotify:
+    {
+      if (event.xcrossing.window != window_info->id)
+        break;
+      (*state)&=(unsigned int) (~InactiveWidgetState);
+      break;
+    }
+    case Expose:
+    {
+      ExposeListBrowserWindow(context,event,widgets);
+      break;
+    }
+    default:
+    {
+      HandleListBrowserKeyEvent(context,event,targets,widgets);
+      break;
+    }
+  }
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -13072,36 +13119,9 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
         PressListBrowserSlider(&list_context,event,&targets,&list_widgets);
         break;
       }
-      case ButtonRelease:
-      {
-        ReleaseListBrowserScroll(&list_context,event,&list_widgets);
-        break;
-      }
-      case ClientMessage:
-      {
-        ClientListBrowserMessage(&list_context,event,&list_widgets);
-        break;
-      }
-      case ConfigureNotify:
-      {
-        ConfigureListBrowserWindow(&list_context,event,&list_widgets);
-        break;
-      }
-      case EnterNotify:
-      {
-        if (event.xcrossing.window != window_info->id)
-          break;
-        state&=(unsigned int) (~InactiveWidgetState);
-        break;
-      }
-      case Expose:
-      {
-        ExposeListBrowserWindow(&list_context,event,&list_widgets);
-        break;
-      }
       default:
       {
-        HandleListBrowserKeyEvent(&list_context,event,&targets,&list_widgets);
+        HandleListBrowserWindowEvent(&list_context,event,&targets,&list_widgets);
         break;
       }
     }
