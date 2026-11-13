@@ -1507,6 +1507,9 @@ static void XCreateBackgroundScenes(const AnimateBackgroundSetup *setup,
   }
 }
 
+static Image **
+XSortAnimateScenes(Image *,const size_t,ExceptionInfo *);
+
 MagickExport void XAnimateBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *images,ExceptionInfo *exception)
 {
@@ -1639,11 +1642,7 @@ MagickExport void XAnimateBackgroundImage(Display *display,
     Sort images by increasing scene number.
   */
   number_scenes=GetImageListLength(images);
-  image_list=ImageListToArray(images,exception);
-  if (image_list == (Image **) NULL)
-    ThrowXWindowFatalException(ResourceLimitFatalError,
-      "MemoryAllocationFailed",images->filename);
-  XSortSceneList(image_list,number_scenes);
+  image_list=XSortAnimateScenes(images,number_scenes,exception);
   setup.display=display;
   setup.resource_info=resource_info;
   setup.exception=exception;
