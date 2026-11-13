@@ -1767,6 +1767,44 @@ static void InterpolateKernelChannels(const ChannelsInterpolation grid,
   }
 }
 
+static MagickBooleanType InterpolateAverageChannels(
+  const ChannelsInterpolation *grid,const PixelInterpolateMethod interpolate,
+  Quantum *pixel,MagickBooleanType status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    count,
+    x_offset = grid->x_offset,
+    y_offset = grid->y_offset;
+
+  count=2;  /* size of the area to average - default nearest 4 */
+  if (interpolate == Average9InterpolatePixel)
+    {
+      count=3;
+      x_offset=CastDoubleToSsizeT(floor(grid->x+0.5)-1.0);
+      y_offset=CastDoubleToSsizeT(floor(grid->y+0.5)-1.0);
+    }
+  else
+    if (interpolate == Average16InterpolatePixel)
+      {
+        count=4;
+        x_offset--;
+        y_offset--;
+      }
+  p=GetCacheViewVirtualPixels(grid->source_view,x_offset,y_offset,
+    (size_t) count,(size_t) count,grid->exception);
+  if (p == (const Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  count*=count;  /* Number of pixels to average */
+  AverageInterpolateChannels(grid,p,count,pixel);
+  return(status);
+}
+
 MagickExport MagickBooleanType InterpolatePixelChannels(
   const Image *magick_restrict source,const CacheView_ *source_view,
   const Image *magick_restrict destination,const PixelInterpolateMethod method,
@@ -1778,13 +1816,6 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
   MagickBooleanType
     status;
 
-  const Quantum
-    *magick_restrict p;
-
-  ssize_t
-    x_offset,
-    y_offset;
-
   PixelInterpolateMethod
     interpolate;
 
@@ -1792,8 +1823,6 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
   assert(source->signature == MagickCoreSignature);
   assert(source_view != (CacheView *) NULL);
   status=MagickTrue;
-  x_offset=CastDoubleToSsizeT(floor(x));
-  y_offset=CastDoubleToSsizeT(floor(y));
   interpolate=method;
   if (interpolate == UndefinedInterpolatePixel)
     interpolate=source->interpolate;
@@ -1802,8 +1831,8 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
   grid.destination=destination;
   grid.x=x;
   grid.y=y;
-  grid.x_offset=x_offset;
-  grid.y_offset=y_offset;
+  grid.x_offset=CastDoubleToSsizeT(floor(x));
+  grid.y_offset=CastDoubleToSsizeT(floor(y));
   grid.exception=exception;
   switch (interpolate)
   {
@@ -1811,32 +1840,7 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
     case Average9InterpolatePixel:  /* nearest 9 neighbours */
     case Average16InterpolatePixel:  /* nearest 16 neighbours */
     {
-      ssize_t
-        count;
-
-      count=2;  /* size of the area to average - default nearest 4 */
-      if (interpolate == Average9InterpolatePixel)
-        {
-          count=3;
-          x_offset=CastDoubleToSsizeT(floor(x+0.5)-1.0);
-          y_offset=CastDoubleToSsizeT(floor(y+0.5)-1.0);
-        }
-      else
-        if (interpolate == Average16InterpolatePixel)
-          {
-            count=4;
-            x_offset--;
-            y_offset--;
-          }
-      p=GetCacheViewVirtualPixels(source_view,x_offset,y_offset,(size_t) count,
-        (size_t) count,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      count*=count;  /* Number of pixels to average */
-      AverageInterpolateChannels(&grid,p,count,pixel);
+      status=InterpolateAverageChannels(&grid,interpolate,pixel,status);
       break;
     }
     default:
