@@ -1509,6 +1509,42 @@ static void SetEXIFTagProperty(const EXIFWalkInfo *walk,
   key=DestroyString(key);
 }
 
+static MagickBooleanType GetEXIFTagProperty(const EXIFWalkInfo *walk,
+  const EXIFTagInfo *exif_tag,const ssize_t level)
+{
+  const ssize_t
+    all = walk->all;
+
+  const size_t
+    tag = walk->tag;
+
+  const unsigned char
+    *const exif = walk->exif;
+
+  const size_t
+    length = walk->length;
+
+  const size_t
+    tag_value = exif_tag->tag_value,
+    format = exif_tag->format;
+
+  unsigned char
+    *const p = exif_tag->p;
+
+  if ((all != 0) || (tag == (size_t) tag_value))
+    {
+      char
+        *value;
+
+      if ((p < exif) || (p > (exif+length-tag_bytes[format])))
+        return(MagickFalse);
+      value=AcquireEXIFTagValue(walk,exif_tag);
+      if (value != (char *) NULL)
+        SetEXIFTagProperty(walk,tag_value,level,value);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType PushEXIFDirectory(const EXIFWalkInfo *walk,
   const EXIFTagInfo *exif_tag,const size_t number_entries,
   const EXIFWalkTargets *targets)
@@ -1597,12 +1633,6 @@ static MagickBooleanType PushEXIFDirectory(const EXIFWalkInfo *walk,
 static void GetEXIFDirectory(const EXIFWalkInfo *walk,
   const EXIFWalkTargets *targets)
 {
-  const ssize_t
-    all = walk->all;
-
-  const size_t
-    tag = walk->tag;
-
   const EndianType
     endian = walk->endian;
 
@@ -1694,17 +1724,8 @@ static void GetEXIFDirectory(const EXIFWalkInfo *walk,
     exif_tag.components=components;
     exif_tag.number_bytes=number_bytes;
     exif_tag.p=p;
-    if ((all != 0) || (tag == (size_t) tag_value))
-      {
-        char
-          *value;
-
-        if ((p < exif) || (p > (exif+length-tag_bytes[format])))
-          break;
-        value=AcquireEXIFTagValue(walk,&exif_tag);
-        if (value != (char *) NULL)
-          SetEXIFTagProperty(walk,tag_value,(*level),value);
-      }
+    if (GetEXIFTagProperty(walk,&exif_tag,(*level)) == MagickFalse)
+      break;
     if (PushEXIFDirectory(walk,&exif_tag,number_entries,targets) !=
         MagickFalse)
       break;
