@@ -450,7 +450,6 @@ static void *DestroyRegistryNode(void *registry_info)
   p=(RegistryInfo *) registry_info;
   switch (p->type)
   {
-    case StringRegistryType:
     default:
     {
       p->value=RelinquishMagickMemory(p->value);
