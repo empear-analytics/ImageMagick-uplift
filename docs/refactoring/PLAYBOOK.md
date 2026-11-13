@@ -13270,6 +13270,57 @@ Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
 
 ---
 
+## Recipe DD - Drop a Case That Repeats the Default
+
+**Use when:** CodeScene reports *Complex Method* on a function whose `switch` has a
+`case L:` with its own statements that are character for character those of the `default:`
+group, as `stream.c`'s `GetStreamPacketSize` has `default: packet_size=sizeof(unsigned
+char); break;` and `case CharPixel: packet_size=sizeof(unsigned char); break;`. Each label
+counts as a branch.
+
+**Not covered by:** Recipe DL, whose labels carry no statements of their own and fall into
+`default:`; it refuses a label with statements.
+
+**How:**
+
+1. Find a `case L:` group and the `default:` group with identical statements (same text,
+   ending in `break;` or the same `return`), where `L` is a constant label.
+2. Delete the `case L:` group. Nothing else is written. `L` now reaches `default:`, which
+   does what the group did.
+3. Run `sh tools/obj_identical.sh <file>`: it must print `IDENTICAL`; otherwise revert.
+   Run `tools/ci_warnings.sh <file>` and keep the step only if it prints `OK`.
+
+**Before:**
+
+```c
+    default: packet_size=sizeof(unsigned char); break;
+    case CharPixel: packet_size=sizeof(unsigned char); break;
+```
+
+**After:**
+
+```c
+    default: packet_size=sizeof(unsigned char); break;
+```
+
+**Careful:**
+
+- The two groups must be identical statements; a group that differs by one token is not
+  covered.
+- A group that falls through into a following label, or that sits between a label and a
+  group that matters, is refused: the fall-through target would change.
+- The labels documented which enumerators the function handles; a comment on `default:`
+  may keep that.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
+`HEAD`.
+
+**Provenance:** 2026-11-13, from `stream.c`'s `GetStreamPacketSize` (campaign B, M123):
+cc 9 to 8, the file 5.84 to 5.98, object code identical. Added by Claude Code (Claude
+Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -13589,3 +13640,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | FO | Open the file with the shortest `static` helper: move a one- or two-statement helper above a first function that the include-block span makes a *Large Method*; evidence `obj_identical.sh` IDENTICAL | `image.c` (`SetImageSize`, 76 lines for nine; 5.17 to 5.37); H moves preprocessor lines, E adds functions | mandate (2026-10-24) |
 | 2026-11-13 | NEW | KS | Replace a keyed `switch` whose groups assign string literals to one local by a `static const` key/name table and a lookup loop; evidence oracle | `identify.c` `GetIPTCTagName` (cc 55); KT needs a call per group, TB needs `0..k` labels | mandate (2026-10-24) |
 | 2026-11-13 | NEW | KR | Replace a keyed `switch` whose groups return string literals by a `static const` key/name table and a lookup loop; evidence oracle | `exception.c` `ExceptionSeverityToTag` (cc 65); KS assigns to a local, TB needs `0..k` labels | mandate (2026-10-24) |
+| 2026-11-13 | NEW | DD | Drop a `case` whose statements repeat the `default:` group; proof `obj_identical.sh` | `stream.c`'s `GetStreamPacketSize` (cc 9 to 8, 5.84 to 5.98, object code identical); DL refuses a label with its own statements | mandate (2026-10-24) |
