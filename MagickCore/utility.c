@@ -2203,6 +2203,12 @@ static MagickBooleanType ExtendFileList(const size_t *number_entries,
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsDotDirectoryEntry(const char *name)
+{
+  return(((LocaleCompare(name,".") == 0) ||
+    (LocaleCompare(name,"..") == 0)) ? MagickTrue : MagickFalse);
+}
+
 MagickPrivate char **ListFiles(const char *directory,const char *pattern,
   size_t *number_entries)
 {
@@ -2255,8 +2261,7 @@ MagickPrivate char **ListFiles(const char *directory,const char *pattern,
   while ((MagickReadDirectory(current_directory,buffer,&entry) == 0) &&
          (entry != (struct dirent *) NULL))
   {
-    if ((LocaleCompare(entry->d_name,".") == 0) ||
-        (LocaleCompare(entry->d_name,"..") == 0))
+    if (IsDotDirectoryEntry(entry->d_name) != MagickFalse)
       continue;
     if ((IsPathDirectory(entry->d_name) > 0) ||
 #if defined(MAGICKCORE_WINDOWS_SUPPORT)
