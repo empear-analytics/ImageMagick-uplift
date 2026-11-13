@@ -15465,6 +15465,50 @@ static void HandlePreferencesWindowEvent(const PreferencesContext *context,
   }
 }
 
+static void RespondToPreferencesEvents(const PreferencesContext *context,
+  const PreferencesWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  XEvent
+    *const event = widgets->event;
+
+  do
+  {
+    UpdatePreferencesButtons(context,widgets);
+    RedrawPreferencesWidget(context,widgets);
+    /*
+      Wait for next event.
+    */
+    (void) XIfEvent(display,event,XScreenEvent,(char *) windows);
+    switch ((*event).type)
+    {
+      case ButtonPress:
+      {
+        PressPreferencesButton(context,(*event),widgets);
+        break;
+      }
+      case ButtonRelease:
+      {
+        ReleasePreferencesButtons(context,(*event),widgets);
+        break;
+      }
+      default:
+      {
+        HandlePreferencesWindowEvent(context,(*event),widgets);
+        break;
+      }
+    }
+  } while (((*state) & ExitState) == 0);
+}
+
 MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XResourceInfo *resource_info,XWindows *windows)
 {
@@ -15531,33 +15575,7 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   context.windows=windows;
   context.height=height;
   context.display=display;
-  do
-  {
-    UpdatePreferencesButtons(&context,&widgets);
-    RedrawPreferencesWidget(&context,&widgets);
-    /*
-      Wait for next event.
-    */
-    (void) XIfEvent(display,&event,XScreenEvent,(char *) windows);
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        PressPreferencesButton(&context,event,&widgets);
-        break;
-      }
-      case ButtonRelease:
-      {
-        ReleasePreferencesButtons(&context,event,&widgets);
-        break;
-      }
-      default:
-      {
-        HandlePreferencesWindowEvent(&context,event,&widgets);
-        break;
-      }
-    }
-  } while ((state & ExitState) == 0);
+  RespondToPreferencesEvents(&context,&widgets);
   WithdrawBrowserWidget(display,windows);
   if (apply_info.raised)
     return(MagickFalse);
