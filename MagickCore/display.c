@@ -5332,18 +5332,73 @@ static void XResizePanWindow(Display *display,XWindows *windows,Image *image)
     (unsigned int) (CWWidth | CWHeight),&window_changes);
 }
 
+typedef struct _ConfigureNotifyInput
+{
+  size_t
+    width,
+    height;
+
+  ssize_t
+    x,
+    y;
+} ConfigureNotifyInput;
+
+static void XNotifyWindowManager(Display *display,XResourceInfo *resource_info,
+  XWindows *windows,const ConfigureNotifyInput *input)
+{
+  char
+    geometry[MagickPathExtent];
+
+  size_t
+    height = input->height,
+    mask,
+    width = input->width;
+
+  ssize_t
+    x = input->x,
+    y = input->y;
+
+  XWindowChanges
+    window_changes;
+
+  if (resource_info->image_geometry != (char *) NULL)
+    (void) FormatLocaleString(geometry,MagickPathExtent,"%s>!",
+      resource_info->image_geometry);
+  else
+    (void) FormatLocaleString(geometry,MagickPathExtent,"%ux%u+0+0>!",
+      XDisplayWidth(display,windows->image.screen),
+      XDisplayHeight(display,windows->image.screen));
+  (void) ParseMetaGeometry(geometry,&x,&y,&width,&height);
+  window_changes.width=(int) width;
+  if (window_changes.width > XDisplayWidth(display,windows->image.screen))
+    window_changes.width=XDisplayWidth(display,windows->image.screen);
+  window_changes.height=(int) height;
+  if (window_changes.height > XDisplayHeight(display,windows->image.screen))
+    window_changes.height=XDisplayHeight(display,windows->image.screen);
+  mask=(size_t) (CWWidth | CWHeight);
+  if (resource_info->backdrop)
+    {
+      mask|=CWX | CWY;
+      window_changes.x=((XDisplayWidth(display,windows->image.screen)/2)-
+        ((int) width/2));
+      window_changes.y=((XDisplayHeight(display,windows->image.screen)/2)-
+        ((int) height/2));
+    }
+  (void) XReconfigureWMWindow(display,windows->image.id,windows->image.screen,
+    (unsigned int) mask,&window_changes);
+}
+
 static MagickBooleanType XConfigureImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
 {
-  char
-    geometry[MagickPathExtent];
+  ConfigureNotifyInput
+    notify;
 
   MagickStatusType
     status;
 
   size_t
-    mask,
     height,
     width;
 
@@ -5390,31 +5445,11 @@ static MagickBooleanType XConfigureImage(Display *display,
   /*
     Notify window manager of the new configuration.
   */
-  if (resource_info->image_geometry != (char *) NULL)
-    (void) FormatLocaleString(geometry,MagickPathExtent,"%s>!",
-      resource_info->image_geometry);
-  else
-    (void) FormatLocaleString(geometry,MagickPathExtent,"%ux%u+0+0>!",
-      XDisplayWidth(display,windows->image.screen),
-      XDisplayHeight(display,windows->image.screen));
-  (void) ParseMetaGeometry(geometry,&x,&y,&width,&height);
-  window_changes.width=(int) width;
-  if (window_changes.width > XDisplayWidth(display,windows->image.screen))
-    window_changes.width=XDisplayWidth(display,windows->image.screen);
-  window_changes.height=(int) height;
-  if (window_changes.height > XDisplayHeight(display,windows->image.screen))
-    window_changes.height=XDisplayHeight(display,windows->image.screen);
-  mask=(size_t) (CWWidth | CWHeight);
-  if (resource_info->backdrop)
-    {
-      mask|=CWX | CWY;
-      window_changes.x=((XDisplayWidth(display,windows->image.screen)/2)-
-        ((int) width/2));
-      window_changes.y=((XDisplayHeight(display,windows->image.screen)/2)-
-        ((int) height/2));
-    }
-  (void) XReconfigureWMWindow(display,windows->image.id,windows->image.screen,
-    (unsigned int) mask,&window_changes);
+  notify.width=width;
+  notify.height=height;
+  notify.x=x;
+  notify.y=y;
+  XNotifyWindowManager(display,resource_info,windows,&notify);
   (void) XClearWindow(display,windows->image.id);
   XRefreshWindow(display,&windows->image,(XEvent *) NULL);
   /*
