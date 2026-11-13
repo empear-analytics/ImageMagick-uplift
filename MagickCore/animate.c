@@ -6094,12 +6094,46 @@ static MagickBooleanType XFinishSaveImage(Display *display,
   return(status != 0 ? MagickTrue : MagickFalse);
 }
 
-static MagickBooleanType XSaveImage(Display *display,
-  XResourceInfo *resource_info,XWindows *windows,Image *image,
-  ExceptionInfo *exception)
+typedef struct _AnimateSaveInputs
 {
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+
   char
-    filename[MagickPathExtent];
+    *filename;
+} AnimateSaveInputs;
+
+static MagickBooleanType XSaveImageFile(const AnimateSaveInputs *save)
+{
+  Display
+    *const display = save->display;
+
+  XResourceInfo
+    *const resource_info = save->resource_info;
+
+  XWindows
+    *const windows = save->windows;
+
+  Image
+    *const image = save->image;
+
+  ExceptionInfo
+    *const exception = save->exception;
+
+  char
+    *const filename = save->filename;
 
   ImageInfo
     *image_info;
@@ -6107,29 +6141,6 @@ static MagickBooleanType XSaveImage(Display *display,
   MagickStatusType
     status;
 
-  /*
-    Request file name from user.
-  */
-  if (resource_info->write_filename != (char *) NULL)
-    (void) CopyMagickString(filename,resource_info->write_filename,
-      MagickPathExtent);
-  else
-    XChangeToImageDirectory(image,filename,exception);
-  XFileBrowserWidget(display,windows,"Save",filename);
-  if (*filename == '\0')
-    return(MagickTrue);
-  if (IsPathAccessible(filename) != MagickFalse)
-    {
-      int
-        status;
-
-      /*
-        File exists-- seek user's permission before overwriting.
-      */
-      status=XConfirmWidget(display,windows,"Overwrite",filename);
-      if (status == 0)
-        return(MagickTrue);
-    }
   image_info=CloneImageInfo(resource_info->image_info);
   (void) CopyMagickString(image_info->filename,filename,MagickPathExtent);
   (void) SetImageInfo(image_info,1,exception);
@@ -6159,6 +6170,48 @@ static MagickBooleanType XSaveImage(Display *display,
   */
   status=XWriteSavedImages(image_info,image,filename,exception);
   return(XFinishSaveImage(display,windows,image_info,status));
+}
+
+static MagickBooleanType XSaveImage(Display *display,
+  XResourceInfo *resource_info,XWindows *windows,Image *image,
+  ExceptionInfo *exception)
+{
+  AnimateSaveInputs
+    save;
+
+  char
+    filename[MagickPathExtent];
+
+  /*
+    Request file name from user.
+  */
+  if (resource_info->write_filename != (char *) NULL)
+    (void) CopyMagickString(filename,resource_info->write_filename,
+      MagickPathExtent);
+  else
+    XChangeToImageDirectory(image,filename,exception);
+  XFileBrowserWidget(display,windows,"Save",filename);
+  if (*filename == '\0')
+    return(MagickTrue);
+  if (IsPathAccessible(filename) != MagickFalse)
+    {
+      int
+        status;
+
+      /*
+        File exists-- seek user's permission before overwriting.
+      */
+      status=XConfirmWidget(display,windows,"Overwrite",filename);
+      if (status == 0)
+        return(MagickTrue);
+    }
+  save.display=display;
+  save.resource_info=resource_info;
+  save.windows=windows;
+  save.image=image;
+  save.exception=exception;
+  save.filename=filename;
+  return(XSaveImageFile(&save));
 }
 #else
 
