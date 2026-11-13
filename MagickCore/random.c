@@ -468,6 +468,29 @@ static void AppendProcessEntropy(StringInfo *entropy,StringInfo *chaos)
 #endif
 }
 
+static void AppendProcessorTimeEntropy(StringInfo *entropy,StringInfo *chaos)
+{
+  time_t
+    nanoseconds;
+
+  nanoseconds=0;
+#if defined(MAGICKCORE_HAVE_CLOCK)
+  nanoseconds=clock();
+#endif
+#if defined(MAGICKCORE_HAVE_TIMES)
+  {
+    struct tms
+      timer;
+
+    (void) times(&timer);
+    nanoseconds=timer.tms_utime+timer.tms_stime;
+  }
+#endif
+  SetStringInfoLength(chaos,sizeof(nanoseconds));
+  SetStringInfoDatum(chaos,(unsigned char *) &nanoseconds);
+  ConcatenateStringInfo(entropy,chaos);
+}
+
 static StringInfo *GenerateEntropicChaos(RandomInfo *random_info)
 {
   StringInfo
@@ -548,22 +571,7 @@ static StringInfo *GenerateEntropicChaos(RandomInfo *random_info)
   SetStringInfoLength(chaos,sizeof(nanoseconds));
   SetStringInfoDatum(chaos,(unsigned char *) &nanoseconds);
   ConcatenateStringInfo(entropy,chaos);
-  nanoseconds=0;
-#if defined(MAGICKCORE_HAVE_CLOCK)
-  nanoseconds=clock();
-#endif
-#if defined(MAGICKCORE_HAVE_TIMES)
-  {
-    struct tms
-      timer;
-
-    (void) times(&timer);
-    nanoseconds=timer.tms_utime+timer.tms_stime;
-  }
-#endif
-  SetStringInfoLength(chaos,sizeof(nanoseconds));
-  SetStringInfoDatum(chaos,(unsigned char *) &nanoseconds);
-  ConcatenateStringInfo(entropy,chaos);
+  AppendProcessorTimeEntropy(entropy,chaos);
 #if defined(MAGICKCORE_WINDOWS_SUPPORT)
   {
     double
