@@ -7041,6 +7041,9 @@ typedef struct _FileBrowserWidgets
 
   XEvent
     *event;
+
+  MagickStatusType
+    *mask;
 } FileBrowserWidgets;
 
 typedef struct _FileBrowserContext
@@ -8646,6 +8649,44 @@ static void MapFileBrowserWidget(Display *display,XWindows *windows,
   windows->widget.mapped=MagickFalse;
 }
 
+static void RespondToFileBrowserEvents(const FileBrowserContext *context,
+  const FileBrowserTargets *targets,const FileBrowserWidgets *widgets)
+{
+  size_t
+    *const state = widgets->state;
+
+  XEvent
+    *const event = widgets->event;
+
+  MagickStatusType
+    *const mask = widgets->mask;
+
+  do
+  {
+    if (UpdateFileBrowserState(context,widgets) == MagickFalse)
+      break;
+    /*
+      Wait for next event.
+    */
+    if (WaitForFileBrowserEvent(context,widgets) == MagickFalse)
+      continue;
+    switch ((*event).type)
+    {
+      case MapNotify:
+      {
+        (*mask)&=(unsigned int) (~CWX);
+        (*mask)&=(unsigned int) (~CWY);
+        break;
+      }
+      default:
+      {
+        HandleFileBrowserKeyEvent(context,(*event),targets,widgets);
+        break;
+      }
+    }
+  } while (((*state) & ExitState) == 0);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8709,7 +8750,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
       &scroll_info, &slider_info, &visible_files, &files, &up_info, &home_info,
       &special_info, &action_info, &cancel_info, &i, &filelist, &north_info,
       &south_info, &list_info, &delay, &expose_info, &text_info,
-      &selection_info, &event };
+      &selection_info, &event, &mask };
 
   FileBrowserContext
     file_context;
@@ -8787,30 +8828,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   file_context.action=action;
   file_context.width=width;
   file_context.text=text;
-  do
-  {
-    if (UpdateFileBrowserState(&file_context,&file_widgets) == MagickFalse)
-      break;
-    /*
-      Wait for next event.
-    */
-    if (WaitForFileBrowserEvent(&file_context,&file_widgets) == MagickFalse)
-      continue;
-    switch (event.type)
-    {
-      case MapNotify:
-      {
-        mask&=(unsigned int) (~CWX);
-        mask&=(unsigned int) (~CWY);
-        break;
-      }
-      default:
-      {
-        HandleFileBrowserKeyEvent(&file_context,event,&targets,&file_widgets);
-        break;
-      }
-    }
-  } while ((state & ExitState) == 0);
+  RespondToFileBrowserEvents(&file_context,&targets,&file_widgets);
   WithdrawBrowserWidget(display,windows);
   /*
     Free file list.
