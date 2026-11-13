@@ -3388,6 +3388,23 @@ static void XTrackInfoWidget(Display *display,XWindows *windows,const int x,
       (void) XMapWindow(display,windows->info.id);
 }
 
+static void XClampChopSegment(const XWindows *windows,XSegment *segment_info)
+{
+  /*
+    Check boundary conditions.
+  */
+  if ((*segment_info).x2 < 0)
+    (*segment_info).x2=0;
+  else
+    if ((*segment_info).x2 > windows->image.ximage->width)
+      (*segment_info).x2=windows->image.ximage->width;
+  if ((*segment_info).y2 < 0)
+    (*segment_info).y2=0;
+  else
+    if ((*segment_info).y2 > windows->image.ximage->height)
+      (*segment_info).y2=windows->image.ximage->height;
+}
+
 static MagickBooleanType XChopImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -3678,19 +3695,7 @@ static MagickBooleanType XChopImage(Display *display,
       default:
         break;
     }
-    /*
-      Check boundary conditions.
-    */
-    if (segment_info.x2 < 0)
-      segment_info.x2=0;
-    else
-      if (segment_info.x2 > windows->image.ximage->width)
-        segment_info.x2=windows->image.ximage->width;
-    if (segment_info.y2 < 0)
-      segment_info.y2=0;
-    else
-      if (segment_info.y2 > windows->image.ximage->height)
-        segment_info.y2=windows->image.ximage->height;
+    XClampChopSegment(windows,&segment_info);
     distance=(unsigned int)
       (((segment_info.x2-segment_info.x1)*(segment_info.x2-segment_info.x1))+
        ((segment_info.y2-segment_info.y1)*(segment_info.y2-segment_info.y1)));
