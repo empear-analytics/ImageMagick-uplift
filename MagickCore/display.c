@@ -14964,8 +14964,6 @@ static MagickBooleanType XROIImage(Display *display,
           XROIKeyPress(&key_input,&event,&key_targets);
           break;
         }
-        case KeyRelease:
-          break;
         case MotionNotify:
         {
           XROIMotion(&event_input,&targets);
