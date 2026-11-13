@@ -591,6 +591,42 @@ static MagickStatusType ParseGeometryOffsets(char *p,MagickStatusType flags,
   return(flags);
 }
 
+static MagickStatusType ParseGeometrySigma(char **p,MagickStatusType flags,
+  GeometryInfo *geometry_info)
+{
+  char
+    *q;
+
+  double
+    value;
+
+  int
+    c;
+
+  q=(*p);
+  c=(int) ((unsigned char) **p);
+  if (IsGeometrySigmaSeparator(c,*p) != MagickFalse)
+    {
+      /*
+        Parse sigma.
+      */
+      (*p)++;
+      SkipGeometryWhitespace(p);
+      c=(int) ((unsigned char) *q);
+      if (IsGeometrySigmaParsable(c,*p,q) != MagickFalse)
+        {
+          q=(*p);
+          value=StringToDouble(*p,p);
+          if (*p != q)
+            {
+              flags|=SigmaValue;
+              geometry_info->sigma=value;
+            }
+        }
+    }
+  return(flags);
+}
+
 MagickExport MagickStatusType ParseGeometry(const char *geometry,
   GeometryInfo *geometry_info)
 {
@@ -771,28 +807,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
           geometry_info->rho=value;
         }
     }
-  q=p;
-  c=(int) ((unsigned char) *p);
-  if (IsGeometrySigmaSeparator(c,p) != MagickFalse)
-    {
-      /*
-        Parse sigma.
-      */
-      p++;
-      while (isspace((int) ((unsigned char) *p)) != 0)
-        p++;
-      c=(int) ((unsigned char) *q);
-      if (IsGeometrySigmaParsable(c,p,q) != MagickFalse)
-        {
-          q=p;
-          value=StringToDouble(p,&p);
-          if (p != q)
-            {
-              flags|=SigmaValue;
-              geometry_info->sigma=value;
-            }
-        }
-    }
+  flags=ParseGeometrySigma(&p,flags,geometry_info);
   flags=ParseGeometryOffsets(p,flags,geometry_info);
   if (strchr(pedantic_geometry,':') != (char *) NULL)
     NormalizeSamplingFactor(flags,geometry_info);
