@@ -596,6 +596,41 @@ static MagickBooleanType TokenizeEscapeChar(const TokenizerState *tokenizer,
   return(MagickTrue);
 }
 
+static MagickBooleanType TokenizeTokenChar(const TokenizerState *tokenizer,
+  const int c)
+{
+  TokenInfo
+    *const token_info = tokenizer->token_info;
+
+  char
+    *const token = tokenizer->token;
+
+  const size_t
+    max_token_length = tokenizer->max_token_length;
+
+  switch (token_info->state)
+  {
+    case IN_WHITE:
+    {
+      token_info->state=IN_TOKEN;
+      StoreToken(token_info,token,max_token_length,c);
+      break;
+    }
+    case IN_TOKEN:
+    case IN_QUOTE:
+    {
+      StoreToken(token_info,token,max_token_length,c);
+      break;
+    }
+    case IN_OZONE:
+    {
+      token[token_info->offset]='\0';
+      return(MagickFalse);
+    }
+  }
+  return(MagickTrue);
+}
+
 MagickExport int Tokenizer(TokenInfo *token_info,const unsigned flag,
   char *token,const size_t max_token_length,const char *line,const char *white,
   const char *break_set,const char *quote,const char escape,char *breaker,
@@ -655,26 +690,8 @@ MagickExport int Tokenizer(TokenInfo *token_info,const unsigned flag,
           return(0);
         continue;
       }
-    switch (token_info->state)
-    {
-      case IN_WHITE:
-      {
-        token_info->state=IN_TOKEN;
-        StoreToken(token_info,token,max_token_length,c);
-        break;
-      }
-      case IN_TOKEN:
-      case IN_QUOTE:
-      {
-        StoreToken(token_info,token,max_token_length,c);
-        break;
-      }
-      case IN_OZONE:
-      {
-        token[token_info->offset]='\0';
-        return(0);
-      }
-    }
+    if (TokenizeTokenChar(&tokenizer,c) == MagickFalse)
+      return(0);
   }
   token[token_info->offset]='\0';
   return(0);
