@@ -7839,6 +7839,41 @@ static void XMagnifyMultiBytePixels(const XMagnifyContext *context)
   MagnifyRowsMultiByte(&multi_byte);
 }
 
+static void XMagnify8BitPixels(const XMagnifyContext *context)
+{
+  XImage
+    *const ximage = context->ximage;
+
+  const unsigned int
+    height = context->height,
+    magnify = context->magnify,
+    width = context->width,
+    scanline_pad = context->scanline_pad;
+
+  const int
+    x = context->x,
+    y = context->y;
+
+  unsigned char
+    *const q = context->q;
+
+  Magnify8BitRows
+    magnify_rows;
+
+  /*
+    Magnify 8 bit X image.
+  */
+  magnify_rows.height=height;
+  magnify_rows.magnify=magnify;
+  magnify_rows.ximage=ximage;
+  magnify_rows.x=x;
+  magnify_rows.y=y;
+  magnify_rows.width=width;
+  magnify_rows.scanline_pad=scanline_pad;
+  magnify_rows.q=q;
+  MagnifyRows8Bit(&magnify_rows);
+}
+
 MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   ExceptionInfo *exception)
 {
@@ -7909,21 +7944,7 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
       case 6:
       case 8:
       {
-        Magnify8BitRows
-          magnify_rows;
-
-        /*
-          Magnify 8 bit X image.
-        */
-        magnify_rows.height=height;
-        magnify_rows.magnify=magnify;
-        magnify_rows.ximage=ximage;
-        magnify_rows.x=x;
-        magnify_rows.y=y;
-        magnify_rows.width=width;
-        magnify_rows.scanline_pad=scanline_pad;
-        magnify_rows.q=q;
-        MagnifyRows8Bit(&magnify_rows);
+        XMagnify8BitPixels(&context);
         break;
       }
       default:
