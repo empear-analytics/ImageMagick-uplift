@@ -889,6 +889,18 @@ static inline MagickBooleanType IsEpbx2XCornerConsistent(
   ) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsEpbx2XCentreMatched(const Quantum *pixels,
+  const size_t channels)
+{
+  return((
+    PixelsEqual(pixels,4,3,channels) ||
+    PixelsEqual(pixels,4,7,channels) ||
+    PixelsEqual(pixels,4,5,channels) ||
+    PixelsEqual(pixels,4,1,channels) ||
+    (IsEpbx2XCornerConsistent(pixels,channels) != MagickFalse)
+  ) ? MagickTrue : MagickFalse);
+}
+
 static inline MagickBooleanType IsEpbx2XBlendable(const Quantum *pixels,
   const size_t channels)
 {
@@ -896,11 +908,7 @@ static inline MagickBooleanType IsEpbx2XBlendable(const Quantum *pixels,
     !PixelsEqual(pixels,3,5,channels) &&
     !PixelsEqual(pixels,1,7,channels) &&
     (
-      PixelsEqual(pixels,4,3,channels) ||
-      PixelsEqual(pixels,4,7,channels) ||
-      PixelsEqual(pixels,4,5,channels) ||
-      PixelsEqual(pixels,4,1,channels) ||
-      (IsEpbx2XCornerConsistent(pixels,channels) != MagickFalse)
+      IsEpbx2XCentreMatched(pixels,channels) != MagickFalse
     )
   ) ? MagickTrue : MagickFalse);
 }
