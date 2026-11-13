@@ -9008,6 +9008,16 @@ static int XSetUserGeometry(Display *display,XWindowInfo *window_info,
   return(gravity);
 }
 
+static void XFreeTextProperty(XTextProperty *text_property)
+{
+  if (text_property->value != (void *) NULL)
+    {
+      (void) XFree((void *) text_property->value);
+      text_property->value=(unsigned char *) NULL;
+      text_property->nitems=0;
+    }
+}
+
 MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
   int argc,XClassHint *class_hint,XWMHints *manager_hints,
   XWindowInfo *window_info)
@@ -9110,18 +9120,8 @@ MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
     }
   XSetWMProperties(display,window_info->id,&window_name,&icon_name,argv,argc,
     size_hints,manager_hints,class_hint);
-  if (window_name.value != (void *) NULL)
-    {
-      (void) XFree((void *) window_name.value);
-      window_name.value=(unsigned char *) NULL;
-      window_name.nitems=0;
-    }
-  if (icon_name.value != (void *) NULL)
-    {
-      (void) XFree((void *) icon_name.value);
-      icon_name.value=(unsigned char *) NULL;
-      icon_name.nitems=0;
-    }
+  XFreeTextProperty(&window_name);
+  XFreeTextProperty(&icon_name);
   atom_list[0]=XInternAtom(display,"WM_DELETE_WINDOW",MagickFalse);
   atom_list[1]=XInternAtom(display,"WM_TAKE_FOCUS",MagickFalse);
   (void) XSetWMProtocols(display,window_info->id,atom_list,2);
