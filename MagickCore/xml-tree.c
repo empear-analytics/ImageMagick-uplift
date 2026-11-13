@@ -3285,6 +3285,19 @@ static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,char **source,size_t *length,
   return(content);
 }
 
+static MagickBooleanType ExtendXMLBufferBy(char **source,const size_t *length,
+  size_t *extent,const size_t size)
+{
+  if ((*length+size+MagickPathExtent) > *extent)
+    {
+      *extent=(*length)+size+MagickPathExtent;
+      *source=(char *) ResizeQuantumMemory(*source,*extent,sizeof(**source));
+      if (*source == (char *) NULL)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport char *XMLTreeInfoToXML(XMLTreeInfo *xml_info)
 {
   char
@@ -3338,13 +3351,9 @@ MagickExport char *XMLTreeInfoToXML(XMLTreeInfo *xml_info)
             continue;
           }
         q=root->processing_instructions[i][0];
-        if ((length+strlen(p)+strlen(q)+MagickPathExtent) > extent)
-          {
-            extent=length+strlen(p)+strlen(q)+MagickPathExtent;
-            xml=(char *) ResizeQuantumMemory(xml,extent,sizeof(*xml));
-            if (xml == (char *) NULL)
-              return(xml);
-          }
+        if (ExtendXMLBufferBy(&xml,&length,&extent,strlen(p)+strlen(q)) ==
+            MagickFalse)
+          return(xml);
         length+=(size_t) FormatLocaleString(xml+length,extent,"<?%s%s%s?>\n",q,
           *p != '\0' ? " " : "",p);
         p=root->processing_instructions[i][j];
@@ -3372,13 +3381,9 @@ MagickExport char *XMLTreeInfoToXML(XMLTreeInfo *xml_info)
             continue;
           }
         q=root->processing_instructions[i][0];
-        if ((length+strlen(p)+strlen(q)+MagickPathExtent) > extent)
-          {
-            extent=length+strlen(p)+strlen(q)+MagickPathExtent;
-            xml=(char *) ResizeQuantumMemory(xml,extent,sizeof(*xml));
-            if (xml == (char *) NULL)
-              return(xml);
-          }
+        if (ExtendXMLBufferBy(&xml,&length,&extent,strlen(p)+strlen(q)) ==
+            MagickFalse)
+          return(xml);
         length+=(size_t) FormatLocaleString(xml+length,extent,"\n<?%s%s%s?>",q,
           *p != '\0' ? " " : "",p);
         p=root->processing_instructions[i][j];
