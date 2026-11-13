@@ -9507,6 +9507,36 @@ static void XDefineTrueColors(const XColormapContext *context,
   XStoreTrueColors(&source,(*colors),(*number_colors));
 }
 
+static void XDefineColormapColors(const XColormapContext *context,
+  const XColormapTargets *targets)
+{
+  Colormap
+    *const colormap = targets->colormap;
+
+  switch (context->visual_info->klass)
+  {
+    case StaticGray:
+    case StaticColor:
+    {
+      XDefineStaticColors(context,targets);
+      break;
+    }
+    case GrayScale:
+    case PseudoColor:
+    {
+      XDefineGrayScaleColors(context,targets);
+      break;
+    }
+    case TrueColor:
+    case DirectColor:
+    default:
+    {
+      XDefineTrueColors(context,(*colormap),targets);
+      break;
+    }
+  }
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -9567,28 +9597,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
   /*
     Allocating colors in server colormap is based on visual class.
   */
-  switch (visual_info->klass)
-  {
-    case StaticGray:
-    case StaticColor:
-    {
-      XDefineStaticColors(&context,&targets);
-      break;
-    }
-    case GrayScale:
-    case PseudoColor:
-    {
-      XDefineGrayScaleColors(&context,&targets);
-      break;
-    }
-    case TrueColor:
-    case DirectColor:
-    default:
-    {
-      XDefineTrueColors(&context,colormap,&targets);
-      break;
-    }
-  }
+  XDefineColormapColors(&context,&targets);
   if ((visual_info->klass != DirectColor) &&
       (visual_info->klass != TrueColor))
     {
