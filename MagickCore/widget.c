@@ -15632,6 +15632,100 @@ static XWidgetInfo MoveTextViewSlider(XWidgetInfo slider_info,
 
 #define DismissButtonText  "Dismiss"
 
+typedef struct _TextViewWidgets
+{
+  XWidgetInfo
+    *north_info;
+
+  XWidgetInfo
+    *south_info;
+
+  size_t
+    *delay;
+
+  XWidgetInfo
+    *slider_info;
+
+  XWidgetInfo
+    *dismiss_info;
+
+  size_t
+    *state;
+} TextViewWidgets;
+
+typedef struct _TextViewContext
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+} TextViewContext;
+
+static void ReleaseTextViewScroll(const TextViewContext *context,
+  const XEvent event,const TextViewWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  size_t
+    *const delay = widgets->delay;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const dismiss_info = widgets->dismiss_info;
+
+  size_t
+    *const state = widgets->state;
+
+  DialogRelease
+    release;
+
+  if (windows->widget.mapped == MagickFalse)
+    return;
+  if ((*north_info).raised == MagickFalse)
+    {
+      /*
+        User released up button.
+      */
+      (*delay)=SuspendTime << 2;
+      (*north_info).raised=MagickTrue;
+      XDrawTriangleNorth(display,&windows->widget,north_info);
+    }
+  if ((*south_info).raised == MagickFalse)
+    {
+      /*
+        User released down button.
+      */
+      (*delay)=SuspendTime << 2;
+      (*south_info).raised=MagickTrue;
+      XDrawTriangleSouth(display,&windows->widget,south_info);
+    }
+  if ((*slider_info).active)
+    {
+      /*
+        Stop tracking slider.
+      */
+      (*slider_info).active=MagickFalse;
+      return;
+    }
+  release.display=display;
+  release.windows=windows;
+  release.event=event;
+  ReleaseTextViewDismiss(&release,dismiss_info,state);
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -15684,6 +15778,13 @@ MagickPrivate void XTextViewWidget(Display *display,
 
   const TextViewTargets
     targets = { &list_info, &selection_info, &state };
+
+  const TextViewWidgets
+    view_widgets = { &north_info, &south_info, &delay, &slider_info,
+      &dismiss_info, &state };
+
+  TextViewContext
+    view_context;
 
   /*
     Convert text string to a text list.
@@ -15766,6 +15867,8 @@ MagickPrivate void XTextViewWidget(Display *display,
   delay=SuspendTime << 2;
   height=(unsigned int) (font_info->ascent+font_info->descent);
   state=UpdateConfigurationState;
+  view_context.display=display;
+  view_context.windows=windows;
   do
   {
     if (state & UpdateConfigurationState)
@@ -16019,41 +16122,7 @@ MagickPrivate void XTextViewWidget(Display *display,
       }
       case ButtonRelease:
       {
-        DialogRelease
-          release;
-
-        if (windows->widget.mapped == MagickFalse)
-          break;
-        if (north_info.raised == MagickFalse)
-          {
-            /*
-              User released up button.
-            */
-            delay=SuspendTime << 2;
-            north_info.raised=MagickTrue;
-            XDrawTriangleNorth(display,&windows->widget,&north_info);
-          }
-        if (south_info.raised == MagickFalse)
-          {
-            /*
-              User released down button.
-            */
-            delay=SuspendTime << 2;
-            south_info.raised=MagickTrue;
-            XDrawTriangleSouth(display,&windows->widget,&south_info);
-          }
-        if (slider_info.active)
-          {
-            /*
-              Stop tracking slider.
-            */
-            slider_info.active=MagickFalse;
-            break;
-          }
-        release.display=display;
-        release.windows=windows;
-        release.event=event;
-        ReleaseTextViewDismiss(&release,&dismiss_info,&state);
+        ReleaseTextViewScroll(&view_context,event,&view_widgets);
         break;
       }
       case ClientMessage:
