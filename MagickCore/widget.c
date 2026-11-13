@@ -8133,6 +8133,78 @@ static MagickBooleanType ReplaceFileBrowserList(
   return(MagickTrue);
 }
 
+static void RefreshFileBrowserList(const FileBrowserContext *context,
+  const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const glob_pattern = context->glob_pattern,
+    *const working_path = context->working_path;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info,
+    *const scroll_info = widgets->scroll_info,
+    *const slider_info = widgets->slider_info,
+    *const north_info = widgets->north_info,
+    *const south_info = widgets->south_info,
+    *const list_info = widgets->list_info,
+    *const expose_info = widgets->expose_info,
+    *const text_info = widgets->text_info,
+    *const selection_info = widgets->selection_info;
+
+  size_t
+    *const files = widgets->files;
+
+  unsigned int
+    *const visible_files = widgets->visible_files;
+
+  /*
+    Update file list.
+  */
+  (*slider_info).height=(unsigned int) ((int) (*scroll_info).height-
+    (((*slider_info).min_y-(*scroll_info).y+1) << 1)+1);
+  if ((*files) > (*visible_files))
+    (*slider_info).height=(unsigned int)
+      (((*visible_files)*(*slider_info).height)/(*files));
+  (*slider_info).max_y=(*south_info).y-(int) (*south_info).bevel_width-
+    (int) (*slider_info).bevel_width-2;
+  (*slider_info).id=0;
+  (*slider_info).y=(*slider_info).min_y;
+  (*expose_info).y=(*slider_info).y;
+  (*selection_info).id=(~0);
+  (*list_info).id=(~0);
+  (*state)|=RedrawListState;
+  /*
+    Redraw directory name & reply.
+  */
+  if (IsGlob((*reply_info).text) == MagickFalse)
+    {
+      *(*reply_info).text='\0';
+      (*reply_info).cursor=(*reply_info).text;
+    }
+  (void) CopyMagickString((*text_info).text,working_path,MagickPathExtent);
+  (void) ConcatenateMagickString((*text_info).text,DirectorySeparator,
+    MagickPathExtent);
+  (void) ConcatenateMagickString((*text_info).text,glob_pattern,
+    MagickPathExtent);
+  XDrawWidgetText(display,&windows->widget,text_info);
+  XDrawMatteText(display,&windows->widget,reply_info);
+  XDrawBeveledMatte(display,&windows->widget,scroll_info);
+  XDrawTriangleNorth(display,&windows->widget,north_info);
+  XDrawBeveledButton(display,&windows->widget,slider_info);
+  XDrawTriangleSouth(display,&windows->widget,south_info);
+  XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
+  (*state)&=(unsigned int) (~UpdateListState);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8340,43 +8412,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
       {
         if (ReplaceFileBrowserList(&file_context,&file_widgets) == MagickFalse)
           break;
-        /*
-          Update file list.
-        */
-        slider_info.height=(unsigned int) ((int) scroll_info.height-
-          ((slider_info.min_y-scroll_info.y+1) << 1)+1);
-        if (files > visible_files)
-          slider_info.height=(unsigned int)
-            ((visible_files*slider_info.height)/files);
-        slider_info.max_y=south_info.y-(int) south_info.bevel_width-
-          (int) slider_info.bevel_width-2;
-        slider_info.id=0;
-        slider_info.y=slider_info.min_y;
-        expose_info.y=slider_info.y;
-        selection_info.id=(~0);
-        list_info.id=(~0);
-        state|=RedrawListState;
-        /*
-          Redraw directory name & reply.
-        */
-        if (IsGlob(reply_info.text) == MagickFalse)
-          {
-            *reply_info.text='\0';
-            reply_info.cursor=reply_info.text;
-          }
-        (void) CopyMagickString(text_info.text,working_path,MagickPathExtent);
-        (void) ConcatenateMagickString(text_info.text,DirectorySeparator,
-          MagickPathExtent);
-        (void) ConcatenateMagickString(text_info.text,glob_pattern,
-          MagickPathExtent);
-        XDrawWidgetText(display,&windows->widget,&text_info);
-        XDrawMatteText(display,&windows->widget,&reply_info);
-        XDrawBeveledMatte(display,&windows->widget,&scroll_info);
-        XDrawTriangleNorth(display,&windows->widget,&north_info);
-        XDrawBeveledButton(display,&windows->widget,&slider_info);
-        XDrawTriangleSouth(display,&windows->widget,&south_info);
-        XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
-        state&=(unsigned int) (~UpdateListState);
+        RefreshFileBrowserList(&file_context,&file_widgets);
       }
     if (state & JumpListState)
       {
