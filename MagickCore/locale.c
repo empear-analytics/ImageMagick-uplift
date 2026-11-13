@@ -1347,6 +1347,20 @@ static LocaleInfo *AcquireLocaleMessage(const char *filename,const char *tag,
   return(locale_info);
 }
 
+static MagickStatusType AddLocaleMessage(SplayTreeInfo *cache,
+  LocaleInfo *locale_info,ExceptionInfo *exception)
+{
+  MagickStatusType
+    status;
+
+  status=AddValueToSplayTree(cache,locale_info->tag,locale_info);
+  if (status == MagickFalse)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ResourceLimitError,"MemoryAllocationFailed","`%s'",
+      locale_info->tag);
+  return(status);
+}
+
 static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1440,11 +1454,7 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
         q=ReadMessageName(q,extent,token,tag);
         q=ReadMessageText(q,message);
         locale_info=AcquireLocaleMessage(filename,tag,message);
-        status=AddValueToSplayTree(cache,locale_info->tag,locale_info);
-        if (status == MagickFalse)
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            ResourceLimitError,"MemoryAllocationFailed","`%s'",
-            locale_info->tag);
+        status=AddLocaleMessage(cache,locale_info,exception);
         (void) ConcatenateMagickString(tag,message,MagickLocaleExtent);
         (void) ConcatenateMagickString(tag,"\n",MagickLocaleExtent);
         q++;
