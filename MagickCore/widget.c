@@ -16111,6 +16111,53 @@ static void HandleTextViewKeyEvent(const TextViewContext *context,
   }
 }
 
+static void HandleTextViewWindowEvent(const TextViewContext *context,
+  const XEvent event,const TextViewWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  switch (event.type)
+  {
+    case ButtonRelease:
+    {
+      ReleaseTextViewScroll(context,event,widgets);
+      break;
+    }
+    case ClientMessage:
+    {
+      (*state)=ClientWidgetMessage(display,windows,event,(*state));
+      break;
+    }
+    case ConfigureNotify:
+    {
+      (*state)=ConfigureWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case EnterNotify:
+    {
+      (*state)=EnterWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case Expose:
+    {
+      (*state)=ExposeWidgetWindow(windows,event,(*state));
+      break;
+    }
+    default:
+    {
+      HandleTextViewKeyEvent(context,event,widgets);
+      break;
+    }
+  }
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -16448,34 +16495,9 @@ MagickPrivate void XTextViewWidget(Display *display,
         PressTextViewSlider(&view_context,event,&targets,&view_widgets);
         break;
       }
-      case ButtonRelease:
-      {
-        ReleaseTextViewScroll(&view_context,event,&view_widgets);
-        break;
-      }
-      case ClientMessage:
-      {
-        state=ClientWidgetMessage(display,windows,event,state);
-        break;
-      }
-      case ConfigureNotify:
-      {
-        state=ConfigureWidgetWindow(windows,event,state);
-        break;
-      }
-      case EnterNotify:
-      {
-        state=EnterWidgetWindow(windows,event,state);
-        break;
-      }
-      case Expose:
-      {
-        state=ExposeWidgetWindow(windows,event,state);
-        break;
-      }
       default:
       {
-        HandleTextViewKeyEvent(&view_context,event,&view_widgets);
+        HandleTextViewWindowEvent(&view_context,event,&view_widgets);
         break;
       }
     }
