@@ -3807,6 +3807,44 @@ static void XShowChopSelection(const ChopEventInput *input,
       (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
 }
 
+static void XChopDragEvent(const XEvent *event,const ChopTargets *targets)
+{
+  XSegment
+    *const segment_info = targets->segment_info;
+
+  size_t
+    *const state = targets->state;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      (*segment_info).x2=(short int) (*event).xmotion.x;
+      (*segment_info).y2=(short int) (*event).xmotion.y;
+      break;
+    }
+    case ButtonRelease:
+    {
+      /*
+        User has committed to chopping line.
+      */
+      (*segment_info).x2=(short int) (*event).xbutton.x;
+      (*segment_info).y2=(short int) (*event).xbutton.y;
+      (*state)|=ExitState;
+      break;
+    }
+    case Expose:
+      break;
+    case MotionNotify:
+    {
+      (*segment_info).x2=(short int) (*event).xmotion.x;
+      (*segment_info).y2=(short int) (*event).xmotion.y;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType XChopImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -3908,34 +3946,7 @@ static MagickBooleanType XChopImage(Display *display,
     if (distance > 9)
       XHighlightLine(display,windows->image.id,
         windows->image.highlight_context,&segment_info);
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        segment_info.x2=(short int) event.xmotion.x;
-        segment_info.y2=(short int) event.xmotion.y;
-        break;
-      }
-      case ButtonRelease:
-      {
-        /*
-          User has committed to chopping line.
-        */
-        segment_info.x2=(short int) event.xbutton.x;
-        segment_info.y2=(short int) event.xbutton.y;
-        state|=ExitState;
-        break;
-      }
-      case Expose:
-        break;
-      case MotionNotify:
-      {
-        segment_info.x2=(short int) event.xmotion.x;
-        segment_info.y2=(short int) event.xmotion.y;
-      }
-      default:
-        break;
-    }
+    XChopDragEvent(&event,&targets);
     XClampChopSegment(windows,&segment_info);
     distance=(unsigned int)
       (((segment_info.x2-segment_info.x1)*(segment_info.x2-segment_info.x1))+
