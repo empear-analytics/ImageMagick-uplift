@@ -7012,6 +7012,13 @@ typedef struct _FileBrowserWidgets
 
   size_t
     *files;
+
+  XWidgetInfo
+    *up_info,
+    *home_info,
+    *special_info,
+    *action_info,
+    *cancel_info;
 } FileBrowserWidgets;
 
 typedef struct _FileBrowserContext
@@ -7201,6 +7208,71 @@ static void PressFileBrowserKey(const FileBrowserContext *context,
   (*state)|=JumpListState;
 }
 
+static void ToggleFileBrowserButtons(const FileBrowserContext *context,
+  const XEvent event,const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const up_info = widgets->up_info,
+    *const home_info = widgets->home_info,
+    *const special_info = widgets->special_info,
+    *const action_info = widgets->action_info,
+    *const cancel_info = widgets->cancel_info;
+
+  if ((*up_info).raised == MatteIsActive((*up_info),event.xmotion))
+    {
+      /*
+        Up button status changed.
+      */
+      (*up_info).raised=!(*up_info).raised;
+      XDrawBeveledButton(display,&windows->widget,up_info);
+      return;
+    }
+  if ((*home_info).raised == MatteIsActive((*home_info),event.xmotion))
+    {
+      /*
+        Home button status changed.
+      */
+      (*home_info).raised=!(*home_info).raised;
+      XDrawBeveledButton(display,&windows->widget,home_info);
+      return;
+    }
+  if ((*special_info).raised == MatteIsActive((*special_info),event.xmotion))
+    {
+      /*
+        Grab button status changed.
+      */
+      (*special_info).raised=!(*special_info).raised;
+      XDrawBeveledButton(display,&windows->widget,special_info);
+      return;
+    }
+  if ((*action_info).raised == MatteIsActive((*action_info),event.xmotion))
+    {
+      /*
+        Action button status changed.
+      */
+      (*action_info).raised=(*action_info).raised == MagickFalse ?
+        MagickTrue : MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,action_info);
+      return;
+    }
+  if ((*cancel_info).raised == MatteIsActive((*cancel_info),event.xmotion))
+    {
+      /*
+        Cancel button status changed.
+      */
+      (*cancel_info).raised=(*cancel_info).raised == MagickFalse ?
+        MagickTrue : MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      return;
+    }
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -7288,7 +7360,8 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
 
   const FileBrowserWidgets
     file_widgets = { &reply_info, &state,
-      &scroll_info, &slider_info, &visible_files, &files };
+      &scroll_info, &slider_info, &visible_files, &files, &up_info, &home_info,
+      &special_info, &action_info, &cancel_info };
 
   FileBrowserContext
     file_context;
@@ -8006,53 +8079,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
           }
         if (state & InactiveWidgetState)
           break;
-        if (up_info.raised == MatteIsActive(up_info,event.xmotion))
-          {
-            /*
-              Up button status changed.
-            */
-            up_info.raised=!up_info.raised;
-            XDrawBeveledButton(display,&windows->widget,&up_info);
-            break;
-          }
-        if (home_info.raised == MatteIsActive(home_info,event.xmotion))
-          {
-            /*
-              Home button status changed.
-            */
-            home_info.raised=!home_info.raised;
-            XDrawBeveledButton(display,&windows->widget,&home_info);
-            break;
-          }
-        if (special_info.raised == MatteIsActive(special_info,event.xmotion))
-          {
-            /*
-              Grab button status changed.
-            */
-            special_info.raised=!special_info.raised;
-            XDrawBeveledButton(display,&windows->widget,&special_info);
-            break;
-          }
-        if (action_info.raised == MatteIsActive(action_info,event.xmotion))
-          {
-            /*
-              Action button status changed.
-            */
-            action_info.raised=action_info.raised == MagickFalse ?
-              MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&action_info);
-            break;
-          }
-        if (cancel_info.raised == MatteIsActive(cancel_info,event.xmotion))
-          {
-            /*
-              Cancel button status changed.
-            */
-            cancel_info.raised=cancel_info.raised == MagickFalse ?
-              MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-            break;
-          }
+        ToggleFileBrowserButtons(&file_context,event,&file_widgets);
         break;
       }
       case SelectionClear:
