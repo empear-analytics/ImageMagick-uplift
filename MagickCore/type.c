@@ -1058,16 +1058,47 @@ static inline MagickBooleanType IsNewTypePath(const char *path,
     (type_info[i]->path != (char *) NULL)));
 }
 
-MagickExport MagickBooleanType ListTypeInfo(FILE *file,ExceptionInfo *exception)
+static void PrintTypeInfo(FILE *file,const TypeInfo **type_info,
+  const ssize_t i)
 {
   const char
     *family,
     *glyphs,
     *metrics,
     *name,
-    *path,
     *stretch,
     *style;
+
+  name="not defined";
+  if (type_info[i]->name != (char *) NULL)
+    name=type_info[i]->name;
+  family="not defined";
+  if (type_info[i]->family != (char *) NULL)
+    family=type_info[i]->family;
+  style=CommandOptionToMnemonic(MagickStyleOptions,type_info[i]->style);
+  stretch=CommandOptionToMnemonic(MagickStretchOptions,type_info[i]->stretch);
+  metrics="not defined";
+  if (type_info[i]->metrics != (char *) NULL)
+    metrics=type_info[i]->metrics;
+  glyphs="not defined";
+  if (type_info[i]->glyphs != (char *) NULL)
+    glyphs=type_info[i]->glyphs;
+  (void) FormatLocaleFile(file,"  Font: %s\n",name);
+  (void) FormatLocaleFile(file,"    family: %s\n",family);
+  (void) FormatLocaleFile(file,"    style: %s\n",style);
+  (void) FormatLocaleFile(file,"    stretch: %s\n",stretch);
+  (void) FormatLocaleFile(file,"    weight: %.17g\n",(double)
+    type_info[i]->weight);
+  (void) FormatLocaleFile(file,"    metrics: %s\n",metrics);
+  (void) FormatLocaleFile(file,"    glyphs: %s\n",glyphs);
+  (void) FormatLocaleFile(file,"    index: %d\n",(int)
+    type_info[i]->face);
+}
+
+MagickExport MagickBooleanType ListTypeInfo(FILE *file,ExceptionInfo *exception)
+{
+  const char
+    *path;
 
   const TypeInfo
     **type_info;
@@ -1092,30 +1123,7 @@ MagickExport MagickBooleanType ListTypeInfo(FILE *file,ExceptionInfo *exception)
     if (IsNewTypePath(path,type_info,i) != MagickFalse)
       (void) FormatLocaleFile(file,"\nPath: %s\n",type_info[i]->path);
     path=type_info[i]->path;
-    name="not defined";
-    if (type_info[i]->name != (char *) NULL)
-      name=type_info[i]->name;
-    family="not defined";
-    if (type_info[i]->family != (char *) NULL)
-      family=type_info[i]->family;
-    style=CommandOptionToMnemonic(MagickStyleOptions,type_info[i]->style);
-    stretch=CommandOptionToMnemonic(MagickStretchOptions,type_info[i]->stretch);
-    metrics="not defined";
-    if (type_info[i]->metrics != (char *) NULL)
-      metrics=type_info[i]->metrics;
-    glyphs="not defined";
-    if (type_info[i]->glyphs != (char *) NULL)
-      glyphs=type_info[i]->glyphs;
-    (void) FormatLocaleFile(file,"  Font: %s\n",name);
-    (void) FormatLocaleFile(file,"    family: %s\n",family);
-    (void) FormatLocaleFile(file,"    style: %s\n",style);
-    (void) FormatLocaleFile(file,"    stretch: %s\n",stretch);
-    (void) FormatLocaleFile(file,"    weight: %.17g\n",(double)
-      type_info[i]->weight);
-    (void) FormatLocaleFile(file,"    metrics: %s\n",metrics);
-    (void) FormatLocaleFile(file,"    glyphs: %s\n",glyphs);
-    (void) FormatLocaleFile(file,"    index: %d\n",(int)
-      type_info[i]->face);
+    PrintTypeInfo(file,type_info,i);
   }
   (void) fflush(file);
   type_info=(const TypeInfo **) RelinquishMagickMemory((void *) type_info);
