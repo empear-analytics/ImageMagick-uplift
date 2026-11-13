@@ -9322,6 +9322,115 @@ static void XImproveColorRecovery(const XColormapContext *context,
     }
 }
 
+typedef struct _XColormapTargets
+{
+  size_t
+    *number_colors;
+
+  XColor
+    **colors;
+
+  Colormap
+    *colormap;
+} XColormapTargets;
+
+static void XDefineGrayScaleColors(const XColormapContext *context,
+  const XColormapTargets *targets)
+{
+  size_t
+    *const number_colors = targets->number_colors;
+
+  XColor
+    **const colors = targets->colors;
+
+  Colormap
+    *const colormap = targets->colormap;
+
+  Status
+    status;
+
+  unsigned int
+    colormap_type;
+
+  /*
+    Define Standard Colormap for GrayScale or PseudoColor visual.
+  */
+  (*number_colors)=context->image->colors;
+  (*colors)=(XColor *) AcquireQuantumMemory((size_t)
+    context->visual_info->colormap_size,sizeof(*(*colors)));
+  if ((*colors) == (XColor *) NULL)
+    ThrowXWindowFatalException(ResourceLimitFatalError,
+      "UnableToCreateColormap",context->image->filename);
+  /*
+    Preallocate our GUI colors.
+  */
+  XAllocGuiColors(context->display,(*colormap),context->pixel);
+  /*
+    Determine if image colors will "fit" into X server colormap.
+  */
+  colormap_type=context->resource_info->colormap;
+  status=XAllocColorCells(context->display,(*colormap),MagickFalse,(unsigned long *)
+    NULL,0,context->pixel->pixels,(unsigned int) context->image->colors);
+  if (status != False)
+    colormap_type=PrivateColormap;
+  if (colormap_type == SharedColormap)
+    {
+      DiversityPacket
+        *diversity;
+
+      XSharedColormapSource
+        shared_source;
+
+      /*
+        Define Standard colormap for shared GrayScale or PseudoColor visual.
+      */
+      diversity=(DiversityPacket *) AcquireQuantumMemory(context->image->colors,
+        sizeof(*diversity));
+      if (diversity == (DiversityPacket *) NULL)
+        ThrowXWindowFatalException(ResourceLimitFatalError,
+          "UnableToCreateColormap",context->image->filename);
+      shared_source.display=context->display;
+      shared_source.visual_info=context->visual_info;
+      shared_source.colormap=(*colormap);
+      shared_source.image=context->image;
+      shared_source.pixel=context->pixel;
+      shared_source.colors=(*colors);
+      shared_source.diversity=diversity;
+      shared_source.exception=context->exception;
+      (*number_colors)=XAllocSharedColors(&shared_source,(*number_colors));
+      diversity=(DiversityPacket *) RelinquishMagickMemory(diversity);
+      return;
+    }
+  /*
+    Define Standard colormap for private GrayScale or PseudoColor visual.
+  */
+  if (status == False)
+    {
+      XDefaultColorSource
+        default_source;
+
+      /*
+        Not enough colormap entries in the colormap-- Create a new colormap.
+      */
+      (*colormap)=XCreatePrivateColormap(context->display,context->visual_info,context->map_info,context->image);
+      default_source.display=context->display;
+      default_source.visual_info=context->visual_info;
+      default_source.colormap=(*colormap);
+      default_source.image=context->image;
+      default_source.pixel=context->pixel;
+      default_source.colors=(*colors);
+      (*number_colors)=XRetainDefaultColors(&default_source,(*number_colors));
+      (void) XAllocColorCells(context->display,(*colormap),MagickFalse,
+        (unsigned long *) NULL,0,context->pixel->pixels,(unsigned int)
+        context->image->colors);
+    }
+  /*
+    Store the image colormap.
+  */
+  XStoreImageColors(context->visual_info,context->image,context->pixel,(*colors));
+  (void) XStoreColors(context->display,(*colormap),(*colors),(int) context->image->colors);
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -9329,14 +9438,17 @@ MagickPrivate void XMakeStandardColormap(Display *display,
   Colormap
     colormap;
 
-  Status
-    status;
-
   size_t
     number_colors;
 
   XColor
     *colors;
+
+  XColormapContext
+    context;
+
+  const XColormapTargets
+    targets = { &number_colors, &colors, &colormap };
 
   assert(display != (Display *) NULL);
   assert(visual_info != (XVisualInfo *) NULL);
@@ -9345,11 +9457,15 @@ MagickPrivate void XMakeStandardColormap(Display *display,
   assert(pixel != (XPixelInfo *) NULL);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  context.display=display;
+  context.visual_info=visual_info;
+  context.resource_info=resource_info;
+  context.image=image;
+  context.map_info=map_info;
+  context.pixel=pixel;
+  context.exception=exception;
   if (resource_info->map_type != (char *) NULL)
     {
-      XColormapContext
-        context;
-
       /*
         Standard Colormap is already defined (i.e. xstdcmap).
       */
@@ -9357,13 +9473,6 @@ MagickPrivate void XMakeStandardColormap(Display *display,
         pixel);
       number_colors=(unsigned int) (map_info->base_pixel+
         (map_info->red_max+1)*(map_info->green_max+1)*(map_info->blue_max+1));
-      context.display=display;
-      context.visual_info=visual_info;
-      context.resource_info=resource_info;
-      context.image=image;
-      context.map_info=map_info;
-      context.pixel=pixel;
-      context.exception=exception;
       XImproveColorRecovery(&context,number_colors);
       LogXStandardColormap(map_info);
       return;
@@ -9408,86 +9517,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
     case GrayScale:
     case PseudoColor:
     {
-      unsigned int
-        colormap_type;
-
-      /*
-        Define Standard Colormap for GrayScale or PseudoColor visual.
-      */
-      number_colors=image->colors;
-      colors=(XColor *) AcquireQuantumMemory((size_t)
-        visual_info->colormap_size,sizeof(*colors));
-      if (colors == (XColor *) NULL)
-        ThrowXWindowFatalException(ResourceLimitFatalError,
-          "UnableToCreateColormap",image->filename);
-      /*
-        Preallocate our GUI colors.
-      */
-      XAllocGuiColors(display,colormap,pixel);
-      /*
-        Determine if image colors will "fit" into X server colormap.
-      */
-      colormap_type=resource_info->colormap;
-      status=XAllocColorCells(display,colormap,MagickFalse,(unsigned long *)
-        NULL,0,pixel->pixels,(unsigned int) image->colors);
-      if (status != False)
-        colormap_type=PrivateColormap;
-      if (colormap_type == SharedColormap)
-        {
-          DiversityPacket
-            *diversity;
-
-          XSharedColormapSource
-            shared_source;
-
-          /*
-            Define Standard colormap for shared GrayScale or PseudoColor visual.
-          */
-          diversity=(DiversityPacket *) AcquireQuantumMemory(image->colors,
-            sizeof(*diversity));
-          if (diversity == (DiversityPacket *) NULL)
-            ThrowXWindowFatalException(ResourceLimitFatalError,
-              "UnableToCreateColormap",image->filename);
-          shared_source.display=display;
-          shared_source.visual_info=visual_info;
-          shared_source.colormap=colormap;
-          shared_source.image=image;
-          shared_source.pixel=pixel;
-          shared_source.colors=colors;
-          shared_source.diversity=diversity;
-          shared_source.exception=exception;
-          number_colors=XAllocSharedColors(&shared_source,number_colors);
-          diversity=(DiversityPacket *) RelinquishMagickMemory(diversity);
-          break;
-        }
-      /*
-        Define Standard colormap for private GrayScale or PseudoColor visual.
-      */
-      if (status == False)
-        {
-          XDefaultColorSource
-            default_source;
-
-          /*
-            Not enough colormap entries in the colormap-- Create a new colormap.
-          */
-          colormap=XCreatePrivateColormap(display,visual_info,map_info,image);
-          default_source.display=display;
-          default_source.visual_info=visual_info;
-          default_source.colormap=colormap;
-          default_source.image=image;
-          default_source.pixel=pixel;
-          default_source.colors=colors;
-          number_colors=XRetainDefaultColors(&default_source,number_colors);
-          (void) XAllocColorCells(display,colormap,MagickFalse,
-            (unsigned long *) NULL,0,pixel->pixels,(unsigned int)
-            image->colors);
-        }
-      /*
-        Store the image colormap.
-      */
-      XStoreImageColors(visual_info,image,pixel,colors);
-      (void) XStoreColors(display,colormap,colors,(int) image->colors);
+      XDefineGrayScaleColors(&context,&targets);
       break;
     }
     case TrueColor:
