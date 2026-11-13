@@ -16310,6 +16310,33 @@ static void InitializeTextViewList(const TextViewContext *context,
   (*list_info).y=(*scroll_info).y;
 }
 
+static void InitializeTextViewSelection(const TextViewContext *context,
+  const TextViewWidgets *widgets)
+{
+  XFontStruct
+    *const text_info = context->text_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info;
+
+  XWidgetInfo
+    *const selection_info = widgets->selection_info;
+
+  /*
+    Initialize selection information.
+  */
+  XGetWidgetInfo((char *) NULL,selection_info);
+  (*selection_info).center=MagickFalse;
+  (*selection_info).width=(*list_info).width;
+  (*selection_info).height=(unsigned int)
+    (9*(text_info->ascent+text_info->descent)) >> 3;
+  (*selection_info).x=(*list_info).x;
+  (*state)&=(unsigned int) (~UpdateConfigurationState);
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -16468,16 +16495,7 @@ MagickPrivate void XTextViewWidget(Display *display,
         InitializeTextViewButtons(&view_context,&view_widgets);
         InitializeTextViewScroll(&view_context,&view_widgets);
         InitializeTextViewList(&view_context,&view_widgets);
-        /*
-          Initialize selection information.
-        */
-        XGetWidgetInfo((char *) NULL,&selection_info);
-        selection_info.center=MagickFalse;
-        selection_info.width=list_info.width;
-        selection_info.height=(unsigned int)
-          (9*(text_info->ascent+text_info->descent)) >> 3;
-        selection_info.x=list_info.x;
-        state&=(unsigned int) (~UpdateConfigurationState);
+        InitializeTextViewSelection(&view_context,&view_widgets);
       }
     if (state & RedrawWidgetState)
       {
