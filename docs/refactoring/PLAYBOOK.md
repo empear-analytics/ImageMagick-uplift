@@ -15872,6 +15872,131 @@ OK of 2026-11-10 to evolve the recipes.
 
 ---
 
+## Recipe FU - Fill a Struct by Initialiser in a Block Running to its Last Use
+
+**Use when:** CodeScene reports *Large Method* (or *Complex Method* or *Bumpy Road Ahead*, when the
+lines the fills hold are what a later extraction cannot afford), and the function declares a
+struct local among its declarations, fills it member by member (`name.m=e;`, every member once)
+somewhere in the middle of its body, and then passes `&name` to a run of calls that reaches the
+end of the block: `animate.c`'s `XAnimateImages` declares `setup` (eighteen members) and
+`event_context` (nineteen), fills each after the colormap and the window creation have written
+the values (`display_image`, `context_mask`), and hands `&setup` to twelve calls and
+`&event_context` to three.
+
+**Not covered by:** Recipe FI, whose steps 1 to 4 need the run to stand directly after the
+declaration and whose step 8 needs every value fixed at the top of a block and the struct
+used in one call; Recipe FB, whose compound statement holds the one call that uses the
+struct; Recipe RF, which deletes a repeated fill; Recipe N step 8, which keeps the struct
+mutable and filled member by member; Recipes B, N, Y, Z and I, which say how a *new* struct
+is declared and filled, not how an existing fill is rewritten.
+
+**How:**
+
+1. The struct local `name` is declared, with no initialiser, among the declarations at the
+   top of a block `B` of the function, of a `typedef struct` type whose members are scalars,
+   pointers or struct values (no array member), and nothing names it before the run. Further
+   down, in `B`'s own statement list (not in a nested block, not the unbraced body of an
+   `if`, `else` or loop, no label on it), one run of statements `name.m=e;` assigns every
+   member exactly once, in declaration order (checked by script against the typedef).
+2. Every `e` is a plain identifier or a literal, or a member read through a pointer-to-`const`
+   parameter, as Recipe FI step 2 says: no call, member access through a local, cast,
+   increment, assignment or macro with a side effect.
+3. After the run, `name` appears in `B` only as `&name` passed to a parameter of type
+   pointer-to-`const`, or in `name.m` reads (Recipe FI step 3); nothing writes a member of
+   it, and nothing passes it to a pointer-to-non-`const` parameter. Call `L` the last
+   statement of `B` that names `name`, and the *tail* the statements of `B` from the run
+   up to and including `L`. The tail holds no `#` line, no label and no `case` label of an
+   enclosing `switch`, and lies outside every OpenMP region (it holds no `#pragma omp` line
+   and `B` is no parallel body), so nothing jumps into the middle of it.
+4. Delete the declaration of `name` (with the blank line after it; a type line left with no
+   name under it goes too). Replace the run by a compound statement at the run's
+   indentation: `{`, then `const Name name = { e1, e2, ... };` as Recipe FI step 4 writes it
+   (the values in declaration order, wrapped at 79 columns), a blank line, the tail with
+   every line two columns further right, and `}` directly after `L`. A line the new
+   indentation pushes past 79 columns is wrapped again at the break the author would have
+   chosen (check by reading); a comment moves with its statement. The statements of `B`
+   after `L` stay where they are, outside the compound statement.
+5. A second struct that meets steps 1 to 3 in the same function, whose run lies in the
+   tail, takes the same step inside the first compound statement: its block opens at its
+   own run, one level deeper, and closes after its own last use.
+6. Run `sh tools/obj_identical.sh <file>` (`WIDE=1` for a wide-build file). It must print
+   `IDENTICAL`: the members took the values the assignments gave them, member by member, and
+   no statement of the tail changed. Otherwise revert the step.
+7. One function's fills, however many, go in one commit (one recipe, one function).
+
+**Before:**
+
+```c
+  XMakeStandardColormap(display,visual_info,resource_info,display_image,
+    map_info,pixel,exception);
+  setup.display=display;
+  setup.resource_info=resource_info;
+  ...
+  setup.number_scenes=number_scenes;
+  XCreateContextWindow(&setup);
+  ...
+  return(XFinishAnimation(&event_context,&setup,&exit_info,nexus));
+}
+```
+
+**After:**
+
+```c
+  XMakeStandardColormap(display,visual_info,resource_info,display_image,
+    map_info,pixel,exception);
+  {
+    const AnimateWindowSetup
+      setup = { display, resource_info, windows, visual_info, map_info, pixel,
+        font_info, root_window, class_hints, manager_hints, argv, argc,
+        icon_resources, icon_visual, icon_map, icon_pixel, display_image,
+        number_scenes };
+
+    XCreateContextWindow(&setup);
+    ...
+    return(XFinishAnimation(&event_context,&setup,&exit_info,nexus));
+  }
+}
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The assignments ran in order, each from an identifier (or a
+  read of a `const` parameter's member) that nothing between them wrote, and nothing read
+  the struct before the run (step 1); a block's declarations are initialised when execution
+  reaches them (C11 6.8p3), which is where the run stood, so each member takes the value
+  the assignment gave it. Every member is set, so none is left to zero where it held an
+  indeterminate value before. The tail runs the same statements in the same order; wrapping
+  them in a compound statement adds no branch, no jump and no conditional nesting, and the
+  struct is still alive at every use (the block closes after the last one, step 3). `const`
+  is a promise the compiler checks, and the pointer-to-`const` parameters say the callees
+  keep to it.
+- A `return` inside the tail leaves the compound statement and the function as it left
+  them; a `break` or `continue` of a loop or `switch` around `B` would leave the compound
+  statement the same way (step 3 keeps `case` labels out).
+- The declaration moves from the top of the block to the run, so `-Wdeclaration-after-
+  statement` is met (it opens a block) and the name is declared once, so nothing is shadowed
+  (`tools/ci_linux_warnings.sh` checks). An initialiser that names automatic variables needs
+  C99, as Recipe FI's does.
+- The tail is re-indented, not rewritten: `git diff -w` shows the removed run, the removed
+  declaration, the added initialiser and the two braces, and nothing else.
+- Like FI and FB, the step shortens the function's text without hiding any of it: each value
+  is still written once, where it was written before, beside the calls that read it.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against `HEAD`;
+`refactor_guard.py` and `--calls` see no change; `git diff -w` shows only the lines named in
+*Careful*.
+
+**Provenance:** 2026-11-13, from `animate.c`'s `XAnimateImages` (campaign A, W23 round nine
+lane d, wide build): after the window creation and the event loop were peeled into helpers the
+function keeps *Large Method* at 156 lines, of which the `setup` and `event_context` fills are 37
+(with their declarations 41); FI step 8 refuses them (`display_image`, `context_mask` and
+`number_scenes` are written between the declaration and the run, and each struct is used by
+several calls) and FB refuses the several calls. A probe of both: `IDENTICAL` object code, 156 to
+129 lines, 8.01 to 8.13. Added by Claude Code (Claude Sonnet 5.5) under the owner's OK of
+2026-11-10 to evolve the recipes.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -16230,3 +16355,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | I | Step 2: a block-scope `static` of structure type may be a written variable on Recipe CT step 2's terms (member a pointer to the structure, `v.m` written `(*v).m`, `&v` written `v`), and when every written variable of the targets struct is such a `static` the limit of six rises to ten. The text gives the argument (one object at a fixed address, block scope, distinct objects, nothing to alias) | `xwindow.c`'s `XRenderImage` (campaign A, W22 round seven lane b, wide build): the `if (display == NULL)` init block writes eight statics, three of them structures, and leaves through `return(MagickFalse);` four times; Recipe I stopped at six variables and refused structure statics | owner |
 | 2026-11-13 | NEW | KM | Replace a Key Switch Selecting by Modifier Masks with a Table of Rules: the groups of a key `switch` that return a constant command after at most two non-Control mask tests and the Control test become rows `{ key, mask, command, mask, command, plain, control }` of a `static const` table (a missing pair filled with `ControlMask` and the control command) read by one lookup function that the caller returns from after `default: break;`. *Careful* gives the argument (same value, same tests in the same order, the filler pair returns what the next test would, `break` meant the closing return) | `display.c`'s `XImageWindowCommand` (campaign A, W23 round eight lane a, wide build): cc 132 to 41, 342 to 129 lines, the lookup finding-free; KR, KT, KC and KE refuse groups that test masks | owner |
 | 2026-11-13 | AMEND | F | Step 2: a `static` array that the function stores into a member of a local struct it only fills may move as written, when every reader of the member only reads through it by subscript (checked by reading each reader). The declaration is already `static`, so its storage, bytes and section do not change (data sections compare identical); only the scope of its name widens, which steps 4 and 5 check | `display.c`'s `XDisplayImage` (campaign A, W23 round eight lane b, wide build): the thirteen `static DisplayCommand` tables and `Commands` are stored into `event_context.VirtualCommands`, `.ShortCutsCommands` and `.Commands` and read by subscript in `XSelectCommandMenuEntry`, `XSelectVirtualCommand` and `XPressImageButton3`; Recipe F's text covered element reads and `const` pointer arguments only | owner |
+| 2026-11-13 | NEW | FU | Fill a Struct by Initialiser in a Block Running to its Last Use: a struct local declared at the top of a block, filled member by member in the middle of it (every member once, in order, from plain identifiers) and then passed as `&name` to pointer-to-`const` parameters of a run of calls reaching the end of the block, becomes a `const` initialiser at the run's place, opening a compound statement that holds the tail up to the last use (re-indented two columns). *Careful* gives the argument (declarations are initialised where execution reaches them, the same identifiers, every member set, the tail unchanged, no branch added) | `animate.c`'s `XAnimateImages` (campaign A, W23 round nine lane d, wide build): `setup` (18 members, 12 calls) and `event_context` (19 members, 3 calls) are filled after `display_image` and `context_mask` are written, so FI step 8 refuses and FB takes one call only. A probe of both: `IDENTICAL` object code, 156 to 129 lines, 8.01 to 8.13 | owner |
