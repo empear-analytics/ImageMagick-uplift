@@ -2863,12 +2863,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
             AnnotateMenuInput
               annotate_input;
 
-            annotate_input.display=display;
-            annotate_input.resource_info=resource_info;
-            annotate_input.windows=windows;
-            annotate_input.AnnotateMenu=AnnotateMenu;
-            annotate_input.id=id;
-            annotate_input.command=command;
+            XSetAnnotateMenuInput(&context,id,&annotate_input);
             XSelectAnnotateFontColor(&annotate_input,&font_color_targets);
             break;
           }
@@ -2877,12 +2872,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
             AnnotateMenuInput
               annotate_input;
 
-            annotate_input.display=display;
-            annotate_input.resource_info=resource_info;
-            annotate_input.windows=windows;
-            annotate_input.AnnotateMenu=AnnotateMenu;
-            annotate_input.id=id;
-            annotate_input.command=command;
+            XSetAnnotateMenuInput(&context,id,&annotate_input);
             XSelectAnnotateBoxColor(&annotate_input,&box_color_targets);
             break;
           }
@@ -2891,12 +2881,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
             AnnotateMenuInput
               annotate_input;
 
-            annotate_input.display=display;
-            annotate_input.resource_info=resource_info;
-            annotate_input.windows=windows;
-            annotate_input.AnnotateMenu=AnnotateMenu;
-            annotate_input.id=id;
-            annotate_input.command=command;
+            XSetAnnotateMenuInput(&context,id,&annotate_input);
             XSelectAnnotateRotation(&annotate_input,&rotate_targets);
             break;
           }
