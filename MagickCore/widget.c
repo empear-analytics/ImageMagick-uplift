@@ -8486,6 +8486,56 @@ static void HandleFileBrowserSelectionEvent(
   }
 }
 
+static void HandleFileBrowserWindowEvent(
+  const FileBrowserContext *context,const XEvent event,
+  const FileBrowserTargets *targets,const FileBrowserWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  switch (event.type)
+  {
+    case ButtonPress:
+    {
+      PressFileBrowserScroll(context,event,targets,widgets);
+      break;
+    }
+    case ButtonRelease:
+    {
+      ReleaseFileBrowserScroll(context,event,widgets);
+      break;
+    }
+    case ClientMessage:
+    {
+      ClientFileBrowserMessage(context,event,widgets);
+      break;
+    }
+    case ConfigureNotify:
+    {
+      (*state)=ConfigureWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case EnterNotify:
+    {
+      (*state)=EnterWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case Expose:
+    {
+      (*state)=ExposeWidgetWindow(windows,event,(*state));
+      break;
+    }
+    default:
+    {
+      HandleFileBrowserSelectionEvent(context,event,widgets);
+      break;
+    }
+  }
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8684,36 +8734,6 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
       continue;
     switch (event.type)
     {
-      case ButtonPress:
-      {
-        PressFileBrowserScroll(&file_context,event,&targets,&file_widgets);
-        break;
-      }
-      case ButtonRelease:
-      {
-        ReleaseFileBrowserScroll(&file_context,event,&file_widgets);
-        break;
-      }
-      case ClientMessage:
-      {
-        ClientFileBrowserMessage(&file_context,event,&file_widgets);
-        break;
-      }
-      case ConfigureNotify:
-      {
-        state=ConfigureWidgetWindow(windows,event,state);
-        break;
-      }
-      case EnterNotify:
-      {
-        state=EnterWidgetWindow(windows,event,state);
-        break;
-      }
-      case Expose:
-      {
-        state=ExposeWidgetWindow(windows,event,state);
-        break;
-      }
       case KeyPress:
       {
         PressFileBrowserKey(&file_context,event,&file_widgets);
@@ -8737,7 +8757,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
       }
       default:
       {
-        HandleFileBrowserSelectionEvent(&file_context,event,&file_widgets);
+        HandleFileBrowserWindowEvent(&file_context,event,&targets,&file_widgets);
         break;
       }
     }
