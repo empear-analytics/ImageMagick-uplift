@@ -1704,6 +1704,35 @@ static DisposeType *AcquireFrameDisposals(const Image *image,
   return(disposals);
 }
 
+static MagickBooleanType AreFramesCoalesced(const Image *image,
+  ExceptionInfo *exception)
+{
+  const Image
+    *curr;
+
+  /*
+    Ensure  all the images are the same size.
+  */
+  curr=GetFirstImageInList(image);
+  for (; curr != (Image *) NULL; curr=GetNextImageInList(curr))
+  {
+    if ((curr->columns != image->columns) || (curr->rows != image->rows))
+      {
+        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+          "ImagesAreNotTheSameSize","`%s'",image->filename);
+        return(MagickFalse);
+      }
+
+    if (IsPartialPageFrame(curr,image) != MagickFalse)
+      {
+        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+          "ImagePagesAreNotCoalesced","`%s'",image->filename);
+        return(MagickFalse);
+      }
+  }
+  return(MagickTrue);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1751,18 +1780,8 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     Are we allowed to add/remove frames from animation?
   */
   add_frames=method == OptimizePlusLayer ? MagickTrue : MagickFalse;
-  /*
-    Ensure  all the images are the same size.
-  */
-  curr=GetFirstImageInList(image);
-  for (; curr != (Image *) NULL; curr=GetNextImageInList(curr))
-  {
-    if ((curr->columns != image->columns) || (curr->rows != image->rows))
-      ThrowImageException(OptionError,"ImagesAreNotTheSameSize");
-
-    if (IsPartialPageFrame(curr,image) != MagickFalse)
-      ThrowImageException(OptionError,"ImagePagesAreNotCoalesced");
-  }
+  if (AreFramesCoalesced(image,exception) == MagickFalse)
+    return((Image *) NULL);
   /*
     Allocate memory (times 2 if we allow the use of frame duplications)
   */
