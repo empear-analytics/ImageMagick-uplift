@@ -1222,6 +1222,19 @@ static MagickBooleanType XConvertWindowImage(const WindowConvertInput *input)
   return(MagickTrue);
 }
 
+static XImage *XGetListedXImage(Display *display,const WindowInfo *window_info,
+  const int id)
+{
+  XImage
+    *ximage;
+
+  ximage=XGetImage(display,window_info[id].window,(int)
+    window_info[id].crop_info.x,(int) window_info[id].crop_info.y,
+    (unsigned int) window_info[id].crop_info.width,(unsigned int)
+    window_info[id].crop_info.height,AllPlanes,ZPixmap);
+  return(ximage);
+}
+
 static void XRelinquishColormapInfo(ColormapInfo **colormap_info)
 {
   ColormapInfo
@@ -1468,10 +1481,7 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
         /*
           Get X image.
         */
-        ximage=XGetImage(display,window_info[id].window,(int)
-          window_info[id].crop_info.x,(int) window_info[id].crop_info.y,
-          (unsigned int) window_info[id].crop_info.width,(unsigned int)
-          window_info[id].crop_info.height,AllPlanes,ZPixmap);
+        ximage=XGetListedXImage(display,window_info,id);
         if (ximage == (XImage *) NULL)
           continue;
         /*
