@@ -1952,24 +1952,54 @@ static void SetDitherEntries(const XDitherTables tables)
   }
 }
 
-static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
+static int AdvanceDitherColumn(int j)
 {
-  static const short int
-    dither_red[2][16]=
-    {
-      {-16,  4, -1, 11,-14,  6, -3,  9,-15,  5, -2, 10,-13,  7, -4,  8},
-      { 15, -5,  0,-12, 13, -7,  2,-10, 14, -6,  1,-11, 12, -8,  3, -9}
-    },
-    dither_green[2][16]=
-    {
-      { 11,-15,  7, -3,  8,-14,  4, -2, 10,-16,  6, -4,  9,-13,  5, -1},
-      {-12, 14, -8,  2, -9, 13, -5,  1,-11, 15, -7,  3,-10, 12, -6,  0}
-    },
-    dither_blue[2][16]=
-    {
-      { -3,  9,-13,  7, -1, 11,-15,  5, -4,  8,-14,  6, -2, 10,-16,  4},
-      {  2,-10, 12, -8,  0,-12, 14, -6,  3, -9, 13, -7,  1,-11, 15, -5}
-    };
+  j++;
+  if (j == 16)
+    j=0;
+  return(j);
+}
+
+typedef struct _XDitherSource
+{
+  Image
+    *image;
+
+  XImage
+    *ximage;
+
+  ExceptionInfo
+    *exception;
+
+  unsigned char
+    *(*red_map)[16];
+
+  unsigned char
+    *(*green_map)[16];
+
+  unsigned char
+    *(*blue_map)[16];
+} XDitherSource;
+
+static void DitherXImagePixels(const XDitherSource *source)
+{
+  Image
+    *const image = source->image;
+
+  XImage
+    *const ximage = source->ximage;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  unsigned char
+    *(*const red_map)[16] = source->red_map;
+
+  unsigned char
+    *(*const green_map)[16] = source->green_map;
+
+  unsigned char
+    *(*const blue_map)[16] = source->blue_map;
 
   CacheView
     *image_view;
@@ -1992,37 +2022,9 @@ static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
   size_t
     pixel;
 
-  unsigned char
-    *blue_map[2][16],
-    *green_map[2][16],
-    *red_map[2][16];
-
   unsigned int
     scanline_pad;
 
-  XDitherTables
-    tables;
-
-  /*
-    Allocate and initialize dither maps.
-  */
-  AcquireDitherMaps(red_map,green_map,blue_map);
-  /*
-    Initialize dither tables.
-  */
-  for (i=0; i < 2; i++)
-    for (j=0; j < 16; j++)
-    {
-      tables.i=i;
-      tables.j=j;
-      tables.dither_red=dither_red;
-      tables.red_map=red_map;
-      tables.dither_green=dither_green;
-      tables.green_map=green_map;
-      tables.dither_blue=dither_blue;
-      tables.blue_map=blue_map;
-      SetDitherEntries(tables);
-    }
   /*
     Dither image.
   */
@@ -2051,9 +2053,7 @@ static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
         (((size_t) color.blue & 0xc0) >> 6));
       *q++=(char) pixel;
       p+=(ptrdiff_t) GetPixelChannels(image);
-      j++;
-      if (j == 16)
-        j=0;
+      j=AdvanceDitherColumn(j);
     }
     q+=(ptrdiff_t) scanline_pad;
     i++;
@@ -2061,6 +2061,69 @@ static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
       i=0;
   }
   image_view=DestroyCacheView(image_view);
+}
+
+static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
+{
+  static const short int
+    dither_red[2][16]=
+    {
+      {-16,  4, -1, 11,-14,  6, -3,  9,-15,  5, -2, 10,-13,  7, -4,  8},
+      { 15, -5,  0,-12, 13, -7,  2,-10, 14, -6,  1,-11, 12, -8,  3, -9}
+    },
+    dither_green[2][16]=
+    {
+      { 11,-15,  7, -3,  8,-14,  4, -2, 10,-16,  6, -4,  9,-13,  5, -1},
+      {-12, 14, -8,  2, -9, 13, -5,  1,-11, 15, -7,  3,-10, 12, -6,  0}
+    },
+    dither_blue[2][16]=
+    {
+      { -3,  9,-13,  7, -1, 11,-15,  5, -4,  8,-14,  6, -2, 10,-16,  4},
+      {  2,-10, 12, -8,  0,-12, 14, -6,  3, -9, 13, -7,  1,-11, 15, -5}
+    };
+
+  int
+    i,
+    j;
+
+  unsigned char
+    *blue_map[2][16],
+    *green_map[2][16],
+    *red_map[2][16];
+
+  XDitherSource
+    source;
+
+  XDitherTables
+    tables;
+
+  /*
+    Allocate and initialize dither maps.
+  */
+  AcquireDitherMaps(red_map,green_map,blue_map);
+  /*
+    Initialize dither tables.
+  */
+  for (i=0; i < 2; i++)
+    for (j=0; j < 16; j++)
+    {
+      tables.i=i;
+      tables.j=j;
+      tables.dither_red=dither_red;
+      tables.red_map=red_map;
+      tables.dither_green=dither_green;
+      tables.green_map=green_map;
+      tables.dither_blue=dither_blue;
+      tables.blue_map=blue_map;
+      SetDitherEntries(tables);
+    }
+  source.image=image;
+  source.ximage=ximage;
+  source.exception=exception;
+  source.red_map=red_map;
+  source.green_map=green_map;
+  source.blue_map=blue_map;
+  DitherXImagePixels(&source);
   /*
     Free allocated memory.
   */
@@ -4621,6 +4684,12 @@ static void XRemoveSharedSegment(XShmSegmentInfo *segment_info)
       segment_info[1].shmaddr=(char *) NULL;
     }
 }
+
+static void XSyncAttachedSegment(Display *display,const Status status)
+{
+  if (status != False)
+    (void) XSync(display,MagickFalse);
+}
 #endif
 
 static XImage *XAttachSharedXImage(Display *display,XWindowInfo *window,
@@ -4644,8 +4713,7 @@ static XImage *XAttachSharedXImage(Display *display,XWindowInfo *window,
       ximage->data=segment_info[1].shmaddr;
       segment_info[1].readOnly=MagickFalse;
       status=XShmAttach(display,&segment_info[1]);
-      if (status != False)
-        (void) XSync(display,MagickFalse);
+      XSyncAttachedSegment(display,status);
       if ((status == False) || (xerror_alert != MagickFalse))
         {
           window->shared_memory=MagickFalse;
@@ -4782,6 +4850,127 @@ static XImage *XReplaceWindowMatteImage(Display *display,XWindowInfo *window,
   return(matte_image);
 }
 
+typedef struct _XMakeImageSource
+{
+  Display
+    *display;
+
+  const XResourceInfo
+    *resource_info;
+
+  XWindowInfo
+    *window;
+
+  ExceptionInfo
+    *exception;
+
+  int
+    depth,
+    format;
+
+  unsigned int
+    width,
+    height;
+} XMakeImageSource;
+
+static MagickBooleanType XCreateWindowXImage(const XMakeImageSource *source,
+  XImage **ximage)
+{
+  Display
+    *const display = source->display;
+
+  XWindowInfo
+    *const window = source->window;
+
+  const int
+    depth = source->depth,
+    format = source->format;
+
+  const unsigned int
+    width = source->width,
+    height = source->height;
+
+  *ximage=XAttachSharedXImage(display,window,*ximage);
+  if (window->shared_memory == MagickFalse)
+    *ximage=XCreateImage(display,window->visual,(unsigned int) depth,format,0,
+      (char *) NULL,width,height,XBitmapPad(display),0);
+  if (*ximage == (XImage *) NULL)
+    {
+      /*
+        Unable to create X image.
+      */
+      (void) XCheckDefineCursor(display,window->id,window->cursor);
+      return(MagickFalse);
+    }
+  if ((GetLogEventMask() & X11Event) != 0)
+    XLogXImage(*ximage);
+  if (window->shared_memory == MagickFalse)
+    XAcquireXImageData(*ximage);
+  if ((*ximage)->data == (char *) NULL)
+    {
+      /*
+        Unable to allocate pixel data.
+      */
+      XDestroyImage(*ximage);
+      *ximage=(XImage *) NULL;
+      (void) XCheckDefineCursor(display,window->id,window->cursor);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType XConvertWindowXImage(const XMakeImageSource *source,
+  XImage *ximage)
+{
+  Display
+    *const display = source->display;
+
+  const XResourceInfo
+    *const resource_info = source->resource_info;
+
+  XWindowInfo
+    *const window = source->window;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  const unsigned int
+    width = source->width,
+    height = source->height;
+
+  XImage
+    *matte_image;
+
+  XReplaceWindowXImage(display,window,ximage);
+  matte_image=XReplaceWindowMatteImage(display,window,width,height);
+  /*
+    Convert pixels to X image data.
+  */
+  if (window->image != (Image *) NULL)
+    {
+      const MakeImageContext
+        make_context = { resource_info, window, exception };
+
+      XMakeXImagePixels(make_context,window,ximage,matte_image);
+    }
+  if (window->matte_image != (XImage *) NULL)
+    XCreateWindowMattePixmap(display,window,width,height);
+  (void) XMakePixmap(display,resource_info,window);
+  /*
+    Restore cursor.
+  */
+  (void) XCheckDefineCursor(display,window->id,window->cursor);
+  return(MagickTrue);
+}
+
+static void XAssignWindowImage(XWindowInfo *window,Image *image)
+{
+  if (window->destroy)
+    window->image=DestroyImage(window->image);
+  window->image=image;
+  window->destroy=MagickFalse;
+}
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
@@ -4791,8 +4980,10 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
     format;
 
   XImage
-    *matte_image,
     *ximage;
+
+  XMakeImageSource
+    source;
 
   XWindowTransform
     transform;
@@ -4812,10 +5003,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
   (void) XCheckDefineCursor(display,window->id,window->busy_cursor);
   (void) XFlush(display);
   depth=(int) window->depth;
-  if (window->destroy)
-    window->image=DestroyImage(window->image);
-  window->image=image;
-  window->destroy=MagickFalse;
+  XAssignWindowImage(window,image);
   if (window->image != (Image *) NULL)
     {
       transform.display=display;
@@ -4849,52 +5037,17 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
       ximage=XAllocateSharedSegment(window,segment_info,ximage);
     }
 #endif
-  ximage=XAttachSharedXImage(display,window,ximage);
-  if (window->shared_memory == MagickFalse)
-    ximage=XCreateImage(display,window->visual,(unsigned int) depth,format,0,
-      (char *) NULL,width,height,XBitmapPad(display),0);
-  if (ximage == (XImage *) NULL)
-    {
-      /*
-        Unable to create X image.
-      */
-      (void) XCheckDefineCursor(display,window->id,window->cursor);
-      return(MagickFalse);
-    }
-  if ((GetLogEventMask() & X11Event) != 0)
-    XLogXImage(ximage);
-  if (window->shared_memory == MagickFalse)
-    XAcquireXImageData(ximage);
-  if (ximage->data == (char *) NULL)
-    {
-      /*
-        Unable to allocate pixel data.
-      */
-      XDestroyImage(ximage);
-      ximage=(XImage *) NULL;
-      (void) XCheckDefineCursor(display,window->id,window->cursor);
-      return(MagickFalse);
-    }
-  XReplaceWindowXImage(display,window,ximage);
-  matte_image=XReplaceWindowMatteImage(display,window,width,height);
-  /*
-    Convert pixels to X image data.
-  */
-  if (window->image != (Image *) NULL)
-    {
-      const MakeImageContext
-        make_context = { resource_info, window, exception };
-
-      XMakeXImagePixels(make_context,window,ximage,matte_image);
-    }
-  if (window->matte_image != (XImage *) NULL)
-    XCreateWindowMattePixmap(display,window,width,height);
-  (void) XMakePixmap(display,resource_info,window);
-  /*
-    Restore cursor.
-  */
-  (void) XCheckDefineCursor(display,window->id,window->cursor);
-  return(MagickTrue);
+  source.display=display;
+  source.resource_info=resource_info;
+  source.window=window;
+  source.exception=exception;
+  source.depth=depth;
+  source.format=format;
+  source.width=width;
+  source.height=height;
+  if (XCreateWindowXImage(&source,&ximage) == MagickFalse)
+    return(MagickFalse);
+  return(XConvertWindowXImage(&source,ximage));
 }
 
 /*
@@ -5969,6 +6122,155 @@ static void XPackContinuousLSB(const XImage *ximage,
   }
 }
 
+static MagickBooleanType XCreateAlphaCanvas(
+  const MakeImageContext *make_context,Image *image,Image **canvas)
+{
+  const XResourceInfo
+    *const resource_info = make_context->resource_info;
+
+  const XWindowInfo
+    *const window = make_context->window;
+
+  ExceptionInfo
+    *const exception = make_context->exception;
+
+  if (IsMutableAlphaImage(window,image) != MagickFalse)
+    {
+      Image
+        *pattern;
+
+      pattern=XReadTexturePattern(resource_info,image,exception);
+      if (pattern != (Image *) NULL)
+        {
+          *canvas=CloneImage(image,0,0,MagickTrue,exception);
+          if (*canvas == (Image *) NULL)
+            return(MagickFalse);
+          (void) CompositeImage(*canvas,pattern,DstOverCompositeOp,MagickTrue,
+            0,0,exception);
+          pattern=DestroyImage(pattern);
+        }
+    }
+  return(MagickTrue);
+}
+
+typedef struct _XCanvasPacking
+{
+  Image
+    *image,
+    *canvas;
+
+  CacheView
+    *canvas_view;
+
+  XImage
+    *matte_image;
+
+  unsigned int
+    scanline_pad;
+
+  int
+    x;
+} XCanvasPacking;
+
+static void XPackMatteImageLSB(const MakeImageContext *make_context,
+  const XCanvasPacking *packing)
+{
+  ExceptionInfo
+    *const exception = make_context->exception;
+
+  Image
+    *const canvas = packing->canvas;
+
+  CacheView
+    *const canvas_view = packing->canvas_view;
+
+  XImage
+    *const matte_image = packing->matte_image;
+
+  const Quantum
+    *p;
+
+  int
+    x = packing->x,
+    y;
+
+  unsigned char
+    *q;
+
+  unsigned int
+    scanline_pad;
+
+  if (matte_image != (XImage *) NULL)
+    {
+      /*
+        Initialize matte canvas.
+      */
+      scanline_pad=(unsigned int) (matte_image->bytes_per_line-
+        ((matte_image->width*matte_image->bits_per_pixel) >> 3));
+      q=(unsigned char *) matte_image->data;
+      for (y=0; y < (int) canvas->rows; y++)
+      {
+        p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,canvas->columns,1,
+          exception);
+        if (p == (const Quantum *) NULL)
+          break;
+        XPackMatteRowLSB(canvas,p,&q,&x);
+        q+=(ptrdiff_t) scanline_pad;
+      }
+    }
+}
+
+static void XPackBitmapImageLSB(const MakeImageContext *make_context,
+  const XCanvasPacking *packing,unsigned char *q)
+{
+  const XWindowInfo
+    *const window = make_context->window;
+
+  ExceptionInfo
+    *const exception = make_context->exception;
+
+  Image
+    *const image = packing->image;
+
+  Image
+    *const canvas = packing->canvas;
+
+  CacheView
+    *const canvas_view = packing->canvas_view;
+
+  const unsigned int
+    scanline_pad = packing->scanline_pad;
+
+  unsigned short
+    polarity;
+
+  unsigned char
+    background,
+    foreground;
+
+  XBitmapPacking
+    bitmap;
+
+  /*
+    Convert canvas to big-endian bitmap.
+  */
+  background=(unsigned char)
+    (XPixelIntensity(&window->pixel_info->foreground_color) <
+     XPixelIntensity(&window->pixel_info->background_color) ? 0x80 : 0x00);
+  foreground=(unsigned char)
+    (XPixelIntensity(&window->pixel_info->background_color) <
+     XPixelIntensity(&window->pixel_info->foreground_color) ? 0x80 : 0x00);
+  polarity=XBitmapPolarity(image,canvas);
+  bitmap.canvas=canvas;
+  bitmap.polarity=polarity;
+  bitmap.background=background;
+  bitmap.foreground=foreground;
+  bitmap.canvas_view=canvas_view;
+  bitmap.exception=exception;
+  bitmap.scanline_pad=scanline_pad;
+  XPackBitmapLSB(&bitmap,q);
+}
+
 static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -5988,12 +6290,6 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
     *canvas;
 
   int
-    y;
-
-  const Quantum
-    *p;
-
-  int
     x;
 
   unsigned char
@@ -6008,6 +6304,9 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   XStandardColormap
     *map_info;
 
+  XCanvasPacking
+    packing;
+
   XImageRowSource
     row_source;
 
@@ -6017,22 +6316,8 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   canvas=image;
-  if (IsMutableAlphaImage(window,image) != MagickFalse)
-    {
-      Image
-        *pattern;
-
-      pattern=XReadTexturePattern(resource_info,image,exception);
-      if (pattern != (Image *) NULL)
-        {
-          canvas=CloneImage(image,0,0,MagickTrue,exception);
-          if (canvas == (Image *) NULL)
-            return;
-          (void) CompositeImage(canvas,pattern,DstOverCompositeOp,MagickTrue,
-            0,0,exception);
-          pattern=DestroyImage(pattern);
-        }
-    }
+  if (XCreateAlphaCanvas(make_context,image,&canvas) == MagickFalse)
+    return;
   scanline_pad=(unsigned int) (ximage->bytes_per_line-((ximage->width*
     ximage->bits_per_pixel) >> 3));
   map_info=window->map_info;
@@ -6048,60 +6333,20 @@ static void XMakeImageLSBFirst(const MakeImageContext *make_context,
   row_source.scanline_pad=scanline_pad;
   row_source.pixels=pixels;
   row_source.map_info=map_info;
+  packing.image=image;
+  packing.canvas=canvas;
+  packing.canvas_view=canvas_view;
+  packing.matte_image=matte_image;
+  packing.scanline_pad=scanline_pad;
+  packing.x=x;
   if (ximage->format == XYBitmap)
-    {
-      unsigned short
-        polarity;
-
-      unsigned char
-        background,
-        foreground;
-
-      XBitmapPacking
-        bitmap;
-
-      /*
-        Convert canvas to big-endian bitmap.
-      */
-      background=(unsigned char)
-        (XPixelIntensity(&window->pixel_info->foreground_color) <
-         XPixelIntensity(&window->pixel_info->background_color) ? 0x80 : 0x00);
-      foreground=(unsigned char)
-        (XPixelIntensity(&window->pixel_info->background_color) <
-         XPixelIntensity(&window->pixel_info->foreground_color) ? 0x80 : 0x00);
-      polarity=XBitmapPolarity(image,canvas);
-      bitmap.canvas=canvas;
-      bitmap.polarity=polarity;
-      bitmap.background=background;
-      bitmap.foreground=foreground;
-      bitmap.canvas_view=canvas_view;
-      bitmap.exception=exception;
-      bitmap.scanline_pad=scanline_pad;
-      XPackBitmapLSB(&bitmap,q);
-    }
+    XPackBitmapImageLSB(make_context,&packing,q);
   else
     if (window->pixel_info->colors != 0)
       XPackColormappedLSB(ximage,row_source,q);
     else
       XPackContinuousLSB(ximage,map_info,row_source,q);
-  if (matte_image != (XImage *) NULL)
-    {
-      /*
-        Initialize matte canvas.
-      */
-      scanline_pad=(unsigned int) (matte_image->bytes_per_line-
-        ((matte_image->width*matte_image->bits_per_pixel) >> 3));
-      q=(unsigned char *) matte_image->data;
-      for (y=0; y < (int) canvas->rows; y++)
-      {
-        p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,canvas->columns,1,
-          exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        XPackMatteRowLSB(canvas,p,&q,&x);
-        q+=(ptrdiff_t) scanline_pad;
-      }
-    }
+  XPackMatteImageLSB(make_context,&packing);
   canvas_view=DestroyCacheView(canvas_view);
   if (canvas != image)
     canvas=DestroyImage(canvas);
@@ -7065,8 +7310,136 @@ static void XPackContinuousMSB(const XImage *ximage,
   }
 }
 
-static void XMakeImageMSBFirst(const MakeImageContext *make_context,
-  Image *image,XImage *ximage,XImage *matte_image)
+static void XPackMatteImageMSB(const MakeImageContext *make_context,
+  const XCanvasPacking *packing)
+{
+  ExceptionInfo
+    *const exception = make_context->exception;
+
+  Image
+    *const canvas = packing->canvas;
+
+  CacheView
+    *const canvas_view = packing->canvas_view;
+
+  XImage
+    *const matte_image = packing->matte_image;
+
+  const Quantum
+    *p;
+
+  int
+    x = packing->x,
+    y;
+
+  unsigned char
+    *q;
+
+  unsigned int
+    scanline_pad;
+
+  if (matte_image != (XImage *) NULL)
+    {
+      /*
+        Initialize matte canvas.
+      */
+      scanline_pad=(unsigned int) (matte_image->bytes_per_line-
+        ((matte_image->width*matte_image->bits_per_pixel) >> 3));
+      q=(unsigned char *) matte_image->data;
+      for (y=0; y < (int) canvas->rows; y++)
+      {
+        p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,canvas->columns,1,
+          exception);
+        if (p == (const Quantum *) NULL)
+          break;
+        q=XPackMatteRowMSB(canvas,p,q,&x);
+        q+=(ptrdiff_t) scanline_pad;
+      }
+    }
+}
+
+static void XPackBitmapImageMSB(const MakeImageContext *make_context,
+  const XCanvasPacking *packing,unsigned char *q)
+{
+  const XWindowInfo
+    *const window = make_context->window;
+
+  ExceptionInfo
+    *const exception = make_context->exception;
+
+  Image
+    *const image = packing->image;
+
+  Image
+    *const canvas = packing->canvas;
+
+  CacheView
+    *const canvas_view = packing->canvas_view;
+
+  const unsigned int
+    scanline_pad = packing->scanline_pad;
+
+  const Quantum
+    *p;
+
+  int
+    y;
+
+  unsigned short
+    polarity;
+
+  unsigned char
+    background,
+    foreground;
+
+  XBitmapPacking
+    bitmap;
+
+  /*
+    Convert canvas to big-endian bitmap.
+  */
+  background=(unsigned char)
+    (XPixelIntensity(&window->pixel_info->foreground_color) <
+     XPixelIntensity(&window->pixel_info->background_color) ?  0x01 : 0x00);
+  foreground=(unsigned char)
+    (XPixelIntensity(&window->pixel_info->background_color) <
+     XPixelIntensity(&window->pixel_info->foreground_color) ?  0x01 : 0x00);
+  polarity=(unsigned short) ((GetPixelInfoIntensity(image,
+    &canvas->colormap[0])) < ((double) QuantumRange/2.0) ? 1 : 0);
+  if (canvas->colors == 2)
+    polarity=GetPixelInfoIntensity(image,&canvas->colormap[0]) <
+      GetPixelInfoIntensity(image,&canvas->colormap[1]);
+  bitmap.canvas=canvas;
+  bitmap.polarity=polarity;
+  bitmap.background=background;
+  bitmap.foreground=foreground;
+  bitmap.canvas_view=canvas_view;
+  bitmap.exception=exception;
+  bitmap.scanline_pad=scanline_pad;
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,canvas->columns,1,
+      exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    q=XPackBitmapRowMSB(&bitmap,p,q);
+    q+=(ptrdiff_t) scanline_pad;
+  }
+}
+
+typedef struct _XCanvasConversion
+{
+  Image
+    *image,
+    *canvas;
+
+  XImage
+    *ximage,
+    *matte_image;
+} XCanvasConversion;
+
+static void XPackCanvasMSB(const MakeImageContext *make_context,
+  const XCanvasConversion *conversion)
 {
   const XResourceInfo
     *const resource_info = make_context->resource_info;
@@ -7077,20 +7450,23 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
   ExceptionInfo
     *const exception = make_context->exception;
 
+  Image
+    *const image = conversion->image;
+
+  XImage
+    *const ximage = conversion->ximage;
+
+  XImage
+    *const matte_image = conversion->matte_image;
+
+  Image
+    *canvas = conversion->canvas;
+
   CacheView
     *canvas_view;
 
-  Image
-    *canvas;
-
-  int
-    y;
-
   int
     x;
-
-  const Quantum
-    *p;
 
   unsigned char
     *q;
@@ -7104,8 +7480,63 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
   XStandardColormap
     *map_info;
 
+  XCanvasPacking
+    packing;
+
   XImageRowSource
     row_source;
+
+  scanline_pad=(unsigned int) (ximage->bytes_per_line-((ximage->width*
+    ximage->bits_per_pixel) >> 3));
+  map_info=window->map_info;
+  pixels=window->pixel_info->pixels;
+  q=(unsigned char *) ximage->data;
+  x=0;
+  canvas_view=AcquireVirtualCacheView(canvas,exception);
+  row_source.canvas=canvas;
+  row_source.canvas_view=canvas_view;
+  row_source.exception=exception;
+  row_source.resource_info=resource_info;
+  row_source.ximage=ximage;
+  row_source.scanline_pad=scanline_pad;
+  row_source.pixels=pixels;
+  row_source.map_info=map_info;
+  packing.image=image;
+  packing.canvas=canvas;
+  packing.canvas_view=canvas_view;
+  packing.matte_image=matte_image;
+  packing.scanline_pad=scanline_pad;
+  packing.x=x;
+  if (ximage->format == XYBitmap)
+    XPackBitmapImageMSB(make_context,&packing,q);
+  else
+    if (window->pixel_info->colors != 0)
+      XPackColormappedMSB(ximage,row_source,q);
+    else
+      XPackContinuousMSB(ximage,map_info,row_source,q);
+  XPackMatteImageMSB(make_context,&packing);
+  canvas_view=DestroyCacheView(canvas_view);
+  if (canvas != image)
+    canvas=DestroyImage(canvas);
+}
+
+static void XMakeImageMSBFirst(const MakeImageContext *make_context,
+  Image *image,XImage *ximage,XImage *matte_image)
+{
+  const XResourceInfo
+    *const resource_info = make_context->resource_info;
+
+  const XWindowInfo
+    *const window = make_context->window;
+
+  ExceptionInfo
+    *const exception = make_context->exception;
+
+  Image
+    *canvas;
+
+  XCanvasConversion
+    conversion;
 
   assert(resource_info != (XResourceInfo *) NULL);
   assert(window != (XWindowInfo *) NULL);
@@ -7144,90 +7575,11 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
           pattern=DestroyImage(pattern);
         }
     }
-  scanline_pad=(unsigned int) (ximage->bytes_per_line-((ximage->width*
-    ximage->bits_per_pixel) >> 3));
-  map_info=window->map_info;
-  pixels=window->pixel_info->pixels;
-  q=(unsigned char *) ximage->data;
-  x=0;
-  canvas_view=AcquireVirtualCacheView(canvas,exception);
-  row_source.canvas=canvas;
-  row_source.canvas_view=canvas_view;
-  row_source.exception=exception;
-  row_source.resource_info=resource_info;
-  row_source.ximage=ximage;
-  row_source.scanline_pad=scanline_pad;
-  row_source.pixels=pixels;
-  row_source.map_info=map_info;
-  if (ximage->format == XYBitmap)
-    {
-      unsigned short
-        polarity;
-
-      unsigned char
-        background,
-        foreground;
-
-      XBitmapPacking
-        bitmap;
-
-      /*
-        Convert canvas to big-endian bitmap.
-      */
-      background=(unsigned char)
-        (XPixelIntensity(&window->pixel_info->foreground_color) <
-         XPixelIntensity(&window->pixel_info->background_color) ?  0x01 : 0x00);
-      foreground=(unsigned char)
-        (XPixelIntensity(&window->pixel_info->background_color) <
-         XPixelIntensity(&window->pixel_info->foreground_color) ?  0x01 : 0x00);
-      polarity=(unsigned short) ((GetPixelInfoIntensity(image,
-        &canvas->colormap[0])) < ((double) QuantumRange/2.0) ? 1 : 0);
-      if (canvas->colors == 2)
-        polarity=GetPixelInfoIntensity(image,&canvas->colormap[0]) <
-          GetPixelInfoIntensity(image,&canvas->colormap[1]);
-      bitmap.canvas=canvas;
-      bitmap.polarity=polarity;
-      bitmap.background=background;
-      bitmap.foreground=foreground;
-      bitmap.canvas_view=canvas_view;
-      bitmap.exception=exception;
-      bitmap.scanline_pad=scanline_pad;
-      for (y=0; y < (int) canvas->rows; y++)
-      {
-        p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,canvas->columns,1,
-          exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        q=XPackBitmapRowMSB(&bitmap,p,q);
-        q+=(ptrdiff_t) scanline_pad;
-      }
-    }
-  else
-    if (window->pixel_info->colors != 0)
-      XPackColormappedMSB(ximage,row_source,q);
-    else
-      XPackContinuousMSB(ximage,map_info,row_source,q);
-  if (matte_image != (XImage *) NULL)
-    {
-      /*
-        Initialize matte canvas.
-      */
-      scanline_pad=(unsigned int) (matte_image->bytes_per_line-
-        ((matte_image->width*matte_image->bits_per_pixel) >> 3));
-      q=(unsigned char *) matte_image->data;
-      for (y=0; y < (int) canvas->rows; y++)
-      {
-        p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,canvas->columns,1,
-          exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        q=XPackMatteRowMSB(canvas,p,q,&x);
-        q+=(ptrdiff_t) scanline_pad;
-      }
-    }
-  canvas_view=DestroyCacheView(canvas_view);
-  if (canvas != image)
-    canvas=DestroyImage(canvas);
+  conversion.image=image;
+  conversion.canvas=canvas;
+  conversion.ximage=ximage;
+  conversion.matte_image=matte_image;
+  XPackCanvasMSB(make_context,&conversion);
 }
 
 /*
