@@ -4326,6 +4326,60 @@ static void XWithdrawBackdropWindows(Display *display,
     }
 }
 
+static void XCreateGraphicContexts(const AnimateWindowSetup *setup,
+  const char *filename,XGCValues *context_values,
+  MagickStatusType *context_mask)
+{
+  Display
+    *const display = setup->display;
+
+  XWindows
+    *const windows = setup->windows;
+
+  XPixelInfo
+    *const pixel = setup->pixel;
+
+  XFontStruct
+    *const font_info = setup->font_info;
+
+  /*
+    Initialize graphic context.
+  */
+  (*context_values).background=pixel->background_color.pixel;
+  (*context_values).font=font_info->fid;
+  (*context_values).foreground=pixel->foreground_color.pixel;
+  (*context_values).graphics_exposures=MagickFalse;
+  *context_mask=(MagickStatusType)
+    (GCBackground | GCFont | GCForeground | GCGraphicsExposures);
+  if (pixel->annotate_context != (GC) NULL)
+    (void) XFreeGC(display,pixel->annotate_context);
+  pixel->annotate_context=
+    XCreateGC(display,windows->context.id,*context_mask,context_values);
+  if (pixel->annotate_context == (GC) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
+      filename);
+  (*context_values).background=pixel->depth_color.pixel;
+  if (pixel->widget_context != (GC) NULL)
+    (void) XFreeGC(display,pixel->widget_context);
+  pixel->widget_context=
+    XCreateGC(display,windows->context.id,*context_mask,context_values);
+  if (pixel->widget_context == (GC) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
+      filename);
+  (*context_values).background=pixel->foreground_color.pixel;
+  (*context_values).foreground=pixel->background_color.pixel;
+  (*context_values).plane_mask=
+    (*context_values).background ^ (*context_values).foreground;
+  if (pixel->highlight_context != (GC) NULL)
+    (void) XFreeGC(display,pixel->highlight_context);
+  pixel->highlight_context=XCreateGC(display,windows->context.id,
+    (size_t) (*context_mask | GCPlaneMask),context_values);
+  if (pixel->highlight_context == (GC) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
+      filename);
+  (void) XDestroyWindow(display,windows->context.id);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4507,39 +4561,8 @@ MagickExport Image *XAnimateImages(Display *display,
   setup.display_image=display_image;
   setup.number_scenes=number_scenes;
   XCreateContextWindow(&setup);
-  context_values.background=pixel->background_color.pixel;
-  context_values.font=font_info->fid;
-  context_values.foreground=pixel->foreground_color.pixel;
-  context_values.graphics_exposures=MagickFalse;
-  context_mask=(MagickStatusType)
-    (GCBackground | GCFont | GCForeground | GCGraphicsExposures);
-  if (pixel->annotate_context != (GC) NULL)
-    (void) XFreeGC(display,pixel->annotate_context);
-  pixel->annotate_context=
-    XCreateGC(display,windows->context.id,context_mask,&context_values);
-  if (pixel->annotate_context == (GC) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
-      images->filename);
-  context_values.background=pixel->depth_color.pixel;
-  if (pixel->widget_context != (GC) NULL)
-    (void) XFreeGC(display,pixel->widget_context);
-  pixel->widget_context=
-    XCreateGC(display,windows->context.id,context_mask,&context_values);
-  if (pixel->widget_context == (GC) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
-      images->filename);
-  context_values.background=pixel->foreground_color.pixel;
-  context_values.foreground=pixel->background_color.pixel;
-  context_values.plane_mask=
-    context_values.background ^ context_values.foreground;
-  if (pixel->highlight_context != (GC) NULL)
-    (void) XFreeGC(display,pixel->highlight_context);
-  pixel->highlight_context=XCreateGC(display,windows->context.id,
-    (size_t) (context_mask | GCPlaneMask),&context_values);
-  if (pixel->highlight_context == (GC) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
-      images->filename);
-  (void) XDestroyWindow(display,windows->context.id);
+  XCreateGraphicContexts(&setup,images->filename,&context_values,
+    &context_mask);
   XCreateIconWindow(&setup);
   /*
     Initialize graphic context for icon window.
