@@ -1186,6 +1186,14 @@ static void PrintMagickNote(FILE *file,const MagickInfo **magick_info,
     }
 }
 
+static void PrintMagickFormatName(FILE *file,const MagickInfo **magick_info,
+  const ssize_t i)
+{
+  (void) FormatLocaleFile(file,"%9s%c ",
+    magick_info[i]->name != (char *) NULL ? magick_info[i]->name : "",
+    GetMagickBlobSupport(magick_info[i]) != MagickFalse ? '*' : ' ');
+}
+
 static void PrintMagickFormatSupport(FILE *file,const MagickInfo **magick_info,
   const ssize_t i)
 {
@@ -1231,9 +1239,7 @@ MagickExport MagickBooleanType ListMagickInfo(FILE *file,
   {
     if (GetMagickStealth(magick_info[i]) != MagickFalse)
       continue;
-    (void) FormatLocaleFile(file,"%9s%c ",
-      magick_info[i]->name != (char *) NULL ? magick_info[i]->name : "",
-      GetMagickBlobSupport(magick_info[i]) != MagickFalse ? '*' : ' ');
+    PrintMagickFormatName(file,magick_info,i);
 #if defined(MAGICKCORE_MODULES_SUPPORT)
     {
       char
