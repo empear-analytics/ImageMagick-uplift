@@ -1380,6 +1380,39 @@ MagickExport MagickBooleanType IsStringFalse(const char *value)
   return(MagickFalse);
 }
 
+static void PadStringInfoHexLine(FILE *file,size_t j)
+{
+  /*
+    Padding.
+  */
+  for ( ; j < CharsPerLine; j++)
+  {
+    (void) fputc(' ',file);
+    (void) fputc(' ',file);
+    if (((j+1) % 0x04) == 0)
+      (void) fputc(' ',file);
+  }
+}
+
+static void PrintStringInfoAsciiLine(FILE *file,
+  const StringInfo *string_info,const unsigned char *p,const size_t i)
+{
+  size_t
+    j;
+
+  /*
+    ASCII section.
+  */
+  for (j=0; j < MagickMin(string_info->length-i,CharsPerLine); j++)
+  {
+    unsigned char c = p[i+j];
+    if (isprint((int) c) != 0)
+      (void) fputc(c,file);
+    else
+      (void) fputc('-',file);
+  }
+}
+
 static void PrintStringInfoHexLine(FILE *file,
   const StringInfo *string_info,const unsigned char *p,const size_t i)
 {
@@ -1393,28 +1426,9 @@ static void PrintStringInfoHexLine(FILE *file,
     if (((j+1) % 0x04) == 0)
       (void) fputc(' ',file);
   }
-  /*
-    Padding.
-  */
-  for ( ; j < CharsPerLine; j++)
-  {
-    (void) fputc(' ',file);
-    (void) fputc(' ',file);
-    if (((j+1) % 0x04) == 0)
-      (void) fputc(' ',file);
-  }
+  PadStringInfoHexLine(file,j);
   (void) fputc(' ',file);
-  /*
-    ASCII section.
-  */
-  for (j=0; j < MagickMin(string_info->length-i,CharsPerLine); j++)
-  {
-    unsigned char c = p[i+j];
-    if (isprint((int) c) != 0)
-      (void) fputc(c,file);
-    else
-      (void) fputc('-',file);
-  }
+  PrintStringInfoAsciiLine(file,string_info,p,i);
   (void) fputc('\n',file);
 }
 
