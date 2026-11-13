@@ -2581,6 +2581,158 @@ static FT_UInt GetFreetypeGlyphId(const GraphemeInfo *grapheme,
       tag,"`%s'",value); \
 }
 
+typedef struct _FreetypeFaceTargets
+{
+  FT_Memory
+    *memory;
+
+  FT_Library
+    *library;
+
+  FT_StreamRec
+    **stream;
+
+  FT_Face
+    *face;
+} FreetypeFaceTargets;
+
+static MagickBooleanType ConfigureFreetypeFace(const FreetypeTarget *target,
+  const FreetypeFaceTargets *targets,ExceptionInfo *exception)
+{
+  FT_Memory
+    *const memory = targets->memory;
+
+  FT_Library
+    *const library = targets->library;
+
+  FT_StreamRec
+    **const stream = targets->stream;
+
+  FT_Face
+    *const face = targets->face;
+
+  const DrawInfo
+    *draw_info = target->draw_info;
+
+  const char
+    *encoding = target->encoding;
+
+  FT_Encoding
+    encoding_type;
+
+  FT_Error
+    ft_status;
+
+  PointInfo
+    resolution;
+
+  if ((draw_info->metrics != (char *) NULL) &&
+      (IsPathAccessible(draw_info->metrics) != MagickFalse))
+    (void) FT_Attach_File(*face,draw_info->metrics);
+  encoding_type=FT_ENCODING_UNICODE;
+  SelectFreetypeCharmap(*face,encoding_type);
+  if (encoding != (const char *) NULL)
+    {
+      encoding_type=SelectFreetypeEncoding(encoding,encoding_type);
+      ft_status=FT_Select_Charmap(*face,encoding_type);
+      if (ft_status != 0)
+        {
+          (void) FT_Done_Face(*face);
+          FreetypeDone(*memory,*library,*stream);
+          ThrowFreetypeErrorException("UnrecognizedFontEncoding",ft_status,
+            encoding);
+          return(MagickFalse);
+        }
+    }
+  /*
+    Set text size.
+  */
+  resolution=GetFreetypeTextResolution(draw_info);
+  ft_status=FT_Set_Char_Size(*face,(FT_F26Dot6) (64.0*draw_info->pointsize),
+    (FT_F26Dot6) (64.0*draw_info->pointsize),(FT_UInt) resolution.x,
+    (FT_UInt) resolution.y);
+  if (ft_status != 0)
+    {
+      (void) FT_Done_Face(*face);
+      FreetypeDone(*memory,*library,*stream);
+      ThrowFreetypeErrorException("UnableToReadFont",ft_status,
+        draw_info->font);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType OpenFreetypeFace(const FreetypeTarget *target,
+  const FreetypeFaceTargets *targets,ExceptionInfo *exception)
+{
+  FT_Memory
+    *const memory = targets->memory;
+
+  FT_Library
+    *const library = targets->library;
+
+  FT_StreamRec
+    **const stream = targets->stream;
+
+  FT_Face
+    *const face = targets->face;
+
+  Image
+    *image = target->image;
+
+  const DrawInfo
+    *draw_info = target->draw_info;
+
+  FT_Error
+    ft_status;
+
+  FT_Long
+    face_index;
+
+  FT_Open_Args
+    args;
+
+  /*
+    Initialize Truetype library.
+  */
+  if (IsUnauthorizedFontFile(draw_info) != MagickFalse)
+    ThrowPolicyException(draw_info->font,MagickFalse);
+  *memory=FreetypeAcquireMemoryManager();
+  if (*memory == (FT_Memory) NULL)
+    ThrowBinaryException(ResourceLimitError,"UnableToInitializeFreetypeLibrary",
+      image->filename);
+  ft_status=FreetypeInit(*memory,library);
+  if (ft_status != 0)
+    {
+      ThrowFreetypeErrorException("UnableToInitializeFreetypeLibrary",ft_status,
+        image->filename);
+      return(MagickFalse);
+    }
+  /*
+    Open font face.
+  */
+  face_index=(FT_Long) draw_info->face;
+  (void) memset(&args,0,sizeof(args));
+  SelectFreetypeFontPath(draw_info,&args,&face_index,exception);
+  /*
+    Configure streaming interface.
+  */
+  *stream=AcquireFreetypeStream(args.pathname);
+  args.flags=FT_OPEN_STREAM;
+  args.stream=*stream;
+  *face=(FT_Face) NULL;
+  ft_status=FT_Open_Face(*library,&args,face_index,face);
+  if (ft_status != 0)
+    {
+      FreetypeDone(*memory,*library,*stream);
+      ThrowFreetypeErrorException("UnableToReadFont",ft_status,args.pathname);
+      args.pathname=DestroyString(args.pathname);
+      return(MagickFalse);
+    }
+  args.pathname=DestroyString(args.pathname);
+  return(ConfigureFreetypeFace(target,targets,exception));
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2621,9 +2773,6 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   FT_BitmapGlyph
     bitmap;
 
-  FT_Encoding
-    encoding_type;
-
   FT_Error
     ft_status;
 
@@ -2636,17 +2785,11 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   FT_Library
     library;
 
-  FT_Long
-    face_index;
-
   FT_Matrix
     affine;
 
   FT_Memory
     memory;
-
-  FT_Open_Args
-    args;
 
   FT_StreamRec
     *stream;
@@ -2665,12 +2808,14 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   GraphemeInfo
     *grapheme;
 
+  FreetypeFaceTargets
+    targets;
+
   MagickBooleanType
     status;
 
   PointInfo
-    point,
-    resolution;
+    point;
 
   ssize_t
     i;
@@ -2695,77 +2840,12 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   unsigned char
     *utf8;
 
-  /*
-    Initialize Truetype library.
-  */
-  if (IsUnauthorizedFontFile(draw_info) != MagickFalse)
-    ThrowPolicyException(draw_info->font,MagickFalse);
-  memory=FreetypeAcquireMemoryManager();
-  if (memory == (FT_Memory) NULL)
-    ThrowBinaryException(ResourceLimitError,"UnableToInitializeFreetypeLibrary",
-      image->filename);
-  ft_status=FreetypeInit(memory,&library);
-  if (ft_status != 0)
-    {
-      ThrowFreetypeErrorException("UnableToInitializeFreetypeLibrary",ft_status,
-        image->filename);
-      return(MagickFalse);
-    }
-  /*
-    Open font face.
-  */
-  face_index=(FT_Long) draw_info->face;
-  (void) memset(&args,0,sizeof(args));
-  SelectFreetypeFontPath(draw_info,&args,&face_index,exception);
-  /*
-    Configure streaming interface.
-  */
-  stream=AcquireFreetypeStream(args.pathname);
-  args.flags=FT_OPEN_STREAM;
-  args.stream=stream;
-  face=(FT_Face) NULL;
-  ft_status=FT_Open_Face(library,&args,face_index,&face);
-  if (ft_status != 0)
-    {
-      FreetypeDone(memory,library,stream);
-      ThrowFreetypeErrorException("UnableToReadFont",ft_status,args.pathname);
-      args.pathname=DestroyString(args.pathname);
-      return(MagickFalse);
-    }
-  args.pathname=DestroyString(args.pathname);
-  if ((draw_info->metrics != (char *) NULL) &&
-      (IsPathAccessible(draw_info->metrics) != MagickFalse))
-    (void) FT_Attach_File(face,draw_info->metrics);
-  encoding_type=FT_ENCODING_UNICODE;
-  SelectFreetypeCharmap(face,encoding_type);
-  if (encoding != (const char *) NULL)
-    {
-      encoding_type=SelectFreetypeEncoding(encoding,encoding_type);
-      ft_status=FT_Select_Charmap(face,encoding_type);
-      if (ft_status != 0)
-        {
-          (void) FT_Done_Face(face);
-          FreetypeDone(memory,library,stream);
-          ThrowFreetypeErrorException("UnrecognizedFontEncoding",ft_status,
-            encoding);
-          return(MagickFalse);
-        }
-    }
-  /*
-    Set text size.
-  */
-  resolution=GetFreetypeTextResolution(draw_info);
-  ft_status=FT_Set_Char_Size(face,(FT_F26Dot6) (64.0*draw_info->pointsize),
-    (FT_F26Dot6) (64.0*draw_info->pointsize),(FT_UInt) resolution.x,
-    (FT_UInt) resolution.y);
-  if (ft_status != 0)
-    {
-      (void) FT_Done_Face(face);
-      FreetypeDone(memory,library,stream);
-      ThrowFreetypeErrorException("UnableToReadFont",ft_status,
-        draw_info->font);
-      return(MagickFalse);
-    }
+  targets.memory=(&memory);
+  targets.library=(&library);
+  targets.stream=(&stream);
+  targets.face=(&face);
+  if (OpenFreetypeFace(target,&targets,exception) == MagickFalse)
+    return(MagickFalse);
   SetFreetypeMetrics(face,metrics);
   first_glyph_id=0;
   FT_Get_First_Char(face,&first_glyph_id);
