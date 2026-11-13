@@ -386,13 +386,7 @@ MagickExport SplayTreeInfo *CloneSplayTree(SplayTreeInfo *splay_tree,
 */
 MagickExport int CompareSplayTreeString(const void *target,const void *source)
 {
-  const char
-    *p,
-    *q;
-
-  p=(const char *) target;
-  q=(const char *) source;
-  return(LocaleCompare(p,q));
+  return(LocaleCompare((const char *) target,(const char *) source));
 }
 
 /*
@@ -417,13 +411,8 @@ MagickExport int CompareSplayTreeString(const void *target,const void *source)
 MagickExport int CompareSplayTreeStringInfo(const void *target,
   const void *source)
 {
-  const StringInfo
-    *p,
-    *q;
-
-  p=(const StringInfo *) target;
-  q=(const StringInfo *) source;
-  return(CompareStringInfo(p,q));
+  return(CompareStringInfo((const StringInfo *) target,
+    (const StringInfo *) source));
 }
 
 static NodeInfo *GetSuccessorNode(const SplayTreeInfo *splay_tree)
