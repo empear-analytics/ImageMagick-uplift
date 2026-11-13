@@ -3343,6 +3343,33 @@ static void ExportAnyDepthGrayQuantum(const Image *image,
   }
 }
 
+static void ExportOtherDepthGrayQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  switch (quantum_info->depth)
+  {
+    case 32:
+    {
+      Export32BitGrayQuantum(image,quantum_info,span);
+      break;
+    }
+    case 64:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          Export64BitFloatGrayQuantum(image,quantum_info,span);
+          break;
+        }
+      magick_fallthrough;
+    }
+    default:
+    {
+      ExportAnyDepthGrayQuantum(image,quantum_info,span);
+      break;
+    }
+  }
+}
+
 static void ExportGrayQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span)
 {
@@ -3378,23 +3405,9 @@ static void ExportGrayQuantum(const Image *image,QuantumInfo *quantum_info,
       Export16BitGrayQuantum(image,quantum_info,span);
       break;
     }
-    case 32:
-    {
-      Export32BitGrayQuantum(image,quantum_info,span);
-      break;
-    }
-    case 64:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          Export64BitFloatGrayQuantum(image,quantum_info,span);
-          break;
-        }
-      magick_fallthrough;
-    }
     default:
     {
-      ExportAnyDepthGrayQuantum(image,quantum_info,span);
+      ExportOtherDepthGrayQuantum(image,quantum_info,span);
       break;
     }
   }
