@@ -18518,173 +18518,173 @@ static MagickBooleanType XSelectCommandMenuEntry(
   return(MagickFalse);
 }
 
+static const char
+  *const CommandMenu[] =
+  {
+    "File",
+    "Edit",
+    "View",
+    "Transform",
+    "Enhance",
+    "Effects",
+    "F/X",
+    "Image Edit",
+    "Miscellany",
+    "Help",
+    (char *) NULL
+  },
+  *const FileMenu[] =
+  {
+    "Open...",
+    "Next",
+    "Former",
+    "Select...",
+    "Save...",
+    "Print...",
+    "Delete...",
+    "New...",
+    "Visual Directory...",
+    "Quit",
+    (char *) NULL
+  },
+  *const EditMenu[] =
+  {
+    "Undo",
+    "Redo",
+    "Cut",
+    "Copy",
+    "Paste",
+    (char *) NULL
+  },
+  *const ViewMenu[] =
+  {
+    "Half Size",
+    "Original Size",
+    "Double Size",
+    "Resize...",
+    "Apply",
+    "Refresh",
+    "Restore",
+    (char *) NULL
+  },
+  *const TransformMenu[] =
+  {
+    "Crop",
+    "Chop",
+    "Flop",
+    "Flip",
+    "Rotate Right",
+    "Rotate Left",
+    "Rotate...",
+    "Shear...",
+    "Roll...",
+    "Trim Edges",
+    (char *) NULL
+  },
+  *const EnhanceMenu[] =
+  {
+    "Hue...",
+    "Saturation...",
+    "Brightness...",
+    "Gamma...",
+    "Spiff",
+    "Dull",
+    "Contrast Stretch...",
+    "Sigmoidal Contrast...",
+    "Normalize",
+    "Equalize",
+    "Negate",
+    "Grayscale",
+    "Map...",
+    "Quantize...",
+    (char *) NULL
+  },
+  *const EffectsMenu[] =
+  {
+    "Despeckle",
+    "Emboss",
+    "Reduce Noise",
+    "Add Noise...",
+    "Sharpen...",
+    "Blur...",
+    "Threshold...",
+    "Edge Detect...",
+    "Spread...",
+    "Shade...",
+    "Raise...",
+    "Segment...",
+    (char *) NULL
+  },
+  *const FXMenu[] =
+  {
+    "Solarize...",
+    "Sepia Tone...",
+    "Swirl...",
+    "Implode...",
+    "Vignette...",
+    "Wave...",
+    "Oil Paint...",
+    "Charcoal Draw...",
+    (char *) NULL
+  },
+  *const ImageEditMenu[] =
+  {
+    "Annotate...",
+    "Draw...",
+    "Color...",
+    "Matte...",
+    "Composite...",
+    "Add Border...",
+    "Add Frame...",
+    "Comment...",
+    "Launch...",
+    "Region of Interest...",
+    (char *) NULL
+  },
+  *const MiscellanyMenu[] =
+  {
+    "Image Info",
+    "Zoom Image",
+    "Show Preview...",
+    "Show Histogram",
+    "Show Matte",
+    "Background...",
+    "Slide Show...",
+    "Preferences...",
+    (char *) NULL
+  },
+  *const HelpMenu[] =
+  {
+    "Overview",
+    "Browse Documentation",
+    "About Display",
+    (char *) NULL
+  },
+  *const ShortCutsMenu[] =
+  {
+    "Next",
+    "Former",
+    "Open...",
+    "Save...",
+    "Print...",
+    "Undo",
+    "Restore",
+    "Image Info",
+    "Quit",
+    (char *) NULL
+  },
+  *const VirtualMenu[] =
+  {
+    "Image Info",
+    "Print",
+    "Next",
+    "Quit",
+    (char *) NULL
+  };
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
-  const char
-    *const CommandMenu[] =
-    {
-      "File",
-      "Edit",
-      "View",
-      "Transform",
-      "Enhance",
-      "Effects",
-      "F/X",
-      "Image Edit",
-      "Miscellany",
-      "Help",
-      (char *) NULL
-    },
-    *const FileMenu[] =
-    {
-      "Open...",
-      "Next",
-      "Former",
-      "Select...",
-      "Save...",
-      "Print...",
-      "Delete...",
-      "New...",
-      "Visual Directory...",
-      "Quit",
-      (char *) NULL
-    },
-    *const EditMenu[] =
-    {
-      "Undo",
-      "Redo",
-      "Cut",
-      "Copy",
-      "Paste",
-      (char *) NULL
-    },
-    *const ViewMenu[] =
-    {
-      "Half Size",
-      "Original Size",
-      "Double Size",
-      "Resize...",
-      "Apply",
-      "Refresh",
-      "Restore",
-      (char *) NULL
-    },
-    *const TransformMenu[] =
-    {
-      "Crop",
-      "Chop",
-      "Flop",
-      "Flip",
-      "Rotate Right",
-      "Rotate Left",
-      "Rotate...",
-      "Shear...",
-      "Roll...",
-      "Trim Edges",
-      (char *) NULL
-    },
-    *const EnhanceMenu[] =
-    {
-      "Hue...",
-      "Saturation...",
-      "Brightness...",
-      "Gamma...",
-      "Spiff",
-      "Dull",
-      "Contrast Stretch...",
-      "Sigmoidal Contrast...",
-      "Normalize",
-      "Equalize",
-      "Negate",
-      "Grayscale",
-      "Map...",
-      "Quantize...",
-      (char *) NULL
-    },
-    *const EffectsMenu[] =
-    {
-      "Despeckle",
-      "Emboss",
-      "Reduce Noise",
-      "Add Noise...",
-      "Sharpen...",
-      "Blur...",
-      "Threshold...",
-      "Edge Detect...",
-      "Spread...",
-      "Shade...",
-      "Raise...",
-      "Segment...",
-      (char *) NULL
-    },
-    *const FXMenu[] =
-    {
-      "Solarize...",
-      "Sepia Tone...",
-      "Swirl...",
-      "Implode...",
-      "Vignette...",
-      "Wave...",
-      "Oil Paint...",
-      "Charcoal Draw...",
-      (char *) NULL
-    },
-    *const ImageEditMenu[] =
-    {
-      "Annotate...",
-      "Draw...",
-      "Color...",
-      "Matte...",
-      "Composite...",
-      "Add Border...",
-      "Add Frame...",
-      "Comment...",
-      "Launch...",
-      "Region of Interest...",
-      (char *) NULL
-    },
-    *const MiscellanyMenu[] =
-    {
-      "Image Info",
-      "Zoom Image",
-      "Show Preview...",
-      "Show Histogram",
-      "Show Matte",
-      "Background...",
-      "Slide Show...",
-      "Preferences...",
-      (char *) NULL
-    },
-    *const HelpMenu[] =
-    {
-      "Overview",
-      "Browse Documentation",
-      "About Display",
-      (char *) NULL
-    },
-    *const ShortCutsMenu[] =
-    {
-      "Next",
-      "Former",
-      "Open...",
-      "Save...",
-      "Print...",
-      "Undo",
-      "Restore",
-      "Image Info",
-      "Quit",
-      (char *) NULL
-    },
-    *const VirtualMenu[] =
-    {
-      "Image Info",
-      "Print",
-      "Next",
-      "Quit",
-      (char *) NULL
-    };
-
   const char
     *const *Menus[MagickMenus] =
     {
