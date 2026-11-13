@@ -8981,6 +8981,33 @@ static void XSetUserGeometryHints(const int flags,XSizeHints *size_hints,
     }
 }
 
+static int XSetUserGeometry(Display *display,XWindowInfo *window_info,
+  XSizeHints *size_hints,int gravity)
+{
+  if (window_info->geometry != (char *) NULL)
+    {
+      char
+        default_geometry[MagickPathExtent],
+        geometry[MagickPathExtent];
+
+      int
+        flags;
+
+      /*
+        User specified geometry.
+      */
+      (void) FormatLocaleString(default_geometry,MagickPathExtent,"%dx%d",
+        size_hints->width,size_hints->height);
+      (void) CopyMagickString(geometry,window_info->geometry,MagickPathExtent);
+      XStripGeometrySpaces(geometry);
+      flags=XWMGeometry(display,window_info->screen,geometry,default_geometry,
+        window_info->border_width,size_hints,&size_hints->x,&size_hints->y,
+        &size_hints->width,&size_hints->height,&gravity);
+      XSetUserGeometryHints(flags,size_hints,window_info);
+    }
+  return(gravity);
+}
+
 MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
   int argc,XClassHint *class_hint,XWMHints *manager_hints,
   XWindowInfo *window_info)
@@ -9047,27 +9074,7 @@ MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
 #endif
     }
   gravity=NorthWestGravity;
-  if (window_info->geometry != (char *) NULL)
-    {
-      char
-        default_geometry[MagickPathExtent],
-        geometry[MagickPathExtent];
-
-      int
-        flags;
-
-      /*
-        User specified geometry.
-      */
-      (void) FormatLocaleString(default_geometry,MagickPathExtent,"%dx%d",
-        size_hints->width,size_hints->height);
-      (void) CopyMagickString(geometry,window_info->geometry,MagickPathExtent);
-      XStripGeometrySpaces(geometry);
-      flags=XWMGeometry(display,window_info->screen,geometry,default_geometry,
-        window_info->border_width,size_hints,&size_hints->x,&size_hints->y,
-        &size_hints->width,&size_hints->height,&gravity);
-      XSetUserGeometryHints(flags,size_hints,window_info);
-    }
+  gravity=XSetUserGeometry(display,window_info,size_hints,gravity);
 #if !defined(PRE_R4_ICCCM)
   size_hints->win_gravity=gravity;
   size_hints->flags|=PWinGravity;
