@@ -6795,7 +6795,15 @@ statements, never declarations. No other recipe moves a variable.
 1. Take one declaration in the function's opening run of declarations (before its first
    statement) with storage class `static` and an initialiser made only of literals,
    constant expressions, the `#if` lines inside it, and the addresses of other file-scope
-   data.
+   data. *Automatic form* (2026-11-13): the declaration may instead be an automatic array,
+   with no storage class, of `const` string pointers or of pointers to such arrays
+   (`const char *const Menu[]=`, `const char *const *Menus[N]=`), whose initialiser holds
+   only string literals, `(char *) NULL` and the names of other arrays this recipe moves;
+   it moves as `static`, written as it was with `static` in front. Every use of its name
+   is in the function and is an element read, an argument to a pointer-to-`const`
+   parameter whose callee keeps no copy of the pointer beyond the call, or the value
+   stored into a member of a local struct that the function only reads (checked by
+   reading each use and each callee).
 2. The variable is never written: its type is `const`, or it is a pointer to `const` that
    no statement assigns. A static the function updates (a counter, a cache, a flag set
    once) does not move. A non-`const` array counts as never written when every use of
@@ -6857,6 +6865,15 @@ MagickExport const char *GetMagickDelegates(void)
 
 **Careful:**
 
+- *Automatic form.* An automatic array is initialised on each entry and ends with the
+  call; the `static` one is initialised once and lasts. The array is const-valued data
+  that nothing writes (step 2), so every entry sees the same values; the same address
+  goes to the same callees, which keep no copy past the call (step 1), so nothing can
+  tell the two lifetimes apart. A use after the function returns is the only place they
+  differ, and it would have dangled: step 1 refuses it. The function's own code loses
+  the stores that built the array, so `obj_modulo.sh` shows a different caller; the
+  evidence is the oracle on the cases that reach each use, `refactor_guard.py`, and the
+  section comparison of the data, not identical machine code.
 - A `static` local already has static storage duration and is initialised once, before
   the program runs; at file scope it keeps both, so only its visibility widens, to the
   rest of the file below it. Step 2 makes that harmless: nothing else writes it.
@@ -6874,6 +6891,12 @@ MagickExport const char *GetMagickDelegates(void)
 `GetEXIFProperty`'s tag table (304 lines), `TransformsRGBImage`'s colour tables (236),
 `TransformSignature`'s constants and `AcquireResizeFilter`'s mapping table. Added by
 Claude Code (Claude Opus 5.5) during task M101, under the mandate of 2026-10-24.
+*Automatic form* (step 1): 2026-11-13, from `animate.c`'s `XAnimateImages` (campaign A,
+W22 lane d, wide build): its menu label arrays and the `Menus` array of arrays are 48
+lines of string literals and addresses at the top of a function of 726 lines, read only
+by the Command widget calls; the `static const` command tables above them had already
+moved by this recipe. Added by Claude Code (Claude Sonnet 5.5) under the owner's OK of
+2026-11-10 to evolve the recipes.
 
 ---
 
@@ -15517,3 +15540,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | HN | Extract a Head That Builds One Image, Returning It or NULL: a head block that leaves through `return(R);` and ends with `v=Last(...);` directly before the caller's `if (v == NULL) return(R);` becomes a `static T *` function returning `v`, `NULL` for each early return. *Careful* gives the argument (the caller's existing test turns each `NULL` into the same `return(R);` at the same point) | `composite.c`'s `SeamlessBlendImage` after Recipe RD (campaign A, W22 lane c): 73 lines, out of *Large Method*, 3.58 to 3.70 in a probe | owner |
 | 2026-11-13 | NEW | GS | Group a Cleanup Macro's Locals into Sets Released in Its Order: a function-local macro of guarded `DestroyImage` calls over locals of a few same-shaped sets becomes one struct type and one release function per set, called in the macro's order; each acquisition chain becomes a function filling its set, the final chain a function returning the result. *Careful* gives the argument (every exit releases the same non-`NULL` images in the same order; the result is returned on the same path; an unreleased temporary stays unreleased) | `composite.c`'s `BlendDivergentImage` (cc 20, 114 lines) (campaign A, W22 lane c): after Recipes RD and HN, 3.70 to 3.90 in a probe | owner |
 | 2026-11-13 | NEW | WP | Fold Wrapper Prologues into One Function and a Guard in Each Callee: wrappers that assert, optionally log, test a precondition of one of a few kinds, fetch a resource that may be `NULL` and return their `static` worker's result become one statement `return(Worker(image,getNameEnvironment(image,Kind,__func__,exception),...));`; the prologue function keeps the asserts, the log (under the wrapper's `__func__`, `NULL` for a wrapper that did not log), the test and the fetch in order, and each worker returns the failure value first when the resource is `NULL`. *Careful* gives the argument (same side effects in the same order, the fetch only where it ran, the worker's guard before anything of its own) | `accelerate.c`'s `Accelerate*Image` wrappers (campaign A, W22 lane d): ten wrappers in *Code Duplication*; D, CF, W, E and G leave a test in each wrapper, which stays flagged; four wrappers in this form, 3.27 to 3.71 in a probe | owner |
+| 2026-11-13 | AMEND | F | Step 1 (*Automatic form*): an automatic array of `const` string pointers, or of pointers to such arrays, whose initialiser holds only string literals, a null pointer and the names of other moved arrays, moves as `static` when every use is an element read, an argument to a pointer-to-`const` parameter whose callee keeps no copy past the call, or a member of a local struct the function only reads. *Careful* gives the argument (const-valued data nothing writes, the same address to the same callees, lifetimes distinguishable only by a use after return, which step 1 refuses); the evidence is the oracle plus the data-section comparison, since the caller's code loses the stores that built the array | `animate.c`'s `XAnimateImages` (campaign A, W22 lane d, wide build): `CommandMenu`, `AnimateMenu`, `SpeedMenu`, `DirectionMenu`, `HelpMenu` and `Menus` are 48 lines of the function's 726; Recipe F handled only `static` declarations | owner |
