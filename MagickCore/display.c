@@ -15572,6 +15572,85 @@ static MagickBooleanType XSelectRotateAngle(
   return(MagickTrue);
 }
 
+typedef struct _RotateCropInput
+{
+  XWindows
+    *windows;
+
+  Image
+    **image;
+
+  unsigned int
+    rotations;
+
+  int
+    x,
+    y;
+} RotateCropInput;
+
+static void XRotateCropGeometry(const RotateCropInput *crop,
+  unsigned int *width,unsigned int *height)
+{
+  XWindows
+    *const windows = crop->windows;
+
+  Image
+    **const image = crop->image;
+
+  const unsigned int
+    rotations = crop->rotations;
+
+  int
+    x = crop->x,
+    y = crop->y;
+
+  if (windows->image.crop_geometry != (char *) NULL)
+    {
+      /*
+        Rotate crop geometry.
+      */
+      (*width)=(unsigned int) (*image)->columns;
+      (*height)=(unsigned int) (*image)->rows;
+      (void) XParseGeometry(windows->image.crop_geometry,&x,&y,width,height);
+      switch (rotations % 4)
+      {
+        default:
+        case 0:
+          break;
+        case 1:
+        {
+          /*
+            Rotate 90 degrees.
+          */
+          (void) FormatLocaleString(windows->image.crop_geometry,
+            MagickPathExtent,"%ux%u%+d%+d",(*height),(*width),
+            (int) (*image)->columns-(int) (*height)-y,x);
+          break;
+        }
+        case 2:
+        {
+          /*
+            Rotate 180 degrees.
+          */
+          (void) FormatLocaleString(windows->image.crop_geometry,
+            MagickPathExtent,"%ux%u%+d%+d",(*width),(*height),
+            (int) (*width)-x,(int) (*height)-y);
+          break;
+        }
+        case 3:
+        {
+          /*
+            Rotate 270 degrees.
+          */
+          (void) FormatLocaleString(windows->image.crop_geometry,
+            MagickPathExtent,"%ux%u%+d%+d",(*height),(*width),y,
+            (int) (*image)->rows-(int) (*width)-x);
+          break;
+        }
+      }
+    }
+}
+
 static MagickBooleanType XRotateImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,double degrees,Image **image,
   ExceptionInfo *exception)
@@ -15665,51 +15744,12 @@ static MagickBooleanType XRotateImage(Display *display,
     return(MagickFalse);
   *image=DestroyImage(*image);
   *image=rotate_image;
-  if (windows->image.crop_geometry != (char *) NULL)
-    {
-      /*
-        Rotate crop geometry.
-      */
-      width=(unsigned int) (*image)->columns;
-      height=(unsigned int) (*image)->rows;
-      (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
-      switch (rotations % 4)
-      {
-        default:
-        case 0:
-          break;
-        case 1:
-        {
-          /*
-            Rotate 90 degrees.
-          */
-          (void) FormatLocaleString(windows->image.crop_geometry,
-            MagickPathExtent,"%ux%u%+d%+d",height,width,(int) (*image)->columns-
-            (int) height-y,x);
-          break;
-        }
-        case 2:
-        {
-          /*
-            Rotate 180 degrees.
-          */
-          (void) FormatLocaleString(windows->image.crop_geometry,
-            MagickPathExtent,"%ux%u%+d%+d",width,height,(int) width-x,(int)
-            height-y);
-          break;
-        }
-        case 3:
-        {
-          /*
-            Rotate 270 degrees.
-          */
-          (void) FormatLocaleString(windows->image.crop_geometry,
-            MagickPathExtent,"%ux%u%+d%+d",height,width,y,(int) (*image)->rows-
-            (int) width-x);
-          break;
-        }
-      }
-    }
+  {
+    const RotateCropInput
+      crop = { windows, image, rotations, x, y };
+
+    XRotateCropGeometry(&crop,&width,&height);
+  }
   if (windows->image.orphan != MagickFalse)
     return(MagickTrue);
   if (normalized_degrees != 0.0)
