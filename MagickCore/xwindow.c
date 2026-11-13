@@ -9617,6 +9617,24 @@ MagickExport MagickBooleanType XRemoteCommand(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void XSetRenderMetrics(TypeMetric *metrics,const DrawInfo *draw_info,
+  const XFontStruct *font_info,const XAnnotateInfo annotate_info)
+{
+  metrics->pixels_per_em.x=(double) font_info->max_bounds.width;
+  metrics->pixels_per_em.y=(double) font_info->ascent+font_info->descent;
+  metrics->ascent=(double) font_info->ascent+4;
+  metrics->descent=(double) (-font_info->descent);
+  metrics->width=annotate_info.width/ExpandAffine(&draw_info->affine);
+  metrics->height=(double) font_info->ascent+font_info->descent;
+  metrics->max_advance=(double) font_info->max_bounds.width;
+  metrics->bounds.x1=0.0;
+  metrics->bounds.y1=metrics->descent;
+  metrics->bounds.x2=metrics->ascent+metrics->descent;
+  metrics->bounds.y2=metrics->ascent+metrics->descent;
+  metrics->underline_position=(-2.0);
+  metrics->underline_thickness=1.0;
+}
+
 MagickPrivate MagickBooleanType XRenderImage(Image *image,
   const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
   ExceptionInfo *exception)
@@ -9761,19 +9779,7 @@ MagickPrivate MagickBooleanType XRenderImage(Image *image,
   annotate_info.width=(unsigned int) XTextWidth(font_info,draw_info->text,(int)
     strlen(draw_info->text));
   annotate_info.height=(unsigned int) (font_info->ascent+font_info->descent);
-  metrics->pixels_per_em.x=(double) font_info->max_bounds.width;
-  metrics->pixels_per_em.y=(double) font_info->ascent+font_info->descent;
-  metrics->ascent=(double) font_info->ascent+4;
-  metrics->descent=(double) (-font_info->descent);
-  metrics->width=annotate_info.width/ExpandAffine(&draw_info->affine);
-  metrics->height=(double) font_info->ascent+font_info->descent;
-  metrics->max_advance=(double) font_info->max_bounds.width;
-  metrics->bounds.x1=0.0;
-  metrics->bounds.y1=metrics->descent;
-  metrics->bounds.x2=metrics->ascent+metrics->descent;
-  metrics->bounds.y2=metrics->ascent+metrics->descent;
-  metrics->underline_position=(-2.0);
-  metrics->underline_thickness=1.0;
+  XSetRenderMetrics(metrics,draw_info,font_info,annotate_info);
   if (draw_info->render == MagickFalse)
     return(MagickTrue);
   if (draw_info->fill.alpha == (double) TransparentAlpha)
