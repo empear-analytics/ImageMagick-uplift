@@ -994,6 +994,25 @@ static void ResetLZWTable(TableType *table)
   }
 }
 
+static ssize_t FindLZWString(const TableType *table,size_t *last_code,
+  const unsigned char pixel)
+{
+  ssize_t
+    index;
+
+  index=(ssize_t) (*last_code);
+  while (index != -1)
+    if ((table[index].prefix != (ssize_t) (*last_code)) ||
+        (table[index].suffix != (ssize_t) pixel))
+      index=table[index].next;
+    else
+      {
+        (*last_code)=(size_t) index;
+        break;
+      }
+  return(index);
+}
+
 static void AddLZWString(TableType *table,const size_t last_code,
   const unsigned char pixel,const size_t next_index)
 {
@@ -1067,16 +1086,7 @@ MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
     /*
       Find string.
     */
-    index=(ssize_t) last_code;
-    while (index != -1)
-      if ((table[index].prefix != (ssize_t) last_code) ||
-          (table[index].suffix != (ssize_t) pixels[i]))
-        index=table[index].next;
-      else
-        {
-          last_code=(size_t) index;
-          break;
-        }
+    index=FindLZWString(table,&last_code,pixels[i]);
     if (last_code != (size_t) index)
       {
         /*
