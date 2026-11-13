@@ -786,9 +786,8 @@ MagickExport Image *GetLastImageInList(const Image *images)
   const Image
     *p;
 
-  if (images == (Image *) NULL)
+  if (IsImageListMember(images) == MagickFalse)
     return((Image *) NULL);
-  assert(images->signature == MagickCoreSignature);
   for (p=images; p->next != (Image *) NULL; p=p->next) ;
   return((Image *) p);
 }
