@@ -1140,7 +1140,7 @@ MagickExport Image *RemoveLastImageFromList(Image **images)
 %    o replace: the image or image list replacing the original
 %
 */
-MagickExport void ReplaceImageInList(Image **images,Image *replace)
+static MagickBooleanType IsReplaceableImage(Image **images,Image *replace)
 {
   assert(images != (Image **) NULL);
   assert(replace != (Image *) NULL);
@@ -1148,8 +1148,15 @@ MagickExport void ReplaceImageInList(Image **images,Image *replace)
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",replace->filename);
   if ((*images) == (Image *) NULL)
-    return;
+    return(MagickFalse);
   assert((*images)->signature == MagickCoreSignature);
+  return(MagickTrue);
+}
+
+MagickExport void ReplaceImageInList(Image **images,Image *replace)
+{
+  if (IsReplaceableImage(images,replace) == MagickFalse)
+    return;
   /*
     Link next pointer.
   */
