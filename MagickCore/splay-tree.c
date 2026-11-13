@@ -1463,6 +1463,15 @@ static NodeInfo *RotateSplayNode(NodeInfo *n,NodeInfo **node,NodeInfo **parent,
   return(n);
 }
 
+static NodeInfo **GetSplayChildLink(NodeInfo *n,const int compare)
+{
+  if (compare > 0)
+    return(&n->left);
+  if (compare < 0)
+    return(&n->right);
+  return((NodeInfo **) NULL);
+}
+
 static NodeInfo *Splay(SplayTreeInfo *splay_tree,const size_t depth,
   const void *key,NodeInfo **node,NodeInfo **parent,NodeInfo **grandparent)
 {
@@ -1482,12 +1491,7 @@ static NodeInfo *Splay(SplayTreeInfo *splay_tree,const size_t depth,
         return((NodeInfo *) NULL);
     }
   compare=CompareNodeKey(splay_tree,n,key);
-  next=(NodeInfo **) NULL;
-  if (compare > 0)
-    next=(&n->left);
-  else
-    if (compare < 0)
-      next=(&n->right);
+  next=GetSplayChildLink(n,compare);
   if (next != (NodeInfo **) NULL)
     {
       if (depth >= MaxSplayTreeDepth)
