@@ -3298,21 +3298,64 @@ static MagickBooleanType ExtendXMLBufferBy(char **source,const size_t *length,
   return(MagickTrue);
 }
 
+static MagickBooleanType AppendRootInstructions(const XMLTreeRoot *root,
+  const char skip,const TagBufferInfo *tag_buffer)
+{
+  char
+    **const source = tag_buffer->source,
+    *p,
+    *q;
+
+  size_t
+    *const extent = tag_buffer->extent,
+    *const length = tag_buffer->length;
+
+  ssize_t
+    i,
+    j,
+    k;
+
+  for (i=0; root->processing_instructions[i] != (char **) NULL; i++)
+  {
+    /*
+      Pre-root or post-root processing instructions.
+    */
+    for (k=2; root->processing_instructions[i][k-1]; k++) ;
+    p=root->processing_instructions[i][1];
+    for (j=1; p != (char *) NULL; j++)
+    {
+      if (root->processing_instructions[i][k][j-1] == skip)
+        {
+          p=root->processing_instructions[i][j];
+          continue;
+        }
+      q=root->processing_instructions[i][0];
+      if (ExtendXMLBufferBy(source,length,extent,strlen(p)+strlen(q)) ==
+          MagickFalse)
+        return(MagickFalse);
+      if (skip == '>')
+        *length+=(size_t) FormatLocaleString(*source+(*length),*extent,
+          "<?%s%s%s?>\n",q,*p != '\0' ? " " : "",p);
+      else
+        *length+=(size_t) FormatLocaleString(*source+(*length),*extent,
+          "\n<?%s%s%s?>",q,*p != '\0' ? " " : "",p);
+      p=root->processing_instructions[i][j];
+    }
+  }
+  return(MagickTrue);
+}
+
 MagickExport char *XMLTreeInfoToXML(XMLTreeInfo *xml_info)
 {
   char
-    *p,
-    *q,
     *xml;
 
   size_t
     extent,
     length;
 
-  ssize_t
-    i,
-    j,
-    k;
+  TagBufferInfo
+    tag_buffer;
 
   XMLTreeInfo
     *ordered,
@@ -3335,59 +3378,22 @@ MagickExport char *XMLTreeInfoToXML(XMLTreeInfo *xml_info)
   while (root->root.parent != (XMLTreeInfo *) NULL)
     root=(XMLTreeRoot *) root->root.parent;
   parent=xml_info->parent;
-  if (parent == (XMLTreeInfo *) NULL)
-    for (i=0; root->processing_instructions[i] != (char **) NULL; i++)
-    {
-      /*
-        Pre-root processing instructions.
-      */
-      for (k=2; root->processing_instructions[i][k-1]; k++) ;
-      p=root->processing_instructions[i][1];
-      for (j=1; p != (char *) NULL; j++)
-      {
-        if (root->processing_instructions[i][k][j-1] == '>')
-          {
-            p=root->processing_instructions[i][j];
-            continue;
-          }
-        q=root->processing_instructions[i][0];
-        if (ExtendXMLBufferBy(&xml,&length,&extent,strlen(p)+strlen(q)) ==
-            MagickFalse)
-          return(xml);
-        length+=(size_t) FormatLocaleString(xml+length,extent,"<?%s%s%s?>\n",q,
-          *p != '\0' ? " " : "",p);
-        p=root->processing_instructions[i][j];
-      }
-    }
+  tag_buffer.xml_info=xml_info;
+  tag_buffer.source=(&xml);
+  tag_buffer.length=(&length);
+  tag_buffer.extent=(&extent);
+  tag_buffer.attributes=root->attributes;
+  if ((parent == (XMLTreeInfo *) NULL) &&
+      (AppendRootInstructions(root,'>',&tag_buffer) == MagickFalse))
+    return((char *) NULL);
   ordered=xml_info->ordered;
   xml_info->parent=(XMLTreeInfo *) NULL;
   xml_info->ordered=(XMLTreeInfo *) NULL;
   xml=XMLTreeTagToXML(xml_info,&xml,&length,&extent,0,root->attributes);
   xml_info->parent=parent;
   xml_info->ordered=ordered;
-  if (parent == (XMLTreeInfo *) NULL)
-    for (i=0; root->processing_instructions[i] != (char **) NULL; i++)
-    {
-      /*
-        Post-root processing instructions.
-      */
-      for (k=2; root->processing_instructions[i][k-1]; k++) ;
-      p=root->processing_instructions[i][1];
-      for (j=1; p != (char *) NULL; j++)
-      {
-        if (root->processing_instructions[i][k][j-1] == '<')
-          {
-            p=root->processing_instructions[i][j];
-            continue;
-          }
-        q=root->processing_instructions[i][0];
-        if (ExtendXMLBufferBy(&xml,&length,&extent,strlen(p)+strlen(q)) ==
-            MagickFalse)
-          return(xml);
-        length+=(size_t) FormatLocaleString(xml+length,extent,"\n<?%s%s%s?>",q,
-          *p != '\0' ? " " : "",p);
-        p=root->processing_instructions[i][j];
-      }
-    }
+  if ((parent == (XMLTreeInfo *) NULL) &&
+      (AppendRootInstructions(root,'<',&tag_buffer) == MagickFalse))
+    return((char *) NULL);
   return((char *) ResizeQuantumMemory(xml,length+1,sizeof(*xml)));
 }
