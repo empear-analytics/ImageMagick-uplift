@@ -4482,7 +4482,11 @@ Recipe D, whose copies are moved whole and so may not leave the caller.
    and no `continue` or `break` that leaves it.
 2. `R` is a constant, or reads only what the block writes through a pointer the caller
    also holds (`*source`), so the caller evaluating `R` after the call gets the value the
-   block's `return` would have returned.
+   block's `return` would have returned. `R` may also be a plain local of the caller
+   that the block neither writes nor takes the address of (2026-11-13;
+   `splay-tree.c`'s `RemoveNodeFromSplayTree`, `return(value);` with `value` set to
+   `NULL` before the block): it holds the same value after the call as at the block's
+   `return`.
 3. The block writes no plain local of the caller, apart from locals nothing after the
    block reads (Recipe E step 4), which the new function declares, and locals it writes
    only on paths that end in `return(R);`, which go by value. Writes through pointers it
@@ -4547,7 +4551,9 @@ static MagickBooleanType ExtendXMLBuffer(char **source,const size_t *length,
 **Careful:**
 
 - On a failure path the caller returns from the same point as before, with the same
-  value: a constant, or what the block left behind the pointer.
+  value: a constant, what the block left behind the pointer, or a local of the caller
+  that nothing in the block writes (step 2), read after the call as it was read at the
+  block's `return`.
 - Under step 8 the failure path is the same with no value: the caller's `return;` runs
   directly after the helper's `return(MagickFalse);`, where the block's `return;` stood,
   after every statement the block ran before it.
@@ -9973,6 +9979,10 @@ recipe turns control flow into data.
    The labels may instead all be character constants when `n` is a parameter of type
    `char` (a predicate Recipe EC made), each the value of a member of the basic
    character set (C11 5.2.1), so that it is representable in `char` and non-negative.
+   When `n` is a parameter of type `int`, the labels may be character constants and
+   integer literals mixed (2026-11-13; `geometry-parse.c`'s
+   `IsGeometryAdvanceCharacter`, `case '-': ... case 215: case 'e':`), and the table is
+   of `int`.
    Index form: the labels are the integer literals `0` to `k` in increasing order, one
    per case, each case's body is `return(vi);` of a constant `vi` (a string literal, a
    numeric literal or an enumeration constant), there is no `default:` or it is `break;`
@@ -10055,6 +10065,10 @@ static const char *poly_basis_str(ssize_t n)
   `char` (C11 6.2.5p3), so the element initialised from it holds the same value, and
   `T[i] == n` promotes both `char` operands to `int` and compares the values the `case`
   compared.
+- Integer labels on an `int` parameter. A `case` converts its constant to the promoted
+  type of `n`, here `int` itself (C11 6.8.4.2p5); a character constant and an integer
+  literal that fits in `int` are already `int` values, so the `int` element initialised
+  from each holds the value the `case` compared, and `T[i] == n` compares two `int`s.
 - Index form. For `0 <= n <= k` the `switch` returns `vn`; the table's element `n` is
   `vn` (step 5), of the return type, so `T[n]` is the value the `return` converted.
   Otherwise the `switch` falls through to `return(d);`. The count `sizeof(T)/sizeof(*T)`
@@ -10816,6 +10830,23 @@ the caller (a *Bumpy Road Ahead* in `AcquireRidgesKernel`, 3.08 in a probe).
    added once (the loop's start) and every value still present; `--calls` moves the
    copies' callees and `R`'s callee down by the copies less one, and the helper up by
    two.
+
+8. Records and a `void` caller (2026-11-13). The copies may differ in two constants, a
+   numeric literal (the same value at each of its positions in one copy, as Recipe D's
+   *One value at several positions*) and a string literal, and each copy may write its
+   own local, the copies being the same once those locals are renamed to one name
+   (Recipe D's renaming) and the constants replaced: `years=ttl/31536000;
+   seconds=ttl % 31536000; if (seconds == 0) { (void) FormatLocaleString(timeString,
+   MagickPathExtent,"%lld years",years); return; }`, then `months` with `2628000`, and
+   so on (`resource.c`'s `FormatTimeToLive`). The table is then of a `typedef struct`
+   with one member per constant, the numeric one of the type of the other operand of
+   the arithmetic it takes part in (`MagickSizeType` for `ttl/31536000`, which the
+   usual arithmetic conversions bring to that type), the string one `const char *`, one
+   element `{ n, "s" }` per copy; the renamed local is declared once in the helper, of
+   the type every copy's local had. In a `void` caller each exit is `return;`: it
+   becomes `return(MagickFalse);` and step 6 writes `if (Helper(...) == MagickFalse)
+   return;`, as Recipe W step 8 does. A string used as a format reaches the callee as
+   a pointer to the same characters (*Careful*).
 
 **Before:**
 
@@ -14877,6 +14908,122 @@ Lane: c
 
 ---
 
+## Recipe KP - Peel a Keyed Flag Group out of a Loop's Switch Through a Lookup Table
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Brain Method* on a
+function whose loop body ends in a `switch (c)` over a character in which a run of
+groups, one label each, are the same statements but for the enumeration constant each
+ORs into a flags variable, as `geometry-parse.c`'s `GetGeometry` and `ParseGeometry`
+do for the seven meta characters (`case '%': flags|=PercentValue;
+(void) CopyMagickString(p,p+1,MagickPathExtent); break;`, then `!`, `<`, `>`, `#`, `^`,
+`@`).
+
+**Not covered by:** Recipe PA, whose peeled group is one body under many labels (here
+each label has its own constant); Recipe KL, whose roles are a string and a numeric
+literal and whose run stays in the `switch`'s `default:`; Recipes KS and KR, which
+replace a whole function that is one `switch`; Recipe SV, which keeps one group per
+label; Recipe SD, which keeps the labels in a new `switch` (a new *Complex Method*).
+
+**How:**
+
+1. The `switch (c)` is the last statement of the body of a `for` or `while` loop outside
+   every OpenMP region, with no `#` line in it; `c` is a local `int` that nothing in the
+   `switch` assigns. The run is two or more groups, each one label `Li` (a character
+   constant or an integer literal), none falling into another or out of it, whose bodies
+   are the same token sequence `f|=Ki; S break;` once the enumeration constant `Ki` is
+   replaced by a name: `f` a local the caller declares, `S` statements with no
+   declaration, `break`, `continue`, `return` or `goto`. Every `Ki` is nonzero, and no
+   `Li` occurs in another group. The loop's increment expression is empty.
+2. Directly above the first function that uses it write `typedef struct` with members
+   `int key` and one member `flag` of `f`'s type, then a `static const` array of that
+   type with no size, one element `{ Li, Ki }` per group in the `switch`'s order.
+3. Below it write a `static inline` lookup function of `f`'s type taking `const int c`:
+   `size_t i;`, `for (i=0; i < (sizeof(T)/sizeof(*T)); i++) if (T[i].key == c)
+   return(T[i].flag);` and `return(NoValue);` (the constant `0` of the flag type that
+   the file uses for "no flag").
+4. Delete the run's groups. Directly before the `switch`, write `flag=Lookup(c);` and
+   `if (flag != NoValue) { f|=flag; S continue; }`, with `S` the groups' common text, and
+   declare `flag` beside `f` in the caller, of the same type.
+5. *Several sites.* A loop in another function of the file whose run has the same labels
+   and constants uses the same table and lookup function.
+6. Check by script that every deleted label is the key of exactly one element holding the
+   constant its group ORed in, that `S` is each deleted group's text without the `f|=Ki;`
+   and the `break;`, and that nothing else in the `switch` changed.
+
+**Before:**
+
+```c
+    switch (c)
+    {
+      case '%':
+      {
+        flags|=PercentValue;
+        (void) CopyMagickString(p,p+1,MagickPathExtent);
+        break;
+      }
+      case '!':
+      ...
+      case '@':
+      {
+        flags|=AreaValue;
+        (void) CopyMagickString(p,p+1,MagickPathExtent);
+        break;
+      }
+      case '(':
+      ...
+```
+
+**After:**
+
+```c
+static const GeometryMetaFlag
+  GeometryMetaFlags[] =
+  {
+    { '%', PercentValue },
+    ...
+    { '@', AreaValue }
+  };
+...
+    flag=GetGeometryMetaFlag(c);
+    if (flag != NoValue)
+      {
+        flags|=flag;
+        (void) CopyMagickString(p,p+1,MagickPathExtent);
+        continue;
+      }
+    switch (c)
+    {
+      case '(':
+      ...
+```
+
+**Careful:**
+
+- Why the behaviour is the same. For a `c` equal to some `Li` the lookup returns `Ki`,
+  nonzero, so the new `if` runs `f|=Ki;` and `S`, as the group did; `continue;` goes to
+  the loop's test as the group's `break;` did, since the `switch` ends the body and the
+  increment is empty (step 1). For any other `c` the lookup returns `NoValue`, the `if`
+  does nothing, and the `switch` sends `c` to the group it went to before, the deleted
+  labels being disjoint from the others.
+- The table's `key` is `int`, so a character constant or literal label keeps the value
+  the `case` compared with the promoted `c` (Recipe TB's *Integer labels*); `flag` has
+  `f`'s type, so `f|=flag` ORs the value `f|=Ki` ORed.
+- The lookup reads a `static const` table and has no side effect; the order of the
+  comparisons changes, which is speed only (the loop runs per character of a geometry
+  string, not per pixel).
+- A new table is data only this file reads; no existing table changes.
+
+**Evidence level:** oracle (the cases that reach each loop's function), with step 6
+checked by script.
+
+**Provenance:** 2026-11-13, from `geometry-parse.c`'s `GetGeometry` and `ParseGeometry`
+(campaign B, M127 lane b round 3): a probe 7.40 to 7.60, cc 35 and 39 to 30 and 34; the
+lookup written as a `switch` was itself a *Complex Method* (cc 9) and gained 0.02. Added
+by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -15223,3 +15370,7 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | UR | Unnest a repeated test of the guard's own condition: `if (C) { S if (C) X }` becomes `if (C) { S }` and `if (C) X` for a side-effect-free `C`, even when `S` writes what `C` reads (the forms can differ only when `C` was false, and then nothing runs between the two tests); evidence oracle | `draw.c`'s `ConvertPathToPolygon` (the new-subpath allocation and its failure test, the last depth-4 site; chain probe 2.62 to 2.68); SG requires `S` not to write `G`'s reads, UX needs a disjunction | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | I | Step 8: V step 7's `S return(<expr>);` with a calling expression may be left in the caller, and `S` and the expression may read and write the written variables, as the macro form may (the writes land through the members before the helper returns) | `draw.c`'s `ConvertPathToPolygon`: the subpath flush writes `number_edges`, `points`, `ghostline` and `edge`, and its exit releases `points` before `return(DestroyPolygonInfo(polygon_info));`; chain probe 2.62 to 2.68 | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | LX | Step 4: written variables whose pointers would take the call past four parameters go in one `const` targets struct (Recipe LB step 8's form), taken after the input struct and before `broke` | `cache.c`'s `GetVirtualPixelRows`: the single-pixel transfer writes `length`, `q` and `s`, continues the column loop and breaks it when the fetch fails; with the input struct and `broke` the pointers would give six parameters | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | TB | Step 1: on a parameter of type `int`, the membership labels may be character constants and integer literals mixed, the table of `int` (*Careful*: integer labels); Lane: b | `geometry-parse.c`'s `IsGeometryAdvanceCharacter` (sixteen labels, `215` among them, cc 18; probe 7.04 to 7.40); the character form needs a `char` parameter | mandate (2026-10-24) |
+| 2026-11-13 | NEW | KP | Peel a run of one-label groups that OR a different enumeration constant into a flags variable out of a loop's character `switch`, through a `static const` table of `{ key, flag }` and a lookup before the `switch`; evidence oracle; Lane: b | `geometry-parse.c`'s `GetGeometry` and `ParseGeometry` (seven meta characters each; probe 7.40 to 7.60); PA needs one shared body, KL a string and a numeric literal | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | W | Step 2: `R` may be a plain local of the caller that the block neither writes nor takes the address of; Lane: b | `splay-tree.c`'s `RemoveNodeFromSplayTree` (`return(value);`, `value` set before the block), the twin of `DeleteNodeFromSplayTree`'s `return(MagickFalse);` block (probe 8.54 to 8.81) | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | RT | Step 8: copies differing in a numeric and a string literal (a table of two-member records), each writing its own renamed local, in a `void` caller whose exits are `return;`; Lane: b | `resource.c`'s `FormatTimeToLive` (six unit copies); with it the file's line budget admits the helpers of `AcquireMagickResource` (probe 8.46 to 8.97 over three steps) | mandate (2026-10-24) |

@@ -232,6 +232,40 @@ MagickExport char *GetPageGeometry(const char *page_geometry)
   return(AcquireString(page));
 }
 
+static void SetDefaultRegionSize(const size_t width,const size_t height,
+  RectangleInfo *region)
+{
+  if (region->height == 0)
+    region->height=height;
+  if (region->width == 0)
+    region->width=width;
+}
+
+static void GravityAdjustX(const size_t width,const GravityType gravity,
+  RectangleInfo *region)
+{
+  switch (gravity)
+  {
+    case NorthEastGravity:
+    case EastGravity:
+    case SouthEastGravity:
+    {
+      region->x=CastDoubleToSsizeT((double) width-region->width-region->x);
+      break;
+    }
+    case NorthGravity:
+    case SouthGravity:
+    case CenterGravity:
+    {
+      region->x=CastDoubleToSsizeT((double) width/2.0-region->width/2.0+
+        region->x);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -266,34 +300,8 @@ MagickExport char *GetPageGeometry(const char *page_geometry)
 MagickExport void GravityAdjustGeometry(const size_t width,
   const size_t height,const GravityType gravity,RectangleInfo *region)
 {
-  if (region->height == 0)
-    region->height=height;
-  if (region->width == 0)
-    region->width=width;
-  switch (gravity)
-  {
-    case NorthEastGravity:
-    case EastGravity:
-    case SouthEastGravity:
-    {
-      region->x=CastDoubleToSsizeT((double) width-region->width-region->x);
-      break;
-    }
-    case NorthGravity:
-    case SouthGravity:
-    case CenterGravity:
-    {
-      region->x=CastDoubleToSsizeT((double) width/2.0-region->width/2.0+
-        region->x);
-      break;
-    }
-    case ForgetGravity:
-    case NorthWestGravity:
-    case WestGravity:
-    case SouthWestGravity:
-    default:
-      break;
-  }
+  SetDefaultRegionSize(width,height,region);
+  GravityAdjustX(width,gravity,region);
   switch (gravity)
   {
     case SouthWestGravity:
@@ -311,10 +319,6 @@ MagickExport void GravityAdjustGeometry(const size_t width,
         region->y);
       break;
     }
-    case ForgetGravity:
-    case NorthWestGravity:
-    case NorthGravity:
-    case NorthEastGravity:
     default:
       break;
   }
@@ -358,6 +362,18 @@ MagickExport MagickBooleanType IsGeometry(const char *geometry)
   return(flags != NoValue ? MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType IsSceneGeometryText(const char *geometry,
+  const char *p,const MagickBooleanType pedantic)
+{
+  if (p == geometry)
+    return(MagickFalse);
+  if (strspn(geometry,"0123456789-, ") != strlen(geometry))
+    return(MagickFalse);
+  if ((pedantic != MagickFalse) && (strchr(geometry,',') != (char *) NULL))
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -404,13 +420,7 @@ MagickExport MagickBooleanType IsSceneGeometry(const char *geometry,
     return(MagickFalse);
   if (value < (double) MAGICK_SSIZE_MIN)
     return(MagickFalse);
-  if (p == geometry)
-    return(MagickFalse);
-  if (strspn(geometry,"0123456789-, ") != strlen(geometry))
-    return(MagickFalse);
-  if ((pedantic != MagickFalse) && (strchr(geometry,',') != (char *) NULL))
-    return(MagickFalse);
-  return(MagickTrue);
+  return(IsSceneGeometryText(geometry,p,pedantic));
 }
 
 /*
@@ -499,6 +509,47 @@ MagickExport MagickStatusType ParseAbsoluteGeometry(const char *geometry,
   return(flags);
 }
 
+static MagickStatusType SetAffineMatrixTerm(AffineMatrix *affine_matrix,
+  const ssize_t i,const char *token,MagickStatusType flags)
+{
+  switch (i)
+  {
+    case 0:
+    {
+      affine_matrix->sx=StringToDouble(token,(char **) NULL);
+      break;
+    }
+    case 1:
+    {
+      affine_matrix->rx=StringToDouble(token,(char **) NULL);
+      break;
+    }
+    case 2:
+    {
+      affine_matrix->ry=StringToDouble(token,(char **) NULL);
+      break;
+    }
+    case 3:
+    {
+      affine_matrix->sy=StringToDouble(token,(char **) NULL);
+      break;
+    }
+    case 4:
+    {
+      affine_matrix->tx=StringToDouble(token,(char **) NULL);
+      flags|=XValue;
+      break;
+    }
+    case 5:
+    {
+      affine_matrix->ty=StringToDouble(token,(char **) NULL);
+      flags|=YValue;
+      break;
+    }
+  }
+  return(flags);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -555,41 +606,7 @@ MagickExport MagickStatusType ParseAffineGeometry(const char *geometry,
     (void) GetNextToken(p,&p,MagickPathExtent,token);
     if (*token == ',')
       (void) GetNextToken(p,&p,MagickPathExtent,token);
-    switch (i)
-    {
-      case 0:
-      {
-        affine_matrix->sx=StringToDouble(token,(char **) NULL);
-        break;
-      }
-      case 1:
-      {
-        affine_matrix->rx=StringToDouble(token,(char **) NULL);
-        break;
-      }
-      case 2:
-      {
-        affine_matrix->ry=StringToDouble(token,(char **) NULL);
-        break;
-      }
-      case 3:
-      {
-        affine_matrix->sy=StringToDouble(token,(char **) NULL);
-        break;
-      }
-      case 4:
-      {
-        affine_matrix->tx=StringToDouble(token,(char **) NULL);
-        flags|=XValue;
-        break;
-      }
-      case 5:
-      {
-        affine_matrix->ty=StringToDouble(token,(char **) NULL);
-        flags|=YValue;
-        break;
-      }
-    }
+    flags=SetAffineMatrixTerm(affine_matrix,i,token,flags);
   }
   determinant=(affine_matrix->sx*affine_matrix->sy-affine_matrix->rx*
     affine_matrix->ry);
@@ -715,15 +732,77 @@ static void SetPageGeometryDefaults(const Image *image,
     region_info->height=image->page.height;
 }
 
+static inline MagickBooleanType IsRegionSmallerThanImage(const Image *image,
+  const RectangleInfo *region_info)
+{
+  return(((region_info->width < image->columns) &&
+    (region_info->height < image->rows)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsRegionLargerThanImage(const Image *image,
+  const RectangleInfo *region_info)
+{
+  return(((region_info->width > image->columns) &&
+    (region_info->height > image->rows)) ? MagickTrue : MagickFalse);
+}
+
+static MagickStatusType SetRelativeRegion(const Image *image,
+  const char *geometry,RectangleInfo *region_info,MagickStatusType flags)
+{
+  if ((flags & PercentValue) != 0)
+    flags=SetPercentRegion(image,geometry,region_info,flags);
+  if ((flags & AspectRatioValue) != 0)
+    flags=SetAspectRatioRegion(image,geometry,region_info,flags);
+  return(flags);
+}
+
+static MagickBooleanType CheckGravityRegionLimits(const Image *image,
+  RectangleInfo *region_info,const MagickStatusType flags)
+{
+  if (((flags & LessValue) != 0) &&
+      (IsRegionSmallerThanImage(image,region_info) != MagickFalse))
+    {
+      SetGeometry(image,region_info);
+      return(MagickFalse);
+    }
+  if (((flags & GreaterValue) != 0) &&
+      (IsRegionLargerThanImage(image,region_info) != MagickFalse))
+    {
+      SetGeometry(image,region_info);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickStatusType AdjustGravityRegion(const Image *image,
+  RectangleInfo *region_info,const MagickStatusType flags)
+{
+  size_t
+    height,
+    width;
+
+  /*
+    Adjust offset according to gravity setting.
+  */
+  width=region_info->width;
+  height=region_info->height;
+  if (width == 0)
+    region_info->width=image->page.width | image->columns;
+  if (height == 0)
+    region_info->height=image->page.height | image->rows;
+  GravityAdjustGeometry(image->columns,image->rows,image->gravity,region_info);
+  if (CheckGravityRegionLimits(image,region_info,flags) == MagickFalse)
+    return(NoValue);
+  region_info->width=width;
+  region_info->height=height;
+  return(flags);
+}
+
 MagickExport MagickStatusType ParseGravityGeometry(const Image *image,
   const char *geometry,RectangleInfo *region_info,ExceptionInfo *exception)
 {
   MagickStatusType
     flags;
-
-  size_t
-    height,
-    width;
 
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",geometry);
@@ -737,37 +816,8 @@ MagickExport MagickStatusType ParseGravityGeometry(const Image *image,
         "InvalidGeometry","`%s'",geometry);
       return(flags);
     }
-  if ((flags & PercentValue) != 0)
-    flags=SetPercentRegion(image,geometry,region_info,flags);
-  if ((flags & AspectRatioValue) != 0)
-    flags=SetAspectRatioRegion(image,geometry,region_info,flags);
-  /*
-    Adjust offset according to gravity setting.
-  */
-  width=region_info->width;
-  height=region_info->height;
-  if (width == 0)
-    region_info->width=image->page.width | image->columns;
-  if (height == 0)
-    region_info->height=image->page.height | image->rows;
-  GravityAdjustGeometry(image->columns,image->rows,image->gravity,region_info);
-  if ((flags & LessValue) != 0)
-    if ((region_info->width < image->columns) &&
-        (region_info->height < image->rows))
-      {
-        SetGeometry(image,region_info);
-        return(NoValue);
-      }
-  if ((flags & GreaterValue) != 0)
-    if ((region_info->width > image->columns) &&
-        (region_info->height > image->rows))
-      {
-        SetGeometry(image,region_info);
-        return(NoValue);
-      }
-  region_info->width=width;
-  region_info->height=height;
-  return(flags);
+  flags=SetRelativeRegion(image,geometry,region_info,flags);
+  return(AdjustGravityRegion(image,region_info,flags));
 }
 
 
@@ -811,17 +861,22 @@ static inline MagickBooleanType IsPageSizeScaled(const MagickStatusType flags)
     MagickTrue : MagickFalse);
 }
 
+static void SetScaledPageSize(const MagickStatusType flags,
+  RectangleInfo *region_info)
+{
+  if ((flags & WidthValue) == 0)
+    region_info->width=region_info->height;
+  if ((flags & HeightValue) == 0)
+    region_info->height=region_info->width;
+}
+
 MagickExport MagickStatusType ParsePageGeometry(const Image *image,
   const char *geometry,RectangleInfo *region_info,ExceptionInfo *exception)
 {
   MagickStatusType
     flags;
 
-  SetGeometry(image,region_info);
-  if (image->page.width != 0)
-    region_info->width=image->page.width;
-  if (image->page.height != 0)
-    region_info->height=image->page.height;
+  SetPageGeometryDefaults(image,region_info);
   flags=ParseAbsoluteGeometry(geometry,region_info);
   if (flags == NoValue)
     {
@@ -837,12 +892,7 @@ MagickExport MagickStatusType ParsePageGeometry(const Image *image,
   flags=ParseMetaGeometry(geometry,&region_info->x,&region_info->y,
     &region_info->width,&region_info->height);
   if (IsPageSizeScaled(flags) != MagickFalse)
-    {
-      if ((flags & WidthValue) == 0)
-        region_info->width=region_info->height;
-      if ((flags & HeightValue) == 0)
-        region_info->height=region_info->width;
-    }
+    SetScaledPageSize(flags,region_info);
   return(flags);
 }
 
