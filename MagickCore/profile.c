@@ -3668,6 +3668,20 @@ static void UpdateClipPath(unsigned char *blob,size_t length,
   }
 }
 
+static MagickBooleanType Skip8BIMClipPathMarker(unsigned char **info,
+  size_t *length)
+{
+  if (ReadProfileByte(info,length) != (unsigned char) '8')
+    return(MagickTrue);
+  if (ReadProfileByte(info,length) != (unsigned char) 'B')
+    return(MagickTrue);
+  if (ReadProfileByte(info,length) != (unsigned char) 'I')
+    return(MagickTrue);
+  if (ReadProfileByte(info,length) != (unsigned char) 'M')
+    return(MagickTrue);
+  return(MagickFalse);
+}
+
 static void Update8BIMResource(const ClipPathResizeInfo *resize,
   unsigned char **info,size_t *length)
 {
@@ -3721,13 +3735,7 @@ MagickPrivate void Update8BIMClipPath(const Image *image,
   info=GetStringInfoDatum(profile);
   while (length > 0)
   {
-    if (ReadProfileByte(&info,&length) != (unsigned char) '8')
-      continue;
-    if (ReadProfileByte(&info,&length) != (unsigned char) 'B')
-      continue;
-    if (ReadProfileByte(&info,&length) != (unsigned char) 'I')
-      continue;
-    if (ReadProfileByte(&info,&length) != (unsigned char) 'M')
+    if (Skip8BIMClipPathMarker(&info,&length) != MagickFalse)
       continue;
     Update8BIMResource(&resize,&info,&length);
   }
