@@ -8205,6 +8205,51 @@ static void RefreshFileBrowserList(const FileBrowserContext *context,
   (*state)&=(unsigned int) (~UpdateListState);
 }
 
+static void JumpFileBrowserList(const FileBrowserContext *context,
+  const FileBrowserWidgets *widgets)
+{
+  char
+    *const reply = context->reply;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info,
+    *const list_info = widgets->list_info,
+    *const selection_info = widgets->selection_info;
+
+  unsigned int
+    *const visible_files = widgets->visible_files;
+
+  size_t
+    *const files = widgets->files;
+
+  ssize_t
+    *const i = widgets->i;
+
+  char
+    ***const filelist = widgets->filelist;
+
+  FileBrowserMatch
+    match;
+
+  /*
+    Jump scroll to match user filename.
+  */
+  (*list_info).id=(~0);
+  match.filelist=(*filelist);
+  match.files=(*files);
+  match.reply=reply;
+  MatchFileBrowserReply(&match,list_info,i);
+  if (((*i) < (ssize_t) (*slider_info).id) ||
+      ((*i) >= ((*slider_info).id+(ssize_t) (*visible_files))))
+    (*slider_info).id=(*i)-(int) ((*visible_files) >> 1);
+  (*selection_info).id=(~0);
+  (*state)|=RedrawListState;
+  (*state)&=(unsigned int) (~JumpListState);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8415,25 +8460,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
         RefreshFileBrowserList(&file_context,&file_widgets);
       }
     if (state & JumpListState)
-      {
-        FileBrowserMatch
-          match;
-
-        /*
-          Jump scroll to match user filename.
-        */
-        list_info.id=(~0);
-        match.filelist=filelist;
-        match.files=files;
-        match.reply=reply;
-        MatchFileBrowserReply(&match,&list_info,&i);
-        if ((i < (ssize_t) slider_info.id) ||
-            (i >= (slider_info.id+(ssize_t) visible_files)))
-          slider_info.id=i-(int) (visible_files >> 1);
-        selection_info.id=(~0);
-        state|=RedrawListState;
-        state&=(unsigned int) (~JumpListState);
-      }
+      JumpFileBrowserList(&file_context,&file_widgets);
     if (state & RedrawListState)
       {
         /*
