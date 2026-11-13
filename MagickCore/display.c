@@ -17562,6 +17562,49 @@ static void XAdjustBackgroundSize(const BackgroundInput *input,
     }
 }
 
+static void XDisplayBackgroundPixmap(const BackgroundInput *input,
+  const BackgroundTargets *targets,const int width,const int height)
+{
+  Display
+    *const display = input->display;
+
+  Image
+    *const image = input->image;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  size_t
+    delay;
+
+  /*
+    Create the X pixmap.
+  */
+  (*window_info).pixmap=XCreatePixmap(display,(*window_info).id,
+    (unsigned int) width,(unsigned int) height,(*window_info).depth);
+  if ((*window_info).pixmap == (Pixmap) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXPixmap",
+      image->filename);
+  /*
+    Display pixmap on the window.
+  */
+  if (((unsigned int) width > (*window_info).width) ||
+      ((unsigned int) height > (*window_info).height))
+    (void) XFillRectangle(display,(*window_info).pixmap,
+      (*window_info).annotate_context,0,0,(unsigned int) width,
+      (unsigned int) height);
+  (void) XPutImage(display,(*window_info).pixmap,
+    (*window_info).annotate_context,(*window_info).ximage,0,0,
+    (*window_info).x,(*window_info).y,(unsigned int) (*window_info).width,
+    (unsigned int) (*window_info).height);
+  (void) XSetWindowBackgroundPixmap(display,(*window_info).id,
+    (*window_info).pixmap);
+  (void) XClearWindow(display,(*window_info).id);
+  delay=1000*image->delay/(size_t) MagickMax(image->ticks_per_second,1L);
+  XDelay(display,delay == 0UL ? 10UL : delay);
+  (void) XSync(display,MagickFalse);
+}
+
 MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *image,ExceptionInfo *exception)
 {
@@ -17583,9 +17626,6 @@ MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
 
   static XWindowInfo
     window_info;
-
-  size_t
-    delay;
 
   Window
     root_window;
@@ -17650,30 +17690,7 @@ MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
   input.image=image;
   input.window_attributes=(&window_attributes);
   XAdjustBackgroundSize(&input,&targets,&width,&height);
-  /*
-    Create the X pixmap.
-  */
-  window_info.pixmap=XCreatePixmap(display,window_info.id,(unsigned int) width,
-    (unsigned int) height,window_info.depth);
-  if (window_info.pixmap == (Pixmap) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXPixmap",
-      image->filename);
-  /*
-    Display pixmap on the window.
-  */
-  if (((unsigned int) width > window_info.width) ||
-      ((unsigned int) height > window_info.height))
-    (void) XFillRectangle(display,window_info.pixmap,
-      window_info.annotate_context,0,0,(unsigned int) width,
-      (unsigned int) height);
-  (void) XPutImage(display,window_info.pixmap,window_info.annotate_context,
-    window_info.ximage,0,0,window_info.x,window_info.y,(unsigned int)
-    window_info.width,(unsigned int) window_info.height);
-  (void) XSetWindowBackgroundPixmap(display,window_info.id,window_info.pixmap);
-  (void) XClearWindow(display,window_info.id);
-  delay=1000*image->delay/(size_t) MagickMax(image->ticks_per_second,1L);
-  XDelay(display,delay == 0UL ? 10UL : delay);
-  (void) XSync(display,MagickFalse);
+  XDisplayBackgroundPixmap(&input,&targets,width,height);
   return(window_info.id == root_window ? MagickTrue : MagickFalse);
 }
 
