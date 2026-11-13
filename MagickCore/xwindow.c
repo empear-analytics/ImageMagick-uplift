@@ -7480,17 +7480,68 @@ static void XSetMagnifyWindowName(Display *display,XWindows *windows,
     }
 }
 
-MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
+static void XShowMagnifyPixelColor(Display *display,XWindows *windows,
   ExceptionInfo *exception)
 {
   char
     tuple[MagickPathExtent];
 
   int
+    x,
     y;
 
   PixelInfo
     pixel;
+
+  unsigned int
+    height;
+
+  /*
+    Show center pixel color.
+  */
+  (void) GetOneVirtualPixelInfo(windows->image.image,TileVirtualPixelMethod,
+    (ssize_t) windows->magnify.x,(ssize_t) windows->magnify.y,&pixel,exception);
+  (void) FormatLocaleString(tuple,MagickPathExtent,"%d,%d: ",
+    windows->magnify.x,windows->magnify.y);
+  (void) ConcatenateMagickString(tuple,"(",MagickPathExtent);
+  ConcatenateColorComponent(&pixel,RedPixelChannel,X11Compliance,tuple);
+  (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+  ConcatenateColorComponent(&pixel,GreenPixelChannel,X11Compliance,tuple);
+  (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+  ConcatenateColorComponent(&pixel,BluePixelChannel,X11Compliance,tuple);
+  if (pixel.colorspace == CMYKColorspace)
+    {
+      (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+      ConcatenateColorComponent(&pixel,BlackPixelChannel,X11Compliance,tuple);
+    }
+  if (pixel.alpha_trait != UndefinedPixelTrait)
+    {
+      (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+      ConcatenateColorComponent(&pixel,AlphaPixelChannel,X11Compliance,tuple);
+    }
+  (void) ConcatenateMagickString(tuple,")",MagickPathExtent);
+  height=(unsigned int) (windows->magnify.font_info->ascent+
+    windows->magnify.font_info->descent);
+  x=windows->magnify.font_info->max_bounds.width >> 1;
+  y=windows->magnify.font_info->ascent+(int) (height >> 2);
+  (void) XDrawImageString(display,windows->magnify.pixmap,
+    windows->magnify.annotate_context,x,y,tuple,(int) strlen(tuple));
+  GetColorTuple(&pixel,MagickTrue,tuple);
+  y+=(int) height;
+  (void) XDrawImageString(display,windows->magnify.pixmap,
+    windows->magnify.annotate_context,x,y,tuple,(int) strlen(tuple));
+  (void) QueryColorname(windows->image.image,&pixel,SVGCompliance,tuple,
+    exception);
+  y+=(int) height;
+  (void) XDrawImageString(display,windows->magnify.pixmap,
+    windows->magnify.annotate_context,x,y,tuple,(int) strlen(tuple));
+}
+
+MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
+  ExceptionInfo *exception)
+{
+  int
+    y;
 
   int
     x;
@@ -7730,45 +7781,7 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
           (int) highlight_info.y+1,(unsigned int) highlight_info.width-3,
           (unsigned int) highlight_info.height-3);
     }
-  /*
-    Show center pixel color.
-  */
-  (void) GetOneVirtualPixelInfo(windows->image.image,TileVirtualPixelMethod,
-    (ssize_t) windows->magnify.x,(ssize_t) windows->magnify.y,&pixel,exception);
-  (void) FormatLocaleString(tuple,MagickPathExtent,"%d,%d: ",
-    windows->magnify.x,windows->magnify.y);
-  (void) ConcatenateMagickString(tuple,"(",MagickPathExtent);
-  ConcatenateColorComponent(&pixel,RedPixelChannel,X11Compliance,tuple);
-  (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-  ConcatenateColorComponent(&pixel,GreenPixelChannel,X11Compliance,tuple);
-  (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-  ConcatenateColorComponent(&pixel,BluePixelChannel,X11Compliance,tuple);
-  if (pixel.colorspace == CMYKColorspace)
-    {
-      (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-      ConcatenateColorComponent(&pixel,BlackPixelChannel,X11Compliance,tuple);
-    }
-  if (pixel.alpha_trait != UndefinedPixelTrait)
-    {
-      (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-      ConcatenateColorComponent(&pixel,AlphaPixelChannel,X11Compliance,tuple);
-    }
-  (void) ConcatenateMagickString(tuple,")",MagickPathExtent);
-  height=(unsigned int) (windows->magnify.font_info->ascent+
-    windows->magnify.font_info->descent);
-  x=windows->magnify.font_info->max_bounds.width >> 1;
-  y=windows->magnify.font_info->ascent+(int) (height >> 2);
-  (void) XDrawImageString(display,windows->magnify.pixmap,
-    windows->magnify.annotate_context,x,y,tuple,(int) strlen(tuple));
-  GetColorTuple(&pixel,MagickTrue,tuple);
-  y+=(int) height;
-  (void) XDrawImageString(display,windows->magnify.pixmap,
-    windows->magnify.annotate_context,x,y,tuple,(int) strlen(tuple));
-  (void) QueryColorname(windows->image.image,&pixel,SVGCompliance,tuple,
-    exception);
-  y+=(int) height;
-  (void) XDrawImageString(display,windows->magnify.pixmap,
-    windows->magnify.annotate_context,x,y,tuple,(int) strlen(tuple));
+  XShowMagnifyPixelColor(display,windows,exception);
   /*
     Refresh magnify window.
   */
