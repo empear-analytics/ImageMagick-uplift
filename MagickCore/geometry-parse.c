@@ -591,6 +591,42 @@ static MagickStatusType ParseGeometryOffsets(char *p,MagickStatusType flags,
   return(flags);
 }
 
+static MagickStatusType ParseGeometryRho(char **p,MagickStatusType flags,
+  GeometryInfo *geometry_info)
+{
+  char
+    *q;
+
+  double
+    value;
+
+  int
+    c;
+
+  q=(*p);
+  value=StringToDouble(*p,&q);
+  if (LocaleNCompare(*p,"0x",2) == 0)
+    (void) strtol(*p,&q,10);
+  c=(int) ((unsigned char) *q);
+  if (IsGeometryRhoTerminator(c,q) != MagickFalse)
+    {
+      /*
+        Parse rho.
+      */
+      q=(*p);
+      if (LocaleNCompare(*p,"0x",2) == 0)
+        value=(double) strtol(*p,p,10);
+      else
+        value=StringToDouble(*p,p);
+      if (*p != q)
+        {
+          flags|=RhoValue;
+          geometry_info->rho=value;
+        }
+    }
+  return(flags);
+}
+
 static MagickStatusType ParseGeometrySigma(char **p,MagickStatusType flags,
   GeometryInfo *geometry_info)
 {
@@ -632,11 +668,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
 {
   char
     *p,
-    pedantic_geometry[MagickPathExtent],
-    *q;
-
-  double
-    value;
+    pedantic_geometry[MagickPathExtent];
 
   GeometryInfo
     coordinate;
@@ -786,27 +818,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
   p=pedantic_geometry;
   if (*p == '\0')
     return(flags);
-  q=p;
-  value=StringToDouble(p,&q);
-  if (LocaleNCompare(p,"0x",2) == 0)
-    (void) strtol(p,&q,10);
-  c=(int) ((unsigned char) *q);
-  if (IsGeometryRhoTerminator(c,q) != MagickFalse)
-    {
-      /*
-        Parse rho.
-      */
-      q=p;
-      if (LocaleNCompare(p,"0x",2) == 0)
-        value=(double) strtol(p,&p,10);
-      else
-        value=StringToDouble(p,&p);
-      if (p != q)
-        {
-          flags|=RhoValue;
-          geometry_info->rho=value;
-        }
-    }
+  flags=ParseGeometryRho(&p,flags,geometry_info);
   flags=ParseGeometrySigma(&p,flags,geometry_info);
   flags=ParseGeometryOffsets(p,flags,geometry_info);
   if (strchr(pedantic_geometry,':') != (char *) NULL)
