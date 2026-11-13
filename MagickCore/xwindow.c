@@ -7573,6 +7573,30 @@ static int XGetMagnifyPixmapY(const XWindows *windows,const XImage *ximage,
   return(y);
 }
 
+static void XHighlightMagnifyCenter(Display *display,XWindows *windows,
+  const unsigned int magnify)
+{
+  RectangleInfo
+    highlight_info;
+
+  /*
+    Highlight center pixel.
+  */
+  highlight_info.x=(ssize_t) windows->magnify.width >> 1;
+  highlight_info.y=(ssize_t) windows->magnify.height >> 1;
+  highlight_info.width=magnify;
+  highlight_info.height=magnify;
+  (void) XDrawRectangle(display,windows->magnify.pixmap,
+    windows->magnify.highlight_context,(int) highlight_info.x,
+    (int) highlight_info.y,(unsigned int) highlight_info.width-1,
+    (unsigned int) highlight_info.height-1);
+  if (magnify > 2)
+    (void) XDrawRectangle(display,windows->magnify.pixmap,
+      windows->magnify.annotate_context,(int) highlight_info.x+1,
+      (int) highlight_info.y+1,(unsigned int) highlight_info.width-3,
+      (unsigned int) highlight_info.height-3);
+}
+
 MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
   ExceptionInfo *exception)
 {
@@ -7781,25 +7805,7 @@ MagickPrivate void XMakeMagnifyImage(Display *display,XWindows *windows,
     (unsigned int) ((int) width-x),(unsigned int) ((int) height-y));
   if (IsMagnifyWithinHalf(magnify,width,height) != MagickFalse)
     {
-      RectangleInfo
-        highlight_info;
-
-      /*
-        Highlight center pixel.
-      */
-      highlight_info.x=(ssize_t) windows->magnify.width >> 1;
-      highlight_info.y=(ssize_t) windows->magnify.height >> 1;
-      highlight_info.width=magnify;
-      highlight_info.height=magnify;
-      (void) XDrawRectangle(display,windows->magnify.pixmap,
-        windows->magnify.highlight_context,(int) highlight_info.x,
-        (int) highlight_info.y,(unsigned int) highlight_info.width-1,
-        (unsigned int) highlight_info.height-1);
-      if (magnify > 2)
-        (void) XDrawRectangle(display,windows->magnify.pixmap,
-          windows->magnify.annotate_context,(int) highlight_info.x+1,
-          (int) highlight_info.y+1,(unsigned int) highlight_info.width-3,
-          (unsigned int) highlight_info.height-3);
+      XHighlightMagnifyCenter(display,windows,magnify);
     }
   XShowMagnifyPixelColor(display,windows,exception);
   /*
