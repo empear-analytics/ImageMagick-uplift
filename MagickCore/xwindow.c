@@ -7310,6 +7310,54 @@ static void XPackContinuousMSB(const XImage *ximage,
   }
 }
 
+static void XPackMatteImageMSB(const MakeImageContext *make_context,
+  const XCanvasPacking *packing)
+{
+  ExceptionInfo
+    *const exception = make_context->exception;
+
+  Image
+    *const canvas = packing->canvas;
+
+  CacheView
+    *const canvas_view = packing->canvas_view;
+
+  XImage
+    *const matte_image = packing->matte_image;
+
+  const Quantum
+    *p;
+
+  int
+    x = packing->x,
+    y;
+
+  unsigned char
+    *q;
+
+  unsigned int
+    scanline_pad;
+
+  if (matte_image != (XImage *) NULL)
+    {
+      /*
+        Initialize matte canvas.
+      */
+      scanline_pad=(unsigned int) (matte_image->bytes_per_line-
+        ((matte_image->width*matte_image->bits_per_pixel) >> 3));
+      q=(unsigned char *) matte_image->data;
+      for (y=0; y < (int) canvas->rows; y++)
+      {
+        p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,canvas->columns,1,
+          exception);
+        if (p == (const Quantum *) NULL)
+          break;
+        q=XPackMatteRowMSB(canvas,p,q,&x);
+        q+=(ptrdiff_t) scanline_pad;
+      }
+    }
+}
+
 static void XMakeImageMSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -7348,6 +7396,9 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
 
   XStandardColormap
     *map_info;
+
+  XCanvasPacking
+    packing;
 
   XImageRowSource
     row_source;
@@ -7404,6 +7455,12 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
   row_source.scanline_pad=scanline_pad;
   row_source.pixels=pixels;
   row_source.map_info=map_info;
+  packing.image=image;
+  packing.canvas=canvas;
+  packing.canvas_view=canvas_view;
+  packing.matte_image=matte_image;
+  packing.scanline_pad=scanline_pad;
+  packing.x=x;
   if (ximage->format == XYBitmap)
     {
       unsigned short
@@ -7452,24 +7509,7 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
       XPackColormappedMSB(ximage,row_source,q);
     else
       XPackContinuousMSB(ximage,map_info,row_source,q);
-  if (matte_image != (XImage *) NULL)
-    {
-      /*
-        Initialize matte canvas.
-      */
-      scanline_pad=(unsigned int) (matte_image->bytes_per_line-
-        ((matte_image->width*matte_image->bits_per_pixel) >> 3));
-      q=(unsigned char *) matte_image->data;
-      for (y=0; y < (int) canvas->rows; y++)
-      {
-        p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,canvas->columns,1,
-          exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        q=XPackMatteRowMSB(canvas,p,q,&x);
-        q+=(ptrdiff_t) scanline_pad;
-      }
-    }
+  XPackMatteImageMSB(make_context,&packing);
   canvas_view=DestroyCacheView(canvas_view);
   if (canvas != image)
     canvas=DestroyImage(canvas);
