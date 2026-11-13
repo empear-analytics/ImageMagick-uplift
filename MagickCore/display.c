@@ -18697,160 +18697,160 @@ static const char
     HelpMenu
   };
 
+static DisplayCommand
+  CommandMenus[] =
+  {
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    NullCommand,
+  },
+  FileCommands[] =
+  {
+    OpenCommand,
+    NextCommand,
+    FormerCommand,
+    SelectCommand,
+    SaveCommand,
+    PrintCommand,
+    DeleteCommand,
+    NewCommand,
+    VisualDirectoryCommand,
+    QuitCommand
+  },
+  EditCommands[] =
+  {
+    UndoCommand,
+    RedoCommand,
+    CutCommand,
+    CopyCommand,
+    PasteCommand
+  },
+  ViewCommands[] =
+  {
+    HalfSizeCommand,
+    OriginalSizeCommand,
+    DoubleSizeCommand,
+    ResizeCommand,
+    ApplyCommand,
+    RefreshCommand,
+    RestoreCommand
+  },
+  TransformCommands[] =
+  {
+    CropCommand,
+    ChopCommand,
+    FlopCommand,
+    FlipCommand,
+    RotateRightCommand,
+    RotateLeftCommand,
+    RotateCommand,
+    ShearCommand,
+    RollCommand,
+    TrimCommand
+  },
+  EnhanceCommands[] =
+  {
+    HueCommand,
+    SaturationCommand,
+    BrightnessCommand,
+    GammaCommand,
+    SpiffCommand,
+    DullCommand,
+    ContrastStretchCommand,
+    SigmoidalContrastCommand,
+    NormalizeCommand,
+    EqualizeCommand,
+    NegateCommand,
+    GrayscaleCommand,
+    MapCommand,
+    QuantizeCommand
+  },
+  EffectsCommands[] =
+  {
+    DespeckleCommand,
+    EmbossCommand,
+    ReduceNoiseCommand,
+    AddNoiseCommand,
+    SharpenCommand,
+    BlurCommand,
+    ThresholdCommand,
+    EdgeDetectCommand,
+    SpreadCommand,
+    ShadeCommand,
+    RaiseCommand,
+    SegmentCommand
+  },
+  FXCommands[] =
+  {
+    SolarizeCommand,
+    SepiaToneCommand,
+    SwirlCommand,
+    ImplodeCommand,
+    VignetteCommand,
+    WaveCommand,
+    OilPaintCommand,
+    CharcoalDrawCommand
+  },
+  ImageEditCommands[] =
+  {
+    AnnotateCommand,
+    DrawCommand,
+    ColorCommand,
+    MatteCommand,
+    CompositeCommand,
+    AddBorderCommand,
+    AddFrameCommand,
+    CommentCommand,
+    LaunchCommand,
+    RegionOfInterestCommand
+  },
+  MiscellanyCommands[] =
+  {
+    InfoCommand,
+    ZoomCommand,
+    ShowPreviewCommand,
+    ShowHistogramCommand,
+    ShowMatteCommand,
+    BackgroundCommand,
+    SlideShowCommand,
+    PreferencesCommand
+  },
+  HelpCommands[] =
+  {
+    HelpCommand,
+    BrowseDocumentationCommand,
+    VersionCommand
+  },
+  ShortCutsCommands[] =
+  {
+    NextCommand,
+    FormerCommand,
+    OpenCommand,
+    SaveCommand,
+    PrintCommand,
+    UndoCommand,
+    RestoreCommand,
+    InfoCommand,
+    QuitCommand
+  },
+  VirtualCommands[] =
+  {
+    InfoCommand,
+    PrintCommand,
+    NextCommand,
+    QuitCommand
+  };
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
-  static DisplayCommand
-    CommandMenus[] =
-    {
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      NullCommand,
-    },
-    FileCommands[] =
-    {
-      OpenCommand,
-      NextCommand,
-      FormerCommand,
-      SelectCommand,
-      SaveCommand,
-      PrintCommand,
-      DeleteCommand,
-      NewCommand,
-      VisualDirectoryCommand,
-      QuitCommand
-    },
-    EditCommands[] =
-    {
-      UndoCommand,
-      RedoCommand,
-      CutCommand,
-      CopyCommand,
-      PasteCommand
-    },
-    ViewCommands[] =
-    {
-      HalfSizeCommand,
-      OriginalSizeCommand,
-      DoubleSizeCommand,
-      ResizeCommand,
-      ApplyCommand,
-      RefreshCommand,
-      RestoreCommand
-    },
-    TransformCommands[] =
-    {
-      CropCommand,
-      ChopCommand,
-      FlopCommand,
-      FlipCommand,
-      RotateRightCommand,
-      RotateLeftCommand,
-      RotateCommand,
-      ShearCommand,
-      RollCommand,
-      TrimCommand
-    },
-    EnhanceCommands[] =
-    {
-      HueCommand,
-      SaturationCommand,
-      BrightnessCommand,
-      GammaCommand,
-      SpiffCommand,
-      DullCommand,
-      ContrastStretchCommand,
-      SigmoidalContrastCommand,
-      NormalizeCommand,
-      EqualizeCommand,
-      NegateCommand,
-      GrayscaleCommand,
-      MapCommand,
-      QuantizeCommand
-    },
-    EffectsCommands[] =
-    {
-      DespeckleCommand,
-      EmbossCommand,
-      ReduceNoiseCommand,
-      AddNoiseCommand,
-      SharpenCommand,
-      BlurCommand,
-      ThresholdCommand,
-      EdgeDetectCommand,
-      SpreadCommand,
-      ShadeCommand,
-      RaiseCommand,
-      SegmentCommand
-    },
-    FXCommands[] =
-    {
-      SolarizeCommand,
-      SepiaToneCommand,
-      SwirlCommand,
-      ImplodeCommand,
-      VignetteCommand,
-      WaveCommand,
-      OilPaintCommand,
-      CharcoalDrawCommand
-    },
-    ImageEditCommands[] =
-    {
-      AnnotateCommand,
-      DrawCommand,
-      ColorCommand,
-      MatteCommand,
-      CompositeCommand,
-      AddBorderCommand,
-      AddFrameCommand,
-      CommentCommand,
-      LaunchCommand,
-      RegionOfInterestCommand
-    },
-    MiscellanyCommands[] =
-    {
-      InfoCommand,
-      ZoomCommand,
-      ShowPreviewCommand,
-      ShowHistogramCommand,
-      ShowMatteCommand,
-      BackgroundCommand,
-      SlideShowCommand,
-      PreferencesCommand
-    },
-    HelpCommands[] =
-    {
-      HelpCommand,
-      BrowseDocumentationCommand,
-      VersionCommand
-    },
-    ShortCutsCommands[] =
-    {
-      NextCommand,
-      FormerCommand,
-      OpenCommand,
-      SaveCommand,
-      PrintCommand,
-      UndoCommand,
-      RestoreCommand,
-      InfoCommand,
-      QuitCommand
-    },
-    VirtualCommands[] =
-    {
-      InfoCommand,
-      PrintCommand,
-      NextCommand,
-      QuitCommand
-    };
-
   static DisplayCommand
     *Commands[MagickMenus] =
     {
