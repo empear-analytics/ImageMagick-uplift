@@ -777,6 +777,28 @@ typedef struct _FloodfillSegments
     y_offset;
 } FloodfillSegments;
 
+static MagickBooleanType PushFloodfillSeeds(const FloodfillSegments *segments,
+  const FloodfillStack *stack)
+{
+  {
+    const FloodfillSegment
+      segment = { segments->y_offset, segments->x_offset, segments->x_offset,
+        1 };
+
+    if (PushFloodfillSegment(stack,&segment) == MagickFalse)
+      return(MagickFalse);
+  }
+  {
+    const FloodfillSegment
+      segment = { segments->y_offset+1, segments->x_offset,
+        segments->x_offset, -1 };
+
+    if (PushFloodfillSegment(stack,&segment) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType FillFloodplaneSegments(
   const FloodfillSegments *segments)
 {
@@ -804,22 +826,8 @@ static MagickBooleanType FillFloodplaneSegments(
   stack.segment_info=segments->segment_info;
   stack.segment_stack=segments->segment_stack;
   stack.top=&s;
-  {
-    const FloodfillSegment
-      segment = { segments->y_offset, segments->x_offset, segments->x_offset,
-        1 };
-
-    if (PushFloodfillSegment(&stack,&segment) == MagickFalse)
-      return(MagickFalse);
-  }
-  {
-    const FloodfillSegment
-      segment = { segments->y_offset+1, segments->x_offset,
-        segments->x_offset, -1 };
-
-    if (PushFloodfillSegment(&stack,&segment) == MagickFalse)
-      return(MagickFalse);
-  }
+  if (PushFloodfillSeeds(segments,&stack) == MagickFalse)
+    return(MagickFalse);
   while (s > segments->segment_stack)
   {
     FloodfillRow
