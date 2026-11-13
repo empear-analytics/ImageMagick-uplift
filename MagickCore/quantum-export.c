@@ -4752,28 +4752,11 @@ static void ExportAnyDepthMultispectralQuantum(const Image *image,
   }
 }
 
-static void ExportMultispectralQuantum(const Image *image,QuantumInfo *quantum_info,
-  const QuantumPixelSpan *span,ExceptionInfo *exception)
+static void ExportOtherDepthMultispectralQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
 {
-  if (image->number_meta_channels == 0)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-        "MultispectralImageRequired","`%s'",image->filename);
-      return;
-    }
-  if (quantum_info->meta_channel != 0)
-    {
-      ExportPixelChannel(image,quantum_info,span,
-        (PixelChannel) (MetaPixelChannels+quantum_info->meta_channel-1));
-      return;
-    }
   switch (quantum_info->depth)
   {
-    case 8:
-    {
-      Export8BitMultispectralQuantum(image,quantum_info,span);
-      break;
-    }
     case 16:
     {
       Export16BitMultispectralQuantum(image,quantum_info,span);
@@ -4796,6 +4779,36 @@ static void ExportMultispectralQuantum(const Image *image,QuantumInfo *quantum_i
     default:
     {
       ExportAnyDepthMultispectralQuantum(image,quantum_info,span);
+      break;
+    }
+  }
+}
+
+static void ExportMultispectralQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span,ExceptionInfo *exception)
+{
+  if (image->number_meta_channels == 0)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
+        "MultispectralImageRequired","`%s'",image->filename);
+      return;
+    }
+  if (quantum_info->meta_channel != 0)
+    {
+      ExportPixelChannel(image,quantum_info,span,
+        (PixelChannel) (MetaPixelChannels+quantum_info->meta_channel-1));
+      return;
+    }
+  switch (quantum_info->depth)
+  {
+    case 8:
+    {
+      Export8BitMultispectralQuantum(image,quantum_info,span);
+      break;
+    }
+    default:
+    {
+      ExportOtherDepthMultispectralQuantum(image,quantum_info,span);
       break;
     }
   }
