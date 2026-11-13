@@ -2597,6 +2597,24 @@ static void SetICCColorspace(const char *name,char *colorspace,ssize_t *i,
   *icc_color=MagickTrue;
 }
 
+static void SetColorFromGeometry(PixelInfo *color,
+  const GeometryInfo geometry_info,const MagickStatusType flags,
+  const double scale)
+{
+  if (color->colorspace == OklchColorspace)
+     SetOklchColorFromGeometry(color,geometry_info,flags);
+  else
+    if (IsLabCompatibleColorspace(color->colorspace) != MagickFalse)
+      SetLabColorFromGeometry(color,geometry_info,flags,scale);
+    else
+      SetScaledColorFromGeometry(color,geometry_info,flags,scale);
+  if ((flags & AlphaValue) != 0)
+    color->alpha_trait=BlendPixelTrait;
+  color->alpha=(double) OpaqueAlpha;
+  if ((flags & PsiValue) != 0)
+    SetPsiColorFromGeometry(color,geometry_info,flags,scale);
+}
+
 static MagickBooleanType QueryColorFunction(const char *name,
   const char *q,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2658,18 +2676,7 @@ static MagickBooleanType QueryColorFunction(const char *name,
     flags=ParseCSSColor(name+i+1,&geometry_info);
   if (flags == 0)
     return(QueryColorFromCSSName(name,i,color,exception));
-  if (color->colorspace == OklchColorspace)
-     SetOklchColorFromGeometry(color,geometry_info,flags);
-  else
-    if (IsLabCompatibleColorspace(color->colorspace) != MagickFalse)
-      SetLabColorFromGeometry(color,geometry_info,flags,scale);
-    else
-      SetScaledColorFromGeometry(color,geometry_info,flags,scale);
-  if ((flags & AlphaValue) != 0)
-    color->alpha_trait=BlendPixelTrait;
-  color->alpha=(double) OpaqueAlpha;
-  if ((flags & PsiValue) != 0)
-    SetPsiColorFromGeometry(color,geometry_info,flags,scale);
+  SetColorFromGeometry(color,geometry_info,flags,scale);
   if (((flags & ChiValue) != 0) &&
       (color->alpha_trait != UndefinedPixelTrait))
     color->alpha=(double) ClampToQuantum((double) QuantumRange*
