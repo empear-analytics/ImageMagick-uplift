@@ -1074,6 +1074,24 @@ static MagickBooleanType XImportWindowImage(const WindowImageSource *source)
   return(MagickTrue);
 }
 
+static void XGrowWindowInfo(const int number_windows,int *max_windows,
+  WindowInfo **window_info)
+{
+  if (number_windows >= (*max_windows))
+    {
+      /*
+        Allocate or resize window info buffer.
+      */
+      (*max_windows)+=1024;
+      if ((*window_info) == (WindowInfo *) NULL)
+        (*window_info)=(WindowInfo *) AcquireQuantumMemory((size_t)
+          (*max_windows),sizeof(*(*window_info)));
+      else
+        (*window_info)=(WindowInfo *) ResizeQuantumMemory((*window_info),
+          (size_t) (*max_windows),sizeof(*(*window_info)));
+    }
+}
+
 static void XIncludeWindowBorder(RectangleInfo *crop_info,
   const unsigned int borders,const XWindowAttributes window_attributes)
 {
@@ -1182,19 +1200,7 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
   /*
     Initialize window info attributes.
   */
-  if (number_windows >= max_windows)
-    {
-      /*
-        Allocate or resize window info buffer.
-      */
-      max_windows+=1024;
-      if (window_info == (WindowInfo *) NULL)
-        window_info=(WindowInfo *) AcquireQuantumMemory((size_t) max_windows,
-          sizeof(*window_info));
-      else
-        window_info=(WindowInfo *) ResizeQuantumMemory(window_info,(size_t)
-          max_windows,sizeof(*window_info));
-    }
+  XGrowWindowInfo(number_windows,&max_windows,&window_info);
   if (window_info == (WindowInfo *) NULL)
     {
       ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed","...");
