@@ -2436,18 +2436,35 @@ static int XTransferDrawPixels(const DrawPixels *draw_pixels)
   return(y);
 }
 
-MagickPrivate MagickBooleanType XDrawImage(Display *display,
-  const XPixelInfo *pixel,XDrawInfo *draw_info,Image *image,
-  ExceptionInfo *exception)
+typedef struct _XDrawSource
 {
+  XImage
+    *draw_ximage;
+
+  const XPixelInfo
+    *pixel;
+
+  XDrawInfo
+    *draw_info;
+} XDrawSource;
+
+static MagickBooleanType XComposeDrawImage(const XDrawSource *source,
+  Image *image,ExceptionInfo *exception)
+{
+  XImage
+    *const draw_ximage = source->draw_ximage;
+
+  const XPixelInfo
+    *const pixel = source->pixel;
+
+  XDrawInfo
+    *const draw_info = source->draw_info;
+
   DrawPixels
     draw_pixels;
 
   DrawRotationTargets
     targets;
-
-  GC
-    draw_context;
 
   Image
     *draw_image;
@@ -2459,61 +2476,10 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
   PixelTrait
     alpha_trait;
 
-  Pixmap
-    draw_pixmap;
-
   unsigned int
-    depth,
     height,
     width;
 
-  Window
-    root_window;
-
-  XGCValues
-    context_values;
-
-  XImage
-    *draw_ximage;
-
-  /*
-    Initialize drawd image.
-  */
-  assert(display != (Display *) NULL);
-  assert(pixel != (XPixelInfo *) NULL);
-  assert(draw_info != (XDrawInfo *) NULL);
-  assert(image != (Image *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  /*
-    Initialize drawd pixmap.
-  */
-  root_window=XRootWindow(display,XDefaultScreen(display));
-  depth=(unsigned int) XDefaultDepth(display,XDefaultScreen(display));
-  draw_pixmap=XCreatePixmap(display,root_window,draw_info->width,
-    draw_info->height,depth);
-  if (draw_pixmap == (Pixmap) NULL)
-    return(MagickFalse);
-  /*
-    Initialize graphics info.
-  */
-  context_values.background=(size_t) (~0);
-  context_values.foreground=0;
-  context_values.line_width=(int) draw_info->line_width;
-  draw_context=XCreateGC(display,root_window,(size_t)
-    (GCBackground | GCForeground | GCLineWidth),&context_values);
-  if (draw_context == (GC) NULL)
-    return(MagickFalse);
-  XDrawElementToPixmap(display,draw_pixmap,draw_context,draw_info);
-  (void) XFreeGC(display,draw_context);
-  /*
-    Initialize X image.
-  */
-  draw_ximage=XGetImage(display,draw_pixmap,0,0,draw_info->width,
-    draw_info->height,AllPlanes,ZPixmap);
-  if (draw_ximage == (XImage *) NULL)
-    return(MagickFalse);
-  (void) XFreePixmap(display,draw_pixmap);
   /*
     Initialize draw image.
   */
@@ -2568,6 +2534,75 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
     }
   draw_image=DestroyImage(draw_image);
   return(MagickTrue);
+}
+
+MagickPrivate MagickBooleanType XDrawImage(Display *display,
+  const XPixelInfo *pixel,XDrawInfo *draw_info,Image *image,
+  ExceptionInfo *exception)
+{
+  GC
+    draw_context;
+
+  Pixmap
+    draw_pixmap;
+
+  unsigned int
+    depth;
+
+  Window
+    root_window;
+
+  XDrawSource
+    source;
+
+  XGCValues
+    context_values;
+
+  XImage
+    *draw_ximage;
+
+  /*
+    Initialize drawd image.
+  */
+  assert(display != (Display *) NULL);
+  assert(pixel != (XPixelInfo *) NULL);
+  assert(draw_info != (XDrawInfo *) NULL);
+  assert(image != (Image *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  /*
+    Initialize drawd pixmap.
+  */
+  root_window=XRootWindow(display,XDefaultScreen(display));
+  depth=(unsigned int) XDefaultDepth(display,XDefaultScreen(display));
+  draw_pixmap=XCreatePixmap(display,root_window,draw_info->width,
+    draw_info->height,depth);
+  if (draw_pixmap == (Pixmap) NULL)
+    return(MagickFalse);
+  /*
+    Initialize graphics info.
+  */
+  context_values.background=(size_t) (~0);
+  context_values.foreground=0;
+  context_values.line_width=(int) draw_info->line_width;
+  draw_context=XCreateGC(display,root_window,(size_t)
+    (GCBackground | GCForeground | GCLineWidth),&context_values);
+  if (draw_context == (GC) NULL)
+    return(MagickFalse);
+  XDrawElementToPixmap(display,draw_pixmap,draw_context,draw_info);
+  (void) XFreeGC(display,draw_context);
+  /*
+    Initialize X image.
+  */
+  draw_ximage=XGetImage(display,draw_pixmap,0,0,draw_info->width,
+    draw_info->height,AllPlanes,ZPixmap);
+  if (draw_ximage == (XImage *) NULL)
+    return(MagickFalse);
+  (void) XFreePixmap(display,draw_pixmap);
+  source.draw_ximage=draw_ximage;
+  source.pixel=pixel;
+  source.draw_info=draw_info;
+  return(XComposeDrawImage(&source,image,exception));
 }
 
 /*
@@ -9412,6 +9447,221 @@ static void XImproveColorRecovery(const XColormapContext *context,
     }
 }
 
+typedef struct _XColormapTargets
+{
+  size_t
+    *number_colors;
+
+  XColor
+    **colors;
+
+  Colormap
+    *colormap;
+} XColormapTargets;
+
+static void XDefineGrayScaleColors(const XColormapContext *context,
+  const XColormapTargets *targets)
+{
+  size_t
+    *const number_colors = targets->number_colors;
+
+  XColor
+    **const colors = targets->colors;
+
+  Colormap
+    *const colormap = targets->colormap;
+
+  Status
+    status;
+
+  unsigned int
+    colormap_type;
+
+  /*
+    Define Standard Colormap for GrayScale or PseudoColor visual.
+  */
+  (*number_colors)=context->image->colors;
+  (*colors)=(XColor *) AcquireQuantumMemory((size_t)
+    context->visual_info->colormap_size,sizeof(*(*colors)));
+  if ((*colors) == (XColor *) NULL)
+    ThrowXWindowFatalException(ResourceLimitFatalError,
+      "UnableToCreateColormap",context->image->filename);
+  /*
+    Preallocate our GUI colors.
+  */
+  XAllocGuiColors(context->display,(*colormap),context->pixel);
+  /*
+    Determine if image colors will "fit" into X server colormap.
+  */
+  colormap_type=context->resource_info->colormap;
+  status=XAllocColorCells(context->display,(*colormap),MagickFalse,(unsigned long *)
+    NULL,0,context->pixel->pixels,(unsigned int) context->image->colors);
+  if (status != False)
+    colormap_type=PrivateColormap;
+  if (colormap_type == SharedColormap)
+    {
+      DiversityPacket
+        *diversity;
+
+      XSharedColormapSource
+        shared_source;
+
+      /*
+        Define Standard colormap for shared GrayScale or PseudoColor visual.
+      */
+      diversity=(DiversityPacket *) AcquireQuantumMemory(context->image->colors,
+        sizeof(*diversity));
+      if (diversity == (DiversityPacket *) NULL)
+        ThrowXWindowFatalException(ResourceLimitFatalError,
+          "UnableToCreateColormap",context->image->filename);
+      shared_source.display=context->display;
+      shared_source.visual_info=context->visual_info;
+      shared_source.colormap=(*colormap);
+      shared_source.image=context->image;
+      shared_source.pixel=context->pixel;
+      shared_source.colors=(*colors);
+      shared_source.diversity=diversity;
+      shared_source.exception=context->exception;
+      (*number_colors)=XAllocSharedColors(&shared_source,(*number_colors));
+      diversity=(DiversityPacket *) RelinquishMagickMemory(diversity);
+      return;
+    }
+  /*
+    Define Standard colormap for private GrayScale or PseudoColor visual.
+  */
+  if (status == False)
+    {
+      XDefaultColorSource
+        default_source;
+
+      /*
+        Not enough colormap entries in the colormap-- Create a new colormap.
+      */
+      (*colormap)=XCreatePrivateColormap(context->display,context->visual_info,context->map_info,context->image);
+      default_source.display=context->display;
+      default_source.visual_info=context->visual_info;
+      default_source.colormap=(*colormap);
+      default_source.image=context->image;
+      default_source.pixel=context->pixel;
+      default_source.colors=(*colors);
+      (*number_colors)=XRetainDefaultColors(&default_source,(*number_colors));
+      (void) XAllocColorCells(context->display,(*colormap),MagickFalse,
+        (unsigned long *) NULL,0,context->pixel->pixels,(unsigned int)
+        context->image->colors);
+    }
+  /*
+    Store the image colormap.
+  */
+  XStoreImageColors(context->visual_info,context->image,context->pixel,(*colors));
+  (void) XStoreColors(context->display,(*colormap),(*colors),(int) context->image->colors);
+}
+
+static void XDefineStaticColors(const XColormapContext *context,
+  const XColormapTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XVisualInfo
+    *const visual_info = context->visual_info;
+
+  Image
+    *const image = context->image;
+
+  XPixelInfo
+    *const pixel = context->pixel;
+
+  size_t
+    *const number_colors = targets->number_colors;
+
+  XColor
+    **const colors = targets->colors;
+
+  Colormap
+    *const colormap = targets->colormap;
+
+  XStaticColorSource
+    static_source;
+
+  /*
+    Define Standard Colormap for StaticGray or StaticColor visual.
+  */
+  (*number_colors)=image->colors;
+  (*colors)=(XColor *) AcquireQuantumMemory((size_t)
+    visual_info->colormap_size,sizeof(*(*colors)));
+  if ((*colors) == (XColor *) NULL)
+    ThrowXWindowFatalException(ResourceLimitFatalError,
+      "UnableToCreateColormap",image->filename);
+  static_source.display=display;
+  static_source.visual_info=visual_info;
+  static_source.image=image;
+  (*colormap)=XAllocStaticColors(&static_source,(*colormap),pixel,(*colors));
+}
+
+static void XDefineTrueColors(const XColormapContext *context,
+  const Colormap colormap,const XColormapTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XVisualInfo
+    *const visual_info = context->visual_info;
+
+  Image
+    *const image = context->image;
+
+  XStandardColormap
+    *const map_info = context->map_info;
+
+  size_t
+    *const number_colors = targets->number_colors;
+
+  XColor
+    **const colors = targets->colors;
+
+  XTrueColorSource
+    source;
+
+
+  source.display=display;
+  source.visual_info=visual_info;
+  source.colormap=colormap;
+  source.map_info=map_info;
+  source.image=image;
+  XAllocateColorRamp(&source,number_colors,colors);
+  XStoreTrueColors(&source,(*colors),(*number_colors));
+}
+
+static void XDefineColormapColors(const XColormapContext *context,
+  const XColormapTargets *targets)
+{
+  Colormap
+    *const colormap = targets->colormap;
+
+  switch (context->visual_info->klass)
+  {
+    case StaticGray:
+    case StaticColor:
+    {
+      XDefineStaticColors(context,targets);
+      break;
+    }
+    case GrayScale:
+    case PseudoColor:
+    {
+      XDefineGrayScaleColors(context,targets);
+      break;
+    }
+    case TrueColor:
+    case DirectColor:
+    default:
+    {
+      XDefineTrueColors(context,(*colormap),targets);
+      break;
+    }
+  }
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -9419,14 +9669,17 @@ MagickPrivate void XMakeStandardColormap(Display *display,
   Colormap
     colormap;
 
-  Status
-    status;
-
   size_t
     number_colors;
 
   XColor
     *colors;
+
+  XColormapContext
+    context;
+
+  const XColormapTargets
+    targets = { &number_colors, &colors, &colormap };
 
   assert(display != (Display *) NULL);
   assert(visual_info != (XVisualInfo *) NULL);
@@ -9435,11 +9688,15 @@ MagickPrivate void XMakeStandardColormap(Display *display,
   assert(pixel != (XPixelInfo *) NULL);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  context.display=display;
+  context.visual_info=visual_info;
+  context.resource_info=resource_info;
+  context.image=image;
+  context.map_info=map_info;
+  context.pixel=pixel;
+  context.exception=exception;
   if (resource_info->map_type != (char *) NULL)
     {
-      XColormapContext
-        context;
-
       /*
         Standard Colormap is already defined (i.e. xstdcmap).
       */
@@ -9447,13 +9704,6 @@ MagickPrivate void XMakeStandardColormap(Display *display,
         pixel);
       number_colors=(unsigned int) (map_info->base_pixel+
         (map_info->red_max+1)*(map_info->green_max+1)*(map_info->blue_max+1));
-      context.display=display;
-      context.visual_info=visual_info;
-      context.resource_info=resource_info;
-      context.image=image;
-      context.map_info=map_info;
-      context.pixel=pixel;
-      context.exception=exception;
       XImproveColorRecovery(&context,number_colors);
       LogXStandardColormap(map_info);
       return;
@@ -9472,132 +9722,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
   /*
     Allocating colors in server colormap is based on visual class.
   */
-  switch (visual_info->klass)
-  {
-    case StaticGray:
-    case StaticColor:
-    {
-      XStaticColorSource
-        static_source;
-
-      /*
-        Define Standard Colormap for StaticGray or StaticColor visual.
-      */
-      number_colors=image->colors;
-      colors=(XColor *) AcquireQuantumMemory((size_t)
-        visual_info->colormap_size,sizeof(*colors));
-      if (colors == (XColor *) NULL)
-        ThrowXWindowFatalException(ResourceLimitFatalError,
-          "UnableToCreateColormap",image->filename);
-      static_source.display=display;
-      static_source.visual_info=visual_info;
-      static_source.image=image;
-      colormap=XAllocStaticColors(&static_source,colormap,pixel,colors);
-      break;
-    }
-    case GrayScale:
-    case PseudoColor:
-    {
-      unsigned int
-        colormap_type;
-
-      /*
-        Define Standard Colormap for GrayScale or PseudoColor visual.
-      */
-      number_colors=image->colors;
-      colors=(XColor *) AcquireQuantumMemory((size_t)
-        visual_info->colormap_size,sizeof(*colors));
-      if (colors == (XColor *) NULL)
-        ThrowXWindowFatalException(ResourceLimitFatalError,
-          "UnableToCreateColormap",image->filename);
-      /*
-        Preallocate our GUI colors.
-      */
-      XAllocGuiColors(display,colormap,pixel);
-      /*
-        Determine if image colors will "fit" into X server colormap.
-      */
-      colormap_type=resource_info->colormap;
-      status=XAllocColorCells(display,colormap,MagickFalse,(unsigned long *)
-        NULL,0,pixel->pixels,(unsigned int) image->colors);
-      if (status != False)
-        colormap_type=PrivateColormap;
-      if (colormap_type == SharedColormap)
-        {
-          DiversityPacket
-            *diversity;
-
-          XSharedColormapSource
-            shared_source;
-
-          /*
-            Define Standard colormap for shared GrayScale or PseudoColor visual.
-          */
-          diversity=(DiversityPacket *) AcquireQuantumMemory(image->colors,
-            sizeof(*diversity));
-          if (diversity == (DiversityPacket *) NULL)
-            ThrowXWindowFatalException(ResourceLimitFatalError,
-              "UnableToCreateColormap",image->filename);
-          shared_source.display=display;
-          shared_source.visual_info=visual_info;
-          shared_source.colormap=colormap;
-          shared_source.image=image;
-          shared_source.pixel=pixel;
-          shared_source.colors=colors;
-          shared_source.diversity=diversity;
-          shared_source.exception=exception;
-          number_colors=XAllocSharedColors(&shared_source,number_colors);
-          diversity=(DiversityPacket *) RelinquishMagickMemory(diversity);
-          break;
-        }
-      /*
-        Define Standard colormap for private GrayScale or PseudoColor visual.
-      */
-      if (status == False)
-        {
-          XDefaultColorSource
-            default_source;
-
-          /*
-            Not enough colormap entries in the colormap-- Create a new colormap.
-          */
-          colormap=XCreatePrivateColormap(display,visual_info,map_info,image);
-          default_source.display=display;
-          default_source.visual_info=visual_info;
-          default_source.colormap=colormap;
-          default_source.image=image;
-          default_source.pixel=pixel;
-          default_source.colors=colors;
-          number_colors=XRetainDefaultColors(&default_source,number_colors);
-          (void) XAllocColorCells(display,colormap,MagickFalse,
-            (unsigned long *) NULL,0,pixel->pixels,(unsigned int)
-            image->colors);
-        }
-      /*
-        Store the image colormap.
-      */
-      XStoreImageColors(visual_info,image,pixel,colors);
-      (void) XStoreColors(display,colormap,colors,(int) image->colors);
-      break;
-    }
-    case TrueColor:
-    case DirectColor:
-    default:
-    {
-      XTrueColorSource
-        source;
-
-
-      source.display=display;
-      source.visual_info=visual_info;
-      source.colormap=colormap;
-      source.map_info=map_info;
-      source.image=image;
-      XAllocateColorRamp(&source,&number_colors,&colors);
-      XStoreTrueColors(&source,colors,number_colors);
-      break;
-    }
-  }
+  XDefineColormapColors(&context,&targets);
   if ((visual_info->klass != DirectColor) &&
       (visual_info->klass != TrueColor))
     {
@@ -9766,32 +9891,35 @@ static void XSetWindowProtocols(Display *display,const XWindowInfo *window_info)
   (void) XSetWMProtocols(display,window_info->id,atom_list,2);
 }
 
-MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
-  int argc,XClassHint *class_hint,XWMHints *manager_hints,
-  XWindowInfo *window_info)
+static void XSetIconGeometryHints(Display *display,
+  const XWindowInfo *window_info,XSizeHints *size_hints,
+  XWMHints *manager_hints)
 {
-#define MinWindowSize  64
+  if (window_info->icon_geometry != (char *) NULL)
+    {
+      int
+        flags,
+        gravity,
+        height,
+        width;
 
-  int
-    gravity;
+      /*
+        User specified icon geometry.
+      */
+      size_hints->flags|=USPosition;
+      flags=XWMGeometry(display,window_info->screen,window_info->icon_geometry,
+        (char *) NULL,0,size_hints,&manager_hints->icon_x,
+        &manager_hints->icon_y,&width,&height,&gravity);
+      if ((flags & XValue) && (flags & YValue))
+        manager_hints->flags|=IconPositionHint;
+    }
+}
 
-  static XTextProperty
-    icon_name,
-    window_name;
-
-  Status
-    status;
-
+static XSizeHints *XCreateSizeHints(char **argv,const XWindowInfo *window_info)
+{
   XSizeHints
     *size_hints;
 
-  /*
-    Set window info hints.
-  */
-  assert(display != (Display *) NULL);
-  assert(window_info != (XWindowInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
   size_hints=XAllocSizeHints();
   if (size_hints == (XSizeHints *) NULL)
     ThrowXWindowFatalException(XServerFatalError,"UnableToMakeXWindow",argv[0]);
@@ -9828,6 +9956,66 @@ MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
       size_hints->base_height=size_hints->height_inc;
 #endif
     }
+  return(size_hints);
+}
+
+static void XCreateWindowTextProperties(XWindowInfo *window_info,
+  XTextProperty *window_name,XTextProperty *icon_name)
+{
+  Status
+    status;
+
+  status=XStringListToTextProperty(&window_info->name,1,window_name);
+  if (status == False)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateTextProperty",
+      window_info->name);
+  status=XStringListToTextProperty(&window_info->icon_name,1,icon_name);
+  if (status == False)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateTextProperty",
+      window_info->icon_name);
+}
+
+#if defined(MAGICKCORE_HAVE_SHAPE)
+static void XQueryShapeSupport(Display *display,XWindowInfo *window_info)
+{
+  int
+    error_base,
+    event_base;
+
+  /*
+    Can we apply a non-rectangular shaping mask?
+  */
+  error_base=0;
+  event_base=0;
+  if (XShapeQueryExtension(display,&error_base,&event_base) == 0)
+    window_info->shape=MagickFalse;
+}
+#endif
+
+MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
+  int argc,XClassHint *class_hint,XWMHints *manager_hints,
+  XWindowInfo *window_info)
+{
+#define MinWindowSize  64
+
+  int
+    gravity;
+
+  static XTextProperty
+    icon_name,
+    window_name;
+
+  XSizeHints
+    *size_hints;
+
+  /*
+    Set window info hints.
+  */
+  assert(display != (Display *) NULL);
+  assert(window_info != (XWindowInfo *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  size_hints=XCreateSizeHints(argv,window_info);
   gravity=NorthWestGravity;
   gravity=XSetUserGeometry(display,window_info,size_hints,gravity);
 #if !defined(PRE_R4_ICCCM)
@@ -9838,31 +10026,8 @@ MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
   if (window_info->id == (Window) NULL)
     ThrowXWindowFatalException(XServerFatalError,"UnableToCreateWindow",
       window_info->name);
-  status=XStringListToTextProperty(&window_info->name,1,&window_name);
-  if (status == False)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateTextProperty",
-      window_info->name);
-  status=XStringListToTextProperty(&window_info->icon_name,1,&icon_name);
-  if (status == False)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateTextProperty",
-      window_info->icon_name);
-  if (window_info->icon_geometry != (char *) NULL)
-    {
-      int
-        flags,
-        height,
-        width;
-
-      /*
-        User specified icon geometry.
-      */
-      size_hints->flags|=USPosition;
-      flags=XWMGeometry(display,window_info->screen,window_info->icon_geometry,
-        (char *) NULL,0,size_hints,&manager_hints->icon_x,
-        &manager_hints->icon_y,&width,&height,&gravity);
-      if ((flags & XValue) && (flags & YValue))
-        manager_hints->flags|=IconPositionHint;
-    }
+  XCreateWindowTextProperties(window_info,&window_name,&icon_name);
+  XSetIconGeometryHints(display,window_info,size_hints,manager_hints);
   XSetWMProperties(display,window_info->id,&window_name,&icon_name,argv,argc,
     size_hints,manager_hints,class_hint);
   XFreeTextProperty(&window_name);
@@ -9872,17 +10037,7 @@ MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
   if (window_info->shape != MagickFalse)
     {
 #if defined(MAGICKCORE_HAVE_SHAPE)
-      int
-        error_base,
-        event_base;
-
-      /*
-        Can we apply a non-rectangular shaping mask?
-      */
-      error_base=0;
-      event_base=0;
-      if (XShapeQueryExtension(display,&error_base,&event_base) == 0)
-        window_info->shape=MagickFalse;
+      XQueryShapeSupport(display,window_info);
 #else
       window_info->shape=MagickFalse;
 #endif
@@ -10150,6 +10305,70 @@ static unsigned int XClipRefreshHeight(const XWindowInfo *window,const int y,
   return(height);
 }
 
+static void XApplyMatteShape(Display *display,const XWindowInfo *window)
+{
+  if (window->matte_pixmap != (Pixmap) NULL)
+    {
+#if defined(MAGICKCORE_HAVE_SHAPE)
+      if (window->shape != MagickFalse)
+        XShapeCombineMask(display,window->id,ShapeBounding,0,0,
+          window->matte_pixmap,ShapeSet);
+#endif
+    }
+}
+
+typedef struct _XRefreshArea
+{
+  int
+    x,
+    y;
+
+  unsigned int
+    height,
+    width;
+} XRefreshArea;
+
+static void XPutRefreshImage(Display *display,const XWindowInfo *window,
+  const XRefreshArea *area)
+{
+  const int
+    x = area->x,
+    y = area->y;
+
+  const unsigned int
+    height = area->height,
+    width = area->width;
+
+#if defined(MAGICKCORE_HAVE_SHARED_MEMORY)
+  if (window->shared_memory)
+    (void) XShmPutImage(display,window->id,window->annotate_context,
+      window->ximage,x+window->x,y+window->y,x,y,width,height,MagickTrue);
+#endif
+  if (window->shared_memory == MagickFalse)
+    (void) XPutImage(display,window->id,window->annotate_context,
+      window->ximage,x+window->x,y+window->y,x,y,width,height);
+}
+
+static void XCopyRefreshPixmap(Display *display,const XWindowInfo *window,
+  const XRefreshArea *area)
+{
+  const int
+    x = area->x,
+    y = area->y;
+
+  const unsigned int
+    height = area->height,
+    width = area->width;
+
+  if (window->depth > 1)
+    (void) XCopyArea(display,window->pixmap,window->id,
+      window->annotate_context,x+window->x,y+window->y,width,height,x,y);
+  else
+    (void) XCopyPlane(display,window->pixmap,window->id,
+      window->highlight_context,x+window->x,y+window->y,width,height,x,y,
+      1L);
+}
+
 MagickPrivate void XRefreshWindow(Display *display,const XWindowInfo *window,
   const XEvent *event)
 {
@@ -10160,6 +10379,9 @@ MagickPrivate void XRefreshWindow(Display *display,const XWindowInfo *window,
   unsigned int
     height,
     width;
+
+  XRefreshArea
+    area;
 
   assert(display != (Display *) NULL);
   assert(window != (XWindowInfo *) NULL);
@@ -10190,14 +10412,7 @@ MagickPrivate void XRefreshWindow(Display *display,const XWindowInfo *window,
       width=window->width;
       height=window->height;
       while (XCheckTypedWindowEvent(display,window->id,Expose,&sans_event)) ;
-      if (window->matte_pixmap != (Pixmap) NULL)
-        {
-#if defined(MAGICKCORE_HAVE_SHAPE)
-          if (window->shape != MagickFalse)
-            XShapeCombineMask(display,window->id,ShapeBounding,0,0,
-              window->matte_pixmap,ShapeSet);
-#endif
-        }
+      XApplyMatteShape(display,window);
     }
   /*
     Check boundary conditions.
@@ -10209,27 +10424,14 @@ MagickPrivate void XRefreshWindow(Display *display,const XWindowInfo *window,
   */
   if (window->matte_pixmap != (Pixmap) NULL)
     (void) XSetClipMask(display,window->annotate_context,window->matte_pixmap);
+  area.x=x;
+  area.y=y;
+  area.height=height;
+  area.width=width;
   if (window->pixmap != (Pixmap) NULL)
-    {
-      if (window->depth > 1)
-        (void) XCopyArea(display,window->pixmap,window->id,
-          window->annotate_context,x+window->x,y+window->y,width,height,x,y);
-      else
-        (void) XCopyPlane(display,window->pixmap,window->id,
-          window->highlight_context,x+window->x,y+window->y,width,height,x,y,
-          1L);
-    }
+    XCopyRefreshPixmap(display,window,&area);
   else
-    {
-#if defined(MAGICKCORE_HAVE_SHARED_MEMORY)
-      if (window->shared_memory)
-        (void) XShmPutImage(display,window->id,window->annotate_context,
-          window->ximage,x+window->x,y+window->y,x,y,width,height,MagickTrue);
-#endif
-      if (window->shared_memory == MagickFalse)
-        (void) XPutImage(display,window->id,window->annotate_context,
-          window->ximage,x+window->x,y+window->y,x,y,width,height);
-    }
+    XPutRefreshImage(display,window,&area);
   if (window->matte_pixmap != (Pixmap) NULL)
     (void) XSetClipMask(display,window->annotate_context,None);
   (void) XFlush(display);
@@ -10373,16 +10575,253 @@ static void XSetRenderMetrics(TypeMetric *metrics,const DrawInfo *draw_info,
   metrics->underline_thickness=1.0;
 }
 
-MagickPrivate MagickBooleanType XRenderImage(Image *image,
-  const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
-  ExceptionInfo *exception)
+typedef struct _XRenderTargets
 {
+  XrmDatabase
+    *resource_database;
+
+  XResourceInfo
+    *resource_info;
+
+  XStandardColormap
+    **map_info;
+
+  XVisualInfo
+    **visual_info;
+
+  XFontStruct
+    **font_info;
+
+  XPixelInfo
+    *pixel;
+
+  DrawInfo
+    *cache_info;
+
+  Display
+    **display;
+} XRenderTargets;
+
+static MagickBooleanType XInitializeRenderResources(const DrawInfo *draw_info,
+  const Image *image,Display *display,const XRenderTargets *targets)
+{
+  XrmDatabase
+    *const resource_database = targets->resource_database;
+
+  XResourceInfo
+    *const resource_info = targets->resource_info;
+
+  XStandardColormap
+    **const map_info = targets->map_info;
+
+  XVisualInfo
+    **const visual_info = targets->visual_info;
+
+  XFontStruct
+    **const font_info = targets->font_info;
+
+  XPixelInfo
+    *const pixel = targets->pixel;
+
+  DrawInfo
+    *const cache_info = targets->cache_info;
+
+  const char
+    *client_name;
+
+  ImageInfo
+    *image_info;
+
+  (void) XSetErrorHandler(XError);
+  image_info=AcquireImageInfo();
+  client_name=GetClientName();
+  (*resource_database)=XGetResourceDatabase(display,client_name);
+  XGetResourceInfo(image_info,(*resource_database),client_name,resource_info);
+  (*resource_info).close_server=MagickFalse;
+  (*resource_info).colormap=PrivateColormap;
+  (*resource_info).font=AcquireString(draw_info->font);
+  (*resource_info).background_color=AcquireString("#ffffffffffff");
+  (*resource_info).foreground_color=AcquireString("#000000000000");
+  (*map_info)=XAllocStandardColormap();
+  (*visual_info)=(XVisualInfo *) NULL;
+  (*font_info)=(XFontStruct *) NULL;
+  (*pixel).pixels=(unsigned long *) NULL;
+  if ((*map_info) == (XStandardColormap *) NULL)
+    {
+      ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
+        image->filename);
+      return(MagickFalse);
+    }
+  /*
+    Initialize visual info.
+  */
+  (*visual_info)=XBestVisualInfo(display,(*map_info),resource_info);
+  if ((*visual_info) == (XVisualInfo *) NULL)
+    {
+      XFreeResources(display,(*visual_info),(*map_info),pixel,(*font_info),
+        resource_info,(XWindowInfo *) NULL);
+      ThrowXWindowException(XServerError,"UnableToGetVisual",
+        image->filename);
+      return(MagickFalse);
+    }
+  (*map_info)->colormap=(Colormap) NULL;
+  /*
+    Initialize Standard Colormap info.
+  */
+  XGetMapInfo((*visual_info),XDefaultColormap(display,(*visual_info)->screen),
+    (*map_info));
+  XGetPixelInfo(display,(*visual_info),(*map_info),resource_info,(Image *) NULL,
+    pixel);
+  (*pixel).annotate_context=XDefaultGC(display,(*visual_info)->screen);
+  /*
+    Initialize font info.
+  */
+  (*font_info)=XBestFont(display,resource_info,MagickFalse);
+  if ((*font_info) == (XFontStruct *) NULL)
+    {
+      XFreeResources(display,(*visual_info),(*map_info),pixel,(*font_info),
+        resource_info,(XWindowInfo *) NULL);
+      ThrowXWindowException(XServerError,"UnableToLoadFont",
+        draw_info->font);
+      return(MagickFalse);
+    }
+  (*cache_info)=(*draw_info);
+  return(MagickTrue);
+}
+
+typedef struct _XRenderRequest
+{
+  Image
+    *image;
+
+  const DrawInfo
+    *draw_info;
+
+  const PointInfo
+    *offset;
+
+  TypeMetric
+    *metrics;
+
+  ExceptionInfo
+    *exception;
+} XRenderRequest;
+
+static MagickBooleanType XRenderFillColor(const XRenderRequest *request,
+  Display *display,XAnnotateInfo *annotate_info,XPixelInfo *pixel)
+{
+  Image
+    *const image = request->image;
+
+  const DrawInfo
+    *const draw_info = request->draw_info;
+
+  const PointInfo
+    *const offset = request->offset;
+
+  TypeMetric
+    *const metrics = request->metrics;
+
+  ExceptionInfo
+    *const exception = request->exception;
+
   MagickBooleanType
     status;
 
   size_t
     height,
     width;
+
+  /*
+    Render fill color.
+  */
+  width=(*annotate_info).width;
+  height=(*annotate_info).height;
+  if ((fabs(draw_info->affine.rx) >= MagickEpsilon) ||
+      (fabs(draw_info->affine.ry) >= MagickEpsilon))
+    {
+      if ((fabs(draw_info->affine.sx-draw_info->affine.sy) < MagickEpsilon) &&
+          (fabs(draw_info->affine.rx+draw_info->affine.ry) < MagickEpsilon))
+        (*annotate_info).degrees=(double) (180.0/MagickPI)*
+          atan2(draw_info->affine.rx,draw_info->affine.sx);
+    }
+  (void) FormatLocaleString((*annotate_info).geometry,MagickPathExtent,
+    "%.17gx%.17g%+.20g%+.20g",(double) width,(double) height,
+    ceil(offset->x-0.5),ceil(offset->y-metrics->ascent-metrics->descent+
+    draw_info->interline_spacing-0.5));
+  (*pixel).pen_color.red=ScaleQuantumToShort(
+    ClampToQuantum(draw_info->fill.red));
+  (*pixel).pen_color.green=ScaleQuantumToShort(
+    ClampToQuantum(draw_info->fill.green));
+  (*pixel).pen_color.blue=ScaleQuantumToShort(
+    ClampToQuantum(draw_info->fill.blue));
+  status=XAnnotateImage(display,pixel,annotate_info,image,exception);
+  if (status == 0)
+    {
+      ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
+        image->filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType XChangeRenderFont(const DrawInfo *draw_info,
+  Display *display,char *font,const XRenderTargets *targets)
+{
+  XResourceInfo
+    *const resource_info = targets->resource_info;
+
+  XFontStruct
+    **const font_info = targets->font_info;
+
+  if (font != draw_info->font)
+    {
+      /*
+        Type name has changed.
+      */
+      (void) XFreeFont(display,(*font_info));
+      (void) CloneString(&(*resource_info).font,draw_info->font);
+      (*font_info)=XBestFont(display,resource_info,MagickFalse);
+      if ((*font_info) == (XFontStruct *) NULL)
+        {
+          ThrowXWindowException(XServerError,"UnableToLoadFont",
+            draw_info->font);
+          return(MagickFalse);
+        }
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType XOpenRenderResources(const DrawInfo *draw_info,
+  const Image *image,const XRenderTargets *targets)
+{
+  Display
+    **const display = targets->display;
+
+  /*
+    Open X server connection.
+  */
+  (*display)=XOpenDisplay(draw_info->server_name);
+  if ((*display) == (Display *) NULL)
+    {
+      ThrowXWindowException(XServerError,"UnableToOpenXServer",
+        draw_info->server_name);
+      return(MagickFalse);
+    }
+  /*
+    Get user defaults from X resource database.
+  */
+  if (XInitializeRenderResources(draw_info,image,(*display),targets) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+MagickPrivate MagickBooleanType XRenderImage(Image *image,
+  const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
+  ExceptionInfo *exception)
+{
+  XRenderRequest
+    request;
 
   static Display
     *display = (Display *) NULL;
@@ -10411,102 +10850,22 @@ MagickPrivate MagickBooleanType XRenderImage(Image *image,
   static XVisualInfo
     *visual_info;
 
+  const XRenderTargets
+    targets = { &resource_database, &resource_info, &map_info, &visual_info,
+      &font_info, &pixel, &cache_info, &display };
+
   if (display == (Display *) NULL)
     {
-      const char
-        *client_name;
-
-      ImageInfo
-        *image_info;
-
-      /*
-        Open X server connection.
-      */
-      display=XOpenDisplay(draw_info->server_name);
-      if (display == (Display *) NULL)
-        {
-          ThrowXWindowException(XServerError,"UnableToOpenXServer",
-            draw_info->server_name);
-          return(MagickFalse);
-        }
-      /*
-        Get user defaults from X resource database.
-      */
-      (void) XSetErrorHandler(XError);
-      image_info=AcquireImageInfo();
-      client_name=GetClientName();
-      resource_database=XGetResourceDatabase(display,client_name);
-      XGetResourceInfo(image_info,resource_database,client_name,&resource_info);
-      resource_info.close_server=MagickFalse;
-      resource_info.colormap=PrivateColormap;
-      resource_info.font=AcquireString(draw_info->font);
-      resource_info.background_color=AcquireString("#ffffffffffff");
-      resource_info.foreground_color=AcquireString("#000000000000");
-      map_info=XAllocStandardColormap();
-      visual_info=(XVisualInfo *) NULL;
-      font_info=(XFontStruct *) NULL;
-      pixel.pixels=(unsigned long *) NULL;
-      if (map_info == (XStandardColormap *) NULL)
-        {
-          ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
-            image->filename);
-          return(MagickFalse);
-        }
-      /*
-        Initialize visual info.
-      */
-      visual_info=XBestVisualInfo(display,map_info,&resource_info);
-      if (visual_info == (XVisualInfo *) NULL)
-        {
-          XFreeResources(display,visual_info,map_info,&pixel,font_info,
-            &resource_info,(XWindowInfo *) NULL);
-          ThrowXWindowException(XServerError,"UnableToGetVisual",
-            image->filename);
-          return(MagickFalse);
-        }
-      map_info->colormap=(Colormap) NULL;
-      /*
-        Initialize Standard Colormap info.
-      */
-      XGetMapInfo(visual_info,XDefaultColormap(display,visual_info->screen),
-        map_info);
-      XGetPixelInfo(display,visual_info,map_info,&resource_info,(Image *) NULL,
-        &pixel);
-      pixel.annotate_context=XDefaultGC(display,visual_info->screen);
-      /*
-        Initialize font info.
-      */
-      font_info=XBestFont(display,&resource_info,MagickFalse);
-      if (font_info == (XFontStruct *) NULL)
-        {
-          XFreeResources(display,visual_info,map_info,&pixel,font_info,
-            &resource_info,(XWindowInfo *) NULL);
-          ThrowXWindowException(XServerError,"UnableToLoadFont",
-            draw_info->font);
-          return(MagickFalse);
-        }
-      cache_info=(*draw_info);
+      if (XOpenRenderResources(draw_info,image,&targets) == MagickFalse)
+        return(MagickFalse);
     }
   /*
     Initialize annotate info.
   */
   XGetAnnotateInfo(&annotate_info);
   annotate_info.stencil=ForegroundStencil;
-  if (cache_info.font != draw_info->font)
-    {
-      /*
-        Type name has changed.
-      */
-      (void) XFreeFont(display,font_info);
-      (void) CloneString(&resource_info.font,draw_info->font);
-      font_info=XBestFont(display,&resource_info,MagickFalse);
-      if (font_info == (XFontStruct *) NULL)
-        {
-          ThrowXWindowException(XServerError,"UnableToLoadFont",
-            draw_info->font);
-          return(MagickFalse);
-        }
-    }
+  if (XChangeRenderFont(draw_info,display,cache_info.font,&targets) == MagickFalse)
+    return(MagickFalse);
   if (draw_info->debug != MagickFalse)
     (void) LogMagickEvent(AnnotateEvent,GetMagickModule(),
       "Font %s; pointsize %g",draw_info->font != (char *) NULL ?
@@ -10522,37 +10881,12 @@ MagickPrivate MagickBooleanType XRenderImage(Image *image,
     return(MagickTrue);
   if (draw_info->fill.alpha == (double) TransparentAlpha)
     return(MagickTrue);
-  /*
-    Render fill color.
-  */
-  width=annotate_info.width;
-  height=annotate_info.height;
-  if ((fabs(draw_info->affine.rx) >= MagickEpsilon) ||
-      (fabs(draw_info->affine.ry) >= MagickEpsilon))
-    {
-      if ((fabs(draw_info->affine.sx-draw_info->affine.sy) < MagickEpsilon) &&
-          (fabs(draw_info->affine.rx+draw_info->affine.ry) < MagickEpsilon))
-        annotate_info.degrees=(double) (180.0/MagickPI)*
-          atan2(draw_info->affine.rx,draw_info->affine.sx);
-    }
-  (void) FormatLocaleString(annotate_info.geometry,MagickPathExtent,
-    "%.17gx%.17g%+.20g%+.20g",(double) width,(double) height,
-    ceil(offset->x-0.5),ceil(offset->y-metrics->ascent-metrics->descent+
-    draw_info->interline_spacing-0.5));
-  pixel.pen_color.red=ScaleQuantumToShort(
-    ClampToQuantum(draw_info->fill.red));
-  pixel.pen_color.green=ScaleQuantumToShort(
-    ClampToQuantum(draw_info->fill.green));
-  pixel.pen_color.blue=ScaleQuantumToShort(
-    ClampToQuantum(draw_info->fill.blue));
-  status=XAnnotateImage(display,&pixel,&annotate_info,image,exception);
-  if (status == 0)
-    {
-      ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
-        image->filename);
-      return(MagickFalse);
-    }
-  return(MagickTrue);
+  request.image=image;
+  request.draw_info=draw_info;
+  request.offset=offset;
+  request.metrics=metrics;
+  request.exception=exception;
+  return(XRenderFillColor(&request,display,&annotate_info,&pixel));
 }
 
 /*
