@@ -1488,6 +1488,13 @@ typedef struct _WindowDescendInput
     *window_info;
 } WindowDescendInput;
 
+static void XAdjustWindowCrop(Display *display,RectangleInfo *crop_info,
+  const unsigned int borders,const XWindowAttributes window_attributes)
+{
+  XIncludeWindowBorder(crop_info,borders,window_attributes);
+  XCropToRootWindow(display,crop_info);
+}
+
 typedef struct _WindowCropTargets
 {
   int
@@ -1659,8 +1666,7 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
   if (XGetViewableAttributes(display,window,&window_attributes) == MagickFalse)
     return((Image *) NULL);
   XGetWindowCrop(display,window,window_attributes,&targets);
-  XIncludeWindowBorder(&crop_info,borders,window_attributes);
-  XCropToRootWindow(display,&crop_info);
+  XAdjustWindowCrop(display,&crop_info,borders,window_attributes);
   /*
     Initialize window info attributes.
   */
