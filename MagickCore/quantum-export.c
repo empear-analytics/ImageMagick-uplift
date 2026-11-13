@@ -6444,6 +6444,38 @@ static void ExportBGRGrayFamilyQuantum(const Image *image,
   }
 }
 
+static void ExportChannelFamilyQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumType quantum_type,
+  QuantumPixelSpan span)
+{
+  switch (quantum_type)
+  {
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      ExportPixelChannel(image,quantum_info,&span,BluePixelChannel);
+      break;
+    }
+    case CbYCrYQuantum:
+    {
+      ExportCbYCrYQuantum(image,quantum_info,&span);
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      ExportPixelChannel(image,quantum_info,&span,
+        GreenPixelChannel);
+      break;
+    }
+    default:
+    {
+      ExportBGRGrayFamilyQuantum(image,quantum_info,quantum_type,span);
+      break;
+    }
+  }
+}
+
 MagickExport size_t ExportQuantumPixels(const Image *image,
   CacheView *image_view,QuantumInfo *quantum_info,
   const QuantumType quantum_type,unsigned char *magick_restrict pixels,
@@ -6508,12 +6540,6 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
       ExportBlackQuantum(image,quantum_info,&span,exception);
       break;
     }
-    case BlueQuantum:
-    case YellowQuantum:
-    {
-      ExportPixelChannel(image,quantum_info,&span,BluePixelChannel);
-      break;
-    }
     case CMYKQuantum:
     {
       ExportCMYKQuantum(image,quantum_info,&span,exception);
@@ -6534,18 +6560,6 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
       ExportCMYKOQuantum(image,quantum_info,&span,exception);
       break;
     }
-    case CbYCrYQuantum:
-    {
-      ExportCbYCrYQuantum(image,quantum_info,&span);
-      break;
-    }
-    case GreenQuantum:
-    case MagentaQuantum:
-    {
-      ExportPixelChannel(image,quantum_info,&span,
-        GreenPixelChannel);
-      break;
-    }
     case IndexQuantum:
     {
       ExportIndexQuantum(image,quantum_info,&span,exception);
@@ -6563,7 +6577,7 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
     }
     default:
     {
-      ExportBGRGrayFamilyQuantum(image,quantum_info,quantum_type,span);
+      ExportChannelFamilyQuantum(image,quantum_info,quantum_type,span);
       break;
     }
   }
