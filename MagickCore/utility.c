@@ -1137,6 +1137,62 @@ static void TransferFileList(const FileListTransfer *transfer,char *filename,
   }
 }
 
+typedef struct _WildcardArgument
+{
+  char
+    *option,
+    *filename,
+    *path,
+    *subimage,
+    *home_directory;
+} WildcardArgument;
+
+static void ListWildcardFiles(const WildcardArgument *wildcard,
+  char ***filelist,size_t *number_files)
+{
+  char
+    *const option = wildcard->option,
+    *const filename = wildcard->filename,
+    *const path = wildcard->path,
+    *const subimage = wildcard->subimage,
+    *const home_directory = wildcard->home_directory;
+
+  /*
+    Generate file list from wildcard filename (e.g. *.jpg).
+  */
+  GetPathComponent(option,HeadPath,path);
+  GetPathComponent(option,SubimagePath,subimage);
+  ExpandFilename(path);
+  if (*home_directory == '\0')
+    getcwd_utf8(home_directory,MagickPathExtent-1);
+  (*filelist)=ListFiles(*path == '\0' ? home_directory : path,filename,
+    number_files);
+}
+
+static MagickBooleanType ListArgumentFiles(const WildcardArgument *wildcard,
+  char ***filelist,size_t *number_files)
+{
+  char
+    *const option = wildcard->option;
+
+  if (*option != '@')
+    ListWildcardFiles(wildcard,filelist,number_files);
+  else
+    {
+      ArgumentFileTargets
+        targets;
+
+      /*
+        Generate file list from file list (e.g. @filelist.txt).
+      */
+      targets.filelist=filelist;
+      targets.number_files=number_files;
+      if (ReadFileList(option,&targets) == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType HasFileListFiles(char ***filelist,
   const size_t number_files)
 {
@@ -1217,6 +1273,9 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
     MagickBooleanType
       destroy;
 
+    WildcardArgument
+      wildcard;
+
     option=(*arguments)[i];
     *magick='\0';
     *path='\0';
@@ -1239,32 +1298,13 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
       }
     if (ParseExpandableArgument(option,filename,magick) == MagickFalse)
       continue;
-    if (*option != '@')
-      {
-        /*
-          Generate file list from wildcard filename (e.g. *.jpg).
-        */
-        GetPathComponent(option,HeadPath,path);
-        GetPathComponent(option,SubimagePath,subimage);
-        ExpandFilename(path);
-        if (*home_directory == '\0')
-          getcwd_utf8(home_directory,MagickPathExtent-1);
-        filelist=ListFiles(*path == '\0' ? home_directory : path,filename,
-          &number_files);
-      }
-    else
-      {
-        ArgumentFileTargets
-          targets;
-
-        /*
-          Generate file list from file list (e.g. @filelist.txt).
-        */
-        targets.filelist=(&filelist);
-        targets.number_files=(&number_files);
-        if (ReadFileList(option,&targets) == MagickFalse)
-          continue;
-      }
+    wildcard.option=option;
+    wildcard.filename=filename;
+    wildcard.path=path;
+    wildcard.subimage=subimage;
+    wildcard.home_directory=home_directory;
+    if (ListArgumentFiles(&wildcard,&filelist,&number_files) == MagickFalse)
+      continue;
     if (HasFileListFiles(&filelist,number_files) == MagickFalse)
       continue;
     /*
