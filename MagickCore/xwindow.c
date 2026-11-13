@@ -2292,20 +2292,7 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
     Determine draw geometry.
   */
   (void) XParseGeometry(draw_info->geometry,&x,&y,&width,&height);
-  if ((width != (unsigned int) draw_image->columns) ||
-      (height != (unsigned int) draw_image->rows))
-    {
-      char
-        image_geometry[MagickPathExtent];
-
-      /*
-        Scale image.
-      */
-      (void) FormatLocaleString(image_geometry,MagickPathExtent,"%ux%u",
-        width,height);
-      (void) TransformImage(&draw_image,(char *) NULL,image_geometry,
-        exception);
-    }
+  draw_image=XScaleAnnotateImage(draw_image,width,height,exception);
   if (draw_info->degrees != 0.0)
     {
       Image
