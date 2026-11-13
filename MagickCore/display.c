@@ -8317,6 +8317,17 @@ static void XPrepareDrawInfo(const DrawEditContext *context,
   windows->pixel_info->pen_color=windows->pixel_info->pen_colors[(*pen_id)];
 }
 
+static void XMapDrawCommandWidget(Display *display,XWindows *windows,
+  const char *const *DrawMenu)
+{
+  (void) CloneString(&windows->command.name,"Draw");
+  windows->command.data=4;
+  (void) XCommandWidget(display,windows,DrawMenu,(XEvent *) NULL);
+  (void) XMapRaised(display,windows->command.id);
+  XClientMessage(display,windows->image.id,windows->im_protocols,
+    windows->im_update_widget,CurrentTime);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -8423,12 +8434,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
   /*
     Map Command widget.
   */
-  (void) CloneString(&windows->command.name,"Draw");
-  windows->command.data=4;
-  (void) XCommandWidget(display,windows,DrawMenu,(XEvent *) NULL);
-  (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
+  XMapDrawCommandWidget(display,windows,DrawMenu);
   /*
     Wait for first button press.
   */
