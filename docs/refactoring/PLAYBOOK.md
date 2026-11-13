@@ -12658,6 +12658,18 @@ Recipe SD, whose groups do not return.
 5. Why the behaviour is the same: where the group returned `R`, the helper returns `R`
    and the caller returns it; where it broke, the caller would have returned `F` and the
    helper returns `F`.
+6. *Void form* (2026-11-13). In a `void` function, a group whose every path ends with
+   `return;` (its last statement is `return;`; it holds no `break;` of the `switch`, and
+   nothing else step 1 refuses) moves wherever the `switch` stands, step 1's `return(F);`
+   aside. The new function is `static void`; its body is the block without its last
+   `return;`, every other `return;` unchanged; the group's place holds
+   `Helper(<arguments>);` and `return;`. A `static` of the caller's body that the block
+   writes goes by pointer on Recipe O step 2's terms (`*v` at every use, the call passing
+   `&v`); inputs past four go in one input struct of Recipe N (steps 2 to 6, step 8 for
+   sibling blocks sharing it). Why the behaviour is the same: each `return;` ends the
+   helper after the statements that ran before it in the caller, and the caller's
+   `return;` follows the call at once, so the caller ends at the same point; nothing
+   after the `switch` ran on any path of the group, before or after.
 
 **Before:**
 
@@ -12698,6 +12710,10 @@ M120): three domain groups to `SetCachePolicyValue`, `SetResourcePolicyValue` an
 `SetSystemPolicyValue`, the function leaving Large Method and Bumpy Road to 3 bumps, the
 file 5.29 to 5.45. Added by Claude Code (Claude Sonnet 5.5) under the mandate of
 2026-10-24.
+Step 6 (void form): 2026-11-13, from `display.c`'s `XImageCache` (campaign A, W23 round
+nine lane b, wide build), whose undo group (`return;` on its three paths, the undo and redo
+lists `static`) is the last block holding the function's *Complex Method*. Added by Claude
+Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
@@ -16261,3 +16277,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | KM | Replace a Key Switch Selecting by Modifier Masks with a Table of Rules: the groups of a key `switch` that return a constant command after at most two non-Control mask tests and the Control test become rows `{ key, mask, command, mask, command, plain, control }` of a `static const` table (a missing pair filled with `ControlMask` and the control command) read by one lookup function that the caller returns from after `default: break;`. *Careful* gives the argument (same value, same tests in the same order, the filler pair returns what the next test would, `break` meant the closing return) | `display.c`'s `XImageWindowCommand` (campaign A, W23 round eight lane a, wide build): cc 132 to 41, 342 to 129 lines, the lookup finding-free; KR, KT, KC and KE refuse groups that test masks | owner |
 | 2026-11-13 | AMEND | F | Step 2: a `static` array that the function stores into a member of a local struct it only fills may move as written, when every reader of the member only reads through it by subscript (checked by reading each reader). The declaration is already `static`, so its storage, bytes and section do not change (data sections compare identical); only the scope of its name widens, which steps 4 and 5 check | `display.c`'s `XDisplayImage` (campaign A, W23 round eight lane b, wide build): the thirteen `static DisplayCommand` tables and `Commands` are stored into `event_context.VirtualCommands`, `.ShortCutsCommands` and `.Commands` and read by subscript in `XSelectCommandMenuEntry`, `XSelectVirtualCommand` and `XPressImageButton3`; Recipe F's text covered element reads and `const` pointer arguments only | owner |
 | 2026-11-13 | AMEND | LP | Step 6 (*fall-out form*): besides the label group `G` and `default: break;` the `switch` may hold other groups that end every path with a `return`, and `G`'s body `B` may end with its only `break;` of the `switch`; `e` is a parameter or local nothing in the `switch` writes. `G` leaves the `switch` and `B`, without the `break;`, stands under `if (<Name>(e) != MagickFalse)` directly after the `switch`. *Careful* gives the argument (disjoint labels; `default: break;` reaches the same point doing nothing; `e` side-effect free and unwritten, so the predicate sees the selected value; the returning groups never reach the `if`) | `display.c`'s `XImageCache` (campaign A, W23 round nine lane b, wide build): the sixty-label save-to-undo group breaks to the redo and info tests beside the free-buffers and undo groups, which return, so step 1's two-group form refused it; a probe of the chain (N on the save body, this step, TB, RC on the undo group, N on the tail) leaves `XImageCache` only its six arguments | owner |
+| 2026-11-13 | AMEND | RC | Step 6 (*void form*): in a `void` function a group whose every path ends with `return;` moves wherever the `switch` stands into a `static void` function, its last `return;` dropped and every other kept; the group holds `Helper(...); return;`. Written block-scope statics go by pointer on Recipe O step 2's terms, inputs past four in a Recipe N input struct. The step gives the argument (each `return;` ends the helper where it ended the caller, whose `return;` follows the call at once) | `display.c`'s `XImageCache` (campaign A, W23 round nine lane b, wide build): the undo group returns on its three paths and writes the static undo and redo lists; RC's value form (`return(F);` after the `switch`) refused it | owner |
