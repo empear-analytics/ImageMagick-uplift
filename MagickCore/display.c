@@ -12655,6 +12655,56 @@ static void XMatteRelease(const MatteCommandInput *input,const XEvent *event,
   (*state)&=(unsigned int) (~UpdateConfigurationState);
 }
 
+static void XMatteEditEvent(const MatteCommandInput *input,XEvent *event,
+  const Cursor cursor,const MatteEventTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  XWindows
+    *const windows = input->windows;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  size_t
+    *const state = targets->state;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      XMattePress(input,event,targets);
+      break;
+    }
+    case ButtonRelease:
+    {
+      XMatteRelease(input,event,cursor,targets);
+      break;
+    }
+    case Expose:
+      break;
+    case KeyPress:
+    {
+      (*state)=XMatteKeyPress(input,event,(*state));
+      break;
+    }
+    case MotionNotify:
+    {
+      /*
+        Map and unmap Info widget as cursor crosses its boundaries.
+      */
+      (*x)=(*event).xmotion.x;
+      (*y)=(*event).xmotion.y;
+      XTrackInfoWidget(display,windows,(*x),(*y));
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType XMatteEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -12765,38 +12815,7 @@ static MagickBooleanType XMatteEditImage(Display *display,
     XScreenEvent(display,windows,&event,exception);
     if (XMatteCommandBlock(&command_input,&event,cursor,&state) != MagickFalse)
       continue;
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        XMattePress(&command_input,&event,&event_targets);
-        break;
-      }
-      case ButtonRelease:
-      {
-        XMatteRelease(&command_input,&event,cursor,&event_targets);
-        break;
-      }
-      case Expose:
-        break;
-      case KeyPress:
-      {
-        state=XMatteKeyPress(&command_input,&event,state);
-        break;
-      }
-      case MotionNotify:
-      {
-        /*
-          Map and unmap Info widget as cursor crosses its boundaries.
-        */
-        x=event.xmotion.x;
-        y=event.xmotion.y;
-        XTrackInfoWidget(display,windows,x,y);
-        break;
-      }
-      default:
-        break;
-    }
+    XMatteEditEvent(&command_input,&event,cursor,&event_targets);
     if (event.xany.window == windows->magnify.id)
       {
         x=windows->magnify.x-windows->image.x;
