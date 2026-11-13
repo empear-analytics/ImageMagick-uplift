@@ -322,6 +322,23 @@ static void DestroyXWindowImagesAndId(Display *display,XWindowInfo *window)
     }
 }
 
+static void DestroyXWindowOwnedImage(Display *display,XWindowInfo *window)
+{
+  if (window->destroy != MagickFalse)
+    {
+      if (window->image != (Image *) NULL)
+        {
+          window->image=DestroyImage(window->image);
+          window->image=NewImageList();
+        }
+      if (window->matte_pixmap != (Pixmap) NULL)
+        {
+          (void) XFreePixmap(display,window->matte_pixmap);
+          window->matte_pixmap=(Pixmap) NULL;
+        }
+    }
+}
+
 MagickExport void DestroyXResources(void)
 {
   int
@@ -363,20 +380,7 @@ MagickExport void DestroyXResources(void)
     DestroyXWindowNames(magick_windows[i]);
     FreeXWindowCursors(windows->display,magick_windows[i]);
     DestroyXWindowImagesAndId(windows->display,magick_windows[i]);
-    if (magick_windows[i]->destroy != MagickFalse)
-      {
-        if (magick_windows[i]->image != (Image *) NULL)
-          {
-            magick_windows[i]->image=DestroyImage(magick_windows[i]->image);
-            magick_windows[i]->image=NewImageList();
-          }
-        if (magick_windows[i]->matte_pixmap != (Pixmap) NULL)
-          {
-            (void) XFreePixmap(windows->display,
-              magick_windows[i]->matte_pixmap);
-            magick_windows[i]->matte_pixmap=(Pixmap) NULL;
-          }
-      }
+    DestroyXWindowOwnedImage(windows->display,magick_windows[i]);
     if (magick_windows[i]->segment_info != (void *) NULL)
       {
 #if defined(MAGICKCORE_HAVE_SHARED_MEMORY)
