@@ -4224,6 +4224,69 @@ static MagickBooleanType CreateMappedPixelCache(CacheInfo *cache_info,
   return(MagickTrue);
 }
 
+static MagickBooleanType CreateDistributedPixelCache(CacheInfo *cache_info,
+  const PixelCacheOpenInfo *open_info,CacheInfo source_info,
+  DistributeCacheInfo *server_info)
+{
+  const MapMode
+    mode = open_info->mode;
+
+  ExceptionInfo
+    *const exception = open_info->exception;
+
+  char
+    format[MagickPathExtent],
+    message[MagickPathExtent];
+
+  const char
+    *type;
+
+  MagickBooleanType
+    status;
+
+  /*
+    Create a distributed pixel cache.
+  */
+  status=MagickTrue;
+  cache_info->type=DistributedCache;
+  cache_info->server_info=server_info;
+  (void) FormatLocaleString(cache_info->cache_filename,
+    MagickPathExtent,"%s:%d",GetDistributeCacheHostname(
+    (DistributeCacheInfo *) cache_info->server_info),
+    GetDistributeCachePort((DistributeCacheInfo *)
+    cache_info->server_info));
+  if (IsCacheSourcePending(source_info,mode) != MagickFalse)
+    {
+      status=ClonePixelCacheRepository(cache_info,&source_info,
+        exception);
+      RelinquishPixelCachePixels(&source_info);
+    }
+  if (cache_info->debug != MagickFalse)
+    {
+      (void) FormatMagickSize(cache_info->length,MagickFalse,"B",
+        MagickPathExtent,format);
+      type=CommandOptionToMnemonic(MagickCacheOptions,(ssize_t)
+        cache_info->type);
+      (void) FormatLocaleString(message,MagickPathExtent,
+        "open %s (%s[%d], %s, %.17gx%.17gx%.17g %s)",
+        cache_info->filename,cache_info->cache_filename,
+        GetDistributeCacheFile((DistributeCacheInfo *)
+        cache_info->server_info),type,(double) cache_info->columns,
+        (double) cache_info->rows,(double)
+        cache_info->number_channels,format);
+      (void) LogMagickEvent(CacheEvent,GetMagickModule(),"%s",
+        message);
+    }
+  if (status == 0)
+    {
+      if (IsCacheSourcePending(source_info,mode) != MagickFalse)
+        RelinquishPixelCachePixels(&source_info);
+      cache_info->type=UndefinedCache;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
   ExceptionInfo *exception)
 {
@@ -4415,49 +4478,8 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
               server_info=DestroyDistributeCacheInfo(server_info);
             }
           else
-            {
-              /*
-                Create a distributed pixel cache.
-              */
-              status=MagickTrue;
-              cache_info->type=DistributedCache;
-              cache_info->server_info=server_info;
-              (void) FormatLocaleString(cache_info->cache_filename,
-                MagickPathExtent,"%s:%d",GetDistributeCacheHostname(
-                (DistributeCacheInfo *) cache_info->server_info),
-                GetDistributeCachePort((DistributeCacheInfo *)
-                cache_info->server_info));
-              if (IsCacheSourcePending(source_info,mode) != MagickFalse)
-                {
-                  status=ClonePixelCacheRepository(cache_info,&source_info,
-                    exception);
-                  RelinquishPixelCachePixels(&source_info);
-                }
-              if (cache_info->debug != MagickFalse)
-                {
-                  (void) FormatMagickSize(cache_info->length,MagickFalse,"B",
-                    MagickPathExtent,format);
-                  type=CommandOptionToMnemonic(MagickCacheOptions,(ssize_t)
-                    cache_info->type);
-                  (void) FormatLocaleString(message,MagickPathExtent,
-                    "open %s (%s[%d], %s, %.17gx%.17gx%.17g %s)",
-                    cache_info->filename,cache_info->cache_filename,
-                    GetDistributeCacheFile((DistributeCacheInfo *)
-                    cache_info->server_info),type,(double) cache_info->columns,
-                    (double) cache_info->rows,(double)
-                    cache_info->number_channels,format);
-                  (void) LogMagickEvent(CacheEvent,GetMagickModule(),"%s",
-                    message);
-                }
-              if (status == 0)
-                {
-                  if (IsCacheSourcePending(source_info,mode) != MagickFalse)
-                    RelinquishPixelCachePixels(&source_info);
-                  cache_info->type=UndefinedCache;
-                  return(MagickFalse);
-                }
-              return(MagickTrue);
-            }
+            return(CreateDistributedPixelCache(cache_info,&open_info,
+              source_info,server_info));
         }
       if (IsCacheSourcePending(source_info,mode) != MagickFalse)
         RelinquishPixelCachePixels(&source_info);
