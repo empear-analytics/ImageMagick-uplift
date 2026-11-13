@@ -541,9 +541,12 @@ MagickExport void GetPixelInfo(const Image *image,PixelInfo *pixel)
 typedef MagickRealType
   (*PixelGammaHandler)(const MagickRealType);
 
+static const double
+  rec601_weights[3] = { 0.298839, 0.586811, 0.114350 },
+  rec709_weights[3] = { 0.212656, 0.715158, 0.072186 };
+
 static MagickRealType GammaWeightedIntensity(const MagickRealType *sample,
-  const PixelGammaHandler gamma,const double red_weight,
-  const double green_weight,const double blue_weight)
+  const PixelGammaHandler gamma,const double *weight)
 {
   MagickRealType
     blue,
@@ -559,7 +562,25 @@ static MagickRealType GammaWeightedIntensity(const MagickRealType *sample,
       green=gamma(green);
       blue=gamma(blue);
     }
-  return(red_weight*red+green_weight*green+blue_weight*blue);
+  return(weight[0]*red+weight[1]*green+weight[2]*blue);
+}
+
+static MagickRealType LumaIntensityFromSamples(
+  const PixelIntensityMethod method,const PixelGammaHandler encode,
+  const PixelGammaHandler decode,const MagickRealType *sample)
+{
+  switch (method)
+  {
+    case Rec601LumaPixelIntensityMethod:
+      return(GammaWeightedIntensity(sample,encode,rec601_weights));
+    case Rec601LuminancePixelIntensityMethod:
+      return(GammaWeightedIntensity(sample,decode,rec601_weights));
+    case Rec709LuminancePixelIntensityMethod:
+      return(GammaWeightedIntensity(sample,decode,rec709_weights));
+    default:
+      break;
+  }
+  return(GammaWeightedIntensity(sample,encode,rec709_weights));
 }
 
 static MagickRealType IntensityFromSamples(const PixelIntensityMethod method,
@@ -586,19 +607,13 @@ static MagickRealType IntensityFromSamples(const PixelIntensityMethod method,
     case MSPixelIntensityMethod:
       return((MagickRealType) (((double) red*red+green*green+blue*blue)/
         (3.0*(double) QuantumRange)));
-    case Rec601LumaPixelIntensityMethod:
-      return(GammaWeightedIntensity(sample,encode,0.298839,0.586811,0.114350));
-    case Rec601LuminancePixelIntensityMethod:
-      return(GammaWeightedIntensity(sample,decode,0.298839,0.586811,0.114350));
-    case Rec709LuminancePixelIntensityMethod:
-      return(GammaWeightedIntensity(sample,decode,0.212656,0.715158,0.072186));
     case RMSPixelIntensityMethod:
       return((MagickRealType) (sqrt((double) red*red+green*green+blue*blue)/
         sqrt(3.0)));
     default:
       break;
   }
-  return(GammaWeightedIntensity(sample,encode,0.212656,0.715158,0.072186));
+  return(LumaIntensityFromSamples(method,encode,decode,sample));
 }
 
 MagickExport MagickRealType GetPixelInfoIntensity(
