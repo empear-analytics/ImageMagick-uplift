@@ -1187,6 +1187,45 @@ static MagickBooleanType ReadEXIFHeader(const unsigned char **exif,
   return(MagickTrue);
 }
 
+static MagickBooleanType ParseEXIFHexTag(const char **property,size_t *tag)
+{
+  int
+    c;
+
+  size_t
+    n;
+
+  ssize_t
+    i;
+
+  n=strlen((*property));
+  if (n != 4)
+    return(MagickFalse);
+  /*
+    Parse tag specification as a hex number.
+  */
+  n/=4;
+  do
+  {
+    for (i=(ssize_t) n-1L; i >= 0; i--)
+    {
+      c=(*(*property)++);
+      (*tag)<<=4;
+      if ((c >= '0') && (c <= '9'))
+        (*tag)|=(size_t) (c-'0');
+      else
+        if ((c >= 'A') && (c <= 'F'))
+          (*tag)|=(size_t) (c-('A'-10));
+        else
+          if ((c >= 'a') && (c <= 'f'))
+            (*tag)|=(size_t) (c-('a'-10));
+          else
+            return(MagickFalse);
+    }
+  } while (*(*property) != '\0');
+  return(MagickTrue);
+}
+
 static void GetEXIFProperty(const Image *image,const char *property,
   ExceptionInfo *exception)
 {
@@ -1556,42 +1595,13 @@ static void GetEXIFProperty(const Image *image,const char *property,
     case '#':
     case '@':
     {
-      int
-        c;
-
-      size_t
-        n;
-
       /*
         Check for a hex based tag specification first.
       */
       tag=(*(property+5) == '@') ? 1UL : 0UL;
       property+=6;
-      n=strlen(property);
-      if (n != 4)
+      if (ParseEXIFHexTag(&property,&tag) == MagickFalse)
         return;
-      /*
-        Parse tag specification as a hex number.
-      */
-      n/=4;
-      do
-      {
-        for (i=(ssize_t) n-1L; i >= 0; i--)
-        {
-          c=(*property++);
-          tag<<=4;
-          if ((c >= '0') && (c <= '9'))
-            tag|=(size_t) (c-'0');
-          else
-            if ((c >= 'A') && (c <= 'F'))
-              tag|=(size_t) (c-('A'-10));
-            else
-              if ((c >= 'a') && (c <= 'f'))
-                tag|=(size_t) (c-('a'-10));
-              else
-                return;
-        }
-      } while (*property != '\0');
       break;
     }
     default:
