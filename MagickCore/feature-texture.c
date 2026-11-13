@@ -1734,6 +1734,108 @@ static void RecordFeatureGrays(const Image *image,const Quantum *p,
   }
 }
 
+typedef struct _TextureFeatureState
+{
+  const Image
+    *image;
+
+  ChannelFeatures
+    *channel_features;
+
+  FeatureStatistics
+    **cooccurrence,
+    *density_x,
+    *density_xy,
+    *density_y,
+    **Q,
+    *sum;
+
+  unsigned int
+    number_grays;
+
+  FeatureStatistics
+    correlation,
+    entropy_x,
+    entropy_xy,
+    entropy_xy1,
+    entropy_xy2,
+    entropy_y,
+    mean;
+} TextureFeatureState;
+
+static void ComputeDifferenceAndContrastFeatures(
+  const TextureFeatureState *state,MagickBooleanType status)
+{
+  const Image
+    *const image = state->image;
+
+  ChannelFeatures
+    *const channel_features = state->channel_features;
+
+  FeatureStatistics
+    **const cooccurrence = state->cooccurrence,
+    *const density_x = state->density_x,
+    *const density_xy = state->density_xy,
+    *const density_y = state->density_y,
+    **const Q = state->Q,
+    *const sum = state->sum;
+
+  const unsigned int
+    number_grays = state->number_grays;
+
+  FeatureStatistics
+    correlation = state->correlation,
+    entropy_x = state->entropy_x,
+    entropy_xy = state->entropy_xy,
+    entropy_xy1 = state->entropy_xy1,
+    entropy_xy2 = state->entropy_xy2,
+    entropy_y = state->entropy_y,
+    mean = state->mean,
+    sum_squares,
+    variance;
+
+  ssize_t
+    i;
+
+  (void) status;
+  (void) memset(&variance,0,sizeof(variance));
+  (void) memset(&sum_squares,0,sizeof(sum_squares));
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,number_grays,1)
+#endif
+  for (i=0; i < 4; i++)
+  {
+    const TextureDirection
+      texture = { image, channel_features, cooccurrence, density_x,
+        density_xy, density_y, Q, sum, number_grays, i };
+
+    const TextureSlots
+      slots = { &correlation.direction[i], &entropy_x.direction[i],
+        &entropy_xy.direction[i], &entropy_xy1.direction[i],
+        &entropy_xy2.direction[i], &entropy_y.direction[i],
+        &mean.direction[i], &sum_squares.direction[i],
+        &variance.direction[i] };
+
+    ComputeDifferenceFeatures(&texture,&slots);
+  }
+  /*
+    Compute more texture features.
+  */
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,number_grays,1)
+#endif
+  for (i=0; i < 4; i++)
+  {
+    const TextureDirection
+      texture = { image, channel_features, cooccurrence, density_x,
+        density_xy, density_y, Q, sum, number_grays, i };
+
+    ComputeContrastFeatures(&texture);
+  }
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1748,6 +1850,9 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
 
   FeatureMatrixInputs
     matrix;
+
+  TextureFeatureState
+    state;
 
   FeatureStatistics
     **cooccurrence,
@@ -1966,42 +2071,23 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   /*
     Compute more texture features.
   */
-  (void) memset(&variance,0,sizeof(variance));
-  (void) memset(&sum_squares,0,sizeof(sum_squares));
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(image,image,number_grays,1)
-#endif
-  for (i=0; i < 4; i++)
-  {
-    const TextureDirection
-      texture = { image, channel_features, cooccurrence, density_x,
-        density_xy, density_y, Q, sum, number_grays, i };
-
-    const TextureSlots
-      slots = { &correlation.direction[i], &entropy_x.direction[i],
-        &entropy_xy.direction[i], &entropy_xy1.direction[i],
-        &entropy_xy2.direction[i], &entropy_y.direction[i],
-        &mean.direction[i], &sum_squares.direction[i],
-        &variance.direction[i] };
-
-    ComputeDifferenceFeatures(&texture,&slots);
-  }
-  /*
-    Compute more texture features.
-  */
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(image,image,number_grays,1)
-#endif
-  for (i=0; i < 4; i++)
-  {
-    const TextureDirection
-      texture = { image, channel_features, cooccurrence, density_x,
-        density_xy, density_y, Q, sum, number_grays, i };
-
-    ComputeContrastFeatures(&texture);
-  }
+  state.image=image;
+  state.channel_features=channel_features;
+  state.cooccurrence=cooccurrence;
+  state.density_x=density_x;
+  state.density_xy=density_xy;
+  state.density_y=density_y;
+  state.Q=Q;
+  state.sum=sum;
+  state.number_grays=number_grays;
+  state.correlation=correlation;
+  state.entropy_x=entropy_x;
+  state.entropy_xy=entropy_xy;
+  state.entropy_xy1=entropy_xy1;
+  state.entropy_xy2=entropy_xy2;
+  state.entropy_y=entropy_y;
+  state.mean=mean;
+  ComputeDifferenceAndContrastFeatures(&state,status);
   /*
     Relinquish resources.
   */
