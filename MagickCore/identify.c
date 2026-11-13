@@ -1616,6 +1616,20 @@ static void PrintImageHistogram(FILE *file,Image *image,
     }
 }
 
+static void FindTransparentPixel(const Image *image,ssize_t *x,
+  MagickBooleanType *found,const Quantum **p)
+{
+  for (*x=0; *x < (ssize_t) image->columns; (*x)++)
+  {
+    if (GetPixelAlpha(image,(*p)) == (Quantum) TransparentAlpha)
+      {
+        (*found)=MagickTrue;
+        break;
+      }
+    (*p)+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static void PrintTransparentPixel(FILE *file,const Image *image,ssize_t *x,
   ExceptionInfo *exception)
 {
@@ -1634,15 +1648,7 @@ static void PrintTransparentPixel(FILE *file,const Image *image,ssize_t *x,
     p=GetVirtualPixels(image,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    for (*x=0; *x < (ssize_t) image->columns; (*x)++)
-    {
-      if (GetPixelAlpha(image,p) == (Quantum) TransparentAlpha)
-        {
-          found=MagickTrue;
-          break;
-        }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    FindTransparentPixel(image,x,&found,&p);
     if (found != MagickFalse)
       break;
   }
