@@ -1250,10 +1250,30 @@ static MagickBooleanType SetTypeInfoText(TypeInfo *type_info,
   return(MagickTrue);
 }
 
+static MagickBooleanType SetTypeInfoStyle(TypeInfo *type_info,
+  const char *keyword,const char *token)
+{
+  if (LocaleCompare((char *) keyword,"stealth") == 0)
+    type_info->stealth=IsStringTrue(token);
+  else if (LocaleCompare((char *) keyword,"stretch") == 0)
+    type_info->stretch=(StretchType) ParseCommandOption(
+      MagickStretchOptions,MagickFalse,token);
+  else if (LocaleCompare((char *) keyword,"style") == 0)
+    type_info->style=(StyleType) ParseCommandOption(MagickStyleOptions,
+      MagickFalse,token);
+  else if (LocaleCompare((char *) keyword,"weight") == 0)
+    type_info->weight=ParseTypeWeight(token);
+  else
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static TypeInfo *SetTypeInfoAttribute(TypeInfo *type_info,const char *keyword,
   const char *token,const char *filename,char *font_path)
 {
   if (SetTypeInfoText(type_info,keyword,token) != MagickFalse)
+    return(type_info);
+  if (SetTypeInfoStyle(type_info,keyword,token) != MagickFalse)
     return(type_info);
   if (LocaleCompare((char *) keyword,"face") == 0)
     type_info->face=StringToUnsignedLong(token);
@@ -1265,16 +1285,6 @@ static TypeInfo *SetTypeInfoAttribute(TypeInfo *type_info,const char *keyword,
            (SetTypeNodePath(filename,font_path,token,&type_info->metrics) ==
             MagickFalse))
     type_info=(TypeInfo *) DestroyTypeNode(type_info);
-  else if (LocaleCompare((char *) keyword,"stealth") == 0)
-    type_info->stealth=IsStringTrue(token);
-  else if (LocaleCompare((char *) keyword,"stretch") == 0)
-    type_info->stretch=(StretchType) ParseCommandOption(
-      MagickStretchOptions,MagickFalse,token);
-  else if (LocaleCompare((char *) keyword,"style") == 0)
-    type_info->style=(StyleType) ParseCommandOption(MagickStyleOptions,
-      MagickFalse,token);
-  else if (LocaleCompare((char *) keyword,"weight") == 0)
-    type_info->weight=ParseTypeWeight(token);
   return(type_info);
 }
 
