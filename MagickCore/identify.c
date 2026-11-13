@@ -401,8 +401,7 @@ static ssize_t PrintChannelLocations(const ChannelLocationsReport *report,
       if (traits == UndefinedPixelTrait)
         continue;
       offset=GetPixelChannelOffset(image,channel);
-      match=fabs((double) p[offset]-target) < MagickEpsilon ? MagickTrue :
-        MagickFalse;
+      match=fabs((double) p[offset]-target) < MagickEpsilon;
       if (match != MagickFalse)
         {
           if ((report->locations != 0) &&
