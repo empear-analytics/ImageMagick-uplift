@@ -7025,6 +7025,11 @@ typedef struct _FileBrowserWidgets
 
   char
     ***filelist;
+
+  XWidgetInfo
+    *north_info,
+    *south_info,
+    *list_info;
 } FileBrowserWidgets;
 
 typedef struct _FileBrowserContext
@@ -7482,6 +7487,75 @@ static void ChooseFileBrowserEntry(const FileBrowserContext *context,
   SelectFileBrowserEntry(&entry,targets);
 }
 
+static void PressFileBrowserScroll(const FileBrowserContext *context,
+  const XEvent event,const FileBrowserTargets *targets,
+  const FileBrowserWidgets *widgets)
+{
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info,
+    *const slider_info = widgets->slider_info;
+
+  unsigned int
+    *const visible_files = widgets->visible_files;
+
+  size_t
+    *const files = widgets->files;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info,
+    *const south_info = widgets->south_info,
+    *const list_info = widgets->list_info;
+
+  if (MatteIsActive((*slider_info),event.xbutton))
+    {
+      /*
+        Track slider.
+      */
+      (*slider_info).active=MagickTrue;
+      return;
+    }
+  if ((MatteIsActive((*north_info),event.xbutton)) && ((*slider_info).id > 0))
+    {
+      /*
+        Move slider up.
+      */
+      (*north_info).raised=MagickFalse;
+      (*slider_info).id--;
+      (*state)|=RedrawListState;
+      return;
+    }
+  if ((MatteIsActive((*south_info),event.xbutton)) &&
+      ((*slider_info).id < (int) (*files)))
+    {
+      /*
+        Move slider down.
+      */
+      (*south_info).raised=MagickFalse;
+      (*slider_info).id++;
+      (*state)|=RedrawListState;
+      return;
+    }
+  if (MatteIsActive((*scroll_info),event.xbutton))
+    {
+      /*
+        Move slider.
+      */
+      (*slider_info)=PageListBrowserSlider((*slider_info),event,
+        (*visible_files));
+      (*state)|=RedrawListState;
+      return;
+    }
+  if (MatteIsActive((*list_info),event.xbutton))
+    {
+      ChooseFileBrowserEntry(context,event,targets,widgets);
+      return;
+    }
+  PressFileBrowserButtons(context,event,widgets);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -7570,7 +7644,8 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const FileBrowserWidgets
     file_widgets = { &reply_info, &state,
       &scroll_info, &slider_info, &visible_files, &files, &up_info, &home_info,
-      &special_info, &action_info, &cancel_info, &i, &filelist };
+      &special_info, &action_info, &cancel_info, &i, &filelist, &north_info,
+      &south_info, &list_info };
 
   FileBrowserContext
     file_context;
@@ -8011,50 +8086,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
     {
       case ButtonPress:
       {
-        if (MatteIsActive(slider_info,event.xbutton))
-          {
-            /*
-              Track slider.
-            */
-            slider_info.active=MagickTrue;
-            break;
-          }
-        if ((MatteIsActive(north_info,event.xbutton)) && (slider_info.id > 0))
-          {
-            /*
-              Move slider up.
-            */
-            north_info.raised=MagickFalse;
-            slider_info.id--;
-            state|=RedrawListState;
-            break;
-          }
-        if ((MatteIsActive(south_info,event.xbutton)) &&
-            (slider_info.id < (int) files))
-          {
-            /*
-              Move slider down.
-            */
-            south_info.raised=MagickFalse;
-            slider_info.id++;
-            state|=RedrawListState;
-            break;
-          }
-        if (MatteIsActive(scroll_info,event.xbutton))
-          {
-            /*
-              Move slider.
-            */
-            slider_info=PageListBrowserSlider(slider_info,event,visible_files);
-            state|=RedrawListState;
-            break;
-          }
-        if (MatteIsActive(list_info,event.xbutton))
-          {
-            ChooseFileBrowserEntry(&file_context,event,&targets,&file_widgets);
-            break;
-          }
-        PressFileBrowserButtons(&file_context,event,&file_widgets);
+        PressFileBrowserScroll(&file_context,event,&targets,&file_widgets);
         break;
       }
       case ButtonRelease:
