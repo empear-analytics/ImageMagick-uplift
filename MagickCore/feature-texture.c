@@ -1870,14 +1870,75 @@ static MagickBooleanType FillFeatureGrays(const Image *image,
   return(status);
 }
 
+typedef struct _FeatureGraysForm
+{
+  const Image
+    *image;
+
+  ChannelFeatures
+    *channel_features;
+
+  ExceptionInfo
+    *exception;
+
+  PixelPacket
+    **grays,
+    *gray;
+} FeatureGraysForm;
+
+static MagickBooleanType FormFeatureGrays(const FeatureGraysForm *form,
+  ChannelFeatures **result)
+{
+  const Image
+    *const image = form->image;
+
+  ChannelFeatures
+    *channel_features = form->channel_features;
+
+  ExceptionInfo
+    *const exception = form->exception;
+
+  PixelPacket
+    **const grays = form->grays,
+    *const gray = form->gray;
+
+  MagickBooleanType
+    status;
+
+  (*grays)=(PixelPacket *) AcquireQuantumMemory(MaxMap+1UL,sizeof(*(*grays)));
+  if ((*grays) == (PixelPacket *) NULL)
+    {
+      channel_features=(ChannelFeatures *) RelinquishMagickMemory(
+        channel_features);
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+      (*result)=channel_features;
+      return(MagickTrue);
+    }
+  InitializeFeatureGrays((*grays));
+  status=FillFeatureGrays(image,(*grays),exception);
+  if (status == MagickFalse)
+    {
+      channel_features=RelinquishFeatureGrays((*grays),channel_features);
+      (*result)=channel_features;
+      return(MagickTrue);
+    }
+  (*gray)=CompactFeatureGrays(image,(*grays));
+  return(MagickFalse);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
   ChannelFeatures
-    *channel_features;
+    *channel_features,
+    *returned;
 
   FeatureBuffers
     buffers;
+
+  FeatureGraysForm
+    form;
 
   FeatureMatrixInputs
     matrix;
@@ -1938,23 +1999,13 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   /*
     Form grays.
   */
-  grays=(PixelPacket *) AcquireQuantumMemory(MaxMap+1UL,sizeof(*grays));
-  if (grays == (PixelPacket *) NULL)
-    {
-      channel_features=(ChannelFeatures *) RelinquishMagickMemory(
-        channel_features);
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
-      return(channel_features);
-    }
-  InitializeFeatureGrays(grays);
-  status=FillFeatureGrays(image,grays,exception);
-  if (status == MagickFalse)
-    {
-      channel_features=RelinquishFeatureGrays(grays,channel_features);
-      return(channel_features);
-    }
-  gray=CompactFeatureGrays(image,grays);
+  form.image=image;
+  form.channel_features=channel_features;
+  form.exception=exception;
+  form.grays=(&grays);
+  form.gray=(&gray);
+  if (FormFeatureGrays(&form,&returned) != MagickFalse)
+    return(returned);
   /*
     Allocate spatial dependence matrix.
   */
