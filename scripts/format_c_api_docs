@@ -87,6 +87,7 @@ if ( ! GetOptions(
 	 'pixel-iterator.c',
 	 'pixel-wand.c',
 	 'profile.c',
+	 'profile-sync.c',
 	 'quantize.c',
 	 'quantize-error.c',
 	 'quantize-info.c',
