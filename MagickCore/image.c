@@ -4107,44 +4107,53 @@ typedef struct _SmushXRows
     *exception;
 } SmushXRows;
 
-static size_t SmushXRow(const SmushXRows *rows,const ssize_t y,size_t gap)
+static ssize_t FindLeftGapEdge(const SmushXRows *rows,const ssize_t y,
+  const size_t gap)
 {
-  const Image
-    *left_image = rows->left_image,
-    *right_image = rows->right_image;
-
-  CacheView
-    *left_view = rows->left_view,
-    *right_view = rows->right_view;
-
-  const RectangleInfo
-    left_geometry = rows->left_geometry,
-    right_geometry = rows->right_geometry;
-
-  ExceptionInfo
-    *exception = rows->exception;
-
   const Quantum
     *p;
 
   ssize_t
+    x;
+
+  for (x=(ssize_t) rows->left_image->columns-1; x > 0; x--)
+  {
+    p=GetCacheViewVirtualPixels(rows->left_view,x,rows->left_geometry.y+y,1,1,
+      rows->exception);
+    if (IsLeftGapEdge(rows->left_image,p,x,gap) != MagickFalse)
+      break;
+  }
+  return(x);
+}
+
+static ssize_t FindRightGapEdge(const SmushXRows *rows,const ssize_t y,
+  const ssize_t i,const size_t gap)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) rows->right_image->columns; x++)
+  {
+    p=GetCacheViewVirtualPixels(rows->right_view,x,rows->right_geometry.y+y,1,1,
+      rows->exception);
+    if (IsRightGapEdge(rows->right_image,p,x,i,gap) != MagickFalse)
+      break;
+  }
+  return(x);
+}
+
+static size_t SmushXRow(const SmushXRows *rows,const ssize_t y,size_t gap)
+{
+  ssize_t
     i,
     x;
 
-  for (x=(ssize_t) left_image->columns-1; x > 0; x--)
-  {
-    p=GetCacheViewVirtualPixels(left_view,x,left_geometry.y+y,1,1,exception);
-    if (IsLeftGapEdge(left_image,p,x,gap) != MagickFalse)
-      break;
-  }
-  i=(ssize_t) left_image->columns-x-1;
-  for (x=0; x < (ssize_t) right_image->columns; x++)
-  {
-    p=GetCacheViewVirtualPixels(right_view,x,right_geometry.y+y,1,1,
-      exception);
-    if (IsRightGapEdge(right_image,p,x,i,gap) != MagickFalse)
-      break;
-  }
+  x=FindLeftGapEdge(rows,y,gap);
+  i=(ssize_t) rows->left_image->columns-x-1;
+  x=FindRightGapEdge(rows,y,i,gap);
   if ((x+i) < (ssize_t) gap)
     gap=(size_t) (x+i);
   return(gap);
