@@ -1475,6 +1475,23 @@ static Window XSelectWindowByIDOrName(Display *display,const Window root,
   return(target);
 }
 
+static Window XSelectNamedWindow(Display *display,const Window root,
+  const ImageInfo *image_info)
+{
+  Window
+    target;
+
+  target=(Window) NULL;
+  if (*image_info->filename != '\0')
+    {
+      if (LocaleCompare(image_info->filename,"root") == 0)
+        target=root;
+      else
+        target=XSelectWindowByIDOrName(display,root,image_info,target);
+    }
+  return(target);
+}
+
 static Image *XCropWindowImage(Image *image,const RectangleInfo crop_info,
   ExceptionInfo *exception)
 {
@@ -1667,14 +1684,7 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
   crop_info.width=0;
   crop_info.height=0;
   root=XRootWindow(display,XDefaultScreen(display));
-  target=(Window) NULL;
-  if (*image_info->filename != '\0')
-    {
-      if (LocaleCompare(image_info->filename,"root") == 0)
-        target=root;
-      else
-        target=XSelectWindowByIDOrName(display,root,image_info,target);
-    }
+  target=XSelectNamedWindow(display,root,image_info);
   /*
     If target window is not defined, interactively select one.
   */
