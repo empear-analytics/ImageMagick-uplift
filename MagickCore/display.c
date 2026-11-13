@@ -6581,6 +6581,34 @@ static void XCropSizeEvent(const CropContext *context,
   }
 }
 
+static void XCropDrawRegion(const CropContext *context,
+  const CropTargets *targets,RectangleInfo *highlight_info)
+{
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  (*highlight_info)=(*crop_info);
+  (*highlight_info).x=(*crop_info).x-context->windows->image.x;
+  (*highlight_info).y=(*crop_info).y-context->windows->image.y;
+  if (((*highlight_info).width > 3) && ((*highlight_info).height > 3))
+    {
+      /*
+        Display info and draw cropping rectangle.
+      */
+      XMapInfoWidget(context->display,context->windows);
+      (void) FormatLocaleString(context->text,MagickPathExtent,
+        " %.17gx%.17g%+.20g%+.20g",(double) (*crop_info).width,(double)
+        (*crop_info).height,(double) (*crop_info).x,(double) (*crop_info).y);
+      XInfoWidget(context->display,context->windows,context->text);
+      XHighlightRectangle(context->display,context->windows->image.id,
+        context->windows->image.highlight_context,highlight_info);
+    }
+  else
+    if (context->windows->info.mapped != MagickFalse)
+      (void) XWithdrawWindow(context->display,context->windows->info.id,
+        context->windows->info.screen);
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -6715,25 +6743,7 @@ static MagickBooleanType XCropImage(Display *display,
     state=DefaultState;
     do
     {
-      highlight_info=crop_info;
-      highlight_info.x=crop_info.x-windows->image.x;
-      highlight_info.y=crop_info.y-windows->image.y;
-      if ((highlight_info.width > 3) && (highlight_info.height > 3))
-        {
-          /*
-            Display info and draw cropping rectangle.
-          */
-          XMapInfoWidget(display,windows);
-          (void) FormatLocaleString(text,MagickPathExtent,
-            " %.17gx%.17g%+.20g%+.20g",(double) crop_info.width,(double)
-            crop_info.height,(double) crop_info.x,(double) crop_info.y);
-          XInfoWidget(display,windows,text);
-          XHighlightRectangle(display,windows->image.id,
-            windows->image.highlight_context,&highlight_info);
-        }
-      else
-        if (windows->info.mapped != MagickFalse)
-          (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+      XCropDrawRegion(&context,&targets,&highlight_info);
       /*
         Wait for next event.
       */
