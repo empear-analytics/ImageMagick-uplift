@@ -893,9 +893,6 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
   MagickBooleanType
     status;
 
-  FloodfillPlane
-    plane;
-
   MemoryInfo
     *segment_info;
 
@@ -955,13 +952,13 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
     if (FillFloodplaneSegments(&segments) == MagickFalse)
       return(MagickFalse);
   }
-  plane.image=image;
-  plane.floodplane_image=floodplane_image;
-  plane.floodplane_view=floodplane_view;
-  plane.image_view=image_view;
-  plane.draw_info=draw_info;
-  plane.exception=exception;
-  status=TileFloodplaneImage(&plane);
+  {
+    const FloodfillPlane
+      plane = { image, floodplane_image, floodplane_view, image_view,
+        draw_info, exception };
+
+    status=TileFloodplaneImage(&plane);
+  }
   floodplane_view=DestroyCacheView(floodplane_view);
   image_view=DestroyCacheView(image_view);
   segment_info=RelinquishVirtualMemory(segment_info);
