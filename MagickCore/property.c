@@ -706,6 +706,11 @@ static void Set8BIMAttribute(const AttributeInfo8BIM *attribute_info,
     }
 }
 
+static inline MagickBooleanType Is8BIMResourceName(const char *name)
+{
+  return(((*name != '\0') && (*name != '#')) ? MagickTrue : MagickFalse);
+}
+
 static void Get8BIMProperty(const Image *image,const char *key,
   ExceptionInfo *exception)
 {
@@ -790,7 +795,7 @@ static void Get8BIMProperty(const Image *image,const char *key,
     if (resource != (char *) NULL)
       macroman_resource=(char *) ConvertMacRomanToUTF8((unsigned char *)
         resource);
-    if ((*name != '\0') && (*name != '#'))
+    if (Is8BIMResourceName(name) != MagickFalse)
       if (IsUnrequestedResource(resource,macroman_resource,name) != MagickFalse)
         {
           /*
