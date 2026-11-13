@@ -2028,12 +2028,352 @@ static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
 %    o exception: return any errors or warnings in this structure.
 %
 */
-MagickPrivate MagickBooleanType XDrawImage(Display *display,
-  const XPixelInfo *pixel,XDrawInfo *draw_info,Image *image,
+static void XDrawLineOrRectangle(Display *display,const Pixmap draw_pixmap,
+  const GC draw_context,const XDrawInfo *draw_info)
+{
+  switch (draw_info->element)
+  {
+    case PointElement:
+    default:
+    {
+      (void) XDrawLines(display,draw_pixmap,draw_context,
+        draw_info->coordinate_info,(int) draw_info->number_coordinates,
+        CoordModeOrigin);
+      break;
+    }
+    case LineElement:
+    {
+      (void) XDrawLine(display,draw_pixmap,draw_context,draw_info->line_info.x1,
+        draw_info->line_info.y1,draw_info->line_info.x2,
+        draw_info->line_info.y2);
+      break;
+    }
+    case RectangleElement:
+    {
+      (void) XDrawRectangle(display,draw_pixmap,draw_context,
+        (int) draw_info->rectangle_info.x,(int) draw_info->rectangle_info.y,
+        (unsigned int) draw_info->rectangle_info.width,
+        (unsigned int) draw_info->rectangle_info.height);
+      break;
+    }
+    case FillRectangleElement:
+    {
+      (void) XFillRectangle(display,draw_pixmap,draw_context,
+        (int) draw_info->rectangle_info.x,(int) draw_info->rectangle_info.y,
+        (unsigned int) draw_info->rectangle_info.width,
+        (unsigned int) draw_info->rectangle_info.height);
+      break;
+    }
+  }
+}
+
+static void XDrawArcElement(Display *display,const Pixmap draw_pixmap,
+  const GC draw_context,const XDrawInfo *draw_info)
+{
+  switch (draw_info->element)
+  {
+    default:
+    {
+      XDrawLineOrRectangle(display,draw_pixmap,draw_context,draw_info);
+      break;
+    }
+    case CircleElement:
+    case EllipseElement:
+    {
+      (void) XDrawArc(display,draw_pixmap,draw_context,
+        (int) draw_info->rectangle_info.x,(int) draw_info->rectangle_info.y,
+        (unsigned int) draw_info->rectangle_info.width,
+        (unsigned int) draw_info->rectangle_info.height,0,360*64);
+      break;
+    }
+    case FillCircleElement:
+    case FillEllipseElement:
+    {
+      (void) XFillArc(display,draw_pixmap,draw_context,
+        (int) draw_info->rectangle_info.x,(int) draw_info->rectangle_info.y,
+        (unsigned int) draw_info->rectangle_info.width,
+        (unsigned int) draw_info->rectangle_info.height,0,360*64);
+      break;
+    }
+  }
+}
+
+static void XDrawElementToPixmap(Display *display,const Pixmap draw_pixmap,
+  const GC draw_context,const XDrawInfo *draw_info)
+{
+  /*
+    Clear pixmap.
+  */
+  (void) XFillRectangle(display,draw_pixmap,draw_context,0,0,draw_info->width,
+    draw_info->height);
+  /*
+    Draw line to pixmap.
+  */
+  (void) XSetBackground(display,draw_context,0);
+  (void) XSetForeground(display,draw_context,(size_t) (~0));
+  if (draw_info->stipple !=  (Pixmap) NULL)
+    {
+      (void) XSetFillStyle(display,draw_context,FillOpaqueStippled);
+      (void) XSetStipple(display,draw_context,draw_info->stipple);
+    }
+  switch (draw_info->element)
+  {
+    default:
+    {
+      XDrawArcElement(display,draw_pixmap,draw_context,draw_info);
+      break;
+    }
+    case PolygonElement:
+    {
+      XPoint
+        *coordinate_info;
+
+      coordinate_info=draw_info->coordinate_info;
+      (void) XDrawLines(display,draw_pixmap,draw_context,coordinate_info,
+        (int) draw_info->number_coordinates,CoordModeOrigin);
+      (void) XDrawLine(display,draw_pixmap,draw_context,
+        coordinate_info[draw_info->number_coordinates-1].x,
+        coordinate_info[draw_info->number_coordinates-1].y,
+        coordinate_info[0].x,coordinate_info[0].y);
+      break;
+    }
+    case FillPolygonElement:
+    {
+      (void) XFillPolygon(display,draw_pixmap,draw_context,
+        draw_info->coordinate_info,(int) draw_info->number_coordinates,Complex,
+        CoordModeOrigin);
+      break;
+    }
+  }
+}
+
+typedef struct _DrawRotationTargets
+{
+  Image
+    **draw_image;
+
+  int
+    *x,
+    *y;
+} DrawRotationTargets;
+
+static MagickBooleanType XRotateDrawImage(const XDrawInfo *draw_info,
+  ExceptionInfo *exception,const DrawRotationTargets *targets)
+{
+  Image
+    **const draw_image = targets->draw_image;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  if (draw_info->degrees != 0.0)
+    {
+      Image
+        *rotate_image;
+
+      int
+        rotations;
+
+      /*
+        Rotate image.
+      */
+      rotate_image=RotateImage((*draw_image),draw_info->degrees,exception);
+      if (rotate_image == (Image *) NULL)
+        return(MagickFalse);
+      *draw_image=DestroyImage(*draw_image);
+      (*draw_image)=rotate_image;
+      /*
+        Annotation is relative to the degree of rotation.
+      */
+      rotations=XQuarterTurns(draw_info->degrees);
+      switch (rotations % 4)
+      {
+        default:
+        case 0:
+          break;
+        case 1:
+        {
+          /*
+            Rotate 90 degrees.
+          */
+          (*x)=(*x)-(int) (*draw_image)->columns/2;
+          (*y)=(*y)+(int) (*draw_image)->columns/2;
+          break;
+        }
+        case 2:
+        {
+          /*
+            Rotate 180 degrees.
+          */
+          (*x)=(*x)-(int) (*draw_image)->columns;
+          break;
+        }
+        case 3:
+        {
+          /*
+            Rotate 270 degrees.
+          */
+          (*x)=(*x)-(int) (*draw_image)->columns/2;
+          (*y)=(*y)-(int) ((*draw_image)->rows-((*draw_image)->columns/2));
+          break;
+        }
+      }
+    }
+  return(MagickTrue);
+}
+
+static void XSetDrawRowOpacity(const Image *draw_image,const Image *image,
+  Quantum *magick_restrict q)
+{
+  int
+    x;
+
+  for (x=0; x < (int) draw_image->columns; x++)
+  {
+    if (GetPixelAlpha(image,q) != TransparentAlpha)
+      SetPixelAlpha(draw_image,OpaqueAlpha,q);
+    q+=(ptrdiff_t) GetPixelChannels(draw_image);
+  }
+}
+
+static int XSetDrawImageOpacity(const Image *draw_image,const Image *image,
   ExceptionInfo *exception)
 {
   CacheView
     *draw_view;
+
+  int
+    y;
+
+  draw_view=AcquireAuthenticCacheView(draw_image,exception);
+  for (y=0; y < (int) draw_image->rows; y++)
+  {
+    Quantum
+      *magick_restrict q;
+
+    q=GetCacheViewAuthenticPixels(draw_view,0,(ssize_t) y,draw_image->columns,1,
+      exception);
+    if (q == (Quantum *) NULL)
+      break;
+    XSetDrawRowOpacity(draw_image,image,q);
+    if (SyncCacheViewAuthenticPixels(draw_view,exception) == MagickFalse)
+      break;
+  }
+  draw_view=DestroyCacheView(draw_view);
+  return(y);
+}
+
+typedef struct _DrawPixels
+{
+  Image
+    *draw_image;
+
+  XImage
+    *draw_ximage;
+
+  const XPixelInfo
+    *pixel;
+
+  XDrawInfo
+    *draw_info;
+
+  ExceptionInfo
+    *exception;
+} DrawPixels;
+
+static void XSetDrawRow(const DrawPixels *draw_pixels,
+  Quantum *magick_restrict q,const int y)
+{
+  Image
+    *const draw_image = draw_pixels->draw_image;
+
+  XImage
+    *const draw_ximage = draw_pixels->draw_ximage;
+
+  const XPixelInfo
+    *const pixel = draw_pixels->pixel;
+
+  XDrawInfo
+    *const draw_info = draw_pixels->draw_info;
+
+  int
+    x;
+
+  for (x=0; x < (int) draw_image->columns; x++)
+  {
+    if (XGetPixel(draw_ximage,x,y) == 0)
+      {
+        /*
+          Set this pixel to the background color.
+        */
+        SetPixelViaPixelInfo(draw_image,&draw_image->background_color,q);
+        SetPixelAlpha(draw_image,(Quantum) (draw_info->stencil ==
+          OpaqueStencil ? TransparentAlpha : OpaqueAlpha),q);
+      }
+    else
+      {
+        /*
+          Set this pixel to the pen color.
+        */
+        SetPixelRed(draw_image,ScaleShortToQuantum(
+          pixel->pen_color.red),q);
+        SetPixelGreen(draw_image,ScaleShortToQuantum(
+          pixel->pen_color.green),q);
+        SetPixelBlue(draw_image,ScaleShortToQuantum(
+          pixel->pen_color.blue),q);
+        SetPixelAlpha(draw_image,(Quantum) (draw_info->stencil ==
+          OpaqueStencil ? OpaqueAlpha : TransparentAlpha),q);
+      }
+    q+=(ptrdiff_t) GetPixelChannels(draw_image);
+  }
+}
+
+static int XTransferDrawPixels(const DrawPixels *draw_pixels)
+{
+  Image
+    *const draw_image = draw_pixels->draw_image;
+
+  XImage
+    *const draw_ximage = draw_pixels->draw_ximage;
+
+  ExceptionInfo
+    *const exception = draw_pixels->exception;
+
+  CacheView
+    *draw_view;
+
+  int
+    y;
+
+  draw_view=AcquireAuthenticCacheView(draw_image,exception);
+  for (y=0; y < (int) draw_image->rows; y++)
+  {
+    Quantum
+      *magick_restrict q;
+
+    q=QueueCacheViewAuthenticPixels(draw_view,0,(ssize_t) y,draw_image->columns,
+      1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    XSetDrawRow(draw_pixels,q,y);
+    if (SyncCacheViewAuthenticPixels(draw_view,exception) == MagickFalse)
+      break;
+  }
+  draw_view=DestroyCacheView(draw_view);
+  XDestroyImage(draw_ximage);
+  return(y);
+}
+
+MagickPrivate MagickBooleanType XDrawImage(Display *display,
+  const XPixelInfo *pixel,XDrawInfo *draw_info,Image *image,
+  ExceptionInfo *exception)
+{
+  DrawPixels
+    draw_pixels;
+
+  DrawRotationTargets
+    targets;
 
   GC
     draw_context;
@@ -2093,94 +2433,7 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
     (GCBackground | GCForeground | GCLineWidth),&context_values);
   if (draw_context == (GC) NULL)
     return(MagickFalse);
-  /*
-    Clear pixmap.
-  */
-  (void) XFillRectangle(display,draw_pixmap,draw_context,0,0,draw_info->width,
-    draw_info->height);
-  /*
-    Draw line to pixmap.
-  */
-  (void) XSetBackground(display,draw_context,0);
-  (void) XSetForeground(display,draw_context,(size_t) (~0));
-  if (draw_info->stipple !=  (Pixmap) NULL)
-    {
-      (void) XSetFillStyle(display,draw_context,FillOpaqueStippled);
-      (void) XSetStipple(display,draw_context,draw_info->stipple);
-    }
-  switch (draw_info->element)
-  {
-    case PointElement:
-    default:
-    {
-      (void) XDrawLines(display,draw_pixmap,draw_context,
-        draw_info->coordinate_info,(int) draw_info->number_coordinates,
-        CoordModeOrigin);
-      break;
-    }
-    case LineElement:
-    {
-      (void) XDrawLine(display,draw_pixmap,draw_context,draw_info->line_info.x1,
-        draw_info->line_info.y1,draw_info->line_info.x2,
-        draw_info->line_info.y2);
-      break;
-    }
-    case RectangleElement:
-    {
-      (void) XDrawRectangle(display,draw_pixmap,draw_context,
-        (int) draw_info->rectangle_info.x,(int) draw_info->rectangle_info.y,
-        (unsigned int) draw_info->rectangle_info.width,
-        (unsigned int) draw_info->rectangle_info.height);
-      break;
-    }
-    case FillRectangleElement:
-    {
-      (void) XFillRectangle(display,draw_pixmap,draw_context,
-        (int) draw_info->rectangle_info.x,(int) draw_info->rectangle_info.y,
-        (unsigned int) draw_info->rectangle_info.width,
-        (unsigned int) draw_info->rectangle_info.height);
-      break;
-    }
-    case CircleElement:
-    case EllipseElement:
-    {
-      (void) XDrawArc(display,draw_pixmap,draw_context,
-        (int) draw_info->rectangle_info.x,(int) draw_info->rectangle_info.y,
-        (unsigned int) draw_info->rectangle_info.width,
-        (unsigned int) draw_info->rectangle_info.height,0,360*64);
-      break;
-    }
-    case FillCircleElement:
-    case FillEllipseElement:
-    {
-      (void) XFillArc(display,draw_pixmap,draw_context,
-        (int) draw_info->rectangle_info.x,(int) draw_info->rectangle_info.y,
-        (unsigned int) draw_info->rectangle_info.width,
-        (unsigned int) draw_info->rectangle_info.height,0,360*64);
-      break;
-    }
-    case PolygonElement:
-    {
-      XPoint
-        *coordinate_info;
-
-      coordinate_info=draw_info->coordinate_info;
-      (void) XDrawLines(display,draw_pixmap,draw_context,coordinate_info,
-        (int) draw_info->number_coordinates,CoordModeOrigin);
-      (void) XDrawLine(display,draw_pixmap,draw_context,
-        coordinate_info[draw_info->number_coordinates-1].x,
-        coordinate_info[draw_info->number_coordinates-1].y,
-        coordinate_info[0].x,coordinate_info[0].y);
-      break;
-    }
-    case FillPolygonElement:
-    {
-      (void) XFillPolygon(display,draw_pixmap,draw_context,
-        draw_info->coordinate_info,(int) draw_info->number_coordinates,Complex,
-        CoordModeOrigin);
-      break;
-    }
-  }
+  XDrawElementToPixmap(display,draw_pixmap,draw_context,draw_info);
   (void) XFreeGC(display,draw_context);
   /*
     Initialize X image.
@@ -2211,155 +2464,26 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
   if (SetImageStorageClass(draw_image,DirectClass,exception) == MagickFalse)
     return(MagickFalse);
   draw_image->alpha_trait=BlendPixelTrait;
-  draw_view=AcquireAuthenticCacheView(draw_image,exception);
-  for (y=0; y < (int) draw_image->rows; y++)
-  {
-    int
-      x;
-
-    Quantum
-      *magick_restrict q;
-
-    q=QueueCacheViewAuthenticPixels(draw_view,0,(ssize_t) y,draw_image->columns,
-      1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (int) draw_image->columns; x++)
-    {
-      if (XGetPixel(draw_ximage,x,y) == 0)
-        {
-          /*
-            Set this pixel to the background color.
-          */
-          SetPixelViaPixelInfo(draw_image,&draw_image->background_color,q);
-          SetPixelAlpha(draw_image,(Quantum) (draw_info->stencil ==
-            OpaqueStencil ? TransparentAlpha : OpaqueAlpha),q);
-        }
-      else
-        {
-          /*
-            Set this pixel to the pen color.
-          */
-          SetPixelRed(draw_image,ScaleShortToQuantum(
-            pixel->pen_color.red),q);
-          SetPixelGreen(draw_image,ScaleShortToQuantum(
-            pixel->pen_color.green),q);
-          SetPixelBlue(draw_image,ScaleShortToQuantum(
-            pixel->pen_color.blue),q);
-          SetPixelAlpha(draw_image,(Quantum) (draw_info->stencil ==
-            OpaqueStencil ? OpaqueAlpha : TransparentAlpha),q);
-        }
-      q+=(ptrdiff_t) GetPixelChannels(draw_image);
-    }
-    if (SyncCacheViewAuthenticPixels(draw_view,exception) == MagickFalse)
-      break;
-  }
-  draw_view=DestroyCacheView(draw_view);
-  XDestroyImage(draw_ximage);
+  draw_pixels.draw_image=draw_image;
+  draw_pixels.draw_ximage=draw_ximage;
+  draw_pixels.pixel=pixel;
+  draw_pixels.draw_info=draw_info;
+  draw_pixels.exception=exception;
+  y=XTransferDrawPixels(&draw_pixels);
   /*
     Determine draw geometry.
   */
   (void) XParseGeometry(draw_info->geometry,&x,&y,&width,&height);
-  if ((width != (unsigned int) draw_image->columns) ||
-      (height != (unsigned int) draw_image->rows))
-    {
-      char
-        image_geometry[MagickPathExtent];
-
-      /*
-        Scale image.
-      */
-      (void) FormatLocaleString(image_geometry,MagickPathExtent,"%ux%u",
-        width,height);
-      (void) TransformImage(&draw_image,(char *) NULL,image_geometry,
-        exception);
-    }
-  if (draw_info->degrees != 0.0)
-    {
-      Image
-        *rotate_image;
-
-      int
-        rotations;
-
-      double
-        normalized_degrees;
-
-      /*
-        Rotate image.
-      */
-      rotate_image=RotateImage(draw_image,draw_info->degrees,exception);
-      if (rotate_image == (Image *) NULL)
-        return(MagickFalse);
-      draw_image=DestroyImage(draw_image);
-      draw_image=rotate_image;
-      /*
-        Annotation is relative to the degree of rotation.
-      */
-      normalized_degrees=draw_info->degrees;
-      while (normalized_degrees < -45.0)
-        normalized_degrees+=360.0;
-      for (rotations=0; normalized_degrees > 45.0; rotations++)
-        normalized_degrees-=90.0;
-      switch (rotations % 4)
-      {
-        default:
-        case 0:
-          break;
-        case 1:
-        {
-          /*
-            Rotate 90 degrees.
-          */
-          x=x-(int) draw_image->columns/2;
-          y=y+(int) draw_image->columns/2;
-          break;
-        }
-        case 2:
-        {
-          /*
-            Rotate 180 degrees.
-          */
-          x=x-(int) draw_image->columns;
-          break;
-        }
-        case 3:
-        {
-          /*
-            Rotate 270 degrees.
-          */
-          x=x-(int) draw_image->columns/2;
-          y=y-(int) (draw_image->rows-(draw_image->columns/2));
-          break;
-        }
-      }
-    }
+  draw_image=XScaleAnnotateImage(draw_image,width,height,exception);
+  targets.draw_image=(&draw_image);
+  targets.x=(&x);
+  targets.y=(&y);
+  if (XRotateDrawImage(draw_info,exception,&targets) == MagickFalse)
+    return(MagickFalse);
   /*
     Composite text onto the image.
   */
-  draw_view=AcquireAuthenticCacheView(draw_image,exception);
-  for (y=0; y < (int) draw_image->rows; y++)
-  {
-    int
-      x;
-
-    Quantum
-      *magick_restrict q;
-
-    q=GetCacheViewAuthenticPixels(draw_view,0,(ssize_t) y,draw_image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (int) draw_image->columns; x++)
-    {
-      if (GetPixelAlpha(image,q) != TransparentAlpha)
-        SetPixelAlpha(draw_image,OpaqueAlpha,q);
-      q+=(ptrdiff_t) GetPixelChannels(draw_image);
-    }
-    if (SyncCacheViewAuthenticPixels(draw_view,exception) == MagickFalse)
-      break;
-  }
-  draw_view=DestroyCacheView(draw_view);
+  y=XSetDrawImageOpacity(draw_image,image,exception);
   (void) XParseGeometry(draw_info->geometry,&x,&y,&width,&height);
   if (draw_info->stencil == TransparentStencil)
     (void) CompositeImage(image,draw_image,CopyAlphaCompositeOp,MagickTrue,
@@ -8899,14 +9023,125 @@ MagickPrivate void XMakeStandardColormap(Display *display,
 %    o window_info: Specifies a pointer to a X11 XWindowInfo structure.
 %
 */
+static void XStripGeometrySpaces(char *geometry)
+{
+  char
+    *p;
+
+  p=geometry;
+  while (strlen(p) != 0)
+  {
+    if ((isspace((int) ((unsigned char) *p)) == 0) && (*p != '%'))
+      p++;
+    else
+      (void) memmove(p,p+1,(size_t) (MagickPathExtent-(p-geometry)));
+  }
+}
+
+static void XCreateOrConfigureWindow(Display *display,const Window parent,
+  XWindowInfo *window_info,const XSizeHints *size_hints)
+{
+  if (window_info->id == (Window) NULL)
+    window_info->id=XCreateWindow(display,parent,window_info->x,window_info->y,
+      (unsigned int) size_hints->width,(unsigned int) size_hints->height,
+      window_info->border_width,(int) window_info->depth,InputOutput,
+      window_info->visual,(unsigned long) window_info->mask,
+      &window_info->attributes);
+  else
+    {
+      MagickStatusType
+        mask;
+
+      XEvent
+        sans_event;
+
+      XWindowChanges
+        window_changes;
+
+      /*
+        Window already exists;  change relevant attributes.
+      */
+      (void) XChangeWindowAttributes(display,window_info->id,(unsigned long)
+        window_info->mask,&window_info->attributes);
+      mask=ConfigureNotify;
+      while (XCheckTypedWindowEvent(display,window_info->id,(int) mask,&sans_event)) ;
+      window_changes.x=window_info->x;
+      window_changes.y=window_info->y;
+      window_changes.width=(int) window_info->width;
+      window_changes.height=(int) window_info->height;
+      mask=(MagickStatusType) (CWWidth | CWHeight);
+      if (window_info->flags & USPosition)
+        mask|=CWX | CWY;
+      (void) XReconfigureWMWindow(display,window_info->id,window_info->screen,
+        mask,&window_changes);
+    }
+}
+
+static void XSetUserGeometryHints(const int flags,XSizeHints *size_hints,
+  XWindowInfo *window_info)
+{
+  if ((flags & WidthValue) && (flags & HeightValue))
+    size_hints->flags|=USSize;
+  if ((flags & XValue) && (flags & YValue))
+    {
+      size_hints->flags|=USPosition;
+      window_info->x=size_hints->x;
+      window_info->y=size_hints->y;
+    }
+}
+
+static int XSetUserGeometry(Display *display,XWindowInfo *window_info,
+  XSizeHints *size_hints,int gravity)
+{
+  if (window_info->geometry != (char *) NULL)
+    {
+      char
+        default_geometry[MagickPathExtent],
+        geometry[MagickPathExtent];
+
+      int
+        flags;
+
+      /*
+        User specified geometry.
+      */
+      (void) FormatLocaleString(default_geometry,MagickPathExtent,"%dx%d",
+        size_hints->width,size_hints->height);
+      (void) CopyMagickString(geometry,window_info->geometry,MagickPathExtent);
+      XStripGeometrySpaces(geometry);
+      flags=XWMGeometry(display,window_info->screen,geometry,default_geometry,
+        window_info->border_width,size_hints,&size_hints->x,&size_hints->y,
+        &size_hints->width,&size_hints->height,&gravity);
+      XSetUserGeometryHints(flags,size_hints,window_info);
+    }
+  return(gravity);
+}
+
+static void XFreeTextProperty(XTextProperty *text_property)
+{
+  if (text_property->value != (void *) NULL)
+    {
+      (void) XFree((void *) text_property->value);
+      text_property->value=(unsigned char *) NULL;
+      text_property->nitems=0;
+    }
+}
+
+static void XSetWindowProtocols(Display *display,const XWindowInfo *window_info)
+{
+  Atom
+    atom_list[2];
+
+  atom_list[0]=XInternAtom(display,"WM_DELETE_WINDOW",MagickFalse);
+  atom_list[1]=XInternAtom(display,"WM_TAKE_FOCUS",MagickFalse);
+  (void) XSetWMProtocols(display,window_info->id,atom_list,2);
+}
+
 MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
   int argc,XClassHint *class_hint,XWMHints *manager_hints,
   XWindowInfo *window_info)
 {
 #define MinWindowSize  64
-
-  Atom
-    atom_list[2];
 
   int
     gravity;
@@ -8965,82 +9200,12 @@ MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
 #endif
     }
   gravity=NorthWestGravity;
-  if (window_info->geometry != (char *) NULL)
-    {
-      char
-        default_geometry[MagickPathExtent],
-        geometry[MagickPathExtent];
-
-      int
-        flags;
-
-      char
-        *p;
-
-      /*
-        User specified geometry.
-      */
-      (void) FormatLocaleString(default_geometry,MagickPathExtent,"%dx%d",
-        size_hints->width,size_hints->height);
-      (void) CopyMagickString(geometry,window_info->geometry,MagickPathExtent);
-      p=geometry;
-      while (strlen(p) != 0)
-      {
-        if ((isspace((int) ((unsigned char) *p)) == 0) && (*p != '%'))
-          p++;
-        else
-          (void) memmove(p,p+1,(size_t) (MagickPathExtent-(p-geometry)));
-      }
-      flags=XWMGeometry(display,window_info->screen,geometry,default_geometry,
-        window_info->border_width,size_hints,&size_hints->x,&size_hints->y,
-        &size_hints->width,&size_hints->height,&gravity);
-      if ((flags & WidthValue) && (flags & HeightValue))
-        size_hints->flags|=USSize;
-      if ((flags & XValue) && (flags & YValue))
-        {
-          size_hints->flags|=USPosition;
-          window_info->x=size_hints->x;
-          window_info->y=size_hints->y;
-        }
-    }
+  gravity=XSetUserGeometry(display,window_info,size_hints,gravity);
 #if !defined(PRE_R4_ICCCM)
   size_hints->win_gravity=gravity;
   size_hints->flags|=PWinGravity;
 #endif
-  if (window_info->id == (Window) NULL)
-    window_info->id=XCreateWindow(display,parent,window_info->x,window_info->y,
-      (unsigned int) size_hints->width,(unsigned int) size_hints->height,
-      window_info->border_width,(int) window_info->depth,InputOutput,
-      window_info->visual,(unsigned long) window_info->mask,
-      &window_info->attributes);
-  else
-    {
-      MagickStatusType
-        mask;
-
-      XEvent
-        sans_event;
-
-      XWindowChanges
-        window_changes;
-
-      /*
-        Window already exists;  change relevant attributes.
-      */
-      (void) XChangeWindowAttributes(display,window_info->id,(unsigned long)
-        window_info->mask,&window_info->attributes);
-      mask=ConfigureNotify;
-      while (XCheckTypedWindowEvent(display,window_info->id,(int) mask,&sans_event)) ;
-      window_changes.x=window_info->x;
-      window_changes.y=window_info->y;
-      window_changes.width=(int) window_info->width;
-      window_changes.height=(int) window_info->height;
-      mask=(MagickStatusType) (CWWidth | CWHeight);
-      if (window_info->flags & USPosition)
-        mask|=CWX | CWY;
-      (void) XReconfigureWMWindow(display,window_info->id,window_info->screen,
-        mask,&window_changes);
-    }
+  XCreateOrConfigureWindow(display,parent,window_info,size_hints);
   if (window_info->id == (Window) NULL)
     ThrowXWindowFatalException(XServerFatalError,"UnableToCreateWindow",
       window_info->name);
@@ -9071,21 +9236,9 @@ MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
     }
   XSetWMProperties(display,window_info->id,&window_name,&icon_name,argv,argc,
     size_hints,manager_hints,class_hint);
-  if (window_name.value != (void *) NULL)
-    {
-      (void) XFree((void *) window_name.value);
-      window_name.value=(unsigned char *) NULL;
-      window_name.nitems=0;
-    }
-  if (icon_name.value != (void *) NULL)
-    {
-      (void) XFree((void *) icon_name.value);
-      icon_name.value=(unsigned char *) NULL;
-      icon_name.nitems=0;
-    }
-  atom_list[0]=XInternAtom(display,"WM_DELETE_WINDOW",MagickFalse);
-  atom_list[1]=XInternAtom(display,"WM_TAKE_FOCUS",MagickFalse);
-  (void) XSetWMProtocols(display,window_info->id,atom_list,2);
+  XFreeTextProperty(&window_name);
+  XFreeTextProperty(&icon_name);
+  XSetWindowProtocols(display,window_info);
   (void) XFree((void *) size_hints);
   if (window_info->shape != MagickFalse)
     {
@@ -9352,6 +9505,22 @@ MagickPrivate void XQueryPosition(Display *display,const Window window,int *x,
 %      the entire image is refreshed.
 %
 */
+static unsigned int XClipRefreshWidth(const XWindowInfo *window,const int x,
+  unsigned int width)
+{
+  if ((window->ximage->width-(x+window->x)) < (int) width)
+    width=(unsigned int) (window->ximage->width-(x+window->x));
+  return(width);
+}
+
+static unsigned int XClipRefreshHeight(const XWindowInfo *window,const int y,
+  unsigned int height)
+{
+  if ((window->ximage->height-(y+window->y)) < (int) height)
+    height=(unsigned int) (window->ximage->height-(y+window->y));
+  return(height);
+}
+
 MagickPrivate void XRefreshWindow(Display *display,const XWindowInfo *window,
   const XEvent *event)
 {
@@ -9404,10 +9573,8 @@ MagickPrivate void XRefreshWindow(Display *display,const XWindowInfo *window,
   /*
     Check boundary conditions.
   */
-  if ((window->ximage->width-(x+window->x)) < (int) width)
-    width=(unsigned int) (window->ximage->width-(x+window->x));
-  if ((window->ximage->height-(y+window->y)) < (int) height)
-    height=(unsigned int) (window->ximage->height-(y+window->y));
+  width=XClipRefreshWidth(window,x,width);
+  height=XClipRefreshHeight(window,y,height);
   /*
     Refresh image.
   */
@@ -9559,6 +9726,24 @@ MagickExport MagickBooleanType XRemoteCommand(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void XSetRenderMetrics(TypeMetric *metrics,const DrawInfo *draw_info,
+  const XFontStruct *font_info,const XAnnotateInfo annotate_info)
+{
+  metrics->pixels_per_em.x=(double) font_info->max_bounds.width;
+  metrics->pixels_per_em.y=(double) font_info->ascent+font_info->descent;
+  metrics->ascent=(double) font_info->ascent+4;
+  metrics->descent=(double) (-font_info->descent);
+  metrics->width=annotate_info.width/ExpandAffine(&draw_info->affine);
+  metrics->height=(double) font_info->ascent+font_info->descent;
+  metrics->max_advance=(double) font_info->max_bounds.width;
+  metrics->bounds.x1=0.0;
+  metrics->bounds.y1=metrics->descent;
+  metrics->bounds.x2=metrics->ascent+metrics->descent;
+  metrics->bounds.y2=metrics->ascent+metrics->descent;
+  metrics->underline_position=(-2.0);
+  metrics->underline_thickness=1.0;
+}
+
 MagickPrivate MagickBooleanType XRenderImage(Image *image,
   const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
   ExceptionInfo *exception)
@@ -9703,19 +9888,7 @@ MagickPrivate MagickBooleanType XRenderImage(Image *image,
   annotate_info.width=(unsigned int) XTextWidth(font_info,draw_info->text,(int)
     strlen(draw_info->text));
   annotate_info.height=(unsigned int) (font_info->ascent+font_info->descent);
-  metrics->pixels_per_em.x=(double) font_info->max_bounds.width;
-  metrics->pixels_per_em.y=(double) font_info->ascent+font_info->descent;
-  metrics->ascent=(double) font_info->ascent+4;
-  metrics->descent=(double) (-font_info->descent);
-  metrics->width=annotate_info.width/ExpandAffine(&draw_info->affine);
-  metrics->height=(double) font_info->ascent+font_info->descent;
-  metrics->max_advance=(double) font_info->max_bounds.width;
-  metrics->bounds.x1=0.0;
-  metrics->bounds.y1=metrics->descent;
-  metrics->bounds.x2=metrics->ascent+metrics->descent;
-  metrics->bounds.y2=metrics->ascent+metrics->descent;
-  metrics->underline_position=(-2.0);
-  metrics->underline_thickness=1.0;
+  XSetRenderMetrics(metrics,draw_info,font_info,annotate_info);
   if (draw_info->render == MagickFalse)
     return(MagickTrue);
   if (draw_info->fill.alpha == (double) TransparentAlpha)
