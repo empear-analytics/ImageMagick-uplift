@@ -392,12 +392,32 @@ static MagickBooleanType ExpandFilenameSpecifier(
   return(MagickTrue);
 }
 
+static MagickBooleanType CopyLiteralFilename(const char *format,
+  char *filename,ExceptionInfo *exception,size_t *result)
+{
+  char
+    *literal;
+
+  literal=(char *) GetImageRegistry(StringRegistryType,"filename:literal",
+    exception);
+  if (IsStringTrue(literal) != MagickFalse)
+    {
+      if (literal != (char *) NULL)
+        literal=DestroyString(literal);
+      (void) CopyMagickString(filename,format,MagickPathExtent);
+      (*result)=strlen(filename);
+      return(MagickTrue);
+    }
+  if (literal != (char *) NULL)
+    literal=DestroyString(literal);
+  return(MagickFalse);
+}
+
 MagickExport size_t InterpretImageFilename(const ImageInfo *image_info,
   Image *image,const char *format,int value,char *filename,
   ExceptionInfo *exception)
 {
   char
-    *literal,
     *p = filename;
 
   const char
@@ -406,19 +426,13 @@ MagickExport size_t InterpretImageFilename(const ImageInfo *image_info,
   const FilenameTargets
     targets = { &p, &cursor };
 
+  size_t
+    returned;
+
   assert(format != (const char *) NULL);
   assert(filename != (char *) NULL);
-  literal=(char *) GetImageRegistry(StringRegistryType,"filename:literal",
-    exception);
-  if (IsStringTrue(literal) != MagickFalse)
-    {
-      if (literal != (char *) NULL)
-        literal=DestroyString(literal);
-      (void) CopyMagickString(filename,format,MagickPathExtent);
-      return(strlen(filename));
-    }
-  if (literal != (char *) NULL)
-    literal=DestroyString(literal);
+  if (CopyLiteralFilename(format,filename,exception,&returned) != MagickFalse)
+    return(returned);
   while ((*cursor != '\0') && ((p-filename) < ((ssize_t) MagickPathExtent-1)))
   {
     const char
