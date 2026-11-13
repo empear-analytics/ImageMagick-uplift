@@ -8080,6 +8080,59 @@ static void RedrawFileBrowserWidget(const FileBrowserContext *context,
   (*state)&=(unsigned int) (~RedrawWidgetState);
 }
 
+static MagickBooleanType ReplaceFileBrowserList(
+  const FileBrowserContext *context,const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const glob_pattern = context->glob_pattern,
+    *const working_path = context->working_path;
+
+  XWidgetInfo
+    *const action_info = widgets->action_info;
+
+  size_t
+    *const files = widgets->files;
+
+  ssize_t
+    *const i = widgets->i;
+
+  char
+    ***const filelist = widgets->filelist;
+
+  char
+    **checklist;
+
+  size_t
+    number_files;
+
+  /*
+    Update file list.
+  */
+  checklist=ListFiles(working_path,glob_pattern,&number_files);
+  if (checklist == (char **) NULL)
+    {
+      /*
+        Reply is a filename, exit.
+      */
+      (*action_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,action_info);
+      return(MagickFalse);
+    }
+  for ((*i)=0; (*i) < (ssize_t) (*files); (*i)++)
+    (*filelist)[(*i)]=DestroyString((*filelist)[(*i)]);
+  if ((*filelist) != (char **) NULL)
+    (*filelist)=(char **) RelinquishMagickMemory((*filelist));
+  (*filelist)=checklist;
+  (*files)=number_files;
+  return(MagickTrue);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8285,31 +8338,8 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
       RedrawFileBrowserWidget(&file_context,&file_widgets);
     if (state & UpdateListState)
       {
-        char
-          **checklist;
-
-        size_t
-          number_files;
-
-        /*
-          Update file list.
-        */
-        checklist=ListFiles(working_path,glob_pattern,&number_files);
-        if (checklist == (char **) NULL)
-          {
-            /*
-              Reply is a filename, exit.
-            */
-            action_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&action_info);
-            break;
-          }
-        for (i=0; i < (ssize_t) files; i++)
-          filelist[i]=DestroyString(filelist[i]);
-        if (filelist != (char **) NULL)
-          filelist=(char **) RelinquishMagickMemory(filelist);
-        filelist=checklist;
-        files=number_files;
+        if (ReplaceFileBrowserList(&file_context,&file_widgets) == MagickFalse)
+          break;
         /*
           Update file list.
         */
