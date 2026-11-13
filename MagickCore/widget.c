@@ -12908,7 +12908,8 @@ static void InitializeListBrowserScroll(const ListBrowserContext *context,
   (*scroll_info).width=height;
   (*scroll_info).height=(unsigned int)
     ((*reply_info).y-((6*QuantumMargin) >> 1)-(int) height);
-  (*scroll_info).x=(*reply_info).x+(int) ((*reply_info).width-(*scroll_info).width);
+  (*scroll_info).x=(*reply_info).x+(int) ((*reply_info).width-
+    (*scroll_info).width);
   (*scroll_info).y=((5*QuantumMargin) >> 1)+(int) height-(int)
     (*reply_info).bevel_width;
   (*scroll_info).raised=MagickFalse;
