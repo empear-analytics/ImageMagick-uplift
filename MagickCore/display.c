@@ -7771,6 +7771,50 @@ static void XClampLineEnd(const XWindows *windows,XSegment *line_info)
       (*line_info).y2=(short) windows->image.height;
 }
 
+static void XSizeDrawRegion(const DrawEditContext *context,
+  XDrawInfo *draw_info,const unsigned int line_width,
+  const RectangleInfo *rectangle_info)
+{
+  Image
+    **const image = context->image;
+
+  XWindows
+    *const windows = context->windows;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    height,
+    width;
+
+  width=(unsigned int) (*image)->columns;
+  height=(unsigned int) (*image)->rows;
+  x=0;
+  y=0;
+  if (windows->image.crop_geometry != (char *) NULL)
+    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
+  (*draw_info).x+=windows->image.x-((int) line_width/2);
+  if ((*draw_info).x < 0)
+    (*draw_info).x=0;
+  (*draw_info).x=(int) width*(*draw_info).x/windows->image.ximage->width;
+  (*draw_info).y+=windows->image.y-((int) line_width/2);
+  if ((*draw_info).y < 0)
+    (*draw_info).y=0;
+  (*draw_info).y=(int) height*(*draw_info).y/windows->image.ximage->height;
+  (*draw_info).width=(unsigned int) (*rectangle_info).width+(line_width << 1);
+  if ((*draw_info).width > (unsigned int) (*image)->columns)
+    (*draw_info).width=(unsigned int) (*image)->columns;
+  (*draw_info).height=(unsigned int) (*rectangle_info).height+(line_width << 1);
+  if ((*draw_info).height > (unsigned int) (*image)->rows)
+    (*draw_info).height=(unsigned int) (*image)->rows;
+  (void) FormatLocaleString((*draw_info).geometry,MagickPathExtent,"%ux%u%+d%+d",
+    width*(*draw_info).width/(unsigned int) windows->image.ximage->width,
+    height*(*draw_info).height/(unsigned int) windows->image.ximage->height,
+    (*draw_info).x+x,(*draw_info).y+y);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -7833,9 +7877,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
 
   unsigned int
     distance,
-    height,
-    max_coordinates,
-    width;
+    max_coordinates;
 
   size_t
     state;
@@ -8109,30 +8151,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
     draw_info.y=(int) rectangle_info.y;
     (void) XMagickCommand(display,resource_info,windows,SaveToUndoBufferCommand,
       image,exception);
-    width=(unsigned int) (*image)->columns;
-    height=(unsigned int) (*image)->rows;
-    x=0;
-    y=0;
-    if (windows->image.crop_geometry != (char *) NULL)
-      (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
-    draw_info.x+=windows->image.x-((int) line_width/2);
-    if (draw_info.x < 0)
-      draw_info.x=0;
-    draw_info.x=(int) width*draw_info.x/windows->image.ximage->width;
-    draw_info.y+=windows->image.y-((int) line_width/2);
-    if (draw_info.y < 0)
-      draw_info.y=0;
-    draw_info.y=(int) height*draw_info.y/windows->image.ximage->height;
-    draw_info.width=(unsigned int) rectangle_info.width+(line_width << 1);
-    if (draw_info.width > (unsigned int) (*image)->columns)
-      draw_info.width=(unsigned int) (*image)->columns;
-    draw_info.height=(unsigned int) rectangle_info.height+(line_width << 1);
-    if (draw_info.height > (unsigned int) (*image)->rows)
-      draw_info.height=(unsigned int) (*image)->rows;
-    (void) FormatLocaleString(draw_info.geometry,MagickPathExtent,"%ux%u%+d%+d",
-      width*draw_info.width/(unsigned int) windows->image.ximage->width,
-      height*draw_info.height/(unsigned int) windows->image.ximage->height,
-      draw_info.x+x,draw_info.y+y);
+    XSizeDrawRegion(&draw_context,&draw_info,line_width,&rectangle_info);
     /*
       Initialize drawing attributes.
     */
