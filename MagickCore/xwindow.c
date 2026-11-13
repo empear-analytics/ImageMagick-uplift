@@ -4226,7 +4226,7 @@ typedef struct _XWindowTransform
     *exception;
 } XWindowTransform;
 
-static void XTransformWindowImage(const XWindowTransform *transform)
+static void XResizeWindowImage(const XWindowTransform *transform)
 {
   Display
     *const display = transform->display;
@@ -4244,35 +4244,51 @@ static void XTransformWindowImage(const XWindowTransform *transform)
   ExceptionInfo
     *const exception = transform->exception;
 
+  Image
+    *resize_image;
+
+  /*
+    Resize image.
+  */
+  resize_image=NewImageList();
+  if (IsImageBeyondDisplay(display,window) != MagickFalse)
+      resize_image=ResizeImage(window->image,width,height,
+        image->filter,exception);
+  else if (window->image->storage_class == PseudoClass)
+    resize_image=SampleImage(window->image,width,height,
+      exception);
+  else
+    resize_image=ThumbnailImage(window->image,width,height,
+      exception);
+  if (resize_image != (Image *) NULL)
+    {
+      if (window->image != image)
+        window->image=DestroyImage(window->image);
+      window->image=resize_image;
+      window->destroy=MagickTrue;
+    }
+}
+
+static void XTransformWindowImage(const XWindowTransform *transform)
+{
+  XWindowInfo
+    *const window = transform->window;
+
+  Image
+    *const image = transform->image;
+
+  const unsigned int
+    width = transform->width,
+    height = transform->height;
+
+  ExceptionInfo
+    *const exception = transform->exception;
+
   if (window->crop_geometry != (char *) NULL)
     XCropWindowImage(window,image,exception);
   if ((width != (unsigned int) window->image->columns) ||
       (height != (unsigned int) window->image->rows))
-    {
-      Image
-        *resize_image;
-
-      /*
-        Resize image.
-      */
-      resize_image=NewImageList();
-      if (IsImageBeyondDisplay(display,window) != MagickFalse)
-          resize_image=ResizeImage(window->image,width,height,
-            image->filter,exception);
-      else if (window->image->storage_class == PseudoClass)
-        resize_image=SampleImage(window->image,width,height,
-          exception);
-      else
-        resize_image=ThumbnailImage(window->image,width,height,
-          exception);
-      if (resize_image != (Image *) NULL)
-        {
-          if (window->image != image)
-            window->image=DestroyImage(window->image);
-          window->image=resize_image;
-          window->destroy=MagickTrue;
-        }
-    }
+    XResizeWindowImage(transform);
 }
 
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
