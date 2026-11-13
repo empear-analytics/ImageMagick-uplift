@@ -473,22 +473,11 @@ static void ConcatenateColorComponents(const PixelInfo *color,char *tuple)
     }
 }
 
-MagickExport void GetColorTuple(const PixelInfo *pixel,
-  const MagickBooleanType hex,char *tuple)
+static void ConcatenateColorFunction(const PixelInfo *pixel,char *tuple)
 {
   PixelInfo
     color;
 
-  assert(pixel != (const PixelInfo *) NULL);
-  assert(tuple != (char *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",tuple);
-  *tuple='\0';
-  if (hex != MagickFalse)
-    {
-      ConcatenateHexColor(pixel,tuple);
-      return;
-    }
   /*
     Convert pixel to rgb() or cmyk() color.
   */
@@ -503,5 +492,21 @@ MagickExport void GetColorTuple(const PixelInfo *pixel,
   ConcatenateColorComponents(&color,tuple);
   (void) ConcatenateMagickString(tuple,")",MagickPathExtent);
   LocaleLower(tuple);
+}
+
+MagickExport void GetColorTuple(const PixelInfo *pixel,
+  const MagickBooleanType hex,char *tuple)
+{
+  assert(pixel != (const PixelInfo *) NULL);
+  assert(tuple != (char *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",tuple);
+  *tuple='\0';
+  if (hex != MagickFalse)
+    {
+      ConcatenateHexColor(pixel,tuple);
+      return;
+    }
+  ConcatenateColorFunction(pixel,tuple);
   return;
 }
