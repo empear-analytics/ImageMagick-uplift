@@ -15651,6 +15651,12 @@ typedef struct _TextViewWidgets
 
   size_t
     *state;
+
+  XWidgetInfo
+    *scroll_info;
+
+  unsigned int
+    *visible_lines;
 } TextViewWidgets;
 
 typedef struct _TextViewContext
@@ -15660,6 +15666,9 @@ typedef struct _TextViewContext
 
   XWindows
     *windows;
+
+  unsigned int
+    lines;
 } TextViewContext;
 
 static void ReleaseTextViewScroll(const TextViewContext *context,
@@ -15726,6 +15735,69 @@ static void ReleaseTextViewScroll(const TextViewContext *context,
   ReleaseTextViewDismiss(&release,dismiss_info,state);
 }
 
+static void PressTextViewKey(const TextViewContext *context,const XEvent event,
+  const TextViewWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    lines = context->lines;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const dismiss_info = widgets->dismiss_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  unsigned int
+    *const visible_lines = widgets->visible_lines;
+
+  static char
+    command[MagickPathExtent];
+
+  static int
+    length;
+
+  static KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key press.
+  */
+  if (event.xkey.window != windows->widget.id)
+    return;
+  length=XLookupString((XKeyEvent *) &event.xkey,command,
+    (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+  *(command+length)='\0';
+  if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
+    {
+      (*dismiss_info).raised=MagickFalse;
+      XDrawBeveledButton(display,&windows->widget,dismiss_info);
+      (*state)|=ExitState;
+      return;
+    }
+  if (AreaIsActive((*scroll_info),event.xkey))
+    {
+      /*
+        Move slider.
+      */
+      (*slider_info)=MoveTextViewSlider((*slider_info),key_symbol,(*visible_lines),
+        lines);
+      (*state)|=RedrawListState;
+      return;
+    }
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -15781,7 +15853,7 @@ MagickPrivate void XTextViewWidget(Display *display,
 
   const TextViewWidgets
     view_widgets = { &north_info, &south_info, &delay, &slider_info,
-      &dismiss_info, &state };
+      &dismiss_info, &state, &scroll_info, &visible_lines };
 
   TextViewContext
     view_context;
@@ -15869,6 +15941,7 @@ MagickPrivate void XTextViewWidget(Display *display,
   state=UpdateConfigurationState;
   view_context.display=display;
   view_context.windows=windows;
+  view_context.lines=lines;
   do
   {
     if (state & UpdateConfigurationState)
@@ -16147,40 +16220,7 @@ MagickPrivate void XTextViewWidget(Display *display,
       }
       case KeyPress:
       {
-        static char
-          command[MagickPathExtent];
-
-        static int
-          length;
-
-        static KeySym
-          key_symbol;
-
-        /*
-          Respond to a user key press.
-        */
-        if (event.xkey.window != windows->widget.id)
-          break;
-        length=XLookupString((XKeyEvent *) &event.xkey,command,
-          (int) sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        *(command+length)='\0';
-        if ((key_symbol == XK_Return) || (key_symbol == XK_KP_Enter))
-          {
-            dismiss_info.raised=MagickFalse;
-            XDrawBeveledButton(display,&windows->widget,&dismiss_info);
-            state|=ExitState;
-            break;
-          }
-        if (AreaIsActive(scroll_info,event.xkey))
-          {
-            /*
-              Move slider.
-            */
-            slider_info=MoveTextViewSlider(slider_info,key_symbol,visible_lines,
-              lines);
-            state|=RedrawListState;
-            break;
-          }
+        PressTextViewKey(&view_context,event,&view_widgets);
         break;
       }
       case KeyRelease:
