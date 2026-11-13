@@ -335,6 +335,20 @@ static PolicyDomain StripPolicyDomain(char *policyname)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType GetWildcardPolicy(const char *name,
+  const ElementInfo *p,PolicyInfo *policy,PolicyInfo **result)
+{
+  if ((name == (const char *) NULL) || (LocaleCompare(name,"*") == 0))
+    {
+      UnlockSemaphoreInfo(policy_semaphore);
+      if (p != (ElementInfo *) NULL)
+        policy=(PolicyInfo *) p->value;
+      (*result)=policy;
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 static PolicyInfo *GetPolicyInfo(const char *name,ExceptionInfo *exception)
 {
   char
@@ -347,7 +361,8 @@ static PolicyInfo *GetPolicyInfo(const char *name,ExceptionInfo *exception)
     domain;
 
   PolicyInfo
-    *policy;
+    *policy,
+    *returned;
 
   assert(exception != (ExceptionInfo *) NULL);
   if (IsPolicyCacheInstantiated(exception) == MagickFalse)
@@ -370,13 +385,8 @@ static PolicyInfo *GetPolicyInfo(const char *name,ExceptionInfo *exception)
   LockSemaphoreInfo(policy_semaphore);
   ResetLinkedListIterator(policy_cache);
   p=GetHeadElementInLinkedList(policy_cache);
-  if ((name == (const char *) NULL) || (LocaleCompare(name,"*") == 0))
-    {
-      UnlockSemaphoreInfo(policy_semaphore);
-      if (p != (ElementInfo *) NULL)
-        policy=(PolicyInfo *) p->value;
-      return(policy);
-    }
+  if (GetWildcardPolicy(name,p,policy,&returned) != MagickFalse)
+    return(returned);
   while (p != (ElementInfo *) NULL)
   {
     policy=(PolicyInfo *) p->value;
