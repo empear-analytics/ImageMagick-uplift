@@ -4683,6 +4683,50 @@ static void XColorEditKey(const ColorEditContext *context,
   }
 }
 
+static void XColorEditEvent(const ColorEditContext *context,
+  const ColorEditTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      XColorEditPress(context,targets);
+      break;
+    }
+    case ButtonRelease:
+    {
+      XColorEditRelease(context,targets);
+      break;
+    }
+    case Expose:
+      break;
+    case KeyPress:
+    {
+      XColorEditKey(context,targets);
+      break;
+    }
+    case MotionNotify:
+    {
+      /*
+        Map and unmap Info widget as cursor crosses its boundaries.
+      */
+      (*x)=(*event).xmotion.x;
+      (*y)=(*event).xmotion.y;
+      XTrackInfoWidget(context->display,context->windows,(*x),(*y));
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType XColorEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -4792,38 +4836,7 @@ static MagickBooleanType XColorEditImage(Display *display,
         XColorEditCommand(&context,&targets);
         continue;
       }
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        XColorEditPress(&context,&targets);
-        break;
-      }
-      case ButtonRelease:
-      {
-        XColorEditRelease(&context,&targets);
-        break;
-      }
-      case Expose:
-        break;
-      case KeyPress:
-      {
-        XColorEditKey(&context,&targets);
-        break;
-      }
-      case MotionNotify:
-      {
-        /*
-          Map and unmap Info widget as cursor crosses its boundaries.
-        */
-        x=event.xmotion.x;
-        y=event.xmotion.y;
-        XTrackInfoWidget(display,windows,x,y);
-        break;
-      }
-      default:
-        break;
-    }
+    XColorEditEvent(&context,&targets);
     if (event.xany.window == windows->magnify.id)
       {
         x=windows->magnify.x-windows->image.x;
