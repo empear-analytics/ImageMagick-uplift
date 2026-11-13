@@ -376,8 +376,9 @@ static const char *GetOpenCLCacheDirectoryValue(void)
 
 static const char *GetOpenCLCacheDirectory()
 {
-  if (cache_directory == (char *) NULL)
-    {
+  if (cache_directory != (char *) NULL)
+    return(GetOpenCLCacheDirectoryValue());
+  {
       if (cache_directory_lock == (SemaphoreInfo *) NULL)
         ActivateSemaphoreInfo(&cache_directory_lock);
       LockSemaphoreInfo(cache_directory_lock);
@@ -406,7 +407,7 @@ static const char *GetOpenCLCacheDirectory()
           SetOpenCLCacheDirectory(home,path,temp);
         }
       UnlockSemaphoreInfo(cache_directory_lock);
-    }
+  }
   return(GetOpenCLCacheDirectoryValue());
 }
 
