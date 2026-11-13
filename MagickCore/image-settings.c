@@ -909,29 +909,29 @@ static void SyncImageRenderingSettings(const ImageInfo *image_info,
       MagickOrientationOptions,MagickFalse,option);
 }
 
-static void SyncImagePageAndQualitySettings(const ImageInfo *image_info,
-  Image *image)
+static void SyncGeometryOption(const ImageInfo *image_info,
+  const char *key,RectangleInfo *value)
 {
   const char
     *option;
 
-  option=GetImageOption(image_info,"page");
+  option=GetImageOption(image_info,key);
   if (option != (const char *) NULL)
-    (void) ParsePageGeometryOption(option,&image->page);
+    (void) ParsePageGeometryOption(option,value);
+}
+
+static void SyncImagePageAndQualitySettings(const ImageInfo *image_info,
+  Image *image)
+{
+  SyncGeometryOption(image_info,"page",&image->page);
   SyncUnsignedLongOption(image_info,"quality",&image->quality);
-  option=GetImageOption(image_info,"red-primary");
-  if (option != (const char *) NULL)
-    ParseChromaticityPrimary(option,&image->chromaticity.red_primary);
+  SyncChromaticityOption(image_info,"red-primary",
+    &image->chromaticity.red_primary);
   if (image_info->quality != UndefinedCompressionQuality)
     image->quality=image_info->quality;
   SyncUnsignedLongOption(image_info,"scene",&image->scene);
-  option=GetImageOption(image_info,"taint");
-  if (option != (const char *) NULL)
-    image->taint=(MagickBooleanType) ParseCommandOption(MagickBooleanOptions,
-      MagickFalse,option);
-  option=GetImageOption(image_info,"tile-offset");
-  if (option != (const char *) NULL)
-    (void) ParsePageGeometryOption(option,&image->tile_offset);
+  SyncBooleanOption(image_info,"taint",&image->taint);
+  SyncGeometryOption(image_info,"tile-offset",&image->tile_offset);
 }
 
 static void SyncImageUnitsSettings(const ImageInfo *image_info,Image *image)
