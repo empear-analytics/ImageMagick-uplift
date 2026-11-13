@@ -936,6 +936,12 @@ static inline MagickBooleanType IsExtractRequested(const ImageInfo *read_info)
     (read_info->stream == (StreamHandler) NULL)) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsEmptyImageSize(const Image *image)
+{
+  return(((image->columns == 0) || (image->rows == 0)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport Image *ReadImage(const ImageInfo *image_info,
   ExceptionInfo *exception)
 {
@@ -1089,7 +1095,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
     {
       for (next=image; next != (Image *) NULL; next=GetNextImageInList(next))
       {
-        if ((image->columns == 0) || (image->rows == 0))
+        if (IsEmptyImageSize(image) != MagickFalse)
           {
             read_info=DestroyImageInfo(read_info);
             ThrowReaderException(ImageError,"NegativeOrZeroImageSize");
