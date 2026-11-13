@@ -39,34 +39,50 @@ beyond the arguments of the link calls: the build, `tools/obj_modulo.sh` and rea
 import re
 import subprocess
 import sys
+from collections import namedtuple
 
 TOKEN = re.compile(
     r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|[A-Za-z_]\w*|\d[\w.]*|->|<<=|>>=|\+\+|--|'
     r'<<|>>|<=|>=|==|!=|&&|\|\||[-+*/%&|^]=|\S')
 
 
+def literal_at(text, i):
+    """The string or character literal opening at text[i], and the index after it."""
+    quote = text[i]
+    j = i + 1
+    while j < len(text) and text[j] != quote:
+        j += 2 if text[j] == "\\" else 1
+    return text[i:j + 1], j + 1
+
+
+def block_comment_at(text, i):
+    """A space for the /* */ comment opening at text[i], and the index after it."""
+    return " ", text.index("*/", i + 2) + 2
+
+
+def line_comment_at(text, i):
+    """Nothing for the // comment opening at text[i], and the index of its newline."""
+    j = text.find("\n", i)
+    return "", len(text) if j < 0 else j
+
+
+def scan(text, i):
+    """What text[i:] contributes once comments are dropped, and the index after it."""
+    if text[i] in "\"'":
+        return literal_at(text, i)
+    if text.startswith("/*", i):
+        return block_comment_at(text, i)
+    if text.startswith("//", i):
+        return line_comment_at(text, i)
+    return text[i], i + 1
+
+
 def strip_comments(text):
     out = []
     i = 0
-    n = len(text)
-    while i < n:
-        c = text[i]
-        if c == '"' or c == "'":
-            j = i + 1
-            while j < n and text[j] != c:
-                j += 2 if text[j] == "\\" else 1
-            out.append(text[i:j + 1])
-            i = j + 1
-        elif text.startswith("/*", i):
-            j = text.index("*/", i + 2)
-            out.append(" ")
-            i = j + 2
-        elif text.startswith("//", i):
-            j = text.find("\n", i)
-            i = n if j < 0 else j
-        else:
-            out.append(c)
-            i += 1
+    while i < len(text):
+        piece, i = scan(text, i)
+        out.append(piece)
     return "".join(out)
 
 
@@ -78,39 +94,57 @@ def match_close(toks, i, open_, close):
     """Index of the token closing the bracket opened at toks[i]."""
     depth = 0
     for j in range(i, len(toks)):
-        if toks[j] == open_:
-            depth += 1
-        elif toks[j] == close:
-            depth -= 1
-            if depth == 0:
-                return j
+        depth += (toks[j] == open_) - (toks[j] == close)
+        if depth == 0 and toks[j] == close:
+            return j
     raise SystemExit("FAIL: unbalanced %s at token %d" % (open_, i))
 
 
+Span = namedtuple("Span", "start params_start params_end body_open body_close")
+
+
+def definition_start(toks, name_index):
+    """Index of the first token of the declaration whose name is toks[name_index]."""
+    start = name_index
+    while start > 0 and toks[start - 1] not in (";", "}", "{"):
+        start -= 1
+    return start
+
+
+def definition_at(toks, i):
+    """(name, Span) of the function whose parameter list opens at toks[i], else None."""
+    if i == 0 or not re.match(r"[A-Za-z_]\w*$", toks[i - 1]):
+        return None
+    close = match_close(toks, i, "(", ")")
+    if close + 1 >= len(toks) or toks[close + 1] != "{":
+        return None
+    body_close = match_close(toks, close + 1, "{", "}")
+    return toks[i - 1], Span(definition_start(toks, i - 1), i, close, close + 1, body_close)
+
+
 def functions(toks):
-    """name -> (start, params_start, params_end, body_open, body_close), top-level definitions."""
+    """name -> Span, top-level definitions."""
     found = {}
-    i = 0
-    n = len(toks)
     depth = 0
-    while i < n:
-        t = toks[i]
-        if t == "{":
-            depth += 1
-        elif t == "}":
-            depth -= 1
-        elif depth == 0 and t == "(" and i > 0 and re.match(r"[A-Za-z_]\w*$", toks[i - 1]):
-            close = match_close(toks, i, "(", ")")
-            if close + 1 < n and toks[close + 1] == "{":
-                body_close = match_close(toks, close + 1, "{", "}")
-                start = i - 1
-                while start > 0 and toks[start - 1] not in (";", "}", "{"):
-                    start -= 1
-                found[toks[i - 1]] = (start, i, close, close + 1, body_close)
-                i = body_close + 1
-                continue
-        i += 1
+    i = 0
+    while i < len(toks):
+        depth += (toks[i] == "{") - (toks[i] == "}")
+        definition = definition_at(toks, i) if toks[i] == "(" and depth == 0 else None
+        if definition is None:
+            i += 1
+            continue
+        name, span = definition
+        found[name] = span
+        i = span.body_close + 1
     return found
+
+
+def switch_at(toks, i):
+    """(switch, close paren, open brace, close brace) of the `switch (E) { ... }` at toks[i]."""
+    if toks[i] != "switch" or toks[i + 1] != "(":
+        return None
+    pc = match_close(toks, i + 1, "(", ")")
+    return i, pc, pc + 1, match_close(toks, pc + 1, "{", "}")
 
 
 def switches(toks, lo, hi):
@@ -118,13 +152,28 @@ def switches(toks, lo, hi):
     found = []
     i = lo
     while i < hi:
-        if toks[i] == "switch" and toks[i + 1] == "(":
-            pc = match_close(toks, i + 1, "(", ")")
-            bc = match_close(toks, pc + 1, "{", "}")
-            found.append((i, pc, pc + 1, bc))
-            i = bc
+        found_here = switch_at(toks, i)
+        if found_here:
+            found.append(found_here)
+            i = found_here[3]
         i += 1
     return found
+
+
+def label_at(toks, i):
+    """The label `case X :` or `default :` at toks[i] as text, and the index after its colon."""
+    j = i + 1
+    while toks[j] != ":":
+        j += 1
+    return " ".join(toks[i:j + 1]), j + 1
+
+
+def close_group(out, labels, body):
+    """Move the group read so far, when it has a body, from labels and body to out."""
+    if body:
+        out.append((tuple(labels), tuple(body)))
+        labels.clear()
+        body.clear()
 
 
 def groups(toks, lo, hi):
@@ -137,33 +186,27 @@ def groups(toks, lo, hi):
     while i < hi:
         t = toks[i]
         if depth == 0 and t in ("case", "default"):
-            if body:
-                out.append((tuple(labels), tuple(body)))
-                labels, body = [], []
-            j = i + 1
-            while toks[j] != ":":
-                j += 1
-            labels.append(" ".join(toks[i:j + 1]))
-            i = j + 1
-            continue
-        if t == "{":
-            depth += 1
-        elif t == "}":
-            depth -= 1
-        body.append(t)
-        i += 1
+            close_group(out, labels, body)
+            label, i = label_at(toks, i)
+            labels.append(label)
+        else:
+            depth += (t == "{") - (t == "}")
+            body.append(t)
+            i += 1
     if labels:
         out.append((tuple(labels), tuple(body)))
     return out
 
 
+def bracket_depth_change(t):
+    """+1 for an opening bracket, -1 for a closing one, else 0."""
+    return (t in "([{") - (t in ")]}")
+
+
 def split_args(toks):
     args, cur, depth = [], [], 0
     for t in toks:
-        if t in "([{":
-            depth += 1
-        elif t in ")]}":
-            depth -= 1
+        depth += bracket_depth_change(t)
         if t == "," and depth == 0:
             args.append(cur)
             cur = []
@@ -174,12 +217,30 @@ def split_args(toks):
     return args
 
 
+def parameters(toks, fn):
+    """The parameter declarations of the function fn, each a list of tokens."""
+    return split_args(toks[fn.params_start + 1:fn.params_end])
+
+
 def param_names(toks, fn):
-    s, ps, pe, bo, bc = fn
-    names = []
-    for a in split_args(toks[ps + 1:pe]):
-        names.append(a[-1])
-    return names
+    return [a[-1] for a in parameters(toks, fn)]
+
+
+def bound_member_at(body, i, bound):
+    """(member, 4) when body[i:] opens with `( * member )` for a bound member, else None."""
+    window = list(body[i:i + 4])
+    if len(window) < 4 or window[2] not in bound:
+        return None
+    if window[:2] + window[3:] != ["(", "*", ")"]:
+        return None
+    return window[2], 4
+
+
+def address_of_at(body, i, ptr_params):
+    """(parameter, 2) when body[i:] opens with `& parameter` for a pointer parameter, else None."""
+    if body[i] != "&" or i + 1 >= len(body):
+        return None
+    return (body[i + 1], 2) if body[i + 1] in ptr_params else None
 
 
 def normalise(body, bound, ptr_params):
@@ -187,16 +248,10 @@ def normalise(body, bound, ptr_params):
     out = []
     i = 0
     while i < len(body):
-        if (body[i] == "(" and i + 3 < len(body) and body[i + 1] == "*"
-                and body[i + 2] in bound and body[i + 3] == ")"):
-            out.append(body[i + 2])
-            i += 4
-        elif body[i] == "&" and i + 1 < len(body) and body[i + 1] in ptr_params:
-            out.append(body[i + 1])
-            i += 2
-        else:
-            out.append(body[i])
-            i += 1
+        rewrite = bound_member_at(body, i, bound) or address_of_at(body, i, ptr_params)
+        token, width = rewrite or (body[i], 1)
+        out.append(token)
+        i += width
     return tuple(out)
 
 
@@ -250,15 +305,19 @@ class Chain:
         self.toks = toks
 
 
+CALL_TAIL = [")", ";", "break", ";"]
+
+
 def link_target(norm_body, names):
     """Next helper name when the group is `{ Next(...); break; }`, else None."""
     b = list(norm_body)
-    if b and b[0] == "{":
-        b = b[1:-1] if b[-1] == "}" else b
-    if len(b) >= 4 and b[0] in names and b[1] == "(" and b[-4] == ")" and b[-3] == ";" \
-            and b[-2] == "break" and b[-1] == ";":
-        return b[0], b[2:-4]
-    return None
+    if b[:1] == ["{"] and b[-1:] == ["}"]:
+        b = b[1:-1]
+    if len(b) < 4 or b[-4:] != CALL_TAIL:
+        return None
+    if b[0] not in names or b[1] != "(":
+        return None
+    return b[0], b[2:-4]
 
 
 def flatten(toks, funcs, name, expr, problems, names, tag, ptr_all, top=True):
