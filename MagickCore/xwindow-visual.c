@@ -359,6 +359,22 @@ static void XRestrictVisualByType(Display *display,const char *visual_type,
     XRestrictVisualByID(display,visual_type,visual_mask,visual_template);
 }
 
+static void XRestrictVisualByScreen(Display *display,
+  const XResourceInfo *resource_info,int *visual_mask,
+  XVisualInfo *visual_template)
+{
+  size_t
+    one;
+
+  (*visual_mask)=VisualScreenMask;
+  (*visual_template).screen=XDefaultScreen(display);
+  (*visual_template).depth=XDefaultDepth(display,XDefaultScreen(display));
+  one=1;
+  if ((resource_info->immutable != MagickFalse) && (resource_info->colors != 0))
+    if (resource_info->colors <= (one << (size_t) (*visual_template).depth))
+      (*visual_mask)|=VisualDepthMask;
+}
+
 MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
   XStandardColormap *map_info,XResourceInfo *resource_info)
 {
@@ -371,9 +387,6 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
 
   int
     i;
-
-  size_t
-    one;
 
   static int
     number_visuals;
@@ -395,13 +408,7 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
   map_type=resource_info->map_type;
   visual_type=resource_info->visual_type;
-  visual_mask=VisualScreenMask;
-  visual_template.screen=XDefaultScreen(display);
-  visual_template.depth=XDefaultDepth(display,XDefaultScreen(display));
-  one=1;
-  if ((resource_info->immutable != MagickFalse) && (resource_info->colors != 0))
-    if (resource_info->colors <= (one << (size_t) visual_template.depth))
-      visual_mask|=VisualDepthMask;
+  XRestrictVisualByScreen(display,resource_info,&visual_mask,&visual_template);
   if (visual_type != (char *) NULL)
     XRestrictVisualByType(display,visual_type,&visual_mask,&visual_template);
   /*
