@@ -15630,12 +15630,12 @@ static XWidgetInfo MoveTextViewSlider(XWidgetInfo slider_info,
   return(slider_info);
 }
 
+#define DismissButtonText  "Dismiss"
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
 {
-#define DismissButtonText  "Dismiss"
-
   char
     primary_selection[MagickPathExtent];
 
