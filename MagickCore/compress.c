@@ -1191,6 +1191,36 @@ static int GetLiteralRunLength(const unsigned char *magick_restrict pixels,
 %      pixels to compress.
 %
 */
+static int WritePackbitsRun(Image *image,
+  const unsigned char *magick_restrict pixels,unsigned char *packbits,
+  const ssize_t i)
+{
+  int
+    count;
+
+  ssize_t
+    j;
+
+  if ((*pixels == *(pixels+1)) && (*(pixels+1) == *(pixels+2)))
+    {
+      /*
+        Packed run.
+      */
+      count=GetPackedRunLength(pixels,i);
+      (void) WriteBlobByte(image,(unsigned char) ((256-count)+1));
+      (void) WriteBlobByte(image,*pixels);
+      return(count);
+    }
+  /*
+    Literal run.
+  */
+  count=GetLiteralRunLength(pixels,packbits,i);
+  *packbits=(unsigned char) (count-1);
+  for (j=0; j <= (ssize_t) count; j++)
+    (void) WriteBlobByte(image,packbits[j]);
+  return(count);
+}
+
 MagickExport MagickBooleanType PackbitsEncodeImage(Image *image,
   const size_t length,unsigned char *magick_restrict pixels,
   ExceptionInfo *exception)
@@ -1199,8 +1229,7 @@ MagickExport MagickBooleanType PackbitsEncodeImage(Image *image,
     count;
 
   ssize_t
-    i,
-    j;
+    i;
 
   unsigned char
     *packbits;
@@ -1253,26 +1282,8 @@ MagickExport MagickBooleanType PackbitsEncodeImage(Image *image,
       }
       default:
       {
-        if ((*pixels == *(pixels+1)) && (*(pixels+1) == *(pixels+2)))
-          {
-            /*
-              Packed run.
-            */
-            count=GetPackedRunLength(pixels,i);
-            i-=count;
-            (void) WriteBlobByte(image,(unsigned char) ((256-count)+1));
-            (void) WriteBlobByte(image,*pixels);
-            pixels+=count;
-            break;
-          }
-        /*
-          Literal run.
-        */
-        count=GetLiteralRunLength(pixels,packbits,i);
+        count=WritePackbitsRun(image,pixels,packbits,i);
         i-=count;
-        *packbits=(unsigned char) (count-1);
-        for (j=0; j <= (ssize_t) count; j++)
-          (void) WriteBlobByte(image,packbits[j]);
         pixels+=count;
         break;
       }
