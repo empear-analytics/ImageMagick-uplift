@@ -7954,6 +7954,46 @@ static void XWaitForDrawStart(const DrawEditContext *context,
   (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
 }
 
+static void XPreviewElement(const DrawEditContext *context,
+  const DrawPreviewInput *preview,const ElementType element,double *degrees)
+{
+  switch (element)
+  {
+    case PointElement:
+    default:
+    {
+      XPreviewPoint(context,preview);
+      break;
+    }
+    case LineElement:
+    {
+      XPreviewLine(context,preview,degrees);
+      break;
+    }
+    case RectangleElement:
+    case FillRectangleElement:
+    {
+      XPreviewRectangle(context,preview);
+      break;
+    }
+    case CircleElement:
+    case FillCircleElement:
+    case EllipseElement:
+    case FillEllipseElement:
+    {
+      XPreviewEllipse(context,preview);
+      break;
+    }
+    case PolygonElement:
+    case FillPolygonElement:
+    {
+      XPreviewPolyline(context,preview);
+      XPreviewLine(context,preview,degrees);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -8123,41 +8163,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
       preview_input.distance=distance;
       preview_input.line_info=line_info;
       preview_input.rectangle_info=rectangle_info;
-      switch (element)
-      {
-        case PointElement:
-        default:
-        {
-          XPreviewPoint(&draw_context,&preview_input);
-          break;
-        }
-        case LineElement:
-        {
-          XPreviewLine(&draw_context,&preview_input,&degrees);
-          break;
-        }
-        case RectangleElement:
-        case FillRectangleElement:
-        {
-          XPreviewRectangle(&draw_context,&preview_input);
-          break;
-        }
-        case CircleElement:
-        case FillCircleElement:
-        case EllipseElement:
-        case FillEllipseElement:
-        {
-          XPreviewEllipse(&draw_context,&preview_input);
-          break;
-        }
-        case PolygonElement:
-        case FillPolygonElement:
-        {
-          XPreviewPolyline(&draw_context,&preview_input);
-          XPreviewLine(&draw_context,&preview_input,&degrees);
-          break;
-        }
-      }
+      XPreviewElement(&draw_context,&preview_input,element,&degrees);
       /*
         Wait for next event.
       */
