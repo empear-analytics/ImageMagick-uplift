@@ -4420,6 +4420,9 @@ typedef struct _ColorEditContext
 
   ColorBorderTargets
     border_targets;
+
+  char
+    *text;
 } ColorEditContext;
 
 static void XColorEditCommandAction(const ColorEditContext *context,
@@ -4598,6 +4601,39 @@ static void XColorEditPress(const ColorEditContext *context,
   (*state)|=UpdateConfigurationState;
 }
 
+static void XColorEditRelease(const ColorEditContext *context,
+  const ColorEditTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  if ((*event).xbutton.button != Button1)
+    return;
+  if (((*event).xbutton.window != context->windows->image.id) &&
+      ((*event).xbutton.window != context->windows->magnify.id))
+    return;
+  /*
+    Update colormap information.
+  */
+  (*x)=(*event).xbutton.x;
+  (*y)=(*event).xbutton.y;
+  XConfigureImageColormap(context->display,context->resource_info,
+    context->windows,*context->image,context->exception);
+  (void) XConfigureImage(context->display,context->resource_info,
+    context->windows,*context->image,context->exception);
+  XInfoWidget(context->display,context->windows,context->text);
+  (void) XCheckDefineCursor(context->display,context->windows->image.id,
+    context->cursor);
+  (*state)&=(size_t) (~UpdateConfigurationState);
+}
+
 static MagickBooleanType XColorEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -4686,6 +4722,7 @@ static MagickBooleanType XColorEditImage(Display *display,
   context.method_targets=method_targets;
   context.pen_targets=pen_targets;
   context.border_targets=border_targets;
+  context.text=text;
   do
   {
     if (windows->info.mapped != MagickFalse)
@@ -4715,21 +4752,7 @@ static MagickBooleanType XColorEditImage(Display *display,
       }
       case ButtonRelease:
       {
-        if (event.xbutton.button != Button1)
-          break;
-        if ((event.xbutton.window != windows->image.id) &&
-            (event.xbutton.window != windows->magnify.id))
-          break;
-        /*
-          Update colormap information.
-        */
-        x=event.xbutton.x;
-        y=event.xbutton.y;
-        XConfigureImageColormap(display,resource_info,windows,*image,exception);
-        (void) XConfigureImage(display,resource_info,windows,*image,exception);
-        XInfoWidget(display,windows,text);
-        (void) XCheckDefineCursor(display,windows->image.id,cursor);
-        state&=(size_t) (~UpdateConfigurationState);
+        XColorEditRelease(&context,&targets);
         break;
       }
       case Expose:
