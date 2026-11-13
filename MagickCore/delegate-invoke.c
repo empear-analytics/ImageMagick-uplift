@@ -1397,16 +1397,10 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
     return(MagickFalse);
   if (IsTwoStepDelegate(delegate_info,decode,encode) != MagickFalse)
     {
-      DelegateInvocation
-        request;
+      const DelegateInvocation
+        request = { image_info, image, decode, encode, exception,
+          delegate_info, temporary };
 
-      request.image_info=image_info;
-      request.image=image;
-      request.decode=decode;
-      request.encode=encode;
-      request.exception=exception;
-      request.delegate_info=delegate_info;
-      request.temporary=temporary;
       if (ConvertDelegateInput(&request) == MagickFalse)
         return(MagickFalse);
     }
