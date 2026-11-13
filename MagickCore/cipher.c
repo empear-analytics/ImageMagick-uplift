@@ -1123,6 +1123,15 @@ static ssize_t SetAESRounds(AESInfo *aes_info,const StringInfo *key)
   return(n);
 }
 
+static void OpenSetAESKey(const AESInfo *aes_info,const StringInfo *key)
+{
+  assert(aes_info != (AESInfo *) NULL);
+  assert(aes_info->signature == MagickCoreSignature);
+  assert(key != (StringInfo *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+}
+
 static void SetAESKey(AESInfo *aes_info,const StringInfo *key)
 {
   ssize_t
@@ -1142,11 +1151,7 @@ static void SetAESKey(AESInfo *aes_info,const StringInfo *key)
   /*
     Determine the number of rounds based on the number of bits in key.
   */
-  assert(aes_info != (AESInfo *) NULL);
-  assert(aes_info->signature == MagickCoreSignature);
-  assert(key != (StringInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  OpenSetAESKey(aes_info,key);
   n=SetAESRounds(aes_info,key);
   /*
     Generate crypt key.
