@@ -1405,45 +1405,12 @@ static int CompareNodeKey(const SplayTreeInfo *splay_tree,const NodeInfo *n,
 %
 */
 
-static NodeInfo *Splay(SplayTreeInfo *splay_tree,const size_t depth,
-  const void *key,NodeInfo **node,NodeInfo **parent,NodeInfo **grandparent)
+static NodeInfo *RotateSplayNode(NodeInfo *n,NodeInfo **node,NodeInfo **parent,
+  NodeInfo **grandparent)
 {
-  int
-    compare;
-
   NodeInfo
-    *n,
-    **next,
     *p;
 
-  n=(*node);
-  if (n == (NodeInfo *) NULL)
-    {
-      if (parent != (NodeInfo **) NULL)
-        return(*parent);
-      else
-        return((NodeInfo *) NULL);
-    }
-  compare=CompareNodeKey(splay_tree,n,key);
-  next=(NodeInfo **) NULL;
-  if (compare > 0)
-    next=(&n->left);
-  else
-    if (compare < 0)
-      next=(&n->right);
-  if (next != (NodeInfo **) NULL)
-    {
-      if (depth >= MaxSplayTreeDepth)
-        {
-          splay_tree->balance=MagickTrue;
-          return(n);
-        }
-      n=Splay(splay_tree,depth+1,key,next,node,parent);
-      if ((n != *node) || (splay_tree->balance != MagickFalse))
-        return(n);
-    }
-  if (parent == (NodeInfo **) NULL)
-    return(n);
   if (grandparent == (NodeInfo **) NULL)
     {
       if (n == (*parent)->left)
@@ -1494,6 +1461,47 @@ static NodeInfo *Splay(SplayTreeInfo *splay_tree,const size_t depth,
   n->right=(*grandparent);
   *grandparent=n;
   return(n);
+}
+
+static NodeInfo *Splay(SplayTreeInfo *splay_tree,const size_t depth,
+  const void *key,NodeInfo **node,NodeInfo **parent,NodeInfo **grandparent)
+{
+  int
+    compare;
+
+  NodeInfo
+    *n,
+    **next;
+
+  n=(*node);
+  if (n == (NodeInfo *) NULL)
+    {
+      if (parent != (NodeInfo **) NULL)
+        return(*parent);
+      else
+        return((NodeInfo *) NULL);
+    }
+  compare=CompareNodeKey(splay_tree,n,key);
+  next=(NodeInfo **) NULL;
+  if (compare > 0)
+    next=(&n->left);
+  else
+    if (compare < 0)
+      next=(&n->right);
+  if (next != (NodeInfo **) NULL)
+    {
+      if (depth >= MaxSplayTreeDepth)
+        {
+          splay_tree->balance=MagickTrue;
+          return(n);
+        }
+      n=Splay(splay_tree,depth+1,key,next,node,parent);
+      if ((n != *node) || (splay_tree->balance != MagickFalse))
+        return(n);
+    }
+  if (parent == (NodeInfo **) NULL)
+    return(n);
+  return(RotateSplayNode(n,node,parent,grandparent));
 }
 
 static void SplaySplayTree(SplayTreeInfo *splay_tree,const void *key)
