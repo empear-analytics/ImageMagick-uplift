@@ -8782,9 +8782,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
       }
     }
   } while ((state & ExitState) == 0);
-  XSetCursorState(display,windows,MagickFalse);
-  (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
-  XCheckRefreshWindows(display,windows);
+  WithdrawBrowserWidget(display,windows);
   /*
     Free file list.
   */
