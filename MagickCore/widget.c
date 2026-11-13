@@ -8384,6 +8384,39 @@ static MagickBooleanType WaitForFileBrowserEvent(
   return(MagickTrue);
 }
 
+static MagickBooleanType UpdateFileBrowserState(
+  const FileBrowserContext *context,const FileBrowserWidgets *widgets)
+{
+  size_t
+    *const state = widgets->state;
+
+  if ((*state) & UpdateConfigurationState)
+    {
+      InitializeFileBrowserButtons(context,widgets);
+      InitializeFileBrowserReply(context,widgets);
+      /*
+        Initialize scroll information.
+      */
+      InitializeFileBrowserScroll(context,widgets);
+      InitializeFileBrowserList(context,widgets);
+      InitializeFileBrowserText(context,widgets);
+      (*state)&=(unsigned int) (~UpdateConfigurationState);
+    }
+  if ((*state) & RedrawWidgetState)
+    RedrawFileBrowserWidget(context,widgets);
+  if ((*state) & UpdateListState)
+    {
+      if (ReplaceFileBrowserList(context,widgets) == MagickFalse)
+        return(MagickFalse);
+      RefreshFileBrowserList(context,widgets);
+    }
+  if ((*state) & JumpListState)
+    JumpFileBrowserList(context,widgets);
+  if ((*state) & RedrawListState)
+    RedrawFileBrowserList(context,widgets);
+  return(MagickTrue);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8573,30 +8606,8 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   file_context.text=text;
   do
   {
-    if (state & UpdateConfigurationState)
-      {
-        InitializeFileBrowserButtons(&file_context,&file_widgets);
-        InitializeFileBrowserReply(&file_context,&file_widgets);
-        /*
-          Initialize scroll information.
-        */
-        InitializeFileBrowserScroll(&file_context,&file_widgets);
-        InitializeFileBrowserList(&file_context,&file_widgets);
-        InitializeFileBrowserText(&file_context,&file_widgets);
-        state&=(unsigned int) (~UpdateConfigurationState);
-      }
-    if (state & RedrawWidgetState)
-      RedrawFileBrowserWidget(&file_context,&file_widgets);
-    if (state & UpdateListState)
-      {
-        if (ReplaceFileBrowserList(&file_context,&file_widgets) == MagickFalse)
-          break;
-        RefreshFileBrowserList(&file_context,&file_widgets);
-      }
-    if (state & JumpListState)
-      JumpFileBrowserList(&file_context,&file_widgets);
-    if (state & RedrawListState)
-      RedrawFileBrowserList(&file_context,&file_widgets);
+    if (UpdateFileBrowserState(&file_context,&file_widgets) == MagickFalse)
+      break;
     /*
       Wait for next event.
     */
