@@ -146,29 +146,241 @@ static inline MagickBooleanType IsTokenDelimiter(const char *magick_restrict p)
     (*(p-1) != '\\')) ? MagickTrue : MagickFalse);
 }
 
-MagickExport magick_hot_spot size_t GetNextToken(
-  const char *magick_restrict start,const char **magick_restrict end,
-  const size_t extent,char *magick_restrict token)
+static inline void AppendTokenChar(char *magick_restrict token,
+  const size_t extent,const char *magick_restrict p,ssize_t *i)
 {
+  if ((*i) < (ssize_t) (extent-1))
+    token[(*i)++]=(*p);
+}
+
+typedef struct _NextTokenInput
+{
+  const char
+    *start;
+
+  size_t
+    extent;
+
   char
-    *magick_restrict q;
+    *token;
+} NextTokenInput;
+
+typedef struct _NextTokenTargets
+{
+  const char
+    *magick_restrict *p;
+
+  ssize_t
+    *i;
+} NextTokenTargets;
+
+static void ScanQuotedToken(const NextTokenInput *input,
+  const NextTokenTargets *targets)
+{
+  const char
+    *const start = input->start;
+
+  const size_t
+    extent = input->extent;
+
+  char
+    *const token = input->token;
 
   const char
-    *magick_restrict p;
+    *magick_restrict *const p = targets->p;
+
+  ssize_t
+    *const i = targets->i;
+
+  char
+    escape;
+
+  escape=GetClosingQuote((*p));
+  for ((*p)++; *(*p) != '\0'; (*p)++)
+  {
+    if (IsEscapedQuote((*p),escape) != MagickFalse)
+      (*p)++;
+    else
+      if (*(*p) == escape)
+        {
+          (*p)++;
+          break;
+        }
+    AppendTokenChar(token,extent,(*p),i);
+    if ((size_t) ((*p)-start) >= (extent-1))
+      break;
+  }
+}
+
+static void ScanSlashToken(const NextTokenInput *input,
+  const NextTokenTargets *targets)
+{
+  const size_t
+    extent = input->extent;
+
+  char
+    *const token = input->token;
+
+  const char
+    *magick_restrict *const p = targets->p;
+
+  ssize_t
+    *const i = targets->i;
+
+  AppendTokenChar(token,extent,(*p),i);
+  (*p)++;
+  if ((*(*p) == '>') || (*(*p) == '/'))
+    {
+      AppendTokenChar(token,extent,(*p),i);
+      (*p)++;
+    }
+}
+
+static MagickBooleanType ScanNumberToken(const NextTokenInput *input,
+  const NextTokenTargets *targets)
+{
+  const char
+    *const start = input->start;
+
+  const size_t
+    extent = input->extent;
+
+  char
+    *const token = input->token;
+
+  const char
+    *magick_restrict *const p = targets->p;
+
+  ssize_t
+    *const i = targets->i;
+
+  char
+    *magick_restrict q;
 
   double
     value;
 
-  ssize_t
-    i;
+  value=StringToDouble((*p),&q);
+  (void) value;
+  if (((*p) != q) && (*(*p) != ','))
+    {
+      for ( ; ((*p) < q) && (*(*p) != ','); (*p)++)
+      {
+        AppendTokenChar(token,extent,(*p),i);
+        if ((size_t) ((*p)-start) >= (extent-1))
+          break;
+      }
+      if (*(*p) == '%')
+        {
+          AppendTokenChar(token,extent,(*p),i);
+          (*p)++;
+        }
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
 
-  assert(start != (const char *) NULL);
-  assert(token != (char *) NULL);
-  i=0;
-  p=start;
-  while ((isspace((int) ((unsigned char) *p)) != 0) && (*p != '\0'))
-    p++;
-  switch (*p)
+static MagickBooleanType ScanParenthesizedToken(const NextTokenInput *input,
+  const NextTokenTargets *targets)
+{
+  const char
+    *const start = input->start;
+
+  const size_t
+    extent = input->extent;
+
+  char
+    *const token = input->token;
+
+  const char
+    *magick_restrict *const p = targets->p;
+
+  ssize_t
+    *const i = targets->i;
+
+  if (*(*p) == '(')
+    {
+      for ((*p)++; *(*p) != '\0'; (*p)++)
+      {
+        AppendTokenChar(token,extent,(*p),i);
+        if ((*(*p) == ')') && (*((*p)-1) != '\\'))
+          break;
+        if ((size_t) ((*p)-start) >= (extent-1))
+          break;
+      }
+      if (*(*p) == '\0')
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static void ScanWordToken(const NextTokenInput *input,
+  const NextTokenTargets *targets)
+{
+  const char
+    *const start = input->start;
+
+  const size_t
+    extent = input->extent;
+
+  char
+    *const token = input->token;
+
+  const char
+    *magick_restrict *const p = targets->p;
+
+  ssize_t
+    *const i = targets->i;
+
+  for ( ; *(*p) != '\0'; (*p)++)
+  {
+    if (IsTokenDelimiter((*p)) != MagickFalse)
+      break;
+    if (((*i) > 0) && (*(*p) == '<'))
+      break;
+    AppendTokenChar(token,extent,(*p),i);
+    if (*(*p) == '>')
+      break;
+    if (ScanParenthesizedToken(input,targets) == MagickFalse)
+      break;
+    if ((size_t) ((*p)-start) >= (extent-1))
+      break;
+  }
+}
+
+static void ScanDefaultToken(const NextTokenInput *input,
+  const NextTokenTargets *targets)
+{
+  const size_t
+    extent = input->extent;
+
+  char
+    *const token = input->token;
+
+  const char
+    *magick_restrict *const p = targets->p;
+
+  ssize_t
+    *const i = targets->i;
+
+  if (ScanNumberToken(input,targets) == MagickFalse)
+    return;
+  if (IsSingleCharToken((*p)) != MagickFalse)
+    {
+      AppendTokenChar(token,extent,(*p),i);
+      (*p)++;
+      return;
+    }
+  ScanWordToken(input,targets);
+}
+
+static void ScanNextToken(const NextTokenInput *input,
+  const NextTokenTargets *targets)
+{
+  const char
+    *magick_restrict *const p = targets->p;
+
+  switch (*(*p))
   {
     case '\0':
       break;
@@ -177,98 +389,45 @@ MagickExport magick_hot_spot size_t GetNextToken(
     case '`':
     case '{':
     {
-      char
-        escape;
-
-      escape=GetClosingQuote(p);
-      for (p++; *p != '\0'; p++)
-      {
-        if (IsEscapedQuote(p,escape) != MagickFalse)
-          p++;
-        else
-          if (*p == escape)
-            {
-              p++;
-              break;
-            }
-        if (i < (ssize_t) (extent-1))
-          token[i++]=(*p);
-        if ((size_t) (p-start) >= (extent-1))
-          break;
-      }
+      ScanQuotedToken(input,targets);
       break;
     }
     case '/':
     {
-      if (i < (ssize_t) (extent-1))
-        token[i++]=(*p);
-      p++;
-      if ((*p == '>') || (*p == '/'))
-        {
-          if (i < (ssize_t) (extent-1))
-            token[i++]=(*p);
-          p++;
-        }
+      ScanSlashToken(input,targets);
       break;
     }
     default:
     {
-      value=StringToDouble(p,&q);
-      (void) value;
-      if ((p != q) && (*p != ','))
-        {
-          for ( ; (p < q) && (*p != ','); p++)
-          {
-            if (i < (ssize_t) (extent-1))
-              token[i++]=(*p);
-            if ((size_t) (p-start) >= (extent-1))
-              break;
-          }
-          if (*p == '%')
-            {
-              if (i < (ssize_t) (extent-1))
-                token[i++]=(*p);
-              p++;
-            }
-          break;
-        }
-      if (IsSingleCharToken(p) != MagickFalse)
-        {
-          if (i < (ssize_t) (extent-1))
-            token[i++]=(*p);
-          p++;
-          break;
-        }
-      for ( ; *p != '\0'; p++)
-      {
-        if (IsTokenDelimiter(p) != MagickFalse)
-          break;
-        if ((i > 0) && (*p == '<'))
-          break;
-        if (i < (ssize_t) (extent-1))
-          token[i++]=(*p);
-        if (*p == '>')
-          break;
-        if (*p == '(')
-          {
-            for (p++; *p != '\0'; p++)
-            {
-              if (i < (ssize_t) (extent-1))
-                token[i++]=(*p);
-              if ((*p == ')') && (*(p-1) != '\\'))
-                break;
-              if ((size_t) (p-start) >= (extent-1))
-                break;
-            }
-            if (*p == '\0')
-              break;
-          }
-        if ((size_t) (p-start) >= (extent-1))
-          break;
-      }
+      ScanDefaultToken(input,targets);
       break;
     }
   }
+}
+
+MagickExport magick_hot_spot size_t GetNextToken(
+  const char *magick_restrict start,const char **magick_restrict end,
+  const size_t extent,char *magick_restrict token)
+{
+  const char
+    *magick_restrict p;
+
+  ssize_t
+    i;
+
+  const NextTokenInput
+    input = { start, extent, token };
+
+  const NextTokenTargets
+    targets = { &p, &i };
+
+  assert(start != (const char *) NULL);
+  assert(token != (char *) NULL);
+  i=0;
+  p=start;
+  while ((isspace((int) ((unsigned char) *p)) != 0) && (*p != '\0'))
+    p++;
+  ScanNextToken(&input,&targets);
   token[i]='\0';
   if (LocaleNCompare(token,"url(#",5) == 0)
     StripURLReference(token);
