@@ -1721,10 +1721,6 @@ static void SelectPathHeadComponent(char *component,PathType type,char *p)
         (void) CopyMagickString(component,p+1,MagickPathExtent);
       break;
     }
-    case SubcanonicalPath:
-    case CanonicalPath:
-    case UndefinedPath:
-      break;
     default:
       break;
   }
