@@ -14516,6 +14516,99 @@ Lane: b
 
 ---
 
+## Recipe UR - Unnest a Repeated Test of the Guard's Own Condition
+
+**Use when:** CodeScene reports *Deep, Nested Complexity* (or *Bumpy Road Ahead*), and the
+deepest level is a guard that ends by testing its own condition again: `if (C) { S if (C)
+X }`, typically an allocation made only when a pointer is still `NULL`, followed by the
+failure test of that same pointer, as `draw.c`'s `ConvertPathToPolygon` does for a new
+subpath's point array (`if (points == NULL) { number_points=16; points=Acquire...; if
+(points == NULL) { throw; return(...); } }`). The failure exit records `GetMagickModule()`
+and stays in the function, so no extraction takes the nested `if` away.
+
+**Not covered by:** Recipe SG, whose shape (b) spreads `G` over `if ((G) && (B))` and
+requires that `S` write nothing `G` reads (here `S` assigns the very variable `C` tests);
+Recipe UX, whose guard is a disjunction `(A) || (B)` and whose inner test chooses between
+two exits; Recipe CN, whose outer `if` holds the inner one and nothing else; Recipes E, V,
+W and I, which move the block, and with it the throw, into a helper.
+
+**How:**
+
+1. Find `if (C) { S if (C) X }` outside every OpenMP region: the outer `if` has no `else`;
+   its braces hold no declaration, label or preprocessor line; `S` is one or more
+   statements; the last statement in the braces is `if (C) X` with no `else`, whose
+   condition is the outer condition's text, character for character.
+2. `C` has no side effect: comparisons and logical operators over variables and
+   constants, no call, assignment, increment or `volatile` object.
+3. Rewrite it as two statements at the outer `if`'s indentation: `if (C) { S }`, the
+   outer condition and `S` unchanged; then `if (C) X`, moved out unchanged and re-indented
+   one level up. Nothing else changes.
+4. Run `tools/ci_warnings.sh <file>`, `tools/cxx_warnings.sh <file>`,
+   `refactor_guard.py` (the literals of `C` may count once more: a WARN whose counts only
+   rose, every value present; name it in the commit message), and the oracle for the
+   function.
+
+**Before:**
+
+```c
+        if (points == (PointInfo *) NULL)
+          {
+            number_points=16;
+            points=(PointInfo *) AcquireQuantumMemory((size_t) number_points,
+              sizeof(*points));
+            if (points == (PointInfo *) NULL)
+              {
+                (void) ThrowMagickException(exception,GetMagickModule(),
+                  ResourceLimitError,"MemoryAllocationFailed","`%s'","");
+                return(DestroyPolygonInfo(polygon_info));
+              }
+          }
+```
+
+**After:**
+
+```c
+        if (points == (PointInfo *) NULL)
+          {
+            number_points=16;
+            points=(PointInfo *) AcquireQuantumMemory((size_t) number_points,
+              sizeof(*points));
+          }
+        if (points == (PointInfo *) NULL)
+          {
+            (void) ThrowMagickException(exception,GetMagickModule(),
+              ResourceLimitError,"MemoryAllocationFailed","`%s'","");
+            return(DestroyPolygonInfo(polygon_info));
+          }
+```
+
+**Careful:**
+
+- Why the behaviour is the same, path by path. If `C` is false at the outer test, the
+  original runs nothing; the new code skips `S` and evaluates `C` again: nothing ran
+  between the two evaluations and `C` has no side effect (step 2), so it is false again
+  and `X` is skipped too. If `C` is true, the original runs `S` and then evaluates `C`;
+  the new code runs `S` and then evaluates the same text at the same point, reading what
+  `S` left, and runs `X` exactly when the original did.
+- Unlike Recipe SG, `S` may write what `C` reads: the second test is evaluated after `S`
+  in both forms, and the case in which the two forms could differ (`C` false at first)
+  runs no statement in between.
+- `X` need not leave: the inner `if` was the last statement in the braces, so in both
+  forms nothing follows it but what follows the outer `if`.
+- The step adds a decision (cyclomatic complexity `+1`) and removes a level of nesting,
+  so it pays only where the depth is the finding that matters.
+
+**Evidence level:** oracle, with steps 1 and 2 checked by reading.
+
+**Provenance:** 2026-11-13, from `draw.c`'s `ConvertPathToPolygon` (campaign B, M127):
+the new-subpath allocation keeps the function at nesting depth 4 once the edge growth
+(Recipe V) and the subpath flush (Recipe I) have left; the probed end state of the three
+steps takes the function out of *Deep, Nested Complexity*, 2.62 to 2.68. Added by Claude
+Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -14854,3 +14947,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | TC | Drop a loop body's last statement `if (cond) continue;` when `cond` has no side effect; proof `obj_identical.sh` | `locale.c`'s `LoadLocaleCache` (cc 22 to 20, 6.46 to 6.50, object code identical) | mandate (2026-10-24) |
 | 2026-11-13 | NEW | KF | Replace an enumerator-keyed `switch` whose groups each call a different function of one signature with the same arguments by a `static const` key/function-pointer table, a lookup function and one call, the `default` statements kept as the else branch; evidence oracle | `stream.c`'s `StreamImagePixels` (cc 16 to 9, 6.15 to 6.31); KD needs a `LocaleCompare` ladder of returns | mandate (2026-10-24) |
 | 2026-11-13 | NEW | SP | Split a predicate whose body returns a disjunction of pure comparisons at a leading run: the run becomes a `static inline` predicate, called as the first operand; evidence oracle | `stream.c`'s `IsCacheMorphologyChanged` (cc 10, 6.31 to 6.44); P names an `if` expression, GD needs an `if ... return` | mandate (2026-10-24) |
+| 2026-11-13 | NEW | UR | Unnest a repeated test of the guard's own condition: `if (C) { S if (C) X }` becomes `if (C) { S }` and `if (C) X` for a side-effect-free `C`, even when `S` writes what `C` reads (the forms can differ only when `C` was false, and then nothing runs between the two tests); evidence oracle | `draw.c`'s `ConvertPathToPolygon` (the new-subpath allocation and its failure test, the last depth-4 site; chain probe 2.62 to 2.68); SG requires `S` not to write `G`'s reads, UX needs a disjunction | mandate (2026-10-24) |
