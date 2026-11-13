@@ -1488,6 +1488,15 @@ typedef struct _WindowDescendInput
     *window_info;
 } WindowDescendInput;
 
+static void XSetWindowBounds(WindowInfo *window_info,const int id,
+  const RectangleInfo crop_info)
+{
+  window_info[id].bounds.x1=(short) crop_info.x;
+  window_info[id].bounds.y1=(short) crop_info.y;
+  window_info[id].bounds.x2=(short) (crop_info.x+(int) crop_info.width-1);
+  window_info[id].bounds.y2=(short) (crop_info.y+(int) crop_info.height-1);
+}
+
 static MagickBooleanType XGetViewableAttributes(Display *display,
   const Window window,XWindowAttributes *window_attributes)
 {
@@ -1631,10 +1640,7 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
   window_info[id].window=window;
   window_info[id].visual=window_attributes.visual;
   window_info[id].colormap=window_attributes.colormap;
-  window_info[id].bounds.x1=(short) crop_info.x;
-  window_info[id].bounds.y1=(short) crop_info.y;
-  window_info[id].bounds.x2=(short) (crop_info.x+(int) crop_info.width-1);
-  window_info[id].bounds.y2=(short) (crop_info.y+(int) crop_info.height-1);
+  XSetWindowBounds(window_info,id,crop_info);
   crop_info.x-=x_offset;
   crop_info.y-=y_offset;
   window_info[id].crop_info=crop_info;
