@@ -4815,6 +4815,112 @@ const size_t
     (void) XMapWindow(display,windows->image.id);
 }
 
+typedef struct _AnimatePlayTargets
+{
+  ssize_t
+    *scene,
+    *iterations;
+
+  MagickStatusType
+    *state;
+
+  Image
+    **image;
+
+  ssize_t
+    *first_scene;
+
+  XEvent
+    *event;
+} AnimatePlayTargets;
+
+static void XPlayNextScene(const AnimateEventContext *event_context,
+  const AnimatePlayTargets *targets)
+{
+  Display
+    *const display = event_context->display;
+
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+  XWindows
+    *const windows = event_context->windows;
+
+  Image
+    **const image_list = event_context->image_list;
+
+  const size_t
+    number_scenes = event_context->number_scenes;
+
+  size_t
+    delay;
+
+  ssize_t
+    *const scene = targets->scene,
+    *const iterations = targets->iterations,
+    *const first_scene = targets->first_scene;
+
+  MagickStatusType
+    *const state = targets->state;
+
+  Image
+    **const image = targets->image;
+
+  XEvent
+    *const event = targets->event;
+
+  AnimationTitle
+    animation_title;
+
+  MagickBooleanType
+    pause;
+
+  AnimationSceneStep
+    scene_step;
+
+  AnimateSceneView
+    scene_view;
+
+  const AnimationSceneTargets
+    scene_targets = { scene, iterations, state, &pause };
+
+  pause=MagickFalse;
+  delay=1000*(*image)->delay/(size_t) MagickMax((*image)->ticks_per_second,
+    1L);
+  XDelay(display,resource_info->delay*(delay == 0 ? 10 : delay));
+  scene_step.number_scenes=number_scenes;
+  scene_step.image_list=image_list;
+  scene_step.first_scene=(*first_scene);
+  XAdvanceScene(&scene_step,&scene_targets);
+  (*scene)=MagickMax((*scene),0);
+  (*image)=image_list[(*scene)];
+  (*first_scene)=XLoopStartScene((*image),(*scene),(*first_scene));
+  animation_title.display=display;
+  animation_title.resource_info=resource_info;
+  animation_title.windows=windows;
+  animation_title.image_list=image_list;
+  animation_title.image=(*image);
+  animation_title.exception=event_context->exception;
+  animation_title.scene=(*scene);
+  animation_title.number_scenes=number_scenes;
+  animation_title.state=(*state);
+  XUpdateAnimationTitle(&animation_title);
+  /*
+    Copy X pixmap to Image window.
+  */
+  scene_view.display=display;
+  scene_view.resource_info=resource_info;
+  scene_view.windows=windows;
+  scene_view.visual_info=event_context->visual_info;
+  scene_view.map_info=event_context->map_info;
+  scene_view.image_list=image_list;
+  scene_view.image=(*image);
+  scene_view.scene=(*scene);
+  XShowAnimationScene(&scene_view,(*state),event);
+  (*state)&=(~StepAnimationState);
+  XPauseAnimationScene(&scene_view,pause,event);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4850,7 +4956,6 @@ MagickExport Image *XAnimateImages(Display *display,
     timestamp;
 
   size_t
-    delay,
     number_scenes;
 
   WarningHandler
@@ -4906,6 +5011,10 @@ MagickExport Image *XAnimateImages(Display *display,
 
   const AnimateClientTargets
     client_targets = { &state, &context_values, &nexus };
+
+  const AnimatePlayTargets
+    play_targets = { &scene, &iterations, &state, &image, &first_scene,
+      &event };
 
   assert(images != (Image *) NULL);
   assert(images->signature == MagickCoreSignature);
@@ -5055,56 +5164,7 @@ MagickExport Image *XAnimateImages(Display *display,
     if ((XEventsQueued(display,QueuedAfterFlush) == 0) &&
         (IsAnimationPlaying(state) != MagickFalse))
       {
-        AnimationTitle
-          animation_title;
-
-        MagickBooleanType
-          pause;
-
-        AnimationSceneStep
-          scene_step;
-
-        AnimateSceneView
-          scene_view;
-
-        const AnimationSceneTargets
-          scene_targets = { &scene, &iterations, &state, &pause };
-
-        pause=MagickFalse;
-        delay=1000*image->delay/(size_t) MagickMax(image->ticks_per_second,
-          1L);
-        XDelay(display,resource_info->delay*(delay == 0 ? 10 : delay));
-        scene_step.number_scenes=number_scenes;
-        scene_step.image_list=image_list;
-        scene_step.first_scene=first_scene;
-        XAdvanceScene(&scene_step,&scene_targets);
-        scene=MagickMax(scene,0);
-        image=image_list[scene];
-        first_scene=XLoopStartScene(image,scene,first_scene);
-        animation_title.display=display;
-        animation_title.resource_info=resource_info;
-        animation_title.windows=windows;
-        animation_title.image_list=image_list;
-        animation_title.image=image;
-        animation_title.exception=exception;
-        animation_title.scene=scene;
-        animation_title.number_scenes=number_scenes;
-        animation_title.state=state;
-        XUpdateAnimationTitle(&animation_title);
-        /*
-          Copy X pixmap to Image window.
-        */
-        scene_view.display=display;
-        scene_view.resource_info=resource_info;
-        scene_view.windows=windows;
-        scene_view.visual_info=visual_info;
-        scene_view.map_info=map_info;
-        scene_view.image_list=image_list;
-        scene_view.image=image;
-        scene_view.scene=scene;
-        XShowAnimationScene(&scene_view,state,&event);
-        state&=(~StepAnimationState);
-        XPauseAnimationScene(&scene_view,pause,&event);
+        XPlayNextScene(&event_context,&play_targets);
         continue;
       }
     /*
