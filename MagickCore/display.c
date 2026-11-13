@@ -6442,6 +6442,54 @@ static void XCropPointerKey(const CropContext *context,
   }
 }
 
+static void XCropPointerEvent(const CropContext *context,
+  const CropTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      XCropPointerPress(context,targets);
+      break;
+    }
+    case ButtonRelease:
+      break;
+    case Expose:
+      break;
+    case KeyPress:
+    {
+      XCropPointerKey(context,targets);
+      break;
+    }
+    case MotionNotify:
+    {
+      if ((*event).xmotion.window != context->windows->image.id)
+        break;
+      /*
+        Map and unmap Info widget as text cursor crosses its boundaries.
+      */
+      (*x)=(*event).xmotion.x;
+      (*y)=(*event).xmotion.y;
+      XTrackInfoWidget(context->display,context->windows,(*x),(*y));
+      (*crop_info).x=(ssize_t) context->windows->image.x+(*x);
+      (*crop_info).y=(ssize_t) context->windows->image.y+(*y);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -6568,39 +6616,7 @@ static MagickBooleanType XCropImage(Display *display,
         XCropPointerCommand(&context,&targets);
         continue;
       }
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        XCropPointerPress(&context,&targets);
-        break;
-      }
-      case ButtonRelease:
-        break;
-      case Expose:
-        break;
-      case KeyPress:
-      {
-        XCropPointerKey(&context,&targets);
-        break;
-      }
-      case MotionNotify:
-      {
-        if (event.xmotion.window != windows->image.id)
-          break;
-        /*
-          Map and unmap Info widget as text cursor crosses its boundaries.
-        */
-        x=event.xmotion.x;
-        y=event.xmotion.y;
-        XTrackInfoWidget(display,windows,x,y);
-        crop_info.x=(ssize_t) windows->image.x+x;
-        crop_info.y=(ssize_t) windows->image.y+y;
-        break;
-      }
-      default:
-        break;
-    }
+    XCropPointerEvent(&context,&targets);
   } while ((state & ExitState) == 0);
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask);
