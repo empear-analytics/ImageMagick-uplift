@@ -114,6 +114,69 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _EquivalentSearch
+{
+  const Image
+    *image,
+    *target_image;
+
+  CacheView
+    *image_view,
+    *target_view;
+
+  ssize_t
+    y;
+
+  ExceptionInfo
+    *exception;
+} EquivalentSearch;
+
+static ssize_t MatchEquivalentTarget(const EquivalentSearch *search,
+  const ssize_t x,PixelInfo *pixel,PixelInfo *target)
+{
+  const Image
+    *const image = search->image,
+    *const target_image = search->target_image;
+
+  CacheView
+    *const image_view = search->image_view,
+    *const target_view = search->target_view;
+
+  const ssize_t
+    y = search->y;
+
+  ExceptionInfo
+    *const exception = search->exception;
+
+  const Quantum
+    *p,
+    *q;
+
+  ssize_t
+    i,
+    j;
+
+  for (j=0; j < (ssize_t) target_image->rows; j++)
+  {
+    for (i=0; i < (ssize_t) target_image->columns; i++)
+    {
+      p=GetCacheViewVirtualPixels(image_view,x+i,y+j,1,1,exception);
+      if (p == (const Quantum *) NULL)
+        break;
+      GetPixelInfoPixel(image,p,pixel);
+      q=GetCacheViewVirtualPixels(target_view,i,j,1,1,exception);
+      if (q == (const Quantum *) NULL)
+        break;
+      GetPixelInfoPixel(image,q,target);
+      if (IsFuzzyEquivalencePixelInfo(pixel,target) == MagickFalse)
+        break;
+    }
+    if (i < (ssize_t) target_image->columns)
+      break;
+  }
+  return(j);
+}
+
 MagickExport MagickBooleanType IsEquivalentImage(const Image *image,
   const Image *target_image,ssize_t *x_offset,ssize_t *y_offset,
   ExceptionInfo *exception)
@@ -131,12 +194,7 @@ MagickExport MagickBooleanType IsEquivalentImage(const Image *image,
     target,
     pixel;
 
-  const Quantum
-    *p,
-    *q;
-
   ssize_t
-    i,
     x;
 
   ssize_t
@@ -160,26 +218,18 @@ MagickExport MagickBooleanType IsEquivalentImage(const Image *image,
   target_view=AcquireVirtualCacheView(target_image,exception);
   for (y=(*y_offset); y < (ssize_t) image->rows; y++)
   {
+    EquivalentSearch
+      search;
+
+    search.image=image;
+    search.target_image=target_image;
+    search.image_view=image_view;
+    search.target_view=target_view;
+    search.y=y;
+    search.exception=exception;
     for (x=y == 0 ? *x_offset : 0; x < (ssize_t) image->columns; x++)
     {
-      for (j=0; j < (ssize_t) target_image->rows; j++)
-      {
-        for (i=0; i < (ssize_t) target_image->columns; i++)
-        {
-          p=GetCacheViewVirtualPixels(image_view,x+i,y+j,1,1,exception);
-          if (p == (const Quantum *) NULL)
-            break;
-          GetPixelInfoPixel(image,p,&pixel);
-          q=GetCacheViewVirtualPixels(target_view,i,j,1,1,exception);
-          if (q == (const Quantum *) NULL)
-            break;
-          GetPixelInfoPixel(image,q,&target);
-          if (IsFuzzyEquivalencePixelInfo(&pixel,&target) == MagickFalse)
-            break;
-        }
-        if (i < (ssize_t) target_image->columns)
-          break;
-      }
+      j=MatchEquivalentTarget(&search,x,&pixel,&target);
       if (j == (ssize_t) target_image->rows)
         break;
     }
