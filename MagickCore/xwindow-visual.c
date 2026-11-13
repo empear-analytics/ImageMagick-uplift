@@ -534,6 +534,46 @@ static MagickBooleanType XSelectVisualID(const VisualSelection *selection,
   return(MagickTrue);
 }
 
+typedef struct _VisualListTargets
+{
+  int
+    *number_visuals;
+
+  XVisualInfo
+    **visual_list,
+    *visual_template;
+} VisualListTargets;
+
+static MagickBooleanType XGetDefaultVisualList(Display *display,
+  const char *visual_type,const int visual_mask,
+  const VisualListTargets *targets)
+{
+  int
+    *const number_visuals = targets->number_visuals;
+
+  XVisualInfo
+    **const visual_list = targets->visual_list,
+    *const visual_template = targets->visual_template;
+
+  if (((*number_visuals) == 0) || ((*visual_list) == (XVisualInfo *) NULL))
+    {
+      /*
+        Failed to get visual;  try using the default visual.
+      */
+      ThrowXWindowException(XServerWarning,"UnableToGetVisual",visual_type);
+      (*visual_template).visualid=XVisualIDFromVisual(XDefaultVisual(display,
+        XDefaultScreen(display)));
+      (*visual_list)=XGetVisualInfo(display,visual_mask,visual_template,
+        number_visuals);
+      if (((*number_visuals) == 0) ||
+          ((*visual_list) == (XVisualInfo *) NULL))
+        return(MagickFalse);
+      ThrowXWindowException(XServerWarning,"UsingDefaultVisual",
+        XVisualClassName((*visual_list)->klass));
+    }
+  return(MagickTrue);
+}
+
 MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
   XStandardColormap *map_info,XResourceInfo *resource_info)
 {
@@ -549,6 +589,9 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
 
   static XVisualInfo
     visual_template;
+
+  VisualListTargets
+    targets;
 
   XVisualInfo
     *visual_info,
@@ -574,21 +617,12 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
   visual_list=XGetVisualInfo(display,visual_mask,&visual_template,
     &number_visuals);
   visual_mask=VisualScreenMask | VisualIDMask;
-  if ((number_visuals == 0) || (visual_list == (XVisualInfo *) NULL))
-    {
-      /*
-        Failed to get visual;  try using the default visual.
-      */
-      ThrowXWindowException(XServerWarning,"UnableToGetVisual",visual_type);
-      visual_template.visualid=XVisualIDFromVisual(XDefaultVisual(display,
-        XDefaultScreen(display)));
-      visual_list=XGetVisualInfo(display,visual_mask,&visual_template,
-        &number_visuals);
-      if ((number_visuals == 0) || (visual_list == (XVisualInfo *) NULL))
-        return((XVisualInfo *) NULL);
-      ThrowXWindowException(XServerWarning,"UsingDefaultVisual",
-        XVisualClassName(visual_list->klass));
-    }
+  targets.number_visuals=(&number_visuals);
+  targets.visual_list=(&visual_list);
+  targets.visual_template=(&visual_template);
+  if (XGetDefaultVisualList(display,visual_type,visual_mask,&targets) ==
+      MagickFalse)
+    return((XVisualInfo *) NULL);
   resource_info->color_recovery=MagickFalse;
   {
     const VisualSelection
