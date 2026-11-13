@@ -12705,6 +12705,60 @@ static void XMatteEditEvent(const MatteCommandInput *input,XEvent *event,
   }
 }
 
+static MagickBooleanType XMatteEditStep(const MatteCommandInput *input,
+  const Cursor cursor,const MatteEventTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  XWindows
+    *const windows = input->windows;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  size_t
+    *const state = targets->state;
+
+  int
+    x_offset,
+    y_offset;
+
+  XEvent
+    event;
+
+  if (windows->info.mapped != MagickFalse)
+    {
+      /*
+        Display pointer position.
+      */
+      (void) FormatLocaleString(input->text,MagickPathExtent," %+d%+d ",
+        (*x)+windows->image.x,(*y)+windows->image.y);
+      XInfoWidget(display,windows,input->text);
+    }
+  /*
+    Wait for next event.
+  */
+  XScreenEvent(display,windows,&event,exception);
+  if (XMatteCommandBlock(input,&event,cursor,state) != MagickFalse)
+    return(MagickTrue);
+  XMatteEditEvent(input,&event,cursor,targets);
+  if (event.xany.window == windows->magnify.id)
+    {
+      (*x)=windows->magnify.x-windows->image.x;
+      (*y)=windows->magnify.y-windows->image.y;
+    }
+  x_offset=(*x);
+  y_offset=(*y);
+  if (XMatteUpdatePixels(input,x_offset,y_offset,state) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType XMatteEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -12752,15 +12806,10 @@ static MagickBooleanType XMatteEditImage(Display *display,
 
   int
     x,
-    x_offset,
-    y,
-    y_offset;
+    y;
 
   size_t
     state;
-
-  XEvent
-    event;
 
   const PaintMethodTargets
     method_targets = { &method };
@@ -12800,30 +12849,7 @@ static MagickBooleanType XMatteEditImage(Display *display,
   state=DefaultState;
   do
   {
-    if (windows->info.mapped != MagickFalse)
-      {
-        /*
-          Display pointer position.
-        */
-        (void) FormatLocaleString(text,MagickPathExtent," %+d%+d ",
-          x+windows->image.x,y+windows->image.y);
-        XInfoWidget(display,windows,text);
-      }
-    /*
-      Wait for next event.
-    */
-    XScreenEvent(display,windows,&event,exception);
-    if (XMatteCommandBlock(&command_input,&event,cursor,&state) != MagickFalse)
-      continue;
-    XMatteEditEvent(&command_input,&event,cursor,&event_targets);
-    if (event.xany.window == windows->magnify.id)
-      {
-        x=windows->magnify.x-windows->image.x;
-        y=windows->magnify.y-windows->image.y;
-      }
-    x_offset=x;
-    y_offset=y;
-    if (XMatteUpdatePixels(&command_input,x_offset,y_offset,&state) == MagickFalse)
+    if (XMatteEditStep(&command_input,cursor,&event_targets) == MagickFalse)
       return(MagickFalse);
   } while ((state & ExitState) == 0);
   (void) XSelectInput(display,windows->image.id,
