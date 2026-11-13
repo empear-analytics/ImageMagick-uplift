@@ -103,6 +103,7 @@ $call Make layer-composite.c
 $call Make layer-merge.c
 $call Make list.c
 $call Make locale.c
+$call Make locale-format.c
 $call Make log.c
 $call Make magic.c
 $call Make magick.c
