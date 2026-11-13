@@ -1510,6 +1510,23 @@ static MagickBooleanType EncodeImageWithInfo(const MagickInfo *magick_info,
   return(status);
 }
 
+static MagickBooleanType CloseSeekableWriteBlob(ImageInfo *write_info,
+  Image *image,MagickBooleanType *temporary)
+{
+  if (IsBlobSeekable(image) == MagickFalse)
+    {
+      /*
+        A seekable stream is required by the encoder.
+      */
+      write_info->adjoin=MagickTrue;
+      (void) CopyMagickString(write_info->filename,image->filename,
+        MagickPathExtent);
+      (void) AcquireUniqueFilename(image->filename);
+      *temporary=MagickTrue;
+    }
+  return(CloseBlob(image));
+}
+
 MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
   Image *image,ExceptionInfo *exception)
 {
@@ -1607,18 +1624,8 @@ MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
       (void) CopyMagickString(image->filename, image_filename,MagickPathExtent);
       if (status != MagickFalse)
         {
-          if (IsBlobSeekable(image) == MagickFalse)
-            {
-              /*
-                A seekable stream is required by the encoder.
-              */
-              write_info->adjoin=MagickTrue;
-              (void) CopyMagickString(write_info->filename,image->filename,
-                MagickPathExtent);
-              (void) AcquireUniqueFilename(image->filename);
-              temporary=MagickTrue;
-            }
-          if (CloseBlob(image) == MagickFalse)
+          if (CloseSeekableWriteBlob(write_info,image,&temporary) ==
+              MagickFalse)
             status=MagickFalse;
         }
     }
