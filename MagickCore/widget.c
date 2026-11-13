@@ -13202,6 +13202,72 @@ static void RedrawListBrowserEntries(const ListBrowserContext *context,
     }
 }
 
+static MagickBooleanType WaitForListBrowserEvent(
+  const ListBrowserContext *context,const ListBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    entries = context->entries;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  size_t
+    *const delay = widgets->delay;
+
+  XEvent
+    *const event = widgets->event;
+
+  /*
+    Wait for next event.
+  */
+  if ((*north_info).raised && (*south_info).raised)
+    (void) XIfEvent(display,event,XScreenEvent,(char *) windows);
+  else
+    {
+      /*
+        Brief delay before advancing scroll bar.
+      */
+      XDelay(display,(*delay));
+      (*delay)=SuspendTime;
+      (void) XCheckIfEvent(display,event,XScreenEvent,(char *) windows);
+      if (((*north_info).raised == MagickFalse) && ((*slider_info).id > 0))
+        {
+          /*
+            Move slider up.
+          */
+          (*slider_info).id--;
+          (*state)|=RedrawListState;
+        }
+      if (((*south_info).raised == MagickFalse) &&
+          ((*slider_info).id < (int) entries))
+        {
+          /*
+            Move slider down.
+          */
+          (*slider_info).id++;
+          (*state)|=RedrawListState;
+        }
+      if ((*event).type != ButtonRelease)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -13357,39 +13423,8 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
     UpdateListBrowserLayout(&list_context,&list_widgets);
     RedrawListBrowserWidget(&list_context,&list_widgets);
     RedrawListBrowserEntries(&list_context,&list_widgets);
-    /*
-      Wait for next event.
-    */
-    if (north_info.raised && south_info.raised)
-      (void) XIfEvent(display,&event,XScreenEvent,(char *) windows);
-    else
-      {
-        /*
-          Brief delay before advancing scroll bar.
-        */
-        XDelay(display,delay);
-        delay=SuspendTime;
-        (void) XCheckIfEvent(display,&event,XScreenEvent,(char *) windows);
-        if ((north_info.raised == MagickFalse) && (slider_info.id > 0))
-          {
-            /*
-              Move slider up.
-            */
-            slider_info.id--;
-            state|=RedrawListState;
-          }
-        if ((south_info.raised == MagickFalse) &&
-            (slider_info.id < (int) entries))
-          {
-            /*
-              Move slider down.
-            */
-            slider_info.id++;
-            state|=RedrawListState;
-          }
-        if (event.type != ButtonRelease)
-          continue;
-      }
+    if (WaitForListBrowserEvent(&list_context,&list_widgets) == MagickFalse)
+      continue;
     switch (event.type)
     {
       case ButtonPress:
