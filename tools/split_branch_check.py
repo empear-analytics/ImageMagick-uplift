@@ -68,13 +68,33 @@ def pointer_slots(obj, strs, src):
         else: slots[int(off, 16)] = "%s+%s" % (sym, add)
     return slots
 
+def canonical_data_names(syms):
+    """SYMS (section -> [(value, size, name)]) with every name of the form `stem.N` (the number a compiler appends
+    to a function's `static` local to keep its name unique in the object, as clang's `XMagickCommand.radius.203`)
+    renamed `stem.#K`, K being the rank of N among the numbers that the object gives that stem. The number
+    depends on how many names the compiler had made before, so it differs between the original object and the
+    object of the file split off it, while the rank does not: a reference to the same variable has the same
+    rank, and a reference to another variable of the stem, or to another stem, does not."""
+    ranks = {}
+    for sec, rows in syms.items():
+        for _, _, name in rows:
+            m = re.fullmatch(r"(.+)\.(\d+)", name)
+            if m: ranks.setdefault((sec, m.group(1)), set()).add(int(m.group(2)))
+    out = {}
+    for sec, rows in syms.items():
+        for value, size, name in rows:
+            m = re.fullmatch(r"(.+)\.(\d+)", name)
+            if m: name = "%s.#%d" % (m.group(1), sorted(ranks[(sec, m.group(1))]).index(int(m.group(2))))
+            out.setdefault(sec, []).append((value, size, name))
+    return out
+
 def data_symbols(obj):
     """Map a section (.bss, .data) of OBJ to its (value, size, name) object symbols."""
     syms = {}
     for value, sec, size, name in re.findall(r"(?m)^([0-9a-f]+) .{7} (\.bss|\.data)\s+([0-9a-f]+) (\S+)$",
                                              sh("objdump", "-t", obj, text=True).stdout):
         if name != sec: syms.setdefault(sec, []).append((int(value, 16), int(size, 16), name))
-    return syms
+    return canonical_data_names(syms)
 
 def symbol_at(syms, sec, target):
     """`sec[name:size+offset]` for the symbol of section SEC that the address TARGET (in the section) falls in, or None."""
@@ -213,4 +233,5 @@ def main():
     kinds, bad = compare_by_name(a, b)
     report(kinds, bad)
 
-main()
+if __name__ == "__main__":
+    main()
