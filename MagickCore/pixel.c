@@ -1782,9 +1782,6 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
     *magick_restrict p;
 
   ssize_t
-    i;
-
-  ssize_t
     x_offset,
     y_offset;
 
@@ -1855,25 +1852,9 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
     }
     case NearestInterpolatePixel:
     {
-      x_offset=CastDoubleToSsizeT(floor(x+0.5));
-      y_offset=CastDoubleToSsizeT(floor(y+0.5));
-      p=GetCacheViewVirtualPixels(source_view,x_offset,y_offset,1,1,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      for (i=0; i < (ssize_t) GetPixelChannels(source); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(source,i);
-        PixelTrait traits = GetPixelChannelTraits(source,channel);
-        PixelTrait destination_traits=GetPixelChannelTraits(destination,
-          channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (destination_traits == UndefinedPixelTrait))
-          continue;
-        SetPixelChannel(destination,channel,p[i],pixel);
-      }
+      grid.x_offset=CastDoubleToSsizeT(floor(x+0.5));
+      grid.y_offset=CastDoubleToSsizeT(floor(y+0.5));
+      status=InterpolateIntegerChannels(&grid,pixel,status);
       break;
     }
   }
