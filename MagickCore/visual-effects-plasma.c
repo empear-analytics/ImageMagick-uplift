@@ -315,6 +315,137 @@ static MagickBooleanType SetPlasmaMiddlePixel(const PlasmaMidpoint *midpoint,
   return(MagickTrue);
 }
 
+typedef enum
+{
+  PlasmaColumnEdge,
+  PlasmaRowEdge
+} PlasmaEdgeSide;
+
+static inline MagickBooleanType SetPlasmaEdgePixel(
+  const PlasmaMidpoint *midpoint,const PlasmaEdgeSide side,const double edge,
+  MagickStatusType *status)
+{
+  const PlasmaContext
+    *const context = midpoint->context;
+
+  const SegmentInfo
+    *const segment = midpoint->segment;
+
+  const ssize_t
+    x_mid = midpoint->x_mid,
+    y_mid = midpoint->y_mid;
+
+  const double
+    plasma = midpoint->plasma;
+
+  const Quantum
+    *magick_restrict u,
+    *magick_restrict v;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    offset;
+
+  offset=CastDoubleToSsizeT(ceil(edge-0.5));
+  u=GetCacheViewVirtualPixels(context->u_view,((side == PlasmaColumnEdge) ?
+    offset : CastDoubleToSsizeT(ceil(segment->x1-0.5))),((side ==
+    PlasmaColumnEdge) ? CastDoubleToSsizeT(ceil(segment->y1-0.5)) : offset),1,1,
+    context->exception);
+  v=GetCacheViewVirtualPixels(context->v_view,((side == PlasmaColumnEdge) ?
+    offset : CastDoubleToSsizeT(ceil(segment->x2-0.5))),((side ==
+    PlasmaColumnEdge) ? CastDoubleToSsizeT(ceil(segment->y2-0.5)) : offset),1,1,
+    context->exception);
+  q=QueueCacheViewAuthenticPixels(context->image_view,((side ==
+    PlasmaColumnEdge) ? offset : x_mid),((side == PlasmaColumnEdge) ? y_mid :
+    offset),1,1,context->exception);
+  if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
+    return(MagickFalse);
+  SetPlasmaPixelChannels(context->image,context->random_info,u,v,q,plasma);
+  *status=SyncCacheViewAuthenticPixels(context->image_view,context->exception);
+  return(MagickTrue);
+}
+
+static MagickBooleanType SetPlasmaRowPixels(const PlasmaMidpoint *midpoint,
+  MagickStatusType *status)
+{
+  const SegmentInfo
+    *const segment = midpoint->segment;
+
+  const ssize_t
+    x_mid = midpoint->x_mid,
+    y_mid = midpoint->y_mid;
+
+  if ((fabs(segment->y1-y_mid) >= MagickEpsilon) ||
+      (fabs(segment->y2-y_mid) >= MagickEpsilon))
+    {
+      if ((fabs(segment->x1-x_mid) >= MagickEpsilon) ||
+          (fabs(segment->y2-y_mid) >= MagickEpsilon))
+        {
+          /*
+            Bottom pixel.
+          */
+          if (SetPlasmaEdgePixel(midpoint,PlasmaRowEdge,segment->y2,
+              status) == MagickFalse)
+            return(MagickFalse);
+        }
+      /*
+        Top pixel.
+      */
+      if ((fabs(segment->y1-segment->y2) >= MagickEpsilon) &&
+          (SetPlasmaEdgePixel(midpoint,PlasmaRowEdge,segment->y1,
+              status) == MagickFalse))
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType FinishPlasmaSegment(const PlasmaMidpoint *midpoint,
+  MagickStatusType status)
+{
+  const SegmentInfo
+    *const segment = midpoint->segment;
+
+  if (SetPlasmaMiddlePixel(midpoint,&status) == MagickFalse)
+    return(MagickTrue);
+  if ((fabs(segment->x2-segment->x1) < 3.0) &&
+      (fabs(segment->y2-segment->y1) < 3.0))
+    return(status == 0 ? MagickFalse : MagickTrue);
+  return(MagickFalse);
+}
+
+static MagickBooleanType SetPlasmaColumnPixels(const PlasmaMidpoint *midpoint,
+  MagickStatusType status)
+{
+  const SegmentInfo
+    *const segment = midpoint->segment;
+
+  const ssize_t
+    x_mid = midpoint->x_mid;
+
+  if ((fabs(segment->x1-x_mid) >= MagickEpsilon) ||
+      (fabs(segment->x2-x_mid) >= MagickEpsilon))
+    {
+      /*
+        Left pixel.
+      */
+      if (SetPlasmaEdgePixel(midpoint,PlasmaColumnEdge,segment->x1,
+          &status) == MagickFalse)
+        return(MagickTrue);
+      /*
+        Right pixel.
+      */
+      if ((fabs(segment->x1-segment->x2) >= MagickEpsilon) &&
+          (SetPlasmaEdgePixel(midpoint,PlasmaColumnEdge,segment->x2,
+              &status) == MagickFalse))
+        return(MagickFalse);
+    }
+  if (SetPlasmaRowPixels(midpoint,&status) == MagickFalse)
+    return(MagickTrue);
+  return(FinishPlasmaSegment(midpoint,status));
+}
+
 static MagickBooleanType PlasmaImageProxy(const PlasmaContext *context,
   const SegmentInfo *magick_restrict segment,size_t attenuate,size_t depth)
 {
@@ -327,17 +458,8 @@ static MagickBooleanType PlasmaImageProxy(const PlasmaContext *context,
   PlasmaMidpoint
     midpoint;
 
-  const Quantum
-    *magick_restrict u,
-    *magick_restrict v;
-
-  Quantum
-    *magick_restrict q;
-
   ssize_t
-    x,
     x_mid,
-    y,
     y_mid;
 
   if ((fabs(segment->x2-segment->x1) < MagickEpsilon) &&
@@ -354,90 +476,12 @@ static MagickBooleanType PlasmaImageProxy(const PlasmaContext *context,
   */
   status=MagickTrue;
   plasma=(double) QuantumRange/(2.0*attenuate);
-  if ((fabs(segment->x1-x_mid) >= MagickEpsilon) ||
-      (fabs(segment->x2-x_mid) >= MagickEpsilon))
-    {
-      /*
-        Left pixel.
-      */
-      x=CastDoubleToSsizeT(ceil(segment->x1-0.5));
-      u=GetCacheViewVirtualPixels(context->u_view,x,CastDoubleToSsizeT(ceil(
-        segment->y1-0.5)),1,1,context->exception);
-      v=GetCacheViewVirtualPixels(context->v_view,x,CastDoubleToSsizeT(ceil(
-        segment->y2-0.5)),1,1,context->exception);
-      q=QueueCacheViewAuthenticPixels(context->image_view,x,y_mid,1,1,context->exception);
-      if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
-        return(MagickTrue);
-      SetPlasmaPixelChannels(context->image,context->random_info,u,v,q,plasma);
-      status=SyncCacheViewAuthenticPixels(context->image_view,context->exception);
-      if (fabs(segment->x1-segment->x2) >= MagickEpsilon)
-        {
-          /*
-            Right pixel.
-          */
-          x=CastDoubleToSsizeT(ceil(segment->x2-0.5));
-          u=GetCacheViewVirtualPixels(context->u_view,x,CastDoubleToSsizeT(ceil(
-            segment->y1-0.5)),1,1,context->exception);
-          v=GetCacheViewVirtualPixels(context->v_view,x,CastDoubleToSsizeT(ceil(
-            segment->y2-0.5)),1,1,context->exception);
-          q=QueueCacheViewAuthenticPixels(context->image_view,x,y_mid,1,1,
-            context->exception);
-          if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
-            return(MagickFalse);
-          SetPlasmaPixelChannels(context->image,context->random_info,u,v,q,plasma);
-          status=SyncCacheViewAuthenticPixels(context->image_view,context->exception);
-        }
-    }
-  if ((fabs(segment->y1-y_mid) >= MagickEpsilon) ||
-      (fabs(segment->y2-y_mid) >= MagickEpsilon))
-    {
-      if ((fabs(segment->x1-x_mid) >= MagickEpsilon) ||
-          (fabs(segment->y2-y_mid) >= MagickEpsilon))
-        {
-          /*
-            Bottom pixel.
-          */
-          y=CastDoubleToSsizeT(ceil(segment->y2-0.5));
-          u=GetCacheViewVirtualPixels(context->u_view,CastDoubleToSsizeT(ceil(
-            segment->x1-0.5)),y,1,1,context->exception);
-          v=GetCacheViewVirtualPixels(context->v_view,CastDoubleToSsizeT(ceil(
-            segment->x2-0.5)),y,1,1,context->exception);
-          q=QueueCacheViewAuthenticPixels(context->image_view,x_mid,y,1,1,
-            context->exception);
-          if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
-            return(MagickTrue);
-          SetPlasmaPixelChannels(context->image,context->random_info,u,v,q,plasma);
-          status=SyncCacheViewAuthenticPixels(context->image_view,context->exception);
-        }
-      if (fabs(segment->y1-segment->y2) >= MagickEpsilon)
-        {
-          /*
-            Top pixel.
-          */
-          y=CastDoubleToSsizeT(ceil(segment->y1-0.5));
-          u=GetCacheViewVirtualPixels(context->u_view,CastDoubleToSsizeT(ceil(
-            segment->x1-0.5)),y,1,1,context->exception);
-          v=GetCacheViewVirtualPixels(context->v_view,CastDoubleToSsizeT(ceil(
-            segment->x2-0.5)),y,1,1,context->exception);
-          q=QueueCacheViewAuthenticPixels(context->image_view,x_mid,y,1,1,
-            context->exception);
-          if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
-            return(MagickTrue);
-          SetPlasmaPixelChannels(context->image,context->random_info,u,v,q,plasma);
-          status=SyncCacheViewAuthenticPixels(context->image_view,context->exception);
-        }
-    }
   midpoint.context=context;
   midpoint.segment=segment;
   midpoint.x_mid=x_mid;
   midpoint.y_mid=y_mid;
   midpoint.plasma=plasma;
-  if (SetPlasmaMiddlePixel(&midpoint,&status) == MagickFalse)
-    return(MagickTrue);
-  if ((fabs(segment->x2-segment->x1) < 3.0) &&
-      (fabs(segment->y2-segment->y1) < 3.0))
-    return(status == 0 ? MagickFalse : MagickTrue);
-  return(MagickFalse);
+  return(SetPlasmaColumnPixels(&midpoint,status));
 }
 
 MagickExport MagickBooleanType PlasmaImage(Image *image,
