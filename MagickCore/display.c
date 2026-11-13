@@ -14097,107 +14097,107 @@ static const char
     ROIMiscellanyMenu
   };
 
+static const DisplayCommand
+  ApplyCommands[] =
+  {
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    NullCommand,
+    HelpCommand,
+    QuitCommand
+  },
+  ROIFileCommands[] =
+  {
+    SaveCommand,
+    PrintCommand
+  },
+  ROIEditCommands[] =
+  {
+    UndoCommand,
+    RedoCommand
+  },
+  ROITransformCommands[] =
+  {
+    FlopCommand,
+    FlipCommand,
+    RotateRightCommand,
+    RotateLeftCommand
+  },
+  ROIEnhanceCommands[] =
+  {
+    HueCommand,
+    SaturationCommand,
+    BrightnessCommand,
+    GammaCommand,
+    SpiffCommand,
+    DullCommand,
+    ContrastStretchCommand,
+    SigmoidalContrastCommand,
+    NormalizeCommand,
+    EqualizeCommand,
+    NegateCommand,
+    GrayscaleCommand,
+    MapCommand,
+    QuantizeCommand
+  },
+  ROIEffectsCommands[] =
+  {
+    DespeckleCommand,
+    EmbossCommand,
+    ReduceNoiseCommand,
+    AddNoiseCommand,
+    SharpenCommand,
+    BlurCommand,
+    ThresholdCommand,
+    EdgeDetectCommand,
+    SpreadCommand,
+    ShadeCommand,
+    RaiseCommand,
+    SegmentCommand
+  },
+  ROIFXCommands[] =
+  {
+    SolarizeCommand,
+    SepiaToneCommand,
+    SwirlCommand,
+    ImplodeCommand,
+    VignetteCommand,
+    WaveCommand,
+    OilPaintCommand,
+    CharcoalDrawCommand
+  },
+  ROIMiscellanyCommands[] =
+  {
+    InfoCommand,
+    ZoomCommand,
+    ShowPreviewCommand,
+    ShowHistogramCommand,
+    ShowMatteCommand
+  },
+  ROICommands[] =
+  {
+    ROIHelpCommand,
+    ROIDismissCommand
+  };
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
 {
   static const DisplayCommand
-    ApplyCommands[] =
-    {
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      NullCommand,
-      HelpCommand,
-      QuitCommand
-    },
-    FileCommands[] =
-    {
-      SaveCommand,
-      PrintCommand
-    },
-    EditCommands[] =
-    {
-      UndoCommand,
-      RedoCommand
-    },
-    TransformCommands[] =
-    {
-      FlopCommand,
-      FlipCommand,
-      RotateRightCommand,
-      RotateLeftCommand
-    },
-    EnhanceCommands[] =
-    {
-      HueCommand,
-      SaturationCommand,
-      BrightnessCommand,
-      GammaCommand,
-      SpiffCommand,
-      DullCommand,
-      ContrastStretchCommand,
-      SigmoidalContrastCommand,
-      NormalizeCommand,
-      EqualizeCommand,
-      NegateCommand,
-      GrayscaleCommand,
-      MapCommand,
-      QuantizeCommand
-    },
-    EffectsCommands[] =
-    {
-      DespeckleCommand,
-      EmbossCommand,
-      ReduceNoiseCommand,
-      AddNoiseCommand,
-      SharpenCommand,
-      BlurCommand,
-      ThresholdCommand,
-      EdgeDetectCommand,
-      SpreadCommand,
-      ShadeCommand,
-      RaiseCommand,
-      SegmentCommand
-    },
-    FXCommands[] =
-    {
-      SolarizeCommand,
-      SepiaToneCommand,
-      SwirlCommand,
-      ImplodeCommand,
-      VignetteCommand,
-      WaveCommand,
-      OilPaintCommand,
-      CharcoalDrawCommand
-    },
-    MiscellanyCommands[] =
-    {
-      InfoCommand,
-      ZoomCommand,
-      ShowPreviewCommand,
-      ShowHistogramCommand,
-      ShowMatteCommand
-    },
-    ROICommands[] =
-    {
-      ROIHelpCommand,
-      ROIDismissCommand
-    };
-
-  static const DisplayCommand
     *Commands[ApplyMenus] =
     {
-      FileCommands,
-      EditCommands,
-      TransformCommands,
-      EnhanceCommands,
-      EffectsCommands,
-      FXCommands,
-      MiscellanyCommands
+      ROIFileCommands,
+      ROIEditCommands,
+      ROITransformCommands,
+      ROIEnhanceCommands,
+      ROIEffectsCommands,
+      ROIFXCommands,
+      ROIMiscellanyCommands
     };
 
   char
