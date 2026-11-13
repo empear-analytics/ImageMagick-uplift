@@ -1050,6 +1050,17 @@ static void SetLogInfoAttribute(LogInfo *log_info,const char *keyword,
       (log_info->handler_mask | ParseLogHandlers(token));
 }
 
+static MagickBooleanType ReadLogAttributeValue(const char **q,
+  const size_t extent,char *token)
+{
+  (void) GetNextToken(*q,(const char **) NULL,extent,token);
+  if (*token != '=')
+    return(MagickFalse);
+  (void) GetNextToken(*q,q,extent,token);
+  (void) GetNextToken(*q,q,extent,token);
+  return(MagickTrue);
+}
+
 static MagickStatusType AppendLogElement(LinkedListInfo *cache,
   LogInfo *log_info,const char *filename,ExceptionInfo *exception)
 {
@@ -1239,12 +1250,8 @@ static MagickBooleanType LoadLogCache(const LogLoadTarget *target,
         log_info=(LogInfo *) NULL;
         continue;
       }
-    (void) GetNextToken(q,(const char **) NULL,extent,token);
-    if (*token != '=')
-      continue;
-    (void) GetNextToken(q,&q,extent,token);
-    (void) GetNextToken(q,&q,extent,token);
-    SetLogInfoAttribute(log_info,keyword,token);
+    if (ReadLogAttributeValue(&q,extent,token) != MagickFalse)
+      SetLogInfoAttribute(log_info,keyword,token);
   }
   token=DestroyString(token);
   if (cache == (LinkedListInfo *) NULL)
