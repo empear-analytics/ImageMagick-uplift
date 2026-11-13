@@ -5400,27 +5400,94 @@ switch (event.type)
 }
 }
 
-MagickExport Image *XAnimateImages(Display *display,
-  XResourceInfo *resource_info,char **argv,const int argc,Image *images,
-  ExceptionInfo *exception)
+static Image *XRunAnimateLoop(const AnimateEventContext *event_context,
+  Image **images,XGCValues *context_values,XEvent *event)
 {
   char
     command[MagickPathExtent];
 
+  Display
+    *const display = event_context->display;
+
+  ExceptionInfo
+    *const exception = event_context->exception;
+
   Image
-    *display_image,
     *image,
-    **image_list,
+    **const image_list = event_context->image_list,
     *nexus;
 
+  AnimateEventInput
+    input;
+
   MagickStatusType
-    context_mask,
     state;
 
   ssize_t
     first_scene,
     iterations,
     scene;
+
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+  XWindows
+    *const windows = event_context->windows;
+
+  const AnimateCommandTargets
+    command_targets = { event, &image, &state, &nexus };
+
+  const AnimateClientTargets
+    client_targets = { &state, context_values, &nexus };
+
+  const AnimatePlayTargets
+    play_targets = { &scene, &iterations, &state, &image, &first_scene,
+      event };
+
+  nexus=NewImageList();
+  scene=0;
+  first_scene=0;
+  iterations=0;
+  image=image_list[0];
+  state=(MagickStatusType) (ForwardAnimationState | RepeatAnimationState);
+  (void) XMagickCommand(display,resource_info,windows,PlayCommand,images,
+    &state,exception);
+  do
+  {
+    if (IsAnimationStep(display,state) != MagickFalse)
+      {
+        XPlayNextScene(event_context,&play_targets);
+        continue;
+      }
+    /*
+      Handle a window event.
+    */
+    XNextAnimateEvent(display,windows,event);
+    if ((*event).xany.window == windows->command.id)
+      {
+        XRunCommandWindow(event_context,command,&command_targets);
+        continue;
+      }
+    input.command_targets=&command_targets;
+    input.client_targets=&client_targets;
+    input.scene=scene;
+    XDispatchAnimateEvent(event_context,(*event),&input);
+  }
+  while (!(state & ExitState));
+  return(nexus);
+}
+
+MagickExport Image *XAnimateImages(Display *display,
+  XResourceInfo *resource_info,char **argv,const int argc,Image *images,
+  ExceptionInfo *exception)
+{
+  Image
+    *display_image,
+    **image_list,
+    *nexus;
+
+  MagickStatusType
+    context_mask;
 
   static char
     working_directory[MagickPathExtent];
@@ -5481,19 +5548,6 @@ MagickExport Image *XAnimateImages(Display *display,
 
   AnimateWindowSetup
     setup;
-
-  AnimateEventInput
-    input;
-
-  const AnimateCommandTargets
-    command_targets = { &event, &image, &state, &nexus };
-
-  const AnimateClientTargets
-    client_targets = { &state, &context_values, &nexus };
-
-  const AnimatePlayTargets
-    play_targets = { &scene, &iterations, &state, &image, &first_scene,
-      &event };
 
   assert(images != (Image *) NULL);
   assert(images->signature == MagickCoreSignature);
@@ -5630,36 +5684,7 @@ MagickExport Image *XAnimateImages(Display *display,
   /*
     Respond to events.
   */
-  nexus=NewImageList();
-  scene=0;
-  first_scene=0;
-  iterations=0;
-  image=image_list[0];
-  state=(MagickStatusType) (ForwardAnimationState | RepeatAnimationState);
-  (void) XMagickCommand(display,resource_info,windows,PlayCommand,&images,
-    &state,exception);
-  do
-  {
-    if (IsAnimationStep(display,state) != MagickFalse)
-      {
-        XPlayNextScene(&event_context,&play_targets);
-        continue;
-      }
-    /*
-      Handle a window event.
-    */
-    XNextAnimateEvent(display,windows,&event);
-    if (event.xany.window == windows->command.id)
-      {
-        XRunCommandWindow(&event_context,command,&command_targets);
-        continue;
-      }
-    input.command_targets=&command_targets;
-    input.client_targets=&client_targets;
-    input.scene=scene;
-    XDispatchAnimateEvent(&event_context,event,&input);
-  }
-  while (!(state & ExitState));
+  nexus=XRunAnimateLoop(&event_context,&images,&context_values,&event);
   image_list=(Image **) RelinquishMagickMemory(image_list);
   images=DestroyImageList(images);
   XWithdrawColormapWindows(display,windows);
