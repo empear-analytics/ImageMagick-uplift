@@ -4814,6 +4814,51 @@ static MagickBooleanType XColorEditUpdate(const ColorEditContext *context,
   return(MagickTrue);
 }
 
+static MagickBooleanType XColorEditStep(const ColorEditContext *context,
+  const ColorEditTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  int
+    x_offset,
+    y_offset;
+
+  if (context->windows->info.mapped != MagickFalse)
+    {
+      /*
+        Display pointer position.
+      */
+      (void) FormatLocaleString(context->text,MagickPathExtent," %+d%+d ",
+        (*x)+context->windows->image.x,(*y)+context->windows->image.y);
+      XInfoWidget(context->display,context->windows,context->text);
+    }
+  /*
+    Wait for next event.
+  */
+  XScreenEvent(context->display,context->windows,event,context->exception);
+  if ((*event).xany.window == context->windows->command.id)
+    {
+      XColorEditCommand(context,targets);
+      return(MagickTrue);
+    }
+  XColorEditEvent(context,targets);
+  if ((*event).xany.window == context->windows->magnify.id)
+    {
+      (*x)=context->windows->magnify.x-context->windows->image.x;
+      (*y)=context->windows->magnify.y-context->windows->image.y;
+    }
+  x_offset=(*x);
+  y_offset=(*y);
+  if (XColorEditUpdate(context,targets,x_offset,y_offset) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType XColorEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -4836,9 +4881,7 @@ static MagickBooleanType XColorEditImage(Display *display,
 
   int
     x,
-    x_offset,
-    y,
-    y_offset;
+    y;
 
   size_t
     state;
@@ -4902,33 +4945,7 @@ static MagickBooleanType XColorEditImage(Display *display,
   context.text=text;
   do
   {
-    if (windows->info.mapped != MagickFalse)
-      {
-        /*
-          Display pointer position.
-        */
-        (void) FormatLocaleString(text,MagickPathExtent," %+d%+d ",
-          x+windows->image.x,y+windows->image.y);
-        XInfoWidget(display,windows,text);
-      }
-    /*
-      Wait for next event.
-    */
-    XScreenEvent(display,windows,&event,exception);
-    if (event.xany.window == windows->command.id)
-      {
-        XColorEditCommand(&context,&targets);
-        continue;
-      }
-    XColorEditEvent(&context,&targets);
-    if (event.xany.window == windows->magnify.id)
-      {
-        x=windows->magnify.x-windows->image.x;
-        y=windows->magnify.y-windows->image.y;
-      }
-    x_offset=x;
-    y_offset=y;
-    if (XColorEditUpdate(&context,&targets,x_offset,y_offset) == MagickFalse)
+    if (XColorEditStep(&context,&targets) == MagickFalse)
       return(MagickFalse);
   } while ((state & ExitState) == 0);
   (void) XSelectInput(display,windows->image.id,
