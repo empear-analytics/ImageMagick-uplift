@@ -517,11 +517,8 @@ MagickExport unsigned char *Base64Decode(const char *source,size_t *length)
           return((unsigned char *) NULL);
         }
     }
-  else
-    {
-      if (VerifyBase64Padding(p,state,decode,i) == MagickFalse)
-        return((unsigned char *) NULL);
-    }
+  else if (VerifyBase64Padding(p,state,decode,i) == MagickFalse)
+    return((unsigned char *) NULL);
   *length=i;
   return(decode);
 }
