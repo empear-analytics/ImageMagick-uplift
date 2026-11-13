@@ -2413,38 +2413,15 @@ static Window XSelectWindow(Display *display,RectangleInfo *crop_info)
 %    o id: Specifies the id of the window to locate.
 %
 */
-MagickPrivate Window XWindowByID(Display *display,const Window root_window,
-  const size_t id)
+static Window XSearchChildrenByID(Display *display,Window *children,
+  const unsigned int number_children,const size_t id)
 {
-  RectangleInfo
-    rectangle_info;
-
   int
     i;
 
-  Status
-    status;
-
-  unsigned int
-    number_children;
-
   Window
-    child,
-    *children,
     window;
 
-  assert(display != (Display *) NULL);
-  assert(root_window != (Window) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  if (id == 0)
-    return(XSelectWindow(display,&rectangle_info));
-  if (root_window == id)
-    return(root_window);
-  status=XQueryTree(display,root_window,&child,&child,&children,
-    &number_children);
-  if (status == False)
-    return((Window) NULL);
   window=(Window) NULL;
   for (i=0; i < (int) number_children; i++)
   {
@@ -2458,6 +2435,37 @@ MagickPrivate Window XWindowByID(Display *display,const Window root_window,
   if (children != (Window *) NULL)
     (void) XFree((void *) children);
   return(window);
+}
+
+MagickPrivate Window XWindowByID(Display *display,const Window root_window,
+  const size_t id)
+{
+  RectangleInfo
+    rectangle_info;
+
+  Status
+    status;
+
+  unsigned int
+    number_children;
+
+  Window
+    child,
+    *children;
+
+  assert(display != (Display *) NULL);
+  assert(root_window != (Window) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  if (id == 0)
+    return(XSelectWindow(display,&rectangle_info));
+  if (root_window == id)
+    return(root_window);
+  status=XQueryTree(display,root_window,&child,&child,&children,
+    &number_children);
+  if (status == False)
+    return((Window) NULL);
+  return(XSearchChildrenByID(display,children,number_children,id));
 }
 
 /*
