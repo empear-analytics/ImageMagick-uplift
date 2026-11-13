@@ -1532,6 +1532,46 @@ static void XGetBackgroundVisualType(Display *display,
       XVisualIDFromVisual((*window_attributes).visual));
 }
 
+typedef struct _AnimateBackgroundEarlyTargets
+{
+  Window
+    *root_window;
+
+  XResourceInfo
+    *resources;
+
+  XWindowInfo
+    *window_info;
+} AnimateBackgroundEarlyTargets;
+
+static void XFindBackgroundWindow(Display *display,
+  XResourceInfo *resource_info,const AnimateBackgroundEarlyTargets *targets)
+{
+  Window
+    *const root_window = targets->root_window;
+
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  (*resources)=(*resource_info);
+  (*window_info).id=(Window) NULL;
+  (*root_window)=XRootWindow(display,XDefaultScreen(display));
+  if (LocaleCompare((*resources).window_id,"root") == 0)
+    (*window_info).id=(*root_window);
+  else
+    {
+      if (isdigit((int) ((unsigned char) *(*resources).window_id)) != 0)
+        (*window_info).id=XWindowByID(display,(*root_window),
+          (Window) strtol((char *) (*resources).window_id,(char **) NULL,0));
+      if ((*window_info).id == (Window) NULL)
+        (*window_info).id=
+          XWindowByName(display,(*root_window),(*resources).window_id);
+    }
+}
+
 MagickExport void XAnimateBackgroundImage(Display *display,
   XResourceInfo *resource_info,Image *images,ExceptionInfo *exception)
 {
@@ -1577,6 +1617,9 @@ MagickExport void XAnimateBackgroundImage(Display *display,
     targets = { &window_info, &resources, &window_attributes, &width,
       &height, &pixel };
 
+  const AnimateBackgroundEarlyTargets
+    early_targets = { &root_window, &resources, &window_info };
+
   /*
     Determine target window.
   */
@@ -1584,20 +1627,7 @@ MagickExport void XAnimateBackgroundImage(Display *display,
   assert(images->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
-  resources=(*resource_info);
-  window_info.id=(Window) NULL;
-  root_window=XRootWindow(display,XDefaultScreen(display));
-  if (LocaleCompare(resources.window_id,"root") == 0)
-    window_info.id=root_window;
-  else
-    {
-      if (isdigit((int) ((unsigned char) *resources.window_id)) != 0)
-        window_info.id=XWindowByID(display,root_window,
-          (Window) strtol((char *) resources.window_id,(char **) NULL,0));
-      if (window_info.id == (Window) NULL)
-        window_info.id=
-          XWindowByName(display,root_window,resources.window_id);
-    }
+  XFindBackgroundWindow(display,resource_info,&early_targets);
   if (window_info.id == (Window) NULL)
     {
       ThrowXWindowException(XServerError,"NoWindowWithSpecifiedIDExists",
