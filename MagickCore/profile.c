@@ -1127,6 +1127,18 @@ static void SyncProfileView(CacheView *image_view,ExceptionInfo *exception,
   if (sync == MagickFalse)
     (*status)=MagickFalse;
 }
+
+static void SetProfileProgress(Image *image,const MagickOffsetType progress,
+  MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,ProfileImageTag,progress,
+    image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
 #endif
 
 #define ThrowProfileException(severity,tag,context) \
@@ -1530,17 +1542,11 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
               SyncProfileView(image_view,exception,&status);
               if (image->progress_monitor != (MagickProgressMonitor) NULL)
                 {
-                  MagickBooleanType
-                    proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
                   #pragma omp atomic
 #endif
                   progress++;
-                  proceed=SetImageProgress(image,ProfileImageTag,progress,
-                    image->rows);
-                  if (proceed == MagickFalse)
-                    status=MagickFalse;
+                  SetProfileProgress(image,progress,&status);
                 }
             }
             image_view=DestroyCacheView(image_view);
