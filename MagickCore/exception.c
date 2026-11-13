@@ -1016,6 +1016,22 @@ static inline MagickBooleanType IsRepeatedException(const ExceptionInfo *p,
     MagickFalse);
 }
 
+static MagickBooleanType IsExceptionListSaturated(LinkedListInfo *exceptions,
+  const ExceptionType severity)
+{
+  const ExceptionInfo
+    *p;
+
+  if (GetNumberOfElementsInLinkedList(exceptions) <= MaxExceptionList)
+    return(MagickFalse);
+  if (severity < ErrorException)
+    return(MagickTrue);
+  p=(const ExceptionInfo *) GetLastValueInLinkedList(exceptions);
+  if (p->severity >= ErrorException)
+    return(MagickTrue);
+  return(MagickFalse);
+}
+
 MagickExport MagickBooleanType ThrowException(ExceptionInfo *exception,
   const ExceptionType severity,const char *reason,const char *description)
 {
@@ -1029,19 +1045,10 @@ MagickExport MagickBooleanType ThrowException(ExceptionInfo *exception,
   assert(exception->signature == MagickCoreSignature);
   LockSemaphoreInfo(exception->semaphore);
   exceptions=(LinkedListInfo *) exception->exceptions;
-  if (GetNumberOfElementsInLinkedList(exceptions) > MaxExceptionList)
+  if (IsExceptionListSaturated(exceptions,severity) != MagickFalse)
     {
-      if (severity < ErrorException)
-        {
-          UnlockSemaphoreInfo(exception->semaphore);
-          return(MagickTrue);
-        }
-      p=(ExceptionInfo *) GetLastValueInLinkedList(exceptions);
-      if (p->severity >= ErrorException)
-        {
-          UnlockSemaphoreInfo(exception->semaphore);
-          return(MagickTrue);
-        }
+      UnlockSemaphoreInfo(exception->semaphore);
+      return(MagickTrue);
     }
   p=(ExceptionInfo *) GetLastValueInLinkedList(exceptions);
   if (IsRepeatedException(p,severity,exception,reason,description) !=
