@@ -261,6 +261,40 @@ static MagickCLEnv getOpenCLEnvironment(ExceptionInfo* exception)
   return(clEnv);
 }
 
+typedef enum
+{
+  BasicAccelerateCheck,
+  RGBAAccelerateCheck,
+  HistogramAccelerateCheck
+} AccelerateCheck;
+
+static MagickBooleanType checkAccelerateKind(const Image *image,
+  const AccelerateCheck check)
+{
+  if (check == BasicAccelerateCheck)
+    return(checkAccelerateCondition(image));
+  if (checkAccelerateConditionRGBA(image) == MagickFalse)
+    return(MagickFalse);
+  if (check == RGBAAccelerateCheck)
+    return(MagickTrue);
+  return(checkHistogramCondition(image,image->intensity));
+}
+
+static MagickCLEnv getAccelerateEnvironment(const Image *image,
+  const AccelerateCheck check,const char *trace_function,
+  ExceptionInfo *exception)
+{
+  assert(image != NULL);
+  assert(exception != (ExceptionInfo *) NULL);
+  if ((trace_function != (const char *) NULL) &&
+      (IsEventLogging() != MagickFalse))
+    (void) LogMagickEvent(TraceEvent,__FILE__,trace_function,(const size_t)
+      __LINE__,"%s",image->filename);
+  if (checkAccelerateKind(image,check) == MagickFalse)
+    return((MagickCLEnv) NULL);
+  return(getOpenCLEnvironment(exception));
+}
+
 static MagickBooleanType IsRGBAChannelMask(const Image *image)
 {
   return((((image->channel_mask & RedChannel) != 0) &&
@@ -493,6 +527,9 @@ static Image *ComputeBlurImage(const Image* image,MagickCLEnv clEnv,
     length,
     lsize[2];
 
+  if (clEnv == (MagickCLEnv) NULL)
+    return((Image *) NULL);
+
   queue=NULL;
   filteredImage=NULL;
   imageBuffer=NULL;
@@ -634,26 +671,8 @@ cleanup:
 MagickPrivate Image* AccelerateBlurImage(const Image *image,
   const double radius,const double sigma,ExceptionInfo *exception)
 {
-  Image
-    *filteredImage;
-
-  MagickCLEnv
-    clEnv;
-
-  assert(image != NULL);
-  assert(exception != (ExceptionInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-
-  if (checkAccelerateCondition(image) == MagickFalse)
-    return((Image *) NULL);
-
-  clEnv=getOpenCLEnvironment(exception);
-  if (clEnv == (MagickCLEnv) NULL)
-    return((Image *) NULL);
-
-  filteredImage=ComputeBlurImage(image,clEnv,radius,sigma,exception);
-  return(filteredImage);
+  return(ComputeBlurImage(image,getAccelerateEnvironment(image,
+    BasicAccelerateCheck,__func__,exception),radius,sigma,exception));
 }
 
 /*
@@ -696,6 +715,9 @@ static MagickBooleanType ComputeContrastImage(Image *image,MagickCLEnv clEnv,
   size_t
     gsize[2],
     i;
+
+  if (clEnv == (MagickCLEnv) NULL)
+    return(MagickFalse);
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -762,26 +784,8 @@ cleanup:
 MagickPrivate MagickBooleanType AccelerateContrastImage(Image *image,
   const MagickBooleanType sharpen,ExceptionInfo *exception)
 {
-  MagickBooleanType
-    status;
-
-  MagickCLEnv
-    clEnv;
-
-  assert(image != NULL);
-  assert(exception != (ExceptionInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-
-  if (checkAccelerateCondition(image) == MagickFalse)
-    return(MagickFalse);
-
-  clEnv=getOpenCLEnvironment(exception);
-  if (clEnv == (MagickCLEnv) NULL)
-    return(MagickFalse);
-
-  status=ComputeContrastImage(image,clEnv,sharpen,exception);
-  return(status);
+  return(ComputeContrastImage(image,getAccelerateEnvironment(image,
+    BasicAccelerateCheck,__func__,exception),sharpen,exception));
 }
 
 /*
@@ -1507,6 +1511,9 @@ static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
     *filteredPixels,
     *hostPtr;
 
+  if (clEnv == (MagickCLEnv) NULL)
+    return((Image *) NULL);
+
   queue=NULL;
   image_view=NULL;
   inputPixels=NULL;
@@ -1812,24 +1819,8 @@ cleanup:
 MagickPrivate Image *AccelerateDespeckleImage(const Image* image,
   ExceptionInfo* exception)
 {
-  Image
-    *filteredImage;
-
-  MagickCLEnv
-    clEnv;
-
-  assert(image != NULL);
-  assert(exception != (ExceptionInfo *) NULL);
-
-  if (checkAccelerateConditionRGBA(image) == MagickFalse)
-    return((Image *) NULL);
-
-  clEnv=getOpenCLEnvironment(exception);
-  if (clEnv == (MagickCLEnv) NULL)
-    return((Image *) NULL);
-
-  filteredImage=ComputeDespeckleImage(image,clEnv,exception);
-  return(filteredImage);
+  return(ComputeDespeckleImage(image,getAccelerateEnvironment(image,
+    RGBAAccelerateCheck,(const char *) NULL,exception),exception));
 }
 
 /*
@@ -2095,6 +2086,9 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   void
     *hostPtr,
     *inputPixels;
+
+  if (clEnv == (MagickCLEnv) NULL)
+    return(MagickFalse);
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -2380,27 +2374,8 @@ cleanup:
 MagickPrivate MagickBooleanType AccelerateEqualizeImage(Image *image,
   ExceptionInfo *exception)
 {
-  MagickBooleanType
-    status;
-
-  MagickCLEnv
-    clEnv;
-
-  assert(image != NULL);
-  assert(exception != (ExceptionInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-
-  if ((checkAccelerateConditionRGBA(image) == MagickFalse) ||
-      (checkHistogramCondition(image,image->intensity) == MagickFalse))
-    return(MagickFalse);
-
-  clEnv=getOpenCLEnvironment(exception);
-  if (clEnv == (MagickCLEnv) NULL)
-    return(MagickFalse);
-
-  status=ComputeEqualizeImage(image,clEnv,exception);
-  return(status);
+  return(ComputeEqualizeImage(image,getAccelerateEnvironment(image,
+    HistogramAccelerateCheck,__func__,exception),exception));
 }
 
 /*
