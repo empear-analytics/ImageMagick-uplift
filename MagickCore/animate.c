@@ -3911,6 +3911,20 @@ static Image *XCoalesceAnimateImages(Image *images,ExceptionInfo *exception)
   return(images);
 }
 
+static Image **XSortAnimateScenes(Image *images,const size_t number_scenes,
+  ExceptionInfo *exception)
+{
+  Image
+    **image_list;
+
+  image_list=ImageListToArray(images,exception);
+  if (image_list == (Image **) NULL)
+    ThrowXWindowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed",
+      images->filename);
+  XSortSceneList(image_list,number_scenes);
+  return(image_list);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4060,11 +4074,7 @@ MagickExport Image *XAnimateImages(Display *display,
     Sort images by increasing scene number.
   */
   number_scenes=GetImageListLength(images);
-  image_list=ImageListToArray(images,exception);
-  if (image_list == (Image **) NULL)
-    ThrowXWindowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed",
-      images->filename);
-  XSortSceneList(image_list,number_scenes);
+  image_list=XSortAnimateScenes(images,number_scenes,exception);
   /*
     Initialize Standard Colormap.
   */
