@@ -12461,6 +12461,55 @@ static MagickBooleanType XMatteWritePixels(const MatteCommandInput *input,
   return(MagickTrue);
 }
 
+static MagickBooleanType XMatteUpdatePixels(const MatteCommandInput *input,
+  int x_offset,int y_offset,size_t *state)
+{
+  XWindows
+    *const windows = input->windows;
+
+  Image
+    **const image = input->image;
+
+  unsigned int
+    height,
+    width;
+
+  if (((*state) & UpdateConfigurationState) != 0)
+    {
+      int
+        x,
+        y;
+
+      /*
+        Matte edit is relative to image configuration.
+      */
+      (void) XClearArea(input->display,windows->image.id,x_offset,y_offset,1,1,
+        MagickTrue);
+      XPutPixel(windows->image.ximage,x_offset,y_offset,
+        windows->pixel_info->background_color.pixel);
+      width=(unsigned int) (*image)->columns;
+      height=(unsigned int) (*image)->rows;
+      x=0;
+      y=0;
+      if (windows->image.crop_geometry != (char *) NULL)
+        (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,
+          &height);
+      x_offset=((int) width*(windows->image.x+x_offset)/
+        windows->image.ximage->width+x);
+      y_offset=((int) height*(windows->image.y+y_offset)/
+        windows->image.ximage->height+y);
+      if ((x_offset < 0) || (y_offset < 0))
+        return(MagickTrue);
+      if ((x_offset >= (int) (*image)->columns) ||
+          (y_offset >= (int) (*image)->rows))
+        return(MagickTrue);
+      if (XMatteWritePixels(input,x_offset,y_offset) == MagickFalse)
+        return(MagickFalse);
+      (*state)&=(unsigned int) (~UpdateConfigurationState);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType XMatteEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -12511,10 +12560,6 @@ static MagickBooleanType XMatteEditImage(Display *display,
     x_offset,
     y,
     y_offset;
-
-  unsigned int
-    height,
-    width;
 
   size_t
     state;
@@ -12674,39 +12719,8 @@ static MagickBooleanType XMatteEditImage(Display *display,
       }
     x_offset=x;
     y_offset=y;
-    if ((state & UpdateConfigurationState) != 0)
-      {
-        int
-          x,
-          y;
-
-        /*
-          Matte edit is relative to image configuration.
-        */
-        (void) XClearArea(display,windows->image.id,x_offset,y_offset,1,1,
-          MagickTrue);
-        XPutPixel(windows->image.ximage,x_offset,y_offset,
-          windows->pixel_info->background_color.pixel);
-        width=(unsigned int) (*image)->columns;
-        height=(unsigned int) (*image)->rows;
-        x=0;
-        y=0;
-        if (windows->image.crop_geometry != (char *) NULL)
-          (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,
-            &height);
-        x_offset=((int) width*(windows->image.x+x_offset)/
-          windows->image.ximage->width+x);
-        y_offset=((int) height*(windows->image.y+y_offset)/
-          windows->image.ximage->height+y);
-        if ((x_offset < 0) || (y_offset < 0))
-          continue;
-        if ((x_offset >= (int) (*image)->columns) ||
-            (y_offset >= (int) (*image)->rows))
-          continue;
-        if (XMatteWritePixels(&command_input,x_offset,y_offset) == MagickFalse)
-          return(MagickFalse);
-        state&=(unsigned int) (~UpdateConfigurationState);
-      }
+    if (XMatteUpdatePixels(&command_input,x_offset,y_offset,&state) == MagickFalse)
+      return(MagickFalse);
   } while ((state & ExitState) == 0);
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask);
