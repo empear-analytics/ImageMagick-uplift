@@ -12187,6 +12187,76 @@ static void XSelectMatteValue(const EditMenuInput *menu,
     return;
 }
 
+typedef struct _MatteCommandInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  const ModeType
+    *MatteEditCommands;
+
+  Image
+    **image;
+
+  ExceptionInfo
+    *exception;
+} MatteCommandInput;
+
+static void XMatteEditControl(const MatteCommandInput *input,const int id,
+  size_t *state)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  const ModeType
+    *const MatteEditCommands = input->MatteEditCommands;
+
+  Image
+    **const image = input->image;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  switch (MatteEditCommands[id])
+  {
+    case MatteEditUndoCommand:
+    {
+      (void) XMagickCommand(display,resource_info,windows,UndoCommand,
+        image,exception);
+      break;
+    }
+    case MatteEditHelpCommand:
+    {
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Matte Edit",ImageMatteEditHelp);
+      break;
+    }
+    case MatteEditDismissCommand:
+    {
+      /*
+        Prematurely exit.
+      */
+      (*state)|=EscapeState;
+      (*state)|=ExitState;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType XMatteEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -12254,6 +12324,10 @@ static MagickBooleanType XMatteEditImage(Display *display,
 
   const BorderColorTargets
     border_targets = { &border_color };
+
+  const MatteCommandInput
+    command_input = { display, resource_info, windows, MatteEditCommands,
+      image, exception };
 
   /*
     Map Command widget.
@@ -12375,29 +12449,11 @@ static MagickBooleanType XMatteEditImage(Display *display,
             XSelectMatteValue(&menu_input,MatteMenu,message,matte);
             break;
           }
-          case MatteEditUndoCommand:
-          {
-            (void) XMagickCommand(display,resource_info,windows,UndoCommand,
-              image,exception);
-            break;
-          }
-          case MatteEditHelpCommand:
-          {
-            XTextViewHelp(display,resource_info,windows,MagickFalse,
-              "Help Viewer - Matte Edit",ImageMatteEditHelp);
-            break;
-          }
-          case MatteEditDismissCommand:
-          {
-            /*
-              Prematurely exit.
-            */
-            state|=EscapeState;
-            state|=ExitState;
-            break;
-          }
           default:
+          {
+            XMatteEditControl(&command_input,id,&state);
             break;
+          }
         }
         (void) XCheckDefineCursor(display,windows->image.id,cursor);
         continue;
