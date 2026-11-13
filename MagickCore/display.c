@@ -6644,6 +6644,28 @@ static void XCropSizeRegion(const CropContext *context,
   } while (((*state) & ExitState) == 0);
 }
 
+static void XCropWaitCommand(const CropContext *context,
+  const CropTargets *targets,const RectangleInfo highlight_info)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  CropCommandInput
+    command_input;
+
+  command_input.display=context->display;
+  command_input.resource_info=context->resource_info;
+  command_input.windows=context->windows;
+  command_input.mode=context->mode;
+  command_input.highlight_info=highlight_info;
+  command_input.RectifyModeMenu=context->RectifyModeMenu;
+  command_input.RectifyCommands=RectifyCommands;
+  XCropRectifyCommand(&command_input,event,state);
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -6811,17 +6833,7 @@ static MagickBooleanType XCropImage(Display *display,
       XScreenEvent(display,windows,&event,exception);
       if (event.xany.window == windows->command.id)
         {
-          CropCommandInput
-            command_input;
-
-          command_input.display=display;
-          command_input.resource_info=resource_info;
-          command_input.windows=windows;
-          command_input.mode=mode;
-          command_input.highlight_info=highlight_info;
-          command_input.RectifyModeMenu=RectifyModeMenu;
-          command_input.RectifyCommands=RectifyCommands;
-          XCropRectifyCommand(&command_input,&event,&state);
+          XCropWaitCommand(&context,&targets,highlight_info);
           continue;
         }
       XHighlightRectangle(display,windows->image.id,
