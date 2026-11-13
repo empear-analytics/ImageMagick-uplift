@@ -14817,6 +14817,34 @@ static void DrawNoticeText(const NoticeText *notice)
     }
 }
 
+static void RespondToNoticePointerEvents(Display *display,XWindows *windows,
+  const XEvent event,const NoticeTargets *targets)
+{
+  size_t
+    *const state = targets->state;
+
+  switch (event.type)
+  {
+    case KeyPress:
+    {
+      KeyNoticeDismiss(display,windows,event,targets);
+      break;
+    }
+    case LeaveNotify:
+    {
+      (*state)=LeaveWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case MotionNotify:
+    {
+      MoveNoticeDismiss(display,windows,event,targets);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -14941,23 +14969,11 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
         state=ExposeWidgetWindow(windows,event,state);
         break;
       }
-      case KeyPress:
-      {
-        KeyNoticeDismiss(display,windows,event,&targets);
-        break;
-      }
-      case LeaveNotify:
-      {
-        state=LeaveWidgetWindow(windows,event,state);
-        break;
-      }
-      case MotionNotify:
-      {
-        MoveNoticeDismiss(display,windows,event,&targets);
-        break;
-      }
       default:
+      {
+        RespondToNoticePointerEvents(display,windows,event,&targets);
         break;
+      }
     }
   } while ((state & ExitState) == 0);
   XSetCursorState(display,windows,MagickFalse);
