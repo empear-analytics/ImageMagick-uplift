@@ -2573,6 +2573,106 @@ static KernelInfo *AcquireEdgeDetectionKernel(KernelInfo *kernel,
   }
 }
 
+static void AddRankedBlurGaussian(KernelInfo *kernel,const ssize_t v,
+  const double alpha,const double beta)
+{
+  ssize_t
+    u;
+
+  for ( u=-v; u <= v; u++) {
+    kernel->values[(u+v)/KernelRank] +=
+                    exp(-((double)(u*u))*alpha)*beta;
+  }
+}
+
+static KernelInfo *AcquireBlurKernel(KernelInfo *kernel,
+  const GeometryInfo *args)
+{
+  ssize_t
+    v;
+
+  double
+    sigma = fabs(args->sigma),
+    alpha, beta;
+
+  if ( args->rho >= 1.0 )
+    kernel->width = CastDoubleToSizeT(args->rho)*2+1;
+  else
+    kernel->width = GetOptimalKernelWidth1D(args->rho,sigma);
+  kernel->height = 1;
+  kernel->x = (ssize_t) (kernel->width-1)/2;
+  kernel->y = 0;
+  kernel->negative_range = kernel->positive_range = 0.0;
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+#if 1
+#define KernelRank 3
+  /* Formula derived from GetBlurKernel() in "effect.c" (plus bug fix).
+  ** It generates a gaussian 3 times the width, and compresses it into
+  ** the expected range.  This produces a closer normalization of the
+  ** resulting kernel, especially for very low sigma values.
+  ** As such while wierd it is prefered.
+  **
+  ** I am told this method originally came from Photoshop.
+  **
+  ** A properly normalized curve is generated (apart from edge clipping)
+  ** even though we later normalize the result (for edge clipping)
+  ** to allow the correct generation of a "Difference of Blurs".
+  */
+
+  /* initialize */
+  v = (ssize_t) (kernel->width*KernelRank-1)/2; /* start/end points to fit range */
+  (void) memset(kernel->values,0, (size_t)
+    kernel->width*kernel->height*sizeof(*kernel->values));
+  /* Calculate a Positive 1D Gaussian */
+  if ( sigma > MagickEpsilon )
+    { sigma *= KernelRank;               /* simplify loop expressions */
+      alpha = 1.0/(2.0*sigma*sigma);
+      beta= (double) (1.0/(MagickSQ2PI*sigma ));
+      AddRankedBlurGaussian(kernel,v,alpha,beta);
+    }
+  else /* special case - generate a unity kernel */
+    kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
+#else
+  /* Direct calculation without curve averaging
+     This is equivalent to a KernelRank of 1 */
+
+  /* Calculate a Positive Gaussian */
+  if ( sigma > MagickEpsilon )
+    { alpha = 1.0/(2.0*sigma*sigma);    /* simplify loop expressions */
+      beta = 1.0/(MagickSQ2PI*sigma);
+      for ( i=0, u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+        kernel->values[i] = exp(-((double)(u*u))*alpha)*beta;
+    }
+  else /* special case - generate a unity kernel */
+    { (void) memset(kernel->values,0, (size_t)
+        kernel->width*kernel->height*sizeof(*kernel->values));
+      kernel->values[kernel->x+kernel->y*kernel->width] = 1.0;
+    }
+#endif
+  /* Note the above kernel may have been 'clipped' by a user defined
+  ** radius, producing a smaller (darker) kernel.  Also for very small
+  ** sigma's (> 0.1) the central value becomes larger than one, as a
+  ** result of not generating a actual 'discrete' kernel, and thus
+  ** producing a very bright 'impulse'.
+  **
+  ** Because of these two factors Normalization is required!
+  */
+
+  /* Normalize the 1D Gaussian Kernel
+  **
+  ** NB: a CorrelateNormalize performs a normal Normalize if
+  ** there are no negative values.
+  */
+  CalcKernelMetaData(kernel);  /* the other kernel meta-data */
+  ScaleKernelInfo(kernel, 1.0, CorrelateNormalizeValue);
+
+  /* rotate the 1D kernel by given angle */
+  RotateKernelInfo(kernel, args->xi );
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -2581,10 +2681,6 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
 
   KernelInfo
     *kernel;
-
-  ssize_t
-    u,
-    v;
 
   double
     nan = sqrt(-1.0);  /* Special Value : Not A Number */
@@ -2663,90 +2759,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
     case LoGKernel:
       return(AcquireGaussianKernel(kernel,type,args));
     case BlurKernel:
-      { double
-          sigma = fabs(args->sigma),
-          alpha, beta;
-
-        if ( args->rho >= 1.0 )
-          kernel->width = CastDoubleToSizeT(args->rho)*2+1;
-        else
-          kernel->width = GetOptimalKernelWidth1D(args->rho,sigma);
-        kernel->height = 1;
-        kernel->x = (ssize_t) (kernel->width-1)/2;
-        kernel->y = 0;
-        kernel->negative_range = kernel->positive_range = 0.0;
-        if (AcquireKernelValues(kernel) == MagickFalse)
-          return(DestroyKernelInfo(kernel));
-
-#if 1
-#define KernelRank 3
-        /* Formula derived from GetBlurKernel() in "effect.c" (plus bug fix).
-        ** It generates a gaussian 3 times the width, and compresses it into
-        ** the expected range.  This produces a closer normalization of the
-        ** resulting kernel, especially for very low sigma values.
-        ** As such while wierd it is prefered.
-        **
-        ** I am told this method originally came from Photoshop.
-        **
-        ** A properly normalized curve is generated (apart from edge clipping)
-        ** even though we later normalize the result (for edge clipping)
-        ** to allow the correct generation of a "Difference of Blurs".
-        */
-
-        /* initialize */
-        v = (ssize_t) (kernel->width*KernelRank-1)/2; /* start/end points to fit range */
-        (void) memset(kernel->values,0, (size_t)
-          kernel->width*kernel->height*sizeof(*kernel->values));
-        /* Calculate a Positive 1D Gaussian */
-        if ( sigma > MagickEpsilon )
-          { sigma *= KernelRank;               /* simplify loop expressions */
-            alpha = 1.0/(2.0*sigma*sigma);
-            beta= (double) (1.0/(MagickSQ2PI*sigma ));
-            for ( u=-v; u <= v; u++) {
-              kernel->values[(u+v)/KernelRank] +=
-                              exp(-((double)(u*u))*alpha)*beta;
-            }
-          }
-        else /* special case - generate a unity kernel */
-          kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
-#else
-        /* Direct calculation without curve averaging
-           This is equivalent to a KernelRank of 1 */
-
-        /* Calculate a Positive Gaussian */
-        if ( sigma > MagickEpsilon )
-          { alpha = 1.0/(2.0*sigma*sigma);    /* simplify loop expressions */
-            beta = 1.0/(MagickSQ2PI*sigma);
-            for ( i=0, u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-              kernel->values[i] = exp(-((double)(u*u))*alpha)*beta;
-          }
-        else /* special case - generate a unity kernel */
-          { (void) memset(kernel->values,0, (size_t)
-              kernel->width*kernel->height*sizeof(*kernel->values));
-            kernel->values[kernel->x+kernel->y*kernel->width] = 1.0;
-          }
-#endif
-        /* Note the above kernel may have been 'clipped' by a user defined
-        ** radius, producing a smaller (darker) kernel.  Also for very small
-        ** sigma's (> 0.1) the central value becomes larger than one, as a
-        ** result of not generating a actual 'discrete' kernel, and thus
-        ** producing a very bright 'impulse'.
-        **
-        ** Because of these two factors Normalization is required!
-        */
-
-        /* Normalize the 1D Gaussian Kernel
-        **
-        ** NB: a CorrelateNormalize performs a normal Normalize if
-        ** there are no negative values.
-        */
-        CalcKernelMetaData(kernel);  /* the other kernel meta-data */
-        ScaleKernelInfo(kernel, 1.0, CorrelateNormalizeValue);
-
-        /* rotate the 1D kernel by given angle */
-        RotateKernelInfo(kernel, args->xi );
-        break;
-      }
+      return(AcquireBlurKernel(kernel,args));
     case CometKernel:
       return(AcquireCometKernel(kernel,args));
     case BinomialKernel:
@@ -6270,6 +6283,126 @@ static const MorphologyStageLimit *FindMorphologyStageLimit(
   return((const MorphologyStageLimit *) NULL);
 }
 
+static void DiscardMorphologyResult(Image **curr_image,Image **rslt_image)
+{
+  if ( (*curr_image) == (*rslt_image) )
+    (*curr_image) = (Image *) NULL;
+  if ( (*rslt_image) != (Image *) NULL )
+    (*rslt_image) = DestroyImage((*rslt_image));
+}
+
+static size_t SelectMorphologyStageLimit(const MorphologyMethod method,
+  size_t stage_limit,const MorphologyIteratedLimits limits)
+{
+  const MorphologyStageLimit
+    *entry;
+
+  entry=FindMorphologyStageLimit(method);
+  if (entry != (const MorphologyStageLimit *) NULL)
+    stage_limit=entry->limit;
+  else
+    SetIteratedMorphologyLimits(method,&limits);
+  return(stage_limit);
+}
+
+typedef struct _MorphologyApplyStages
+{
+  const Image
+    *image;
+
+  MorphologyMethod
+    method;
+
+  const KernelInfo
+    *kernel;
+
+  CompositeOperator
+    compose;
+
+  double
+    bias;
+
+  MagickBooleanType
+    special,
+    verbose;
+
+  size_t
+    method_limit,
+    stage_limit,
+    kernel_limit;
+
+  char
+    *v_info;
+
+  ExceptionInfo
+    *exception;
+
+  MorphologyApplyTargets
+    targets;
+} MorphologyApplyStages;
+
+typedef struct _MorphologyStagesTargets
+{
+  Image
+    **rslt_image;
+
+  KernelInfo
+    **reflected_kernel;
+} MorphologyStagesTargets;
+
+static MagickBooleanType ApplyMorphologyMethodPrimitives(
+  const MorphologyApplyStages *stages,CompositeOperator rslt_compose,
+  const MorphologyStagesTargets *stage_targets)
+{
+  Image
+    **const rslt_image = stage_targets->rslt_image;
+
+  KernelInfo
+    **const reflected_kernel = stage_targets->reflected_kernel;
+
+  const MorphologyApplyTargets
+    targets = stages->targets;
+
+  /* Apply special methods with special requirements
+  ** For example, single run only, or post-processing requirements
+  */
+  if ( stages->special != MagickFalse )
+    {
+      const MorphologyDirectApply
+        direct = { stages->image, stages->method, stages->kernel,
+          stages->verbose, stages->exception };
+
+      if (ApplyDirectMorphology(&direct,rslt_image) == MagickFalse)
+        return(MagickFalse);
+      return(MagickTrue);
+    }
+
+  /* Handle user (caller) specified multi-kernel composition method */
+  rslt_compose=ResolveMultiKernelCompose(stages->compose,rslt_compose);
+
+  /* Some methods require a reflected kernel to use with primitives.
+   * Create the reflected kernel for those methods. */
+  if (AcquireReflectedKernel(stages->method,stages->kernel,reflected_kernel) ==
+      MagickFalse)
+    return(MagickFalse);
+
+  /* Loops around more primitive morphology methods
+  **  erose, dilate, open, close, smooth, edge, etc...
+  */
+  {
+    const MorphologyMethodLoop
+      loop = { stages->image, stages->method, stages->kernel,
+        (*reflected_kernel), stages->bias, stages->verbose,
+        stages->method_limit, stages->stage_limit, stages->kernel_limit,
+        stages->v_info, stages->exception, rslt_compose };
+
+    if (ApplyMorphologyMethodLoop(&loop,&targets) == MagickFalse)
+      return(MagickFalse);
+  }
+
+  return(MagickTrue);
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -6309,8 +6442,8 @@ MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyApplyTargets
     targets = { &curr_image, &rslt_image, &save_image, &work_image, &count };
 
-  const MorphologyStageLimit
-    *entry;
+  const MorphologyStagesTargets
+    stage_targets = { &rslt_image, &reflected_kernel };
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -6343,43 +6476,15 @@ MagickPrivate Image *MorphologyApply(const Image *image,
   stage_limit = 1;        /* assume method is not a compound */
   special = MagickFalse;   /* assume it is NOT a direct modify primitive */
   rslt_compose = compose; /* and we are composing multi-kernels as given */
-  entry=FindMorphologyStageLimit(method);
-  if (entry != (const MorphologyStageLimit *) NULL)
-    stage_limit=entry->limit;
-  else
-    SetIteratedMorphologyLimits(method,&limits);
+  stage_limit=SelectMorphologyStageLimit(method,stage_limit,limits);
 
-  /* Apply special methods with special requirements
-  ** For example, single run only, or post-processing requirements
-  */
-  if ( special != MagickFalse )
-    {
-      const MorphologyDirectApply
-        direct = { image, method, kernel, verbose, exception };
-
-      if (ApplyDirectMorphology(&direct,&rslt_image) == MagickFalse)
-        goto error_cleanup;
-      goto exit_cleanup;
-    }
-
-  /* Handle user (caller) specified multi-kernel composition method */
-  rslt_compose=ResolveMultiKernelCompose(compose,rslt_compose);
-
-  /* Some methods require a reflected kernel to use with primitives.
-   * Create the reflected kernel for those methods. */
-  if (AcquireReflectedKernel(method,kernel,&reflected_kernel) == MagickFalse)
-    goto error_cleanup;
-
-  /* Loops around more primitive morphology methods
-  **  erose, dilate, open, close, smooth, edge, etc...
-  */
   {
-    const MorphologyMethodLoop
-      loop = { image, method, kernel, reflected_kernel, bias, verbose,
-        method_limit, stage_limit, kernel_limit, v_info, exception,
-        rslt_compose };
+    const MorphologyApplyStages
+      stages = { image, method, kernel, compose, bias, special, verbose,
+        method_limit, stage_limit, kernel_limit, v_info, exception, targets };
 
-    if (ApplyMorphologyMethodLoop(&loop,&targets) == MagickFalse)
+    if (ApplyMorphologyMethodPrimitives(&stages,rslt_compose,&stage_targets) ==
+        MagickFalse)
       goto error_cleanup;
   }
 
@@ -6387,10 +6492,7 @@ MagickPrivate Image *MorphologyApply(const Image *image,
 
   /* Yes goto's are bad, but it makes cleanup lot more efficient */
 error_cleanup:
-  if ( curr_image == rslt_image )
-    curr_image = (Image *) NULL;
-  if ( rslt_image != (Image *) NULL )
-    rslt_image = DestroyImage(rslt_image);
+  DiscardMorphologyResult(&curr_image,&rslt_image);
 exit_cleanup:
   {
     const MorphologyApplyRelease
