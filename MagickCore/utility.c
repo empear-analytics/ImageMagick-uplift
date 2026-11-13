@@ -466,6 +466,22 @@ static MagickBooleanType VerifyBase64Padding(const char *p,const int state,
   return(MagickTrue);
 }
 
+static MagickBooleanType VerifyBase64Terminal(const char *p,const int state,
+  unsigned char *decode,const size_t i)
+{
+  if (*p != '=')
+    {
+      if (state != 0)
+        {
+          decode=(unsigned char *) RelinquishMagickMemory(decode);
+          return(MagickFalse);
+        }
+    }
+  else if (VerifyBase64Padding(p,state,decode,i) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport unsigned char *Base64Decode(const char *source,size_t *length)
 {
   int
@@ -509,15 +525,7 @@ MagickExport unsigned char *Base64Decode(const char *source,size_t *length)
   /*
     Verify Base-64 string has proper terminal characters.
   */
-  if (*p != '=')
-    {
-      if (state != 0)
-        {
-          decode=(unsigned char *) RelinquishMagickMemory(decode);
-          return((unsigned char *) NULL);
-        }
-    }
-  else if (VerifyBase64Padding(p,state,decode,i) == MagickFalse)
+  if (VerifyBase64Terminal(p,state,decode,i) == MagickFalse)
     return((unsigned char *) NULL);
   *length=i;
   return(decode);
