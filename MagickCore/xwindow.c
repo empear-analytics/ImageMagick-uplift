@@ -3071,6 +3071,19 @@ MagickPrivate void XGetPixelInfo(Display *display,
 %      fails to find the specified keyword/class.
 %
 */
+static int XUppercaseKeysym(int c)
+{
+  if ((c >= XK_a) && (c <= XK_z))
+    c-=(XK_a-XK_A);
+  else
+    if ((c >= XK_agrave) && (c <= XK_odiaeresis))
+      c-=(XK_agrave-XK_Agrave);
+    else
+      if ((c >= XK_oslash) && (c <= XK_thorn))
+        c-=(XK_oslash-XK_Ooblique);
+  return(c);
+}
+
 MagickExport char *XGetResourceClass(XrmDatabase database,
   const char *client_name,const char *keyword,char *resource_default)
 {
@@ -3103,23 +3116,9 @@ MagickExport char *XGetResourceClass(XrmDatabase database,
       (void) FormatLocaleString(resource_name,MagickPathExtent,"%s.%s",
         client_name,keyword);
       c=(int) (*client_name);
-      if ((c >= XK_a) && (c <= XK_z))
-        c-=(XK_a-XK_A);
-      else
-        if ((c >= XK_agrave) && (c <= XK_odiaeresis))
-          c-=(XK_agrave-XK_Agrave);
-        else
-          if ((c >= XK_oslash) && (c <= XK_thorn))
-            c-=(XK_oslash-XK_Ooblique);
+      c=XUppercaseKeysym(c);
       k=(int) (*keyword);
-      if ((k >= XK_a) && (k <= XK_z))
-        k-=(XK_a-XK_A);
-      else
-        if ((k >= XK_agrave) && (k <= XK_odiaeresis))
-          k-=(XK_agrave-XK_Agrave);
-        else
-          if ((k >= XK_oslash) && (k <= XK_thorn))
-            k-=(XK_oslash-XK_Ooblique);
+      k=XUppercaseKeysym(k);
       (void) FormatLocaleString(resource_class,MagickPathExtent,"%c%s.%c%s",c,
         client_name+1,k,keyword+1);
     }
