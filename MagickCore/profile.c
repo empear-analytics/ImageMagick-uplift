@@ -1090,6 +1090,28 @@ static MagickBooleanType DeleteMatchingImageProfiles(Image *image,
   return(MagickTrue);
 }
 
+static const StringInfo *SyncsRGBImageProfile(Image *image,
+  const StringInfo *icc_profile,const StringInfo *profile,
+  ExceptionInfo *exception)
+{
+  if ((icc_profile != (const StringInfo *) NULL) &&
+      (CompareStringInfo(icc_profile,profile) == 0))
+    {
+      const char
+        *value;
+
+      value=GetImageProperty(image,"exif:ColorSpace",exception);
+      (void) value;
+      if (LocaleCompare(value,"1") != 0)
+        SetsRGBImageProfile(image,exception);
+      value=GetImageProperty(image,"exif:InteroperabilityIndex",exception);
+      if (LocaleCompare(value,"R98.") != 0)
+        SetsRGBImageProfile(image,exception);
+      icc_profile=GetImageProfile(image,"icc");
+    }
+  return(icc_profile);
+}
+
 MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
   const void *datum,const size_t length,ExceptionInfo *exception)
 {
@@ -1139,21 +1161,7 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
         *icc_profile;
 
       icc_profile=GetImageProfile(image,"icc");
-      if ((icc_profile != (const StringInfo *) NULL) &&
-          (CompareStringInfo(icc_profile,profile) == 0))
-        {
-          const char
-            *value;
-
-          value=GetImageProperty(image,"exif:ColorSpace",exception);
-          (void) value;
-          if (LocaleCompare(value,"1") != 0)
-            SetsRGBImageProfile(image,exception);
-          value=GetImageProperty(image,"exif:InteroperabilityIndex",exception);
-          if (LocaleCompare(value,"R98.") != 0)
-            SetsRGBImageProfile(image,exception);
-          icc_profile=GetImageProfile(image,"icc");
-        }
+      icc_profile=SyncsRGBImageProfile(image,icc_profile,profile,exception);
       if ((icc_profile != (const StringInfo *) NULL) &&
           (CompareStringInfo(icc_profile,profile) == 0))
         {
