@@ -6855,6 +6855,76 @@ static void XCropCutPixels(Image *image,const RectangleInfo crop_info,
   image_view=DestroyCacheView(image_view);
 }
 
+static MagickBooleanType XCropCopyImage(const CropContext *context,Image *image,
+  RectangleInfo crop_info)
+{
+  Image
+    *crop_image;
+
+  double
+    scale_factor;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    height,
+    width;
+
+  /*
+    Copy image before applying image transforms.
+  */
+  XSetCursorState(context->display,context->windows,MagickTrue);
+  XCheckRefreshWindows(context->display,context->windows);
+  width=(unsigned int) image->columns;
+  height=(unsigned int) image->rows;
+  x=0;
+  y=0;
+  if (context->windows->image.crop_geometry != (char *) NULL)
+    (void) XParseGeometry(context->windows->image.crop_geometry,&x,&y,&width,
+      &height);
+  scale_factor=(double) width/context->windows->image.ximage->width;
+  crop_info.x+=x;
+  crop_info.x=(ssize_t) (scale_factor*crop_info.x+0.5);
+  crop_info.width=(unsigned int) (scale_factor*crop_info.width+0.5);
+  scale_factor=(double) height/context->windows->image.ximage->height;
+  crop_info.y+=y;
+  crop_info.y=(ssize_t) (scale_factor*crop_info.y+0.5);
+  crop_info.height=(unsigned int) (scale_factor*crop_info.height+0.5);
+  crop_info.x+=image->page.x;
+  crop_info.y+=image->page.y;
+  crop_image=CropImage(image,&crop_info,context->exception);
+  XSetCursorState(context->display,context->windows,MagickFalse);
+  if (crop_image == (Image *) NULL)
+    return(MagickFalse);
+  if (context->resource_info->copy_image != (Image *) NULL)
+    context->resource_info->copy_image=DestroyImage(
+      context->resource_info->copy_image);
+  context->resource_info->copy_image=crop_image;
+  if (context->mode == CopyMode)
+    {
+      (void) XConfigureImage(context->display,context->resource_info,
+        context->windows,image,context->exception);
+      return(MagickTrue);
+    }
+  /*
+    Cut image.
+  */
+  if (SetImageStorageClass(image,DirectClass,context->exception) == MagickFalse)
+    return(MagickFalse);
+  image->alpha_trait=BlendPixelTrait;
+  XCropCutPixels(image,crop_info,context->exception);
+  /*
+    Update image configuration.
+  */
+  XConfigureImageColormap(context->display,context->resource_info,
+    context->windows,image,context->exception);
+  (void) XConfigureImage(context->display,context->resource_info,
+    context->windows,image,context->exception);
+  return(MagickTrue);
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -6884,18 +6954,8 @@ static MagickBooleanType XCropImage(Display *display,
     x,
     y;
 
-  Image
-    *crop_image;
-
-  double
-    scale_factor;
-
   RectangleInfo
     crop_info;
-
-  unsigned int
-    height,
-    width;
 
   size_t
     state;
@@ -6988,52 +7048,7 @@ static MagickBooleanType XCropImage(Display *display,
         (void) XConfigureImage(display,resource_info,windows,image,exception);
         return(MagickTrue);
       }
-  /*
-    Copy image before applying image transforms.
-  */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  width=(unsigned int) image->columns;
-  height=(unsigned int) image->rows;
-  x=0;
-  y=0;
-  if (windows->image.crop_geometry != (char *) NULL)
-    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
-  scale_factor=(double) width/windows->image.ximage->width;
-  crop_info.x+=x;
-  crop_info.x=(ssize_t) (scale_factor*crop_info.x+0.5);
-  crop_info.width=(unsigned int) (scale_factor*crop_info.width+0.5);
-  scale_factor=(double) height/windows->image.ximage->height;
-  crop_info.y+=y;
-  crop_info.y=(ssize_t) (scale_factor*crop_info.y+0.5);
-  crop_info.height=(unsigned int) (scale_factor*crop_info.height+0.5);
-  crop_info.x+=image->page.x;
-  crop_info.y+=image->page.y;
-  crop_image=CropImage(image,&crop_info,exception);
-  XSetCursorState(display,windows,MagickFalse);
-  if (crop_image == (Image *) NULL)
-    return(MagickFalse);
-  if (resource_info->copy_image != (Image *) NULL)
-    resource_info->copy_image=DestroyImage(resource_info->copy_image);
-  resource_info->copy_image=crop_image;
-  if (mode == CopyMode)
-    {
-      (void) XConfigureImage(display,resource_info,windows,image,exception);
-      return(MagickTrue);
-    }
-  /*
-    Cut image.
-  */
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-    return(MagickFalse);
-  image->alpha_trait=BlendPixelTrait;
-  XCropCutPixels(image,crop_info,exception);
-  /*
-    Update image configuration.
-  */
-  XConfigureImageColormap(display,resource_info,windows,image,exception);
-  (void) XConfigureImage(display,resource_info,windows,image,exception);
-  return(MagickTrue);
+  return(XCropCopyImage(&context,image,crop_info));
 }
 
 /*
