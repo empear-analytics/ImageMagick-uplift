@@ -48,6 +48,7 @@ if ( ! GetOptions(
 	 'compare-similarity.c',
 	 'composite.c',
 	 'constitute.c',
+	 'constitute-pixels.c',
 	 'decorate.c',
 	 'decorate-raise.c',
    'deprecate.c',

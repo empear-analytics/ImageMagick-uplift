@@ -137,6 +137,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/configure-paths.c \
   MagickCore/configure.h \
   MagickCore/constitute.c \
+  MagickCore/constitute-pixels.c \
   MagickCore/constitute.h \
   MagickCore/decorate.c \
   MagickCore/decorate-raise.c \
