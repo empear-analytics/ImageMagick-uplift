@@ -228,9 +228,10 @@ class SwitchSplitCheck(unittest.TestCase):
         problems = run(old, new, helpers)
         self.assertTrue(any(text in p for p in problems), (text, problems))
 
-    def planted(self, what, was, now, text, base=NEW, old=OLD, helpers=("RespondA", "RespondB")):
-        self.assertIn(was, base, what)
-        self.refused(old, base.replace(was, now, 1), list(helpers), text)
+    def planted(self, what, was, now, text):
+        """Refuse the correct two-helper split of OLD once `was` is replaced by `now`."""
+        self.assertIn(was, NEW, what)
+        self.refused(OLD, NEW.replace(was, now, 1), ["RespondA", "RespondB"], text)
 
     def test_lost_label(self):
         self.planted("ConfigureNotify group removed from the helper",
