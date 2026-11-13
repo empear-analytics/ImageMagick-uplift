@@ -5729,6 +5729,14 @@ an option: it would sit at the block's depth, as LB's *Not covered by* says of `
    `if (Helper(...) == MagickFalse) { S return(...); }` with `S` and the return copied
    unchanged; a `continue;` that followed the block stays after it. Check every argument
    and member by reading.
+6. *A cleanup jump* (2026-11-14, lane c). Step 2's exit may also be Recipe V's jump with
+   a run `S` before it, `S goto L;`, the same text at every exit (checked by script),
+   where `S` only assigns constants to variables of the caller (`status=MagickFalse;
+   goto cleanup;`, as Recipe MC leaves each use). Each becomes `return(MagickFalse);`
+   and the caller writes `if (Helper(...) == MagickFalse) { S goto L; }`, `S` copied
+   unchanged. A `goto M;` whose label `M` stands inside the block, every jump to `M`
+   being inside it too, is not an exit: it and its label move unchanged (step 1's "no
+   `goto`" means none that leaves the block).
 
 **Before:**
 
@@ -16850,6 +16858,148 @@ flagged (3.27 to 3.35); bodies of one statement clear the finding (a probe of fo
 3.27 to 3.71). Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to
 evolve the recipes.
 
+## Recipe MC - Make a Cleanup-Jumping Statement Macro a Function
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Deep, Nested Complexity*, *Complex
+Method* or *Large Method* on a function that defines, inside its body, function-like
+macros expanding to a compound statement whose only exit is `status=MagickFalse;` then
+`goto cleanup;`, and whose blocks cannot move because each holds uses of the macros:
+a helper cannot jump to the caller's label. The typical case is a text buffer that grows
+on demand, as `property.c`'s `InterpretImageProperties` defines `ExtendInterpretText`,
+`AppendKeyValue2Text` and `AppendString2Text`, used seventeen times; their text names the
+caller's `interpret_text`, `q`, `extent` and `status`.
+
+**Not covered by:** Recipe MF, whose macro leaves through a throw macro's `return(c);`
+and whose helper takes a stack struct with a single use per helper; Recipe H, which moves
+the macros above the function but leaves every use (and so every block holding one)
+where it is; Recipes MB and CK, which keep the macro text and copy the locals it names,
+and refuse a `goto` (MB step 1, CK step 1); Recipes V and VC, which move a block whose
+`goto` is its own text, not a macro's.
+
+**How:**
+
+1. The macros are defined inside the caller (or hoisted under Recipe H), each body one
+   compound statement with no `#`, `##`, `return`, `break` or `continue`; the only jump
+   is `goto L;` to a label `L` of the caller, preceded in the same block by
+   `status=c;` of one constant `c` to the caller's status variable. Every use is a
+   statement `M(a1,...,ak);` in that caller, outside every OpenMP region, and each
+   argument is evaluated once by the macro (its parameter appears once in the body, or
+   the body copies it into a local first) or has no side effect.
+2. List the caller's variables the macro bodies name besides `status` and their own
+   locals: each is a plain local whose address the caller takes only for the struct of
+   step 3 (`interpret_text`, `q`, `extent`).
+3. Directly above the caller declare `typedef struct _Name { ... } Name;` with one
+   pointer member `T *v` per variable of step 2 (`char **interpret_text`), and in the
+   caller, as its last declaration, `const Name name = { &v1, ... };` (Recipe I's
+   targets struct, every member bound once).
+4. Directly above the caller, below the struct, write one `static MagickBooleanType`
+   function `F` per macro, under a new name, taking `const Name *name` first and then
+   one parameter per macro parameter, of the type the uses pass (`const char *`,
+   `const size_t`). Its body is the macro's text with every use of a step-2 variable `v`
+   written `(*name->v)`, the `status=c; goto L;` exit written `return(MagickFalse);`,
+   and `return(MagickTrue);` at the end. A macro whose body opens with another macro's
+   growth test on a length it computes first calls that macro's function with the
+   computed length instead; check by reading that the test is the same text.
+5. Each `#define` keeps its name and parameters; its body becomes `{ if (F(&name,a1,...)
+   == MagickFalse) { status=c; goto L; } }`, each parameter in parentheses. The uses do
+   not change. This is the commit of this recipe: the score is flat or better (the
+   branches of the macro bodies, which CodeScene counts in the caller, leave it).
+6. A later step that moves a block holding uses out of the caller (Recipe VC, V, W, or
+   E step 7) first writes each use in the block as the macro's body with the arguments
+   substituted (the preprocessor's own expansion), so that its exit is the block's own
+   `status=c; goto L;` and that recipe's rules apply to it; `&name` passed into the new
+   function is written `name` there. The commit that moves the last use deletes the
+   `#define`s.
+7. Check by reading: (a) on the path that falls through, the function performs the same
+   reads and writes of the caller's variables in the same order, through pointers to
+   them; (b) on the jump path the function has made the same writes (the failed
+   reallocation's `NULL` included) before it returns `MagickFalse`, and the macro then
+   runs `status=c; goto L;` as before; (c) each argument is evaluated once, as before
+   (step 1).
+8. Run `tools/refactor_guard.py --calls` (each new function `+2` or more, nothing
+   dropped), `tools/ci_warnings.sh` and `tools/cxx_warnings.sh`, and the oracle on the
+   caller's cases.
+
+**Before:**
+
+```c
+#define AppendString2Text(string) \
+{ \
+  size_t length = strlen((string)); \
+  if ((size_t) (q-interpret_text+(ssize_t) length+1) >= extent) \
+    { \
+      extent+=length; \
+      interpret_text=(char *) ResizeQuantumMemory(interpret_text,extent+ \
+        MagickPathExtent,sizeof(*interpret_text)); \
+      if (interpret_text == (char *) NULL) \
+        { \
+          status=MagickFalse; \
+          goto cleanup; \
+        } \
+      q=interpret_text+strlen(interpret_text); \
+    } \
+  (void) CopyMagickString(q,(string),extent); \
+  q+=(ptrdiff_t) length; \
+}
+```
+
+**After:**
+
+```c
+static MagickBooleanType AppendInterpretString(const InterpretText *text,
+  const char *string)
+{
+  size_t
+    length = strlen((string));
+
+  if (ExtendInterpretBuffer(text,length) == MagickFalse)
+    return(MagickFalse);
+  (void) CopyMagickString((*text->q),(string),(*text->extent));
+  (*text->q)+=(ptrdiff_t) length;
+  return(MagickTrue);
+}
+  ...
+#define AppendString2Text(string) \
+{ \
+  if (AppendInterpretString(&text,(string)) == MagickFalse) \
+    { \
+      status=MagickFalse; \
+      goto cleanup; \
+    } \
+}
+```
+
+**Careful:**
+
+- The macro's statements run in the function in the same order on the same objects:
+  every write to a caller's variable lands through its pointer at the point where the
+  macro wrote it, so the caller sees the same values after the call; the struct is
+  bound once and nothing else takes the variables' addresses (step 2).
+- On a failed reallocation the macro left `interpret_text` `NULL`, set `status` and
+  jumped; the function leaves `(*text->interpret_text)` `NULL` and returns
+  `MagickFalse`, and the macro sets `status` and jumps. The statements at the label
+  read the same variables with the same values. `q` and `extent` may be stale on that
+  path in both versions; the cleanup reads neither.
+- A parameter named once in the old body is evaluated once, at the same point; one
+  named twice must have no side effect (step 1), since the function evaluates it once.
+- A macro that repeats another's growth test (`AppendString2Text` and
+  `AppendKeyValue2Text` both open with `ExtendInterpretText`'s text on their own
+  `length`) calls that function: the same comparison, increment, reallocation and
+  pointer update run on the same length.
+- Writing every use out as a call with its own `if` in one commit would add a branch
+  and a nesting level at each use (a probe of `InterpretImageProperties`: 3.21 to
+  3.13, bumps 13 to 21): step 6 writes a use out only when its block leaves the caller.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls`, `ci_warnings.sh`,
+`cxx_warnings.sh`, and step 6 checked by reading.
+
+**Provenance:** 2026-11-14, from `property.c`'s `InterpretImageProperties` (campaign B,
+M127 lane c round 7): seventeen uses of three buffer macros sat in every block of the
+function, so none could move. The wrappers alone: 3.21 to 3.21, cc 124 to 121; the end
+state of the chain (the escape blocks moved under Recipes VC and E step 7) probed 3.44. Added by
+Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: c
+
 ---
 
 ## Catalogue changes
@@ -17225,3 +17375,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | AT | Step 6: the `if` may have an `else` arm of the same kind; that arm alone moves (`else return(Helper(...));`), a local only it and `R` read is declared in the helper with its initialiser; Lane: b | `color.c`'s `QueryHexColor` (two bumps, one per arm) | mandate (2026-10-24) |
 | 2026-11-13 | NEW | IC | Inline Cast-Only Locals into Their One Use: a local assigned once from a cast of an unassigned parameter to its own type, and read once, is replaced at that read by the cast; declaration and assignment go; the grouped copies in one commit; evidence guard (`obj_identical.sh`); Lane: b | `splay-tree.c`'s `CompareSplayTreeString` and `CompareSplayTreeStringInfo` (*Code Duplication*; probe 9.38 to 10.0) | mandate (2026-10-24) |
 | 2026-11-13 | NEW | OS | Share an Option-Sync Block Through a Helper Keyed by the Option Name: copies of `option=GetImageOption(image_info,"K"); if (option != NULL) S;` whose `S` stores into one member become calls of a `static void` helper taking the key and a pointer to the member; one function per commit; targets *Overall Code Complexity*; evidence oracle; Lane: b | `image-settings.c`'s `SyncImage...Settings` (`quality`, `scene`, `depth`, `loop`, `page`, `tile-offset`, colours) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | MC | Make a Cleanup-Jumping Statement Macro a Function: function-local statement macros whose only exit is `status=c; goto L;` get `static MagickBooleanType` functions taking a `const` struct of pointers to the caller's locals they name, and the macros become one-call wrappers that keep the jump; a block that later moves writes its uses out; evidence oracle; Lane: c | `property.c`'s `InterpretImageProperties` (seventeen uses of three buffer macros in every block; probe of the chain 3.21 to 3.44) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | VC | Step 6: the cleanup exit may be `S goto L;` (Recipe V's jump after assignments of constants, `status=MagickFalse; goto cleanup;`), the caller writing `{ S goto L; }`; a `goto` whose label is inside the block moves with it; Lane: c | `InterpretImageProperties`' braced-escape block after Recipe MC | mandate (2026-10-24) |
