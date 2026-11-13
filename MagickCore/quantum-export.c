@@ -949,26 +949,11 @@ static void ExportAnyDepthBGRQuantum(const Image *image,
   }
 }
 
-static void ExportBGRQuantum(const Image *image,QuantumInfo *quantum_info,
-  const QuantumPixelSpan *span)
+static void ExportOtherDepthBGRQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
 {
   switch (quantum_info->depth)
   {
-    case 8:
-    {
-      Export8BitBGRQuantum(image,quantum_info,span);
-      break;
-    }
-    case 10:
-    {
-      Export10BitBGRQuantum(image,quantum_info,span);
-      break;
-    }
-    case 12:
-    {
-      Export12BitBGRQuantum(image,quantum_info,span);
-      break;
-    }
     case 16:
     {
       Export16BitBGRQuantum(image,quantum_info,span);
@@ -991,6 +976,34 @@ static void ExportBGRQuantum(const Image *image,QuantumInfo *quantum_info,
     default:
     {
       ExportAnyDepthBGRQuantum(image,quantum_info,span);
+      break;
+    }
+  }
+}
+
+static void ExportBGRQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span)
+{
+  switch (quantum_info->depth)
+  {
+    case 8:
+    {
+      Export8BitBGRQuantum(image,quantum_info,span);
+      break;
+    }
+    case 10:
+    {
+      Export10BitBGRQuantum(image,quantum_info,span);
+      break;
+    }
+    case 12:
+    {
+      Export12BitBGRQuantum(image,quantum_info,span);
+      break;
+    }
+    default:
+    {
+      ExportOtherDepthBGRQuantum(image,quantum_info,span);
       break;
     }
   }
