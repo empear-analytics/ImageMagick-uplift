@@ -231,6 +231,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/magick-type.h \
   MagickCore/magick.h \
   MagickCore/matrix.c \
+  MagickCore/matrix-gauss.c \
   MagickCore/matrix.h \
   MagickCore/matrix-private.h \
   MagickCore/memory.c \

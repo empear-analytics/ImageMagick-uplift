@@ -113,6 +113,7 @@ $call Make log.c
 $call Make magic.c
 $call Make magick.c
 $call Make matrix.c
+$call Make matrix-gauss.c
 $call Make memory.c
 $call Make memory-quantum.c
 $call Make mime.c
