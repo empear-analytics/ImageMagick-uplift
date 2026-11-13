@@ -8843,6 +8843,41 @@ static Colormap XCreateVisualColormap(Display *display,
   return(colormap);
 }
 
+typedef struct _XTrueColorSource
+{
+  Display
+    *display;
+
+  XVisualInfo
+    *visual_info;
+
+  Colormap
+    colormap;
+} XTrueColorSource;
+
+static void XStoreTrueColors(const XTrueColorSource *source,XColor *colors,
+  const size_t number_colors)
+{
+  Display
+    *const display = source->display;
+
+  XVisualInfo
+    *const visual_info = source->visual_info;
+
+  const Colormap
+    colormap = source->colormap;
+
+  ssize_t
+    i;
+
+  if ((visual_info->klass == DirectColor) &&
+      (colormap != XDefaultColormap(display,visual_info->screen)))
+    (void) XStoreColors(display,colormap,colors,(int) number_colors);
+  else
+    for (i=0; i < (ssize_t) number_colors; i++)
+      (void) XAllocColor(display,colormap,&colors[i]);
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -9062,6 +9097,9 @@ MagickPrivate void XMakeStandardColormap(Display *display,
       MagickBooleanType
         linear_colormap;
 
+      XTrueColorSource
+        source;
+
       /*
         Define Standard Colormap for TrueColor or DirectColor visual.
       */
@@ -9091,12 +9129,10 @@ MagickPrivate void XMakeStandardColormap(Display *display,
         XFillLinearColorRamp(map_info,number_colors,color,p);
       else
         XFillColorRamp(map_info,number_colors,color,p);
-      if ((visual_info->klass == DirectColor) &&
-          (colormap != XDefaultColormap(display,visual_info->screen)))
-        (void) XStoreColors(display,colormap,colors,(int) number_colors);
-      else
-        for (i=0; i < (ssize_t) number_colors; i++)
-          (void) XAllocColor(display,colormap,&colors[i]);
+      source.display=display;
+      source.visual_info=visual_info;
+      source.colormap=colormap;
+      XStoreTrueColors(&source,colors,number_colors);
       break;
     }
   }
