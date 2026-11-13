@@ -13061,6 +13061,71 @@ static void UpdateListBrowserLayout(const ListBrowserContext *context,
     }
 }
 
+static void RedrawListBrowserWidget(const ListBrowserContext *context,
+  const ListBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const action_info = widgets->action_info;
+
+  XWidgetInfo
+    *const cancel_info = widgets->cancel_info;
+
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  XWidgetInfo
+    *const south_info = widgets->south_info;
+
+  XWidgetInfo
+    *const scroll_info = widgets->scroll_info;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info;
+
+  XWidgetInfo
+    *const text_info = widgets->text_info;
+
+  XWidgetInfo
+    *const selection_info = widgets->selection_info;
+
+  if ((*state) & RedrawWidgetState)
+    {
+      /*
+        Redraw List Browser window.
+      */
+      XDrawWidgetText(display,window_info,text_info);
+      XDrawBeveledMatte(display,window_info,list_info);
+      XDrawBeveledMatte(display,window_info,scroll_info);
+      XDrawTriangleNorth(display,window_info,north_info);
+      XDrawBeveledButton(display,window_info,slider_info);
+      XDrawTriangleSouth(display,window_info,south_info);
+      XDrawBeveledMatte(display,window_info,reply_info);
+      XDrawMatteText(display,window_info,reply_info);
+      XDrawBeveledButton(display,window_info,action_info);
+      XDrawBeveledButton(display,window_info,cancel_info);
+      XHighlightWidget(display,window_info,BorderOffset,BorderOffset);
+      (*selection_info).id=(~0);
+      (*state)|=RedrawActionState;
+      (*state)|=RedrawListState;
+      (*state)&=(unsigned int) (~RedrawWidgetState);
+    }
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -13214,27 +13279,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   do
   {
     UpdateListBrowserLayout(&list_context,&list_widgets);
-    if (state & RedrawWidgetState)
-      {
-        /*
-          Redraw List Browser window.
-        */
-        XDrawWidgetText(display,window_info,&text_info);
-        XDrawBeveledMatte(display,window_info,&list_info);
-        XDrawBeveledMatte(display,window_info,&scroll_info);
-        XDrawTriangleNorth(display,window_info,&north_info);
-        XDrawBeveledButton(display,window_info,&slider_info);
-        XDrawTriangleSouth(display,window_info,&south_info);
-        XDrawBeveledMatte(display,window_info,&reply_info);
-        XDrawMatteText(display,window_info,&reply_info);
-        XDrawBeveledButton(display,window_info,&action_info);
-        XDrawBeveledButton(display,window_info,&cancel_info);
-        XHighlightWidget(display,window_info,BorderOffset,BorderOffset);
-        selection_info.id=(~0);
-        state|=RedrawActionState;
-        state|=RedrawListState;
-        state&=(unsigned int) (~RedrawWidgetState);
-      }
+    RedrawListBrowserWidget(&list_context,&list_widgets);
     if (state & RedrawListState)
       {
         /*
