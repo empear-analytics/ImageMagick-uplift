@@ -375,6 +375,205 @@ static void XRestrictVisualByScreen(Display *display,
       (*visual_mask)|=VisualDepthMask;
 }
 
+static MagickBooleanType XGetStandardColormapList(Display *display,
+  const char *map_type,XResourceInfo *resource_info,
+  const StandardColormapTargets *targets)
+{
+  Status
+    *const status = targets->status;
+
+  int
+    *const number_maps = targets->number_maps;
+
+  Window
+    root_window;
+
+  /*
+    Choose a visual associated with a standard colormap.
+  */
+  root_window=XRootWindow(display,XDefaultScreen(display));
+  (*status)=False;
+  (*number_maps)=0;
+  if (LocaleCompare(map_type,"list") != 0)
+    XGetNamedStandardColormap(display,root_window,map_type,targets);
+  else
+    XGetListedStandardColormap(display,root_window,resource_info,targets);
+  if ((*status) == False)
+    {
+      ThrowXWindowException(XServerError,"UnableToGetStandardColormap",
+        map_type);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+typedef struct _StandardColormapSearch
+{
+  XVisualInfo
+    *visual_list;
+
+  XStandardColormap
+    *map_list;
+
+  char
+    *map_type;
+
+  int
+    number_maps,
+    number_visuals;
+} StandardColormapSearch;
+
+static MagickBooleanType XMatchStandardColormap(
+  const StandardColormapSearch *search,XVisualInfo *visual_template,
+  XStandardColormap *map_info)
+{
+  int
+    i,
+    j;
+
+  (*visual_template).visualid=XVisualIDFromVisual(
+    search->visual_list[0].visual);
+  for (i=0; i < search->number_maps; i++)
+    for (j=0; j < search->number_visuals; j++)
+      if (search->map_list[i].visualid ==
+          XVisualIDFromVisual(search->visual_list[j].visual))
+        {
+          *map_info=search->map_list[i];
+          (*visual_template).visualid=XVisualIDFromVisual(
+            search->visual_list[j].visual);
+          break;
+        }
+  if (map_info->visualid != (*visual_template).visualid)
+    {
+      ThrowXWindowException(XServerError,
+        "UnableToMatchVisualToStandardColormap",search->map_type);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+typedef struct _VisualSelection
+{
+  Display
+    *display;
+
+  char
+    *map_type;
+
+  XVisualInfo
+    *visual_list;
+
+  int
+    number_visuals;
+} VisualSelection;
+
+static MagickBooleanType XSelectVisualID(const VisualSelection *selection,
+  XVisualInfo *visual_template,XStandardColormap *map_info,
+  XResourceInfo *resource_info)
+{
+  Display
+    *const display = selection->display;
+
+  char
+    *const map_type = selection->map_type;
+
+  XVisualInfo
+    *const visual_list = selection->visual_list;
+
+  const int
+    number_visuals = selection->number_visuals;
+
+  XVisualInfo
+    *visual_info;
+
+  if ((map_info != (XStandardColormap *) NULL) && (map_type != (char *) NULL))
+    {
+      int
+        number_maps;
+
+      Status
+        status;
+
+      XStandardColormap
+        *map_list;
+
+      const StandardColormapTargets
+        targets = { &status,&map_list,&number_maps };
+
+      if (XGetStandardColormapList(display,map_type,resource_info,&targets) ==
+          MagickFalse)
+        return(MagickFalse);
+      /*
+        Search all Standard Colormaps and visuals for ids that match.
+      */
+      *map_info=map_list[0];
+#if !defined(PRE_R4_ICCCM)
+      {
+        const StandardColormapSearch
+          search = { visual_list,map_list,map_type,number_maps,
+            number_visuals };
+
+        if (XMatchStandardColormap(&search,visual_template,map_info) ==
+            MagickFalse)
+          return(MagickFalse);
+      }
+#endif
+      if (map_info->colormap == (Colormap) NULL)
+        {
+          ThrowXWindowException(XServerError,"StandardColormapIsNotInitialized",
+            map_type);
+          return(MagickFalse);
+        }
+      (void) XFree((void *) map_list);
+    }
+  else
+    {
+      visual_info=XPickRichestVisual(visual_list,number_visuals);
+      (*visual_template).visualid=XVisualIDFromVisual(visual_info->visual);
+    }
+  return(MagickTrue);
+}
+
+typedef struct _VisualListTargets
+{
+  int
+    *number_visuals;
+
+  XVisualInfo
+    **visual_list,
+    *visual_template;
+} VisualListTargets;
+
+static MagickBooleanType XGetDefaultVisualList(Display *display,
+  const char *visual_type,const int visual_mask,
+  const VisualListTargets *targets)
+{
+  int
+    *const number_visuals = targets->number_visuals;
+
+  XVisualInfo
+    **const visual_list = targets->visual_list,
+    *const visual_template = targets->visual_template;
+
+  if (((*number_visuals) == 0) || ((*visual_list) == (XVisualInfo *) NULL))
+    {
+      /*
+        Failed to get visual;  try using the default visual.
+      */
+      ThrowXWindowException(XServerWarning,"UnableToGetVisual",visual_type);
+      (*visual_template).visualid=XVisualIDFromVisual(XDefaultVisual(display,
+        XDefaultScreen(display)));
+      (*visual_list)=XGetVisualInfo(display,visual_mask,visual_template,
+        number_visuals);
+      if (((*number_visuals) == 0) ||
+          ((*visual_list) == (XVisualInfo *) NULL))
+        return(MagickFalse);
+      ThrowXWindowException(XServerWarning,"UsingDefaultVisual",
+        XVisualClassName((*visual_list)->klass));
+    }
+  return(MagickTrue);
+}
+
 MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
   XStandardColormap *map_info,XResourceInfo *resource_info)
 {
@@ -385,14 +584,14 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
   int
     visual_mask;
 
-  int
-    i;
-
   static int
     number_visuals;
 
   static XVisualInfo
     visual_template;
+
+  VisualListTargets
+    targets;
 
   XVisualInfo
     *visual_info,
@@ -418,92 +617,21 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
   visual_list=XGetVisualInfo(display,visual_mask,&visual_template,
     &number_visuals);
   visual_mask=VisualScreenMask | VisualIDMask;
-  if ((number_visuals == 0) || (visual_list == (XVisualInfo *) NULL))
-    {
-      /*
-        Failed to get visual;  try using the default visual.
-      */
-      ThrowXWindowException(XServerWarning,"UnableToGetVisual",visual_type);
-      visual_template.visualid=XVisualIDFromVisual(XDefaultVisual(display,
-        XDefaultScreen(display)));
-      visual_list=XGetVisualInfo(display,visual_mask,&visual_template,
-        &number_visuals);
-      if ((number_visuals == 0) || (visual_list == (XVisualInfo *) NULL))
-        return((XVisualInfo *) NULL);
-      ThrowXWindowException(XServerWarning,"UsingDefaultVisual",
-        XVisualClassName(visual_list->klass));
-    }
+  targets.number_visuals=(&number_visuals);
+  targets.visual_list=(&visual_list);
+  targets.visual_template=(&visual_template);
+  if (XGetDefaultVisualList(display,visual_type,visual_mask,&targets) ==
+      MagickFalse)
+    return((XVisualInfo *) NULL);
   resource_info->color_recovery=MagickFalse;
-  if ((map_info != (XStandardColormap *) NULL) && (map_type != (char *) NULL))
-    {
-      int
-        j,
-        number_maps;
+  {
+    const VisualSelection
+      selection = { display,map_type,visual_list,number_visuals };
 
-      Status
-        status;
-
-      Window
-        root_window;
-
-      XStandardColormap
-        *map_list;
-
-      const StandardColormapTargets
-        targets = { &status,&map_list,&number_maps };
-
-      /*
-        Choose a visual associated with a standard colormap.
-      */
-      root_window=XRootWindow(display,XDefaultScreen(display));
-      status=False;
-      number_maps=0;
-      if (LocaleCompare(map_type,"list") != 0)
-        XGetNamedStandardColormap(display,root_window,map_type,&targets);
-      else
-        XGetListedStandardColormap(display,root_window,resource_info,&targets);
-      if (status == False)
-        {
-          ThrowXWindowException(XServerError,"UnableToGetStandardColormap",
-            map_type);
-          return((XVisualInfo *) NULL);
-        }
-      /*
-        Search all Standard Colormaps and visuals for ids that match.
-      */
-      *map_info=map_list[0];
-#if !defined(PRE_R4_ICCCM)
-      visual_template.visualid=XVisualIDFromVisual(visual_list[0].visual);
-      for (i=0; i < number_maps; i++)
-        for (j=0; j < number_visuals; j++)
-          if (map_list[i].visualid ==
-              XVisualIDFromVisual(visual_list[j].visual))
-            {
-              *map_info=map_list[i];
-              visual_template.visualid=XVisualIDFromVisual(
-                visual_list[j].visual);
-              break;
-            }
-      if (map_info->visualid != visual_template.visualid)
-        {
-          ThrowXWindowException(XServerError,
-            "UnableToMatchVisualToStandardColormap",map_type);
-          return((XVisualInfo *) NULL);
-        }
-#endif
-      if (map_info->colormap == (Colormap) NULL)
-        {
-          ThrowXWindowException(XServerError,"StandardColormapIsNotInitialized",
-            map_type);
-          return((XVisualInfo *) NULL);
-        }
-      (void) XFree((void *) map_list);
-    }
-  else
-    {
-      visual_info=XPickRichestVisual(visual_list,number_visuals);
-      visual_template.visualid=XVisualIDFromVisual(visual_info->visual);
-    }
+    if (XSelectVisualID(&selection,&visual_template,map_info,resource_info) ==
+        MagickFalse)
+      return((XVisualInfo *) NULL);
+  }
   (void) XFree((void *) visual_list);
   /*
     Retrieve only one visual by its screen & id number.
@@ -550,7 +678,7 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static void XWriteVisualInfo(FILE *file,const XResourceInfo *resource_info,
+static void XWriteColormapInfo(FILE *file,const XResourceInfo *resource_info,
   const XWindows *windows)
 {
   (void) FormatLocaleFile(file,"X\n  visual: %s\n",
@@ -563,6 +691,10 @@ static void XWriteVisualInfo(FILE *file,const XResourceInfo *resource_info,
     (void) FormatLocaleFile(file,"  colormap type: Shared\n");
   else
     (void) FormatLocaleFile(file,"  colormap type: Private\n");
+}
+
+static void XWriteGeometryInfo(FILE *file,const XWindows *windows)
+{
   (void) FormatLocaleFile(file,"  geometry: %dx%d\n",
     windows->image.ximage->width,windows->image.ximage->height);
   if (windows->image.crop_geometry != (char *) NULL)
@@ -580,6 +712,13 @@ static void XWriteVisualInfo(FILE *file,const XResourceInfo *resource_info,
     (void) FormatLocaleFile(file,"  shared memory: True\n");
   else
     (void) FormatLocaleFile(file,"  shared memory: False\n");
+}
+
+static void XWriteVisualInfo(FILE *file,const XResourceInfo *resource_info,
+  const XWindows *windows)
+{
+  XWriteColormapInfo(file,resource_info,windows);
+  XWriteGeometryInfo(file,windows);
   (void) FormatLocaleFile(file,"\n");
 }
 
@@ -625,6 +764,16 @@ static void XWriteGammaInfo(FILE *file,const XResourceInfo *resource_info)
         resource_info->display_gamma);
 }
 
+static void DestroyXTextList(char **textlist)
+{
+  ssize_t
+    i;
+
+  for (i=0; textlist[i] != (char *) NULL; i++)
+    textlist[i]=DestroyString(textlist[i]);
+  textlist=(char **) RelinquishMagickMemory(textlist);
+}
+
 MagickPrivate void XDisplayImageInfo(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,Image *undo_image,
   Image *image,ExceptionInfo *exception)
@@ -639,9 +788,6 @@ MagickPrivate void XDisplayImageInfo(Display *display,
 
   int
     unique_file;
-
-  ssize_t
-    i;
 
   /*
     Write info about the X server to a file.
@@ -698,9 +844,7 @@ MagickPrivate void XDisplayImageInfo(Display *display,
         image->filename);
       XTextViewWidget(display,resource_info,windows,MagickTrue,title,
         (char const **) textlist);
-      for (i=0; textlist[i] != (char *) NULL; i++)
-        textlist[i]=DestroyString(textlist[i]);
-      textlist=(char **) RelinquishMagickMemory(textlist);
+      DestroyXTextList(textlist);
     }
   text=DestroyString(text);
 }
@@ -837,6 +981,35 @@ static void InitializeXWindowColormaps(XWindows *windows)
   windows->icon_pixel->pixels=(unsigned long *) NULL;
 }
 
+static void InitializeXWindowAtoms(Display *display,XWindows *windows)
+{
+  windows->display=display;
+  windows->wm_protocols=XInternAtom(display,"WM_PROTOCOLS",MagickFalse);
+  windows->wm_delete_window=XInternAtom(display,"WM_DELETE_WINDOW",MagickFalse);
+  windows->wm_take_focus=XInternAtom(display,"WM_TAKE_FOCUS",MagickFalse);
+  windows->im_protocols=XInternAtom(display,"IM_PROTOCOLS",MagickFalse);
+  windows->im_remote_command=
+    XInternAtom(display,"IM_REMOTE_COMMAND",MagickFalse);
+  windows->im_update_widget=XInternAtom(display,"IM_UPDATE_WIDGET",MagickFalse);
+  windows->im_update_colormap=
+    XInternAtom(display,"IM_UPDATE_COLORMAP",MagickFalse);
+  windows->im_former_image=XInternAtom(display,"IM_FORMER_IMAGE",MagickFalse);
+  windows->im_next_image=XInternAtom(display,"IM_NEXT_IMAGE",MagickFalse);
+  windows->im_retain_colors=XInternAtom(display,"IM_RETAIN_COLORS",MagickFalse);
+  windows->im_exit=XInternAtom(display,"IM_EXIT",MagickFalse);
+  windows->dnd_protocols=XInternAtom(display,"DndProtocol",MagickFalse);
+}
+
+static void AllocateXWindowHints(XWindows *windows)
+{
+  windows->class_hints=XAllocClassHint();
+  windows->manager_hints=XAllocWMHints();
+  if ((windows->class_hints == (XClassHint *) NULL) ||
+      (windows->manager_hints == (XWMHints *) NULL))
+    ThrowXWindowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed",
+      "...");
+}
+
 MagickPrivate XWindows *XInitializeWindows(Display *display,
   XResourceInfo *resource_info)
 {
@@ -871,21 +1044,7 @@ MagickPrivate XWindows *XInitializeWindows(Display *display,
   /*
     Initialize windows structure.
   */
-  windows->display=display;
-  windows->wm_protocols=XInternAtom(display,"WM_PROTOCOLS",MagickFalse);
-  windows->wm_delete_window=XInternAtom(display,"WM_DELETE_WINDOW",MagickFalse);
-  windows->wm_take_focus=XInternAtom(display,"WM_TAKE_FOCUS",MagickFalse);
-  windows->im_protocols=XInternAtom(display,"IM_PROTOCOLS",MagickFalse);
-  windows->im_remote_command=
-    XInternAtom(display,"IM_REMOTE_COMMAND",MagickFalse);
-  windows->im_update_widget=XInternAtom(display,"IM_UPDATE_WIDGET",MagickFalse);
-  windows->im_update_colormap=
-    XInternAtom(display,"IM_UPDATE_COLORMAP",MagickFalse);
-  windows->im_former_image=XInternAtom(display,"IM_FORMER_IMAGE",MagickFalse);
-  windows->im_next_image=XInternAtom(display,"IM_NEXT_IMAGE",MagickFalse);
-  windows->im_retain_colors=XInternAtom(display,"IM_RETAIN_COLORS",MagickFalse);
-  windows->im_exit=XInternAtom(display,"IM_EXIT",MagickFalse);
-  windows->dnd_protocols=XInternAtom(display,"DndProtocol",MagickFalse);
+  InitializeXWindowAtoms(display,windows);
 #if defined(MAGICKCORE_WINDOWS_SUPPORT)
   (void) XSynchronize(display,MagickFalse);
 #endif
@@ -912,12 +1071,7 @@ MagickPrivate XWindows *XInitializeWindows(Display *display,
   /*
     Allocate class and manager hints.
   */
-  windows->class_hints=XAllocClassHint();
-  windows->manager_hints=XAllocWMHints();
-  if ((windows->class_hints == (XClassHint *) NULL) ||
-      (windows->manager_hints == (XWMHints *) NULL))
-    ThrowXWindowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed",
-      "...");
+  AllocateXWindowHints(windows);
   /*
     Determine group leader if we have one.
   */
