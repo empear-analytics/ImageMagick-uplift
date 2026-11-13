@@ -9744,6 +9744,22 @@ static XSizeHints *XCreateSizeHints(char **argv,const XWindowInfo *window_info)
   return(size_hints);
 }
 
+static void XCreateWindowTextProperties(XWindowInfo *window_info,
+  XTextProperty *window_name,XTextProperty *icon_name)
+{
+  Status
+    status;
+
+  status=XStringListToTextProperty(&window_info->name,1,window_name);
+  if (status == False)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateTextProperty",
+      window_info->name);
+  status=XStringListToTextProperty(&window_info->icon_name,1,icon_name);
+  if (status == False)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateTextProperty",
+      window_info->icon_name);
+}
+
 MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
   int argc,XClassHint *class_hint,XWMHints *manager_hints,
   XWindowInfo *window_info)
@@ -9756,9 +9772,6 @@ MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
   static XTextProperty
     icon_name,
     window_name;
-
-  Status
-    status;
 
   XSizeHints
     *size_hints;
@@ -9781,14 +9794,7 @@ MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
   if (window_info->id == (Window) NULL)
     ThrowXWindowFatalException(XServerFatalError,"UnableToCreateWindow",
       window_info->name);
-  status=XStringListToTextProperty(&window_info->name,1,&window_name);
-  if (status == False)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateTextProperty",
-      window_info->name);
-  status=XStringListToTextProperty(&window_info->icon_name,1,&icon_name);
-  if (status == False)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateTextProperty",
-      window_info->icon_name);
+  XCreateWindowTextProperties(window_info,&window_name,&icon_name);
   XSetIconGeometryHints(display,window_info,size_hints,manager_hints);
   XSetWMProperties(display,window_info->id,&window_name,&icon_name,argv,argc,
     size_hints,manager_hints,class_hint);
