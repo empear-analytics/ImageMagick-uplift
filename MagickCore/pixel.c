@@ -2763,6 +2763,89 @@ MagickPrivate MagickBooleanType ResetPixelChannelMap(Image *image,
 %
 */
 
+static const char *GetRedChannelLogName(const Image *image)
+{
+  if ((image->colorspace == LinearGRAYColorspace) ||
+      (image->colorspace == GRAYColorspace))
+    return("gray");
+  if (image->colorspace == CMYKColorspace)
+    return("cyan");
+  return("red");
+}
+
+static const char *GetColorChannelLogName(const Image *image,
+  const PixelChannel channel)
+{
+  switch (channel)
+  {
+    case RedPixelChannel:
+      return(GetRedChannelLogName(image));
+    case GreenPixelChannel:
+    {
+      if (image->colorspace == CMYKColorspace)
+        return("magenta");
+      return("green");
+    }
+    case BluePixelChannel:
+    {
+      if (image->colorspace == CMYKColorspace)
+        return("yellow");
+      return("blue");
+    }
+    default:
+      break;
+  }
+  return((const char *) NULL);
+}
+
+static const char *GetSpecialChannelLogName(const PixelChannel channel)
+{
+  switch (channel)
+  {
+    case ReadMaskPixelChannel:
+      return("read-mask");
+    case WriteMaskPixelChannel:
+      return("write-mask");
+    case CompositeMaskPixelChannel:
+      return("composite-mask");
+    case MetaPixelChannels:
+      return("meta");
+    default:
+      break;
+  }
+  return((const char *) NULL);
+}
+
+static const char *GetPixelChannelLogName(const Image *image,
+  const PixelChannel channel)
+{
+  const char
+    *name;
+
+  name=GetColorChannelLogName(image,channel);
+  if (name != (const char *) NULL)
+    return(name);
+  name=GetSpecialChannelLogName(channel);
+  if (name != (const char *) NULL)
+    return(name);
+  switch (channel)
+  {
+    case BlackPixelChannel:
+    {
+      if (image->storage_class == PseudoClass)
+        return("index");
+      return("black");
+    }
+    case IndexPixelChannel:
+      return("index");
+    case AlphaPixelChannel:
+      return("alpha");
+    default:
+      break;
+  }
+  return("undefined");
+}
+
 static void LogPixelChannels(const Image *image)
 {
   ssize_t
@@ -2783,72 +2866,7 @@ static void LogPixelChannels(const Image *image)
       channel;
 
     channel=GetPixelChannelChannel(image,i);
-    switch (channel)
-    {
-      case RedPixelChannel:
-      {
-        name="red";
-        if (image->colorspace == CMYKColorspace)
-          name="cyan";
-        if ((image->colorspace == LinearGRAYColorspace) ||
-            (image->colorspace == GRAYColorspace))
-          name="gray";
-        break;
-      }
-      case GreenPixelChannel:
-      {
-        name="green";
-        if (image->colorspace == CMYKColorspace)
-          name="magenta";
-        break;
-      }
-      case BluePixelChannel:
-      {
-        name="blue";
-        if (image->colorspace == CMYKColorspace)
-          name="yellow";
-        break;
-      }
-      case BlackPixelChannel:
-      {
-        name="black";
-        if (image->storage_class == PseudoClass)
-          name="index";
-        break;
-      }
-      case IndexPixelChannel:
-      {
-        name="index";
-        break;
-      }
-      case AlphaPixelChannel:
-      {
-        name="alpha";
-        break;
-      }
-      case ReadMaskPixelChannel:
-      {
-        name="read-mask";
-        break;
-      }
-      case WriteMaskPixelChannel:
-      {
-        name="write-mask";
-        break;
-      }
-      case CompositeMaskPixelChannel:
-      {
-        name="composite-mask";
-        break;
-      }
-      case MetaPixelChannels:
-      {
-        name="meta";
-        break;
-      }
-      default:
-        name="undefined";
-    }
+    name=GetPixelChannelLogName(image,channel);
     if (image->colorspace ==  UndefinedColorspace)
       {
         (void) FormatLocaleString(channel_name,MagickPathExtent,"%.17g",
