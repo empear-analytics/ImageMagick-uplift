@@ -618,8 +618,11 @@ typedef struct _TextDecorationInfo
   TypeMetric
     metrics;
 
-  const char
+  char
     *primitive;
+
+  size_t
+    height;
 
   ExceptionInfo
     *exception;
@@ -667,6 +670,50 @@ static void DrawTextDecoration(const TextDecorationInfo *decoration,
     default:
       break;
   }
+}
+
+static void DrawTextUndercolor(const TextDecorationInfo *decoration,
+  const PointInfo *offset)
+{
+  Image
+    *const image = decoration->image;
+
+  const DrawInfo
+    *const draw_info = decoration->draw_info;
+
+  const TypeMetric
+    metrics = decoration->metrics;
+
+  char
+    *const primitive = decoration->primitive;
+
+  const size_t
+    height = decoration->height;
+
+  ExceptionInfo
+    *const exception = decoration->exception;
+
+  if (draw_info->undercolor.alpha != (MagickRealType) TransparentAlpha)
+    {
+      DrawInfo
+        *undercolor_info;
+
+      /*
+        Text box.
+      */
+      undercolor_info=CloneDrawInfo((ImageInfo *) NULL,(DrawInfo *) NULL);
+      undercolor_info->fill=draw_info->undercolor;
+      undercolor_info->affine=draw_info->affine;
+      undercolor_info->affine.tx=(*offset).x-draw_info->affine.ry*
+        metrics.ascent;
+      undercolor_info->affine.ty=(*offset).y-draw_info->affine.sy*
+        metrics.ascent;
+      (void) FormatLocaleString(primitive,MagickPathExtent,
+        "rectangle 0.0,0.0 %g,%g",metrics.origin.x,(double) height);
+      (void) CloneString(&undercolor_info->primitive,primitive);
+      (void) DrawImage(image,undercolor_info,exception);
+      (void) DestroyDrawInfo(undercolor_info);
+    }
 }
 
 MagickExport MagickBooleanType AnnotateImage(Image *image,
@@ -806,25 +853,14 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
     text_align.i=i;
     text_align.metrics=metrics;
     GetAnnotateAlignOffset(&text_align,&offset);
-    if (draw_info->undercolor.alpha != (MagickRealType) TransparentAlpha)
-      {
-        DrawInfo
-          *undercolor_info;
-
-        /*
-          Text box.
-        */
-        undercolor_info=CloneDrawInfo((ImageInfo *) NULL,(DrawInfo *) NULL);
-        undercolor_info->fill=draw_info->undercolor;
-        undercolor_info->affine=draw_info->affine;
-        undercolor_info->affine.tx=offset.x-draw_info->affine.ry*metrics.ascent;
-        undercolor_info->affine.ty=offset.y-draw_info->affine.sy*metrics.ascent;
-        (void) FormatLocaleString(primitive,MagickPathExtent,
-          "rectangle 0.0,0.0 %g,%g",metrics.origin.x,(double) height);
-        (void) CloneString(&undercolor_info->primitive,primitive);
-        (void) DrawImage(image,undercolor_info,exception);
-        (void) DestroyDrawInfo(undercolor_info);
-      }
+    decoration.image=image;
+    decoration.draw_info=draw_info;
+    decoration.annotate=annotate;
+    decoration.metrics=metrics;
+    decoration.primitive=primitive;
+    decoration.exception=exception;
+    decoration.height=height;
+    DrawTextUndercolor(&decoration,&offset);
     annotate_info->affine.tx=offset.x;
     annotate_info->affine.ty=offset.y;
     pixel=GetDecorationColor(annotate_info);
@@ -835,12 +871,6 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
     /*
       Annotate image with text.
     */
-    decoration.image=image;
-    decoration.draw_info=draw_info;
-    decoration.annotate=annotate;
-    decoration.metrics=metrics;
-    decoration.primitive=primitive;
-    decoration.exception=exception;
     DrawTextDecoration(&decoration,annotate_info);
     status=RenderType(&target,&offset,&metrics,exception);
     if (status == MagickFalse)
