@@ -652,6 +652,26 @@ ReportAlpha(image);
 - Inside an OpenMP loop the early exit is `continue`, and it must not skip a
   `#pragma omp critical` or `atomic` block that the original ran on that path.
 
+**Guard before a returned call (amendment, 2026-11-13).** When the outermost `if` has no
+`else` and the only statement after it, up to the function's closing brace, is
+`return(<call>);`, where `<call>` names a `static` function of the file whose arguments, if
+any, are identifiers the `if` body does not write, the guard may return that same call:
+`if (<inverse>) return(<call>);`. On the path where the original condition is false the
+original ran nothing between the test and that return, so the guard makes the same call, at
+the same point, with the same arguments, and returns what it returns; on the other path the
+body runs as before and reaches the unchanged `return(<call>);`. The call is the fall-through
+value the *Careful* note below asks for; a bare value (`return(status);`) is the plain form.
+The usual source of `<call>` is a Recipe E step 7 helper holding the function's former
+tail. `refactor_guard.py --calls` counts `<call>`'s function once more: name the rise in
+the commit.
+When the body holds a nested `#if` block that no available build compiles (the Windows
+block of `opencl.c`'s `GetOpenCLCacheDirectory`), the body is not re-indented: it stays a
+compound statement, its opening and closing braces moved to the guard's column and every
+line between them unchanged byte for byte. A compound statement opens a scope exactly as the
+`if` body did, so its declarations, their lifetimes and every statement keep their meaning;
+only the test around it changed. Check with `git diff` that no line inside the braces
+changed.
+
 **Evidence level:** guard.
 
 **Provenance:** founding recipe (2026-09-29).
@@ -16404,3 +16424,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | LP | Step 6 (*fall-out form*): besides the label group `G` and `default: break;` the `switch` may hold other groups that end every path with a `return`, and `G`'s body `B` may end with its only `break;` of the `switch`; `e` is a parameter or local nothing in the `switch` writes. `G` leaves the `switch` and `B`, without the `break;`, stands under `if (<Name>(e) != MagickFalse)` directly after the `switch`. *Careful* gives the argument (disjoint labels; `default: break;` reaches the same point doing nothing; `e` side-effect free and unwritten, so the predicate sees the selected value; the returning groups never reach the `if`) | `display.c`'s `XImageCache` (campaign A, W23 round nine lane b, wide build): the sixty-label save-to-undo group breaks to the redo and info tests beside the free-buffers and undo groups, which return, so step 1's two-group form refused it; a probe of the chain (N on the save body, this step, TB, RC on the undo group, N on the tail) leaves `XImageCache` only its six arguments | owner |
 | 2026-11-13 | AMEND | RC | Step 6 (*void form*): in a `void` function a group whose every path ends with `return;` moves wherever the `switch` stands into a `static void` function, its last `return;` dropped and every other kept; the group holds `Helper(...); return;`. Written block-scope statics go by pointer on Recipe O step 2's terms, inputs past four in a Recipe N input struct. The step gives the argument (each `return;` ends the helper where it ended the caller, whose `return;` follows the call at once) | `display.c`'s `XImageCache` (campaign A, W23 round nine lane b, wide build): the undo group returns on its three paths and writes the static undo and redo lists; RC's value form (`return(F);` after the `switch`) refused it | owner |
 | 2026-11-13 | NEW | FU | Fill a Struct by Initialiser in a Block Running to its Last Use: a struct local declared at the top of a block, filled member by member in the middle of it (every member once, in order, from plain identifiers) and then passed as `&name` to pointer-to-`const` parameters of a run of calls reaching the end of the block, becomes a `const` initialiser at the run's place, opening a compound statement that holds the tail up to the last use (re-indented two columns). *Careful* gives the argument (declarations are initialised where execution reaches them, the same identifiers, every member set, the tail unchanged, no branch added) | `animate.c`'s `XAnimateImages` (campaign A, W23 round nine lane d, wide build): `setup` (18 members, 12 calls) and `event_context` (19 members, 3 calls) are filled after `display_image` and `context_mask` are written, so FI step 8 refuses and FB takes one call only. A probe of both: `IDENTICAL` object code, 156 to 129 lines, 8.01 to 8.13 | owner |
+| 2026-11-13 | AMEND | G | *Guard before a returned call*: when the only statement after an outermost `if` without `else` is `return(<call>);` of a file `static` function (arguments, if any, identifiers the body does not write), the guard may be `if (<inverse>) return(<call>);`: the false path ran nothing between the test and that return, so the same call is made at the same point. A body holding a nested `#if` block no available build compiles is kept as a compound statement (braces moved to the guard's column, every line between unchanged), so no line of the uncompiled branch changes | `opencl.c`'s `GetOpenCLCacheDirectory` (campaign A, W23 lane d, wide build): the depth-4 nesting and both bumps sit in the outer double-checked test around the Windows `#if` block, which no recipe may move or re-indent; after Recipe E took the tail (`GetOpenCLCacheDirectoryValue`) a probe of the guard form gave 8.22 to 8.81, no stubs | mandate (2026-10-24) |
