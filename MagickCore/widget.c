@@ -8417,6 +8417,75 @@ static MagickBooleanType UpdateFileBrowserState(
   return(MagickTrue);
 }
 
+static void HandleFileBrowserSelectionEvent(
+  const FileBrowserContext *context,XEvent event,
+  const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const primary_selection = context->primary_selection;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  switch (event.type)
+  {
+    case MotionNotify:
+    {
+      MoveFileBrowserButtons(context,event,widgets);
+      break;
+    }
+    case SelectionClear:
+    {
+      (*reply_info).highlight=MagickFalse;
+      XDrawMatteText(display,&windows->widget,reply_info);
+      break;
+    }
+    case SelectionNotify:
+    {
+      SelectFileBrowserReply(context,event,widgets);
+      break;
+    }
+    case SelectionRequest:
+    {
+      XSelectionEvent
+        notify;
+
+      XSelectionRequestEvent
+        *request;
+
+      if ((*reply_info).highlight == MagickFalse)
+        break;
+      /*
+        Set primary selection.
+      */
+      request=(&(event.xselectionrequest));
+      (void) XChangeProperty(request->display,request->requestor,
+        request->property,request->target,8,PropModeReplace,
+        (unsigned char *) primary_selection,Extent(primary_selection));
+      notify.type=SelectionNotify;
+      notify.display=request->display;
+      notify.requestor=request->requestor;
+      notify.selection=request->selection;
+      notify.target=request->target;
+      notify.time=request->time;
+      if (request->property == None)
+        notify.property=request->target;
+      else
+        notify.property=request->property;
+      (void) XSendEvent(request->display,request->requestor,False,0,
+        (XEvent *) &notify);
+    }
+    default:
+      break;
+  }
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8666,54 +8735,11 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
         mask&=(unsigned int) (~CWY);
         break;
       }
-      case MotionNotify:
-      {
-        MoveFileBrowserButtons(&file_context,event,&file_widgets);
-        break;
-      }
-      case SelectionClear:
-      {
-        reply_info.highlight=MagickFalse;
-        XDrawMatteText(display,&windows->widget,&reply_info);
-        break;
-      }
-      case SelectionNotify:
-      {
-        SelectFileBrowserReply(&file_context,event,&file_widgets);
-        break;
-      }
-      case SelectionRequest:
-      {
-        XSelectionEvent
-          notify;
-
-        XSelectionRequestEvent
-          *request;
-
-        if (reply_info.highlight == MagickFalse)
-          break;
-        /*
-          Set primary selection.
-        */
-        request=(&(event.xselectionrequest));
-        (void) XChangeProperty(request->display,request->requestor,
-          request->property,request->target,8,PropModeReplace,
-          (unsigned char *) primary_selection,Extent(primary_selection));
-        notify.type=SelectionNotify;
-        notify.display=request->display;
-        notify.requestor=request->requestor;
-        notify.selection=request->selection;
-        notify.target=request->target;
-        notify.time=request->time;
-        if (request->property == None)
-          notify.property=request->target;
-        else
-          notify.property=request->property;
-        (void) XSendEvent(request->display,request->requestor,False,0,
-          (XEvent *) &notify);
-      }
       default:
+      {
+        HandleFileBrowserSelectionEvent(&file_context,event,&file_widgets);
         break;
+      }
     }
   } while ((state & ExitState) == 0);
   XSetCursorState(display,windows,MagickFalse);
