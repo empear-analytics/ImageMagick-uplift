@@ -3518,6 +3518,26 @@ static const char *GetPathComponentProperty(const Image *image,
   return(string);
 }
 
+static void GetProfilesProperty(const Image *image,char *value)
+{
+  const char
+    *name;
+
+  ResetImageProfileIterator(image);
+  name=GetNextImageProfile(image);
+  if (name != (char *) NULL)
+    {
+      (void) CopyMagickString(value,name,MagickPathExtent);
+      name=GetNextImageProfile(image);
+      while (name != (char *) NULL)
+      {
+        ConcatenateMagickString(value,",",MagickPathExtent);
+        ConcatenateMagickString(value,name,MagickPathExtent);
+        name=GetNextImageProfile(image);
+      }
+    }
+}
+
 MagickExport const char *GetMagickProperty(ImageInfo *image_info,
   Image *image,const char *property,ExceptionInfo *exception)
 {
@@ -4043,23 +4063,8 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
         }
       if (LocaleCompare("profiles",property) == 0)
         {
-          const char
-            *name;
-
           WarnNoImageReturn("\"%%[%s]\"",property);
-          ResetImageProfileIterator(image);
-          name=GetNextImageProfile(image);
-          if (name != (char *) NULL)
-            {
-              (void) CopyMagickString(value,name,MagickPathExtent);
-              name=GetNextImageProfile(image);
-              while (name != (char *) NULL)
-              {
-                ConcatenateMagickString(value,",",MagickPathExtent);
-                ConcatenateMagickString(value,name,MagickPathExtent);
-                name=GetNextImageProfile(image);
-              }
-            }
+          GetProfilesProperty(image,value);
           break;
         }
       break;
