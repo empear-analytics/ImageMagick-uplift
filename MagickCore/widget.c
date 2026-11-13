@@ -11981,6 +11981,9 @@ typedef struct _ListBrowserWidgets
 
   XEvent
     *event;
+
+  XWidgetInfo
+    *list_info;
 } ListBrowserWidgets;
 
 typedef struct _ListBrowserContext
@@ -12002,6 +12005,12 @@ typedef struct _ListBrowserContext
 
   XFontStruct
     *font_info;
+
+  const char
+    *const *list;
+
+  unsigned int
+    height;
 } ListBrowserContext;
 
 static void ClientListBrowserMessage(const ListBrowserContext *context,
@@ -12403,6 +12412,49 @@ static void PressListBrowserButtons(const ListBrowserContext *context,
   ClickListBrowserReply(context,event,widgets);
 }
 
+static void PressListBrowserList(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserTargets *targets,
+  const ListBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  const unsigned int
+    entries = context->entries;
+
+  const char
+    *const *const list = context->list;
+
+  const unsigned int
+    height = context->height;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info;
+
+  if (MatteIsActive((*list_info),event.xbutton))
+    {
+      ListBrowserPress
+        press;
+
+      press.display=display;
+      press.window_info=window_info;
+      press.list=list;
+      press.entries=entries;
+      press.height=height;
+      press.event=event;
+      press.slider_info=(*slider_info);
+      SelectListBrowserEntry(&press,targets);
+      return;
+    }
+  PressListBrowserButtons(context,event,widgets);
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -12459,7 +12511,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   const ListBrowserWidgets
     list_widgets = { &reply_info, &state, &slider_info, &action_info,
       &cancel_info, &north_info, &south_info, &delay, &scroll_info,
-      &visible_entries, &event };
+      &visible_entries, &event, &list_info };
 
   ListBrowserContext
     list_context;
@@ -12546,6 +12598,8 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   list_context.entries=entries;
   list_context.primary_selection=primary_selection;
   list_context.font_info=font_info;
+  list_context.list=list;
+  list_context.height=height;
   do
   {
     if (state & UpdateConfigurationState)
@@ -12790,22 +12844,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
             state|=RedrawListState;
             break;
           }
-        if (MatteIsActive(list_info,event.xbutton))
-          {
-            ListBrowserPress
-              press;
-
-            press.display=display;
-            press.window_info=window_info;
-            press.list=list;
-            press.entries=entries;
-            press.height=height;
-            press.event=event;
-            press.slider_info=slider_info;
-            SelectListBrowserEntry(&press,&targets);
-            break;
-          }
-        PressListBrowserButtons(&list_context,event,&list_widgets);
+        PressListBrowserList(&list_context,event,&targets,&list_widgets);
         break;
       }
       case ButtonRelease:
