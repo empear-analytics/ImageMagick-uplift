@@ -15263,6 +15263,49 @@ static void PressPreferencesButton(const PreferencesContext *context,
     }
 }
 
+static void ReleasePreferencesButtons(const PreferencesContext *context,
+  const XEvent event,const PreferencesWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const apply_info = widgets->apply_info;
+
+  XWidgetInfo
+    *const cancel_info = widgets->cancel_info;
+
+  XWidgetInfo
+    *const cache_info = widgets->cache_info;
+
+  size_t
+    *const state = widgets->state;
+
+  if (windows->widget.mapped == MagickFalse)
+    return;
+  if ((*apply_info).raised == MagickFalse)
+    {
+      (*state)=ReleasePreferencesButton(windows,event,(*apply_info),(*state));
+      (*apply_info).raised=MagickTrue;
+      XDrawBeveledButton(display,&windows->widget,apply_info);
+      (*apply_info).raised=MagickFalse;
+    }
+  if ((*cancel_info).raised == MagickFalse)
+    {
+      (*state)=ReleasePreferencesButton(windows,event,(*cancel_info),(*state));
+      (*cancel_info).raised=MagickTrue;
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+    }
+  if ((*cache_info).raised == MagickFalse)
+    {
+      (*cache_info).raised=MagickTrue;
+      XDrawTriangleEast(display,&windows->widget,cache_info);
+    }
+}
+
 MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XResourceInfo *resource_info,XWindows *windows)
 {
@@ -15346,26 +15389,7 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
       }
       case ButtonRelease:
       {
-        if (windows->widget.mapped == MagickFalse)
-          break;
-        if (apply_info.raised == MagickFalse)
-          {
-            state=ReleasePreferencesButton(windows,event,apply_info,state);
-            apply_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&apply_info);
-            apply_info.raised=MagickFalse;
-          }
-        if (cancel_info.raised == MagickFalse)
-          {
-            state=ReleasePreferencesButton(windows,event,cancel_info,state);
-            cancel_info.raised=MagickTrue;
-            XDrawBeveledButton(display,&windows->widget,&cancel_info);
-          }
-        if (cache_info.raised == MagickFalse)
-          {
-            cache_info.raised=MagickTrue;
-            XDrawTriangleEast(display,&windows->widget,&cache_info);
-          }
+        ReleasePreferencesButtons(&context,event,&widgets);
         break;
       }
       case ClientMessage:
