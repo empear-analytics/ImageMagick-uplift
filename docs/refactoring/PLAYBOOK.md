@@ -1499,6 +1499,18 @@ merges code, not parameters.
 7. At each call, replace the group with `&name`, and check by reading that every member
    is initialised from the argument it replaces.
 8. Build: a call left with the old arguments does not compile.
+   Existing input struct (2026-11-13). When every caller is a helper that binds `const`
+   locals from the members of one `const Name *name` input struct of Recipe N (step 4's
+   form), and the group's arguments at every call are exactly such locals, each bound
+   from the member of its own name and type (`AppendTokenChar(token,extent,...)` in
+   helpers that bind `token = input->token` and `extent = input->extent`), the group
+   may be replaced by `const Name *name` itself instead of a new struct, although `Name`
+   has members the group lacks: the callee binds the group's members as `const` locals
+   of their old names (step 3), and each call passes `name` for the group. A caller's
+   local bound only for those calls, now unused, is deleted with its binding (Recipe DV
+   step 3's reasoning: `-Wunused-variable` shows it). The callee reads the same members
+   of the same struct the caller read, which nothing writes, so each use sees the value
+   the argument carried.
 
 **Before:**
 
@@ -14020,6 +14032,110 @@ Lane: b
 
 ---
 
+## Recipe RS - Extract a Loop Body of Status-Call Exits, Returning the Calls' Status
+
+**Use when:** CodeScene reports *Complex Method* or *Bumpy Road Ahead* on a function whose
+sequential loop's body is a dispatch: a run of tests, each holding a call of a helper that
+returns `MagickBooleanType`, an exit `return(c);` (one constant `c`) when it returns
+`MagickFalse`, and `continue;` otherwise, as `token.c`'s `Tokenizer` is once its four
+character classes are helpers: `if (i >= 0) { if (TokenizeBreakChar(...) == MagickFalse)
+return(0); continue; }` three times over, then `if (TokenizeTokenChar(...) ==
+MagickFalse) return(0);` at the body's end. Each such `if` in an `if` is a bump.
+
+**Not covered by:** Recipe CR (b), which moves the same body but keeps each `if (H(...) ==
+MagickFalse) return(MagickFalse); return(MagickTrue);` pair as two statements, so the new
+function keeps every bump and is refused by the gate; Recipe BC, whose block leaves through
+`break;` and has no `return`; Recipe LC, whose block is followed by statements that stay.
+
+**How:**
+
+1. The block is the whole body of a sequential loop `Lp`, outside every OpenMP region, with
+   no `#` line. It holds no `goto` and no `break` that leaves it; every `continue;` in it
+   continues `Lp`; every `return` in it is `return(c);` with one constant `c`, written
+   alike.
+2. Variables of the caller that the block writes: temporaries it writes before reading
+   that nothing after it reads (the character `c`, the index `i`) are declared in the new
+   function (Recipe E step 4); it writes nothing else of the caller but through pointers
+   it already uses or through members of an input struct the caller already passes to
+   the helpers it calls (Recipe N step 8's siblings), which the new function takes in
+   their place, unchanged, binding the members the block reads (`const` locals of their
+   own names, Recipe N step 4). At most four parameters.
+3. Cut the body into a new `static MagickBooleanType` function directly above the caller,
+   as Recipe CR step 3 says: each `continue;` becomes `return(MagickTrue);`, each
+   `return(c);` becomes `return(MagickFalse);`, and the function ends with
+   `return(MagickTrue);`. A call that passed `&name` passes `name`.
+4. Then, in the new function only, each pair `if (H(...) == MagickFalse)
+   return(MagickFalse);` followed directly by `return(MagickTrue);` (or by the function's
+   end, which returns `MagickTrue`) becomes `return(H(...));`, where `H` is a `static`
+   function of the file every `return` of which returns the literal `MagickTrue` or
+   `MagickFalse` (checked by reading `H`'s body). A pair inside braces loses the braces
+   when nothing else is left in them.
+5. Where the body stood write `if (Helper(...) == MagickFalse) return(c);` as `Lp`'s whole
+   body, and check every argument by reading.
+
+**Before:**
+
+```c
+  for (token_info->offset=0; (int) line[*next] != 0; (*next)++)
+  {
+    c=(int) line[*next];
+    i=sindex(c,break_set);
+    if (i >= 0)
+      {
+        if (TokenizeBreakChar(&tokenizer,c,i) == MagickFalse)
+          return(0);
+        continue;
+      }
+    ...
+    if (TokenizeTokenChar(&tokenizer,c) == MagickFalse)
+      return(0);
+  }
+```
+
+**After:**
+
+```c
+static MagickBooleanType TokenizeChar(const TokenizerState *tokenizer)
+{
+  ...
+  c=(int) line[*next];
+  i=sindex(c,break_set);
+  if (i >= 0)
+    return(TokenizeBreakChar(tokenizer,c,i));
+  ...
+  return(TokenizeTokenChar(tokenizer,c));
+}
+...
+  for (token_info->offset=0; (int) line[*next] != 0; (*next)++)
+    if (TokenizeChar(&tokenizer) == MagickFalse)
+      return(0);
+```
+
+**Careful:**
+
+- Steps 1 to 3 are Recipe CR (b): the helper runs the body's statements up to the exit the
+  body took; `return(MagickTrue);` is followed by the caller's loop step, as `continue;`
+  was, and `return(MagickFalse);` by the caller's `return(c);`.
+- Step 4: when `H` returns `MagickFalse`, both forms return `MagickFalse`; when it returns
+  `MagickTrue`, the pair falls to `return(MagickTrue);` and the new form returns `H`'s
+  `MagickTrue`. `H` returns no other value (step 4's reading), so the two forms return the
+  same value on every path, and `H` is called once, at the same point, in both. The
+  caller tests `== MagickFalse`, as before.
+- A pair whose `return(MagickTrue);` does not follow directly (a statement between) is
+  left as it is.
+
+**Evidence level:** oracle, for the caller (`casemap.py` first), with
+`refactor_guard.py --calls` and step 4's reading of each `H`.
+
+**Provenance:** 2026-11-13, from `token.c`'s `Tokenizer` (campaign B, M127 lane c round
+4): after Recipe Y moved its four character classes into helpers, the body is three
+`if (i >= 0) { if (H(...) == MagickFalse) return(0); continue; }` dispatches (three bumps,
+cc 15); CR alone would move all three bumps into the new function. Added by Claude Code
+(Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: c
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -15459,3 +15575,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | RT | Step 8: copies differing in a numeric and a string literal (a table of two-member records), each writing its own renamed local, in a `void` caller whose exits are `return;`; Lane: b | `resource.c`'s `FormatTimeToLive` (six unit copies); with it the file's line budget admits the helpers of `AcquireMagickResource` (probe 8.46 to 8.97 over three steps) | mandate (2026-10-24) |
 | 2026-11-13 | NEW | IX | Inline a Constant Extent Local into Its Loop Bound: a local set once from an integer constant expression of `sizeof`s and read only in `for` bounds is replaced by the parenthesised expression; evidence guard (`obj_identical.sh`); Lane: b | `static.c`'s `UnregisterStaticModules` (after Recipe D, *Code Duplication* with `UnregisterStaticModule` left; probe 9.09 to 9.68, object code identical) | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | KC | Step 1: a label may be a character constant (type `int`; `key` of type `int`); Lane: b | `string-si.c`'s `GetSiPrefixExponent` (twenty-four letter labels each assigning a `double` exponent, cc 26; probe 8.50 to 9.09) | mandate (2026-10-24) |
+| 2026-11-13 | NEW | RS | Extract a Loop Body of Status-Call Exits, Returning the Calls' Status: a sequential loop's whole body whose exits are `continue;` and `return(c);` after status calls moves as in Recipe CR (b), and in the new function each `if (H(...) == MagickFalse) return(MagickFalse); return(MagickTrue);` pair becomes `return(H(...));` when `H` returns only `MagickTrue` or `MagickFalse`; evidence oracle | `token.c`'s `Tokenizer` (cc 15, three bumps after Recipe Y); CR alone keeps the bumps in the new function | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | B | Existing input struct: when every caller binds the group's arguments as `const` locals from one Recipe N input struct, the group may become that struct's pointer instead of a new struct (members the group lacks are allowed); the callers' bindings left unused are deleted | `token-next.c`'s `AppendTokenChar(token,extent,p,i)`, called only from the `Scan*Token` helpers that bind `token` and `extent` from `NextTokenInput`: *String Heavy Function Arguments* leaves the file, 9.09 to 9.38 in a probe | mandate (2026-10-24) |

@@ -1186,6 +1186,29 @@ static void PrintMagickNote(FILE *file,const MagickInfo **magick_info,
     }
 }
 
+static void PrintMagickFormatName(FILE *file,const MagickInfo **magick_info,
+  const ssize_t i)
+{
+  (void) FormatLocaleFile(file,"%9s%c ",
+    magick_info[i]->name != (char *) NULL ? magick_info[i]->name : "",
+    GetMagickBlobSupport(magick_info[i]) != MagickFalse ? '*' : ' ');
+}
+
+static void PrintMagickFormatSupport(FILE *file,const MagickInfo **magick_info,
+  const ssize_t i)
+{
+  (void) FormatLocaleFile(file,"%c%c%c ",magick_info[i]->decoder ? 'r' : '-',
+    magick_info[i]->encoder ? 'w' : '-',magick_info[i]->encoder != NULL &&
+    GetMagickAdjoin(magick_info[i]) != MagickFalse ? '+' : '-');
+  if (magick_info[i]->description != (char *) NULL)
+    (void) FormatLocaleFile(file,"  %s",magick_info[i]->description);
+  if (magick_info[i]->version != (char *) NULL)
+    (void) FormatLocaleFile(file," (%s)",magick_info[i]->version);
+  (void) FormatLocaleFile(file,"\n");
+  if (magick_info[i]->note != (char *) NULL)
+    PrintMagickNote(file,magick_info,i);
+}
+
 MagickExport MagickBooleanType ListMagickInfo(FILE *file,
   ExceptionInfo *exception)
 {
@@ -1216,9 +1239,7 @@ MagickExport MagickBooleanType ListMagickInfo(FILE *file,
   {
     if (GetMagickStealth(magick_info[i]) != MagickFalse)
       continue;
-    (void) FormatLocaleFile(file,"%9s%c ",
-      magick_info[i]->name != (char *) NULL ? magick_info[i]->name : "",
-      GetMagickBlobSupport(magick_info[i]) != MagickFalse ? '*' : ' ');
+    PrintMagickFormatName(file,magick_info,i);
 #if defined(MAGICKCORE_MODULES_SUPPORT)
     {
       char
@@ -1234,16 +1255,7 @@ MagickExport MagickBooleanType ListMagickInfo(FILE *file,
       (void) FormatLocaleFile(file,"%9s ",magick_module);
     }
 #endif
-    (void) FormatLocaleFile(file,"%c%c%c ",magick_info[i]->decoder ? 'r' : '-',
-      magick_info[i]->encoder ? 'w' : '-',magick_info[i]->encoder != NULL &&
-      GetMagickAdjoin(magick_info[i]) != MagickFalse ? '+' : '-');
-    if (magick_info[i]->description != (char *) NULL)
-      (void) FormatLocaleFile(file,"  %s",magick_info[i]->description);
-    if (magick_info[i]->version != (char *) NULL)
-      (void) FormatLocaleFile(file," (%s)",magick_info[i]->version);
-    (void) FormatLocaleFile(file,"\n");
-    if (magick_info[i]->note != (char *) NULL)
-      PrintMagickNote(file,magick_info,i);
+    PrintMagickFormatSupport(file,magick_info,i);
   }
   (void) FormatLocaleFile(file,"\n* native blob support\n");
   (void) FormatLocaleFile(file,"r read support\n");
@@ -1488,50 +1500,46 @@ static void SetClientNameAndPath(const char *path)
   (void) SetClientPath(execution_path);
 }
 
+static void EstablishSignalHandler(int signal_number)
+{
+  if (signal_handlers[signal_number] == (SignalHandler *) NULL)
+    signal_handlers[signal_number]=RegisterMagickSignalHandler(signal_number);
+}
+
 static void EstablishSignalHandlers(void)
 {
   /*
     Set signal handlers.
   */
 #if defined(SIGABRT)
-  if (signal_handlers[SIGABRT] == (SignalHandler *) NULL)
-    signal_handlers[SIGABRT]=RegisterMagickSignalHandler(SIGABRT);
+  EstablishSignalHandler(SIGABRT);
 #endif
 #if defined(SIGBUS)
-  if (signal_handlers[SIGBUS] == (SignalHandler *) NULL)
-    signal_handlers[SIGBUS]=RegisterMagickSignalHandler(SIGBUS);
+  EstablishSignalHandler(SIGBUS);
 #endif
 #if defined(SIGSEGV)
-  if (signal_handlers[SIGSEGV] == (SignalHandler *) NULL)
-    signal_handlers[SIGSEGV]=RegisterMagickSignalHandler(SIGSEGV);
+  EstablishSignalHandler(SIGSEGV);
 #endif
 #if defined(SIGFPE)
-  if (signal_handlers[SIGFPE] == (SignalHandler *) NULL)
-    signal_handlers[SIGFPE]=RegisterMagickSignalHandler(SIGFPE);
+  EstablishSignalHandler(SIGFPE);
 #endif
 #if defined(SIGHUP)
-  if (signal_handlers[SIGHUP] == (SignalHandler *) NULL)
-    signal_handlers[SIGHUP]=RegisterMagickSignalHandler(SIGHUP);
+  EstablishSignalHandler(SIGHUP);
 #endif
 #if defined(SIGINT)
-  if (signal_handlers[SIGINT] == (SignalHandler *) NULL)
-    signal_handlers[SIGINT]=RegisterMagickSignalHandler(SIGINT);
+  EstablishSignalHandler(SIGINT);
 #endif
 #if defined(SIGQUIT)
-  if (signal_handlers[SIGQUIT] == (SignalHandler *) NULL)
-    signal_handlers[SIGQUIT]=RegisterMagickSignalHandler(SIGQUIT);
+  EstablishSignalHandler(SIGQUIT);
 #endif
 #if defined(SIGTERM)
-  if (signal_handlers[SIGTERM] == (SignalHandler *) NULL)
-    signal_handlers[SIGTERM]=RegisterMagickSignalHandler(SIGTERM);
+  EstablishSignalHandler(SIGTERM);
 #endif
 #if defined(SIGXCPU)
-  if (signal_handlers[SIGXCPU] == (SignalHandler *) NULL)
-    signal_handlers[SIGXCPU]=RegisterMagickSignalHandler(SIGXCPU);
+  EstablishSignalHandler(SIGXCPU);
 #endif
 #if defined(SIGXFSZ)
-  if (signal_handlers[SIGXFSZ] == (SignalHandler *) NULL)
-    signal_handlers[SIGXFSZ]=RegisterMagickSignalHandler(SIGXFSZ);
+  EstablishSignalHandler(SIGXFSZ);
 #endif
 }
 

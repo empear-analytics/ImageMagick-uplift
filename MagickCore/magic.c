@@ -160,6 +160,21 @@ static MagickBooleanType
 %
 */
 
+static MagickOffsetType GetMagicOffsetDelta(const MagicInfo *ma,
+  const MagicInfo *mb)
+{
+  MagickOffsetType
+    delta;
+
+  /*
+    Offset is near the start? Let's search a bit further in the stream.
+  */
+  delta=ma->offset-mb->offset;
+  if ((ma->offset > mb->offset ? ma->offset : mb->offset) <= 10)
+    delta=mb->offset-ma->offset;
+  return(delta);
+}
+
 static int CompareMagickInfoExtent(const void *a,const void *b)
 {
   MagicInfo
@@ -173,14 +188,7 @@ static int CompareMagickInfoExtent(const void *a,const void *b)
   mb=(MagicInfo *) b;
   delta=(MagickOffsetType) mb->length-(MagickOffsetType) ma->length;
   if (ma->offset != mb->offset)
-    {
-      /*
-        Offset is near the start? Let's search a bit further in the stream.
-      */
-      delta=ma->offset-mb->offset;
-      if ((ma->offset > mb->offset ? ma->offset : mb->offset) <= 10)
-        delta=mb->offset-ma->offset;
-    }
+    delta=GetMagicOffsetDelta(ma,mb);
   return(delta > INT_MAX ? 0 : (int) delta);
 }
 
@@ -300,11 +308,45 @@ static MagickBooleanType IsMagicCacheInstantiated(void)
   return(magic_cache != (LinkedListInfo *) NULL ? MagickTrue : MagickFalse);
 }
 
+static void FindMagicElement(const unsigned char *magic,const size_t length,
+  ElementInfo **p,const MagicInfo **magic_info)
+{
+  while ((*p) != (ElementInfo *) NULL)
+  {
+    (*magic_info)=(const MagicInfo *) (*p)->value;
+    if (CompareMagic(magic,length,(*magic_info)) != MagickFalse)
+      break;
+    (*p)=(*p)->next;
+  }
+}
+
+static MagickBooleanType FindCachedMagic(const unsigned char *magic,
+  const size_t length,const MagicInfo *magic_info,const MagicInfo **result)
+{
+  ElementInfo
+    *p;
+
+  if (magic != (const unsigned char *) NULL)
+    {
+      LockSemaphoreInfo(magic_cache_semaphore);
+      p=GetHeadElementInLinkedList(magic_cache);
+      FindMagicElement(magic,length,&p,&magic_info);
+      UnlockSemaphoreInfo(magic_cache_semaphore);
+      if (p != (ElementInfo *) NULL)
+        {
+          (*result)=magic_info;
+          return(MagickTrue);
+        }
+    }
+  return(MagickFalse);
+}
+
 MagickExport const MagicInfo *GetMagicInfo(const unsigned char *magic,
   const size_t length,ExceptionInfo *exception)
 {
   const MagicInfo *
-    magic_info;
+    magic_info,
+    *returned;
 
   ElementInfo
     *p;
@@ -318,21 +360,8 @@ MagickExport const MagicInfo *GetMagicInfo(const unsigned char *magic,
     Search for cached entries.
   */
   magic_info=(const MagicInfo *) NULL;
-  if (magic != (const unsigned char *) NULL)
-    {
-      LockSemaphoreInfo(magic_cache_semaphore);
-      p=GetHeadElementInLinkedList(magic_cache);
-      while (p != (ElementInfo *) NULL)
-      {
-        magic_info=(const MagicInfo *) p->value;
-        if (CompareMagic(magic,length,magic_info) != MagickFalse)
-          break;
-        p=p->next;
-      }
-      UnlockSemaphoreInfo(magic_cache_semaphore);
-      if (p != (ElementInfo *) NULL)
-        return(magic_info);
-    }
+  if (FindCachedMagic(magic,length,magic_info,&returned) != MagickFalse)
+    return(returned);
   /*
     Search for magic tag.
   */
@@ -345,13 +374,7 @@ MagickExport const MagicInfo *GetMagicInfo(const unsigned char *magic,
         magic_info=(const MagicInfo *) p->value;
       return(magic_info);
     }
-  while (p != (ElementInfo *) NULL)
-  {
-    magic_info=(const MagicInfo *) p->value;
-    if (CompareMagic(magic,length,magic_info) != MagickFalse)
-      break;
-    p=p->next;
-  }
+  FindMagicElement(magic,length,&p,&magic_info);
   UnlockSemaphoreInfo(magic_list_semaphore);
   if (p == (ElementInfo *) NULL)
     magic_info=(const MagicInfo *) NULL;
@@ -722,6 +745,23 @@ static void PrintMagicBytes(FILE *file,const MagicInfo **magic_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void PrintMagicInfoLine(FILE *file,const MagicInfo **magic_info,
+  const ssize_t i)
+{
+  ssize_t
+    j;
+
+  (void) FormatLocaleFile(file,"%s",magic_info[i]->name);
+  for (j=(ssize_t) strlen(magic_info[i]->name); j <= 9; j++)
+    (void) FormatLocaleFile(file," ");
+  (void) FormatLocaleFile(file,"%6ld ",(long) magic_info[i]->offset);
+  if (magic_info[i]->magic != (unsigned char *) NULL)
+    {
+      PrintMagicBytes(file,magic_info,i);
+    }
+  (void) FormatLocaleFile(file,"\n");
+}
+
 MagickExport MagickBooleanType ListMagicInfo(FILE *file,
   ExceptionInfo *exception)
 {
@@ -734,9 +774,6 @@ MagickExport MagickBooleanType ListMagicInfo(FILE *file,
   size_t
     number_aliases;
 
-  ssize_t
-    j;
-
   if (file == (const FILE *) NULL)
     file=stdout;
   magic_info=GetMagicInfoList("*",&number_aliases,exception);
@@ -747,17 +784,7 @@ MagickExport MagickBooleanType ListMagicInfo(FILE *file,
     "-------------------------------------------------"
     "------------------------------\n");
   for (i=0; i < (ssize_t) number_aliases; i++)
-  {
-    (void) FormatLocaleFile(file,"%s",magic_info[i]->name);
-    for (j=(ssize_t) strlen(magic_info[i]->name); j <= 9; j++)
-      (void) FormatLocaleFile(file," ");
-    (void) FormatLocaleFile(file,"%6ld ",(long) magic_info[i]->offset);
-    if (magic_info[i]->magic != (unsigned char *) NULL)
-      {
-        PrintMagicBytes(file,magic_info,i);
-      }
-    (void) FormatLocaleFile(file,"\n");
-  }
+    PrintMagicInfoLine(file,magic_info,i);
   (void) fflush(file);
   magic_info=(const MagicInfo **) RelinquishMagickMemory((void *) magic_info);
   return(MagickTrue);
