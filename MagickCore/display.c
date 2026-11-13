@@ -14653,6 +14653,47 @@ static void XROITrackPointer(const ROIContext *context,
   } while (((*state) & ExitState) == 0);
 }
 
+static void XROISizeEvent(const ROIContext *context,
+  const ROITargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      (*roi_info).x=(ssize_t) context->windows->image.x+(*event).xbutton.x;
+      (*roi_info).y=(ssize_t) context->windows->image.y+(*event).xbutton.y;
+      break;
+    }
+    case ButtonRelease:
+    {
+      ROIApplyInput
+        apply_input;
+
+      apply_input.display=context->display;
+      apply_input.windows=context->windows;
+      apply_input.event=(event);
+      apply_input.ApplyMenu=ApplyMenu;
+      XROIButtonRelease(&apply_input,targets);
+      break;
+    }
+    case Expose:
+      break;
+    case MotionNotify:
+    {
+      (*roi_info).x=(ssize_t) context->windows->image.x+(*event).xmotion.x;
+      (*roi_info).y=(ssize_t) context->windows->image.y+(*event).xmotion.y;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -14768,36 +14809,7 @@ static MagickBooleanType XROIImage(Display *display,
       if ((highlight_info.width > 3) && (highlight_info.height > 3))
         XHighlightRectangle(display,windows->image.id,
           windows->image.highlight_context,&highlight_info);
-      switch (event.type)
-      {
-        case ButtonPress:
-        {
-          roi_info.x=(ssize_t) windows->image.x+event.xbutton.x;
-          roi_info.y=(ssize_t) windows->image.y+event.xbutton.y;
-          break;
-        }
-        case ButtonRelease:
-        {
-          ROIApplyInput
-            apply_input;
-
-          apply_input.display=display;
-          apply_input.windows=windows;
-          apply_input.event=(&event);
-          apply_input.ApplyMenu=ApplyMenu;
-          XROIButtonRelease(&apply_input,&targets);
-          break;
-        }
-        case Expose:
-          break;
-        case MotionNotify:
-        {
-          roi_info.x=(ssize_t) windows->image.x+event.xmotion.x;
-          roi_info.y=(ssize_t) windows->image.y+event.xmotion.y;
-        }
-        default:
-          break;
-      }
+      XROISizeEvent(&context,&targets);
       if (IsSelectionMovedOrDone(roi_info,x,y,state) != MagickFalse)
         XCheckSelectionBounds(windows,x,y,&roi_info);
     } while ((state & ExitState) == 0);
