@@ -1137,6 +1137,20 @@ static void TransferFileList(const FileListTransfer *transfer,char *filename,
   }
 }
 
+static void LogExpandedCommandLine(char **vector,const ssize_t count)
+{
+  if (IsEventLogging() != MagickFalse)
+    {
+      char
+        *command_line;
+
+      command_line=AcquireCommandLine(vector,count);
+      (void) LogMagickEvent(ConfigureEvent,GetMagickModule(),
+        "Command line: %s",command_line);
+      command_line=DestroyString(command_line);
+    }
+}
+
 MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
   char ***arguments)
 {
@@ -1263,16 +1277,7 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
     filelist=(char **) RelinquishMagickMemory(filelist);
   }
   vector[count]=(char *) NULL;
-  if (IsEventLogging() != MagickFalse)
-    {
-      char
-        *command_line;
-
-      command_line=AcquireCommandLine(vector,count);
-      (void) LogMagickEvent(ConfigureEvent,GetMagickModule(),
-        "Command line: %s",command_line);
-      command_line=DestroyString(command_line);
-    }
+  LogExpandedCommandLine(vector,count);
   *number_arguments=(int) count;
   *arguments=vector;
   return(MagickTrue);
