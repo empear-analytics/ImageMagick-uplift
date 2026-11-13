@@ -915,6 +915,12 @@ static void LookupReadImageProfiles(const Image *next)
     profile=GetImageProfile(next,"8bim");
 }
 
+static inline MagickBooleanType IsExtractRequested(const ImageInfo *read_info)
+{
+  return(((read_info->extract != (char *) NULL) &&
+    (read_info->stream == (StreamHandler) NULL)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *ReadImage(const ImageInfo *image_info,
   ExceptionInfo *exception)
 {
@@ -1093,8 +1099,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
     if (IsBlobTemporary(image) != MagickFalse)
       (void) CopyMagickString(next->filename,filename,MagickPathExtent);
     SyncReadImageMetadata(read_info,next,&constitute_info,exception);
-    if ((read_info->extract != (char *) NULL) &&
-        (read_info->stream == (StreamHandler) NULL))
+    if (IsExtractRequested(read_info) != MagickFalse)
       next=ApplyExtractGeometry(read_info,next,exception);
     LookupReadImageProfiles(next);
     if (IsSourceDataEpochSet() == MagickFalse)
