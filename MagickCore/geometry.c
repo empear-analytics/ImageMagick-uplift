@@ -746,6 +746,16 @@ static inline MagickBooleanType IsRegionLargerThanImage(const Image *image,
     (region_info->height > image->rows)) ? MagickTrue : MagickFalse);
 }
 
+static MagickStatusType SetRelativeRegion(const Image *image,
+  const char *geometry,RectangleInfo *region_info,MagickStatusType flags)
+{
+  if ((flags & PercentValue) != 0)
+    flags=SetPercentRegion(image,geometry,region_info,flags);
+  if ((flags & AspectRatioValue) != 0)
+    flags=SetAspectRatioRegion(image,geometry,region_info,flags);
+  return(flags);
+}
+
 static MagickStatusType AdjustGravityRegion(const Image *image,
   RectangleInfo *region_info,const MagickStatusType flags)
 {
@@ -798,10 +808,7 @@ MagickExport MagickStatusType ParseGravityGeometry(const Image *image,
         "InvalidGeometry","`%s'",geometry);
       return(flags);
     }
-  if ((flags & PercentValue) != 0)
-    flags=SetPercentRegion(image,geometry,region_info,flags);
-  if ((flags & AspectRatioValue) != 0)
-    flags=SetAspectRatioRegion(image,geometry,region_info,flags);
+  flags=SetRelativeRegion(image,geometry,region_info,flags);
   return(AdjustGravityRegion(image,region_info,flags));
 }
 
