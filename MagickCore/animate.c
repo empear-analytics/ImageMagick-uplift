@@ -5477,6 +5477,73 @@ static Image *XRunAnimateLoop(const AnimateEventContext *event_context,
   return(nexus);
 }
 
+typedef struct _AnimateExitInfo
+{
+  Image
+    *images;
+
+  WarningHandler
+    warning_handler;
+
+  char
+    *working_directory;
+} AnimateExitInfo;
+
+static Image *XFinishAnimation(const AnimateEventContext *event_context,
+  const AnimateWindowSetup *setup,const AnimateExitInfo *exit_info,
+  Image *nexus)
+{
+  Display
+    *const display = event_context->display;
+
+  ExceptionInfo
+    *const exception = event_context->exception;
+
+  Image
+    *images = exit_info->images,
+    **image_list = event_context->image_list;
+
+  const size_t
+    number_scenes = event_context->number_scenes;
+
+  const WarningHandler
+    warning_handler = exit_info->warning_handler;
+
+  char
+    *const working_directory = exit_info->working_directory;
+
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+  XWindows
+    *const windows = event_context->windows;
+
+  image_list=(Image **) RelinquishMagickMemory(image_list);
+  images=DestroyImageList(images);
+  XWithdrawColormapWindows(display,windows);
+  XWithdrawBackdropWindows(display,resource_info,windows);
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  XFreeScenePixmaps(display,windows,number_scenes);
+  XSetCursorState(display,windows,MagickFalse);
+  windows->image.pixmaps=(Pixmap *)
+    RelinquishMagickMemory(windows->image.pixmaps);
+  windows->image.matte_pixmaps=(Pixmap *)
+    RelinquishMagickMemory(windows->image.matte_pixmaps);
+  XReleaseAnimateWindows(setup,nexus);
+  (void) XSync(display,MagickFalse);
+  /*
+    Restore our progress monitor and warning handlers.
+  */
+  (void) SetErrorHandler(warning_handler);
+  (void) SetWarningHandler(warning_handler);
+  /*
+    Change to home directory.
+  */
+  XChangeToHomeDirectory(resource_info,working_directory,exception);
+  return(nexus);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -5548,6 +5615,9 @@ MagickExport Image *XAnimateImages(Display *display,
 
   AnimateWindowSetup
     setup;
+
+  AnimateExitInfo
+    exit_info;
 
   assert(images != (Image *) NULL);
   assert(images->signature == MagickCoreSignature);
@@ -5685,30 +5755,10 @@ MagickExport Image *XAnimateImages(Display *display,
     Respond to events.
   */
   nexus=XRunAnimateLoop(&event_context,&images,&context_values,&event);
-  image_list=(Image **) RelinquishMagickMemory(image_list);
-  images=DestroyImageList(images);
-  XWithdrawColormapWindows(display,windows);
-  XWithdrawBackdropWindows(display,resource_info,windows);
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  XFreeScenePixmaps(display,windows,number_scenes);
-  XSetCursorState(display,windows,MagickFalse);
-  windows->image.pixmaps=(Pixmap *)
-    RelinquishMagickMemory(windows->image.pixmaps);
-  windows->image.matte_pixmaps=(Pixmap *)
-    RelinquishMagickMemory(windows->image.matte_pixmaps);
-  XReleaseAnimateWindows(&setup,nexus);
-  (void) XSync(display,MagickFalse);
-  /*
-    Restore our progress monitor and warning handlers.
-  */
-  (void) SetErrorHandler(warning_handler);
-  (void) SetWarningHandler(warning_handler);
-  /*
-    Change to home directory.
-  */
-  XChangeToHomeDirectory(resource_info,working_directory,exception);
-  return(nexus);
+  exit_info.images=images;
+  exit_info.warning_handler=warning_handler;
+  exit_info.working_directory=working_directory;
+  return(XFinishAnimation(&event_context,&setup,&exit_info,nexus));
 }
 
 /*
