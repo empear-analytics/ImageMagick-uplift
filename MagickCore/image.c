@@ -617,6 +617,15 @@ static Image *DestroyImageOnFailure(Image *image,
   return(image);
 }
 
+static void SubtractAppendGeometry(const RectangleInfo *geometry,
+  const MagickBooleanType stack,ssize_t *x_offset,ssize_t *y_offset)
+{
+  if (stack != MagickFalse)
+    (*x_offset)-=geometry->x;
+  else
+    (*y_offset)-=geometry->y;
+}
+
 MagickExport Image *AppendImages(const Image *images,
   const MagickBooleanType stack,ExceptionInfo *exception)
 {
@@ -710,10 +719,7 @@ MagickExport Image *AppendImages(const Image *images,
 
     SetGeometry(append_image,&geometry);
     GravityAdjustGeometry(next->columns,next->rows,next->gravity,&geometry);
-    if (stack != MagickFalse)
-      x_offset-=geometry.x;
-    else
-      y_offset-=geometry.y;
+    SubtractAppendGeometry(&geometry,stack,&x_offset,&y_offset);
     image_view=AcquireVirtualCacheView(next,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
     #pragma omp parallel for schedule(static) shared(status) \
