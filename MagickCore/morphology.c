@@ -6305,6 +6305,104 @@ static size_t SelectMorphologyStageLimit(const MorphologyMethod method,
   return(stage_limit);
 }
 
+typedef struct _MorphologyApplyStages
+{
+  const Image
+    *image;
+
+  MorphologyMethod
+    method;
+
+  const KernelInfo
+    *kernel;
+
+  CompositeOperator
+    compose;
+
+  double
+    bias;
+
+  MagickBooleanType
+    special,
+    verbose;
+
+  size_t
+    method_limit,
+    stage_limit,
+    kernel_limit;
+
+  char
+    *v_info;
+
+  ExceptionInfo
+    *exception;
+
+  MorphologyApplyTargets
+    targets;
+} MorphologyApplyStages;
+
+typedef struct _MorphologyStagesTargets
+{
+  Image
+    **rslt_image;
+
+  KernelInfo
+    **reflected_kernel;
+} MorphologyStagesTargets;
+
+static MagickBooleanType ApplyMorphologyMethodPrimitives(
+  const MorphologyApplyStages *stages,CompositeOperator rslt_compose,
+  const MorphologyStagesTargets *stage_targets)
+{
+  Image
+    **const rslt_image = stage_targets->rslt_image;
+
+  KernelInfo
+    **const reflected_kernel = stage_targets->reflected_kernel;
+
+  const MorphologyApplyTargets
+    targets = stages->targets;
+
+  /* Apply special methods with special requirements
+  ** For example, single run only, or post-processing requirements
+  */
+  if ( stages->special != MagickFalse )
+    {
+      const MorphologyDirectApply
+        direct = { stages->image, stages->method, stages->kernel,
+          stages->verbose, stages->exception };
+
+      if (ApplyDirectMorphology(&direct,rslt_image) == MagickFalse)
+        return(MagickFalse);
+      return(MagickTrue);
+    }
+
+  /* Handle user (caller) specified multi-kernel composition method */
+  rslt_compose=ResolveMultiKernelCompose(stages->compose,rslt_compose);
+
+  /* Some methods require a reflected kernel to use with primitives.
+   * Create the reflected kernel for those methods. */
+  if (AcquireReflectedKernel(stages->method,stages->kernel,reflected_kernel) ==
+      MagickFalse)
+    return(MagickFalse);
+
+  /* Loops around more primitive morphology methods
+  **  erose, dilate, open, close, smooth, edge, etc...
+  */
+  {
+    const MorphologyMethodLoop
+      loop = { stages->image, stages->method, stages->kernel,
+        (*reflected_kernel), stages->bias, stages->verbose,
+        stages->method_limit, stages->stage_limit, stages->kernel_limit,
+        stages->v_info, stages->exception, rslt_compose };
+
+    if (ApplyMorphologyMethodLoop(&loop,&targets) == MagickFalse)
+      return(MagickFalse);
+  }
+
+  return(MagickTrue);
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -6344,6 +6442,9 @@ MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyApplyTargets
     targets = { &curr_image, &rslt_image, &save_image, &work_image, &count };
 
+  const MorphologyStagesTargets
+    stage_targets = { &rslt_image, &reflected_kernel };
+
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   assert(kernel != (KernelInfo *) NULL);
@@ -6377,37 +6478,13 @@ MagickPrivate Image *MorphologyApply(const Image *image,
   rslt_compose = compose; /* and we are composing multi-kernels as given */
   stage_limit=SelectMorphologyStageLimit(method,stage_limit,limits);
 
-  /* Apply special methods with special requirements
-  ** For example, single run only, or post-processing requirements
-  */
-  if ( special != MagickFalse )
-    {
-      const MorphologyDirectApply
-        direct = { image, method, kernel, verbose, exception };
-
-      if (ApplyDirectMorphology(&direct,&rslt_image) == MagickFalse)
-        goto error_cleanup;
-      goto exit_cleanup;
-    }
-
-  /* Handle user (caller) specified multi-kernel composition method */
-  rslt_compose=ResolveMultiKernelCompose(compose,rslt_compose);
-
-  /* Some methods require a reflected kernel to use with primitives.
-   * Create the reflected kernel for those methods. */
-  if (AcquireReflectedKernel(method,kernel,&reflected_kernel) == MagickFalse)
-    goto error_cleanup;
-
-  /* Loops around more primitive morphology methods
-  **  erose, dilate, open, close, smooth, edge, etc...
-  */
   {
-    const MorphologyMethodLoop
-      loop = { image, method, kernel, reflected_kernel, bias, verbose,
-        method_limit, stage_limit, kernel_limit, v_info, exception,
-        rslt_compose };
+    const MorphologyApplyStages
+      stages = { image, method, kernel, compose, bias, special, verbose,
+        method_limit, stage_limit, kernel_limit, v_info, exception, targets };
 
-    if (ApplyMorphologyMethodLoop(&loop,&targets) == MagickFalse)
+    if (ApplyMorphologyMethodPrimitives(&stages,rslt_compose,&stage_targets) ==
+        MagickFalse)
       goto error_cleanup;
   }
 
