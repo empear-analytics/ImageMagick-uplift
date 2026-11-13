@@ -483,6 +483,17 @@ static void InstantiateRegistry(void)
     }
 }
 
+static void *CloneRegistryString(const char *key,const void *value)
+{
+  const char
+    *string;
+
+  string=(const char *) value;
+  if (LocaleCompare(key,"date:precision") == 0)
+    SetMagickDatePrecision((size_t) StringToInteger(string));
+  return((void *) ConstantString(string));
+}
+
 MagickExport MagickBooleanType SetImageRegistry(const RegistryType type,
   const char *key,const void *value,ExceptionInfo *exception)
 {
@@ -502,13 +513,7 @@ MagickExport MagickBooleanType SetImageRegistry(const RegistryType type,
   {
     default:
     {
-      const char
-        *string;
-
-      string=(const char *) value;
-      if (LocaleCompare(key,"date:precision") == 0)
-        SetMagickDatePrecision((size_t) StringToInteger(string));
-      clone_value=(void *) ConstantString(string);
+      clone_value=CloneRegistryString(key,value);
       break;
     }
     case ImageRegistryType:
