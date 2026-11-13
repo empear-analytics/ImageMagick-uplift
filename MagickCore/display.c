@@ -8007,6 +8007,46 @@ static void XPreviewElement(const DrawEditContext *context,
   }
 }
 
+static void XErasePreviewElement(const DrawEditContext *context,
+  const DrawPreviewInput *preview,const ElementType element)
+{
+  switch (element)
+  {
+    case PointElement:
+    default:
+    {
+      XPreviewPolyline(context,preview);
+      break;
+    }
+    case LineElement:
+    {
+      XPreviewLongLine(context,preview);
+      break;
+    }
+    case RectangleElement:
+    case FillRectangleElement:
+    {
+      XPreviewRectangleErase(context,preview);
+      break;
+    }
+    case CircleElement:
+    case FillCircleElement:
+    case EllipseElement:
+    case FillEllipseElement:
+    {
+      XPreviewEllipseErase(context,preview);
+      break;
+    }
+    case PolygonElement:
+    case FillPolygonElement:
+    {
+      XPreviewPolyline(context,preview);
+      XPreviewLongLine(context,preview);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -8181,41 +8221,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
         Wait for next event.
       */
       XScreenEvent(display,windows,&event,exception);
-      switch (element)
-      {
-        case PointElement:
-        default:
-        {
-          XPreviewPolyline(&draw_context,&preview_input);
-          break;
-        }
-        case LineElement:
-        {
-          XPreviewLongLine(&draw_context,&preview_input);
-          break;
-        }
-        case RectangleElement:
-        case FillRectangleElement:
-        {
-          XPreviewRectangleErase(&draw_context,&preview_input);
-          break;
-        }
-        case CircleElement:
-        case FillCircleElement:
-        case EllipseElement:
-        case FillEllipseElement:
-        {
-          XPreviewEllipseErase(&draw_context,&preview_input);
-          break;
-        }
-        case PolygonElement:
-        case FillPolygonElement:
-        {
-          XPreviewPolyline(&draw_context,&preview_input);
-          XPreviewLongLine(&draw_context,&preview_input);
-          break;
-        }
-      }
+      XErasePreviewElement(&draw_context,&preview_input,element);
       shape_input.element=element;
       shape_input.distance=distance;
       XDrawShapeEvent(&draw_context,&shape_input,event,&shape_targets);
