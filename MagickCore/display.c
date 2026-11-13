@@ -8060,6 +8060,40 @@ static void XErasePreviewElement(const DrawEditContext *context,
   }
 }
 
+static void XStartDrawElement(const DrawPointerTargets *pointer_targets,
+  const DrawShapeTargets *shape_targets)
+{
+  int
+    *const x = pointer_targets->x;
+
+  int
+    *const y = pointer_targets->y;
+
+  XSegment
+    *const line_info = shape_targets->line_info;
+
+  RectangleInfo
+    *const rectangle_info = shape_targets->rectangle_info;
+
+  XPoint
+    **const coordinate_info = shape_targets->coordinate_info;
+
+  int
+    *const number_coordinates = shape_targets->number_coordinates;
+
+  (*line_info).x1=(*x);
+  (*line_info).y1=(*y);
+  (*line_info).x2=(*x);
+  (*line_info).y2=(*y);
+  (*rectangle_info).x=(ssize_t) (*x);
+  (*rectangle_info).y=(ssize_t) (*y);
+  (*rectangle_info).width=0;
+  (*rectangle_info).height=0;
+  (*number_coordinates)=1;
+  (*coordinate_info)->x=(*x);
+  (*coordinate_info)->y=(*y);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -8208,17 +8242,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
     */
     distance=0;
     degrees=0.0;
-    line_info.x1=x;
-    line_info.y1=y;
-    line_info.x2=x;
-    line_info.y2=y;
-    rectangle_info.x=(ssize_t) x;
-    rectangle_info.y=(ssize_t) y;
-    rectangle_info.width=0;
-    rectangle_info.height=0;
-    number_coordinates=1;
-    coordinate_info->x=x;
-    coordinate_info->y=y;
+    XStartDrawElement(&pointer_targets,&shape_targets);
     (void) XSetFunction(display,windows->image.highlight_context,GXinvert);
     state=DefaultState;
     do
