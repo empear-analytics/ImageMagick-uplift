@@ -2803,6 +2803,64 @@ static MagickBooleanType ReadExifHeader(unsigned char **exif,size_t *length,
   return(MagickTrue);
 }
 
+static void SyncExifTag(const ExifTagInfo *exif_tag,
+  unsigned char *exif_directory)
+{
+  const Image
+    *const image = exif_tag->image;
+
+  const EndianType
+    endian = exif_tag->endian;
+
+  unsigned char
+    *const directory = exif_tag->directory;
+
+  unsigned char
+    *const ifd0 = exif_tag->ifd0;
+
+  const unsigned short
+    tag_value = exif_tag->tag_value;
+
+  const size_t
+    number_bytes = exif_tag->number_bytes;
+
+  unsigned char
+    *const p = exif_tag->p;
+
+  switch (tag_value)
+  {
+    case TAG_IMAGE_WIDTH:
+    case TAG_IMAGE_LENGTH:
+    {
+      SyncExifDimension(exif_tag,ifd0,TAG_IMAGE_WIDTH);
+      break;
+    }
+    case TAG_PIXEL_X_DIMENSION:
+    case TAG_PIXEL_Y_DIMENSION:
+    {
+      SyncExifDimension(exif_tag,exif_directory,TAG_PIXEL_X_DIMENSION);
+      break;
+    }
+    case 0x0128:
+    {
+      if (directory != ifd0)
+        break;
+      if (number_bytes == 4)
+        {
+          (void) WriteProfileLong(endian,((size_t) image->units)+1,p);
+          break;
+        }
+      (void) WriteProfileShort(endian,(unsigned short) (image->units+1),p);
+      break;
+    }
+    default:
+    {
+      SyncExifIfd0Tag(tag_value,*exif_tag,image);
+      break;
+    }
+  }
+}
+
 typedef struct _ExifWalkInfo
 {
   const Image
@@ -2951,38 +3009,7 @@ static void SyncExifDirectory(const ExifWalkInfo *walk,
     exif_tag.number_bytes=number_bytes;
     exif_tag.q=q;
     exif_tag.p=p;
-    switch (tag_value)
-    {
-      case TAG_IMAGE_WIDTH:
-      case TAG_IMAGE_LENGTH:
-      {
-        SyncExifDimension(&exif_tag,ifd0,TAG_IMAGE_WIDTH);
-        break;
-      }
-      case TAG_PIXEL_X_DIMENSION:
-      case TAG_PIXEL_Y_DIMENSION:
-      {
-        SyncExifDimension(&exif_tag,(*exif_directory),TAG_PIXEL_X_DIMENSION);
-        break;
-      }
-      case 0x0128:
-      {
-        if (directory != ifd0)
-          break;
-        if (number_bytes == 4)
-          {
-            (void) WriteProfileLong(endian,((size_t) image->units)+1,p);
-            break;
-          }
-        (void) WriteProfileShort(endian,(unsigned short) (image->units+1),p);
-        break;
-      }
-      default:
-      {
-        SyncExifIfd0Tag(tag_value,exif_tag,image);
-        break;
-      }
-    }
+    SyncExifTag(&exif_tag,(*exif_directory));
     if (IsExifDirectoryOffset(tag_value,format,components,number_bytes) ==
         MagickFalse)
       continue;
