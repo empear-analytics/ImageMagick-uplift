@@ -1513,6 +1513,16 @@ static void XAlertImportDone(Display *display,const XImportInfo *ximage_info)
     }
 }
 
+static void XSelectImportWindow(Display *display,const ImageInfo *image_info,
+  RectangleInfo *crop_info,Window *target)
+{
+  if ((*target) == (Window) NULL)
+    (*target)=XSelectWindow(display,crop_info);
+  if ((*target) == (Window) NULL)
+    ThrowXWindowException(XServerError,"UnableToReadXWindowImage",
+      image_info->filename);
+}
+
 static Image *XCropWindowImage(Image *image,const RectangleInfo crop_info,
   ExceptionInfo *exception)
 {
@@ -1710,11 +1720,7 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
     If target window is not defined, interactively select one.
   */
   prior_target=target;
-  if (target == (Window) NULL)
-    target=XSelectWindow(display,&crop_info);
-  if (target == (Window) NULL)
-    ThrowXWindowException(XServerError,"UnableToReadXWindowImage",
-      image_info->filename);
+  XSelectImportWindow(display,image_info,&crop_info,&target);
   XResolveImportTarget(display,ximage_info,prior_target,&targets);
   if (XGetScreenCrop(display,ximage_info,root,&targets) == MagickFalse)
     {
