@@ -12602,6 +12602,75 @@ static void ReleaseListBrowserKey(const ListBrowserContext *context,
     (*state)&=(unsigned int) (~ControlState);
 }
 
+static void HandleListBrowserSelectionEvent(const ListBrowserContext *context,
+  XEvent event,const ListBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  char
+    *const primary_selection = context->primary_selection;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  switch (event.type)
+  {
+    case MotionNotify:
+    {
+      MoveListBrowserPointer(context,widgets);
+      break;
+    }
+    case SelectionClear:
+    {
+      (*reply_info).highlight=MagickFalse;
+      XDrawMatteText(display,window_info,reply_info);
+      break;
+    }
+    case SelectionNotify:
+    {
+      InsertListBrowserSelection(context,event,widgets);
+      break;
+    }
+    case SelectionRequest:
+    {
+      XSelectionEvent
+        notify;
+
+      XSelectionRequestEvent
+        *request;
+
+      if ((*reply_info).highlight == MagickFalse)
+        break;
+      /*
+        Set primary selection.
+      */
+      request=(&(event.xselectionrequest));
+      (void) XChangeProperty(request->display,request->requestor,
+        request->property,request->target,8,PropModeReplace,
+        (unsigned char *) primary_selection,Extent(primary_selection));
+      notify.type=SelectionNotify;
+      notify.send_event=MagickTrue;
+      notify.display=request->display;
+      notify.requestor=request->requestor;
+      notify.selection=request->selection;
+      notify.target=request->target;
+      notify.time=request->time;
+      if (request->property == None)
+        notify.property=request->target;
+      else
+        notify.property=request->property;
+      (void) XSendEvent(request->display,request->requestor,False,NoEventMask,
+        (XEvent *) &notify);
+    }
+    default:
+      break;
+  }
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -13004,55 +13073,11 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
         mask&=(unsigned int) (~CWY);
         break;
       }
-      case MotionNotify:
-      {
-        MoveListBrowserPointer(&list_context,&list_widgets);
-        break;
-      }
-      case SelectionClear:
-      {
-        reply_info.highlight=MagickFalse;
-        XDrawMatteText(display,window_info,&reply_info);
-        break;
-      }
-      case SelectionNotify:
-      {
-        InsertListBrowserSelection(&list_context,event,&list_widgets);
-        break;
-      }
-      case SelectionRequest:
-      {
-        XSelectionEvent
-          notify;
-
-        XSelectionRequestEvent
-          *request;
-
-        if (reply_info.highlight == MagickFalse)
-          break;
-        /*
-          Set primary selection.
-        */
-        request=(&(event.xselectionrequest));
-        (void) XChangeProperty(request->display,request->requestor,
-          request->property,request->target,8,PropModeReplace,
-          (unsigned char *) primary_selection,Extent(primary_selection));
-        notify.type=SelectionNotify;
-        notify.send_event=MagickTrue;
-        notify.display=request->display;
-        notify.requestor=request->requestor;
-        notify.selection=request->selection;
-        notify.target=request->target;
-        notify.time=request->time;
-        if (request->property == None)
-          notify.property=request->target;
-        else
-          notify.property=request->property;
-        (void) XSendEvent(request->display,request->requestor,False,NoEventMask,
-          (XEvent *) &notify);
-      }
       default:
+      {
+        HandleListBrowserSelectionEvent(&list_context,event,&list_widgets);
         break;
+      }
     }
   } while ((state & ExitState) == 0);
   XSetCursorState(display,windows,MagickFalse);
