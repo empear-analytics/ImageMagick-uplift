@@ -4778,6 +4778,43 @@ static void XHandleAnimateInputEvent(
   }
 }
 
+static void XCreateImagePixmaps(const AnimateWindowSetup *setup,
+  const char *filename)
+{
+Display
+    *const display = setup->display;
+
+XWindows
+    *const windows = setup->windows;
+
+const size_t
+    number_scenes = setup->number_scenes;
+
+  XWindowChanges
+    window_changes;
+
+  windows->image.x=0;
+  windows->image.y=0;
+  /*
+    Initialize image pixmaps structure.
+  */
+  window_changes.width=(int) windows->image.width;
+  window_changes.height=(int) windows->image.height;
+  (void) XReconfigureWMWindow(display,windows->image.id,windows->command.screen,
+    (unsigned int) (CWWidth | CWHeight),&window_changes);
+  windows->image.pixmaps=(Pixmap *) AcquireQuantumMemory(number_scenes,
+    sizeof(*windows->image.pixmaps));
+  windows->image.matte_pixmaps=(Pixmap *) AcquireQuantumMemory(number_scenes,
+    sizeof(*windows->image.pixmaps));
+  if ((windows->image.pixmaps == (Pixmap *) NULL) ||
+      (windows->image.matte_pixmaps == (Pixmap *) NULL))
+    ThrowXWindowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed",
+      filename);
+  if ((windows->image.mapped == MagickFalse) ||
+      (windows->backdrop.id != (Window) NULL))
+    (void) XMapWindow(display,windows->image.id);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4848,9 +4885,6 @@ MagickExport Image *XAnimateImages(Display *display,
   XVisualInfo
     *icon_visual,
     *visual_info;
-
-  XWindowChanges
-    window_changes;
 
   XWindows
     *windows;
@@ -4980,26 +5014,7 @@ MagickExport Image *XAnimateImages(Display *display,
   /*
     Initialize X image structure.
   */
-  windows->image.x=0;
-  windows->image.y=0;
-  /*
-    Initialize image pixmaps structure.
-  */
-  window_changes.width=(int) windows->image.width;
-  window_changes.height=(int) windows->image.height;
-  (void) XReconfigureWMWindow(display,windows->image.id,windows->command.screen,
-    (unsigned int) (CWWidth | CWHeight),&window_changes);
-  windows->image.pixmaps=(Pixmap *) AcquireQuantumMemory(number_scenes,
-    sizeof(*windows->image.pixmaps));
-  windows->image.matte_pixmaps=(Pixmap *) AcquireQuantumMemory(number_scenes,
-    sizeof(*windows->image.pixmaps));
-  if ((windows->image.pixmaps == (Pixmap *) NULL) ||
-      (windows->image.matte_pixmaps == (Pixmap *) NULL))
-    ThrowXWindowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed",
-      images->filename);
-  if ((windows->image.mapped == MagickFalse) ||
-      (windows->backdrop.id != (Window) NULL))
-    (void) XMapWindow(display,windows->image.id);
+  XCreateImagePixmaps(&setup,images->filename);
   XSetCursorState(display,windows,MagickTrue);
   event_context.display=display;
   event_context.resource_info=resource_info;
