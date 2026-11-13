@@ -856,6 +856,18 @@ static void PrintUpdatedChannelMoments(const ChannelMomentsReport *report,
     (void) PrintChannelMoments(report,channel,name);
 }
 
+static void PrintAlphaAndImageMoments(FILE *file,const Image *image,
+  const ColorspaceType colorspace,const ChannelMomentsReport *report)
+{
+  if (image->alpha_trait != UndefinedPixelTrait)
+    (void) PrintChannelMoments(report,AlphaPixelChannel,"Alpha");
+  if (colorspace != GRAYColorspace)
+    {
+      (void) FormatLocaleFile(file,"  Image moments:\n");
+      (void) PrintChannelMoments(report,CompositePixelChannel,"Overall");
+    }
+}
+
 static void PrintChannelMomentsTable(FILE *file,const Image *image,
   const ColorspaceType colorspace,ChannelMoments *channel_moments)
 {
@@ -911,13 +923,7 @@ static void PrintChannelMomentsTable(FILE *file,const Image *image,
       break;
     }
   }
-  if (image->alpha_trait != UndefinedPixelTrait)
-    (void) PrintChannelMoments(&report,AlphaPixelChannel,"Alpha");
-  if (colorspace != GRAYColorspace)
-    {
-      (void) FormatLocaleFile(file,"  Image moments:\n");
-      (void) PrintChannelMoments(&report,CompositePixelChannel,"Overall");
-    }
+  PrintAlphaAndImageMoments(file,image,colorspace,&report);
 }
 
 typedef struct _IPTCTagName
