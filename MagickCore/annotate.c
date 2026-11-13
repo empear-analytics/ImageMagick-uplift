@@ -2086,6 +2086,28 @@ static FT_Encoding SelectAdobeBig5Encoding(const char *encoding,
   return(encoding_type);
 }
 
+static FT_Encoding SelectCjkLatinEncoding(const char *encoding,
+  FT_Encoding encoding_type)
+{
+#if defined(FT_ENCODING_PRC)
+  if (LocaleCompare(encoding,"GB2312") == 0)
+    encoding_type=FT_ENCODING_PRC;
+#endif
+#if defined(FT_ENCODING_JOHAB)
+  if (LocaleCompare(encoding,"Johab") == 0)
+    encoding_type=FT_ENCODING_JOHAB;
+#endif
+#if defined(FT_ENCODING_ADOBE_LATIN_1)
+  if (LocaleCompare(encoding,"Latin-1") == 0)
+    encoding_type=FT_ENCODING_ADOBE_LATIN_1;
+#endif
+#if defined(FT_ENCODING_ADOBE_LATIN_2)
+  if (LocaleCompare(encoding,"Latin-2") == 0)
+    encoding_type=FT_ENCODING_OLD_LATIN_2;
+#endif
+  return(encoding_type);
+}
+
 static void BlendGlyphAlpha(const Image *image,double fill_opacity,
   Quantum *q)
 {
@@ -2604,22 +2626,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   if (encoding != (const char *) NULL)
     {
       encoding_type=SelectAdobeBig5Encoding(encoding,encoding_type);
-#if defined(FT_ENCODING_PRC)
-      if (LocaleCompare(encoding,"GB2312") == 0)
-        encoding_type=FT_ENCODING_PRC;
-#endif
-#if defined(FT_ENCODING_JOHAB)
-      if (LocaleCompare(encoding,"Johab") == 0)
-        encoding_type=FT_ENCODING_JOHAB;
-#endif
-#if defined(FT_ENCODING_ADOBE_LATIN_1)
-      if (LocaleCompare(encoding,"Latin-1") == 0)
-        encoding_type=FT_ENCODING_ADOBE_LATIN_1;
-#endif
-#if defined(FT_ENCODING_ADOBE_LATIN_2)
-      if (LocaleCompare(encoding,"Latin-2") == 0)
-        encoding_type=FT_ENCODING_OLD_LATIN_2;
-#endif
+      encoding_type=SelectCjkLatinEncoding(encoding,encoding_type);
       if (LocaleCompare(encoding,"None") == 0)
         encoding_type=FT_ENCODING_NONE;
       if (LocaleCompare(encoding,"SJIScode") == 0)
