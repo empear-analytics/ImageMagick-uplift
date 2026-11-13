@@ -1075,6 +1075,13 @@ needs two copies of the block.
    too (2026-11-11), on Recipe CT step 2's terms: it passes as a pointer like any
    written variable, never as a copy. CT step 2's structure form (a `static XColor`)
    counts in the same way, `v.m` written `(*v).m` and `&v` written `v`.
+   Such a block-scope `static` may also have its address passed elsewhere in the caller,
+   outside the block, as an argument of calls that keep no copy of it (2026-11-13), on the
+   terms a plain local has above (checked by reading the callee): while the new function
+   runs none of those calls is running, and none of them stores the pointer, so the
+   helper's pointer is the only one in use (`XBestVisualInfo`'s `static XVisualInfo
+   visual_template`, whose address goes to the library's `XGetVisualInfo`, which reads the
+   template and stores no pointer to it).
    A parameter the caller receives by value, of a struct or arithmetic type (not a
    pointer, and not an array parameter, which is one), counts as a plain local
    (`ApplySpliceGravity`'s `RectangleInfo splice_geometry`): it is the caller's own
@@ -13403,3 +13410,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | NEW | KD | Replace a Constant-Assigning Label Run with a Table Lookup: the groups of a `switch` that are `v=c;` `break;` (several labels to a group) become a `static const` table of `{label, literal}` read through a lookup function, `if (entry != NULL) v=entry->value; else` the `default:` group's text; *Careful* gives the argument (`e` evaluated once, the lookup finds an element exactly when a deleted group carried the label, the literal converted to `v`'s type as before) | `morphology.c`'s `MorphologyApply` (campaign A, W19 lane d): the stage-count `switch` (`SmoothMorphology` 4, seven labels 2, `default:` calling `SetIteratedMorphologyLimits`); probe cc 22 to 14, 6.63 to 6.70 | owner |
 | 2026-11-12 | AMEND | S | Step 2: a quoted `#include` of a header that defines objects (a file-scope initialised variable in column 0) is left out of the new file's include block, when no line of the family names an object or macro of that header; the split is refused when one does. *Careful* gives the argument | `opencl.c`'s device-property family (campaign A, W19 lane a, wide build): the copied include block included `accelerate-kernels-private.h`, which defines `accelerateKernels` and `accelerateKernels2`, and the pair failed to link (multiple definition); the family names neither, and the moved functions' object code compares unchanged | owner |
 | 2026-11-13 | AMEND | EJ | Step 1: the sole `if` of the `else` may stand in a pair of braces that holds nothing else; the pair goes with the join (`else {` newline `if (...)` ... `}` becomes `else if (...)`); proof `obj_identical.sh` as before | `opencl.c`'s `LoadOpenCLDeviceBenchmark` DOCTYPE loop (campaign A, W21 lane c, wide build): the chain sits in `else { ... }`, so the helper extracted from it kept 2 bumps after the unbraced levels were joined | owner |
+| 2026-11-13 | AMEND | O | Step 2: a block-scope `static` that the static clause admits (arithmetic, enumeration, pointer or structure type) may also have its address passed elsewhere in the caller, outside the block, to calls that keep no copy of it, as a plain local may; the helper's pointer is then the only one in use while it runs | `xwindow-visual.c`'s `XBestVisualInfo` (campaign A, W21 lane c, wide build): the visual-type ladder writes `visual_mask` and the members `klass` and `visualid` of `static XVisualInfo visual_template`, whose address also goes to `XGetVisualInfo` (reads the template, stores no pointer); the clause as written (address taken nowhere else) refused it | owner |
