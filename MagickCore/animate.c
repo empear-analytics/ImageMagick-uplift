@@ -4682,6 +4682,50 @@ const int
       "Window id: 0x%lx (pop up)",windows->popup.id);
 }
 
+static void XHandleAnimateWindowEvent(
+  const AnimateEventContext *event_context,XEvent event,
+  const AnimateCommandTargets *command_targets)
+{
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+  switch (event.type)
+  {
+    case MapNotify:
+    {
+      XHandleMapNotify(event_context,event,command_targets);
+      break;
+    }
+    case MappingNotify:
+    {
+      (void) XRefreshKeyboardMapping(&event.xmapping);
+      break;
+    }
+    case NoExpose:
+      break;
+    case PropertyNotify:
+    {
+      XHandlePropertyNotify(event_context,event,command_targets);
+      break;
+    }
+    case ReparentNotify:
+    {
+      XLogReparentNotify(resource_info,event);
+      break;
+    }
+    case UnmapNotify:
+    {
+      XHandleUnmapNotify(event_context,event);
+      break;
+    }
+    default:
+    {
+      XLogUnknownEvent(resource_info,event);
+      break;
+    }
+  }
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -5082,36 +5126,9 @@ MagickExport Image *XAnimateImages(Display *display,
           XUninstallColormap(display,map_info->colormap);
         break;
       }
-      case MapNotify:
-      {
-        XHandleMapNotify(&event_context,event,&command_targets);
-        break;
-      }
-      case MappingNotify:
-      {
-        (void) XRefreshKeyboardMapping(&event.xmapping);
-        break;
-      }
-      case NoExpose:
-        break;
-      case PropertyNotify:
-      {
-        XHandlePropertyNotify(&event_context,event,&command_targets);
-        break;
-      }
-      case ReparentNotify:
-      {
-        XLogReparentNotify(resource_info,event);
-        break;
-      }
-      case UnmapNotify:
-      {
-        XHandleUnmapNotify(&event_context,event);
-        break;
-      }
       default:
       {
-        XLogUnknownEvent(resource_info,event);
+        XHandleAnimateWindowEvent(&event_context,event,&command_targets);
         break;
       }
     }
