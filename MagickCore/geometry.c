@@ -503,6 +503,47 @@ MagickExport MagickStatusType ParseAbsoluteGeometry(const char *geometry,
   return(flags);
 }
 
+static MagickStatusType SetAffineMatrixTerm(AffineMatrix *affine_matrix,
+  const ssize_t i,const char *token,MagickStatusType flags)
+{
+  switch (i)
+  {
+    case 0:
+    {
+      affine_matrix->sx=StringToDouble(token,(char **) NULL);
+      break;
+    }
+    case 1:
+    {
+      affine_matrix->rx=StringToDouble(token,(char **) NULL);
+      break;
+    }
+    case 2:
+    {
+      affine_matrix->ry=StringToDouble(token,(char **) NULL);
+      break;
+    }
+    case 3:
+    {
+      affine_matrix->sy=StringToDouble(token,(char **) NULL);
+      break;
+    }
+    case 4:
+    {
+      affine_matrix->tx=StringToDouble(token,(char **) NULL);
+      flags|=XValue;
+      break;
+    }
+    case 5:
+    {
+      affine_matrix->ty=StringToDouble(token,(char **) NULL);
+      flags|=YValue;
+      break;
+    }
+  }
+  return(flags);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -559,41 +600,7 @@ MagickExport MagickStatusType ParseAffineGeometry(const char *geometry,
     (void) GetNextToken(p,&p,MagickPathExtent,token);
     if (*token == ',')
       (void) GetNextToken(p,&p,MagickPathExtent,token);
-    switch (i)
-    {
-      case 0:
-      {
-        affine_matrix->sx=StringToDouble(token,(char **) NULL);
-        break;
-      }
-      case 1:
-      {
-        affine_matrix->rx=StringToDouble(token,(char **) NULL);
-        break;
-      }
-      case 2:
-      {
-        affine_matrix->ry=StringToDouble(token,(char **) NULL);
-        break;
-      }
-      case 3:
-      {
-        affine_matrix->sy=StringToDouble(token,(char **) NULL);
-        break;
-      }
-      case 4:
-      {
-        affine_matrix->tx=StringToDouble(token,(char **) NULL);
-        flags|=XValue;
-        break;
-      }
-      case 5:
-      {
-        affine_matrix->ty=StringToDouble(token,(char **) NULL);
-        flags|=YValue;
-        break;
-      }
-    }
+    flags=SetAffineMatrixTerm(affine_matrix,i,token,flags);
   }
   determinant=(affine_matrix->sx*affine_matrix->sy-affine_matrix->rx*
     affine_matrix->ry);
