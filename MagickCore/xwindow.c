@@ -4103,6 +4103,41 @@ static void XDestroyWindowXImage(Display *display,XWindowInfo *window)
   window->ximage=(XImage *) NULL;
 }
 
+static XImage *XCreateMatteXImage(Display *display,
+  const XWindowInfo *window,const unsigned int width,
+  const unsigned int height)
+{
+  XImage
+    *matte_image;
+
+  /*
+    Create matte image.
+  */
+  matte_image=XCreateImage(display,window->visual,1,XYBitmap,0,
+    (char *) NULL,width,height,XBitmapPad(display),0);
+  if ((GetLogEventMask() & X11Event) != 0)
+    {
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"Matte Image:");
+      (void) LogMagickEvent(X11Event,GetMagickModule(),
+        "  width, height: %dx%d",matte_image->width,matte_image->height);
+    }
+  if (matte_image != (XImage *) NULL)
+    {
+      /*
+        Allocate matte image pixel data.
+      */
+      matte_image->data=(char *) malloc((size_t)
+        (matte_image->bytes_per_line*matte_image->depth*
+        matte_image->height));
+      if (matte_image->data == (char *) NULL)
+        {
+          XDestroyImage(matte_image);
+          matte_image=(XImage *) NULL;
+        }
+    }
+  return(matte_image);
+}
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
@@ -4327,33 +4362,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
   matte_image=(XImage *) NULL;
   if ((window->shape != MagickFalse) && (window->image != (Image *) NULL))
     if (IsShapeWithinDisplay(display,window,width,height) != MagickFalse)
-      {
-        /*
-          Create matte image.
-        */
-        matte_image=XCreateImage(display,window->visual,1,XYBitmap,0,
-          (char *) NULL,width,height,XBitmapPad(display),0);
-        if ((GetLogEventMask() & X11Event) != 0)
-          {
-            (void) LogMagickEvent(X11Event,GetMagickModule(),"Matte Image:");
-            (void) LogMagickEvent(X11Event,GetMagickModule(),
-              "  width, height: %dx%d",matte_image->width,matte_image->height);
-          }
-        if (matte_image != (XImage *) NULL)
-          {
-            /*
-              Allocate matte image pixel data.
-            */
-            matte_image->data=(char *) malloc((size_t)
-              (matte_image->bytes_per_line*matte_image->depth*
-              matte_image->height));
-            if (matte_image->data == (char *) NULL)
-              {
-                XDestroyImage(matte_image);
-                matte_image=(XImage *) NULL;
-              }
-          }
-      }
+      matte_image=XCreateMatteXImage(display,window,width,height);
   if (window->matte_image != (XImage *) NULL)
     {
       /*
