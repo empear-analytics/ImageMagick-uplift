@@ -697,6 +697,22 @@ static MagickStatusType ParseGeometrySigma(char **p,MagickStatusType flags,
   return(flags);
 }
 
+static MagickStatusType ParseGeometryFields(char *p,
+  const char *pedantic_geometry,MagickStatusType flags,
+  GeometryInfo *geometry_info)
+{
+  flags=ParseGeometryRho(&p,flags,geometry_info);
+  flags=ParseGeometrySigma(&p,flags,geometry_info);
+  flags=ParseGeometryOffsets(p,flags,geometry_info);
+  if (strchr(pedantic_geometry,':') != (char *) NULL)
+    NormalizeSamplingFactor(flags,geometry_info);
+  if (IsNegativeHeightGeometry(flags) != MagickFalse)
+    flags=ShiftNegativeHeight(flags,geometry_info);
+  if ((flags & PercentValue) != 0)
+    SetPercentGeometryInfo(flags,geometry_info);
+  return(flags);
+}
+
 MagickExport MagickStatusType ParseGeometry(const char *geometry,
   GeometryInfo *geometry_info)
 {
@@ -803,15 +819,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
   p=pedantic_geometry;
   if (*p == '\0')
     return(flags);
-  flags=ParseGeometryRho(&p,flags,geometry_info);
-  flags=ParseGeometrySigma(&p,flags,geometry_info);
-  flags=ParseGeometryOffsets(p,flags,geometry_info);
-  if (strchr(pedantic_geometry,':') != (char *) NULL)
-    NormalizeSamplingFactor(flags,geometry_info);
-  if (IsNegativeHeightGeometry(flags) != MagickFalse)
-    flags=ShiftNegativeHeight(flags,geometry_info);
-  if ((flags & PercentValue) != 0)
-    SetPercentGeometryInfo(flags,geometry_info);
+  flags=ParseGeometryFields(p,pedantic_geometry,flags,geometry_info);
 #if 0
   /* Debugging Geometry */
   (void) fprintf(stderr,"ParseGeometry...\n");
