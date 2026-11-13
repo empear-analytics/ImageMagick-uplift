@@ -125,6 +125,7 @@ typedef struct _EquivalentSearch
     *target_view;
 
   ssize_t
+    *x_offset,
     y;
 
   ExceptionInfo
@@ -177,6 +178,32 @@ static ssize_t MatchEquivalentTarget(const EquivalentSearch *search,
   return(j);
 }
 
+static ssize_t ScanEquivalentRow(const EquivalentSearch *search,
+  PixelInfo *pixel,PixelInfo *target)
+{
+  const Image
+    *const image = search->image,
+    *const target_image = search->target_image;
+
+  ssize_t
+    *const x_offset = search->x_offset;
+
+  const ssize_t
+    y = search->y;
+
+  ssize_t
+    j,
+    x;
+
+  for (x=y == 0 ? *x_offset : 0; x < (ssize_t) image->columns; x++)
+  {
+    j=MatchEquivalentTarget(search,x,pixel,target);
+    if (j == (ssize_t) target_image->rows)
+      break;
+  }
+  return(x);
+}
+
 MagickExport MagickBooleanType IsEquivalentImage(const Image *image,
   const Image *target_image,ssize_t *x_offset,ssize_t *y_offset,
   ExceptionInfo *exception)
@@ -198,7 +225,6 @@ MagickExport MagickBooleanType IsEquivalentImage(const Image *image,
     x;
 
   ssize_t
-    j,
     y;
 
   assert(image != (Image *) NULL);
@@ -225,14 +251,10 @@ MagickExport MagickBooleanType IsEquivalentImage(const Image *image,
     search.target_image=target_image;
     search.image_view=image_view;
     search.target_view=target_view;
+    search.x_offset=x_offset;
     search.y=y;
     search.exception=exception;
-    for (x=y == 0 ? *x_offset : 0; x < (ssize_t) image->columns; x++)
-    {
-      j=MatchEquivalentTarget(&search,x,&pixel,&target);
-      if (j == (ssize_t) target_image->rows)
-        break;
-    }
+    x=ScanEquivalentRow(&search,&pixel,&target);
     if (x < (ssize_t) image->columns)
       break;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
