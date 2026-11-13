@@ -7063,6 +7063,12 @@ typedef struct _FileBrowserContext
 
   char
     *home_directory;
+
+  const char
+    *action;
+
+  unsigned int
+    width;
 } FileBrowserContext;
 
 static void ClientFileBrowserMessage(const FileBrowserContext *context,
@@ -7741,6 +7747,79 @@ static void ReleaseFileBrowserScroll(const FileBrowserContext *context,
 #define HomeButtonText  "Home"
 #define UpButtonText  "Up"
 
+static void InitializeFileBrowserButtons(const FileBrowserContext *context,
+  const FileBrowserWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  char
+    *const reply = context->reply;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    height = context->height;
+
+  char
+    *const format = context->format;
+
+  const unsigned int
+    anomaly = context->anomaly;
+
+  const char
+    *const action = context->action;
+
+  const unsigned int
+    width = context->width;
+
+  XWidgetInfo
+    *const up_info = widgets->up_info,
+    *const home_info = widgets->home_info,
+    *const special_info = widgets->special_info,
+    *const action_info = widgets->action_info,
+    *const cancel_info = widgets->cancel_info;
+
+  /*
+    Initialize button information.
+  */
+  XGetWidgetInfo(CancelButtonText,cancel_info);
+  (*cancel_info).width=width;
+  (*cancel_info).height=(unsigned int) ((3*height) >> 1);
+  (*cancel_info).x=(int) windows->widget.width-(int) (*cancel_info).width-
+    QuantumMargin-2;
+  (*cancel_info).y=(int) windows->widget.height-(int) (*cancel_info).height-
+    QuantumMargin;
+  XGetWidgetInfo(action,action_info);
+  (*action_info).width=width;
+  (*action_info).height=(unsigned int) ((3*height) >> 1);
+  (*action_info).x=(*cancel_info).x-((int) (*cancel_info).width+
+    (QuantumMargin >> 1)+(int) ((*action_info).bevel_width << 1));
+  (*action_info).y=(*cancel_info).y;
+  XGetWidgetInfo(GrabButtonText,special_info);
+  (*special_info).width=width;
+  (*special_info).height=(unsigned int) ((3*height) >> 1);
+  (*special_info).x=(*action_info).x-((int) (*action_info).width+
+    (QuantumMargin >> 1)+(int) ((*special_info).bevel_width << 1));
+  (*special_info).y=(*action_info).y;
+  if (anomaly == MagickFalse)
+    {
+      (*special_info).text=(char *) FormatButtonText;
+      CopyFileBrowserFormat(reply,format);
+    }
+  XGetWidgetInfo(UpButtonText,up_info);
+  (*up_info).width=width;
+  (*up_info).height=(unsigned int) ((3*height) >> 1);
+  (*up_info).x=QuantumMargin;
+  (*up_info).y=(int) ((5*QuantumMargin) >> 1)+(int) height;
+  XGetWidgetInfo(HomeButtonText,home_info);
+  (*home_info).width=width;
+  (*home_info).height=(unsigned int) ((3*height) >> 1);
+  (*home_info).x=QuantumMargin;
+  (*home_info).y=(*up_info).y+(int) (*up_info).height+QuantumMargin;
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -7928,6 +8007,8 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   file_context.format=format;
   file_context.anomaly=anomaly;
   file_context.home_directory=home_directory;
+  file_context.action=action;
+  file_context.width=width;
   do
   {
     if (state & UpdateConfigurationState)
@@ -7935,43 +8016,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
         int
           id;
 
-        /*
-          Initialize button information.
-        */
-        XGetWidgetInfo(CancelButtonText,&cancel_info);
-        cancel_info.width=width;
-        cancel_info.height=(unsigned int) ((3*height) >> 1);
-        cancel_info.x=(int) windows->widget.width-(int) cancel_info.width-
-          QuantumMargin-2;
-        cancel_info.y=(int) windows->widget.height-(int) cancel_info.height-
-          QuantumMargin;
-        XGetWidgetInfo(action,&action_info);
-        action_info.width=width;
-        action_info.height=(unsigned int) ((3*height) >> 1);
-        action_info.x=cancel_info.x-((int) cancel_info.width+
-          (QuantumMargin >> 1)+(int) (action_info.bevel_width << 1));
-        action_info.y=cancel_info.y;
-        XGetWidgetInfo(GrabButtonText,&special_info);
-        special_info.width=width;
-        special_info.height=(unsigned int) ((3*height) >> 1);
-        special_info.x=action_info.x-((int) action_info.width+
-          (QuantumMargin >> 1)+(int) (special_info.bevel_width << 1));
-        special_info.y=action_info.y;
-        if (anomaly == MagickFalse)
-          {
-            special_info.text=(char *) FormatButtonText;
-            CopyFileBrowserFormat(reply,format);
-          }
-        XGetWidgetInfo(UpButtonText,&up_info);
-        up_info.width=width;
-        up_info.height=(unsigned int) ((3*height) >> 1);
-        up_info.x=QuantumMargin;
-        up_info.y=(int) ((5*QuantumMargin) >> 1)+(int) height;
-        XGetWidgetInfo(HomeButtonText,&home_info);
-        home_info.width=width;
-        home_info.height=(unsigned int) ((3*height) >> 1);
-        home_info.x=QuantumMargin;
-        home_info.y=up_info.y+(int) up_info.height+QuantumMargin;
+        InitializeFileBrowserButtons(&file_context,&file_widgets);
         /*
           Initialize reply information.
         */
