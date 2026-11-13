@@ -1039,6 +1039,15 @@ static void StripColorNameWhitespace(char *colorname)
   }
 }
 
+static const ColorInfo *GetFirstColorInfo(const ElementInfo *p,
+  const ColorInfo *color)
+{
+  UnlockSemaphoreInfo(color_semaphore);
+  if (p != (ElementInfo *) NULL)
+    color=(const ColorInfo *) p->value;
+  return(color);
+}
+
 MagickExport const ColorInfo *GetColorCompliance(const char *name,
   const ComplianceType compliance,ExceptionInfo *exception)
 {
@@ -1068,12 +1077,7 @@ MagickExport const ColorInfo *GetColorCompliance(const char *name,
   LockSemaphoreInfo(color_semaphore);
   p=GetHeadElementInLinkedList(color_cache);
   if ((name == (const char *) NULL) || (LocaleCompare(name,"*") == 0))
-    {
-      UnlockSemaphoreInfo(color_semaphore);
-      if (p != (ElementInfo *) NULL)
-        color=(const ColorInfo *) p->value;
-      return(color);
-    }
+    return(GetFirstColorInfo(p,color));
   while (p != (ElementInfo *) NULL)
   {
     color=(const ColorInfo *) p->value;
