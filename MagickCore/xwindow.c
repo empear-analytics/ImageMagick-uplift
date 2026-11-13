@@ -9676,6 +9676,30 @@ static void XSetWindowProtocols(Display *display,const XWindowInfo *window_info)
   (void) XSetWMProtocols(display,window_info->id,atom_list,2);
 }
 
+static void XSetIconGeometryHints(Display *display,
+  const XWindowInfo *window_info,XSizeHints *size_hints,
+  XWMHints *manager_hints)
+{
+  if (window_info->icon_geometry != (char *) NULL)
+    {
+      int
+        flags,
+        gravity,
+        height,
+        width;
+
+      /*
+        User specified icon geometry.
+      */
+      size_hints->flags|=USPosition;
+      flags=XWMGeometry(display,window_info->screen,window_info->icon_geometry,
+        (char *) NULL,0,size_hints,&manager_hints->icon_x,
+        &manager_hints->icon_y,&width,&height,&gravity);
+      if ((flags & XValue) && (flags & YValue))
+        manager_hints->flags|=IconPositionHint;
+    }
+}
+
 MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
   int argc,XClassHint *class_hint,XWMHints *manager_hints,
   XWindowInfo *window_info)
@@ -9756,23 +9780,7 @@ MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
   if (status == False)
     ThrowXWindowFatalException(XServerFatalError,"UnableToCreateTextProperty",
       window_info->icon_name);
-  if (window_info->icon_geometry != (char *) NULL)
-    {
-      int
-        flags,
-        height,
-        width;
-
-      /*
-        User specified icon geometry.
-      */
-      size_hints->flags|=USPosition;
-      flags=XWMGeometry(display,window_info->screen,window_info->icon_geometry,
-        (char *) NULL,0,size_hints,&manager_hints->icon_x,
-        &manager_hints->icon_y,&width,&height,&gravity);
-      if ((flags & XValue) && (flags & YValue))
-        manager_hints->flags|=IconPositionHint;
-    }
+  XSetIconGeometryHints(display,window_info,size_hints,manager_hints);
   XSetWMProperties(display,window_info->id,&window_name,&icon_name,argv,argc,
     size_hints,manager_hints,class_hint);
   XFreeTextProperty(&window_name);
