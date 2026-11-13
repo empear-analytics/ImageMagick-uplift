@@ -8007,7 +8007,7 @@ static void XPreviewElement(const DrawEditContext *context,
   }
 }
 
-static void XErasePreviewElement(const DrawEditContext *context,
+static void XErasePointLineBox(const DrawEditContext *context,
   const DrawPreviewInput *preview,const ElementType element)
 {
   switch (element)
@@ -8027,6 +8027,19 @@ static void XErasePreviewElement(const DrawEditContext *context,
     case FillRectangleElement:
     {
       XPreviewRectangleErase(context,preview);
+      break;
+    }
+  }
+}
+
+static void XErasePreviewElement(const DrawEditContext *context,
+  const DrawPreviewInput *preview,const ElementType element)
+{
+  switch (element)
+  {
+    default:
+    {
+      XErasePointLineBox(context,preview,element);
       break;
     }
     case CircleElement:
