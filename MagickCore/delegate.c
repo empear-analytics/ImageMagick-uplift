@@ -518,6 +518,25 @@ static int ReadDelegateOutput(const char *sanitize_command,char *message)
 }
 #endif
 
+static char *PrepareDelegateCommand(const MagickBooleanType asynchronous,
+  const MagickBooleanType verbose,const char *command,char *message)
+{
+  char
+    *sanitize_command;
+
+  if (verbose != MagickFalse)
+    {
+      (void) FormatLocaleFile(stderr,"%s\n",command);
+      (void) fflush(stderr);
+    }
+  sanitize_command=SanitizeString(command);
+  if (asynchronous != MagickFalse)
+    (void) ConcatenateMagickString(sanitize_command,"&",MagickPathExtent);
+  if (message != (char *) NULL)
+    *message='\0';
+  return(sanitize_command);
+}
+
 MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
   const MagickBooleanType verbose,const char *command,char *message,
   ExceptionInfo *exception)
@@ -542,16 +561,8 @@ MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
   if (AuthorizeDelegateArguments(arguments,number_arguments,exception) ==
       MagickFalse)
     return(-1);
-  if (verbose != MagickFalse)
-    {
-      (void) FormatLocaleFile(stderr,"%s\n",command);
-      (void) fflush(stderr);
-    }
-  sanitize_command=SanitizeString(command);
-  if (asynchronous != MagickFalse)
-    (void) ConcatenateMagickString(sanitize_command,"&",MagickPathExtent);
-  if (message != (char *) NULL)
-    *message='\0';
+  sanitize_command=PrepareDelegateCommand(asynchronous,verbose,command,
+    message);
 #if defined(MAGICKCORE_POSIX_SUPPORT)
 #if defined(MAGICKCORE_HAVE_POPEN)
   if ((asynchronous == MagickFalse) && (message !=  (char *) NULL))
