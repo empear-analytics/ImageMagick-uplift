@@ -1190,6 +1190,31 @@ static const char *SkipDelegateSpace(const char *p)
   return(p);
 }
 
+static MagickBooleanType DecodeDelegateCharacter(const char **p,char **q)
+{
+  switch (*(*p))
+  {
+    case '\\':
+    {
+      DecodeDelegateEscape(p,q);
+      return(MagickTrue);
+    }
+    case '&':
+    {
+      DecodeDelegateEntity(p,q);
+      return(MagickTrue);
+    }
+    case '%':
+      break;  /* continue to next set of handlers */
+    default:
+    {
+      *(*q)++=(*(*p));  /* any thing else is 'as normal' */
+      return(MagickTrue);
+    }
+  }
+  return(MagickFalse);
+}
+
 static char *InterpretDelegateProperties(ImageInfo *image_info,
   Image *image,const char *embed_text,ExceptionInfo *exception)
 {
@@ -1235,26 +1260,8 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
     */
     *q='\0';
     ExtendInterpretText(MagickPathExtent);
-    switch (*p)
-    {
-      case '\\':
-      {
-        DecodeDelegateEscape(&p,&q);
-        continue;
-      }
-      case '&':
-      {
-        DecodeDelegateEntity(&p,&q);
-        continue;
-      }
-      case '%':
-        break;  /* continue to next set of handlers */
-      default:
-      {
-        *q++=(*p);  /* any thing else is 'as normal' */
-        continue;
-      }
-    }
+    if (DecodeDelegateCharacter(&p,&q) != MagickFalse)
+      continue;
     if (DecodeDelegatePercent(&p,&q,number) != MagickFalse)
       continue;
     string=GetMagickPropertyLetter(image_info,image,*p,exception);
