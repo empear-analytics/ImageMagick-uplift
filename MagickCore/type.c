@@ -330,22 +330,22 @@ MagickExport const TypeInfo *GetTypeInfo(const char *name,
 static inline MagickBooleanType IsStyleMismatch(const TypeInfo *p,
   const StyleType style)
 {
-  return(((style != UndefinedStyle) && (style != AnyStyle) &&
-    (p->style != style)) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((style != UndefinedStyle) &&
+    (style != AnyStyle) && (p->style != style)));
 }
 
 static inline MagickBooleanType IsStretchMismatch(const TypeInfo *p,
   const StretchType stretch)
 {
-  return(((stretch != UndefinedStretch) && (stretch != AnyStretch) &&
-    (p->stretch != stretch)) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((stretch != UndefinedStretch) &&
+    (stretch != AnyStretch) && (p->stretch != stretch)));
 }
 
 static inline MagickBooleanType IsStyleMatch(const TypeInfo *p,
   const StyleType style)
 {
-  return(((style == UndefinedStyle) || (style == AnyStyle) ||
-    (p->style == style)) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((style == UndefinedStyle) ||
+    (style == AnyStyle) || (p->style == style)));
 }
 
 static inline MagickBooleanType IsSlantedStyleMatch(const TypeInfo *p,
@@ -388,9 +388,9 @@ static size_t GetTypeScore(const TypeInfo *p,const StyleType style,
 static MagickBooleanType IsFamilyMismatch(const char *name,const char *family)
 {
   if (family == (const char *) NULL)
-    return(((LocaleCompare(name,"arial") != 0) &&
-      (LocaleCompare(name,"helvetica") != 0)) ? MagickTrue : MagickFalse);
-  return(LocaleCompare(name,family) != 0 ? MagickTrue : MagickFalse);
+    return((MagickBooleanType) ((LocaleCompare(name,"arial") != 0) &&
+      (LocaleCompare(name,"helvetica") != 0)));
+  return((MagickBooleanType) (LocaleCompare(name,family) != 0));
 }
 
 static MagickBooleanType IsFaceMismatch(const TypeInfo *p,
@@ -400,7 +400,7 @@ static MagickBooleanType IsFaceMismatch(const TypeInfo *p,
     return(MagickTrue);
   if (IsStretchMismatch(p,stretch) != MagickFalse)
     return(MagickTrue);
-  return(p->weight != font_weight ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (p->weight != font_weight));
 }
 
 static const TypeInfo *GetExactTypeInfo(const char *family,
@@ -1023,7 +1023,7 @@ static MagickBooleanType IsTypeTreeInstantiated(ExceptionInfo *exception)
         }
       UnlockSemaphoreInfo(type_semaphore);
     }
-  return(type_cache != (SplayTreeInfo *) NULL ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (type_cache != (SplayTreeInfo *) NULL));
 }
 
 /*
@@ -1053,9 +1053,9 @@ static MagickBooleanType IsTypeTreeInstantiated(ExceptionInfo *exception)
 static inline MagickBooleanType IsNewTypePath(const char *path,
   const TypeInfo **type_info,const ssize_t i)
 {
-  return((((path == (const char *) NULL) ||
+  return((MagickBooleanType) (((path == (const char *) NULL) ||
     (LocaleCompare(path,type_info[i]->path) != 0)) &&
-    (type_info[i]->path != (char *) NULL)) ? MagickTrue : MagickFalse);
+    (type_info[i]->path != (char *) NULL)));
 }
 
 MagickExport MagickBooleanType ListTypeInfo(FILE *file,ExceptionInfo *exception)
@@ -1321,7 +1321,7 @@ static MagickBooleanType IsIncludeFileAttribute(const char **q,
   if (*token != '=')
     return(MagickFalse);
   (void) GetNextToken(*q,q,extent,token);
-  return(LocaleCompare(keyword,"file") == 0 ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (LocaleCompare(keyword,"file") == 0));
 }
 
 static MagickBooleanType LoadTypeInclude(const TypeLoadTarget *target,
@@ -1472,7 +1472,7 @@ static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
       font_path);
   }
   token=(char *) RelinquishMagickMemory(token);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (status != 0));
 }
 
 /*
