@@ -225,9 +225,6 @@ static MagickBooleanType CopyToUniqueFile(const char *source,
 MagickExport MagickBooleanType AcquireUniqueSymbolicLink(const char *source,
   char *destination)
 {
-  MagickBooleanType
-    status;
-
   static ssize_t
     passes = -1;
 
@@ -235,6 +232,9 @@ MagickExport MagickBooleanType AcquireUniqueSymbolicLink(const char *source,
   assert(destination != (char *) NULL);
 #if defined(MAGICKCORE_HAVE_SYMLINK)
   {
+    MagickBooleanType
+      status;
+
     /*
       Does policy permit symbolic links?
     */
@@ -455,6 +455,7 @@ static MagickBooleanType VerifyBase64Padding(const char *p,const int state,
           return(MagickFalse);
         }
       p++;
+      magick_fallthrough;
     }
     case 3:
     {
