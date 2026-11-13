@@ -1164,6 +1164,29 @@ static void SkipToEXIFHeader(const unsigned char **exif,size_t *length)
   }
 }
 
+static MagickBooleanType ReadEXIFHeader(const unsigned char **exif,
+  size_t *length,EndianType *endian)
+{
+  ssize_t
+    id;
+
+  SkipToEXIFHeader(exif,length);
+  if ((*length) < 16)
+    return(MagickFalse);
+  id=(ssize_t) ReadPropertySignedShort(LSBEndian,(*exif));
+  (*endian)=LSBEndian;
+  if (id == 0x4949)
+    (*endian)=LSBEndian;
+  else
+    if (id == 0x4D4D)
+      (*endian)=MSBEndian;
+    else
+      return(MagickFalse);
+  if (ReadPropertyUnsignedShort((*endian),(*exif)+2) != 0x002a)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static void GetEXIFProperty(const Image *image,const char *property,
   ExceptionInfo *exception)
 {
@@ -1495,7 +1518,6 @@ static void GetEXIFProperty(const Image *image,const char *property,
   ssize_t
     all,
     i,
-    id,
     level,
     offset,
     tag_offset;
@@ -1587,19 +1609,7 @@ static void GetEXIFProperty(const Image *image,const char *property,
   if (length < 6)
     return;
   exif=GetStringInfoDatum(profile);
-  SkipToEXIFHeader(&exif,&length);
-  if (length < 16)
-    return;
-  id=(ssize_t) ReadPropertySignedShort(LSBEndian,exif);
-  endian=LSBEndian;
-  if (id == 0x4949)
-    endian=LSBEndian;
-  else
-    if (id == 0x4D4D)
-      endian=MSBEndian;
-    else
-      return;
-  if (ReadPropertyUnsignedShort(endian,exif+2) != 0x002a)
+  if (ReadEXIFHeader(&exif,&length,&endian) == MagickFalse)
     return;
   /*
     This the offset to the first IFD.
