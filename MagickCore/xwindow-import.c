@@ -1817,10 +1817,10 @@ static MagickBooleanType XGrabTargetCursor(Display *display,
   return(MagickTrue);
 }
 
-static Window XSelectWindow(Display *display,RectangleInfo *crop_info)
-{
 #define MinimumCropArea  (unsigned int) 9
 
+static Window XSelectWindow(Display *display,RectangleInfo *crop_info)
+{
   Cursor
     target_cursor;
 
