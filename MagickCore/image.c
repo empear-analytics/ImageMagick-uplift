@@ -4249,44 +4249,53 @@ typedef struct _SmushYRows
     *exception;
 } SmushYRows;
 
-static size_t SmushYRow(const SmushYRows *rows,const ssize_t x,size_t gap)
+static ssize_t FindTopGapEdge(const SmushYRows *rows,const ssize_t x,
+  const size_t gap)
 {
-  const Image
-    *bottom_image = rows->bottom_image,
-    *top_image = rows->top_image;
-
-  CacheView
-    *bottom_view = rows->bottom_view,
-    *top_view = rows->top_view;
-
-  const RectangleInfo
-    bottom_geometry = rows->bottom_geometry,
-    top_geometry = rows->top_geometry;
-
-  ExceptionInfo
-    *exception = rows->exception;
-
   const Quantum
     *p;
 
   ssize_t
+    y;
+
+  for (y=(ssize_t) rows->top_image->rows-1; y > 0; y--)
+  {
+    p=GetCacheViewVirtualPixels(rows->top_view,rows->top_geometry.x+x,y,1,1,
+      rows->exception);
+    if (IsTopGapEdge(rows->top_image,p,y,gap) != MagickFalse)
+      break;
+  }
+  return(y);
+}
+
+static ssize_t FindBottomGapEdge(const SmushYRows *rows,const ssize_t x,
+  const ssize_t i,const size_t gap)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    y;
+
+  for (y=0; y < (ssize_t) rows->bottom_image->rows; y++)
+  {
+    p=GetCacheViewVirtualPixels(rows->bottom_view,rows->bottom_geometry.x+x,y,1,
+      1,rows->exception);
+    if (IsBottomGapEdge(rows->bottom_image,p,y,i,gap) != MagickFalse)
+      break;
+  }
+  return(y);
+}
+
+static size_t SmushYRow(const SmushYRows *rows,const ssize_t x,size_t gap)
+{
+  ssize_t
     i,
     y;
 
-  for (y=(ssize_t) top_image->rows-1; y > 0; y--)
-  {
-    p=GetCacheViewVirtualPixels(top_view,top_geometry.x+x,y,1,1,exception);
-    if (IsTopGapEdge(top_image,p,y,gap) != MagickFalse)
-      break;
-  }
-  i=(ssize_t) top_image->rows-y-1;
-  for (y=0; y < (ssize_t) bottom_image->rows; y++)
-  {
-    p=GetCacheViewVirtualPixels(bottom_view,bottom_geometry.x+x,y,1,1,
-      exception);
-    if (IsBottomGapEdge(bottom_image,p,y,i,gap) != MagickFalse)
-      break;
-  }
+  y=FindTopGapEdge(rows,x,gap);
+  i=(ssize_t) rows->top_image->rows-y-1;
+  y=FindBottomGapEdge(rows,x,i,gap);
   if ((y+i) < (ssize_t) gap)
     gap=(size_t) (y+i);
   return(gap);
