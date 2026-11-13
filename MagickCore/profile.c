@@ -2803,29 +2803,31 @@ static MagickBooleanType ReadExifHeader(unsigned char **exif,size_t *length,
   return(MagickTrue);
 }
 
+static void SyncExifResolutionUnit(const ExifTagInfo *exif_tag)
+{
+  if (exif_tag->directory != exif_tag->ifd0)
+    return;
+  if (exif_tag->number_bytes == 4)
+    {
+      (void) WriteProfileLong(exif_tag->endian,((size_t)
+        exif_tag->image->units)+1,exif_tag->p);
+      return;
+    }
+  (void) WriteProfileShort(exif_tag->endian,(unsigned short)
+    (exif_tag->image->units+1),exif_tag->p);
+}
+
 static void SyncExifTag(const ExifTagInfo *exif_tag,
   unsigned char *exif_directory)
 {
   const Image
     *const image = exif_tag->image;
 
-  const EndianType
-    endian = exif_tag->endian;
-
-  unsigned char
-    *const directory = exif_tag->directory;
-
   unsigned char
     *const ifd0 = exif_tag->ifd0;
 
   const unsigned short
     tag_value = exif_tag->tag_value;
-
-  const size_t
-    number_bytes = exif_tag->number_bytes;
-
-  unsigned char
-    *const p = exif_tag->p;
 
   switch (tag_value)
   {
@@ -2843,14 +2845,7 @@ static void SyncExifTag(const ExifTagInfo *exif_tag,
     }
     case 0x0128:
     {
-      if (directory != ifd0)
-        break;
-      if (number_bytes == 4)
-        {
-          (void) WriteProfileLong(endian,((size_t) image->units)+1,p);
-          break;
-        }
-      (void) WriteProfileShort(endian,(unsigned short) (image->units+1),p);
+      SyncExifResolutionUnit(exif_tag);
       break;
     }
     default:
