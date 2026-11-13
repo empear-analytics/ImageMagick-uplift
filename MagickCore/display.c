@@ -6324,6 +6324,12 @@ typedef struct _CropContext
 
   Cursor
     cursor;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    *text;
 } CropContext;
 
 static void XCropPointerCommand(const CropContext *context,
@@ -6490,6 +6496,42 @@ static void XCropPointerEvent(const CropContext *context,
   }
 }
 
+static void XCropTrackPointer(const CropContext *context,
+  const CropTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  do
+  {
+    if (context->windows->info.mapped != MagickFalse)
+      {
+        /*
+          Display pointer position.
+        */
+        (void) FormatLocaleString(context->text,MagickPathExtent," %+ld%+ld ",
+          (long) (*crop_info).x,(long) (*crop_info).y);
+        XInfoWidget(context->display,context->windows,context->text);
+      }
+    /*
+      Wait for next event.
+    */
+    XScreenEvent(context->display,context->windows,event,context->exception);
+    if ((*event).xany.window == context->windows->command.id)
+      {
+        XCropPointerCommand(context,targets);
+        continue;
+      }
+    XCropPointerEvent(context,targets);
+  } while (((*state) & ExitState) == 0);
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -6595,29 +6637,10 @@ static MagickBooleanType XCropImage(Display *display,
   context.windows=windows;
   context.mode=mode;
   context.CropModeMenu=CropModeMenu;
+  context.exception=exception;
+  context.text=text;
   context.cursor=cursor;
-  do
-  {
-    if (windows->info.mapped != MagickFalse)
-      {
-        /*
-          Display pointer position.
-        */
-        (void) FormatLocaleString(text,MagickPathExtent," %+ld%+ld ",
-          (long) crop_info.x,(long) crop_info.y);
-        XInfoWidget(display,windows,text);
-      }
-    /*
-      Wait for next event.
-    */
-    XScreenEvent(display,windows,&event,exception);
-    if (event.xany.window == windows->command.id)
-      {
-        XCropPointerCommand(&context,&targets);
-        continue;
-      }
-    XCropPointerEvent(&context,&targets);
-  } while ((state & ExitState) == 0);
+  XCropTrackPointer(&context,&targets);
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask);
   if ((state & EscapeState) != 0)
