@@ -12202,10 +12202,14 @@ early exits and changes the text of the tests.
 **How:**
 
 1. Find `else` followed by exactly one statement that is an `if` statement (with or
-   without `else` of its own), with no braces around it and no comment between.
+   without `else` of its own), with no comment between. The `if` statement may stand in
+   a pair of braces that holds nothing else: `else`, `{`, the `if` statement with its
+   own `else` chain, `}` (2026-11-13).
 2. Write `else if (...)` on one line, the `if` and everything after it in the text as it
    was, each line of the joined `if` moved one indent level less (and, with it, the lines
-   of its own `else` chain).
+   of its own `else` chain). When the `if` stood in braces, the pair is removed (the
+   opening brace line and the matching closing brace line go, and the lines of the
+   `if` statement move out of it, one indent level less each, as above).
 3. Repeat down the chain; every such chain of one function may go in one commit (one
    recipe, one function).
 4. Run `sh tools/obj_identical.sh <file>`. It must print `IDENTICAL`; otherwise revert
@@ -12246,7 +12250,11 @@ early exits and changes the text of the tests.
 - Why the behaviour is the same. `else` followed by one statement and `else if` are the
   same tokens; only the line breaks and the indentation change. The compiler sees the
   same program, which the object file proves.
-- A comment between the `else` and the `if`, or braces around the `if`, are not covered: step 1 refuses them.
+- A comment between the `else` and the `if`, or braces that hold anything besides the
+  one `if` statement, are not covered: step 1 refuses them. A pair of braces that holds
+  exactly one statement and nothing else (a compound statement of one statement) makes
+  no difference to the program: the `else` governs the same `if` statement, with the
+  same `else` chain inside it, before and after, and the object file proves it.
 - No test, statement or literal changes; only whitespace and the `else`/`if` line join.
 
 **Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
@@ -12256,7 +12264,12 @@ early exits and changes the text of the tests.
 `QueryColorCompliance`'s hex-digit loops (campaign B, M120): extracting the loop
 verbatim into a helper dropped the file 4.24 to 4.09, because the helper is itself
 Deep, Nested; the same chain joined with `else if` gave 4.42 after the extraction. Added
-by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24. Step 1's braced
+form: 2026-11-13, from `opencl.c`'s `LoadOpenCLDeviceBenchmark` DOCTYPE loop (campaign A,
+W21 lane c, wide build), whose `else { if (IsDoctypeQuote(q) ...) }` chain is braced as a
+whole, so the extracted helper kept Bumpy Road (2 bumps) after the unbraced levels were
+joined (added by Claude Code, Claude Sonnet 5.5, under the owner's OK of 2026-11-10 to
+evolve the recipes).
 
 ---
 
@@ -13389,3 +13402,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | NEW | KL | Replace Case Groups Sharing a Tail with a Keyed Lookup: a run of one-label groups of a `switch` that are the same statements on a string literal and a numeric literal become one copy in the `default:` group, reading both from a `static const` table found by a lookup function; the groups that differ stay. *Careful* gives the argument (the `switch` value held once, the lookup finds an element exactly when a deleted group carried the label, constants converted as before) | `morphology.c`'s `AcquireFreiChenKernel` (campaign A, W19 lane d): cases 15 to 19; Recipe KT refuses the tail, SC leaves five labels, a helper clones `AcquireFreiChenEdgeBasisKernel`; probe 6.35 to 6.63, cc 16 to 8 | owner |
 | 2026-11-12 | NEW | KD | Replace a Constant-Assigning Label Run with a Table Lookup: the groups of a `switch` that are `v=c;` `break;` (several labels to a group) become a `static const` table of `{label, literal}` read through a lookup function, `if (entry != NULL) v=entry->value; else` the `default:` group's text; *Careful* gives the argument (`e` evaluated once, the lookup finds an element exactly when a deleted group carried the label, the literal converted to `v`'s type as before) | `morphology.c`'s `MorphologyApply` (campaign A, W19 lane d): the stage-count `switch` (`SmoothMorphology` 4, seven labels 2, `default:` calling `SetIteratedMorphologyLimits`); probe cc 22 to 14, 6.63 to 6.70 | owner |
 | 2026-11-12 | AMEND | S | Step 2: a quoted `#include` of a header that defines objects (a file-scope initialised variable in column 0) is left out of the new file's include block, when no line of the family names an object or macro of that header; the split is refused when one does. *Careful* gives the argument | `opencl.c`'s device-property family (campaign A, W19 lane a, wide build): the copied include block included `accelerate-kernels-private.h`, which defines `accelerateKernels` and `accelerateKernels2`, and the pair failed to link (multiple definition); the family names neither, and the moved functions' object code compares unchanged | owner |
+| 2026-11-13 | AMEND | EJ | Step 1: the sole `if` of the `else` may stand in a pair of braces that holds nothing else; the pair goes with the join (`else {` newline `if (...)` ... `}` becomes `else if (...)`); proof `obj_identical.sh` as before | `opencl.c`'s `LoadOpenCLDeviceBenchmark` DOCTYPE loop (campaign A, W21 lane c, wide build): the chain sits in `else { ... }`, so the helper extracted from it kept 2 bumps after the unbraced levels were joined | owner |
