@@ -141,6 +141,20 @@ static MagickBooleanType ReadXMLFileContent(int file,char *xml,
   return(MagickTrue);
 }
 
+static size_t GetXMLReadQuantum(int file)
+{
+  size_t
+    quantum;
+
+  struct stat
+    file_stats;
+
+  quantum=(size_t) MagickMaxBufferExtent;
+  if ((fstat(file,&file_stats) == 0) && (file_stats.st_size > 0))
+    quantum=(size_t) MagickMin(file_stats.st_size,MagickMaxBufferExtent);
+  return(quantum);
+}
+
 MagickPrivate char *FileToXML(const char *filename,const size_t extent)
 {
   char
@@ -173,16 +187,11 @@ MagickPrivate char *FileToXML(const char *filename,const size_t extent)
       size_t
         quantum;
 
-      struct stat
-        file_stats;
-
       /*
         Stream is not seekable.
       */
       offset=(MagickOffsetType) lseek(file,0,SEEK_SET);
-      quantum=(size_t) MagickMaxBufferExtent;
-      if ((fstat(file,&file_stats) == 0) && (file_stats.st_size > 0))
-        quantum=(size_t) MagickMin(file_stats.st_size,MagickMaxBufferExtent);
+      quantum=GetXMLReadQuantum(file);
       xml=(char *) AcquireQuantumMemory(quantum,sizeof(*xml));
       for (i=0; xml != (char *) NULL; i+=(size_t) count)
       {
