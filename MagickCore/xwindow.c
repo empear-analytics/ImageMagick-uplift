@@ -10465,6 +10465,9 @@ typedef struct _XRenderTargets
 
   DrawInfo
     *cache_info;
+
+  Display
+    **display;
 } XRenderTargets;
 
 static MagickBooleanType XInitializeRenderResources(const DrawInfo *draw_info,
@@ -10657,6 +10660,30 @@ static MagickBooleanType XChangeRenderFont(const DrawInfo *draw_info,
   return(MagickTrue);
 }
 
+static MagickBooleanType XOpenRenderResources(const DrawInfo *draw_info,
+  const Image *image,const XRenderTargets *targets)
+{
+  Display
+    **const display = targets->display;
+
+  /*
+    Open X server connection.
+  */
+  (*display)=XOpenDisplay(draw_info->server_name);
+  if ((*display) == (Display *) NULL)
+    {
+      ThrowXWindowException(XServerError,"UnableToOpenXServer",
+        draw_info->server_name);
+      return(MagickFalse);
+    }
+  /*
+    Get user defaults from X resource database.
+  */
+  if (XInitializeRenderResources(draw_info,image,(*display),targets) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickPrivate MagickBooleanType XRenderImage(Image *image,
   const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
   ExceptionInfo *exception)
@@ -10693,24 +10720,11 @@ MagickPrivate MagickBooleanType XRenderImage(Image *image,
 
   const XRenderTargets
     targets = { &resource_database, &resource_info, &map_info, &visual_info,
-      &font_info, &pixel, &cache_info };
+      &font_info, &pixel, &cache_info, &display };
 
   if (display == (Display *) NULL)
     {
-      /*
-        Open X server connection.
-      */
-      display=XOpenDisplay(draw_info->server_name);
-      if (display == (Display *) NULL)
-        {
-          ThrowXWindowException(XServerError,"UnableToOpenXServer",
-            draw_info->server_name);
-          return(MagickFalse);
-        }
-      /*
-        Get user defaults from X resource database.
-      */
-      if (XInitializeRenderResources(draw_info,image,display,&targets) == MagickFalse)
+      if (XOpenRenderResources(draw_info,image,&targets) == MagickFalse)
         return(MagickFalse);
     }
   /*
