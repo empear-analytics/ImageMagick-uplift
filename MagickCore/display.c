@@ -13422,6 +13422,123 @@ static MagickBooleanType XPasteCommand(const PasteCommandInput *input,
   return(MagickFalse);
 }
 
+typedef struct _PasteFinishInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+
+  Cursor
+    cursor;
+
+  size_t
+    state;
+
+  Image
+    *paste_image;
+
+  RectangleInfo
+    paste_info;
+
+  CompositeOperator
+    compose;
+} PasteFinishInput;
+
+static MagickBooleanType XPasteFinish(const PasteFinishInput *input)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  Image
+    *const image = input->image;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  const Cursor
+    cursor = input->cursor;
+
+  const size_t
+    state = input->state;
+
+  const CompositeOperator
+    compose = input->compose;
+
+  Image
+    *paste_image = input->paste_image;
+
+  RectangleInfo
+    paste_info = input->paste_info;
+
+  double
+    scale_factor;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    height,
+    width;
+
+  (void) XSelectInput(display,windows->image.id,
+    windows->image.attributes.event_mask);
+  (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
+  XSetCursorState(display,windows,MagickFalse);
+  (void) XFreeCursor(display,cursor);
+  if ((state & EscapeState) != 0)
+    return(MagickTrue);
+  /*
+    Image pasting is relative to image configuration.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  width=(unsigned int) image->columns;
+  height=(unsigned int) image->rows;
+  x=0;
+  y=0;
+  if (windows->image.crop_geometry != (char *) NULL)
+    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
+  scale_factor=(double) width/windows->image.ximage->width;
+  paste_info.x+=x;
+  paste_info.x=(ssize_t) (scale_factor*paste_info.x+0.5);
+  paste_info.width=(unsigned int) (scale_factor*paste_info.width+0.5);
+  scale_factor=(double) height/windows->image.ximage->height;
+  paste_info.y+=y;
+  paste_info.y=(ssize_t) (scale_factor*paste_info.y*scale_factor+0.5);
+  paste_info.height=(unsigned int) (scale_factor*paste_info.height+0.5);
+  /*
+    Paste image with X Image window.
+  */
+  (void) CompositeImage(image,paste_image,compose,MagickTrue,paste_info.x,
+    paste_info.y,exception);
+  paste_image=DestroyImage(paste_image);
+  XSetCursorState(display,windows,MagickFalse);
+  /*
+    Update image colormap.
+  */
+  XConfigureImageColormap(display,resource_info,windows,image,exception);
+  (void) XConfigureImage(display,resource_info,windows,image,exception);
+  return(MagickTrue);
+}
+
 static MagickBooleanType XPasteImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -13664,45 +13781,13 @@ static MagickBooleanType XPasteImage(Display *display,
       }
     }
   } while ((state & ExitState) == 0);
-  (void) XSelectInput(display,windows->image.id,
-    windows->image.attributes.event_mask);
-  (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
-  XSetCursorState(display,windows,MagickFalse);
-  (void) XFreeCursor(display,cursor);
-  if ((state & EscapeState) != 0)
-    return(MagickTrue);
-  /*
-    Image pasting is relative to image configuration.
-  */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  width=(unsigned int) image->columns;
-  height=(unsigned int) image->rows;
-  x=0;
-  y=0;
-  if (windows->image.crop_geometry != (char *) NULL)
-    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
-  scale_factor=(double) width/windows->image.ximage->width;
-  paste_info.x+=x;
-  paste_info.x=(ssize_t) (scale_factor*paste_info.x+0.5);
-  paste_info.width=(unsigned int) (scale_factor*paste_info.width+0.5);
-  scale_factor=(double) height/windows->image.ximage->height;
-  paste_info.y+=y;
-  paste_info.y=(ssize_t) (scale_factor*paste_info.y*scale_factor+0.5);
-  paste_info.height=(unsigned int) (scale_factor*paste_info.height+0.5);
-  /*
-    Paste image with X Image window.
-  */
-  (void) CompositeImage(image,paste_image,compose,MagickTrue,paste_info.x,
-    paste_info.y,exception);
-  paste_image=DestroyImage(paste_image);
-  XSetCursorState(display,windows,MagickFalse);
-  /*
-    Update image colormap.
-  */
-  XConfigureImageColormap(display,resource_info,windows,image,exception);
-  (void) XConfigureImage(display,resource_info,windows,image,exception);
-  return(MagickTrue);
+  {
+    const PasteFinishInput
+      finish = { display, resource_info, windows, image, exception, cursor,
+        state, paste_image, paste_info, compose };
+
+    return(XPasteFinish(&finish));
+  }
 }
 
 /*
