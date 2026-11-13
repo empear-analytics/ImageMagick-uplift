@@ -186,6 +186,33 @@ def family_only_define(lines, name):
     one_line = [l for l in named if re.match(r"^#define\s+%s\b.*[^\\\s]\s*$" % name, l)]
     return named[0] if named == one_line[:1] else None
 
+def family_only_multiline_defines(lines, region):
+    """(name, first line, last line) of every multi-line `#define` (backslash continuation) of LINES that REGION names
+    and that no other line of LINES names, outside the define blocks that move with it: a macro named by another
+    moving define moves with it (XGammaPixel names XRedGamma), a macro named by anything else stays, refusing."""
+    blocks = {}
+    for k, line in enumerate(lines):
+        m = re.match(r"^#define\s+(\w+)", line)
+        if m and line.rstrip().endswith("\\"):
+            e = k
+            while lines[e].rstrip().endswith("\\") and e + 1 < len(lines): e += 1
+            blocks[m.group(1)] = (k, e)
+    cand = {n for n in blocks if re.search(r"\b%s\b" % n, region)}
+    grown = True
+    while grown:   # a multi-line define named by a candidate's text is a candidate too
+        grown = False
+        text = "\n".join("\n".join(lines[blocks[n][0]:blocks[n][1] + 1]) for n in cand)
+        for n in blocks:
+            if n not in cand and re.search(r"\b%s\b" % n, text): cand.add(n); grown = True
+    changed = True
+    while changed:
+        changed = False
+        drop = {i for n in cand for i in range(blocks[n][0], blocks[n][1] + 1)}
+        residue = "\n".join(l for i, l in enumerate(lines) if i not in drop)
+        for n in sorted(cand):
+            if re.search(r"\b%s\b" % n, residue): cand.discard(n); changed = True
+    return sorted(((n,) + blocks[n] for n in cand), key=lambda row: row[1])
+
 def drop_empty_banner(lines, banner):
     """Remove a `/* banner */` comment block of LINES that has nothing but blank lines under it."""
     text = re.sub(r"(?m)^/\*\n  %s\n\*/\n[\n\f]*(?=/\*)" % re.escape(banner), "", "\n".join(lines), count=1)
@@ -323,7 +350,7 @@ for run in runs:
     first, last = order[run[0]], order[run[-1]]
     # start: the comment directly above the first function
     # start: the comments and family-only typedefs directly above the first function
-    a = first[1]
+    a = first[1]; externs = 0
     while True:
         c = a
         while c > 0 and L[c - 1].strip() == "": c -= 1
@@ -341,10 +368,20 @@ for run in runs:
         fp = function_pointer_typedef(L, c - 1)
         if fp and not any(re.search(r"\b%s\b" % n, "\n".join(L[:fp[0]] + L[last[2] + 1:])) for n in fp[1]):
             a = fp[0]; continue
+        # the opener of an `extern "C"` pair (`#if defined(__cplusplus)` / `extern "C" {` / `#endif`) directly above
+        # moves with the functions it wraps; its closer is taken below (a pair left open in either file refuses)
+        if c >= 3 and L[c - 1].strip() == "#endif" and L[c - 2].strip() == 'extern "C" {' \
+                and re.match(r"#\s*if defined\(__cplusplus\)", L[c - 3].strip()):
+            a = c - 3; externs += 1; continue
         u = macro_block_start(L, c)
         if u is None: break
         a = u
     b = last[2] + 1
+    for _ in range(externs):
+        j = b
+        while j < len(L) and L[j].strip() == "": j += 1
+        if j + 2 < len(L) and re.match(r"#\s*if defined\(__cplusplus\)", L[j].strip()) and L[j + 1].strip() == "}" \
+                and L[j + 2].strip() == "#endif": b = j + 3
     incomment = False; intype = False; bad = []; depth = 0; inner = []; inproto = False; table_end = -1; fp_end = -1
     for n in range(a, b):
         if any(s <= n <= e for s, e in spans): continue
@@ -417,8 +454,17 @@ for tname in typedefs + tables:
     if re.search(r"\b%s\b" % tname, rest): sys.exit("refused: %s moves with the region but the kept part uses it" % tname)
 defined = lambda text: set(re.findall(r"^\s*#\s*define\s+(\w+)", text, re.M))
 macro_lines = []; moved_macros = []
+# a multi-line `#define` (backslash continuation) that no line of the kept part names moves with the family, together
+# with the other multi-line defines that name it and that move too (2026-11-13)
+ml_defines = family_only_multiline_defines(rest_lines, region)
+moved_macros.extend("\n".join(rest_lines[k0:e0 + 1]) for _, k0, e0 in ml_defines)
+for _, k0, e0 in reversed(ml_defines):
+    note_banner(rest_lines, k0, moved_banners)
+    del rest_lines[k0:e0 + 1]
+rest = "\n".join(rest_lines)
+moving_text = region + "\n" + "\n".join(moved_macros)   # a one-line define that a moving define names moves too
 for mname in sorted(defined(rest), key=lambda m: next(i for i, l in enumerate(rest_lines) if re.match(r"^\s*#\s*define\s+%s\b" % m, l))):
-    if not re.search(r"\b%s\b" % mname, region): continue
+    if not re.search(r"\b%s\b" % mname, moving_text): continue
     dl = [l for l in rest_lines if re.match(r"^#define\s+%s\b" % mname, l)]
     if mname in copy_macros and len(dl) == 1 and re.fullmatch(r'#define\s+%s\s+"[^"\\]*"' % mname, dl[0]) \
         and not re.search(r"^\s*#\s*define\s+%s\b" % mname, region, re.M):
