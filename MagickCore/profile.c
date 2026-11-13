@@ -1770,6 +1770,56 @@ static void SpliceProfileInto8Bim(Image *image,const StringInfo *profile,
   extract_profile=DestroyStringInfo(extract_profile);
 }
 
+typedef struct _ResourceHeaderTargets
+{
+  const unsigned char
+    **q,
+    **p;
+
+  unsigned short
+    *id;
+
+  ssize_t
+    *count;
+} ResourceHeaderTargets;
+
+static MagickBooleanType Read8BimResourceHeader(const unsigned char *datum,
+  const size_t length,const ResourceHeaderTargets *targets)
+{
+  const unsigned char
+    **const q = targets->q,
+    **const p = targets->p;
+
+  unsigned short
+    *const id = targets->id;
+
+  ssize_t
+    *const count = targets->count;
+
+  unsigned char
+    length_byte;
+
+  unsigned int
+    value;
+
+  (*q)=(*p);
+  if (LocaleNCompare((char *) (*p),"8BIM",4) != 0)
+    return(MagickFalse);
+  (*p)+=(ptrdiff_t) 4;
+  (*p)=ReadResourceShort((*p),id);
+  (*p)=ReadResourceByte((*p),&length_byte);
+  (*p)+=(ptrdiff_t) length_byte;
+  if (((length_byte+1) & 0x01) != 0)
+    (*p)++;
+  if ((*p) > (datum+length-4))
+    return(MagickFalse);
+  (*p)=ReadResourceLong((*p),&value);
+  (*count)=(ssize_t) value;
+  if (((*count) & 0x01) != 0)
+    (*count)++;
+  return(MagickTrue);
+}
+
 static MagickBooleanType Get8BimProfileId(const char *name,
   unsigned short *profile_id)
 {
@@ -1805,15 +1855,12 @@ static void WriteTo8BimProfile(Image *image,const char *name,
   ssize_t
     count;
 
-  unsigned char
-    length_byte;
-
-  unsigned int
-    value;
-
   unsigned short
     id,
     profile_id;
+
+  const ResourceHeaderTargets
+    targets = { &q, &p, &id, &count };
 
   if (Get8BimProfileId(name,&profile_id) == MagickFalse)
     return;
@@ -1825,21 +1872,8 @@ static void WriteTo8BimProfile(Image *image,const char *name,
   length=GetStringInfoLength(profile_8bim);
   for (p=datum; p < (datum+length-16); )
   {
-    q=p;
-    if (LocaleNCompare((char *) p,"8BIM",4) != 0)
+    if (Read8BimResourceHeader(datum,length,&targets) == MagickFalse)
       break;
-    p+=(ptrdiff_t) 4;
-    p=ReadResourceShort(p,&id);
-    p=ReadResourceByte(p,&length_byte);
-    p+=(ptrdiff_t) length_byte;
-    if (((length_byte+1) & 0x01) != 0)
-      p++;
-    if (p > (datum+length-4))
-      break;
-    p=ReadResourceLong(p,&value);
-    count=(ssize_t) value;
-    if ((count & 0x01) != 0)
-      count++;
     if (IsInvalid8BimCount(count,p,datum,length) != MagickFalse)
       break;
     if (id != profile_id)
