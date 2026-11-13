@@ -4684,6 +4684,12 @@ static void XRemoveSharedSegment(XShmSegmentInfo *segment_info)
       segment_info[1].shmaddr=(char *) NULL;
     }
 }
+
+static void XSyncAttachedSegment(Display *display,const Status status)
+{
+  if (status != False)
+    (void) XSync(display,MagickFalse);
+}
 #endif
 
 static XImage *XAttachSharedXImage(Display *display,XWindowInfo *window,
@@ -4707,8 +4713,7 @@ static XImage *XAttachSharedXImage(Display *display,XWindowInfo *window,
       ximage->data=segment_info[1].shmaddr;
       segment_info[1].readOnly=MagickFalse;
       status=XShmAttach(display,&segment_info[1]);
-      if (status != False)
-        (void) XSync(display,MagickFalse);
+      XSyncAttachedSegment(display,status);
       if ((status == False) || (xerror_alert != MagickFalse))
         {
           window->shared_memory=MagickFalse;
