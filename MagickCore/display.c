@@ -6162,27 +6162,120 @@ static MagickBooleanType XCompositeImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void XResizePanWindow(Display *display,XWindows *windows,Image *image)
+{
+  XSizeHints
+    *size_hints;
+
+  XWindowChanges
+    window_changes;
+
+  windows->pan.crop_geometry=windows->image.crop_geometry;
+  XBestIconSize(display,&windows->pan,image);
+  while (((windows->pan.width << 1) < MaxIconSize) &&
+         ((windows->pan.height << 1) < MaxIconSize))
+  {
+    windows->pan.width<<=1;
+    windows->pan.height<<=1;
+  }
+  if (windows->pan.geometry != (char *) NULL)
+    (void) XParseGeometry(windows->pan.geometry,&windows->pan.x,&windows->pan.y,
+      &windows->pan.width,&windows->pan.height);
+  window_changes.width=(int) windows->pan.width;
+  window_changes.height=(int) windows->pan.height;
+  size_hints=XAllocSizeHints();
+  if (size_hints != (XSizeHints *) NULL)
+    {
+      /*
+        Set new size hints.
+      */
+      size_hints->flags=PSize | PMinSize | PMaxSize;
+      size_hints->width=window_changes.width;
+      size_hints->height=window_changes.height;
+      size_hints->min_width=size_hints->width;
+      size_hints->min_height=size_hints->height;
+      size_hints->max_width=size_hints->width;
+      size_hints->max_height=size_hints->height;
+      (void) XSetNormalHints(display,windows->pan.id,size_hints);
+      (void) XFree((void *) size_hints);
+    }
+  (void) XReconfigureWMWindow(display,windows->pan.id,windows->pan.screen,
+    (unsigned int) (CWWidth | CWHeight),&window_changes);
+}
+
+typedef struct _ConfigureNotifyInput
+{
+  size_t
+    width,
+    height;
+
+  ssize_t
+    x,
+    y;
+} ConfigureNotifyInput;
+
+static void XNotifyWindowManager(Display *display,XResourceInfo *resource_info,
+  XWindows *windows,const ConfigureNotifyInput *input)
+{
+  char
+    geometry[MagickPathExtent];
+
+  size_t
+    height = input->height,
+    mask,
+    width = input->width;
+
+  ssize_t
+    x = input->x,
+    y = input->y;
+
+  XWindowChanges
+    window_changes;
+
+  if (resource_info->image_geometry != (char *) NULL)
+    (void) FormatLocaleString(geometry,MagickPathExtent,"%s>!",
+      resource_info->image_geometry);
+  else
+    (void) FormatLocaleString(geometry,MagickPathExtent,"%ux%u+0+0>!",
+      XDisplayWidth(display,windows->image.screen),
+      XDisplayHeight(display,windows->image.screen));
+  (void) ParseMetaGeometry(geometry,&x,&y,&width,&height);
+  window_changes.width=(int) width;
+  if (window_changes.width > XDisplayWidth(display,windows->image.screen))
+    window_changes.width=XDisplayWidth(display,windows->image.screen);
+  window_changes.height=(int) height;
+  if (window_changes.height > XDisplayHeight(display,windows->image.screen))
+    window_changes.height=XDisplayHeight(display,windows->image.screen);
+  mask=(size_t) (CWWidth | CWHeight);
+  if (resource_info->backdrop)
+    {
+      mask|=CWX | CWY;
+      window_changes.x=((XDisplayWidth(display,windows->image.screen)/2)-
+        ((int) width/2));
+      window_changes.y=((XDisplayHeight(display,windows->image.screen)/2)-
+        ((int) height/2));
+    }
+  (void) XReconfigureWMWindow(display,windows->image.id,windows->image.screen,
+    (unsigned int) mask,&window_changes);
+}
+
 static MagickBooleanType XConfigureImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
 {
-  char
-    geometry[MagickPathExtent];
+  ConfigureNotifyInput
+    notify;
 
   MagickStatusType
     status;
 
   size_t
-    mask,
     height,
     width;
 
   ssize_t
     x,
     y;
-
-  XSizeHints
-    *size_hints;
 
   XWindowChanges
     window_changes;
@@ -6223,31 +6316,11 @@ static MagickBooleanType XConfigureImage(Display *display,
   /*
     Notify window manager of the new configuration.
   */
-  if (resource_info->image_geometry != (char *) NULL)
-    (void) FormatLocaleString(geometry,MagickPathExtent,"%s>!",
-      resource_info->image_geometry);
-  else
-    (void) FormatLocaleString(geometry,MagickPathExtent,"%ux%u+0+0>!",
-      XDisplayWidth(display,windows->image.screen),
-      XDisplayHeight(display,windows->image.screen));
-  (void) ParseMetaGeometry(geometry,&x,&y,&width,&height);
-  window_changes.width=(int) width;
-  if (window_changes.width > XDisplayWidth(display,windows->image.screen))
-    window_changes.width=XDisplayWidth(display,windows->image.screen);
-  window_changes.height=(int) height;
-  if (window_changes.height > XDisplayHeight(display,windows->image.screen))
-    window_changes.height=XDisplayHeight(display,windows->image.screen);
-  mask=(size_t) (CWWidth | CWHeight);
-  if (resource_info->backdrop)
-    {
-      mask|=CWX | CWY;
-      window_changes.x=((XDisplayWidth(display,windows->image.screen)/2)-
-        ((int) width/2));
-      window_changes.y=((XDisplayHeight(display,windows->image.screen)/2)-
-        ((int) height/2));
-    }
-  (void) XReconfigureWMWindow(display,windows->image.id,windows->image.screen,
-    (unsigned int) mask,&window_changes);
+  notify.width=width;
+  notify.height=height;
+  notify.x=x;
+  notify.y=y;
+  XNotifyWindowManager(display,resource_info,windows,&notify);
   (void) XClearWindow(display,windows->image.id);
   XRefreshWindow(display,&windows->image,(XEvent *) NULL);
   /*
@@ -6255,37 +6328,7 @@ static MagickBooleanType XConfigureImage(Display *display,
   */
   if (windows->magnify.mapped != MagickFalse)
     XMakeMagnifyImage(display,windows,exception);
-  windows->pan.crop_geometry=windows->image.crop_geometry;
-  XBestIconSize(display,&windows->pan,image);
-  while (((windows->pan.width << 1) < MaxIconSize) &&
-         ((windows->pan.height << 1) < MaxIconSize))
-  {
-    windows->pan.width<<=1;
-    windows->pan.height<<=1;
-  }
-  if (windows->pan.geometry != (char *) NULL)
-    (void) XParseGeometry(windows->pan.geometry,&windows->pan.x,&windows->pan.y,
-      &windows->pan.width,&windows->pan.height);
-  window_changes.width=(int) windows->pan.width;
-  window_changes.height=(int) windows->pan.height;
-  size_hints=XAllocSizeHints();
-  if (size_hints != (XSizeHints *) NULL)
-    {
-      /*
-        Set new size hints.
-      */
-      size_hints->flags=PSize | PMinSize | PMaxSize;
-      size_hints->width=window_changes.width;
-      size_hints->height=window_changes.height;
-      size_hints->min_width=size_hints->width;
-      size_hints->min_height=size_hints->height;
-      size_hints->max_width=size_hints->width;
-      size_hints->max_height=size_hints->height;
-      (void) XSetNormalHints(display,windows->pan.id,size_hints);
-      (void) XFree((void *) size_hints);
-    }
-  (void) XReconfigureWMWindow(display,windows->pan.id,windows->pan.screen,
-    (unsigned int) (CWWidth | CWHeight),&window_changes);
+  XResizePanWindow(display,windows,image);
   /*
     Update icon window configuration.
   */
@@ -8862,6 +8905,623 @@ static void XDrawCommand(const DrawEditContext *context,
   (void) XCheckDefineCursor(display,windows->image.id,context->cursor);
 }
 
+static void XDrawShapeEvent(const DrawEditContext *context,
+  const DrawShapeInput *shape,const XEvent event,
+  const DrawShapeTargets *targets)
+{
+  switch (event.type)
+  {
+    case ButtonPress:
+      break;
+    case ButtonRelease:
+    {
+      XDrawButtonRelease(context,shape,event,targets);
+      break;
+    }
+    case Expose:
+      break;
+    case MotionNotify:
+    {
+      XDrawMotion(context,shape,event,targets);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void XClampLineEnd(const XWindows *windows,XSegment *line_info)
+{
+  if ((*line_info).x2 < 0)
+    (*line_info).x2=0;
+  else
+    if ((*line_info).x2 > (int) windows->image.width)
+      (*line_info).x2=(short) windows->image.width;
+  if ((*line_info).y2 < 0)
+    (*line_info).y2=0;
+  else
+    if ((*line_info).y2 > (int) windows->image.height)
+      (*line_info).y2=(short) windows->image.height;
+}
+
+static void XSizeDrawRegion(const DrawEditContext *context,
+  XDrawInfo *draw_info,const unsigned int line_width,
+  const RectangleInfo *rectangle_info)
+{
+  Image
+    **const image = context->image;
+
+  XWindows
+    *const windows = context->windows;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    height,
+    width;
+
+  width=(unsigned int) (*image)->columns;
+  height=(unsigned int) (*image)->rows;
+  x=0;
+  y=0;
+  if (windows->image.crop_geometry != (char *) NULL)
+    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
+  (*draw_info).x+=windows->image.x-((int) line_width/2);
+  if ((*draw_info).x < 0)
+    (*draw_info).x=0;
+  (*draw_info).x=(int) width*(*draw_info).x/windows->image.ximage->width;
+  (*draw_info).y+=windows->image.y-((int) line_width/2);
+  if ((*draw_info).y < 0)
+    (*draw_info).y=0;
+  (*draw_info).y=(int) height*(*draw_info).y/windows->image.ximage->height;
+  (*draw_info).width=(unsigned int) (*rectangle_info).width+(line_width << 1);
+  if ((*draw_info).width > (unsigned int) (*image)->columns)
+    (*draw_info).width=(unsigned int) (*image)->columns;
+  (*draw_info).height=(unsigned int) (*rectangle_info).height+(line_width << 1);
+  if ((*draw_info).height > (unsigned int) (*image)->rows)
+    (*draw_info).height=(unsigned int) (*image)->rows;
+  (void) FormatLocaleString((*draw_info).geometry,MagickPathExtent,"%ux%u%+d%+d",
+    width*(*draw_info).width/(unsigned int) windows->image.ximage->width,
+    height*(*draw_info).height/(unsigned int) windows->image.ximage->height,
+    (*draw_info).x+x,(*draw_info).y+y);
+}
+
+static void XSetDrawLineInfo(XDrawInfo *draw_info,const XSegment *line_info,
+  const unsigned int line_width)
+{
+  (*draw_info).line_info=(*line_info);
+  if ((*line_info).x1 > (int) (line_width/2))
+    (*draw_info).line_info.x1=(short) line_width/2;
+  if ((*line_info).y1 > (int) (line_width/2))
+    (*draw_info).line_info.y1=(short) line_width/2;
+  (*draw_info).line_info.x2=(short) ((*line_info).x2-(*line_info).x1+
+    ((int) line_width/2));
+  (*draw_info).line_info.y2=(short) ((*line_info).y2-(*line_info).y1+
+    ((int) line_width/2));
+  if (((*draw_info).line_info.x2 < 0) && ((*draw_info).line_info.y2 < 0))
+    {
+      (*draw_info).line_info.x2=(-(*draw_info).line_info.x2);
+      (*draw_info).line_info.y2=(-(*draw_info).line_info.y2);
+    }
+  if ((*draw_info).line_info.x2 < 0)
+    {
+      (*draw_info).line_info.x2=(-(*draw_info).line_info.x2);
+      Swap((*draw_info).line_info.x1,(*draw_info).line_info.x2);
+    }
+  if ((*draw_info).line_info.y2 < 0)
+    {
+      (*draw_info).line_info.y2=(-(*draw_info).line_info.y2);
+      Swap((*draw_info).line_info.y1,(*draw_info).line_info.y2);
+    }
+}
+
+static void XDrawStartEvent(const DrawEditContext *context,
+  const DrawPointerTargets *pointer_targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  int
+    *const x = pointer_targets->x;
+
+  int
+    *const y = pointer_targets->y;
+
+  XEvent
+    *const event = pointer_targets->event;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      XDrawButtonPress(context,(*event),pointer_targets);
+      break;
+    }
+    case ButtonRelease:
+      break;
+    case Expose:
+      break;
+    case KeyPress:
+    {
+      XDrawKeyPress(context,pointer_targets);
+      break;
+    }
+    case MotionNotify:
+    {
+      /*
+        Map and unmap Info widget as text cursor crosses its boundaries.
+      */
+      (*x)=(*event).xmotion.x;
+      (*y)=(*event).xmotion.y;
+      XTrackInfoWidget(display,windows,(*x),(*y));
+      break;
+    }
+  }
+}
+
+static void XWaitForDrawStart(const DrawEditContext *context,
+  const DrawPointerTargets *pointer_targets,
+  const DrawStyleTargets *style_targets)
+{
+  const Cursor
+    cursor = context->cursor;
+
+  Display
+    *const display = context->display;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  XWindows
+    *const windows = context->windows;
+
+  int
+    *const x = pointer_targets->x;
+
+  int
+    *const y = pointer_targets->y;
+
+  size_t
+    *const state = pointer_targets->state;
+
+  XEvent
+    *const event = pointer_targets->event;
+
+  char
+    text[MagickPathExtent];
+
+  XQueryPosition(display,windows->image.id,x,y);
+  (void) XSelectInput(display,windows->image.id,
+    windows->image.attributes.event_mask | PointerMotionMask);
+  (void) XCheckDefineCursor(display,windows->image.id,cursor);
+  (*state)=DefaultState;
+  do
+  {
+    if (windows->info.mapped != MagickFalse)
+      {
+        /*
+          Display pointer position.
+        */
+        (void) FormatLocaleString(text,MagickPathExtent," %+d%+d ",
+          (*x)+windows->image.x,(*y)+windows->image.y);
+        XInfoWidget(display,windows,text);
+      }
+    /*
+      Wait for next event.
+    */
+    XScreenEvent(display,windows,event,exception);
+    if ((*event).xany.window == windows->command.id)
+      {
+        XDrawCommand(context,pointer_targets,style_targets);
+        continue;
+      }
+    XDrawStartEvent(context,pointer_targets);
+  } while (((*state) & ExitState) == 0);
+  (void) XSelectInput(display,windows->image.id,
+    windows->image.attributes.event_mask);
+  (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+}
+
+static void XPreviewPointLineBox(const DrawEditContext *context,
+  const DrawPreviewInput *preview,const ElementType element,double *degrees)
+{
+  switch (element)
+  {
+    case PointElement:
+    default:
+    {
+      XPreviewPoint(context,preview);
+      break;
+    }
+    case LineElement:
+    {
+      XPreviewLine(context,preview,degrees);
+      break;
+    }
+    case RectangleElement:
+    case FillRectangleElement:
+    {
+      XPreviewRectangle(context,preview);
+      break;
+    }
+  }
+}
+
+static void XPreviewElement(const DrawEditContext *context,
+  const DrawPreviewInput *preview,const ElementType element,double *degrees)
+{
+  switch (element)
+  {
+    default:
+    {
+      XPreviewPointLineBox(context,preview,element,degrees);
+      break;
+    }
+    case CircleElement:
+    case FillCircleElement:
+    case EllipseElement:
+    case FillEllipseElement:
+    {
+      XPreviewEllipse(context,preview);
+      break;
+    }
+    case PolygonElement:
+    case FillPolygonElement:
+    {
+      XPreviewPolyline(context,preview);
+      XPreviewLine(context,preview,degrees);
+      break;
+    }
+  }
+}
+
+static void XErasePointLineBox(const DrawEditContext *context,
+  const DrawPreviewInput *preview,const ElementType element)
+{
+  switch (element)
+  {
+    case PointElement:
+    default:
+    {
+      XPreviewPolyline(context,preview);
+      break;
+    }
+    case LineElement:
+    {
+      XPreviewLongLine(context,preview);
+      break;
+    }
+    case RectangleElement:
+    case FillRectangleElement:
+    {
+      XPreviewRectangleErase(context,preview);
+      break;
+    }
+  }
+}
+
+static void XErasePreviewElement(const DrawEditContext *context,
+  const DrawPreviewInput *preview,const ElementType element)
+{
+  switch (element)
+  {
+    default:
+    {
+      XErasePointLineBox(context,preview,element);
+      break;
+    }
+    case CircleElement:
+    case FillCircleElement:
+    case EllipseElement:
+    case FillEllipseElement:
+    {
+      XPreviewEllipseErase(context,preview);
+      break;
+    }
+    case PolygonElement:
+    case FillPolygonElement:
+    {
+      XPreviewPolyline(context,preview);
+      XPreviewLongLine(context,preview);
+      break;
+    }
+  }
+}
+
+static void XStartDrawElement(const DrawPointerTargets *pointer_targets,
+  const DrawShapeTargets *shape_targets)
+{
+  int
+    *const x = pointer_targets->x;
+
+  int
+    *const y = pointer_targets->y;
+
+  XSegment
+    *const line_info = shape_targets->line_info;
+
+  RectangleInfo
+    *const rectangle_info = shape_targets->rectangle_info;
+
+  XPoint
+    **const coordinate_info = shape_targets->coordinate_info;
+
+  int
+    *const number_coordinates = shape_targets->number_coordinates;
+
+  (*line_info).x1=(*x);
+  (*line_info).y1=(*y);
+  (*line_info).x2=(*x);
+  (*line_info).y2=(*y);
+  (*rectangle_info).x=(ssize_t) (*x);
+  (*rectangle_info).y=(ssize_t) (*y);
+  (*rectangle_info).width=0;
+  (*rectangle_info).height=0;
+  (*number_coordinates)=1;
+  (*coordinate_info)->x=(*x);
+  (*coordinate_info)->y=(*y);
+}
+
+static void XTrackDrawElement(const DrawEditContext *context,
+  const DrawPointerTargets *pointer_targets,
+  const DrawShapeTargets *shape_targets,unsigned int *distance)
+{
+  Display
+    *const display = context->display;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  XWindows
+    *const windows = context->windows;
+
+  int
+    *const x = pointer_targets->x;
+
+  int
+    *const y = pointer_targets->y;
+
+  size_t
+    *const state = pointer_targets->state;
+
+  XEvent
+    *const event = pointer_targets->event;
+
+  ElementType
+    *const element = pointer_targets->element;
+
+  XSegment
+    *const line_info = shape_targets->line_info;
+
+  RectangleInfo
+    *const rectangle_info = shape_targets->rectangle_info;
+
+  XPoint
+    **const coordinate_info = shape_targets->coordinate_info;
+
+  int
+    *const number_coordinates = shape_targets->number_coordinates;
+
+  double
+    degrees;
+
+  DrawPreviewInput
+    preview_input;
+
+  DrawShapeInput
+    shape_input;
+
+  degrees=0.0;
+  (void) XSetFunction(display,windows->image.highlight_context,GXinvert);
+  (*state)=DefaultState;
+  do
+  {
+    preview_input.element=(*element);
+    preview_input.number_coordinates=(*number_coordinates);
+    preview_input.coordinate_info=(*coordinate_info);
+    preview_input.distance=(*distance);
+    preview_input.line_info=(*line_info);
+    preview_input.rectangle_info=(*rectangle_info);
+    XPreviewElement(context,&preview_input,(*element),&degrees);
+    /*
+      Wait for next event.
+    */
+    XScreenEvent(display,windows,event,exception);
+    XErasePreviewElement(context,&preview_input,(*element));
+    shape_input.element=(*element);
+    shape_input.distance=(*distance);
+    XDrawShapeEvent(context,&shape_input,(*event),shape_targets);
+    /*
+      Check boundary conditions.
+    */
+    XClampLineEnd(windows,line_info);
+    (*distance)=(unsigned int)
+      ((((*line_info).x2-(*line_info).x1+1)*
+        ((*line_info).x2-(*line_info).x1+1))+
+       (((*line_info).y2-(*line_info).y1+1)*
+        ((*line_info).y2-(*line_info).y1+1)));
+    if (IsSelectionMovedOrDone((*rectangle_info),(*x),(*y),(*state)) !=
+        MagickFalse)
+      {
+        (*rectangle_info)=XFitSelectionRectangle(windows,(*x),(*y),
+          (*rectangle_info));
+      }
+  } while (((*state) & ExitState) == 0);
+  (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
+}
+
+static MagickStatusType XDrawElementImage(const DrawEditContext *context,
+  XDrawInfo *draw_info)
+{
+  Display
+    *const display = context->display;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  Image
+    **const image = context->image;
+
+  MagickStatusType
+    status;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  status=XDrawImage(display,windows->pixel_info,draw_info,*image,exception);
+  XSetCursorState(display,windows,MagickFalse);
+  /*
+    Update image colormap and return to image drawing.
+  */
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+  return(status);
+}
+
+static MagickBooleanType XFitDrawBounds(
+  const DrawPointerTargets *pointer_targets,
+  const DrawShapeTargets *shape_targets,const unsigned int distance)
+{
+  ElementType
+    *const element = pointer_targets->element;
+
+  RectangleInfo
+    *const rectangle_info = shape_targets->rectangle_info;
+
+  XPoint
+    **const coordinate_info = shape_targets->coordinate_info;
+
+  int
+    *const number_coordinates = shape_targets->number_coordinates;
+
+  if (IsPolygonElement((*element)) != MagickFalse)
+    {
+      (*rectangle_info)=XDrawPolygonBounds((*coordinate_info),
+        (*number_coordinates),(*rectangle_info));
+    }
+  else
+    if (distance <= 9)
+      return(MagickTrue);
+    else
+      if (IsBoxedElement((*element)) != MagickFalse)
+        {
+          (*rectangle_info).width--;
+          (*rectangle_info).height--;
+        }
+  return(MagickFalse);
+}
+
+static void XPrepareDrawInfo(const DrawEditContext *context,
+  const DrawPointerTargets *pointer_targets,
+  const DrawShapeTargets *shape_targets,const DrawStyleTargets *style_targets)
+{
+  Display
+    *const display = context->display;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  Image
+    **const image = context->image;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ElementType
+    *const element = pointer_targets->element;
+
+  XSegment
+    *const line_info = shape_targets->line_info;
+
+  RectangleInfo
+    *const rectangle_info = shape_targets->rectangle_info;
+
+  XPoint
+    **const coordinate_info = shape_targets->coordinate_info;
+
+  int
+    *const number_coordinates = shape_targets->number_coordinates;
+
+  XDrawInfo
+    *const draw_info = style_targets->draw_info;
+
+  unsigned int
+    *const pen_id = style_targets->pen_id;
+
+  unsigned int
+    *const line_width = style_targets->line_width;
+
+  Pixmap
+    *const stipple = style_targets->stipple;
+
+  (*draw_info).x=(int) (*rectangle_info).x;
+  (*draw_info).y=(int) (*rectangle_info).y;
+  (void) XMagickCommand(display,resource_info,windows,SaveToUndoBufferCommand,
+    image,exception);
+  XSizeDrawRegion(context,draw_info,(*line_width),rectangle_info);
+  /*
+    Initialize drawing attributes.
+  */
+  (*draw_info).degrees=0.0;
+  (*draw_info).element=(*element);
+  (*draw_info).stipple=(*stipple);
+  (*draw_info).line_width=(*line_width);
+  XSetDrawLineInfo(draw_info,line_info,(*line_width));
+  (*draw_info).rectangle_info=(*rectangle_info);
+  if ((*draw_info).rectangle_info.x > (ssize_t) ((*line_width)/2))
+    (*draw_info).rectangle_info.x=(ssize_t) (*line_width)/2;
+  if ((*draw_info).rectangle_info.y > (ssize_t) ((*line_width)/2))
+    (*draw_info).rectangle_info.y=(ssize_t) (*line_width)/2;
+  (*draw_info).number_coordinates=(unsigned int) (*number_coordinates);
+  (*draw_info).coordinate_info=(*coordinate_info);
+  windows->pixel_info->pen_color=windows->pixel_info->pen_colors[(*pen_id)];
+}
+
+static void XMapDrawCommandWidget(Display *display,XWindows *windows,
+  const char *const *DrawMenu)
+{
+  (void) CloneString(&windows->command.name,"Draw");
+  windows->command.data=4;
+  (void) XCommandWidget(display,windows,DrawMenu,(XEvent *) NULL);
+  (void) XMapRaised(display,windows->command.id);
+  XClientMessage(display,windows->image.id,windows->im_protocols,
+    windows->im_update_widget,CurrentTime);
+}
+
+static MagickBooleanType XAcquireDrawCoordinates(ExceptionInfo *exception,
+  const DrawShapeTargets *targets)
+{
+  XPoint
+    **const coordinate_info = targets->coordinate_info;
+
+  unsigned int
+    *const max_coordinates = targets->max_coordinates;
+
+  (*max_coordinates)=2048;
+  (*coordinate_info)=(XPoint *) AcquireQuantumMemory((size_t) (*max_coordinates),
+    sizeof(*(*coordinate_info)));
+  if ((*coordinate_info) == (XPoint *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'","...");
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -8902,8 +9562,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
     line_width = 1;
 
   char
-    command[MagickPathExtent],
-    text[MagickPathExtent];
+    command[MagickPathExtent];
 
   Cursor
     cursor;
@@ -8913,9 +9572,6 @@ static MagickBooleanType XDrawEditImage(Display *display,
     x,
     y;
 
-  double
-    degrees;
-
   MagickStatusType
     status;
 
@@ -8924,9 +9580,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
 
   unsigned int
     distance,
-    height,
-    max_coordinates,
-    width;
+    max_coordinates;
 
   size_t
     state;
@@ -8949,15 +9603,9 @@ static MagickBooleanType XDrawEditImage(Display *display,
   DrawEditContext
     draw_context;
 
-  DrawPreviewInput
-    preview_input;
-
   const DrawShapeTargets
     shape_targets = { &line_info, &rectangle_info, &coordinate_info, &state,
       &number_coordinates, &max_coordinates };
-
-  DrawShapeInput
-    shape_input;
 
   const DrawPointerTargets
     pointer_targets = { &x, &y, &state, &event, &element };
@@ -8968,24 +9616,12 @@ static MagickBooleanType XDrawEditImage(Display *display,
   /*
     Allocate polygon info.
   */
-  max_coordinates=2048;
-  coordinate_info=(XPoint *) AcquireQuantumMemory((size_t) max_coordinates,
-    sizeof(*coordinate_info));
-  if (coordinate_info == (XPoint *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'","...");
-      return(MagickFalse);
-    }
+  if (XAcquireDrawCoordinates(exception,&shape_targets) == MagickFalse)
+    return(MagickFalse);
   /*
     Map Command widget.
   */
-  (void) CloneString(&windows->command.name,"Draw");
-  windows->command.data=4;
-  (void) XCommandWidget(display,windows,DrawMenu,(XEvent *) NULL);
-  (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
+  XMapDrawCommandWidget(display,windows,DrawMenu);
   /*
     Wait for first button press.
   */
@@ -9005,303 +9641,26 @@ static MagickBooleanType XDrawEditImage(Display *display,
   draw_context.DrawCommands=DrawCommands;
   for ( ; ; )
   {
-    XQueryPosition(display,windows->image.id,&x,&y);
-    (void) XSelectInput(display,windows->image.id,
-      windows->image.attributes.event_mask | PointerMotionMask);
-    (void) XCheckDefineCursor(display,windows->image.id,cursor);
-    state=DefaultState;
-    do
-    {
-      if (windows->info.mapped != MagickFalse)
-        {
-          /*
-            Display pointer position.
-          */
-          (void) FormatLocaleString(text,MagickPathExtent," %+d%+d ",
-            x+windows->image.x,y+windows->image.y);
-          XInfoWidget(display,windows,text);
-        }
-      /*
-        Wait for next event.
-      */
-      XScreenEvent(display,windows,&event,exception);
-      if (event.xany.window == windows->command.id)
-        {
-          XDrawCommand(&draw_context,&pointer_targets,&style_targets);
-          continue;
-        }
-      switch (event.type)
-      {
-        case ButtonPress:
-        {
-          XDrawButtonPress(&draw_context,event,&pointer_targets);
-          break;
-        }
-        case ButtonRelease:
-          break;
-        case Expose:
-          break;
-        case KeyPress:
-        {
-          XDrawKeyPress(&draw_context,&pointer_targets);
-          break;
-        }
-        case MotionNotify:
-        {
-          /*
-            Map and unmap Info widget as text cursor crosses its boundaries.
-          */
-          x=event.xmotion.x;
-          y=event.xmotion.y;
-          XTrackInfoWidget(display,windows,x,y);
-          break;
-        }
-      }
-    } while ((state & ExitState) == 0);
-    (void) XSelectInput(display,windows->image.id,
-      windows->image.attributes.event_mask);
-    (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+    XWaitForDrawStart(&draw_context,&pointer_targets,&style_targets);
     if ((state & EscapeState) != 0)
       break;
     /*
       Draw element as pointer moves until the button is released.
     */
     distance=0;
-    degrees=0.0;
-    line_info.x1=x;
-    line_info.y1=y;
-    line_info.x2=x;
-    line_info.y2=y;
-    rectangle_info.x=(ssize_t) x;
-    rectangle_info.y=(ssize_t) y;
-    rectangle_info.width=0;
-    rectangle_info.height=0;
-    number_coordinates=1;
-    coordinate_info->x=x;
-    coordinate_info->y=y;
-    (void) XSetFunction(display,windows->image.highlight_context,GXinvert);
-    state=DefaultState;
-    do
-    {
-      preview_input.element=element;
-      preview_input.number_coordinates=number_coordinates;
-      preview_input.coordinate_info=coordinate_info;
-      preview_input.distance=distance;
-      preview_input.line_info=line_info;
-      preview_input.rectangle_info=rectangle_info;
-      switch (element)
-      {
-        case PointElement:
-        default:
-        {
-          XPreviewPoint(&draw_context,&preview_input);
-          break;
-        }
-        case LineElement:
-        {
-          XPreviewLine(&draw_context,&preview_input,&degrees);
-          break;
-        }
-        case RectangleElement:
-        case FillRectangleElement:
-        {
-          XPreviewRectangle(&draw_context,&preview_input);
-          break;
-        }
-        case CircleElement:
-        case FillCircleElement:
-        case EllipseElement:
-        case FillEllipseElement:
-        {
-          XPreviewEllipse(&draw_context,&preview_input);
-          break;
-        }
-        case PolygonElement:
-        case FillPolygonElement:
-        {
-          XPreviewPolyline(&draw_context,&preview_input);
-          XPreviewLine(&draw_context,&preview_input,&degrees);
-          break;
-        }
-      }
-      /*
-        Wait for next event.
-      */
-      XScreenEvent(display,windows,&event,exception);
-      switch (element)
-      {
-        case PointElement:
-        default:
-        {
-          XPreviewPolyline(&draw_context,&preview_input);
-          break;
-        }
-        case LineElement:
-        {
-          XPreviewLongLine(&draw_context,&preview_input);
-          break;
-        }
-        case RectangleElement:
-        case FillRectangleElement:
-        {
-          XPreviewRectangleErase(&draw_context,&preview_input);
-          break;
-        }
-        case CircleElement:
-        case FillCircleElement:
-        case EllipseElement:
-        case FillEllipseElement:
-        {
-          XPreviewEllipseErase(&draw_context,&preview_input);
-          break;
-        }
-        case PolygonElement:
-        case FillPolygonElement:
-        {
-          XPreviewPolyline(&draw_context,&preview_input);
-          XPreviewLongLine(&draw_context,&preview_input);
-          break;
-        }
-      }
-      shape_input.element=element;
-      shape_input.distance=distance;
-      switch (event.type)
-      {
-        case ButtonPress:
-          break;
-        case ButtonRelease:
-        {
-          XDrawButtonRelease(&draw_context,&shape_input,event,&shape_targets);
-          break;
-        }
-        case Expose:
-          break;
-        case MotionNotify:
-        {
-          XDrawMotion(&draw_context,&shape_input,event,&shape_targets);
-          break;
-        }
-        default:
-          break;
-      }
-      /*
-        Check boundary conditions.
-      */
-      if (line_info.x2 < 0)
-        line_info.x2=0;
-      else
-        if (line_info.x2 > (int) windows->image.width)
-          line_info.x2=(short) windows->image.width;
-      if (line_info.y2 < 0)
-        line_info.y2=0;
-      else
-        if (line_info.y2 > (int) windows->image.height)
-          line_info.y2=(short) windows->image.height;
-      distance=(unsigned int)
-        (((line_info.x2-line_info.x1+1)*(line_info.x2-line_info.x1+1))+
-         ((line_info.y2-line_info.y1+1)*(line_info.y2-line_info.y1+1)));
-      if (IsSelectionMovedOrDone(rectangle_info,x,y,state) != MagickFalse)
-        {
-          rectangle_info=XFitSelectionRectangle(windows,x,y,rectangle_info);
-        }
-    } while ((state & ExitState) == 0);
-    (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
-    if (IsPolygonElement(element) != MagickFalse)
-      {
-        rectangle_info=XDrawPolygonBounds(coordinate_info,number_coordinates,
-          rectangle_info);
-      }
-    else
-      if (distance <= 9)
-        continue;
-      else
-        if (IsBoxedElement(element) != MagickFalse)
-          {
-            rectangle_info.width--;
-            rectangle_info.height--;
-          }
+    XStartDrawElement(&pointer_targets,&shape_targets);
+    XTrackDrawElement(&draw_context,&pointer_targets,&shape_targets,&distance);
+    if (XFitDrawBounds(&pointer_targets,&shape_targets,distance) != MagickFalse)
+      continue;
     /*
       Drawing is relative to image configuration.
     */
-    draw_info.x=(int) rectangle_info.x;
-    draw_info.y=(int) rectangle_info.y;
-    (void) XMagickCommand(display,resource_info,windows,SaveToUndoBufferCommand,
-      image,exception);
-    width=(unsigned int) (*image)->columns;
-    height=(unsigned int) (*image)->rows;
-    x=0;
-    y=0;
-    if (windows->image.crop_geometry != (char *) NULL)
-      (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
-    draw_info.x+=windows->image.x-((int) line_width/2);
-    if (draw_info.x < 0)
-      draw_info.x=0;
-    draw_info.x=(int) width*draw_info.x/windows->image.ximage->width;
-    draw_info.y+=windows->image.y-((int) line_width/2);
-    if (draw_info.y < 0)
-      draw_info.y=0;
-    draw_info.y=(int) height*draw_info.y/windows->image.ximage->height;
-    draw_info.width=(unsigned int) rectangle_info.width+(line_width << 1);
-    if (draw_info.width > (unsigned int) (*image)->columns)
-      draw_info.width=(unsigned int) (*image)->columns;
-    draw_info.height=(unsigned int) rectangle_info.height+(line_width << 1);
-    if (draw_info.height > (unsigned int) (*image)->rows)
-      draw_info.height=(unsigned int) (*image)->rows;
-    (void) FormatLocaleString(draw_info.geometry,MagickPathExtent,"%ux%u%+d%+d",
-      width*draw_info.width/(unsigned int) windows->image.ximage->width,
-      height*draw_info.height/(unsigned int) windows->image.ximage->height,
-      draw_info.x+x,draw_info.y+y);
-    /*
-      Initialize drawing attributes.
-    */
-    draw_info.degrees=0.0;
-    draw_info.element=element;
-    draw_info.stipple=stipple;
-    draw_info.line_width=line_width;
-    draw_info.line_info=line_info;
-    if (line_info.x1 > (int) (line_width/2))
-      draw_info.line_info.x1=(short) line_width/2;
-    if (line_info.y1 > (int) (line_width/2))
-      draw_info.line_info.y1=(short) line_width/2;
-    draw_info.line_info.x2=(short) (line_info.x2-line_info.x1+
-      ((int) line_width/2));
-    draw_info.line_info.y2=(short) (line_info.y2-line_info.y1+
-      ((int) line_width/2));
-    if ((draw_info.line_info.x2 < 0) && (draw_info.line_info.y2 < 0))
-      {
-        draw_info.line_info.x2=(-draw_info.line_info.x2);
-        draw_info.line_info.y2=(-draw_info.line_info.y2);
-      }
-    if (draw_info.line_info.x2 < 0)
-      {
-        draw_info.line_info.x2=(-draw_info.line_info.x2);
-        Swap(draw_info.line_info.x1,draw_info.line_info.x2);
-      }
-    if (draw_info.line_info.y2 < 0)
-      {
-        draw_info.line_info.y2=(-draw_info.line_info.y2);
-        Swap(draw_info.line_info.y1,draw_info.line_info.y2);
-      }
-    draw_info.rectangle_info=rectangle_info;
-    if (draw_info.rectangle_info.x > (ssize_t) (line_width/2))
-      draw_info.rectangle_info.x=(ssize_t) line_width/2;
-    if (draw_info.rectangle_info.y > (ssize_t) (line_width/2))
-      draw_info.rectangle_info.y=(ssize_t) line_width/2;
-    draw_info.number_coordinates=(unsigned int) number_coordinates;
-    draw_info.coordinate_info=coordinate_info;
-    windows->pixel_info->pen_color=windows->pixel_info->pen_colors[pen_id];
+    XPrepareDrawInfo(&draw_context,&pointer_targets,&shape_targets,
+      &style_targets);
     /*
       Draw element on image.
     */
-    XSetCursorState(display,windows,MagickTrue);
-    XCheckRefreshWindows(display,windows);
-    status=XDrawImage(display,windows->pixel_info,&draw_info,*image,exception);
-    XSetCursorState(display,windows,MagickFalse);
-    /*
-      Update image colormap and return to image drawing.
-    */
-    XConfigureImageColormap(display,resource_info,windows,*image,exception);
-    (void) XConfigureImage(display,resource_info,windows,*image,exception);
+    status=XDrawElementImage(&draw_context,&draw_info);
   }
   XSetCursorState(display,windows,MagickFalse);
   coordinate_info=(XPoint *) RelinquishMagickMemory(coordinate_info);
@@ -12474,61 +12833,10 @@ static void XMagnifyImage(Display *display,XWindows *windows,XEvent *event,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static void XMagnifyWindowCommand(Display *display,XWindows *windows,
-  const MagickStatusType state,const KeySym key_symbol,ExceptionInfo *exception)
+static void XSelectMagnifyDigit(XWindows *windows,const KeySym key_symbol)
 {
-  unsigned int
-    quantum;
-
-  /*
-    User specified a magnify factor or position.
-  */
-  quantum=1;
-  if ((state & Mod1Mask) != 0)
-    quantum=10;
   switch ((int) key_symbol)
   {
-    case QuitCommand:
-    {
-      (void) XWithdrawWindow(display,windows->magnify.id,
-        windows->magnify.screen);
-      break;
-    }
-    case XK_Home:
-    case XK_KP_Home:
-    {
-      windows->magnify.x=(int) windows->image.width/2;
-      windows->magnify.y=(int) windows->image.height/2;
-      break;
-    }
-    case XK_Left:
-    case XK_KP_Left:
-    {
-      if (windows->magnify.x > 0)
-        windows->magnify.x-=(int) quantum;
-      break;
-    }
-    case XK_Up:
-    case XK_KP_Up:
-    {
-      if (windows->magnify.y > 0)
-        windows->magnify.y-=(int) quantum;
-      break;
-    }
-    case XK_Right:
-    case XK_KP_Right:
-    {
-      if (windows->magnify.x < (int) (windows->image.ximage->width-1))
-        windows->magnify.x+=(int) quantum;
-      break;
-    }
-    case XK_Down:
-    case XK_KP_Down:
-    {
-      if (windows->magnify.y < (int) (windows->image.ximage->height-1))
-        windows->magnify.y+=(int) quantum;
-      break;
-    }
     case XK_0:
     case XK_1:
     case XK_2:
@@ -12559,6 +12867,95 @@ static void XMagnifyWindowCommand(Display *display,XWindows *windows,
     }
     default:
       break;
+  }
+}
+
+static void XMoveMagnifyRightDown(XWindows *windows,const unsigned int quantum,
+  const KeySym key_symbol)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_Right:
+    case XK_KP_Right:
+    {
+      if (windows->magnify.x < (int) (windows->image.ximage->width-1))
+        windows->magnify.x+=(int) quantum;
+      break;
+    }
+    case XK_Down:
+    case XK_KP_Down:
+    {
+      if (windows->magnify.y < (int) (windows->image.ximage->height-1))
+        windows->magnify.y+=(int) quantum;
+      break;
+    }
+    default:
+    {
+      XSelectMagnifyDigit(windows,key_symbol);
+      break;
+    }
+  }
+}
+
+static void XMoveMagnifyPosition(XWindows *windows,const unsigned int quantum,
+  const KeySym key_symbol)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_Left:
+    case XK_KP_Left:
+    {
+      if (windows->magnify.x > 0)
+        windows->magnify.x-=(int) quantum;
+      break;
+    }
+    case XK_Up:
+    case XK_KP_Up:
+    {
+      if (windows->magnify.y > 0)
+        windows->magnify.y-=(int) quantum;
+      break;
+    }
+    default:
+    {
+      XMoveMagnifyRightDown(windows,quantum,key_symbol);
+      break;
+    }
+  }
+}
+
+static void XMagnifyWindowCommand(Display *display,XWindows *windows,
+  const MagickStatusType state,const KeySym key_symbol,ExceptionInfo *exception)
+{
+  unsigned int
+    quantum;
+
+  /*
+    User specified a magnify factor or position.
+  */
+  quantum=1;
+  if ((state & Mod1Mask) != 0)
+    quantum=10;
+  switch ((int) key_symbol)
+  {
+    case QuitCommand:
+    {
+      (void) XWithdrawWindow(display,windows->magnify.id,
+        windows->magnify.screen);
+      break;
+    }
+    case XK_Home:
+    case XK_KP_Home:
+    {
+      windows->magnify.x=(int) windows->image.width/2;
+      windows->magnify.y=(int) windows->image.height/2;
+      break;
+    }
+    default:
+    {
+      XMoveMagnifyPosition(windows,quantum,key_symbol);
+      break;
+    }
   }
   XMakeMagnifyImage(display,windows,exception);
 }
@@ -18706,6 +19103,78 @@ static void XClampImageOffset(XWindows *windows)
 %      to trim.
 %
 */
+static MagickBooleanType XOffsetImageWindowDown(XWindows *windows,
+  const KeySym key_symbol,const unsigned int y_offset)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_Prior:
+    case XK_Down:
+    case XK_KP_Down:
+    {
+      windows->image.y+=(int) y_offset;
+      break;
+    }
+    default:
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType XOffsetImageWindowUpRight(XWindows *windows,
+  const KeySym key_symbol,const unsigned int x_offset,
+  const unsigned int y_offset)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_Next:
+    case XK_Up:
+    case XK_KP_Up:
+    {
+      windows->image.y-=(int) y_offset;
+      break;
+    }
+    case XK_Right:
+    case XK_KP_Right:
+    {
+      windows->image.x+=(int) x_offset;
+      break;
+    }
+    default:
+    {
+      return(XOffsetImageWindowDown(windows,key_symbol,y_offset));
+    }
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType XOffsetImageWindow(XWindows *windows,
+  const KeySym key_symbol,const unsigned int x_offset,
+  const unsigned int y_offset)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_Home:
+    case XK_KP_Home:
+    {
+      windows->image.x=(int) windows->image.width/2;
+      windows->image.y=(int) windows->image.height/2;
+      break;
+    }
+    case XK_Left:
+    case XK_KP_Left:
+    {
+      windows->image.x-=(int) x_offset;
+      break;
+    }
+    default:
+    {
+      return(XOffsetImageWindowUpRight(windows,key_symbol,x_offset,y_offset));
+    }
+  }
+  return(MagickTrue);
+}
+
 static void XTranslateImage(Display *display,XWindows *windows,
   Image *image,const KeySym key_symbol)
 {
@@ -18727,44 +19196,8 @@ static void XTranslateImage(Display *display,XWindows *windows,
   y_offset=windows->image.height;
   if (image->montage != (char *) NULL)
     (void) XParseGeometry(image->montage,&x,&y,&x_offset,&y_offset);
-  switch ((int) key_symbol)
-  {
-    case XK_Home:
-    case XK_KP_Home:
-    {
-      windows->image.x=(int) windows->image.width/2;
-      windows->image.y=(int) windows->image.height/2;
-      break;
-    }
-    case XK_Left:
-    case XK_KP_Left:
-    {
-      windows->image.x-=(int) x_offset;
-      break;
-    }
-    case XK_Next:
-    case XK_Up:
-    case XK_KP_Up:
-    {
-      windows->image.y-=(int) y_offset;
-      break;
-    }
-    case XK_Right:
-    case XK_KP_Right:
-    {
-      windows->image.x+=(int) x_offset;
-      break;
-    }
-    case XK_Prior:
-    case XK_Down:
-    case XK_KP_Down:
-    {
-      windows->image.y+=(int) y_offset;
-      break;
-    }
-    default:
-      return;
-  }
+  if (XOffsetImageWindow(windows,key_symbol,x_offset,y_offset) == MagickFalse)
+    return;
   /*
     Check boundary conditions.
   */
@@ -19190,195 +19623,256 @@ static Image *XVisualDirectoryImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
-  XResourceInfo *resource_info,Image *image,ExceptionInfo *exception)
+static MagickBooleanType XFindBackgroundWindow(Display *display,
+  char *window_id,const Window root_window,XWindowInfo *window_info)
+{
+  if (LocaleCompare(window_id,"root") == 0)
+    (*window_info).id=root_window;
+  else
+    {
+      if (isdigit((int) ((unsigned char) *window_id)) != 0)
+        (*window_info).id=XWindowByID(display,root_window,
+          (Window) strtol((char *) window_id,(char **) NULL,0));
+      if ((*window_info).id == (Window) NULL)
+        (*window_info).id=XWindowByName(display,root_window,window_id);
+    }
+  if ((*window_info).id == (Window) NULL)
+    {
+      ThrowXWindowException(XServerError,"NoWindowWithSpecifiedIDExists",
+        window_id);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static void XGetBackgroundVisualType(Display *display,
+  const XWindowInfo *window_info,XWindowAttributes *window_attributes,
+  char *visual_type)
+{
+  int
+    status;
+
+  (*window_attributes).width=XDisplayWidth(display,XDefaultScreen(display));
+  (*window_attributes).height=XDisplayHeight(display,XDefaultScreen(display));
+  (void) CopyMagickString(visual_type,"default",MagickPathExtent);
+  status=XGetWindowAttributes(display,(*window_info).id,window_attributes);
+  if (status != 0)
+    (void) FormatLocaleString(visual_type,MagickPathExtent,"0x%lx",
+      XVisualIDFromVisual((*window_attributes).visual));
+}
+
+static void XFitBackgroundWindow(const XWindowAttributes *window_attributes,
+  XWindowInfo *window_info)
 {
   char
-    geometry[MagickPathExtent],
-    visual_type[MagickPathExtent];
-
-  int
-    height,
-    status,
-    width;
+    geometry[MagickPathExtent];
 
   RectangleInfo
     geometry_info;
 
-  static XPixelInfo
-    pixel;
+  (void) FormatLocaleString(geometry,MagickPathExtent,"%ux%u+0+0>",
+    (*window_attributes).width,(*window_attributes).height);
+  geometry_info.width=(*window_info).width;
+  geometry_info.height=(*window_info).height;
+  geometry_info.x=(ssize_t) (*window_info).x;
+  geometry_info.y=(ssize_t) (*window_info).y;
+  (void) ParseMetaGeometry(geometry,&geometry_info.x,&geometry_info.y,
+    &geometry_info.width,&geometry_info.height);
+  (*window_info).width=(unsigned int) geometry_info.width;
+  (*window_info).height=(unsigned int) geometry_info.height;
+  (*window_info).x=(int) geometry_info.x;
+  (*window_info).y=(int) geometry_info.y;
+}
 
-  static XStandardColormap
-    *map_info;
+typedef struct _BackgroundTargets
+{
+  XStandardColormap
+    **map_info;
 
-  static XVisualInfo
-    *visual_info = (XVisualInfo *) NULL;
+  XPixelInfo
+    *pixel;
 
-  static XWindowInfo
-    window_info;
+  XResourceInfo
+    *resources;
 
-  size_t
-    delay;
+  XVisualInfo
+    **visual_info;
 
-  Window
-    root_window;
+  XWindowInfo
+    *window_info;
+} BackgroundTargets;
+
+static void XInitializeBackgroundVisual(Display *display,const Image *image,
+  char *visual_type,const BackgroundTargets *targets)
+{
+  XStandardColormap
+    **const map_info = targets->map_info;
+
+  XPixelInfo
+    *const pixel = targets->pixel;
+
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XVisualInfo
+    **const visual_info = targets->visual_info;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  /*
+    Allocate standard colormap.
+  */
+  (*map_info)=XAllocStandardColormap();
+  if ((*map_info) == (XStandardColormap *) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"MemoryAllocationFailed",
+      image->filename);
+  (*map_info)->colormap=(Colormap) NULL;
+  (*pixel).pixels=(unsigned long *) NULL;
+  /*
+    Initialize visual info.
+  */
+  (*resources).map_type=(char *) NULL;
+  (*resources).visual_type=visual_type;
+  (*visual_info)=XBestVisualInfo(display,(*map_info),resources);
+  if ((*visual_info) == (XVisualInfo *) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToGetVisual",
+      (*resources).visual_type);
+  /*
+    Initialize window info.
+  */
+  (*window_info).ximage=(XImage *) NULL;
+  (*window_info).matte_image=(XImage *) NULL;
+  (*window_info).pixmap=(Pixmap) NULL;
+  (*window_info).matte_pixmap=(Pixmap) NULL;
+}
+
+static void XCreateBackgroundWindowInfo(Display *display,Image *image,
+  ExceptionInfo *exception,const BackgroundTargets *targets)
+{
+  XStandardColormap
+    **const map_info = targets->map_info;
+
+  XPixelInfo
+    *const pixel = targets->pixel;
+
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XVisualInfo
+    **const visual_info = targets->visual_info;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
 
   XGCValues
     context_values;
 
-  XResourceInfo
-    resources;
-
-  XWindowAttributes
-    window_attributes;
-
-  /*
-    Determine target window.
-  */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  resources=(*resource_info);
-  window_info.id=(Window) NULL;
-  root_window=XRootWindow(display,XDefaultScreen(display));
-  if (LocaleCompare(resources.window_id,"root") == 0)
-    window_info.id=root_window;
-  else
-    {
-      if (isdigit((int) ((unsigned char) *resources.window_id)) != 0)
-        window_info.id=XWindowByID(display,root_window,
-          (Window) strtol((char *) resources.window_id,(char **) NULL,0));
-      if (window_info.id == (Window) NULL)
-        window_info.id=XWindowByName(display,root_window,resources.window_id);
-    }
-  if (window_info.id == (Window) NULL)
-    {
-      ThrowXWindowException(XServerError,"NoWindowWithSpecifiedIDExists",
-        resources.window_id);
-      return(MagickFalse);
-    }
-  /*
-    Determine window visual id.
-  */
-  window_attributes.width=XDisplayWidth(display,XDefaultScreen(display));
-  window_attributes.height=XDisplayHeight(display,XDefaultScreen(display));
-  (void) CopyMagickString(visual_type,"default",MagickPathExtent);
-  status=XGetWindowAttributes(display,window_info.id,&window_attributes);
-  if (status != 0)
-    (void) FormatLocaleString(visual_type,MagickPathExtent,"0x%lx",
-      XVisualIDFromVisual(window_attributes.visual));
-  if (visual_info == (XVisualInfo *) NULL)
-    {
-      /*
-        Allocate standard colormap.
-      */
-      map_info=XAllocStandardColormap();
-      if (map_info == (XStandardColormap *) NULL)
-        ThrowXWindowFatalException(XServerFatalError,"MemoryAllocationFailed",
-          image->filename);
-      map_info->colormap=(Colormap) NULL;
-      pixel.pixels=(unsigned long *) NULL;
-      /*
-        Initialize visual info.
-      */
-      resources.map_type=(char *) NULL;
-      resources.visual_type=visual_type;
-      visual_info=XBestVisualInfo(display,map_info,&resources);
-      if (visual_info == (XVisualInfo *) NULL)
-        ThrowXWindowFatalException(XServerFatalError,"UnableToGetVisual",
-          resources.visual_type);
-      /*
-        Initialize window info.
-      */
-      window_info.ximage=(XImage *) NULL;
-      window_info.matte_image=(XImage *) NULL;
-      window_info.pixmap=(Pixmap) NULL;
-      window_info.matte_pixmap=(Pixmap) NULL;
-    }
-  /*
-    Free previous root colors.
-  */
-  if (window_info.id == root_window)
-    (void) XDestroyWindowColors(display,root_window);
   /*
     Initialize Standard Colormap.
   */
-  resources.colormap=SharedColormap;
-  XMakeStandardColormap(display,visual_info,&resources,image,map_info,&pixel,
-    exception);
+  (*resources).colormap=SharedColormap;
+  XMakeStandardColormap(display,(*visual_info),resources,image,(*map_info),
+    pixel,exception);
   /*
     Graphic context superclass.
   */
-  context_values.background=pixel.foreground_color.pixel;
-  context_values.foreground=pixel.background_color.pixel;
-  pixel.annotate_context=XCreateGC(display,window_info.id,
+  context_values.background=(*pixel).foreground_color.pixel;
+  context_values.foreground=(*pixel).background_color.pixel;
+  (*pixel).annotate_context=XCreateGC(display,(*window_info).id,
     (size_t) (GCBackground | GCForeground),&context_values);
-  if (pixel.annotate_context == (GC) NULL)
+  if ((*pixel).annotate_context == (GC) NULL)
     ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
       image->filename);
   /*
     Initialize Image window attributes.
   */
-  window_info.name=AcquireString("\0");
-  window_info.icon_name=AcquireString("\0");
-  XGetWindowInfo(display,visual_info,map_info,&pixel,(XFontStruct *) NULL,
-    &resources,&window_info);
-  /*
-    Create the X image.
-  */
-  window_info.width=(unsigned int) image->columns;
-  window_info.height=(unsigned int) image->rows;
-  if ((image->columns != window_info.width) ||
-      (image->rows != window_info.height))
+  (*window_info).name=AcquireString("\0");
+  (*window_info).icon_name=AcquireString("\0");
+  XGetWindowInfo(display,(*visual_info),(*map_info),pixel,(XFontStruct *) NULL,
+    resources,window_info);
+}
+
+static void XSizeBackgroundWindow(const Image *image,XWindowInfo *window_info)
+{
+  (*window_info).width=(unsigned int) image->columns;
+  (*window_info).height=(unsigned int) image->rows;
+  if ((image->columns != (*window_info).width) ||
+      (image->rows != (*window_info).height))
     ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
       image->filename);
-  (void) FormatLocaleString(geometry,MagickPathExtent,"%ux%u+0+0>",
-    window_attributes.width,window_attributes.height);
-  geometry_info.width=window_info.width;
-  geometry_info.height=window_info.height;
-  geometry_info.x=(ssize_t) window_info.x;
-  geometry_info.y=(ssize_t) window_info.y;
-  (void) ParseMetaGeometry(geometry,&geometry_info.x,&geometry_info.y,
-    &geometry_info.width,&geometry_info.height);
-  window_info.width=(unsigned int) geometry_info.width;
-  window_info.height=(unsigned int) geometry_info.height;
-  window_info.x=(int) geometry_info.x;
-  window_info.y=(int) geometry_info.y;
-  status=XMakeImage(display,&resources,&window_info,image,window_info.width,
-    window_info.height,exception) == MagickFalse ? 0 : 1;
+}
+
+static void XMakeBackgroundXImage(Display *display,Image *image,
+  ExceptionInfo *exception,const BackgroundTargets *targets)
+{
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  int
+    status;
+
+  status=XMakeImage(display,resources,window_info,image,(*window_info).width,
+    (*window_info).height,exception) == MagickFalse ? 0 : 1;
   if (status == MagickFalse)
     ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
       image->filename);
-  window_info.x=0;
-  window_info.y=0;
-  if (resource_info->debug != MagickFalse)
-    {
-      (void) LogMagickEvent(X11Event,GetMagickModule(),
-        "Image: %s[%.17g] %.17gx%.17g ",image->filename,(double) image->scene,
-        (double) image->columns,(double) image->rows);
-      if (image->colors != 0)
-        (void) LogMagickEvent(X11Event,GetMagickModule(),"%.17gc ",(double)
-          image->colors);
-      (void) LogMagickEvent(X11Event,GetMagickModule(),"%s",image->magick);
-    }
-  /*
-    Adjust image dimensions as specified by backdrop or geometry options.
-  */
-  width=(int) window_info.width;
-  height=(int) window_info.height;
-  if (resources.backdrop != MagickFalse)
+  (*window_info).x=0;
+  (*window_info).y=0;
+}
+
+typedef struct _BackgroundInput
+{
+  Display
+    *display;
+
+  Image
+    *image;
+
+  const XWindowAttributes
+    *window_attributes;
+} BackgroundInput;
+
+static void XAdjustBackgroundSize(const BackgroundInput *input,
+  const BackgroundTargets *targets,int *width,int *height)
+{
+  Display
+    *const display = input->display;
+
+  Image
+    *const image = input->image;
+
+  const XWindowAttributes
+    *const window_attributes = input->window_attributes;
+
+  XResourceInfo
+    *const resources = targets->resources;
+
+  XVisualInfo
+    **const visual_info = targets->visual_info;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  (*width)=(int) (*window_info).width;
+  (*height)=(int) (*window_info).height;
+  if ((*resources).backdrop != MagickFalse)
     {
       /*
         Center image on window.
       */
-      window_info.x=(window_attributes.width/2)-(window_info.ximage->width/2);
-      window_info.y=(window_attributes.height/2)-(window_info.ximage->height/2);
-      width=window_attributes.width;
-      height=window_attributes.height;
+      (*window_info).x=((*window_attributes).width/2)-
+        ((*window_info).ximage->width/2);
+      (*window_info).y=((*window_attributes).height/2)-
+        ((*window_info).ximage->height/2);
+      (*width)=(*window_attributes).width;
+      (*height)=(*window_attributes).height;
     }
-  if ((resources.image_geometry != (char *) NULL) &&
-      (*resources.image_geometry != '\0'))
+  if (((*resources).image_geometry != (char *) NULL) &&
+      (*(*resources).image_geometry != '\0'))
     {
       char
         default_geometry[MagickPathExtent];
@@ -19399,41 +19893,149 @@ MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
           "MemoryAllocationFailed",image->filename);
       size_hints->flags=0L;
       (void) FormatLocaleString(default_geometry,MagickPathExtent,"%dx%d",
-        width,height);
-      flags=XWMGeometry(display,visual_info->screen,resources.image_geometry,
-        default_geometry,window_info.border_width,size_hints,&window_info.x,
-        &window_info.y,&width,&height,&gravity);
+        (*width),(*height));
+      flags=XWMGeometry(display,(*visual_info)->screen,
+        (*resources).image_geometry,default_geometry,
+        (*window_info).border_width,size_hints,&(*window_info).x,
+        &(*window_info).y,width,height,&gravity);
       if (flags & (XValue | YValue))
         {
-          width=window_attributes.width;
-          height=window_attributes.height;
+          (*width)=(*window_attributes).width;
+          (*height)=(*window_attributes).height;
         }
       (void) XFree((void *) size_hints);
     }
+}
+
+static void XDisplayBackgroundPixmap(const BackgroundInput *input,
+  const BackgroundTargets *targets,const int width,const int height)
+{
+  Display
+    *const display = input->display;
+
+  Image
+    *const image = input->image;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  size_t
+    delay;
+
   /*
     Create the X pixmap.
   */
-  window_info.pixmap=XCreatePixmap(display,window_info.id,(unsigned int) width,
-    (unsigned int) height,window_info.depth);
-  if (window_info.pixmap == (Pixmap) NULL)
+  (*window_info).pixmap=XCreatePixmap(display,(*window_info).id,
+    (unsigned int) width,(unsigned int) height,(*window_info).depth);
+  if ((*window_info).pixmap == (Pixmap) NULL)
     ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXPixmap",
       image->filename);
   /*
     Display pixmap on the window.
   */
-  if (((unsigned int) width > window_info.width) ||
-      ((unsigned int) height > window_info.height))
-    (void) XFillRectangle(display,window_info.pixmap,
-      window_info.annotate_context,0,0,(unsigned int) width,
+  if (((unsigned int) width > (*window_info).width) ||
+      ((unsigned int) height > (*window_info).height))
+    (void) XFillRectangle(display,(*window_info).pixmap,
+      (*window_info).annotate_context,0,0,(unsigned int) width,
       (unsigned int) height);
-  (void) XPutImage(display,window_info.pixmap,window_info.annotate_context,
-    window_info.ximage,0,0,window_info.x,window_info.y,(unsigned int)
-    window_info.width,(unsigned int) window_info.height);
-  (void) XSetWindowBackgroundPixmap(display,window_info.id,window_info.pixmap);
-  (void) XClearWindow(display,window_info.id);
+  (void) XPutImage(display,(*window_info).pixmap,
+    (*window_info).annotate_context,(*window_info).ximage,0,0,
+    (*window_info).x,(*window_info).y,(unsigned int) (*window_info).width,
+    (unsigned int) (*window_info).height);
+  (void) XSetWindowBackgroundPixmap(display,(*window_info).id,
+    (*window_info).pixmap);
+  (void) XClearWindow(display,(*window_info).id);
   delay=1000*image->delay/(size_t) MagickMax(image->ticks_per_second,1L);
   XDelay(display,delay == 0UL ? 10UL : delay);
   (void) XSync(display,MagickFalse);
+}
+
+MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
+  XResourceInfo *resource_info,Image *image,ExceptionInfo *exception)
+{
+  char
+    visual_type[MagickPathExtent];
+
+  int
+    height,
+    width;
+
+  static XPixelInfo
+    pixel;
+
+  static XStandardColormap
+    *map_info;
+
+  static XVisualInfo
+    *visual_info = (XVisualInfo *) NULL;
+
+  static XWindowInfo
+    window_info;
+
+  Window
+    root_window;
+
+  XResourceInfo
+    resources;
+
+  BackgroundInput
+    input;
+
+  const BackgroundTargets
+    targets = { &map_info, &pixel, &resources, &visual_info, &window_info };
+
+  XWindowAttributes
+    window_attributes;
+
+  /*
+    Determine target window.
+  */
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  resources=(*resource_info);
+  window_info.id=(Window) NULL;
+  root_window=XRootWindow(display,XDefaultScreen(display));
+  if (XFindBackgroundWindow(display,resources.window_id,root_window,
+      &window_info) == MagickFalse)
+    return(MagickFalse);
+  /*
+    Determine window visual id.
+  */
+  XGetBackgroundVisualType(display,&window_info,&window_attributes,visual_type);
+  if (visual_info == (XVisualInfo *) NULL)
+    XInitializeBackgroundVisual(display,image,visual_type,&targets);
+  /*
+    Free previous root colors.
+  */
+  if (window_info.id == root_window)
+    (void) XDestroyWindowColors(display,root_window);
+  XCreateBackgroundWindowInfo(display,image,exception,&targets);
+  /*
+    Create the X image.
+  */
+  XSizeBackgroundWindow(image,&window_info);
+  XFitBackgroundWindow(&window_attributes,&window_info);
+  XMakeBackgroundXImage(display,image,exception,&targets);
+  if (resource_info->debug != MagickFalse)
+    {
+      (void) LogMagickEvent(X11Event,GetMagickModule(),
+        "Image: %s[%.17g] %.17gx%.17g ",image->filename,(double) image->scene,
+        (double) image->columns,(double) image->rows);
+      if (image->colors != 0)
+        (void) LogMagickEvent(X11Event,GetMagickModule(),"%.17gc ",(double)
+          image->colors);
+      (void) LogMagickEvent(X11Event,GetMagickModule(),"%s",image->magick);
+    }
+  /*
+    Adjust image dimensions as specified by backdrop or geometry options.
+  */
+  input.display=display;
+  input.image=image;
+  input.window_attributes=(&window_attributes);
+  XAdjustBackgroundSize(&input,&targets,&width,&height);
+  XDisplayBackgroundPixmap(&input,&targets,width,height);
   return(window_info.id == root_window ? MagickTrue : MagickFalse);
 }
 
