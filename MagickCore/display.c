@@ -4831,6 +4831,32 @@ static void XSelectDisplaceGeometry(Display *display,XWindows *windows,
   (*compose)=DisplaceCompositeOp;
 }
 
+static void XSetBlendAlpha(Image *image,CacheView *image_view,
+  const Quantum opacity,ExceptionInfo *exception)
+{
+  int
+    x,
+    y;
+
+  Quantum
+    *q;
+
+  for (y=0; y < (int) image->rows; y++)
+  {
+    q=GetCacheViewAuthenticPixels(image_view,0,(ssize_t) y,image->columns,1,
+      exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (int) image->columns; x++)
+    {
+      SetPixelAlpha(image,opacity,q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      break;
+  }
+}
+
 static MagickBooleanType XCompositeImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -5190,17 +5216,8 @@ static MagickBooleanType XCompositeImage(Display *display,
       CacheView
         *image_view;
 
-      int
-        y;
-
       Quantum
         opacity;
-
-      int
-        x;
-
-      Quantum
-        *q;
 
       /*
         Create mattes for blending.
@@ -5212,20 +5229,7 @@ static MagickBooleanType XCompositeImage(Display *display,
         return(MagickFalse);
       image->alpha_trait=BlendPixelTrait;
       image_view=AcquireAuthenticCacheView(image,exception);
-      for (y=0; y < (int) image->rows; y++)
-      {
-        q=GetCacheViewAuthenticPixels(image_view,0,(ssize_t) y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          break;
-        for (x=0; x < (int) image->columns; x++)
-        {
-          SetPixelAlpha(image,opacity,q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-          break;
-      }
+      XSetBlendAlpha(image,image_view,opacity,exception);
       image_view=DestroyCacheView(image_view);
     }
   /*
