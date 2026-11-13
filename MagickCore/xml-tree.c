@@ -1903,6 +1903,43 @@ static MagickBooleanType SkipDoctypeMarkup(XMLTreeRoot *root,char **xml)
   return(MagickTrue);
 }
 
+typedef struct _EntityHeadTargets
+{
+  char
+    **xml,
+    **c,
+    **n,
+    **v,
+    *q;
+} EntityHeadTargets;
+
+static MagickBooleanType ParseEntityDeclarationHead(
+  const EntityHeadTargets *targets)
+{
+  char
+    **const xml = targets->xml,
+    **const c = targets->c,
+    **const n = targets->n,
+    **const v = targets->v,
+    *const q = targets->q;
+
+  if (strspn(*xml+8,XMLWhitespace) == 0)
+    return(MagickFalse);
+  *xml+=strspn(*xml+8,XMLWhitespace)+8;
+  *c=(*xml);
+  *n=(*xml)+strspn(*xml,XMLWhitespace "%");
+  if ((isalpha((int) ((unsigned char) **n)) == 0) && (**n != '_'))
+    return(MagickFalse);
+  *xml=(*n)+strcspn(*n,XMLWhitespace);
+  if (**xml == '\0')
+    return(MagickFalse);
+  **xml=';';
+  *v=(*xml)+strspn(*xml+1,XMLWhitespace)+1;
+  *q=(**v);
+  (*v)++;
+  return(MagickTrue);
+}
+
 static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
   size_t length,ExceptionInfo *exception)
 {
@@ -1913,6 +1950,9 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
     **predefined_entities,
     q,
     *v;
+
+  EntityHeadTargets
+    entity_targets;
 
   ssize_t
     i;
@@ -1933,20 +1973,13 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
         /*
           Parse entity definitions.
         */
-        if (strspn(xml+8,XMLWhitespace) == 0)
+        entity_targets.xml=(&xml);
+        entity_targets.c=(&c);
+        entity_targets.n=(&n);
+        entity_targets.v=(&v);
+        entity_targets.q=(&q);
+        if (ParseEntityDeclarationHead(&entity_targets) == MagickFalse)
           break;
-        xml+=strspn(xml+8,XMLWhitespace)+8;
-        c=xml;
-        n=xml+strspn(xml,XMLWhitespace "%");
-        if ((isalpha((int) ((unsigned char) *n)) == 0) && (*n != '_'))
-          break;
-        xml=n+strcspn(n,XMLWhitespace);
-        if (*xml == '\0')
-          break;
-        *xml=';';
-        v=xml+strspn(xml+1,XMLWhitespace)+1;
-        q=(*v);
-        v++;
         if ((q != '"') && (q != '\''))
           {
             /*
