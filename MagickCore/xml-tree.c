@@ -2721,6 +2721,42 @@ static MagickBooleanType SkipToRootTag(char **p,ExceptionInfo *exception)
   return(MagickTrue);
 }
 
+typedef struct _XMLTreeUTF8Targets
+{
+  char
+    **utf8;
+
+  size_t
+    *length;
+} XMLTreeUTF8Targets;
+
+static MagickBooleanType ConvertXMLTreeToUTF8(const char *xml,
+  ExceptionInfo *exception,const XMLTreeUTF8Targets *targets)
+{
+  char
+    **const utf8 = targets->utf8;
+
+  size_t
+    *const length = targets->length;
+
+  *length=strlen(xml);
+  *utf8=ConvertUTF16ToUTF8(xml,length);
+  if (*utf8 == (char *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+        "ParseError","UTF16 to UTF8 failed");
+      return(MagickFalse);
+    }
+  if (*length == 0)
+    {
+      *utf8=DestroyString(*utf8);
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+        "ParseError","root tag missing");
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
 {
   char
@@ -2744,6 +2780,9 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
   XMLTreeRoot
     *root;
 
+  XMLTreeUTF8Targets
+    utf8_targets;
+
   /*
     Convert xml-string to UTF8.
   */
@@ -2754,21 +2793,10 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
       return((XMLTreeInfo *) NULL);
     }
   root=(XMLTreeRoot *) NewXMLTreeTag((char *) NULL);
-  length=strlen(xml);
-  utf8=ConvertUTF16ToUTF8(xml,&length);
-  if (utf8 == (char *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-        "ParseError","UTF16 to UTF8 failed");
-      return((XMLTreeInfo *) NULL);
-    }
-  if (length == 0)
-    {
-      utf8=DestroyString(utf8);
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-        "ParseError","root tag missing");
-      return((XMLTreeInfo *) NULL);
-    }
+  utf8_targets.utf8=(&utf8);
+  utf8_targets.length=(&length);
+  if (ConvertXMLTreeToUTF8(xml,exception,&utf8_targets) == MagickFalse)
+    return((XMLTreeInfo *) NULL);
   terminal=utf8[length-1];
   utf8[length-1]='\0';
   p=utf8;
