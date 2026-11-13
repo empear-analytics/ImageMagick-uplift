@@ -2731,6 +2731,12 @@ typedef struct _AnnotateContext
 
   Cursor
     cursor;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    *text;
 } AnnotateContext;
 
 static void XSetAnnotateMenuInput(const AnnotateContext *context,const int id,
@@ -2945,6 +2951,43 @@ static void XAnnotateCommandBranch(const AnnotateContext *context,
   XAnnotatePointerCommand(context,targets,id);
 }
 
+static void XAnnotateTrackPointer(const AnnotateContext *context,
+  const AnnotateTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  do
+  {
+    if (context->windows->info.mapped != MagickFalse)
+      {
+        /*
+          Display pointer position.
+        */
+        (void) FormatLocaleString(context->text,MagickPathExtent," %+d%+d ",
+          (*x)+context->windows->image.x,(*y)+context->windows->image.y);
+        XInfoWidget(context->display,context->windows,context->text);
+      }
+    /*
+      Wait for next event.
+    */
+    XScreenEvent(context->display,context->windows,event,context->exception);
+    if ((*event).xany.window == context->windows->command.id)
+      {
+        XAnnotateCommandBranch(context,targets);
+        continue;
+      }
+    XAnnotatePointerEvent(context,targets);
+  } while (((*state) & ExitState) == 0);
+}
+
 static MagickBooleanType XAnnotateEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -3046,29 +3089,10 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
   context.font_color_targets=&font_color_targets;
   context.box_color_targets=&box_color_targets;
   context.rotate_targets=&rotate_targets;
+  context.exception=exception;
+  context.text=text;
   context.cursor=cursor;
-  do
-  {
-    if (windows->info.mapped != MagickFalse)
-      {
-        /*
-          Display pointer position.
-        */
-        (void) FormatLocaleString(text,MagickPathExtent," %+d%+d ",
-          x+windows->image.x,y+windows->image.y);
-        XInfoWidget(display,windows,text);
-      }
-    /*
-      Wait for next event.
-    */
-    XScreenEvent(display,windows,&event,exception);
-    if (event.xany.window == windows->command.id)
-      {
-        XAnnotateCommandBranch(&context,&targets);
-        continue;
-      }
-    XAnnotatePointerEvent(&context,&targets);
-  } while ((state & ExitState) == 0);
+  XAnnotateTrackPointer(&context,&targets);
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask);
   (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
