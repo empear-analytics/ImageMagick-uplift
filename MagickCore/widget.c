@@ -15392,6 +15392,37 @@ static void MovePreferencesPointer(const PreferencesContext *context,
     }
 }
 
+static void HandlePreferencesKeyEvent(const PreferencesContext *context,
+  const XEvent event,const PreferencesWidgets *widgets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = widgets->state;
+
+  switch (event.type)
+  {
+    case KeyPress:
+    {
+      PressPreferencesKey(context,event,widgets);
+      break;
+    }
+    case LeaveNotify:
+    {
+      (*state)=LeaveWidgetWindow(windows,event,(*state));
+      break;
+    }
+    case MotionNotify:
+    {
+      MovePreferencesPointer(context,widgets);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XResourceInfo *resource_info,XWindows *windows)
 {
@@ -15498,23 +15529,11 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
         state=ExposeWidgetWindow(windows,event,state);
         break;
       }
-      case KeyPress:
-      {
-        PressPreferencesKey(&context,event,&widgets);
-        break;
-      }
-      case LeaveNotify:
-      {
-        state=LeaveWidgetWindow(windows,event,state);
-        break;
-      }
-      case MotionNotify:
-      {
-        MovePreferencesPointer(&context,&widgets);
-        break;
-      }
       default:
+      {
+        HandlePreferencesKeyEvent(&context,event,&widgets);
         break;
+      }
     }
   } while ((state & ExitState) == 0);
   WithdrawBrowserWidget(display,windows);
