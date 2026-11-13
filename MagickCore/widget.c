@@ -11990,6 +11990,12 @@ typedef struct _ListBrowserWidgets
 
   XWidgetInfo
     *expose_info;
+
+  XWidgetInfo
+    *text_info;
+
+  XWidgetInfo
+    *selection_info;
 } ListBrowserWidgets;
 
 typedef struct _ListBrowserContext
@@ -12026,6 +12032,9 @@ typedef struct _ListBrowserContext
 
   char
     *reply;
+
+  const char
+    *query;
 } ListBrowserContext;
 
 static void ClientListBrowserMessage(const ListBrowserContext *context,
@@ -12990,6 +12999,52 @@ static void InitializeListBrowserList(const ListBrowserContext *context,
     }
 }
 
+static void InitializeListBrowserText(const ListBrowserContext *context,
+  const ListBrowserWidgets *widgets)
+{
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    height = context->height;
+
+  const char
+    *const query = context->query;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const list_info = widgets->list_info;
+
+  XWidgetInfo
+    *const text_info = widgets->text_info;
+
+  XWidgetInfo
+    *const selection_info = widgets->selection_info;
+
+  /*
+    Initialize text information.
+  */
+  XGetWidgetInfo(query,text_info);
+  (*text_info).width=(*reply_info).width;
+  (*text_info).height=height;
+  (*text_info).x=(*list_info).x-(int) (QuantumMargin >> 1);
+  (*text_info).y=QuantumMargin;
+  /*
+    Initialize selection information.
+  */
+  XGetWidgetInfo((char *) NULL,selection_info);
+  (*selection_info).center=MagickFalse;
+  (*selection_info).width=(*list_info).width;
+  (*selection_info).height=(unsigned int) ((9*height) >> 3);
+  (*selection_info).x=(*list_info).x;
+  (*state)&=(unsigned int) (~UpdateConfigurationState);
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -13046,7 +13101,8 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   const ListBrowserWidgets
     list_widgets = { &reply_info, &state, &slider_info, &action_info,
       &cancel_info, &north_info, &south_info, &delay, &scroll_info,
-      &visible_entries, &event, &list_info, &mask, &expose_info };
+      &visible_entries, &event, &list_info, &mask, &expose_info, &text_info,
+      &selection_info };
 
   ListBrowserContext
     list_context;
@@ -13138,6 +13194,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   list_context.action=action;
   list_context.width=width;
   list_context.reply=reply;
+  list_context.query=query;
   do
   {
     if (state & UpdateConfigurationState)
@@ -13146,23 +13203,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
         InitializeListBrowserReply(&list_context,&list_widgets);
         InitializeListBrowserScroll(&list_context,&list_widgets);
         InitializeListBrowserList(&list_context,&list_widgets);
-        /*
-          Initialize text information.
-        */
-        XGetWidgetInfo(query,&text_info);
-        text_info.width=reply_info.width;
-        text_info.height=height;
-        text_info.x=list_info.x-(int) (QuantumMargin >> 1);
-        text_info.y=QuantumMargin;
-        /*
-          Initialize selection information.
-        */
-        XGetWidgetInfo((char *) NULL,&selection_info);
-        selection_info.center=MagickFalse;
-        selection_info.width=list_info.width;
-        selection_info.height=(unsigned int) ((9*height) >> 3);
-        selection_info.x=list_info.x;
-        state&=(unsigned int) (~UpdateConfigurationState);
+        InitializeListBrowserText(&list_context,&list_widgets);
       }
     if (state & RedrawWidgetState)
       {
