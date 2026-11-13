@@ -2087,6 +2087,48 @@ static void GetRequestedMoments(const Image *image,
     }
 }
 
+static MagickBooleanType PrintImageLocations(Image *image,FILE *file,
+  const char *locate,ExceptionInfo *exception)
+{
+  ChannelLocationsReport report;
+
+  ChannelStatistics
+    *channel_statistics;
+
+  ColorspaceType
+    colorspace;
+
+  size_t
+    locations;
+
+  StatisticType
+    statistic_type;
+
+  colorspace=image->colorspace;
+  /*
+    Display minimum, maximum, or mean pixel locations.
+  */
+  statistic_type=(StatisticType) ParseCommandOption(MagickStatisticOptions,
+    MagickFalse,locate);
+  locations=GetLocationsLimit(image);
+  channel_statistics=GetLocationStatistics(image,statistic_type,exception);
+  if (channel_statistics == (ChannelStatistics *) NULL)
+    return(MagickFalse);
+  report.file=file;
+  report.image=image;
+  report.type=statistic_type;
+  report.locations=locations;
+  report.channel_statistics=channel_statistics;
+
+  (void) FormatLocaleFile(file,"Channel %s locations:\n",locate);
+  PrintColorspaceLocations(image,colorspace,report);
+  if (image->alpha_trait != UndefinedPixelTrait)
+    (void) PrintChannelLocations(&report,AlphaPixelChannel,"Alpha");
+  channel_statistics=(ChannelStatistics *) RelinquishMagickMemory(
+    channel_statistics);
+  return(ferror(file) != 0 ? MagickFalse : MagickTrue);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -2133,38 +2175,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   colorspace=image->colorspace;
   locate=GetImageArtifact(image,"identify:locate");
   if (locate != (const char *) NULL)
-    {
-      size_t
-        locations;
-
-      StatisticType
-        statistic_type;
-
-      ChannelLocationsReport report;
-
-      /*
-        Display minimum, maximum, or mean pixel locations.
-      */
-      statistic_type=(StatisticType) ParseCommandOption(MagickStatisticOptions,
-        MagickFalse,locate);
-      locations=GetLocationsLimit(image);
-      channel_statistics=GetLocationStatistics(image,statistic_type,exception);
-      if (channel_statistics == (ChannelStatistics *) NULL)
-        return(MagickFalse);
-      report.file=file;
-      report.image=image;
-      report.type=statistic_type;
-      report.locations=locations;
-      report.channel_statistics=channel_statistics;
-
-      (void) FormatLocaleFile(file,"Channel %s locations:\n",locate);
-      PrintColorspaceLocations(image,colorspace,report);
-      if (image->alpha_trait != UndefinedPixelTrait)
-        (void) PrintChannelLocations(&report,AlphaPixelChannel,"Alpha");
-      channel_statistics=(ChannelStatistics *) RelinquishMagickMemory(
-        channel_statistics);
-      return(ferror(file) != 0 ? MagickFalse : MagickTrue);
-    }
+    return(PrintImageLocations(image,file,locate,exception));
   elapsed_time=GetElapsedTime(&image->timer);
   user_time=GetUserTime(&image->timer);
   GetTimerInfo(&image->timer);
