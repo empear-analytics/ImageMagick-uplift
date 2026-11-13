@@ -13594,6 +13594,9 @@ typedef struct _ROITargets
 
   XEvent
     *event;
+
+  DisplayCommand
+    *display_command;
 } ROITargets;
 
 static void XROIButtonPress(const CropEventInput *event_input,
@@ -14756,6 +14759,32 @@ static void XROISizeRegion(const ROIContext *context,const ROITargets *targets)
   } while (((*state) & ExitState) == 0);
 }
 
+static void XROIWaitCommand(const ROIContext *context,const ROITargets *targets,
+  const RectangleInfo highlight_info)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  DisplayCommand
+    *const display_command = targets->display_command;
+
+  ROICommandInput
+    command_input;
+
+  command_input.display=context->display;
+  command_input.resource_info=context->resource_info;
+  command_input.windows=context->windows;
+  command_input.highlight_info=highlight_info;
+  command_input.ApplyMenu=ApplyMenu;
+  command_input.ApplyCommands=ApplyCommands;
+  command_input.Menus=ROIMenus;
+  command_input.Commands=ROIMenuCommands;
+  XROICommand(&command_input,event,display_command,state);
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -14788,7 +14817,7 @@ static MagickBooleanType XROIImage(Display *display,
     context;
 
   const ROITargets
-    targets = { &x, &y, &roi_info, &state, &event };
+    targets = { &x, &y, &roi_info, &state, &event, &display_command };
 
   const ROIKeyTargets
     key_targets = { &roi_info, &display_command, &state };
@@ -14897,18 +14926,7 @@ static MagickBooleanType XROIImage(Display *display,
       XScreenEvent(display,windows,&event,exception);
       if (event.xany.window == windows->command.id)
         {
-          ROICommandInput
-            command_input;
-
-          command_input.display=display;
-          command_input.resource_info=resource_info;
-          command_input.windows=windows;
-          command_input.highlight_info=highlight_info;
-          command_input.ApplyMenu=ApplyMenu;
-          command_input.ApplyCommands=ApplyCommands;
-          command_input.Menus=ROIMenus;
-          command_input.Commands=ROIMenuCommands;
-          XROICommand(&command_input,&event,&display_command,&state);
+          XROIWaitCommand(&context,&targets,highlight_info);
           continue;
         }
       XHighlightRectangle(display,windows->image.id,
