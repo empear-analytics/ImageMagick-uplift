@@ -3509,6 +3509,15 @@ static const char *GetMagickPropertyLetter(ImageInfo *image_info,
   return(CloneMagickPropertyValue(image_info,image,value));
 }
 
+static const char *GetPathComponentProperty(const Image *image,
+  const PathType type,char *value,const char *string)
+{
+  GetPathComponent(image->magick_filename,type,value);
+  if (*value == '\0')
+    string="";
+  return(string);
+}
+
 MagickExport const char *GetMagickProperty(ImageInfo *image_info,
   Image *image,const char *property,ExceptionInfo *exception)
 {
@@ -3538,9 +3547,7 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
       if (LocaleCompare("basename",property) == 0)
         {
           WarnNoImageReturn("\"%%[%s]\"",property);
-          GetPathComponent(image->magick_filename,BasePath,value);
-          if (*value == '\0')
-            string="";
+          string=GetPathComponentProperty(image,BasePath,value,string);
           break;
         }
       if (LocaleCompare("bit-depth",property) == 0)
@@ -3748,9 +3755,7 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
       if (LocaleCompare("directory",property) == 0)
         {
           WarnNoImageReturn("\"%%[%s]\"",property);
-          GetPathComponent(image->magick_filename,HeadPath,value);
-          if (*value == '\0')
-            string="";
+          string=GetPathComponentProperty(image,HeadPath,value,string);
           break;
         }
       break;
@@ -3771,9 +3776,7 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
       if (LocaleCompare("extension",property) == 0)
         {
           WarnNoImageReturn("\"%%[%s]\"",property);
-          GetPathComponent(image->magick_filename,ExtensionPath,value);
-          if (*value == '\0')
-            string="";
+          string=GetPathComponentProperty(image,ExtensionPath,value,string);
           break;
         }
       break;
