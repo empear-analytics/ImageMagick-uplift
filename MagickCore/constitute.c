@@ -1263,6 +1263,13 @@ static inline MagickBooleanType IsDataTypeChar(const char *p)
     MagickFalse);
 }
 
+static inline MagickBooleanType IsMissingDataSubtype(const char *slash,
+  const char *p)
+{
+  return(((slash == (const char *) NULL) || ((slash+1) >= p)) ? MagickTrue :
+    MagickFalse);
+}
+
 static void NormalizeDataImageType(char *magick)
 {
   char
@@ -1300,7 +1307,7 @@ static MagickBooleanType GetImplicitDataImageType(const char *data_url,
   if (p == type)
     return(MagickFalse);
   slash=(const char *) memchr(type,'/',(size_t) (p-type));
-  if ((slash == (const char *) NULL) || ((slash+1) >= p))
+  if (IsMissingDataSubtype(slash,p) != MagickFalse)
     return(MagickFalse);
   offset=(size_t) (p-(slash+1));
   if (offset >= MagickPathExtent)
