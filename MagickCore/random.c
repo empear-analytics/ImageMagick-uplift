@@ -309,6 +309,8 @@ MagickExport RandomInfo *DestroyRandomInfo(RandomInfo *random_info)
 %
 */
 
+#define MaxEntropyExtent  64  /* max permitted: 256 */
+
 #if !defined(MAGICKCORE_WINDOWS_SUPPORT)
 static ssize_t ReadRandom(int file,unsigned char *source,size_t length)
 {
@@ -339,8 +341,6 @@ static ssize_t ReadRandom(int file,unsigned char *source,size_t length)
 
 static StringInfo *GenerateEntropicChaos(RandomInfo *random_info)
 {
-#define MaxEntropyExtent  64  /* max permitted: 256 */
-
   MagickThreadType
     tid;
 
