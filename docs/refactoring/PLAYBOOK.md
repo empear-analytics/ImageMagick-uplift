@@ -14074,6 +14074,91 @@ HN on Seamless's head, 3.90 with Recipe GS on `BlendDivergentImage`. Added by Cl
 
 ---
 
+## Recipe HN - Extract a Head That Builds One Image, Returning It or NULL
+
+**Use when:** CodeScene reports *Large Method* or *Complex Method* on a function whose head builds
+one image through a chain of temporaries (crop, sum, mean), leaves through `return(R);` when a
+temporary cannot be made, and ends with `v=Last(...);` followed directly by the caller's own
+`if (v == (Image *) NULL) return(R);`, as `composite.c`'s `SeamlessBlendImage` does for
+`mean_image`.
+
+**Not covered by:** Recipe W, whose block may write no plain local the caller reads afterwards
+(here `v`); Recipe E, whose step 6 covers only the `return` hidden in throw macros; Recipe I,
+which returns success and writes its results through a struct of out-pointers; Recipe V, whose
+block leaves through `goto`.
+
+**How:**
+
+1. The block lies outside every OpenMP region, contains no `#pragma` line, no `goto`, and no
+   `break` or `continue` that leaves it. Every `return` in it is `return(R);` with the caller's
+   one constant `R`, and each comes before the block's last statement.
+2. The block's last statement is `v=Call(...);` (possibly followed by statements that release
+   temporaries and do not read or write `v`), `v` a pointer local of the caller that the block
+   writes nowhere else, and the caller's next statement is `if (v == (T *) NULL) return(R);`
+   with the same `R`.
+3. Every other local the block writes is written before it is read on every path and read by
+   nothing after the block (Recipe E step 4): it moves into the new function with its
+   declaration, initialiser and `const` included (a `RectangleInfo` filled from parameters, a
+   `const` weights struct). A local whose declaration leaves the caller must have no other use
+   there.
+4. Cut the block into a `static T *` function directly above the caller, taking at most four
+   parameters, each something the block reads; a pointer parameter is `const` when the block
+   only reads through it. Each `return(R);` becomes `return((T *) NULL);`; the function declares
+   `v` and ends with `return(v);`.
+5. Where the block stood write `v=Helper(...);`; the caller's `if (v == (T *) NULL) return(R);`
+   stays as it was. Check each argument against its parameter by reading.
+6. `refactor_guard.py`: `PASS` or `WARN` with `NULL`'s cast added only; `--calls`: `+2` for
+   the new function and nothing else.
+
+**Before:**
+
+```c
+  crop_image=CropImage(image,&crop_info,exception);
+  if (crop_image == (Image *) NULL)
+    return(MagickFalse);
+  ...
+  sum_image=BlendSumImage(crop_image,source_image,&difference,exception);
+  crop_image=DestroyImage(crop_image);
+  if (sum_image == (Image *) NULL)
+    return(MagickFalse);
+  mean_image=BlendMeanImage(sum_image,source_image,exception);
+  sum_image=DestroyImage(sum_image);
+  if (mean_image == (Image *) NULL)
+    return(MagickFalse);
+```
+
+**After:**
+
+```c
+  mean_image=BlendSeamlessMeanImage(image,source_image,request,exception);
+  if (mean_image == (Image *) NULL)
+    return(MagickFalse);
+```
+
+**Careful:**
+
+- Each early `return(R);` of the block becomes `return((T *) NULL);`, which the caller's next
+  statement turns into `return(R);` at once, after the same statements ran: the caller leaves
+  with the same value at the same point. On the last path the helper returns the value `v` was
+  given, and the caller tests it as before, after the same releases.
+- Locals that move were never read by the caller after the block (step 3), so nothing the caller
+  reads changes; the images the block releases it still releases, in its order.
+- A `const` struct initialised from parameters now reads them inside the function: the same
+  values, since nothing between the caller's declaration and the block wrote them.
+- The early returns are allocation failures that no case reaches: checked by reading, each
+  `return(R);` against its `return((T *) NULL);`; the last path is checked by the oracle.
+
+**Evidence level:** oracle on the caller's cases, with `refactor_guard.py --calls`, steps 1 to 3
+checked by reading.
+
+**Provenance:** 2026-11-13, from `composite.c`'s `SeamlessBlendImage` (campaign A, W22 lane c):
+after Recipe RD it is a *Large Method* of 73 lines whose head builds `mean_image` from a crop and
+a difference sum; the head as a helper takes it out of the finding, 3.58 to 3.70 in a probe, no
+finding on the helper. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10
+to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -15125,3 +15210,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | AMEND | RH | New step 8, the if/else form: the `switch` may stand before other statements and hold up to two runs, each with its own table, predicate and flag; its groups become an `if` / `else if` / `else` chain, and the flags may be filled by the initialiser of a `const` struct local. *Careful* gives the argument (one group selected by value; groups disjoint; the statements after run in every case) | `composite.c`'s `SetVirtualCompositeChannels` (a nine-label run inside the channel loop, `virtual_inputs` initialised once per row) and `CompositeImagePixel` (two runs of six and four labels that set `Si`, `Di` and the pixel infos before the channel loop) (campaign A, W19 lane c): both are Complex Methods held by their label runs, and the stub of the five remaining pixel-path methods measured 3.83 | owner |
 | 2026-11-12 | NEW | MP | Merge Membership Predicates over a Table Parameter: the `static` predicates of Recipe TB's shape, each over its own `static const` table, become one that takes the table and its element count; each call passes `T,sizeof(T)/sizeof(*T)`, one predicate per commit, the others deleted. *Careful* gives the argument (same loop, same table, same count, same argument) | `composite.c`'s five RH predicates (campaign A, W21 lane c): the file stands at 110 functions and the chain needs a sixth for `SetVirtualCompositeChannels` (111: 3.69 to 3.59); folding the five frees four slots, whole fold probe 3.69 to 3.69 | owner |
 | 2026-11-13 | NEW | RD | Share a Twin Relaxation Loop Through a Driver Releasing by Pointer Lists: two `static` twins' runs from the residual copy to the loop's end become one driver taking a struct with the differing images, the callers' mutable images by address and, per failure stage, a `NULL`-terminated array of the caller's own locals' addresses in its own release order; the loop's step, tick report, title and residual refresh become helpers. *Careful* gives the argument (each failure path releases the same images in the same order; the optional stage runs where it ran; the in-loop guard is always true; upstream leaks kept and reported) | `composite.c`'s `SaliencyBlendImage` and `SeamlessBlendImage` (campaign A, W22 lane c): 3.69 to 3.58 alone, 3.70 with Recipe HN, 3.90 with Recipe GS in a probe | owner |
+| 2026-11-13 | NEW | HN | Extract a Head That Builds One Image, Returning It or NULL: a head block that leaves through `return(R);` and ends with `v=Last(...);` directly before the caller's `if (v == NULL) return(R);` becomes a `static T *` function returning `v`, `NULL` for each early return. *Careful* gives the argument (the caller's existing test turns each `NULL` into the same `return(R);` at the same point) | `composite.c`'s `SeamlessBlendImage` after Recipe RD (campaign A, W22 lane c): 73 lines, out of *Large Method*, 3.58 to 3.70 in a probe | owner |
