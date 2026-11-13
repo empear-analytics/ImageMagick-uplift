@@ -10601,6 +10601,65 @@ static void XApplyDespeckleCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyRollCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  RectangleInfo
+    page_geometry;
+
+  Image
+    *roll_image;
+
+  static char
+    geometry[MagickPathExtent] = "+2+2";
+
+  /*
+    Query user for the roll geometry.
+  */
+  (void) XDialogWidget(display,windows,"Roll","Enter roll geometry:",
+    geometry);
+  if (*geometry == '\0')
+    return;
+  /*
+    Roll image.
+  */
+  (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
+    exception);
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) ParsePageGeometry(*image,geometry,&page_geometry,
+    exception);
+  roll_image=RollImage(*image,page_geometry.x,page_geometry.y,
+    exception);
+  if (roll_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=roll_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  windows->image.window_changes.width=(int) (*image)->columns;
+  windows->image.window_changes.height=(int) (*image)->rows;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -11121,46 +11180,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       break;
     }
     case RollCommand:
-    {
-      Image
-        *roll_image;
-
-      static char
-        geometry[MagickPathExtent] = "+2+2";
-
-      /*
-        Query user for the roll geometry.
-      */
-      (void) XDialogWidget(display,windows,"Roll","Enter roll geometry:",
-        geometry);
-      if (*geometry == '\0')
-        break;
-      /*
-        Roll image.
-      */
-      (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
-        exception);
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      (void) ParsePageGeometry(*image,geometry,&page_geometry,
-        exception);
-      roll_image=RollImage(*image,page_geometry.x,page_geometry.y,
-        exception);
-      if (roll_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=roll_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      windows->image.window_changes.width=(int) (*image)->columns;
-      windows->image.window_changes.height=(int) (*image)->rows;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyRollCommand(&context);
       break;
-    }
     case TrimCommand:
     {
       static char
