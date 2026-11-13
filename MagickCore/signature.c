@@ -643,11 +643,62 @@ static const unsigned int
     0x90befffaU, 0xa4506cebU, 0xbef9a3f7U, 0xc67178f2U
   };  /* 32-bit fractional part of the cube root of the first 64 primes */
 
-static void TransformSignature(SignatureInfo *signature_info)
+static void LoadSignatureWords(unsigned char *p,const unsigned int shift,
+  unsigned int *T,unsigned int *W)
 {
   ssize_t
     i;
 
+DisableMSCWarning(4127)
+  if (sizeof(unsigned int) <= 4)
+RestoreMSCWarning
+    for (i=0; i < 16; i++)
+    {
+      (*T)=(*((unsigned int *) p));
+      p+=(ptrdiff_t) 4;
+      W[i]=Trunc32(*T);
+    }
+  else
+    for (i=0; i < 16; i+=2)
+    {
+      (*T)=(*((unsigned int *) p));
+      p+=(ptrdiff_t) 8;
+      W[i]=Trunc32((*T) >> shift);
+      W[i+1]=Trunc32(*T);
+    }
+}
+
+static void LoadSwappedSignatureWords(unsigned char *p,const unsigned int shift,
+  unsigned int *T,unsigned int *W)
+{
+  ssize_t
+    i;
+
+DisableMSCWarning(4127)
+  if (sizeof(unsigned int) <= 4)
+RestoreMSCWarning
+    for (i=0; i < 16; i++)
+    {
+      (*T)=(*((unsigned int *) p));
+      p+=(ptrdiff_t) 4;
+      W[i]=(((*T) << 24) & 0xff000000) | (((*T) << 8) & 0x00ff0000) |
+        (((*T) >> 8) & 0x0000ff00) | (((*T) >> 24) & 0x000000ff);
+    }
+  else
+    for (i=0; i < 16; i+=2)
+    {
+      (*T)=(*((unsigned int *) p));
+      p+=(ptrdiff_t) 8;
+      W[i]=(((*T) << 24) & 0xff000000) | (((*T) << 8) & 0x00ff0000) |
+        (((*T) >> 8) & 0x0000ff00) | (((*T) >> 24) & 0x000000ff);
+      (*T)>>=shift;
+      W[i+1]=(((*T) << 24) & 0xff000000) | (((*T) << 8) & 0x00ff0000) |
+        (((*T) >> 8) & 0x0000ff00) | (((*T) >> 24) & 0x000000ff);
+    }
+}
+
+static void TransformSignature(SignatureInfo *signature_info)
+{
   unsigned char
     *p;
 
@@ -672,47 +723,9 @@ static void TransformSignature(SignatureInfo *signature_info)
   shift=32;
   p=GetStringInfoDatum(signature_info->message);
   if (signature_info->lsb_first == MagickFalse)
-    {
-DisableMSCWarning(4127)
-      if (sizeof(unsigned int) <= 4)
-RestoreMSCWarning
-        for (i=0; i < 16; i++)
-        {
-          T=(*((unsigned int *) p));
-          p+=(ptrdiff_t) 4;
-          W[i]=Trunc32(T);
-        }
-      else
-        for (i=0; i < 16; i+=2)
-        {
-          T=(*((unsigned int *) p));
-          p+=(ptrdiff_t) 8;
-          W[i]=Trunc32(T >> shift);
-          W[i+1]=Trunc32(T);
-        }
-    }
+    LoadSignatureWords(p,shift,&T,W);
   else
-DisableMSCWarning(4127)
-    if (sizeof(unsigned int) <= 4)
-RestoreMSCWarning
-      for (i=0; i < 16; i++)
-      {
-        T=(*((unsigned int *) p));
-        p+=(ptrdiff_t) 4;
-        W[i]=((T << 24) & 0xff000000) | ((T << 8) & 0x00ff0000) |
-          ((T >> 8) & 0x0000ff00) | ((T >> 24) & 0x000000ff);
-      }
-    else
-      for (i=0; i < 16; i+=2)
-      {
-        T=(*((unsigned int *) p));
-        p+=(ptrdiff_t) 8;
-        W[i]=((T << 24) & 0xff000000) | ((T << 8) & 0x00ff0000) |
-          ((T >> 8) & 0x0000ff00) | ((T >> 24) & 0x000000ff);
-        T>>=shift;
-        W[i+1]=((T << 24) & 0xff000000) | ((T << 8) & 0x00ff0000) |
-          ((T >> 8) & 0x0000ff00) | ((T >> 24) & 0x000000ff);
-      }
+    LoadSwappedSignatureWords(p,shift,&T,W);
   /*
     Copy accumulator to registers.
   */
