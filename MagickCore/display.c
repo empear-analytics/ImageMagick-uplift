@@ -6330,6 +6330,9 @@ typedef struct _CropContext
 
   char
     *text;
+
+  const char
+    **RectifyModeMenu;
 } CropContext;
 
 static void XCropPointerCommand(const CropContext *context,
@@ -6532,6 +6535,52 @@ static void XCropTrackPointer(const CropContext *context,
   } while (((*state) & ExitState) == 0);
 }
 
+static void XCropSizeEvent(const CropContext *context,
+  const CropTargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      (*crop_info).x=(ssize_t) context->windows->image.x+(*event).xbutton.x;
+      (*crop_info).y=(ssize_t) context->windows->image.y+(*event).xbutton.y;
+      break;
+    }
+    case ButtonRelease:
+    {
+      /*
+        User has committed to cropping rectangle.
+      */
+      (*crop_info).x=(ssize_t) context->windows->image.x+(*event).xbutton.x;
+      (*crop_info).y=(ssize_t) context->windows->image.y+(*event).xbutton.y;
+      XSetCursorState(context->display,context->windows,MagickFalse);
+      (*state)|=ExitState;
+      context->windows->command.data=0;
+      (void) XCommandWidget(context->display,context->windows,
+        context->RectifyModeMenu,(XEvent *) NULL);
+      break;
+    }
+    case Expose:
+      break;
+    case MotionNotify:
+    {
+      (*crop_info).x=(ssize_t) context->windows->image.x+(*event).xmotion.x;
+      (*crop_info).y=(ssize_t) context->windows->image.y+(*event).xmotion.y;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -6639,6 +6688,7 @@ static MagickBooleanType XCropImage(Display *display,
   context.CropModeMenu=CropModeMenu;
   context.exception=exception;
   context.text=text;
+  context.RectifyModeMenu=RectifyModeMenu;
   context.cursor=cursor;
   XCropTrackPointer(&context,&targets);
   (void) XSelectInput(display,windows->image.id,
@@ -6691,38 +6741,7 @@ static MagickBooleanType XCropImage(Display *display,
       if ((highlight_info.width > 3) && (highlight_info.height > 3))
         XHighlightRectangle(display,windows->image.id,
           windows->image.highlight_context,&highlight_info);
-      switch (event.type)
-      {
-        case ButtonPress:
-        {
-          crop_info.x=(ssize_t) windows->image.x+event.xbutton.x;
-          crop_info.y=(ssize_t) windows->image.y+event.xbutton.y;
-          break;
-        }
-        case ButtonRelease:
-        {
-          /*
-            User has committed to cropping rectangle.
-          */
-          crop_info.x=(ssize_t) windows->image.x+event.xbutton.x;
-          crop_info.y=(ssize_t) windows->image.y+event.xbutton.y;
-          XSetCursorState(display,windows,MagickFalse);
-          state|=ExitState;
-          windows->command.data=0;
-          (void) XCommandWidget(display,windows,RectifyModeMenu,
-            (XEvent *) NULL);
-          break;
-        }
-        case Expose:
-          break;
-        case MotionNotify:
-        {
-          crop_info.x=(ssize_t) windows->image.x+event.xmotion.x;
-          crop_info.y=(ssize_t) windows->image.y+event.xmotion.y;
-        }
-        default:
-          break;
-      }
+      XCropSizeEvent(&context,&targets);
       if (IsSelectionMovedOrDone(crop_info,x,y,state) != MagickFalse)
         XCheckSelectionBounds(windows,x,y,&crop_info);
     } while ((state & ExitState) == 0);
