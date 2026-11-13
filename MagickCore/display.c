@@ -6985,6 +6985,26 @@ static void XSetCropCommandName(XWindows *windows,const ClipboardMode mode)
   }
 }
 
+static MagickBooleanType XCropReconfigure(const CropContext *context,
+  Image *image,RectangleInfo crop_info)
+{
+  if (context->mode == CropMode)
+    if (((int) crop_info.width != context->windows->image.ximage->width) ||
+        ((int) crop_info.height != context->windows->image.ximage->height))
+      {
+        /*
+          Reconfigure Image window as defined by cropping rectangle.
+        */
+        XSetCropGeometry(context->display,context->windows,&crop_info,image);
+        context->windows->image.window_changes.width=(int) crop_info.width;
+        context->windows->image.window_changes.height=(int) crop_info.height;
+        (void) XConfigureImage(context->display,context->resource_info,
+          context->windows,image,context->exception);
+        return(MagickFalse);
+      }
+  return(MagickTrue);
+}
+
 static MagickBooleanType XCropImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   const ClipboardMode mode,ExceptionInfo *exception)
@@ -7064,19 +7084,8 @@ static MagickBooleanType XCropImage(Display *display,
   XCropSelectArea(&context,&targets);
   if ((state & EscapeState) != 0)
     return(MagickTrue);
-  if (mode == CropMode)
-    if (((int) crop_info.width != windows->image.ximage->width) ||
-        ((int) crop_info.height != windows->image.ximage->height))
-      {
-        /*
-          Reconfigure Image window as defined by cropping rectangle.
-        */
-        XSetCropGeometry(display,windows,&crop_info,image);
-        windows->image.window_changes.width=(int) crop_info.width;
-        windows->image.window_changes.height=(int) crop_info.height;
-        (void) XConfigureImage(display,resource_info,windows,image,exception);
-        return(MagickTrue);
-      }
+  if (XCropReconfigure(&context,image,crop_info) == MagickFalse)
+    return(MagickTrue);
   return(XCropCopyImage(&context,image,crop_info));
 }
 
