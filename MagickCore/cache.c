@@ -4339,6 +4339,26 @@ static MagickBooleanType ExhaustPixelCacheResources(CacheInfo *cache_info,
   return(MagickFalse);
 }
 
+static MagickBooleanType FailPixelCacheOnDisk(CacheInfo *cache_info,
+  const PixelCacheOpenInfo *open_info,CacheInfo source_info,const char *tag)
+{
+  Image
+    *const image = open_info->image;
+
+  const MapMode
+    mode = open_info->mode;
+
+  ExceptionInfo
+    *const exception = open_info->exception;
+
+  if (IsCacheSourcePending(source_info,mode) != MagickFalse)
+    RelinquishPixelCachePixels(&source_info);
+  cache_info->type=UndefinedCache;
+  ThrowFileException(exception,CacheError,tag,
+    image->filename);
+  return(MagickFalse);
+}
+
 static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
   ExceptionInfo *exception)
 {
@@ -4532,25 +4552,13 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
       *cache_info->cache_filename='\0';
     }
   if (OpenPixelCacheOnDisk(cache_info,mode) == MagickFalse)
-    {
-      if (IsCacheSourcePending(source_info,mode) != MagickFalse)
-        RelinquishPixelCachePixels(&source_info);
-      cache_info->type=UndefinedCache;
-      ThrowFileException(exception,CacheError,"UnableToOpenPixelCache",
-        image->filename);
-      return(MagickFalse);
-    }
+    return(FailPixelCacheOnDisk(cache_info,&open_info,source_info,
+      "UnableToOpenPixelCache"));
   status=SetPixelCacheExtent(image,(MagickSizeType) cache_info->offset+
     cache_info->length);
   if (status == MagickFalse)
-    {
-      if (IsCacheSourcePending(source_info,mode) != MagickFalse)
-        RelinquishPixelCachePixels(&source_info);
-      cache_info->type=UndefinedCache;
-      ThrowFileException(exception,CacheError,"UnableToExtendCache",
-        image->filename);
-      return(MagickFalse);
-    }
+    return(FailPixelCacheOnDisk(cache_info,&open_info,source_info,
+      "UnableToExtendCache"));
   cache_info->type=DiskCache;
   length=number_pixels*(cache_info->number_channels*sizeof(Quantum)+
     cache_info->metacontent_extent);
