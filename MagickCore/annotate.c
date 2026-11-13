@@ -1384,6 +1384,23 @@ static void SetTypeInfoFace(DrawInfo *annotate_info,
     (void) CloneString(&annotate_info->font,type_info->glyphs);
 }
 
+static MagickBooleanType RenderTargetFreetype(const RenderTarget *target,
+  const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
+{
+  Image
+    *image = target->image;
+
+  const DrawInfo
+    *draw_info = target->draw_info;
+
+  MagickBooleanType
+    status;
+
+  const FreetypeTarget ft_font = { image, draw_info, draw_info->encoding };
+  status=RenderFreetype(&ft_font,offset,metrics,exception);
+  return(status);
+}
+
 static MagickBooleanType RenderType(const RenderTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -1411,23 +1428,13 @@ static MagickBooleanType RenderType(const RenderTarget *target,
   if (draw_info->font != (char *) NULL)
     {
       if (*draw_info->font == '@')
-        {
-          const FreetypeTarget ft_font = { image, draw_info,
-            draw_info->encoding };
-          status=RenderFreetype(&ft_font,offset,metrics,exception);
-          return(status);
-        }
+        return(RenderTargetFreetype(target,offset,metrics,exception));
       if (*draw_info->font == '-')
         return(RenderX11(image,draw_info,offset,metrics,exception));
       if (*draw_info->font == '^')
         return(RenderPostscript(image,draw_info,offset,metrics,exception));
       if (IsPathAccessible(draw_info->font) != MagickFalse)
-        {
-          const FreetypeTarget ft_font = { image, draw_info,
-            draw_info->encoding };
-          status=RenderFreetype(&ft_font,offset,metrics,exception);
-          return(status);
-        }
+        return(RenderTargetFreetype(target,offset,metrics,exception));
       type_info=GetTypeInfo(draw_info->font,exception);
       if (type_info == (const TypeInfo *) NULL)
         (void) ThrowMagickException(exception,GetMagickModule(),TypeWarning,
@@ -1458,11 +1465,7 @@ static MagickBooleanType RenderType(const RenderTarget *target,
   if (type_info == (const TypeInfo *) NULL)
     type_info=GetDefaultTypeInfo(draw_info,type_info);
   if (type_info == (const TypeInfo *) NULL)
-    {
-      const FreetypeTarget ft_font = { image, draw_info, draw_info->encoding };
-      status=RenderFreetype(&ft_font,offset,metrics,exception);
-      return(status);
-    }
+    return(RenderTargetFreetype(target,offset,metrics,exception));
   annotate_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
   SetTypeInfoFace(annotate_info,type_info);
   freetype.image=image;
