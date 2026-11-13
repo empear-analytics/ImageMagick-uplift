@@ -585,28 +585,24 @@ static MagickStatusType ParseGeometryOffsets(char *p,MagickStatusType flags,
       geometry_info->xi=value;
     }
   SkipGeometryWhitespace(&p);
-  if (IsGeometryOffsetPrefix(p) != MagickFalse)
+  /*
+    Parse psi value.
+  */
+  if ((IsGeometryOffsetPrefix(p) != MagickFalse) &&
+      (ParseGeometryOffsetValue(&p,&flags,PsiNegative,&value) != MagickFalse))
     {
-      /*
-        Parse psi value.
-      */
-      if (ParseGeometryOffsetValue(&p,&flags,PsiNegative,&value) != MagickFalse)
-        {
-          flags|=PsiValue;
-          geometry_info->psi=value;
-        }
+      flags|=PsiValue;
+      geometry_info->psi=value;
     }
   SkipGeometryWhitespace(&p);
-  if (IsGeometryOffsetPrefix(p) != MagickFalse)
+  /*
+    Parse chi value.
+  */
+  if ((IsGeometryOffsetPrefix(p) != MagickFalse) &&
+      (ParseGeometryOffsetValue(&p,&flags,ChiNegative,&value) != MagickFalse))
     {
-      /*
-        Parse chi value.
-      */
-      if (ParseGeometryOffsetValue(&p,&flags,ChiNegative,&value) != MagickFalse)
-        {
-          flags|=ChiValue;
-          geometry_info->chi=value;
-        }
+      flags|=ChiValue;
+      geometry_info->chi=value;
     }
   return(flags);
 }
