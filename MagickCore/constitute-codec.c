@@ -440,6 +440,31 @@ static void SetInterpretedProperty(ImageInfo *read_info,Image *next,
     }
 }
 
+static MagickBooleanType CopySeekableReadStream(Image *image,
+  ImageInfo *read_info,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  if (IsBlobSeekable(image) == MagickFalse)
+    {
+      /*
+        Coder requires a seekable stream.
+      */
+      *read_info->filename='\0';
+      status=ImageToFile(image,read_info->filename,exception);
+      if (status == MagickFalse)
+        {
+          (void) CloseBlob(image);
+          read_info=DestroyImageInfo(read_info);
+          image=DestroyImage(image);
+          return(MagickFalse);
+        }
+      read_info->temporary=MagickTrue;
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType OpenSeekableReadStream(const ImageInfo *image_info,
   ImageInfo *read_info,const MagickInfo *magick_info,ExceptionInfo *exception)
 {
@@ -462,22 +487,8 @@ static MagickBooleanType OpenSeekableReadStream(const ImageInfo *image_info,
           image=DestroyImage(image);
           return(MagickFalse);
         }
-      if (IsBlobSeekable(image) == MagickFalse)
-        {
-          /*
-            Coder requires a seekable stream.
-          */
-          *read_info->filename='\0';
-          status=ImageToFile(image,read_info->filename,exception);
-          if (status == MagickFalse)
-            {
-              (void) CloseBlob(image);
-              read_info=DestroyImageInfo(read_info);
-              image=DestroyImage(image);
-              return(MagickFalse);
-            }
-          read_info->temporary=MagickTrue;
-        }
+      if (CopySeekableReadStream(image,read_info,exception) == MagickFalse)
+        return(MagickFalse);
       (void) CloseBlob(image);
       image=DestroyImage(image);
     }
