@@ -131,3 +131,31 @@ a further +0.09 in an earlier probe); a flat List context FI commit is parked on
 but costs +0.6% to +6.4% instructions across four expressions, and even a single cold helper behind 17 hot labels costs +2.0% to +3.7%); `quantize.c` (Number of Functions needs 16 fewer functions; one closed family of 122 functions, no twins);
 `compare-similarity.c` (stubbing all eleven `Get*Similarity` gives 3.80, every smaller set is flat, 36 shared statics); `accelerate.c` (the ten wrappers stay flagged as clones even at 12 lines with one shared helper; about 100 steps on the five giant
 Compute functions). `visual-effects-plasma.c` 8.50 (a shared edge helper probed flat) and `distort.c` 7.70 are unchanged.
+
+## Round four and the Opus round (2026-11-13 day)
+
+`origin/main` had moved on (campaign B work, M121 to M125): merged into `campaign/W21` (7c0d88744). Main's Recipe KD (a table of function pointers) took the code that our constant-assigning label run recipe
+had used since W19b: ours is now **Recipe KC** (the playbook section says so; commit 1d7e3897a and the W19 report still call it KD). Gate on the merged tree: whole catalogue 15,955 cases, 0 diverged (baseline 63dec72208);
+wide catalogue 14,200, 0 diverged; `ci_linux_warnings.sh --campaign-a` OK on 92 files in seven configurations; `playbook_lint` 0 problems. Sweep: campaign A 92 files, mean **9.11**, 44 at 10.0.
+
+**Round four (Sonnet), `widget.c` 4.86 -> 7.31 with both lanes merged** (lane a alone 5.79, lane b alone 5.73; the two edit different functions and merge cleanly). Lane a (18 commits): `XScreenEvent` (ST), `XEditText` (E, E, FT, E)
+and `XMenuWidget` (O, E, E) keep only their argument findings; `XNoticeWidget` cc 28 -> 18, LoC 179 -> 115 with nine helpers (H, E, N, FI; guard level, because no case executes it), still Complex Method (the 10-label event switch) and
+Large Method (the two SD splits and the wait helper are oracle-level recipes and no case reaches the function; stubbing it entirely scores 6.16). Lane b (20 commits): `XPreferencesWidget` has no finding (DT, D, F, six E leaf helpers, O, CT, SD).
+Reviewer notes: lane b's commits 295f0cb2a and de922cb57 wrote `&cache[0]` and `&preferences_info[0]`, which added a numeric literal 0 (guard WARN) and made `case_tail_check.py` print FAIL on four CT commits; fixed by cb0bc378a (the pointers written bare;
+`obj_identical.sh` IDENTICAL, 182296 bytes). Several coverage counts in lane b's messages are off by one or two lines (15,220-15,223; 16 of 16 lines versus 17); lane a's `Verified: oracle` figure of 237 `XScreenEvent` cases is a union over widget.c and display.c
+(220 and 105 cases). Recipe SD step 1's "no statement writes e" question is still open (`MovePreferencesPointer`, `MoveListBrowserPointer`, `MoveTextViewPointer` write the caller's event inside their own group).
+
+**Opus 5.5 lanes on the items the Sonnet lanes could not move** (two lanes, Sonnet reviewers): lane d raised `visual-effects-plasma.c` 8.50 -> **9.09** (new Recipe ME, merge mirrored twins that leave through a constant
+return: the four edge blocks become one inline helper that takes a constant selector and the differing value, the return value staying at each call site, a script checks the helper against all four original blocks; then CN, Y, E step 7 twice).
+The earlier Sonnet probe of "a shared helper" was flat at 8.50 because every call site kept its own guard and return; the new form removes them. Timing is 0.99 to 1.01 of CPU time (a reviewer could not reproduce the 1.1% speedup the message quotes); the instruction count is
+up 2.2% because clang does not inline the helper. Lane c (`fx.c`, `compare-similarity.c`) made no commit but found where the cost comes from: `fxFltType` is `long double` (x87), the `ExecuteRPN` loop is about 80 instructions per element, so an out-of-line call per element costs
++15% to +51%; when GCC inlines the family helpers back they use up `ExecuteRPN`'s large-function-growth budget and GCC stops inlining five pixel accessors (+13% to +45%); moving only a cold run behind the default label is free (-0.15% to -1.1%) but scores 4.58
+(below 4.61); the file rises only when about 20 helpers each stay under cc 9, and every way to dispatch to that many helpers costs too much. `compare-similarity.c`: only `GetMAESimilarity` and `GetMSESimilarity` share a skeleton, and a function-pointer driver would
+have to merge their named `omp critical` sections (a pragma edit; the file is not on the 2026-11-12 list); the MAE+MSE fold probes flat at 2.97. For the owner: a function-pointer dispatch table indexed by operator index (`fx.c`) or a ruling allowing one shared critical name
+(`compare-similarity.c`).
+Probes, not committed: `composite.c`: the Saliency/Seamless pair does have a real shared structure (one relax driver taking the per-image differences and, per failure stage, a NULL-terminated list of the caller's image pointers in its own free order, which keeps every free and its order):
+3.59 on the parked 18-commit flat chain (the clone finding is gone; the driver is cc 10 and Seamless 73 lines), 3.78 with `BlendDivergentImage` also peeled against a 4.01 ceiling; it needs a new recipe and the parked chain, and was not built. `accelerate.c`: only a wrapper body of one statement clears the
+Code Duplication finding on all ten wrappers (3.27 -> 3.71); that needs the clEnv NULL guard moved into each static `Compute*` callee, which no recipe covers.
+
+**Upstream observations, reported and not fixed:** `SaliencyBlendImage` leaks `divergent_image` when the residual clone or the kernel acquire fails, and `relax_image` when the mask step fails; `SaliencyBlendImage` and `SeamlessBlendImage` both call
+`DestroyImage(residual_image)` after the loop even when the in-loop re-clone returned NULL; in `PlasmaImageProxy` the bottom-pixel test uses `y2-y_mid` where `y1-y_mid` may have been meant.

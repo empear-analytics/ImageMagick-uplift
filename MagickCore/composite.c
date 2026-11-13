@@ -100,6 +100,20 @@ typedef struct _BlendMagnitudePair
     *beta_image;
 } BlendMagnitudePair;
 
+typedef struct _BlendRequest
+{
+  ssize_t
+    x_offset,
+    y_offset;
+
+  double
+    iterations,
+    residual_threshold;
+
+  size_t
+    tick;
+} BlendRequest;
+
 typedef struct _CompositePlacement
 {
   MagickBooleanType
@@ -712,134 +726,120 @@ static Image *BlendSumImage(const Image *alpha_image,const Image *beta_image,
   return(FinishBlendImage(sum_image,status));
 }
 
-static Image *BlendDivergentImage(const Image *alpha_image,
-  const Image *beta_image,ExceptionInfo *exception)
+typedef struct _BlendGradientSet
 {
-#define FreeDivergentResources() \
-{ \
-  if (dy_image != (Image *) NULL) \
-    dy_image=DestroyImage(dy_image); \
-  if (dx_image != (Image *) NULL) \
-    dx_image=DestroyImage(dx_image); \
-  if (magnitude_beta != (Image *) NULL) \
-    magnitude_beta=DestroyImage(magnitude_beta); \
-  if (dy_beta != (Image *) NULL) \
-    dy_beta=DestroyImage(dy_beta); \
-  if (dx_beta != (Image *) NULL) \
-    dx_beta=DestroyImage(dx_beta); \
-  if (magnitude_alpha != (Image *) NULL) \
-    magnitude_alpha=DestroyImage(magnitude_alpha); \
-  if (dy_alpha != (Image *) NULL) \
-    dy_alpha=DestroyImage(dy_alpha); \
-  if (dx_alpha != (Image *) NULL) \
-    dx_alpha=DestroyImage(dx_alpha); \
+  Image
+    *dx_image,
+    *dy_image,
+    *magnitude_image;
+} BlendGradientSet;
+
+static MagickBooleanType BlendGradientImages(const Image *image,
+  BlendGradientSet *gradients,ExceptionInfo *exception)
+{
+  /*
+    Create X and Y gradient images and the magnitude.
+  */
+  gradients->dx_image=BlendConvolveImage(image,"3x1:-0.5,0.0,0.5",exception);
+  if (gradients->dx_image == (Image *) NULL)
+    return(MagickFalse);
+  gradients->dy_image=BlendConvolveImage(image,"1x3:-0.5,0.0,0.5",exception);
+  if (gradients->dy_image == (Image *) NULL)
+    return(MagickFalse);
+  gradients->magnitude_image=BlendMagnitudeImage(gradients->dx_image,
+    gradients->dy_image,exception);
+  if (gradients->magnitude_image == (Image *) NULL)
+    return(MagickFalse);
+  return(MagickTrue);
 }
 
-  Image
-    *divergent_image = (Image *) NULL,
-    *dx_alpha = (Image *) NULL,
-    *dx_beta = (Image *) NULL,
-    *dx_divergent = (Image *) NULL,
-    *dx_image = (Image *) NULL,
-    *dy_alpha = (Image *) NULL,
-    *dy_beta = (Image *) NULL,
-    *dy_divergent = (Image *) NULL,
-    *dy_image = (Image *) NULL,
-    *magnitude_alpha = (Image *) NULL,
-    *magnitude_beta = (Image *) NULL;
+static void DestroyBlendGradients(BlendGradientSet *gradients)
+{
+  if (gradients->magnitude_image != (Image *) NULL)
+    gradients->magnitude_image=DestroyImage(gradients->magnitude_image);
+  if (gradients->dy_image != (Image *) NULL)
+    gradients->dy_image=DestroyImage(gradients->dy_image);
+  if (gradients->dx_image != (Image *) NULL)
+    gradients->dx_image=DestroyImage(gradients->dx_image);
+}
 
+static MagickBooleanType SelectBlendGradients(BlendGradientSet *alpha,
+  BlendGradientSet *beta,BlendGradientSet *selected,ExceptionInfo *exception)
+{
   BlendMagnitudePair magnitudes;
+
+  /*
+    Select alpha or beta gradient for larger of two magnitudes.
+  */
+  magnitudes.alpha_image=alpha->magnitude_image;
+  magnitudes.beta_image=beta->magnitude_image;
+  selected->dx_image=BlendMaxMagnitudeImage(&magnitudes,alpha->dx_image,
+    beta->dx_image,exception);
+  if (selected->dx_image == (Image *) NULL)
+    return(MagickFalse);
+  selected->dy_image=BlendMaxMagnitudeImage(&magnitudes,alpha->dy_image,
+    beta->dy_image,exception);
+  if (selected->dy_image == (Image *) NULL)
+    return(MagickFalse);
+  beta->dx_image=DestroyImage(beta->dx_image);
+  alpha->dx_image=DestroyImage(alpha->dx_image);
+  beta->magnitude_image=DestroyImage(beta->magnitude_image);
+  alpha->magnitude_image=DestroyImage(alpha->magnitude_image);
+  return(MagickTrue);
+}
+
+static Image *BlendDivergenceImage(const BlendGradientSet *selected,
+  ExceptionInfo *exception)
+{
+  Image
+    *divergent_image,
+    *dx_divergent,
+    *dy_divergent;
 
   const BlendSumWeights quarter_sum = { 0.25, 1.0 };
 
   /*
-    Create X and Y gradient images for alpha image and the magnitude.
-  */
-  dx_alpha=BlendConvolveImage(alpha_image,"3x1:-0.5,0.0,0.5",exception);
-  if (dx_alpha == (Image *) NULL)
-    {
-      FreeDivergentResources();
-      return((Image *) NULL);
-    }
-  dy_alpha=BlendConvolveImage(alpha_image,"1x3:-0.5,0.0,0.5",exception);
-  if (dy_alpha == (Image *) NULL)
-    {
-      FreeDivergentResources();
-      return((Image *) NULL);
-    }
-  magnitude_alpha=BlendMagnitudeImage(dx_alpha,dy_alpha,exception);
-  if (magnitude_alpha == (Image *) NULL)
-    {
-      FreeDivergentResources();
-      return((Image *) NULL);
-    }
-  /*
-    Create X and Y gradient images for beta and the magnitude.
-  */
-  dx_beta=BlendConvolveImage(beta_image,"3x1:-0.5,0.0,0.5",exception);
-  if (dx_beta == (Image *) NULL)
-    {
-      FreeDivergentResources();
-      return((Image *) NULL);
-    }
-  dy_beta=BlendConvolveImage(beta_image,"1x3:-0.5,0.0,0.5",exception);
-  if (dy_beta == (Image *) NULL)
-    {
-      FreeDivergentResources();
-      return((Image *) NULL);
-    }
-  magnitude_beta=BlendMagnitudeImage(dx_beta,dy_beta,exception);
-  if (magnitude_beta == (Image *) NULL)
-    {
-      FreeDivergentResources();
-      return((Image *) NULL);
-    }
-  /*
-    Select alpha or beta gradient for larger of two magnitudes.
-  */
-  magnitudes.alpha_image=magnitude_alpha;
-  magnitudes.beta_image=magnitude_beta;
-  dx_image=BlendMaxMagnitudeImage(&magnitudes,dx_alpha,dx_beta,exception);
-  if (dx_image == (Image *) NULL)
-    {
-      FreeDivergentResources();
-      return((Image *) NULL);
-    }
-  dy_image=BlendMaxMagnitudeImage(&magnitudes,dy_alpha,dy_beta,exception);
-  if (dy_image == (Image *) NULL)
-    {
-      FreeDivergentResources();
-      return((Image *) NULL);
-    }
-  dx_beta=DestroyImage(dx_beta);
-  dx_alpha=DestroyImage(dx_alpha);
-  magnitude_beta=DestroyImage(magnitude_beta);
-  magnitude_alpha=DestroyImage(magnitude_alpha);
-  /*
     Create divergence of gradients dx and dy and divide by 4 as guide image.
   */
-  dx_divergent=BlendConvolveImage(dx_image,"3x1:-0.5,0.0,0.5",exception);
+  dx_divergent=BlendConvolveImage(selected->dx_image,"3x1:-0.5,0.0,0.5",
+    exception);
   if (dx_divergent == (Image *) NULL)
-    {
-      FreeDivergentResources();
-      return((Image *) NULL);
-    }
-  dy_divergent=BlendConvolveImage(dy_image,"1x3:-0.5,0.0,0.5",exception);
+    return((Image *) NULL);
+  dy_divergent=BlendConvolveImage(selected->dy_image,"1x3:-0.5,0.0,0.5",
+    exception);
   if (dy_divergent == (Image *) NULL)
-    {
-      FreeDivergentResources();
-      return((Image *) NULL);
-    }
+    return((Image *) NULL);
   divergent_image=BlendSumImage(dx_divergent,dy_divergent,&quarter_sum,
     exception);
   dy_divergent=DestroyImage(dy_divergent);
   dx_divergent=DestroyImage(dx_divergent);
-  if (divergent_image == (Image *) NULL)
-    {
-      FreeDivergentResources();
-      return((Image *) NULL);
-    }
-  FreeDivergentResources();
+  return(divergent_image);
+}
+
+static Image *BlendDivergentImage(const Image *alpha_image,
+  const Image *beta_image,ExceptionInfo *exception)
+{
+  BlendGradientSet
+    alpha = { (Image *) NULL, (Image *) NULL, (Image *) NULL },
+    beta = { (Image *) NULL, (Image *) NULL, (Image *) NULL },
+    selected = { (Image *) NULL, (Image *) NULL, (Image *) NULL };
+
+  Image
+    *divergent_image = (Image *) NULL;
+
+  MagickBooleanType
+    status;
+
+  status=BlendGradientImages(alpha_image,&alpha,exception);
+  if (status != MagickFalse)
+    status=BlendGradientImages(beta_image,&beta,exception);
+  if (status != MagickFalse)
+    status=SelectBlendGradients(&alpha,&beta,&selected,exception);
+  if (status != MagickFalse)
+    divergent_image=BlendDivergenceImage(&selected,exception);
+  DestroyBlendGradients(&selected);
+  DestroyBlendGradients(&beta);
+  DestroyBlendGradients(&alpha);
   return(divergent_image);
 }
 
@@ -1875,9 +1875,141 @@ static void ReportBlendResidual(const MagickBooleanType verbose,
       residual);
 }
 
+typedef struct _BlendRelaxation
+{
+  Image
+    *anchor_image,
+    *divergent_image,
+    **relax_image,
+    **residual_image;
+
+  Image
+    **const *residual_failure,
+    **const *kernel_failure;
+} BlendRelaxation;
+
+static void ReleaseBlendImages(Image **const *images)
+{
+  ssize_t
+    k;
+
+  for (k=0; images[k] != (Image **) NULL; k++)
+    *images[k]=DestroyImage(*images[k]);
+}
+
+static void ReportBlendIteration(const MagickBooleanType verbose,
+  const ssize_t i,const size_t tick,const double residual)
+{
+  if ((verbose != MagickFalse) && ((i % MagickMax(tick,1)) == 0))
+    (void) FormatLocaleFile(stderr,"  %g: %g\n",(double) i,(double) residual);
+}
+
+static void ReportBlendTitle(const BlendRelaxation *relaxation,
+  const MagickBooleanType verbose)
+{
+  if (verbose == MagickFalse)
+    return;
+  if (relaxation->divergent_image != (Image *) NULL)
+    (void) FormatLocaleFile(stderr,"saliency blending:\n");
+  else
+    (void) FormatLocaleFile(stderr,"seamless blending:\n");
+}
+
+static Image *CloneBlendResidual(Image *residual_image,
+  const Image *relax_image,ExceptionInfo *exception)
+{
+  if (residual_image != (Image *) NULL)
+    residual_image=DestroyImage(residual_image);
+  return(CloneImage(relax_image,0,0,MagickTrue,exception));
+}
+
+static MagickBooleanType RelaxBlendStep(const BlendRelaxation *relaxation,
+  const KernelInfo *kernel_info,double *residual,ExceptionInfo *exception)
+{
+  Image
+    *convolve_image,
+    *sum_image;
+
+  const BlendSumWeights difference = { 1.0, -1.0 };
+  const CompositePlacement origin = { MagickTrue, 0, 0 };
+
+  convolve_image=ConvolveImage(*relaxation->relax_image,kernel_info,exception);
+  if (convolve_image == (Image *) NULL)
+    return(MagickFalse);
+  *relaxation->relax_image=DestroyImage(*relaxation->relax_image);
+  *relaxation->relax_image=convolve_image;
+  if (relaxation->divergent_image != (Image *) NULL)
+    {
+      sum_image=BlendSumImage(*relaxation->relax_image,
+        relaxation->divergent_image,&difference,exception);
+      if (sum_image == (Image *) NULL)
+        return(MagickFalse);
+      *relaxation->relax_image=DestroyImage(*relaxation->relax_image);
+      *relaxation->relax_image=sum_image;
+    }
+  if (CompositeOverImage(*relaxation->relax_image,relaxation->anchor_image,
+      &origin,exception) == MagickFalse)
+    return(MagickFalse);
+  return(BlendRMSEResidual(*relaxation->relax_image,
+    *relaxation->residual_image,residual,exception));
+}
+
+static MagickBooleanType RelaxBlendImage(Image *image,
+  const BlendRelaxation *relaxation,const BlendRequest *request,
+  ExceptionInfo *exception)
+{
+  KernelInfo
+    *kernel_info;
+
+  MagickBooleanType
+    verbose;
+
+  ssize_t
+    i;
+
+  *relaxation->residual_image=CloneImage(*relaxation->relax_image,0,0,
+    MagickTrue,exception);
+  if (*relaxation->residual_image == (Image *) NULL)
+    {
+      ReleaseBlendImages(relaxation->residual_failure);
+      return(MagickFalse);
+    }
+  /*
+    Convolve relaxed image and blur area of interest.
+  */
+  kernel_info=AcquireKernelInfo("3x3:0,0.25,0,0.25,0,0.25,0,0.25,0",exception);
+  if (kernel_info == (KernelInfo *) NULL)
+    {
+      ReleaseBlendImages(relaxation->kernel_failure);
+      return(MagickFalse);
+    }
+  verbose=IsStringTrue(GetImageArtifact(image,"verbose"));
+  ReportBlendTitle(relaxation,verbose);
+  for (i=0; i < (ssize_t) request->iterations; i++)
+  {
+    double
+      residual = 1.0;
+
+    if (RelaxBlendStep(relaxation,kernel_info,&residual,
+        exception) == MagickFalse)
+      break;
+    ReportBlendIteration(verbose,i,request->tick,residual);
+    if (residual < request->residual_threshold)
+      {
+        ReportBlendResidual(verbose,i,residual);
+        break;
+      }
+    *relaxation->residual_image=CloneBlendResidual(
+      *relaxation->residual_image,*relaxation->relax_image,exception);
+    if (*relaxation->residual_image == (Image *) NULL)
+      break;
+  }
+  kernel_info=DestroyKernelInfo(kernel_info);
+  return(MagickTrue);
+}
+
 static MagickBooleanType SaliencyBlendImage(Image *image,
-  const Image *source_image,const ssize_t x_offset,const ssize_t y_offset,
-  const double iterations,const double residual_threshold,const size_t tick,
+  const Image *source_image,const BlendRequest *request,
   ExceptionInfo *exception)
 {
   Image
@@ -1886,25 +2018,23 @@ static MagickBooleanType SaliencyBlendImage(Image *image,
     *relax_image,
     *residual_image = (Image *) NULL;
 
-  KernelInfo
-    *kernel_info;
-
   MagickBooleanType
-    status = MagickTrue,
-    verbose = MagickFalse;
+    status = MagickTrue;
 
   RectangleInfo
     crop_info = {
       source_image->columns,
       source_image->rows,
-      x_offset,
-      y_offset
+      request->x_offset,
+      request->y_offset
     };
 
-  ssize_t
-    i;
+  const CompositePlacement placement = { MagickTrue, request->x_offset, request->y_offset };
 
-  const CompositePlacement placement = { MagickTrue, x_offset, y_offset };
+  Image
+    **const residual_failure[] = { &crop_image, &relax_image, NULL },
+    **const kernel_failure[] = { &crop_image, &residual_image, &relax_image,
+      NULL };
 
   /*
     Saliency blend composite operator.
@@ -1934,68 +2064,14 @@ static MagickBooleanType SaliencyBlendImage(Image *image,
       divergent_image=DestroyImage(divergent_image);
       return(MagickFalse);
     }
-  residual_image=CloneImage(relax_image,0,0,MagickTrue,exception);
-  if (residual_image == (Image *) NULL)
-    {
-      crop_image=DestroyImage(crop_image);
-      relax_image=DestroyImage(relax_image);
-      return(MagickFalse);
-    }
-  /*
-    Convolve relaxed image and blur area of interest.
-  */
-  kernel_info=AcquireKernelInfo("3x3:0,0.25,0,0.25,0,0.25,0,0.25,0",exception);
-  if (kernel_info == (KernelInfo *) NULL)
-    {
-      crop_image=DestroyImage(crop_image);
-      residual_image=DestroyImage(residual_image);
-      relax_image=DestroyImage(relax_image);
-      return(MagickFalse);
-    }
-  verbose=IsStringTrue(GetImageArtifact(image,"verbose"));
-  if (verbose != MagickFalse)
-    (void) FormatLocaleFile(stderr,"saliency blending:\n");
-  for (i=0; i < (ssize_t) iterations; i++)
   {
-    double
-      residual = 1.0;
+    const BlendRelaxation
+      relaxation = { crop_image, divergent_image, &relax_image,
+        &residual_image, residual_failure, kernel_failure };
 
-    Image
-      *convolve_image,
-      *sum_image;
-
-    const BlendSumWeights difference = { 1.0, -1.0 };
-    const CompositePlacement origin = { MagickTrue, 0, 0 };
-
-    convolve_image=ConvolveImage(relax_image,kernel_info,exception);
-    if (convolve_image == (Image *) NULL)
-      break;
-    relax_image=DestroyImage(relax_image);
-    relax_image=convolve_image;
-    sum_image=BlendSumImage(relax_image,divergent_image,&difference,exception);
-    if (sum_image == (Image *) NULL)
-      break;
-    relax_image=DestroyImage(relax_image);
-    relax_image=sum_image;
-    status=CompositeOverImage(relax_image,crop_image,&origin,exception);
-    if (status == MagickFalse)
-      break;
-    status=BlendRMSEResidual(relax_image,residual_image,&residual,exception);
-    if (status == MagickFalse)
-      break;
-    if ((verbose != MagickFalse) && ((i % MagickMax(tick,1)) == 0))
-      (void) FormatLocaleFile(stderr,"  %g: %g\n",(double) i,(double) residual);
-    if (residual < residual_threshold)
-      {
-        ReportBlendResidual(verbose,i,residual);
-        break;
-      }
-    residual_image=DestroyImage(residual_image);
-    residual_image=CloneImage(relax_image,0,0,MagickTrue,exception);
-    if (residual_image == (Image *) NULL)
-      break;
+    if (RelaxBlendImage(image,&relaxation,request,exception) == MagickFalse)
+      return(MagickFalse);
   }
-  kernel_info=DestroyKernelInfo(kernel_info);
   crop_image=DestroyImage(crop_image);
   divergent_image=DestroyImage(divergent_image);
   residual_image=DestroyImage(residual_image);
@@ -2007,55 +2083,64 @@ static MagickBooleanType SaliencyBlendImage(Image *image,
   return(status);
 }
 
-static MagickBooleanType SeamlessBlendImage(Image *image,
-  const Image *source_image,const ssize_t x_offset,const ssize_t y_offset,
-  const double iterations,const double residual_threshold,const size_t tick,
+static Image *BlendSeamlessMeanImage(const Image *image,
+  const Image *source_image,const BlendRequest *request,
   ExceptionInfo *exception)
 {
   Image
     *crop_image,
-    *foreground_image,
     *mean_image,
-    *relax_image,
-    *residual_image,
     *sum_image;
-
-  KernelInfo
-    *kernel_info;
-
-  MagickBooleanType
-    status = MagickTrue,
-    verbose = MagickFalse;
 
   RectangleInfo
     crop_info = {
       source_image->columns,
       source_image->rows,
-      x_offset,
-      y_offset
+      request->x_offset,
+      request->y_offset
     };
 
-  ssize_t
-    i;
-
   const BlendSumWeights difference = { 1.0, -1.0 };
-  const BlendSumWeights sum = { 1.0, 1.0 };
-  const CompositePlacement placement = { MagickTrue, x_offset, y_offset };
 
-  /*
-    Seamless blend composite operator.
-  */
   crop_image=CropImage(image,&crop_info,exception);
   if (crop_image == (Image *) NULL)
-    return(MagickFalse);
+    return((Image *) NULL);
   DisableCompositeClampUnlessSpecified(crop_image);
   (void) ResetImagePage(crop_image,"0x0+0+0");
   sum_image=BlendSumImage(crop_image,source_image,&difference,exception);
   crop_image=DestroyImage(crop_image);
   if (sum_image == (Image *) NULL)
-    return(MagickFalse);
+    return((Image *) NULL);
   mean_image=BlendMeanImage(sum_image,source_image,exception);
   sum_image=DestroyImage(sum_image);
+  return(mean_image);
+}
+
+static MagickBooleanType SeamlessBlendImage(Image *image,
+  const Image *source_image,const BlendRequest *request,
+  ExceptionInfo *exception)
+{
+  Image
+    *foreground_image,
+    *mean_image,
+    *relax_image,
+    *residual_image;
+
+  MagickBooleanType
+    status = MagickTrue;
+
+  const BlendSumWeights sum = { 1.0, 1.0 };
+  const CompositePlacement placement = { MagickTrue, request->x_offset, request->y_offset };
+
+  Image
+    **const residual_failure[] = { &relax_image, &mean_image, NULL },
+    **const kernel_failure[] = { &residual_image, &relax_image, &mean_image,
+      NULL };
+
+  /*
+    Seamless blend composite operator.
+  */
+  mean_image=BlendSeamlessMeanImage(image,source_image,request,exception);
   if (mean_image == (Image *) NULL)
     return(MagickFalse);
   relax_image=CloneImage(mean_image,0,0,MagickTrue,exception);
@@ -2071,62 +2156,14 @@ static MagickBooleanType SeamlessBlendImage(Image *image,
       mean_image=DestroyImage(mean_image);
       return(MagickFalse);
     }
-  residual_image=CloneImage(relax_image,0,0,MagickTrue,exception);
-  if (residual_image == (Image *) NULL)
-    {
-      relax_image=DestroyImage(relax_image);
-      mean_image=DestroyImage(mean_image);
-      return(MagickFalse);
-    }
-  /*
-    Convolve relaxed image and blur area of interest.
-  */
-  kernel_info=AcquireKernelInfo("3x3:0,0.25,0,0.25,0,0.25,0,0.25,0",exception);
-  if (kernel_info == (KernelInfo *) NULL)
-    {
-      residual_image=DestroyImage(residual_image);
-      relax_image=DestroyImage(relax_image);
-      mean_image=DestroyImage(mean_image);
-      return(MagickFalse);
-    }
-  verbose=IsStringTrue(GetImageArtifact(image,"verbose"));
-  if (verbose != MagickFalse)
-    (void) FormatLocaleFile(stderr,"seamless blending:\n");
-  for (i=0; i < (ssize_t) iterations; i++)
   {
-    double
-      residual = 1.0;
+    const BlendRelaxation
+      relaxation = { mean_image, (Image *) NULL, &relax_image,
+        &residual_image, residual_failure, kernel_failure };
 
-    Image
-      *convolve_image;
-
-    const CompositePlacement origin = { MagickTrue, 0, 0 };
-
-    convolve_image=ConvolveImage(relax_image,kernel_info,exception);
-    if (convolve_image == (Image *) NULL)
-      break;
-    relax_image=DestroyImage(relax_image);
-    relax_image=convolve_image;
-    status=CompositeOverImage(relax_image,mean_image,&origin,exception);
-    if (status == MagickFalse)
-      break;
-    status=BlendRMSEResidual(relax_image,residual_image,&residual,exception);
-    if (status == MagickFalse)
-      break;
-    if ((verbose != MagickFalse) && ((i % MagickMax(tick,1)) == 0))
-      (void) FormatLocaleFile(stderr,"  %g: %g\n",(double) i,(double) residual);
-    if (residual < residual_threshold)
-      {
-        ReportBlendResidual(verbose,i,residual);
-        break;
-      }
-    if (residual_image != (Image *) NULL)
-      residual_image=DestroyImage(residual_image);
-    residual_image=CloneImage(relax_image,0,0,MagickTrue,exception);
-    if (residual_image == (Image *) NULL)
-      break;
+    if (RelaxBlendImage(image,&relaxation,request,exception) == MagickFalse)
+      return(MagickFalse);
   }
-  kernel_info=DestroyKernelInfo(kernel_info);
   mean_image=DestroyImage(mean_image);
   residual_image=DestroyImage(residual_image);
   /*
@@ -2156,7 +2193,8 @@ typedef struct _VirtualCompositeInputs
     canvas_dissolve;
 
   MagickBooleanType
-    clamp;
+    clamp,
+    canvas_pixel;
 } VirtualCompositeInputs;
 
 static void SetVirtualDissolvePixel(const VirtualCompositeInputs *composite,
@@ -2218,6 +2256,20 @@ static MagickRealType GetVirtualCanvasPixel(const PixelChannel channel,
   return(pixel);
 }
 
+static const CompositeOperator
+  CanvasPixelOperators[] =
+  {
+    AlphaCompositeOp,
+    ChangeMaskCompositeOp,
+    CopyAlphaCompositeOp,
+    DstAtopCompositeOp,
+    DstInCompositeOp,
+    InCompositeOp,
+    OutCompositeOp,
+    SrcInCompositeOp,
+    SrcOutCompositeOp
+  };
+
 static inline void SetVirtualCompositeChannels(
   const VirtualCompositeInputs *composite,const Quantum *source,
   Quantum *magick_restrict q)
@@ -2237,27 +2289,10 @@ static inline void SetVirtualCompositeChannels(
     if ((traits == UndefinedPixelTrait) ||
         (source_traits == UndefinedPixelTrait))
       continue;
-    switch (composite->compose)
-    {
-      case AlphaCompositeOp:
-      case ChangeMaskCompositeOp:
-      case CopyAlphaCompositeOp:
-      case DstAtopCompositeOp:
-      case DstInCompositeOp:
-      case InCompositeOp:
-      case OutCompositeOp:
-      case SrcInCompositeOp:
-      case SrcOutCompositeOp:
-      {
-        pixel=GetVirtualCanvasPixel(channel,q,i);
-        break;
-      }
-      default:
-      {
-        SetVirtualSourcePixel(composite,channel,source,&pixel);
-        break;
-      }
-    }
+    if (composite->canvas_pixel != MagickFalse)
+      pixel=GetVirtualCanvasPixel(channel,q,i);
+    else
+      SetVirtualSourcePixel(composite,channel,source,&pixel);
     q[i]=composite->clamp != MagickFalse ? ClampPixel(pixel) :
       ClampToQuantum(pixel);
   }
@@ -3289,6 +3324,13 @@ typedef struct _CompositeRowInputs
 
   GeometryInfo
     geometry_info;
+
+  MagickBooleanType
+    union_coverage,
+    canvas_alpha,
+    source_alpha,
+    pixel_info_inputs,
+    intensity_inputs;
 } CompositeRowInputs;
 
 static void SetCompositeCoverageModulus(const CompositeRowInputs *row,
@@ -3406,56 +3448,64 @@ static void SetCompositeCoverageDissolve(const CompositeRowInputs *row,
   }
 }
 
+static const CompositeOperator
+  UnionCoverageOperators[] =
+  {
+    BumpmapCompositeOp,
+    ColorBurnCompositeOp,
+    ColorDodgeCompositeOp,
+    DarkenCompositeOp,
+    DifferenceCompositeOp,
+    DivideCompositeOp,
+    DivideDstCompositeOp,
+    DivideSrcCompositeOp,
+    ExclusionCompositeOp,
+    FreezeCompositeOp,
+    HardLightCompositeOp,
+    HardMixCompositeOp,
+    InterpolateCompositeOp,
+    LightenCompositeOp,
+    LinearBurnCompositeOp,
+    LinearDodgeCompositeOp,
+    LinearLightCompositeOp,
+    MathematicsCompositeOp,
+    MinusDstCompositeOp,
+    MinusSrcCompositeOp,
+    MultiplyCompositeOp,
+    NegateCompositeOp,
+    OverlayCompositeOp,
+    PegtopLightCompositeOp,
+    PinLightCompositeOp,
+    ReflectCompositeOp,
+    ScreenCompositeOp,
+    SoftBurnCompositeOp,
+    SoftDodgeCompositeOp,
+    SoftLightCompositeOp,
+    StampCompositeOp,
+    VividLightCompositeOp
+  };
+
+static MagickBooleanType IsListedOperator(const CompositeOperator *list,
+  const size_t count,const CompositeOperator compose)
+{
+  size_t
+    i;
+
+  for (i=0; i < count; i++)
+    if (list[i] == compose)
+      return(MagickTrue);
+  return(MagickFalse);
+}
+
 static void SetCompositeCoverage(const CompositeRowInputs *row,
   const MagickRealType Sa,const MagickRealType Da,MagickRealType *alpha)
 {
-  const CompositeOperator
-    compose = row->compose;
-
-  switch (compose)
-  {
-    case BumpmapCompositeOp:
-    case ColorBurnCompositeOp:
-    case ColorDodgeCompositeOp:
-    case DarkenCompositeOp:
-    case DifferenceCompositeOp:
-    case DivideCompositeOp:
-    case DivideDstCompositeOp:
-    case DivideSrcCompositeOp:
-    case ExclusionCompositeOp:
-    case FreezeCompositeOp:
-    case HardLightCompositeOp:
-    case HardMixCompositeOp:
-    case InterpolateCompositeOp:
-    case LightenCompositeOp:
-    case LinearBurnCompositeOp:
-    case LinearDodgeCompositeOp:
-    case LinearLightCompositeOp:
-    case MathematicsCompositeOp:
-    case MinusDstCompositeOp:
-    case MinusSrcCompositeOp:
-    case MultiplyCompositeOp:
-    case NegateCompositeOp:
-    case OverlayCompositeOp:
-    case PegtopLightCompositeOp:
-    case PinLightCompositeOp:
-    case ReflectCompositeOp:
-    case ScreenCompositeOp:
-    case SoftBurnCompositeOp:
-    case SoftDodgeCompositeOp:
-    case SoftLightCompositeOp:
-    case StampCompositeOp:
-    case VividLightCompositeOp:
+  if (row->union_coverage != MagickFalse)
     {
       (*alpha)=RoundToUnity(Sa+Da-Sa*Da);
-      break;
+      return;
     }
-    default:
-    {
-      SetCompositeCoverageDissolve(row,Sa,Da,alpha);
-      break;
-    }
-  }
+  SetCompositeCoverageDissolve(row,Sa,Da,alpha);
 }
 
 typedef struct _CompositePixelInputs
@@ -3475,25 +3525,100 @@ typedef struct _CompositePixelInputs
     *source_pixel;
 } CompositePixelInputs;
 
-static void CompositeAlphaChannel(const CompositeRowInputs *row,
-  const CompositePixelInputs *authentic,Quantum *magick_restrict q,
-  MagickRealType *pixel)
-{
-  Image
-    *const image = row->image,
-    *const source_image = row->source_image;
+static const CompositeOperator
+  CanvasAlphaOperators[] =
+  {
+    AtopCompositeOp,
+    CopyBlackCompositeOp,
+    CopyBlueCompositeOp,
+    CopyCyanCompositeOp,
+    CopyGreenCompositeOp,
+    CopyMagentaCompositeOp,
+    CopyRedCompositeOp,
+    CopyYellowCompositeOp,
+    SrcAtopCompositeOp,
+    DstCompositeOp,
+    NoCompositeOp
+  };
 
+static const CompositeOperator
+  SourceAlphaOperators[] =
+  {
+    BlurCompositeOp,
+    CopyCompositeOp,
+    DisplaceCompositeOp,
+    DistortCompositeOp,
+    DstAtopCompositeOp,
+    ReplaceCompositeOp,
+    SrcCompositeOp
+  };
+
+static void CompositeAlphaMultiplyRun(const CompositeRowInputs *row,
+  const CompositePixelInputs *authentic,MagickRealType *pixel)
+{
   const CompositeOperator
     compose = row->compose;
 
   const MagickBooleanType
     compose_sync = row->compose_sync;
 
-  const Quantum
-    *const p = authentic->p;
-
   const MagickRealType
     alpha = authentic->alpha,
+    Da = authentic->Da,
+    Sa = authentic->Sa;
+
+  switch (compose)
+  {
+    case MultiplyCompositeOp:
+    {
+      MultiplyAlphaInputs
+        multiply;
+
+      multiply.compose_sync=compose_sync;
+      multiply.alpha=alpha;
+      multiply.Sa=Sa;
+      multiply.Da=Da;
+      (*pixel)=GetMultiplyAlpha(&multiply,(*pixel));
+      break;
+    }
+    case NegateCompositeOp:
+    {
+      (*pixel)=(double) QuantumRange*((1.0-Sa-Da));
+      break;
+    }
+    case ReflectCompositeOp:
+    {
+      (*pixel)=GetReflectAlpha(Sa,Da);
+      break;
+    }
+    case StampCompositeOp:
+    {
+      (*pixel)=(double) QuantumRange*(Sa+Da*Da-1.0);
+      break;
+    }
+    case StereoCompositeOp:
+    {
+      (*pixel)=(double) QuantumRange*(Sa+Da)/2;
+      break;
+    }
+    default:
+    {
+      (*pixel)=(double) QuantumRange*alpha;
+      break;
+    }
+  }
+}
+
+static void CompositeAlphaDarkenRun(const CompositeRowInputs *row,
+  const CompositePixelInputs *authentic,MagickRealType *pixel)
+{
+  const CompositeOperator
+    compose = row->compose;
+
+  const MagickBooleanType
+    compose_sync = row->compose_sync;
+
+  const MagickRealType
     Da = authentic->Da,
     Di = authentic->Di,
     Sa = authentic->Sa,
@@ -3501,71 +3626,6 @@ static void CompositeAlphaChannel(const CompositeRowInputs *row,
 
   switch (compose)
   {
-    case AlphaCompositeOp:
-    {
-      (*pixel)=(double) QuantumRange*Sa;
-      break;
-    }
-    case AtopCompositeOp:
-    case CopyBlackCompositeOp:
-    case CopyBlueCompositeOp:
-    case CopyCyanCompositeOp:
-    case CopyGreenCompositeOp:
-    case CopyMagentaCompositeOp:
-    case CopyRedCompositeOp:
-    case CopyYellowCompositeOp:
-    case SrcAtopCompositeOp:
-    case DstCompositeOp:
-    case NoCompositeOp:
-    {
-      (*pixel)=(double) QuantumRange*Da;
-      break;
-    }
-    case BumpmapCompositeOp:
-    {
-      (*pixel)=Si*Da;
-      break;
-    }
-    case ChangeMaskCompositeOp:
-    {
-      ChangeMaskImages
-        images;
-
-      images.image=image;
-      images.source_image=source_image;
-      (*pixel)=GetChangeMaskAlpha(&images,p,q,Da);
-      break;
-    }
-    case ClearCompositeOp:
-    {
-      (*pixel)=(MagickRealType) TransparentAlpha;
-      break;
-    }
-    case ColorizeCompositeOp:
-    case HueCompositeOp:
-    case LuminizeCompositeOp:
-    case RMSECompositeOp:
-    case SaturateCompositeOp:
-    {
-      (*pixel)=GetHueAlpha(Sa,Da,(*pixel));
-      break;
-    }
-    case CopyAlphaCompositeOp:
-    {
-      (*pixel)=GetCopyAlpha(source_image,Si,Sa);
-      break;
-    }
-    case BlurCompositeOp:
-    case CopyCompositeOp:
-    case DisplaceCompositeOp:
-    case DistortCompositeOp:
-    case DstAtopCompositeOp:
-    case ReplaceCompositeOp:
-    case SrcCompositeOp:
-    {
-      (*pixel)=(double) QuantumRange*Sa;
-      break;
-    }
     case DarkenIntensityCompositeOp:
     {
       IntensityAlphaInputs
@@ -3613,41 +3673,111 @@ static void CompositeAlphaChannel(const CompositeRowInputs *row,
       (*pixel)=(double) QuantumRange*Da;
       break;
     }
-    case MultiplyCompositeOp:
+    default:
     {
-      MultiplyAlphaInputs
-        multiply;
+      CompositeAlphaMultiplyRun(row,authentic,pixel);
+      break;
+    }
+  }
+}
 
-      multiply.compose_sync=compose_sync;
-      multiply.alpha=alpha;
-      multiply.Sa=Sa;
-      multiply.Da=Da;
-      (*pixel)=GetMultiplyAlpha(&multiply,(*pixel));
+static void CompositeAlphaColorizeRun(const CompositeRowInputs *row,
+  const CompositePixelInputs *authentic,MagickRealType *pixel)
+{
+  Image
+    *const source_image = row->source_image;
+
+  const CompositeOperator
+    compose = row->compose;
+
+  const MagickRealType
+    Da = authentic->Da,
+    Sa = authentic->Sa,
+    Si = authentic->Si;
+
+  switch (compose)
+  {
+    case ColorizeCompositeOp:
+    case HueCompositeOp:
+    case LuminizeCompositeOp:
+    case RMSECompositeOp:
+    case SaturateCompositeOp:
+    {
+      (*pixel)=GetHueAlpha(Sa,Da,(*pixel));
       break;
     }
-    case NegateCompositeOp:
+    case CopyAlphaCompositeOp:
     {
-      (*pixel)=(double) QuantumRange*((1.0-Sa-Da));
-      break;
-    }
-    case ReflectCompositeOp:
-    {
-      (*pixel)=GetReflectAlpha(Sa,Da);
-      break;
-    }
-    case StampCompositeOp:
-    {
-      (*pixel)=(double) QuantumRange*(Sa+Da*Da-1.0);
-      break;
-    }
-    case StereoCompositeOp:
-    {
-      (*pixel)=(double) QuantumRange*(Sa+Da)/2;
+      (*pixel)=GetCopyAlpha(source_image,Si,Sa);
       break;
     }
     default:
     {
-      (*pixel)=(double) QuantumRange*alpha;
+      CompositeAlphaDarkenRun(row,authentic,pixel);
+      break;
+    }
+  }
+}
+
+static void CompositeAlphaChannel(const CompositeRowInputs *row,
+  const CompositePixelInputs *authentic,Quantum *magick_restrict q,
+  MagickRealType *pixel)
+{
+  Image
+    *const image = row->image,
+    *const source_image = row->source_image;
+
+  const CompositeOperator
+    compose = row->compose;
+
+  const Quantum
+    *const p = authentic->p;
+
+  const MagickRealType
+    Da = authentic->Da,
+    Sa = authentic->Sa,
+    Si = authentic->Si;
+
+  if (row->canvas_alpha != MagickFalse)
+    {
+      (*pixel)=(double) QuantumRange*Da;
+      return;
+    }
+  if (row->source_alpha != MagickFalse)
+    {
+      (*pixel)=(double) QuantumRange*Sa;
+      return;
+    }
+  switch (compose)
+  {
+    case AlphaCompositeOp:
+    {
+      (*pixel)=(double) QuantumRange*Sa;
+      break;
+    }
+    case BumpmapCompositeOp:
+    {
+      (*pixel)=Si*Da;
+      break;
+    }
+    case ChangeMaskCompositeOp:
+    {
+      ChangeMaskImages
+        images;
+
+      images.image=image;
+      images.source_image=source_image;
+      (*pixel)=GetChangeMaskAlpha(&images,p,q,Da);
+      break;
+    }
+    case ClearCompositeOp:
+    {
+      (*pixel)=(MagickRealType) TransparentAlpha;
+      break;
+    }
+    default:
+    {
+      CompositeAlphaColorizeRun(row,authentic,pixel);
       break;
     }
   }
@@ -4527,11 +4657,50 @@ static void CompositeChannelColor(const CompositeRowInputs *row,
   }
 }
 
-static void CompositeImageChannels(const CompositeRowInputs *row,
-  const CompositePixelInputs *authentic,Quantum *magick_restrict q)
+typedef struct _CompositeChannelTail
 {
+  const CompositeRowInputs
+    *row;
+
+  const CompositePixelInputs
+    *authentic;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    i;
+
+  PixelChannel
+    channel;
+
+  PixelTrait
+    traits,
+    source_traits;
+} CompositeChannelTail;
+
+static void CompositeSourceChannel(const CompositeChannelTail *tail)
+{
+  const CompositeRowInputs
+    *const row = tail->row;
+
+  const CompositePixelInputs
+    *const authentic = tail->authentic;
+
+  Quantum
+    *magick_restrict q = tail->q;
+
+  const ssize_t
+    i = tail->i;
+
+  const PixelChannel
+    channel = tail->channel;
+
+  const PixelTrait
+    source_traits = tail->source_traits,
+    traits = tail->traits;
+
   Image
-    *const image = row->image,
     *const source_image = row->source_image;
 
   const CompositeOperator
@@ -4557,13 +4726,64 @@ static void CompositeImageChannels(const CompositeRowInputs *row,
     Sc = 0.0,
     Sca = 0.0;
 
+  CompositeChannelInputs
+    tile;
+
+  MagickRealType
+    pixel = 0.0;
+
+  if (source_traits == UndefinedPixelTrait)
+    return;
+  /*
+    Sc: source color.
+    Dc: canvas color.
+  */
+  Sc=(MagickRealType) GetPixelChannel(source_image,channel,p);
+  Dc=(MagickRealType) q[i];
+  if ((traits & CopyPixelTrait) != 0)
+    {
+      /*
+        Copy channel.
+      */
+      q[i]=ClampToQuantum(Dc);
+      return;
+    }
+  /*
+    Porter-Duff compositions:
+      Sca: source normalized color multiplied by alpha.
+      Dca: normalized canvas color multiplied by alpha.
+  */
+  Sca=QuantumScale*Sa*Sc;
+  Dca=QuantumScale*Da*Dc;
+  gamma=GetCompositeGamma(compose,alpha);
+  pixel=Dc;
+  tile.channel=channel;
+  tile.Dc=Dc;
+  tile.Dca=Dca;
+  tile.Sc=Sc;
+  tile.Sca=Sca;
+  tile.gamma=gamma;
+  CompositeChannelColor(row,authentic,&tile,&pixel);
+  q[i]=clamp != MagickFalse ? ClampPixel(pixel) : ClampToQuantum(pixel);
+}
+
+static void CompositeImageChannels(const CompositeRowInputs *row,
+  const CompositePixelInputs *authentic,Quantum *magick_restrict q)
+{
+  Image
+    *const image = row->image,
+    *const source_image = row->source_image;
+
+  const MagickBooleanType
+    clamp = row->clamp;
+
   ssize_t
     i;
 
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
   {
-    CompositeChannelInputs
-      tile;
+    CompositeChannelTail
+      tail;
 
     MagickRealType
       pixel = 0.0;
@@ -4584,41 +4804,36 @@ static void CompositeImageChannels(const CompositeRowInputs *row,
           ClampToQuantum(pixel);
         continue;
       }
-    if (source_traits == UndefinedPixelTrait)
-      continue;
-    /*
-      Sc: source color.
-      Dc: canvas color.
-    */
-    Sc=(MagickRealType) GetPixelChannel(source_image,channel,p);
-    Dc=(MagickRealType) q[i];
-    if ((traits & CopyPixelTrait) != 0)
-      {
-        /*
-          Copy channel.
-        */
-        q[i]=ClampToQuantum(Dc);
-        continue;
-      }
-    /*
-      Porter-Duff compositions:
-        Sca: source normalized color multiplied by alpha.
-        Dca: normalized canvas color multiplied by alpha.
-    */
-    Sca=QuantumScale*Sa*Sc;
-    Dca=QuantumScale*Da*Dc;
-    gamma=GetCompositeGamma(compose,alpha);
-    pixel=Dc;
-    tile.channel=channel;
-    tile.Dc=Dc;
-    tile.Dca=Dca;
-    tile.Sc=Sc;
-    tile.Sca=Sca;
-    tile.gamma=gamma;
-    CompositeChannelColor(row,authentic,&tile,&pixel);
-    q[i]=clamp != MagickFalse ? ClampPixel(pixel) : ClampToQuantum(pixel);
+    tail.row=row;
+    tail.authentic=authentic;
+    tail.q=q;
+    tail.i=i;
+    tail.channel=channel;
+    tail.traits=traits;
+    tail.source_traits=source_traits;
+    CompositeSourceChannel(&tail);
   }
 }
+
+static const CompositeOperator
+  PixelInfoInputOperators[] =
+  {
+    ColorizeCompositeOp,
+    HueCompositeOp,
+    LuminizeCompositeOp,
+    ModulateCompositeOp,
+    RMSECompositeOp,
+    SaturateCompositeOp
+  };
+
+static const CompositeOperator
+  IntensityInputOperators[] =
+  {
+    BumpmapCompositeOp,
+    CopyAlphaCompositeOp,
+    DarkenIntensityCompositeOp,
+    LightenIntensityCompositeOp
+  };
 
 static void CompositeImagePixel(const CompositeRowInputs *row,
   const Quantum *magick_restrict p,Quantum *magick_restrict q)
@@ -4626,9 +4841,6 @@ static void CompositeImagePixel(const CompositeRowInputs *row,
   Image
     *const image = row->image,
     *const source_image = row->source_image;
-
-  const CompositeOperator
-    compose = row->compose;
 
   CompositePixelInputs
     authentic;
@@ -4652,32 +4864,17 @@ static void CompositeImagePixel(const CompositeRowInputs *row,
   Sa=QuantumScale*(double) GetPixelAlpha(source_image,p);
   Da=QuantumScale*(double) GetPixelAlpha(image,q);
   SetCompositeCoverage(row,Sa,Da,&alpha);
-  switch (compose)
-  {
-    case ColorizeCompositeOp:
-    case HueCompositeOp:
-    case LuminizeCompositeOp:
-    case ModulateCompositeOp:
-    case RMSECompositeOp:
-    case SaturateCompositeOp:
+  if (row->pixel_info_inputs != MagickFalse)
     {
-      Si=GetPixelIntensity(source_image,p);
-      GetPixelInfoPixel(source_image,p,&source_pixel);
-      GetPixelInfoPixel(image,q,&canvas_pixel);
-      break;
+        Si=GetPixelIntensity(source_image,p);
+        GetPixelInfoPixel(source_image,p,&source_pixel);
+        GetPixelInfoPixel(image,q,&canvas_pixel);
     }
-    case BumpmapCompositeOp:
-    case CopyAlphaCompositeOp:
-    case DarkenIntensityCompositeOp:
-    case LightenIntensityCompositeOp:
+  else if (row->intensity_inputs != MagickFalse)
     {
-      Si=GetPixelIntensity(source_image,p);
-      Di=GetPixelIntensity(image,q);
-      break;
+        Si=GetPixelIntensity(source_image,p);
+        Di=GetPixelIntensity(image,q);
     }
-    default:
-      break;
-  }
   authentic.p=p;
   authentic.alpha=alpha;
   authentic.Da=Da;
@@ -4720,7 +4917,9 @@ static void CompositeImageRow(const CompositeRowInputs *row,
     clamp = row->clamp;
 
   const VirtualCompositeInputs
-    virtual_inputs = { image, source_image, compose, canvas_dissolve, clamp };
+    virtual_inputs = { image, source_image, compose, canvas_dissolve, clamp,
+      IsListedOperator(CanvasPixelOperators,
+        sizeof(CanvasPixelOperators)/sizeof(*CanvasPixelOperators),compose) };
 
   PixelInfo
     canvas_pixel,
@@ -5219,12 +5418,19 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
         residual_threshold = 0.0002,
         iterations = 400.0;
 
+      BlendRequest
+        request;
+
       size_t
         tick = 100;
 
       GetBlendIterations(image,&iterations,&residual_threshold,&tick);
-      status=SaliencyBlendImage(image,composite,x_offset,y_offset,iterations,
-        residual_threshold,tick,exception);
+      request.x_offset=x_offset;
+      request.y_offset=y_offset;
+      request.iterations=iterations;
+      request.residual_threshold=residual_threshold;
+      request.tick=tick;
+      status=SaliencyBlendImage(image,composite,&request,exception);
       source_image=DestroyImage(source_image);
       return(status);
     }
@@ -5234,12 +5440,19 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
         residual_threshold = 0.0002,
         iterations = 400.0;
 
+      BlendRequest
+        request;
+
       size_t
         tick = 100;
 
       GetBlendIterations(image,&iterations,&residual_threshold,&tick);
-      status=SeamlessBlendImage(image,composite,x_offset,y_offset,iterations,
-        residual_threshold,tick,exception);
+      request.x_offset=x_offset;
+      request.y_offset=y_offset;
+      request.iterations=iterations;
+      request.residual_threshold=residual_threshold;
+      request.tick=tick;
+      status=SeamlessBlendImage(image,composite,&request,exception);
       source_image=DestroyImage(source_image);
       return(status);
     }
@@ -5316,6 +5529,16 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     row.image=image;
     row.source_image=source_image;
     row.compose=compose;
+    row.union_coverage=IsListedOperator(UnionCoverageOperators,
+      sizeof(UnionCoverageOperators)/sizeof(*UnionCoverageOperators),compose);
+    row.canvas_alpha=IsListedOperator(CanvasAlphaOperators,
+      sizeof(CanvasAlphaOperators)/sizeof(*CanvasAlphaOperators),compose);
+    row.source_alpha=IsListedOperator(SourceAlphaOperators,
+      sizeof(SourceAlphaOperators)/sizeof(*SourceAlphaOperators),compose);
+    row.pixel_info_inputs=IsListedOperator(PixelInfoInputOperators,
+      sizeof(PixelInfoInputOperators)/sizeof(*PixelInfoInputOperators),compose);
+    row.intensity_inputs=IsListedOperator(IntensityInputOperators,
+      sizeof(IntensityInputOperators)/sizeof(*IntensityInputOperators),compose);
     row.clip_to_self=clip_to_self;
     row.x_offset=x_offset;
     row.y_offset=y_offset;
