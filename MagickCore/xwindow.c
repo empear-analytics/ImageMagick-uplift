@@ -2264,6 +2264,68 @@ static int XSetDrawImageOpacity(const Image *draw_image,const Image *image,
   return(y);
 }
 
+typedef struct _DrawPixels
+{
+  Image
+    *draw_image;
+
+  XImage
+    *draw_ximage;
+
+  const XPixelInfo
+    *pixel;
+
+  XDrawInfo
+    *draw_info;
+} DrawPixels;
+
+static void XSetDrawRow(const DrawPixels *draw_pixels,
+  Quantum *magick_restrict q,const int y)
+{
+  Image
+    *const draw_image = draw_pixels->draw_image;
+
+  XImage
+    *const draw_ximage = draw_pixels->draw_ximage;
+
+  const XPixelInfo
+    *const pixel = draw_pixels->pixel;
+
+  XDrawInfo
+    *const draw_info = draw_pixels->draw_info;
+
+  int
+    x;
+
+  for (x=0; x < (int) draw_image->columns; x++)
+  {
+    if (XGetPixel(draw_ximage,x,y) == 0)
+      {
+        /*
+          Set this pixel to the background color.
+        */
+        SetPixelViaPixelInfo(draw_image,&draw_image->background_color,q);
+        SetPixelAlpha(draw_image,(Quantum) (draw_info->stencil ==
+          OpaqueStencil ? TransparentAlpha : OpaqueAlpha),q);
+      }
+    else
+      {
+        /*
+          Set this pixel to the pen color.
+        */
+        SetPixelRed(draw_image,ScaleShortToQuantum(
+          pixel->pen_color.red),q);
+        SetPixelGreen(draw_image,ScaleShortToQuantum(
+          pixel->pen_color.green),q);
+        SetPixelBlue(draw_image,ScaleShortToQuantum(
+          pixel->pen_color.blue),q);
+        SetPixelAlpha(draw_image,(Quantum) (draw_info->stencil ==
+          OpaqueStencil ? OpaqueAlpha : TransparentAlpha),q);
+      }
+    q+=(ptrdiff_t) GetPixelChannels(draw_image);
+  }
+}
+
 MagickPrivate MagickBooleanType XDrawImage(Display *display,
   const XPixelInfo *pixel,XDrawInfo *draw_info,Image *image,
   ExceptionInfo *exception)
@@ -2366,8 +2428,8 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
   draw_view=AcquireAuthenticCacheView(draw_image,exception);
   for (y=0; y < (int) draw_image->rows; y++)
   {
-    int
-      x;
+    DrawPixels
+      draw_pixels;
 
     Quantum
       *magick_restrict q;
@@ -2376,33 +2438,11 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
       1,exception);
     if (q == (Quantum *) NULL)
       break;
-    for (x=0; x < (int) draw_image->columns; x++)
-    {
-      if (XGetPixel(draw_ximage,x,y) == 0)
-        {
-          /*
-            Set this pixel to the background color.
-          */
-          SetPixelViaPixelInfo(draw_image,&draw_image->background_color,q);
-          SetPixelAlpha(draw_image,(Quantum) (draw_info->stencil ==
-            OpaqueStencil ? TransparentAlpha : OpaqueAlpha),q);
-        }
-      else
-        {
-          /*
-            Set this pixel to the pen color.
-          */
-          SetPixelRed(draw_image,ScaleShortToQuantum(
-            pixel->pen_color.red),q);
-          SetPixelGreen(draw_image,ScaleShortToQuantum(
-            pixel->pen_color.green),q);
-          SetPixelBlue(draw_image,ScaleShortToQuantum(
-            pixel->pen_color.blue),q);
-          SetPixelAlpha(draw_image,(Quantum) (draw_info->stencil ==
-            OpaqueStencil ? OpaqueAlpha : TransparentAlpha),q);
-        }
-      q+=(ptrdiff_t) GetPixelChannels(draw_image);
-    }
+    draw_pixels.draw_image=draw_image;
+    draw_pixels.draw_ximage=draw_ximage;
+    draw_pixels.pixel=pixel;
+    draw_pixels.draw_info=draw_info;
+    XSetDrawRow(&draw_pixels,q,y);
     if (SyncCacheViewAuthenticPixels(draw_view,exception) == MagickFalse)
       break;
   }
