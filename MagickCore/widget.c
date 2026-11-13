@@ -11978,6 +11978,9 @@ typedef struct _ListBrowserWidgets
 
   unsigned int
     *visible_entries;
+
+  XEvent
+    *event;
 } ListBrowserWidgets;
 
 typedef struct _ListBrowserContext
@@ -12180,6 +12183,70 @@ static void PressListBrowserKey(const ListBrowserContext *context,
   XDrawMatteText(display,window_info,reply_info);
 }
 
+static void MoveListBrowserPointer(const ListBrowserContext *context,
+  const ListBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  const unsigned int
+    entries = context->entries;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  XWidgetInfo
+    *const action_info = widgets->action_info;
+
+  XWidgetInfo
+    *const cancel_info = widgets->cancel_info;
+
+  XEvent
+    *const event = widgets->event;
+
+  /*
+    Discard pending button motion events.
+  */
+  while (XCheckMaskEvent(display,ButtonMotionMask,event)) ;
+  if ((*slider_info).active)
+    {
+      /*
+        Move slider matte.
+      */
+      (*slider_info)=TrackListBrowserSlider((*slider_info),(*event),entries);
+      (*state)|=RedrawListState;
+      return;
+    }
+  if ((*state) & InactiveWidgetState)
+    return;
+  if ((*action_info).raised == MatteIsActive((*action_info),(*event).xmotion))
+    {
+      /*
+        Action button status changed.
+      */
+      (*action_info).raised=(*action_info).raised == MagickFalse ?
+        MagickTrue : MagickFalse;
+      XDrawBeveledButton(display,window_info,action_info);
+      return;
+    }
+  if ((*cancel_info).raised == MatteIsActive((*cancel_info),(*event).xmotion))
+    {
+      /*
+        Cancel button status changed.
+      */
+      (*cancel_info).raised=(*cancel_info).raised == MagickFalse ?
+        MagickTrue : MagickFalse;
+      XDrawBeveledButton(display,window_info,cancel_info);
+      return;
+    }
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -12242,7 +12309,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   const ListBrowserWidgets
     list_widgets = { &reply_info, &state, &slider_info, &action_info,
       &cancel_info, &north_info, &south_info, &delay, &scroll_info,
-      &visible_entries };
+      &visible_entries, &event };
 
   ListBrowserContext
     list_context;
@@ -12719,41 +12786,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
       }
       case MotionNotify:
       {
-        /*
-          Discard pending button motion events.
-        */
-        while (XCheckMaskEvent(display,ButtonMotionMask,&event)) ;
-        if (slider_info.active)
-          {
-            /*
-              Move slider matte.
-            */
-            slider_info=TrackListBrowserSlider(slider_info,event,entries);
-            state|=RedrawListState;
-            break;
-          }
-        if (state & InactiveWidgetState)
-          break;
-        if (action_info.raised == MatteIsActive(action_info,event.xmotion))
-          {
-            /*
-              Action button status changed.
-            */
-            action_info.raised=action_info.raised == MagickFalse ?
-              MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,window_info,&action_info);
-            break;
-          }
-        if (cancel_info.raised == MatteIsActive(cancel_info,event.xmotion))
-          {
-            /*
-              Cancel button status changed.
-            */
-            cancel_info.raised=cancel_info.raised == MagickFalse ?
-              MagickTrue : MagickFalse;
-            XDrawBeveledButton(display,window_info,&cancel_info);
-            break;
-          }
+        MoveListBrowserPointer(&list_context,&list_widgets);
         break;
       }
       case SelectionClear:
