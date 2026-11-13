@@ -1384,6 +1384,20 @@ static ptrdiff_t FormatLogSpecifier(char *q,const size_t extent,
   }
 }
 
+static char *FormatLogGeneration(const LogInfo *log_info,
+  const ssize_t generation,char *q)
+{
+  if (log_info->generations == 0)
+    {
+      (void) CopyMagickString(q,"0",MagickPathExtent);
+      q++;
+      return(q);
+    }
+  q+=(ptrdiff_t) FormatLocaleString(q,MagickPathExtent,"%.17g",(double)
+    (generation % log_info->generations));
+  return(q);
+}
+
 static void FormatLogFilename(const LogInfo *log_info,const ssize_t generation,
   char *filename)
 {
@@ -1427,14 +1441,7 @@ static void FormatLogFilename(const LogInfo *log_info,const ssize_t generation,
       }
       case 'g':
       {
-        if (log_info->generations == 0)
-          {
-            (void) CopyMagickString(q,"0",MagickPathExtent);
-            q++;
-            break;
-          }
-        q+=(ptrdiff_t) FormatLocaleString(q,MagickPathExtent,"%.17g",(double)
-          (generation % log_info->generations));
+        q=FormatLogGeneration(log_info,generation,q);
         break;
       }
       default:
