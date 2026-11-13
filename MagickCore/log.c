@@ -1477,6 +1477,20 @@ static char GetLogEscape(const char *p)
   return('\0');
 }
 
+static MagickBooleanType GrowLogEventText(char **text,char **q,
+  size_t *extent)
+{
+  if ((size_t) ((*q)-(*text)+MagickPathExtent) >= (*extent))
+    {
+      (*extent)<<=1;
+      (*text)=(char *) ResizeQuantumMemory((*text),(*extent),sizeof(**text));
+      if ((*text) == (char *) NULL)
+        return(MagickFalse);
+      (*q)=(*text)+strlen((*text));
+    }
+  return(MagickTrue);
+}
+
 static char *TranslateEvent(const LogEventLocation *location,
   const char *domain,const char *event)
 {
@@ -1560,14 +1574,8 @@ static char *TranslateEvent(const LogEventLocation *location,
   for (p=log_info->format; *p != '\0'; p++)
   {
     *q='\0';
-    if ((size_t) (q-text+MagickPathExtent) >= extent)
-      {
-        extent<<=1;
-        text=(char *) ResizeQuantumMemory(text,extent,sizeof(*text));
-        if (text == (char *) NULL)
-          return((char *) NULL);
-        q=text+strlen(text);
-      }
+    if (GrowLogEventText(&text,&q,&extent) == MagickFalse)
+      return((char *) NULL);
     /*
       The format of the log is defined by embedding special format characters:
 
