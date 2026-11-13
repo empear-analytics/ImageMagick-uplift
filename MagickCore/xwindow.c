@@ -4768,9 +4768,9 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
 #endif
   window->ximage=ximage;
   matte_image=(XImage *) NULL;
-  if (IsShapedImageWindow(window) != MagickFalse)
-    if (IsShapeWithinDisplay(display,window,width,height) != MagickFalse)
-      matte_image=XCreateMatteXImage(display,window,width,height);
+  if ((IsShapedImageWindow(window) != MagickFalse) &&
+      (IsShapeWithinDisplay(display,window,width,height) != MagickFalse))
+    matte_image=XCreateMatteXImage(display,window,width,height);
   if (window->matte_image != (XImage *) NULL)
     XDestroyWindowMatteImage(window);
   window->matte_image=matte_image;
