@@ -13508,6 +13508,173 @@ the owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
+## Recipe ME - Merge Mirrored Twins That Leave Through a Constant Return
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Complex Method* or *Large Method* on a
+function that holds several copies of one block which leave the function on failure through
+`return(c);`, and the copies come in two mirrored sides: copies of one side differ only in one
+value, and the two sides differ in which operand of a few calls is the fixed coordinate, as
+`visual-effects-plasma.c`'s `PlasmaImageProxy` does for its four edge pixels (left and right
+fetch along a column at `x1` and `x2`, bottom and top along a row at `y2` and `y1`, each
+returning `MagickTrue` or `MagickFalse` when a fetch fails). Moved one by one, the copies
+become look-alike helpers that clone each other, and the caller keeps every guard.
+
+**Not covered by:** Recipe MT, whose copies meet Recipe E and so leave through no `return` of
+their own, and which merges exactly two copies; Recipe Y, which moves one block and takes no
+value or selector, so four copies become four helpers or two mirrored clones; Recipe SV, whose
+copies meet Recipe E and differ in one value only, never in an operand's role; Recipe W step 7,
+which passes every input as a parameter (here six or more) and admits no mirrored copy.
+
+**How:**
+
+1. Copies. Two or more copies of one block in one function, outside every OpenMP region, with
+   no `#pragma` line, each meeting Recipe Y steps 1 and 2: it leaves the function only through
+   `return(c);` of one constant `c` (which may differ between copies), it writes at most one
+   variable `v` of the caller that the caller reads after it (the same `v` in every copy), and
+   every other variable it writes it writes before reading it, and the caller does not read it
+   after the copy before writing it again. The copies fall into two sides. Copies of one side
+   are one token sequence once one value is replaced by a name: a member access of a variable
+   that nothing in the copies writes (`segment->x1` in one copy, `segment->x2` in another), of
+   one type in every copy (Recipe SV step 2's member form). The two sides align as Recipe MT
+   step 1 says (each side's variables renamed to one name per role, `x` and `y` to `offset`):
+   each differing run a whole argument or a whole expression, with no declaration, no
+   statement in one side only and no unbalanced parenthesis. The value stands at the same
+   positions in both sides.
+2. The selector. Write `typedef enum { NameA, NameB } NameSide;` directly above the new
+   function, one constant per side, named for what that side does (`PlasmaColumnEdge`,
+   `PlasmaRowEdge`).
+3. Types. Each differing pair meets Recipe MT step 3. The value's parameter is `const` and has
+   the member's declared type.
+4. Write one `static inline MagickBooleanType` function directly above the caller. Its
+   parameters are Recipe Y's input struct `const Name *name` (the variables a copy only reads;
+   the struct the caller already fills under Recipe N step 8 may serve, when every variable a
+   copy reads is a member), `const NameSide side`, the value, and `v` as a pointer: at most four.
+   At the top of its body bind the members a copy reads as `const` locals of their own names
+   (Recipe N step 4), then declare the variables of step 1 that the copies write first, under
+   their role names. The body is one copy's text with every differing pair written `((side ==
+   NameA) ? runA : runB)`, each run verbatim, the value replaced by the parameter's name at each
+   of its positions, `*v` for every use of `v`, and each `return(c);` written
+   `return(MagickFalse);`; the function ends with `return(MagickTrue);`. Nothing else changes.
+5. Replace each copy by `if (Helper(&name,Side,value,&v) == MagickFalse) return(c);`: the
+   copy's own side constant (never a variable), its own value expression verbatim, and its own
+   `c`, wrapped as ImageMagick wraps. The struct is filled as Recipe Y step 5 says, or once
+   under Recipe N step 8's sibling form at a point every call follows, with nothing on any path
+   from the fill to a call writing a member's variable (checked by reading every path). A
+   comment that headed a copy stays above its call.
+6. All copies move in one commit (rule 1). Copies that run per pixel or per segment are timed
+   as Recipe CF step 7 says, against the baseline binary, several runs, median: a slowdown over
+   3% stops the step.
+7. Check by script that folding every conditional of the new function to the run of a copy's
+   side, the role names back to that side's variables, the value's parameter to the copy's
+   value, `*v` to `v` and `return(MagickFalse);` to the copy's `return(c);` gives exactly that
+   copy's token sequence, for every copy; and by reading that every argument fills its
+   parameter and every member is filled from the variable of its name.
+8. Evidence: the oracle on the function (each copy reached by a case, named from the line
+   coverage), `refactor_guard.py --calls`, `ci_linux_warnings.sh`; a `return(c);` that no case
+   reaches (a failed fetch) is checked by reading against step 7's fold.
+
+**Before:**
+
+```c
+      /*
+        Left pixel.
+      */
+      x=CastDoubleToSsizeT(ceil(segment->x1-0.5));
+      u=GetCacheViewVirtualPixels(context->u_view,x,CastDoubleToSsizeT(ceil(
+        segment->y1-0.5)),1,1,context->exception);
+      v=GetCacheViewVirtualPixels(context->v_view,x,CastDoubleToSsizeT(ceil(
+        segment->y2-0.5)),1,1,context->exception);
+      q=QueueCacheViewAuthenticPixels(context->image_view,x,y_mid,1,1,context->exception);
+      if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
+        return(MagickTrue);
+      SetPlasmaPixelChannels(context->image,context->random_info,u,v,q,plasma);
+      status=SyncCacheViewAuthenticPixels(context->image_view,context->exception);
+      ...
+          /*
+            Bottom pixel.
+          */
+          y=CastDoubleToSsizeT(ceil(segment->y2-0.5));
+          u=GetCacheViewVirtualPixels(context->u_view,CastDoubleToSsizeT(ceil(
+            segment->x1-0.5)),y,1,1,context->exception);
+          v=GetCacheViewVirtualPixels(context->v_view,CastDoubleToSsizeT(ceil(
+            segment->x2-0.5)),y,1,1,context->exception);
+          q=QueueCacheViewAuthenticPixels(context->image_view,x_mid,y,1,1,
+            context->exception);
+          if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
+            return(MagickTrue);
+          SetPlasmaPixelChannels(context->image,context->random_info,u,v,q,plasma);
+          status=SyncCacheViewAuthenticPixels(context->image_view,context->exception);
+```
+
+**After:**
+
+```c
+static inline MagickBooleanType SetPlasmaEdgePixel(
+  const PlasmaMidpoint *midpoint,const PlasmaEdgeSide side,const double edge,
+  MagickStatusType *status)
+{
+  ...
+  offset=CastDoubleToSsizeT(ceil(edge-0.5));
+  u=GetCacheViewVirtualPixels(context->u_view,((side == PlasmaColumnEdge) ?
+    offset : CastDoubleToSsizeT(ceil(segment->x1-0.5))),((side ==
+    PlasmaColumnEdge) ? CastDoubleToSsizeT(ceil(segment->y1-0.5)) : offset),1,1,
+    context->exception);
+  ...
+  if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
+    return(MagickFalse);
+  SetPlasmaPixelChannels(context->image,context->random_info,u,v,q,plasma);
+  *status=SyncCacheViewAuthenticPixels(context->image_view,context->exception);
+  return(MagickTrue);
+}
+...
+      /*
+        Left pixel.
+      */
+      if (SetPlasmaEdgePixel(&midpoint,PlasmaColumnEdge,segment->x1,
+          &status) == MagickFalse)
+        return(MagickTrue);
+```
+
+**Careful:**
+
+- The conditional operator evaluates `side == C`, a `const` local with no side effect, then
+  exactly one of its runs, with a sequence point between (C11 6.5.15). Each call therefore
+  evaluates exactly its copy's run at each place and nothing of the other side: a
+  `CastDoubleToSsizeT` (which may write `errno`) runs only where the copy ran it, between the
+  same two fetches, in the copy's order, and the other side's casts never run.
+- The value goes by value: a member access of a variable nothing in the copies writes, read
+  once at the call instead of once at its position in the copy; nothing runs between the two
+  but the binding of `const` locals, so it reads the same value (Recipe SV, Recipe TW step 2).
+- The input struct holds the values the copies read (Recipe Y step 3, Recipe N step 8's
+  sibling form: filled from the variables of their names, nothing writing them before a
+  call), so each binding reads what the copy read.
+- `v` through its pointer: the function writes `*v` where the copy wrote `v`, in the same
+  order, on the same paths (Recipe Y step 4). Variables the copies write first are the new
+  function's own, as Recipe Y step 2 declares them; the caller never read their values.
+- Each path through a copy ends at its `return(c);` or falls off its end. The function returns
+  `MagickFalse` exactly where the copy returned and `MagickTrue` where it fell off, and the
+  caller then runs `return(c);` with the copy's own constant, or goes on, as before: the
+  differing constants stay in the callers, so one function serves copies that leave with
+  different values.
+- Speed: the function is `static inline` and every call passes a constant selector; a
+  compiler that keeps it out of line tests the selector at run time, which step 6's timing
+  measures.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls`, step 7's fold by script, steps 1
+and 5 by reading, and step 6's timing.
+
+**Provenance:** 2026-11-13, from `visual-effects-plasma.c`'s `PlasmaImageProxy` (campaign A,
+W21 round four, lane d): its four edge-pixel blocks hold the function's cc 21, 103 lines and
+four bumps. A shared helper over six precomputed coordinates (W21 round three) left the score
+flat at 8.50 and moved casts that may write `errno` ahead of fetches; one helper per side cloned
+(8.15, W18). The four copies as one helper of this form leave the caller's guards in place
+(8.50 alone, Large Method gone); with Recipe CN on the two single-test guards, Recipe Y on the
+row pair and Recipe E step 7 on the two tails, a probe measured 8.50, 8.50, 8.72, 8.81 and
+9.09, no finding on a new function and no *Code Duplication*. Added by Claude Code (Claude Opus
+5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -13937,3 +14104,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | MF | Make a Hoisted Statement Macro a Function: the uses of a hoisted function-like statement macro (`M(a1,...,ak);`, side-effect-free arguments, one `ThrowBinaryException` exit, at most one pointer local advanced on the fall-through path) become calls of one `static MagickBooleanType` helper that holds the one remaining use, taking a struct of the macro's free variables with `T **top` for the advanced pointer and a struct of the arguments; *Careful* gives the argument (arguments evaluated once to the same value, cleanup on copies of objects the caller releases before returning, the pointer stored back on the success path); proof: the oracle, `--calls`, reading | `paint-floodfill.c`'s `PushSegmentStack` (campaign A, W21 lane b): five uses in `FloodfillPaintImage`, the file 8.35; with the helper and the loop split under Recipes Y and I, probed 9.09 | owner |
 | 2026-11-13 | AMEND | N | Step 2: a variable the block writes before it reads it, whose only other use is the caller's earlier write of it, may be carried in by value like a read-then-written one (a non-`const` local of the member's name initialised from the member), since declaring it in the new function would leave the caller's write set but never used (`-Wunused-but-set-variable`, an error in the CI jobs) | `paint-floodfill.c`'s `FloodfillPaintImage` (campaign A, W21 lane b): `start=0;` before the stack loop, which the loop overwrites before reading; the loop as a helper under Recipe Y with `start` declared in it leaves `start` set and unused in the caller | owner |
 | 2026-11-13 | NEW | LX | Extract Block Returning Whether the Iteration Went On, Flagging a Break: a block in a sequential loop body that leaves by `continue;`, by `break;` and by falling off its end becomes a function returning `MagickFalse` for each `continue;` and `MagickTrue` otherwise, with a `MagickBooleanType *broke` out-parameter set by each `break;`; the caller writes `if (Helper(...,&broke) == MagickFalse) continue;` and `if (broke != MagickFalse) break;`. *Careful* gives the argument for the three kinds of path | `opencl.c`'s `LoadOpenCLDeviceBenchmark` (campaign A, W21 round three, lane c): the `<device` branch's `if (NULL) break;` before its `continue;`, which LB, SG and BR refuse; 7.89 to 8.15 with the run of the LC helper's call and the branch as one helper | owner |
+| 2026-11-13 | NEW | ME | Merge Mirrored Twins That Leave Through a Constant Return: copies of one block that leave the function through `return(c);` (Recipe Y steps 1 and 2; `c` may differ between copies), in two mirrored sides (Recipe MT step 1's alignment) whose copies differ in one member-access value, become one `static inline MagickBooleanType` function taking the input struct, a constant selector, the value and the written variable by pointer; each copy becomes `if (Helper(...) == MagickFalse) return(c);` with its own constant. *Careful* gives the argument (the conditional evaluates only the copy's run, in its order; the constants stay in the callers) | `visual-effects-plasma.c`'s `PlasmaImageProxy` (campaign A, W21 round four, lane d): four edge-pixel blocks (left/right along a column, bottom/top along a row) that Recipes MT, Y, SV and W refuse; helpers per side cloned (8.15), precomputed coordinates moved `errno`-writing casts; a probe of the chain this recipe opens: 8.50 to 9.09 | mandate (2026-10-24) |
