@@ -1782,6 +1782,25 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
 %      contains the extents of any cropping rectangle.
 %
 */
+static GC XCreateInvertContext(Display *display,const Window root_window)
+{
+  GC
+    annotate_context;
+
+  XGCValues
+    context_values;
+
+  context_values.background=XBlackPixel(display,XDefaultScreen(display));
+  context_values.foreground=XWhitePixel(display,XDefaultScreen(display));
+  context_values.function=GXinvert;
+  context_values.plane_mask=
+    context_values.background ^ context_values.foreground;
+  context_values.subwindow_mode=IncludeInferiors;
+  annotate_context=XCreateGC(display,root_window,(size_t) (GCBackground |
+    GCForeground | GCFunction | GCSubwindowMode),&context_values);
+  return(annotate_context);
+}
+
 static Window XSelectWindow(Display *display,RectangleInfo *crop_info)
 {
 #define MinimumCropArea  (unsigned int) 9
@@ -1807,9 +1826,6 @@ static Window XSelectWindow(Display *display,RectangleInfo *crop_info)
   XEvent
     event;
 
-  XGCValues
-    context_values;
-
   /*
     Initialize graphic context.
   */
@@ -1818,14 +1834,7 @@ static Window XSelectWindow(Display *display,RectangleInfo *crop_info)
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
   root_window=XRootWindow(display,XDefaultScreen(display));
-  context_values.background=XBlackPixel(display,XDefaultScreen(display));
-  context_values.foreground=XWhitePixel(display,XDefaultScreen(display));
-  context_values.function=GXinvert;
-  context_values.plane_mask=
-    context_values.background ^ context_values.foreground;
-  context_values.subwindow_mode=IncludeInferiors;
-  annotate_context=XCreateGC(display,root_window,(size_t) (GCBackground |
-    GCForeground | GCFunction | GCSubwindowMode),&context_values);
+  annotate_context=XCreateInvertContext(display,root_window);
   if (annotate_context == (GC) NULL)
     return((Window) NULL);
   /*
