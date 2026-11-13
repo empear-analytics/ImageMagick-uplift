@@ -4101,6 +4101,73 @@ static void XCreateIconWindow(const AnimateWindowSetup *setup)
       windows->icon.id);
 }
 
+static void XCreateInfoWindow(const AnimateWindowSetup *setup)
+{
+  Display
+    *const display = setup->display;
+
+  XResourceInfo
+    *const resource_info = setup->resource_info;
+
+  XWindows
+    *const windows = setup->windows;
+
+  XVisualInfo
+    *const visual_info = setup->visual_info;
+
+  XStandardColormap
+    *const map_info = setup->map_info;
+
+  XPixelInfo
+    *const pixel = setup->pixel;
+
+  XFontStruct
+    *const font_info = setup->font_info;
+
+  XClassHint
+    *const class_hints = setup->class_hints;
+
+  XWMHints
+    *const manager_hints = setup->manager_hints;
+
+  char
+    **const argv = setup->argv;
+
+  const int
+    argc = setup->argc;
+
+  /*
+    Initialize Info widget.
+  */
+  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
+    resource_info,&windows->info);
+  (void) CloneString(&windows->info.name,"Info");
+  (void) CloneString(&windows->info.icon_name,"Info");
+  windows->info.border_width=1;
+  windows->info.x=2;
+  windows->info.y=2;
+  windows->info.flags|=PPosition;
+  windows->info.attributes.win_gravity=UnmapGravity;
+  windows->info.attributes.event_mask=ButtonPressMask | ExposureMask |
+    StructureNotifyMask;
+  manager_hints->flags=InputHint | StateHint | WindowGroupHint;
+  manager_hints->input=MagickFalse;
+  manager_hints->initial_state=NormalState;
+  manager_hints->window_group=windows->image.id;
+  XMakeWindow(display,windows->image.id,argv,argc,class_hints,manager_hints,
+    &windows->info);
+  windows->info.highlight_stipple=XCreateBitmapFromData(display,
+    windows->info.id,(char *) HighlightBitmap,HighlightWidth,HighlightHeight);
+  windows->info.shadow_stipple=XCreateBitmapFromData(display,
+    windows->info.id,(char *) ShadowBitmap,ShadowWidth,ShadowHeight);
+  (void) XSetTransientForHint(display,windows->info.id,windows->image.id);
+  if (windows->image.mapped)
+    (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),"Window id: 0x%lx (info)",
+      windows->info.id);
+}
+
 MagickExport Image *XAnimateImages(Display *display,
   XResourceInfo *resource_info,char **argv,const int argc,Image *images,
   ExceptionInfo *exception)
@@ -4448,36 +4515,7 @@ MagickExport Image *XAnimateImages(Display *display,
   if (resource_info->debug != MagickFalse)
     (void) LogMagickEvent(X11Event,GetMagickModule(),"Window id: 0x%lx (image)",
       windows->image.id);
-  /*
-    Initialize Info widget.
-  */
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->info);
-  (void) CloneString(&windows->info.name,"Info");
-  (void) CloneString(&windows->info.icon_name,"Info");
-  windows->info.border_width=1;
-  windows->info.x=2;
-  windows->info.y=2;
-  windows->info.flags|=PPosition;
-  windows->info.attributes.win_gravity=UnmapGravity;
-  windows->info.attributes.event_mask=ButtonPressMask | ExposureMask |
-    StructureNotifyMask;
-  manager_hints->flags=InputHint | StateHint | WindowGroupHint;
-  manager_hints->input=MagickFalse;
-  manager_hints->initial_state=NormalState;
-  manager_hints->window_group=windows->image.id;
-  XMakeWindow(display,windows->image.id,argv,argc,class_hints,manager_hints,
-    &windows->info);
-  windows->info.highlight_stipple=XCreateBitmapFromData(display,
-    windows->info.id,(char *) HighlightBitmap,HighlightWidth,HighlightHeight);
-  windows->info.shadow_stipple=XCreateBitmapFromData(display,
-    windows->info.id,(char *) ShadowBitmap,ShadowWidth,ShadowHeight);
-  (void) XSetTransientForHint(display,windows->info.id,windows->image.id);
-  if (windows->image.mapped)
-    (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
-  if (resource_info->debug != MagickFalse)
-    (void) LogMagickEvent(X11Event,GetMagickModule(),"Window id: 0x%lx (info)",
-      windows->info.id);
+  XCreateInfoWindow(&setup);
   /*
     Initialize Command widget.
   */
