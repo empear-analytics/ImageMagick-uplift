@@ -14565,6 +14565,52 @@ static void XROIPointerKey(const ROIContext *context,
   }
 }
 
+static void XROIPointerEvent(const ROIContext *context,
+  const ROITargets *targets)
+{
+  XEvent
+    *const event = targets->event;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  RectangleInfo
+    *const roi_info = targets->roi_info;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      XROIPointerPress(context,targets);
+      break;
+    }
+    case ButtonRelease:
+      break;
+    case Expose:
+      break;
+    case KeyPress:
+    {
+      XROIPointerKey(context,targets);
+      break;
+    }
+    case MotionNotify:
+    {
+      /*
+        Map and unmap Info widget as text cursor crosses its boundaries.
+      */
+      (*x)=(*event).xmotion.x;
+      (*y)=(*event).xmotion.y;
+      XTrackInfoWidget(context->display,context->windows,(*x),(*y));
+      (*roi_info).x=(ssize_t) context->windows->image.x+(*x);
+      (*roi_info).y=(ssize_t) context->windows->image.y+(*y);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType XROIImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -14647,37 +14693,7 @@ static MagickBooleanType XROIImage(Display *display,
         XROIPointerCommand(&context,&targets);
         continue;
       }
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        XROIPointerPress(&context,&targets);
-        break;
-      }
-      case ButtonRelease:
-        break;
-      case Expose:
-        break;
-      case KeyPress:
-      {
-        XROIPointerKey(&context,&targets);
-        break;
-      }
-      case MotionNotify:
-      {
-        /*
-          Map and unmap Info widget as text cursor crosses its boundaries.
-        */
-        x=event.xmotion.x;
-        y=event.xmotion.y;
-        XTrackInfoWidget(display,windows,x,y);
-        roi_info.x=(ssize_t) windows->image.x+x;
-        roi_info.y=(ssize_t) windows->image.y+y;
-        break;
-      }
-      default:
-        break;
-    }
+    XROIPointerEvent(&context,&targets);
   } while ((state & ExitState) == 0);
   (void) XSelectInput(display,windows->image.id,
     windows->image.attributes.event_mask);
