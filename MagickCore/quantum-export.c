@@ -4062,6 +4062,38 @@ static void ExportAnyDepthIndexQuantum(const Image *image,
   }
 }
 
+static void ExportOtherDepthIndexQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  switch (quantum_info->depth)
+  {
+    case 16:
+    {
+      Export16BitIndexQuantum(image,quantum_info,span);
+      break;
+    }
+    case 32:
+    {
+      Export32BitIndexQuantum(image,quantum_info,span);
+      break;
+    }
+    case 64:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          Export64BitFloatIndexQuantum(image,quantum_info,span);
+          break;
+        }
+      magick_fallthrough;
+    }
+    default:
+    {
+      ExportAnyDepthIndexQuantum(image,quantum_info,span);
+      break;
+    }
+  }
+}
+
 static void ExportIndexQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
@@ -4088,28 +4120,9 @@ static void ExportIndexQuantum(const Image *image,QuantumInfo *quantum_info,
       Export8BitIndexQuantum(image,quantum_info,span);
       break;
     }
-    case 16:
-    {
-      Export16BitIndexQuantum(image,quantum_info,span);
-      break;
-    }
-    case 32:
-    {
-      Export32BitIndexQuantum(image,quantum_info,span);
-      break;
-    }
-    case 64:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          Export64BitFloatIndexQuantum(image,quantum_info,span);
-          break;
-        }
-      magick_fallthrough;
-    }
     default:
     {
-      ExportAnyDepthIndexQuantum(image,quantum_info,span);
+      ExportOtherDepthIndexQuantum(image,quantum_info,span);
       break;
     }
   }
