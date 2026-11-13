@@ -53,6 +53,7 @@ if ( ! GetOptions(
 	 'draw.c',
 	 'drawing-wand.c',
 	 'display.c',
+	 'display-image.c',
 	 'effect.c',
 	 'effect-filter.c',
 	 'effect-preview.c',

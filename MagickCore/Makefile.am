@@ -146,6 +146,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/deprecate.c \
   MagickCore/deprecate.h \
   MagickCore/display.c \
+  MagickCore/display-image.c \
   MagickCore/display.h \
   MagickCore/display-private.h \
   MagickCore/distort.c \

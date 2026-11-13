@@ -62,6 +62,7 @@ $call Make decorate-raise.c
 $call Make delegate.c
 $call Make deprecate.c
 $call Make display.c
+$call Make display-image.c
 $call Make distort.c
 $call Make distort-affine.c
 $call Make distort-resize.c
