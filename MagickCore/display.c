@@ -15220,6 +15220,9 @@ typedef struct _RotateLoopInput
 
   RotateTargets
     targets;
+
+  ExceptionInfo
+    *exception;
 } RotateLoopInput;
 
 static MagickBooleanType XRotateLoopCommand(
@@ -15266,6 +15269,78 @@ static MagickBooleanType XRotateLoopCommand(
       return(MagickTrue);
     }
   return(MagickFalse);
+}
+
+static void XRotateSelectStep(const RotateLoopInput *loop_input,
+  const RotateLineTargets *line_targets,ModeType *direction)
+{
+  Display
+    *const display = loop_input->display;
+
+  XResourceInfo
+    *const resource_info = loop_input->resource_info;
+
+  XWindows
+    *const windows = loop_input->windows;
+
+  ExceptionInfo
+    *const exception = loop_input->exception;
+
+  XSegment
+    *const rotate_info = line_targets->rotate_info;
+
+  size_t
+    *const state = line_targets->state;
+
+  XEvent
+    event;
+
+  XHighlightLine(display,windows->image.id,
+    windows->image.highlight_context,rotate_info);
+  /*
+    Wait for next event.
+  */
+  XScreenEvent(display,windows,&event,exception);
+  XHighlightLine(display,windows->image.id,
+    windows->image.highlight_context,rotate_info);
+  if (XRotateLoopCommand(loop_input,event,direction,state) !=
+      MagickFalse)
+    return;
+  switch (event.type)
+  {
+    case ButtonPress:
+    {
+      XStartRotateLine(display,windows,event,line_targets);
+      break;
+    }
+    case ButtonRelease:
+      break;
+    case Expose:
+      break;
+    case KeyPress:
+    {
+      RotateKeyInput
+        key_input;
+
+      key_input.display=display;
+      key_input.resource_info=resource_info;
+      key_input.windows=windows;
+      key_input.event=event;
+      XRotateKeyPress(&key_input,line_targets);
+      break;
+    }
+    case MotionNotify:
+    {
+      (*rotate_info).x1=event.xmotion.x;
+      (*rotate_info).y1=event.xmotion.y;
+    }
+  }
+  (*rotate_info).x2=(*rotate_info).x1;
+  (*rotate_info).y2=(*rotate_info).y1;
+  if ((*direction) == HorizontalRotateCommand)
+    (*rotate_info).x2+=32;
+  else
+    (*rotate_info).y2-=32;
 }
 
 static MagickBooleanType XRotateImage(Display *display,
@@ -15343,7 +15418,7 @@ static MagickBooleanType XRotateImage(Display *display,
 
       const RotateLoopInput
         loop_input = { display, resource_info, windows, RotateMenu,
-          RotateCommands, DirectionCommands, command, targets };
+          RotateCommands, DirectionCommands, command, targets, exception };
 
       /*
         Map Command widget.
@@ -15366,52 +15441,7 @@ static MagickBooleanType XRotateImage(Display *display,
       state=DefaultState;
       do
       {
-        XHighlightLine(display,windows->image.id,
-          windows->image.highlight_context,&rotate_info);
-        /*
-          Wait for next event.
-        */
-        XScreenEvent(display,windows,&event,exception);
-        XHighlightLine(display,windows->image.id,
-          windows->image.highlight_context,&rotate_info);
-        if (XRotateLoopCommand(&loop_input,event,&direction,&state) !=
-            MagickFalse)
-          continue;
-        switch (event.type)
-        {
-          case ButtonPress:
-          {
-            XStartRotateLine(display,windows,event,&line_targets);
-            break;
-          }
-          case ButtonRelease:
-            break;
-          case Expose:
-            break;
-          case KeyPress:
-          {
-            RotateKeyInput
-              key_input;
-
-            key_input.display=display;
-            key_input.resource_info=resource_info;
-            key_input.windows=windows;
-            key_input.event=event;
-            XRotateKeyPress(&key_input,&line_targets);
-            break;
-          }
-          case MotionNotify:
-          {
-            rotate_info.x1=event.xmotion.x;
-            rotate_info.y1=event.xmotion.y;
-          }
-        }
-        rotate_info.x2=rotate_info.x1;
-        rotate_info.y2=rotate_info.y1;
-        if (direction == HorizontalRotateCommand)
-          rotate_info.x2+=32;
-        else
-          rotate_info.y2-=32;
+        XRotateSelectStep(&loop_input,&line_targets,&direction);
       } while ((state & ExitState) == 0);
       (void) XSetFunction(display,windows->image.highlight_context,GXcopy);
       (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
