@@ -14999,6 +14999,8 @@ typedef struct _PreferencesWidgets
 
   char
     *cache;
+  XWidgetInfo
+    *preferences_info;
 } PreferencesWidgets;
 
 typedef struct _PreferencesContext
@@ -15035,6 +15037,28 @@ static void InitializePreferencesCache(const PreferencesContext *context,
   (*cache_info).y=y;
 }
 
+static void SetPreferencesRaised(const PreferencesContext *context,
+  const PreferencesWidgets *widgets)
+{
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWidgetInfo
+    *const preferences_info = widgets->preferences_info;
+
+  preferences_info[0].raised=resource_info->backdrop == MagickFalse;
+  preferences_info[1].raised=resource_info->confirm_exit == MagickFalse;
+  preferences_info[2].raised=resource_info->confirm_edit == MagickFalse;
+  preferences_info[3].raised=resource_info->gamma_correct ==
+    MagickFalse;
+  preferences_info[4].raised=resource_info->display_warnings ==
+    MagickFalse;
+  preferences_info[5].raised=
+    resource_info->quantize_info->dither_method == NoDitherMethod;
+  preferences_info[6].raised=resource_info->colormap != SharedColormap;
+  preferences_info[7].raised=resource_info->use_pixmap == MagickFalse;
+}
+
 MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XResourceInfo *resource_info,XWindows *windows)
 {
@@ -15069,7 +15093,7 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
     preferences_info[NumberPreferences];
 
   const PreferencesWidgets
-    widgets = { &cache_info, &cache[0] };
+    widgets = { &cache_info, &cache[0], &preferences_info[0] };
 
   PreferencesContext
     context;
@@ -15134,17 +15158,7 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
           preferences_info[i].y=y;
           y+=(int) height+(QuantumMargin >> 1);
         }
-        preferences_info[0].raised=resource_info->backdrop == MagickFalse;
-        preferences_info[1].raised=resource_info->confirm_exit == MagickFalse;
-        preferences_info[2].raised=resource_info->confirm_edit == MagickFalse;
-        preferences_info[3].raised=resource_info->gamma_correct ==
-          MagickFalse;
-        preferences_info[4].raised=resource_info->display_warnings ==
-          MagickFalse;
-        preferences_info[5].raised=
-          resource_info->quantize_info->dither_method == NoDitherMethod;
-        preferences_info[6].raised=resource_info->colormap != SharedColormap;
-        preferences_info[7].raised=resource_info->use_pixmap == MagickFalse;
+        SetPreferencesRaised(&context,&widgets);
         InitializePreferencesCache(&context,&widgets,y);
         state&=(unsigned int) (~UpdateConfigurationState);
       }
