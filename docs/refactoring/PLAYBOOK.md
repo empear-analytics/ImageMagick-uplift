@@ -14159,6 +14159,101 @@ to evolve the recipes.
 
 ---
 
+## Recipe GS - Group a Cleanup Macro's Locals into Sets Released in Its Order
+
+**Use when:** CodeScene reports *Complex Method* or *Large Method* on a function whose
+complexity is a function-local cleanup macro that releases a run of image locals, each under its
+own `NULL` guard, and that the function calls before every `return` of a chain of acquisitions,
+as `composite.c`'s `BlendDivergentImage` does with `FreeDivergentResources` (eight guarded
+`DestroyImage`, called on ten failure paths and at the end). The locals come in sets of the same
+shape (`dx_`, `dy_`, `magnitude_` for the alpha image, again for the beta image, and the selected
+pair) acquired by the same steps.
+
+**Not covered by:** Recipe MF, which makes a statement macro a function but would pass every
+local by address (eight here); Recipe H, which only hoists the macro; Recipe I, which keeps every
+guard in the caller; Recipe RD, whose release lists belong to two twin callers.
+
+**How:**
+
+1. The macro is defined and used inside one function `F` only, outside every OpenMP region,
+   and is a run of `if (v != (Image *) NULL) v=DestroyImage(v);` over locals `v` that are
+   initialised to `NULL` at their declaration. Partition the run, in its order, into adjacent
+   groups that each name one set's members in one fixed member order (here `dy`, `dx` for the
+   selected pair; `magnitude`, `dy`, `dx` for beta, then for alpha).
+2. Write a `typedef struct` with one `Image *` member per set member, and
+   `static void DestroyBlend<Set>s(S *set)` holding the group's guarded releases, each
+   `v` written `set->m`, in the macro's member order. Members a set never has (the selected
+   pair's magnitude) stay `NULL` and their guard is false.
+3. Each acquisition chain that fills one set and leaves through the macro and
+   `return((Image *) NULL);` becomes a `static MagickBooleanType` function taking the set by
+   pointer: each `v=Acquire(...)` becomes `set->m=Acquire(...)`, each failure exit
+   `return(MagickFalse);`, the end `return(MagickTrue);`. A chain that reads other sets takes
+   them by pointer and keeps its in-line releases of their members (`beta->dx_image=
+   DestroyImage(beta->dx_image);`) in place.
+4. A final chain that builds the result from temporaries of its own (not in the macro) moves to
+   a `static Image *` function returning the result, `NULL` where it left early; its
+   temporaries move with it, released where they were (a temporary the macro never released
+   stays unreleased: report it).
+5. `F` declares each set initialised to all-`NULL` and the result as `NULL`, runs the chains as
+   `status=Chain1(...); if (status != MagickFalse) status=Chain2(...); ...`, assigns the result
+   only when every chain succeeded, then calls the sets' release functions in the macro's group
+   order and returns the result. The macro's `#define` goes with its last use.
+6. Check by script that the release calls, expanded, list the macro's locals in the macro's
+   order; `refactor_guard.py` `PASS` (or `WARN`, copies removed, for the twin chains' literals
+   now written once); `--calls --renamed <Macro>=DestroyBlend<Set>s` (the macro's uses become
+   the release calls) `PASS`, with `DestroyImage` dropping only by the macro's copies.
+
+**Before:**
+
+```c
+  dx_alpha=BlendConvolveImage(alpha_image,"3x1:-0.5,0.0,0.5",exception);
+  if (dx_alpha == (Image *) NULL)
+    {
+      FreeDivergentResources();
+      return((Image *) NULL);
+    }
+```
+
+**After:**
+
+```c
+  status=BlendGradientImages(alpha_image,&alpha,exception);
+  if (status != MagickFalse)
+    status=BlendGradientImages(beta_image,&beta,exception);
+  ...
+  DestroyBlendGradients(&selected);
+  DestroyBlendGradients(&beta);
+  DestroyBlendGradients(&alpha);
+  return(divergent_image);
+```
+
+**Careful:**
+
+- Every exit of `F` ran the macro, which releases each non-`NULL` local once in its order. After
+  the step every exit runs the release calls, which release each non-`NULL` member once in the
+  same order (step 1's partition, step 6's script): a chain's failure leaves the members it set
+  so far, and nothing later runs, so the same images are non-`NULL` at the release as before.
+- A member released in line before the end (`DestroyImage` returns `NULL` into it) is skipped by
+  its guard at the end, as the local was.
+- The result: `F` returned the result only on the path where every acquisition succeeded, and
+  `NULL` on every other; the new `F` assigns it only when every chain returned `MagickTrue`.
+- A temporary that the original released on no failure path (`BlendDivergentImage`'s
+  `dx_divergent` when the `dy_divergent` convolution fails) is still not released: an upstream
+  leak, reported and not fixed.
+- The failure paths are allocation failures that no case reaches: checked by reading and by
+  step 6's script; the success path by the oracle.
+
+**Evidence level:** oracle on `F`'s cases, with `refactor_guard.py --calls`, steps 1, 5 and 6
+checked by reading and by script.
+
+**Provenance:** 2026-11-13, from `composite.c`'s `BlendDivergentImage` (cc 20, 114 lines; the
+macro's eight `if`s count in it) (campaign A, W22 lane c). Earlier lanes saw it "peel cleanly" in
+a probe but no recipe covered the macro. After Recipes RD and HN, 3.70 to 3.90 in a probe, no
+finding on a new function. Added by Claude Code (Claude Opus 5.5) under the owner's OK of
+2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -15211,3 +15306,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | NEW | MP | Merge Membership Predicates over a Table Parameter: the `static` predicates of Recipe TB's shape, each over its own `static const` table, become one that takes the table and its element count; each call passes `T,sizeof(T)/sizeof(*T)`, one predicate per commit, the others deleted. *Careful* gives the argument (same loop, same table, same count, same argument) | `composite.c`'s five RH predicates (campaign A, W21 lane c): the file stands at 110 functions and the chain needs a sixth for `SetVirtualCompositeChannels` (111: 3.69 to 3.59); folding the five frees four slots, whole fold probe 3.69 to 3.69 | owner |
 | 2026-11-13 | NEW | RD | Share a Twin Relaxation Loop Through a Driver Releasing by Pointer Lists: two `static` twins' runs from the residual copy to the loop's end become one driver taking a struct with the differing images, the callers' mutable images by address and, per failure stage, a `NULL`-terminated array of the caller's own locals' addresses in its own release order; the loop's step, tick report, title and residual refresh become helpers. *Careful* gives the argument (each failure path releases the same images in the same order; the optional stage runs where it ran; the in-loop guard is always true; upstream leaks kept and reported) | `composite.c`'s `SaliencyBlendImage` and `SeamlessBlendImage` (campaign A, W22 lane c): 3.69 to 3.58 alone, 3.70 with Recipe HN, 3.90 with Recipe GS in a probe | owner |
 | 2026-11-13 | NEW | HN | Extract a Head That Builds One Image, Returning It or NULL: a head block that leaves through `return(R);` and ends with `v=Last(...);` directly before the caller's `if (v == NULL) return(R);` becomes a `static T *` function returning `v`, `NULL` for each early return. *Careful* gives the argument (the caller's existing test turns each `NULL` into the same `return(R);` at the same point) | `composite.c`'s `SeamlessBlendImage` after Recipe RD (campaign A, W22 lane c): 73 lines, out of *Large Method*, 3.58 to 3.70 in a probe | owner |
+| 2026-11-13 | NEW | GS | Group a Cleanup Macro's Locals into Sets Released in Its Order: a function-local macro of guarded `DestroyImage` calls over locals of a few same-shaped sets becomes one struct type and one release function per set, called in the macro's order; each acquisition chain becomes a function filling its set, the final chain a function returning the result. *Careful* gives the argument (every exit releases the same non-`NULL` images in the same order; the result is returned on the same path; an unreleased temporary stays unreleased) | `composite.c`'s `BlendDivergentImage` (cc 20, 114 lines) (campaign A, W22 lane c): after Recipes RD and HN, 3.70 to 3.90 in a probe | owner |
