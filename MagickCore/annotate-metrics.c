@@ -207,6 +207,15 @@ static inline void KeepWidestMetrics(TypeMetric *metrics,
     *metrics=extent;
 }
 
+static void DestroyMultilineText(DrawInfo *annotate_info,char **textlist,
+  const size_t count)
+{
+  annotate_info->text=(char *) NULL;
+  annotate_info=DestroyDrawInfo(annotate_info);
+  DestroyTextLines(textlist,count);
+  textlist=(char **) RelinquishMagickMemory(textlist);
+}
+
 MagickExport MagickBooleanType GetMultilineTypeMetrics(Image *image,
   const DrawInfo *draw_info,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -294,9 +303,6 @@ MagickExport MagickBooleanType GetMultilineTypeMetrics(Image *image,
   /*
     Relinquish resources.
   */
-  annotate_info->text=(char *) NULL;
-  annotate_info=DestroyDrawInfo(annotate_info);
-  DestroyTextLines(textlist,count);
-  textlist=(char **) RelinquishMagickMemory(textlist);
+  DestroyMultilineText(annotate_info,textlist,count);
   return(status);
 }
