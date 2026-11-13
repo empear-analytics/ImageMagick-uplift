@@ -10660,6 +10660,52 @@ static void XApplyRollCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyHueCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  char
+    modulate_factors[MagickPathExtent];
+
+  static char
+    hue_percent[MagickPathExtent] = "110";
+
+  /*
+    Query user for percent hue change.
+  */
+  (void) XDialogWidget(display,windows,"Apply",
+    "Enter percent change in image hue (0-200):",hue_percent);
+  if (*hue_percent == '\0')
+    return;
+  /*
+    Vary the image hue.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) CopyMagickString(modulate_factors,"100.0/100.0/",MagickPathExtent);
+  (void) ConcatenateMagickString(modulate_factors,hue_percent,
+    MagickPathExtent);
+  (void) ModulateImage(*image,modulate_factors,exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -11209,33 +11255,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       break;
     }
     case HueCommand:
-    {
-      static char
-        hue_percent[MagickPathExtent] = "110";
-
-      /*
-        Query user for percent hue change.
-      */
-      (void) XDialogWidget(display,windows,"Apply",
-        "Enter percent change in image hue (0-200):",hue_percent);
-      if (*hue_percent == '\0')
-        break;
-      /*
-        Vary the image hue.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      (void) CopyMagickString(modulate_factors,"100.0/100.0/",MagickPathExtent);
-      (void) ConcatenateMagickString(modulate_factors,hue_percent,
-        MagickPathExtent);
-      (void) ModulateImage(*image,modulate_factors,exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyHueCommand(&context);
       break;
-    }
     case SaturationCommand:
     {
       static char
