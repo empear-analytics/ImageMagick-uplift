@@ -938,33 +938,9 @@ static MagickBooleanType CloneImageColormap(Image *clone_image,
   return(MagickTrue);
 }
 
-MagickExport Image *CloneImage(const Image *image,const size_t columns,
-  const size_t rows,const MagickBooleanType detach,ExceptionInfo *exception)
+static void CopyImageAttributes(Image *clone_image,const Image *image,
+  const MagickBooleanType detach)
 {
-  double
-    scale_x,
-    scale_y;
-
-  Image
-    *clone_image;
-
-  /*
-    Clone the image.
-  */
-  assert(image != (const Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((image->columns == 0) || (image->rows == 0))
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),CorruptImageError,
-        "NegativeOrZeroImageSize","`%s'",image->filename);
-      return((Image *) NULL);
-    }
-  clone_image=(Image *) AcquireCriticalMemory(sizeof(*clone_image));
-  (void) memset(clone_image,0,sizeof(*clone_image));
   clone_image->signature=MagickCoreSignature;
   clone_image->storage_class=image->storage_class;
   clone_image->number_channels=image->number_channels;
@@ -1014,6 +990,36 @@ MagickExport Image *CloneImage(const Image *image,const size_t columns,
   clone_image->ttl=image->ttl;
   clone_image->debug=image->debug;
   clone_image->semaphore=AcquireSemaphoreInfo();
+}
+
+MagickExport Image *CloneImage(const Image *image,const size_t columns,
+  const size_t rows,const MagickBooleanType detach,ExceptionInfo *exception)
+{
+  double
+    scale_x,
+    scale_y;
+
+  Image
+    *clone_image;
+
+  /*
+    Clone the image.
+  */
+  assert(image != (const Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if ((image->columns == 0) || (image->rows == 0))
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),CorruptImageError,
+        "NegativeOrZeroImageSize","`%s'",image->filename);
+      return((Image *) NULL);
+    }
+  clone_image=(Image *) AcquireCriticalMemory(sizeof(*clone_image));
+  (void) memset(clone_image,0,sizeof(*clone_image));
+  CopyImageAttributes(clone_image,image,detach);
   if (CloneImageColormap(clone_image,image) == MagickFalse)
     ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
   if ((columns == 0) || (rows == 0))
