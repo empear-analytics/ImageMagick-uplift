@@ -4150,6 +4150,16 @@ static void XDestroyWindowMatteImage(XWindowInfo *window)
   window->matte_image=(XImage *) NULL;
 }
 
+static void XFreeWindowMattePixmap(Display *display,XWindowInfo *window)
+{
+  (void) XFreePixmap(display,window->matte_pixmap);
+  window->matte_pixmap=(Pixmap) NULL;
+#if defined(MAGICKCORE_HAVE_SHAPE)
+  if (window->shape != MagickFalse)
+    XShapeCombineMask(display,window->id,ShapeBounding,0,0,None,ShapeSet);
+#endif
+}
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
@@ -4379,14 +4389,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
     XDestroyWindowMatteImage(window);
   window->matte_image=matte_image;
   if (window->matte_pixmap != (Pixmap) NULL)
-    {
-      (void) XFreePixmap(display,window->matte_pixmap);
-      window->matte_pixmap=(Pixmap) NULL;
-#if defined(MAGICKCORE_HAVE_SHAPE)
-      if (window->shape != MagickFalse)
-        XShapeCombineMask(display,window->id,ShapeBounding,0,0,None,ShapeSet);
-#endif
-    }
+    XFreeWindowMattePixmap(display,window);
   window->stasis=MagickFalse;
   /*
     Convert pixels to X image data.
