@@ -8953,6 +8953,22 @@ static void XAllocGuiColors(Display *display,const Colormap colormap,
     (void) XAllocColor(display,colormap,&pixel->pen_colors[i]);
 }
 
+static Colormap XCreatePrivateColormap(Display *display,
+  const XVisualInfo *visual_info,XStandardColormap *map_info,const Image *image)
+{
+  Colormap
+    colormap;
+
+  colormap=XCreateColormap(display,
+    XRootWindow(display,visual_info->screen),visual_info->visual,
+    AllocNone);
+  if (colormap == (Colormap) NULL)
+    ThrowXWindowFatalException(ResourceLimitFatalError,
+      "UnableToCreateColormap",image->filename);
+  map_info->colormap=colormap;
+  return(colormap);
+}
+
 MagickPrivate void XMakeStandardColormap(Display *display,
   XVisualInfo *visual_info,XResourceInfo *resource_info,Image *image,
   XStandardColormap *map_info,XPixelInfo *pixel,ExceptionInfo *exception)
@@ -9126,13 +9142,7 @@ MagickPrivate void XMakeStandardColormap(Display *display,
           /*
             Not enough colormap entries in the colormap-- Create a new colormap.
           */
-          colormap=XCreateColormap(display,
-            XRootWindow(display,visual_info->screen),visual_info->visual,
-            AllocNone);
-          if (colormap == (Colormap) NULL)
-            ThrowXWindowFatalException(ResourceLimitFatalError,
-              "UnableToCreateColormap",image->filename);
-          map_info->colormap=colormap;
+          colormap=XCreatePrivateColormap(display,visual_info,map_info,image);
           default_source.display=display;
           default_source.visual_info=visual_info;
           default_source.colormap=colormap;
