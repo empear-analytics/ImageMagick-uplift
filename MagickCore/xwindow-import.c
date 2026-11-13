@@ -1488,6 +1488,18 @@ typedef struct _WindowDescendInput
     *window_info;
 } WindowDescendInput;
 
+static MagickBooleanType XGetViewableAttributes(Display *display,
+  const Window window,XWindowAttributes *window_attributes)
+{
+  Status
+    status;
+
+  status=XGetWindowAttributes(display,window,window_attributes);
+  if ((status == False) || ((*window_attributes).map_state != IsViewable))
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static void XRestoreWindowState(ColormapInfo **colormap_info,
   WindowInfo **window_info,int *max_windows,int *number_windows)
 {
@@ -1579,9 +1591,6 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
   static WindowInfo
     *window_info;
 
-  Status
-    status;
-
   Window
     child,
     root_window;
@@ -1595,8 +1604,7 @@ static Image *XGetWindowImage(const WindowImageContext *window_context,
   assert(display != (Display *) NULL);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  status=XGetWindowAttributes(display,window,&window_attributes);
-  if ((status == False) || (window_attributes.map_state != IsViewable))
+  if (XGetViewableAttributes(display,window,&window_attributes) == MagickFalse)
     return((Image *) NULL);
   /*
     Cropping rectangle is relative to root window.
