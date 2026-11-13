@@ -12968,6 +12968,111 @@ the owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
+## Recipe CQ - Name a Selection of Calls Over Its Condition
+
+**Use when:** CodeScene reports *Complex Method* (or *Overall Code Complexity*) on a function
+that holds a run of selections `if (C) F(...); else G(...);`, each branch one call, the sites
+the same text except for `C` and a few argument values, as `magnify.c`'s `Scale3X` does: eight
+`if (C) CopyPixels(&magnify,a,d); else CopyPixels(&magnify,4,d);` pairs, eight of the
+function's twelve decisions. The condition `C` calls other functions, so Recipe NS (which
+needs a condition of identifiers) does not reach it.
+
+**Not covered by:** Recipe NS, whose helper takes the condition's variables and returns one
+of two constants; here the selection chooses between calls and `C` holds calls. Recipe P,
+which names `C` and leaves the `if` and its decision in the caller. Recipes E and O, which
+move the `if` with `C` and so pass every variable `C` reads. Recipes SV and D, which merge
+copies of blocks and leave a block's `if` where it is.
+
+**How:**
+
+1. Each site is `if (C) F(x1,...,xn); else G(y1,...,ym);` with one call statement in each
+   branch (no braces, no `else if`). At least three sites in the file are of one shape: the
+   same `F` and `G` (they may be one function) and the same arguments except in positions
+   that differ between sites. `C` has type `int` (a comparison, a `&&`/`||` of those, or a
+   call returning `int`) and contains no assignment, increment or decrement; any call in `C`
+   is to a function that writes nothing.
+2. Every argument of `F` and `G` is an identifier, a literal, the address of an identifier,
+   or a cast or an operator expression of those, with no call, assignment, increment,
+   decrement, division, modulo or dereference: evaluating it when its branch is not taken
+   changes nothing and cannot trap. A position that holds the same literal at every site
+   in its branch stays in the helper; every other position is one parameter, an argument
+   that stands in both branches is one parameter, and the parameters, `C`'s value included,
+   number at most four.
+3. Write a `static inline void` function directly above the first function that holds a
+   site, with `const int selected` and one `const` parameter for each remaining position,
+   of the type `F` or `G` declares for it, whose body is `if (selected != 0) F(...); else
+   G(...);` with the parameters substituted and the shared literals written out. When `F`
+   and `G` are one function and the branches differ in one argument position only, the body
+   is the single call `F(...)` with that argument written `selected != 0 ? a : b` (`a` the
+   parameter, `b` the literal): one inlined copy of `F` instead of two, which the timing of
+   step 6 showed is the form that runs as fast as the sites did.
+4. Replace each site by a call passing `C` for `selected`, written as `C` was, and the
+   site's other arguments. Check by script that every site becomes the helper's body with
+   those arguments substituted, character for character apart from line breaks, and that
+   no site was left or altered.
+5. All sites in one function go in one commit; a site in another function is its own
+   commit, which adds no helper.
+6. The helper is called on a per-pixel path in the function that motivated this recipe: check
+   with `nm` that it is inlined in the candidate build, then time the baseline binary and the
+   candidate on images that take every branch (several interleaved runs, median CPU time),
+   and count instructions under `valgrind --tool=callgrind`. A step more than 3% slower is
+   not taken.
+
+**Before:**
+
+```c
+  if (IsScale3XTopEdge(pixels,channels) != MagickFalse)
+    CopyPixels(&magnify,1,1);
+  else
+    CopyPixels(&magnify,4,1);
+  if (PixelsEqual(pixels,5,1,channels))
+    CopyPixels(&magnify,5,2);
+  else
+    CopyPixels(&magnify,4,2);
+```
+
+**After:**
+
+```c
+static inline void CopyPixelsIf(const MagnifyPixels *magnify,
+  const int selected,const ssize_t source_offset,
+  const ssize_t destination_offset)
+{
+  CopyPixels(magnify,selected != 0 ? source_offset : 4,destination_offset);
+}
+...
+  CopyPixelsIf(&magnify,IsScale3XTopEdge(pixels,channels) != MagickFalse,1,1);
+  CopyPixelsIf(&magnify,PixelsEqual(pixels,5,1,channels),5,2);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. `C` is evaluated once, before either branch, as the `if`
+  evaluated it: it has no side effect and the function it calls writes nothing, so its place
+  among the other arguments does not matter, and every argument is evaluated before the call
+  runs, as the branch's statement ran after `C`. The helper tests the value as `if (C)`
+  did (`C` is `0` or `1` of type `int`; `!= 0` is the same test) and then makes the call the
+  taken branch made. The other arguments are now evaluated in the branch not taken too:
+  they are side-effect free and cannot trap (step 2), so the extra evaluation changes no
+  state.
+- The sites' shared literal (`4`) stays one literal in the helper, and each call keeps the
+  value it passed; no constant changes.
+- Not a licence to merge sites that differ in the callee: `F` and `G` stay as written.
+- Compiler output differs (`tools/obj_identical.sh` prints `DIFFERENT`), which is why the
+  evidence is the oracle and the timing, and the step the owner admitted for `magnify.c`
+  on 2026-11-12 (the `?:` fold, with a reached function whose object code differs).
+
+**Evidence level:** oracle on the cases that reach the function (`casemap.py`), with
+`refactor_guard.py --calls` (the new function and one call per site added, the callee's
+calls removed, each by its count) and step 6's timing quoted in the commit.
+
+**Provenance:** 2026-11-13, from `magnify.c`'s `Scale3X` (campaign A, W21 lane d): eight
+selections of `CopyPixels` over a call condition, cc 12; the file 8.84 to 9.09, beside
+Recipe NS on one site of `Xbr2X`. Added by Claude Code (Claude Sonnet 5.5) under the owner's
+leave to evolve the recipes (2026-11-10).
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -13389,3 +13494,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-12 | NEW | KL | Replace Case Groups Sharing a Tail with a Keyed Lookup: a run of one-label groups of a `switch` that are the same statements on a string literal and a numeric literal become one copy in the `default:` group, reading both from a `static const` table found by a lookup function; the groups that differ stay. *Careful* gives the argument (the `switch` value held once, the lookup finds an element exactly when a deleted group carried the label, constants converted as before) | `morphology.c`'s `AcquireFreiChenKernel` (campaign A, W19 lane d): cases 15 to 19; Recipe KT refuses the tail, SC leaves five labels, a helper clones `AcquireFreiChenEdgeBasisKernel`; probe 6.35 to 6.63, cc 16 to 8 | owner |
 | 2026-11-12 | NEW | KD | Replace a Constant-Assigning Label Run with a Table Lookup: the groups of a `switch` that are `v=c;` `break;` (several labels to a group) become a `static const` table of `{label, literal}` read through a lookup function, `if (entry != NULL) v=entry->value; else` the `default:` group's text; *Careful* gives the argument (`e` evaluated once, the lookup finds an element exactly when a deleted group carried the label, the literal converted to `v`'s type as before) | `morphology.c`'s `MorphologyApply` (campaign A, W19 lane d): the stage-count `switch` (`SmoothMorphology` 4, seven labels 2, `default:` calling `SetIteratedMorphologyLimits`); probe cc 22 to 14, 6.63 to 6.70 | owner |
 | 2026-11-12 | AMEND | S | Step 2: a quoted `#include` of a header that defines objects (a file-scope initialised variable in column 0) is left out of the new file's include block, when no line of the family names an object or macro of that header; the split is refused when one does. *Careful* gives the argument | `opencl.c`'s device-property family (campaign A, W19 lane a, wide build): the copied include block included `accelerate-kernels-private.h`, which defines `accelerateKernels` and `accelerateKernels2`, and the pair failed to link (multiple definition); the family names neither, and the moved functions' object code compares unchanged | owner |
+| 2026-11-13 | NEW | CQ | Name a Selection of Calls Over Its Condition: sites `if (C) F(...); else G(...);` (one call per branch, `C` an `int` condition that may call read-only functions, the other arguments free of side effects and traps) become calls of one `static inline void` helper taking `C`'s value as `const int selected` and the sites' differing arguments; *Careful* gives the argument (`C` evaluated once before either branch, the other arguments evaluated in the branch not taken too with no effect); proof: the oracle, `--calls`, `nm` for inlining, and a timing (at most 3% slower) | `magnify.c`'s `Scale3X` (campaign A, W21 lane d): eight `if (C) CopyPixels(&magnify,a,d); else CopyPixels(&magnify,4,d);` over `PixelsEqual` and `IsScale3X*Edge` conditions, cc 12; Recipe NS refuses a call in the condition and the owner's `?:` fold for magnify (2026-11-12) leaves the decisions in place. A probe: 8.84 to 9.09 | owner |
