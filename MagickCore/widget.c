@@ -8250,6 +8250,80 @@ static void JumpFileBrowserList(const FileBrowserContext *context,
   (*state)&=(unsigned int) (~JumpListState);
 }
 
+static void RedrawFileBrowserList(const FileBrowserContext *context,
+  const FileBrowserWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    height = context->height;
+
+  size_t
+    *const state = widgets->state;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info,
+    *const north_info = widgets->north_info,
+    *const south_info = widgets->south_info,
+    *const list_info = widgets->list_info,
+    *const expose_info = widgets->expose_info,
+    *const selection_info = widgets->selection_info;
+
+  unsigned int
+    *const visible_files = widgets->visible_files;
+
+  size_t
+    *const files = widgets->files;
+
+  char
+    ***const filelist = widgets->filelist;
+
+  /*
+    Determine slider id and position.
+  */
+  if ((*slider_info).id >= (int) ((*files)-(*visible_files)))
+    (*slider_info).id=(int) ((*files)-(*visible_files));
+  if (((*slider_info).id < 0) || ((*files) <= (*visible_files)))
+    (*slider_info).id=0;
+  (*slider_info).y=(*slider_info).min_y;
+  if ((*files) > 0)
+    (*slider_info).y+=((int) (*slider_info).id*((*slider_info).max_y-
+      (*slider_info).min_y+1)/(int) (*files));
+  if ((*slider_info).id != (*selection_info).id)
+    {
+      FileBrowserNames
+        names;
+
+      /*
+        Redraw scroll bar and file names.
+      */
+      (*selection_info).id=(*slider_info).id;
+      (*selection_info).y=(*list_info).y+(int) (height >> 3)+2;
+      names.display=display;
+      names.windows=windows;
+      names.filelist=(*filelist);
+      names.files=(*files);
+      names.visible_files=(*visible_files);
+      names.list_info=(*list_info);
+      names.slider_info=(*slider_info);
+      DrawFileBrowserNames(&names,selection_info);
+      /*
+        Update slider.
+      */
+      (*expose_info)=PlaceTextViewExpose((*expose_info),(*slider_info));
+      XDrawTriangleNorth(display,&windows->widget,north_info);
+      XDrawMatte(display,&windows->widget,expose_info);
+      XDrawBeveledButton(display,&windows->widget,slider_info);
+      XDrawTriangleSouth(display,&windows->widget,south_info);
+      (*expose_info).y=(*slider_info).y;
+    }
+  (*state)&=(unsigned int) (~RedrawListState);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8462,48 +8536,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
     if (state & JumpListState)
       JumpFileBrowserList(&file_context,&file_widgets);
     if (state & RedrawListState)
-      {
-        /*
-          Determine slider id and position.
-        */
-        if (slider_info.id >= (int) (files-visible_files))
-          slider_info.id=(int) (files-visible_files);
-        if ((slider_info.id < 0) || (files <= visible_files))
-          slider_info.id=0;
-        slider_info.y=slider_info.min_y;
-        if (files > 0)
-          slider_info.y+=((int) slider_info.id*(slider_info.max_y-
-            slider_info.min_y+1)/(int) files);
-        if (slider_info.id != selection_info.id)
-          {
-            FileBrowserNames
-              names;
-
-            /*
-              Redraw scroll bar and file names.
-            */
-            selection_info.id=slider_info.id;
-            selection_info.y=list_info.y+(int) (height >> 3)+2;
-            names.display=display;
-            names.windows=windows;
-            names.filelist=filelist;
-            names.files=files;
-            names.visible_files=visible_files;
-            names.list_info=list_info;
-            names.slider_info=slider_info;
-            DrawFileBrowserNames(&names,&selection_info);
-            /*
-              Update slider.
-            */
-            expose_info=PlaceTextViewExpose(expose_info,slider_info);
-            XDrawTriangleNorth(display,&windows->widget,&north_info);
-            XDrawMatte(display,&windows->widget,&expose_info);
-            XDrawBeveledButton(display,&windows->widget,&slider_info);
-            XDrawTriangleSouth(display,&windows->widget,&south_info);
-            expose_info.y=slider_info.y;
-          }
-        state&=(unsigned int) (~RedrawListState);
-      }
+      RedrawFileBrowserList(&file_context,&file_widgets);
     /*
       Wait for next event.
     */
