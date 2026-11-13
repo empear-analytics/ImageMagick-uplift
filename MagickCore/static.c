@@ -318,6 +318,15 @@ MagickExport void RegisterStaticModules(void)
 %    o module: the module we want to unregister.
 %
 */
+static void UnregisterStaticModuleEntry(const ssize_t i)
+{
+  if (MagickModules[i].registered != MagickFalse)
+    {
+      (MagickModules[i].unregister_module)();
+      MagickModules[i].registered=MagickFalse;
+    }
+}
+
 MagickExport MagickBooleanType UnregisterStaticModule(const char *module)
 {
   size_t
@@ -330,11 +339,7 @@ MagickExport MagickBooleanType UnregisterStaticModule(const char *module)
   for (i=0; i < (ssize_t) extent; i++)
     if (LocaleCompare(MagickModules[i].module,module) == 0)
       {
-        if (MagickModules[i].registered != MagickFalse)
-          {
-            (MagickModules[i].unregister_module)();
-            MagickModules[i].registered=MagickFalse;
-          }
+        UnregisterStaticModuleEntry(i);
         return(MagickTrue);
       }
   return(MagickFalse);
@@ -369,11 +374,5 @@ MagickExport void UnregisterStaticModules(void)
 
   extent=sizeof(MagickModules)/sizeof(MagickModules[0]);
   for (i=0; i < (ssize_t) extent; i++)
-  {
-    if (MagickModules[i].registered != MagickFalse)
-      {
-        (MagickModules[i].unregister_module)();
-        MagickModules[i].registered=MagickFalse;
-      }
-  }
+    UnregisterStaticModuleEntry(i);
 }
