@@ -421,6 +421,28 @@ static void InitializeHuffmanHashes(HuffmanTable **mb_hash,
   InitializeHashTable(mb_hash,EXTable,MBHashA,MBHashB);
 }
 
+static void SetHuffmanScanlinePixels(Image *image,
+  const unsigned char *scanline,Quantum *q)
+{
+  const unsigned char
+    *p;
+
+  Quantum
+    index;
+
+  ssize_t
+    x;
+
+  p=scanline;
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    index=(Quantum) (*p++);
+    SetPixelIndex(image,index,q);
+    SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static void FillHuffmanBlackRun(unsigned char *scanline,const size_t columns,
   ssize_t *x,ssize_t *count)
 {
@@ -474,9 +496,6 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   MagickBooleanType
     proceed;
 
-  Quantum
-    index;
-
   size_t
     bit,
     code,
@@ -489,7 +508,6 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
     y;
 
   unsigned char
-    *p,
     *scanline;
 
   unsigned int
@@ -638,17 +656,10 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
     /*
       Transfer scanline to image pixels.
     */
-    p=scanline;
     q=QueueCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
     if (q == (Quantum *) NULL)
       break;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      index=(Quantum) (*p++);
-      SetPixelIndex(image,index,q);
-      SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    SetHuffmanScanlinePixels(image,scanline,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       break;
     proceed=SetImageProgress(image,LoadImageTag,(MagickOffsetType) y,
