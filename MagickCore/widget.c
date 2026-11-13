@@ -16590,6 +16590,38 @@ static MagickBooleanType WaitForTextViewEvent(const TextViewContext *context,
   return(MagickTrue);
 }
 
+static void RespondToTextViewEvents(const TextViewContext *context,
+  const TextViewTargets *targets,const TextViewWidgets *widgets)
+{
+  size_t
+    *const state = widgets->state;
+
+  XEvent
+    *const event = widgets->event;
+
+  do
+  {
+    UpdateTextViewLayout(context,widgets);
+    RedrawTextViewWidget(context,widgets);
+    RedrawTextViewLines(context,widgets);
+    if (WaitForTextViewEvent(context,widgets) == MagickFalse)
+      continue;
+    switch ((*event).type)
+    {
+      case ButtonPress:
+      {
+        PressTextViewSlider(context,(*event),targets,widgets);
+        break;
+      }
+      default:
+      {
+        HandleTextViewWindowEvent(context,(*event),widgets);
+        break;
+      }
+    }
+  } while (((*state) & ExitState) == 0);
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -16741,27 +16773,7 @@ MagickPrivate void XTextViewWidget(Display *display,
   view_context.width=width;
   view_context.font_info=font_info;
   view_context.text_info=text_info;
-  do
-  {
-    UpdateTextViewLayout(&view_context,&view_widgets);
-    RedrawTextViewWidget(&view_context,&view_widgets);
-    RedrawTextViewLines(&view_context,&view_widgets);
-    if (WaitForTextViewEvent(&view_context,&view_widgets) == MagickFalse)
-      continue;
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        PressTextViewSlider(&view_context,event,&targets,&view_widgets);
-        break;
-      }
-      default:
-      {
-        HandleTextViewWindowEvent(&view_context,event,&view_widgets);
-        break;
-      }
-    }
-  } while ((state & ExitState) == 0);
+  RespondToTextViewEvents(&view_context,&targets,&view_widgets);
   if (text_info != windows->widget.font_info)
     (void) XFreeFont(display,text_info);
   XSetCursorState(display,windows,MagickFalse);
