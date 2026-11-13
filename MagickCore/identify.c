@@ -463,6 +463,32 @@ static ssize_t PrintChannelMoments(const ChannelMomentsReport *report,
   return(n);
 }
 
+static ssize_t PrintPerceptualHashRows(FILE *file,
+  const ChannelPerceptualHash *channel_phash,const PixelChannel channel)
+{
+  ssize_t
+    j,
+    n;
+
+  n=0;
+  for (j=0; j < MaximumNumberOfPerceptualHashes; j++)
+  {
+    ssize_t
+      k;
+
+    n+=FormatLocaleFile(file,"      PH%.17g: ",(double) j+1);
+    for (k=0; k < (ssize_t) channel_phash[0].number_colorspaces; k++)
+    {
+      n+=FormatLocaleFile(file,"%.*g",GetMagickPrecision(),
+        channel_phash[channel].phash[k][j]);
+      if (k < (ssize_t) (channel_phash[0].number_colorspaces-1))
+        n+=FormatLocaleFile(file,", ");
+    }
+    n+=FormatLocaleFile(file,"\n");
+  }
+  return(n);
+}
+
 static ssize_t PrintChannelPerceptualHash(Image *image,FILE *file,
   const ChannelPerceptualHash *channel_phash)
 {
@@ -490,9 +516,6 @@ static ssize_t PrintChannelPerceptualHash(Image *image,FILE *file,
     PixelTrait
       traits;
 
-    ssize_t
-      j;
-
     channel=GetPixelChannelChannel(image,i);
     if (channel == IndexPixelChannel)
       continue;
@@ -500,21 +523,7 @@ static ssize_t PrintChannelPerceptualHash(Image *image,FILE *file,
     if (traits == UndefinedPixelTrait)
       continue;
     n=FormatLocaleFile(file,"    Channel %.17g:\n",(double) channel);
-    for (j=0; j < MaximumNumberOfPerceptualHashes; j++)
-    {
-      ssize_t
-        k;
-
-      n+=FormatLocaleFile(file,"      PH%.17g: ",(double) j+1);
-      for (k=0; k < (ssize_t) channel_phash[0].number_colorspaces; k++)
-      {
-        n+=FormatLocaleFile(file,"%.*g",GetMagickPrecision(),
-          channel_phash[channel].phash[k][j]);
-        if (k < (ssize_t) (channel_phash[0].number_colorspaces-1))
-          n+=FormatLocaleFile(file,", ");
-      }
-      n+=FormatLocaleFile(file,"\n");
-    }
+    n+=PrintPerceptualHashRows(file,channel_phash,channel);
   }
   return(n);
 }
