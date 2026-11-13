@@ -2988,14 +2988,27 @@ static PointInfo GetPostscriptResolution(const DrawInfo *draw_info)
   return(resolution);
 }
 
+static void WritePostscriptText(FILE *file,const DrawInfo *draw_info,
+  const MagickBooleanType identity,ExceptionInfo *exception)
+{
+  char
+    *text;
+
+  text=EscapeParenthesis(draw_info->text,MAGICK_SIZE_MAX,exception);
+  if (identity == MagickFalse)
+    (void) FormatLocaleFile(file,"(%s) stringwidth pop -0.5 mul -0.5 rmoveto\n",
+      text);
+  (void) FormatLocaleFile(file,"(%s) show\n",text);
+  text=DestroyString(text);
+}
+
 static MagickBooleanType RenderPostscript(Image *image,
   const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
   ExceptionInfo *exception)
 {
   char
     filename[MagickPathExtent],
-    geometry[MagickPathExtent],
-    *text;
+    geometry[MagickPathExtent];
 
   FILE
     *file;
@@ -3052,12 +3065,7 @@ static MagickBooleanType RenderPostscript(Image *image,
   (void) FormatLocaleFile(file,"[%g %g %g %g 0 0] concat\n",
     draw_info->affine.sx,-draw_info->affine.rx,-draw_info->affine.ry,
     draw_info->affine.sy);
-  text=EscapeParenthesis(draw_info->text,MAGICK_SIZE_MAX,exception);
-  if (identity == MagickFalse)
-    (void) FormatLocaleFile(file,"(%s) stringwidth pop -0.5 mul -0.5 rmoveto\n",
-      text);
-  (void) FormatLocaleFile(file,"(%s) show\n",text);
-  text=DestroyString(text);
+  WritePostscriptText(file,draw_info,identity,exception);
   (void) FormatLocaleFile(file,"showpage\n");
   (void) fclose(file);
   (void) FormatLocaleString(geometry,MagickPathExtent,"%.17gx%.17g+0+0!",
