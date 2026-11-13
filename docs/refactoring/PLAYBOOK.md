@@ -4574,7 +4574,11 @@ Recipe D, whose copies are moved whole and so may not leave the caller.
 3. The block writes no plain local of the caller, apart from locals nothing after the
    block reads (Recipe E step 4), which the new function declares, and locals it writes
    only on paths that end in `return(R);`, which go by value. Writes through pointers it
-   already uses stay as they are; variables it declares move with it.
+   already uses stay as they are; variables it declares move with it. Widening
+   (2026-11-13): up to three plain locals the caller reads after the block may be written,
+   on Recipe RV step 6(b)'s terms (Recipe O step 2): each goes as a pointer, written
+   `(*v)` at every use, `&v` passed on to a callee written `v`, and counts among step 5's
+   four parameters; `R` (step 2) must not read one of them.
 4. Cut the block into a new `static MagickBooleanType` function directly above the
    caller. Each `return(R);` becomes `return(MagickFalse);`, and the function ends with
    `return(MagickTrue);`. Nothing else in the text changes.
@@ -4656,7 +4660,11 @@ the mandate of 2026-10-24. Step 8 (2026-11-11, W17 lane c, wide build):
 function whose allocation of `clEnv->contexts` releases the device and platform arrays
 and leaves through `return;` when it fails; as a helper it takes the function out of
 *Large Method*, 5.43 to 5.47 in a probe, no finding on the helper. Added by Claude Code
-(Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+(Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes. Step 3's widening
+(2026-11-13): `profile.c`'s `SyncExifProfile`, whose Exif header block writes `exif`,
+`length` and `endian` for the walk that follows. Added by Claude Code (Claude Opus 5.5)
+under the mandate of 2026-10-24.
+Lane: c
 
 ---
 
@@ -12271,7 +12279,9 @@ guard over tests inside it.
    line in it, no `&&`, `?:`, assignment or increment in the controlling expression, each operand in
    its own parentheses (a single comparison or a call), and no `else`. `X` is the one statement
    `return(F);` or `return;`, with `F` a constant (an enumeration constant or a literal), braces or
-   none.
+   none. `X` may instead be `break;` or `continue;` (2026-11-13): every guard of step 2 stands
+   where the `if` stood, inside the same loops and `switch`es, so each leaves the same statement
+   the original's `X` left.
 2. Write one guard per operand, in the operands' order, each with the operand's text (the
    outer parentheses of the operand go) and `X` unchanged: `if (A1) X` `if (A2) X` ... `if (An) X`.
 3. Every such `if` of one function may go in one commit (one recipe, one function).
@@ -12308,7 +12318,8 @@ guard over tests inside it.
   runs `X` and leaves, so no later operand is evaluated, exactly as the short circuit. When none
   holds, nothing runs and control reaches the next statement. Each operand is evaluated at most
   once, as before.
-- `X` is a bare `return`: a guard that ran any statement before it would not be this recipe.
+- `X` is a bare `return`, `break` or `continue`: a guard that ran any statement before it would
+  not be this recipe.
 
 **Evidence level:** oracle, with `refactor_guard.py` (and `--calls`) clean; for lines no case
 reaches, the object code `IDENTICAL` or `MODULO-IDENTICAL` as step 4 says.
@@ -12318,6 +12329,12 @@ a, wide build): the three-trait failure test is the file's only *Complex Conditi
 predicate is flat (3.19 to 3.19, with a new *Code Duplication* function), three guards: 3.19 to
 3.27, the category leaves. Added by Claude Code (Claude Sonnet 5.5) under the owner's OK of
 2026-11-10 to evolve the recipes.
+
+`X` as `break;` or `continue;` (2026-11-13, campaign B, M127 lane c): `profile.c`'s
+`GetXMPContinuedFraction`, whose loop leaves on two failed `TryAccumulate` calls or a zero
+denominator; 4.60 to 4.72 in a probe. Added by Claude Code (Claude Opus 5.5) under the mandate
+of 2026-10-24.
+Lane: c
 
 ---
 
@@ -12841,14 +12858,20 @@ tests. Neither removes one.
 1. Find `? MagickTrue : MagickFalse` (or `? MagickFalse : MagickTrue`, with the test's
    sense kept as written) whose condition is a comparison (`==`, `!=`, `<`, ...), a `!`
    test, or `&&` / `||` of those, all of which yield `0` or `1` in C.
-2. Delete the ternary and keep the condition: `return(a == b);`, `status = (a != b) &&
-   (c == d);`. A condition that is a bare value (`return(p ? MagickTrue : MagickFalse);`,
-   `x & mask`) is refused: its value is not `0` or `1`.
+2. Delete the ternary and keep the condition inside a cast to the destination's type:
+   `return((MagickBooleanType) (a == b));`, `status=(MagickBooleanType) ((a != b) &&
+   (c == d));`, and the same for an argument passed to a `MagickBooleanType` parameter.
+   The cast is required: the Windows jobs compile MagickCore as C++, where a comparison
+   is `bool` and does not convert to an enum (MSVC C2440, C2664); the bare form passed
+   every check on the Mac and broke main's Windows jobs (2026-11-13). A condition that is
+   a bare value (`return(p ? MagickTrue : MagickFalse);`, `x & mask`) is refused: its
+   value is not `0` or `1`.
 3. `MagickFalse` is `0` and `MagickTrue` is `1` (`MagickCore/magick-type.h`); check it
    once by reading. A `MagickBooleanType` function returning, or a variable of that type
    assigned, an `int` of `0` or `1` is the same value.
 4. Run `sh tools/obj_identical.sh <file>`: it must print `IDENTICAL`; otherwise revert the
-   step. Run `tools/ci_warnings.sh <file>` and keep the step only if it prints `OK`.
+   step. Run `tools/ci_warnings.sh <file>` and `tools/cxx_warnings.sh <file>` and keep the
+   step only if both print `OK`.
 
 **Before:**
 
@@ -12860,8 +12883,8 @@ tests. Neither removes one.
 **After:**
 
 ```c
-  return((policy_info[i]->domain == CachePolicyDomain) ||
-    (policy_info[i]->domain == ResourcePolicyDomain));
+  return((MagickBooleanType) ((policy_info[i]->domain == CachePolicyDomain) ||
+    (policy_info[i]->domain == ResourcePolicyDomain)));
 ```
 
 **Careful:**
@@ -12872,7 +12895,7 @@ tests. Neither removes one.
   the ternary: step 2.
 
 **Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
-`HEAD` and `tools/ci_warnings.sh` printing `OK`.
+`HEAD` and `tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`.
 
 **Provenance:** 2026-11-12, from `policy.c` (campaign B, M120): seven ternaries, the
 file 6.21 to 6.38, object code identical. Added by Claude Code (Claude Sonnet 5.5) under
@@ -13699,6 +13722,279 @@ mandate of 2026-10-24.
 ---
 
 
+## Recipe KF - Replace an Enumerator-Keyed Call Switch by a Table of Function Pointers
+
+**Use when:** CodeScene reports *Complex Method* on a function whose complexity is a
+`switch` over an enumeration whose groups each make one call, `F(args); break;`, to a
+different function of one signature with the same arguments, plus a `default:` group that
+handles an unknown value. `stream.c`'s `StreamImagePixels` (seven `StorageType` labels,
+each calling `Stream<Type>Pixels(stream_info,image,quantum_map,length)`).
+
+**Not covered by:** Recipe KD, whose run is a ladder of `LocaleCompare` tests that each
+`return` the call; Recipe KT, whose groups assign one call's result; Recipes KS, KR and KE,
+whose groups assign or return constants; Recipe SD, which moves groups but keeps every
+label as a branch.
+
+**How:**
+
+1. The `switch` lies outside every OpenMP region. Every group but `default:` is one
+   constant label and one statement `F(a,b,...);` followed by `break;`, the arguments the
+   same text in every group and free of side effects; the labels are distinct; the `F`
+   are `static` functions of one signature. The `default:` group ends in `break;`, falls
+   into nothing and stays as written.
+2. Directly above the function write a `typedef struct` of the key (the enumeration type)
+   and a pointer to a function of that signature, and a `static const` array of it with
+   one element `{ L, F }` per group, in the order of the groups.
+3. Below the table write a lookup function `static const T *Get<Name>(const E key)` that
+   scans the array and returns the first element whose key equals `key`, or `NULL`.
+4. In the function, declare a `const T *` local, and replace the `switch` by
+   `m=Get<Name>(e); if (m != (const T *) NULL) m->fn(a,b,...); else { <default group's
+   statements without the break> }`. Every `ThrowMagickException` stays where it was.
+5. Check by reading that every label of the `switch` has exactly one element and that
+   each element names the function its group called.
+6. Run `tools/ci_warnings.sh <file>`, `tools/cxx_warnings.sh <file>` (both must print
+   `OK`) and the oracle for the function.
+
+**Before:**
+
+```c
+  switch (stream_info->storage_type)
+  {
+    case CharPixel:
+    {
+      StreamCharPixels(stream_info,image,quantum_map,length);
+      break;
+    }
+    ...
+    default:
+    {
+      quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "UnrecognizedPixelMap","`%s'",stream_info->map);
+      break;
+    }
+  }
+```
+
+**After:**
+
+```c
+  storage_method=GetStreamStorageMethod(stream_info->storage_type);
+  if (storage_method != (const StreamStorageMethod *) NULL)
+    storage_method->stream_pixels(stream_info,image,quantum_map,length);
+  else
+    {
+      quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "UnrecognizedPixelMap","`%s'",stream_info->map);
+    }
+```
+
+**Careful:**
+
+- Labels are distinct, so the first match is the group the `switch` would have run, with
+  the same arguments; a value outside the table reaches the `default` statements as before.
+- A group with a second statement, a fall-through, or a `return` is refused (step 1).
+- The lookup adds a function: watch the file's function-count threshold.
+
+**Evidence level:** oracle (the cases that reach the function).
+
+**Provenance:** 2026-11-13, from `stream.c`'s `StreamImagePixels` (campaign B, M127): cc
+16 to 9, the file 6.15 to 6.31. Added by Claude Code (Claude Opus 5.5) under the mandate
+of 2026-10-24.
+Lane: b
+
+---
+
+## Recipe SP - Split a Predicate's Disjunction at a Leading Run
+
+**Use when:** CodeScene reports *Complex Method* on a predicate whose body is one
+`return` of a disjunction of many operands (`A1 || A2 || ... || An`, each `&&` and `||`
+counted as a branch), as `stream.c`'s `IsCacheMorphologyChanged` returns ten comparisons
+of an image against its pixel cache. No statement is left to extract.
+
+**Not covered by:** Recipe P, which names an expression that stands in an `if` and leaves
+an existing predicate as it is; Recipe GD, which turns an `if (A1 || ... ) return(F);`
+into guards and refuses a returned disjunction; Recipe DT, which drops a ternary and
+keeps every operand.
+
+**How:**
+
+1. The predicate lies outside every OpenMP region and its body is
+   `return((MagickBooleanType) (A1 || A2 || ... || An));` (or the same with
+   `? MagickTrue : MagickFalse`), each operand a comparison in its own parentheses, no
+   `?:`, assignment or increment in any operand, and no `#` line in it.
+2. Choose a leading run `A1 || ... || Ak` (`k` two or more, `k < n`) whose operands read
+   only some of the predicate's parameters.
+3. Directly above the predicate write `static inline MagickBooleanType <Name>(...)`
+   taking those parameters (same types and names) whose body is
+   `return((MagickBooleanType) (A1 || ... || Ak));`, the operands' text unchanged.
+4. In the predicate replace the run by the one operand `(<Name>(...) != MagickFalse)`,
+   the remaining operands `|| A(k+1) || ... || An` unchanged and in order.
+5. Run `tools/ci_warnings.sh <file>` and `tools/cxx_warnings.sh <file>` (both `OK`), and
+   the oracle for the functions that call the predicate.
+
+**Before:**
+
+```c
+  return((MagickBooleanType) ((image->storage_class != cache_info->storage_class) ||
+    (image->colorspace != cache_info->colorspace) ||
+    ...
+    (image->number_channels != cache_info->number_channels) ||
+    (memcmp(p,q,image->number_channels*sizeof(*p)) != 0) ||
+    (image->metacontent_extent != cache_info->metacontent_extent) ||
+    (cache_info->nexus_info == (NexusInfo **) NULL)));
+```
+
+**After:**
+
+```c
+static inline MagickBooleanType IsCacheGeometryChanged(const Image *image,
+  const CacheInfo *cache_info)
+{
+  return((MagickBooleanType) ((image->storage_class != cache_info->storage_class) ||
+    ...
+    (image->number_channels != cache_info->number_channels)));
+}
+...
+  return((MagickBooleanType) (
+    (IsCacheGeometryChanged(image,cache_info) != MagickFalse) ||
+    (memcmp(p,q,image->number_channels*sizeof(*p)) != 0) || ...));
+```
+
+**Careful:**
+
+- Why the behaviour is the same. `||` evaluates left to right and stops at the first
+  true operand; the new predicate evaluates `A1 ... Ak` in that order and yields `1` when
+  one holds, so the predicate's first operand is true exactly when one of them held, and
+  `A(k+1) ... An` are evaluated only when none did, as before. Each comparison yields `0`
+  or `1`, so the cast gives `MagickTrue` or `MagickFalse`.
+- An operand with a side effect is refused (step 1): its count of evaluations is kept,
+  but the step's argument is only made for pure operands.
+- The step adds a function: watch the file's function-count threshold.
+
+**Evidence level:** oracle (the cases that reach the predicate's callers).
+
+**Provenance:** 2026-11-13, from `stream.c`'s `IsCacheMorphologyChanged` (campaign B,
+M127): cc 10, the file 6.31 to 6.44. Added by Claude Code (Claude Opus 5.5) under the
+mandate of 2026-10-24.
+Lane: b
+
+---
+
+## Recipe LW - Merge Twin List Walks Differing in the Link Member
+
+**Use when:** CodeScene reports *Code Duplication* on two `static` functions (or blocks)
+that walk a linked list, detaching and handling each node, and differ only in the link
+member they follow, which is read from the start object and then from each node in turn:
+`xml-tree.c`'s `DestroyXMLTreeChild` and `DestroyXMLTreeOrdered`, which unlink and destroy
+the nodes along `child` and along `ordered`. In a file over the function-count threshold
+the twin also costs the score a function.
+
+**Not covered by:** Recipe MA, whose differing member belongs to one lvalue `e.m` with
+the same base in every copy, so that the caller can pass `&e.m`; here the base is the
+node the walk has reached, so no address exists before the walk. Recipe LS, which
+handles linear searches over an array (`a[u].m != e`, advancing an index), not a walk
+along a pointer member that also writes it. Recipe D, SV and SC, whose copies differ in a
+value, not a member designator; Recipe CF, which differs in the function called; Recipe
+TI and MT, which select between whole-expression runs.
+
+**How:**
+
+1. Copies. Two `static void` functions of one file (outside every OpenMP region) whose
+   bodies align token for token after renaming each one's walk variable to one name, and
+   differ only in the member designator `m` of every `e->m` they name, where `e` is a
+   pointer to one struct type `S` and every such member has one declared type `T`, a
+   pointer type. Each is called from one place and its address is never taken (`grep`).
+2. Write one `static void` function in place of the first: the copy's parameters, then
+   `const size_t member`. Its body is the copy's text with each `e->m` written
+   `(*(T *) ((char *) e+member))`, the walk variable under a neutral name, nothing else
+   changed.
+3. Delete the second function. Replace each call by a call of the new function passing
+   the same arguments and `offsetof(S,m)` of that copy's member, in the original order.
+   `offsetof` comes from `<stddef.h>`, which `studio.h` includes.
+4. Check by script that substituting each copy's member back (`(*(T *) ((char *) e+
+   member))` to `e->m`) and its names gives that copy's token sequence.
+5. Run `tools/ci_warnings.sh` and `tools/cxx_warnings.sh` (both `OK`) and the oracle for
+   the function that holds the calls.
+
+**Before:**
+
+```c
+static void DestroyXMLTreeChild(XMLTreeInfo *xml_info,
+  const size_t depth)
+{
+  XMLTreeInfo
+    *child,
+    *node;
+
+  child=xml_info->child;
+  while (child != (XMLTreeInfo *) NULL)
+  {
+    node=child;
+    child=node->child;
+    node->child=(XMLTreeInfo *) NULL;
+    (void) DestroyXMLTree_(node,depth+1);
+  }
+}
+/* DestroyXMLTreeOrdered: the same with ordered */
+...
+  DestroyXMLTreeChild(xml_info,depth+1);
+  DestroyXMLTreeOrdered(xml_info,depth+1);
+```
+
+**After:**
+
+```c
+static void DestroyXMLTreeList(XMLTreeInfo *xml_info,
+  const size_t depth,const size_t member)
+{
+  XMLTreeInfo
+    *next,
+    *node;
+
+  next=(*(XMLTreeInfo **) ((char *) xml_info+member));
+  while (next != (XMLTreeInfo *) NULL)
+  {
+    node=next;
+    next=(*(XMLTreeInfo **) ((char *) node+member));
+    (*(XMLTreeInfo **) ((char *) node+member))=(XMLTreeInfo *) NULL;
+    (void) DestroyXMLTree_(node,depth+1);
+  }
+}
+...
+  DestroyXMLTreeList(xml_info,depth+1,offsetof(XMLTreeInfo,child));
+  DestroyXMLTreeList(xml_info,depth+1,offsetof(XMLTreeInfo,ordered));
+```
+
+**Careful:**
+
+- The member. `offsetof(S,m)` is the byte offset of `m` in `S` (C11 7.19p3); `(char *) e`
+  addresses the first byte of `*e`, adding the offset stays inside it, and the result
+  converted to `T *` points at the member object itself, which an lvalue of its declared
+  type `T` reads and writes (C11 6.3.2.3p7, 6.5p7). Every read and write therefore lands
+  on the object the copy's `e->m` named, in the same order.
+- The writes through `node` and the reads through `next` are of one member of different
+  objects, as before; the recursion in the loop body sees the same state.
+- The calls stay in their order, so the first list is walked and destroyed before the
+  second, as before. The struct has no bit-field member to name (`offsetof` refuses one).
+- `refactor_guard.py --calls --renamed A=New --renamed B=New` reports the merged name
+  down by one (the deleted definition), each callee of the walk's body down by one (the
+  copy that left) and `offsetof` up by one per call (`WARN`); anything else stops the
+  step. Step 4's script may find the locals of one declaration listed in another order
+  (`*node,*ordered` against `*next,*node`), which declares the same objects.
+
+**Evidence level:** oracle (the function holding the calls reached by a case), with
+`refactor_guard.py --calls` and step 4 checked by script.
+
+**Provenance:** 2026-11-13, from `xml-tree.c`'s `DestroyXMLTreeChild` and
+`DestroyXMLTreeOrdered` (campaign B, M127): a probe 4.56 to 4.68, one *Code Duplication*
+pair and one function leaving a file over the function-count threshold. Added by Claude
+Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: a
+
+---
+
 ## Recipe ME - Merge Mirrored Twins That Leave Through a Constant Return
 
 **Use when:** CodeScene reports *Bumpy Road Ahead*, *Complex Method* or *Large Method* on a
@@ -14501,7 +14797,11 @@ labels in a `switch` of the new function; Recipe EC, which names an equality cha
    The peeled group `G` has labels `L1 ... Ln` (character constants or integer literals)
    and exactly the body `p++; break;` (the group's braces and comments aside); no label
    of `G` occurs in another group, and no group falls into `G` or out of it. No `#` line
-   stands inside the `switch`.
+   stands inside the `switch`. Widening (2026-11-13): `c` may be a local of
+   any integer type that nothing in the loop body after its assignment writes (the
+   predicate's parameter then has that type, `const ssize_t selector`), and `G`'s body may
+   instead be one call statement `F(...);` and `break;`, whose call writes nothing the
+   `switch` tests (step 3 then copies that call in place of `p++`).
 2. Directly above the first function that uses it write `static inline
    MagickBooleanType Name(const int c)` whose body is `switch (c) { <L1 ... Ln in the
    original order> return(MagickTrue); default: break; } return(MagickFalse);`.
@@ -14568,6 +14868,10 @@ labels in a `switch` of the new function; Recipe EC, which names an equality cha
 **Provenance:** 2026-11-13, from `geometry-parse.c`'s `GetGeometry` and `ParseGeometry`
 (campaign B, M121): 6.80 to 6.99, cc 50 and 52 to 36 and 38. Added by Claude Code (Claude
 Sonnet 5.5) under the mandate of 2026-10-24.
+Step 1's widening (2026-11-13, campaign B, M127 lane c): `profile.c`'s `UpdateClipPath`,
+whose knot group is a call on a `ssize_t` selector. Added by Claude Code (Claude Opus 5.5)
+under the mandate of 2026-10-24.
+Lane: c
 
 ---
 
@@ -15087,6 +15391,177 @@ enumerator.
 
 ---
 
+## Recipe TC - Drop a Trailing Conditional Continue
+
+**Use when:** CodeScene reports *Complex Method*, *Bumpy Road Ahead* or *Large Method*,
+and the last statement of a loop body is `if (cond) continue;`, with no `else`: the
+`continue` goes where falling off the end of the body goes, so the test decides nothing
+(`locale.c`'s `LoadLocaleCache`, whose XML loop ends in `if (*token != '=') continue;`).
+
+**Not covered by:** Recipe G, CN, EJ and UX, which reshape a test and keep it; Recipe NG,
+which drops a test before a NULL-safe call and changes the object code; Recipe DD and DL,
+which drop `case` labels of a `switch`, not a statement of a loop body.
+
+**How:**
+
+1. The `if (cond) continue;` is the last statement of the body of a `for`, `while` or
+   `do` loop, with no `else`, and the `continue` belongs to that loop (no `switch` or
+   inner loop between them).
+2. `cond` has no side effect: no assignment, increment, decrement or call (a dereference
+   and comparisons of locals, as `*token != '='`, qualify). A call refuses the step.
+3. Delete the two lines; nothing else changes.
+4. Proof: `tools/obj_identical.sh FILE` prints `IDENTICAL` (the compiler already drops a
+   test whose two outcomes reach the same place). Any difference refuses the step.
+
+**Before:**
+
+```c
+    (void) GetNextToken(q,(const char **) NULL,extent,token);
+    if (*token != '=')
+      continue;
+  }
+```
+
+**After:**
+
+```c
+    (void) GetNextToken(q,(const char **) NULL,extent,token);
+  }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. A `continue` of a `for` runs its increment expression and
+  then its test, as reaching the end of the body does; for `while` and `do` it goes to the
+  test, as the end of the body does. Both outcomes of `cond` lead to the same next step,
+  and evaluating `cond` has no effect, so removing it removes nothing observable. A
+  `cond` that reads through a pointer could fault on a bad address, but every read it makes
+  is one the program made just before on the same value (step 2 and the object-code check
+  catch the rest).
+- Do not use it when the test is followed by a closing brace of an inner block rather than
+  of the loop body: the `continue` then skips statements after that block.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL`.
+
+**Provenance:** 2026-11-13, from `locale.c`'s `LoadLocaleCache` (campaign B, M127 lane c):
+LoadLocaleCache cc 22 to 20, locale.c 6.46 to 6.50 in a probe, object code identical.
+Lane: c
+Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+
+---
+
+## Recipe BC - Extract a Loop-Body Tail Returning Whether It Broke
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead*, and
+the block that would fix it is the tail of a sequential loop's body (or its whole body)
+whose every path ends the iteration through `continue;` or `break;` of that loop, as the
+sub-directory push of `profile.c`'s `SyncExifDirectory` does (`continue;` when the tag is
+no directory offset or the offset is out of range, `break;` after the push on every other
+path).
+
+**Not covered by:** Recipe LX, which takes the same exits but returns a second result
+through a `broke` out-parameter, one parameter more (here it would be the fifth); Recipe
+LB, whose block leaves only through `break;`; Recipe LC, whose block has no `break`;
+Recipe OC, whose block leaves only through `continue;`. At the end of a loop's body a
+`continue;` and falling off the end are the same step, so one result can say "break" or
+"go on".
+
+**How:**
+
+1. The block lies outside every OpenMP region and contains no `#pragma` line. It ends the
+   body of a sequential loop `Lp` (nothing of the body follows it). Every `continue;` in
+   it that leaves it continues `Lp`, every `break;` in it that leaves it ends `Lp`; it
+   holds no `return` and no `goto`. A `break` or `continue` of a loop or `switch` nested
+   inside it stays as it is.
+2. The variables of the caller it writes meet Recipe O step 2; each goes by pointer,
+   written `(*v)` at every use, or through a `const` targets struct of their addresses
+   that the caller already passes to helpers of the same loop (Recipe OC step 7, LB step
+   8), passed on unchanged and bound once at the top (`T *const v = targets->v;`). A
+   temporary it writes before reading, that nothing after it reads, is declared in the
+   new function (Recipe E step 4).
+3. Cut the block into a new `static MagickBooleanType` function directly above the
+   caller. Each `break;` that ended `Lp` becomes `return(MagickTrue);`, each `continue;`
+   that continued `Lp` becomes `return(MagickFalse);`, one for one; if the block can fall
+   off its end, the function ends with `return(MagickFalse);`. Nothing else in the text
+   changes.
+4. Pass what it only reads as parameters, or through `const` input structs: an input
+   struct the caller already passes to helpers of the same loop (passed on unchanged),
+   and a struct local the caller fills member by member from those variables directly
+   before the block (nothing between the fill and the block writes a member's variable;
+   Recipe N), each bound once at the top of the function (`const T v = name->v;`). At
+   most four parameters.
+5. Where the block stood, as the last statement of the body, write
+   `if (Helper(...) != MagickFalse) break;`. Check every argument against its parameter
+   by reading.
+
+**Before:**
+
+```c
+    SyncExifTag(&exif_tag,(*exif_directory));
+    if (IsExifDirectoryOffset(tag_value,format,components,number_bytes) ==
+        MagickFalse)
+      continue;
+    offset=(ssize_t) ReadProfileLong(endian,p);
+    if (((size_t) offset >= (length-1)) ||
+        ((*level) >= (MaxDirectoryStack-2)))
+      continue;
+    ...
+    if ((directory+2+(12*number_entries)) > (exif+length))
+      break;
+    ...
+    break;
+  }
+```
+
+**After:**
+
+```c
+static MagickBooleanType PushExifDirectory(const ExifWalkInfo *walk,
+  const ExifTagInfo *exif_tag,const size_t number_entries,
+  const ExifWalkTargets *targets)
+{
+  ...
+  if (IsExifDirectoryOffset(tag_value,format,components,number_bytes) ==
+      MagickFalse)
+    return(MagickFalse);
+  ...
+  if ((directory+2+(12*number_entries)) > (exif+length))
+    return(MagickTrue);
+  ...
+  return(MagickTrue);
+}
+...
+    SyncExifTag(&exif_tag,(*exif_directory));
+    if (PushExifDirectory(walk,&exif_tag,number_entries,targets) !=
+        MagickFalse)
+      break;
+  }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The function runs the block's statements up to the exit
+  the block would have taken; a `continue;` there (now `return(MagickFalse);`) and the
+  end of the body both go to `Lp`'s increment and test, and the caller's `if` falls off
+  the body's end on `MagickFalse`; a `break;` (now `return(MagickTrue);`) is followed by
+  the caller's `break;`, with nothing in between. Each written variable is the caller's
+  own object through its pointer, so the next iteration, or the code after `Lp`, reads
+  what the block wrote.
+- The block must be the body's tail: with a statement after it, `continue;` would skip
+  that statement and `return(MagickFalse);` would not (use Recipe LX then).
+- A struct bound at the top is read once; check by reading that the block writes no
+  member's variable before reading it.
+
+**Evidence level:** oracle, for the function the step changes (`casemap.py` first; name
+the original caller), with `refactor_guard.py --calls`.
+
+**Provenance:** 2026-11-13, from `profile.c`'s `SyncExifDirectory` (campaign B, M127 lane
+c): the push tail as `PushExifDirectory`, 3.84 to 3.90; LX would have needed five
+parameters. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: c
+
+---
+
 ## Recipe WP - Fold Wrapper Prologues into One Function and a Guard in Each Callee
 
 **Use when:** CodeScene reports *Code Duplication* among several wrapper functions of one
@@ -15562,6 +16037,15 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | KE | Replace a letter-keyed `switch` that assigns an enumerator (and for some letters tests then exits) by a `static const` table of records and a lookup helper; evidence oracle | `stream.c`'s `StreamImagePixels` map parser (cc 39 to 16, 5.98 to 6.12); KS assigns strings and returns, SR keeps the labels | mandate (2026-10-24) |
 | 2026-11-13 | NEW | DV | Drop a `static` function's parameter that every caller fills with a member of another argument; the callee reads the member into a local; evidence oracle | `stream.c`'s `StreamDoublePixels` and `StreamFloatPixels` (five arguments to four; 6.12 to 6.13); M merges identical arguments only | mandate (2026-10-24) |
 | 2026-11-13 | NEW | KD | Replace a run of `if (LocaleCompare(v,"K") == 0) return(F(...));` calls of one signature by a `static const` table of key/function-pointer records and a lookup loop; evidence oracle | `pixel-import.c` `ImportCharPixel` (cc 10, file 6.69 to 6.89); KT assigns, KR returns strings, KE assigns enumerators | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | DT | Step 2 keeps the condition inside a `(MagickBooleanType)` cast, step 4 adds `tools/cxx_warnings.sh`: the bare comparison is `bool` in C++ and broke main's Windows jobs (C2440/C2664 in `policy.c`, `constitute.c`, `stream.c`; the casts fixed them with object code identical) | build fixes on `campaign/M126` | mandate (2026-10-24) |
+| 2026-11-13 | NEW | TC | Drop a loop body's last statement `if (cond) continue;` when `cond` has no side effect; proof `obj_identical.sh` | `locale.c`'s `LoadLocaleCache` (cc 22 to 20, 6.46 to 6.50, object code identical) | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | W | Step 3: up to three plain locals the caller reads after the block may be written, each by pointer on Recipe RV step 6(b)'s terms (`(*v)` at every use, `&v` passed on written `v`), counted among step 5's four parameters; `R` reads none of them. *Careful* unchanged: on the success path each pointer has carried the block's writes to the caller's variable, on a failure path the caller returns at once | `profile.c`'s `SyncExifProfile` (lane c, M127): the Exif header block (length test, marker scan, byte-order test, `0x002a` test) returns on failure and writes `exif`, `length` and `endian`, which the IFD walk reads; part of a chain measured 3.58 to 4.03 on a scratch copy | mandate (2026-10-24) |
+| 2026-11-13 | NEW | BC | Extract a Loop-Body Tail Returning Whether It Broke: the tail of a sequential loop's body whose every path ends the iteration by `continue;` or `break;` becomes a `static MagickBooleanType` function returning `MagickTrue` for each `break;` and `MagickFalse` for each `continue;`; the caller writes `if (Helper(...) != MagickFalse) break;` as the body's last statement; evidence oracle | `profile.c`'s `SyncExifDirectory` (lane c, M127): the sub-directory push as `PushExifDirectory`, 3.84 to 3.90; LX needs a fifth parameter for its `broke` flag, LB refuses the `continue`, OC the `break` | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | PA | Step 1: `c` may be a local of any integer type the body does not write after its assignment (the predicate takes that type), and the peeled group's body may be one call statement and `break;` instead of `p++; break;`, the call writing nothing the `switch` tests; step 3 copies the call. *Careful* unchanged: the label sets are disjoint and the `switch` was the body's last statement, so `continue` after the call ends the iteration where the group's `break;` did | `profile.c`'s `UpdateClipPath` (lane c, M127): the knot group `1, 2, 4, 5` (`UpdateClipPathSubpathKnot(resize,&targets);`) of a `switch` on `ssize_t selector`; 4.36 to 4.46 on a scratch copy | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | GD | Step 1: the exit `X` may be `break;` or `continue;`; every guard stands where the `if` stood, so each leaves the same loop or `switch` the original left, after the same operands were evaluated in the same order | `profile.c`'s `GetXMPContinuedFraction` (lane c, M127): a three-operand disjunction (two failed `TryAccumulate` calls, a zero `new_den`) ending in `break;`, the file's only *Complex Conditional*; 4.60 to 4.72 in a probe | mandate (2026-10-24) |
+| 2026-11-13 | NEW | KF | Replace an enumerator-keyed `switch` whose groups each call a different function of one signature with the same arguments by a `static const` key/function-pointer table, a lookup function and one call, the `default` statements kept as the else branch; evidence oracle | `stream.c`'s `StreamImagePixels` (cc 16 to 9, 6.15 to 6.31); KD needs a `LocaleCompare` ladder of returns | mandate (2026-10-24) |
+| 2026-11-13 | NEW | SP | Split a predicate whose body returns a disjunction of pure comparisons at a leading run: the run becomes a `static inline` predicate, called as the first operand; evidence oracle | `stream.c`'s `IsCacheMorphologyChanged` (cc 10, 6.31 to 6.44); P names an `if` expression, GD needs an `if ... return` | mandate (2026-10-24) |
+| 2026-11-13 | NEW | LW | Merge two `static` list walks that differ only in the link member they follow into one function taking the member's `offsetof`; evidence oracle | `xml-tree.c`'s `DestroyXMLTreeChild` and `DestroyXMLTreeOrdered` (probe 4.56 to 4.68); MA needs one base, LS walks arrays | mandate (2026-10-24) |
 | 2026-11-13 | NEW | ME | Merge Mirrored Twins That Leave Through a Constant Return: copies of one block that leave the function through `return(c);` (Recipe Y steps 1 and 2; `c` may differ between copies), in two mirrored sides (Recipe MT step 1's alignment) whose copies differ in one member-access value, become one `static inline MagickBooleanType` function taking the input struct, a constant selector, the value and the written variable by pointer; each copy becomes `if (Helper(...) == MagickFalse) return(c);` with its own constant. *Careful* gives the argument (the conditional evaluates only the copy's run, in its order; the constants stay in the callers) | `visual-effects-plasma.c`'s `PlasmaImageProxy` (campaign A, W21 round four, lane d): four edge-pixel blocks (left/right along a column, bottom/top along a row) that Recipes MT, Y, SV and W refuse; helpers per side cloned (8.15), precomputed coordinates moved `errno`-writing casts; a probe of the chain this recipe opens: 8.50 to 9.09 | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | SD | *Two levels of evidence*, *Unreached functions: Recipe SD*: Recipe SD may be applied to a function no case reaches, `Verified: guard`, with SD steps 1 to 6 and 8 checked by reading (no group that throws through `GetMagickModule()`), `refactor_guard.py` `OK` with `--calls` moving only `+2` for each new function, `tools/switch_split_check.py` printing `OK` (the added functions are the helpers; the rest of the file is the same token stream; one controlling expression; helper bodies only bindings and their `switch`; links pass each parameter by name; the flattened chain has the original's groups label for label, bodies equal after `(*v)` to `v` and `&p` to `p`, kept groups unchanged, no `return`, `continue` or `goto` in a moved group, original order) and `tools/obj_modulo.sh` printing `IDENTICAL` or `MODULO-IDENTICAL`. The new tool and its tests are a commit of their own. The guard-verified sentence, SD's *Evidence level* and AGENTS.md say so (the AGENTS.md line is the agent's addition for the owner's confirmation) | `widget.c`'s `XNoticeWidget` (campaign A, W22 lane a), reached by no case: its ten-label event `switch` keeps *Complex Method* and *Large Method* after nine guard-level helpers, and no guard-level recipe splits a `switch`; a probe of two chained SD helpers and an E step 7 tail helper takes the file from 7.31 to 7.78 and the function out of both findings. Planted errors (a label dropped, a callee changed, a write dropped, transposed link arguments, a kept group edited, a statement added to the caller, a member bound from another) are each refused | owner |
 | 2026-11-13 | AMEND | V | Step 1: a `goto M;` to a second label may stand in the block when the caller's statement directly after the block is `goto M;`; it becomes `return(MagickTrue);` like falling off the end, and Recipes Y and I admit it too (the path returns success and the caller runs only that `goto M;`) | `morphology.c`'s `MorphologyApply`: the direct-method path's `goto exit_cleanup;` kept the stage block (cc 11, the special, direct, reflected-kernel and loop tests) from Recipe I; with it, the function leaves Complex Method (6.90 to 6.93) | mandate (2026-10-24) |

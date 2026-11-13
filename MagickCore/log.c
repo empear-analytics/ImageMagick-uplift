@@ -1384,6 +1384,20 @@ static ptrdiff_t FormatLogSpecifier(char *q,const size_t extent,
   }
 }
 
+static char *FormatLogGeneration(const LogInfo *log_info,
+  const ssize_t generation,char *q)
+{
+  if (log_info->generations == 0)
+    {
+      (void) CopyMagickString(q,"0",MagickPathExtent);
+      q++;
+      return(q);
+    }
+  q+=(ptrdiff_t) FormatLocaleString(q,MagickPathExtent,"%.17g",(double)
+    (generation % log_info->generations));
+  return(q);
+}
+
 static void FormatLogFilename(const LogInfo *log_info,const ssize_t generation,
   char *filename)
 {
@@ -1427,14 +1441,7 @@ static void FormatLogFilename(const LogInfo *log_info,const ssize_t generation,
       }
       case 'g':
       {
-        if (log_info->generations == 0)
-          {
-            (void) CopyMagickString(q,"0",MagickPathExtent);
-            q++;
-            break;
-          }
-        q+=(ptrdiff_t) FormatLocaleString(q,MagickPathExtent,"%.17g",(double)
-          (generation % log_info->generations));
+        q=FormatLogGeneration(log_info,generation,q);
         break;
       }
       default:
@@ -1468,6 +1475,144 @@ static char GetLogEscape(const char *p)
   if ((*p == '\\') && (*(p+1) == 'n'))
     return('\n');
   return('\0');
+}
+
+static MagickBooleanType GrowLogEventText(char **text,char **q,
+  size_t *extent)
+{
+  if ((size_t) ((*q)-(*text)+MagickPathExtent) >= (*extent))
+    {
+      (*extent)<<=1;
+      (*text)=(char *) ResizeQuantumMemory((*text),(*extent),sizeof(**text));
+      if ((*text) == (char *) NULL)
+        return(MagickFalse);
+      (*q)=(*text)+strlen((*text));
+    }
+  return(MagickTrue);
+}
+
+typedef struct _LogEventText
+{
+  char
+    *text;
+
+  size_t
+    extent;
+
+  double
+    elapsed_time,
+    user_time;
+
+  time_t
+    seconds;
+
+  const char
+    *event,
+    *function,
+    *module;
+
+  size_t
+    line;
+} LogEventText;
+
+static void TranslateLogTimeSpecifier(const LogEventText *event_text,
+  const char *p,char **q)
+{
+  char
+    *const text = event_text->text;
+
+  const size_t
+    extent = event_text->extent;
+
+  const double
+    elapsed_time = event_text->elapsed_time,
+    user_time = event_text->user_time;
+
+  const time_t
+    seconds = event_text->seconds;
+
+  switch (*p)
+  {
+    case 'r':
+    {
+      (*q)+=(ptrdiff_t) FormatLocaleString((*q),extent-((*q)-text),
+        "%lu:%02lu.%03lu",(unsigned long) (elapsed_time/60.0),(unsigned long)
+        floor(fmod(elapsed_time,60.0)),(unsigned long) (1000.0*(elapsed_time-
+        floor(elapsed_time))+0.5));
+      break;
+    }
+    case 't':
+    {
+      (*q)+=(ptrdiff_t) FormatMagickTime(seconds,extent-((*q)-text),(*q));
+      break;
+    }
+    case 'u':
+    {
+      (*q)+=(ptrdiff_t) FormatLocaleString((*q),extent-((*q)-text),"%0.3fu",
+        user_time);
+      break;
+    }
+    default:
+    {
+      (*q)+=FormatLogSpecifier((*q),extent-((*q)-text),*p);
+      break;
+    }
+  }
+}
+
+static void TranslateLogLocationSpecifier(const LogEventText *event_text,
+  const char *p,char **q)
+{
+  char
+    *const text = event_text->text;
+
+  const size_t
+    extent = event_text->extent;
+
+  const char
+    *const event = event_text->event,
+    *const function = event_text->function,
+    *const module = event_text->module;
+
+  const size_t
+    line = event_text->line;
+
+  switch (*p)
+  {
+    case 'e':
+    {
+      (*q)+=(ptrdiff_t) CopyMagickString((*q),event,extent-((*q)-text));
+      break;
+    }
+    case 'f':
+    {
+      (*q)+=(ptrdiff_t) CopyMagickString((*q),function,extent-((*q)-text));
+      break;
+    }
+    case 'i':
+    {
+      (*q)+=(ptrdiff_t) FormatLocaleString((*q),extent-((*q)-text),"%.17g",
+        (double) GetMagickThreadSignature());
+      break;
+    }
+    case 'l':
+    {
+      (*q)+=(ptrdiff_t) FormatLocaleString((*q),extent-((*q)-text),"%.17g",
+        (double) line);
+      break;
+    }
+    case 'm':
+    {
+      (*q)+=(ptrdiff_t) CopyMagickString((*q),GetModuleBasename(module),
+        extent-((*q)-text));
+      break;
+    }
+    default:
+    {
+      TranslateLogTimeSpecifier(event_text,p,q);
+      break;
+    }
+  }
 }
 
 static char *TranslateEvent(const LogEventLocation *location,
@@ -1505,6 +1650,9 @@ static char *TranslateEvent(const LogEventLocation *location,
 
   time_t
     seconds;
+
+  LogEventText
+    event_text;
 
   exception=AcquireExceptionInfo();
   log_info=GetLogInfo("*",exception);
@@ -1553,14 +1701,8 @@ static char *TranslateEvent(const LogEventLocation *location,
   for (p=log_info->format; *p != '\0'; p++)
   {
     *q='\0';
-    if ((size_t) (q-text+MagickPathExtent) >= extent)
-      {
-        extent<<=1;
-        text=(char *) ResizeQuantumMemory(text,extent,sizeof(*text));
-        if (text == (char *) NULL)
-          return((char *) NULL);
-        q=text+strlen(text);
-      }
+    if (GrowLogEventText(&text,&q,&extent) == MagickFalse)
+      return((char *) NULL);
     /*
       The format of the log is defined by embedding special format characters:
 
@@ -1596,6 +1738,15 @@ static char *TranslateEvent(const LogEventLocation *location,
     p++;
     if (*p == '\0')
       break;
+    event_text.text=text;
+    event_text.extent=extent;
+    event_text.elapsed_time=elapsed_time;
+    event_text.user_time=user_time;
+    event_text.seconds=seconds;
+    event_text.event=event;
+    event_text.function=function;
+    event_text.module=module;
+    event_text.line=line;
     switch (*p)
     {
       case 'd':
@@ -1603,55 +1754,9 @@ static char *TranslateEvent(const LogEventLocation *location,
         q+=(ptrdiff_t) CopyMagickString(q,domain,extent-(q-text));
         break;
       }
-      case 'e':
-      {
-        q+=(ptrdiff_t) CopyMagickString(q,event,extent-(q-text));
-        break;
-      }
-      case 'f':
-      {
-        q+=(ptrdiff_t) CopyMagickString(q,function,extent-(q-text));
-        break;
-      }
-      case 'i':
-      {
-        q+=(ptrdiff_t) FormatLocaleString(q,extent-(q-text),"%.17g",(double)
-          GetMagickThreadSignature());
-        break;
-      }
-      case 'l':
-      {
-        q+=(ptrdiff_t) FormatLocaleString(q,extent-(q-text),"%.17g",(double)
-          line);
-        break;
-      }
-      case 'm':
-      {
-        q+=(ptrdiff_t) CopyMagickString(q,GetModuleBasename(module),
-          extent-(q-text));
-        break;
-      }
-      case 'r':
-      {
-        q+=(ptrdiff_t) FormatLocaleString(q,extent-(q-text),"%lu:%02lu.%03lu",
-          (unsigned long) (elapsed_time/60.0),(unsigned long) floor(fmod(
-          elapsed_time,60.0)),(unsigned long) (1000.0*(elapsed_time-floor(
-          elapsed_time))+0.5));
-        break;
-      }
-      case 't':
-      {
-        q+=(ptrdiff_t) FormatMagickTime(seconds,extent-(q-text),q);
-        break;
-      }
-      case 'u':
-      {
-        q+=(ptrdiff_t) FormatLocaleString(q,extent-(q-text),"%0.3fu",user_time);
-        break;
-      }
       default:
       {
-        q+=FormatLogSpecifier(q,extent-(q-text),*p);
+        TranslateLogLocationSpecifier(&event_text,p,&q);
         break;
       }
     }

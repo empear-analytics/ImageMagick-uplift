@@ -897,13 +897,29 @@ static inline MagickBooleanType NeedsEscape(const char c,const char escape)
   return((c == '\\') || (c == escape) ? MagickTrue : MagickFalse);
 }
 
+static void CopyEscapedString(char *destination,const char *source,
+  const char escape)
+{
+  char
+    *q;
+
+  const char
+    *p;
+
+  q=destination;
+  for (p=source; *p != '\0'; p++)
+  {
+    if (NeedsEscape(*p,escape) != MagickFalse)
+      *q++='\\';
+    *q++=(*p);
+  }
+  *q='\0';
+}
+
 MagickExport char *EscapeString(const char *source,const char escape)
 {
   char
     *destination;
-
-  char
-    *q;
 
   const char
     *p;
@@ -930,14 +946,7 @@ MagickExport char *EscapeString(const char *source,const char escape)
   if (destination == (char *) NULL)
     ThrowFatalException(ResourceLimitFatalError,"UnableToEscapeString");
   *destination='\0';
-  q=destination;
-  for (p=source; *p != '\0'; p++)
-  {
-    if (NeedsEscape(*p,escape) != MagickFalse)
-      *q++='\\';
-    *q++=(*p);
-  }
-  *q='\0';
+  CopyEscapedString(destination,source,escape);
   return(destination);
 }
 
@@ -1371,6 +1380,39 @@ MagickExport MagickBooleanType IsStringFalse(const char *value)
   return(MagickFalse);
 }
 
+static void PadStringInfoHexLine(FILE *file,size_t j)
+{
+  /*
+    Padding.
+  */
+  for ( ; j < CharsPerLine; j++)
+  {
+    (void) fputc(' ',file);
+    (void) fputc(' ',file);
+    if (((j+1) % 0x04) == 0)
+      (void) fputc(' ',file);
+  }
+}
+
+static void PrintStringInfoAsciiLine(FILE *file,
+  const StringInfo *string_info,const unsigned char *p,const size_t i)
+{
+  size_t
+    j;
+
+  /*
+    ASCII section.
+  */
+  for (j=0; j < MagickMin(string_info->length-i,CharsPerLine); j++)
+  {
+    unsigned char c = p[i+j];
+    if (isprint((int) c) != 0)
+      (void) fputc(c,file);
+    else
+      (void) fputc('-',file);
+  }
+}
+
 static void PrintStringInfoHexLine(FILE *file,
   const StringInfo *string_info,const unsigned char *p,const size_t i)
 {
@@ -1384,28 +1426,9 @@ static void PrintStringInfoHexLine(FILE *file,
     if (((j+1) % 0x04) == 0)
       (void) fputc(' ',file);
   }
-  /*
-    Padding.
-  */
-  for ( ; j < CharsPerLine; j++)
-  {
-    (void) fputc(' ',file);
-    (void) fputc(' ',file);
-    if (((j+1) % 0x04) == 0)
-      (void) fputc(' ',file);
-  }
+  PadStringInfoHexLine(file,j);
   (void) fputc(' ',file);
-  /*
-    ASCII section.
-  */
-  for (j=0; j < MagickMin(string_info->length-i,CharsPerLine); j++)
-  {
-    unsigned char c = p[i+j];
-    if (isprint((int) c) != 0)
-      (void) fputc(c,file);
-    else
-      (void) fputc('-',file);
-  }
+  PrintStringInfoAsciiLine(file,string_info,p,i);
   (void) fputc('\n',file);
 }
 
@@ -2236,11 +2259,40 @@ static char **AsciiTextList(const char *text,size_t *lines)
   return(textlist);
 }
 
-static char *FormatHexTextLine(char *q,const char **text)
+static char *PadHexTextLine(char *q,ssize_t j)
+{
+  for ( ; j <= CharsPerLine; j++)
+  {
+    *q++=' ';
+    *q++=' ';
+    if ((j % 0x04) == 0)
+      *q++=' ';
+  }
+  return(q);
+}
+
+static char *FormatHexDigits(char *q,const char *p,const size_t length)
 {
   char
     hex_string[MagickPathExtent];
 
+  ssize_t
+    j;
+
+  for (j=1; j <= (ssize_t) MagickMin(length,CharsPerLine); j++)
+  {
+    (void) FormatLocaleString(hex_string,MagickPathExtent,"%02x",*(p+j));
+    (void) CopyMagickString(q,hex_string,MagickPathExtent);
+    q+=(ptrdiff_t) 2;
+    if ((j % 0x04) == 0)
+      *q++=' ';
+  }
+  q=PadHexTextLine(q,j);
+  return(q);
+}
+
+static char *FormatHexTextLine(char *q,const char **text)
+{
   const char
     *p;
 
@@ -2252,21 +2304,7 @@ static char *FormatHexTextLine(char *q,const char **text)
 
   p=(*text);
   length=strlen(p);
-  for (j=1; j <= (ssize_t) MagickMin(length,CharsPerLine); j++)
-  {
-    (void) FormatLocaleString(hex_string,MagickPathExtent,"%02x",*(p+j));
-    (void) CopyMagickString(q,hex_string,MagickPathExtent);
-    q+=(ptrdiff_t) 2;
-    if ((j % 0x04) == 0)
-      *q++=' ';
-  }
-  for ( ; j <= CharsPerLine; j++)
-  {
-    *q++=' ';
-    *q++=' ';
-    if ((j % 0x04) == 0)
-      *q++=' ';
-  }
+  q=FormatHexDigits(q,p,length);
   *q++=' ';
   for (j=1; j <= (ssize_t) MagickMin(length,CharsPerLine); j++)
   {

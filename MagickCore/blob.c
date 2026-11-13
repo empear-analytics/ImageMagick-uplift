@@ -3525,6 +3525,10 @@ static void OpenCompressedBlob(const ImageInfo *image_info,
   BlobInfo *magick_restrict blob_info,const char *filename,
   unsigned char *magick)
 {
+#if !defined(MAGICKCORE_ZLIB_DELEGATE) && !defined(MAGICKCORE_BZLIB_DELEGATE)
+  (void) filename;
+  (void) magick;
+#endif
 #if defined(MAGICKCORE_ZLIB_DELEGATE)
   if (IsGzipMagick(magick) != MagickFalse)
     OpenGzipBlob(blob_info,filename);
@@ -4092,9 +4096,6 @@ MagickExport ssize_t ReadBlob(Image *image,const size_t length,void *data)
   BlobInfo
     *magick_restrict blob_info;
 
-  int
-    c;
-
   ssize_t
     count;
 
@@ -4126,6 +4127,7 @@ MagickExport ssize_t ReadBlob(Image *image,const size_t length,void *data)
     {
 #if defined(MAGICKCORE_ZLIB_DELEGATE)
       int
+        c,
         status;
 
       switch (length)

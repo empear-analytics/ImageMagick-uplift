@@ -863,19 +863,26 @@ MagickExport MagickBooleanType OpenStream(const ImageInfo *image_info,
 %
 */
 
-static inline MagickBooleanType IsCacheMorphologyChanged(const Image *image,
-  const CacheInfo *cache_info,const PixelChannelMap *p,const PixelChannelMap *q)
+static inline MagickBooleanType IsCacheGeometryChanged(const Image *image,
+  const CacheInfo *cache_info)
 {
-  return((image->storage_class != cache_info->storage_class) ||
+  return((MagickBooleanType) ((image->storage_class != cache_info->storage_class) ||
     (image->colorspace != cache_info->colorspace) ||
     (image->alpha_trait != cache_info->alpha_trait) ||
     (image->channels != cache_info->channels) ||
     (image->columns != cache_info->columns) ||
     (image->rows != cache_info->rows) ||
-    (image->number_channels != cache_info->number_channels) ||
+    (image->number_channels != cache_info->number_channels)));
+}
+
+static inline MagickBooleanType IsCacheMorphologyChanged(const Image *image,
+  const CacheInfo *cache_info,const PixelChannelMap *p,const PixelChannelMap *q)
+{
+  return((MagickBooleanType) (
+    (IsCacheGeometryChanged(image,cache_info) != MagickFalse) ||
     (memcmp(p,q,image->number_channels*sizeof(*p)) != 0) ||
     (image->metacontent_extent != cache_info->metacontent_extent) ||
-    (cache_info->nexus_info == (NexusInfo **) NULL));
+    (cache_info->nexus_info == (NexusInfo **) NULL)));
 }
 
 static inline MagickBooleanType ValidatePixelCacheMorphology(
@@ -3504,11 +3511,55 @@ static const StreamMapInfo *GetStreamMapInfo(const char key)
   return((const StreamMapInfo *) NULL);
 }
 
+typedef struct _StreamStorageMethod
+{
+  StorageType
+    storage_type;
+
+  void
+    (*stream_pixels)(const StreamInfo *,const Image *,QuantumType *,size_t);
+} StreamStorageMethod;
+
+static const StreamStorageMethod
+  StreamStorageMethods[] =
+  {
+    { CharPixel, StreamCharPixels },
+    { DoublePixel, StreamDoublePixels },
+    { FloatPixel, StreamFloatPixels },
+    { LongPixel, StreamLongPixels },
+    { LongLongPixel, StreamLongLongPixels },
+    { QuantumPixel, StreamQuantumPixels },
+    { ShortPixel, StreamShortPixels }
+  };
+
+static const StreamStorageMethod *GetStreamStorageMethod(
+  const StorageType storage_type)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) (sizeof(StreamStorageMethods)/
+       sizeof(*StreamStorageMethods)); i++)
+    if (StreamStorageMethods[i].storage_type == storage_type)
+      return(StreamStorageMethods+i);
+  return((const StreamStorageMethod *) NULL);
+}
+
+static inline MagickBooleanType IsStreamMapChannelAvailable(
+  const StreamMapInfo *map_info,const Image *image)
+{
+  return(((map_info->separation == MagickFalse) ||
+    (image->colorspace == CMYKColorspace)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
   const Image *image,ExceptionInfo *exception)
 {
   const StreamMapInfo
     *map_info;
+
+  const StreamStorageMethod
+    *storage_method;
 
   QuantumType
     *quantum_map;
@@ -3545,59 +3596,22 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
         return(MagickFalse);
       }
     quantum_map[i]=map_info->quantum;
-    if ((map_info->separation == MagickFalse) ||
-        (image->colorspace == CMYKColorspace))
+    if (IsStreamMapChannelAvailable(map_info,image) != MagickFalse)
       continue;
     quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
     (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
       "ColorSeparatedImageRequired","`%s'",stream_info->map);
     return(MagickFalse);
   }
-  switch (stream_info->storage_type)
-  {
-    case CharPixel:
-    {
-      StreamCharPixels(stream_info,image,quantum_map,length);
-      break;
-    }
-    case DoublePixel:
-    {
-      StreamDoublePixels(stream_info,image,quantum_map,length);
-      break;
-    }
-    case FloatPixel:
-    {
-      StreamFloatPixels(stream_info,image,quantum_map,length);
-      break;
-    }
-    case LongPixel:
-    {
-      StreamLongPixels(stream_info,image,quantum_map,length);
-      break;
-    }
-    case LongLongPixel:
-    {
-      StreamLongLongPixels(stream_info,image,quantum_map,length);
-      break;
-    }
-    case QuantumPixel:
-    {
-      StreamQuantumPixels(stream_info,image,quantum_map,length);
-      break;
-    }
-    case ShortPixel:
-    {
-      StreamShortPixels(stream_info,image,quantum_map,length);
-      break;
-    }
-    default:
+  storage_method=GetStreamStorageMethod(stream_info->storage_type);
+  if (storage_method != (const StreamStorageMethod *) NULL)
+    storage_method->stream_pixels(stream_info,image,quantum_map,length);
+  else
     {
       quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
       (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
         "UnrecognizedPixelMap","`%s'",stream_info->map);
-      break;
     }
-  }
   quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
   return(MagickTrue);
 }
