@@ -2146,6 +2146,12 @@ static const char *ReadColorInfoAttribute(ColorInfo *color_info,
   return(q);
 }
 
+static inline MagickBooleanType IsElementEnd(const char *keyword)
+{
+  return(((LocaleCompare(keyword,"/>") == 0) ||
+    (LocaleCompare(keyword,"</policy>") == 0)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -2226,8 +2232,7 @@ static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
       }
     if (color_info == (ColorInfo *) NULL)
       continue;
-    if ((LocaleCompare(keyword,"/>") == 0) ||
-        (LocaleCompare(keyword,"</policy>") == 0))
+    if (IsElementEnd(keyword) != MagickFalse)
       {
         status=AppendColorInfoToCache(cache,color_info,exception);
         color_info=(ColorInfo *) NULL;
