@@ -204,12 +204,28 @@ static ssize_t ScanEquivalentRow(const EquivalentSearch *search,
   return(x);
 }
 
+static MagickBooleanType SetEquivalentProgress(const Image *image,
+  const ssize_t y,MagickBooleanType status)
+{
+#define SearchImageText  "  Searching image...  "
+
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      proceed=SetImageProgress(image,SearchImageText,(MagickOffsetType) y,
+        image->rows);
+      if (proceed == MagickFalse)
+        status=MagickFalse;
+    }
+  return(status);
+}
+
 MagickExport MagickBooleanType IsEquivalentImage(const Image *image,
   const Image *target_image,ssize_t *x_offset,ssize_t *y_offset,
   ExceptionInfo *exception)
 {
-#define SearchImageText  "  Searching image...  "
-
   CacheView
     *image_view,
     *target_view;
@@ -257,16 +273,7 @@ MagickExport MagickBooleanType IsEquivalentImage(const Image *image,
     x=ScanEquivalentRow(&search,&pixel,&target);
     if (x < (ssize_t) image->columns)
       break;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-        proceed=SetImageProgress(image,SearchImageText,(MagickOffsetType) y,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
+    status=SetEquivalentProgress(image,y,status);
   }
   target_view=DestroyCacheView(target_view);
   image_view=DestroyCacheView(image_view);
