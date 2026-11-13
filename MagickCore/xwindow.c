@@ -6966,6 +6966,42 @@ static void XPackColormappedMSB(const XImage *ximage,
   }
 }
 
+static void XPackContinuousMSB(const XImage *ximage,
+  const XStandardColormap *map_info,const XImageRowSource row_source,
+  unsigned char *q)
+{
+  switch (ximage->bits_per_pixel)
+  {
+    case 2:
+    {
+      XPackContinuous2BitMSB(&row_source,q);
+      break;
+    }
+    case 4:
+    {
+      XPackContinuous4BitMSB(&row_source,q);
+      break;
+    }
+    case 6:
+    case 8:
+    {
+      XPackContinuous8BitMSB(&row_source,q);
+      break;
+    }
+    default:
+    {
+      if (IsRedHigh32BitMap(ximage,map_info) != MagickFalse)
+        XPackRedHigh32BitMSB(&row_source,q);
+      else
+        if (IsBlueHigh32BitMap(ximage,map_info) != MagickFalse)
+          XPackBlueHigh32BitMSB(&row_source,q);
+        else
+          XPackContinuousMultiByteMSB(&row_source,q);
+      break;
+    }
+  }
+}
+
 static void XMakeImageMSBFirst(const MakeImageContext *make_context,
   Image *image,XImage *ximage,XImage *matte_image)
 {
@@ -7107,36 +7143,7 @@ static void XMakeImageMSBFirst(const MakeImageContext *make_context,
     if (window->pixel_info->colors != 0)
       XPackColormappedMSB(ximage,row_source,q);
     else
-      switch (ximage->bits_per_pixel)
-      {
-        case 2:
-        {
-          XPackContinuous2BitMSB(&row_source,q);
-          break;
-        }
-        case 4:
-        {
-          XPackContinuous4BitMSB(&row_source,q);
-          break;
-        }
-        case 6:
-        case 8:
-        {
-          XPackContinuous8BitMSB(&row_source,q);
-          break;
-        }
-        default:
-        {
-          if (IsRedHigh32BitMap(ximage,map_info) != MagickFalse)
-            XPackRedHigh32BitMSB(&row_source,q);
-          else
-            if (IsBlueHigh32BitMap(ximage,map_info) != MagickFalse)
-              XPackBlueHigh32BitMSB(&row_source,q);
-            else
-              XPackContinuousMultiByteMSB(&row_source,q);
-          break;
-        }
-      }
+      XPackContinuousMSB(ximage,map_info,row_source,q);
   if (matte_image != (XImage *) NULL)
     {
       /*
