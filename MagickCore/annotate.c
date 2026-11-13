@@ -2570,6 +2570,17 @@ static FT_UInt GetFreetypeGlyphId(const GraphemeInfo *grapheme,
   return(id);
 }
 
+#define ThrowFreetypeErrorException(tag,ft_status,value) \
+{ \
+  const char *error_string = FreetypeErrorMessage(ft_status); \
+  if (error_string != (const char *) NULL) \
+    (void) ThrowMagickException(exception,GetMagickModule(),TypeError, \
+      tag,"`%s (%s)'",value, error_string); \
+  else \
+    (void) ThrowMagickException(exception,GetMagickModule(),TypeError, \
+      tag,"`%s'",value); \
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2585,17 +2596,6 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
 #if !defined(FT_OPEN_PATHNAME)
 #define FT_OPEN_PATHNAME  ft_open_pathname
 #endif
-
-#define ThrowFreetypeErrorException(tag,ft_status,value) \
-{ \
-  const char *error_string = FreetypeErrorMessage(ft_status); \
-  if (error_string != (const char *) NULL) \
-    (void) ThrowMagickException(exception,GetMagickModule(),TypeError, \
-      tag,"`%s (%s)'",value, error_string); \
-  else \
-    (void) ThrowMagickException(exception,GetMagickModule(),TypeError, \
-      tag,"`%s'",value); \
-}
 
   typedef struct _GlyphInfo
   {
