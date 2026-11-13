@@ -8821,6 +8821,19 @@ static void RunFileBrowser(const FileBrowserContext *context,
   RespondToFileBrowserEvents(context,&targets,&file_widgets);
 }
 
+static void SetFileBrowserReply(char *reply,char *working_path)
+{
+  if (*reply != '\0')
+    {
+      (void) ConcatenateMagickString(working_path,DirectorySeparator,
+        MagickPathExtent);
+      (void) ConcatenateMagickString(working_path,reply,MagickPathExtent);
+    }
+  (void) CopyMagickString(reply,working_path,MagickPathExtent);
+  if (*reply == '~')
+    ExpandFilename(reply);
+}
+
 MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const char *action,char *reply)
 {
@@ -8921,15 +8934,7 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
     filelist[i]=DestroyString(filelist[i]);
   if (filelist != (char **) NULL)
     filelist=(char **) RelinquishMagickMemory(filelist);
-  if (*reply != '\0')
-    {
-      (void) ConcatenateMagickString(working_path,DirectorySeparator,
-        MagickPathExtent);
-      (void) ConcatenateMagickString(working_path,reply,MagickPathExtent);
-    }
-  (void) CopyMagickString(reply,working_path,MagickPathExtent);
-  if (*reply == '~')
-    ExpandFilename(reply);
+  SetFileBrowserReply(reply,working_path);
 }
 
 /*
