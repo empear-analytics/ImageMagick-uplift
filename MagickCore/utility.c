@@ -1656,6 +1656,20 @@ static char *LocateBasenameSeparator(char *component)
   return(p);
 }
 
+static void GetBasePathSansCompressExtension(const char *path,
+  char *component)
+{
+  char
+    extension[MagickPathExtent];
+
+  /*
+    Base path sans any compression extension.
+  */
+  GetPathComponent(path,ExtensionPath,extension);
+  if (IsCompressionExtension(extension) != MagickFalse)
+    GetPathComponent(path,BasePath,component);
+}
+
 MagickExport void GetPathComponent(const char *path,PathType type,
   char *component)
 {
@@ -1727,15 +1741,7 @@ MagickExport void GetPathComponent(const char *path,PathType type,
     }
     case BasePathSansCompressExtension:
     {
-      char
-        extension[MagickPathExtent];
-
-      /*
-        Base path sans any compression extension.
-      */
-      GetPathComponent(path,ExtensionPath,extension);
-      if (IsCompressionExtension(extension) != MagickFalse)
-        GetPathComponent(path,BasePath,component);
+      GetBasePathSansCompressExtension(path,component);
       break;
     }
     case ExtensionPath:
