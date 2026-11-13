@@ -15026,6 +15026,8 @@ typedef struct _PreferencesContext
 
   unsigned int
     height;
+  Display
+    *display;
 } PreferencesContext;
 
 static void InitializePreferencesCache(const PreferencesContext *context,
@@ -15140,6 +15142,48 @@ static void UpdatePreferencesButtons(const PreferencesContext *context,
     }
 }
 
+static void RedrawPreferencesWidget(const PreferencesContext *context,
+  const PreferencesWidgets *widgets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XWidgetInfo
+    *const apply_info = widgets->apply_info;
+
+  XWidgetInfo
+    *const cancel_info = widgets->cancel_info;
+
+  XWidgetInfo
+    *const preferences_info = widgets->preferences_info;
+
+  XWidgetInfo
+    *const cache_info = widgets->cache_info;
+
+  size_t
+    *const state = widgets->state;
+
+  int
+    i;
+
+  if ((*state) & RedrawWidgetState)
+    {
+      /*
+        Redraw Preferences widget.
+      */
+      XDrawBeveledButton(display,&windows->widget,apply_info);
+      XDrawBeveledButton(display,&windows->widget,cancel_info);
+      for (i=0; i < NumberPreferences; i++)
+        XDrawBeveledButton(display,&windows->widget,&preferences_info[i]);
+      XDrawTriangleEast(display,&windows->widget,cache_info);
+      XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
+      (*state)&=(unsigned int) (~RedrawWidgetState);
+    }
+}
+
 MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   XResourceInfo *resource_info,XWindows *windows)
 {
@@ -15149,9 +15193,6 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   int
     x,
     y;
-
-  int
-    i;
 
   unsigned int
     height,
@@ -15212,22 +15253,11 @@ MagickPrivate MagickBooleanType XPreferencesWidget(Display *display,
   context.font_info=font_info;
   context.windows=windows;
   context.height=height;
+  context.display=display;
   do
   {
     UpdatePreferencesButtons(&context,&widgets);
-    if (state & RedrawWidgetState)
-      {
-        /*
-          Redraw Preferences widget.
-        */
-        XDrawBeveledButton(display,&windows->widget,&apply_info);
-        XDrawBeveledButton(display,&windows->widget,&cancel_info);
-        for (i=0; i < NumberPreferences; i++)
-          XDrawBeveledButton(display,&windows->widget,&preferences_info[i]);
-        XDrawTriangleEast(display,&windows->widget,&cache_info);
-        XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
-        state&=(unsigned int) (~RedrawWidgetState);
-      }
+    RedrawPreferencesWidget(&context,&widgets);
     /*
       Wait for next event.
     */
