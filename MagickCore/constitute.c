@@ -893,6 +893,15 @@ static void SetReadEndian(const ImageInfo *image_info,ImageInfo *read_info,
       read_info->endian=GetHostEndian();
 }
 
+static void ReleaseTemporaryReadFile(ImageInfo *read_info,Image *image,
+  const char *filename)
+{
+  (void) RelinquishUniqueFileResource(read_info->filename);
+  read_info->temporary=MagickFalse;
+  if (image != (Image *) NULL)
+    (void) CopyMagickString(image->filename,filename,MagickPathExtent);
+}
+
 MagickExport Image *ReadImage(const ImageInfo *image_info,
   ExceptionInfo *exception)
 {
@@ -1030,12 +1039,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
         UnlockSemaphoreInfo(magick_info->semaphore);
     }
   if (read_info->temporary != MagickFalse)
-    {
-      (void) RelinquishUniqueFileResource(read_info->filename);
-      read_info->temporary=MagickFalse;
-      if (image != (Image *) NULL)
-        (void) CopyMagickString(image->filename,filename,MagickPathExtent);
-    }
+    ReleaseTemporaryReadFile(read_info,image,filename);
   if (image == (Image *) NULL)
     {
       read_info=DestroyImageInfo(read_info);
