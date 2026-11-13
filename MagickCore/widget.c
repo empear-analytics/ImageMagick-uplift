@@ -8857,9 +8857,6 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   const FileBrowserRunTargets
     run_targets = { &files, &i, &filelist, &mask };
 
-  FileBrowserContext
-    file_context;
-
   FileBrowserLayout
     layout;
 
@@ -8908,21 +8905,14 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
     Respond to X events.
   */
   anomaly=GetFileBrowserAnomaly(action);
-  file_context.display=display;
-  file_context.windows=windows;
-  file_context.reply=reply;
-  file_context.glob_pattern=glob_pattern;
-  file_context.working_path=working_path;
-  file_context.primary_selection=primary_selection;
-  file_context.font_info=font_info;
-  file_context.height=height;
-  file_context.format=format;
-  file_context.anomaly=anomaly;
-  file_context.home_directory=home_directory;
-  file_context.action=action;
-  file_context.width=width;
-  file_context.text=text;
-  RunFileBrowser(&file_context,&run_targets);
+  {
+    const FileBrowserContext
+      file_context = { display, windows, reply, glob_pattern, working_path,
+        primary_selection, font_info, height, format, anomaly, home_directory,
+        action, width, text };
+
+    RunFileBrowser(&file_context,&run_targets);
+  }
   WithdrawBrowserWidget(display,windows);
   /*
     Free file list.
