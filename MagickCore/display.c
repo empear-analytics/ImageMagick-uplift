@@ -16495,6 +16495,35 @@ static void XTrimRightEdge(const XWindows *windows,RectangleInfo *trim_info)
   (*trim_info).width=(size_t) (x-(*trim_info).x+1);
 }
 
+static void XTrimTopEdge(const XWindows *windows,RectangleInfo *trim_info)
+{
+  int
+    x,
+    y;
+
+  size_t
+    background,
+    pixel;
+
+  /*
+    Crop the top edge.
+  */
+  background=XGetPixel(windows->image.ximage,0,0);
+  (*trim_info).height=(size_t) windows->image.ximage->height;
+  for (y=0; y < windows->image.ximage->height; y++)
+  {
+    for (x=0; x < windows->image.ximage->width; x++)
+    {
+      pixel=XGetPixel(windows->image.ximage,x,y);
+      if (pixel != background)
+        break;
+    }
+    if (x < windows->image.ximage->width)
+      break;
+  }
+  (*trim_info).y=(ssize_t) y;
+}
+
 static MagickBooleanType XTrimImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -16531,20 +16560,7 @@ static MagickBooleanType XTrimImage(Display *display,
   /*
     Crop the top edge.
   */
-  background=XGetPixel(windows->image.ximage,0,0);
-  trim_info.height=(size_t) windows->image.ximage->height;
-  for (y=0; y < windows->image.ximage->height; y++)
-  {
-    for (x=0; x < windows->image.ximage->width; x++)
-    {
-      pixel=XGetPixel(windows->image.ximage,x,y);
-      if (pixel != background)
-        break;
-    }
-    if (x < windows->image.ximage->width)
-      break;
-  }
-  trim_info.y=(ssize_t) y;
+  XTrimTopEdge(windows,&trim_info);
   /*
     Crop the bottom edge.
   */
