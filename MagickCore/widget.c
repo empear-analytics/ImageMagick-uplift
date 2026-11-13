@@ -14886,18 +14886,13 @@ MagickPrivate void XNoticeWidget(Display *display,XWindows *windows,
       }
     if (state & RedrawWidgetState)
       {
-        NoticeText
-          notice;
+        const NoticeText
+          notice = { display, windows, font_info, height, reason,
+            description };
 
         /*
           Redraw Notice widget.
         */
-        notice.display=display;
-        notice.windows=windows;
-        notice.font_info=font_info;
-        notice.height=height;
-        notice.reason=reason;
-        notice.description=description;
         DrawNoticeText(&notice);
         XDrawBeveledButton(display,&windows->widget,&dismiss_info);
         XHighlightWidget(display,&windows->widget,BorderOffset,BorderOffset);
