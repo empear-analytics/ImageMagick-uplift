@@ -2177,6 +2177,24 @@ static MagickBooleanType PrintImageSummary(Image *image,FILE *file,
   return(ferror(file) != 0 ? MagickFalse : MagickTrue);
 }
 
+static void PrintImageClassToEndianness(FILE *file,Image *image,
+  const ColorspaceType colorspace,ExceptionInfo *exception)
+{
+  (void) FormatLocaleFile(file,"  Class: %s\n",CommandOptionToMnemonic(
+    MagickClassOptions,(ssize_t) image->storage_class));
+  (void) FormatLocaleFile(file,"  Geometry: %.17gx%.17g%+.20g%+.20g\n",(double)
+    image->columns,(double) image->rows,(double) image->tile_offset.x,(double)
+    image->tile_offset.y);
+  PrintImageBaseGeometryAndResolution(file,image);
+  (void) FormatLocaleFile(file,"  Units: %s\n",CommandOptionToMnemonic(
+    MagickResolutionOptions,(ssize_t) image->units));
+  (void) FormatLocaleFile(file,"  Colorspace: %s\n",CommandOptionToMnemonic(
+    MagickColorspaceOptions,(ssize_t) colorspace));
+  PrintImageType(file,image,exception);
+  (void) FormatLocaleFile(file,"  Endianness: %s\n",CommandOptionToMnemonic(
+    MagickEndianOptions,(ssize_t) image->endian));
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -2252,19 +2270,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   properties=(*GetBlobProperties(image));
   PrintImagePermissions(file,&properties);
   PrintImageFormat(file,image,exception);
-  (void) FormatLocaleFile(file,"  Class: %s\n",CommandOptionToMnemonic(
-    MagickClassOptions,(ssize_t) image->storage_class));
-  (void) FormatLocaleFile(file,"  Geometry: %.17gx%.17g%+.20g%+.20g\n",(double)
-    image->columns,(double) image->rows,(double) image->tile_offset.x,(double)
-    image->tile_offset.y);
-  PrintImageBaseGeometryAndResolution(file,image);
-  (void) FormatLocaleFile(file,"  Units: %s\n",CommandOptionToMnemonic(
-    MagickResolutionOptions,(ssize_t) image->units));
-  (void) FormatLocaleFile(file,"  Colorspace: %s\n",CommandOptionToMnemonic(
-    MagickColorspaceOptions,(ssize_t) colorspace));
-  PrintImageType(file,image,exception);
-  (void) FormatLocaleFile(file,"  Endianness: %s\n",CommandOptionToMnemonic(
-    MagickEndianOptions,(ssize_t) image->endian));
+  PrintImageClassToEndianness(file,image,colorspace,exception);
   PrintImageDepth(file,image,depth);
   (void) FormatLocaleFile(file,"  Channels: %g.%g\n",(double)
     image->number_channels,(double) image->number_meta_channels);
