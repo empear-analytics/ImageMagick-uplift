@@ -12560,6 +12560,22 @@ static void ConfigureListBrowserWindow(const ListBrowserContext *context,
   (*state)|=UpdateConfigurationState;
 }
 
+static void ExposeListBrowserWindow(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserWidgets *widgets)
+{
+  XWindowInfo
+    *const window_info = context->window_info;
+
+  size_t
+    *const state = widgets->state;
+
+  if (event.xexpose.window != window_info->id)
+    return;
+  if (event.xexpose.count != 0)
+    return;
+  (*state)|=RedrawWidgetState;
+}
+
 MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   XWindowInfo *window_info,const char *const *list,const char *action,
   const char *query,char *reply)
@@ -12936,11 +12952,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
       }
       case Expose:
       {
-        if (event.xexpose.window != window_info->id)
-          break;
-        if (event.xexpose.count != 0)
-          break;
-        state|=RedrawWidgetState;
+        ExposeListBrowserWindow(&list_context,event,&list_widgets);
         break;
       }
       case KeyPress:
