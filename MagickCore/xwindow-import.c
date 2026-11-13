@@ -1521,6 +1521,7 @@ typedef struct _XImportTargets
     *crop_info;
 
   Window
+    *root,
     *target;
 } XImportTargets;
 
@@ -1577,6 +1578,44 @@ static MagickBooleanType XGetScreenCrop(Display *display,
   return(MagickTrue);
 }
 
+static void XResolveImportTarget(Display *display,
+  const XImportInfo *ximage_info,const Window prior_target,
+  const XImportTargets *targets)
+{
+  int
+    x;
+
+  Status
+    status;
+
+  Window
+    client,
+    *const root = targets->root,
+    *const target = targets->target;
+
+  client=(*target);   /* obsolete */
+  if ((*target) != (*root))
+    {
+      unsigned int
+        d;
+
+      status=XGetGeometry(display,(*target),root,&x,&x,&d,&d,&d,&d);
+      if (status != False)
+        {
+          XFindFrameWindow(display,root,target);
+          /*
+            Get client window.
+          */
+          client=XClientWindow(display,(*target));
+          if (ximage_info->frame == MagickFalse)
+            (*target)=client;
+          if ((ximage_info->frame == MagickFalse) &&
+              (prior_target != MagickFalse))
+            (*target)=prior_target;
+        }
+    }
+}
+
 MagickExport Image *XImportImage(const ImageInfo *image_info,
   XImportInfo *ximage_info,ExceptionInfo *exception)
 {
@@ -1586,17 +1625,10 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
   Image
     *image;
 
-  int
-    x;
-
   RectangleInfo
     crop_info;
 
-  Status
-    status;
-
   Window
-    client,
     prior_target,
     root,
     target;
@@ -1605,7 +1637,7 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
     window_context;
 
   const XImportTargets
-    targets = { &crop_info, &target };
+    targets = { &crop_info, &root, &target };
 
   /*
     Open X server connection.
@@ -1652,27 +1684,7 @@ MagickExport Image *XImportImage(const ImageInfo *image_info,
   if (target == (Window) NULL)
     ThrowXWindowException(XServerError,"UnableToReadXWindowImage",
       image_info->filename);
-  client=target;   /* obsolete */
-  if (target != root)
-    {
-      unsigned int
-        d;
-
-      status=XGetGeometry(display,target,&root,&x,&x,&d,&d,&d,&d);
-      if (status != False)
-        {
-          XFindFrameWindow(display,&root,&target);
-          /*
-            Get client window.
-          */
-          client=XClientWindow(display,target);
-          if (ximage_info->frame == MagickFalse)
-            target=client;
-          if ((ximage_info->frame == MagickFalse) &&
-              (prior_target != MagickFalse))
-            target=prior_target;
-        }
-    }
+  XResolveImportTarget(display,ximage_info,prior_target,&targets);
   if (XGetScreenCrop(display,ximage_info,root,&targets) == MagickFalse)
     {
       ThrowXWindowException(XServerError,"UnableToReadXWindowAttributes",
