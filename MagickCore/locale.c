@@ -1543,8 +1543,6 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
         continue;
       }
     (void) GetNextToken(q,(const char **) NULL,extent,token);
-    if (*token != '=')
-      continue;
   }
   token=(char *) RelinquishMagickMemory(token);
   (void) SetFatalErrorHandler(fatal_handler);
