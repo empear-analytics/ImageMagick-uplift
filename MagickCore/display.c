@@ -3101,6 +3101,29 @@ static MagickBooleanType XAnnotateTextKey(const AnnotateContext *context,
   return(MagickTrue);
 }
 
+static MagickBooleanType XAnnotateTextPaste(const AnnotateContext *context,
+  const AnnotateTargets *targets)
+{
+  AnnotateTextInput
+    text_input;
+
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  text_input.display=context->display;
+  text_input.windows=context->windows;
+  text_input.annotate_context=context->annotate_context;
+  text_input.font_info=context->font_info;
+  text_input.command=context->command;
+  text_input.state=(*state);
+  if (XPasteSelectionText(&text_input,event,targets) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType XAnnotateEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -3355,16 +3378,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
       }
       case SelectionNotify:
       {
-        AnnotateTextInput
-          text_input;
-
-        text_input.display=display;
-        text_input.windows=windows;
-        text_input.annotate_context=annotate_context;
-        text_input.font_info=font_info;
-        text_input.command=command;
-        text_input.state=state;
-        if (XPasteSelectionText(&text_input,&event,&targets) == MagickFalse)
+        if (XAnnotateTextPaste(&context,&targets) == MagickFalse)
           return(MagickFalse);
         break;
       }
