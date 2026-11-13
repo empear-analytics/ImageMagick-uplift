@@ -279,6 +279,17 @@ MagickExport const CoderInfo *GetCoderInfo(const char *name,
 %
 */
 
+static const CoderInfo *OpenCoderList(const char *pattern,
+  size_t *number_coders,ExceptionInfo *exception)
+{
+  assert(pattern != (char *) NULL);
+  assert(number_coders != (size_t *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",pattern);
+  *number_coders=0;
+  return(GetCoderInfo("*",exception));
+}
+
 static int CoderInfoCompare(const void *x,const void *y)
 {
   const CoderInfo
@@ -307,12 +318,7 @@ MagickExport const CoderInfo **GetCoderInfoList(const char *pattern,
   /*
     Allocate coder list.
   */
-  assert(pattern != (char *) NULL);
-  assert(number_coders != (size_t *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",pattern);
-  *number_coders=0;
-  p=GetCoderInfo("*",exception);
+  p=OpenCoderList(pattern,number_coders,exception);
   if (p == (const CoderInfo *) NULL)
     return((const CoderInfo **) NULL);
   coder_map=(const CoderInfo **) AcquireQuantumMemory((size_t)
@@ -387,12 +393,7 @@ MagickExport char **GetCoderList(const char *pattern,
   /*
     Allocate coder list.
   */
-  assert(pattern != (char *) NULL);
-  assert(number_coders != (size_t *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",pattern);
-  *number_coders=0;
-  p=GetCoderInfo("*",exception);
+  p=OpenCoderList(pattern,number_coders,exception);
   if (p == (const CoderInfo *) NULL)
     return((char **) NULL);
   coder_map=(char **) AcquireQuantumMemory((size_t)
