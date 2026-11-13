@@ -11996,6 +11996,12 @@ typedef struct _ListBrowserContext
 
   unsigned int
     entries;
+
+  char
+    *primary_selection;
+
+  XFontStruct
+    *font_info;
 } ListBrowserContext;
 
 static void ClientListBrowserMessage(const ListBrowserContext *context,
@@ -12304,18 +12310,69 @@ static void InsertListBrowserSelection(const ListBrowserContext *context,
   (void) XFree((void *) data);
 }
 
-MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
-  XWindowInfo *window_info,const char *const *list,const char *action,
-  const char *query,char *reply)
+static void ClickListBrowserReply(const ListBrowserContext *context,
+  const XEvent event,const ListBrowserWidgets *widgets)
 {
+  Display
+    *const display = context->display;
+
+  XWindowInfo
+    *const window_info = context->window_info;
+
   char
-    primary_selection[MagickPathExtent];
+    *const primary_selection = context->primary_selection;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  XWidgetInfo
+    *const reply_info = widgets->reply_info;
 
   int
     x;
 
   int
     i;
+
+  if (MatteIsActive((*reply_info),event.xbutton) == MagickFalse)
+    return;
+  if (event.xbutton.button != Button2)
+    {
+      static Time
+        click_time;
+
+      ListBrowserClick
+        click;
+
+      /*
+        Move text cursor to position of button press.
+      */
+      x=event.xbutton.x-(*reply_info).x-(int) (QuantumMargin >> 2);
+      i=FindListBrowserCursor(font_info,(*reply_info),x);
+      (*reply_info).cursor=(*reply_info).marker+i-1;
+      click.display=display;
+      click.window_info=window_info;
+      click.event=event;
+      click.click_time=click_time;
+      (*reply_info)=HighlightListBrowserReply(&click,primary_selection,
+        (*reply_info));
+      XDrawMatteText(display,window_info,reply_info);
+      click_time=event.xbutton.time;
+      return;
+    }
+  /*
+    Request primary selection.
+  */
+  (void) XConvertSelection(display,XA_PRIMARY,XA_STRING,XA_STRING,
+    window_info->id,event.xbutton.time);
+}
+
+MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
+  XWindowInfo *window_info,const char *const *list,const char *action,
+  const char *query,char *reply)
+{
+  char
+    primary_selection[MagickPathExtent];
 
   static MagickStatusType
     mask = (MagickStatusType) (CWWidth | CWHeight | CWX | CWY);
@@ -12451,6 +12508,8 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
   list_context.windows=windows;
   list_context.window_info=window_info;
   list_context.entries=entries;
+  list_context.primary_selection=primary_selection;
+  list_context.font_info=font_info;
   do
   {
     if (state & UpdateConfigurationState)
@@ -12728,37 +12787,7 @@ MagickPrivate void XListBrowserWidget(Display *display,XWindows *windows,
             XDrawBeveledButton(display,window_info,&cancel_info);
             break;
           }
-        if (MatteIsActive(reply_info,event.xbutton) == MagickFalse)
-          break;
-        if (event.xbutton.button != Button2)
-          {
-            static Time
-              click_time;
-
-            ListBrowserClick
-              click;
-
-            /*
-              Move text cursor to position of button press.
-            */
-            x=event.xbutton.x-reply_info.x-(int) (QuantumMargin >> 2);
-            i=FindListBrowserCursor(font_info,reply_info,x);
-            reply_info.cursor=reply_info.marker+i-1;
-            click.display=display;
-            click.window_info=window_info;
-            click.event=event;
-            click.click_time=click_time;
-            reply_info=HighlightListBrowserReply(&click,primary_selection,
-              reply_info);
-            XDrawMatteText(display,window_info,&reply_info);
-            click_time=event.xbutton.time;
-            break;
-          }
-        /*
-          Request primary selection.
-        */
-        (void) XConvertSelection(display,XA_PRIMARY,XA_STRING,XA_STRING,
-          window_info->id,event.xbutton.time);
+        ClickListBrowserReply(&list_context,event,&list_widgets);
         break;
       }
       case ButtonRelease:
