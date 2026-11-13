@@ -391,6 +391,47 @@ static void MarkImagesForDeletion(MagickBooleanType *delete_list,
       delete_list[i]=MagickTrue;
 }
 
+static void MarkScenesForDeletion(MagickBooleanType *delete_list,
+  const char *scenes,const size_t length)
+{
+  char
+    *p;
+
+  long
+    first,
+    last;
+
+  for (p=(char *) scenes; *p != '\0'; )
+  {
+    char
+      *q;
+
+    while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == ','))
+      p++;
+    first=strtol(p,&q,10);
+    if (p == q)
+      break;
+    p=q;
+    if (first < 0)
+      first+=(long) length;
+    last=first;
+    while (isspace((int) ((unsigned char) *p)) != 0)
+      p++;
+    if (*p == '-')
+      {
+        last=strtol(p+1,&q,10);
+        if ((p+1) == q)
+          break;
+        p=q;
+        if (last < 0)
+          last+=(long) length;
+      }
+    if (first > last)
+      continue;
+    MarkImagesForDeletion(delete_list,first,last,length);
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -430,13 +471,6 @@ static void MarkImagesForDeletion(MagickBooleanType *delete_list,
 MagickExport void DeleteImages(Image **images,const char *scenes,
   ExceptionInfo *exception)
 {
-  char
-    *p;
-
-  long
-    first,
-    last;
-
   MagickBooleanType
     *delete_list;
 
@@ -469,35 +503,7 @@ MagickExport void DeleteImages(Image **images,const char *scenes,
   /*
     Note which images will be deleted, avoid duplicates.
   */
-  for (p=(char *) scenes; *p != '\0'; )
-  {
-    char
-      *q;
-
-    while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == ','))
-      p++;
-    first=strtol(p,&q,10);
-    if (p == q)
-      break;
-    p=q;
-    if (first < 0)
-      first+=(long) length;
-    last=first;
-    while (isspace((int) ((unsigned char) *p)) != 0)
-      p++;
-    if (*p == '-')
-      {
-        last=strtol(p+1,&q,10);
-        if ((p+1) == q)
-          break;
-        p=q;
-        if (last < 0)
-          last+=(long) length;
-      }
-    if (first > last)
-      continue;
-    MarkImagesForDeletion(delete_list,first,last,length);
-  }
+  MarkScenesForDeletion(delete_list,scenes,length);
   /*
     Delete images marked for deletion, once only.
   */
