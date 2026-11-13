@@ -2505,6 +2505,33 @@ static FT_Encoding SelectFreetypeEncoding(const char *encoding,
   return(encoding_type);
 }
 
+static void SelectFreetypeFontPath(const DrawInfo *draw_info,
+  FT_Open_Args *args,FT_Long *face_index,ExceptionInfo *exception)
+{
+  if (draw_info->font == (char *) NULL)
+    {
+      const TypeInfo *type_info = GetTypeInfo("*",exception);
+      if (type_info != (const TypeInfo *) NULL)
+        args->pathname=ConstantString(type_info->glyphs);
+    }
+  else
+    if (*draw_info->font != '@')
+      args->pathname=ConstantString(draw_info->font);
+    else
+      {
+        /*
+          Extract face index, e.g. @msgothic[1].
+        */
+        ImageInfo *image_info = AcquireImageInfo();
+        (void) CopyMagickString(image_info->filename,draw_info->font+1,
+          MagickPathExtent);
+        (void) SetImageInfo(image_info,0,exception);
+        *face_index=(FT_Long) image_info->scene;
+        args->pathname=ConstantString(image_info->filename);
+        image_info=DestroyImageInfo(image_info);
+     }
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2651,28 +2678,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   */
   face_index=(FT_Long) draw_info->face;
   (void) memset(&args,0,sizeof(args));
-  if (draw_info->font == (char *) NULL)
-    {
-      const TypeInfo *type_info = GetTypeInfo("*",exception);
-      if (type_info != (const TypeInfo *) NULL)
-        args.pathname=ConstantString(type_info->glyphs);
-    }
-  else
-    if (*draw_info->font != '@')
-      args.pathname=ConstantString(draw_info->font);
-    else
-      {
-        /*
-          Extract face index, e.g. @msgothic[1].
-        */
-        ImageInfo *image_info = AcquireImageInfo();
-        (void) CopyMagickString(image_info->filename,draw_info->font+1,
-          MagickPathExtent);
-        (void) SetImageInfo(image_info,0,exception);
-        face_index=(FT_Long) image_info->scene;
-        args.pathname=ConstantString(image_info->filename);
-        image_info=DestroyImageInfo(image_info);
-     }
+  SelectFreetypeFontPath(draw_info,&args,&face_index,exception);
   /*
     Configure streaming interface.
   */
