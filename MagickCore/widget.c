@@ -16665,7 +16665,8 @@ static void MapTextViewWidget(Display *display,XWindows *windows,
 }
 
 static XFontStruct *SelectTextViewFont(Display *display,
-  const XResourceInfo *resource_info,XWindows *windows,const MagickBooleanType mono)
+  const XResourceInfo *resource_info,XWindows *windows,
+  const MagickBooleanType mono)
 {
   XFontStruct
     *text_info;
