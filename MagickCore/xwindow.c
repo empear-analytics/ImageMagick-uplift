@@ -4626,6 +4626,27 @@ static inline MagickBooleanType IsShapedImageWindow(const XWindowInfo *window)
 #define CheckOverflowException(length,width,height) \
   (((height) != 0) && ((length)/((size_t) height) != ((size_t) width)))
 
+#if defined(MAGICKCORE_HAVE_SHARED_MEMORY)
+static XImage *XDiscardSharedXImage(XImage *ximage,
+  XShmSegmentInfo *segment_info)
+{
+  if (ximage != (XImage *) NULL)
+    XDestroyImage(ximage);
+  ximage=(XImage *) NULL;
+  if (segment_info[1].shmaddr)
+    {
+      (void) shmdt(segment_info[1].shmaddr);
+      segment_info[1].shmaddr=(char *) NULL;
+    }
+  if (segment_info[1].shmid >= 0)
+    {
+      (void) shmctl(segment_info[1].shmid,IPC_RMID,0);
+      segment_info[1].shmid=(-1);
+    }
+  return(ximage);
+}
+#endif
+
 MagickPrivate MagickBooleanType XMakeImage(Display *display,
   const XResourceInfo *resource_info,XWindowInfo *window,Image *image,
   unsigned int width,unsigned int height,ExceptionInfo *exception)
@@ -4711,21 +4732,7 @@ MagickPrivate MagickBooleanType XMakeImage(Display *display,
       if (window->shared_memory != MagickFalse)
         (void) shmctl(segment_info[1].shmid,IPC_RMID,0);
       else
-        {
-          if (ximage != (XImage *) NULL)
-            XDestroyImage(ximage);
-          ximage=(XImage *) NULL;
-          if (segment_info[1].shmaddr)
-            {
-              (void) shmdt(segment_info[1].shmaddr);
-              segment_info[1].shmaddr=(char *) NULL;
-            }
-          if (segment_info[1].shmid >= 0)
-            {
-              (void) shmctl(segment_info[1].shmid,IPC_RMID,0);
-              segment_info[1].shmid=(-1);
-            }
-        }
+        ximage=XDiscardSharedXImage(ximage,segment_info);
     }
 #endif
   ximage=XAttachSharedXImage(display,window,ximage);
