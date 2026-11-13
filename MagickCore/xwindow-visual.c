@@ -319,6 +319,46 @@ static void XRestrictVisualByID(Display *display,const char *visual_type,
       "UnrecognizedVisualSpecifier",visual_type);
 }
 
+static void XRestrictVisualByType(Display *display,const char *visual_type,
+  int *visual_mask,XVisualInfo *visual_template)
+{
+  /*
+    Restrict visual search by class or visual id.
+  */
+  if (LocaleCompare("staticgray",visual_type) == 0)
+    {
+      (*visual_mask)|=VisualClassMask;
+      (*visual_template).klass=StaticGray;
+    }
+  else if (LocaleCompare("grayscale",visual_type) == 0)
+    {
+      (*visual_mask)|=VisualClassMask;
+      (*visual_template).klass=GrayScale;
+    }
+  else if (LocaleCompare("staticcolor",visual_type) == 0)
+    {
+      (*visual_mask)|=VisualClassMask;
+      (*visual_template).klass=StaticColor;
+    }
+  else if (LocaleCompare("pseudocolor",visual_type) == 0)
+    {
+      (*visual_mask)|=VisualClassMask;
+      (*visual_template).klass=PseudoColor;
+    }
+  else if (LocaleCompare("truecolor",visual_type) == 0)
+    {
+      (*visual_mask)|=VisualClassMask;
+      (*visual_template).klass=TrueColor;
+    }
+  else if (LocaleCompare("directcolor",visual_type) == 0)
+    {
+      (*visual_mask)|=VisualClassMask;
+      (*visual_template).klass=DirectColor;
+    }
+  else
+    XRestrictVisualByID(display,visual_type,visual_mask,visual_template);
+}
+
 MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
   XStandardColormap *map_info,XResourceInfo *resource_info)
 {
@@ -363,43 +403,7 @@ MagickPrivate XVisualInfo *XBestVisualInfo(Display *display,
     if (resource_info->colors <= (one << (size_t) visual_template.depth))
       visual_mask|=VisualDepthMask;
   if (visual_type != (char *) NULL)
-    {
-      /*
-        Restrict visual search by class or visual id.
-      */
-      if (LocaleCompare("staticgray",visual_type) == 0)
-        {
-          visual_mask|=VisualClassMask;
-          visual_template.klass=StaticGray;
-        }
-      else if (LocaleCompare("grayscale",visual_type) == 0)
-        {
-          visual_mask|=VisualClassMask;
-          visual_template.klass=GrayScale;
-        }
-      else if (LocaleCompare("staticcolor",visual_type) == 0)
-        {
-          visual_mask|=VisualClassMask;
-          visual_template.klass=StaticColor;
-        }
-      else if (LocaleCompare("pseudocolor",visual_type) == 0)
-        {
-          visual_mask|=VisualClassMask;
-          visual_template.klass=PseudoColor;
-        }
-      else if (LocaleCompare("truecolor",visual_type) == 0)
-        {
-          visual_mask|=VisualClassMask;
-          visual_template.klass=TrueColor;
-        }
-      else if (LocaleCompare("directcolor",visual_type) == 0)
-        {
-          visual_mask|=VisualClassMask;
-          visual_template.klass=DirectColor;
-        }
-      else
-        XRestrictVisualByID(display,visual_type,&visual_mask,&visual_template);
-    }
+    XRestrictVisualByType(display,visual_type,&visual_mask,&visual_template);
   /*
     Get all visuals that meet our criteria so far.
   */
