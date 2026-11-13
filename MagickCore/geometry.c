@@ -852,11 +852,7 @@ MagickExport MagickStatusType ParsePageGeometry(const Image *image,
   MagickStatusType
     flags;
 
-  SetGeometry(image,region_info);
-  if (image->page.width != 0)
-    region_info->width=image->page.width;
-  if (image->page.height != 0)
-    region_info->height=image->page.height;
+  SetPageGeometryDefaults(image,region_info);
   flags=ParseAbsoluteGeometry(geometry,region_info);
   if (flags == NoValue)
     {
