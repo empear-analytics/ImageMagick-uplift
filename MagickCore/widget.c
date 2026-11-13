@@ -15965,6 +15965,41 @@ static void PressTextViewScroll(const TextViewContext *context,
   PressTextViewList(context,event,targets,widgets);
 }
 
+static void PressTextViewSlider(const TextViewContext *context,
+  const XEvent event,const TextViewTargets *targets,
+  const TextViewWidgets *widgets)
+{
+  XWidgetInfo
+    *const north_info = widgets->north_info;
+
+  XWidgetInfo
+    *const slider_info = widgets->slider_info;
+
+  size_t
+    *const state = widgets->state;
+
+  if (MatteIsActive((*slider_info),event.xbutton))
+    {
+      /*
+        Track slider.
+      */
+      (*slider_info).active=MagickTrue;
+      return;
+    }
+  if ((MatteIsActive((*north_info),event.xbutton)) &&
+      ((*slider_info).id > 0))
+    {
+      /*
+        Move slider up.
+      */
+      (*north_info).raised=MagickFalse;
+      (*slider_info).id--;
+      (*state)|=RedrawListState;
+      return;
+    }
+  PressTextViewScroll(context,event,targets,widgets);
+}
+
 MagickPrivate void XTextViewWidget(Display *display,
   const XResourceInfo *resource_info,XWindows *windows,
   const MagickBooleanType mono,const char *title,const char **textlist)
@@ -16298,26 +16333,7 @@ MagickPrivate void XTextViewWidget(Display *display,
     {
       case ButtonPress:
       {
-        if (MatteIsActive(slider_info,event.xbutton))
-          {
-            /*
-              Track slider.
-            */
-            slider_info.active=MagickTrue;
-            break;
-          }
-        if ((MatteIsActive(north_info,event.xbutton)) &&
-            (slider_info.id > 0))
-          {
-            /*
-              Move slider up.
-            */
-            north_info.raised=MagickFalse;
-            slider_info.id--;
-            state|=RedrawListState;
-            break;
-          }
-        PressTextViewScroll(&view_context,event,&targets,&view_widgets);
+        PressTextViewSlider(&view_context,event,&targets,&view_widgets);
         break;
       }
       case ButtonRelease:
