@@ -13358,6 +13358,9 @@ typedef struct _PasteCommandInput
 
   Image
     *image;
+
+  ExceptionInfo
+    *exception;
 } PasteCommandInput;
 
 static MagickBooleanType XPasteCommand(const PasteCommandInput *input,
@@ -13552,6 +13555,9 @@ typedef struct _PasteTargets
 
   RectangleInfo
     *paste_info;
+
+  CompositeOperator
+    *compose;
 } PasteTargets;
 
 static void XPasteKeyPress(const PasteCommandInput *input,XEvent *event,
@@ -13779,6 +13785,61 @@ static void XPasteEvent(const PasteCommandInput *input,XEvent *event,
   }
 }
 
+static void XPasteStep(const PasteCommandInput *input,const Cursor cursor,
+  const PasteTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  XWindows
+    *const windows = input->windows;
+
+  CompositeOperator
+    *const compose = targets->compose;
+
+  RectangleInfo
+    *const paste_info = targets->paste_info;
+
+  size_t
+    *const state = targets->state;
+
+  char
+    text[MagickPathExtent];
+
+  RectangleInfo
+    highlight_info;
+
+  XEvent
+    event;
+
+  if (windows->info.mapped != MagickFalse)
+    {
+      /*
+        Display pointer position.
+      */
+      (void) FormatLocaleString(text,MagickPathExtent," %+ld%+ld ",
+        (long) (*paste_info).x,(long) (*paste_info).y);
+      XInfoWidget(display,windows,text);
+    }
+  highlight_info=(*paste_info);
+  highlight_info.x=(*paste_info).x-windows->image.x;
+  highlight_info.y=(*paste_info).y-windows->image.y;
+  XHighlightRectangle(display,windows->image.id,
+    windows->image.highlight_context,&highlight_info);
+  /*
+    Wait for next event.
+  */
+  XScreenEvent(display,windows,&event,exception);
+  XHighlightRectangle(display,windows->image.id,
+    windows->image.highlight_context,&highlight_info);
+  if (XPasteCommand(input,&event,compose,state) != MagickFalse)
+    return;
+  XPasteEvent(input,&event,cursor,targets);
+}
+
 static MagickBooleanType XPasteImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -13803,9 +13864,6 @@ static MagickBooleanType XPasteImage(Display *display,
   static CompositeOperator
     compose = CopyCompositeOp;
 
-  char
-    text[MagickPathExtent];
-
   Cursor
     cursor;
 
@@ -13817,21 +13875,17 @@ static MagickBooleanType XPasteImage(Display *display,
     y;
 
   RectangleInfo
-    highlight_info,
     paste_info;
 
   size_t
     state;
 
-  XEvent
-    event;
-
   const PasteTargets
-    paste_targets = { &paste_image, &state, &paste_info };
+    paste_targets = { &paste_image, &state, &paste_info, &compose };
 
   const PasteCommandInput
     command_input = { display, resource_info, windows, PasteMenu,
-      PasteCommands, image };
+      PasteCommands, image, exception };
 
   /*
     Copy image.
@@ -13866,29 +13920,7 @@ static MagickBooleanType XPasteImage(Display *display,
   state=DefaultState;
   do
   {
-    if (windows->info.mapped != MagickFalse)
-      {
-        /*
-          Display pointer position.
-        */
-        (void) FormatLocaleString(text,MagickPathExtent," %+ld%+ld ",
-          (long) paste_info.x,(long) paste_info.y);
-        XInfoWidget(display,windows,text);
-      }
-    highlight_info=paste_info;
-    highlight_info.x=paste_info.x-windows->image.x;
-    highlight_info.y=paste_info.y-windows->image.y;
-    XHighlightRectangle(display,windows->image.id,
-      windows->image.highlight_context,&highlight_info);
-    /*
-      Wait for next event.
-    */
-    XScreenEvent(display,windows,&event,exception);
-    XHighlightRectangle(display,windows->image.id,
-      windows->image.highlight_context,&highlight_info);
-    if (XPasteCommand(&command_input,&event,&compose,&state) != MagickFalse)
-      continue;
-    XPasteEvent(&command_input,&event,cursor,&paste_targets);
+    XPasteStep(&command_input,cursor,&paste_targets);
   } while ((state & ExitState) == 0);
   {
     const PasteFinishInput
