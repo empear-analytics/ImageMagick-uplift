@@ -172,37 +172,37 @@ static void SetImagePage(Image *image,const char *page)
     }
 }
 
+static void LimitImageDelay(Image *image,const double rho)
+{
+  if ((double) image->delay > floor(rho+0.5))
+    image->delay=(size_t) CastDoubleToSsizeT(floor(rho+0.5));
+}
+
+static void LimitImageTicks(Image *image,const GeometryInfo *geometry_info)
+{
+  if ((double) image->delay < floor(geometry_info->rho+0.5))
+    image->ticks_per_second=CastDoubleToSsizeT(floor(geometry_info->sigma+0.5));
+}
+
 static void SetImageDelay(Image *image,const char *delay)
 {
+  GeometryInfo
+    geometry_info;
+
   MagickStatusType
     flags;
 
-  if (delay != (const char *) NULL)
-    {
-      GeometryInfo
-        geometry_info;
-
-      flags=ParseGeometry(delay,&geometry_info);
-      if ((flags & GreaterValue) != 0)
-        {
-          if ((double) image->delay > floor(geometry_info.rho+0.5))
-            image->delay=(size_t) CastDoubleToSsizeT(floor(geometry_info.rho+
-              0.5));
-        }
-      else
-        if ((flags & LessValue) != 0)
-          {
-            if ((double) image->delay < floor(geometry_info.rho+0.5))
-              image->ticks_per_second=CastDoubleToSsizeT(floor(
-                geometry_info.sigma+0.5));
-          }
-        else
-          image->delay=(size_t) CastDoubleToSsizeT(floor(geometry_info.rho+
-            0.5));
-      if ((flags & SigmaValue) != 0)
-        image->ticks_per_second=CastDoubleToSsizeT(floor(geometry_info.sigma+
-          0.5));
-    }
+  if (delay == (const char *) NULL)
+    return;
+  flags=ParseGeometry(delay,&geometry_info);
+  if ((flags & GreaterValue) != 0)
+    LimitImageDelay(image,geometry_info.rho);
+  else if ((flags & LessValue) != 0)
+    LimitImageTicks(image,&geometry_info);
+  else
+    image->delay=(size_t) CastDoubleToSsizeT(floor(geometry_info.rho+0.5));
+  if ((flags & SigmaValue) != 0)
+    image->ticks_per_second=CastDoubleToSsizeT(floor(geometry_info.sigma+0.5));
 }
 
 static void SetImageDefaults(Image *image)
