@@ -10820,6 +10820,45 @@ static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyRestoreCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  /*
+    Restore Image window to its original size.
+  */
+  if (IsImageWindowOriginalSize(windows,image) != MagickFalse)
+    {
+      (void) XBell(display,0);
+      return;
+    }
+  windows->image.window_changes.width=(int) (*image)->columns;
+  windows->image.window_changes.height=(int) (*image)->rows;
+  if (windows->image.crop_geometry != (char *) NULL)
+    {
+      windows->image.crop_geometry=(char *)
+        RelinquishMagickMemory(windows->image.crop_geometry);
+      windows->image.crop_geometry=(char *) NULL;
+      windows->image.x=0;
+      windows->image.y=0;
+    }
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -11132,29 +11171,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       break;
     }
     case RestoreCommand:
-    {
-      /*
-        Restore Image window to its original size.
-      */
-      if (IsImageWindowOriginalSize(windows,image) != MagickFalse)
-        {
-          (void) XBell(display,0);
-          break;
-        }
-      windows->image.window_changes.width=(int) (*image)->columns;
-      windows->image.window_changes.height=(int) (*image)->rows;
-      if (windows->image.crop_geometry != (char *) NULL)
-        {
-          windows->image.crop_geometry=(char *)
-            RelinquishMagickMemory(windows->image.crop_geometry);
-          windows->image.crop_geometry=(char *) NULL;
-          windows->image.x=0;
-          windows->image.y=0;
-        }
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyRestoreCommand(&context);
       break;
-    }
     case CropCommand:
     {
       /*
