@@ -4476,7 +4476,11 @@ Recipe D, whose copies are moved whole and so may not leave the caller.
 3. The block writes no plain local of the caller, apart from locals nothing after the
    block reads (Recipe E step 4), which the new function declares, and locals it writes
    only on paths that end in `return(R);`, which go by value. Writes through pointers it
-   already uses stay as they are; variables it declares move with it.
+   already uses stay as they are; variables it declares move with it. Widening
+   (2026-11-13): up to three plain locals the caller reads after the block may be written,
+   on Recipe RV step 6(b)'s terms (Recipe O step 2): each goes as a pointer, written
+   `(*v)` at every use, `&v` passed on to a callee written `v`, and counts among step 5's
+   four parameters; `R` (step 2) must not read one of them.
 4. Cut the block into a new `static MagickBooleanType` function directly above the
    caller. Each `return(R);` becomes `return(MagickFalse);`, and the function ends with
    `return(MagickTrue);`. Nothing else in the text changes.
@@ -4558,7 +4562,11 @@ the mandate of 2026-10-24. Step 8 (2026-11-11, W17 lane c, wide build):
 function whose allocation of `clEnv->contexts` releases the device and platform arrays
 and leaves through `return;` when it fails; as a helper it takes the function out of
 *Large Method*, 5.43 to 5.47 in a probe, no finding on the helper. Added by Claude Code
-(Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+(Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes. Step 3's widening
+(2026-11-13): `profile.c`'s `SyncExifProfile`, whose Exif header block writes `exif`,
+`length` and `endian` for the walk that follows. Added by Claude Code (Claude Opus 5.5)
+under the mandate of 2026-10-24.
+Lane: c
 
 ---
 
@@ -14691,3 +14699,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | KD | Replace a run of `if (LocaleCompare(v,"K") == 0) return(F(...));` calls of one signature by a `static const` table of key/function-pointer records and a lookup loop; evidence oracle | `pixel-import.c` `ImportCharPixel` (cc 10, file 6.69 to 6.89); KT assigns, KR returns strings, KE assigns enumerators | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | DT | Step 2 keeps the condition inside a `(MagickBooleanType)` cast, step 4 adds `tools/cxx_warnings.sh`: the bare comparison is `bool` in C++ and broke main's Windows jobs (C2440/C2664 in `policy.c`, `constitute.c`, `stream.c`; the casts fixed them with object code identical) | build fixes on `campaign/M126` | mandate (2026-10-24) |
 | 2026-11-13 | NEW | TC | Drop a loop body's last statement `if (cond) continue;` when `cond` has no side effect; proof `obj_identical.sh` | `locale.c`'s `LoadLocaleCache` (cc 22 to 20, 6.46 to 6.50, object code identical) | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | W | Step 3: up to three plain locals the caller reads after the block may be written, each by pointer on Recipe RV step 6(b)'s terms (`(*v)` at every use, `&v` passed on written `v`), counted among step 5's four parameters; `R` reads none of them. *Careful* unchanged: on the success path each pointer has carried the block's writes to the caller's variable, on a failure path the caller returns at once | `profile.c`'s `SyncExifProfile` (lane c, M127): the Exif header block (length test, marker scan, byte-order test, `0x002a` test) returns on failure and writes `exif`, `length` and `endian`, which the IFD walk reads; part of a chain measured 3.58 to 4.03 on a scratch copy | mandate (2026-10-24) |
