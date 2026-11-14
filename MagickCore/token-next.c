@@ -334,6 +334,21 @@ static MagickBooleanType ScanParenthesizedToken(const NextTokenInput *input,
   return(MagickTrue);
 }
 
+static MagickBooleanType IsWordTokenContinued(const NextTokenTargets *targets)
+{
+  const char
+    *magick_restrict *const p = targets->p;
+
+  ssize_t
+    *const i = targets->i;
+
+  if (IsTokenDelimiter((*p)) != MagickFalse)
+    return(MagickFalse);
+  if (((*i) > 0) && (*(*p) == '<'))
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static void ScanWordToken(const NextTokenInput *input,
   const NextTokenTargets *targets)
 {
@@ -345,9 +360,7 @@ static void ScanWordToken(const NextTokenInput *input,
 
   for ( ; *(*p) != '\0'; (*p)++)
   {
-    if (IsTokenDelimiter((*p)) != MagickFalse)
-      break;
-    if (((*i) > 0) && (*(*p) == '<'))
+    if (IsWordTokenContinued(targets) == MagickFalse)
       break;
     AppendTokenChar(input,(*p),i);
     if (*(*p) == '>')
