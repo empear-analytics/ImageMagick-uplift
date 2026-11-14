@@ -14395,6 +14395,28 @@ static void XApplyResizeCommands(const XMagickCommandContext *context,
   }
 }
 
+static void XApplyEditCommands(const XMagickCommandContext *context,
+  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
+{
+  switch (command)
+  {
+    case CutCommand:
+      XApplyCutCommand(context);
+      break;
+    case CopyCommand:
+      XApplyCopyCommand(context);
+      break;
+    case PasteCommand:
+      XApplyPasteCommand(context);
+      break;
+    default:
+    {
+      XApplyResizeCommands(context,command,&(*flags),&(*nexus));
+      break;
+    }
+  }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -14471,18 +14493,9 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
     case QuitCommand:
       XApplyQuitCommand(&context);
       break;
-    case CutCommand:
-      XApplyCutCommand(&context);
-      break;
-    case CopyCommand:
-      XApplyCopyCommand(&context);
-      break;
-    case PasteCommand:
-      XApplyPasteCommand(&context);
-      break;
     default:
     {
-      XApplyResizeCommands(&context,command,&flags,&nexus);
+      XApplyEditCommands(&context,command,&flags,&nexus);
       break;
     }
   }
