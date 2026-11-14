@@ -3358,6 +3358,31 @@ static MagickBooleanType AppendDefaultTagAttributes(
   return(MagickTrue);
 }
 
+static MagickBooleanType AppendAllTagAttributes(XMLTreeInfo *xml_info,
+  const XMLBufferInfo *buffer,char ***attributes)
+{
+  char
+    **const source = buffer->destination;
+
+  size_t
+    *const length = buffer->length,
+    *const extent = buffer->extent;
+
+  TagBufferInfo
+    tag_buffer;
+
+  if (AppendTagAttributes(xml_info,source,length,extent) == MagickFalse)
+    return(MagickFalse);
+  tag_buffer.xml_info=xml_info;
+  tag_buffer.source=source;
+  tag_buffer.length=length;
+  tag_buffer.extent=extent;
+  tag_buffer.attributes=attributes;
+  if (AppendDefaultTagAttributes(&tag_buffer) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,const XMLBufferInfo *buffer,
   size_t start,char ***attributes)
 {
@@ -3374,9 +3399,6 @@ static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,const XMLBufferInfo *buffer,
   size_t
     offset;
 
-  TagBufferInfo
-    tag_buffer;
-
   content=(char *) "";
   if (xml_info->parent != (XMLTreeInfo *) NULL)
     content=xml_info->parent->content;
@@ -3388,14 +3410,7 @@ static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,const XMLBufferInfo *buffer,
     return(*source);
   *length+=(size_t) FormatLocaleString(*source+(*length),*extent,
     "<%s",xml_info->tag);
-  if (AppendTagAttributes(xml_info,source,length,extent) == MagickFalse)
-    return((char *) NULL);
-  tag_buffer.xml_info=xml_info;
-  tag_buffer.source=source;
-  tag_buffer.length=length;
-  tag_buffer.extent=extent;
-  tag_buffer.attributes=attributes;
-  if (AppendDefaultTagAttributes(&tag_buffer) == MagickFalse)
+  if (AppendAllTagAttributes(xml_info,buffer,attributes) == MagickFalse)
     return((char *) NULL);
   *length+=(size_t) FormatLocaleString(*source+(*length),*extent,
     *xml_info->content ? ">" : "/>");
