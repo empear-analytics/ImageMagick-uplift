@@ -4251,6 +4251,23 @@ time (E, O or Z on its body) leaves every label in the caller, and the cc with i
    in the order the moved groups (the `default:` call included) first write them,
    `(*v)` at every use and `&(*v)` for `&v`, at most four parameters in all. Check the
    step with `tools/switch_split_check.py`, which reads this form.
+   A run kept apart from `default`, and the caller's shared structs (2026-11-14). (a) The
+   groups that move with the `default` group need not stand beside it when groups that
+   stay in the caller stand between: a run of groups adjacent to one another, in their
+   source order, may move with the `default` group, as step 6 already allows for its own
+   form. Each step moves one such run; the kept groups stay where they were, and none of
+   them is part of a chain (step 1). (b) When the caller already declares an input struct
+   that Recipe N step 8 fills once for the sibling helpers of the loop holding the
+   `switch`, and a `const` targets struct of Recipe CT step 3's loop-wide form, the
+   helpers of the chain take both, `const Name *name` and `const T *targets`, under the
+   names of the caller's two locals, in place of step 8's own struct and fill: no
+   typedef, local or fill is added. In the moved groups each `&name` and `&targets` is
+   written `name` and `targets` (the pointer the helper received, as CT step 5 passes
+   them on), each member a group reads is bound once at the top of the helper,
+   `T *const v = name->v;` or `T *const v = targets->v;`, and a targets member is written
+   `(*v)` at every use, `&v` as `v`, the controlling expression included
+   (`switch ((*event).type)`). The caller's `default:` group and each helper's are the
+   call `Helper(&name,&targets);` or `Helper(name,targets);` and `break;`.
 
 **Before:**
 
@@ -4418,6 +4435,19 @@ static void ApplyUnaryComplexOperator(const ComplexUnaryOperands *unary,
   controlling parameter is `const`, so the value each helper's `switch` tests is the one
   the caller's tested: the chain selects as the first point of *Careful* says. Each
   written variable is the caller's own through its pointer, as Z step 4 argues.
+- Under step 8's run kept apart from `default` (a), a value of a kept label still selects its own group; a value of a
+  moved label matches no label of the caller's `switch`, wherever the kept groups stand,
+  so it reaches `default`, whose call selects the same group in the new `switch`. C
+  selects a group by its label, not by its position (C11 6.8.4.2p4), and no group that
+  stays runs into another (step 1 refuses fall-through), so taking a run out from between
+  kept groups changes which statements run for no value of `e`. Under (b) the input
+  struct is the one N step 8 already fills before the loop, and nothing on a path from
+  that fill to a call writes a member's variable (N step 8's condition, which the
+  sibling helpers already rely on); the targets struct holds the addresses of the
+  caller's locals, so each `(*v)` is the caller's own object, read and written at the
+  point the group read and wrote it (CT step 3). A helper that passes `name` and
+  `targets` on passes the addresses it received, which are the caller's `&name` and
+  `&targets`.
 - Under step 8's `targets` form the argument is Recipe Z step 7's: only the addresses
   travel, fixed at the declaration and bound once to `*const` locals, so each `(*v)` is
   the caller's own variable, written at the points it was; they are the addresses of
@@ -11997,6 +12027,21 @@ block with a `continue` that leaves it.
    When the reads and writes are four or fewer, no struct.
 5. Where the block stood write `if (Helper(...) != MagickFalse) continue;`, and check every
    argument against its parameter by reading.
+6. The caller's shared structs (2026-11-14). When the caller already declares an input
+   struct that Recipe N step 8 fills once for the sibling helpers of the loop `Lp`, and a
+   `const` targets struct of Recipe CT step 3's loop-wide form whose members include every
+   variable of step 2 that goes by pointer, the helper takes those two, `const Name *name`
+   and `const T *targets`, in place of step 4's struct and pointers (CT step 4's form):
+   each member the block reads or writes is bound once at the top of the helper,
+   `T *const v = name->v;` or `T *const v = targets->v;`, a targets member is written
+   `(*v)` at every use and `&v` as `v`, and `&name` and `&targets` in the block are
+   written `name` and `targets`. Step 2's temporaries are still declared in the helper.
+   An array of the caller that the input struct already holds as a pointer to its first
+   element (`char *command` for `char command[MagickPathExtent]`) is written through that
+   member, bound as the others; a use of `sizeof` on the array refuses the step.
+   A variable the block names that is neither a member nor a temporary (a file-scope
+   table) stays as written. The call is `if (Helper(&name,&targets) != MagickFalse)
+   continue;`.
 
 **Before:**
 
@@ -12062,6 +12107,12 @@ static MagickBooleanType XROIUpdateRegion(const ROIRegionInput *region_input,
   block, so the helper's own copies hold every value the caller's did. The input struct holds
   copies taken directly before the call of variables the block does not write (Recipe N's
   argument).
+- Under step 6 the reads go through the input struct that N step 8 filled before the loop,
+  and nothing from that fill to the call writes a member's variable (N step 8's
+  condition, which the loop's other helpers already rely on), so each read sees the value
+  the block saw; the writes go through the addresses in the targets struct, so each
+  `(*v)` is the caller's own local, written at the point the block wrote it (CT step 3).
+  A callee the block passed `&name` or `&v` now receives `name` or `v`, the same address.
 - The helper's result is a status of the block, not a value of the function: the caller
   tests it for `continue;` only. A block with a `break;` leaving `Lp` is Recipe LB, one with
   a `return` Recipe W, RV or V.
@@ -16689,3 +16740,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | AMEND | SD | Step 8, *context form*: a caller that already fills a context struct member by member before its `switch` (N step 8) uses it as the tile; members a step needs are appended at the end of the typedef and filled directly after the existing fills; a group's `&context` is passed on as `context`; the `switch`'s `const` controlling parameter passes by value under its own name (as step 6 passes parameters); written variables as Z steps 3 and 4. *Careful* gives the argument (fill once before the `switch`, the same address, a `const` selector) | `display-image.c`'s `XMagickCommand` (campaign A, W23 round twelve lane a, wide build): an 86-label `switch` of `XApply<Name>Command(&context,...)` calls, cc 88, 305 lines; a probe of the chain in sixteen menu-sized helpers clears its Complex and Large Method findings (stubbed score 5.01 to 6.12) | owner |
 | 2026-11-14 | AMEND | FT | Step 5 (*unreached functions*): the step applies to a function no case reaches at the guard level (`Verified: guard`): `refactor_guard.py` OK, `--calls` `+1` for `Q` and nothing else, steps 1 and 2 by reading. The argument: the call is a character-for-character copy of the one the next case runs, at the point where the fall-through entered it, with the same argument values, followed by the same `break;`; nothing is added, removed or reordered but that call | `display-image.c`'s `XTileImage` (campaign A, W23 round twelve lane b, wide build): the Delete case falls through into Update's `XTileUpdateImage(&input); break;`; no case reaches the function, and the guard-level recipes that move the Delete body (E step 7, N) need it to end in `break;` (Claude Code, Sonnet 5.5) | owner |
 | 2026-11-14 | NEW | KO | Replace Keyed Offset Groups with a Table of Bases: a `switch` whose label groups each assign `V=(K-C);` and break becomes a `static const` table of `{ label, base }` rows read by one loop, `V=(K-R[i].base);`. *Careful* gives the argument (labels distinct so at most one row matches, the row of the selected group; `E` and `K` unwritten and side-effect free; `base` holds the constant with its own value and type) | `display-image.c`'s `XSelectMagnifyDigit` (campaign A, W23 round twelve lane b, wide build): twenty labels in two runs, cc 22; a probe 2.76 to 2.89 and, stubbed, 6.12 to 6.49 (Claude Code, Sonnet 5.5) | owner |
+| 2026-11-14 | AMEND | LC | Step 6: a caller that already shares a Recipe N step 8 input struct and a Recipe CT step 3 loop-wide `const` targets struct between the helpers of its loop passes both to the helper (`if (Helper(&name,&targets) != MagickFalse) continue;`) in place of step 4's own struct and pointers: members bound once, targets members written `(*v)`, `&v` as `v`, `&name` as `name`, step 2's temporaries declared in the helper. *Careful* gives the argument (N step 8's fill condition for the reads, CT step 3's addresses for the writes) | `display-image.c`'s `XDisplayImage` (campaign A, W23 round twelve lane d, wide build): the command-widget test at the head of its event loop leaves the iteration through three `continue;`, writes `nexus` and `display_image` (members of `DisplayEventTargets`) and reads `event`, the command buffer and the context members; a probe of the step with the stasis test's Recipe E step: bumps 9 to 7, cc 95 to 87, the file with the other seven finding functions emptied 4.51 to 4.56, no finding on a new function | owner |
+| 2026-11-14 | AMEND | SD | Step 8, a run kept apart and shared structs: (a) a run of adjacent groups, in source order, may move with the `default` group when groups that stay stand between the run and `default` (step 6 already allowed it for its own form; C selects by label, not position, and no kept group falls through); (b) a caller that already shares a Recipe N step 8 input struct and a Recipe CT step 3 loop-wide `const` targets struct between the helpers of its loop passes both to the chain under the caller's local names (`&name` written `name` in the moved groups, members bound once, targets members as `(*v)`, the controlling expression included), with no struct, fill or local of its own. *Careful* gives the argument | `display-image.c`'s `XDisplayImage` (campaign A, W23 round twelve lane d, wide build): its 17-group event `switch` must keep `KeyPress` and `KeyRelease` in the caller (`XLookupString` takes `sizeof(command)` of the caller's array), which stand between the groups before them and `default`; the cases already share `DisplayEventContext` and `DisplayEventTargets`. A probe of the four-link chain after the crossing cases' Recipe P step: `XDisplayImage` cc 85 to 64, the file with the other seven finding functions emptied 4.56 to 4.76, no finding on a new function | owner |
