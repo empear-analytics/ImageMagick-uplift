@@ -21985,6 +21985,16 @@ static DisplayCommand
     HelpCommands
   };
 
+static time_t XGetDisplayTimer(const Image *display_image)
+{
+  size_t
+    delay;
+
+  delay=display_image->delay/(size_t)
+    MagickMax(display_image->ticks_per_second,1L);
+  return(GetMagickTime()+(time_t) (delay == 0 ? 1 : delay)+1);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -22037,9 +22047,6 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   unsigned int
     height,
     width;
-
-  size_t
-    delay;
 
   WarningHandler
     warning_handler;
@@ -22537,9 +22544,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   /*
     Respond to events.
   */
-  delay=display_image->delay/(size_t)
-    MagickMax(display_image->ticks_per_second,1L);
-  timer=GetMagickTime()+(time_t) (delay == 0 ? 1 : delay)+1;
+  timer=XGetDisplayTimer(display_image);
   update_time=XGetUpdateTime(resource_info,display_image);
   *state&=(unsigned int) (~FormerImageState);
   *state&=(unsigned int) (~MontageImageState);
@@ -22622,9 +22627,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
             XPressPanWindow(&event_context,&event);
             break;
           }
-        delay=display_image->delay/(size_t)
-          MagickMax(display_image->ticks_per_second,1L);
-        timer=GetMagickTime()+(time_t) (delay == 0 ? 1 : delay)+1;
+        timer=XGetDisplayTimer(display_image);
         break;
       }
       case ButtonRelease:
@@ -22752,9 +22755,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
             windows->image.mapped != MagickFalse)
           {
             XRefreshWindow(display,&windows->image,&event);
-            delay=display_image->delay/(size_t) MagickMax(
-              display_image->ticks_per_second,1L);
-            timer=GetMagickTime()+(time_t) (delay == 0 ? 1 : delay)+1;
+            timer=XGetDisplayTimer(display_image);
             break;
           }
         if ((event.xexpose.window == windows->magnify.id) &&
@@ -22802,9 +22803,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
           {
             XPanWindowKeyPress(&event_context,key_symbol);
           }
-        delay=display_image->delay/(size_t) MagickMax(
-          display_image->ticks_per_second,1L);
-        timer=GetMagickTime()+(time_t) (delay == 0 ? 1 : delay)+1;
+        timer=XGetDisplayTimer(display_image);
         break;
       }
       case KeyRelease:
