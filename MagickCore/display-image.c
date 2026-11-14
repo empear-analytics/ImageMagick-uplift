@@ -3026,6 +3026,74 @@ static MagickBooleanType XAnnotateTextKeyEvent(
   return(MagickTrue);
 }
 
+static MagickBooleanType XAnnotateTextEvent(const AnnotateContext *context,
+  const AnnotateTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const GC
+    annotate_context = context->annotate_context;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  XEvent
+    *const text_event = targets->text_event;
+
+  XEvent
+    *const event = targets->event;
+
+  /*
+    Erase text cursor.
+  */
+  (*text_event).xexpose.x=(*x);
+  (*text_event).xexpose.y=(*y)-font_info->max_bounds.ascent;
+  (void) XClearArea(display,windows->image.id,(*x),(*text_event).xexpose.y,
+    (unsigned int) (*text_event).xexpose.width,(unsigned int)
+    (*text_event).xexpose.height,MagickFalse);
+  XRefreshWindow(display,&windows->image,text_event);
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      XAnnotateTextPress(context,targets);
+      break;
+    }
+    case Expose:
+    {
+      if ((*event).xexpose.count == 0)
+        {
+          /*
+            Refresh Image window.
+          */
+          XRefreshWindow(display,&windows->image,(XEvent *) NULL);
+          XRedrawTextLines(display,windows,(*annotate_info),annotate_context);
+          (void) XDrawString(display,windows->image.id,annotate_context,
+            (*x),(*y),"_",1);
+        }
+      break;
+    }
+    default:
+    {
+      if (XAnnotateTextKeyEvent(context,targets) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
 typedef struct _AnnotateRenderInput
 {
   Image
@@ -3290,43 +3358,8 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
         XAnnotateTextCommand(&context,&targets);
         continue;
       }
-    /*
-      Erase text cursor.
-    */
-    text_event.xexpose.x=x;
-    text_event.xexpose.y=y-font_info->max_bounds.ascent;
-    (void) XClearArea(display,windows->image.id,x,text_event.xexpose.y,
-      (unsigned int) text_event.xexpose.width,(unsigned int)
-      text_event.xexpose.height,MagickFalse);
-    XRefreshWindow(display,&windows->image,&text_event);
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        XAnnotateTextPress(&context,&targets);
-        break;
-      }
-      case Expose:
-      {
-        if (event.xexpose.count == 0)
-          {
-            /*
-              Refresh Image window.
-            */
-            XRefreshWindow(display,&windows->image,(XEvent *) NULL);
-            XRedrawTextLines(display,windows,annotate_info,annotate_context);
-            (void) XDrawString(display,windows->image.id,annotate_context,
-              x,y,"_",1);
-          }
-        break;
-      }
-      default:
-      {
-        if (XAnnotateTextKeyEvent(&context,&targets) == MagickFalse)
-          return(MagickFalse);
-        break;
-      }
-    }
+    if (XAnnotateTextEvent(&context,&targets) == MagickFalse)
+      return(MagickFalse);
   } while ((state & ExitState) == 0);
   (void) XFreeCursor(display,cursor);
   /*
