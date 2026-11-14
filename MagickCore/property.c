@@ -4550,6 +4550,40 @@ static MagickBooleanType InterpretCharacter(char **q,const char **p)
   return(MagickFalse);
 }
 
+static MagickBooleanType AppendFxValue(const InterpretText *text,
+  Image *property_image,const char *pattern,ExceptionInfo *exception)
+{
+  double
+    value;
+
+  FxInfo
+    *fx_info;
+
+  MagickBooleanType
+    fx_status;
+
+  /*
+    FX - value calculator.
+  */
+  fx_info=AcquireFxInfo(property_image,pattern+3,exception);
+  if (fx_info == (FxInfo *) NULL)
+    return(MagickTrue);
+  fx_status=FxEvaluateChannelExpression(fx_info,CompositePixelChannel,
+    0,0,&value,exception);
+  fx_info=DestroyFxInfo(fx_info);
+  if (fx_status != MagickFalse)
+    {
+      char
+        result[MagickPathExtent];
+
+      (void) FormatLocaleString(result,MagickPathExtent,"%.*g",
+        GetMagickPrecision(),(double) value);
+      if (AppendInterpretString(text,result) == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   const char *embed_text,ExceptionInfo *exception)
 {
@@ -4746,32 +4780,11 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
       */
       if (LocaleNCompare("fx:",pattern,3) == 0)
         {
-          double
-            value;
-
-          FxInfo
-            *fx_info;
-
-          MagickBooleanType
-            fx_status;
-
-          /*
-            FX - value calculator.
-          */
-          fx_info=AcquireFxInfo(property_image,pattern+3,exception);
-          if (fx_info == (FxInfo *) NULL)
-            continue;
-          fx_status=FxEvaluateChannelExpression(fx_info,CompositePixelChannel,
-            0,0,&value,exception);
-          fx_info=DestroyFxInfo(fx_info);
-          if (fx_status != MagickFalse)
+          if (AppendFxValue(&text,property_image,pattern,exception) ==
+              MagickFalse)
             {
-              char
-                result[MagickPathExtent];
-
-              (void) FormatLocaleString(result,MagickPathExtent,"%.*g",
-                GetMagickPrecision(),(double) value);
-              AppendString2Text(result);
+              status=MagickFalse;
+              goto cleanup;
             }
           continue;
         }
