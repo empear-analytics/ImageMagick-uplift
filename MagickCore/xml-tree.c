@@ -209,7 +209,7 @@ typedef struct _SiblingListInfo
     offset;
 } SiblingListInfo;
 
-static void InsertIntoSiblingList(XMLTreeInfo *child,XMLTreeInfo *node,
+static void InsertAsNewSibling(XMLTreeInfo *child,XMLTreeInfo *node,
   XMLTreeInfo *previous,const SiblingListInfo *siblings)
 {
   XMLTreeInfo
@@ -218,26 +218,33 @@ static void InsertIntoSiblingList(XMLTreeInfo *child,XMLTreeInfo *node,
   const size_t
     offset = siblings->offset;
 
+  if ((previous != (XMLTreeInfo *) NULL) && (node != (XMLTreeInfo *) NULL))
+    previous->sibling=node->sibling;
+  child->next=node;
+  previous=(XMLTreeInfo *) NULL;
+  node=head;
+  while ((node != (XMLTreeInfo *) NULL) && (node->offset <= offset))
+  {
+    previous=node;
+    node=node->sibling;
+  }
+  child->sibling=node;
+  if (previous != (XMLTreeInfo *) NULL)
+    previous->sibling=child;
+}
+
+static void InsertIntoSiblingList(XMLTreeInfo *child,XMLTreeInfo *node,
+  XMLTreeInfo *previous,const SiblingListInfo *siblings)
+{
+  const size_t
+    offset = siblings->offset;
+
   if ((node != (XMLTreeInfo *) NULL) && (node->offset <= offset))
     {
       InsertIntoTagList(node,child,offset);
     }
   else
-    {
-      if ((previous != (XMLTreeInfo *) NULL) && (node != (XMLTreeInfo *) NULL))
-        previous->sibling=node->sibling;
-      child->next=node;
-      previous=(XMLTreeInfo *) NULL;
-      node=head;
-      while ((node != (XMLTreeInfo *) NULL) && (node->offset <= offset))
-      {
-        previous=node;
-        node=node->sibling;
-      }
-      child->sibling=node;
-      if (previous != (XMLTreeInfo *) NULL)
-        previous->sibling=child;
-    }
+    InsertAsNewSibling(child,node,previous,siblings);
 }
 
 static XMLTreeInfo *InsertTagIntoXMLTree(XMLTreeInfo *xml_info,
