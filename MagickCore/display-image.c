@@ -25212,6 +25212,26 @@ static void XLoadDisplayFont(Display *display,XResourceInfo *resource_info,
       resource_info->font);
 }
 
+static MagickBooleanType XCheckMappedImageTimer(
+  const DisplayEventContext *context,const DisplayEventTargets *targets)
+{
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const nexus = targets->nexus,
+    **const display_image = targets->display_image;
+
+  time_t
+    *const timer = targets->timer;
+
+  if (windows->image.mapped != MagickFalse)
+    if (XCheckImageTimer(context,(*display_image),nexus,timer) !=
+        MagickFalse)
+      return(MagickTrue);
+  return(MagickFalse);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -25414,10 +25434,8 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
     /*
       Handle a window event.
     */
-    if (windows->image.mapped != MagickFalse)
-      if (XCheckImageTimer(&event_context,display_image,&nexus,&timer) !=
-          MagickFalse)
-        continue;
+    if (XCheckMappedImageTimer(&event_context,&event_targets) != MagickFalse)
+      continue;
     timestamp=GetMagickTime();
     (void) XNextEvent(display,&event);
     XUpdateWindowStasis(windows,timestamp);
