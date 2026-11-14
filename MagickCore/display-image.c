@@ -21284,6 +21284,52 @@ static Image *XLoadDirectoryImages(const DirectoryLoadInput *load_input,
   return(images);
 }
 
+typedef struct _DirectoryListTargets
+{
+  char
+    ***filelist;
+
+  int
+    *number_files;
+} DirectoryListTargets;
+
+static MagickBooleanType XExpandDirectoryFiles(char *filenames,
+  const DirectoryListTargets *targets)
+{
+  char
+    ***const filelist = targets->filelist;
+
+  int
+    *const number_files = targets->number_files;
+
+  MagickStatusType
+    status;
+
+  /*
+    Expand the filenames.
+  */
+  (*filelist)=(char **) AcquireMagickMemory(sizeof(**filelist));
+  if ((*filelist) == (char **) NULL)
+    {
+      ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
+        filenames);
+      return(MagickFalse);
+    }
+  (*number_files)=1;
+  (*filelist)[0]=filenames;
+  status=ExpandFilenames(number_files,filelist);
+  if ((status == MagickFalse) || ((*number_files) == 0))
+    {
+      if ((*number_files) == 0)
+        ThrowXWindowException(ImageError,"NoImagesWereFound",filenames)
+      else
+        ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
+          filenames);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static Image *XVisualDirectoryImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,ExceptionInfo *exception)
 {
@@ -21305,9 +21351,6 @@ static Image *XVisualDirectoryImage(Display *display,
   MagickBooleanType
     backdrop;
 
-  MagickStatusType
-    status;
-
   static char
     filename[MagickPathExtent] = "\0",
     filenames[MagickPathExtent] = "*";
@@ -21318,34 +21361,17 @@ static Image *XVisualDirectoryImage(Display *display,
   const DirectoryInput
     input = { display, resource_info, windows, filename, exception };
 
+  const DirectoryListTargets
+    list_targets = { &filelist, &number_files };
+
   /*
     Request file name from user.
   */
   XFileBrowserWidget(display,windows,"Directory",filenames);
   if (*filenames == '\0')
     return((Image *) NULL);
-  /*
-    Expand the filenames.
-  */
-  filelist=(char **) AcquireMagickMemory(sizeof(*filelist));
-  if (filelist == (char **) NULL)
-    {
-      ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
-        filenames);
-      return((Image *) NULL);
-    }
-  number_files=1;
-  filelist[0]=filenames;
-  status=ExpandFilenames(&number_files,&filelist);
-  if ((status == MagickFalse) || (number_files == 0))
-    {
-      if (number_files == 0)
-        ThrowXWindowException(ImageError,"NoImagesWereFound",filenames)
-      else
-        ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
-          filenames);
-      return((Image *) NULL);
-    }
+  if (XExpandDirectoryFiles(filenames,&list_targets) == MagickFalse)
+    return((Image *) NULL);
   /*
     Set image background resources.
   */
