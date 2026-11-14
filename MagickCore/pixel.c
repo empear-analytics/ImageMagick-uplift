@@ -232,6 +232,14 @@ static void ConformImageColorspace(Image *image,ExceptionInfo *exception)
     (void) TransformImageColorspace(image,sRGBColorspace,exception);
 }
 
+static void ConformImageAlpha(Image *image,const PixelInfo *destination,
+  ExceptionInfo *exception)
+{
+  if ((destination->alpha_trait != UndefinedPixelTrait) &&
+      ((image->alpha_trait & BlendPixelTrait) == 0))
+    (void) SetImageAlpha(image,OpaqueAlpha,exception);
+}
+
 MagickExport void ConformPixelInfo(Image *image,const PixelInfo *source,
   PixelInfo *destination,ExceptionInfo *exception)
 {
@@ -241,9 +249,7 @@ MagickExport void ConformPixelInfo(Image *image,const PixelInfo *source,
   *destination=(*source);
   ConformPixelColorspace(image,destination);
   ConformImageColorspace(image,exception);
-  if ((destination->alpha_trait != UndefinedPixelTrait) &&
-      ((image->alpha_trait & BlendPixelTrait) == 0))
-    (void) SetImageAlpha(image,OpaqueAlpha,exception);
+  ConformImageAlpha(image,destination,exception);
 }
 
 
