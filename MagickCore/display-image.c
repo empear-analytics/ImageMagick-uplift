@@ -10466,6 +10466,28 @@ static void XApplyNextCommand(const XMagickCommandContext *context)
       windows->im_next_image,CurrentTime);
 }
 
+static void XApplyFormerCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  int
+    i;
+
+  /*
+    Display former image.
+  */
+  for (i=0; i < resource_info->quantum; i++)
+    XClientMessage(display,windows->image.id,windows->im_protocols,
+      windows->im_former_image,CurrentTime);
+}
+
 static void XApplyResizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11078,9 +11100,6 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   RectangleInfo
     page_geometry;
 
-  int
-    i;
-
   static char
     color[MagickPathExtent] = "gray";
 
@@ -11117,15 +11136,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyNextCommand(&context);
       break;
     case FormerCommand:
-    {
-      /*
-        Display former image.
-      */
-      for (i=0; i < resource_info->quantum; i++)
-        XClientMessage(display,windows->image.id,windows->im_protocols,
-          windows->im_former_image,CurrentTime);
+      XApplyFormerCommand(&context);
       break;
-    }
     case SelectCommand:
     {
       int
