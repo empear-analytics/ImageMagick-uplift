@@ -17000,6 +17000,124 @@ state of the chain (the escape blocks moved under Recipes VC and E step 7) probe
 Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
 Lane: c
 
+## Recipe KM - Replace Option-Parsing Arms by a Keyed Table of Member Setters
+
+**Use when:** CodeScene reports *Bumpy Road Ahead* (or *Complex Method*) on a function
+that selects on a name and holds many arms of one shape: compare the name with a key,
+parse the value against an option table, return failure when the parse fails, store the
+result cast to the member's enumeration type, return success. `property.c`'s
+`SetImageProperty` has ten (`compose`, `compress`, `dispose`, `gravity`, `intensity`,
+`intent`, `interpolate`, `rendering-intent`, `type`, `units`), spread over the groups of
+its first-letter `switch`; each arm's failure `if` is a bump.
+
+**Not covered by:** Recipe KL, whose `switch` is on an integer and whose groups share a
+tail; Recipe KT, KS and KR, whose groups are one call, one assignment of a constant, or
+one return of a constant; Recipe OS, whose copies store into members of one type (here
+every member has its own enumeration type, so no pointer to the member can be shared);
+Recipe E step 7 on each arm, which makes ten helpers that are reported as *Code
+Duplication*; Recipe MT and CF, which merge two copies, not ten.
+
+**How:**
+
+1. Arms. Each is `if (LocaleCompare("K",n) == 0) { ssize_t x; x=ParseCommandOption(O,
+   MagickFalse,v); if (x < 0) return(MagickFalse); e->m=(E) x; return(MagickTrue); }`
+   (a comment after the failure `return` allowed), the same token sequence for every arm
+   once the key `K`, the option table `O`, the local `x`, the member `m` and the type `E`
+   are set aside; `n`, `v` and `e` are the same parameters in every arm. Checked by
+   script. The arms lie outside every OpenMP region and in no `#if` branch.
+2. Hoisting. The function's selection on `n` (a `switch` on its first character, or a
+   chain of tests) starts at a point `P` after which nothing runs before an arm but that
+   selection's own tests: check by reading that, for each key `K`, every statement
+   between `P` and its arm is a side-effect-free comparison of `n` that is false when `n`
+   equals `K` (an exact comparison with another key, a prefix that `K` does not start
+   with), and that a name equal to `K` reaches the arm's group (a first-letter `switch`
+   holds both cases of `K`'s first letter; `LocaleCompare` folds case through the C
+   locale only). Every key appears in one arm.
+3. Setters. Directly above the function, for each distinct pair (`m`, `E`), write
+   `static void SetImage<M>Member(Image *image,const ssize_t value)` whose body is
+   `image->m=(E) value;`; two arms with the same member and type share it. Above them,
+   `typedef void (*SetImageMemberMethod)(Image *,const ssize_t);` and a struct type with
+   the members `const char *property`, `CommandOption option` and `SetImageMemberMethod
+   set_member`.
+4. Table. Below the setters a `static const` array of that type with no size, one
+   element `{ "K", O, Setter }` per arm, in the order of the arms in the source.
+5. Lookup. Below the table, a function in Recipe RV's form: `static MagickBooleanType
+   Name(Image *image,const char *property,const char *value,MagickBooleanType *result)`
+   walks the table; at the element whose key `LocaleCompare(key,property)` finds equal it
+   parses `value` against the element's option, and returns `MagickTrue` after setting
+   `(*result)` to `MagickFalse` when the parse is negative, or to `MagickTrue` after the
+   setter stored it; the walk's end returns `MagickFalse`.
+6. Delete the arms. At `P` write `if (Name(e,n,v,&status) != MagickFalse) return(status);`
+   (the caller's status local, or a `returned` local of Recipe RV step 5).
+7. Check by script that every arm's (`K`, `O`, `m`, `E`) is one element and one setter,
+   and by reading step 2; run `tools/refactor_guard.py --calls` (the arms' calls drop to
+   the lookup's one each, `LocaleCompare` by the number of arms less one), the CI and C++
+   warning checks, and the oracle on the function's cases.
+
+**Before:**
+
+```c
+  status=MagickTrue;
+  switch (*property)
+  {
+    ...
+      if (LocaleCompare("compose",property) == 0)
+        {
+          ssize_t
+            compose;
+
+          compose=ParseCommandOption(MagickComposeOptions,MagickFalse,value);
+          if (compose < 0)
+            return(MagickFalse); /* FUTURE: value exception?? */
+          image->compose=(CompositeOperator) compose;
+          return(MagickTrue);
+        }
+```
+
+**After:**
+
+```c
+static void SetImageComposeMember(Image *image,const ssize_t value)
+{
+  image->compose=(CompositeOperator) value;
+}
+  ...
+static const EnumeratedPropertyInfo
+  EnumeratedProperties[] =
+  {
+    { "compose", MagickComposeOptions, SetImageComposeMember },
+    ...
+  };
+  ...
+  if (SetEnumeratedProperty(image,property,value,&status) != MagickFalse)
+    return(status);
+  status=MagickTrue;
+  switch (*property)
+```
+
+**Careful:**
+
+- For a name equal to a key, the original ran only failing comparisons before the arm
+  (step 2), then the parse, the test and the store; the lookup runs failing comparisons
+  of the table's other keys (side-effect free), then the same parse with the same
+  arguments, the same test, and the same store through the setter, the cast unchanged.
+  It returns the same value through `status`, which the caller returns at once.
+- For a name equal to no key, the lookup runs comparisons only and returns
+  `MagickFalse`; the caller goes on to the selection as before, writing nothing.
+- The setter takes `ssize_t`, the type of the parsed local, so the value reaches the
+  cast unconverted.
+- The arms' comments go; a comment that says something about the API stays above the
+  table.
+
+**Evidence level:** oracle, with the step-1 and step-7 scripts, and step 2 checked by
+reading.
+
+**Provenance:** 2026-11-14, from `property.c`'s `SetImageProperty` (campaign B, M127
+lane c round 7): ten option-parsing arms, each a bump; one helper per arm would clone.
+A probe: property.c 3.27 to 3.39, Bumpy Road 13 to 3. Added by Claude Code (Claude
+Opus 5.5) under the mandate of 2026-10-24.
+Lane: c
+
 ---
 
 ## Catalogue changes
@@ -17377,3 +17495,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | OS | Share an Option-Sync Block Through a Helper Keyed by the Option Name: copies of `option=GetImageOption(image_info,"K"); if (option != NULL) S;` whose `S` stores into one member become calls of a `static void` helper taking the key and a pointer to the member; one function per commit; targets *Overall Code Complexity*; evidence oracle; Lane: b | `image-settings.c`'s `SyncImage...Settings` (`quality`, `scene`, `depth`, `loop`, `page`, `tile-offset`, colours) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | MC | Make a Cleanup-Jumping Statement Macro a Function: function-local statement macros whose only exit is `status=c; goto L;` get `static MagickBooleanType` functions taking a `const` struct of pointers to the caller's locals they name, and the macros become one-call wrappers that keep the jump; a block that later moves writes its uses out; evidence oracle; Lane: c | `property.c`'s `InterpretImageProperties` (seventeen uses of three buffer macros in every block; probe of the chain 3.21 to 3.44) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | VC | Step 6: the cleanup exit may be `S goto L;` (Recipe V's jump after assignments of constants, `status=MagickFalse; goto cleanup;`), the caller writing `{ S goto L; }`; a `goto` whose label is inside the block moves with it; Lane: c | `InterpretImageProperties`' braced-escape block after Recipe MC | mandate (2026-10-24) |
+| 2026-11-14 | NEW | KM | Replace Option-Parsing Arms by a Keyed Table of Member Setters: arms that parse a value against an option table and store it, cast, into one member each become one table of (key, option, setter) walked by an RV-form lookup hoisted before the selection, with a one-statement setter per member; evidence oracle; Lane: c | `property.c`'s `SetImageProperty` (ten arms, ten bumps; probe 3.27 to 3.39) | mandate (2026-10-24) |
