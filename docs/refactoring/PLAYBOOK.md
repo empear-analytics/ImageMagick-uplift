@@ -7112,6 +7112,10 @@ SD, which move statements: the decision moves with them and the helper inherits 
    converts the selection at once to that cast's type (`(Quantum) (pixel == 0 ? 0 :
    QuantumRange)`, an argument of type `Quantum`) or both are of that type; the function
    then returns that type (`Quantum`). The macros stay unexpanded in its body.
+   Variables (2026-11-14): `k1` and `k2` may instead be two locals or parameters of one
+   type that every path to the site has assigned (`mw_hash`, `mb_hash`, tables allocated
+   and checked before the loop), with no call, assignment or increment; they become
+   parameters of that type after those of `c`, and the function returns that type.
 2. Write a `static inline` function directly above the first function that uses it,
    with one parameter per variable expression of `c` (`const size_t extent` for
    `geometry.width`), of that expression's exact type, returning the type of `k1`:
@@ -7163,6 +7167,10 @@ static inline double GravityOffsetSign(const size_t extent)
   prove it for this build on every input, reached or not.
 - The variant with the constants swapped is a different function, not a negated
   argument: `!c` would be a new expression.
+- Under the variable form the call reads both variables where the `?:` read one of
+  them: reading an assigned local has no side effect, so only the value the test
+  selects reaches the site. A variable some path leaves unassigned would make that
+  extra read undefined; step 1 refuses it.
 - Under the constant-macro form the conditional's own type may differ from the return
   type (`0 : QuantumRange` is `int` against `unsigned short` in a Q16 non-HDRI build,
   `float` in HDRI); both operands are exactly representable in `Quantum`, and the site
@@ -7186,6 +7194,10 @@ Constant-macro form (2026-11-14, campaign B, M127 lane b round 13): `quantum-imp
 (`TransparentAlpha : OpaqueAlpha`, `0 : QuantumRange`, `0 : 1`, `0x00 : 0x01`) make them
 *Complex Methods* (cc 12 and 11); a probe 7.65 to 8.15. Added by Claude Code (Claude
 Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
+Variable form (2026-11-14, same lane): `compress.c`'s `HuffmanDecodeImage`, whose
+`(color != MagickFalse) ? mw_hash : mb_hash` is the last decision that keeps its scanline
+loop, as a helper, at cc 9; a probe of the chain 9.44 to 10.0.
 Lane: b
 
 ---
@@ -19922,3 +19934,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | WS | Extract Statement-Macro Twins Through a Writer Struct of the Macro's Locals: copies of a block emitting through a statement macro that binds the caller's plain locals, differing in constants, become one `static void` function taking a struct of those locals (read members, and written members that replace the caller's locals), the constants and the block's input; the function binds members as locals and copies written ones back; Lane: b | `compress.c`'s `HuffmanEncodeImage` (white and black run blocks through `HuffmanOutputCode`/`OutputBit`; seven parameters otherwise; probe 8.06 to 8.13, chain to 8.59) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | WS | Step 7: one block (no copies) moves the same way; further written locals read after it may join the struct as written members, one more may go by pointer (MB's copy in and out), and a flag the block sets on every path is the return value; Lane: b | `compress.c`'s `HuffmanDecodeImage` (the `InputBit` code-reading `do` loop; probe 8.59 to 9.32) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | NS | Step 1: `k1` and `k2` may be constant macros of an installed header (`TransparentAlpha`, `OpaqueAlpha`, `QuantumRange`), or one and `0`, when the site converts the result at once to the macros' cast type, which the function returns; Lane: b | `quantum-import.c`'s `Import1BitGrayAlphaQuantum` and `Import1BitIndexAlphaQuantum` (six selections each; probe 7.65 to 8.15) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | NS | Step 1: `k1` and `k2` may be two locals or parameters of one type assigned on every path to the site (no call, assignment or increment), passed after `c`'s parameters; Lane: b | `compress.c`'s `HuffmanDecodeImage` (`(color != MagickFalse) ? mw_hash : mb_hash`; chain probe 9.44 to 10.0) | mandate (2026-10-24) |
