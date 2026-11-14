@@ -3168,6 +3168,96 @@ static MagickBooleanType XAnnotateRenderLine(const AnnotateContext *context,
   return(MagickTrue);
 }
 
+static MagickBooleanType XAnnotateRenderLines(const AnnotateContext *context,
+  XAnnotateInfo *annotate_info,Image *image)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const GC
+    annotate_context = context->annotate_context;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    height,
+    width;
+
+  XAnnotateInfo
+    *previous_info;
+
+  /*
+    Annotation is relative to image configuration.
+  */
+  width=(unsigned int) image->columns;
+  height=(unsigned int) image->rows;
+  x=0;
+  y=0;
+  if (windows->image.crop_geometry != (char *) NULL)
+    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
+  /*
+    Initialize annotated image.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  while (annotate_info != (XAnnotateInfo *) NULL)
+  {
+    if (annotate_info->width == 0)
+      {
+        /*
+          No text on this line--  go to the next line of text.
+        */
+        previous_info=annotate_info->previous;
+        annotate_info->text=(char *)
+          RelinquishMagickMemory(annotate_info->text);
+        annotate_info=(XAnnotateInfo *) RelinquishMagickMemory(annotate_info);
+        annotate_info=previous_info;
+        continue;
+      }
+    {
+      const AnnotateRenderInput
+        input = { image, x, y, height, width };
+
+      if (XAnnotateRenderLine(context,&input,annotate_info) == MagickFalse)
+        return(MagickFalse);
+    }
+    /*
+      Free up memory.
+    */
+    previous_info=annotate_info->previous;
+    annotate_info->text=DestroyString(annotate_info->text);
+    annotate_info=(XAnnotateInfo *) RelinquishMagickMemory(annotate_info);
+    annotate_info=previous_info;
+  }
+  (void) XSetForeground(display,annotate_context,
+    windows->pixel_info->foreground_color.pixel);
+  (void) XSetBackground(display,annotate_context,
+    windows->pixel_info->background_color.pixel);
+  (void) XSetFont(display,annotate_context,windows->font_info->fid);
+  XSetCursorState(display,windows,MagickFalse);
+  (void) XFreeFont(display,font_info);
+  /*
+    Update image configuration.
+  */
+  XConfigureImageColormap(display,resource_info,windows,image,exception);
+  (void) XConfigureImage(display,resource_info,windows,image,exception);
+  return(MagickTrue);
+}
+
 static MagickBooleanType XAnnotateEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -3202,13 +3292,8 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
   size_t
     state;
 
-  unsigned int
-    height,
-    width;
-
   XAnnotateInfo
-    *annotate_info,
-    *previous_info;
+    *annotate_info;
 
   XColor
     color;
@@ -3362,62 +3447,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
       return(MagickFalse);
   } while ((state & ExitState) == 0);
   (void) XFreeCursor(display,cursor);
-  /*
-    Annotation is relative to image configuration.
-  */
-  width=(unsigned int) image->columns;
-  height=(unsigned int) image->rows;
-  x=0;
-  y=0;
-  if (windows->image.crop_geometry != (char *) NULL)
-    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
-  /*
-    Initialize annotated image.
-  */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  while (annotate_info != (XAnnotateInfo *) NULL)
-  {
-    if (annotate_info->width == 0)
-      {
-        /*
-          No text on this line--  go to the next line of text.
-        */
-        previous_info=annotate_info->previous;
-        annotate_info->text=(char *)
-          RelinquishMagickMemory(annotate_info->text);
-        annotate_info=(XAnnotateInfo *) RelinquishMagickMemory(annotate_info);
-        annotate_info=previous_info;
-        continue;
-      }
-    {
-      const AnnotateRenderInput
-        input = { image, x, y, height, width };
-
-      if (XAnnotateRenderLine(&context,&input,annotate_info) == MagickFalse)
-        return(MagickFalse);
-    }
-    /*
-      Free up memory.
-    */
-    previous_info=annotate_info->previous;
-    annotate_info->text=DestroyString(annotate_info->text);
-    annotate_info=(XAnnotateInfo *) RelinquishMagickMemory(annotate_info);
-    annotate_info=previous_info;
-  }
-  (void) XSetForeground(display,annotate_context,
-    windows->pixel_info->foreground_color.pixel);
-  (void) XSetBackground(display,annotate_context,
-    windows->pixel_info->background_color.pixel);
-  (void) XSetFont(display,annotate_context,windows->font_info->fid);
-  XSetCursorState(display,windows,MagickFalse);
-  (void) XFreeFont(display,font_info);
-  /*
-    Update image configuration.
-  */
-  XConfigureImageColormap(display,resource_info,windows,image,exception);
-  (void) XConfigureImage(display,resource_info,windows,image,exception);
-  return(MagickTrue);
+  return(XAnnotateRenderLines(&context,annotate_info,image));
 }
 
 /*
