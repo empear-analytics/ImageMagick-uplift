@@ -662,6 +662,32 @@ static unsigned int ReadHuffmanCode(HuffmanBitReader *reader,const ssize_t x)
   return(bail);
 }
 
+static MagickBooleanType NextHuffmanCode(Image *image,const ssize_t x,
+  HuffmanBitReader *reader)
+{
+  unsigned int
+    bail;
+
+  if ((*reader).byte == EOF)
+    return(MagickFalse);
+  if (x >= (ssize_t) image->columns)
+    {
+      SkipHuffmanToEndOfLine(image,&(*reader).byte,&(*reader).mask,
+        &(*reader).runlength);
+      return(MagickFalse);
+    }
+  bail=ReadHuffmanCode(reader,x);
+  if (bail != MagickFalse)
+    return(MagickFalse);
+  if ((*reader).length > 13)
+    {
+      SkipHuffmanToEndOfLine(image,&(*reader).byte,&(*reader).mask,
+        &(*reader).runlength);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static void SetFaxResolution(Image *image)
 {
   image->resolution.x=204.0;
@@ -697,7 +723,6 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
     *scanline;
 
   unsigned int
-    bail,
     color;
 
   /*
@@ -760,23 +785,8 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
     x=0;
     for ( ; ; )
     {
-      if (reader.byte == EOF)
+      if (NextHuffmanCode(image,x,&reader) == MagickFalse)
         break;
-      if (x >= (ssize_t) image->columns)
-        {
-          SkipHuffmanToEndOfLine(image,&reader.byte,&reader.mask,
-            &reader.runlength);
-          break;
-        }
-      bail=ReadHuffmanCode(&reader,x);
-      if (bail != MagickFalse)
-        break;
-      if (reader.length > 13)
-        {
-          SkipHuffmanToEndOfLine(image,&reader.byte,&reader.mask,
-            &reader.runlength);
-          break;
-        }
       entry=LookupHuffmanEntry((color != MagickFalse) ? mw_hash : mb_hash,color,
         reader.length,reader.code);
       if (entry == (const HuffmanTable *) NULL)
