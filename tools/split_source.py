@@ -194,10 +194,8 @@ def family_only_define(lines, name):
     one_line = [l for l in named if re.match(r"^#define\s+%s\b.*[^\\\s]\s*$" % name, l)]
     return named[0] if named == one_line[:1] else None
 
-def family_only_multiline_defines(lines, region):
-    """(name, first line, last line) of every multi-line `#define` (backslash continuation) of LINES that REGION names
-    and that no other line of LINES names, outside the define blocks that move with it: a macro named by another
-    moving define moves with it (XGammaPixel names XRedGamma), a macro named by anything else stays, refusing."""
+def multiline_define_blocks(lines):
+    """{name: (first line, last line)} of every multi-line `#define` (backslash continuation) of LINES."""
     blocks = {}
     for k, line in enumerate(lines):
         m = re.match(r"^#define\s+(\w+)", line)
@@ -205,13 +203,19 @@ def family_only_multiline_defines(lines, region):
             e = k
             while lines[e].rstrip().endswith("\\") and e + 1 < len(lines): e += 1
             blocks[m.group(1)] = (k, e)
-    cand = {n for n in blocks if re.search(r"\b%s\b" % n, region)}
+    return blocks
+
+def grow_by_named_defines(lines, blocks, cand):
+    """Add to CAND every multi-line define of BLOCKS that the text of a define already in CAND names, until none is."""
     grown = True
-    while grown:   # a multi-line define named by a candidate's text is a candidate too
+    while grown:
         grown = False
         text = "\n".join("\n".join(lines[blocks[n][0]:blocks[n][1] + 1]) for n in cand)
         for n in blocks:
             if n not in cand and re.search(r"\b%s\b" % n, text): cand.add(n); grown = True
+
+def drop_defines_named_outside(lines, blocks, cand):
+    """Remove from CAND every define that a line outside the blocks of CAND names, until none is."""
     changed = True
     while changed:
         changed = False
@@ -219,6 +223,15 @@ def family_only_multiline_defines(lines, region):
         residue = "\n".join(l for i, l in enumerate(lines) if i not in drop)
         for n in sorted(cand):
             if re.search(r"\b%s\b" % n, residue): cand.discard(n); changed = True
+
+def family_only_multiline_defines(lines, region):
+    """(name, first line, last line) of every multi-line `#define` (backslash continuation) of LINES that REGION names
+    and that no other line of LINES names, outside the define blocks that move with it: a macro named by another
+    moving define moves with it (XGammaPixel names XRedGamma), a macro named by anything else stays, refusing."""
+    blocks = multiline_define_blocks(lines)
+    cand = {n for n in blocks if re.search(r"\b%s\b" % n, region)}
+    grow_by_named_defines(lines, blocks, cand)   # a multi-line define named by a candidate's text is a candidate too
+    drop_defines_named_outside(lines, blocks, cand)
     return sorted(((n,) + blocks[n] for n in cand), key=lambda row: row[1])
 
 def drop_empty_banner(lines, banner):
