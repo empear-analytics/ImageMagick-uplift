@@ -1512,12 +1512,27 @@ static void ListColorCompliance(FILE *file,const ColorInfo *color_info)
     (void) FormatLocaleFile(file,"XPM ");
 }
 
-MagickExport MagickBooleanType ListColorInfo(FILE *file,
-  ExceptionInfo *exception)
+static const char *ListColorEntry(FILE *file,const ColorInfo *color_info,
+  const char *path)
 {
   char
     tuple[MagickPathExtent];
 
+  if ((path == (const char *) NULL) ||
+      (LocaleCompare(path,color_info->path) != 0))
+    ListColorHeader(file,color_info);
+  path=color_info->path;
+  (void) FormatLocaleFile(file,"%-21.21s ",color_info->name);
+  GetColorTuple(&color_info->color,MagickFalse,tuple);
+  (void) FormatLocaleFile(file,"%-45.45s ",tuple);
+  ListColorCompliance(file,color_info);
+  (void) FormatLocaleFile(file,"\n");
+  return(path);
+}
+
+MagickExport MagickBooleanType ListColorInfo(FILE *file,
+  ExceptionInfo *exception)
+{
   const char
     *path;
 
@@ -1543,15 +1558,7 @@ MagickExport MagickBooleanType ListColorInfo(FILE *file,
   {
     if (color_info[i]->stealth != MagickFalse)
       continue;
-    if ((path == (const char *) NULL) ||
-        (LocaleCompare(path,color_info[i]->path) != 0))
-      ListColorHeader(file,color_info[i]);
-    path=color_info[i]->path;
-    (void) FormatLocaleFile(file,"%-21.21s ",color_info[i]->name);
-    GetColorTuple(&color_info[i]->color,MagickFalse,tuple);
-    (void) FormatLocaleFile(file,"%-45.45s ",tuple);
-    ListColorCompliance(file,color_info[i]);
-    (void) FormatLocaleFile(file,"\n");
+    path=ListColorEntry(file,color_info[i],path);
   }
   color_info=(const ColorInfo **) RelinquishMagickMemory((void *) color_info);
   (void) fflush(file);
