@@ -2747,6 +2747,16 @@ typedef struct _GlyphInfo
     image;
 } GlyphInfo;
 
+static FT_Outline_Funcs
+  OutlineMethods =
+  {
+    (FT_Outline_MoveTo_Func) TraceMoveTo,
+    (FT_Outline_LineTo_Func) TraceLineTo,
+    (FT_Outline_ConicTo_Func) TraceQuadraticBezier,
+    (FT_Outline_CubicTo_Func) TraceCubicBezier,
+    0, 0
+  };
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2828,16 +2838,6 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   ssize_t
     code,
     last_character;
-
-  static FT_Outline_Funcs
-    OutlineMethods =
-    {
-      (FT_Outline_MoveTo_Func) TraceMoveTo,
-      (FT_Outline_LineTo_Func) TraceLineTo,
-      (FT_Outline_ConicTo_Func) TraceQuadraticBezier,
-      (FT_Outline_CubicTo_Func) TraceCubicBezier,
-      0, 0
-    };
 
   unsigned char
     *utf8;
