@@ -8445,6 +8445,14 @@ does work would receive the moved labels' values first); Recipe RV, whose block 
    `default:` group, before the new call that passes `&name`, and the moved group is the
    call alone, passing the new function's `name` for `&name`. The new function takes the
    same `const Name *name` and binds only the members its groups read.
+8. No tail (2026-11-14). When every group of the `switch`, `default:` included, ends
+   every path with `return(R);`, no group holds a `break` of this `switch`, and the
+   `switch` is the function's last statement (nothing may follow it: MSVC C4702 refuses
+   unreachable code), step 1's `return(R_T);` is absent: the new function's body is the
+   `switch` alone, with no copy of a tail, and step 3's written plain locals are none
+   (every path returns). The run keeps at least one group in the caller (a `switch` of
+   `default:` alone is refused by `tools/ci_linux_warnings.sh`); steps 2 and 4 to 7
+   apply unchanged.
 
 **Before:**
 
@@ -8546,6 +8554,16 @@ static MagickBooleanType SetBackgroundAlpha(Image *image,
   Nothing writes the struct after the fill. The moved group's call passes the same
   object's address the caller's call passed (`name` in the new function is `&name` of the
   caller), so the next function reads the same members.
+
+- Step 8. Every path of the original ended in a `return` inside the `switch`, and it
+  still does: a kept group returns as before; a moved label, or a value of no label,
+  reaches the caller's `default:`, which returns what the new function returns, and the
+  new function's `switch` selects the same group (as the first bullet argues), which
+  returns the same value after the same statements. The new function ends in a `switch`
+  with a `default:` whose every group returns, the form the caller had, so no compiler
+  warns that control reaches its end (`-Wreturn-type`), and nothing follows either
+  `switch` (C4702). `refactor_guard.py --calls` shows `+2` for the new function and
+  nothing else, there being no tail to copy.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function and
 `+1` for the function `R_T` calls, its copy; nothing else moved), a case for each moved
@@ -16766,3 +16784,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | AMEND | LC | Step 6: a caller that already shares a Recipe N step 8 input struct and a Recipe CT step 3 loop-wide `const` targets struct between the helpers of its loop passes both to the helper (`if (Helper(&name,&targets) != MagickFalse) continue;`) in place of step 4's own struct and pointers: members bound once, targets members written `(*v)`, `&v` as `v`, `&name` as `name`, step 2's temporaries declared in the helper. *Careful* gives the argument (N step 8's fill condition for the reads, CT step 3's addresses for the writes) | `display-image.c`'s `XDisplayImage` (campaign A, W23 round twelve lane d, wide build): the command-widget test at the head of its event loop leaves the iteration through three `continue;`, writes `nexus` and `display_image` (members of `DisplayEventTargets`) and reads `event`, the command buffer and the context members; a probe of the step with the stasis test's Recipe E step: bumps 9 to 7, cc 95 to 87, the file with the other seven finding functions emptied 4.51 to 4.56, no finding on a new function | owner |
 | 2026-11-14 | AMEND | SD | Step 8, a run kept apart and shared structs: (a) a run of adjacent groups, in source order, may move with the `default` group when groups that stay stand between the run and `default` (step 6 already allowed it for its own form; C selects by label, not position, and no kept group falls through); (b) a caller that already shares a Recipe N step 8 input struct and a Recipe CT step 3 loop-wide `const` targets struct between the helpers of its loop passes both to the chain under the caller's local names (`&name` written `name` in the moved groups, members bound once, targets members as `(*v)`, the controlling expression included), with no struct, fill or local of its own. *Careful* gives the argument | `display-image.c`'s `XDisplayImage` (campaign A, W23 round twelve lane d, wide build): its 17-group event `switch` must keep `KeyPress` and `KeyRelease` in the caller (`XLookupString` takes `sizeof(command)` of the caller's array), which stand between the groups before them and `default`; the cases already share `DisplayEventContext` and `DisplayEventTargets`. A probe of the four-link chain after the crossing cases' Recipe P step: `XDisplayImage` cc 85 to 64, the file with the other seven finding functions emptied 4.56 to 4.76, no finding on a new function | owner |
 | 2026-11-14 | AMEND | O | Step 8: a written variable whose address is a member of a `const` targets struct that the block itself passes to another helper's call (nothing outside the block reading the struct) is written through that member, the struct moving in as a parameter of the type the block passed, in place of a pointer parameter of its own or a second struct of the same addresses (step 7). *Careful* gives the argument | `morphology.c`'s `MorphologyApply` (campaign A, W23 round thirteen lane a): its limit initialisation writes `method_limit`, `special` and `rslt_compose`, whose addresses its `const MorphologyIteratedLimits limits` holds, and `stage_limit`, then passes `limits` to `SelectMorphologyStageLimit`; step 4 gives seven parameters and step 7 a second struct of the same addresses in a caller held at 73 lines of *Large Method*. A probe: `MorphologyApply` leaves *Large Method*, 6.93 to 7.21, no finding on the new function. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
+| 2026-11-14 | AMEND | ST | Step 8 (no tail): a `switch` whose every group, `default:` included, ends every path with `return(R);`, with no `break` of it and nothing after it (the function's last statement; MSVC C4702 forbids a tail) splits as steps 2 and 4 to 7 say with no `return(R_T);` to copy: the new function's body is the `switch` alone, at least one group stays in the caller. *Careful* gives the argument | `morphology.c`'s (now `morphology-apply.c`'s) `AcquireKernelBuiltIn` (campaign A, W23 round thirteen lane a): its second `switch` returns on every path and ends the function since bb1745ee8 dropped the unreachable `return(kernel);` after it; step 1 refuses it, SW refuses its working `default:`. A probe moving the Blur, Comet, Binomial, Laplacian and `default:` groups: 7.21 to 7.29, cc 50 to 46, no finding on the new function. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
