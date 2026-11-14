@@ -918,6 +918,32 @@ static ssize_t CountDoubleValues(const char *string)
   return(count);
 }
 
+static void FillArrayOfDoubles(const char *string,const ssize_t count,
+  double *array)
+{
+  char
+    *q;
+
+  const char
+    *p;
+
+  ssize_t
+    i;
+
+  /*
+    Fill in the floating point values.
+  */
+  i=0;
+  p=string;
+  while ((*p != '\0') && (i < count))
+  {
+    array[i++]=StringToDouble(p,&q);
+    p=q;
+    while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == ','))
+      p++;
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -956,12 +982,6 @@ static ssize_t CountDoubleValues(const char *string)
 MagickExport double *StringToArrayOfDoubles(const char *string,ssize_t *count,
   ExceptionInfo *exception)
 {
-  char
-    *q;
-
-  const char
-    *p;
-
   double
     *array;
 
@@ -990,18 +1010,7 @@ MagickExport double *StringToArrayOfDoubles(const char *string,ssize_t *count,
         ResourceLimitError,"MemoryAllocationFailed","`%s'","");
       return((double *) NULL);
     }
-  /*
-    Fill in the floating point values.
-  */
-  i=0;
-  p=string;
-  while ((*p != '\0') && (i < *count))
-  {
-    array[i++]=StringToDouble(p,&q);
-    p=q;
-    while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == ','))
-      p++;
-  }
+  FillArrayOfDoubles(string,*count,array);
   return(array);
 }
 
