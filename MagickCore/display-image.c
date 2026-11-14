@@ -10704,8 +10704,8 @@ static MagickBooleanType IsImageWindowTranslateKey(const KeySym key_symbol)
   return(MagickFalse);
 }
 
-static DisplayCommand XImageWindowCommand(const ImageWindowKeyInput *input,
-  const MagickStatusType state,KeySym key_symbol)
+static DisplayCommand XImageWindowKeyCommand(const ImageWindowKeyInput *input,
+  const MagickStatusType state,const KeySym key_symbol)
 {
   Display
     *const display = input->display;
@@ -10713,26 +10713,9 @@ static DisplayCommand XImageWindowCommand(const ImageWindowKeyInput *input,
   Image
     **const image = input->image;
 
-  XResourceInfo
-    *const resource_info = input->resource_info;
-
   XWindows
     *const windows = input->windows;
 
-  static char
-    delta[MagickPathExtent+1] = "";
-
-  static KeySym
-    last_symbol = XK_0;
-
-  if ((key_symbol >= XK_0) && (key_symbol <= XK_9))
-    {
-      XEnterWindowDigit(resource_info,key_symbol,delta,&last_symbol);
-      return(NullCommand);
-    }
-  last_symbol=key_symbol;
-  if (resource_info->immutable)
-    return(XImmutableWindowCommand(key_symbol));
   switch ((int) key_symbol)
   {
     case XK_P:
@@ -10769,6 +10752,29 @@ static DisplayCommand XImageWindowCommand(const ImageWindowKeyInput *input,
       return(NullCommand);
     }
   return(XLookupKeyCommand((int) key_symbol,state));
+}
+
+static DisplayCommand XImageWindowCommand(const ImageWindowKeyInput *input,
+  const MagickStatusType state,KeySym key_symbol)
+{
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  static char
+    delta[MagickPathExtent+1] = "";
+
+  static KeySym
+    last_symbol = XK_0;
+
+  if ((key_symbol >= XK_0) && (key_symbol <= XK_9))
+    {
+      XEnterWindowDigit(resource_info,key_symbol,delta,&last_symbol);
+      return(NullCommand);
+    }
+  last_symbol=key_symbol;
+  if (resource_info->immutable)
+    return(XImmutableWindowCommand(key_symbol));
+  return(XImageWindowKeyCommand(input,state,key_symbol));
 }
 
 /*
