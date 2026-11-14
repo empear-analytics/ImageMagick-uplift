@@ -502,9 +502,6 @@ static void SetImageBackgroundRow(const BackgroundRow *row,const ssize_t y,
   Quantum
     *magick_restrict q;
 
-  ssize_t
-    x;
-
   if ((*status) == MagickFalse)
     return;
   q=QueueCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -513,11 +510,7 @@ static void SetImageBackgroundRow(const BackgroundRow *row,const ssize_t y,
       (*status)=MagickFalse;
       return;
     }
-  for (x=0; x < (ssize_t) image->columns; x++)
-  {
-    SetPixelViaPixelInfo(image,&background,q);
-    q+=(ptrdiff_t) GetPixelChannels(image);
-  }
+  FillPixelRow(image,&background,q);
   if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
     (*status)=MagickFalse;
 }
