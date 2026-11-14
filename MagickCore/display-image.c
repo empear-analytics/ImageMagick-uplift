@@ -3476,6 +3476,17 @@ static void XStartAnnotateTracking(Display *display,XWindows *windows,
   (*state)=DefaultState;
 }
 
+static MagickBooleanType XFinishAnnotateTracking(Display *display,
+  XWindows *windows,const size_t state)
+{
+  (void) XSelectInput(display,windows->image.id,
+    windows->image.attributes.event_mask);
+  (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+  if ((state & EscapeState) != 0)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType XAnnotateEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -3552,10 +3563,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
   context.text=text;
   context.cursor=cursor;
   XAnnotateTrackPointer(&context,&targets);
-  (void) XSelectInput(display,windows->image.id,
-    windows->image.attributes.event_mask);
-  (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
-  if ((state & EscapeState) != 0)
+  if (XFinishAnnotateTracking(display,windows,state) == MagickFalse)
     return(MagickTrue);
   /*
     Set font info and check boundary conditions.
