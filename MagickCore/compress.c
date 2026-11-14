@@ -1131,6 +1131,14 @@ static void WritePackbitsSingle(Image *image,
   (void) WriteBlobByte(image,*pixels);
 }
 
+static void WritePackbitsPair(Image *image,
+  const unsigned char *magick_restrict pixels)
+{
+  (void) WriteBlobByte(image,(unsigned char) 1);
+  (void) WriteBlobByte(image,*pixels);
+  (void) WriteBlobByte(image,pixels[1]);
+}
+
 static void WritePackbitsTriple(Image *image,
   const unsigned char *magick_restrict pixels)
 {
@@ -1184,9 +1192,7 @@ MagickExport MagickBooleanType PackbitsEncodeImage(Image *image,
       case 2:
       {
         i-=2;
-        (void) WriteBlobByte(image,(unsigned char) 1);
-        (void) WriteBlobByte(image,*pixels);
-        (void) WriteBlobByte(image,pixels[1]);
+        WritePackbitsPair(image,pixels);
         break;
       }
       case 3:
