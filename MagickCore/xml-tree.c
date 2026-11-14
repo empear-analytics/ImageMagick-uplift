@@ -1817,13 +1817,33 @@ static MagickBooleanType AddEntityDeclaration(const EntityValueInput *input,
   return(MagickTrue);
 }
 
-static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
-  size_t length,ExceptionInfo *exception)
+typedef struct _InternalDoctypeInfo
 {
+  XMLTreeRoot
+    *root;
+
+  size_t
+    length;
+
+  ExceptionInfo
+    *exception;
+} InternalDoctypeInfo;
+
+static MagickBooleanType ParseInternalDoctypeDeclarations(
+  const InternalDoctypeInfo *doctype,char *xml,char *n,
+  char ***predefined_entities)
+{
+  XMLTreeRoot
+    *const root = doctype->root;
+
+  const size_t
+    length = doctype->length;
+
+  ExceptionInfo
+    *const exception = doctype->exception;
+
   char
     *c,
-    *n,
-    **predefined_entities,
     q,
     *v;
 
@@ -1836,11 +1856,6 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
   EntityValueTargets
     value_targets;
 
-  n=(char *) NULL;
-  predefined_entities=(char **) AcquireMagickMemory(sizeof(sentinel));
-  if (predefined_entities == (char **) NULL)
-    ThrowFatalException(ResourceLimitError,"MemoryAllocationFailed");
-  (void) memcpy(predefined_entities,sentinel,sizeof(sentinel));
   for (xml[length]='\0'; xml != (char *) NULL; )
   {
     while (IsDoctypeTextChar(xml) != MagickFalse)
@@ -1874,13 +1889,9 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
         value_input.q=q;
         value_input.exception=exception;
         value_targets.xml=(&xml);
-        value_targets.predefined_entities=(&predefined_entities);
+        value_targets.predefined_entities=predefined_entities;
         if (AddEntityDeclaration(&value_input,&value_targets) == MagickFalse)
-          {
-            predefined_entities=(char **) RelinquishMagickMemory(
-              predefined_entities);
-            return(MagickFalse);
-          }
+          return(MagickFalse);
         }
       else
        if (strncmp(xml,"<!ATTLIST",9) == 0)
@@ -1892,16 +1903,39 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
             attribute_list_targets.n=(&n);
             if (ParseAttributeListDeclaration(root,exception,
                 &attribute_list_targets) == MagickFalse)
-              {
-                predefined_entities=(char **) RelinquishMagickMemory(
-                  predefined_entities);
-                return(MagickFalse);
-              }
+              return(MagickFalse);
         }
       else
         if (SkipDoctypeMarkup(root,&xml) == MagickFalse)
           break;
     }
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
+  size_t length,ExceptionInfo *exception)
+{
+  char
+    *n,
+    **predefined_entities;
+
+  n=(char *) NULL;
+  predefined_entities=(char **) AcquireMagickMemory(sizeof(sentinel));
+  if (predefined_entities == (char **) NULL)
+    ThrowFatalException(ResourceLimitError,"MemoryAllocationFailed");
+  (void) memcpy(predefined_entities,sentinel,sizeof(sentinel));
+  {
+    const InternalDoctypeInfo
+      doctype = { root, length, exception };
+
+    if (ParseInternalDoctypeDeclarations(&doctype,xml,n,
+          &predefined_entities) == MagickFalse)
+      {
+        predefined_entities=(char **) RelinquishMagickMemory(
+          predefined_entities);
+        return(MagickFalse);
+      }
+  }
   predefined_entities=(char **) RelinquishMagickMemory(predefined_entities);
   return(MagickTrue);
 }
