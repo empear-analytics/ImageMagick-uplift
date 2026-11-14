@@ -2519,6 +2519,18 @@ static void LogPixelChannels(const Image *image)
   }
 }
 
+static void SetExtraChannelMaskTraits(Image *image)
+{
+  if (image->storage_class == PseudoClass)
+    SetPixelChannelTraits(image,IndexPixelChannel,CopyPixelTrait);
+  if ((image->channels & ReadMaskChannel) != 0)
+    SetPixelChannelTraits(image,ReadMaskPixelChannel,CopyPixelTrait);
+  if ((image->channels & WriteMaskChannel) != 0)
+    SetPixelChannelTraits(image,WriteMaskPixelChannel,CopyPixelTrait);
+  if ((image->channels & CompositeMaskChannel) != 0)
+    SetPixelChannelTraits(image,CompositeMaskPixelChannel,CopyPixelTrait);
+}
+
 static void SetPixelChannelMaskTrait(Image *image,
   const ChannelType channel_mask,const ssize_t i)
 {
@@ -2567,14 +2579,7 @@ MagickExport ChannelType SetPixelChannelMask(Image *image,
   image->channel_mask=channel_mask;
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
     SetPixelChannelMaskTrait(image,channel_mask,i);
-  if (image->storage_class == PseudoClass)
-    SetPixelChannelTraits(image,IndexPixelChannel,CopyPixelTrait);
-  if ((image->channels & ReadMaskChannel) != 0)
-    SetPixelChannelTraits(image,ReadMaskPixelChannel,CopyPixelTrait);
-  if ((image->channels & WriteMaskChannel) != 0)
-    SetPixelChannelTraits(image,WriteMaskPixelChannel,CopyPixelTrait);
-  if ((image->channels & CompositeMaskChannel) != 0)
-    SetPixelChannelTraits(image,CompositeMaskPixelChannel,CopyPixelTrait);
+  SetExtraChannelMaskTraits(image);
   if ((GetLogEventMask() & PixelEvent) != 0)
     LogPixelChannels(image);
   return(mask);
