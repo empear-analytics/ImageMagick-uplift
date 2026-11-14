@@ -225,6 +225,13 @@ static void ConformPixelColorspace(const Image *image,PixelInfo *destination)
       ConvertCMYKToRGB(destination);
 }
 
+static void ConformImageColorspace(Image *image,ExceptionInfo *exception)
+{
+  if ((IsPixelInfoGray(&image->background_color) == MagickFalse) &&
+      (IsGrayColorspace(image->colorspace) != MagickFalse))
+    (void) TransformImageColorspace(image,sRGBColorspace,exception);
+}
+
 MagickExport void ConformPixelInfo(Image *image,const PixelInfo *source,
   PixelInfo *destination,ExceptionInfo *exception)
 {
@@ -233,9 +240,7 @@ MagickExport void ConformPixelInfo(Image *image,const PixelInfo *source,
   assert(destination != (const PixelInfo *) NULL);
   *destination=(*source);
   ConformPixelColorspace(image,destination);
-  if ((IsPixelInfoGray(&image->background_color) == MagickFalse) &&
-      (IsGrayColorspace(image->colorspace) != MagickFalse))
-    (void) TransformImageColorspace(image,sRGBColorspace,exception);
+  ConformImageColorspace(image,exception);
   if ((destination->alpha_trait != UndefinedPixelTrait) &&
       ((image->alpha_trait & BlendPixelTrait) == 0))
     (void) SetImageAlpha(image,OpaqueAlpha,exception);
