@@ -202,6 +202,39 @@ static void ThrowPolicyAllocationError(ExceptionInfo *exception,
   CatchException(exception);
 }
 
+static void AppendBuiltInPolicies(LinkedListInfo *cache,
+  ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) (sizeof(PolicyMap)/sizeof(*PolicyMap)); i++)
+  {
+    const PolicyMapInfo
+      *p;
+
+    PolicyInfo
+      *policy_info;
+
+    p=PolicyMap+i;
+    policy_info=(PolicyInfo *) AcquireMagickMemory(sizeof(*policy_info));
+    if (policy_info == (PolicyInfo *) NULL)
+      {
+        ThrowPolicyAllocationError(exception,p);
+        continue;
+      }
+    SetBuiltInPolicyInfo(policy_info,p);
+    status=AppendValueToLinkedList(cache,policy_info);
+    if (status == MagickFalse)
+      {
+        ThrowPolicyAllocationError(exception,p);
+      }
+  }
+}
+
 static LinkedListInfo *AcquirePolicyCache(const char *filename,
   ExceptionInfo *exception)
 {
@@ -210,9 +243,6 @@ static LinkedListInfo *AcquirePolicyCache(const char *filename,
 
   MagickBooleanType
     status;
-
-  ssize_t
-    i;
 
   /*
     Load external policy map.
@@ -252,28 +282,7 @@ static LinkedListInfo *AcquirePolicyCache(const char *filename,
   /*
     Load built-in policy map.
   */
-  for (i=0; i < (ssize_t) (sizeof(PolicyMap)/sizeof(*PolicyMap)); i++)
-  {
-    const PolicyMapInfo
-      *p;
-
-    PolicyInfo
-      *policy_info;
-
-    p=PolicyMap+i;
-    policy_info=(PolicyInfo *) AcquireMagickMemory(sizeof(*policy_info));
-    if (policy_info == (PolicyInfo *) NULL)
-      {
-        ThrowPolicyAllocationError(exception,p);
-        continue;
-      }
-    SetBuiltInPolicyInfo(policy_info,p);
-    status=AppendValueToLinkedList(cache,policy_info);
-    if (status == MagickFalse)
-      {
-        ThrowPolicyAllocationError(exception,p);
-      }
-  }
+  AppendBuiltInPolicies(cache,exception);
   return(cache);
 }
 
