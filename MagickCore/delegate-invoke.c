@@ -154,6 +154,19 @@ static const char *GetListProperty(const Image *image,const char letter,
   }
 }
 
+static void FormatClassColorspaceAlpha(const Image *image,char *value)
+{
+  ColorspaceType
+    colorspace;
+
+  colorspace=image->colorspace;
+  (void) FormatLocaleString(value,MagickPathExtent,"%s %s %s",
+    CommandOptionToMnemonic(MagickClassOptions,(ssize_t)
+    image->storage_class),CommandOptionToMnemonic(MagickColorspaceOptions,
+    (ssize_t) colorspace),image->alpha_trait != UndefinedPixelTrait ?
+    "Alpha" : "");
+}
+
 static const char *GetMnemonicProperty(Image *image,const char letter,
   char *value,ExceptionInfo *exception)
 {
@@ -161,15 +174,7 @@ static const char *GetMnemonicProperty(Image *image,const char letter,
   {
     case 'r': /* Image storage class, colorspace, and alpha enabled.  */
     {
-      ColorspaceType
-        colorspace;
-
-      colorspace=image->colorspace;
-      (void) FormatLocaleString(value,MagickPathExtent,"%s %s %s",
-        CommandOptionToMnemonic(MagickClassOptions,(ssize_t)
-        image->storage_class),CommandOptionToMnemonic(MagickColorspaceOptions,
-        (ssize_t) colorspace),image->alpha_trait != UndefinedPixelTrait ?
-        "Alpha" : "");
+      FormatClassColorspaceAlpha(image,value);
       return(value);
     }
     case 'A': /* Image alpha channel  */
