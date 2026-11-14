@@ -2702,11 +2702,44 @@ static KernelInfo *AcquireBlurOrNamedKernel(KernelInfo *kernel,
   }
 }
 
+static KernelInfo *AcquireKernelOfType(KernelInfo *kernel,
+  const KernelInfoType type,const BuiltInKernelInputs *builtin)
+{
+  BuiltInKernelInputs
+    inputs;
+
+  const GeometryInfo
+    *args = builtin->args;
+
+  const double
+    nan = builtin->nan;
+
+  ExceptionInfo
+    *exception = builtin->exception;
+
+  switch(type) {
+    /*
+      Convolution Kernels
+    */
+    case UnityKernel:
+      return(AcquireUnityKernel(kernel,args));
+    case GaussianKernel:
+    case DoGKernel:
+    case LoGKernel:
+      return(AcquireGaussianKernel(kernel,type,args));
+    default:
+      inputs.args=args;
+      inputs.nan=nan;
+      inputs.exception=exception;
+      return(AcquireBlurOrNamedKernel(kernel,type,&inputs));
+  }
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
   BuiltInKernelInputs
-    inputs;
+    builtin;
 
   KernelInfo
     *kernel;
@@ -2777,22 +2810,10 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       break;
   }
 
-  switch(type) {
-    /*
-      Convolution Kernels
-    */
-    case UnityKernel:
-      return(AcquireUnityKernel(kernel,args));
-    case GaussianKernel:
-    case DoGKernel:
-    case LoGKernel:
-      return(AcquireGaussianKernel(kernel,type,args));
-    default:
-      inputs.args=args;
-      inputs.nan=nan;
-      inputs.exception=exception;
-      return(AcquireBlurOrNamedKernel(kernel,type,&inputs));
-  }
+  builtin.args=args;
+  builtin.nan=nan;
+  builtin.exception=exception;
+  return(AcquireKernelOfType(kernel,type,&builtin));
 }
 
 /*
