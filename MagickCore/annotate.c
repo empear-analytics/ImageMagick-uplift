@@ -861,14 +861,8 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
   {
     const RenderTarget target = { image, annotate };
 
-    TextAlignInfo
-      text_align;
-
     TextDecorationInfo
       decoration;
-
-    GravityTextInfo
-      gravity;
 
     if (*textlist[i] == '\0')
       continue;
@@ -881,20 +875,18 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
     if ((metrics.width == 0) || (annotate->gravity != NorthWestGravity))
       (void) GetTypeMetrics(image,annotate,&metrics,exception);
     height=GetTextLineHeight(&metrics,draw_info);
-    gravity.annotate=annotate;
-    gravity.annotate_info=annotate_info;
-    gravity.geometry=geometry;
-    gravity.height=height;
-    gravity.i=i;
-    gravity.metrics=metrics;
-    gravity.number_lines=number_lines;
-    GetAnnotateTextOffset(&gravity,&offset);
-    text_align.annotate=annotate;
-    text_align.annotate_info=annotate_info;
-    text_align.height=height;
-    text_align.i=i;
-    text_align.metrics=metrics;
-    GetAnnotateAlignOffset(&text_align,&offset);
+    {
+      const GravityTextInfo gravity = { annotate, annotate_info, geometry,
+        height, i, metrics, number_lines };
+
+      GetAnnotateTextOffset(&gravity,&offset);
+    }
+    {
+      const TextAlignInfo text_align = { annotate, annotate_info, height, i,
+        metrics };
+
+      GetAnnotateAlignOffset(&text_align,&offset);
+    }
     decoration.image=image;
     decoration.draw_info=draw_info;
     decoration.annotate=annotate;
