@@ -7725,6 +7725,9 @@ typedef struct _DrawStyleTargets
 
   int
     *y;
+
+  MagickStatusType
+    *status;
 } DrawStyleTargets;
 
 static void XSelectDrawColor(const DrawEditContext *context,const int id,
@@ -9405,6 +9408,32 @@ static MagickBooleanType XTrackDrawStroke(const DrawEditContext *context,
   return(MagickFalse);
 }
 
+static MagickBooleanType XDrawEditStep(const DrawEditContext *context,
+  const DrawPointerTargets *pointer_targets,
+  const DrawShapeTargets *shape_targets,const DrawStyleTargets *style_targets)
+{
+  MagickStatusType
+    *const status = style_targets->status;
+
+  size_t
+    *const state = pointer_targets->state;
+
+  XDrawInfo
+    *const draw_info = style_targets->draw_info;
+
+  XWaitForDrawStart(context,pointer_targets,style_targets);
+  if (((*state) & EscapeState) != 0)
+    return(MagickTrue);
+  if (XTrackDrawStroke(context,pointer_targets,shape_targets,style_targets) !=
+      MagickFalse)
+    return(MagickFalse);
+  /*
+    Draw element on image.
+  */
+  (*status)=XDrawElementImage(context,draw_info);
+  return(MagickFalse);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -9465,7 +9494,8 @@ static MagickBooleanType XDrawEditImage(Display *display,
     pointer_targets = { &x, &y, &state, &event, &element };
 
   const DrawStyleTargets
-    style_targets = { &draw_info, &pen_id, &line_width, &stipple, &x, &y };
+    style_targets = { &draw_info, &pen_id, &line_width, &stipple, &x, &y,
+      &status };
 
   /*
     Allocate polygon info.
@@ -9490,16 +9520,9 @@ static MagickBooleanType XDrawEditImage(Display *display,
 
     for ( ; ; )
     {
-      XWaitForDrawStart(&draw_context,&pointer_targets,&style_targets);
-      if ((state & EscapeState) != 0)
-        break;
-      if (XTrackDrawStroke(&draw_context,&pointer_targets,&shape_targets,
+      if (XDrawEditStep(&draw_context,&pointer_targets,&shape_targets,
           &style_targets) != MagickFalse)
-        continue;
-      /*
-        Draw element on image.
-      */
-      status=XDrawElementImage(&draw_context,&draw_info);
+        break;
     }
   }
   XSetCursorState(display,windows,MagickFalse);
