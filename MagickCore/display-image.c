@@ -11023,6 +11023,38 @@ static void XApplyRotateLeftCommand(const XMagickCommandContext *context)
     }
 }
 
+static void XApplyRotateCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  MagickStatusType
+    status;
+
+  /*
+    Rotate image.
+  */
+  status=XRotateImage(display,resource_info,windows,0.0,image,exception);
+  if (status == MagickFalse)
+    {
+      XNoticeWidget(display,windows,"Unable to rotate X image",
+        (*image)->filename);
+      return;
+    }
+}
+
 static void XApplyResizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11735,19 +11767,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyRotateLeftCommand(&context);
       break;
     case RotateCommand:
-    {
-      /*
-        Rotate image.
-      */
-      status=XRotateImage(display,resource_info,windows,0.0,image,exception);
-      if (status == MagickFalse)
-        {
-          XNoticeWidget(display,windows,"Unable to rotate X image",
-            (*image)->filename);
-          break;
-        }
+      XApplyRotateCommand(&context);
       break;
-    }
     case ShearCommand:
       XApplyShearCommand(&context,color);
       break;
