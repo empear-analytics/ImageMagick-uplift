@@ -14078,6 +14078,37 @@ static void XApplyImageEditCommands(const XMagickCommandContext *context,
   }
 }
 
+static void XApplyPaintCommands(const XMagickCommandContext *context,
+  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
+{
+  switch (command)
+  {
+    case OilPaintCommand:
+      XApplyOilPaintCommand(context,&(*flags));
+      break;
+    case CharcoalDrawCommand:
+      XApplyCharcoalDrawCommand(context);
+      break;
+    case AnnotateCommand:
+      XApplyAnnotateCommand(context);
+      break;
+    case DrawCommand:
+      XApplyDrawCommand(context);
+      break;
+    case ColorCommand:
+      XApplyColorCommand(context);
+      break;
+    case MatteCommand:
+      XApplyMatteCommand(context);
+      break;
+    default:
+    {
+      XApplyImageEditCommands(context,command,&(*nexus));
+      break;
+    }
+  }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -14309,27 +14340,9 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
     case WaveCommand:
       XApplyWaveCommand(&context);
       break;
-    case OilPaintCommand:
-      XApplyOilPaintCommand(&context,&flags);
-      break;
-    case CharcoalDrawCommand:
-      XApplyCharcoalDrawCommand(&context);
-      break;
-    case AnnotateCommand:
-      XApplyAnnotateCommand(&context);
-      break;
-    case DrawCommand:
-      XApplyDrawCommand(&context);
-      break;
-    case ColorCommand:
-      XApplyColorCommand(&context);
-      break;
-    case MatteCommand:
-      XApplyMatteCommand(&context);
-      break;
     default:
     {
-      XApplyImageEditCommands(&context,command,&nexus);
+      XApplyPaintCommands(&context,command,&flags,&nexus);
       break;
     }
   }
