@@ -22190,6 +22190,63 @@ static void XHandleConfigureNotify(const DisplayEventContext *context,
     }
 }
 
+static void XHandleExpose(const DisplayEventContext *context,
+  const DisplayEventTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  Image
+    **const display_image = targets->display_image;
+
+  XEvent
+    *const event = targets->event;
+
+  time_t
+    *const timer = targets->timer;
+
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Expose: 0x%lx %dx%d+%d+%d",(*event).xexpose.window,
+      (*event).xexpose.width,(*event).xexpose.height,(*event).xexpose.x,
+      (*event).xexpose.y);
+  /*
+    Refresh windows that are now exposed.
+  */
+  if (((*event).xexpose.window == windows->image.id) &&
+      windows->image.mapped != MagickFalse)
+    {
+      XRefreshWindow(display,&windows->image,event);
+      (*timer)=XGetDisplayTimer((*display_image));
+      return;
+    }
+  if (((*event).xexpose.window == windows->magnify.id) &&
+      windows->magnify.mapped != MagickFalse)
+    {
+      XMakeMagnifyImage(display,windows,exception);
+      return;
+    }
+  if ((*event).xexpose.window == windows->pan.id)
+    {
+      XDrawPanRectangle(display,windows);
+      return;
+    }
+  if ((*event).xexpose.window == windows->icon.id)
+    {
+      XRefreshWindow(display,&windows->icon,event);
+      return;
+    }
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -22837,37 +22894,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
       }
       case Expose:
       {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Expose: 0x%lx %dx%d+%d+%d",event.xexpose.window,
-            event.xexpose.width,event.xexpose.height,event.xexpose.x,
-            event.xexpose.y);
-        /*
-          Refresh windows that are now exposed.
-        */
-        if ((event.xexpose.window == windows->image.id) &&
-            windows->image.mapped != MagickFalse)
-          {
-            XRefreshWindow(display,&windows->image,&event);
-            timer=XGetDisplayTimer(display_image);
-            break;
-          }
-        if ((event.xexpose.window == windows->magnify.id) &&
-            windows->magnify.mapped != MagickFalse)
-          {
-            XMakeMagnifyImage(display,windows,exception);
-            break;
-          }
-        if (event.xexpose.window == windows->pan.id)
-          {
-            XDrawPanRectangle(display,windows);
-            break;
-          }
-        if (event.xexpose.window == windows->icon.id)
-          {
-            XRefreshWindow(display,&windows->icon,&event);
-            break;
-          }
+        XHandleExpose(&event_context,&event_targets);
         break;
       }
       case KeyPress:
