@@ -14417,6 +14417,37 @@ static void XApplyEditCommands(const XMagickCommandContext *context,
   }
 }
 
+static void XApplyFileCommands(const XMagickCommandContext *context,
+  const DisplayCommand command,Image **nexus,MagickStatusType *flags)
+{
+  switch (command)
+  {
+    case SaveCommand:
+      XApplySaveCommand(context);
+      break;
+    case PrintCommand:
+      XApplyPrintCommand(context);
+      break;
+    case DeleteCommand:
+      XApplyDeleteCommand(context);
+      break;
+    case NewCommand:
+      (*nexus)=XApplyNewCommand(context,(*nexus));
+      break;
+    case VisualDirectoryCommand:
+      (*nexus)=XApplyVisualDirectoryCommand(context);
+      break;
+    case QuitCommand:
+      XApplyQuitCommand(context);
+      break;
+    default:
+    {
+      XApplyEditCommands(context,command,&(*flags),&(*nexus));
+      break;
+    }
+  }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -14475,27 +14506,9 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
     case SelectCommand:
       nexus=XApplySelectCommand(&context);
       break;
-    case SaveCommand:
-      XApplySaveCommand(&context);
-      break;
-    case PrintCommand:
-      XApplyPrintCommand(&context);
-      break;
-    case DeleteCommand:
-      XApplyDeleteCommand(&context);
-      break;
-    case NewCommand:
-      nexus=XApplyNewCommand(&context,nexus);
-      break;
-    case VisualDirectoryCommand:
-      nexus=XApplyVisualDirectoryCommand(&context);
-      break;
-    case QuitCommand:
-      XApplyQuitCommand(&context);
-      break;
     default:
     {
-      XApplyEditCommands(&context,command,&flags,&nexus);
+      XApplyFileCommands(&context,command,&nexus,&flags);
       break;
     }
   }
