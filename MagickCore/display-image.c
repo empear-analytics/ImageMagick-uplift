@@ -11187,6 +11187,28 @@ static void XApplyAddFrameCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XStoreEditedComment(const XMagickCommandContext *context)
+{
+  Image
+    **const image = context->image;
+
+  ImageInfo
+    *const image_info = context->image_info;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  char
+    *comment;
+
+  comment=FileToString(image_info->filename,~0UL,exception);
+  if (comment != (char *) NULL)
+    {
+      (void) SetImageProperty(*image,"comment",comment,exception);
+      (*image)->taint=MagickTrue;
+    }
+}
+
 static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12778,17 +12800,7 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
         XNoticeWidget(display,windows,"Unable to edit image comment",
           (char *) NULL);
       else
-        {
-          char
-            *comment;
-
-          comment=FileToString(image_info->filename,~0UL,exception);
-          if (comment != (char *) NULL)
-            {
-              (void) SetImageProperty(*image,"comment",comment,exception);
-              (*image)->taint=MagickTrue;
-            }
-        }
+        XStoreEditedComment(&context);
       (void) RelinquishUniqueFileResource(image_info->filename);
       XSetCursorState(display,windows,MagickFalse);
       break;
