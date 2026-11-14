@@ -5894,6 +5894,34 @@ static MagickBooleanType XCompositeIntoImage(
   return(MagickTrue);
 }
 
+static Image *XReadCompositeImage(const CompositeCommandInput *input,
+  const char *filename)
+{
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  Image
+    *composite_image;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) CopyMagickString(resource_info->image_info->filename,filename,
+    MagickPathExtent);
+  composite_image=ReadImage(resource_info->image_info,exception);
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  return(composite_image);
+}
+
 static MagickBooleanType XCompositeImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -5944,13 +5972,7 @@ static MagickBooleanType XCompositeImage(Display *display,
   /*
     Read image.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) CopyMagickString(resource_info->image_info->filename,filename,
-    MagickPathExtent);
-  composite_image=ReadImage(resource_info->image_info,exception);
-  CatchException(exception);
-  XSetCursorState(display,windows,MagickFalse);
+  composite_image=XReadCompositeImage(&command_input,filename);
   if (composite_image == (Image *) NULL)
     return(MagickFalse);
   /*
