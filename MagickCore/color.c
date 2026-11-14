@@ -2547,6 +2547,13 @@ static const char *GetQueryColorName(const char *name)
   return(name);
 }
 
+static const char *SkipColorNameSpaces(const char *name)
+{
+  while (isspace((int) ((unsigned char) *name)) != 0)
+    name++;
+  return(name);
+}
+
 MagickExport MagickBooleanType QueryColorCompliance(const char *name,
   const ComplianceType compliance,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2569,8 +2576,7 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
         "UnrecognizedColor","`%s'",name);
       return(MagickFalse);
     }
-  while (isspace((int) ((unsigned char) *name)) != 0)
-    name++;
+  name=SkipColorNameSpaces(name);
   GetPixelInfo((Image *) NULL,color);
   if (*name == '#')
     return(QueryHexColor(name,color,exception));
