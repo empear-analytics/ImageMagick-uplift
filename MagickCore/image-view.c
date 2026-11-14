@@ -944,9 +944,8 @@ MagickExport MagickBooleanType TransferImageViewIterator(ImageView *source,
     return(MagickFalse);
   source_image=source->image;
   destination_image=destination->image;
-  status=SetImageStorageClass(destination_image,DirectClass,
-    destination->exception);
-  if (status == MagickFalse)
+  if (SetImageViewDirectClass(destination_image,destination->exception) ==
+      MagickFalse)
     return(MagickFalse);
   status=MagickTrue;
   progress=0;
