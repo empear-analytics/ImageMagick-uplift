@@ -1459,10 +1459,7 @@ MagickExport const Quantum *GetVirtualPixels(const Image *image,
     *magick_restrict p;
 
   assert(image != (const Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(image->cache != (Cache) NULL);
-  cache_info=(CacheInfo *) image->cache;
-  assert(cache_info->signature == MagickCoreSignature);
+  cache_info=GetImageCacheInfo(image);
   if (cache_info->methods.get_virtual_pixel_handler !=
        (GetVirtualPixelHandler) NULL)
     return(cache_info->methods.get_virtual_pixel_handler(image,
