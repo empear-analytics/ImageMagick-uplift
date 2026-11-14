@@ -189,26 +189,19 @@ static void SetMaskPixel(const Image *image,const PixelMask type,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static void AddImageMaskChannel(Image *image,const PixelMask type)
+static ChannelType GetMaskChannel(const PixelMask type)
 {
   switch (type)
   {
-    case ReadPixelMask:
-    {
-      image->channels=(ChannelType) (image->channels | ReadMaskChannel);
-      break;
-    }
-    case WritePixelMask:
-    {
-      image->channels=(ChannelType) (image->channels | WriteMaskChannel);
-      break;
-    }
-    default:
-    {
-      image->channels=(ChannelType) (image->channels | CompositeMaskChannel);
-      break;
-    }
+    case ReadPixelMask: return(ReadMaskChannel);
+    case WritePixelMask: return(WriteMaskChannel);
+    default: return(CompositeMaskChannel);
   }
+}
+
+static void AddImageMaskChannel(Image *image,const PixelMask type)
+{
+  image->channels=(ChannelType) (image->channels | GetMaskChannel(type));
 }
 
 typedef struct _ImageMaskRow
@@ -334,27 +327,8 @@ MagickExport MagickBooleanType SetImageMask(Image *image,const PixelMask type,
 
 static void RemoveRegionMaskChannel(Image *image,const PixelMask type)
 {
-  switch (type)
-  {
-    case ReadPixelMask:
-    {
-      image->channels=(ChannelType) ((unsigned int) image->channels &
-        (unsigned int) ~ReadMaskChannel);
-      break;
-    }
-    case WritePixelMask:
-    {
-      image->channels=(ChannelType) ((unsigned int) image->channels &
-        (unsigned int) ~WriteMaskChannel);
-      break;
-    }
-    default:
-    {
-      image->channels=(ChannelType) ((unsigned int) image->channels &
-        (unsigned int) ~CompositeMaskChannel);
-      break;
-    }
-  }
+  image->channels=(ChannelType) ((unsigned int) image->channels &
+    (unsigned int) ~GetMaskChannel(type));
 }
 
 /*
