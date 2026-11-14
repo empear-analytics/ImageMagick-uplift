@@ -5230,18 +5230,49 @@ static MagickBooleanType InterpretLetterEscape(
   return(MagickTrue);
 }
 
+static MagickBooleanType InterpretEscapeCharacter(
+  const InterpretLetterInputs *inputs,const InterpretText *text,
+  const char **p)
+{
+  char
+    **const q = text->q;
+
+  /*
+    Look for the various escapes, (and handle other specials)
+  */
+  *(*q)='\0';
+  if (ExtendInterpretBuffer(text,(MagickPathExtent)) == MagickFalse)
+    return(MagickFalse);
+  if (InterpretCharacter(q,p) != MagickFalse)
+    return(MagickTrue);
+  (*p)++; /* advance beyond the percent */
+  /*
+    Doubled Percent - or percent at end of string.
+  */
+  if (IsEscapeEnd(*p) != MagickFalse)
+    (*p)--;
+  if (*(*p) == '%')
+    {
+      *(*q)++='%';
+      return(MagickTrue);
+    }
+  /*
+    Single letter escapes %c.
+  */
+  if (*(*p) != '[')
+    return(InterpretLetterEscape(inputs,text,p));
+  {
+    const InterpretSources
+      sources = { inputs->property_info, inputs->property_image,
+        inputs->exception };
+
+    return(InterpretBracedEscape(&sources,text,p));
+  }
+}
+
 MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   const char *embed_text,ExceptionInfo *exception)
 {
-#define ExtendInterpretText(string_length) \
-{ \
-  if (ExtendInterpretBuffer(&text,(string_length)) == MagickFalse) \
-    { \
-      status=MagickFalse; \
-      goto cleanup; \
-    } \
-}
-
   char
     *interpret_text = (char *) NULL,
     *q,  /* current position in interpret_text */
@@ -5315,54 +5346,19 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   number=MagickFalse;                       /* is last char a number? */
   for (q=interpret_text; *p!='\0'; number=isdigit((int) ((unsigned char) *p)) ? MagickTrue : MagickFalse,p++)
   {
-    /*
-      Look for the various escapes, (and handle other specials)
-    */
-    *q='\0';
-    ExtendInterpretText(MagickPathExtent);
-    if (InterpretCharacter(&q,&p) != MagickFalse)
-      continue;
-    p++; /* advance beyond the percent */
-    /*
-      Doubled Percent - or percent at end of string.
-    */
-    if (IsEscapeEnd(p) != MagickFalse)
-      p--;
-    if (*p == '%')
-      {
-        *q++='%';
-        continue;
-      }
-    /*
-      Single letter escapes %c.
-    */
-    if (*p != '[')
-      {
-        InterpretLetterInputs
-          inputs;
+    InterpretLetterInputs
+      inputs;
 
-        inputs.property_info=property_info;
-        inputs.image=image;
-        inputs.property_image=property_image;
-        inputs.exception=exception;
-        inputs.number=number;
-        if (InterpretLetterEscape(&inputs,&text,&p) == MagickFalse)
-          {
-            status=MagickFalse;
-            goto cleanup;
-          }
-        continue;
+    inputs.property_info=property_info;
+    inputs.image=image;
+    inputs.property_image=property_image;
+    inputs.exception=exception;
+    inputs.number=number;
+    if (InterpretEscapeCharacter(&inputs,&text,&p) == MagickFalse)
+      {
+        status=MagickFalse;
+        goto cleanup;
       }
-    {
-      const InterpretSources
-        sources = { property_info, property_image, exception };
-
-      if (InterpretBracedEscape(&sources,&text,&p) == MagickFalse)
-        {
-          status=MagickFalse;
-          goto cleanup;
-        }
-    }
   }
   *q='\0';
 
