@@ -20706,6 +20706,9 @@ typedef struct _DisplayEventTargets
 
   time_t
     *timer;
+
+  XGCValues
+    *context_values;
 } DisplayEventTargets;
 
 static void XSelectVirtualCommand(const DisplayEventContext *context,
@@ -22056,6 +22059,80 @@ static void XHandleButtonPress(const DisplayEventContext *context,
   (*timer)=XGetDisplayTimer((*display_image));
 }
 
+static void XHandleClientMessage(const DisplayEventContext *context,
+  const DisplayEventTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  size_t
+    *const state = context->state;
+
+  XVisualInfo
+    *const visual_info = context->visual_info;
+
+  Image
+    **const nexus = targets->nexus;
+
+  Image
+    **const display_image = targets->display_image;
+
+  XEvent
+    *const event = targets->event;
+
+  XGCValues
+    *const context_values = targets->context_values;
+
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Client Message: 0x%lx 0x%lx %d 0x%lx",(*event).xclient.window,
+      (*event).xclient.message_type,(*event).xclient.format,(unsigned long)
+      (*event).xclient.data.l[0]);
+  if ((*event).xclient.message_type == windows->im_protocols)
+    {
+      XHandleProtocolMessage(context,(*event),context_values);
+      return;
+    }
+  if ((*event).xclient.message_type == windows->dnd_protocols)
+    {
+      (*nexus)=XDropImage(context,(*event),(*nexus));
+      return;
+    }
+  /*
+    If client window delete message, exit.
+  */
+  if ((*event).xclient.message_type != windows->wm_protocols)
+    return;
+  if (*(*event).xclient.data.l != (long) windows->wm_delete_window)
+    return;
+  (void) XWithdrawWindow(display,(*event).xclient.window,
+    visual_info->screen);
+  if ((*event).xclient.window == windows->image.id)
+    {
+      *state|=ExitState;
+      return;
+    }
+  if ((*event).xclient.window == windows->pan.id)
+    {
+      /*
+        Restore original image size when pan window is deleted.
+      */
+      windows->image.window_changes.width=windows->image.ximage->width;
+      windows->image.window_changes.height=windows->image.ximage->height;
+      (void) XConfigureImage(display,resource_info,windows,
+        (*display_image),exception);
+    }
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -22152,7 +22229,8 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
     event_context;
 
   const DisplayEventTargets
-    event_targets = { &nexus, &display_image, &event, &vid_info, &timer };
+    event_targets = { &nexus, &display_image, &event, &vid_info, &timer,
+      &context_values };
 
   assert(image != (Image **) NULL);
   assert((*image)->signature == MagickCoreSignature);
@@ -22667,45 +22745,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
       }
       case ClientMessage:
       {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Client Message: 0x%lx 0x%lx %d 0x%lx",event.xclient.window,
-            event.xclient.message_type,event.xclient.format,(unsigned long)
-            event.xclient.data.l[0]);
-        if (event.xclient.message_type == windows->im_protocols)
-          {
-            XHandleProtocolMessage(&event_context,event,&context_values);
-            break;
-          }
-        if (event.xclient.message_type == windows->dnd_protocols)
-          {
-            nexus=XDropImage(&event_context,event,nexus);
-            break;
-          }
-        /*
-          If client window delete message, exit.
-        */
-        if (event.xclient.message_type != windows->wm_protocols)
-          break;
-        if (*event.xclient.data.l != (long) windows->wm_delete_window)
-          break;
-        (void) XWithdrawWindow(display,event.xclient.window,
-          visual_info->screen);
-        if (event.xclient.window == windows->image.id)
-          {
-            *state|=ExitState;
-            break;
-          }
-        if (event.xclient.window == windows->pan.id)
-          {
-            /*
-              Restore original image size when pan window is deleted.
-            */
-            windows->image.window_changes.width=windows->image.ximage->width;
-            windows->image.window_changes.height=windows->image.ximage->height;
-            (void) XConfigureImage(display,resource_info,windows,
-              display_image,exception);
-          }
+        XHandleClientMessage(&event_context,&event_targets);
         break;
       }
       case ConfigureNotify:
