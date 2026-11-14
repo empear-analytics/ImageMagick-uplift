@@ -402,6 +402,36 @@ static MagickBooleanType IsModuleMatch(const char *name,const char *pattern,
   return(GlobExpression(name,pattern,MagickFalse));
 }
 
+static MagickBooleanType GetModuleListPath(const MagickModuleType type,
+  char *module_path,ExceptionInfo *exception)
+{
+  char
+    filename[MagickPathExtent];
+
+  MagickBooleanType
+    status;
+
+  switch (type)
+  {
+    case MagickImageCoderModule:
+    default:
+    {
+      TagToCoderModuleName("magick",filename);
+      status=GetMagickModulePath(filename,MagickImageCoderModule,module_path,
+        exception);
+      break;
+    }
+    case MagickImageFilterModule:
+    {
+      TagToFilterModuleName("analyze",filename);
+      status=GetMagickModulePath(filename,MagickImageFilterModule,module_path,
+        exception);
+      break;
+    }
+  }
+  return(status);
+}
+
 MagickExport char **GetModuleList(const char *pattern,
   const MagickModuleType type,size_t *number_modules,ExceptionInfo *exception)
 {
@@ -409,7 +439,6 @@ MagickExport char **GetModuleList(const char *pattern,
 
   char
     **modules,
-    filename[MagickPathExtent],
     module_path[MagickPathExtent],
     path[MagickPathExtent];
 
@@ -432,24 +461,7 @@ MagickExport char **GetModuleList(const char *pattern,
   /*
     Locate all modules in the image coder or filter path.
   */
-  switch (type)
-  {
-    case MagickImageCoderModule:
-    default:
-    {
-      TagToCoderModuleName("magick",filename);
-      status=GetMagickModulePath(filename,MagickImageCoderModule,module_path,
-        exception);
-      break;
-    }
-    case MagickImageFilterModule:
-    {
-      TagToFilterModuleName("analyze",filename);
-      status=GetMagickModulePath(filename,MagickImageFilterModule,module_path,
-        exception);
-      break;
-    }
-  }
+  status=GetModuleListPath(type,module_path,exception);
   if (status == MagickFalse)
     return((char **) NULL);
   GetPathComponent(module_path,HeadPath,path);
