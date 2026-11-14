@@ -2251,7 +2251,7 @@ typedef struct _TagAttributeTargets
     *l;
 } TagAttributeTargets;
 
-static MagickBooleanType ParseTagAttributes(XMLTreeRoot *root,
+static MagickBooleanType ParseTagAttribute(XMLTreeRoot *root,
   char **attribute,ExceptionInfo *exception,const TagAttributeTargets *targets)
 {
   char
@@ -2263,40 +2263,54 @@ static MagickBooleanType ParseTagAttributes(XMLTreeRoot *root,
   ssize_t
     *const l = targets->l;
 
+  /*
+    Attribute.
+  */
+  *attributes=GrowAttributeList(*attributes,*l);
+  if (*attributes == (char **) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'","");
+      return(MagickFalse);
+    }
+  (*attributes)[*l+2]=(char *) NULL;
+  (*attributes)[*l+1]=(char *) NULL;
+  (*attributes)[*l]=*p;
+  *p+=(ptrdiff_t) strcspn(*p,XMLWhitespace "=/>");
+  if ((**p != '=') && (isspace((int) ((unsigned char) **p)) == 0))
+    (*attributes)[*l]=ConstantString("");
+  else
+    {
+      AttributeValueInfo
+        value;
+
+      value.root=root;
+      value.attribute=attribute;
+      value.attributes=attributes;
+      value.p=p;
+      value.l=l;
+      value.exception=exception;
+      if (ParseAttributeValue(&value) == MagickFalse)
+        return(MagickFalse);
+    }
+  while (isspace((int) ((unsigned char) **p)) != 0)
+    (*p)++;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseTagAttributes(XMLTreeRoot *root,
+  char **attribute,ExceptionInfo *exception,const TagAttributeTargets *targets)
+{
+  char
+    **const p = targets->p;
+
+  ssize_t
+    *const l = targets->l;
+
   for (*l=0; IsInsideXMLTag(*p) != MagickFalse; *l+=2)
   {
-    /*
-      Attribute.
-    */
-    *attributes=GrowAttributeList(*attributes,*l);
-    if (*attributes == (char **) NULL)
-      {
-        (void) ThrowMagickException(exception,GetMagickModule(),
-          ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-        return(MagickFalse);
-      }
-    (*attributes)[*l+2]=(char *) NULL;
-    (*attributes)[*l+1]=(char *) NULL;
-    (*attributes)[*l]=*p;
-    *p+=(ptrdiff_t) strcspn(*p,XMLWhitespace "=/>");
-    if ((**p != '=') && (isspace((int) ((unsigned char) **p)) == 0))
-      (*attributes)[*l]=ConstantString("");
-    else
-      {
-        AttributeValueInfo
-          value;
-
-        value.root=root;
-        value.attribute=attribute;
-        value.attributes=attributes;
-        value.p=p;
-        value.l=l;
-        value.exception=exception;
-        if (ParseAttributeValue(&value) == MagickFalse)
-          return(MagickFalse);
-      }
-    while (isspace((int) ((unsigned char) **p)) != 0)
-      (*p)++;
+    if (ParseTagAttribute(root,attribute,exception,targets) == MagickFalse)
+      return(MagickFalse);
   }
   return(MagickTrue);
 }
