@@ -6972,6 +6972,21 @@ static MagickBooleanType ParseMVGKeyword(const MVGRenderState *state)
   return(keyword_info->parse(state));
 }
 
+static MagickBooleanType SetMVGImageOpaque(Image *image,
+  ExceptionInfo *exception)
+{
+  MagickStatusType
+    status;
+
+  if ((image->alpha_trait & BlendPixelTrait) == 0)
+    {
+      status=SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
+      if (status == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static DrawInfo **DestroyMVGGraphicContexts(DrawInfo **graphic_context,
   ssize_t n)
 {
@@ -7072,12 +7087,8 @@ static MagickBooleanType RenderMVGContent(Image *image,
     (void) LogMagickEvent(DrawEvent,GetMagickModule(),"begin draw-image");
   if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
     return(MagickFalse);
-  if ((image->alpha_trait & BlendPixelTrait) == 0)
-    {
-      status=SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
-      if (status == MagickFalse)
-        return(MagickFalse);
-    }
+  if (SetMVGImageOpaque(image,exception) == MagickFalse)
+    return(MagickFalse);
   if (IsMVGFileReference(draw_info,depth) != MagickFalse)
     primitive=FileToString(draw_info->primitive,~0UL,exception);
   else
