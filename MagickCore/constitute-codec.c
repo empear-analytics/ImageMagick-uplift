@@ -1145,12 +1145,9 @@ MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
       (void) CopyMagickString(image_filename,image->filename,MagickPathExtent);
       status=OpenBlob(image_info,image,WriteBinaryBlobMode,exception);
       (void) CopyMagickString(image->filename, image_filename,MagickPathExtent);
-      if (status != MagickFalse)
-        {
-          if (CloseSeekableWriteBlob(write_info,image,&temporary) ==
-              MagickFalse)
-            status=MagickFalse;
-        }
+      if ((status != MagickFalse) &&
+          (CloseSeekableWriteBlob(write_info,image,&temporary) == MagickFalse))
+        status=MagickFalse;
     }
   encoder=GetImageEncoder(magick_info);
   if (encoder != (EncodeImageHandler *) NULL)
