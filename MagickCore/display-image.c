@@ -11350,6 +11350,58 @@ static void XApplyContrastStretchCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplySigmoidalContrastCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  static char
+    levels[MagickPathExtent] = "3x50%";
+
+  /*
+    Query user for gamma value.
+  */
+  (void) XDialogWidget(display,windows,"Sigmoidal Contrast",
+    "Enter contrast and midpoint:",levels);
+  if (*levels == '\0')
+    return;
+  /*
+    Contrast stretch image.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flags=ParseGeometry(levels,&geometry_info);
+  if ((flags & SigmaValue) == 0)
+    geometry_info.sigma=1.0*(double) QuantumRange/2.0;
+  if ((flags & PercentValue) != 0)
+    geometry_info.sigma=1.0*(double) QuantumRange*geometry_info.sigma/100.0;
+  (void) SigmoidalContrastImage(*image,MagickTrue,geometry_info.rho,
+    geometry_info.sigma,exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyResizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12094,42 +12146,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyContrastStretchCommand(&context);
       break;
     case SigmoidalContrastCommand:
-    {
-      GeometryInfo
-        geometry_info;
-
-      MagickStatusType
-        flags;
-
-      static char
-        levels[MagickPathExtent] = "3x50%";
-
-      /*
-        Query user for gamma value.
-      */
-      (void) XDialogWidget(display,windows,"Sigmoidal Contrast",
-        "Enter contrast and midpoint:",levels);
-      if (*levels == '\0')
-        break;
-      /*
-        Contrast stretch image.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      flags=ParseGeometry(levels,&geometry_info);
-      if ((flags & SigmaValue) == 0)
-        geometry_info.sigma=1.0*(double) QuantumRange/2.0;
-      if ((flags & PercentValue) != 0)
-        geometry_info.sigma=1.0*(double) QuantumRange*geometry_info.sigma/100.0;
-      (void) SigmoidalContrastImage(*image,MagickTrue,geometry_info.rho,
-        geometry_info.sigma,exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplySigmoidalContrastCommand(&context);
       break;
-    }
     case NormalizeCommand:
     {
       /*
