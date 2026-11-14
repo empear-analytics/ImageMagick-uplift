@@ -14264,6 +14264,31 @@ static void XApplyContrastCommands(const XMagickCommandContext *context,
   }
 }
 
+static void XApplyToneCommands(const XMagickCommandContext *context,
+  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
+{
+  switch (command)
+  {
+    case HueCommand:
+      XApplyHueCommand(context);
+      break;
+    case SaturationCommand:
+      XApplySaturationCommand(context);
+      break;
+    case BrightnessCommand:
+      XApplyBrightnessCommand(context);
+      break;
+    case GammaCommand:
+      XApplyGammaCommand(context);
+      break;
+    default:
+    {
+      XApplyContrastCommands(context,command,&(*flags),&(*nexus));
+      break;
+    }
+  }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -14400,21 +14425,9 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
     case TrimCommand:
       XApplyTrimCommand(&context);
       break;
-    case HueCommand:
-      XApplyHueCommand(&context);
-      break;
-    case SaturationCommand:
-      XApplySaturationCommand(&context);
-      break;
-    case BrightnessCommand:
-      XApplyBrightnessCommand(&context);
-      break;
-    case GammaCommand:
-      XApplyGammaCommand(&context);
-      break;
     default:
     {
-      XApplyContrastCommands(&context,command,&flags,&nexus);
+      XApplyToneCommands(&context,command,&flags,&nexus);
       break;
     }
   }
