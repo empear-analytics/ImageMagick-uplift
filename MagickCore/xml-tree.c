@@ -3383,6 +3383,14 @@ static MagickBooleanType AppendAllTagAttributes(XMLTreeInfo *xml_info,
   return(MagickTrue);
 }
 
+static size_t SkipTagContentOffset(const XMLTreeInfo *xml_info,
+  const char *content,size_t offset)
+{
+  while ((offset < xml_info->offset) && (content[offset] != '\0'))
+    offset++;
+  return(offset);
+}
+
 static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,const XMLBufferInfo *buffer,
   size_t start,char ***attributes)
 {
@@ -3424,8 +3432,7 @@ static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,const XMLBufferInfo *buffer,
   if (*xml_info->content != '\0')
     *length+=(size_t) FormatLocaleString(*source+(*length),*extent,"</%s>",
       xml_info->tag);
-  while ((offset < xml_info->offset) && (content[offset] != '\0'))
-    offset++;
+  offset=SkipTagContentOffset(xml_info,content,offset);
   if (xml_info->ordered != (XMLTreeInfo *) NULL)
     content=XMLTreeTagToXML(xml_info->ordered,buffer,offset,attributes);
   else
