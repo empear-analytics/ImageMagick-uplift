@@ -916,6 +916,55 @@ static MagickBooleanType UpdateHuffmanProgress(Image *huffman_image,
   return(MagickTrue);
 }
 
+typedef struct _HuffmanBitWriter
+{
+  const ImageInfo
+    *image_info;
+
+  Image
+    *image;
+
+  size_t
+    one;
+
+  unsigned char
+    byte,
+    bit;
+} HuffmanBitWriter;
+
+static void OutputHuffmanRun(HuffmanBitWriter *writer,
+  const HuffmanTable *makeup_table,const HuffmanTable *terminating_table,
+  int runlength)
+{
+  const HuffmanTable
+    *entry;
+
+  const ImageInfo
+    *image_info = writer->image_info;
+
+  Image
+    *image = writer->image;
+
+  size_t
+    mask,
+    one = writer->one;
+
+  unsigned char
+    byte = writer->byte,
+    bit = writer->bit;
+
+  if (runlength >= 64)
+    {
+      entry=HuffmanMakeupEntry(makeup_table,runlength);
+      runlength-=(long) entry->count;
+      HuffmanOutputCode(entry);
+    }
+  entry=terminating_table+MagickMin((size_t) runlength,63);
+  HuffmanOutputCode(entry);
+  writer->byte=byte;
+  writer->bit=bit;
+}
+
 static size_t GetHuffmanWidth(const ImageInfo *image_info,
   const Image *inject_image)
 {
@@ -943,8 +992,8 @@ static void OutputHuffmanEndOfPage(const ImageInfo *image_info,Image *image,
 MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
   Image *image,Image *inject_image,ExceptionInfo *exception)
 {
-  const HuffmanTable
-    *entry;
+  HuffmanBitWriter
+    writer;
 
   int
     runlength;
@@ -959,7 +1008,6 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
     *q;
 
   size_t
-    mask,
     one,
     width;
 
@@ -968,8 +1016,6 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
     y;
 
   unsigned char
-    byte,
-    bit,
     *scanline;
 
   /*
@@ -998,8 +1044,11 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
       return(MagickFalse);
     }
   (void) SetImageType(huffman_image,BilevelType,exception);
-  byte='\0';
-  bit=(unsigned char) 0x80;
+  writer.image_info=image_info;
+  writer.image=image;
+  writer.one=one;
+  writer.byte='\0';
+  writer.bit=(unsigned char) 0x80;
   if (LocaleCompare(image_info->magick,"FAX") != 0)
     Ascii85Initialize(image);
   else
@@ -1007,7 +1056,7 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
       /*
         End of line.
       */
-      OutputHuffmanEndOfLine(image_info,image,&byte,&bit);
+      OutputHuffmanEndOfLine(image_info,image,&writer.byte,&writer.bit);
     }
   /*
     Compress to 1D Huffman pixels.
@@ -1029,34 +1078,20 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
         Output white run.
       */
       runlength=CountHuffmanRun(&q,&n,MagickFalse);
-      if (runlength >= 64)
-        {
-          entry=HuffmanMakeupEntry(MWTable,runlength);
-          runlength-=(long) entry->count;
-          HuffmanOutputCode(entry);
-        }
-      entry=TWTable+MagickMin((size_t) runlength,63);
-      HuffmanOutputCode(entry);
+      OutputHuffmanRun(&writer,MWTable,TWTable,runlength);
       if (n != 0)
         {
           /*
             Output black run.
           */
           runlength=CountHuffmanRun(&q,&n,MagickTrue);
-          if (runlength >= 64)
-            {
-              entry=HuffmanMakeupEntry(MBTable,runlength);
-              runlength-=(long) entry->count;
-              HuffmanOutputCode(entry);
-            }
-          entry=TBTable+MagickMin((size_t) runlength,63);
-          HuffmanOutputCode(entry);
+          OutputHuffmanRun(&writer,MBTable,TBTable,runlength);
         }
     }
     /*
       End of line.
     */
-    OutputHuffmanEndOfLine(image_info,image,&byte,&bit);
+    OutputHuffmanEndOfLine(image_info,image,&writer.byte,&writer.bit);
     q=scanline;
     if (UpdateHuffmanProgress(huffman_image,y) == MagickFalse)
       break;
@@ -1064,11 +1099,11 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
   /*
     End of page.
   */
-  OutputHuffmanEndOfPage(image_info,image,&byte,&bit);
+  OutputHuffmanEndOfPage(image_info,image,&writer.byte,&writer.bit);
   /*
     Flush bits.
   */
-  FlushHuffmanBits(image_info,image,byte,bit);
+  FlushHuffmanBits(image_info,image,writer.byte,writer.bit);
   if (LocaleCompare(image_info->magick,"FAX") != 0)
     Ascii85Flush(image);
   huffman_image=DestroyImage(huffman_image);
