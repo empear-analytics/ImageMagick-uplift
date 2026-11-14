@@ -1641,6 +1641,9 @@ typedef struct _AnnotateTargets
 
   XEvent
     *event;
+
+  Cursor
+    *cursor;
 } AnnotateTargets;
 
 static void XGoToPreviousTextLine(const AnnotateTargets *targets)
@@ -3440,6 +3443,39 @@ static MagickBooleanType XAnnotateText(AnnotateContext *context,
   return(XAnnotateRenderLines(context,(*annotate_info),image));
 }
 
+static void XStartAnnotateTracking(Display *display,XWindows *windows,
+  const AnnotateTargets *targets)
+{
+  Cursor
+    *const cursor = targets->cursor;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  size_t
+    *const state = targets->state;
+
+  /*
+    Map Command widget.
+  */
+  (void) CloneString(&windows->command.name,"Annotate");
+  windows->command.data=4;
+  (void) XCommandWidget(display,windows,AnnotateMenu,(XEvent *) NULL);
+  (void) XMapRaised(display,windows->command.id);
+  XClientMessage(display,windows->image.id,windows->im_protocols,
+    windows->im_update_widget,CurrentTime);
+  /*
+    Track pointer until button 1 is pressed.
+  */
+  XQueryPosition(display,windows->image.id,x,y);
+  (void) XSelectInput(display,windows->image.id,
+    windows->image.attributes.event_mask | PointerMotionMask);
+  (*cursor)=XCreateFontCursor(display,XC_left_side);
+  (void) XCheckDefineCursor(display,windows->image.id,(*cursor));
+  (*state)=DefaultState;
+}
+
 static MagickBooleanType XAnnotateEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -3488,7 +3524,8 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
     context;
 
   const AnnotateTargets
-    targets = { &annotate_info, &p, &x, &y, &text_event, &state, &event };
+    targets = { &annotate_info, &p, &x, &y, &text_event, &state, &event,
+      &cursor };
 
   const AnnotateRotateTargets
     rotate_targets = { &degrees };
@@ -3502,24 +3539,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
   const AnnotateFontTargets
     font_targets = { &font_id };
 
-  /*
-    Map Command widget.
-  */
-  (void) CloneString(&windows->command.name,"Annotate");
-  windows->command.data=4;
-  (void) XCommandWidget(display,windows,AnnotateMenu,(XEvent *) NULL);
-  (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
-  /*
-    Track pointer until button 1 is pressed.
-  */
-  XQueryPosition(display,windows->image.id,&x,&y);
-  (void) XSelectInput(display,windows->image.id,
-    windows->image.attributes.event_mask | PointerMotionMask);
-  cursor=XCreateFontCursor(display,XC_left_side);
-  (void) XCheckDefineCursor(display,windows->image.id,cursor);
-  state=DefaultState;
+  XStartAnnotateTracking(display,windows,&targets);
   context.display=display;
   context.resource_info=resource_info;
   context.windows=windows;
