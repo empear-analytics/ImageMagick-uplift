@@ -3020,6 +3020,16 @@ static inline MagickBooleanType IsRenderableClass(DrawInfo **graphic_context,
     MagickFalse);
 }
 
+static void DestroyMVGPrimitiveText(PrimitiveInfo *primitive_info)
+{
+  ssize_t
+    i;
+
+  for (i=0; primitive_info[i].primitive != UndefinedPrimitive; i++)
+    if (primitive_info[i].text != (char *) NULL)
+      primitive_info[i].text=DestroyString(primitive_info[i].text);
+}
+
 typedef struct _MVGRenderState
 {
   AffineMatrix
@@ -3121,9 +3131,7 @@ static void ParseMVGPrimitivePoints(const MVGRenderState *state)
     j = (*state->j),
     x = (*state->x);
 
-  for (i=0; primitive_info[i].primitive != UndefinedPrimitive; i++)
-    if (primitive_info[i].text != (char *) NULL)
-      primitive_info[i].text=DestroyString(primitive_info[i].text);
+  DestroyMVGPrimitiveText(primitive_info);
   i=0;
   mvg_info.offset=i;
   j=0;
@@ -7210,9 +7218,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
   token=DestroyString(token);
   if (primitive_info != (PrimitiveInfo *) NULL)
     {
-      for (i=0; primitive_info[i].primitive != UndefinedPrimitive; i++)
-        if (primitive_info[i].text != (char *) NULL)
-          primitive_info[i].text=DestroyString(primitive_info[i].text);
+      DestroyMVGPrimitiveText(primitive_info);
       primitive_info=(PrimitiveInfo *) RelinquishMagickMemory(primitive_info);
     }
   primitive=DestroyString(primitive);
