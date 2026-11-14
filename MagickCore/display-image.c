@@ -11014,6 +11014,39 @@ static void XApplyMatteCommand(const XMagickCommandContext *context)
     }
 }
 
+static void XApplyCompositeCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  MagickStatusType
+    status;
+
+  /*
+    Composite image.
+  */
+  status=XCompositeImage(display,resource_info,windows,*image,
+    exception);
+  if (status == MagickFalse)
+    {
+      XNoticeWidget(display,windows,"Unable to composite X image",
+        (*image)->filename);
+      return;
+    }
+}
+
 static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12548,20 +12581,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyMatteCommand(&context);
       break;
     case CompositeCommand:
-    {
-      /*
-        Composite image.
-      */
-      status=XCompositeImage(display,resource_info,windows,*image,
-        exception);
-      if (status == MagickFalse)
-        {
-          XNoticeWidget(display,windows,"Unable to composite X image",
-            (*image)->filename);
-          break;
-        }
+      XApplyCompositeCommand(&context);
       break;
-    }
     case AddBorderCommand:
     {
       Image
