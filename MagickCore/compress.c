@@ -1020,6 +1020,20 @@ static void OutputHuffmanEndOfPage(const ImageInfo *image_info,Image *image,
   }
 }
 
+static void StartHuffmanPage(const ImageInfo *image_info,Image *image,
+  HuffmanBitWriter *writer)
+{
+  if (LocaleCompare(image_info->magick,"FAX") != 0)
+    Ascii85Initialize(image);
+  else
+    {
+      /*
+        End of line.
+      */
+      OutputHuffmanEndOfLine(image_info,image,&(*writer).byte,&(*writer).bit);
+    }
+}
+
 static void FinishHuffmanPage(const ImageInfo *image_info,Image *image,
   HuffmanBitWriter *writer)
 {
@@ -1091,15 +1105,7 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
   writer.one=one;
   writer.byte='\0';
   writer.bit=(unsigned char) 0x80;
-  if (LocaleCompare(image_info->magick,"FAX") != 0)
-    Ascii85Initialize(image);
-  else
-    {
-      /*
-        End of line.
-      */
-      OutputHuffmanEndOfLine(image_info,image,&writer.byte,&writer.bit);
-    }
+  StartHuffmanPage(image_info,image,&writer);
   /*
     Compress to 1D Huffman pixels.
   */
