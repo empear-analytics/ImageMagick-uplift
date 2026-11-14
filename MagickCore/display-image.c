@@ -11580,6 +11580,32 @@ static Image *XApplyBackgroundCommand(const XMagickCommandContext *context,
   return(nexus);
 }
 
+static void XApplySlideShowCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  static char
+    delay[MagickPathExtent] = "5";
+
+  /*
+    Display next image after pausing.
+  */
+  (void) XDialogWidget(display,windows,"Slide Show",
+    "Pause how many 1/100ths of a second between images:",delay);
+  if (*delay == '\0')
+    return;
+  resource_info->delay=StringToUnsignedLong(delay);
+  XClientMessage(display,windows->image.id,windows->im_protocols,
+    windows->im_next_image,CurrentTime);
+}
+
 static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
 {
   Display
@@ -13153,22 +13179,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       nexus=XApplyBackgroundCommand(&context,nexus);
       break;
     case SlideShowCommand:
-    {
-      static char
-        delay[MagickPathExtent] = "5";
-
-      /*
-        Display next image after pausing.
-      */
-      (void) XDialogWidget(display,windows,"Slide Show",
-        "Pause how many 1/100ths of a second between images:",delay);
-      if (*delay == '\0')
-        break;
-      resource_info->delay=StringToUnsignedLong(delay);
-      XClientMessage(display,windows->image.id,windows->im_protocols,
-        windows->im_next_image,CurrentTime);
+      XApplySlideShowCommand(&context);
       break;
-    }
     case PreferencesCommand:
     {
       /*
