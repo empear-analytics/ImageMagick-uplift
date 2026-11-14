@@ -423,6 +423,13 @@ static void ScanNextToken(const NextTokenInput *input,
   }
 }
 
+static inline const char *SkipTrailingTokenSpace(const char *magick_restrict p)
+{
+  while (isspace((int) ((unsigned char) *p)) != 0)
+    p++;
+  return(p);
+}
+
 MagickExport magick_hot_spot size_t GetNextToken(
   const char *magick_restrict start,const char **magick_restrict end,
   const size_t extent,char *magick_restrict token)
@@ -449,8 +456,7 @@ MagickExport magick_hot_spot size_t GetNextToken(
   token[i]='\0';
   if (LocaleNCompare(token,"url(#",5) == 0)
     StripURLReference(token);
-  while (isspace((int) ((unsigned char) *p)) != 0)
-    p++;
+  p=SkipTrailingTokenSpace(p);
   if (end != (const char **) NULL)
     *end=(const char *) p;
   return((size_t) (p-start+1));
