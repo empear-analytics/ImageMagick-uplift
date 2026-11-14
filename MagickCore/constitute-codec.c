@@ -758,6 +758,47 @@ static MagickBooleanType HasPingImageSizes(const ImageInfo *read_info,
   return(MagickTrue);
 }
 
+typedef struct _DecodeFallbackInfo
+{
+  ImageInfo
+    *read_info;
+
+  char
+    *filename;
+
+  ExceptionInfo
+    *exception;
+} DecodeFallbackInfo;
+
+static void FindFallbackDecoder(const DecodeFallbackInfo *info,
+  const MagickInfo **magick_info,DecodeImageHandler **decoder)
+{
+  ImageInfo
+    *const read_info = info->read_info;
+
+  char
+    *const filename = info->filename;
+
+  ExceptionInfo
+    *const exception = info->exception;
+
+  const DelegateInfo
+    *delegate_info;
+
+  if ((*decoder) == (DecodeImageHandler *) NULL)
+    {
+      delegate_info=GetDelegateInfo(read_info->magick,(char *) NULL,exception);
+      if (delegate_info == (const DelegateInfo *) NULL)
+        {
+          (void) SetImageInfo(read_info,0,exception);
+          (void) CopyMagickString(read_info->filename,filename,
+            MagickPathExtent);
+          (*magick_info)=GetMagickInfo(read_info->magick,exception);
+          (*decoder)=GetImageDecoder((*magick_info));
+        }
+    }
+}
+
 static void CheckReadImageArguments(const ImageInfo *image_info,
   const ExceptionInfo *exception)
 {
@@ -781,8 +822,8 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
   ConstituteInfo
     constitute_info;
 
-  const DelegateInfo
-    *delegate_info;
+  DecodeFallbackInfo
+    fallback;
 
   const MagickInfo
     *magick_info;
@@ -817,18 +858,10 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
     return((Image *) NULL);
   image=NewImageList();
   decoder=GetImageDecoder(magick_info);
-  if (decoder == (DecodeImageHandler *) NULL)
-    {
-      delegate_info=GetDelegateInfo(read_info->magick,(char *) NULL,exception);
-      if (delegate_info == (const DelegateInfo *) NULL)
-        {
-          (void) SetImageInfo(read_info,0,exception);
-          (void) CopyMagickString(read_info->filename,filename,
-            MagickPathExtent);
-          magick_info=GetMagickInfo(read_info->magick,exception);
-          decoder=GetImageDecoder(magick_info);
-        }
-    }
+  fallback.read_info=read_info;
+  fallback.filename=filename;
+  fallback.exception=exception;
+  FindFallbackDecoder(&fallback,&magick_info,&decoder);
   if (decoder != (DecodeImageHandler *) NULL)
     {
       /*
