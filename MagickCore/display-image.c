@@ -1548,6 +1548,24 @@ typedef struct _ImageWindowKeyInput
     *exception;
 } ImageWindowKeyInput;
 
+typedef struct _XImageCacheContext
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    **image;
+
+  ExceptionInfo
+    *exception;
+} XImageCacheContext;
+
 /*
   Forward declarations.
 */
@@ -1588,8 +1606,7 @@ static MagickBooleanType
   XTrimImage(Display *,XResourceInfo *,XWindows *,Image *,ExceptionInfo *);
 static void
   XDrawPanRectangle(Display *,XWindows *),
-  XImageCache(Display *,XResourceInfo *,XWindows *,const DisplayCommand,Image **,
-    ExceptionInfo *),
+  XImageCache(const XImageCacheContext *,const DisplayCommand),
   XMagnifyImage(Display *,XWindows *,XEvent *,ExceptionInfo *),
   XMakePanImage(Display *,XResourceInfo *,XWindows *,Image *,ExceptionInfo *),
   XPanImage(Display *,XWindows *,XEvent *,ExceptionInfo *),
@@ -10016,24 +10033,6 @@ static void XTrimUndoCache(const XResourceInfo *resource_info,size_t *bytes,
     }
 }
 
-typedef struct _XImageCacheContext
-{
-  Display
-    *display;
-
-  XResourceInfo
-    *resource_info;
-
-  XWindows
-    *windows;
-
-  Image
-    **image;
-
-  ExceptionInfo
-    *exception;
-} XImageCacheContext;
-
 static Image *XSaveUndoImage(const XImageCacheContext *cache_context,
   Image *undo_image)
 {
@@ -10284,9 +10283,8 @@ static void XRedoOrShowImageCache(const XImageCacheContext *cache_context,
   XSetCursorState(display,windows,MagickFalse);
 }
 
-static void XImageCache(Display *display,XResourceInfo *resource_info,
-  XWindows *windows,const DisplayCommand command,Image **image,
-  ExceptionInfo *exception)
+static void XImageCache(const XImageCacheContext *cache_context,
+  const DisplayCommand command)
 {
   Image
     *cache_image;
@@ -10295,14 +10293,6 @@ static void XImageCache(Display *display,XResourceInfo *resource_info,
     *redo_image = (Image *) NULL,
     *undo_image = (Image *) NULL;
 
-  XImageCacheContext
-    cache_context;
-
-  cache_context.display=display;
-  cache_context.resource_info=resource_info;
-  cache_context.windows=windows;
-  cache_context.image=image;
-  cache_context.exception=exception;
   switch (command)
   {
     case FreeBuffersCommand:
@@ -10325,15 +10315,15 @@ static void XImageCache(Display *display,XResourceInfo *resource_info,
     }
     case UndoCommand:
     {
-      XUndoImageCache(&cache_context,&undo_image,&redo_image);
+      XUndoImageCache(cache_context,&undo_image,&redo_image);
       return;
     }
     default:
       break;
   }
   if (IsUndoCacheCommand(command) != MagickFalse)
-    undo_image=XSaveUndoImage(&cache_context,undo_image);
-  XRedoOrShowImageCache(&cache_context,command,&redo_image,undo_image);
+    undo_image=XSaveUndoImage(cache_context,undo_image);
+  XRedoOrShowImageCache(cache_context,command,&redo_image,undo_image);
 }
 
 /*
@@ -14955,11 +14945,14 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XMagickCommandContext
     context;
 
+  const XImageCacheContext
+    cache_context = { display, resource_info, windows, image, exception };
+
   /*
     Process user command.
   */
   XCheckRefreshWindows(display,windows);
-  XImageCache(display,resource_info,windows,command,image,exception);
+  XImageCache(&cache_context,command);
   nexus=NewImageList();
   windows->image.window_changes.width=windows->image.ximage->width;
   windows->image.window_changes.height=windows->image.ximage->height;
