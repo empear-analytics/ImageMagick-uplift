@@ -1666,6 +1666,13 @@ static void SelectPathTailComponent(const char *path,PathType type,
   }
 }
 
+static inline MagickBooleanType IsSubimageComponent(const size_t magick_length,
+  const size_t subimage_offset,const size_t subimage_length)
+{
+  return(((subimage_length != 0) && (magick_length < subimage_offset)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport void GetPathComponent(const char *path,PathType type,
   char *component)
 {
@@ -1716,7 +1723,8 @@ MagickExport void GetPathComponent(const char *path,PathType type,
     case SubimagePath:
     {
       *component='\0';
-      if ((subimage_length != 0) && (magick_length < subimage_offset))
+      if (IsSubimageComponent(magick_length,subimage_offset,subimage_length) !=
+          MagickFalse)
         (void) CopyMagickString(component,path+subimage_offset,subimage_length);
       break;
     }
