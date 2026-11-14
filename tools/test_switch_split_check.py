@@ -9,6 +9,12 @@ correct split, in one step and in two, must print OK; each planted defect, a los
 label, a wrong call, a group edited on the way, a transposed argument, a moved `default:`, a kept group
 edited, a statement added to the caller, a binding of the wrong member, a changed initialiser and a
 reordering, must be refused.
+
+A second fixture has the shape of display-image.c's `XMagickCommand`: a context struct the caller
+fills member by member, written variables passed as pointers (`(*v)`, `&(*v)`) and a member added
+by the step. The correct step must print OK; a member filled by address used without `(*v)`, a
+member bound but not filled, an appended member filled out of place or not at all, an existing
+member changed, and a written variable's group edited must be refused.
 """
 import os, sys, unittest
 
@@ -336,6 +342,197 @@ class SwitchSplitCheck(unittest.TestCase):
         self.planted("helper switches on another expression",
                      "switch (event.type)\n  {\n    case KeyPress:", "switch (event_type)\n  {\n    case KeyPress:",
                      "controls on")
+
+
+CTX_OLD = """
+typedef struct _Context
+{
+  Display
+    *display;
+
+  Image
+    **image;
+} Context;
+
+static Image *Caller(Display *display,Image **image,const Command command)
+{
+  Image
+    *nexus;
+
+  MagickStatusType
+    flags;
+
+  QuantizeInfo
+    quantize_info;
+
+  Context
+    context;
+
+  nexus=NewImageList();
+  GetQuantizeInfo(&quantize_info);
+  context.display=display;
+  context.image=image;
+  switch (command)
+  {
+    case OpenCommand:
+      nexus=Open(&context);
+      break;
+    case MapCommand:
+      Map(&context,quantize_info);
+      break;
+    case BlurCommand:
+      Blur(&context,&flags);
+      break;
+    case NewCommand:
+      nexus=New(&context,nexus);
+      break;
+    default:
+    {
+      (void) XBell(display,0);
+      break;
+    }
+  }
+  return(nexus);
+}
+"""
+
+CTX_NEW = """
+typedef struct _Context
+{
+  Display
+    *display;
+
+  Image
+    **image;
+
+  QuantizeInfo
+    *quantize_info;
+} Context;
+
+static void Rest(const Context *context,const Command command,
+  MagickStatusType *flags,Image **nexus)
+{
+  Display
+    *const display = context->display;
+
+  QuantizeInfo
+    *const quantize_info = context->quantize_info;
+
+  switch (command)
+  {
+    case MapCommand:
+      Map(context,(*quantize_info));
+      break;
+    case BlurCommand:
+      Blur(context,&(*flags));
+      break;
+    case NewCommand:
+      (*nexus)=New(context,(*nexus));
+      break;
+    default:
+    {
+      (void) XBell(display,0);
+      break;
+    }
+  }
+}
+
+static Image *Caller(Display *display,Image **image,const Command command)
+{
+  Image
+    *nexus;
+
+  MagickStatusType
+    flags;
+
+  QuantizeInfo
+    quantize_info;
+
+  Context
+    context;
+
+  nexus=NewImageList();
+  GetQuantizeInfo(&quantize_info);
+  context.display=display;
+  context.image=image;
+  context.quantize_info=&quantize_info;
+  switch (command)
+  {
+    case OpenCommand:
+      nexus=Open(&context);
+      break;
+    default:
+    {
+      Rest(&context,command,&flags,&nexus);
+      break;
+    }
+  }
+  return(nexus);
+}
+"""
+
+
+class FilledContextCheck(unittest.TestCase):
+    def problems(self, new):
+        return S.check(CTX_OLD, new, "Caller", ["Rest"])[0]
+
+    def test_filled_context_step(self):
+        self.assertEqual(self.problems(CTX_NEW), [])
+
+    def planted(self, what, was, now, text):
+        self.assertIn(was, CTX_NEW, what)
+        problems = self.problems(CTX_NEW.replace(was, now, 1))
+        self.assertTrue(any(text in p for p in problems), (what, text, problems))
+
+    def test_member_by_address_without_deref(self):
+        self.planted("quantize_info filled by address, passed as the pointer",
+                     "Map(context,(*quantize_info));", "Map(context,quantize_info);",
+                     "without (*quantize_info)")
+
+    def test_member_by_value_dereferenced(self):
+        self.planted("quantize_info filled by value, used as (*v)",
+                     "context.quantize_info=&quantize_info;",
+                     "context.quantize_info=quantize_info;", "filled by value")
+
+    def test_bound_member_not_filled(self):
+        self.planted("display bound, its fill removed",
+                     "  context.display=display;\n", "", "does not fill it")
+
+    def test_appended_member_not_filled(self):
+        self.planted("the new member's fill dropped",
+                     "  context.quantize_info=&quantize_info;\n", "", "does not fill it")
+
+    def test_appended_fill_out_of_place(self):
+        self.planted("the new fill moved before the existing ones",
+                     "  context.display=display;\n  context.image=image;\n"
+                     "  context.quantize_info=&quantize_info;\n",
+                     "  context.quantize_info=&quantize_info;\n  context.display=display;\n"
+                     "  context.image=image;\n", "existing fills")
+
+    def test_appended_fill_not_adjacent(self):
+        self.planted("a statement between the fills",
+                     "  context.image=image;\n  context.quantize_info=&quantize_info;\n",
+                     "  context.image=image;\n  Extra();\n"
+                     "  context.quantize_info=&quantize_info;\n", "outside the helpers")
+
+    def test_existing_member_changed(self):
+        self.planted("an existing member's type changed", "  Image\n    **image;\n\n  Quantize",
+                     "  Image\n    *image;\n\n  Quantize", "existing members changed")
+
+    def test_member_inserted_not_appended(self):
+        self.planted("the new member inserted first",
+                     "{\n  Display\n    *display;\n\n  Image\n    **image;\n\n  QuantizeInfo\n"
+                     "    *quantize_info;\n}",
+                     "{\n  QuantizeInfo\n    *quantize_info;\n\n  Display\n    *display;\n\n"
+                     "  Image\n    **image;\n}", "not only appended")
+
+    def test_written_group_edited(self):
+        self.planted("New's result discarded", "(*nexus)=New(context,(*nexus));",
+                     "(void) New(context,(*nexus));", "body differs")
+
+    def test_written_pointer_transposed(self):
+        self.planted("flags and nexus swapped in the call", "Rest(&context,command,&flags,&nexus);",
+                     "Rest(&context,command,&nexus,&flags);", "where the parameter is")
 
 
 if __name__ == "__main__":
