@@ -17459,6 +17459,84 @@ Lane: a
 
 ---
 
+## Recipe SA - Pass the Sum a Callee Only Reads Whole
+
+**Use when:** CodeScene reports *Excess Number of Function Arguments* on a `static`
+function that reads two of its parameters only as one sum, `(a+b)`, as `image-append.c`'s
+`IsRightGapEdge(right_image,p,x,i,gap)` and `IsBottomGapEdge`, which use `x` and `i`
+only in `((x+i) >= (ssize_t) gap)`.
+
+**Not covered by:** Recipe M, whose call sites pass one identifier to two parameters;
+Recipe DV, which drops a parameter the callee can read from another; Recipe B, which
+bundles the parameters into a struct and keeps the sum in the callee.
+
+**How:**
+
+1. The function is `static`, outside every OpenMP region, and its parameters `a` and
+   `b` have one integer type `T`, are `const` (or never assigned) and appear in its body
+   only inside one parenthesised sum `(a+b)` (each occurrence of either is part of such
+   a sum). Its address is not taken.
+2. Every call passes, for `a` and `b`, expressions `ea` and `eb` of type `T` with no side
+   effect (variables or member reads, as `x` and `i`).
+3. Replace the two parameters by one, `const T name`, at the position of `a`, and every
+   `(a+b)` in the body by `name` (keeping the outer parentheses the expression needs).
+4. At every call, pass `ea+eb` in that position and drop the `eb` argument.
+5. Run `tools/ci_warnings.sh` and `tools/cxx_warnings.sh` (`OK`) and the oracle for each
+   function that calls it.
+
+**Before:**
+
+```c
+static inline MagickBooleanType IsRightGapEdge(const Image *right_image,
+  const Quantum *p,const ssize_t x,const ssize_t i,const size_t gap)
+{
+  return(((p == (const Quantum *) NULL) ||
+    (GetPixelAlpha(right_image,p) != TransparentAlpha) ||
+    ((x+i) >= (ssize_t) gap)) ? MagickTrue : MagickFalse);
+}
+...
+    if (IsRightGapEdge(rows->right_image,p,x,i,gap) != MagickFalse)
+```
+
+**After:**
+
+```c
+static inline MagickBooleanType IsRightGapEdge(const Image *right_image,
+  const Quantum *p,const ssize_t extent,const size_t gap)
+{
+  return(((p == (const Quantum *) NULL) ||
+    (GetPixelAlpha(right_image,p) != TransparentAlpha) ||
+    (extent >= (ssize_t) gap)) ? MagickTrue : MagickFalse);
+}
+...
+    if (IsRightGapEdge(rows->right_image,p,x+i,gap) != MagickFalse)
+```
+
+**Careful:**
+
+- Why the behaviour is the same. Both operands have type `T`, so `ea+eb` at the call is
+  computed in `T` exactly as `a+b` was in the callee from the same values (the parameters
+  held copies of `ea` and `eb`), and passing it to a `T` parameter converts nothing. The
+  callee then reads that value where it computed the sum. Neither operand has a side
+  effect, so computing the sum before the call, rather than possibly never (behind a
+  short-circuit operator, as here), changes nothing observable: signed overflow is
+  ruled out where the callee could have computed the sum, and with indices of one image
+  row or column the sum stays far inside `T`'s range wherever it is computed.
+- A parameter used anywhere else in the body, alone or in another expression, refuses the
+  step.
+
+**Evidence level:** oracle (the cases that reach each caller), with
+`tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`; `obj_identical.sh`
+may differ (the compiler places the addition elsewhere).
+
+**Provenance:** 2026-11-14, from `image-append.c` (campaign B, M127 lane a round 6):
+`IsRightGapEdge` and `IsBottomGapEdge`, the file's *Excess Number of Function
+Arguments*; a probe 8.54 to 8.81, the finding gone. Added by Claude Code (Claude Opus
+5.5) under the mandate of 2026-10-24.
+Lane: a
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -17842,3 +17920,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | SM | Extract a Block Reading Its Inputs Through the Members of a Struct It Passes On: a block that passes `&s` (a `const` struct local) to a callee and reads caller variables holding members of `s` moves into a function taking `const Name *s`, binding those variables from their member paths; at most four parameters; Lane: a | `type.c`'s `LoadTypeCache` and `policy.c`'s `LoadPolicyCache`: the include element's retry loop and throw read `exception` and `token`, which are `scan.target->exception` and `scan.token`; probes 8.13 to 8.22 and 7.89 to 7.97 | mandate (2026-10-24) |
 | 2026-11-14 | NEW | NC | Share a NULL-Tested Copy Through a Helper Taking the Destination: copies `if (S != (T) NULL) (void) F(&D,S);` become calls of one `static void` helper taking `&D` and `S`; Lane: a | `image-clone.c`'s eleven `CloneString` copies in `CloneImageInfo`, `CloneImageInfoRenderStrings` and `CloneMontageStrings` (probe 9.09 to 9.68, *Overall Code Complexity* gone) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | SK | Name the Constant a Keyed Switch's Groups Differ In: a `static` function whose `switch` groups are one statement differing in one enumeration constant becomes that statement with a call of a new `switch` returning the constants; a sibling with the same key-to-constant map shares it; Lane: a | `image-mask.c`'s `AddImageMaskChannel` and `RemoveRegionMaskChannel` (*Code Duplication*, probe 8.81 to 9.38) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | SA | Pass the Sum a Callee Only Reads Whole: two `const` parameters of one integer type that a `static` function reads only as `(a+b)` become one parameter, each call passing `ea+eb` of side-effect-free operands; Lane: a | `image-append.c`'s `IsRightGapEdge` and `IsBottomGapEdge` (*Excess Number of Function Arguments*; probe 8.54 to 8.81) | mandate (2026-10-24) |
