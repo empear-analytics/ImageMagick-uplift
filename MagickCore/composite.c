@@ -4965,6 +4965,28 @@ static void CompositeImageRow(const CompositeRowInputs *row,
   }
 }
 
+static BlendRequest GetBlendRequest(const Image *image,const ssize_t x_offset,
+  const ssize_t y_offset)
+{
+  double
+    residual_threshold = 0.0002,
+    iterations = 400.0;
+
+  BlendRequest
+    request;
+
+  size_t
+    tick = 100;
+
+  GetBlendIterations(image,&iterations,&residual_threshold,&tick);
+  request.x_offset=x_offset;
+  request.y_offset=y_offset;
+  request.iterations=iterations;
+  request.residual_threshold=residual_threshold;
+  request.tick=tick;
+  return(request);
+}
+
 static MagickBooleanType IsSourceInsideCanvas(const Image *image,
   const Image *source_image,const ssize_t x_offset,const ssize_t y_offset)
 {
@@ -5420,44 +5442,20 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     }
     case SaliencyBlendCompositeOp:
     {
-      double
-        residual_threshold = 0.0002,
-        iterations = 400.0;
-
       BlendRequest
         request;
 
-      size_t
-        tick = 100;
-
-      GetBlendIterations(image,&iterations,&residual_threshold,&tick);
-      request.x_offset=x_offset;
-      request.y_offset=y_offset;
-      request.iterations=iterations;
-      request.residual_threshold=residual_threshold;
-      request.tick=tick;
+      request=GetBlendRequest(image,x_offset,y_offset);
       status=SaliencyBlendImage(image,composite,&request,exception);
       source_image=DestroyImage(source_image);
       return(status);
     }
     case SeamlessBlendCompositeOp:
     {
-      double
-        residual_threshold = 0.0002,
-        iterations = 400.0;
-
       BlendRequest
         request;
 
-      size_t
-        tick = 100;
-
-      GetBlendIterations(image,&iterations,&residual_threshold,&tick);
-      request.x_offset=x_offset;
-      request.y_offset=y_offset;
-      request.iterations=iterations;
-      request.residual_threshold=residual_threshold;
-      request.tick=tick;
+      request=GetBlendRequest(image,x_offset,y_offset);
       status=SeamlessBlendImage(image,composite,&request,exception);
       source_image=DestroyImage(source_image);
       return(status);
