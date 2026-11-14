@@ -3027,6 +3027,17 @@ MagickExport ssize_t ParseChannelOption(const char *channels)
   return(channel);
 }
 
+static int GetOptionSentinel(const char *options)
+{
+  int
+    sentinel;
+
+  sentinel=',';
+  if (strchr(options,'|') != (char *) NULL)
+    sentinel='|';
+  return(sentinel);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -3084,9 +3095,7 @@ MagickExport ssize_t ParseCommandOption(const CommandOption option,
   if (option_info == (const OptionInfo *) NULL)
     return(-1);
   option_types=0;
-  sentinel=',';
-  if (strchr(options,'|') != (char *) NULL)
-    sentinel='|';
+  sentinel=GetOptionSentinel(options);
   for (p=options; p != (char *) NULL; p=strchr(p,sentinel))
   {
     p=ReadOptionToken(p,sentinel,token,&negate);
