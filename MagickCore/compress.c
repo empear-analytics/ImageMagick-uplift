@@ -1262,6 +1262,19 @@ static void RelinquishZIPMemory(voidpf context,voidpf memory)
   memory=RelinquishMagickMemory(memory);
 }
 
+static int FinishDeflate(z_stream *stream)
+{
+  int
+    status;
+
+  status=deflate(stream,Z_FINISH);
+  if (status == Z_STREAM_END)
+    status=deflateEnd(stream);
+  else
+    (void) deflateEnd(stream);
+  return(status);
+}
+
 MagickExport MagickBooleanType ZLIBEncodeImage(Image *image,const size_t length,
   unsigned char *magick_restrict pixels,ExceptionInfo *exception)
 {
@@ -1302,11 +1315,7 @@ MagickExport MagickBooleanType ZLIBEncodeImage(Image *image,const size_t length,
     UndefinedCompressionQuality ? 7 : MagickMin(image->quality/10,9)));
   if (status == Z_OK)
     {
-      status=deflate(&stream,Z_FINISH);
-      if (status == Z_STREAM_END)
-        status=deflateEnd(&stream);
-      else
-        (void) deflateEnd(&stream);
+      status=FinishDeflate(&stream);
       compress_packets=(size_t) stream.total_out;
     }
   if (status != Z_OK)
