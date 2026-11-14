@@ -11606,6 +11606,40 @@ static void XApplySlideShowCommand(const XMagickCommandContext *context)
     windows->im_next_image,CurrentTime);
 }
 
+static Image *XApplyPreferencesCommand(const XMagickCommandContext *context,
+  Image *nexus)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  MagickStatusType
+    status;
+
+  /*
+    Set user preferences.
+  */
+  status=XPreferencesWidget(display,resource_info,windows);
+  if (status == MagickFalse)
+    return(nexus);
+  nexus=CloneImage(*image,0,0,MagickTrue,exception);
+  if (nexus != (Image *) NULL)
+    XClientMessage(display,windows->image.id,windows->im_protocols,
+      windows->im_next_image,CurrentTime);
+  return(nexus);
+}
+
 static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
 {
   Display
@@ -13182,19 +13216,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplySlideShowCommand(&context);
       break;
     case PreferencesCommand:
-    {
-      /*
-        Set user preferences.
-      */
-      status=XPreferencesWidget(display,resource_info,windows);
-      if (status == MagickFalse)
-        break;
-      nexus=CloneImage(*image,0,0,MagickTrue,exception);
-      if (nexus != (Image *) NULL)
-        XClientMessage(display,windows->image.id,windows->im_protocols,
-          windows->im_next_image,CurrentTime);
+      nexus=XApplyPreferencesCommand(&context,nexus);
       break;
-    }
     case HelpCommand:
     {
       /*
