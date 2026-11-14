@@ -24750,6 +24750,20 @@ static WarningHandler XRestoreWorkingDirectory(XResourceInfo *resource_info,
   return(warning_handler);
 }
 
+static XWindows *XAllocateDisplayWindows(Display *display,
+  XResourceInfo *resource_info,const Image *display_image,Image **image)
+{
+  XWindows
+    *windows;
+
+  resource_info->colors=display_image->colors;
+  windows=XSetWindows(XInitializeWindows(display,resource_info));
+  if (windows == (XWindows *) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateWindow",
+      (*image)->filename);
+  return(windows);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -24859,11 +24873,8 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
       /*
         Allocate windows structure.
       */
-      resource_info->colors=display_image->colors;
-      windows=XSetWindows(XInitializeWindows(display,resource_info));
-      if (windows == (XWindows *) NULL)
-        ThrowXWindowFatalException(XServerFatalError,"UnableToCreateWindow",
-          (*image)->filename);
+      windows=XAllocateDisplayWindows(display,resource_info,display_image,
+        image);
       /*
         Initialize window id's.
       */
