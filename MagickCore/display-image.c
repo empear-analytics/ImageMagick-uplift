@@ -24617,6 +24617,48 @@ static void XDispatchExposeEvent(const DisplayEventContext *event_context,
   }
 }
 
+static void XDispatchButtonEvent(const DisplayEventContext *event_context,
+  const DisplayEventTargets *event_targets)
+{
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+  XEvent
+    *const event = event_targets->event;
+
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      XHandleButtonPress(event_context,event_targets);
+      break;
+    }
+    case ButtonRelease:
+    {
+      if (resource_info->debug != MagickFalse)
+        (void) LogMagickEvent(X11Event,GetMagickModule(),
+          "Button Release: 0x%lx %u +%d+%d",(*event).xbutton.window,
+          (*event).xbutton.button,(*event).xbutton.x,(*event).xbutton.y);
+      break;
+    }
+    case ClientMessage:
+    {
+      XHandleClientMessage(event_context,event_targets);
+      break;
+    }
+    case ConfigureNotify:
+    {
+      XHandleConfigureNotify(event_context,event_targets);
+      break;
+    }
+    default:
+    {
+      XDispatchExposeEvent(event_context,event_targets);
+      break;
+    }
+  }
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -25021,29 +25063,6 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
       continue;
     switch (event.type)
     {
-      case ButtonPress:
-      {
-        XHandleButtonPress(&event_context,&event_targets);
-        break;
-      }
-      case ButtonRelease:
-      {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Button Release: 0x%lx %u +%d+%d",event.xbutton.window,
-            event.xbutton.button,event.xbutton.x,event.xbutton.y);
-        break;
-      }
-      case ClientMessage:
-      {
-        XHandleClientMessage(&event_context,&event_targets);
-        break;
-      }
-      case ConfigureNotify:
-      {
-        XHandleConfigureNotify(&event_context,&event_targets);
-        break;
-      }
       case KeyPress:
       {
         int
@@ -25072,7 +25091,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
       }
       default:
       {
-        XDispatchExposeEvent(&event_context,&event_targets);
+        XDispatchButtonEvent(&event_context,&event_targets);
         break;
       }
     }
