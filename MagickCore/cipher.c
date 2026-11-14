@@ -944,6 +944,19 @@ MagickExport MagickBooleanType EncipherImage(Image *image,
   return(status);
 }
 
+static void SetCipherProperties(Image *image,
+  const SignatureInfo *signature_info,ExceptionInfo *exception)
+{
+  char
+    *signature;
+
+  signature=StringInfoToHexString(GetSignatureDigest(signature_info));
+  (void) SetImageProperty(image,"cipher:type","AES",exception);
+  (void) SetImageProperty(image,"cipher:mode","CTR",exception);
+  (void) SetImageProperty(image,"cipher:nonce",signature,exception);
+  signature=DestroyString(signature);
+}
+
 MagickExport MagickBooleanType PasskeyEncipherImage(Image *image,
   const StringInfo *passkey,ExceptionInfo *exception)
 {
@@ -954,9 +967,6 @@ MagickExport MagickBooleanType PasskeyEncipherImage(Image *image,
 
   CacheView
     *image_view;
-
-  char
-    *signature;
 
   CipherRows
     rows;
@@ -1001,11 +1011,7 @@ MagickExport MagickBooleanType PasskeyEncipherImage(Image *image,
       MagickFalse)
     return(MagickFalse);
   signature_info=AcquireNonceSignature(image,nonce);
-  signature=StringInfoToHexString(GetSignatureDigest(signature_info));
-  (void) SetImageProperty(image,"cipher:type","AES",exception);
-  (void) SetImageProperty(image,"cipher:mode","CTR",exception);
-  (void) SetImageProperty(image,"cipher:nonce",signature,exception);
-  signature=DestroyString(signature);
+  SetCipherProperties(image,signature_info,exception);
   (void) memset(input_block,0,sizeof(input_block));
   signature_info=CopyNonceDigest(signature_info,input_block);
   /*
