@@ -11492,6 +11492,37 @@ static void XApplyNegateCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyGrayscaleCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  /*
+    Convert image to grayscale.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) SetImageType(*image,(*image)->alpha_trait == UndefinedPixelTrait ?
+    GrayscaleType : GrayscaleAlphaType,exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyResizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12248,21 +12279,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyNegateCommand(&context);
       break;
     case GrayscaleCommand:
-    {
-      /*
-        Convert image to grayscale.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      (void) SetImageType(*image,(*image)->alpha_trait == UndefinedPixelTrait ?
-        GrayscaleType : GrayscaleAlphaType,exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyGrayscaleCommand(&context);
       break;
-    }
     case MapCommand:
     {
       Image
