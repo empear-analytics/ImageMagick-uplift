@@ -353,6 +353,17 @@ static void ClipPixelChannels(const Image *image,const double mask,
   SetPixelAlpha(image,src_alpha,q);
 }
 
+static void ClipNexusPixel(const Image *image,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  double
+    mask;
+
+  mask=(double) GetPixelWriteMask(image,p);
+  if (fabs(mask) >= MagickEpsilon)
+    ClipPixelChannels(image,mask,p,q);
+}
+
 static MagickBooleanType ClipPixelCacheNexus(Image *image,
   NexusInfo *nexus_info,ExceptionInfo *exception)
 {
@@ -391,12 +402,7 @@ static MagickBooleanType ClipPixelCacheNexus(Image *image,
 
     for (x=0; x < (ssize_t) nexus_info->region.width; x++)
     {
-      double
-        mask;
-
-      mask=(double) GetPixelWriteMask(image,p);
-      if (fabs(mask) >= MagickEpsilon)
-        ClipPixelChannels(image,mask,p,q);
+      ClipNexusPixel(image,p,q);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
