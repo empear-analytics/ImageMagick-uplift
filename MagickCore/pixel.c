@@ -1419,6 +1419,23 @@ static void InterpolateCubicChannel(const ChannelsInterpolation *grid,
     pixels[14]+cx[3]*pixels[15]))),pixel);
 }
 
+static void LoadBlendSamples(const ChannelsInterpolation *grid,
+  const Quantum *magick_restrict p,const ssize_t i,const PixelChannel channel,
+  double *alpha,double *pixels)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < 4; j++)
+  {
+    alpha[j]=QuantumScale*(double) GetPixelAlpha(grid->source,p+j*
+      (ssize_t) GetPixelChannels(grid->source));
+    pixels[j]=(double) p[j*(ssize_t) GetPixelChannels(grid->source)+i];
+    if (channel != AlphaPixelChannel)
+      pixels[j]*=alpha[j];
+  }
+}
+
 static void InterpolateBlendChannel(const ChannelsInterpolation *grid,
   const Quantum *magick_restrict p,const ssize_t i,Quantum *pixel)
 {
@@ -1446,14 +1463,7 @@ static void InterpolateBlendChannel(const ChannelsInterpolation *grid,
       pixels[j]=(double) p[j*(ssize_t) GetPixelChannels(grid->source)+i];
     }
   else
-    for (j=0; j < 4; j++)
-    {
-      alpha[j]=QuantumScale*(double) GetPixelAlpha(grid->source,p+j*
-        (ssize_t) GetPixelChannels(grid->source));
-      pixels[j]=(double) p[j*(ssize_t) GetPixelChannels(grid->source)+i];
-      if (channel != AlphaPixelChannel)
-        pixels[j]*=alpha[j];
-    }
+    LoadBlendSamples(grid,p,i,channel,alpha,pixels);
   delta.x=grid->x-grid->x_offset;
   delta.y=grid->y-grid->y_offset;
   SetPixelChannel(grid->destination,channel,ClampToQuantum(
