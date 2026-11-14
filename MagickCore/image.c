@@ -1220,13 +1220,18 @@ static void DestroyImageInfoStrings(ImageInfo *image_info)
     image_info->font=DestroyString(image_info->font);
 }
 
-MagickExport ImageInfo *DestroyImageInfo(ImageInfo *image_info)
+static void CheckTracedImageInfo(const ImageInfo *image_info)
 {
   assert(image_info != (ImageInfo *) NULL);
   assert(image_info->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
       image_info->filename);
+}
+
+MagickExport ImageInfo *DestroyImageInfo(ImageInfo *image_info)
+{
+  CheckTracedImageInfo(image_info);
   DestroyImageInfoStrings(image_info);
   if (image_info->texture != (char *) NULL)
     image_info->texture=DestroyString(image_info->texture);
@@ -2505,11 +2510,7 @@ MagickExport MagickBooleanType SetImageExtent(Image *image,const size_t columns,
 MagickExport void SetImageInfoBlob(ImageInfo *image_info,const void *blob,
   const size_t length)
 {
-  assert(image_info != (ImageInfo *) NULL);
-  assert(image_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      image_info->filename);
+  CheckTracedImageInfo(image_info);
   image_info->blob=(void *) blob;
   image_info->length=length;
 }
@@ -2576,11 +2577,7 @@ MagickExport void SetImageInfoCustomStream(ImageInfo *image_info,
 */
 MagickExport void SetImageInfoFile(ImageInfo *image_info,FILE *file)
 {
-  assert(image_info != (ImageInfo *) NULL);
-  assert(image_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      image_info->filename);
+  CheckTracedImageInfo(image_info);
   image_info->file=file;
 }
 
