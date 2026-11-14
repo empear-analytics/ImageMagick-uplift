@@ -204,6 +204,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/identify.h \
   MagickCore/image.c \
   MagickCore/image-mask.c \
+  MagickCore/image-fill.c \
   MagickCore/image-settings.c \
   MagickCore/image-append.c \
   MagickCore/image-filename.c \
