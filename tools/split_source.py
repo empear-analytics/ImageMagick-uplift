@@ -62,15 +62,20 @@ def letter_spans(art):
     mask = "".join("x" if "".join(column).strip() else " " for column in zip(*art))
     return [m.span() for m in re.finditer(r"x+", mask)]
 
+def file_glyphs(f):
+    """(letter, rows) for each letter of F's file name that the banner at the head of F draws; [] when the banner
+    draws another number of letters."""
+    art = banner_art(f)
+    word = re.sub(r"[^A-Z]", "", f.split("/")[-1][:-2].upper())
+    segs = letter_spans(art)
+    if not art or len(segs) != len(word): return []
+    return [(ch, tuple(r[a:b] for r in art)) for ch, (a, b) in zip(word, segs)]
+
 def harvest_glyphs():
     """The 5-row banner letters, as the MagickCore file headers draw them."""
     g = collections.defaultdict(collections.Counter)
     for f in glob.glob("MagickCore/*.c"):
-        art = banner_art(f)
-        word = re.sub(r"[^A-Z]", "", f.split("/")[-1][:-2].upper())
-        segs = letter_spans(art)
-        if art and len(segs) == len(word):
-            for ch, (a, b) in zip(word, segs): g[ch][tuple(r[a:b] for r in art)] += 1
+        for ch, rows in file_glyphs(f): g[ch][rows] += 1
     return {ch: list(c.most_common(1)[0][0]) for ch, c in g.items()}
 
 def conditional_start(L, end):
