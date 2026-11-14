@@ -933,27 +933,45 @@ static void SetFontConfigTypeInfo(TypeInfo *type_info,FcPattern *font,
   type_info->glyphs=ConstantString((const char *) file);
 }
 
-MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
-  ExceptionInfo *exception)
+static void AddFontConfigFonts(SplayTreeInfo *cache,
+  const FcFontSet *font_set)
 {
-  FcBool
-    result;
-
   FcChar8
     *family,
     *file;
-
-  FcConfig
-    *font_config;
-
-  FcFontSet
-    *font_set;
 
   ssize_t
     i;
 
   TypeInfo
     *type_info;
+
+  for (i=0; i < (ssize_t) font_set->nfont; i++)
+  {
+    if (GetFontConfigFile(font_set->fonts[i],&family,&file) == MagickFalse)
+      continue;
+    type_info=(TypeInfo *) AcquireMagickMemory(sizeof(*type_info));
+    if (type_info == (TypeInfo *) NULL)
+      continue;
+    (void) memset(type_info,0,sizeof(*type_info));
+    type_info->path=ConstantString("System Fonts");
+    type_info->signature=MagickCoreSignature;
+    SetFontConfigTypeInfo(type_info,font_set->fonts[i],family,file);
+    (void) AddValueToSplayTree(cache,type_info->name,type_info);
+  }
+}
+
+MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
+  ExceptionInfo *exception)
+{
+  FcBool
+    result;
+
+  FcConfig
+    *font_config;
+
+  FcFontSet
+    *font_set;
 
   /*
     Load system fonts.
@@ -972,19 +990,7 @@ MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
       FcConfigDestroy(font_config);
       return(MagickFalse);
     }
-  for (i=0; i < (ssize_t) font_set->nfont; i++)
-  {
-    if (GetFontConfigFile(font_set->fonts[i],&family,&file) == MagickFalse)
-      continue;
-    type_info=(TypeInfo *) AcquireMagickMemory(sizeof(*type_info));
-    if (type_info == (TypeInfo *) NULL)
-      continue;
-    (void) memset(type_info,0,sizeof(*type_info));
-    type_info->path=ConstantString("System Fonts");
-    type_info->signature=MagickCoreSignature;
-    SetFontConfigTypeInfo(type_info,font_set->fonts[i],family,file);
-    (void) AddValueToSplayTree(type_cache,type_info->name,type_info);
-  }
+  AddFontConfigFonts(type_cache,font_set);
   FcFontSetDestroy(font_set);
   FcConfigDestroy(font_config);
   return(MagickTrue);
