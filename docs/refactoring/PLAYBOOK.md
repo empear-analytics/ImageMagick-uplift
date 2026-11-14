@@ -17333,6 +17333,95 @@ Lane: b
 
 ---
 
+## Recipe CE - Chain a Continuing Block into an Else Before the Loop's Tail
+
+**Use when:** CodeScene reports *Complex Method* (or *Bumpy Road Ahead*, *Large Method*) on
+a loop whose body ends in a run of element handlers, each `if (c) { S; continue; }`,
+followed by the body's last statement: CodeScene counts every `continue` as a branch
+(`locale.c`'s `LoadLocaleCache`, cc 18 to 17 for one `continue` dropped, nothing else
+changed). The usual case is an XML loader's keyword loop.
+
+**Not covered by:** Recipe TC, which deletes a bare `if (cond) continue;` that is itself the
+last statement (here the block has statements of its own and a statement follows it);
+Recipe EI, which joins the `if`s inside an `else` and keeps their exits; Recipe G, which adds
+an exit rather than removing one; Recipe EJ, which joins an `else` and its sole `if`.
+
+**How:**
+
+1. In the body of a `for`, `while` or `do` loop, find `if (c) { S continue; }` with no
+   `else`, where `S` is one or more statements with no `break`, `continue`, `return` or
+   `goto` and no label, and the `continue` belongs to this loop (no `switch` or inner loop
+   between). The `if` is followed, inside the body, by exactly one statement `T` and then
+   the body's closing brace.
+2. `T` is a single statement: an expression statement, a compound statement, or an `if`
+   (with or without `else`, an earlier application of this recipe included).
+3. Delete the line `continue;`, keep `S` and its braces, and write `else` and `T` after the
+   closing brace: `if (c) { S } else T`. When `T` is an `if`, write `else if (...)` on one
+   line and re-indent `T`'s branches one level less, their text unchanged; otherwise
+   indent `T` under the `else`.
+4. Repeat upward: a block `if (c') { S' continue; }` directly before the `if` the last step
+   made has that `if` statement as its `T`. Stop at the first statement before the chain
+   that is not such a block (a bare `if (...) continue;` stays).
+5. Check by reading that nothing but `T` stood between the block and the body's closing
+   brace, and that `c` is still evaluated exactly once, before `S` or `T`.
+6. Run the oracle on the function (`tools/oracle/oracle.py run --function F`);
+   `tools/obj_identical.sh` may differ (the compiler lays the branches out anew).
+
+**Before:**
+
+```c
+    if (LocaleCompare(keyword,"<message") == 0)
+      {
+        ...
+        q++;
+        continue;
+      }
+    if (*keyword == '<')
+      {
+        AppendSubpathElement(keyword,token,tag);
+        continue;
+      }
+    (void) GetNextToken(q,(const char **) NULL,extent,token);
+  }
+```
+
+**After:**
+
+```c
+    if (LocaleCompare(keyword,"<message") == 0)
+      {
+        ...
+        q++;
+      }
+    else if (*keyword == '<')
+      {
+        AppendSubpathElement(keyword,token,tag);
+      }
+    else
+      (void) GetNextToken(q,(const char **) NULL,extent,token);
+  }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. When `c` holds, `S` runs and the `continue` went to the
+  end of the body; now `S` runs and the `else` skips `T`, which was the only statement
+  before the end of the body, so the next step is again the loop's increment and test.
+  When `c` fails, `T` ran next and still does. `c` is evaluated once in both forms.
+- A `break`, `return` or `goto` inside `S` would leave by another way; step 1 refuses it.
+  A `continue` of an inner loop in `S` is not this loop's; step 1 refuses that too.
+- Do not use it when a statement other than `T` follows the block, or when `T` declares
+  a variable (a declaration cannot be the statement of an `else`).
+
+**Evidence level:** oracle (the object code changes layout).
+
+**Provenance:** 2026-11-14, from `locale.c`'s `LoadLocaleCache` (campaign B, M127 lane b
+round 9): the message and subpath blocks and the token-skip tail, cc 18 to 16 and 8.85 to
+8.90 in a probe. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -17715,3 +17804,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | PT | Peel a Leaving Label Set out of a Selection into a Membership Table: PL's peel with TB's table predicate in one step, for a file of six functions where PL's label-run predicate and the seventh function each dip; Lane: b | `quantum-type.c`'s `SetQuantumImageType` (PL alone 8.92, PT alone 9.09, with PL on the index labels 10.0 from 9.58) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | FG | Fold a Function into the Twin Taking Its Derived Argument: `F(...,t)` whose body is `G(...,s)`'s with `E(t)` for `s` loses its calls to `G(...,E(b))` and is deleted, freeing a place under the function-count threshold; Lane: b | `xml-tree.c`'s `ExtendXMLBuffer`/`ExtendXMLBufferBy` (111 functions; the 112th costs 0.17) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | FW | Fold a Pointer-Advancing Writer into Its Index-Returning Twin: `p=F(p,...);` becomes `p+=G(p,0,...);` when `G` writes at `b[j++]` the bytes `F` writes at `*x++`, and `F` is deleted, freeing a place under the function-count threshold; Lane: b | `xml-tree.c`'s `WriteUTF8Sequence`/`WriteUTF8Bytes` (110 functions; the 112th costs 0.17) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | CE | Chain a Continuing Block into an Else Before the Loop's Tail: `if (c) { S continue; } T` at the end of a loop body becomes `if (c) { S } else T`, repeated upward into an `else if` chain; CodeScene counts each `continue` as a branch; Lane: b | `locale.c`'s `LoadLocaleCache` (cc 18 to 16, 8.85 to 8.90 in a probe) | mandate (2026-10-24) |
