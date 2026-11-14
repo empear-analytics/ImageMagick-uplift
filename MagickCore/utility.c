@@ -1268,14 +1268,8 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
       path[MagickPathExtent],
       subimage[MagickPathExtent];
 
-    FileListTransfer
-      transfer;
-
     MagickBooleanType
       destroy;
-
-    WildcardArgument
-      wildcard;
 
     option=(*arguments)[i];
     *magick='\0';
@@ -1299,13 +1293,13 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
       }
     if (ParseExpandableArgument(option,filename,magick) == MagickFalse)
       continue;
-    wildcard.option=option;
-    wildcard.filename=filename;
-    wildcard.path=path;
-    wildcard.subimage=subimage;
-    wildcard.home_directory=home_directory;
-    if (ListArgumentFiles(&wildcard,&filelist,&number_files) == MagickFalse)
-      continue;
+    {
+      const WildcardArgument wildcard = { option, filename, path, subimage,
+        home_directory };
+
+      if (ListArgumentFiles(&wildcard,&filelist,&number_files) == MagickFalse)
+        continue;
+    }
     if (HasFileListFiles(&filelist,number_files) == MagickFalse)
       continue;
     /*
@@ -1318,13 +1312,12 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
         filelist=DestroyFileList(filelist,number_files);
         return(MagickFalse);
       }
-    transfer.vector=vector;
-    transfer.filelist=filelist;
-    transfer.number_files=number_files;
-    transfer.path=path;
-    transfer.magick=magick;
-    transfer.subimage=subimage;
-    TransferFileList(&transfer,filename,&count,&destroy);
+    {
+      const FileListTransfer transfer = { vector, filelist, number_files, path,
+        magick, subimage };
+
+      TransferFileList(&transfer,filename,&count,&destroy);
+    }
     filelist=(char **) RelinquishMagickMemory(filelist);
   }
   vector[count]=(char *) NULL;
