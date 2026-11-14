@@ -4965,6 +4965,13 @@ static void CompositeImageRow(const CompositeRowInputs *row,
   }
 }
 
+static inline MagickBooleanType IsRowOutsideImage(const Image *image,
+  const ssize_t y,const ssize_t y_offset)
+{
+  return((((y+y_offset) < 0) || ((y+y_offset) >= (ssize_t) image->rows)) ?
+    MagickTrue : MagickFalse);
+}
+
 static BlendRequest GetBlendRequest(const Image *image,const ssize_t x_offset,
   const ssize_t y_offset)
 {
@@ -5369,13 +5376,13 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
         Quantum
           *magick_restrict q;
 
-        if (((y+y_offset) < 0) || ((y+y_offset) >= (ssize_t) image->rows))
+        if (IsRowOutsideImage(image,y,y_offset) != MagickFalse)
           continue;
         p=GetCacheViewVirtualPixels(source_view,0,y,source_image->columns,1,
           exception);
         q=QueueCacheViewAuthenticPixels(canvas_view,0,y,canvas_image->columns,1,
           exception);
-        if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+        if (IsBlendRowPairMissing(p,q) != MagickFalse)
           break;
         {
           const DisplaceColumns
