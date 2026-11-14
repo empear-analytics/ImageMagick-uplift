@@ -4560,10 +4560,6 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
     string=InvokeMagickPropertyHandler(info,&request);
   switch (*property)
   {
-    case 'm':
-    {
-      break;
-    }
     case 'p':
     {
 #if defined(MAGICKCORE_LCMS_DELEGATE)
@@ -4598,10 +4594,6 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
             }
       }
 #endif
-      break;
-    }
-    case 's':
-    {
       break;
     }
   }
