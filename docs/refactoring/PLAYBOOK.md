@@ -19299,6 +19299,138 @@ Lane: b
 
 ---
 
+## Recipe PK - Peel Keyed Arms That Share One Body out of a First-Letter Switch into a Key Table
+
+**Use when:** CodeScene reports *Complex Method* (or *Large Method*) on a function that
+selects on a name with a first-letter `switch`, where many arms in many groups compare the
+name with a key and run one and the same body that leaves the function: `property.c`'s
+`SetImageProperty`, whose fifteen read-only keys (`channels`, `delay_units`, `height`,
+`kurtosis`, `magick`, `max`, `mean`, `min`, `opaque`, `size`, `skewness`, `scenes`,
+`standard-deviation`, `version`, `width`) each throw `SetReadOnlyProperty` and return
+`MagickFalse`, in nine groups, two of them through a predicate of `||` comparisons.
+
+**Not covered by:** Recipe KM, whose arms parse and store a value per key; Recipe PT and
+PL, whose peeled group is one `case` of enumeration labels; Recipe KP, whose groups differ
+in a constant; Recipe EM, which starts from an `||` chain in a predicate; Recipe D, which
+would keep every arm's `if` and its group in the `switch`.
+
+**How:**
+
+1. Arms. Each is `if (LocaleCompare("K",n) == 0) { B }`, or `if (P(n) != MagickFalse)
+   { B }` with `P` a `static` predicate of the file whose body is
+   `return((LocaleCompare("K1",n) == 0) || ... ? MagickTrue : MagickFalse);`, the same
+   body `B` for every arm, token for token (checked by script); `B` ends in a `return`
+   and has no other exit. `n` is the same parameter in every arm, written by nothing in
+   the function. The arms lie outside every OpenMP region and in no `#if` branch.
+2. Hoisting. Recipe KM step 2, read for these keys: from a point `P0` (the statement
+   before the `switch`) nothing runs before an arm but side-effect-free comparisons of
+   `n` that are false when `n` equals the arm's key, and a name equal to a key reaches
+   that key's group (both cases of its first letter label the group; `LocaleCompare`
+   folds case through the C locale only).
+3. Table. Directly above the function (above its banner), `static const char
+   *const Names[] = { "K", ... };` with every key once, in source order (a predicate's
+   keys where its arm stood, in its order; a key repeated in a predicate is listed
+   once). Below it `static MagickBooleanType IsName(const char *n)` with `size_t i;` and
+   `for (i=0; i < (sizeof(Names)/sizeof(*Names)); i++) if (LocaleCompare(Names[i],n)
+   == 0) return(MagickTrue);` then `return(MagickFalse);`.
+4. Delete every arm; at `P0` write `if (IsName(n) != MagickFalse) { B }`, `B` copied
+   unchanged. A predicate of step 1 that no longer has a caller is deleted.
+5. A group left as `break;` alone, or a `case` that falls into one, stays; Recipe DL
+   drops it in a commit of its own.
+6. Check by script that the table holds exactly the keys of the arms, and by reading
+   step 2; `refactor_guard.py` (each `B`'s literals drop to one copy, the arms' keys
+   stay; `WARN` with the loop's `0` added); `--calls` (`ThrowMagickException` and the
+   arms' `LocaleCompare`s drop to one each); the CI and C++ warning checks; the oracle
+   on the function's cases.
+
+**Before:**
+
+```c
+    case 'H':
+    case 'h':
+    {
+      if (LocaleCompare("height",property) == 0)
+        {
+          (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+            "SetReadOnlyProperty","`%s'",property);
+          return(MagickFalse);
+        }
+      break; /* not an attribute, add as a property */
+    }
+    ...
+    case 'M':
+    case 'm':
+      if (IsReadOnlyMProperty(property) != MagickFalse)
+        {
+          (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+             "SetReadOnlyProperty","`%s'",property);
+          return(MagickFalse);
+        }
+      break; /* not an attribute, add as a property */
+```
+
+**After:**
+
+```c
+static const char
+  *const ReadOnlyProperties[] =
+  {
+    "channels",
+    ...
+    "width"
+  };
+
+static MagickBooleanType IsReadOnlyProperty(const char *property)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(ReadOnlyProperties)/sizeof(*ReadOnlyProperties)); i++)
+    if (LocaleCompare(ReadOnlyProperties[i],property) == 0)
+      return(MagickTrue);
+  return(MagickFalse);
+}
+...
+  if (IsReadOnlyProperty(property) != MagickFalse)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+        "SetReadOnlyProperty","`%s'",property);
+      return(MagickFalse);
+    }
+  switch (*property)
+  {
+    case 'H':
+    case 'h':
+    {
+      break; /* not an attribute, add as a property */
+    }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. A name equal to a key reached, before, its group and
+  that arm (step 2), after only comparisons that were false, and ran `B`; now the table
+  finds it equal and runs the same `B` before the `switch`, having run only those
+  comparisons' side-effect-free equivalents. A name equal to no key never ran `B`
+  before (every arm compared it with its own keys), and the table finds no match, so
+  the `switch` runs as before, its arms gone being arms that did not fire.
+- Keys are compared with the same `LocaleCompare` in the opposite argument order; it
+  tests equality only (`== 0`), which is symmetric.
+- The lookup compares up to all keys where the `switch` compared those of one group:
+  only side-effect-free comparisons, off every per-pixel path.
+- A message thrown in `B` keeps its text; `GetMagickModule()` still names the function,
+  since `B` stays in it.
+
+**Evidence level:** oracle, with `refactor_guard.py` and step 2 checked by reading.
+
+**Provenance:** 2026-11-14, from `property.c`'s `SetImageProperty` (campaign B, M127 lane
+c round 10): one link of the chain that takes the file's six big functions out of their
+findings together. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-10-24.
+Lane: c
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -19706,3 +19838,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | JT | Replace Jumps to a Returning Tail by Calls of the Tail: a function-ending `L: S return(R);` reached by `goto L;` from nested arms moves to a `static` helper of the return type taking the (at most four) variables it reads; each `goto L;` and the label's tail become `return(Helper(...));`; Lane: c | `property.c`'s `InterpretBracedEscape` (three lookup arms jumping to `PropertyLookupFailure:`): the first step of a chain that takes the function out of every finding, 3.62 to 3.64 | mandate (2026-10-24) |
 | 2026-11-14 | NEW | XP | Share Mirrored Extreme-Search Loops Through Per-Direction Predicates: copies of a loop keeping the most extreme array element, differing in their tests' operands and operators, become one `static` search taking a predicate pointer, each copy's tests a `MagickBooleanType` predicate returning `MagickTrue` where the copy assigned; Lane: c | `property.c`'s `GetConvexHullExtremePoints` (top, right, bottom, left loops; cc 26, four bumps): leaves every finding, 3.64 to 3.66 | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | V | Step 9: the cleanup exit may be `S goto L;` with `S` assignments of constants to caller variables (`status=MagickFalse; goto cleanup;`), the caller writing `{ S goto L; }`, as VC step 6 does in a loop; Lane: c | `property.c`'s `InterpretImageProperties` (scratch image and text allocation) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | PK | Peel Keyed Arms That Share One Body out of a First-Letter Switch into a Key Table: arms in many groups of a name `switch` that compare the name with keys (or call a predicate joining key comparisons) and run one leaving body become one `static const` key table, a `LocaleCompare` membership lookup, and one `if` before the `switch` holding the body; Lane: c | `property.c`'s `SetImageProperty` (fifteen read-only keys in nine groups) | mandate (2026-10-24) |
