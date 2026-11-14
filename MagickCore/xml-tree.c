@@ -2341,6 +2341,13 @@ typedef struct _AttributeSectionTargets
     *l;
 } AttributeSectionTargets;
 
+static MagickBooleanType SkipStartTagAttributes(char **p)
+{
+  while (IsInsideXMLTag(*p) != MagickFalse)
+    (*p)++;
+  return(MagickTrue);
+}
+
 static MagickBooleanType ParseStartTagAttributes(
   const AttributeSectionInfo *section,
   const AttributeSectionTargets *section_targets)
@@ -2391,10 +2398,7 @@ static MagickBooleanType ParseStartTagAttributes(
         }
     }
   else
-    {
-      while (IsInsideXMLTag(*p) != MagickFalse)
-        (*p)++;
-    }
+    return(SkipStartTagAttributes(p));
   return(MagickTrue);
 }
 
