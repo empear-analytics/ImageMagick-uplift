@@ -4584,6 +4584,40 @@ static MagickBooleanType AppendFxValue(const InterpretText *text,
   return(MagickTrue);
 }
 
+static MagickBooleanType AppendHexValue(const InterpretText *text,
+  Image *property_image,const char *pattern,ExceptionInfo *exception)
+{
+  FxInfo
+    *fx_info;
+
+  MagickStatusType
+    fx_status;
+
+  PixelInfo
+    pixel;
+
+  /*
+    Pixel - color value calculator.
+  */
+  GetPixelInfo(property_image,&pixel);
+  fx_info=AcquireFxInfo(property_image,pattern+4,exception);
+  if (fx_info == (FxInfo *) NULL)
+    return(MagickTrue);
+  fx_status=EvaluatePixelExpression(fx_info,property_image,&pixel,
+    exception);
+  fx_info=DestroyFxInfo(fx_info);
+  if (fx_status != MagickFalse)
+    {
+      char
+        hex[MagickPathExtent];
+
+      GetColorTuple(&pixel,MagickTrue,hex);
+      if (AppendInterpretString(text,hex+1) == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   const char *embed_text,ExceptionInfo *exception)
 {
@@ -4790,32 +4824,11 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
         }
       if (LocaleNCompare("hex:",pattern,4) == 0)
         {
-          FxInfo
-            *fx_info;
-
-          MagickStatusType
-            fx_status;
-
-          PixelInfo
-            pixel;
-
-          /*
-            Pixel - color value calculator.
-          */
-          GetPixelInfo(property_image,&pixel);
-          fx_info=AcquireFxInfo(property_image,pattern+4,exception);
-          if (fx_info == (FxInfo *) NULL)
-            continue;
-          fx_status=EvaluatePixelExpression(fx_info,property_image,&pixel,
-            exception);
-          fx_info=DestroyFxInfo(fx_info);
-          if (fx_status != MagickFalse)
+          if (AppendHexValue(&text,property_image,pattern,exception) ==
+              MagickFalse)
             {
-              char
-                hex[MagickPathExtent];
-
-              GetColorTuple(&pixel,MagickTrue,hex);
-              AppendString2Text(hex+1);
+              status=MagickFalse;
+              goto cleanup;
             }
           continue;
         }
