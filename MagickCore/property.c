@@ -4728,6 +4728,15 @@ static MagickBooleanType AppendGlobbedProperties(const InterpretText *text,
   return(MagickTrue);
 }
 
+static MagickBooleanType WarnUnknownProperty(ExceptionInfo *exception,
+  char *pattern,const ssize_t offset)
+{
+  TruncatePatternForMessage(pattern,offset);
+  (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+    "UnknownImageProperty","\"%%[%s]\"",pattern);
+  return(MagickTrue);
+}
+
 static MagickBooleanType InterpretBracedEscape(
   const InterpretSources *sources,const InterpretText *text,const char **p)
 {
@@ -4791,7 +4800,7 @@ static MagickBooleanType InterpretBracedEscape(
           OptionGlobSide));
       string=GetImageOption(property_info,pattern+7);
       if (string == (char *) NULL)
-        goto PropertyLookupFailure;
+        return(WarnUnknownProperty(exception,pattern,offset));
       return(AppendInterpretString(text,string));
     }
   if (LocaleNCompare("artifact:",pattern,9) == 0)
@@ -4804,7 +4813,7 @@ static MagickBooleanType InterpretBracedEscape(
           ArtifactGlobSide));
       string=GetImageArtifact(property_image,pattern+9);
       if (string == (char *) NULL)
-        goto PropertyLookupFailure;
+        return(WarnUnknownProperty(exception,pattern,offset));
       return(AppendInterpretString(text,string));
     }
   if (LocaleNCompare("property:",pattern,9) == 0)
@@ -4817,7 +4826,7 @@ static MagickBooleanType InterpretBracedEscape(
           exception));
       string=GetImageProperty(property_image,pattern+9,exception);
       if (string == (char *) NULL)
-        goto PropertyLookupFailure;
+        return(WarnUnknownProperty(exception,pattern,offset));
       return(AppendInterpretString(text,string));
     }
   /*
@@ -4852,12 +4861,7 @@ static MagickBooleanType InterpretBracedEscape(
   string=GetImageOption(property_info,pattern);
   if (string != (char *) NULL)
     return(AppendInterpretString(text,string));
-
-PropertyLookupFailure:
-  TruncatePatternForMessage(pattern,offset);
-  (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-    "UnknownImageProperty","\"%%[%s]\"",pattern);
-  return(MagickTrue);
+  return(WarnUnknownProperty(exception,pattern,offset));
 }
 
 static MagickBooleanType ReadInterpretTextFile(const char *p,
