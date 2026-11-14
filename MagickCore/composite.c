@@ -4965,6 +4965,88 @@ static void CompositeImageRow(const CompositeRowInputs *row,
   }
 }
 
+typedef struct _BlurCanvasInputs
+{
+  double
+    angle_range,
+    angle_start,
+    height,
+    width;
+
+  Image
+    *canvas_image,
+    *image,
+    *source_image;
+
+  ssize_t
+    x_offset,
+    y_offset;
+
+  ExceptionInfo
+    *exception;
+} BlurCanvasInputs;
+
+static void BlurCompositeCanvas(const BlurCanvasInputs *inputs,
+  SegmentInfo blur)
+{
+  const double
+    angle_range = inputs->angle_range,
+    angle_start = inputs->angle_start,
+    height = inputs->height,
+    width = inputs->width;
+
+  Image
+    *const canvas_image = inputs->canvas_image,
+    *const image = inputs->image,
+    *const source_image = inputs->source_image;
+
+  const ssize_t
+    x_offset = inputs->x_offset,
+    y_offset = inputs->y_offset;
+
+  ExceptionInfo
+    *const exception = inputs->exception;
+
+  CacheView
+    *canvas_view,
+    *source_view;
+
+  PixelInfo
+    pixel;
+
+  ResampleFilter
+    *resample_filter;
+
+  /*
+    Set up a gaussian cylindrical filter for EWA Blurring.
+
+    As the minimum ellipse radius of support*1.0 the EWA algorithm
+    can only produce a minimum blur of 0.5 for Gaussian (support=2.0)
+    This means that even 'No Blur' will be still a little blurry! The
+    solution (as well as the problem of preventing any user expert filter
+    settings, is to set our own user settings, restore them afterwards.
+  */
+  resample_filter=AcquireResampleFilter(image,exception);
+  SetResampleFilter(resample_filter,GaussianFilter);
+  /*
+    Perform the variable blurring of each pixel in image.
+  */
+  GetPixelInfo(image,&pixel);
+  source_view=AcquireVirtualCacheView(source_image,exception);
+  canvas_view=AcquireAuthenticCacheView(canvas_image,exception);
+  {
+    const BlurComposite
+      blur_composite = { angle_range, angle_start, height, width,
+        canvas_image, image, source_image, canvas_view, source_view,
+        resample_filter, x_offset, y_offset, exception };
+
+    BlurCompositeRows(&blur_composite,&blur,&pixel);
+  }
+  resample_filter=DestroyResampleFilter(resample_filter);
+  source_view=DestroyCacheView(source_view);
+  canvas_view=DestroyCacheView(canvas_view);
+}
+
 static inline MagickBooleanType IsRowOutsideImage(const Image *image,
   const ssize_t y,const ssize_t y_offset)
 {
@@ -5287,20 +5369,14 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     }
     case BlurCompositeOp:
     {
-      CacheView
-        *canvas_view;
+      BlurCanvasInputs
+        inputs;
 
       double
         angle_range,
         angle_start,
         height,
         width;
-
-      PixelInfo
-        pixel;
-
-      ResampleFilter
-        *resample_filter;
 
       SegmentInfo
         blur;
@@ -5371,34 +5447,17 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
           angle_start=DegreesToRadians(geometry_info.xi);
           angle_range=DegreesToRadians(geometry_info.psi)-angle_start;
         }
-      /*
-        Set up a gaussian cylindrical filter for EWA Blurring.
-
-        As the minimum ellipse radius of support*1.0 the EWA algorithm
-        can only produce a minimum blur of 0.5 for Gaussian (support=2.0)
-        This means that even 'No Blur' will be still a little blurry! The
-        solution (as well as the problem of preventing any user expert filter
-        settings, is to set our own user settings, restore them afterwards.
-      */
-      resample_filter=AcquireResampleFilter(image,exception);
-      SetResampleFilter(resample_filter,GaussianFilter);
-      /*
-        Perform the variable blurring of each pixel in image.
-      */
-      GetPixelInfo(image,&pixel);
-      source_view=AcquireVirtualCacheView(source_image,exception);
-      canvas_view=AcquireAuthenticCacheView(canvas_image,exception);
-      {
-        const BlurComposite
-          blur_composite = { angle_range, angle_start, height, width,
-            canvas_image, image, source_image, canvas_view, source_view,
-            resample_filter, x_offset, y_offset, exception };
-
-        BlurCompositeRows(&blur_composite,&blur,&pixel);
-      }
-      resample_filter=DestroyResampleFilter(resample_filter);
-      source_view=DestroyCacheView(source_view);
-      canvas_view=DestroyCacheView(canvas_view);
+      inputs.angle_range=angle_range;
+      inputs.angle_start=angle_start;
+      inputs.height=height;
+      inputs.width=width;
+      inputs.canvas_image=canvas_image;
+      inputs.image=image;
+      inputs.source_image=source_image;
+      inputs.x_offset=x_offset;
+      inputs.y_offset=y_offset;
+      inputs.exception=exception;
+      BlurCompositeCanvas(&inputs,blur);
       source_image=DestroyImage(source_image);
       source_image=canvas_image;
       break;
