@@ -560,6 +560,13 @@ static MagickBooleanType TransferHuffmanScanline(
   return(MagickTrue);
 }
 
+static void SetFaxResolution(Image *image)
+{
+  image->resolution.x=204.0;
+  image->resolution.y=196.0;
+  image->units=PixelsPerInchResolution;
+}
+
 MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -631,9 +638,7 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   null_lines=0;
   runlength=0;
   SkipHuffmanToEndOfLine(image,&byte,&mask,&runlength);
-  image->resolution.x=204.0;
-  image->resolution.y=196.0;
-  image->units=PixelsPerInchResolution;
+  SetFaxResolution(image);
   image_view=AcquireAuthenticCacheView(image,exception);
   transfer.image=image;
   transfer.image_view=image_view;
