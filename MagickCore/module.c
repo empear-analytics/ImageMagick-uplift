@@ -402,6 +402,50 @@ static MagickBooleanType IsModuleMatch(const char *name,const char *pattern,
   return(GlobExpression(name,pattern,MagickFalse));
 }
 
+static void StripModuleNamePrefix(char *module)
+{
+  if (LocaleNCompare("IM_MOD_",module,7) == 0)
+    {
+      (void) CopyMagickString(module,module+10,MagickPathExtent);
+      module[strlen(module)-1]='\0';
+    }
+  else if (LocaleNCompare("FILTER_",module,7) == 0)
+    {
+      (void) CopyMagickString(module,module+10,MagickPathExtent);
+      module[strlen(module)-1]='\0';
+    }
+}
+
+static MagickBooleanType GetModuleListPath(const MagickModuleType type,
+  char *module_path,ExceptionInfo *exception)
+{
+  char
+    filename[MagickPathExtent];
+
+  MagickBooleanType
+    status;
+
+  switch (type)
+  {
+    case MagickImageCoderModule:
+    default:
+    {
+      TagToCoderModuleName("magick",filename);
+      status=GetMagickModulePath(filename,MagickImageCoderModule,module_path,
+        exception);
+      break;
+    }
+    case MagickImageFilterModule:
+    {
+      TagToFilterModuleName("analyze",filename);
+      status=GetMagickModulePath(filename,MagickImageFilterModule,module_path,
+        exception);
+      break;
+    }
+  }
+  return(status);
+}
+
 MagickExport char **GetModuleList(const char *pattern,
   const MagickModuleType type,size_t *number_modules,ExceptionInfo *exception)
 {
@@ -409,7 +453,6 @@ MagickExport char **GetModuleList(const char *pattern,
 
   char
     **modules,
-    filename[MagickPathExtent],
     module_path[MagickPathExtent],
     path[MagickPathExtent];
 
@@ -432,24 +475,7 @@ MagickExport char **GetModuleList(const char *pattern,
   /*
     Locate all modules in the image coder or filter path.
   */
-  switch (type)
-  {
-    case MagickImageCoderModule:
-    default:
-    {
-      TagToCoderModuleName("magick",filename);
-      status=GetMagickModulePath(filename,MagickImageCoderModule,module_path,
-        exception);
-      break;
-    }
-    case MagickImageFilterModule:
-    {
-      TagToFilterModuleName("analyze",filename);
-      status=GetMagickModulePath(filename,MagickImageFilterModule,module_path,
-        exception);
-      break;
-    }
-  }
+  status=GetModuleListPath(type,module_path,exception);
   if (status == MagickFalse)
     return((char **) NULL);
   GetPathComponent(module_path,HeadPath,path);
@@ -489,16 +515,7 @@ MagickExport char **GetModuleList(const char *pattern,
     */
     modules[i]=AcquireString((char *) NULL);
     GetPathComponent(entry->d_name,BasePath,modules[i]);
-    if (LocaleNCompare("IM_MOD_",modules[i],7) == 0)
-      {
-        (void) CopyMagickString(modules[i],modules[i]+10,MagickPathExtent);
-        modules[i][strlen(modules[i])-1]='\0';
-      }
-    else if (LocaleNCompare("FILTER_",modules[i],7) == 0)
-      {
-        (void) CopyMagickString(modules[i],modules[i]+10,MagickPathExtent);
-        modules[i][strlen(modules[i])-1]='\0';
-      }
+    StripModuleNamePrefix(modules[i]);
     i++;
   }
   buffer=(struct dirent *) RelinquishMagickMemory(buffer);
@@ -889,6 +906,33 @@ static void *DestroyModuleNode(void *module_info)
   return(RelinquishMagickMemory(p));
 }
 
+static void AcquireModuleTree(void)
+{
+  MagickBooleanType
+    status;
+
+  ModuleInfo
+    *module_info;
+
+  SplayTreeInfo
+    *splay_tree;
+
+  splay_tree=NewSplayTree(CompareSplayTreeString,
+    (void *(*)(void *)) NULL,DestroyModuleNode);
+  module_info=AcquireModuleInfo((const char *) NULL,"[boot-strap]");
+  module_info->stealth=MagickTrue;
+  status=AddValueToSplayTree(splay_tree,module_info->tag,module_info);
+  if (status == MagickFalse)
+    ThrowFatalException(ResourceLimitFatalError,
+      "MemoryAllocationFailed");
+#if defined(MAGICKCORE_LTDL_DELEGATE)
+  if (lt_dlinit() != 0)
+    ThrowFatalException(ModuleFatalError,
+      "UnableToInitializeModuleLoader");
+#endif
+  module_list=splay_tree;
+}
+
 static MagickBooleanType IsModuleTreeInstantiated(void)
 {
   if (module_list == (SplayTreeInfo *) NULL)
@@ -897,31 +941,7 @@ static MagickBooleanType IsModuleTreeInstantiated(void)
         ActivateSemaphoreInfo(&module_semaphore);
       LockSemaphoreInfo(module_semaphore);
       if (module_list == (SplayTreeInfo *) NULL)
-        {
-          MagickBooleanType
-            status;
-
-          ModuleInfo
-            *module_info;
-
-          SplayTreeInfo
-            *splay_tree;
-
-          splay_tree=NewSplayTree(CompareSplayTreeString,
-            (void *(*)(void *)) NULL,DestroyModuleNode);
-          module_info=AcquireModuleInfo((const char *) NULL,"[boot-strap]");
-          module_info->stealth=MagickTrue;
-          status=AddValueToSplayTree(splay_tree,module_info->tag,module_info);
-          if (status == MagickFalse)
-            ThrowFatalException(ResourceLimitFatalError,
-              "MemoryAllocationFailed");
-#if defined(MAGICKCORE_LTDL_DELEGATE)
-          if (lt_dlinit() != 0)
-            ThrowFatalException(ModuleFatalError,
-              "UnableToInitializeModuleLoader");
-#endif
-          module_list=splay_tree;
-        }
+        AcquireModuleTree();
       UnlockSemaphoreInfo(module_semaphore);
     }
   return(module_list != (SplayTreeInfo *) NULL ? MagickTrue : MagickFalse);
