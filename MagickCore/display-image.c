@@ -2979,6 +2979,80 @@ static void XAnnotateTextPress(const AnnotateContext *context,
     }
 }
 
+typedef struct _AnnotateRenderInput
+{
+  Image
+    *image;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    height,
+    width;
+} AnnotateRenderInput;
+
+static MagickBooleanType XAnnotateRenderLine(const AnnotateContext *context,
+  const AnnotateRenderInput *input,XAnnotateInfo *annotate_info)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    box_id = context->box_id,
+    pen_id = context->pen_id;
+
+  Image
+    *const image = input->image;
+
+  const int
+    x = input->x,
+    y = input->y;
+
+  const unsigned int
+    height = input->height,
+    width = input->width;
+
+  int
+    status;
+
+  /*
+    Determine pixel index for box and pen color.
+  */
+  XSetBoxPixelIndex(windows,box_id);
+  XSetPenPixelIndex(windows,pen_id);
+  /*
+    Define the annotate geometry string.
+  */
+  annotate_info->x=(int)
+    width*(annotate_info->x+windows->image.x)/windows->image.ximage->width;
+  annotate_info->y=(int) height*(annotate_info->y-font_info->ascent+
+    windows->image.y)/windows->image.ximage->height;
+  (void) FormatLocaleString(annotate_info->geometry,MagickPathExtent,
+    "%gx%g%+g%+g",(double) width*annotate_info->width/
+    windows->image.ximage->width,(double) height*annotate_info->height/
+    windows->image.ximage->height,(double) annotate_info->x+x,(double)
+    annotate_info->y+y);
+  /*
+    Annotate image with text.
+  */
+  status=XAnnotateImage(display,windows->pixel_info,annotate_info,image,
+    exception) == MagickFalse ? 0 : 1;
+  if (status == 0)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType XAnnotateEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -3007,7 +3081,6 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
     annotate_context;
 
   int
-    status,
     x,
     y;
 
@@ -3260,30 +3333,13 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
         annotate_info=previous_info;
         continue;
       }
-    /*
-      Determine pixel index for box and pen color.
-    */
-    XSetBoxPixelIndex(windows,box_id);
-    XSetPenPixelIndex(windows,pen_id);
-    /*
-      Define the annotate geometry string.
-    */
-    annotate_info->x=(int)
-      width*(annotate_info->x+windows->image.x)/windows->image.ximage->width;
-    annotate_info->y=(int) height*(annotate_info->y-font_info->ascent+
-      windows->image.y)/windows->image.ximage->height;
-    (void) FormatLocaleString(annotate_info->geometry,MagickPathExtent,
-      "%gx%g%+g%+g",(double) width*annotate_info->width/
-      windows->image.ximage->width,(double) height*annotate_info->height/
-      windows->image.ximage->height,(double) annotate_info->x+x,(double)
-      annotate_info->y+y);
-    /*
-      Annotate image with text.
-    */
-    status=XAnnotateImage(display,windows->pixel_info,annotate_info,image,
-      exception) == MagickFalse ? 0 : 1;
-    if (status == 0)
-      return(MagickFalse);
+    {
+      const AnnotateRenderInput
+        input = { image, x, y, height, width };
+
+      if (XAnnotateRenderLine(&context,&input,annotate_info) == MagickFalse)
+        return(MagickFalse);
+    }
     /*
       Free up memory.
     */
