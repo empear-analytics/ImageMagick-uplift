@@ -10488,6 +10488,40 @@ static void XApplyFormerCommand(const XMagickCommandContext *context)
       windows->im_former_image,CurrentTime);
 }
 
+static Image *XApplySelectCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  Image
+    *nexus;
+
+  int
+    status;
+
+  /*
+    Select image.
+  */
+  if (*resource_info->home_directory == '\0')
+    (void) CopyMagickString(resource_info->home_directory,".",
+      MagickPathExtent);
+  status=chdir(resource_info->home_directory);
+  if (status == -1)
+    (void) ThrowMagickException(exception,GetMagickModule(),FileOpenError,
+      "UnableToOpenFile","%s",resource_info->home_directory);
+  nexus=XOpenImage(display,resource_info,windows,MagickTrue);
+  return(nexus);
+}
+
 static void XApplyResizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11139,23 +11173,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyFormerCommand(&context);
       break;
     case SelectCommand:
-    {
-      int
-        status;
-
-      /*
-        Select image.
-      */
-      if (*resource_info->home_directory == '\0')
-        (void) CopyMagickString(resource_info->home_directory,".",
-          MagickPathExtent);
-      status=chdir(resource_info->home_directory);
-      if (status == -1)
-        (void) ThrowMagickException(exception,GetMagickModule(),FileOpenError,
-          "UnableToOpenFile","%s",resource_info->home_directory);
-      nexus=XOpenImage(display,resource_info,windows,MagickTrue);
+      nexus=XApplySelectCommand(&context);
       break;
-    }
     case SaveCommand:
       XApplySaveCommand(&context);
       break;
