@@ -4503,38 +4503,6 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
     string=InvokeMagickPropertyHandler(info,&request);
   switch (*property)
   {
-    case 'b':
-    {
-      break;
-    }
-    case 'c':
-    {
-      break;
-    }
-    case 'd':
-    {
-      break;
-    }
-    case 'e':
-    {
-      break;
-    }
-    case 'g':
-    {
-      break;
-    }
-    case 'h':
-    {
-      break;
-    }
-    case 'i':
-    {
-      break;
-    }
-    case 'k':
-    {
-      break;
-    }
     case 'm':
     {
       if (LocaleNCompare("minimum-bounding-box",property,20) == 0)
@@ -4546,10 +4514,6 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
           string=GetPointListProperty(&inputs,MinimumBoundingBoxPointList);
           break;
         }
-      break;
-    }
-    case 'o':
-    {
       break;
     }
     case 'p':
@@ -4594,14 +4558,6 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
 #endif
       break;
     }
-    case 'q':
-    {
-      break;
-    }
-    case 'r':
-    {
-      break;
-    }
     case 's':
     {
       if (LocaleCompare("scene",property) == 0)
@@ -4617,22 +4573,6 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
           }
           break;
         }
-      break;
-    }
-    case 't':
-    {
-       break;
-    }
-    case 'u':
-    {
-      break;
-    }
-    case 'v':
-    {
-      break;
-    }
-    case 'w':
-    {
       break;
     }
   }
