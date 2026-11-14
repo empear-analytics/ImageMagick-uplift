@@ -4965,6 +4965,18 @@ static void CompositeImageRow(const CompositeRowInputs *row,
   }
 }
 
+static MagickBooleanType IsSourceInsideCanvas(const Image *image,
+  const Image *source_image,const ssize_t x_offset,const ssize_t y_offset)
+{
+  if ((x_offset < 0) || (y_offset < 0))
+    return(MagickFalse);
+  if ((x_offset+(ssize_t) source_image->columns) > (ssize_t) image->columns)
+    return(MagickFalse);
+  if ((y_offset+(ssize_t) source_image->rows) > (ssize_t) image->rows)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -5074,11 +5086,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
   {
     case CopyCompositeOp:
     {
-      if ((x_offset < 0) || (y_offset < 0))
-        break;
-      if ((x_offset+(ssize_t) source_image->columns) > (ssize_t) image->columns)
-        break;
-      if ((y_offset+(ssize_t) source_image->rows) > (ssize_t) image->rows)
+      if (IsSourceInsideCanvas(image,source_image,x_offset,y_offset) ==
+          MagickFalse)
         break;
       if ((source_image->alpha_trait == UndefinedPixelTrait) &&
           (image->alpha_trait != UndefinedPixelTrait))
@@ -5087,11 +5096,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     }
     case IntensityCompositeOp:
     {
-      if ((x_offset < 0) || (y_offset < 0))
-        break;
-      if ((x_offset+(ssize_t) source_image->columns) > (ssize_t) image->columns)
-        break;
-      if ((y_offset+(ssize_t) source_image->rows) > (ssize_t) image->rows)
+      if (IsSourceInsideCanvas(image,source_image,x_offset,y_offset) ==
+          MagickFalse)
         break;
       status=MagickTrue;
       source_view=AcquireVirtualCacheView(source_image,exception);
