@@ -745,6 +745,23 @@ static MagickStatusType ParseGeometryFields(char *p,
   return(flags);
 }
 
+static MagickBooleanType SkipGeometryCharacter(const int c,char **p,
+  MagickStatusType *flags)
+{
+  MagickStatusType
+    flag;
+
+  flag=GetGeometryMetaFlag(c);
+  if (flag != NoValue)
+    {
+      (*flags)|=flag;
+      (void) CopyMagickString(*p,*p+1,MagickPathExtent);
+    }
+  else if (SkipGeometrySeparator(c,p,flags) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport MagickStatusType ParseGeometry(const char *geometry,
   GeometryInfo *geometry_info)
 {
@@ -759,7 +776,6 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
     c;
 
   MagickStatusType
-    flag,
     flags;
 
   /*
@@ -802,13 +818,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
         p++;
         continue;
       }
-    flag=GetGeometryMetaFlag(c);
-    if (flag != NoValue)
-      {
-        flags|=flag;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-      }
-    else if (SkipGeometrySeparator(c,&p,&flags) == MagickFalse)
+    if (SkipGeometryCharacter(c,&p,&flags) == MagickFalse)
       return(NoValue);
   }
   /*
