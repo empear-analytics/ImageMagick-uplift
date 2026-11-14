@@ -889,6 +889,33 @@ static void *DestroyModuleNode(void *module_info)
   return(RelinquishMagickMemory(p));
 }
 
+static void AcquireModuleTree(void)
+{
+  MagickBooleanType
+    status;
+
+  ModuleInfo
+    *module_info;
+
+  SplayTreeInfo
+    *splay_tree;
+
+  splay_tree=NewSplayTree(CompareSplayTreeString,
+    (void *(*)(void *)) NULL,DestroyModuleNode);
+  module_info=AcquireModuleInfo((const char *) NULL,"[boot-strap]");
+  module_info->stealth=MagickTrue;
+  status=AddValueToSplayTree(splay_tree,module_info->tag,module_info);
+  if (status == MagickFalse)
+    ThrowFatalException(ResourceLimitFatalError,
+      "MemoryAllocationFailed");
+#if defined(MAGICKCORE_LTDL_DELEGATE)
+  if (lt_dlinit() != 0)
+    ThrowFatalException(ModuleFatalError,
+      "UnableToInitializeModuleLoader");
+#endif
+  module_list=splay_tree;
+}
+
 static MagickBooleanType IsModuleTreeInstantiated(void)
 {
   if (module_list == (SplayTreeInfo *) NULL)
@@ -897,31 +924,7 @@ static MagickBooleanType IsModuleTreeInstantiated(void)
         ActivateSemaphoreInfo(&module_semaphore);
       LockSemaphoreInfo(module_semaphore);
       if (module_list == (SplayTreeInfo *) NULL)
-        {
-          MagickBooleanType
-            status;
-
-          ModuleInfo
-            *module_info;
-
-          SplayTreeInfo
-            *splay_tree;
-
-          splay_tree=NewSplayTree(CompareSplayTreeString,
-            (void *(*)(void *)) NULL,DestroyModuleNode);
-          module_info=AcquireModuleInfo((const char *) NULL,"[boot-strap]");
-          module_info->stealth=MagickTrue;
-          status=AddValueToSplayTree(splay_tree,module_info->tag,module_info);
-          if (status == MagickFalse)
-            ThrowFatalException(ResourceLimitFatalError,
-              "MemoryAllocationFailed");
-#if defined(MAGICKCORE_LTDL_DELEGATE)
-          if (lt_dlinit() != 0)
-            ThrowFatalException(ModuleFatalError,
-              "UnableToInitializeModuleLoader");
-#endif
-          module_list=splay_tree;
-        }
+        AcquireModuleTree();
       UnlockSemaphoreInfo(module_semaphore);
     }
   return(module_list != (SplayTreeInfo *) NULL ? MagickTrue : MagickFalse);
