@@ -2969,6 +2969,14 @@ Q and U, whose first step refuses a block containing `goto`.
    return(DestroyImage(resize_image));`): the caller writes
    `if (Helper(...) == MagickFalse) { S return(<expr>); }`, both unchanged, and the
    block writes no variable that `S` or the expression reads or writes.
+9. *A cleanup jump after constant assignments* (2026-11-14, lane c). Step 1's
+   `goto L;` may be preceded, at every exit of the block, by the same run `S` of
+   assignments of constants to variables of the caller (`status=MagickFalse; goto
+   cleanup;`, as Recipe MC leaves each use; checked by script: every copy identical).
+   `S` is not a write of step 2. Each `S goto L;` becomes `return(MagickFalse);`, one
+   for one, and the caller writes `if (Helper(...) == MagickFalse) { S goto L; }`, `S`
+   copied unchanged. Recipe VC step 6 is the same exit for a block that also continues
+   a loop.
 
 **Before:**
 
@@ -3012,6 +3020,10 @@ static MagickBooleanType AcquireWorkImage(const Image *image,
 
 **Careful:**
 
+- Under step 9 the caller runs `S` and the jump directly after the helper returns
+  `MagickFalse`, so the same constants land in the same variables before the same jump;
+  the helper wrote nothing after the point where the block would have run `S`, and
+  nothing between reads them.
 - Under step 6's `void` form the caller's `return;` returns nothing, as the block's
   did, from the same point and after the same writes; the helper's `MagickBooleanType`
   only says whether the block fell through. No value crosses the call that the block
@@ -3131,6 +3143,10 @@ fails) is the same text in both.
 Step 6's `return;` (2026-10-31, task W10): `resample.c`'s `ScaleResampleFilter`, a
 public `void` function whose ellipse-fitting block (the limit test, the support scaling
 of `F` and the four bounds) leaves through `return;` once the ellipse is too large.
+Step 9 (2026-11-14, M127 lane c round 10): `property.c`'s `InterpretImageProperties`,
+whose scratch-image acquisition and text allocation each leave through
+`status=MagickFalse; goto cleanup;`.
+Lane: c
 
 ---
 
@@ -19689,3 +19705,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | QF | Share a Single Pixel Fetch Through Row Functions: many `static void` copies opening with one fetch (`GetAuthenticPixelQueue`) and an early `return;` on `NULL`, differing in the column loop and the buffer type, become one `void` function taking a `const` row struct, a row-function pointer and `void *pixels`; each copy keeps its name as a `void` row function; Lane: c | `stream.c`'s 56 `Stream<Type><Map>Pixels`/`Stream<Type>MapPixels`: 6.89 to 7.32, `magick stream` timing equal on five commands | mandate (2026-10-24) |
 | 2026-11-14 | NEW | JT | Replace Jumps to a Returning Tail by Calls of the Tail: a function-ending `L: S return(R);` reached by `goto L;` from nested arms moves to a `static` helper of the return type taking the (at most four) variables it reads; each `goto L;` and the label's tail become `return(Helper(...));`; Lane: c | `property.c`'s `InterpretBracedEscape` (three lookup arms jumping to `PropertyLookupFailure:`): the first step of a chain that takes the function out of every finding, 3.62 to 3.64 | mandate (2026-10-24) |
 | 2026-11-14 | NEW | XP | Share Mirrored Extreme-Search Loops Through Per-Direction Predicates: copies of a loop keeping the most extreme array element, differing in their tests' operands and operators, become one `static` search taking a predicate pointer, each copy's tests a `MagickBooleanType` predicate returning `MagickTrue` where the copy assigned; Lane: c | `property.c`'s `GetConvexHullExtremePoints` (top, right, bottom, left loops; cc 26, four bumps): leaves every finding, 3.64 to 3.66 | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | V | Step 9: the cleanup exit may be `S goto L;` with `S` assignments of constants to caller variables (`status=MagickFalse; goto cleanup;`), the caller writing `{ S goto L; }`, as VC step 6 does in a loop; Lane: c | `property.c`'s `InterpretImageProperties` (scratch image and text allocation) | mandate (2026-10-24) |
