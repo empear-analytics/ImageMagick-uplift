@@ -13963,6 +13963,54 @@ static void XApplyRegionOfInterestCommand(const XMagickCommandContext *context)
   (void) XROIImage(display,resource_info,windows,image,exception);
 }
 
+static void XApplySessionCommands(const XMagickCommandContext *context,
+  const DisplayCommand command,Image **nexus)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  switch (command)
+  {
+    case SlideShowCommand:
+      XApplySlideShowCommand(context);
+      break;
+    case PreferencesCommand:
+      (*nexus)=XApplyPreferencesCommand(context,(*nexus));
+      break;
+    case HelpCommand:
+    {
+      /*
+        User requested help.
+      */
+      XTextViewHelp(display,resource_info,windows,MagickFalse,
+        "Help Viewer - Display",DisplayHelp);
+      break;
+    }
+    case BrowseDocumentationCommand:
+      XApplyBrowseDocumentationCommand(context);
+      break;
+    case VersionCommand:
+    {
+      XNoticeWidget(display,windows,GetMagickVersion((size_t *) NULL),
+        GetMagickCopyright());
+      break;
+    }
+    case SaveToUndoBufferCommand:
+      break;
+    default:
+    {
+      (void) XBell(display,0);
+      break;
+    }
+  }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -14246,35 +14294,9 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
     case BackgroundCommand:
       nexus=XApplyBackgroundCommand(&context,nexus);
       break;
-    case SlideShowCommand:
-      XApplySlideShowCommand(&context);
-      break;
-    case PreferencesCommand:
-      nexus=XApplyPreferencesCommand(&context,nexus);
-      break;
-    case HelpCommand:
-    {
-      /*
-        User requested help.
-      */
-      XTextViewHelp(display,resource_info,windows,MagickFalse,
-        "Help Viewer - Display",DisplayHelp);
-      break;
-    }
-    case BrowseDocumentationCommand:
-      XApplyBrowseDocumentationCommand(&context);
-      break;
-    case VersionCommand:
-    {
-      XNoticeWidget(display,windows,GetMagickVersion((size_t *) NULL),
-        GetMagickCopyright());
-      break;
-    }
-    case SaveToUndoBufferCommand:
-      break;
     default:
     {
-      (void) XBell(display,0);
+      XApplySessionCommands(&context,command,&nexus);
       break;
     }
   }
