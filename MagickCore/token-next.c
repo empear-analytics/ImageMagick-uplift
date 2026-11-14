@@ -277,7 +277,7 @@ static MagickBooleanType ScanNumberToken(const NextTokenInput *input,
   return(MagickTrue);
 }
 
-static MagickBooleanType ScanParenthesizedToken(const NextTokenInput *input,
+static void ScanParenthesizedContents(const NextTokenInput *input,
   const NextTokenTargets *targets)
 {
   const char
@@ -286,16 +286,25 @@ static MagickBooleanType ScanParenthesizedToken(const NextTokenInput *input,
   ssize_t
     *const i = targets->i;
 
+  for ((*p)++; *(*p) != '\0'; (*p)++)
+  {
+    AppendTokenChar(input,(*p),i);
+    if ((*(*p) == ')') && (*((*p)-1) != '\\'))
+      break;
+    if (IsTokenExtentReached(input,targets) != MagickFalse)
+      break;
+  }
+}
+
+static MagickBooleanType ScanParenthesizedToken(const NextTokenInput *input,
+  const NextTokenTargets *targets)
+{
+  const char
+    *magick_restrict *const p = targets->p;
+
   if (*(*p) == '(')
     {
-      for ((*p)++; *(*p) != '\0'; (*p)++)
-      {
-        AppendTokenChar(input,(*p),i);
-        if ((*(*p) == ')') && (*((*p)-1) != '\\'))
-          break;
-        if (IsTokenExtentReached(input,targets) != MagickFalse)
-          break;
-      }
+      ScanParenthesizedContents(input,targets);
       if (*(*p) == '\0')
         return(MagickFalse);
     }
