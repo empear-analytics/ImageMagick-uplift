@@ -2082,6 +2082,25 @@ static inline MagickBooleanType IsFeatureDistanceBeyondImage(
     MagickTrue : MagickFalse);
 }
 
+static void DestroyFeatureBuffers(const FeatureBuffers *buffers,
+  const unsigned int number_grays)
+{
+  FeatureStatistics
+    **const cooccurrence = buffers->cooccurrence,
+    *density_x = buffers->density_x,
+    *density_xy = buffers->density_xy,
+    *density_y = buffers->density_y,
+    **const Q = buffers->Q,
+    *sum = buffers->sum;
+
+  sum=(FeatureStatistics *) RelinquishMagickMemory(sum);
+  DestroyFeatureMatrix(Q,number_grays);
+  density_y=(FeatureStatistics *) RelinquishMagickMemory(density_y);
+  density_xy=(FeatureStatistics *) RelinquishMagickMemory(density_xy);
+  density_x=(FeatureStatistics *) RelinquishMagickMemory(density_x);
+  DestroyFeatureMatrix(cooccurrence,number_grays);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -2235,11 +2254,6 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   /*
     Relinquish resources.
   */
-  sum=(FeatureStatistics *) RelinquishMagickMemory(sum);
-  DestroyFeatureMatrix(Q,number_grays);
-  density_y=(FeatureStatistics *) RelinquishMagickMemory(density_y);
-  density_xy=(FeatureStatistics *) RelinquishMagickMemory(density_xy);
-  density_x=(FeatureStatistics *) RelinquishMagickMemory(density_x);
-  DestroyFeatureMatrix(cooccurrence,number_grays);
+  DestroyFeatureBuffers(&buffers,number_grays);
   return(channel_features);
 }
