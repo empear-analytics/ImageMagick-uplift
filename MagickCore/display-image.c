@@ -14140,6 +14140,37 @@ static void XApplyFXCommands(const XMagickCommandContext *context,
   }
 }
 
+static void XApplyEffectsCommands(const XMagickCommandContext *context,
+  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
+{
+  switch (command)
+  {
+    case ThresholdCommand:
+      XApplyThresholdCommand(context);
+      break;
+    case EdgeDetectCommand:
+      XApplyEdgeDetectCommand(context,&(*flags));
+      break;
+    case SpreadCommand:
+      XApplySpreadCommand(context,&(*flags));
+      break;
+    case ShadeCommand:
+      XApplyShadeCommand(context);
+      break;
+    case RaiseCommand:
+      XApplyRaiseCommand(context);
+      break;
+    case SegmentCommand:
+      XApplySegmentCommand(context);
+      break;
+    default:
+    {
+      XApplyFXCommands(context,command,&(*flags),&(*nexus));
+      break;
+    }
+  }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -14335,27 +14366,9 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
     case BlurCommand:
       XApplyBlurCommand(&context,&flags);
       break;
-    case ThresholdCommand:
-      XApplyThresholdCommand(&context);
-      break;
-    case EdgeDetectCommand:
-      XApplyEdgeDetectCommand(&context,&flags);
-      break;
-    case SpreadCommand:
-      XApplySpreadCommand(&context,&flags);
-      break;
-    case ShadeCommand:
-      XApplyShadeCommand(&context);
-      break;
-    case RaiseCommand:
-      XApplyRaiseCommand(&context);
-      break;
-    case SegmentCommand:
-      XApplySegmentCommand(&context);
-      break;
     default:
     {
-      XApplyFXCommands(&context,command,&flags,&nexus);
+      XApplyEffectsCommands(&context,command,&flags,&nexus);
       break;
     }
   }
