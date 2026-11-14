@@ -25188,6 +25188,19 @@ static void XCreateDisplayGCs(const DisplayEventContext *context,
   (void) XDestroyWindow(display,windows->context.id);
 }
 
+static WarningHandler XInstallWarningHandlers(
+  const XResourceInfo *resource_info,WarningHandler warning_handler)
+{
+  if (warning_handler == (WarningHandler) NULL)
+    {
+      warning_handler=resource_info->display_warnings ?
+        SetErrorHandler(XWarning) : SetErrorHandler((ErrorHandler) NULL);
+      warning_handler=resource_info->display_warnings ?
+        SetWarningHandler(XWarning) : SetWarningHandler((WarningHandler) NULL);
+    }
+  return(warning_handler);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -25375,13 +25388,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   /*
     Set our progress monitor and warning handlers.
   */
-  if (warning_handler == (WarningHandler) NULL)
-    {
-      warning_handler=resource_info->display_warnings ?
-        SetErrorHandler(XWarning) : SetErrorHandler((ErrorHandler) NULL);
-      warning_handler=resource_info->display_warnings ?
-        SetWarningHandler(XWarning) : SetWarningHandler((WarningHandler) NULL);
-    }
+  warning_handler=XInstallWarningHandlers(resource_info,warning_handler);
   /*
     Initialize Image and Magnify X images.
   */
