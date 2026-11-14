@@ -3677,15 +3677,8 @@ static void TraceMVGPrimitive(const MVGRenderState *state)
 
 static void CheckMVGPrimitiveExtent(const MVGRenderState *state)
 {
-  const char
-    *p = (*state->p),
-    *q = (*state->q);
-
   DrawInfo
     **graphic_context = (*state->graphic_context);
-
-  const DrawInfo
-    *draw_info = state->draw_info;
 
   MagickStatusType
     status = (*state->status);
@@ -3697,14 +3690,10 @@ static void CheckMVGPrimitiveExtent(const MVGRenderState *state)
     *primitive_info = (*state->primitive_info);
 
   ssize_t
-    i = (*state->i),
     n = (*state->n);
 
   do
   {
-    primitive_info[i].primitive=UndefinedPrimitive;
-    if ((draw_info->debug != MagickFalse) && (q > p))
-      (void) LogMagickEvent(DrawEvent,GetMagickModule(),"  %.*s",(int) (q-p),p);
     /*
       Sanity check.
     */
@@ -7192,6 +7181,9 @@ static MagickBooleanType RenderMVGContent(Image *image,
     TraceMVGPrimitive(&render_state);
     if (status == 0)
       break;
+    primitive_info[i].primitive=UndefinedPrimitive;
+    if ((draw_info->debug != MagickFalse) && (q > p))
+      (void) LogMagickEvent(DrawEvent,GetMagickModule(),"  %.*s",(int) (q-p),p);
     CheckMVGPrimitiveExtent(&render_state);
     if (status == 0)
       break;
