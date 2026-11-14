@@ -3401,14 +3401,8 @@ static MagickBooleanType ReadPixelCachePixels(
       /*
         Read pixels from disk.
       */
-      LockSemaphoreInfo(cache_info->file_semaphore);
-      if (OpenPixelCacheOnDisk(cache_info,IOMode) == MagickFalse)
-        {
-          ThrowFileException(exception,FileOpenError,"UnableToOpenFile",
-            cache_info->cache_filename);
-          UnlockSemaphoreInfo(cache_info->file_semaphore);
-          return(MagickFalse);
-        }
+      if (LockPixelCacheOnDisk(cache_info,exception) == MagickFalse)
+        return(MagickFalse);
       if ((cache_info->columns == nexus_info->region.width) &&
           (extent <= MagickMaxBufferExtent))
         {
