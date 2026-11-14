@@ -1357,6 +1357,75 @@ static void LoadTypeIncludeElement(const TypeIncludeScan *scan,
       ConfigureError,"IncludeNodeNestedTooDeeply","`%s'",token);
 }
 
+typedef struct _TypeElementInput
+{
+  SplayTreeInfo
+    *cache;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    *keyword,
+    *token;
+
+  const char
+    *filename;
+
+  char
+    *font_path;
+
+  size_t
+    extent;
+} TypeElementInput;
+
+static void ParseTypeElement(const TypeElementInput *element,
+  TypeInfo **type_info,MagickStatusType *status,const char **q)
+{
+  SplayTreeInfo
+    *const cache = element->cache;
+
+  ExceptionInfo
+    *const exception = element->exception;
+
+  char
+    *const keyword = element->keyword,
+    *const token = element->token;
+
+  const char
+    *const filename = element->filename;
+
+  char
+    *const font_path = element->font_path;
+
+  const size_t
+    extent = element->extent;
+
+  if (LocaleCompare(keyword,"<type") == 0)
+    {
+      /*
+        Type element.
+      */
+      (*type_info)=AcquireTypeNode(filename);
+      return;
+    }
+  if ((*type_info) == (TypeInfo *) NULL)
+    return;
+  if (IsElementEnd(keyword) != MagickFalse)
+    {
+      (*status)=AddTypeNode(cache,(*type_info),exception);
+      (*type_info)=(TypeInfo *) NULL;
+      return;
+    }
+  (void) GetNextToken(*q,(const char **) NULL,extent,token);
+  if (*token != '=')
+    return;
+  (void) GetNextToken(*q,q,extent,token);
+  (void) GetNextToken(*q,q,extent,token);
+  (*type_info)=SetTypeInfoAttribute((*type_info),keyword,token,filename,
+    font_path);
+}
+
 static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1406,6 +1475,9 @@ static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
 #endif
   for (q=(char *) xml; *q != '\0'; )
   {
+    TypeElementInput
+      element;
+
     /*
       Interpret XML.
     */
@@ -1426,29 +1498,14 @@ static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
         LoadTypeIncludeElement(&scan,&q,&status);
         continue;
       }
-    if (LocaleCompare(keyword,"<type") == 0)
-      {
-        /*
-          Type element.
-        */
-        type_info=AcquireTypeNode(filename);
-        continue;
-      }
-    if (type_info == (TypeInfo *) NULL)
-      continue;
-    if (IsElementEnd(keyword) != MagickFalse)
-      {
-        status=AddTypeNode(cache,type_info,exception);
-        type_info=(TypeInfo *) NULL;
-        continue;
-      }
-    (void) GetNextToken(q,(const char **) NULL,extent,token);
-    if (*token != '=')
-      continue;
-    (void) GetNextToken(q,&q,extent,token);
-    (void) GetNextToken(q,&q,extent,token);
-    type_info=SetTypeInfoAttribute(type_info,keyword,token,filename,
-      font_path);
+    element.cache=cache;
+    element.exception=exception;
+    element.keyword=keyword;
+    element.token=token;
+    element.filename=filename;
+    element.font_path=font_path;
+    element.extent=extent;
+    ParseTypeElement(&element,&type_info,&status,&q);
   }
   token=(char *) RelinquishMagickMemory(token);
   return((MagickBooleanType) (status != 0));
