@@ -1242,6 +1242,14 @@ static const char *SkipCommentElement(const char *q,const size_t extent,
   return(q);
 }
 
+static const char *TrimMessageEnd(const char *p,const char *q)
+{
+  q--;
+  while ((isspace((int) ((unsigned char) *q)) != 0) && (q > p))
+    q--;
+  return(q);
+}
+
 static const char *ReadMessageText(const char *q,char *message)
 {
   const char
@@ -1250,9 +1258,7 @@ static const char *ReadMessageText(const char *q,char *message)
   for (p=q; (*q != '<') && (*q != '\0'); q++) ;
   while (isspace((int) ((unsigned char) *p)) != 0)
     p++;
-  q--;
-  while ((isspace((int) ((unsigned char) *q)) != 0) && (q > p))
-    q--;
+  q=TrimMessageEnd(p,q);
   (void) CopyMagickString(message,p,MagickMin((size_t) (q-p+2),
     MagickLocaleExtent));
   return(q);
