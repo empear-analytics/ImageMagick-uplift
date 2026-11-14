@@ -1518,6 +1518,11 @@ typedef struct _AttributeDefinitionInfo
     i;
 } AttributeDefinitionInfo;
 
+static inline MagickBooleanType IsQuotedValueStart(char **xml)
+{
+  return(((**xml == '"') || (**xml == '\'')) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType ParseAttributeDefinition(
   const AttributeDefinitionInfo *definition)
 {
@@ -1560,7 +1565,7 @@ static MagickBooleanType ParseAttributeDefinition(
       v=(char *) NULL;
     }
   else
-    if (((**xml == '"') || (**xml == '\''))  &&
+    if ((IsQuotedValueStart(xml) != MagickFalse) &&
         ((*xml=strchr(v=*xml+1,**xml)) != (char *) NULL))
       **xml='\0';
     else
