@@ -195,6 +195,19 @@ static inline void AppendTokenChar(const NextTokenInput *input,
     token[(*i)++]=(*p);
 }
 
+static inline void AppendTokenCharAndAdvance(const NextTokenInput *input,
+  const NextTokenTargets *targets)
+{
+  const char
+    *magick_restrict *const p = targets->p;
+
+  ssize_t
+    *const i = targets->i;
+
+  AppendTokenChar(input,(*p),i);
+  (*p)++;
+}
+
 static MagickBooleanType ScanQuotedEscape(const NextTokenTargets *targets,
   const char escape)
 {
@@ -241,15 +254,10 @@ static void ScanSlashToken(const NextTokenInput *input,
   const char
     *magick_restrict *const p = targets->p;
 
-  ssize_t
-    *const i = targets->i;
-
-  AppendTokenChar(input,(*p),i);
-  (*p)++;
+  AppendTokenCharAndAdvance(input,targets);
   if ((*(*p) == '>') || (*(*p) == '/'))
     {
-      AppendTokenChar(input,(*p),i);
-      (*p)++;
+      AppendTokenCharAndAdvance(input,targets);
     }
 }
 
@@ -276,9 +284,6 @@ static MagickBooleanType ScanNumberToken(const NextTokenInput *input,
   const char
     *magick_restrict *const p = targets->p;
 
-  ssize_t
-    *const i = targets->i;
-
   char
     *magick_restrict q;
 
@@ -292,8 +297,7 @@ static MagickBooleanType ScanNumberToken(const NextTokenInput *input,
       ScanNumberDigits(input,targets,q);
       if (*(*p) == '%')
         {
-          AppendTokenChar(input,(*p),i);
-          (*p)++;
+          AppendTokenCharAndAdvance(input,targets);
         }
       return(MagickFalse);
     }
@@ -378,15 +382,11 @@ static void ScanDefaultToken(const NextTokenInput *input,
   const char
     *magick_restrict *const p = targets->p;
 
-  ssize_t
-    *const i = targets->i;
-
   if (ScanNumberToken(input,targets) == MagickFalse)
     return;
   if (IsSingleCharToken((*p)) != MagickFalse)
     {
-      AppendTokenChar(input,(*p),i);
-      (*p)++;
+      AppendTokenCharAndAdvance(input,targets);
       return;
     }
   ScanWordToken(input,targets);
