@@ -593,13 +593,9 @@ static void CMSExceptionHandler(cmsContext context,cmsUInt32Number severity,
     message != (char *) NULL ? message : "no message",severity);
 }
 
-static void TransformDoublePixels(const int id,const Image* image,
-  const LCMSInfo *source_info,const LCMSInfo *target_info,
-  const cmsHTRANSFORM *transform,Quantum *q)
+static void StoreTargetDoublePixels(const int id,const Image* image,
+  const LCMSInfo *target_info,Quantum *q)
 {
-#define GetLCMSPixel(source_info,pixel,index) \
-  (source_info->scale[index]*(((double) QuantumScale*(double) pixel)+ \
-  source_info->translate[index]))
 #define SetLCMSPixel(target_info,pixel,index) ClampToQuantum( \
   target_info->scale[index]*(((double) QuantumRange*(double) pixel)+ \
   target_info->translate[index]))
@@ -610,21 +606,6 @@ static void TransformDoublePixels(const int id,const Image* image,
   ssize_t
     x;
 
-  p=(double *) source_info->pixels[id];
-  for (x=0; x < (ssize_t) image->columns; x++)
-  {
-    *p++=GetLCMSPixel(source_info,GetPixelRed(image,q),0);
-    if (source_info->channels > 1)
-      {
-        *p++=GetLCMSPixel(source_info,GetPixelGreen(image,q),1);
-        *p++=GetLCMSPixel(source_info,GetPixelBlue(image,q),2);
-      }
-    if (source_info->channels > 3)
-      *p++=GetLCMSPixel(source_info,GetPixelBlack(image,q),3);
-    q+=(ptrdiff_t) GetPixelChannels(image);
-  }
-  cmsDoTransform(transform[id],source_info->pixels[id],target_info->pixels[id],
-    (unsigned int) image->columns);
   p=(double *) target_info->pixels[id];
   q-=GetPixelChannels(image)*image->columns;
   for (x=0; x < (ssize_t) image->columns; x++)
@@ -648,6 +629,38 @@ static void TransformDoublePixels(const int id,const Image* image,
       }
     q+=(ptrdiff_t) GetPixelChannels(image);
   }
+}
+
+static void TransformDoublePixels(const int id,const Image* image,
+  const LCMSInfo *source_info,const LCMSInfo *target_info,
+  const cmsHTRANSFORM *transform,Quantum *q)
+{
+#define GetLCMSPixel(source_info,pixel,index) \
+  (source_info->scale[index]*(((double) QuantumScale*(double) pixel)+ \
+  source_info->translate[index]))
+
+  double
+    *p;
+
+  ssize_t
+    x;
+
+  p=(double *) source_info->pixels[id];
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    *p++=GetLCMSPixel(source_info,GetPixelRed(image,q),0);
+    if (source_info->channels > 1)
+      {
+        *p++=GetLCMSPixel(source_info,GetPixelGreen(image,q),1);
+        *p++=GetLCMSPixel(source_info,GetPixelBlue(image,q),2);
+      }
+    if (source_info->channels > 3)
+      *p++=GetLCMSPixel(source_info,GetPixelBlack(image,q),3);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  cmsDoTransform(transform[id],source_info->pixels[id],target_info->pixels[id],
+    (unsigned int) image->columns);
+  StoreTargetDoublePixels(id,image,target_info,q);
 }
 
 static void TransformQuantumPixels(const int id,const Image* image,
