@@ -325,6 +325,25 @@ static void ParseGeometryXYOffsets(char **p,MagickStatusType *flags,
     ParseGeometryYOffset(p,flags,y);
 }
 
+static MagickStatusType FinishGeometryFlags(MagickStatusType flags,
+  size_t *width,size_t *height)
+{
+  if ((flags & PercentValue) != 0)
+    flags=SetPercentGeometrySize(flags,width,height);
+#if 0
+  /* Debugging Geometry */
+  (void) fprintf(stderr,"GetGeometry...\n");
+  (void) fprintf(stderr,"Input: %s\n",geometry);
+  (void) fprintf(stderr,"Flags: %c %c %s %s\n",
+    (flags & WidthValue) ? 'W' : ' ',(flags & HeightValue) ? 'H' : ' ',
+    (flags & XValue) ? ((flags & XNegative) ? "-X" : "+X") : "  ",
+    (flags & YValue) ? ((flags & YNegative) ? "-Y" : "+Y") : "  ");
+  (void) fprintf(stderr,"Geometry: %ldx%ld%+ld%+ld\n",(long) *width,(long)
+    *height,(long) *x,(long) *y);
+#endif
+  return(flags);
+}
+
 MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
   ssize_t *y,size_t *width,size_t *height)
 {
@@ -408,20 +427,7 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
   flags=ParseGeometryWidth(&p,flags,width);
   flags=ParseGeometryHeight(&p,flags,height);
   ParseGeometryXYOffsets(&p,&flags,x,y);
-  if ((flags & PercentValue) != 0)
-    flags=SetPercentGeometrySize(flags,width,height);
-#if 0
-  /* Debugging Geometry */
-  (void) fprintf(stderr,"GetGeometry...\n");
-  (void) fprintf(stderr,"Input: %s\n",geometry);
-  (void) fprintf(stderr,"Flags: %c %c %s %s\n",
-    (flags & WidthValue) ? 'W' : ' ',(flags & HeightValue) ? 'H' : ' ',
-    (flags & XValue) ? ((flags & XNegative) ? "-X" : "+X") : "  ",
-    (flags & YValue) ? ((flags & YNegative) ? "-Y" : "+Y") : "  ");
-  (void) fprintf(stderr,"Geometry: %ldx%ld%+ld%+ld\n",(long) *width,(long)
-    *height,(long) *x,(long) *y);
-#endif
-  return(flags);
+  return(FinishGeometryFlags(flags,width,height));
 }
 
 /*
