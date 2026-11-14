@@ -11430,6 +11430,61 @@ static void XApplyShowPreviewCommand(const XMagickCommandContext *context)
   XSetCursorState(display,windows,MagickFalse);
 }
 
+static void XApplyShowHistogramCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ImageInfo
+    *const image_info = context->image_info;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  MagickStatusType
+    status;
+
+  char
+    filename[MagickPathExtent];
+
+  Image
+    *histogram_image;
+
+  /*
+    Show image histogram.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) DeleteImageProperty(*image,"label");
+  (void) FormatImageProperty(*image,"group","%.17g",(double)
+    windows->image.id);
+  (void) SetImageProperty(*image,"label","Histogram",exception);
+  (void) AcquireUniqueFilename(filename);
+  (void) FormatLocaleString((*image)->filename,MagickPathExtent,
+    "histogram:%s",filename);
+  status=WriteImage(image_info,*image,exception);
+  (void) CopyMagickString(image_info->filename,filename,MagickPathExtent);
+  histogram_image=ReadImage(image_info,exception);
+  (void) RelinquishUniqueFileResource(filename);
+  if (histogram_image == (Image *) NULL)
+    return;
+  (void) FormatLocaleString(histogram_image->filename,MagickPathExtent,
+    "show:%s",filename);
+  status=WriteImage(image_info,histogram_image,exception);
+  histogram_image=DestroyImage(histogram_image);
+  if (status == MagickFalse)
+    XNoticeWidget(display,windows,"Unable to show histogram",
+      (*image)->filename);
+  XDelay(display,1500);
+  XSetCursorState(display,windows,MagickFalse);
+}
+
 static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12995,39 +13050,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyShowPreviewCommand(&context);
       break;
     case ShowHistogramCommand:
-    {
-      Image
-        *histogram_image;
-
-      /*
-        Show image histogram.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      (void) DeleteImageProperty(*image,"label");
-      (void) FormatImageProperty(*image,"group","%.17g",(double)
-        windows->image.id);
-      (void) SetImageProperty(*image,"label","Histogram",exception);
-      (void) AcquireUniqueFilename(filename);
-      (void) FormatLocaleString((*image)->filename,MagickPathExtent,
-        "histogram:%s",filename);
-      status=WriteImage(image_info,*image,exception);
-      (void) CopyMagickString(image_info->filename,filename,MagickPathExtent);
-      histogram_image=ReadImage(image_info,exception);
-      (void) RelinquishUniqueFileResource(filename);
-      if (histogram_image == (Image *) NULL)
-        break;
-      (void) FormatLocaleString(histogram_image->filename,MagickPathExtent,
-        "show:%s",filename);
-      status=WriteImage(image_info,histogram_image,exception);
-      histogram_image=DestroyImage(histogram_image);
-      if (status == MagickFalse)
-        XNoticeWidget(display,windows,"Unable to show histogram",
-          (*image)->filename);
-      XDelay(display,1500);
-      XSetCursorState(display,windows,MagickFalse);
+      XApplyShowHistogramCommand(&context);
       break;
-    }
     case ShowMatteCommand:
     {
       Image
