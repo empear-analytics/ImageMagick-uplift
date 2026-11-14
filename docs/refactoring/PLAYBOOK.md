@@ -7106,6 +7106,12 @@ SD, which move statements: the decision moves with them and the helper inherits 
    replaces it without parentheses. It need not recur: a single site is enough when the
    step takes its function out of *Complex Method*, and `k1` and `k2` may be signed
    integer literals (`1` and `-1`).
+   Constant macros (2026-11-14): `k1` and `k2` may also be object-like macros of an
+   installed header that expand to a cast constant (`TransparentAlpha`, `((Quantum) 0)`;
+   `OpaqueAlpha`; `QuantumRange`), or one such macro and the literal `0`, when the site
+   converts the selection at once to that cast's type (`(Quantum) (pixel == 0 ? 0 :
+   QuantumRange)`, an argument of type `Quantum`) or both are of that type; the function
+   then returns that type (`Quantum`). The macros stay unexpanded in its body.
 2. Write a `static inline` function directly above the first function that uses it,
    with one parameter per variable expression of `c` (`const size_t extent` for
    `geometry.width`), of that expression's exact type, returning the type of `k1`:
@@ -7157,6 +7163,11 @@ static inline double GravityOffsetSign(const size_t extent)
   prove it for this build on every input, reached or not.
 - The variant with the constants swapped is a different function, not a negated
   argument: `!c` would be a new expression.
+- Under the constant-macro form the conditional's own type may differ from the return
+  type (`0 : QuantumRange` is `int` against `unsigned short` in a Q16 non-HDRI build,
+  `float` in HDRI); both operands are exactly representable in `Quantum`, and the site
+  converts the result to `Quantum` at once, so returning `Quantum` gives the site the
+  value it got. `obj_identical.sh` checks this build; the argument covers the others.
 
 **Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
 `HEAD`; `refactor_guard.py` reports `WARN` (copies removed, every value still
@@ -7170,6 +7181,12 @@ function; a probe: cc 56 to 38 with `IDENTICAL` object code), and which Recipe S
 split only once they are gone (a helper of three gravity cases would otherwise be a
 *Complex Method*). Added by Claude Code (Claude Opus 5.5) during task M115 (campaign B),
 under the mandate of 2026-10-24.
+Constant-macro form (2026-11-14, campaign B, M127 lane b round 13): `quantum-import.c`'s
+`Import1BitGrayAlphaQuantum` and `Import1BitIndexAlphaQuantum`, whose six `?:` each
+(`TransparentAlpha : OpaqueAlpha`, `0 : QuantumRange`, `0 : 1`, `0x00 : 0x01`) make them
+*Complex Methods* (cc 12 and 11); a probe 7.65 to 8.15. Added by Claude Code (Claude
+Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
 
 ---
 
@@ -19904,3 +19921,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | AMEND | PA | Step 4: a further single-label group `case L: { p++; break; }` may leave the `switch` and join the predicate call's test as an `or` with `(c == L)` when the loop already calls the predicate; Lane: b | `geometry-parse.c`'s `ParseGeometry` (`/`, whose removal leaves the `switch` equal to `GetGeometry`'s shared `SkipGeometrySeparator`; probe flat at 8.33, then 8.47) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | WS | Extract Statement-Macro Twins Through a Writer Struct of the Macro's Locals: copies of a block emitting through a statement macro that binds the caller's plain locals, differing in constants, become one `static void` function taking a struct of those locals (read members, and written members that replace the caller's locals), the constants and the block's input; the function binds members as locals and copies written ones back; Lane: b | `compress.c`'s `HuffmanEncodeImage` (white and black run blocks through `HuffmanOutputCode`/`OutputBit`; seven parameters otherwise; probe 8.06 to 8.13, chain to 8.59) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | WS | Step 7: one block (no copies) moves the same way; further written locals read after it may join the struct as written members, one more may go by pointer (MB's copy in and out), and a flag the block sets on every path is the return value; Lane: b | `compress.c`'s `HuffmanDecodeImage` (the `InputBit` code-reading `do` loop; probe 8.59 to 9.32) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | NS | Step 1: `k1` and `k2` may be constant macros of an installed header (`TransparentAlpha`, `OpaqueAlpha`, `QuantumRange`), or one and `0`, when the site converts the result at once to the macros' cast type, which the function returns; Lane: b | `quantum-import.c`'s `Import1BitGrayAlphaQuantum` and `Import1BitIndexAlphaQuantum` (six selections each; probe 7.65 to 8.15) | mandate (2026-10-24) |
