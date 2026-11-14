@@ -1191,14 +1191,34 @@ static int ColorInfoCompare(const void *x,const void *y)
 }
 #endif
 
+static ssize_t CollectColorInfo(const char *pattern,const ColorInfo **colors)
+{
+  ElementInfo
+    *p;
+
+  ssize_t
+    i;
+
+  p=GetHeadElementInLinkedList(color_cache);
+  for (i=0; p != (ElementInfo *) NULL; )
+  {
+    const ColorInfo
+      *color;
+
+    color=(const ColorInfo *) p->value;
+    if ((color->stealth == MagickFalse) &&
+        (GlobExpression(color->name,pattern,MagickFalse) != MagickFalse))
+      colors[i++]=color;
+    p=p->next;
+  }
+  return(i);
+}
+
 MagickExport const ColorInfo **GetColorInfoList(const char *pattern,
   size_t *number_colors,ExceptionInfo *exception)
 {
   const ColorInfo
     **colors;
-
-  ElementInfo
-    *p;
 
   ssize_t
     i;
@@ -1215,18 +1235,7 @@ MagickExport const ColorInfo **GetColorInfoList(const char *pattern,
   if (colors == (const ColorInfo **) NULL)
     return((const ColorInfo **) NULL);
   LockSemaphoreInfo(color_semaphore);
-  p=GetHeadElementInLinkedList(color_cache);
-  for (i=0; p != (ElementInfo *) NULL; )
-  {
-    const ColorInfo
-      *color;
-
-    color=(const ColorInfo *) p->value;
-    if ((color->stealth == MagickFalse) &&
-        (GlobExpression(color->name,pattern,MagickFalse) != MagickFalse))
-      colors[i++]=color;
-    p=p->next;
-  }
+  i=CollectColorInfo(pattern,colors);
   UnlockSemaphoreInfo(color_semaphore);
   if (i == 0)
     colors=(const ColorInfo **) RelinquishMagickMemory((void*) colors);
