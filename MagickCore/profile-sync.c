@@ -742,6 +742,15 @@ static MagickBooleanType ReadExifEntry(const ExifWalkInfo *walk,
   return(MagickTrue);
 }
 
+static void PushCurrentExifDirectory(DirectoryInfo *directory_stack,
+  ssize_t *level,unsigned char *directory,size_t *entry)
+{
+  directory_stack[(*level)].directory=directory;
+  (*entry)++;
+  directory_stack[(*level)].entry=(*entry);
+  (*level)++;
+}
+
 static void PushExifStackEntry(DirectoryInfo *directory_stack,ssize_t *level,
   unsigned char *exif,const ssize_t offset)
 {
@@ -820,10 +829,7 @@ static MagickBooleanType PushExifDirectory(const ExifWalkInfo *walk,
     return(MagickFalse);
   if (IsExifSubdirectoryTag(directory,ifd0,tag_value) != MagickFalse)
     (*exif_directory)=exif+offset;
-  directory_stack[(*level)].directory=directory;
-  (*entry)++;
-  directory_stack[(*level)].entry=(*entry);
-  (*level)++;
+  PushCurrentExifDirectory(directory_stack,level,directory,entry);
   PushExifStackEntry(directory_stack,level,exif,offset);
   if ((directory+2+(12*number_entries)) > (exif+length))
     return(MagickTrue);
