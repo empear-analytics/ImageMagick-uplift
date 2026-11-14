@@ -854,6 +854,12 @@ static void Convert8BIMResourceName(char *resource,char **macroman_resource)
       resource);
 }
 
+static inline MagickBooleanType Is8BIMScanPending(const size_t length,
+  const MagickBooleanType status)
+{
+  return(((length > 0) && (status == MagickFalse)) ? MagickTrue : MagickFalse);
+}
+
 static void Get8BIMProperty(const Image *image,const char *key,
   ExceptionInfo *exception)
 {
@@ -905,7 +911,7 @@ static void Get8BIMProperty(const Image *image,const char *key,
   status=MagickFalse;
   length=GetStringInfoLength(profile);
   info=GetStringInfoDatum(profile);
-  while ((length > 0) && (status == MagickFalse))
+  while (Is8BIMScanPending(length,status) != MagickFalse)
   {
     AttributeInfo8BIM
       attribute_info;
