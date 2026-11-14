@@ -600,6 +600,68 @@ static unsigned int ApplyHuffmanTerminator(const HuffmanTransfer *transfer,
   return((unsigned int) (color == MagickFalse));
 }
 
+typedef struct _HuffmanBitReader
+{
+  Image
+    *image;
+
+  int
+    byte,
+    mask;
+
+  size_t
+    runlength,
+    code,
+    length,
+    null_lines;
+} HuffmanBitReader;
+
+static unsigned int ReadHuffmanCode(HuffmanBitReader *reader,const ssize_t x)
+{
+  Image
+    *image = reader->image;
+
+  int
+    byte = reader->byte,
+    mask = reader->mask;
+
+  size_t
+    bit,
+    code = reader->code,
+    length = reader->length,
+    null_lines = reader->null_lines,
+    runlength = reader->runlength;
+
+  unsigned int
+    bail;
+
+  bail=MagickFalse;
+  do
+  {
+    if (runlength < 11)
+      InputBit(bit)
+    else
+      {
+        InputBit(bit);
+        if ((int) bit != 0)
+          {
+            null_lines=CountHuffmanNullLine(null_lines,x);
+            bail=MagickTrue;
+            break;
+          }
+      }
+    code=(code << 1)+(size_t) bit;
+    length++;
+  } while (code == 0);
+  reader->byte=byte;
+  reader->mask=mask;
+  reader->runlength=runlength;
+  reader->code=code;
+  reader->length=length;
+  reader->null_lines=null_lines;
+  return(bail);
+}
+
 static void SetFaxResolution(Image *image)
 {
   image->resolution.x=204.0;
@@ -616,6 +678,9 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   const HuffmanTable
     *entry;
 
+  HuffmanBitReader
+    reader;
+
   HuffmanTable
     **mb_hash,
     **mw_hash;
@@ -623,16 +688,6 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   HuffmanTransfer
     transfer;
 
-  int
-    byte,
-    mask;
-
-  size_t
-    bit,
-    code,
-    length,
-    null_lines,
-    runlength;
 
   ssize_t
     count,
@@ -673,18 +728,19 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   /*
     Uncompress 1D Huffman to runlength encoded pixels.
   */
-  byte=0;
-  mask=0;
-  null_lines=0;
-  runlength=0;
-  SkipHuffmanToEndOfLine(image,&byte,&mask,&runlength);
+  reader.image=image;
+  reader.byte=0;
+  reader.mask=0;
+  reader.null_lines=0;
+  reader.runlength=0;
+  SkipHuffmanToEndOfLine(image,&reader.byte,&reader.mask,&reader.runlength);
   SetFaxResolution(image);
   image_view=AcquireAuthenticCacheView(image,exception);
   transfer.image=image;
   transfer.image_view=image_view;
   transfer.scanline=scanline;
   transfer.exception=exception;
-  for (y=0; ((y < (ssize_t) image->rows) && (null_lines < 3)); )
+  for (y=0; ((y < (ssize_t) image->rows) && (reader.null_lines < 3)); )
   {
     ssize_t
       x;
@@ -697,47 +753,32 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
       Decode Huffman encoded scanline.
     */
     color=MagickTrue;
-    code=0;
+    reader.code=0;
     count=0;
-    length=0;
-    runlength=0;
+    reader.length=0;
+    reader.runlength=0;
     x=0;
     for ( ; ; )
     {
-      if (byte == EOF)
+      if (reader.byte == EOF)
         break;
       if (x >= (ssize_t) image->columns)
         {
-          SkipHuffmanToEndOfLine(image,&byte,&mask,&runlength);
+          SkipHuffmanToEndOfLine(image,&reader.byte,&reader.mask,
+            &reader.runlength);
           break;
         }
-      bail=MagickFalse;
-      do
-      {
-        if (runlength < 11)
-          InputBit(bit)
-        else
-          {
-            InputBit(bit);
-            if ((int) bit != 0)
-              {
-                null_lines=CountHuffmanNullLine(null_lines,x);
-                bail=MagickTrue;
-                break;
-              }
-          }
-        code=(code << 1)+(size_t) bit;
-        length++;
-      } while (code == 0);
+      bail=ReadHuffmanCode(&reader,x);
       if (bail != MagickFalse)
         break;
-      if (length > 13)
+      if (reader.length > 13)
         {
-          SkipHuffmanToEndOfLine(image,&byte,&mask,&runlength);
+          SkipHuffmanToEndOfLine(image,&reader.byte,&reader.mask,
+            &reader.runlength);
           break;
         }
       entry=LookupHuffmanEntry((color != MagickFalse) ? mw_hash : mb_hash,color,
-        length,code);
+        reader.length,reader.code);
       if (entry == (const HuffmanTable *) NULL)
         continue;
       switch (entry->id)
@@ -759,8 +800,8 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
         default:
           break;
       }
-      code=0;
-      length=0;
+      reader.code=0;
+      reader.length=0;
     }
     if (TransferHuffmanScanline(&transfer,y) == MagickFalse)
       break;
