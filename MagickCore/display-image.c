@@ -10689,6 +10689,21 @@ static void XEnterWindowDigit(XResourceInfo *resource_info,
   resource_info->quantum=StringToLong(delta);
 }
 
+static MagickBooleanType IsImageWindowTranslateKey(const KeySym key_symbol)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_Next:
+    case XK_Prior:
+    case XK_Home:
+    case XK_KP_Home:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
 static DisplayCommand XImageWindowCommand(Display *display,
   XResourceInfo *resource_info,XWindows *windows,const MagickStatusType state,
   KeySym key_symbol,Image **image,ExceptionInfo *exception)
@@ -10723,14 +10738,6 @@ static DisplayCommand XImageWindowCommand(Display *display,
       (void) XMapRaised(display,windows->command.id);
       return(NullCommand);
     }
-    case XK_Next:
-    case XK_Prior:
-    case XK_Home:
-    case XK_KP_Home:
-    {
-      XTranslateImage(display,windows,*image,key_symbol);
-      return(NullCommand);
-    }
     case XK_Up:
     case XK_KP_Up:
     case XK_Down:
@@ -10748,6 +10755,11 @@ static DisplayCommand XImageWindowCommand(Display *display,
     default:
       break;
   }
+  if (IsImageWindowTranslateKey(key_symbol) != MagickFalse)
+    {
+      XTranslateImage(display,windows,*image,key_symbol);
+      return(NullCommand);
+    }
   return(XLookupKeyCommand((int) key_symbol,state));
 }
 
