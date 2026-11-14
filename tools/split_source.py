@@ -20,7 +20,10 @@ of its names (it refuses the split when the kept part does). A function that nam
 calls what the macro's definitions name, in every branch and through further macros
 (`#define ScaledSig(x) ... ScaledSigmoidal(...)`), so a static reached only through a macro
 moves with its callers, and one the kept part also calls is shared. --copy-macro NAME (repeatable) defines a one-line
-`#define NAME "literal"` of the kept part again in NEW (Recipe S step 2). A file-scope
+`#define NAME "literal"` of the kept part again in NEW (Recipe S step 2). --copy-struct TAG (repeatable) defines
+a `struct TAG` / `{` ... `};` of the kept part (no preprocessor line inside) again, verbatim, in NEW's *Typedef
+declarations* block when the moved part names the type, which both parts then complete in one translation unit
+each (Recipe S step 2); without it a struct the kept part defines and the family uses refuses the split. A file-scope
 `static const` table between the moved functions moves with them, as does a file-scope `static`
 variable or array that is not const (one declaration, any number of plain declarators, with or
 without initialisers) when the kept part names none of its declarators (2026-11-13), and a one-line
@@ -348,9 +351,10 @@ def brace_delta(line):
     t = re.sub(r"/\*.*?\*/|//.*$", "", t)
     return t.count("{") - t.count("}")
 
-args = sys.argv[1:]; out = None; copy_macros = []; moved_banners = []
+args = sys.argv[1:]; out = None; copy_macros = []; copy_structs = []; moved_banners = []
 if {"-h", "--help"} & set(args): print(__doc__); sys.exit(0)
 while "--copy-macro" in args: k = args.index("--copy-macro"); copy_macros.append(args[k + 1]); del args[k:k + 2]
+while "--copy-struct" in args: k = args.index("--copy-struct"); copy_structs.append(args[k + 1]); del args[k:k + 2]
 if "--out" in args: k = args.index("--out"); out = args[k + 1]; del args[k:k + 2]
 if len(args) < 3: sys.exit(__doc__)
 path, new, title, roots = args[0], args[1], args[2], args[3:]
@@ -617,8 +621,24 @@ for k, line in enumerate(rest_lines):
         e = next(x for x in range(k, len(rest_lines)) if rest_lines[x].rstrip().endswith(";"))
         fp = function_pointer_typedef(rest_lines, e)
         if fp and fp[0] == k: types.update(fp[1])
+# a struct definition that both parts name is defined again, verbatim, in the new file (Recipe S step 2, --copy-struct TAG):
+# the definition is `struct TAG` / `{` ... `};` standing once in the kept part, with no preprocessor line, and the moved
+# part names the type
+copied_structs = []
+for tag in copy_structs:
+    d0 = [k for k, l in enumerate(rest_lines) if l == "struct %s" % tag]
+    if len(d0) != 1 or rest_lines[d0[0] + 1:d0[0] + 2] != ["{"]:
+        sys.exit("refused: --copy-struct %s: the kept part holds no single `struct %s` / `{` definition" % (tag, tag))
+    d1 = next((k for k in range(d0[0] + 2, len(rest_lines)) if rest_lines[k] == "};"), None)
+    if d1 is None or any(re.match(r"\s*#", rest_lines[k]) for k in range(d0[0], d1 + 1)):
+        sys.exit("refused: --copy-struct %s: the definition has no closing `};` line of its own or holds a preprocessor line" % tag)
+    if not re.search(r"\b%s\b" % re.escape(tag.lstrip("_")), region):
+        sys.exit("refused: --copy-struct %s: the moved part does not name the type" % tag)
+    copied_structs.append("\n".join(rest_lines[d0[0]:d1 + 1]))
 for tname in sorted(types):
-    if re.search(r"\b%s\b" % tname, region): sys.exit("refused: type %s defined outside the region and used in it" % tname)
+    if re.search(r"\b%s\b" % tname, region):
+        if any(t.lstrip("_") == tname for t in copy_structs): continue
+        sys.exit("refused: type %s defined outside the region and used in it" % tname)
 # a file-scope variable the original keeps must not be used by the region
 for k, line in enumerate(rest_lines):
     if not re.match(r"^static\b", line) or "(" in line: continue
@@ -696,7 +716,7 @@ for k, line in enumerate(list(include_lines)):
     include_lines[k] = None
     print("include block: %s defines objects and stays in the original only" % mi.group(1))
 include_lines = [l for l in include_lines if l is not None]
-extra = declaration_block("Typedef declarations.", moved_types, "\n\n") + \
+extra = declaration_block("Typedef declarations.", moved_types + copied_structs, "\n\n") + \
     declaration_block("Define declarations.", moved_macros + macro_lines) + \
     declaration_block("Constant declarations.", moved_tables, "\n\n") + \
     forward_block(forward)

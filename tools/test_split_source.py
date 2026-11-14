@@ -306,6 +306,61 @@ class SplitSource(unittest.TestCase):
         ok, _ = self.compiles("synth-family.c", "-DDELEGATE")
         self.assertFalse(ok)
 
+    # A struct both parts name: `struct _Rec` completes the header's `typedef struct _Rec Rec;`, as threshold.c's
+    # `struct _ThresholdMap` does for OrderedDitherImage (moved part) and GetThresholdMap (kept part).
+    REC_H = "typedef struct _Rec Rec;\n"
+    REC = "\nstruct _Rec\n{\n  int\n    a;\n\n  long\n    b;\n};\n"
+    REC_FAMILY = FAMILY.replace("return(FamilyHelper(x));", "Rec r;\n  r.a=x;\n  r.b=2;\n  return(FamilyHelper(r.a)+(int) r.b);")
+    REC_KEPT = KEPT.replace("return(x*2);", "Rec r;\n  r.a=x;\n  r.b=2;\n  return(r.a*(int) r.b);")
+
+    def split_rec(self, *options, family=None, rec=None):
+        # the tool takes its options (--copy-struct TAG) from anywhere after its three positional arguments
+        return self.split((rec or self.REC) + (family or self.REC_FAMILY) + self.REC_KEPT, extra_h=self.REC_H,
+                          roots=("FamilyRoot",) + options)
+
+    def test_struct_named_by_both_parts_refused_without_the_flag(self):
+        r = self.split_rec()
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("type Rec defined outside the region and used in it", r.stderr)
+
+    def test_copy_struct_defines_it_again_in_the_new_file(self):
+        r = self.split_rec("--copy-struct", "_Rec")
+        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        old = open(os.path.join(self.out, "synth.c")).read()
+        new = open(os.path.join(self.out, "synth-family.c")).read()
+        text = self.REC.strip("\n")
+        self.assertEqual(old.count(text), 1)
+        self.assertEqual(new.count(text), 1)
+        self.assertLess(new.index("Typedef declarations."), new.index(text))
+        self.assertLess(new.index(text), new.index("FamilyHelper"))
+        self.assert_both_compile()
+
+    def test_planted_defect_copy_removed_does_not_compile(self):
+        r = self.split_rec("--copy-struct", "_Rec")
+        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        path = os.path.join(self.out, "synth-family.c")
+        text = open(path).read()
+        self.assertIn(self.REC.strip("\n"), text)
+        open(path, "w").write(text.replace(self.REC.strip("\n"), ""))
+        ok, _ = self.compiles("synth-family.c")
+        self.assertFalse(ok)
+
+    def test_copy_struct_refused_for_a_name_that_is_no_definition_of_the_kept_part(self):
+        r = self.split_rec("--copy-struct", "_Other")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("holds no single `struct _Other`", r.stderr)
+
+    def test_copy_struct_refused_when_the_moved_part_does_not_name_it(self):
+        r = self.split_rec("--copy-struct", "_Rec", family=FAMILY)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("the moved part does not name the type", r.stderr)
+
+    def test_copy_struct_refused_for_a_definition_holding_a_preprocessor_line(self):
+        rec = "\nstruct _Rec\n{\n  int\n    a;\n#if defined(DELEGATE)\n  long\n    b;\n#endif\n};\n"
+        r = self.split_rec("--copy-struct", "_Rec", rec=rec)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("holds a preprocessor line", r.stderr)
+
     def test_shared_static_still_refused(self):
         r = self.split("#if defined(DELEGATE)\n" + FAMILY + KEPT.replace("x*2", "FamilyHelper(x)") + "#endif\n")
         self.assertNotEqual(r.returncode, 0)
