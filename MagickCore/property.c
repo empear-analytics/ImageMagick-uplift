@@ -5309,6 +5309,17 @@ static MagickBooleanType AcquireInterpretImage(const ImageInfo *image_info,
   return(MagickTrue);
 }
 
+static const char *SkipInterpretSpaces(const char *embed_text)
+{
+  const char
+    *p;
+
+  p=embed_text;
+  while ((isspace((int) ((unsigned char) *p)) != 0) && (*p != '\0'))
+    p++;
+  return(p);
+}
+
 MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   const char *embed_text,ExceptionInfo *exception)
 {
@@ -5339,9 +5350,7 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   LogInterpretImageProperties(image_info,image);
   if (embed_text == (const char *) NULL)
     return(ConstantString(""));
-  p=embed_text;
-  while ((isspace((int) ((unsigned char) *p)) != 0) && (*p != '\0'))
-    p++;
+  p=SkipInterpretSpaces(embed_text);
   if (*p == '\0')
     return(ConstantString(""));
   if (ReadInterpretTextFile(p,&interpret_text,exception,&returned) !=
