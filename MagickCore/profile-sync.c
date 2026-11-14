@@ -742,6 +742,14 @@ static MagickBooleanType ReadExifEntry(const ExifWalkInfo *walk,
   return(MagickTrue);
 }
 
+static void PushExifStackEntry(DirectoryInfo *directory_stack,ssize_t *level,
+  unsigned char *exif,const ssize_t offset)
+{
+  directory_stack[(*level)].directory=exif+offset;
+  directory_stack[(*level)].entry=0;
+  (*level)++;
+}
+
 static MagickBooleanType PushExifDirectory(const ExifWalkInfo *walk,
   const ExifTagInfo *exif_tag,const size_t number_entries,
   const ExifWalkTargets *targets)
@@ -802,18 +810,14 @@ static MagickBooleanType PushExifDirectory(const ExifWalkInfo *walk,
   (*entry)++;
   directory_stack[(*level)].entry=(*entry);
   (*level)++;
-  directory_stack[(*level)].directory=exif+offset;
-  directory_stack[(*level)].entry=0;
-  (*level)++;
+  PushExifStackEntry(directory_stack,level,exif,offset);
   if ((directory+2+(12*number_entries)) > (exif+length))
     return(MagickTrue);
   offset=(ssize_t) ReadProfileLong(endian,directory+2+(12*
     number_entries));
   if (IsNextDirectoryOffset(offset,length,(*level)) != MagickFalse)
     {
-      directory_stack[(*level)].directory=exif+offset;
-      directory_stack[(*level)].entry=0;
-      (*level)++;
+      PushExifStackEntry(directory_stack,level,exif,offset);
     }
   return(MagickTrue);
 }
