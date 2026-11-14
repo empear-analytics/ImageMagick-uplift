@@ -24446,6 +24446,19 @@ static MagickBooleanType XSelectCommandWidgetEvent(
   return(MagickFalse);
 }
 
+static void XUpdateWindowStasis(XWindows *windows,const time_t timestamp)
+{
+  if ((windows->image.stasis == MagickFalse) ||
+      (windows->magnify.stasis == MagickFalse))
+    {
+      if ((GetMagickTime()-timestamp) > 0)
+        {
+          windows->image.stasis=MagickTrue;
+          windows->magnify.stasis=MagickTrue;
+        }
+    }
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -24844,15 +24857,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
         continue;
     timestamp=GetMagickTime();
     (void) XNextEvent(display,&event);
-    if ((windows->image.stasis == MagickFalse) ||
-        (windows->magnify.stasis == MagickFalse))
-      {
-        if ((GetMagickTime()-timestamp) > 0)
-          {
-            windows->image.stasis=MagickTrue;
-            windows->magnify.stasis=MagickTrue;
-          }
-      }
+    XUpdateWindowStasis(windows,timestamp);
     if (XSelectCommandWidgetEvent(&event_context,&event_targets) !=
         MagickFalse)
       continue;
