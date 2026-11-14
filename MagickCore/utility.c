@@ -296,6 +296,15 @@ static MagickBooleanType VerifyBase64Terminal(const char *p,const int state,
   return(MagickTrue);
 }
 
+static void CheckBase64DecodeArguments(const char *source,
+  const size_t *length)
+{
+  assert(source != (char *) NULL);
+  assert(length != (size_t *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+}
+
 MagickExport unsigned char *Base64Decode(const char *source,size_t *length)
 {
   int
@@ -311,10 +320,7 @@ MagickExport unsigned char *Base64Decode(const char *source,size_t *length)
   unsigned char
     *decode;
 
-  assert(source != (char *) NULL);
-  assert(length != (size_t *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  CheckBase64DecodeArguments(source,length);
   *length=0;
   decode=(unsigned char *) AcquireQuantumMemory((strlen(source)+3)/4,
     3*sizeof(*decode));
