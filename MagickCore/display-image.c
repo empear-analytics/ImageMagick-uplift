@@ -11047,6 +11047,71 @@ static void XApplyCompositeCommand(const XMagickCommandContext *context)
     }
 }
 
+static void XApplyAddBorderCommand(const XMagickCommandContext *context,
+  char *color)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  RectangleInfo
+    page_geometry;
+
+  Image
+    *border_image;
+
+  static char
+    geometry[MagickPathExtent] = "6x6";
+
+  /*
+    Query user for border color and geometry.
+  */
+  XColorBrowserWidget(display,windows,"Select",color);
+  if (*color == '\0')
+    return;
+  (void) XDialogWidget(display,windows,"Add Border",
+    "Enter border geometry:",geometry);
+  if (*geometry == '\0')
+    return;
+  /*
+    Add a border to the image.
+  */
+  (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
+    exception);
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) QueryColorCompliance(color,AllCompliance,&(*image)->border_color,
+    exception);
+  (void) ParsePageGeometry(*image,geometry,&page_geometry,
+    exception);
+  border_image=BorderImage(*image,&page_geometry,(*image)->compose,
+    exception);
+  if (border_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=border_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  windows->image.window_changes.width=(int) (*image)->columns;
+  windows->image.window_changes.height=(int) (*image)->rows;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12584,51 +12649,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyCompositeCommand(&context);
       break;
     case AddBorderCommand:
-    {
-      Image
-        *border_image;
-
-      static char
-        geometry[MagickPathExtent] = "6x6";
-
-      /*
-        Query user for border color and geometry.
-      */
-      XColorBrowserWidget(display,windows,"Select",color);
-      if (*color == '\0')
-        break;
-      (void) XDialogWidget(display,windows,"Add Border",
-        "Enter border geometry:",geometry);
-      if (*geometry == '\0')
-        break;
-      /*
-        Add a border to the image.
-      */
-      (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
-        exception);
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      (void) QueryColorCompliance(color,AllCompliance,&(*image)->border_color,
-        exception);
-      (void) ParsePageGeometry(*image,geometry,&page_geometry,
-        exception);
-      border_image=BorderImage(*image,&page_geometry,(*image)->compose,
-        exception);
-      if (border_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=border_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      windows->image.window_changes.width=(int) (*image)->columns;
-      windows->image.window_changes.height=(int) (*image)->rows;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyAddBorderCommand(&context,color);
       break;
-    }
     case AddFrameCommand:
     {
       FrameInfo
