@@ -729,6 +729,36 @@ static void Skip8BIMResourceData(const unsigned char **info,size_t *length,
   (*length)=(size_t) ((ssize_t) (*length)-MagickMin(count,(ssize_t) (*length)));
 }
 
+typedef struct _Range8BIM
+{
+  long
+    start,
+    stop;
+} Range8BIM;
+
+static MagickBooleanType Skip8BIMResourceHeader(const Range8BIM *range,
+  const unsigned char **info,size_t *length,ssize_t *id)
+{
+  const long
+    start = range->start,
+    stop = range->stop;
+
+  if (ReadPropertyByte(info,length) != (unsigned char) '8')
+    return(MagickTrue);
+  if (ReadPropertyByte(info,length) != (unsigned char) 'B')
+    return(MagickTrue);
+  if (ReadPropertyByte(info,length) != (unsigned char) 'I')
+    return(MagickTrue);
+  if (ReadPropertyByte(info,length) != (unsigned char) 'M')
+    return(MagickTrue);
+  (*id)=(ssize_t) ReadPropertyMSBShort(info,length);
+  if ((*id) < (ssize_t) start)
+    return(MagickTrue);
+  if ((*id) > (ssize_t) stop)
+    return(MagickTrue);
+  return(MagickFalse);
+}
+
 static void Get8BIMProperty(const Image *image,const char *key,
   ExceptionInfo *exception)
 {
@@ -783,18 +813,12 @@ static void Get8BIMProperty(const Image *image,const char *key,
   info=GetStringInfoDatum(profile);
   while ((length > 0) && (status == MagickFalse))
   {
-    if (ReadPropertyByte(&info,&length) != (unsigned char) '8')
-      continue;
-    if (ReadPropertyByte(&info,&length) != (unsigned char) 'B')
-      continue;
-    if (ReadPropertyByte(&info,&length) != (unsigned char) 'I')
-      continue;
-    if (ReadPropertyByte(&info,&length) != (unsigned char) 'M')
-      continue;
-    id=(ssize_t) ReadPropertyMSBShort(&info,&length);
-    if (id < (ssize_t) start)
-      continue;
-    if (id > (ssize_t) stop)
+    Range8BIM
+      range;
+
+    range.start=start;
+    range.stop=stop;
+    if (Skip8BIMResourceHeader(&range,&info,&length,&id) != MagickFalse)
       continue;
     Release8BIMResourceNames(&resource,&macroman_resource);
     count=(ssize_t) ReadPropertyByte(&info,&length);
