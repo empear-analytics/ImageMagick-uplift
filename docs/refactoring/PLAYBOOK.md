@@ -4598,7 +4598,11 @@ Recipe D, whose copies are moved whole and so may not leave the caller.
    (2026-11-13): up to three plain locals the caller reads after the block may be written,
    on Recipe RV step 6(b)'s terms (Recipe O step 2): each goes as a pointer, written
    `(*v)` at every use, `&v` passed on to a callee written `v`, and counts among step 5's
-   four parameters; `R` (step 2) must not read one of them.
+   four parameters; `R` (step 2) must not read one of them, except (2026-11-14) when `R`
+   is that local itself, `return(v);`: every write through `(*v)` lands in the caller's
+   `v` before the helper returns, so the caller's `return(v);` reads what the block's
+   `return(v);` read (`geometry-parse.c`'s `GetGeometry`, whose separator `switch` ORs
+   into `flags` and whose `default:` returns `flags`).
 4. Cut the block into a new `static MagickBooleanType` function directly above the
    caller. Each `return(R);` becomes `return(MagickFalse);`, and the function ends with
    `return(MagickTrue);`. Nothing else in the text changes.
@@ -4688,6 +4692,11 @@ and leaves through `return;` when it fails; as a helper it takes the function ou
 `length` and `endian` for the walk that follows. Added by Claude Code (Claude Opus 5.5)
 under the mandate of 2026-10-24.
 Lane: c
+Step 3's `return(v);` exception (2026-11-14, campaign B, M127 lane b round 13):
+`geometry-parse.c`'s `GetGeometry`, whose separator `switch` writes `p` and `flags` and
+leaves through `return(flags);` at its `default:`; a probe 7.90 to 8.04. Added by Claude
+Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
 
 ---
 
@@ -19718,3 +19727,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | QF | Share a Single Pixel Fetch Through Row Functions: many `static void` copies opening with one fetch (`GetAuthenticPixelQueue`) and an early `return;` on `NULL`, differing in the column loop and the buffer type, become one `void` function taking a `const` row struct, a row-function pointer and `void *pixels`; each copy keeps its name as a `void` row function; Lane: c | `stream.c`'s 56 `Stream<Type><Map>Pixels`/`Stream<Type>MapPixels`: 6.89 to 7.32, `magick stream` timing equal on five commands | mandate (2026-10-24) |
 | 2026-11-14 | NEW | JT | Replace Jumps to a Returning Tail by Calls of the Tail: a function-ending `L: S return(R);` reached by `goto L;` from nested arms moves to a `static` helper of the return type taking the (at most four) variables it reads; each `goto L;` and the label's tail become `return(Helper(...));`; Lane: c | `property.c`'s `InterpretBracedEscape` (three lookup arms jumping to `PropertyLookupFailure:`): the first step of a chain that takes the function out of every finding, 3.62 to 3.64 | mandate (2026-10-24) |
 | 2026-11-14 | NEW | XP | Share Mirrored Extreme-Search Loops Through Per-Direction Predicates: copies of a loop keeping the most extreme array element, differing in their tests' operands and operators, become one `static` search taking a predicate pointer, each copy's tests a `MagickBooleanType` predicate returning `MagickTrue` where the copy assigned; Lane: c | `property.c`'s `GetConvexHullExtremePoints` (top, right, bottom, left loops; cc 26, four bumps): leaves every finding, 3.64 to 3.66 | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | W | Step 3's widening: `R` may be a widened local itself, `return(v);`, since every write through `(*v)` lands in the caller's `v` before the helper returns and the caller's `return(v);` reads that value; Lane: b | `geometry-parse.c`'s `GetGeometry` (separator `switch` writing `p` and `flags`, `default:` returning `flags`; probe 7.90 to 8.04) | mandate (2026-10-24) |
