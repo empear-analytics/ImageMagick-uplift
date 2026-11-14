@@ -11356,6 +11356,80 @@ static void XApplyZoomCommand(const XMagickCommandContext *context)
     }
 }
 
+static void XApplyShowPreviewCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ImageInfo
+    *const image_info = context->image_info;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  MagickStatusType
+    status;
+
+  char
+    filename[MagickPathExtent];
+
+  char
+    **previews;
+
+  Image
+    *preview_image;
+
+  PreviewType
+    preview;
+
+  static char
+    preview_type[MagickPathExtent] = "Gamma";
+
+  /*
+    Select preview type from menu.
+  */
+  previews=GetCommandOptions(MagickPreviewOptions);
+  if (previews == (char **) NULL)
+    return;
+  XListBrowserWidget(display,windows,&windows->widget,
+    (const char **) previews,"Preview",
+    "Select an enhancement, effect, or F/X:",preview_type);
+  previews=DestroyStringList(previews);
+  if (*preview_type == '\0')
+    return;
+  /*
+    Show image preview.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  preview=(PreviewType) ParseCommandOption(MagickPreviewOptions,
+    MagickFalse,preview_type);
+  (void) FormatImageProperty(*image,"group","%.17g",(double)
+    windows->image.id);
+  (void) DeleteImageProperty(*image,"label");
+  (void) SetImageProperty(*image,"label","Preview",exception);
+  preview_image=PreviewImage(*image,preview,exception);
+  if (preview_image == (Image *) NULL)
+    return;
+  (void) AcquireUniqueFilename(filename);
+  (void) FormatLocaleString(preview_image->filename,MagickPathExtent,
+    "show:%s",filename);
+  status=WriteImage(image_info,preview_image,exception);
+  (void) RelinquishUniqueFileResource(filename);
+  preview_image=DestroyImage(preview_image);
+  if (status == MagickFalse)
+    XNoticeWidget(display,windows,"Unable to show image preview",
+      (*image)->filename);
+  XDelay(display,1500);
+  XSetCursorState(display,windows,MagickFalse);
+}
+
 static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12918,58 +12992,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyZoomCommand(&context);
       break;
     case ShowPreviewCommand:
-    {
-      char
-        **previews;
-
-      Image
-        *preview_image;
-
-      PreviewType
-        preview;
-
-      static char
-        preview_type[MagickPathExtent] = "Gamma";
-
-      /*
-        Select preview type from menu.
-      */
-      previews=GetCommandOptions(MagickPreviewOptions);
-      if (previews == (char **) NULL)
-        break;
-      XListBrowserWidget(display,windows,&windows->widget,
-        (const char **) previews,"Preview",
-        "Select an enhancement, effect, or F/X:",preview_type);
-      previews=DestroyStringList(previews);
-      if (*preview_type == '\0')
-        break;
-      /*
-        Show image preview.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      preview=(PreviewType) ParseCommandOption(MagickPreviewOptions,
-        MagickFalse,preview_type);
-      (void) FormatImageProperty(*image,"group","%.17g",(double)
-        windows->image.id);
-      (void) DeleteImageProperty(*image,"label");
-      (void) SetImageProperty(*image,"label","Preview",exception);
-      preview_image=PreviewImage(*image,preview,exception);
-      if (preview_image == (Image *) NULL)
-        break;
-      (void) AcquireUniqueFilename(filename);
-      (void) FormatLocaleString(preview_image->filename,MagickPathExtent,
-        "show:%s",filename);
-      status=WriteImage(image_info,preview_image,exception);
-      (void) RelinquishUniqueFileResource(filename);
-      preview_image=DestroyImage(preview_image);
-      if (status == MagickFalse)
-        XNoticeWidget(display,windows,"Unable to show image preview",
-          (*image)->filename);
-      XDelay(display,1500);
-      XSetCursorState(display,windows,MagickFalse);
+      XApplyShowPreviewCommand(&context);
       break;
-    }
     case ShowHistogramCommand:
     {
       Image
