@@ -1761,6 +1761,57 @@ static LogInfo *GetDefaultLogInfo(void)
   return(log_info);
 }
 
+static char *TranslateLogFormat(const char *format,char *text,size_t extent,
+  LogEventText *event_text,const char *domain)
+{
+  char
+    *q;
+
+  const char
+    *p;
+
+  /*
+    Translate event in "human readable" format.
+  */
+  q=text;
+  for (p=format; *p != '\0'; p++)
+  {
+    *q='\0';
+    if (GrowLogEventText(&text,&q,&extent) == MagickFalse)
+      return((char *) NULL);
+    /*
+      The format of the log is defined by embedding special format characters:
+
+        %c   client name
+        %d   domain
+        %e   event
+        %f   function
+        %i   thread id
+        %l   line
+        %m   module
+        %n   log name
+        %p   process id
+        %r   real CPU time
+        %t   wall clock time
+        %u   user CPU time
+        %v   version
+        %%   percent sign
+        \n   newline
+        \r   carriage return
+    */
+    if (CopyLogFormatLiteral(&p,&q) != MagickFalse)
+      continue;
+    p++;
+    if (*p == '\0')
+      break;
+    (*event_text).text=text;
+    (*event_text).extent=extent;
+    TranslateLogSpecifier(event_text,domain,p,&q);
+  }
+  *q='\0';
+  return(text);
+}
+
 static char *TranslateEvent(const LogEventLocation *location,
   const char *domain,const char *event)
 {
@@ -1780,12 +1831,6 @@ static char *TranslateEvent(const LogEventLocation *location,
 
   LogInfo
     *log_info;
-
-  char
-    *q;
-
-  const char
-    *p;
 
   size_t
     extent;
@@ -1820,46 +1865,7 @@ static char *TranslateEvent(const LogEventLocation *location,
       FormatLogEventXML(&event_text,domain);
       return(text);
     }
-  /*
-    Translate event in "human readable" format.
-  */
-  q=text;
-  for (p=log_info->format; *p != '\0'; p++)
-  {
-    *q='\0';
-    if (GrowLogEventText(&text,&q,&extent) == MagickFalse)
-      return((char *) NULL);
-    /*
-      The format of the log is defined by embedding special format characters:
-
-        %c   client name
-        %d   domain
-        %e   event
-        %f   function
-        %i   thread id
-        %l   line
-        %m   module
-        %n   log name
-        %p   process id
-        %r   real CPU time
-        %t   wall clock time
-        %u   user CPU time
-        %v   version
-        %%   percent sign
-        \n   newline
-        \r   carriage return
-    */
-    if (CopyLogFormatLiteral(&p,&q) != MagickFalse)
-      continue;
-    p++;
-    if (*p == '\0')
-      break;
-    event_text.text=text;
-    event_text.extent=extent;
-    TranslateLogSpecifier(&event_text,domain,p,&q);
-  }
-  *q='\0';
-  return(text);
+  return(TranslateLogFormat(log_info->format,text,extent,&event_text,domain));
 }
 
 static void RotateLogFiles(LogInfo *log_info)
