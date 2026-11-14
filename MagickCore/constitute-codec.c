@@ -412,6 +412,32 @@ static void SyncResolutionUnits(Image *image,const char *resolution_units)
     SetResolutionUnitsFromString(image,resolution_units);
 }
 
+typedef struct _ResolutionSource
+{
+  Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+} ResolutionSource;
+
+static void GetExifResolution(const ResolutionSource *source,
+  const char **resolution_x,const char **resolution_y,
+  const char **resolution_units)
+{
+  Image
+    *const image = source->image;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  (*resolution_x)=GetImageProperty(image,"exif:XResolution",exception);
+  (*resolution_y)=GetImageProperty(image,"exif:YResolution",exception);
+  if (HasResolutionPair((*resolution_x),(*resolution_y)) != MagickFalse)
+    (*resolution_units)=GetImageProperty(image,"exif:ResolutionUnit",
+      exception);
+}
+
 static void SyncResolutionFromProperties(Image *image,
   ConstituteInfo *constitute_info, ExceptionInfo *exception)
 {
@@ -429,11 +455,13 @@ static void SyncResolutionFromProperties(Image *image,
   used_tiff=MagickFalse;
   if (constitute_info->sync_from_exif != MagickFalse)
     {
-      resolution_x=GetImageProperty(image,"exif:XResolution",exception);
-      resolution_y=GetImageProperty(image,"exif:YResolution",exception);
-      if (HasResolutionPair(resolution_x,resolution_y) != MagickFalse)
-        resolution_units=GetImageProperty(image,"exif:ResolutionUnit",
-          exception);
+      ResolutionSource
+        source;
+
+      source.image=image;
+      source.exception=exception;
+      GetExifResolution(&source,&resolution_x,&resolution_y,
+        &resolution_units);
     }
   if (IsTIFFResolutionFallback(resolution_x,resolution_y,constitute_info) !=
       MagickFalse)
