@@ -1325,6 +1325,20 @@ static MagickStatusType AddTypeNode(SplayTreeInfo *cache,TypeInfo *type_info,
   return(status);
 }
 
+static void LoadTypeIncludeElement(const TypeIncludeScan *scan,
+  const char **q,MagickStatusType *status)
+{
+  ExceptionInfo
+    *const exception = scan->target->exception;
+
+  char
+    *const token = scan->token;
+
+  while (LoadTypeIncludes(scan,q,status) == MagickFalse)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ConfigureError,"IncludeNodeNestedTooDeeply","`%s'",token);
+}
+
 static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1391,9 +1405,7 @@ static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
         /*
           Include element.
         */
-        while (LoadTypeIncludes(&scan,&q,&status) == MagickFalse)
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            ConfigureError,"IncludeNodeNestedTooDeeply","`%s'",token);
+        LoadTypeIncludeElement(&scan,&q,&status);
         continue;
       }
     if (LocaleCompare(keyword,"<type") == 0)
