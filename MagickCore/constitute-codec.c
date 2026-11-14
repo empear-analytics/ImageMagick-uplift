@@ -406,6 +406,12 @@ static void SetResolutionUnitsFromString(Image *image,
     image->units=(ResolutionType) option_type;
 }
 
+static void SyncResolutionUnits(Image *image,const char *resolution_units)
+{
+  if (resolution_units != (char *) NULL)
+    SetResolutionUnitsFromString(image,resolution_units);
+}
+
 static void SyncResolutionFromProperties(Image *image,
   ConstituteInfo *constitute_info, ExceptionInfo *exception)
 {
@@ -444,8 +450,7 @@ static void SyncResolutionFromProperties(Image *image,
   if (HasResolutionPair(resolution_x,resolution_y) != MagickFalse)
     {
       SetResolutionFromStrings(image,resolution_x,resolution_y);
-      if (resolution_units != (char *) NULL)
-        SetResolutionUnitsFromString(image,resolution_units);
+      SyncResolutionUnits(image,resolution_units);
       DeleteResolutionProperties(image,used_tiff);
     }
 }
