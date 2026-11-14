@@ -10722,6 +10722,25 @@ static DisplayCommand XImageWindowArrowCommand(const ImageWindowKeyInput *input,
   return(NullCommand);
 }
 
+static MagickBooleanType IsImageWindowArrowKey(const KeySym key_symbol)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_Up:
+    case XK_KP_Up:
+    case XK_Down:
+    case XK_KP_Down:
+    case XK_Left:
+    case XK_KP_Left:
+    case XK_Right:
+    case XK_KP_Right:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
 static DisplayCommand XImageWindowKeyCommand(const ImageWindowKeyInput *input,
   const MagickStatusType state,const KeySym key_symbol)
 {
@@ -10747,18 +10766,11 @@ static DisplayCommand XImageWindowKeyCommand(const ImageWindowKeyInput *input,
       (void) XMapRaised(display,windows->command.id);
       return(NullCommand);
     }
-    case XK_Up:
-    case XK_KP_Up:
-    case XK_Down:
-    case XK_KP_Down:
-    case XK_Left:
-    case XK_KP_Left:
-    case XK_Right:
-    case XK_KP_Right:
-      return(XImageWindowArrowCommand(input,state,key_symbol));
     default:
       break;
   }
+  if (IsImageWindowArrowKey(key_symbol) != MagickFalse)
+    return(XImageWindowArrowCommand(input,state,key_symbol));
   if (IsImageWindowTranslateKey(key_symbol) != MagickFalse)
     {
       XTranslateImage(display,windows,*image,key_symbol);
