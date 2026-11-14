@@ -1073,6 +1073,23 @@ typedef struct _EncodeFallbackInfo
     *exception;
 } EncodeFallbackInfo;
 
+static const MagickInfo *GetExtensionMagickInfo(const Image *image,
+  ExceptionInfo *exception)
+{
+  char
+    extension[MagickPathExtent];
+
+  const MagickInfo
+    *magick_info;
+
+  GetPathComponent(image->filename,ExtensionPath,extension);
+  if (*extension != '\0')
+    magick_info=GetMagickInfo(extension,exception);
+  else
+    magick_info=GetMagickInfo(image->magick,exception);
+  return(magick_info);
+}
+
 static void FindFallbackEncoder(const EncodeFallbackInfo *info,
   const MagickInfo **magick_info,EncodeImageHandler **encoder)
 {
@@ -1092,14 +1109,7 @@ static void FindFallbackEncoder(const EncodeFallbackInfo *info,
   *encoder=GetImageEncoder(*magick_info);
   if (*encoder == (EncodeImageHandler *) NULL)
     {
-      char
-        extension[MagickPathExtent];
-
-      GetPathComponent(image->filename,ExtensionPath,extension);
-      if (*extension != '\0')
-        *magick_info=GetMagickInfo(extension,exception);
-      else
-        *magick_info=GetMagickInfo(image->magick,exception);
+      *magick_info=GetExtensionMagickInfo(image,exception);
       (void) CopyMagickString(image->filename,filename,
         MagickPathExtent);
       *encoder=GetImageEncoder(*magick_info);
