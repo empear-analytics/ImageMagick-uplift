@@ -11462,6 +11462,36 @@ static void XApplyEqualizeCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyNegateCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  /*
+    Negate colors in image.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) NegateImage(*image,MagickFalse,exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyResizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12215,20 +12245,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyEqualizeCommand(&context);
       break;
     case NegateCommand:
-    {
-      /*
-        Negate colors in image.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      (void) NegateImage(*image,MagickFalse,exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyNegateCommand(&context);
       break;
-    }
     case GrayscaleCommand:
     {
       /*
