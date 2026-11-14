@@ -338,8 +338,9 @@ def relocate_declarations(lines, statics, macros):
 
 def note_banner(lines, n, titles):
     """Remember the title of the one-title `/* Title. */` banner standing directly above LINES[n], if any."""
-    if n >= 3 and lines[n - 3] == "/*" and lines[n - 1] == "*/" and lines[n - 2].startswith("  "):
-        titles.append(lines[n - 2].strip())
+    if n < 3: return
+    above = lines[n - 3:n]
+    if above == ["/*", above[1], "*/"] and above[1].startswith("  "): titles.append(above[1].strip())
 
 def is_function_head_next(lines, j):
     """Whether a function definition opens within twelve lines from LINES[j]: a line `{` on its own comes before
