@@ -1900,9 +1900,9 @@ static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
       {
         status=AppendColorInfoToCache(cache,color_info,exception);
         color_info=(ColorInfo *) NULL;
-        continue;
       }
-    q=ReadColorInfoAttribute(color_info,keyword,q,extent,token,exception);
+    else
+      q=ReadColorInfoAttribute(color_info,keyword,q,extent,token,exception);
   }
   token=(char *) RelinquishMagickMemory(token);
   return((MagickBooleanType) (status != 0));
