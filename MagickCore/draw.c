@@ -3020,6 +3020,133 @@ static inline MagickBooleanType IsRenderableClass(DrawInfo **graphic_context,
     MagickFalse);
 }
 
+typedef struct _MVGRenderState
+{
+  char
+    **token;
+
+  const char
+    **q;
+
+  ExceptionInfo
+    *exception;
+
+  MagickStatusType
+    *status;
+
+  MVGInfo
+    *mvg_info;
+
+  PrimitiveInfo
+    **primitive_info;
+
+  PrimitiveType
+    *primitive_type;
+
+  size_t
+    *extent,
+    *number_points;
+
+  ssize_t
+    *i,
+    *j,
+    *x;
+} MVGRenderState;
+
+static void ParseMVGPrimitivePoints(const MVGRenderState *state)
+{
+  char
+    *next_token,
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  MagickStatusType
+    status = (*state->status);
+
+  MVGInfo
+    mvg_info = (*state->mvg_info);
+
+  PointInfo
+    point;
+
+  PrimitiveInfo
+    *primitive_info = (*state->primitive_info);
+
+  PrimitiveType
+    primitive_type = (*state->primitive_type);
+
+  size_t
+    extent = (*state->extent),
+    *number_points = state->number_points;
+
+  ssize_t
+    i = (*state->i),
+    j = (*state->j),
+    x = (*state->x);
+
+  for (i=0; primitive_info[i].primitive != UndefinedPrimitive; i++)
+    if (primitive_info[i].text != (char *) NULL)
+      primitive_info[i].text=DestroyString(primitive_info[i].text);
+  i=0;
+  mvg_info.offset=i;
+  j=0;
+  primitive_info[0].primitive=primitive_type;
+  primitive_info[0].point.x=0.0;
+  primitive_info[0].point.y=0.0;
+  primitive_info[0].coordinates=0;
+  primitive_info[0].method=FloodfillMethod;
+  primitive_info[0].closed_subpath=MagickFalse;
+  for (x=0; *q != '\0'; x++)
+  {
+    /*
+      Define points.
+    */
+    if (IsValidPoint(q) == MagickFalse)
+      break;
+    (void) GetNextToken(q,&q,extent,token);
+    point.x=GetDrawValue(token,&next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    (void) GetNextToken(q,&q,extent,token);
+    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+      ThrowPointExpectedException(token,exception);
+    if (*token == ',')
+      (void) GetNextToken(q,&q,extent,token);
+    point.y=GetDrawValue(token,&next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    (void) GetNextToken(q,(const char **) NULL,extent,token);
+    if (*token == ',')
+      (void) GetNextToken(q,&q,extent,token);
+    primitive_info[i].primitive=primitive_type;
+    primitive_info[i].point=point;
+    primitive_info[i].coordinates=0;
+    primitive_info[i].method=FloodfillMethod;
+    primitive_info[i].closed_subpath=MagickFalse;
+    i++;
+    mvg_info.offset=i;
+    if (i < (ssize_t) (*number_points))
+      continue;
+    status&=(MagickStatusType) CheckPrimitiveExtent(&mvg_info,(double)
+      (*number_points));
+    primitive_info=(*mvg_info.primitive_info);
+    if (status == MagickFalse)
+      break;
+  }
+  (*state->q)=q;
+  (*state->status)=status;
+  (*state->mvg_info)=mvg_info;
+  (*state->primitive_info)=primitive_info;
+  (*state->i)=i;
+  (*state->j)=j;
+  (*state->x)=x;
+}
+
 static MagickBooleanType RenderMVGContent(Image *image,
   const DrawInfo *draw_info,const size_t depth,ExceptionInfo *exception)
 {
@@ -3096,6 +3223,10 @@ static MagickBooleanType RenderMVGContent(Image *image,
 
   TypeMetric
     metrics;
+
+  const MVGRenderState
+    render_state = { &token, &q, exception, &status, &mvg_info,
+      &primitive_info, &primitive_type, &extent, &number_points, &i, &j, &x };
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -4657,55 +4788,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     /*
       Parse the primitive attributes.
     */
-    for (i=0; primitive_info[i].primitive != UndefinedPrimitive; i++)
-      if (primitive_info[i].text != (char *) NULL)
-        primitive_info[i].text=DestroyString(primitive_info[i].text);
-    i=0;
-    mvg_info.offset=i;
-    j=0;
-    primitive_info[0].primitive=primitive_type;
-    primitive_info[0].point.x=0.0;
-    primitive_info[0].point.y=0.0;
-    primitive_info[0].coordinates=0;
-    primitive_info[0].method=FloodfillMethod;
-    primitive_info[0].closed_subpath=MagickFalse;
-    for (x=0; *q != '\0'; x++)
-    {
-      /*
-        Define points.
-      */
-      if (IsValidPoint(q) == MagickFalse)
-        break;
-      (void) GetNextToken(q,&q,extent,token);
-      point.x=GetDrawValue(token,&next_token);
-      if (token == next_token)
-        ThrowPointExpectedException(token,exception);
-      (void) GetNextToken(q,&q,extent,token);
-      if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-        ThrowPointExpectedException(token,exception);
-      if (*token == ',')
-        (void) GetNextToken(q,&q,extent,token);
-      point.y=GetDrawValue(token,&next_token);
-      if (token == next_token)
-        ThrowPointExpectedException(token,exception);
-      (void) GetNextToken(q,(const char **) NULL,extent,token);
-      if (*token == ',')
-        (void) GetNextToken(q,&q,extent,token);
-      primitive_info[i].primitive=primitive_type;
-      primitive_info[i].point=point;
-      primitive_info[i].coordinates=0;
-      primitive_info[i].method=FloodfillMethod;
-      primitive_info[i].closed_subpath=MagickFalse;
-      i++;
-      mvg_info.offset=i;
-      if (i < (ssize_t) number_points)
-        continue;
-      status&=(MagickStatusType) CheckPrimitiveExtent(&mvg_info,(double)
-        number_points);
-      primitive_info=(*mvg_info.primitive_info);
-      if (status == MagickFalse)
-        break;
-    }
+    ParseMVGPrimitivePoints(&render_state);
     if (status == MagickFalse)
       break;
     if (primitive_info[j].text != (char *) NULL)
