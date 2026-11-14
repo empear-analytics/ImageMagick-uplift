@@ -49,6 +49,7 @@ if ( ! GetOptions(
 	 'composite.c',
 	 'constitute.c',
 	 'constitute-codec.c',
+	 'constitute-write.c',
 	 'constitute-pixels.c',
 	 'decorate.c',
 	 'decorate-raise.c',

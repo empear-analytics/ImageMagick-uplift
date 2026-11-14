@@ -8885,6 +8885,11 @@ that clones the first (the *Code Duplication* cliff, W14).
    role's own name. Literals and operators are not renamed; whitespace, line breaks and
    comments are ignored, and so is the order of the declarators of a declaration that
    initialises none of them (the script compares them sorted).
+   A copy that writes a loop as `v=e;` directly followed by `for ( ; c; i)`, an empty
+   first clause, compares as `for (v=e; c; i)` (2026-11-14, `constitute.c`'s
+   `ReadSceneImages` beside `PingSceneImages`), and the new function's body takes the
+   form with the clause: C11 6.8.5.3 evaluates the first clause once, before the first
+   test, exactly where the statement ran, and `v` stays the variable the copy declared.
 2. The method type. Every function a copy calls at the role is a function of the file,
    or a function that a header the file includes declares (`static inline` in a private
    header, or exported), and all have the same type: the same return type and the same
@@ -17428,6 +17433,532 @@ Lane: b
 
 ---
 
+## Recipe RW - Share a Sequential Row Walk Through Row Functions Returning the Advanced Pointer
+
+**Use when:** CodeScene reports *Code Duplication* (often with *Overall Code Complexity*)
+in a file where many `static` functions hold the same sequential row walk over a
+rectangle of the pixel cache (fetch one row, stop on a `NULL` row, optionally sync the
+row and stop when the sync fails, return whether every row was done), differing only in
+the column loop that converts one row and in the type of the caller's buffer pointer,
+which that loop advances: `pixel-export.c`'s 49 `Export<Type><Map>Pixels` and seven
+`Export<Type>MapPixels` (one per storage type and fixed map, `GetVirtualPixels`), and
+`pixel-import.c`'s `Import<Type><Map>Pixels` (`GetAuthenticPixels` and
+`SyncAuthenticPixels`).
+
+**Not covered by:** Recipe RL, whose copies hold a parallel loop with a progress block and
+whose row function writes only through the row pointer, while here the walk is sequential
+and the buffer pointer that the column loop advances must carry from one row to the next
+(the row function returns it); Recipe CF, whose new function is `static inline` and called
+with a designator, which would leave one inlined copy of the walk in each caller (the
+duplication stays) and refuses copies whose types differ; Recipe TI and MT, which merge
+two copies into one function selecting their differences, not a walk shared by dozens;
+Recipe D, whose copies differ in a value, not in a loop body and a pointer type.
+
+**How:**
+
+1. Copies. Two or more `static` functions of one file, outside every OpenMP region, each
+   `for (y=0; y < (ssize_t) roi->height; y++) { R=Fetch(image,roi->x,roi->y+y,roi->width,1,exception);
+   if (R == NULL) break; C [if (Sync(image,exception) == MagickFalse) break;] }
+   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);` with the same `Fetch`,
+   the same optional sync, and a column loop `C` (or a call of a row function) that reads
+   the row pointer `R`, advances the caller's buffer pointer `b` (a parameter of a
+   pointer type, possibly `const`), and writes no other local the walk reads. Check by
+   script that every copy matches this template once `C` is taken out.
+2. Write, directly above the first copy, a `typedef struct NameRowInfo` holding what the
+   column loops read besides `R` and `b` (`image`, `roi`, and any per-call input such as
+   the generic map loop's `quantum_map` and `length`), and `typedef void
+   *(*NameRowMethod)(const NameRowInfo *,R's type,void *);` (for a `const` buffer,
+   `const void *` in both places). When the copies already used per-type row structs of
+   the same members (`ExportCharRowInfo`), the one struct replaces them.
+3. Below them, one `static MagickBooleanType` walk taking `(const NameRowInfo *row,const
+   NameRowMethod method,void *pixels,ExceptionInfo *exception)`: `image` and `roi` bound
+   from `row` (Recipe N step 4), then the copies' text with `C` written
+   `pixels=method(row,R,pixels);`, nothing else changed.
+4. Each copy becomes its row function, keeping its name: `static void *F(const
+   NameRowInfo *row,R's type R,void *pixels)`, binding first the members `C` reads under
+   their old names and `b` as `T *magick_restrict b = (T *) pixels;` (its old
+   qualifiers, its own type), then `C` unchanged (one level less indented) and
+   `return(b);`. A copy whose row work was already a row function's call (`q=F(&row,p,q)`
+   of a generic map row) leaves the file, and that row function takes this signature.
+5. Each caller's `return(F(image,roi,b,exception));` becomes
+   `return(NameRows(&row,F,pixels,exception));`, with `row` a local of the caller filled
+   member by member (Recipe B step 5) before the first such call; a member only some
+   paths read is filled directly before the call that needs it, in the copy's order (the
+   generic map path's `length=strlen(map)`). The caller passes its untyped buffer itself;
+   a local that only converted it to the copy's pointer type goes.
+6. All copies move in one commit (rule 1); the message lists the families and quotes
+   step 8's timing. `refactor_guard.py --calls` with `--renamed` for each walk that left
+   (`ExportCharMapPixels=ExportPixelRows`) and `--fnptr` for each row function must print
+   PASS, with only the fetch's count dropping and the walk's rising.
+7. Check by reading that each row function's body is its copy's column loop verbatim,
+   that the pointer it returns is the one the loop advanced, and that `C` wrote nothing
+   the walk reads (`y`, `roi`, `image`, `exception`).
+8. Time it: the walk now makes one indirect call per row, and each column loop is
+   compiled in a function of its own. Build the baseline and the candidate against a
+   small driver calling the public entry on a large image (2000x2000, 20 calls), alternate
+   them nine runs each per command over several types and maps (fixed and generic), and
+   quote the medians; a candidate slower by more than 3% stops the step.
+
+**Before:**
+
+```c
+static MagickBooleanType ExportCharBGRPixels(const Image *image,
+  const RectangleInfo *roi,unsigned char *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
+      *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToChar(GetPixelRed(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+...
+  q=(unsigned char *) pixels;
+  if (LocaleCompare(map,"BGR") == 0)
+    return(ExportCharBGRPixels(image,roi,q,exception));
+```
+
+**After:**
+
+```c
+static MagickBooleanType ExportPixelRows(const ExportRowInfo *row,
+  const ExportRowMethod method,void *pixels,ExceptionInfo *exception)
+{
+  ...
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    pixels=method(row,p,pixels);
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static void *ExportCharBGRPixels(const ExportRowInfo *row,
+  const Quantum *magick_restrict p,void *pixels)
+{
+  ...
+  unsigned char
+    *magick_restrict q = (unsigned char *) pixels;
+  ...
+  for (x=0; x < (ssize_t) roi->width; x++)
+  {
+    *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
+    ...
+  }
+  return(q);
+}
+...
+  row.image=image;
+  row.roi=roi;
+  row.quantum_map=quantum_map;
+  if (LocaleCompare(map,"BGR") == 0)
+    return(ExportPixelRows(&row,ExportCharBGRPixels,pixels,
+      exception));
+```
+
+**Careful:**
+
+- Values. The walk runs the same fetches with the same arguments in the same order, and
+  each row runs the copy's column loop on the same row pointer. The buffer pointer leaves
+  each row function as the loop advanced it and enters the next row as `pixels`: a pointer
+  to an object converted to `void *` and back to its own type compares equal to the
+  original (C11 6.3.2.3p1), so every element lands at the same address. The call goes
+  through a pointer of the row functions' exact type (the typedef makes the build check
+  it). `magick_restrict` on the row function's local promises what the copy's parameter
+  promised: within the call, the buffer is reached only through it.
+- A member read on only one path (`length`) stays unfilled on the others, which never
+  read it; nothing passes the struct by value.
+- C++ (Windows CI): the conversion from `void *` to the typed pointer needs the explicit
+  cast of step 4; the return to `void *` is implicit in both languages. Run
+  `tools/cxx_warnings.sh`.
+- Speed. One indirect call per row is negligible next to a row of pixels, but the column
+  loop now sits in a function of its own: step 8 is the evidence that the compiler still
+  vectorises and schedules it as before.
+
+**Evidence level:** oracle (the cases that reach the callers; name the callers, since the
+case map knows the copies only as callees), with `refactor_guard.py --calls` and step 8's
+timing.
+
+**Provenance:** 2026-11-14, from `pixel-export.c` (campaign B, M127 lane c round 9): its
+56 row walks (seven storage types, seven fixed maps and the generic map) held *Code
+Duplication* over 90 functions and *Overall Code Complexity*; the step took the file from
+6.89 to 7.32 (*Overall Code Complexity* gone, *Code Duplication* over 83 functions).
+Timing medians of nine alternating runs, 2000x2000, 20 exports each, base against
+candidate: char RGB 0.2342/0.2326 s, quantum RGBP 0.0515/0.0516, double RGBA
+0.0914/0.0916, longlong ARGB (generic map) 0.7825/0.7828, float I 0.3423/0.3431.
+Merging the seven per-type dispatchers into one table-driven function on top was flat
+(7.32) and not kept. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-10-24.
+Lane: c
+
+---
+
+## Recipe QF - Share a Single Pixel Fetch Through Row Functions
+
+**Use when:** CodeScene reports *Code Duplication* (often with *Overall Code Complexity*)
+in a file where many `void` `static` functions open with the same single fetch of the
+pixels and an early `return;` when it fails (`p=GetAuthenticPixelQueue(image); if (p ==
+(const Quantum *) NULL) return;`), followed by a column loop that differs from copy to
+copy and writes through a buffer pointer of the copy's own type: `stream.c`'s 49
+`Stream<Type><Map>Pixels` and seven `Stream<Type>MapPixels`.
+
+**Not covered by:** Recipe RW, whose copies walk rows (`for (y=...)`, a fetch per row, a
+`MagickBooleanType` result) and whose row functions return the advanced pointer for the
+next row; here there is one fetch, no result and nothing carried, so the shared function
+is `void` and the row functions return nothing. Recipe RL (parallel loop), Recipe CF
+(one inlined copy per caller keeps the duplication), Recipe D (copies differ in a loop
+body, not a value).
+
+**How:**
+
+1. Copies. Two or more `static void` functions of one file, outside every OpenMP region,
+   each declaring `const Quantum *p;` and the loop counters, then `p=Fetch(image); if (p ==
+   (const Quantum *) NULL) return;` with the same `Fetch`, then a column loop `C` (the
+   rest of the body) that reads `p`, writes through its buffer parameter `b`, and reads
+   only parameters. Check by script that every copy matches this template once `C` is
+   taken out.
+2. Write, directly above the first copy, a `typedef struct NameRowInfo` with one member
+   per parameter any copy takes besides `b` (`image`, `quantum_info`, `quantum_map`,
+   `length`), each of its parameter's type without top-level `const`, and `typedef void
+   (*NameRowMethod)(const NameRowInfo *,const Quantum *,void *);`.
+3. Below them, `static void Name(const NameRowInfo *row,const NameRowMethod
+   method,void *pixels)`: the copies' `p` declaration, the fetch on `row->image`, the
+   `NULL` test with its `return;`, then `method(row,p,pixels);`.
+4. Each copy keeps its name as a row function `static void F(const NameRowInfo *row,const
+   Quantum *p,void *pixels)`: first `const` bindings of the members it took as
+   parameters, under their names (Recipe N step 4), then `b` as `T *b = (T *) pixels;`,
+   its loop counters, and `C` unchanged.
+5. In each caller (a per-type dispatcher), the local that converted the untyped buffer to
+   `b`'s type gives way to `NameRowInfo row;`, filled member by member (Recipe B step 5)
+   where the conversion stood, with the values the calls passed; each call `F(image,...,b);`
+   becomes `Name(&row,F,untyped buffer);`. A member no copy of that caller reads stays
+   unfilled.
+6. All copies move in one commit (rule 1). `refactor_guard.py --calls` with `--fnptr` for
+   each row function must print PASS, with only the fetch's count dropping and `Name`'s
+   rising.
+7. Check by reading that each row function's body is its copy's loop verbatim and that
+   every member a row function binds was filled by every caller that passes it.
+8. Time it as Recipe RW step 8 does, through the public entry (`magick stream` for
+   `stream.c`); slower by more than 3% stops the step.
+
+**Before:**
+
+```c
+static void StreamCharBGRPixels(const Image *image,unsigned char *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
+    ...
+  }
+}
+...
+  q=(unsigned char *) stream_info->pixels;
+  if (LocaleCompare(stream_info->map,"BGR") == 0)
+    {
+      StreamCharBGRPixels(image,q);
+      return;
+    }
+```
+
+**After:**
+
+```c
+static void StreamPixelQueue(const StreamRowInfo *row,
+  const StreamRowMethod method,void *pixels)
+{
+  const Quantum
+    *p;
+
+  p=GetAuthenticPixelQueue(row->image);
+  if (p == (const Quantum *) NULL)
+    return;
+  method(row,p,pixels);
+}
+
+static void StreamCharBGRPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
+{
+  const Image
+    *image = row->image;
+
+  unsigned char
+    *q = (unsigned char *) pixels;
+  ...
+}
+...
+  row.image=image;
+  row.quantum_map=quantum_map;
+  row.length=length;
+  if (LocaleCompare(stream_info->map,"BGR") == 0)
+    {
+      StreamPixelQueue(&row,StreamCharBGRPixels,stream_info->pixels);
+      return;
+    }
+```
+
+**Careful:**
+
+- Values: the same fetch on the same image, the same early return, then the copy's loop on
+  the same pointer; the buffer converted to `void *` and back to its type compares equal
+  (C11 6.3.2.3p1). The call goes through the row functions' exact type, which the
+  typedef makes the build check.
+- The buffer conversion moves from the caller into the row function; it was the caller's
+  first use of the buffer and has no side effect.
+- C++ (Windows CI): the `void *` to typed pointer conversion needs step 4's explicit cast.
+
+**Evidence level:** oracle (the callers' cases), with `refactor_guard.py --calls` and step
+8's timing.
+
+**Provenance:** 2026-11-14, from `stream.c` (campaign B, M127 lane c round 9), right after
+Recipe RW on `pixel-export.c` and `pixel-import.c`: 6.89 to 7.32 (*Overall Code
+Complexity* gone, *Code Duplication* 77 functions, Excess Arguments 4 to 2 functions).
+`magick stream` on a 3000x3000 image, five runs per sample, medians of nine alternating
+samples base/cand: char rgb 0.57/0.57 s, double bgra 0.59/0.59, short i 0.70/0.70, float
+argb 0.88/0.88, quantum rgbp 0.56/0.56. Added by Claude Code (Claude Opus 5.5) under the
+mandate of 2026-10-24.
+Lane: c
+
+---
+
+## Recipe JT - Replace Jumps to a Returning Tail by Calls of the Tail
+
+**Use when:** CodeScene reports *Complex Method*, *Bumpy Road Ahead* or *Large Method* on
+a value-returning function whose last statements are a label and a tail that ends the
+function, `L: S return(R);`, reached by `goto L;` from inside nested arms as well as by
+falling through: `property.c`'s `InterpretBracedEscape`, whose `option:`, `artifact:`
+and `property:` arms jump to `PropertyLookupFailure:` (truncate the pattern, warn,
+`return(MagickTrue);`). Each `goto` keeps its arm from moving out (Recipe E step 1 and
+Recipe V refuse a jump to a label that stays behind), so the arms' bumps stay.
+
+**Not covered by:** Recipe V, VC and MC, whose jumps go to a cleanup label after which
+the caller goes on (`goto cleanup;` then releases and a final return): their block moves
+and the jump stays as `if (Helper(...) == MagickFalse) goto L;`, while here the jumps go
+and the tail moves; Recipe E step 7, which moves a tail reached only by falling through;
+Recipe ST and AT, which copy the tail into a helper that also takes an arm, not a label's
+tail jumped to from several places.
+
+**How:**
+
+1. The label `L` stands in the function's outermost block, followed only by the tail:
+   statements `S` and a final `return(R);`. No other label lies in the tail; the tail
+   holds no `goto`, no `#pragma` line, and lies outside every OpenMP region. Every
+   `goto L;` of the function, and nothing else, jumps to `L`.
+2. The tail reads at most four variables of the caller (parameters or locals); it writes
+   none of them except through a pointer (an array the caller declared, passed as a
+   pointer to its first element, Recipe V step 2). Nothing the caller does after the
+   tail exists, since the tail returns.
+3. Cut `S return(R);` into a new `static` function of the caller's return type directly
+   above the caller, taking those variables by value (an array as `T *v`), each of its
+   declared type and qualifiers. Nothing else in the text changes; macros used only by
+   the tail move with it (Recipe E step 7).
+4. Replace each `goto L;` by `return(Helper(...));`, and the label with its tail by the
+   same `return(Helper(...));`, passing the variables by name. Check by reading that
+   every argument fills its parameter.
+5. Run `tools/ci_warnings.sh` and `tools/cxx_warnings.sh` (both `OK`) and the oracle for
+   the function (or its caller, when the case map does not know it).
+
+**Before:**
+
+```c
+      string=GetImageOption(property_info,pattern+7);
+      if (string == (char *) NULL)
+        goto PropertyLookupFailure;
+      return(AppendInterpretString(text,string));
+  ...
+  string=GetImageOption(property_info,pattern);
+  if (string != (char *) NULL)
+    return(AppendInterpretString(text,string));
+
+PropertyLookupFailure:
+  TruncatePatternForMessage(pattern,offset);
+  (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+    "UnknownImageProperty","\"%%[%s]\"",pattern);
+  return(MagickTrue);
+}
+```
+
+**After:**
+
+```c
+static MagickBooleanType WarnUnknownProperty(ExceptionInfo *exception,
+  char *pattern,const ssize_t offset)
+{
+  TruncatePatternForMessage(pattern,offset);
+  (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+    "UnknownImageProperty","\"%%[%s]\"",pattern);
+  return(MagickTrue);
+}
+...
+      if (string == (char *) NULL)
+        return(WarnUnknownProperty(exception,pattern,offset));
+  ...
+  if (string != (char *) NULL)
+    return(AppendInterpretString(text,string));
+  return(WarnUnknownProperty(exception,pattern,offset));
+}
+```
+
+**Careful:**
+
+- Why the behaviour is the same. A `goto L;` runs no statement between itself and the
+  tail, so the tail reads the variables with the values they hold at the jump; the call
+  passes exactly those values, and the helper runs `S` and returns `R` on them; the
+  caller returns that value at once, as the tail did. The fall-through path reaches the
+  same call with the same values. Writes through a passed array land in the caller's
+  array, which nothing reads after the return.
+- A `ThrowMagickException` moved into the helper names the helper in
+  `GetMagickModule()` (owner, 2026-11-12, AGENTS.md).
+- A tail that reads a local written on some path but not on another (uninitialised on
+  one jump) must not move: passing it by value reads it. Check each jump's path.
+
+**Evidence level:** oracle (the cases that reach the function or its caller).
+
+**Provenance:** 2026-11-14, from `property.c`'s `InterpretBracedEscape` (campaign B, M127
+lane c round 9): alone 3.62 to 3.62 (cc 24 to 21); with Recipe MT on the `option:` and
+`artifact:` arms and Recipe E on the `property:` arm, the tail and the prefix dispatch,
+the function leaves *Bumpy Road Ahead*, *Complex Method* and *Large Method*, 3.62 to 3.64.
+Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: c
+
+---
+
+## Recipe XP - Share Mirrored Extreme-Search Loops Through Per-Direction Predicates
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Complex Method* or *Large Method* on
+a function holding several copies of one search loop that keeps the most extreme element
+of an array, each copy differing only in the operands and comparison operators of its
+tests: `property.c`'s `GetConvexHullExtremePoints`, whose top, right, bottom and left
+loops each run `if (h[n].A op1 e.A) { e=h[n]; continue; } if (h[n].A != e.A) continue;
+if (h[n].B op2 e.B) e=h[n];` with their own axes and operators.
+
+**Not covered by:** Recipe MT, which merges two copies through a selector and writes each
+differing run as a conditional (four copies with two runs each would put six `?:` into
+one loop, a *Complex Method* of its own); Recipe CF, whose copies already differ only in
+the function they call; Recipe P, which names one expression, while each copy's tests
+are a sequence with `continue`; Recipe E, which would give four helper loops that clone
+one another.
+
+**How:**
+
+1. Copies. Two or more loops in one function, outside every OpenMP region, each
+   `e=h[0]; for (n=0; n < (ssize_t) count; n++) { T }` where `T` is a sequence of tests
+   on `h[n]` and `e` that only assign `e=h[n];` and `continue;`, reads nothing the loop
+   writes but `e` and `n`, and calls nothing. Check by script that every copy matches one
+   template once its tests' operands and operators are taken out.
+2. For each copy write a `static MagickBooleanType` predicate directly above the
+   function, taking `(const T *point,const T *extreme)`: `T` with `h[n]` written
+   `point->`, `e` written `extreme->`, each `e=h[n]; continue;` (or `e=h[n];` ending the
+   body) written `return(MagickTrue);`, each lone `continue;` `return(MagickFalse);`,
+   and a final test `if (c) e=h[n];` written `return((MagickBooleanType) (c));`. The
+   tests, their operands and operators, and their order are unchanged.
+3. Write `typedef MagickBooleanType (*NameMethod)(const T *,const T *);` and one
+   `static T` search taking `(const T *h,const size_t count,const NameMethod method)`:
+   `e=h[0];`, the copies' `for` header, `if (method(h+n,&e) != MagickFalse) e=h[n];`,
+   `return(e);`.
+4. Each copy becomes `e=Search(h,count,Predicate);`, its comment kept; the statements
+   after each copy stay. The loop counter leaves the caller when nothing else uses it.
+5. All copies move in one commit (rule 1); the message names each copy and predicate.
+6. Check by reading that each predicate returns `MagickTrue` exactly on the paths where
+   its copy assigned `e`, and that no path assigned twice.
+7. Run the oracle for the function's caller, and compare base and candidate by hand on
+   inputs with ties in the first test (equal coordinates), where the second test decides.
+
+**Before:**
+
+```c
+  extreme=convex_hull[0];  /* top */
+  for (n=0; n < (ssize_t) number_points; n++)
+  {
+    if (convex_hull[n].y < extreme.y)
+      {
+        extreme=convex_hull[n];
+        continue;
+      }
+    if (convex_hull[n].y != extreme.y)
+      continue;
+    if (convex_hull[n].x < extreme.x)
+      extreme=convex_hull[n];
+  }
+```
+
+**After:**
+
+```c
+static MagickBooleanType IsTopHullPoint(const PointInfo *point,
+  const PointInfo *extreme)
+{
+  if (point->y < extreme->y)
+    return(MagickTrue);
+  if (point->y != extreme->y)
+    return(MagickFalse);
+  return((MagickBooleanType) (point->x < extreme->x));
+}
+...
+static PointInfo GetHullExtremePoint(const PointInfo *convex_hull,
+  const size_t number_points,const HullPointMethod method)
+{
+  ...
+  extreme=convex_hull[0];
+  for (n=0; n < (ssize_t) number_points; n++)
+    if (method(convex_hull+n,&extreme) != MagickFalse)
+      extreme=convex_hull[n];
+  return(extreme);
+}
+...
+  extreme=GetHullExtremePoint(convex_hull,number_points,  /* top */
+    IsTopHullPoint);
+```
+
+**Careful:**
+
+- Values. Each iteration evaluates the copy's tests in the same order on the same
+  values (`point` addresses `h[n]`, `extreme` the search's current `e`, which holds what
+  the copy's `e` held), and assigns `e=h[n]` exactly when the copy did: every path of
+  `T` ends either in an assignment (then nothing else of `T` runs, by its `continue` or
+  by being the last statement) or without one. Floating-point comparisons, NaN included,
+  are the same operators on the same operands.
+- C++ (Windows CI): the final comparison is `bool` there; step 2's cast to
+  `MagickBooleanType` is required (Recipe DT).
+- The predicates are small look-alikes; measure that *Code Duplication* does not appear.
+
+**Evidence level:** oracle (the caller's cases), with the hand comparison of step 7.
+
+**Provenance:** 2026-11-14, from `property.c`'s `GetConvexHullExtremePoints` (campaign
+B, M127 lane c round 9), cc 26, 87 lines, four bumps: the function leaves every
+finding and the file goes from 3.64 to 3.66, with no *Code Duplication* among the four
+predicates. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: c
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -19153,3 +19684,8 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | CE | Chain a Continuing Block into an Else Before the Loop's Tail: `if (c) { S continue; } T` at the end of a loop body becomes `if (c) { S } else T`, repeated upward into an `else if` chain; CodeScene counts each `continue` as a branch; Lane: b | `locale.c`'s `LoadLocaleCache` (cc 18 to 16, 8.85 to 8.90 in a probe) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | FC | Fold a Function into the Twin That Calls Out Its Block: `G`, whose block `B` is the body of `F`'s callee `H` (taking and returning the written local `r` by value), loses its calls to `F` and is deleted; `F` and `H` move whole above the first caller, out of a delegate `#if` when they name nothing it declares, freeing a place under the function-count threshold; Lane: b | `annotate.c`'s `GetPostscriptResolution`/`GetFreetypeTextResolution` (113 functions; the 114th costs 0.18; fold probe 5.69 flat) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | FM | Fold Twin Functions Differing in the Member They Read into One Taking the Value: `F(s,a)` and `G(s,b)`, the same text but for reading `s->m` and `s->n` once each, become one `H(a,v)` taking the member's value; calls pass `e->m` or `e->n`; both twins are deleted, freeing a place under the function-count threshold; Lane: b | `annotate.c`'s `IsColumnOutside`/`IsRowOutside` (113 functions; fold flat, with the helper it frees 5.79 to 5.81 in a probe) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | CF | Step 1: a copy whose loop is `v=e;` followed by `for ( ; c; i)` compares as `for (v=e; c; i)`, the merged body taking the clause form (C11 6.8.5.3); Lane: a | `constitute.c`'s `ReadSceneImages` and `PingSceneImages` (*Code Duplication*; probe 8.81 to 10.0) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | RW | Share a Sequential Row Walk Through Row Functions Returning the Advanced Pointer: many `static` copies of one sequential row walk (fetch, `NULL` break, optional sync, `y < height` result) differing in the column loop and the buffer pointer type become one walk taking a `const` row struct, a row-function pointer and `void *pixels`; each copy keeps its name as a row function `void *F(const RowInfo *,row pointer,void *)` returning the advanced pointer; Lane: c | `pixel-export.c`'s 56 `Export<Type><Map>Pixels`/`Export<Type>MapPixels` walks: 6.89 to 7.32, timing equal (five commands, within 0.6%) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | QF | Share a Single Pixel Fetch Through Row Functions: many `static void` copies opening with one fetch (`GetAuthenticPixelQueue`) and an early `return;` on `NULL`, differing in the column loop and the buffer type, become one `void` function taking a `const` row struct, a row-function pointer and `void *pixels`; each copy keeps its name as a `void` row function; Lane: c | `stream.c`'s 56 `Stream<Type><Map>Pixels`/`Stream<Type>MapPixels`: 6.89 to 7.32, `magick stream` timing equal on five commands | mandate (2026-10-24) |
+| 2026-11-14 | NEW | JT | Replace Jumps to a Returning Tail by Calls of the Tail: a function-ending `L: S return(R);` reached by `goto L;` from nested arms moves to a `static` helper of the return type taking the (at most four) variables it reads; each `goto L;` and the label's tail become `return(Helper(...));`; Lane: c | `property.c`'s `InterpretBracedEscape` (three lookup arms jumping to `PropertyLookupFailure:`): the first step of a chain that takes the function out of every finding, 3.62 to 3.64 | mandate (2026-10-24) |
+| 2026-11-14 | NEW | XP | Share Mirrored Extreme-Search Loops Through Per-Direction Predicates: copies of a loop keeping the most extreme array element, differing in their tests' operands and operators, become one `static` search taking a predicate pointer, each copy's tests a `MagickBooleanType` predicate returning `MagickTrue` where the copy assigned; Lane: c | `property.c`'s `GetConvexHullExtremePoints` (top, right, bottom, left loops; cc 26, four bumps): leaves every finding, 3.64 to 3.66 | mandate (2026-10-24) |

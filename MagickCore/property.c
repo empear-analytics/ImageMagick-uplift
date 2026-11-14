@@ -3538,6 +3538,65 @@ static void GetProfilesProperty(const Image *image,char *value)
     }
 }
 
+static MagickBooleanType IsTopHullPoint(const PointInfo *point,
+  const PointInfo *extreme)
+{
+  if (point->y < extreme->y)
+    return(MagickTrue);
+  if (point->y != extreme->y)
+    return(MagickFalse);
+  return((MagickBooleanType) (point->x < extreme->x));
+}
+
+static MagickBooleanType IsRightHullPoint(const PointInfo *point,
+  const PointInfo *extreme)
+{
+  if (point->x > extreme->x)
+    return(MagickTrue);
+  if (point->x != extreme->x)
+    return(MagickFalse);
+  return((MagickBooleanType) (point->y < extreme->y));
+}
+
+static MagickBooleanType IsBottomHullPoint(const PointInfo *point,
+  const PointInfo *extreme)
+{
+  if (point->y > extreme->y)
+    return(MagickTrue);
+  if (point->y != extreme->y)
+    return(MagickFalse);
+  return((MagickBooleanType) (point->x > extreme->x));
+}
+
+static MagickBooleanType IsLeftHullPoint(const PointInfo *point,
+  const PointInfo *extreme)
+{
+  if (point->x < extreme->x)
+    return(MagickTrue);
+  if (point->x != extreme->x)
+    return(MagickFalse);
+  return((MagickBooleanType) (point->y > extreme->y));
+}
+
+typedef MagickBooleanType
+  (*HullPointMethod)(const PointInfo *,const PointInfo *);
+
+static PointInfo GetHullExtremePoint(const PointInfo *convex_hull,
+  const size_t number_points,const HullPointMethod method)
+{
+  PointInfo
+    extreme;
+
+  ssize_t
+    n;
+
+  extreme=convex_hull[0];
+  for (n=0; n < (ssize_t) number_points; n++)
+    if (method(convex_hull+n,&extreme) != MagickFalse)
+      extreme=convex_hull[n];
+  return(extreme);
+}
+
 static const char *GetConvexHullExtremePoints(Image *image,char *value,
   const char *string,ExceptionInfo *exception)
 {
@@ -3548,9 +3607,6 @@ static const char *GetConvexHullExtremePoints(Image *image,char *value,
     extreme,
     *convex_hull;
 
-  ssize_t
-    n;
-
   size_t
     number_points;
 
@@ -3558,67 +3614,23 @@ static const char *GetConvexHullExtremePoints(Image *image,char *value,
   if (convex_hull == (PointInfo *) NULL)
     return(string);
   points=AcquireString("");
-  extreme=convex_hull[0];  /* top */
-  for (n=0; n < (ssize_t) number_points; n++)
-  {
-    if (convex_hull[n].y < extreme.y)
-      {
-        extreme=convex_hull[n];
-        continue;
-      }
-    if (convex_hull[n].y != extreme.y)
-      continue;
-    if (convex_hull[n].x < extreme.x)
-      extreme=convex_hull[n];
-  }
+  extreme=GetHullExtremePoint(convex_hull,number_points,  /* top */
+    IsTopHullPoint);
   (void) FormatLocaleString(value,MagickPathExtent,"%g,%g ",
     extreme.x,extreme.y);
   (void) ConcatenateString(&points,value);
-  extreme=convex_hull[0]; /* right */
-  for (n=0; n < (ssize_t) number_points; n++)
-  {
-    if (convex_hull[n].x > extreme.x)
-      {
-        extreme=convex_hull[n];
-        continue;
-      }
-    if (convex_hull[n].x != extreme.x)
-      continue;
-    if (convex_hull[n].y < extreme.y)
-      extreme=convex_hull[n];
-  }
+  extreme=GetHullExtremePoint(convex_hull,number_points,  /* right */
+    IsRightHullPoint);
   (void) FormatLocaleString(value,MagickPathExtent,"%g,%g ",
     extreme.x,extreme.y);
   (void) ConcatenateString(&points,value);
-  extreme=convex_hull[0];  /* bottom */
-  for (n=0; n < (ssize_t) number_points; n++)
-  {
-    if (convex_hull[n].y > extreme.y)
-      {
-        extreme=convex_hull[n];
-        continue;
-      }
-    if (convex_hull[n].y != extreme.y)
-      continue;
-    if (convex_hull[n].x > extreme.x)
-      extreme=convex_hull[n];
-  }
+  extreme=GetHullExtremePoint(convex_hull,number_points,  /* bottom */
+    IsBottomHullPoint);
   (void) FormatLocaleString(value,MagickPathExtent,"%g,%g ",
     extreme.x,extreme.y);
   (void) ConcatenateString(&points,value);
-  extreme=convex_hull[0];  /* left */
-  for (n=0; n < (ssize_t) number_points; n++)
-  {
-    if (convex_hull[n].x < extreme.x)
-      {
-        extreme=convex_hull[n];
-        continue;
-      }
-    if (convex_hull[n].x != extreme.x)
-      continue;
-    if (convex_hull[n].y > extreme.y)
-      extreme=convex_hull[n];
-  }
+  extreme=GetHullExtremePoint(convex_hull,number_points,  /* left */
+    IsLeftHullPoint);
   (void) FormatLocaleString(value,MagickPathExtent,"%g,%g ",
     extreme.x,extreme.y);
   (void) ConcatenateString(&points,value);
@@ -4728,18 +4740,36 @@ static MagickBooleanType AppendGlobbedProperties(const InterpretText *text,
   return(MagickTrue);
 }
 
-static MagickBooleanType InterpretBracedEscape(
-  const InterpretSources *sources,const InterpretText *text,const char **p)
+static MagickBooleanType WarnUnknownProperty(ExceptionInfo *exception,
+  char *pattern,const ssize_t offset)
+{
+  TruncatePatternForMessage(pattern,offset);
+  (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+    "UnknownImageProperty","\"%%[%s]\"",pattern);
+  return(MagickTrue);
+}
+
+typedef struct _BracedPattern
 {
   char
-    pattern[2*MagickPathExtent] = "\0";
+    *pattern;
+
+  ssize_t
+    offset;
+} BracedPattern;
+
+static MagickBooleanType AppendOptionOrArtifact(
+  const InterpretSources *sources,const InterpretText *text,
+  const BracedPattern *braced,const GlobSide side)
+{
+  char
+    *const pattern = braced->pattern;
 
   const char
     *string;
 
-  ssize_t
-    depth,
-    offset;
+  const ssize_t
+    offset = braced->offset;
 
   ExceptionInfo
     *const exception = sources->exception;
@@ -4751,75 +4781,72 @@ static MagickBooleanType InterpretBracedEscape(
     *const property_info = sources->property_info;
 
   /*
-    Braced Percent Escape %[...].
+    Option - direct global option lookup (with globbing).
+    Artifact - direct image artifact lookup (with glob).
   */
-  (*p)++;  /* advance p to just inside the opening brace */
-  depth=1;
-  if (**p == ']')
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-        "UnknownImageProperty","\"%%[]\"");
-      return(MagickFalse);
-    }
-  ScanBracedPattern(pattern,&offset,&depth,p);
-  if (depth != 0)
-    {
-      /*
-        Check for unmatched final ']' for "%[...]".
-      */
-      TruncatePatternForMessage(pattern,offset);
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-        "UnbalancedBraces","\"%%[%s\"",pattern);
-      return(MagickFalse);
-    }
+  if (IsGlob(((side == OptionGlobSide) ? pattern+7 : pattern+9)) != MagickFalse)
+    return(AppendGlobbedValues(sources,text,((side == OptionGlobSide) ?
+      pattern+7 : pattern+9),side));
+  string=((side == OptionGlobSide) ? GetImageOption(property_info,pattern+7) :
+    GetImageArtifact(property_image,pattern+9));
+  if (string == (char *) NULL)
+    return(WarnUnknownProperty(exception,pattern,offset));
+  return(AppendInterpretString(text,string));
+}
+
+static MagickBooleanType AppendPrefixedProperty(
+  const InterpretSources *sources,const InterpretText *text,
+  const BracedPattern *braced)
+{
+  char
+    *const pattern = braced->pattern;
+
+  const char
+    *string;
+
+  const ssize_t
+    offset = braced->offset;
+
+  ExceptionInfo
+    *const exception = sources->exception;
+
+  Image
+    *const property_image = sources->property_image;
+
   /*
-    Special Lookup Prefixes %[prefix:...].
+    Property - direct image property lookup (with glob).
   */
-  if (LocaleNCompare("fx:",pattern,3) == 0)
-    return(AppendFxValue(text,property_image,pattern,exception));
-  if (LocaleNCompare("hex:",pattern,4) == 0)
-    return(AppendHexValue(text,property_image,pattern,exception));
-  if (LocaleNCompare("pixel:",pattern,6) == 0)
-    return(AppendPixelValue(text,property_image,pattern,exception));
-  if (LocaleNCompare("option:",pattern,7) == 0)
-    {
-      /*
-        Option - direct global option lookup (with globbing).
-      */
-      if (IsGlob(pattern+7) != MagickFalse)
-        return(AppendGlobbedValues(sources,text,pattern+7,
-          OptionGlobSide));
-      string=GetImageOption(property_info,pattern+7);
-      if (string == (char *) NULL)
-        goto PropertyLookupFailure;
-      return(AppendInterpretString(text,string));
-    }
-  if (LocaleNCompare("artifact:",pattern,9) == 0)
-    {
-      /*
-        Artifact - direct image artifact lookup (with glob).
-      */
-      if (IsGlob(pattern+9) != MagickFalse)
-        return(AppendGlobbedValues(sources,text,pattern+9,
-          ArtifactGlobSide));
-      string=GetImageArtifact(property_image,pattern+9);
-      if (string == (char *) NULL)
-        goto PropertyLookupFailure;
-      return(AppendInterpretString(text,string));
-    }
-  if (LocaleNCompare("property:",pattern,9) == 0)
-    {
-      /*
-        Property - direct image property lookup (with glob).
-      */
-      if (IsGlob(pattern+9) != MagickFalse)
-        return(AppendGlobbedProperties(text,property_image,pattern,
-          exception));
-      string=GetImageProperty(property_image,pattern+9,exception);
-      if (string == (char *) NULL)
-        goto PropertyLookupFailure;
-      return(AppendInterpretString(text,string));
-    }
+  if (IsGlob(pattern+9) != MagickFalse)
+    return(AppendGlobbedProperties(text,property_image,pattern,
+      exception));
+  string=GetImageProperty(property_image,pattern+9,exception);
+  if (string == (char *) NULL)
+    return(WarnUnknownProperty(exception,pattern,offset));
+  return(AppendInterpretString(text,string));
+}
+
+static MagickBooleanType AppendUnprefixedValue(
+  const InterpretSources *sources,const InterpretText *text,
+  const BracedPattern *braced)
+{
+  char
+    *const pattern = braced->pattern;
+
+  const char
+    *string;
+
+  const ssize_t
+    offset = braced->offset;
+
+  ExceptionInfo
+    *const exception = sources->exception;
+
+  Image
+    *const property_image = sources->property_image;
+
+  ImageInfo
+    *const property_info = sources->property_info;
+
   /*
     Properties without special prefix.
   */
@@ -4852,12 +4879,81 @@ static MagickBooleanType InterpretBracedEscape(
   string=GetImageOption(property_info,pattern);
   if (string != (char *) NULL)
     return(AppendInterpretString(text,string));
+  return(WarnUnknownProperty(exception,pattern,offset));
+}
 
-PropertyLookupFailure:
-  TruncatePatternForMessage(pattern,offset);
-  (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-    "UnknownImageProperty","\"%%[%s]\"",pattern);
-  return(MagickTrue);
+static MagickBooleanType AppendBracedValue(
+  const InterpretSources *sources,const InterpretText *text,
+  const BracedPattern *braced)
+{
+  char
+    *const pattern = braced->pattern;
+
+  ExceptionInfo
+    *const exception = sources->exception;
+
+  Image
+    *const property_image = sources->property_image;
+
+  /*
+    Special Lookup Prefixes %[prefix:...].
+  */
+  if (LocaleNCompare("fx:",pattern,3) == 0)
+    return(AppendFxValue(text,property_image,pattern,exception));
+  if (LocaleNCompare("hex:",pattern,4) == 0)
+    return(AppendHexValue(text,property_image,pattern,exception));
+  if (LocaleNCompare("pixel:",pattern,6) == 0)
+    return(AppendPixelValue(text,property_image,pattern,exception));
+  if (LocaleNCompare("option:",pattern,7) == 0)
+    return(AppendOptionOrArtifact(sources,text,braced,OptionGlobSide));
+  if (LocaleNCompare("artifact:",pattern,9) == 0)
+    return(AppendOptionOrArtifact(sources,text,braced,ArtifactGlobSide));
+  if (LocaleNCompare("property:",pattern,9) == 0)
+    return(AppendPrefixedProperty(sources,text,braced));
+  return(AppendUnprefixedValue(sources,text,braced));
+}
+
+static MagickBooleanType InterpretBracedEscape(
+  const InterpretSources *sources,const InterpretText *text,const char **p)
+{
+  char
+    pattern[2*MagickPathExtent] = "\0";
+
+  BracedPattern
+    braced;
+
+  ssize_t
+    depth,
+    offset;
+
+  ExceptionInfo
+    *const exception = sources->exception;
+
+  /*
+    Braced Percent Escape %[...].
+  */
+  (*p)++;  /* advance p to just inside the opening brace */
+  depth=1;
+  if (**p == ']')
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+        "UnknownImageProperty","\"%%[]\"");
+      return(MagickFalse);
+    }
+  ScanBracedPattern(pattern,&offset,&depth,p);
+  if (depth != 0)
+    {
+      /*
+        Check for unmatched final ']' for "%[...]".
+      */
+      TruncatePatternForMessage(pattern,offset);
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "UnbalancedBraces","\"%%[%s\"",pattern);
+      return(MagickFalse);
+    }
+  braced.pattern=pattern;
+  braced.offset=offset;
+  return(AppendBracedValue(sources,text,&braced));
 }
 
 static MagickBooleanType ReadInterpretTextFile(const char *p,

@@ -579,17 +579,48 @@ MagickExport Image *StreamImage(const ImageInfo *image_info,
   return(image);
 }
 
-static void StreamCharBGRPixels(const Image *image,unsigned char *q)
+typedef struct _StreamRowInfo
+{
+  const Image
+    *image;
+
+  const QuantumInfo
+    *quantum_info;
+
+  const QuantumType
+    *quantum_map;
+
+  size_t
+    length;
+} StreamRowInfo;
+
+typedef void
+  (*StreamRowMethod)(const StreamRowInfo *,const Quantum *,void *);
+
+static void StreamPixelQueue(const StreamRowInfo *row,
+  const StreamRowMethod method,void *pixels)
 {
   const Quantum
     *p;
 
+  p=GetAuthenticPixelQueue(row->image);
+  if (p == (const Quantum *) NULL)
+    return;
+  method(row,p,pixels);
+}
+
+static void StreamCharBGRPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
+{
+  const Image
+    *image = row->image;
+
+  unsigned char
+    *q = (unsigned char *) pixels;
+
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
@@ -599,17 +630,18 @@ static void StreamCharBGRPixels(const Image *image,unsigned char *q)
   }
 }
 
-static void StreamCharBGRAPixels(const Image *image,unsigned char *q)
+static void StreamCharBGRAPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  unsigned char
+    *q = (unsigned char *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
@@ -620,17 +652,18 @@ static void StreamCharBGRAPixels(const Image *image,unsigned char *q)
   }
 }
 
-static void StreamCharBGRPPixels(const Image *image,unsigned char *q)
+static void StreamCharBGRPPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  unsigned char
+    *q = (unsigned char *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
@@ -641,17 +674,18 @@ static void StreamCharBGRPPixels(const Image *image,unsigned char *q)
   }
 }
 
-static void StreamCharIPixels(const Image *image,unsigned char *q)
+static void StreamCharIPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  unsigned char
+    *q = (unsigned char *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToChar(ClampToQuantum(GetPixelIntensity(image,p)));
@@ -659,17 +693,18 @@ static void StreamCharIPixels(const Image *image,unsigned char *q)
   }
 }
 
-static void StreamCharRGBPixels(const Image *image,unsigned char *q)
+static void StreamCharRGBPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  unsigned char
+    *q = (unsigned char *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToChar(GetPixelRed(image,p));
@@ -679,17 +714,18 @@ static void StreamCharRGBPixels(const Image *image,unsigned char *q)
   }
 }
 
-static void StreamCharRGBAPixels(const Image *image,unsigned char *q)
+static void StreamCharRGBAPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  unsigned char
+    *q = (unsigned char *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToChar(GetPixelRed(image,p));
@@ -700,17 +736,18 @@ static void StreamCharRGBAPixels(const Image *image,unsigned char *q)
   }
 }
 
-static void StreamCharRGBPPixels(const Image *image,unsigned char *q)
+static void StreamCharRGBPPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  unsigned char
+    *q = (unsigned char *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToChar(GetPixelRed(image,p));
@@ -721,17 +758,18 @@ static void StreamCharRGBPPixels(const Image *image,unsigned char *q)
   }
 }
 
-static void StreamLongBGRPixels(const Image *image,unsigned int *q)
+static void StreamLongBGRPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  unsigned int
+    *q = (unsigned int *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
@@ -741,17 +779,18 @@ static void StreamLongBGRPixels(const Image *image,unsigned int *q)
   }
 }
 
-static void StreamLongBGRAPixels(const Image *image,unsigned int *q)
+static void StreamLongBGRAPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  unsigned int
+    *q = (unsigned int *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
@@ -762,17 +801,18 @@ static void StreamLongBGRAPixels(const Image *image,unsigned int *q)
   }
 }
 
-static void StreamLongBGRPPixels(const Image *image,unsigned int *q)
+static void StreamLongBGRPPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  unsigned int
+    *q = (unsigned int *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
@@ -783,17 +823,18 @@ static void StreamLongBGRPPixels(const Image *image,unsigned int *q)
   }
 }
 
-static void StreamLongIPixels(const Image *image,unsigned int *q)
+static void StreamLongIPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  unsigned int
+    *q = (unsigned int *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToLong(ClampToQuantum(GetPixelIntensity(image,p)));
@@ -801,17 +842,18 @@ static void StreamLongIPixels(const Image *image,unsigned int *q)
   }
 }
 
-static void StreamLongRGBPixels(const Image *image,unsigned int *q)
+static void StreamLongRGBPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  unsigned int
+    *q = (unsigned int *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToLong(GetPixelRed(image,p));
@@ -821,17 +863,18 @@ static void StreamLongRGBPixels(const Image *image,unsigned int *q)
   }
 }
 
-static void StreamLongRGBAPixels(const Image *image,unsigned int *q)
+static void StreamLongRGBAPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  unsigned int
+    *q = (unsigned int *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToLong(GetPixelRed(image,p));
@@ -842,17 +885,18 @@ static void StreamLongRGBAPixels(const Image *image,unsigned int *q)
   }
 }
 
-static void StreamLongRGBPPixels(const Image *image,unsigned int *q)
+static void StreamLongRGBPPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  unsigned int
+    *q = (unsigned int *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToLong(GetPixelRed(image,p));
@@ -863,17 +907,18 @@ static void StreamLongRGBPPixels(const Image *image,unsigned int *q)
   }
 }
 
-static void StreamLongLongBGRPixels(const Image *image,MagickSizeType *q)
+static void StreamLongLongBGRPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  MagickSizeType
+    *q = (MagickSizeType *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
@@ -883,17 +928,18 @@ static void StreamLongLongBGRPixels(const Image *image,MagickSizeType *q)
   }
 }
 
-static void StreamLongLongBGRAPixels(const Image *image,MagickSizeType *q)
+static void StreamLongLongBGRAPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  MagickSizeType
+    *q = (MagickSizeType *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
@@ -904,17 +950,18 @@ static void StreamLongLongBGRAPixels(const Image *image,MagickSizeType *q)
   }
 }
 
-static void StreamLongLongBGRPPixels(const Image *image,MagickSizeType *q)
+static void StreamLongLongBGRPPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  MagickSizeType
+    *q = (MagickSizeType *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
@@ -925,17 +972,18 @@ static void StreamLongLongBGRPPixels(const Image *image,MagickSizeType *q)
   }
 }
 
-static void StreamLongLongRGBPixels(const Image *image,MagickSizeType *q)
+static void StreamLongLongRGBPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  MagickSizeType
+    *q = (MagickSizeType *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
@@ -945,17 +993,18 @@ static void StreamLongLongRGBPixels(const Image *image,MagickSizeType *q)
   }
 }
 
-static void StreamLongLongRGBAPixels(const Image *image,MagickSizeType *q)
+static void StreamLongLongRGBAPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  MagickSizeType
+    *q = (MagickSizeType *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
@@ -966,17 +1015,18 @@ static void StreamLongLongRGBAPixels(const Image *image,MagickSizeType *q)
   }
 }
 
-static void StreamLongLongRGBPPixels(const Image *image,MagickSizeType *q)
+static void StreamLongLongRGBPPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  MagickSizeType
+    *q = (MagickSizeType *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
@@ -987,17 +1037,18 @@ static void StreamLongLongRGBPPixels(const Image *image,MagickSizeType *q)
   }
 }
 
-static void StreamQuantumBGRPixels(const Image *image,Quantum *q)
+static void StreamQuantumBGRPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  Quantum
+    *q = (Quantum *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=GetPixelBlue(image,p);
@@ -1007,17 +1058,18 @@ static void StreamQuantumBGRPixels(const Image *image,Quantum *q)
   }
 }
 
-static void StreamQuantumBGRAPixels(const Image *image,Quantum *q)
+static void StreamQuantumBGRAPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  Quantum
+    *q = (Quantum *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=GetPixelBlue(image,p);
@@ -1028,17 +1080,18 @@ static void StreamQuantumBGRAPixels(const Image *image,Quantum *q)
   }
 }
 
-static void StreamQuantumBGRPPixels(const Image *image,Quantum *q)
+static void StreamQuantumBGRPPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  Quantum
+    *q = (Quantum *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=GetPixelBlue(image,p);
@@ -1049,17 +1102,18 @@ static void StreamQuantumBGRPPixels(const Image *image,Quantum *q)
   }
 }
 
-static void StreamQuantumRGBPixels(const Image *image,Quantum *q)
+static void StreamQuantumRGBPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  Quantum
+    *q = (Quantum *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=GetPixelRed(image,p);
@@ -1069,17 +1123,18 @@ static void StreamQuantumRGBPixels(const Image *image,Quantum *q)
   }
 }
 
-static void StreamQuantumRGBAPixels(const Image *image,Quantum *q)
+static void StreamQuantumRGBAPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  Quantum
+    *q = (Quantum *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=GetPixelRed(image,p);
@@ -1090,17 +1145,18 @@ static void StreamQuantumRGBAPixels(const Image *image,Quantum *q)
   }
 }
 
-static void StreamQuantumRGBPPixels(const Image *image,Quantum *q)
+static void StreamQuantumRGBPPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  Quantum
+    *q = (Quantum *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=GetPixelRed(image,p);
@@ -1111,17 +1167,18 @@ static void StreamQuantumRGBPPixels(const Image *image,Quantum *q)
   }
 }
 
-static void StreamShortBGRPixels(const Image *image,unsigned short *q)
+static void StreamShortBGRPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  unsigned short
+    *q = (unsigned short *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
@@ -1131,17 +1188,18 @@ static void StreamShortBGRPixels(const Image *image,unsigned short *q)
   }
 }
 
-static void StreamShortBGRAPixels(const Image *image,unsigned short *q)
+static void StreamShortBGRAPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  unsigned short
+    *q = (unsigned short *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
@@ -1152,17 +1210,18 @@ static void StreamShortBGRAPixels(const Image *image,unsigned short *q)
   }
 }
 
-static void StreamShortBGRPPixels(const Image *image,unsigned short *q)
+static void StreamShortBGRPPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  unsigned short
+    *q = (unsigned short *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
@@ -1173,17 +1232,18 @@ static void StreamShortBGRPPixels(const Image *image,unsigned short *q)
   }
 }
 
-static void StreamShortIPixels(const Image *image,unsigned short *q)
+static void StreamShortIPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  unsigned short
+    *q = (unsigned short *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToShort(ClampToQuantum(
@@ -1192,17 +1252,18 @@ static void StreamShortIPixels(const Image *image,unsigned short *q)
   }
 }
 
-static void StreamShortRGBPixels(const Image *image,unsigned short *q)
+static void StreamShortRGBPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  unsigned short
+    *q = (unsigned short *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToShort(GetPixelRed(image,p));
@@ -1212,17 +1273,18 @@ static void StreamShortRGBPixels(const Image *image,unsigned short *q)
   }
 }
 
-static void StreamShortRGBAPixels(const Image *image,unsigned short *q)
+static void StreamShortRGBAPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  unsigned short
+    *q = (unsigned short *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToShort(GetPixelRed(image,p));
@@ -1233,17 +1295,18 @@ static void StreamShortRGBAPixels(const Image *image,unsigned short *q)
   }
 }
 
-static void StreamShortRGBPPixels(const Image *image,unsigned short *q)
+static void StreamShortRGBPPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  unsigned short
+    *q = (unsigned short *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToShort(GetPixelRed(image,p));
@@ -1254,17 +1317,18 @@ static void StreamShortRGBPPixels(const Image *image,unsigned short *q)
   }
 }
 
-static void StreamLongLongIPixels(const Image *image,MagickSizeType *q)
+static void StreamLongLongIPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  MagickSizeType
+    *q = (MagickSizeType *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ScaleQuantumToLongLong(ClampToQuantum(
@@ -1273,17 +1337,18 @@ static void StreamLongLongIPixels(const Image *image,MagickSizeType *q)
   }
 }
 
-static void StreamQuantumIPixels(const Image *image,Quantum *q)
+static void StreamQuantumIPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  Quantum
+    *q = (Quantum *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=ClampToQuantum(GetPixelIntensity(image,p));
@@ -1291,18 +1356,21 @@ static void StreamQuantumIPixels(const Image *image,Quantum *q)
   }
 }
 
-static void StreamDoubleBGRPixels(const Image *image,
-  const QuantumInfo *quantum_info,double *q)
+static void StreamDoubleBGRPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  const QuantumInfo
+    *quantum_info = row->quantum_info;
+
+  double
+    *q = (double *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=(double) ((QuantumScale*(double) GetPixelBlue(image,p))*
@@ -1315,18 +1383,21 @@ static void StreamDoubleBGRPixels(const Image *image,
   }
 }
 
-static void StreamDoubleBGRAPixels(const Image *image,
-  const QuantumInfo *quantum_info,double *q)
+static void StreamDoubleBGRAPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  const QuantumInfo
+    *quantum_info = row->quantum_info;
+
+  double
+    *q = (double *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=(double) ((QuantumScale*(double) GetPixelBlue(image,p))*
@@ -1341,18 +1412,21 @@ static void StreamDoubleBGRAPixels(const Image *image,
   }
 }
 
-static void StreamDoubleBGRPPixels(const Image *image,
-  const QuantumInfo *quantum_info,double *q)
+static void StreamDoubleBGRPPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  const QuantumInfo
+    *quantum_info = row->quantum_info;
+
+  double
+    *q = (double *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=(double) ((QuantumScale*(double) GetPixelBlue(image,p))*
@@ -1366,18 +1440,21 @@ static void StreamDoubleBGRPPixels(const Image *image,
   }
 }
 
-static void StreamDoubleIPixels(const Image *image,
-  const QuantumInfo *quantum_info,double *q)
+static void StreamDoubleIPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  const QuantumInfo
+    *quantum_info = row->quantum_info;
+
+  double
+    *q = (double *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=(double) ((QuantumScale*(double) GetPixelIntensity(image,p))*
@@ -1386,18 +1463,21 @@ static void StreamDoubleIPixels(const Image *image,
   }
 }
 
-static void StreamDoubleRGBPixels(const Image *image,
-  const QuantumInfo *quantum_info,double *q)
+static void StreamDoubleRGBPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  const QuantumInfo
+    *quantum_info = row->quantum_info;
+
+  double
+    *q = (double *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=(double) ((QuantumScale*(double) GetPixelRed(image,p))*
@@ -1410,18 +1490,21 @@ static void StreamDoubleRGBPixels(const Image *image,
   }
 }
 
-static void StreamDoubleRGBAPixels(const Image *image,
-  const QuantumInfo *quantum_info,double *q)
+static void StreamDoubleRGBAPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  const QuantumInfo
+    *quantum_info = row->quantum_info;
+
+  double
+    *q = (double *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=(double) ((QuantumScale*(double) GetPixelRed(image,p))*
@@ -1436,18 +1519,21 @@ static void StreamDoubleRGBAPixels(const Image *image,
   }
 }
 
-static void StreamDoubleRGBPPixels(const Image *image,
-  const QuantumInfo *quantum_info,double *q)
+static void StreamDoubleRGBPPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  const QuantumInfo
+    *quantum_info = row->quantum_info;
+
+  double
+    *q = (double *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=(double) ((QuantumScale*(double) GetPixelRed(image,p))*
@@ -1461,18 +1547,21 @@ static void StreamDoubleRGBPPixels(const Image *image,
   }
 }
 
-static void StreamFloatBGRPixels(const Image *image,
-  const QuantumInfo *quantum_info,float *q)
+static void StreamFloatBGRPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  const QuantumInfo
+    *quantum_info = row->quantum_info;
+
+  float
+    *q = (float *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=(float) ((QuantumScale*(double) GetPixelBlue(image,p))*
@@ -1485,18 +1574,21 @@ static void StreamFloatBGRPixels(const Image *image,
   }
 }
 
-static void StreamFloatBGRAPixels(const Image *image,
-  const QuantumInfo *quantum_info,float *q)
+static void StreamFloatBGRAPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  const QuantumInfo
+    *quantum_info = row->quantum_info;
+
+  float
+    *q = (float *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=(float) ((QuantumScale*(double) GetPixelBlue(image,p))*
@@ -1511,18 +1603,21 @@ static void StreamFloatBGRAPixels(const Image *image,
   }
 }
 
-static void StreamFloatBGRPPixels(const Image *image,
-  const QuantumInfo *quantum_info,float *q)
+static void StreamFloatBGRPPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  const QuantumInfo
+    *quantum_info = row->quantum_info;
+
+  float
+    *q = (float *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=(float) ((QuantumScale*(double) GetPixelBlue(image,p))*
@@ -1536,18 +1631,21 @@ static void StreamFloatBGRPPixels(const Image *image,
   }
 }
 
-static void StreamFloatIPixels(const Image *image,
-  const QuantumInfo *quantum_info,float *q)
+static void StreamFloatIPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  const QuantumInfo
+    *quantum_info = row->quantum_info;
+
+  float
+    *q = (float *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=(float) ((QuantumScale*(double) GetPixelIntensity(image,p))*
@@ -1556,18 +1654,21 @@ static void StreamFloatIPixels(const Image *image,
   }
 }
 
-static void StreamFloatRGBPixels(const Image *image,
-  const QuantumInfo *quantum_info,float *q)
+static void StreamFloatRGBPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  const QuantumInfo
+    *quantum_info = row->quantum_info;
+
+  float
+    *q = (float *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=(float) ((QuantumScale*(double) GetPixelRed(image,p))*
@@ -1580,18 +1681,21 @@ static void StreamFloatRGBPixels(const Image *image,
   }
 }
 
-static void StreamFloatRGBAPixels(const Image *image,
-  const QuantumInfo *quantum_info,float *q)
+static void StreamFloatRGBAPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  const QuantumInfo
+    *quantum_info = row->quantum_info;
+
+  float
+    *q = (float *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=(float) ((QuantumScale*(double) GetPixelRed(image,p))*
@@ -1606,18 +1710,21 @@ static void StreamFloatRGBAPixels(const Image *image,
   }
 }
 
-static void StreamFloatRGBPPixels(const Image *image,
-  const QuantumInfo *quantum_info,float *q)
+static void StreamFloatRGBPPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  const QuantumInfo
+    *quantum_info = row->quantum_info;
+
+  float
+    *q = (float *) pixels;
 
   ssize_t
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     *q++=(float) ((QuantumScale*(double) GetPixelRed(image,p))*
@@ -2163,19 +2270,25 @@ static void StreamShortQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
-static void StreamCharMapPixels(const Image *image,
-  const QuantumType *quantum_map,const size_t length,unsigned char *q)
+static void StreamCharMapPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  const QuantumType
+    *quantum_map = row->quantum_map;
+
+  const size_t
+    length = row->length;
+
+  unsigned char
+    *q = (unsigned char *) pixels;
 
   ssize_t
     i,
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     for (i=0; i < (ssize_t) length; i++)
@@ -2188,20 +2301,28 @@ static void StreamCharMapPixels(const Image *image,
   }
 }
 
-static void StreamDoubleMapPixels(const Image *image,
-  const QuantumInfo *quantum_info,const QuantumType *quantum_map,
-  const size_t length,double *q)
+static void StreamDoubleMapPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  const QuantumInfo
+    *quantum_info = row->quantum_info;
+
+  const QuantumType
+    *quantum_map = row->quantum_map;
+
+  const size_t
+    length = row->length;
+
+  double
+    *q = (double *) pixels;
 
   ssize_t
     i,
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     for (i=0; i < (ssize_t) length; i++)
@@ -2214,20 +2335,28 @@ static void StreamDoubleMapPixels(const Image *image,
   }
 }
 
-static void StreamFloatMapPixels(const Image *image,
-  const QuantumInfo *quantum_info,const QuantumType *quantum_map,
-  const size_t length,float *q)
+static void StreamFloatMapPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  const QuantumInfo
+    *quantum_info = row->quantum_info;
+
+  const QuantumType
+    *quantum_map = row->quantum_map;
+
+  const size_t
+    length = row->length;
+
+  float
+    *q = (float *) pixels;
 
   ssize_t
     i,
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     for (i=0; i < (ssize_t) length; i++)
@@ -2240,19 +2369,25 @@ static void StreamFloatMapPixels(const Image *image,
   }
 }
 
-static void StreamLongMapPixels(const Image *image,
-  const QuantumType *quantum_map,const size_t length,unsigned int *q)
+static void StreamLongMapPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  const QuantumType
+    *quantum_map = row->quantum_map;
+
+  const size_t
+    length = row->length;
+
+  unsigned int
+    *q = (unsigned int *) pixels;
 
   ssize_t
     i,
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     for (i=0; i < (ssize_t) length; i++)
@@ -2265,19 +2400,25 @@ static void StreamLongMapPixels(const Image *image,
   }
 }
 
-static void StreamLongLongMapPixels(const Image *image,
-  const QuantumType *quantum_map,const size_t length,MagickSizeType *q)
+static void StreamLongLongMapPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  const QuantumType
+    *quantum_map = row->quantum_map;
+
+  const size_t
+    length = row->length;
+
+  MagickSizeType
+    *q = (MagickSizeType *) pixels;
 
   ssize_t
     i,
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     for (i=0; i < (ssize_t) length; i++)
@@ -2290,19 +2431,25 @@ static void StreamLongLongMapPixels(const Image *image,
   }
 }
 
-static void StreamQuantumMapPixels(const Image *image,
-  const QuantumType *quantum_map,const size_t length,Quantum *q)
+static void StreamQuantumMapPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  const QuantumType
+    *quantum_map = row->quantum_map;
+
+  const size_t
+    length = row->length;
+
+  Quantum
+    *q = (Quantum *) pixels;
 
   ssize_t
     i,
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     for (i=0; i < (ssize_t) length; i++)
@@ -2315,19 +2462,25 @@ static void StreamQuantumMapPixels(const Image *image,
   }
 }
 
-static void StreamShortMapPixels(const Image *image,
-  const QuantumType *quantum_map,const size_t length,unsigned short *q)
+static void StreamShortMapPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
 {
-  const Quantum
-    *p;
+  const Image
+    *image = row->image;
+
+  const QuantumType
+    *quantum_map = row->quantum_map;
+
+  const size_t
+    length = row->length;
+
+  unsigned short
+    *q = (unsigned short *) pixels;
 
   ssize_t
     i,
     x;
 
-  p=GetAuthenticPixelQueue(image);
-  if (p == (const Quantum *) NULL)
-    return;
   for (x=0; x < (ssize_t) GetImageExtent(image); x++)
   {
     for (i=0; i < (ssize_t) length; i++)
@@ -2372,46 +2525,48 @@ static void StreamShortMapPixels(const Image *image,
 static void StreamCharPixels(const StreamInfo *stream_info,const Image *image,
   QuantumType *quantum_map,size_t length)
 {
-  unsigned char
-    *q;
+  StreamRowInfo
+    row;
 
-  q=(unsigned char *) stream_info->pixels;
+  row.image=image;
+  row.quantum_map=quantum_map;
+  row.length=length;
   if (LocaleCompare(stream_info->map,"BGR") == 0)
     {
-      StreamCharBGRPixels(image,q);
+      StreamPixelQueue(&row,StreamCharBGRPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"BGRA") == 0)
     {
-      StreamCharBGRAPixels(image,q);
+      StreamPixelQueue(&row,StreamCharBGRAPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"BGRP") == 0)
     {
-      StreamCharBGRPPixels(image,q);
+      StreamPixelQueue(&row,StreamCharBGRPPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"I") == 0)
     {
-      StreamCharIPixels(image,q);
+      StreamPixelQueue(&row,StreamCharIPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"RGB") == 0)
     {
-      StreamCharRGBPixels(image,q);
+      StreamPixelQueue(&row,StreamCharRGBPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"RGBA") == 0)
     {
-      StreamCharRGBAPixels(image,q);
+      StreamPixelQueue(&row,StreamCharRGBAPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"RGBP") == 0)
     {
-      StreamCharRGBPPixels(image,q);
+      StreamPixelQueue(&row,StreamCharRGBPPixels,stream_info->pixels);
       return;
     }
-  StreamCharMapPixels(image,quantum_map,length,q);
+  StreamPixelQueue(&row,StreamCharMapPixels,stream_info->pixels);
 }
 
 static void StreamDoublePixels(const StreamInfo *stream_info,const Image *image,
@@ -2420,47 +2575,50 @@ static void StreamDoublePixels(const StreamInfo *stream_info,const Image *image,
   QuantumInfo
     *quantum_info;
 
-  double
-    *q;
+  StreamRowInfo
+    row;
 
   quantum_info=stream_info->quantum_info;
-  q=(double *) stream_info->pixels;
+  row.image=image;
+  row.quantum_info=quantum_info;
+  row.quantum_map=quantum_map;
+  row.length=length;
   if (LocaleCompare(stream_info->map,"BGR") == 0)
     {
-      StreamDoubleBGRPixels(image,quantum_info,q);
+      StreamPixelQueue(&row,StreamDoubleBGRPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"BGRA") == 0)
     {
-      StreamDoubleBGRAPixels(image,quantum_info,q);
+      StreamPixelQueue(&row,StreamDoubleBGRAPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"BGRP") == 0)
     {
-      StreamDoubleBGRPPixels(image,quantum_info,q);
+      StreamPixelQueue(&row,StreamDoubleBGRPPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"I") == 0)
     {
-      StreamDoubleIPixels(image,quantum_info,q);
+      StreamPixelQueue(&row,StreamDoubleIPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"RGB") == 0)
     {
-      StreamDoubleRGBPixels(image,quantum_info,q);
+      StreamPixelQueue(&row,StreamDoubleRGBPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"RGBA") == 0)
     {
-      StreamDoubleRGBAPixels(image,quantum_info,q);
+      StreamPixelQueue(&row,StreamDoubleRGBAPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"RGBP") == 0)
     {
-      StreamDoubleRGBPPixels(image,quantum_info,q);
+      StreamPixelQueue(&row,StreamDoubleRGBPPixels,stream_info->pixels);
       return;
     }
-  StreamDoubleMapPixels(image,quantum_info,quantum_map,length,q);
+  StreamPixelQueue(&row,StreamDoubleMapPixels,stream_info->pixels);
 }
 
 static void StreamFloatPixels(const StreamInfo *stream_info,const Image *image,
@@ -2469,227 +2627,238 @@ static void StreamFloatPixels(const StreamInfo *stream_info,const Image *image,
   QuantumInfo
     *quantum_info;
 
-  float
-    *q;
+  StreamRowInfo
+    row;
 
   quantum_info=stream_info->quantum_info;
-  q=(float *) stream_info->pixels;
+  row.image=image;
+  row.quantum_info=quantum_info;
+  row.quantum_map=quantum_map;
+  row.length=length;
   if (LocaleCompare(stream_info->map,"BGR") == 0)
     {
-      StreamFloatBGRPixels(image,quantum_info,q);
+      StreamPixelQueue(&row,StreamFloatBGRPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"BGRA") == 0)
     {
-      StreamFloatBGRAPixels(image,quantum_info,q);
+      StreamPixelQueue(&row,StreamFloatBGRAPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"BGRP") == 0)
     {
-      StreamFloatBGRPPixels(image,quantum_info,q);
+      StreamPixelQueue(&row,StreamFloatBGRPPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"I") == 0)
     {
-      StreamFloatIPixels(image,quantum_info,q);
+      StreamPixelQueue(&row,StreamFloatIPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"RGB") == 0)
     {
-      StreamFloatRGBPixels(image,quantum_info,q);
+      StreamPixelQueue(&row,StreamFloatRGBPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"RGBA") == 0)
     {
-      StreamFloatRGBAPixels(image,quantum_info,q);
+      StreamPixelQueue(&row,StreamFloatRGBAPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"RGBP") == 0)
     {
-      StreamFloatRGBPPixels(image,quantum_info,q);
+      StreamPixelQueue(&row,StreamFloatRGBPPixels,stream_info->pixels);
       return;
     }
-  StreamFloatMapPixels(image,quantum_info,quantum_map,length,q);
+  StreamPixelQueue(&row,StreamFloatMapPixels,stream_info->pixels);
 }
 
 static void StreamLongPixels(const StreamInfo *stream_info,const Image *image,
   QuantumType *quantum_map,size_t length)
 {
-  unsigned int
-    *q;
+  StreamRowInfo
+    row;
 
-  q=(unsigned int *) stream_info->pixels;
+  row.image=image;
+  row.quantum_map=quantum_map;
+  row.length=length;
   if (LocaleCompare(stream_info->map,"BGR") == 0)
     {
-      StreamLongBGRPixels(image,q);
+      StreamPixelQueue(&row,StreamLongBGRPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"BGRA") == 0)
     {
-      StreamLongBGRAPixels(image,q);
+      StreamPixelQueue(&row,StreamLongBGRAPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"BGRP") == 0)
     {
-      StreamLongBGRPPixels(image,q);
+      StreamPixelQueue(&row,StreamLongBGRPPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"I") == 0)
     {
-      StreamLongIPixels(image,q);
+      StreamPixelQueue(&row,StreamLongIPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"RGB") == 0)
     {
-      StreamLongRGBPixels(image,q);
+      StreamPixelQueue(&row,StreamLongRGBPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"RGBA") == 0)
     {
-      StreamLongRGBAPixels(image,q);
+      StreamPixelQueue(&row,StreamLongRGBAPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"RGBP") == 0)
     {
-      StreamLongRGBPPixels(image,q);
+      StreamPixelQueue(&row,StreamLongRGBPPixels,stream_info->pixels);
       return;
     }
-  StreamLongMapPixels(image,quantum_map,length,q);
+  StreamPixelQueue(&row,StreamLongMapPixels,stream_info->pixels);
 }
 
 static void StreamLongLongPixels(const StreamInfo *stream_info,
   const Image *image,QuantumType *quantum_map,size_t length)
 {
-  MagickSizeType
-    *q;
+  StreamRowInfo
+    row;
 
-  q=(MagickSizeType *) stream_info->pixels;
+  row.image=image;
+  row.quantum_map=quantum_map;
+  row.length=length;
   if (LocaleCompare(stream_info->map,"BGR") == 0)
     {
-      StreamLongLongBGRPixels(image,q);
+      StreamPixelQueue(&row,StreamLongLongBGRPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"BGRA") == 0)
     {
-      StreamLongLongBGRAPixels(image,q);
+      StreamPixelQueue(&row,StreamLongLongBGRAPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"BGRP") == 0)
     {
-      StreamLongLongBGRPPixels(image,q);
+      StreamPixelQueue(&row,StreamLongLongBGRPPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"I") == 0)
     {
-      StreamLongLongIPixels(image,q);
+      StreamPixelQueue(&row,StreamLongLongIPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"RGB") == 0)
     {
-      StreamLongLongRGBPixels(image,q);
+      StreamPixelQueue(&row,StreamLongLongRGBPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"RGBA") == 0)
     {
-      StreamLongLongRGBAPixels(image,q);
+      StreamPixelQueue(&row,StreamLongLongRGBAPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"RGBP") == 0)
     {
-      StreamLongLongRGBPPixels(image,q);
+      StreamPixelQueue(&row,StreamLongLongRGBPPixels,stream_info->pixels);
       return;
     }
-  StreamLongLongMapPixels(image,quantum_map,length,q);
+  StreamPixelQueue(&row,StreamLongLongMapPixels,stream_info->pixels);
 }
 
 static void StreamQuantumPixels(const StreamInfo *stream_info,
   const Image *image,QuantumType *quantum_map,size_t length)
 {
-  Quantum
-    *q;
+  StreamRowInfo
+    row;
 
-  q=(Quantum *) stream_info->pixels;
+  row.image=image;
+  row.quantum_map=quantum_map;
+  row.length=length;
   if (LocaleCompare(stream_info->map,"BGR") == 0)
     {
-      StreamQuantumBGRPixels(image,q);
+      StreamPixelQueue(&row,StreamQuantumBGRPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"BGRA") == 0)
     {
-      StreamQuantumBGRAPixels(image,q);
+      StreamPixelQueue(&row,StreamQuantumBGRAPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"BGRP") == 0)
     {
-      StreamQuantumBGRPPixels(image,q);
+      StreamPixelQueue(&row,StreamQuantumBGRPPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"I") == 0)
     {
-      StreamQuantumIPixels(image,q);
+      StreamPixelQueue(&row,StreamQuantumIPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"RGB") == 0)
     {
-      StreamQuantumRGBPixels(image,q);
+      StreamPixelQueue(&row,StreamQuantumRGBPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"RGBA") == 0)
     {
-      StreamQuantumRGBAPixels(image,q);
+      StreamPixelQueue(&row,StreamQuantumRGBAPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"RGBP") == 0)
     {
-      StreamQuantumRGBPPixels(image,q);
+      StreamPixelQueue(&row,StreamQuantumRGBPPixels,stream_info->pixels);
       return;
     }
-  StreamQuantumMapPixels(image,quantum_map,length,q);
+  StreamPixelQueue(&row,StreamQuantumMapPixels,stream_info->pixels);
 }
 
 static void StreamShortPixels(const StreamInfo *stream_info,const Image *image,
   QuantumType *quantum_map,size_t length)
 {
-  unsigned short
-    *q;
+  StreamRowInfo
+    row;
 
-  q=(unsigned short *) stream_info->pixels;
+  row.image=image;
+  row.quantum_map=quantum_map;
+  row.length=length;
   if (LocaleCompare(stream_info->map,"BGR") == 0)
     {
-      StreamShortBGRPixels(image,q);
+      StreamPixelQueue(&row,StreamShortBGRPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"BGRA") == 0)
     {
-      StreamShortBGRAPixels(image,q);
+      StreamPixelQueue(&row,StreamShortBGRAPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"BGRP") == 0)
     {
-      StreamShortBGRPPixels(image,q);
+      StreamPixelQueue(&row,StreamShortBGRPPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"I") == 0)
     {
-      StreamShortIPixels(image,q);
+      StreamPixelQueue(&row,StreamShortIPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"RGB") == 0)
     {
-      StreamShortRGBPixels(image,q);
+      StreamPixelQueue(&row,StreamShortRGBPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"RGBA") == 0)
     {
-      StreamShortRGBAPixels(image,q);
+      StreamPixelQueue(&row,StreamShortRGBAPixels,stream_info->pixels);
       return;
     }
   if (LocaleCompare(stream_info->map,"RGBP") == 0)
     {
-      StreamShortRGBPPixels(image,q);
+      StreamPixelQueue(&row,StreamShortRGBPPixels,stream_info->pixels);
       return;
     }
-  StreamShortMapPixels(image,quantum_map,length,q);
+  StreamPixelQueue(&row,StreamShortMapPixels,stream_info->pixels);
 }
 
 typedef struct _StreamMapInfo
