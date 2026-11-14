@@ -4813,14 +4813,68 @@ static MagickBooleanType AppendPrefixedProperty(
   return(AppendInterpretString(text,string));
 }
 
+static MagickBooleanType AppendUnprefixedValue(
+  const InterpretSources *sources,const InterpretText *text,
+  const BracedPattern *braced)
+{
+  char
+    *const pattern = braced->pattern;
+
+  const char
+    *string;
+
+  const ssize_t
+    offset = braced->offset;
+
+  ExceptionInfo
+    *const exception = sources->exception;
+
+  Image
+    *const property_image = sources->property_image;
+
+  ImageInfo
+    *const property_info = sources->property_info;
+
+  /*
+    Properties without special prefix.
+  */
+  string=GetImageProperty(property_image,pattern,exception);
+  if (string != (const char *) NULL)
+    {
+      if (AppendInterpretString(text,string) == MagickFalse)
+        return(MagickFalse);
+      (void) DeleteImageArtifact(property_image,"magick-property");
+      (void) DeleteImageOption(property_info,"magick-property");
+      return(MagickTrue);
+    }
+  if (IsGlob(pattern) != MagickFalse)
+    return(AppendGlobbedProperties(text,property_image,pattern,exception));
+  /*
+    Known property or attribute.
+  */
+  string=GetMagickProperty(property_info,property_image,pattern,exception);
+  if (string != (const char *) NULL)
+    return(AppendInterpretString(text,string));
+  /*
+    Per-image artifact.
+  */
+  string=GetImageArtifact(property_image,pattern);
+  if (string != (char *) NULL)
+    return(AppendInterpretString(text,string));
+  /*
+    Direct option lookup.
+  */
+  string=GetImageOption(property_info,pattern);
+  if (string != (char *) NULL)
+    return(AppendInterpretString(text,string));
+  return(WarnUnknownProperty(exception,pattern,offset));
+}
+
 static MagickBooleanType InterpretBracedEscape(
   const InterpretSources *sources,const InterpretText *text,const char **p)
 {
   char
     pattern[2*MagickPathExtent] = "\0";
-
-  const char
-    *string;
 
   BracedPattern
     braced;
@@ -4834,9 +4888,6 @@ static MagickBooleanType InterpretBracedEscape(
 
   Image
     *const property_image = sources->property_image;
-
-  ImageInfo
-    *const property_info = sources->property_info;
 
   /*
     Braced Percent Escape %[...].
@@ -4877,39 +4928,7 @@ static MagickBooleanType InterpretBracedEscape(
     return(AppendOptionOrArtifact(sources,text,&braced,ArtifactGlobSide));
   if (LocaleNCompare("property:",pattern,9) == 0)
     return(AppendPrefixedProperty(sources,text,&braced));
-  /*
-    Properties without special prefix.
-  */
-  string=GetImageProperty(property_image,pattern,exception);
-  if (string != (const char *) NULL)
-    {
-      if (AppendInterpretString(text,string) == MagickFalse)
-        return(MagickFalse);
-      (void) DeleteImageArtifact(property_image,"magick-property");
-      (void) DeleteImageOption(property_info,"magick-property");
-      return(MagickTrue);
-    }
-  if (IsGlob(pattern) != MagickFalse)
-    return(AppendGlobbedProperties(text,property_image,pattern,exception));
-  /*
-    Known property or attribute.
-  */
-  string=GetMagickProperty(property_info,property_image,pattern,exception);
-  if (string != (const char *) NULL)
-    return(AppendInterpretString(text,string));
-  /*
-    Per-image artifact.
-  */
-  string=GetImageArtifact(property_image,pattern);
-  if (string != (char *) NULL)
-    return(AppendInterpretString(text,string));
-  /*
-    Direct option lookup.
-  */
-  string=GetImageOption(property_info,pattern);
-  if (string != (char *) NULL)
-    return(AppendInterpretString(text,string));
-  return(WarnUnknownProperty(exception,pattern,offset));
+  return(AppendUnprefixedValue(sources,text,&braced));
 }
 
 static MagickBooleanType ReadInterpretTextFile(const char *p,
