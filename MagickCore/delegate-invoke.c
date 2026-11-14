@@ -722,6 +722,19 @@ static void OpenInterpretDelegateProperties(const ImageInfo *image_info,
      (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no-image");
 }
 
+static MagickBooleanType DecodeDelegateSequence(const char **p,char **q,
+  const MagickBooleanType number)
+{
+  if (DecodeDelegateCharacter(p,q) != MagickFalse)
+    return(MagickTrue);
+  return(DecodeDelegatePercent(p,q,number));
+}
+
+static MagickBooleanType IsDelegateDigit(const char *p)
+{
+  return(isdigit((int) ((unsigned char) *p)) ? MagickTrue : MagickFalse);
+}
+
 static char *InterpretDelegateProperties(ImageInfo *image_info,
   Image *image,const char *embed_text,ExceptionInfo *exception)
 {
@@ -752,16 +765,14 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
   extent=MagickPathExtent;  /* allocated space in string */
   number=MagickFalse;  /* is last char a number? */
   for (q=interpret_text; *p!='\0';
-    number=isdigit((int) ((unsigned char) *p)) ? MagickTrue : MagickFalse,p++)
+    number=IsDelegateDigit(p),p++)
   {
     /*
       Interpret escape characters (e.g. Filename: %M).
     */
     *q='\0';
     ExtendInterpretText(MagickPathExtent);
-    if (DecodeDelegateCharacter(&p,&q) != MagickFalse)
-      continue;
-    if (DecodeDelegatePercent(&p,&q,number) != MagickFalse)
+    if (DecodeDelegateSequence(&p,&q,number) != MagickFalse)
       continue;
     string=GetMagickPropertyLetter(image_info,image,*p,exception);
     if (string != (char *) NULL)
