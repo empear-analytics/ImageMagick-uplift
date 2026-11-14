@@ -22642,6 +22642,80 @@ static void XMakeInfoWindow(const DisplayEventContext *context)
       windows->info.id);
 }
 
+static void XMakeCommandWindow(const DisplayEventContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  XPixelInfo
+    *const pixel = context->pixel;
+
+  XStandardColormap
+    *const map_info = context->map_info;
+
+  const Window
+    root_window = context->root_window;
+
+  XVisualInfo
+    *const visual_info = context->visual_info;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  char
+    **const argv = context->argv;
+
+  const int
+    argc = context->argc;
+
+  XClassHint
+    *const class_hints = context->class_hints;
+
+  XWMHints
+    *const manager_hints = context->manager_hints;
+
+  char
+    resource_name[MagickPathExtent];
+
+  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
+    resource_info,&windows->command);
+  windows->command.data=MagickMenus;
+  (void) XCommandWidget(display,windows,CommandMenu,(XEvent *) NULL);
+  (void) FormatLocaleString(resource_name,MagickPathExtent,"%s.command",
+    resource_info->client_name);
+  windows->command.geometry=XGetResourceClass(resource_info->resource_database,
+    resource_name,"geometry",(char *) NULL);
+  (void) CloneString(&windows->command.name,MagickTitle);
+  windows->command.border_width=0;
+  windows->command.flags|=PPosition;
+  windows->command.attributes.event_mask=ButtonMotionMask | ButtonPressMask |
+    ButtonReleaseMask | EnterWindowMask | ExposureMask | LeaveWindowMask |
+    OwnerGrabButtonMask | StructureNotifyMask;
+  manager_hints->flags=InputHint | StateHint | WindowGroupHint;
+  manager_hints->input=MagickTrue;
+  manager_hints->initial_state=NormalState;
+  manager_hints->window_group=windows->image.id;
+  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
+    &windows->command);
+  windows->command.highlight_stipple=XCreateBitmapFromData(display,
+    windows->command.id,(char *) HighlightBitmap,HighlightWidth,
+    HighlightHeight);
+  windows->command.shadow_stipple=XCreateBitmapFromData(display,
+    windows->command.id,(char *) ShadowBitmap,ShadowWidth,ShadowHeight);
+  (void) XSetTransientForHint(display,windows->command.id,windows->image.id);
+  if (windows->command.mapped != MagickFalse)
+    (void) XMapRaised(display,windows->command.id);
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Window id: 0x%lx (command)",windows->command.id);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -22963,37 +23037,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   /*
     Initialize Command widget.
   */
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->command);
-  windows->command.data=MagickMenus;
-  (void) XCommandWidget(display,windows,CommandMenu,(XEvent *) NULL);
-  (void) FormatLocaleString(resource_name,MagickPathExtent,"%s.command",
-    resource_info->client_name);
-  windows->command.geometry=XGetResourceClass(resource_info->resource_database,
-    resource_name,"geometry",(char *) NULL);
-  (void) CloneString(&windows->command.name,MagickTitle);
-  windows->command.border_width=0;
-  windows->command.flags|=PPosition;
-  windows->command.attributes.event_mask=ButtonMotionMask | ButtonPressMask |
-    ButtonReleaseMask | EnterWindowMask | ExposureMask | LeaveWindowMask |
-    OwnerGrabButtonMask | StructureNotifyMask;
-  manager_hints->flags=InputHint | StateHint | WindowGroupHint;
-  manager_hints->input=MagickTrue;
-  manager_hints->initial_state=NormalState;
-  manager_hints->window_group=windows->image.id;
-  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-    &windows->command);
-  windows->command.highlight_stipple=XCreateBitmapFromData(display,
-    windows->command.id,(char *) HighlightBitmap,HighlightWidth,
-    HighlightHeight);
-  windows->command.shadow_stipple=XCreateBitmapFromData(display,
-    windows->command.id,(char *) ShadowBitmap,ShadowWidth,ShadowHeight);
-  (void) XSetTransientForHint(display,windows->command.id,windows->image.id);
-  if (windows->command.mapped != MagickFalse)
-    (void) XMapRaised(display,windows->command.id);
-  if (resource_info->debug != MagickFalse)
-    (void) LogMagickEvent(X11Event,GetMagickModule(),
-      "Window id: 0x%lx (command)",windows->command.id);
+  XMakeCommandWindow(&event_context);
   /*
     Initialize Widget window.
   */
