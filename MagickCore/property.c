@@ -2159,6 +2159,34 @@ static const TagInfo
     { 0x00000, "" }
   };  /* https://cipa.jp/std/documents/download_e.html?DC-008-Translation-2019-E */
 
+static MagickBooleanType ParseEXIFPropertyRequest(const char **property,
+  ssize_t *all,size_t *tag)
+{
+  if (((*property) == (const char *) NULL) || (*(*property) == '\0'))
+    return(MagickFalse);
+  while (isspace((int) ((unsigned char) *(*property))) != 0)
+    (*property)++;
+  if (strlen((*property)) <= 5)
+    return(MagickFalse);
+  if (ParseEXIFTagRequest(EXIFTag,property,all,tag) == MagickFalse)
+    return(MagickFalse);
+  if ((*tag) == (~0UL))
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static MagickBooleanType ReadEXIFProfileHeader(const StringInfo *profile,
+  const unsigned char **exif,size_t *length,EndianType *endian)
+{
+  (*length)=GetStringInfoLength(profile);
+  if ((*length) < 6)
+    return(MagickFalse);
+  (*exif)=GetStringInfoDatum(profile);
+  if (ReadEXIFHeader(exif,length,endian) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static void GetEXIFProperty(const Image *image,const char *property,
   ExceptionInfo *exception)
 {
@@ -2201,21 +2229,9 @@ static void GetEXIFProperty(const Image *image,const char *property,
   profile=GetImageProfile(image,"exif");
   if (profile == (const StringInfo *) NULL)
     return;
-  if ((property == (const char *) NULL) || (*property == '\0'))
+  if (ParseEXIFPropertyRequest(&property,&all,&tag) == MagickFalse)
     return;
-  while (isspace((int) ((unsigned char) *property)) != 0)
-    property++;
-  if (strlen(property) <= 5)
-    return;
-  if (ParseEXIFTagRequest(EXIFTag,&property,&all,&tag) == MagickFalse)
-    return;
-  if (tag == (~0UL))
-    return;
-  length=GetStringInfoLength(profile);
-  if (length < 6)
-    return;
-  exif=GetStringInfoDatum(profile);
-  if (ReadEXIFHeader(&exif,&length,&endian) == MagickFalse)
+  if (ReadEXIFProfileHeader(profile,&exif,&length,&endian) == MagickFalse)
     return;
   /*
     This the offset to the first IFD.
