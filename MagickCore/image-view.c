@@ -642,6 +642,14 @@ MagickExport MagickBooleanType IsImageView(const ImageView *image_view)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void FinishImageView(ImageView *image_view)
+{
+  image_view->exception=AcquireExceptionInfo();
+  image_view->debug=(GetLogEventMask() & ImageEvent) != 0 ? MagickTrue : 
+    MagickFalse;
+  image_view->signature=MagickCoreSignature;
+}
+
 MagickExport ImageView *NewImageView(Image *image,ExceptionInfo *exception)
 {
   ImageView
@@ -658,10 +666,7 @@ MagickExport ImageView *NewImageView(Image *image,ExceptionInfo *exception)
   image_view->extent.height=image->rows;
   image_view->extent.x=0;
   image_view->extent.y=0;
-  image_view->exception=AcquireExceptionInfo();
-  image_view->debug=(GetLogEventMask() & ImageEvent) != 0 ? MagickTrue : 
-    MagickFalse;
-  image_view->signature=MagickCoreSignature;
+  FinishImageView(image_view);
   return(image_view);
 }
 
