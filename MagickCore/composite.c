@@ -4965,6 +4965,26 @@ static void CompositeImageRow(const CompositeRowInputs *row,
   }
 }
 
+static SegmentInfo RotateBlurAxes(const GeometryInfo geometry_info,
+  const double width,const double height)
+{
+  MagickRealType
+    angle;
+
+  SegmentInfo
+    blur;
+
+  /*
+    Rotate vectors if a rotation angle is given.
+  */
+  angle=DegreesToRadians(geometry_info.xi);
+  blur.x1=width*cos(angle);
+  blur.x2=width*sin(angle);
+  blur.y1=(-height*sin(angle));
+  blur.y2=height*cos(angle);
+  return(blur);
+}
+
 typedef struct _BlurCanvasInputs
 {
   double
@@ -5421,19 +5441,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       blur.y1=0.0;
       blur.y2=height;
       if ((flags & XValue) != 0 )
-        {
-          MagickRealType
-            angle;
-
-          /*
-            Rotate vectors if a rotation angle is given.
-          */
-          angle=DegreesToRadians(geometry_info.xi);
-          blur.x1=width*cos(angle);
-          blur.x2=width*sin(angle);
-          blur.y1=(-height*sin(angle));
-          blur.y2=height*cos(angle);
-        }
+        blur=RotateBlurAxes(geometry_info,width,height);
       angle_start=0.0;
       angle_range=0.0;
       if ((flags & YValue) != 0 )
