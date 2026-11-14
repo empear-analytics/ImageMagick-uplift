@@ -886,6 +886,11 @@ static int CombineUTF16Surrogates(const char *content,const ssize_t i,
   return(c);
 }
 
+static inline MagickBooleanType IsUTF16Surrogate(const int c)
+{
+  return(((c >= 0xd800) && (c <= 0xdfff)) ? MagickTrue : MagickFalse);
+}
+
 static char *ConvertUTF16ToUTF8(const char *content,size_t *length)
 {
   char
@@ -920,7 +925,8 @@ static char *ConvertUTF16ToUTF8(const char *content,size_t *length)
   for (i=2; i < (ssize_t) (*length-1); i+=2)
   {
     c=ReadUTF16Unit(content,i,encoding);
-    if ((c >= 0xd800) && (c <= 0xdfff) && ((i+=2) < (ssize_t) (*length-1)))
+    if ((IsUTF16Surrogate(c) != MagickFalse) &&
+        ((i+=2) < (ssize_t) (*length-1)))
       {
         c=CombineUTF16Surrogates(content,i,encoding,c);
       }
