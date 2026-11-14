@@ -1829,6 +1829,50 @@ typedef struct _InternalDoctypeInfo
     *exception;
 } InternalDoctypeInfo;
 
+static MagickBooleanType AddInternalEntityDeclaration(
+  const EntityValueInput *entity,char **xml,char ***predefined_entities)
+{
+  XMLTreeRoot
+    *const root = entity->root;
+
+  char
+    *const c = entity->c,
+    *const n = entity->n,
+    *const v = entity->v;
+
+  const char
+    q = entity->q;
+
+  ExceptionInfo
+    *const exception = entity->exception;
+
+  EntityValueInput
+    value_input;
+
+  EntityValueTargets
+    value_targets;
+
+  if ((q != '"') && (q != '\''))
+    {
+      /*
+        Skip externals.
+      */
+      (*xml)=strchr((*xml),'>');
+      return(MagickTrue);
+    }
+  value_input.root=root;
+  value_input.c=c;
+  value_input.n=n;
+  value_input.v=v;
+  value_input.q=q;
+  value_input.exception=exception;
+  value_targets.xml=xml;
+  value_targets.predefined_entities=predefined_entities;
+  if (AddEntityDeclaration(&value_input,&value_targets) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType ParseInternalDoctypeDeclarations(
   const InternalDoctypeInfo *doctype,char *xml,char *n,
   char ***predefined_entities)
@@ -1850,12 +1894,6 @@ static MagickBooleanType ParseInternalDoctypeDeclarations(
   EntityHeadTargets
     entity_targets;
 
-  EntityValueInput
-    value_input;
-
-  EntityValueTargets
-    value_targets;
-
   for (xml[length]='\0'; xml != (char *) NULL; )
   {
     while (IsDoctypeTextChar(xml) != MagickFalse)
@@ -1874,24 +1912,14 @@ static MagickBooleanType ParseInternalDoctypeDeclarations(
         entity_targets.q=(&q);
         if (ParseEntityDeclarationHead(&entity_targets) == MagickFalse)
           break;
-        if ((q != '"') && (q != '\''))
-          {
-            /*
-              Skip externals.
-            */
-            xml=strchr(xml,'>');
-            continue;
-          }
-        value_input.root=root;
-        value_input.c=c;
-        value_input.n=n;
-        value_input.v=v;
-        value_input.q=q;
-        value_input.exception=exception;
-        value_targets.xml=(&xml);
-        value_targets.predefined_entities=predefined_entities;
-        if (AddEntityDeclaration(&value_input,&value_targets) == MagickFalse)
-          return(MagickFalse);
+        {
+          const EntityValueInput
+            entity = { root, c, n, v, q, exception };
+
+          if (AddInternalEntityDeclaration(&entity,&xml,
+                predefined_entities) == MagickFalse)
+            return(MagickFalse);
+        }
         }
       else
        if (strncmp(xml,"<!ATTLIST",9) == 0)
