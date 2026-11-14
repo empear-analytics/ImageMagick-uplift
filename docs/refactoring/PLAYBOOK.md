@@ -19608,6 +19608,16 @@ shape; Recipe SD, which keeps every arm in a `switch` (a new *Complex Method*).
 6. Check by script that every moved arm is one handler whose body is the arm's text, and
    every key one row; by reading steps 1 and 2; `refactor_guard.py --calls`, the CI and
    C++ warning checks, the oracle on the function's cases.
+7. *Prefix arms and inner guards* (2026-11-14, lane c). An arm tested by
+   `LocaleNCompare("P",n,L) == 0` becomes a row with a length member `L` (`0` in the
+   exact rows); the lookup tests `LocaleNCompare(key,n,length) == 0` for it, through a
+   predicate that takes the row. Step 2 then also checks that no exact key starts with
+   a prefix key and that a name matching the prefix met only false tests before that
+   arm. An arm whose first guard opens `S` and whose second guard stands inside a
+   branch moves the first to its row (step 4) and keeps the second in the handler,
+   which binds as `const` locals the members that macro names (Recipe N step 4's choice
+   member by member). Twin handlers that differ in one constant argument share a helper
+   taking it (Recipe SV), each handler one `return` of its call.
 
 **Before:**
 
@@ -20094,3 +20104,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | KA | Peel Keyed Returning Arms out of a First-Letter Switch into a Table of Handlers: arms in several groups of a name `switch` that compare the name with a key and return become handlers of one signature (an existing function when an arm is one call of it), a `static const` key table, a lookup returning the handler, and one call before the `switch`; Lane: c | `property.c`'s `SetImageProperty` (eight setter keys) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | DL | Step 4: in a `switch` with no `default:`, a group that is `break;` alone, with its labels, may be deleted (a value matching no label leaves the `switch` where the `break;` went); `obj_identical.sh` IDENTICAL; Lane: c | `property.c`'s `SetImageProperty` (fourteen letter groups emptied by Recipes PK and KA) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | KB | Peel Keyed Arms Writing a Result out of a First-Letter Switch into a Table of Handlers: arms of a name `switch` that write a result local or buffer and `break;` to a common tail become handlers taking an input struct and returning the result, a key table whose rows also name the guard macro the arm opened with (run by one dispatcher), and one lookup before the `switch`; Lane: c | `property.c`'s `GetMagickProperty` (45 handlers for 47 keys; 3.69 to 3.99) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | KB | Step 7: prefix arms (`LocaleNCompare` with a length) become rows with a length member; an arm with a second guard inside a branch keeps it in the handler, binding the members it names; twin handlers share a helper taking the differing constant; Lane: c | `property.c`'s `GetMagickProperty` (`minimum-bounding-box`, `papersize:`, `scene`; 3.69 to 4.44 with DL) | mandate (2026-10-24) |
