@@ -1539,6 +1539,13 @@ static inline MagickBooleanType IsSkippable8BimName(const ssize_t count,
     MagickFalse);
 }
 
+static inline MagickBooleanType IsOverlong8BimResource(const ssize_t count,
+  const size_t *length)
+{
+  return(((count < 0) || ((size_t) count > (*length))) ? MagickTrue :
+    MagickFalse);
+}
+
 static void Update8BIMResource(const ClipPathResizeInfo *resize,
   unsigned char **info,size_t *length)
 {
@@ -1556,7 +1563,7 @@ static void Update8BIMResource(const ClipPathResizeInfo *resize,
   if ((count & 0x01) == 0)
     (void) ReadProfileByte(info,length);
   count=(ssize_t) ReadProfileMSBLong(info,length);
-  if ((count < 0) || ((size_t) count > (*length)))
+  if (IsOverlong8BimResource(count,length) != MagickFalse)
     {
       (*length)=0;
       return;
