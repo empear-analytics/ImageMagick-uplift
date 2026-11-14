@@ -3026,6 +3026,7 @@ typedef struct _MVGRenderState
     **token;
 
   const char
+    **p,
     **q;
 
   double
@@ -3034,6 +3035,9 @@ typedef struct _MVGRenderState
 
   DrawInfo
     ***graphic_context;
+
+  const DrawInfo
+    *draw_info;
 
   ExceptionInfo
     *exception;
@@ -3646,6 +3650,53 @@ static void TraceMVGPrimitive(const MVGRenderState *state)
   (*state->i)=i;
 }
 
+static void CheckMVGPrimitiveExtent(const MVGRenderState *state)
+{
+  const char
+    *p = (*state->p),
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  const DrawInfo
+    *draw_info = state->draw_info;
+
+  MagickStatusType
+    status = (*state->status);
+
+  MVGInfo
+    mvg_info = (*state->mvg_info);
+
+  PrimitiveInfo
+    *primitive_info = (*state->primitive_info);
+
+  ssize_t
+    i = (*state->i),
+    n = (*state->n);
+
+  do
+  {
+    primitive_info[i].primitive=UndefinedPrimitive;
+    if ((draw_info->debug != MagickFalse) && (q > p))
+      (void) LogMagickEvent(DrawEvent,GetMagickModule(),"  %.*s",(int) (q-p),p);
+    /*
+      Sanity check.
+    */
+    status&=(MagickStatusType) CheckPrimitiveExtent(&mvg_info,ExpandAffine(
+      &graphic_context[n]->affine));
+    primitive_info=(*mvg_info.primitive_info);
+    if (status == 0)
+      break;
+    status&=(MagickStatusType) CheckPrimitiveExtent(&mvg_info,(double)
+      graphic_context[n]->stroke_width);
+    primitive_info=(*mvg_info.primitive_info);
+  } while (0);
+  (*state->status)=status;
+  (*state->mvg_info)=mvg_info;
+  (*state->primitive_info)=primitive_info;
+}
+
 static MagickBooleanType RenderMVGContent(Image *image,
   const DrawInfo *draw_info,const size_t depth,ExceptionInfo *exception)
 {
@@ -3723,9 +3774,9 @@ static MagickBooleanType RenderMVGContent(Image *image,
     metrics;
 
   const MVGRenderState
-    render_state = { &token, &q, &coordinates, &cursor, &graphic_context,
-      exception, image, &status, &mvg_info, &primitive_info, &primitive_type,
-      &extent, &number_points, &i, &j, &n, &x };
+    render_state = { &token, &p, &q, &coordinates, &cursor, &graphic_context,
+      draw_info, exception, image, &status, &mvg_info, &primitive_info,
+      &primitive_type, &extent, &number_points, &i, &j, &n, &x };
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -5299,20 +5350,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     TraceMVGPrimitive(&render_state);
     if (status == 0)
       break;
-    primitive_info[i].primitive=UndefinedPrimitive;
-    if ((draw_info->debug != MagickFalse) && (q > p))
-      (void) LogMagickEvent(DrawEvent,GetMagickModule(),"  %.*s",(int) (q-p),p);
-    /*
-      Sanity check.
-    */
-    status&=(MagickStatusType) CheckPrimitiveExtent(&mvg_info,ExpandAffine(
-      &graphic_context[n]->affine));
-    primitive_info=(*mvg_info.primitive_info);
-    if (status == 0)
-      break;
-    status&=(MagickStatusType) CheckPrimitiveExtent(&mvg_info,(double)
-      graphic_context[n]->stroke_width);
-    primitive_info=(*mvg_info.primitive_info);
+    CheckMVGPrimitiveExtent(&render_state);
     if (status == 0)
       break;
     if (i == 0)
