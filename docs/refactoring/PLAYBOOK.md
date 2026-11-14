@@ -19627,8 +19627,13 @@ shape; Recipe SD, which keeps every arm in a `switch` (a new *Complex Method*).
    body (after step 3) is the text of an existing handler's is that handler (Recipe D):
    the row names it, and its definition, with the types the table needs, moves up to
    stand above the first function that uses it (declarations only; `obj_same_code.sh`
-   is not needed, the oracle covers the step). A group holding `#` lines or a second
-   guard stays in the `switch`.
+   is not needed, the oracle covers the step). A group holding a second guard, or `#`
+   lines other than one `#if 0` / `#else` / `#endif`, stays in the `switch`. With that
+   one conditional, the `#if 0` branch moves verbatim (the owner's ruling of
+   2026-11-01), the handler binds as `const` locals the members the `#else` branch
+   names so that its text stays, and a guard that is the `#else` branch's first
+   statement, or stands before the `#if 0`, goes to the row. Twin handlers differing in
+   several constants share a helper taking them (Recipe SC).
 
 **Before:**
 
@@ -20117,3 +20122,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | KB | Peel Keyed Arms Writing a Result out of a First-Letter Switch into a Table of Handlers: arms of a name `switch` that write a result local or buffer and `break;` to a common tail become handlers taking an input struct and returning the result, a key table whose rows also name the guard macro the arm opened with (run by one dispatcher), and one lookup before the `switch`; Lane: c | `property.c`'s `GetMagickProperty` (45 handlers for 47 keys; 3.69 to 3.99) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | KB | Step 7: prefix arms (`LocaleNCompare` with a length) become rows with a length member; an arm with a second guard inside a branch keeps it in the handler, binding the members it names; twin handlers share a helper taking the differing constant; Lane: c | `property.c`'s `GetMagickProperty` (`minimum-bounding-box`, `papersize:`, `scene`; 3.69 to 4.44 with DL) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | KB | Step 8: a `switch` on a character parameter takes rows keyed by the character; the guards run in the caller when it has their names; a handler identical to an existing one reuses it, moving it and the shared types above the first user; Lane: c | `property.c`'s `GetMagickPropertyLetter` (39 letters; 4.53 to 5.15) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | KB | Step 8: a group whose only `#` lines are one `#if 0`/`#else`/`#endif` may move, the `#if 0` branch verbatim, the handler binding the members the `#else` branch names, its first guard going to the row; twins differing in several constants share a helper (Recipe SC); Lane: c | `property.c`'s `GetMagickPropertyLetter` (`s`, `S`, `n`, `N`; 5.18 to 5.47) | mandate (2026-10-24) |
