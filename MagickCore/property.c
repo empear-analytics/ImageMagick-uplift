@@ -2979,9 +2979,6 @@ static char *TracePSClippath(const unsigned char *blob,size_t length)
           }
         break;
       }
-      case 6:
-      case 7:
-      case 8:
       default:
       {
         blob+=24;
