@@ -1524,7 +1524,7 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
   }
   token=(char *) RelinquishMagickMemory(token);
   (void) SetFatalErrorHandler(fatal_handler);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (status != 0));
 }
 
 /*
