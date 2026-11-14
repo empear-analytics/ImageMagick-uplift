@@ -2486,14 +2486,7 @@ static MagickBooleanType CreateMappedPixelCache(CacheInfo *cache_info,
       (void) LogMagickEvent(CacheEvent,GetMagickModule(),"%s",
         message);
     }
-  if (status == 0)
-    {
-      if (IsCacheSourcePending(source_info,mode) != MagickFalse)
-        RelinquishPixelCachePixels(&source_info);
-      cache_info->type=UndefinedCache;
-      return(MagickFalse);
-    }
-  return(MagickTrue);
+  return(FinishPixelCacheOpen(cache_info,&source_info,mode,status));
 }
 
 static MagickBooleanType CreateDistributedPixelCache(CacheInfo *cache_info,
