@@ -325,6 +325,42 @@ static void ParseGeometryXYOffsets(char **p,MagickStatusType *flags,
     ParseGeometryYOffset(p,flags,y);
 }
 
+static MagickBooleanType SkipGeometrySeparator(const int c,char **p,
+  MagickStatusType *flags)
+{
+  switch (c)
+  {
+    case '(':
+    case ')':
+    {
+      (void) CopyMagickString(*p,*p+1,MagickPathExtent);
+      break;
+    }
+    case 'x':
+    case 'X':
+    {
+      (*flags)|=SeparatorValue;
+      (*p)++;
+      break;
+    }
+    case '.':
+    {
+      (*p)++;
+      (*flags)|=DecimalValue;
+      break;
+    }
+    case ':':
+    {
+      (*p)++;
+      (*flags)|=AspectRatioValue;
+      break;
+    }
+    default:
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickStatusType FinishGeometryFlags(MagickStatusType flags,
   size_t *width,size_t *height)
 {
@@ -387,36 +423,8 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
         (void) CopyMagickString(p,p+1,MagickPathExtent);
         continue;
       }
-    switch (c)
-    {
-      case '(':
-      case ')':
-      {
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case 'x':
-      case 'X':
-      {
-        flags|=SeparatorValue;
-        p++;
-        break;
-      }
-      case '.':
-      {
-        p++;
-        flags|=DecimalValue;
-        break;
-      }
-      case ':':
-      {
-        p++;
-        flags|=AspectRatioValue;
-        break;
-      }
-      default:
-        return(flags);
-    }
+    if (SkipGeometrySeparator(c,&p,&flags) == MagickFalse)
+      return(flags);
   }
   /*
     Parse width, height, x, and y.
