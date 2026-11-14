@@ -168,13 +168,7 @@ static ssize_t
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   A c q u i r e P i x e l C a c h e                                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  AcquirePixelCache() acquires a pixel cache.
@@ -239,13 +233,7 @@ MagickPrivate Cache AcquirePixelCache(const size_t number_threads)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   A c q u i r e P i x e l C a c h e N e x u s                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  AcquirePixelCacheNexus() allocates the NexusInfo structure.
@@ -288,13 +276,7 @@ MagickPrivate NexusInfo **AcquirePixelCacheNexus(const size_t number_threads)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   A c q u i r e P i x e l C a c h e P i x e l s                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  AcquirePixelCachePixels() returns the pixels associated with the specified
@@ -337,13 +319,7 @@ MagickExport void *AcquirePixelCachePixels(const Image *image,size_t *length,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   C a c h e C o m p o n e n t G e n e s i s                                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  CacheComponentGenesis() instantiates the cache component.
@@ -362,13 +338,7 @@ MagickPrivate MagickBooleanType CacheComponentGenesis(void)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   C a c h e C o m p o n e n t T e r m i n u s                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  CacheComponentTerminus() destroys the cache component.
@@ -388,13 +358,7 @@ MagickPrivate void CacheComponentTerminus(void)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   C l i p P i x e l C a c h e N e x u s                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  ClipPixelCacheNexus() clips the cache nexus as defined by the image clip
@@ -501,13 +465,7 @@ static MagickBooleanType ClipPixelCacheNexus(Image *image,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   C l o n e P i x e l C a c h e                                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  ClonePixelCache() clones a pixel cache.
@@ -542,13 +500,7 @@ MagickPrivate Cache ClonePixelCache(const Cache cache)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   C l o n e P i x e l C a c h e M e t h o d s                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  ClonePixelCacheMethods() clones the pixel cache methods from one cache to
@@ -585,13 +537,7 @@ MagickPrivate void ClonePixelCacheMethods(Cache clone,const Cache cache)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   C l o n e P i x e l C a c h e R e p o s i t o r y                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  ClonePixelCacheRepository() clones the source pixel cache to the destination
@@ -963,13 +909,7 @@ static MagickBooleanType ClonePixelCacheRepository(
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   D e s t r o y I m a g e P i x e l C a c h e                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  DestroyImagePixelCache() deallocates memory associated with the pixel cache.
@@ -995,13 +935,7 @@ static void DestroyImagePixelCache(Image *image)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   D e s t r o y I m a g e P i x e l s                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  DestroyImagePixels() deallocates memory associated with the pixel cache.
@@ -1037,13 +971,7 @@ MagickExport void DestroyImagePixels(Image *image)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   D e s t r o y P i x e l C a c h e                                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  DestroyPixelCache() deallocates memory associated with the pixel cache.
@@ -1190,13 +1118,7 @@ MagickPrivate Cache DestroyPixelCache(Cache cache)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   D e s t r o y P i x e l C a c h e N e x u s                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  DestroyPixelCacheNexus() destroys a pixel cache nexus.
@@ -1248,13 +1170,7 @@ MagickPrivate NexusInfo **DestroyPixelCacheNexus(NexusInfo **nexus_info,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t A u t h e n t i c M e t a c o n t e n t                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetAuthenticMetacontent() returns the authentic metacontent corresponding
@@ -1299,13 +1215,7 @@ MagickExport void *GetAuthenticMetacontent(const Image *image)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t A u t h e n t i c M e t a c o n t e n t F r o m C a c h e           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetAuthenticMetacontentFromCache() returns the meta-content corresponding
@@ -1341,13 +1251,7 @@ static void *GetAuthenticMetacontentFromCache(const Image *image)
 #if defined(MAGICKCORE_OPENCL_SUPPORT)
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t A u t h e n t i c O p e n C L B u f f e r                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetAuthenticOpenCLBuffer() returns an OpenCL buffer used to execute OpenCL
@@ -1405,13 +1309,7 @@ MagickPrivate cl_mem GetAuthenticOpenCLBuffer(const Image *image,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t A u t h e n t i c P i x e l C a c h e N e x u s                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetAuthenticPixelCacheNexus() gets authentic pixels from the in-memory or
@@ -1471,13 +1369,7 @@ MagickPrivate Quantum *GetAuthenticPixelCacheNexus(Image *image,const ssize_t x,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t A u t h e n t i c P i x e l s F r o m C a c h e                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetAuthenticPixelsFromCache() returns the pixels associated with the last
@@ -1511,13 +1403,7 @@ static Quantum *GetAuthenticPixelsFromCache(const Image *image)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t A u t h e n t i c P i x e l Q u e u e                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetAuthenticPixelQueue() returns the authentic pixels associated
@@ -1555,13 +1441,7 @@ MagickExport Quantum *GetAuthenticPixelQueue(const Image *image)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t A u t h e n t i c P i x e l s                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetAuthenticPixels() obtains a pixel region for read/write access. If the
@@ -1631,13 +1511,7 @@ MagickExport Quantum *GetAuthenticPixels(Image *image,const ssize_t x,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t A u t h e n t i c P i x e l s C a c h e                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetAuthenticPixelsCache() gets pixels from the in-memory or disk pixel cache
@@ -1688,13 +1562,7 @@ static Quantum *GetAuthenticPixelsCache(Image *image,const ssize_t x,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t I m a g e E x t e n t                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetImageExtent() returns the extent of the pixels associated corresponding
@@ -1730,13 +1598,7 @@ MagickExport MagickSizeType GetImageExtent(const Image *image)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t I m a g e P i x e l C a c h e                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetImagePixelCache() ensures that there is only a single reference to the
@@ -1974,13 +1836,7 @@ static Cache GetImagePixelCache(Image *image,const MagickBooleanType clone,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t I m a g e P i x e l C a c h e T y p e                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetImagePixelCacheType() returns the pixel cache type: UndefinedCache,
@@ -2010,13 +1866,7 @@ MagickExport CacheType GetImagePixelCacheType(const Image *image)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t O n e A u t h e n t i c P i x e l                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetOneAuthenticPixel() returns a single pixel at the specified (x,y)
@@ -2089,13 +1939,7 @@ MagickExport MagickBooleanType GetOneAuthenticPixel(Image *image,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t O n e A u t h e n t i c P i x e l F r o m C a c h e                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetOneAuthenticPixelFromCache() returns a single pixel at the specified (x,y)
@@ -2144,13 +1988,7 @@ static MagickBooleanType GetOneAuthenticPixelFromCache(Image *image,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t O n e V i r t u a l P i x e l                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetOneVirtualPixel() returns a single virtual pixel at the specified
@@ -2203,13 +2041,7 @@ MagickExport MagickBooleanType GetOneVirtualPixel(const Image *image,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t O n e V i r t u a l P i x e l F r o m C a c h e                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetOneVirtualPixelFromCache() returns a single virtual pixel at the
@@ -2262,13 +2094,7 @@ static MagickBooleanType GetOneVirtualPixelFromCache(const Image *image,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t O n e V i r t u a l P i x e l I n f o                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetOneVirtualPixelInfo() returns a single pixel at the specified (x,y)
@@ -2324,13 +2150,7 @@ MagickExport MagickBooleanType GetOneVirtualPixelInfo(const Image *image,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t P i x e l C a c h e C o l o r s p a c e                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetPixelCacheColorspace() returns the colorspace of the pixel cache.
@@ -2360,13 +2180,7 @@ MagickPrivate ColorspaceType GetPixelCacheColorspace(const Cache cache)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t P i x e l C a c h e F i l e n a m e                                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetPixelCacheFilename() returns the filename associated with the pixel
@@ -2396,13 +2210,7 @@ MagickExport const char *GetPixelCacheFilename(const Image *image)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t P i x e l C a c h e M e t h o d s                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetPixelCacheMethods() initializes the CacheMethods structure.
@@ -2438,13 +2246,7 @@ MagickPrivate void GetPixelCacheMethods(CacheMethods *cache_methods)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t P i x e l C a c h e N e x u s E x t e n t                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetPixelCacheNexusExtent() returns the extent of the pixels associated
@@ -2481,13 +2283,7 @@ MagickPrivate MagickSizeType GetPixelCacheNexusExtent(const Cache cache,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t P i x e l C a c h e P i x e l s                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetPixelCachePixels() returns the pixels associated with the specified image.
@@ -2527,13 +2323,7 @@ MagickExport void *GetPixelCachePixels(Image *image,MagickSizeType *length,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t P i x e l C a c h e S t o r a g e C l a s s                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetPixelCacheStorageClass() returns the class type of the pixel cache.
@@ -2565,13 +2355,7 @@ MagickPrivate ClassType GetPixelCacheStorageClass(const Cache cache)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t P i x e l C a c h e T i l e S i z e                                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetPixelCacheTileSize() returns the pixel cache tile size.
@@ -2610,13 +2394,7 @@ MagickPrivate void GetPixelCacheTileSize(const Image *image,size_t *width,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t P i x e l C a c h e V i r t u a l M e t h o d                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetPixelCacheVirtualMethod() gets the "virtual pixels" method for the
@@ -2647,13 +2425,7 @@ MagickPrivate VirtualPixelMethod GetPixelCacheVirtualMethod(const Image *image)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t V i r t u a l M e t a c o n t e n t F r o m C a c h e               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetVirtualMetacontentFromCache() returns the meta-content corresponding with
@@ -2692,13 +2464,7 @@ static const void *GetVirtualMetacontentFromCache(const Image *image)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t V i r t u a l M e t a c o n t e n t F r o m N e x u s               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetVirtualMetacontentFromNexus() returns the meta-content for the specified
@@ -2732,13 +2498,7 @@ MagickPrivate const void *GetVirtualMetacontentFromNexus(const Cache cache,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t V i r t u a l M e t a c o n t e n t                                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetVirtualMetacontent() returns the virtual metacontent corresponding with
@@ -2785,13 +2545,7 @@ MagickExport const void *GetVirtualMetacontent(const Image *image)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t V i r t u a l P i x e l C a c h e N e x u s                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetVirtualPixelCacheNexus() gets virtual pixels from the in-memory or disk
@@ -3511,13 +3265,7 @@ MagickPrivate const Quantum *GetVirtualPixelCacheNexus(const Image *image,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t V i r t u a l P i x e l C a c h e                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetVirtualPixelCache() get virtual pixels from the in-memory or disk pixel
@@ -3569,13 +3317,7 @@ static const Quantum *GetVirtualPixelCache(const Image *image,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t V i r t u a l P i x e l Q u e u e                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetVirtualPixelQueue() returns the virtual pixels associated corresponding
@@ -3611,13 +3353,7 @@ MagickExport const Quantum *GetVirtualPixelQueue(const Image *image)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t V i r t u a l P i x e l s                                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetVirtualPixels() returns an immutable pixel region. If the
@@ -3687,13 +3423,7 @@ MagickExport const Quantum *GetVirtualPixels(const Image *image,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t V i r t u a l P i x e l s F r o m C a c h e                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetVirtualPixelsCache() returns the pixels associated corresponding with the
@@ -3727,13 +3457,7 @@ static const Quantum *GetVirtualPixelsCache(const Image *image)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t V i r t u a l P i x e l s N e x u s                                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetVirtualPixelsNexus() returns the pixels associated with the specified
@@ -3767,13 +3491,7 @@ MagickPrivate const Quantum *GetVirtualPixelsNexus(const Cache cache,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   M a s k P i x e l C a c h e N e x u s                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  MaskPixelCacheNexus() masks the cache nexus as defined by the composite mask.
@@ -3876,13 +3594,7 @@ static MagickBooleanType MaskPixelCacheNexus(Image *image,NexusInfo *nexus_info,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   O p e n P i x e l C a c h e                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  OpenPixelCache() allocates the pixel cache.  This includes defining the cache
@@ -4636,13 +4348,7 @@ static CacheInfo *AcquirePersistentPixelCache(
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   P e r s i s t P i x e l C a c h e                                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  PersistPixelCache() attaches to or initializes a persistent pixel cache.  A
@@ -4741,13 +4447,7 @@ MagickExport MagickBooleanType PersistPixelCache(Image *image,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   Q u e u e A u t h e n t i c P i x e l C a c h e N e x u s                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  QueueAuthenticPixelCacheNexus() allocates an region to store image pixels as
@@ -4844,13 +4544,7 @@ MagickPrivate Quantum *QueueAuthenticPixelCacheNexus(Image *image,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   Q u e u e A u t h e n t i c P i x e l s C a c h e                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  QueueAuthenticPixelsCache() allocates an region to store image pixels as
@@ -4901,13 +4595,7 @@ static Quantum *QueueAuthenticPixelsCache(Image *image,const ssize_t x,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   Q u e u e A u t h e n t i c P i x e l s                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  QueueAuthenticPixels() queues a mutable pixel region.  If the region is
@@ -4988,13 +4676,7 @@ MagickExport Quantum *QueueAuthenticPixels(Image *image,const ssize_t x,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   R e a d P i x e l C a c h e M e t a c o n t e n t                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  ReadPixelCacheMetacontent() reads metacontent from the specified region of
@@ -5189,13 +4871,7 @@ static MagickBooleanType ReadPixelCacheMetacontent(
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   R e a d P i x e l C a c h e P i x e l s                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  ReadPixelCachePixels() reads pixels from the specified region of the pixel
@@ -5367,13 +5043,7 @@ static MagickBooleanType ReadPixelCachePixels(
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   R e f e r e n c e P i x e l C a c h e                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  ReferencePixelCache() increments the reference count associated with the
@@ -5404,13 +5074,7 @@ MagickPrivate Cache ReferencePixelCache(Cache cache)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   R e s e t P i x e l C a c h e C h a n n e l s                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  ResetPixelCacheChannels() resets the pixel cache channels.
@@ -5439,13 +5103,7 @@ MagickPrivate void ResetPixelCacheChannels(Image *image)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   R e s e t C a c h e A n o n y m o u s M e m o r y                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  ResetCacheAnonymousMemory() resets the anonymous_memory value.
@@ -5462,13 +5120,7 @@ MagickPrivate void ResetCacheAnonymousMemory(void)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   R e s h a p e P i x e l C a c h e                                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  ReshapePixelCache() reshapes an existing pixel cache.
@@ -5517,13 +5169,7 @@ MagickExport MagickBooleanType ReshapePixelCache(Image *image,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   S e t P i x e l C a c h e M e t h o d s                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SetPixelCacheMethods() sets the image pixel methods to the specified ones.
@@ -5606,13 +5252,7 @@ MagickPrivate void SetPixelCacheMethods(Cache cache,CacheMethods *cache_methods)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   S e t P i x e l C a c h e N e x u s P i x e l s                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SetPixelCacheNexusPixels() defines the region of the cache for the
@@ -5844,13 +5484,7 @@ static Quantum *SetPixelCacheNexusPixels(
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   S e t P i x e l C a c h e V i r t u a l M e t h o d                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SetPixelCacheVirtualMethod() sets the "virtual pixels" method for the
@@ -5969,13 +5603,7 @@ MagickPrivate VirtualPixelMethod SetPixelCacheVirtualMethod(Image *image,
 #if defined(MAGICKCORE_OPENCL_SUPPORT)
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   S y n c A u t h e n t i c O p e n C L B u f f e r                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SyncAuthenticOpenCLBuffer() makes sure that all the OpenCL operations have
@@ -6019,13 +5647,7 @@ MagickPrivate void SyncAuthenticOpenCLBuffer(const Image *image)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   S y n c A u t h e n t i c P i x e l C a c h e N e x u s                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SyncAuthenticPixelCacheNexus() saves the authentic image pixels to the
@@ -6093,13 +5715,7 @@ MagickPrivate MagickBooleanType SyncAuthenticPixelCacheNexus(Image *image,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   S y n c A u t h e n t i c P i x e l C a c h e                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SyncAuthenticPixelsCache() saves the authentic image pixels to the in-memory
@@ -6143,13 +5759,7 @@ static MagickBooleanType SyncAuthenticPixelsCache(Image *image,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   S y n c A u t h e n t i c P i x e l s                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SyncAuthenticPixels() saves the image pixels to the in-memory or disk cache.
@@ -6199,13 +5809,7 @@ MagickExport MagickBooleanType SyncAuthenticPixels(Image *image,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   S y n c I m a g e P i x e l C a c h e                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SyncImagePixelCache() saves the image pixels to the in-memory or disk cache.
@@ -6238,13 +5842,7 @@ MagickPrivate MagickBooleanType SyncImagePixelCache(Image *image,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   W r i t e P i x e l C a c h e M e t a c o n t e n t                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  WritePixelCacheMetacontent() writes the meta-content to the specified region
@@ -6417,13 +6015,7 @@ static MagickBooleanType WritePixelCacheMetacontent(CacheInfo *cache_info,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   W r i t e C a c h e P i x e l s                                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  WritePixelCachePixels() writes image pixels to the specified region of the
