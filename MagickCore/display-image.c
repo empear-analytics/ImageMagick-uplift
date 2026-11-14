@@ -5824,6 +5824,76 @@ static const ModeType
     CompositeDismissCommand
   };
 
+static MagickBooleanType XCompositeIntoImage(
+  const CompositeCommandInput *input,Image *image,Image *composite_image,
+  RectangleInfo composite_info)
+{
+  char
+    *const displacement_geometry = input->displacement_geometry;
+
+  CompositeOperator
+    *const compose = input->targets.compose;
+
+  Display
+    *const display = input->display;
+
+  double
+    *const blend = input->targets.blend;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  /*
+    Image compositing is relative to image configuration.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  XCompositeScaleLocation(image,windows,&composite_info);
+  if ((composite_info.width != composite_image->columns) ||
+      (composite_info.height != composite_image->rows))
+    {
+      Image
+        *resize_image;
+
+      /*
+        Scale composite image.
+      */
+      resize_image=ResizeImage(composite_image,composite_info.width,
+        composite_info.height,composite_image->filter,exception);
+      composite_image=DestroyImage(composite_image);
+      if (resize_image == (Image *) NULL)
+        {
+          XSetCursorState(display,windows,MagickFalse);
+          return(MagickFalse);
+        }
+      composite_image=resize_image;
+    }
+  if ((*compose) == DisplaceCompositeOp)
+    (void) SetImageArtifact(composite_image,"compose:args",
+      displacement_geometry);
+  if (XCreateBlendMattes(image,composite_image,(*blend),exception) == MagickFalse)
+    return(MagickFalse);
+  /*
+    Composite image with X Image window.
+  */
+  (void) CompositeImage(image,composite_image,(*compose),MagickTrue,
+    composite_info.x,composite_info.y,exception);
+  composite_image=DestroyImage(composite_image);
+  XSetCursorState(display,windows,MagickFalse);
+  /*
+    Update image configuration.
+  */
+  XConfigureImageColormap(display,resource_info,windows,image,exception);
+  (void) XConfigureImage(display,resource_info,windows,image,exception);
+  return(MagickTrue);
+}
+
 static MagickBooleanType XCompositeImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -5917,49 +5987,8 @@ static MagickBooleanType XCompositeImage(Display *display,
   (void) XFreeCursor(display,cursor);
   if ((state & EscapeState) != 0)
     return(MagickTrue);
-  /*
-    Image compositing is relative to image configuration.
-  */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  XCompositeScaleLocation(image,windows,&composite_info);
-  if ((composite_info.width != composite_image->columns) ||
-      (composite_info.height != composite_image->rows))
-    {
-      Image
-        *resize_image;
-
-      /*
-        Scale composite image.
-      */
-      resize_image=ResizeImage(composite_image,composite_info.width,
-        composite_info.height,composite_image->filter,exception);
-      composite_image=DestroyImage(composite_image);
-      if (resize_image == (Image *) NULL)
-        {
-          XSetCursorState(display,windows,MagickFalse);
-          return(MagickFalse);
-        }
-      composite_image=resize_image;
-    }
-  if (compose == DisplaceCompositeOp)
-    (void) SetImageArtifact(composite_image,"compose:args",
-      displacement_geometry);
-  if (XCreateBlendMattes(image,composite_image,blend,exception) == MagickFalse)
-    return(MagickFalse);
-  /*
-    Composite image with X Image window.
-  */
-  (void) CompositeImage(image,composite_image,compose,MagickTrue,
-    composite_info.x,composite_info.y,exception);
-  composite_image=DestroyImage(composite_image);
-  XSetCursorState(display,windows,MagickFalse);
-  /*
-    Update image configuration.
-  */
-  XConfigureImageColormap(display,resource_info,windows,image,exception);
-  (void) XConfigureImage(display,resource_info,windows,image,exception);
-  return(MagickTrue);
+  return(XCompositeIntoImage(&command_input,image,composite_image,
+    composite_info));
 }
 
 /*
