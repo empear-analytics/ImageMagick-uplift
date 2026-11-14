@@ -15846,6 +15846,109 @@ Lane: b
 
 ---
 
+## Recipe SM - Extract a Block Reading Its Inputs Through the Members of a Struct It Passes On
+
+**Use when:** CodeScene reports *Bumpy Road Ahead* or *Complex Method* on a function in
+which a block passes a `const` struct local `&s` to a callee and also reads, outside that
+call, caller variables whose values are members of `s` (or of a struct a member of `s`
+points to), so that Recipe E would give the new function five or more parameters:
+`type.c`'s `LoadTypeCache` and `policy.c`'s `LoadPolicyCache`, whose include element
+retries `LoadTypeIncludes(&scan,&q,&status)` and throws with `exception` and `token`,
+which are `scan.target->exception` and `scan.token`.
+
+**Not covered by:** Recipe E, whose new function takes every variable the block reads as a
+parameter (here five, the gate refuses the *Excess Number of Function Arguments*); Recipe
+N step 8, whose later block runs after the call of the struct's helper and reads only the
+struct's members, while here the call is inside the block and the block reads the
+caller's own variables that hold the members' values; Recipe DV, which drops a parameter
+of an existing function.
+
+**How:**
+
+1. The block lies outside every OpenMP region, holds no `#pragma` line, and meets Recipe E
+   steps 1 and 3 to 7 (no `return`, `goto`, or `break`/`continue` that leaves it), except
+   for the number of parameters.
+2. `s` is a `const` struct local of the caller, initialised at its declaration; the block
+   passes `&s` to a callee's pointer-to-`const` parameter and does not otherwise name `s`.
+3. Each caller variable `v` that the block reads outside that call, and that is no
+   argument of it, is the value of a member path `s.m` (or `s.m->n`, `m` a pointer
+   member): `s.m` was initialised from `v`, or `s.m` from `p` and `v` from `p->n`, and
+   nothing on any path from those initialisations to the end of the block assigns `v`,
+   `p` or `p->n` (checked by reading; writes through `v`, into the object it points to,
+   are allowed, since the member holds the same pointer).
+4. Cut the block into a `static` function directly above the caller, taking `const Name
+   *s` first and then the block's other parameters under Recipe E or O (variables the
+   block writes, as pointers), at most four in all. At the top of its body declare each
+   step-3 variable as a local of its own name and type, `const` added to the declarator,
+   initialised from its member path (`ExceptionInfo *const exception =
+   scan->target->exception;`). The block's text follows unchanged, `&s` written `s`.
+5. Where the block stood, call the function with `&s` and the other arguments; check each
+   argument against its parameter by reading.
+6. Run `tools/ci_warnings.sh` and `tools/cxx_warnings.sh` (both `OK`),
+   `refactor_guard.py --calls`, and the oracle for the caller.
+
+**Before:**
+
+```c
+    if (LocaleCompare(keyword,"<include") == 0)
+      {
+        const TypeIncludeScan
+          scan = { target, filename, depth, extent, keyword, token };
+
+        /*
+          Include element.
+        */
+        while (LoadTypeIncludes(&scan,&q,&status) == MagickFalse)
+          (void) ThrowMagickException(exception,GetMagickModule(),
+            ConfigureError,"IncludeNodeNestedTooDeeply","`%s'",token);
+        continue;
+      }
+```
+
+**After:**
+
+```c
+static void LoadTypeIncludeElement(const TypeIncludeScan *scan,
+  const char **q,MagickStatusType *status)
+{
+  ExceptionInfo
+    *const exception = scan->target->exception;
+
+  char
+    *const token = scan->token;
+
+  while (LoadTypeIncludes(scan,q,status) == MagickFalse)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ConfigureError,"IncludeNodeNestedTooDeeply","`%s'",token);
+}
+...
+        LoadTypeIncludeElement(&scan,&q,&status);
+        continue;
+```
+
+**Careful:**
+
+- Each bound local holds the value the caller's variable holds at the block: the member
+  was filled from it (or from the pointer it was read through) and step 3 rules out any
+  assignment since. A pointer member is the same pointer, so a callee that writes the
+  buffer it points to (`GetNextToken` into `scan->token`) changes what both names read,
+  as before.
+- The struct is `const` and the block only passes its address on, so binding its members
+  at the top reads what the block would have read at each use.
+- A block whose path no case reaches (an include element, when no configuration file of
+  the corpus includes another) is checked by reading: say so in the commit.
+
+**Evidence level:** oracle for the caller, with steps 2 and 3 checked by reading and
+`refactor_guard.py --calls`.
+
+**Provenance:** 2026-11-14, from `type.c`'s `LoadTypeCache` and `policy.c`'s
+`LoadPolicyCache` (campaign B, M127 lane a round 5): the include element's retry loop and
+its throw; probes 8.13 to 8.22 (type.c, *Bumpy Road Ahead* gone) and 7.89 to 7.97
+(policy.c). Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: a
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -17550,3 +17653,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | PL | Step 6, tail form: in a `void` function whose last statement is the `switch`, a group of statements ending in its one `break;` counts as leaving and is peeled as `{ <statements> return; }`; Lane: b | `quantum-type.c`'s `SetQuantumImageType` (seven colour-separation labels setting `image->type`) | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | KC | Step 7: groups `v=x; break;` with a non-literal `x` stay, with `default:`, in a kept `switch` that is step 4's `else` branch; Lane: b | `quantum-type.c`'s `GetQuantumChannels` (twelve literal channel counts and `MultispectralQuantum`'s `GetImageChannels(image)`) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | PT | Peel a Leaving Label Set out of a Selection into a Membership Table: PL's peel with TB's table predicate in one step, for a file of six functions where PL's label-run predicate and the seventh function each dip; Lane: b | `quantum-type.c`'s `SetQuantumImageType` (PL alone 8.92, PT alone 9.09, with PL on the index labels 10.0 from 9.58) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | SM | Extract a Block Reading Its Inputs Through the Members of a Struct It Passes On: a block that passes `&s` (a `const` struct local) to a callee and reads caller variables holding members of `s` moves into a function taking `const Name *s`, binding those variables from their member paths; at most four parameters; Lane: a | `type.c`'s `LoadTypeCache` and `policy.c`'s `LoadPolicyCache`: the include element's retry loop and throw read `exception` and `token`, which are `scan.target->exception` and `scan.token`; probes 8.13 to 8.22 and 7.89 to 7.97 | mandate (2026-10-24) |

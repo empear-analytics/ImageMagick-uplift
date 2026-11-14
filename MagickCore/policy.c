@@ -193,6 +193,48 @@ static void SetBuiltInPolicyInfo(PolicyInfo *policy_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void ThrowPolicyAllocationError(ExceptionInfo *exception,
+  const PolicyMapInfo *p)
+{
+  (void) ThrowMagickException(exception,GetMagickModule(),
+    ResourceLimitError,"MemoryAllocationFailed","`%s'",
+    p->name == (char *) NULL ? "" : p->name);
+  CatchException(exception);
+}
+
+static void AppendBuiltInPolicies(LinkedListInfo *cache,
+  ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) (sizeof(PolicyMap)/sizeof(*PolicyMap)); i++)
+  {
+    const PolicyMapInfo
+      *p;
+
+    PolicyInfo
+      *policy_info;
+
+    p=PolicyMap+i;
+    policy_info=(PolicyInfo *) AcquireMagickMemory(sizeof(*policy_info));
+    if (policy_info == (PolicyInfo *) NULL)
+      {
+        ThrowPolicyAllocationError(exception,p);
+        continue;
+      }
+    SetBuiltInPolicyInfo(policy_info,p);
+    status=AppendValueToLinkedList(cache,policy_info);
+    if (status == MagickFalse)
+      {
+        ThrowPolicyAllocationError(exception,p);
+      }
+  }
+}
+
 static LinkedListInfo *AcquirePolicyCache(const char *filename,
   ExceptionInfo *exception)
 {
@@ -201,9 +243,6 @@ static LinkedListInfo *AcquirePolicyCache(const char *filename,
 
   MagickBooleanType
     status;
-
-  ssize_t
-    i;
 
   /*
     Load external policy map.
@@ -243,34 +282,7 @@ static LinkedListInfo *AcquirePolicyCache(const char *filename,
   /*
     Load built-in policy map.
   */
-  for (i=0; i < (ssize_t) (sizeof(PolicyMap)/sizeof(*PolicyMap)); i++)
-  {
-    const PolicyMapInfo
-      *p;
-
-    PolicyInfo
-      *policy_info;
-
-    p=PolicyMap+i;
-    policy_info=(PolicyInfo *) AcquireMagickMemory(sizeof(*policy_info));
-    if (policy_info == (PolicyInfo *) NULL)
-      {
-        (void) ThrowMagickException(exception,GetMagickModule(),
-          ResourceLimitError,"MemoryAllocationFailed","`%s'",
-          p->name == (char *) NULL ? "" : p->name);
-        CatchException(exception);
-        continue;
-      }
-    SetBuiltInPolicyInfo(policy_info,p);
-    status=AppendValueToLinkedList(cache,policy_info);
-    if (status == MagickFalse)
-      {
-        (void) ThrowMagickException(exception,GetMagickModule(),
-          ResourceLimitError,"MemoryAllocationFailed","`%s'",
-          p->name == (char *) NULL ? "" : p->name);
-        CatchException(exception);
-      }
-  }
+  AppendBuiltInPolicies(cache,exception);
   return(cache);
 }
 
@@ -349,6 +361,13 @@ static MagickBooleanType GetWildcardPolicy(const char *name,
   return(MagickFalse);
 }
 
+static inline MagickBooleanType IsPolicyInDomain(const PolicyInfo *policy,
+  const PolicyDomain domain)
+{
+  return((MagickBooleanType) ((domain == UndefinedPolicyDomain) ||
+    (policy->domain == domain)));
+}
+
 static PolicyInfo *GetPolicyInfo(const char *name,ExceptionInfo *exception)
 {
   char
@@ -390,7 +409,7 @@ static PolicyInfo *GetPolicyInfo(const char *name,ExceptionInfo *exception)
   while (p != (ElementInfo *) NULL)
   {
     policy=(PolicyInfo *) p->value;
-    if ((domain == UndefinedPolicyDomain) || (policy->domain == domain))
+    if (IsPolicyInDomain(policy,domain) != MagickFalse)
       if (LocaleCompare(policyname,policy->name) == 0)
         break;
     p=p->next;
@@ -1256,6 +1275,20 @@ static MagickBooleanType LoadPolicyIncludes(const PolicyIncludeScan *scan,
   return(MagickTrue);
 }
 
+static void LoadPolicyIncludeElement(const PolicyIncludeScan *scan,
+  const char **q,MagickStatusType *status)
+{
+  ExceptionInfo
+    *const exception = scan->target->exception;
+
+  char
+    *const token = scan->token;
+
+  while (LoadPolicyIncludes(scan,q,status) == MagickFalse)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
+}
+
 static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
   const char *policy,const char *filename,const size_t depth)
 {
@@ -1311,9 +1344,7 @@ static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
         /*
           Include element.
         */
-        while (LoadPolicyIncludes(&scan,&q,&status) == MagickFalse)
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
+        LoadPolicyIncludeElement(&scan,&q,&status);
         continue;
       }
     if (LocaleCompare(keyword,"<policy") == 0)

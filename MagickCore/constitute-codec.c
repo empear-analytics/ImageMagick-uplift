@@ -741,6 +741,18 @@ static MagickBooleanType DecodeDelegateImage(ImageInfo *read_info,
   return(MagickTrue);
 }
 
+static void CheckReadImageArguments(const ImageInfo *image_info,
+  const ExceptionInfo *exception)
+{
+  assert(image_info != (ImageInfo *) NULL);
+  assert(image_info->signature == MagickCoreSignature);
+  assert(image_info->filename != (char *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
+      image_info->filename);
+  assert(exception != (ExceptionInfo *) NULL);
+}
+
 MagickExport Image *ReadImage(const ImageInfo *image_info,
   ExceptionInfo *exception)
 {
@@ -771,13 +783,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
   /*
     Determine image type from filename prefix or suffix (e.g. image.jpg).
   */
-  assert(image_info != (ImageInfo *) NULL);
-  assert(image_info->signature == MagickCoreSignature);
-  assert(image_info->filename != (char *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      image_info->filename);
-  assert(exception != (ExceptionInfo *) NULL);
+  CheckReadImageArguments(image_info,exception);
   read_info=CloneImageInfo(image_info);
   (void) CopyMagickString(magick_filename,read_info->filename,MagickPathExtent);
   (void) SetImageInfo(read_info,0,exception);
