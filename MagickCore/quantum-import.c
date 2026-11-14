@@ -4995,6 +4995,11 @@ static void ImportIndexQuantum(const Image *image,QuantumInfo *quantum_info,
       "InvalidColormapIndex","`%s'",image->filename);
 }
 
+static inline int GetIndexBit(const unsigned char pixel)
+{
+  return(pixel == 0 ? 0 : 1);
+}
+
 static void Import1BitIndexAlphaQuantum(const Image *image,
   QuantumInfo *quantum_info,const QuantumPixelSpan *span)
 {
@@ -5021,10 +5026,9 @@ static void Import1BitIndexAlphaQuantum(const Image *image,
     for (bit=0; bit < 8; bit+=2)
     {
       pixel=GetColormapBit(quantum_info,p,bit);
-      SetPixelGray(image,(Quantum) (pixel == 0 ? 0 : QuantumRange),q);
-      SetPixelAlpha(image,((*p) & (1UL << (unsigned char) (6-bit))) == 0 ?
-        TransparentAlpha : OpaqueAlpha,q);
-      SetPixelIndex(image,(Quantum) (pixel == 0 ? 0 : 1),q);
+      SetPixelGray(image,(Quantum) GetGrayBitQuantum(pixel),q);
+      SetPixelAlpha(image,GetAlphaBitQuantum(*p,bit),q);
+      SetPixelIndex(image,(Quantum) GetIndexBit(pixel),q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
   }
@@ -5032,10 +5036,9 @@ static void Import1BitIndexAlphaQuantum(const Image *image,
     for (bit=3; bit >= (ssize_t) (4-(number_pixels % 4)); bit-=2)
     {
       pixel=GetColormapBit(quantum_info,p,bit);
-      SetPixelIndex(image,(Quantum) (pixel == 0 ? 0 : 1),q);
-      SetPixelGray(image,(Quantum) (pixel == 0 ? 0 : QuantumRange),q);
-      SetPixelAlpha(image,((*p) & (1UL << (unsigned char) (6-bit))) == 0 ?
-        TransparentAlpha : OpaqueAlpha,q);
+      SetPixelIndex(image,(Quantum) GetIndexBit(pixel),q);
+      SetPixelGray(image,(Quantum) GetGrayBitQuantum(pixel),q);
+      SetPixelAlpha(image,GetAlphaBitQuantum(*p,bit),q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
 }
