@@ -316,27 +316,38 @@ static void CheckAppendArguments(const Image *images,
 
 #define AppendImageTag  "Append/Image"
 
-MagickExport Image *AppendImages(const Image *images,
-  const MagickBooleanType stack,ExceptionInfo *exception)
+typedef struct _AppendImageListInput
 {
+  const Image
+    *images;
+
+  MagickBooleanType
+    stack;
+
+  size_t
+    number_images;
+} AppendImageListInput;
+
+static MagickBooleanType AppendImageList(Image *append_image,
+  const AppendImageListInput *list,ExceptionInfo *exception)
+{
+  const Image
+    *const images = list->images;
+
+  const MagickBooleanType
+    stack = list->stack;
+
+  const size_t
+    number_images = list->number_images;
+
   CacheView
     *append_view;
 
-  Image
-    *append_image;
-
-  ImageType
-    image_type;
-
   MagickBooleanType
-    homogeneous_colorspace,
     status;
 
   MagickOffsetType
     n;
-
-  PixelTrait
-    alpha_trait;
 
   RectangleInfo
     geometry;
@@ -344,49 +355,11 @@ MagickExport Image *AppendImages(const Image *images,
   const Image
     *next;
 
-  size_t
-    depth,
-    height,
-    number_images,
-    width;
-
   ssize_t
     x_offset,
     y,
     y_offset;
 
-  /*
-    Compute maximum area of appended area.
-  */
-  CheckAppendArguments(images,exception);
-  alpha_trait=images->alpha_trait;
-  number_images=1;
-  width=images->columns;
-  height=images->rows;
-  depth=images->depth;
-  image_type=images->type;
-  homogeneous_colorspace=MagickTrue;
-  next=GetNextImageInList(images);
-  for ( ; next != (Image *) NULL; next=GetNextImageInList(next))
-  {
-    AccumulateAppendDepth(next,images,&depth,&image_type);
-    AccumulateAppendTraits(next,images,&homogeneous_colorspace,&alpha_trait);
-    number_images++;
-    AddAppendExtent(next,stack,&width,&height);
-  }
-  /*
-    Append images.
-  */
-  append_image=CloneImage(images,width,height,MagickTrue,exception);
-  if (append_image == (Image *) NULL)
-    return((Image *) NULL);
-  if (SetAppendImageClass(append_image,image_type,homogeneous_colorspace,
-      exception) == MagickFalse)
-    return((Image *) NULL);
-  append_image->depth=depth;
-  append_image->alpha_trait=alpha_trait;
-  append_image->page=images->page;
-  (void) SetImageBackgroundColor(append_image,exception);
   status=MagickTrue;
   x_offset=0;
   y_offset=0;
@@ -423,6 +396,73 @@ MagickExport Image *AppendImages(const Image *images,
     next=GetNextImageInList(next);
   }
   append_view=DestroyCacheView(append_view);
+  return(status);
+}
+
+MagickExport Image *AppendImages(const Image *images,
+  const MagickBooleanType stack,ExceptionInfo *exception)
+{
+  Image
+    *append_image;
+
+  ImageType
+    image_type;
+
+  MagickBooleanType
+    homogeneous_colorspace,
+    status;
+
+  PixelTrait
+    alpha_trait;
+
+  const Image
+    *next;
+
+  size_t
+    depth,
+    height,
+    number_images,
+    width;
+
+  AppendImageListInput
+    list;
+
+  /*
+    Compute maximum area of appended area.
+  */
+  CheckAppendArguments(images,exception);
+  alpha_trait=images->alpha_trait;
+  number_images=1;
+  width=images->columns;
+  height=images->rows;
+  depth=images->depth;
+  image_type=images->type;
+  homogeneous_colorspace=MagickTrue;
+  next=GetNextImageInList(images);
+  for ( ; next != (Image *) NULL; next=GetNextImageInList(next))
+  {
+    AccumulateAppendDepth(next,images,&depth,&image_type);
+    AccumulateAppendTraits(next,images,&homogeneous_colorspace,&alpha_trait);
+    number_images++;
+    AddAppendExtent(next,stack,&width,&height);
+  }
+  /*
+    Append images.
+  */
+  append_image=CloneImage(images,width,height,MagickTrue,exception);
+  if (append_image == (Image *) NULL)
+    return((Image *) NULL);
+  if (SetAppendImageClass(append_image,image_type,homogeneous_colorspace,
+      exception) == MagickFalse)
+    return((Image *) NULL);
+  append_image->depth=depth;
+  append_image->alpha_trait=alpha_trait;
+  append_image->page=images->page;
+  (void) SetImageBackgroundColor(append_image,exception);
+  list.images=images;
+  list.stack=stack;
+  list.number_images=number_images;
+  status=AppendImageList(append_image,&list,exception);
   return(DestroyImageOnFailure(append_image,status));
 }
 
