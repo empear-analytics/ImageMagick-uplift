@@ -4426,6 +4426,14 @@ function).
    *targets`, after the input struct, each `&targets` of the groups written `targets`
    (Recipe N step 2's pass-through of an address the block passes to a callee); the
    groups' own text is otherwise unchanged (2026-11-12).
+   Widening (2026-11-14): the moved groups may also write, on paths that do not return,
+   up to three plain locals the caller reads after the `switch`, on Recipe W step 3's
+   widened terms (each a pointer, `(*v)` at every use, counted among the four
+   parameters; `R` reads none of them, W's `return(v);` exception included). When a
+   `static` function of the file is already, token for token, the function step 4 would
+   write from the moved groups (another site's helper), the call group of step 5 calls it
+   and no copy is written (Recipe D); check by script that the moved groups' text, after
+   the rewriting of this step, equals that function's `switch` body.
 4. Cut the moved groups, labels and bodies, in their order, into a new `static
    MagickBooleanType` function directly above the caller, whose body is `switch (e)
    { ... }` with the same text of `e`, followed by `return(MagickTrue);`. Each
@@ -4564,6 +4572,12 @@ test, a returning `default`) holds about half of its cc 39; SD refuses it for th
 `return`s, W for the cc of a single helper. A probe of three functions (`O`/`P`/`R`,
 `G`/`I`, `A`/`B`, each with the `default` chain): 6.20 to 6.40, no finding on any new
 function. Added by Claude Code (Claude Opus 5.5), under the mandate of 2026-10-24.
+Step 3's widening and reuse (2026-11-14, campaign B, M127 lane b round 13):
+`geometry-parse.c`'s `ParseGeometry`, whose separator `switch` writes `p` and `flags` and
+is `GetGeometry`'s but for one kept group (`'/'`, `p++`) and its `return(NoValue);`; the
+moved groups are exactly `GetGeometry`'s `SkipGeometrySeparator`. A probe 8.33 to 8.39, no
+new finding. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
 
 ---
 
@@ -19728,3 +19742,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | JT | Replace Jumps to a Returning Tail by Calls of the Tail: a function-ending `L: S return(R);` reached by `goto L;` from nested arms moves to a `static` helper of the return type taking the (at most four) variables it reads; each `goto L;` and the label's tail become `return(Helper(...));`; Lane: c | `property.c`'s `InterpretBracedEscape` (three lookup arms jumping to `PropertyLookupFailure:`): the first step of a chain that takes the function out of every finding, 3.62 to 3.64 | mandate (2026-10-24) |
 | 2026-11-14 | NEW | XP | Share Mirrored Extreme-Search Loops Through Per-Direction Predicates: copies of a loop keeping the most extreme array element, differing in their tests' operands and operators, become one `static` search taking a predicate pointer, each copy's tests a `MagickBooleanType` predicate returning `MagickTrue` where the copy assigned; Lane: c | `property.c`'s `GetConvexHullExtremePoints` (top, right, bottom, left loops; cc 26, four bumps): leaves every finding, 3.64 to 3.66 | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | W | Step 3's widening: `R` may be a widened local itself, `return(v);`, since every write through `(*v)` lands in the caller's `v` before the helper returns and the caller's `return(v);` reads that value; Lane: b | `geometry-parse.c`'s `GetGeometry` (separator `switch` writing `p` and `flags`, `default:` returning `flags`; probe 7.90 to 8.04) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | SR | Step 3: the moved groups may write up to three plain locals the caller reads after the `switch`, on W step 3's widened terms; when a `static` helper of the file already is the function step 4 would write, the call group calls it (Recipe D), checked by script; Lane: b | `geometry-parse.c`'s `ParseGeometry` (separator `switch` writing `p` and `flags`, the moved groups equal to `GetGeometry`'s `SkipGeometrySeparator`; probe 8.33 to 8.39) | mandate (2026-10-24) |
