@@ -1109,6 +1109,12 @@ static void Sync8BimResource(const Image *image,const unsigned short id,
     SyncExifProfile(image,p,(size_t) count);
 }
 
+static void Skip8BimBytes(unsigned char **p,size_t *length,const ssize_t count)
+{
+  (*p)+=(ptrdiff_t) count;
+  (*length)-=(size_t) count;
+}
+
 static void Sync8BimProfile(const Image *image,const StringInfo *profile)
 {
   size_t
@@ -1140,16 +1146,14 @@ static void Sync8BimProfile(const Image *image,const StringInfo *profile)
     count=(ssize_t) ReadProfileByte(&p,&length);
     if (IsInvalid8BimNameCount(count,length) != MagickFalse)
       return;
-    p+=(ptrdiff_t) count;
-    length-=(size_t) count;
+    Skip8BimBytes(&p,&length,count);
     if ((*p & 0x01) == 0)
       (void) ReadProfileByte(&p,&length);
     count=(ssize_t) ReadProfileMSBLong(&p,&length);
     if (IsInvalid8BimResourceCount(count,length) != MagickFalse)
       return;
     Sync8BimResource(image,id,count,p);
-    p+=(ptrdiff_t) count;
-    length-=(size_t) count;
+    Skip8BimBytes(&p,&length,count);
   }
   return;
 }
