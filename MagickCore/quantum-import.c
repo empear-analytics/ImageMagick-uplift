@@ -4059,6 +4059,22 @@ static inline int GetInverseGrayBit(const unsigned char octet,
   return(((octet) & (1 << (7-bit))) != 0 ? 0x00 : 0x01);
 }
 
+static void ImportGrayAlphaOctet(const Image *image,
+  const unsigned char *magick_restrict p,ssize_t *bit,
+  Quantum *magick_restrict *q)
+{
+  unsigned char
+    pixel;
+
+  for ((*bit)=0; (*bit) < 8; (*bit)+=2)
+  {
+    pixel=(unsigned char) GetInverseGrayBit(*p,(*bit));
+    SetPixelGray(image,(Quantum) GetGrayBitQuantum(pixel),(*q));
+    SetPixelAlpha(image,GetAlphaBitQuantum(*p,(*bit)),(*q));
+    (*q)+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static void Import1BitGrayAlphaQuantum(const Image *image,
   const QuantumPixelSpan *span)
 {
@@ -4083,13 +4099,7 @@ static void Import1BitGrayAlphaQuantum(const Image *image,
   bit=0;
   for (x=((ssize_t) number_pixels-3); x > 0; x-=4)
   {
-    for (bit=0; bit < 8; bit+=2)
-    {
-      pixel=(unsigned char) GetInverseGrayBit(*p,bit);
-      SetPixelGray(image,(Quantum) GetGrayBitQuantum(pixel),q);
-      SetPixelAlpha(image,GetAlphaBitQuantum(*p,bit),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    ImportGrayAlphaOctet(image,p,&bit,&q);
     p++;
   }
   if ((number_pixels % 4) != 0)
