@@ -25091,6 +25091,61 @@ static void XMakeIconWindow(const DisplayEventContext *context,
   windows->icon.annotate_context=icon_pixel->annotate_context;
 }
 
+static void XMakeContextWindow(const DisplayEventContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  XPixelInfo
+    *const pixel = context->pixel;
+
+  XStandardColormap
+    *const map_info = context->map_info;
+
+  const Window
+    root_window = context->root_window;
+
+  XVisualInfo
+    *const visual_info = context->visual_info;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  char
+    **const argv = context->argv;
+
+  const int
+    argc = context->argc;
+
+  XClassHint
+    *const class_hints = context->class_hints;
+
+  XWMHints
+    *const manager_hints = context->manager_hints;
+
+  windows->context.id=(Window) NULL;
+  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
+    resource_info,&windows->context);
+  (void) CloneString(&class_hints->res_name,resource_info->client_name);
+  (void) CloneString(&class_hints->res_class,resource_info->client_name);
+  class_hints->res_class[0]=(char) LocaleToUppercase((int)
+    class_hints->res_class[0]);
+  manager_hints->flags=InputHint | StateHint;
+  manager_hints->input=MagickFalse;
+  manager_hints->initial_state=WithdrawnState;
+  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
+    &windows->context);
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Window id: 0x%lx (context)",windows->context.id);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -25258,21 +25313,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   /*
     Initialize graphic context.
   */
-  windows->context.id=(Window) NULL;
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->context);
-  (void) CloneString(&class_hints->res_name,resource_info->client_name);
-  (void) CloneString(&class_hints->res_class,resource_info->client_name);
-  class_hints->res_class[0]=(char) LocaleToUppercase((int)
-    class_hints->res_class[0]);
-  manager_hints->flags=InputHint | StateHint;
-  manager_hints->input=MagickFalse;
-  manager_hints->initial_state=WithdrawnState;
-  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-    &windows->context);
-  if (resource_info->debug != MagickFalse)
-    (void) LogMagickEvent(X11Event,GetMagickModule(),
-      "Window id: 0x%lx (context)",windows->context.id);
+  XMakeContextWindow(&event_context);
   context_values.background=pixel->background_color.pixel;
   context_values.font=font_info->fid;
   context_values.foreground=pixel->foreground_color.pixel;
