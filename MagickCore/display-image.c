@@ -20709,6 +20709,9 @@ typedef struct _DisplayEventTargets
 
   XGCValues
     *context_values;
+
+  MagickStatusType
+    *status;
 } DisplayEventTargets;
 
 static void XSelectVirtualCommand(const DisplayEventContext *context,
@@ -22133,6 +22136,60 @@ static void XHandleClientMessage(const DisplayEventContext *context,
     }
 }
 
+static void XHandleConfigureNotify(const DisplayEventContext *context,
+  const DisplayEventTargets *targets)
+{
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const display_image = targets->display_image;
+
+  XEvent
+    *const event = targets->event;
+
+  XPoint
+    *const vid_info = targets->vid_info;
+
+  MagickStatusType
+    *const status = targets->status;
+
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Configure Notify: 0x%lx %dx%d+%d+%d %d",(*event).xconfigure.window,
+      (*event).xconfigure.width,(*event).xconfigure.height,(*event).xconfigure.x,
+      (*event).xconfigure.y,(*event).xconfigure.send_event);
+  if ((*event).xconfigure.window == windows->image.id)
+    {
+      XConfigureImageWindow(context,(*event),(*display_image),(*vid_info));
+      return;
+    }
+  if ((*event).xconfigure.window == windows->magnify.id)
+    {
+      (*status)=XConfigureMagnifyWindow(context,(*event),(*display_image),
+        (*status));
+      return;
+    }
+  if (windows->magnify.mapped != MagickFalse &&
+      ((*event).xconfigure.window == windows->pan.id))
+    {
+      XConfigurePanWindow(windows,(*event));
+      return;
+    }
+  if ((*event).xconfigure.window == windows->icon.id)
+    {
+      /*
+        Icon window has a new configuration.
+      */
+      windows->icon.width=(unsigned int) (*event).xconfigure.width;
+      windows->icon.height=(unsigned int) (*event).xconfigure.height;
+      return;
+    }
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -22230,7 +22287,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
 
   const DisplayEventTargets
     event_targets = { &nexus, &display_image, &event, &vid_info, &timer,
-      &context_values };
+      &context_values, &status };
 
   assert(image != (Image **) NULL);
   assert((*image)->signature == MagickCoreSignature);
@@ -22750,37 +22807,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
       }
       case ConfigureNotify:
       {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Configure Notify: 0x%lx %dx%d+%d+%d %d",event.xconfigure.window,
-            event.xconfigure.width,event.xconfigure.height,event.xconfigure.x,
-            event.xconfigure.y,event.xconfigure.send_event);
-        if (event.xconfigure.window == windows->image.id)
-          {
-            XConfigureImageWindow(&event_context,event,display_image,vid_info);
-            break;
-          }
-        if (event.xconfigure.window == windows->magnify.id)
-          {
-            status=XConfigureMagnifyWindow(&event_context,event,display_image,
-              status);
-            break;
-          }
-        if (windows->magnify.mapped != MagickFalse &&
-            (event.xconfigure.window == windows->pan.id))
-          {
-            XConfigurePanWindow(windows,event);
-            break;
-          }
-        if (event.xconfigure.window == windows->icon.id)
-          {
-            /*
-              Icon window has a new configuration.
-            */
-            windows->icon.width=(unsigned int) event.xconfigure.width;
-            windows->icon.height=(unsigned int) event.xconfigure.height;
-            break;
-          }
+        XHandleConfigureNotify(&event_context,&event_targets);
         break;
       }
       case DestroyNotify:
