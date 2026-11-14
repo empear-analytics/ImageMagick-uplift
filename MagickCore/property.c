@@ -5168,21 +5168,74 @@ static MagickBooleanType ReadInterpretTextFile(const char *p,
   return(MagickFalse);
 }
 
+typedef struct _InterpretLetterInputs
+{
+  ImageInfo
+    *property_info;
+
+  Image
+    *image,
+    *property_image;
+
+  ExceptionInfo
+    *exception;
+
+  MagickBooleanType
+    number;
+} InterpretLetterInputs;
+
+static MagickBooleanType InterpretLetterEscape(
+  const InterpretLetterInputs *inputs,const InterpretText *text,
+  const char **p)
+{
+  ImageInfo
+    *const property_info = inputs->property_info;
+
+  Image
+    *const image = inputs->image,
+    *const property_image = inputs->property_image;
+
+  ExceptionInfo
+    *const exception = inputs->exception;
+
+  const MagickBooleanType
+    number = inputs->number;
+
+  char
+    **const q = text->q;
+
+  const char
+    *string;
+
+  if (number != MagickFalse)
+    {
+      /*
+        But only if not preceded by a number!
+      */
+      *(*q)++='%'; /* do NOT substitute the percent */
+      (*p)--;      /* back up one */
+      return(MagickTrue);
+    }
+  string=GetMagickPropertyLetter(property_info,image,*(*p),exception);
+  if (string != (char *) NULL)
+    {
+      if (AppendInterpretString(text,(string)) == MagickFalse)
+        return(MagickFalse);
+      (void) DeleteImageArtifact(property_image,"magick-property");
+      (void) DeleteImageOption(property_info,"magick-property");
+      return(MagickTrue);
+    }
+  (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+    "UnknownImageProperty","\"%%%c\"",*(*p));
+  return(MagickTrue);
+}
+
 MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   const char *embed_text,ExceptionInfo *exception)
 {
 #define ExtendInterpretText(string_length) \
 { \
   if (ExtendInterpretBuffer(&text,(string_length)) == MagickFalse) \
-    { \
-      status=MagickFalse; \
-      goto cleanup; \
-    } \
-}
-
-#define AppendString2Text(string) \
-{ \
-  if (AppendInterpretString(&text,(string)) == MagickFalse) \
     { \
       status=MagickFalse; \
       goto cleanup; \
@@ -5285,28 +5338,19 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
     */
     if (*p != '[')
       {
-        const char
-          *string;
+        InterpretLetterInputs
+          inputs;
 
-        if (number != MagickFalse)
+        inputs.property_info=property_info;
+        inputs.image=image;
+        inputs.property_image=property_image;
+        inputs.exception=exception;
+        inputs.number=number;
+        if (InterpretLetterEscape(&inputs,&text,&p) == MagickFalse)
           {
-            /*
-              But only if not preceded by a number!
-            */
-            *q++='%'; /* do NOT substitute the percent */
-            p--;      /* back up one */
-            continue;
+            status=MagickFalse;
+            goto cleanup;
           }
-        string=GetMagickPropertyLetter(property_info,image,*p,exception);
-        if (string != (char *) NULL)
-          {
-            AppendString2Text(string);
-            (void) DeleteImageArtifact(property_image,"magick-property");
-            (void) DeleteImageOption(property_info,"magick-property");
-            continue;
-          }
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-          "UnknownImageProperty","\"%%%c\"",*p);
         continue;
       }
     {
