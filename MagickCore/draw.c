@@ -6975,6 +6975,13 @@ static MagickBooleanType ParseMVGKeyword(const MVGRenderState *state)
   return(keyword_info->parse(state));
 }
 
+static const char *SkipMVGComment(const char *q)
+{
+  while ((*q != '\n') && (*q != '\0'))
+    q++;
+  return(q);
+}
+
 static MagickBooleanType RenderMVGContent(Image *image,
   const DrawInfo *draw_info,const size_t depth,ExceptionInfo *exception)
 {
@@ -7134,8 +7141,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
         /*
           Comment.
         */
-        while ((*q != '\n') && (*q != '\0'))
-          q++;
+        q=SkipMVGComment(q);
         continue;
       }
     p=q-strlen(keyword)-1;
