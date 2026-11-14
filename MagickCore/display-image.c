@@ -14109,6 +14109,37 @@ static void XApplyPaintCommands(const XMagickCommandContext *context,
   }
 }
 
+static void XApplyFXCommands(const XMagickCommandContext *context,
+  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
+{
+  switch (command)
+  {
+    case SepiaToneCommand:
+      XApplySepiaToneCommand(context);
+      break;
+    case SolarizeCommand:
+      XApplySolarizeCommand(context);
+      break;
+    case SwirlCommand:
+      XApplySwirlCommand(context,&(*flags));
+      break;
+    case ImplodeCommand:
+      XApplyImplodeCommand(context,&(*flags));
+      break;
+    case VignetteCommand:
+      XApplyVignetteCommand(context);
+      break;
+    case WaveCommand:
+      XApplyWaveCommand(context);
+      break;
+    default:
+    {
+      XApplyPaintCommands(context,command,&(*flags),&(*nexus));
+      break;
+    }
+  }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -14322,27 +14353,9 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
     case SegmentCommand:
       XApplySegmentCommand(&context);
       break;
-    case SepiaToneCommand:
-      XApplySepiaToneCommand(&context);
-      break;
-    case SolarizeCommand:
-      XApplySolarizeCommand(&context);
-      break;
-    case SwirlCommand:
-      XApplySwirlCommand(&context,&flags);
-      break;
-    case ImplodeCommand:
-      XApplyImplodeCommand(&context,&flags);
-      break;
-    case VignetteCommand:
-      XApplyVignetteCommand(&context);
-      break;
-    case WaveCommand:
-      XApplyWaveCommand(&context);
-      break;
     default:
     {
-      XApplyPaintCommands(&context,command,&flags,&nexus);
+      XApplyFXCommands(&context,command,&flags,&nexus);
       break;
     }
   }
