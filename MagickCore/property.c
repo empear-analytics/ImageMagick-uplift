@@ -3138,58 +3138,21 @@ static char *TraceSVGClippath(const unsigned char *blob,size_t length,
 static void GetProfileProperty(const Image *image,const char *property,
   ExceptionInfo *exception)
 {
-  switch (*property)
-  {
-    case '8':
+  if (LocaleNCompare("8bim:",property,5) == 0)
+    Get8BIMProperty(image,property,exception);
+  else if (LocaleNCompare("exif:",property,5) == 0)
+    GetEXIFProperty(image,property,exception);
+  else if ((LocaleNCompare("icc:",property,4) == 0) ||
+           (LocaleNCompare("icm:",property,4) == 0))
     {
-      if (LocaleNCompare("8bim:",property,5) == 0)
-        {
-          Get8BIMProperty(image,property,exception);
-          break;
-        }
-      break;
-    }
-    case 'E':
-    case 'e':
-    {
-      if (LocaleNCompare("exif:",property,5) == 0)
-        {
-          GetEXIFProperty(image,property,exception);
-          break;
-        }
-      break;
-    }
-    case 'I':
-    case 'i':
-    {
-      if ((LocaleNCompare("icc:",property,4) == 0) ||
-          (LocaleNCompare("icm:",property,4) == 0))
-        {
 #if defined(MAGICKCORE_LCMS_DELEGATE)
-          GetICCProperty(image,exception);
+      GetICCProperty(image,exception);
 #endif
-          break;
-        }
-      if (LocaleNCompare("iptc:",property,5) == 0)
-        {
-          GetIPTCProperty(image,property,exception);
-          break;
-        }
-      break;
     }
-    case 'X':
-    case 'x':
-    {
-      if (LocaleNCompare("xmp:",property,4) == 0)
-        {
-          GetXMPProperty(image,property);
-          break;
-        }
-      break;
-    }
-    default:
-      break;
-  }
+  else if (LocaleNCompare("iptc:",property,5) == 0)
+    GetIPTCProperty(image,property,exception);
+  else if (LocaleNCompare("xmp:",property,4) == 0)
+    GetXMPProperty(image,property);
 }
 
 static inline MagickBooleanType IsWildcardProperty(const char *property,
