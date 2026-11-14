@@ -807,9 +807,8 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
       {
         flags|=flag;
         (void) CopyMagickString(p,p+1,MagickPathExtent);
-        continue;
       }
-    if (SkipGeometrySeparator(c,&p,&flags) == MagickFalse)
+    else if (SkipGeometrySeparator(c,&p,&flags) == MagickFalse)
       return(NoValue);
   }
   /*
