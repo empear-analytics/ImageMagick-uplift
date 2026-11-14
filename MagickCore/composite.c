@@ -5447,6 +5447,57 @@ static void DisplaceCompositeCanvas(const DisplaceCanvasInputs *canvas)
   DisplaceCompositeRows(&rows);
 }
 
+typedef struct _BlurCanvasTargets
+{
+  Image
+    **canvas_image;
+
+  MagickStatusType
+    *flags;
+
+  GeometryInfo
+    *geometry_info;
+} BlurCanvasTargets;
+
+static MagickBooleanType AcquireBlurCanvas(Image *image,Image *source_image,
+  ExceptionInfo *exception,const BlurCanvasTargets *targets)
+{
+  Image
+    **const canvas_image = targets->canvas_image;
+
+  MagickStatusType
+    *const flags = targets->flags;
+
+  GeometryInfo
+    *const geometry_info = targets->geometry_info;
+
+  const char
+    *artifact;
+
+  (*canvas_image)=CloneImage(image,0,0,MagickTrue,exception);
+  if ((*canvas_image) == (Image *) NULL)
+    {
+      source_image=DestroyImage(source_image);
+      return(MagickFalse);
+    }
+  /*
+    Gather the maximum blur sigma values from user.
+  */
+  (*flags)=NoValue;
+  artifact=GetImageArtifact(image,"compose:args");
+  if (artifact != (const char *) NULL)
+    (*flags)=ParseGeometry(artifact,geometry_info);
+  if (((*flags) & WidthValue) == 0)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+        "InvalidSetting","'%s' '%s'","compose:args",artifact);
+      source_image=DestroyImage(source_image);
+      (*canvas_image)=DestroyImage(*canvas_image);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 typedef struct _ComposeArtifactTargets
 {
   double
@@ -5679,6 +5730,9 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     }
     case BlurCompositeOp:
     {
+      BlurCanvasTargets
+        blur_targets;
+
       BlurGeometryInputs
         geometry;
 
@@ -5687,27 +5741,12 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
           X = red_channel; Y = green_channel; compose:args =
           x_scale[,y_scale[,angle]].
       */
-      canvas_image=CloneImage(image,0,0,MagickTrue,exception);
-      if (canvas_image == (Image *) NULL)
-        {
-          source_image=DestroyImage(source_image);
-          return(MagickFalse);
-        }
-      /*
-        Gather the maximum blur sigma values from user.
-      */
-      flags=NoValue;
-      artifact=GetImageArtifact(image,"compose:args");
-      if (artifact != (const char *) NULL)
-        flags=ParseGeometry(artifact,&geometry_info);
-      if ((flags & WidthValue) == 0)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-            "InvalidSetting","'%s' '%s'","compose:args",artifact);
-          source_image=DestroyImage(source_image);
-          canvas_image=DestroyImage(canvas_image);
-          return(MagickFalse);
-        }
+      blur_targets.canvas_image=(&canvas_image);
+      blur_targets.flags=(&flags);
+      blur_targets.geometry_info=(&geometry_info);
+      if (AcquireBlurCanvas(image,source_image,exception,&blur_targets) ==
+          MagickFalse)
+        return(MagickFalse);
       geometry.geometry_info=geometry_info;
       geometry.flags=flags;
       geometry.canvas_image=canvas_image;
