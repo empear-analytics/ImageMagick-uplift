@@ -3204,6 +3204,35 @@ static inline MagickBooleanType IsWildcardProperty(const char *property,
     (*(property+(property_length-1)) == '*')) ? MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType GetStoredImageProperty(const Image *image,
+  const char *property,const MagickBooleanType read_from_properties,
+  const char **result)
+{
+  const char
+    *p;
+
+  if (read_from_properties != MagickFalse)
+    {
+      p=(const char *) NULL;
+      if (image->properties != (void *) NULL)
+        {
+          p=(const char *) GetValueFromSplayTree((SplayTreeInfo *)
+            image->properties,property);
+          if (p != (const char *) NULL)
+            {
+              (*result)=p;
+              return(MagickTrue);
+            }
+        }
+      if (strchr(property,':') == (char *) NULL)
+        {
+          (*result)=p;
+          return(MagickTrue);
+        }
+    }
+  return(MagickFalse);
+}
+
 MagickExport const char *GetImageProperty(const Image *image,
   const char *property,ExceptionInfo *exception)
 {
@@ -3211,7 +3240,8 @@ MagickExport const char *GetImageProperty(const Image *image,
     read_from_properties;
 
   const char
-    *p;
+    *p,
+    *returned;
 
   size_t
     property_length;
@@ -3226,19 +3256,9 @@ MagickExport const char *GetImageProperty(const Image *image,
   property_length=strlen(property);
   if (IsWildcardProperty(property,property_length) != MagickFalse)
     read_from_properties=MagickFalse;
-  if (read_from_properties != MagickFalse)
-    {
-      p=(const char *) NULL;
-      if (image->properties != (void *) NULL)
-        {
-          p=(const char *) GetValueFromSplayTree((SplayTreeInfo *)
-            image->properties,property);
-          if (p != (const char *) NULL)
-            return(p);
-        }
-      if (strchr(property,':') == (char *) NULL)
-        return(p);
-    }
+  if (GetStoredImageProperty(image,property,read_from_properties,&returned) !=
+      MagickFalse)
+    return(returned);
   GetProfileProperty(image,property,exception);
   if ((image->properties != (void *) NULL) &&
       (read_from_properties != MagickFalse))
