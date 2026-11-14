@@ -5010,6 +5010,27 @@ static inline int GetIndexBit(const unsigned char pixel)
   return(pixel == 0 ? 0 : 1);
 }
 
+static Quantum *ImportIndexAlphaOctet(const Image *image,
+  QuantumInfo *quantum_info,const unsigned char *magick_restrict p,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    bit;
+
+  unsigned char
+    pixel;
+
+  for (bit=0; bit < 8; bit+=2)
+  {
+    pixel=GetColormapBit(quantum_info,p,bit);
+    SetPixelGray(image,(Quantum) GetGrayBitQuantum(pixel),q);
+    SetPixelAlpha(image,GetAlphaBitQuantum(*p,bit),q);
+    SetPixelIndex(image,(Quantum) GetIndexBit(pixel),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(q);
+}
+
 static void Import1BitIndexAlphaQuantum(const Image *image,
   QuantumInfo *quantum_info,const QuantumPixelSpan *span)
 {
@@ -5033,14 +5054,7 @@ static void Import1BitIndexAlphaQuantum(const Image *image,
 
   for (x=((ssize_t) number_pixels-3); x > 0; x-=4)
   {
-    for (bit=0; bit < 8; bit+=2)
-    {
-      pixel=GetColormapBit(quantum_info,p,bit);
-      SetPixelGray(image,(Quantum) GetGrayBitQuantum(pixel),q);
-      SetPixelAlpha(image,GetAlphaBitQuantum(*p,bit),q);
-      SetPixelIndex(image,(Quantum) GetIndexBit(pixel),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    q=ImportIndexAlphaOctet(image,quantum_info,p,q);
   }
   if ((number_pixels % 4) != 0)
     for (bit=3; bit >= (ssize_t) (4-(number_pixels % 4)); bit-=2)
