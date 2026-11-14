@@ -13148,6 +13148,17 @@ moves a run of skip tests as one predicate.
    conditions. The run becomes `if (Is<Name>(<inputs>) == MagickFalse) return;` (or
    `return(c);`), as `utility.c`'s `ExpandFilename` (`if (path == (char *) NULL)
    return; if (*path != '~') return;`). Lane: a
+5. *Case form* (2026-11-14). The first statements of a `switch` group's compound block
+   (after its declarations) may be the run instead: `if (<test>) break;` statements of
+   that `switch`, one or more, each a single `if` with no `else` whose body is `break;`
+   alone, under steps 1 and 2's conditions (no test writes anything; the `break;`
+   leaves the `switch`, not a loop nested in the group). The run becomes
+   `if (Is<Name>(<inputs>) == MagickFalse) break;`, the predicate written as step 2
+   says. When two groups of one `switch` open with the same run (identical character
+   for character once each group's variables are named by the same parameters, checked
+   by script), one predicate serves both, under Recipe P's *Several sites* conditions:
+   every argument an identifier, `refactor_guard.py --calls` `+2` for the predicate and
+   `+1` for the second site, nothing else.
 
 **Before:**
 
@@ -13172,12 +13183,24 @@ moves a run of skip tests as one predicate.
   before.
 - The helper's tests are the original's; a pointer parameter keeps the type the caller
   has.
+- Step 5: a `break;` at the top level of a group's block leaves the `switch`, as a
+  `continue;` at the top level of a loop body ends the iteration. The predicate returns
+  `MagickFalse` at the first test that holds, after running the same earlier tests and
+  no later one, and the caller's `break;` then leaves the `switch` from the same point;
+  when no test holds, the predicate returns `MagickTrue` and the group goes on with the
+  statement that followed the run, as before. The tests have no side effect, so moving
+  their evaluation into a callee changes no value anyone reads.
 
 **Evidence level:** oracle, for the function the step changes (`casemap.py` first).
 
 **Provenance:** 2026-11-12, from `policy.c`'s `IsRightsAuthorizedByName` (campaign B,
 M120), 5.88 to 5.93. Added by Claude Code (Claude Sonnet 5.5) under the mandate of
-2026-10-24.
+2026-10-24. Step 5 (case form): 2026-11-14, from `composite.c`'s `CompositeImage`
+(campaign A, W23 round thirteen lane b), whose `CopyCompositeOp` and
+`IntensityCompositeOp` groups both open with the same three placement tests, each `if
+(...) break;` to fall back on the general composite; a probe of the shared predicate
+3.90 to 3.91, no finding on the helper. Added by Claude Code (Claude Opus 5.5) under the
+owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
@@ -20451,3 +20474,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | XP | Share Mirrored Extreme-Search Loops Through Per-Direction Predicates: copies of a loop keeping the most extreme array element, differing in their tests' operands and operators, become one `static` search taking a predicate pointer, each copy's tests a `MagickBooleanType` predicate returning `MagickTrue` where the copy assigned; Lane: c | `property.c`'s `GetConvexHullExtremePoints` (top, right, bottom, left loops; cc 26, four bumps): leaves every finding, 3.64 to 3.66 | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | O | Step 8: a written variable whose address is a member of a `const` targets struct that the block itself passes to another helper's call (nothing outside the block reading the struct) is written through that member, the struct moving in as a parameter of the type the block passed, in place of a pointer parameter of its own or a second struct of the same addresses (step 7). *Careful* gives the argument | `morphology.c`'s `MorphologyApply` (campaign A, W23 round thirteen lane a): its limit initialisation writes `method_limit`, `special` and `rslt_compose`, whose addresses its `const MorphologyIteratedLimits limits` holds, and `stage_limit`, then passes `limits` to `SelectMorphologyStageLimit`; step 4 gives seven parameters and step 7 a second struct of the same addresses in a caller held at 73 lines of *Large Method*. A probe: `MorphologyApply` leaves *Large Method*, 6.93 to 7.21, no finding on the new function. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
 | 2026-11-14 | AMEND | ST | Step 8 (no tail): a `switch` whose every group, `default:` included, ends every path with `return(R);`, with no `break` of it and nothing after it (the function's last statement; MSVC C4702 forbids a tail) splits as steps 2 and 4 to 7 say with no `return(R_T);` to copy: the new function's body is the `switch` alone, at least one group stays in the caller. *Careful* gives the argument | `morphology.c`'s (now `morphology-apply.c`'s) `AcquireKernelBuiltIn` (campaign A, W23 round thirteen lane a): its second `switch` returns on every path and ends the function since bb1745ee8 dropped the unreachable `return(kernel);` after it; step 1 refuses it, SW refuses its working `default:`. A probe moving the Blur, Comet, Binomial, Laplacian and `default:` groups: 7.21 to 7.29, cc 50 to 46, no finding on the new function. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
+| 2026-11-14 | AMEND | LF | Step 5, *case form*: the leading run of `if (<test>) break;` statements of a `switch` group (each `break;` leaving the `switch`, tests with no side effect) becomes `if (Is<Name>(...) == MagickFalse) break;`; two groups opening with the same run share the predicate under Recipe P's *Several sites* conditions. *Careful* gives the argument (a top-level `break;` of a group ends it as a top-level `continue;` ends an iteration; the same tests in the same order) | `composite.c`'s `CompositeImage` (campaign A, W23 round thirteen lane b): the Copy and Intensity groups open with the same three placement tests; LF's loop form does not take a `break;`, and Recipe P names one expression and keeps its `if`; a probe 3.90 to 3.91 (Claude Code, Opus 5.5) | owner |
