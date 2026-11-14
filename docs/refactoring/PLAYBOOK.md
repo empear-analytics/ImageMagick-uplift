@@ -176,7 +176,7 @@ start new runs (`mutate.py`, Mull builds, `night3.sh`) to gate a step.
 be refactored, as an earlier campaign refactored a program with no tests at all, but only with the
 recipes whose guard fingerprint is exact: **E, G and P** (and B, N and I with the
 checks of *Unreached functions: B and N* and *Unreached functions: Recipe I* below, and SD with
-*Unreached functions: Recipe SD*). The proof is the build
+*Unreached functions: Recipe SD*, and W with *Unreached functions: Recipe W*). The proof is the build
 and `refactor_guard.py` reporting `OK` with `--calls`; a `WARN` stops the commit.
 For E and P, which add a function, `OK` means the exact fingerprint the guard names as
 expected: the literal check `OK`, and `--calls` moving nothing but `+2` for each new
@@ -339,6 +339,32 @@ type of every argument. Planted errors on `widget.c`'s `XNoticeWidget` and on a 
 (`tools/test_switch_split_check.py`) were each caught: a label dropped, a callee changed, a write to
 `state` dropped, a transposed argument, a kept group edited, a statement added after the loop, a
 member bound from another member.
+
+**Unreached functions: Recipe W** (owner's OK of 2026-11-10 to evolve the recipes; added by
+Claude Code, Claude Opus 5.5, campaign B, M127 lane b round 12; awaits the owner's
+confirmation). Recipe W may also be applied to a function no case reaches (`casemap.py` 0 for
+it and for each of its callers in the catalogue), `Verified: guard`, when the step's proof is
+the one Recipe D's *Unreached functions* form rests on. Each of these is run before the commit
+and quoted in its message:
+
+1. The step is W's own step, steps 1 to 6 checked by reading as at the oracle level (no
+   OpenMP region, one `R`, the written locals, at most four parameters, each argument in
+   the position of its parameter). A block that throws through `GetMagickModule()` does
+   not move at this level: the function name the message reports would change.
+2. `refactor_guard.py` prints `OK`, and `--calls` moves nothing but `+2` for the new
+   function, as for E at this level.
+3. `sh tools/obj_identical.sh <file>` prints `IDENTICAL` for the whole object file. A step
+   that prints `DIFFERENT` is not this form, whatever the reason; `MODULO-IDENTICAL` does
+   not suffice, since no tool checks the moved text line for line here as
+   `reuse_check.py` does for D.
+
+Why this proves the step: identical bytes are the same compiled code for every function of
+the file, the shortened caller included (the compiler inlined the helper back where the
+block stood), so the library behaves the same on every input, reached by a case or not
+(Recipe D, *Careful*). Another copy of the block (W step 7) calls the helper the same way,
+one commit per caller, on the same three items (`--calls` then moves the copy's callees
+down and the helper up by one, as for D); `reuse_check.py` does not apply, since the
+caller keeps the block's `return(R);`.
 
 The guard has two blind spots: reordered statements, which the prohibitions already
 forbid, and **transposed arguments**. For every call the step adds, check by reading
@@ -4646,7 +4672,8 @@ static MagickBooleanType ExtendXMLBuffer(char **source,const size_t *length,
   against its `return(MagickFalse);`, and `refactor_guard.py --calls`.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls`, and steps 1 to 3 and 5
-checked by reading.
+checked by reading; or, for a function no case reaches, guard with `tools/obj_identical.sh`
+printing `IDENTICAL` (*Two levels of evidence*, *Unreached functions: Recipe W*).
 
 **Provenance:** 2026-10-29, from `xml-tree.c`'s `XMLTreeTagToXML` (four buffer-growing
 blocks) and `EncodePredefinedEntities` (a fifth), each leaving through `return`; a probe
@@ -19685,6 +19712,8 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | FC | Fold a Function into the Twin That Calls Out Its Block: `G`, whose block `B` is the body of `F`'s callee `H` (taking and returning the written local `r` by value), loses its calls to `F` and is deleted; `F` and `H` move whole above the first caller, out of a delegate `#if` when they name nothing it declares, freeing a place under the function-count threshold; Lane: b | `annotate.c`'s `GetPostscriptResolution`/`GetFreetypeTextResolution` (113 functions; the 114th costs 0.18; fold probe 5.69 flat) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | FM | Fold Twin Functions Differing in the Member They Read into One Taking the Value: `F(s,a)` and `G(s,b)`, the same text but for reading `s->m` and `s->n` once each, become one `H(a,v)` taking the member's value; calls pass `e->m` or `e->n`; both twins are deleted, freeing a place under the function-count threshold; Lane: b | `annotate.c`'s `IsColumnOutside`/`IsRowOutside` (113 functions; fold flat, with the helper it frees 5.79 to 5.81 in a probe) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | CF | Step 1: a copy whose loop is `v=e;` followed by `for ( ; c; i)` compares as `for (v=e; c; i)`, the merged body taking the clause form (C11 6.8.5.3); Lane: a | `constitute.c`'s `ReadSceneImages` and `PingSceneImages` (*Code Duplication*; probe 8.81 to 10.0) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | W | *Two levels of evidence*, *Unreached functions: Recipe W*: W may be applied to a function no case reaches, `Verified: guard`, with steps 1 to 6 checked by reading, `refactor_guard.py` `OK` with `--calls` `+2` only, and `obj_identical.sh` printing `IDENTICAL` for the whole object file (D's proof; `MODULO-IDENTICAL` does not suffice); awaits the owner's confirmation; Lane: b | `image-view.c`'s iterators (no case reaches them): the storage-class check `status=SetImageStorageClass(...); if (status == MagickFalse) return(MagickFalse);` of `DuplexTransferImageViewIterator`, IDENTICAL, 6.63 to 6.83 | mandate (2026-10-24) |
+| 2026-11-14 | WORDING | W | *Unreached functions: Recipe W*: another copy of the block (W step 7) is proven on the same three items, not by `reuse_check.py`, which refuses a call that keeps the block's `return(R);` in the caller; Lane: b | `image-view.c`'s `SetImageViewIterator` (reuse_check FAIL on the kept return) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | RW | Share a Sequential Row Walk Through Row Functions Returning the Advanced Pointer: many `static` copies of one sequential row walk (fetch, `NULL` break, optional sync, `y < height` result) differing in the column loop and the buffer pointer type become one walk taking a `const` row struct, a row-function pointer and `void *pixels`; each copy keeps its name as a row function `void *F(const RowInfo *,row pointer,void *)` returning the advanced pointer; Lane: c | `pixel-export.c`'s 56 `Export<Type><Map>Pixels`/`Export<Type>MapPixels` walks: 6.89 to 7.32, timing equal (five commands, within 0.6%) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | QF | Share a Single Pixel Fetch Through Row Functions: many `static void` copies opening with one fetch (`GetAuthenticPixelQueue`) and an early `return;` on `NULL`, differing in the column loop and the buffer type, become one `void` function taking a `const` row struct, a row-function pointer and `void *pixels`; each copy keeps its name as a `void` row function; Lane: c | `stream.c`'s 56 `Stream<Type><Map>Pixels`/`Stream<Type>MapPixels`: 6.89 to 7.32, `magick stream` timing equal on five commands | mandate (2026-10-24) |
 | 2026-11-14 | NEW | JT | Replace Jumps to a Returning Tail by Calls of the Tail: a function-ending `L: S return(R);` reached by `goto L;` from nested arms moves to a `static` helper of the return type taking the (at most four) variables it reads; each `goto L;` and the label's tail become `return(Helper(...));`; Lane: c | `property.c`'s `InterpretBracedEscape` (three lookup arms jumping to `PropertyLookupFailure:`): the first step of a chain that takes the function out of every finding, 3.62 to 3.64 | mandate (2026-10-24) |
