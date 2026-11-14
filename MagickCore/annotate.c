@@ -769,6 +769,15 @@ static void DrawTextLineThrough(const TextDecorationInfo *decoration,
   }
 }
 
+static void DestroyAnnotateText(DrawInfo *annotate_info,DrawInfo *annotate,
+  char **textlist,char *text)
+{
+  annotate_info=DestroyDrawInfo(annotate_info);
+  annotate=DestroyDrawInfo(annotate);
+  textlist=(char **) RelinquishMagickMemory(textlist);
+  text=DestroyString(text);
+}
+
 MagickExport MagickBooleanType AnnotateImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -841,10 +850,7 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
     }
   if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
     {
-      annotate_info=DestroyDrawInfo(annotate_info);
-      annotate=DestroyDrawInfo(annotate);
-      textlist=(char **) RelinquishMagickMemory(textlist);
-      text=DestroyString(text);
+      DestroyAnnotateText(annotate_info,annotate,textlist,text);
       return(MagickFalse);
     }
   if (IsGrayColorspace(image->colorspace) != MagickFalse)
@@ -918,10 +924,7 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
   /*
     Relinquish resources.
   */
-  annotate_info=DestroyDrawInfo(annotate_info);
-  annotate=DestroyDrawInfo(annotate);
-  textlist=(char **) RelinquishMagickMemory(textlist);
-  text=DestroyString(text);
+  DestroyAnnotateText(annotate_info,annotate,textlist,text);
   return(status);
 }
 
@@ -1405,6 +1408,36 @@ static MagickBooleanType RenderType(const RenderTarget *target,
   return(status);
 }
 
+static PointInfo ParseDensityResolution(const DrawInfo *draw_info,
+  PointInfo resolution)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    geometry_flags;
+
+  geometry_flags=ParseGeometry(draw_info->density,&geometry_info);
+  if ((geometry_flags & RhoValue) != 0)
+    resolution.x=geometry_info.rho;
+  resolution.y=resolution.x;
+  if ((geometry_flags & SigmaValue) != 0)
+    resolution.y=geometry_info.sigma;
+  return(resolution);
+}
+
+static PointInfo GetDensityResolution(const DrawInfo *draw_info)
+{
+  PointInfo
+    resolution;
+
+  resolution.x=DefaultResolution;
+  resolution.y=DefaultResolution;
+  if (draw_info->density != (char *) NULL)
+    resolution=ParseDensityResolution(draw_info,resolution);
+  return(resolution);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 +   R e n d e r F r e e t y p e                                               %
@@ -1838,24 +1871,6 @@ static inline MagickBooleanType IsInterwordSpace(const DrawInfo *draw_info,
     (IsUTFSpace((int) code) == MagickFalse)) ? MagickTrue : MagickFalse);
 }
 
-static PointInfo GetFreetypeResolution(const DrawInfo *draw_info,
-  PointInfo resolution)
-{
-  GeometryInfo
-    geometry_info;
-
-  MagickStatusType
-    geometry_flags;
-
-  geometry_flags=ParseGeometry(draw_info->density,&geometry_info);
-  if ((geometry_flags & RhoValue) != 0)
-    resolution.x=geometry_info.rho;
-  resolution.y=resolution.x;
-  if ((geometry_flags & SigmaValue) != 0)
-    resolution.y=geometry_info.sigma;
-  return(resolution);
-}
-
 static void SetFreetypeMetrics(const FT_Face face,TypeMetric *metrics)
 {
   metrics->pixels_per_em.x=face->size->metrics.x_ppem;
@@ -2042,17 +2057,10 @@ static inline MagickBooleanType IsTransparentFill(const DrawInfo *draw_info)
     MagickFalse);
 }
 
-static inline MagickBooleanType IsColumnOutside(const Image *image,
-  const ssize_t x_offset)
+static inline MagickBooleanType IsOffsetOutside(const ssize_t offset,
+  const size_t extent)
 {
-  return(((x_offset < 0) || (x_offset >= (ssize_t) image->columns)) ?
-    MagickTrue : MagickFalse);
-}
-
-static inline MagickBooleanType IsRowOutside(const Image *image,
-  const ssize_t y_offset)
-{
-  return(((y_offset < 0) || (y_offset >= (ssize_t) image->rows)) ?
+  return(((offset < 0) || (offset >= (ssize_t) extent)) ?
     MagickTrue : MagickFalse);
 }
 
@@ -2254,7 +2262,7 @@ static Quantum *GetGlyphRowPixels(const GlyphRows *rows,
     *magick_restrict q;
 
   q=(Quantum *) NULL;
-  if (IsColumnOutside(image,x_offset) != MagickFalse)
+  if (IsOffsetOutside(x_offset,image->columns) != MagickFalse)
     *active=MagickFalse;
   else
     {
@@ -2340,14 +2348,14 @@ static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
     return;
   x_offset=CastDoubleToSsizeT(ceil(point.x-0.5));
   y_offset=CastDoubleToSsizeT(ceil(point.y+y-0.5));
-  if (IsRowOutside(image,y_offset) != MagickFalse)
+  if (IsOffsetOutside(y_offset,image->rows) != MagickFalse)
     return;
   q=GetGlyphRowPixels(rows,x_offset,y_offset,&active);
   n=y*bitmap->bitmap.pitch;
   for (x=0; x < (ssize_t) bitmap->bitmap.width; x++, n++)
   {
     x_offset=CastDoubleToSsizeT(ceil(point.x+x-0.5));
-    if (IsColumnOutside(image,x_offset) != MagickFalse)
+    if (IsOffsetOutside(x_offset,image->columns) != MagickFalse)
       {
         q=SkipGlyphPixel(image,q);
         continue;
@@ -2375,18 +2383,6 @@ static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
   sync=SyncCacheViewAuthenticPixels(image_view,exception);
   if (sync == MagickFalse)
     (*status)=MagickFalse;
-}
-
-static PointInfo GetFreetypeTextResolution(const DrawInfo *draw_info)
-{
-  PointInfo
-    resolution;
-
-  resolution.x=DefaultResolution;
-  resolution.y=DefaultResolution;
-  if (draw_info->density != (char *) NULL)
-    resolution=GetFreetypeResolution(draw_info,resolution);
-  return(resolution);
 }
 
 static void SelectFreetypeCharmap(FT_Face face,FT_Encoding encoding_type)
@@ -2649,7 +2645,7 @@ static MagickBooleanType ConfigureFreetypeFace(const FreetypeTarget *target,
   /*
     Set text size.
   */
-  resolution=GetFreetypeTextResolution(draw_info);
+  resolution=GetDensityResolution(draw_info);
   ft_status=FT_Set_Char_Size(*face,(FT_F26Dot6) (64.0*draw_info->pointsize),
     (FT_F26Dot6) (64.0*draw_info->pointsize),(FT_UInt) resolution.x,
     (FT_UInt) resolution.y);
@@ -2735,6 +2731,108 @@ static MagickBooleanType OpenFreetypeFace(const FreetypeTarget *target,
   return(ConfigureFreetypeFace(target,targets,exception));
 }
 
+typedef struct _GlyphInfo
+{
+  FT_UInt
+    id;
+
+  FT_Vector
+    origin;
+
+  FT_Glyph
+    image;
+} GlyphInfo;
+
+static FT_Outline_Funcs
+  OutlineMethods =
+  {
+    (FT_Outline_MoveTo_Func) TraceMoveTo,
+    (FT_Outline_LineTo_Func) TraceLineTo,
+    (FT_Outline_ConicTo_Func) TraceQuadraticBezier,
+    (FT_Outline_CubicTo_Func) TraceCubicBezier,
+    0, 0
+  };
+
+typedef struct _GlyphLoadInput
+{
+  FT_Face
+    face;
+
+  FT_Int32
+    flags;
+
+  const DrawInfo
+    *draw_info;
+
+  MagickBooleanType
+    status;
+
+  DrawInfo
+    *annotate_info;
+
+  FT_Matrix
+    affine;
+
+  TypeMetric
+    *metrics;
+} GlyphLoadInput;
+
+static MagickBooleanType LoadFreetypeGlyph(const GlyphLoadInput *glyph_input,
+  GlyphInfo *glyph,FT_BBox *bounds)
+{
+  const FT_Face
+    face = glyph_input->face;
+
+  const FT_Int32
+    flags = glyph_input->flags;
+
+  const DrawInfo
+    *const draw_info = glyph_input->draw_info;
+
+  const MagickBooleanType
+    status = glyph_input->status;
+
+  DrawInfo
+    *const annotate_info = glyph_input->annotate_info;
+
+  const FT_Matrix
+    affine = glyph_input->affine;
+
+  TypeMetric
+    *const metrics = glyph_input->metrics;
+
+  FT_Error
+    ft_status;
+
+  FT_Outline
+    outline;
+
+    (*glyph).image=DestroyFreetypeGlyph((*glyph).image);
+    ft_status=FT_Load_Glyph(face,(*glyph).id,flags);
+    if (ft_status != 0)
+      return(MagickTrue);
+    ft_status=FT_Get_Glyph(face->glyph,&(*glyph).image);
+    if (ft_status != 0)
+      return(MagickTrue);
+    outline=((FT_OutlineGlyph) (*glyph).image)->outline;
+    if (IsNonOutlineGlyph((*glyph).image,outline) != MagickFalse)
+      return(MagickTrue);
+    ft_status=FT_Outline_Get_BBox(&outline,bounds);
+    if (ft_status != 0)
+      return(MagickTrue);
+    ExtendGlyphMinBounds((*bounds),metrics);
+    ExtendGlyphMaxBounds((*bounds),metrics);
+    if (IsRenderedStroke(draw_info,status) != MagickFalse)
+      TraceGlyphOutline(annotate_info,(*glyph).origin,outline,&OutlineMethods);
+    FT_Vector_Transform(&(*glyph).origin,&affine);
+    (void) FT_Glyph_Transform((*glyph).image,&affine,&(*glyph).origin);
+    ft_status=FT_Glyph_To_Bitmap(&(*glyph).image,FT_RENDER_MODE_NORMAL,
+      (FT_Vector *) NULL,MagickTrue);
+    if (ft_status != 0)
+      return(MagickTrue);
+  return(MagickFalse);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2751,18 +2849,6 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
 #define FT_OPEN_PATHNAME  ft_open_pathname
 #endif
 
-  typedef struct _GlyphInfo
-  {
-    FT_UInt
-      id;
-
-    FT_Vector
-      origin;
-
-    FT_Glyph
-      image;
-  } GlyphInfo;
-
   char
     *p;
 
@@ -2774,9 +2860,6 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
 
   FT_BitmapGlyph
     bitmap;
-
-  FT_Error
-    ft_status;
 
   FT_Face
     face;
@@ -2828,16 +2911,6 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   ssize_t
     code,
     last_character;
-
-  static FT_Outline_Funcs
-    OutlineMethods =
-    {
-      (FT_Outline_MoveTo_Func) TraceMoveTo,
-      (FT_Outline_LineTo_Func) TraceLineTo,
-      (FT_Outline_ConicTo_Func) TraceQuadraticBezier,
-      (FT_Outline_CubicTo_Func) TraceCubicBezier,
-      0, 0
-    };
 
   unsigned char
     *utf8;
@@ -2895,8 +2968,8 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   last_character=(ssize_t) length-1;
   for (i=0; i < (ssize_t) length; i++)
   {
-    FT_Outline
-      outline;
+    GlyphLoadInput
+      glyph_input;
 
     /*
       Render UTF-8 sequence.
@@ -2907,28 +2980,14 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     glyph.origin=origin;
     glyph.origin.x+=(FT_Pos) grapheme[i].x_offset;
     glyph.origin.y+=(FT_Pos) grapheme[i].y_offset;
-    glyph.image=DestroyFreetypeGlyph(glyph.image);
-    ft_status=FT_Load_Glyph(face,glyph.id,flags);
-    if (ft_status != 0)
-      continue;
-    ft_status=FT_Get_Glyph(face->glyph,&glyph.image);
-    if (ft_status != 0)
-      continue;
-    outline=((FT_OutlineGlyph) glyph.image)->outline;
-    if (IsNonOutlineGlyph(glyph.image,outline) != MagickFalse)
-      continue;
-    ft_status=FT_Outline_Get_BBox(&outline,&bounds);
-    if (ft_status != 0)
-      continue;
-    ExtendGlyphMinBounds(bounds,metrics);
-    ExtendGlyphMaxBounds(bounds,metrics);
-    if (IsRenderedStroke(draw_info,status) != MagickFalse)
-      TraceGlyphOutline(annotate_info,glyph.origin,outline,&OutlineMethods);
-    FT_Vector_Transform(&glyph.origin,&affine);
-    (void) FT_Glyph_Transform(glyph.image,&affine,&glyph.origin);
-    ft_status=FT_Glyph_To_Bitmap(&glyph.image,FT_RENDER_MODE_NORMAL,
-      (FT_Vector *) NULL,MagickTrue);
-    if (ft_status != 0)
+    glyph_input.face=face;
+    glyph_input.flags=flags;
+    glyph_input.draw_info=draw_info;
+    glyph_input.status=status;
+    glyph_input.annotate_info=annotate_info;
+    glyph_input.affine=affine;
+    glyph_input.metrics=metrics;
+    if (LoadFreetypeGlyph(&glyph_input,&glyph,&bounds) != MagickFalse)
       continue;
     bitmap=(FT_BitmapGlyph) glyph.image;
     point=GetGlyphBitmapPoint(offset,bitmap,origin);
@@ -3108,31 +3167,6 @@ static void WritePostscriptFont(FILE *file,const DrawInfo *draw_info)
       draw_info->font);
 }
 
-static PointInfo GetPostscriptResolution(const DrawInfo *draw_info)
-{
-  PointInfo
-    resolution;
-
-  resolution.x=DefaultResolution;
-  resolution.y=DefaultResolution;
-  if (draw_info->density != (char *) NULL)
-    {
-      GeometryInfo
-        geometry_info;
-
-      MagickStatusType
-        flags;
-
-      flags=ParseGeometry(draw_info->density,&geometry_info);
-      if ((flags & RhoValue) != 0)
-        resolution.x=geometry_info.rho;
-      resolution.y=resolution.x;
-      if ((flags & SigmaValue) != 0)
-        resolution.y=geometry_info.sigma;
-    }
-  return(resolution);
-}
-
 static void WritePostscriptText(FILE *file,const DrawInfo *draw_info,
   const MagickBooleanType identity,ExceptionInfo *exception)
 {
@@ -3257,7 +3291,7 @@ static MagickBooleanType RenderPostscript(Image *image,
   if (annotate_image == (Image *) NULL)
     return(MagickFalse);
   (void) NegateImage(annotate_image,MagickFalse,exception);
-  resolution=GetPostscriptResolution(draw_info);
+  resolution=GetDensityResolution(draw_info);
   if (identity == MagickFalse)
     (void) TransformImage(&annotate_image,"0x0",(char *) NULL,exception);
   else

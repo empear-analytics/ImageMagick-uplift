@@ -16871,6 +16871,563 @@ Lane: b
 
 ---
 
+## Recipe CS - Extract a Loop-Body Segment Through a State of the Caller's Addresses
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead* or *Complex
+Method* on a function whose loop body is a long run of segments, each reading and writing
+several of a dozen loop locals, using a file macro whose text names one of them
+(`ThrowPointExpectedException`, which sets `status`), and touching locals that alias each
+other through a struct the segments pass to callees: `draw.c`'s `RenderMVGContent`, whose
+`mvg_info.primitive_info` holds `&primitive_info` and `mvg_info.extent` holds
+`&number_points`, so `CheckPrimitiveExtent(&mvg_info,...)` reallocates the caller's
+`primitive_info` and grows its `number_points` behind the segment's back.
+
+**Not covered by:** Recipe CK, which moves the groups of a `switch` that leave through
+`return(c);` and refuses aliases (its step 6 (e)); Recipes BC, LX and LB, which write each
+written variable as `(*v)`, editing the macro's text; Recipe MB, one pointer parameter per
+variable (at most four); Recipes O and Z, which refuse a segment writing more than four
+variables or one that leaves the loop.
+
+**How:**
+
+1. The segment is a run of whole statements of the body of a sequential loop outside
+   every OpenMP region, with no `#` line and no `goto`, `return` or `continue` that leaves
+   it; a `break` or `continue` of a loop or `switch` nested in it (a macro's hidden
+   `break` included) stays. Either no `break` leaves it (form A), or every `break;` that
+   leaves it, ending the loop, is reached only with the status local `s` false
+   (`s=MagickFalse; break;`, `if (s == MagickFalse) break;`, a macro that sets `s` false
+   and breaks) and the caller's statement after the segment is
+   `if (s == MagickFalse) break;` (or `== 0`) (form B). In form A the segment may also
+   be a run of statements nested inside the body (in a `switch` group, an `if` block or
+   an inner loop's body), when no `break`, `continue` or `return` in it leaves it.
+2. Variables as Recipe CK step 2: locals, parameters, arrays; temporaries (written
+   before read on every path through the segment, read by nothing after it before being
+   written again) are declared in the helper, and leave the caller when nothing else
+   there names them. An *alias* is a local `v` whose address the caller stored in a
+   member of another local that the segment passes to callees (`mvg_info.extent=
+   (&number_points)`): it is not copied; the helper binds `T *v = state->v;` and each
+   use of `v` in the segment becomes `(*v)`, nothing else changed.
+3. One state struct per caller, `typedef struct _Name { ... } Name;`, above the first
+   helper, Recipe CK step 3's members (the address of each local, the value of each
+   parameter); the caller declares it once as its last declaration, `const Name
+   render_state = { ... };`. A later step adds the members its segment needs and the
+   initialiser grows with them, in member order.
+4. The helper, directly above the caller: `static void Helper(const Name *state)`, whose
+   body holds the copies in (Recipe CK step 4), the alias bindings, the temporaries, then
+   the segment's text, in form B inside `do { ... } while (0);`, then the copy out
+   `(*state->v)=v;` of each copied local the segment writes. The segment becomes
+   `Helper(&render_state);`.
+5. Check by reading: (a) Recipe CK step 6 (a), (c), (d) and (e) for the copied locals;
+   (b) every write to an alias goes through the caller's variable, as before, and
+   every copied pointer local a callee may reallocate through an alias
+   (`primitive_info`) is re-read from the struct (`primitive_info=
+   (*mvg_info.primitive_info);`) after each such call before any use, so the copy
+   out writes the value the caller's variable already holds; (c) in form B, a `break`
+   that left the loop now leaves the `do`, skips the same statements (the rest of the
+   segment), runs the copy out and returns; the caller's next statement finds `s` false
+   and breaks, as before.
+6. Run `tools/refactor_guard.py --calls`, the CI and C++ warning checks, and the oracle on
+   the caller's cases.
+
+**Before:**
+
+```c
+    for (i=0; primitive_info[i].primitive != UndefinedPrimitive; i++)
+      if (primitive_info[i].text != (char *) NULL)
+        primitive_info[i].text=DestroyString(primitive_info[i].text);
+    ...
+      if (i < (ssize_t) number_points)
+        continue;
+      status&=(MagickStatusType) CheckPrimitiveExtent(&mvg_info,(double)
+        number_points);
+      primitive_info=(*mvg_info.primitive_info);
+      if (status == MagickFalse)
+        break;
+    }
+    if (status == MagickFalse)
+      break;
+```
+
+**After:**
+
+```c
+static void ParseMVGPrimitivePoints(const MVGRenderState *state)
+{
+  ...
+  MVGInfo
+    mvg_info = (*state->mvg_info);
+  ...
+  size_t
+    extent = (*state->extent),
+    *number_points = state->number_points;
+  ...
+      if (i < (ssize_t) (*number_points))
+        continue;
+  ...
+  (*state->mvg_info)=mvg_info;
+  (*state->status)=status;
+  (*state->primitive_info)=primitive_info;
+  ...
+}
+  ...
+    ParseMVGPrimitivePoints(&render_state);
+    if (status == MagickFalse)
+      break;
+```
+
+**Careful:**
+
+- A copied alias would go stale: `CheckPrimitiveExtent` grows the caller's
+  `number_points` through `mvg_info.extent`, and the segment's next `i < number_points`
+  must read the grown value; hence step 2's `(*v)`.
+- The copy of a struct local (`mvg_info`) keeps its pointer members, so callees given
+  `&mvg_info` still write the caller's aliased variables; nothing writes those members.
+- An error the macro throws with `GetMagickModule()` now names the helper (owner,
+  2026-11-12).
+
+**Evidence level:** oracle, with `refactor_guard.py --calls`, `ci_warnings.sh`,
+`cxx_warnings.sh`, and step 5 checked by reading.
+
+**Provenance:** 2026-11-14, from `draw.c`'s `RenderMVGContent` (campaign B, M127 lane c
+round 8): a probe with the keyword switch and the primitive tail both gone takes draw.c
+from 2.99 to 3.04, with clean helpers to 3.19; the tail's segments write up to eight
+loop locals and two of them alias through `mvg_info`. Added by Claude Code (Claude Opus
+5.5) under the mandate of 2026-10-24.
+Lane: c
+
+---
+
+## Recipe KH - Replace a Keyword Switch by a Table of Arm Handlers
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead* and a
+*Complex Method* of several hundred on a loop whose body selects on a parsed keyword
+with a first-letter `switch`, each group a run of `if (LocaleCompare("K",keyword) == 0)
+{ ...; break; }` arms ending in `status=MagickFalse; break;`, the arms reading and writing
+a dozen loop locals and using a file macro that names `status` and hides a `break`:
+`draw.c`'s `RenderMVGContent` (69 MVG keywords, `ThrowPointExpectedException`).
+
+**Not covered by:** Recipe CK, whose groups leave through `return(c);` and hold no
+`break` that leaves the group (here every arm ends with one, and so does the macro);
+Recipe KM, whose arms share one shape and set one member; Recipe KD, whose arms are one
+`return F(args);`; Recipes SD and SR, which split the `switch` but keep the arms in it,
+rewriting written variables as `(*v)`, which would edit the macro's text; Recipe SF,
+which keeps every arm in one function.
+
+**How:**
+
+1. The `switch (*keyword)` is outside every OpenMP region, with no `#` line in it; each
+   group holds both cases of one letter and only arms whose key starts with that letter,
+   then `status=MagickFalse; break;`; a `;` group is `break;` alone; `default` is
+   `status=MagickFalse; break;`. Keys are distinct. An arm holds no `goto` and no
+   `continue` that leaves it; a `return` in it is `return(c);` of one constant `c`.
+2. State: the caller's `const` state struct of Recipe CS step 3, grown by the members the
+   arms need (the keyword array's value among them). Temporaries of the arms (Recipe CK
+   step 2) are declared in each handler and leave the caller.
+3. Handlers: each arm whose body is not `primitive_type=P; break;` moves to `static
+   MagickBooleanType ParseX(const State *state)` above the caller: copies in (Recipe CK
+   step 4) of the locals it names, the temporaries, then the arm's text; when anything
+   but its last `break;` leaves the arm (an inner `break;`, the macro), the text is
+   wrapped in `do { ... } while (0);`, otherwise the last `break;` is dropped; then the
+   copies out and `return(r);` (`r` not `c`). An arm that calls a helper taking the
+   state (an earlier Recipe CS step) passes instead `&arm_state`, a `const` struct the
+   handler declares last, whose members are the addresses of the handler's own copies
+   and temporaries and `state`'s members for the rest.
+4. A nested chain of the same shape on a token (`push` and `pop`, whose arms compare the
+   next token, `if (LocaleCompare("class",token) == 0)`, after `if (GetNextToken(...) <
+   1) break;`) gets its own table: its handler runs the token read, copies `q` out, and
+   on a match calls the sub-handler; a miss sets `status` false, as the chain's tail
+   did. A sub-arm that is `break;` alone is a table row without handler.
+5. Table: `typedef struct { const char *keyword; PrimitiveType primitive;
+   ParseMethod parse; }` and one `static const` array per chain, a row
+   `{ "K", P, ParseX }` per arm in source order (`P` for a `primitive_type=P;` arm and no
+   handler, `UndefinedPrimitive` otherwise); `GetMVGKeywordInfo` walks a table with
+   `LocaleCompare(row.keyword,name) == 0`, the arms' argument order.
+6. The `switch` becomes `if (ParseKeyword(&render_state) == c) return(c);`; the lookup
+   sets `primitive_type` from the row, calls the handler, or, on a miss, sets `status`
+   false unless the keyword starts with `;`.
+7. Check by reading: (a) `LocaleCompare` folds case through the C locale only, so a
+   keyword equal to a key starts with one of the two letters of that key's group, as
+   Recipe KM step 2 says: the lookup reaches the arm the `switch` reached, and a keyword
+   equal to no key took the group's or `default`'s `status=MagickFalse;`, or the `;`
+   group's nothing; (b) Recipe CK step 6 for every handler; (c) a `break` that left the
+   `switch` now leaves the `do`, runs the copies out and returns `r`, after which the
+   caller's statement after the `switch` runs, as before; (d) a handler's nested
+   helper reads and writes the handler's copies through `arm_state`, never a stale
+   caller variable.
+8. Run `tools/refactor_guard.py --calls`, the CI and C++ warning checks, and the oracle on
+   the caller's cases.
+
+**Before:**
+
+```c
+    switch (*keyword)
+    {
+      case ';':
+        break;
+      case 'a':
+      case 'A':
+      {
+        if (LocaleCompare("affine",keyword) == 0)
+          {
+            (void) GetNextToken(q,&q,extent,token);
+            affine.sx=GetDrawValue(token,&next_token);
+            if (token == next_token)
+              ThrowPointExpectedException(token,exception);
+            ...
+            break;
+          }
+        if (LocaleCompare("alpha",keyword) == 0)
+          {
+            primitive_type=AlphaPrimitive;
+            break;
+          }
+        ...
+        status=MagickFalse;
+        break;
+      }
+```
+
+**After:**
+
+```c
+static MagickBooleanType ParseMVGAffine(const MVGRenderState *state)
+{
+  ...
+  do
+  {
+    (void) GetNextToken(q,&q,extent,token);
+    affine.sx=GetDrawValue(token,&next_token);
+    ...
+    break;
+  } while (0);
+  (*state->affine)=affine;
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+  ...
+static const MVGKeywordInfo
+  MVGKeywords[] =
+  {
+    { "affine", UndefinedPrimitive, ParseMVGAffine },
+    { "alpha", AlphaPrimitive, (ParseMVGKeywordMethod) NULL },
+    ...
+  };
+  ...
+    if (ParseMVGKeyword(&render_state) == MagickFalse)
+      return(MagickFalse);
+```
+
+**Careful:**
+
+- The `do { } while (0);` is a block a `break` can leave, nothing more; an arm with a
+  `continue` that leaves it is refused (step 1), since it would end the `do`.
+- The lookup scans up to the whole table (69 rows) where the `switch` scanned one
+  group; every comparison is side-effect free.
+- An error the macro throws with `GetMagickModule()` now names the handler (owner,
+  2026-11-12).
+
+**Evidence level:** oracle, with `refactor_guard.py --calls`, `ci_warnings.sh`,
+`cxx_warnings.sh`, and step 7 checked by reading.
+
+**Provenance:** 2026-11-14, from `draw.c`'s `RenderMVGContent` (campaign B, M127 lane c
+round 8): the keyword switch held 74 bumps and depth 6; with the primitive tail moved
+by Recipe CS first, the table takes draw.c from 2.99 to 3.19. Added by Claude Code
+(Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: c
+
+---
+
+## Recipe CE - Chain a Continuing Block into an Else Before the Loop's Tail
+
+**Use when:** CodeScene reports *Complex Method* (or *Bumpy Road Ahead*, *Large Method*) on
+a loop whose body ends in a run of element handlers, each `if (c) { S; continue; }`,
+followed by the body's last statement: CodeScene counts every `continue` as a branch
+(`locale.c`'s `LoadLocaleCache`, cc 18 to 17 for one `continue` dropped, nothing else
+changed). The usual case is an XML loader's keyword loop.
+
+**Not covered by:** Recipe TC, which deletes a bare `if (cond) continue;` that is itself the
+last statement (here the block has statements of its own and a statement follows it);
+Recipe EI, which joins the `if`s inside an `else` and keeps their exits; Recipe G, which adds
+an exit rather than removing one; Recipe EJ, which joins an `else` and its sole `if`.
+
+**How:**
+
+1. In the body of a `for`, `while` or `do` loop, find `if (c) { S continue; }` with no
+   `else`, where `S` is one or more statements with no `break`, `continue`, `return` or
+   `goto` and no label, and the `continue` belongs to this loop (no `switch` or inner loop
+   between). The `if` is followed, inside the body, by exactly one statement `T` and then
+   the body's closing brace.
+2. `T` is a single statement: an expression statement, a compound statement, or an `if`
+   (with or without `else`, an earlier application of this recipe included).
+3. Delete the line `continue;`, keep `S` and its braces, and write `else` and `T` after the
+   closing brace: `if (c) { S } else T`. When `T` is an `if`, write `else if (...)` on one
+   line and re-indent `T`'s branches one level less, their text unchanged; otherwise
+   indent `T` under the `else`.
+4. Repeat upward: a block `if (c') { S' continue; }` directly before the `if` the last step
+   made has that `if` statement as its `T`. Stop at the first statement before the chain
+   that is not such a block (a bare `if (...) continue;` stays).
+5. Check by reading that nothing but `T` stood between the block and the body's closing
+   brace, and that `c` is still evaluated exactly once, before `S` or `T`.
+6. Run the oracle on the function (`tools/oracle/oracle.py run --function F`);
+   `tools/obj_identical.sh` may differ (the compiler lays the branches out anew).
+
+**Before:**
+
+```c
+    if (LocaleCompare(keyword,"<message") == 0)
+      {
+        ...
+        q++;
+        continue;
+      }
+    if (*keyword == '<')
+      {
+        AppendSubpathElement(keyword,token,tag);
+        continue;
+      }
+    (void) GetNextToken(q,(const char **) NULL,extent,token);
+  }
+```
+
+**After:**
+
+```c
+    if (LocaleCompare(keyword,"<message") == 0)
+      {
+        ...
+        q++;
+      }
+    else if (*keyword == '<')
+      {
+        AppendSubpathElement(keyword,token,tag);
+      }
+    else
+      (void) GetNextToken(q,(const char **) NULL,extent,token);
+  }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. When `c` holds, `S` runs and the `continue` went to the
+  end of the body; now `S` runs and the `else` skips `T`, which was the only statement
+  before the end of the body, so the next step is again the loop's increment and test.
+  When `c` fails, `T` ran next and still does. `c` is evaluated once in both forms.
+- A `break`, `return` or `goto` inside `S` would leave by another way; step 1 refuses it.
+  A `continue` of an inner loop in `S` is not this loop's; step 1 refuses that too.
+- Do not use it when a statement other than `T` follows the block, or when `T` declares
+  a variable (a declaration cannot be the statement of an `else`).
+
+**Evidence level:** oracle (the object code changes layout).
+
+**Provenance:** 2026-11-14, from `locale.c`'s `LoadLocaleCache` (campaign B, M127 lane b
+round 9): the message and subpath blocks and the token-skip tail, cc 18 to 16 and 8.85 to
+8.90 in a probe. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
+
+---
+
+## Recipe FC - Fold a Function into the Twin That Calls Out Its Block
+
+**Use when:** a file sits at CodeScene's *Number of Functions in a Single Module*
+threshold, so that the helper the next step needs would trip it, and two `static`
+functions of the file compute the same value, one with a block inline and the other by
+calling a `static` helper whose body is that block: `annotate.c`'s
+`GetPostscriptResolution(draw_info)` parses `draw_info->density` into its `resolution`
+in a nested block, and `GetFreetypeTextResolution(draw_info)` is the same function with
+that block replaced by `resolution=GetFreetypeResolution(draw_info,resolution);`.
+Deleting the first frees a place for a helper.
+
+**Not covered by:** Recipe FG and FW, whose twins differ in a derived argument or in how
+they advance an output pointer, not in a block called out; Recipe D, which deduplicates
+blocks and keeps both functions (its reuse forms would leave the inline twin calling the
+helper and still a function of its own); Recipe TI and MT, which merge two copies into a
+new function with a selector.
+
+**How:**
+
+1. `G` (inline block) and `F` (calling `H`) are `static`, in one file, and the address of
+   none of `G`, `F`, `H` is taken (`grep`). `H` is called only by `F`.
+2. `F`'s body is `G`'s with one block `B` of `G` written as `r=H(a1,...,an,r);`, where `r`
+   is a local of `G` (a struct or arithmetic value) and `H(p1,...,pn,r)` takes `r` by
+   value, runs `B` with `p1,...,pn` for `a1,...,an` (each an identifier `F` and `G` both
+   read, unchanged inside `B`), and returns `r`. `H`'s own locals are `B`'s, renamed at
+   most. Check by reading; `B` writes no other variable of `G` and leaves only by its end.
+3. Then `F` and `G` return the same value for the same arguments: `H` starts from the
+   value `r` had where `B` began, does to its copy what `B` did to `r`, and `F` stores the
+   result back into `r` before anything else reads it.
+4. Replace each call of `G` by a call of `F` with the same arguments, delete `G`, and
+   move `F` and `H` (whole, verbatim but for a rename) above the first caller. When `F` and
+   `H` sat inside an `#if` region that `G` did not (a delegate guard), they move out of it
+   to a place every configuration compiles; they must then name nothing declared only
+   under that `#if` (check by reading), so that a build without it compiles them as it
+   compiled `G`.
+5. `F` and `H` may take names that fit both callers (`GetDensityResolution`); run
+   `refactor_guard.py --calls --renamed` with each rename.
+
+**Before:**
+
+```c
+static PointInfo GetFreetypeResolution(const DrawInfo *draw_info,
+  PointInfo resolution)
+{
+  ...
+  geometry_flags=ParseGeometry(draw_info->density,&geometry_info);
+  if ((geometry_flags & RhoValue) != 0)
+    resolution.x=geometry_info.rho;
+  ...
+  return(resolution);
+}
+
+static PointInfo GetFreetypeTextResolution(const DrawInfo *draw_info)
+{
+  ...
+  if (draw_info->density != (char *) NULL)
+    resolution=GetFreetypeResolution(draw_info,resolution);
+  return(resolution);
+}
+...
+static PointInfo GetPostscriptResolution(const DrawInfo *draw_info)
+{
+  ...
+  if (draw_info->density != (char *) NULL)
+    {
+      ...
+      flags=ParseGeometry(draw_info->density,&geometry_info);
+      if ((flags & RhoValue) != 0)
+        resolution.x=geometry_info.rho;
+      ...
+    }
+  return(resolution);
+}
+...
+  resolution=GetPostscriptResolution(draw_info);
+```
+
+**After:**
+
+```c
+static PointInfo ParseDensityResolution(const DrawInfo *draw_info,
+  PointInfo resolution)
+...
+static PointInfo GetDensityResolution(const DrawInfo *draw_info)
+...
+  resolution=GetDensityResolution(draw_info);
+```
+
+with both moved above the `#if defined(MAGICKCORE_FREETYPE_DELEGATE)` region and
+`GetPostscriptResolution` gone.
+
+**Careful:**
+
+- Same value (step 3): `H` receives `r` by value, so its copy holds what `r` held when
+  `B` began; `B`'s statements run on it in the same order with the same operands; the
+  copy is returned and assigned to `r` before the next statement, so every later read of
+  `r` sees what it saw after `B`. No pointer to `r` exists (it is a local whose address
+  `B` does not take).
+- A call moves to a function that was compiled under the `#if` and now is compiled in
+  every configuration: step 4 checks it names nothing that only the `#if` declares; in a
+  configuration without the delegate it is now the only definition, reached by the calls
+  that reached `G`.
+- The step removes a function and a nested block: it may be flat; it is kept for the
+  place it frees (rule 2), and the commit names the step that uses that place.
+
+**Evidence level:** oracle (the cases that reach each caller of `G` and of `F`).
+
+**Provenance:** 2026-11-14, from `annotate.c`'s `GetPostscriptResolution`,
+`GetFreetypeTextResolution` and `GetFreetypeResolution` (campaign B, M127 lane b round
+10): the file had 113 functions, the 114th trips *Number of Functions* (5.69 to 5.51 in a
+probe), and the glyph loop of `RenderFreetype` needs two helpers. A probe of this fold:
+5.69 to 5.69, 112 functions. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-10-24.
+Lane: b
+
+---
+
+## Recipe FM - Fold Twin Functions Differing in the Member They Read into One Taking the Value
+
+**Use when:** a file sits at CodeScene's *Number of Functions in a Single Module*
+threshold, so that the helper the next step needs would trip it, and two `static`
+functions of the file are the same text but for the member of one struct parameter they
+read, once, as a value: `annotate.c`'s `IsColumnOutside(image,x_offset)` and
+`IsRowOutside(image,y_offset)`, which test an offset against `image->columns` and
+`image->rows`. One function taking that value replaces both and frees a place.
+
+**Not covered by:** Recipe TM, which keeps both twins (each with its own opening block) and
+shares only their tails; Recipe FG, FW and FC, which fold one function into a twin that
+already exists; Recipe DV, which drops a parameter the callee can read from another
+(here the opposite: the callee stops reading the member); Recipe TI and MT, which add a
+selector.
+
+**How:**
+
+1. `F(s,a)` and `G(s,b)` are `static`, in one file, and neither's address is taken
+   (`grep`). Their bodies are the same token sequence once their other parameters are
+   renamed alike, except that `F` reads `s->m` where `G` reads `s->n` (check by script).
+   `s` is used nowhere else in either body, and `m` and `n` have one type `T`.
+2. Write one function `H(a,v)`, with `F`'s other parameters and a parameter `const T v`
+   in place of `s`, whose body is `F`'s with `v` for `s->m`. Put it where `F` stood and
+   delete `F` and `G`.
+3. Replace each call `F(e,x)` by `H(x,e->m)` and each `G(e,y)` by `H(y,e->n)`, where `e`,
+   `x` and `y` have no side effect (identifiers or member reads), so that evaluating the
+   member at the call instead of inside the function reads the same value: nothing runs
+   between the two points.
+4. Build: a call left behind does not compile. Run `refactor_guard.py --calls` with
+   `--renamed F=H --renamed G=H`.
+
+**Before:**
+
+```c
+static inline MagickBooleanType IsColumnOutside(const Image *image,
+  const ssize_t x_offset)
+{
+  return(((x_offset < 0) || (x_offset >= (ssize_t) image->columns)) ?
+    MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsRowOutside(const Image *image,
+  const ssize_t y_offset)
+{
+  return(((y_offset < 0) || (y_offset >= (ssize_t) image->rows)) ?
+    MagickTrue : MagickFalse);
+}
+...
+  if (IsRowOutside(image,y_offset) != MagickFalse)
+```
+
+**After:**
+
+```c
+static inline MagickBooleanType IsOffsetOutside(const ssize_t offset,
+  const size_t extent)
+{
+  return(((offset < 0) || (offset >= (ssize_t) extent)) ?
+    MagickTrue : MagickFalse);
+}
+...
+  if (IsOffsetOutside(y_offset,image->rows) != MagickFalse)
+```
+
+**Careful:**
+
+- The member is read once in the body and once at the call: the same object, with
+  nothing between, so the same value; `v` has the member's exact type (`size_t` for
+  `columns` and `rows`), so every cast and comparison on it is the one the body made.
+- The operators, the casts and their order are those of the twins; only the member read
+  moves out.
+- The step removes a function: flat or a small gain; it is kept for the place it frees
+  (rule 2), and the commit names the step that uses that place.
+
+**Evidence level:** oracle (the cases that reach the callers).
+
+**Provenance:** 2026-11-14, from `annotate.c`'s `IsColumnOutside` and `IsRowOutside`
+(campaign B, M127 lane b round 10): the file had 113 functions, the 114th trips *Number
+of Functions*, and `AnnotateImage`'s shared cleanup needs a helper (probe of both steps:
+5.79 to 5.81). Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -18590,3 +19147,9 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | AMEND | LF | Step 5, function form: a function body's leading run of `if (<test>) return;` (or `return(c);` of one constant) becomes one predicate call with the same exit; Lane: a | `utility.c`'s `ExpandFilename` (`path == NULL` and `*path != '~'` guards; cc 9, *Complex Method*) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | FG | Fold a Function into the Twin Taking Its Derived Argument: `F(...,t)` whose body is `G(...,s)`'s with `E(t)` for `s` loses its calls to `G(...,E(b))` and is deleted, freeing a place under the function-count threshold; Lane: b | `xml-tree.c`'s `ExtendXMLBuffer`/`ExtendXMLBufferBy` (111 functions; the 112th costs 0.17) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | FW | Fold a Pointer-Advancing Writer into Its Index-Returning Twin: `p=F(p,...);` becomes `p+=G(p,0,...);` when `G` writes at `b[j++]` the bytes `F` writes at `*x++`, and `F` is deleted, freeing a place under the function-count threshold; Lane: b | `xml-tree.c`'s `WriteUTF8Sequence`/`WriteUTF8Bytes` (110 functions; the 112th costs 0.17) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | CS | Extract a Loop-Body Segment Through a State of the Caller's Addresses: a segment of a loop body moves to a `void` helper taking one `const` struct of the caller's addresses, copying locals in and out (Recipe CK's form); a local aliased through another struct is bound by address and written `(*v)`; a segment whose loop exits all have the status false is wrapped in `do { } while (0);` and the caller's status test follows; Lane: c | `draw.c`'s `RenderMVGContent` (the primitive tail: segments writing up to eight loop locals, `number_points` and `primitive_info` aliased through `mvg_info`) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | CS | Step 1: in form A the segment may be a run of statements nested inside the loop body (a `switch` group, an `if` block, an inner loop's body) when nothing in it leaves it; Lane: c | `RenderMVGContent`'s `clip-path` and `stroke-dasharray` arms, whose nested blocks hold the depth 4 their keyword handlers would keep | mandate (2026-10-24) |
+| 2026-11-14 | NEW | KH | Replace a Keyword Switch by a Table of Arm Handlers: each `LocaleCompare` arm of a first-letter keyword `switch` moves to a handler taking the caller's state struct (copies in and out, `do { } while (0);` around an arm with inner exits), a nested token chain gets its own table, and the `switch` becomes a table lookup that keeps the misses' `status=MagickFalse;`; Lane: c | `draw.c`'s `RenderMVGContent` (69 keywords, 74 bumps, depth 6; 2.99 to 3.19 after the Recipe CS steps) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | CE | Chain a Continuing Block into an Else Before the Loop's Tail: `if (c) { S continue; } T` at the end of a loop body becomes `if (c) { S } else T`, repeated upward into an `else if` chain; CodeScene counts each `continue` as a branch; Lane: b | `locale.c`'s `LoadLocaleCache` (cc 18 to 16, 8.85 to 8.90 in a probe) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | FC | Fold a Function into the Twin That Calls Out Its Block: `G`, whose block `B` is the body of `F`'s callee `H` (taking and returning the written local `r` by value), loses its calls to `F` and is deleted; `F` and `H` move whole above the first caller, out of a delegate `#if` when they name nothing it declares, freeing a place under the function-count threshold; Lane: b | `annotate.c`'s `GetPostscriptResolution`/`GetFreetypeTextResolution` (113 functions; the 114th costs 0.18; fold probe 5.69 flat) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | FM | Fold Twin Functions Differing in the Member They Read into One Taking the Value: `F(s,a)` and `G(s,b)`, the same text but for reading `s->m` and `s->n` once each, become one `H(a,v)` taking the member's value; calls pass `e->m` or `e->n`; both twins are deleted, freeing a place under the function-count threshold; Lane: b | `annotate.c`'s `IsColumnOutside`/`IsRowOutside` (113 functions; fold flat, with the helper it frees 5.79 to 5.81 in a probe) | mandate (2026-10-24) |

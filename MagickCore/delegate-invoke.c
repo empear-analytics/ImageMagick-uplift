@@ -154,6 +154,19 @@ static const char *GetListProperty(const Image *image,const char letter,
   }
 }
 
+static void FormatClassColorspaceAlpha(const Image *image,char *value)
+{
+  ColorspaceType
+    colorspace;
+
+  colorspace=image->colorspace;
+  (void) FormatLocaleString(value,MagickPathExtent,"%s %s %s",
+    CommandOptionToMnemonic(MagickClassOptions,(ssize_t)
+    image->storage_class),CommandOptionToMnemonic(MagickColorspaceOptions,
+    (ssize_t) colorspace),image->alpha_trait != UndefinedPixelTrait ?
+    "Alpha" : "");
+}
+
 static const char *GetMnemonicProperty(Image *image,const char letter,
   char *value,ExceptionInfo *exception)
 {
@@ -161,15 +174,7 @@ static const char *GetMnemonicProperty(Image *image,const char letter,
   {
     case 'r': /* Image storage class, colorspace, and alpha enabled.  */
     {
-      ColorspaceType
-        colorspace;
-
-      colorspace=image->colorspace;
-      (void) FormatLocaleString(value,MagickPathExtent,"%s %s %s",
-        CommandOptionToMnemonic(MagickClassOptions,(ssize_t)
-        image->storage_class),CommandOptionToMnemonic(MagickColorspaceOptions,
-        (ssize_t) colorspace),image->alpha_trait != UndefinedPixelTrait ?
-        "Alpha" : "");
+      FormatClassColorspaceAlpha(image,value);
       return(value);
     }
     case 'A': /* Image alpha channel  */
@@ -722,6 +727,19 @@ static void OpenInterpretDelegateProperties(const ImageInfo *image_info,
      (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no-image");
 }
 
+static MagickBooleanType DecodeDelegateSequence(const char **p,char **q,
+  const MagickBooleanType number)
+{
+  if (DecodeDelegateCharacter(p,q) != MagickFalse)
+    return(MagickTrue);
+  return(DecodeDelegatePercent(p,q,number));
+}
+
+static MagickBooleanType IsDelegateDigit(const char *p)
+{
+  return(isdigit((int) ((unsigned char) *p)) ? MagickTrue : MagickFalse);
+}
+
 static char *InterpretDelegateProperties(ImageInfo *image_info,
   Image *image,const char *embed_text,ExceptionInfo *exception)
 {
@@ -752,16 +770,14 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
   extent=MagickPathExtent;  /* allocated space in string */
   number=MagickFalse;  /* is last char a number? */
   for (q=interpret_text; *p!='\0';
-    number=isdigit((int) ((unsigned char) *p)) ? MagickTrue : MagickFalse,p++)
+    number=IsDelegateDigit(p),p++)
   {
     /*
       Interpret escape characters (e.g. Filename: %M).
     */
     *q='\0';
     ExtendInterpretText(MagickPathExtent);
-    if (DecodeDelegateCharacter(&p,&q) != MagickFalse)
-      continue;
-    if (DecodeDelegatePercent(&p,&q,number) != MagickFalse)
+    if (DecodeDelegateSequence(&p,&q,number) != MagickFalse)
       continue;
     string=GetMagickPropertyLetter(image_info,image,*p,exception);
     if (string != (char *) NULL)
@@ -1435,6 +1451,11 @@ static void RunDelegateCommands(const DelegateCommandRun *run,
   (void) CopyMagickString(image->filename,input_filename,MagickPathExtent);
 }
 
+static const char *DelegateTag(const char *decode,const char *encode)
+{
+  return(decode ? decode : encode);
+}
+
 static void OpenInvokeDelegate(const ImageInfo *image_info,
   const Image *image)
 {
@@ -1479,7 +1500,7 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
     {
       RelinquishTemporaryInput(image,temporary);
       (void) ThrowMagickException(exception,GetMagickModule(),DelegateError,
-        "NoTagFound","`%s'",decode ? decode : encode);
+        "NoTagFound","`%s'",DelegateTag(decode,encode));
       return(MagickFalse);
     }
   if (AcquireDelegateOutputFilename(image_info,image,temporary,exception) ==
@@ -1503,7 +1524,7 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
       RelinquishTemporaryInput(image,temporary);
       (void) ThrowMagickException(exception,GetMagickModule(),
         ResourceLimitError,"MemoryAllocationFailed","`%s'",
-        decode ? decode : encode);
+        DelegateTag(decode,encode));
       return(MagickFalse);
     }
   run.delegate_info=delegate_info;

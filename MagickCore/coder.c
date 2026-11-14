@@ -303,6 +303,27 @@ static int CoderInfoCompare(const void *x,const void *y)
   return(LocaleCompare((*p)->path,(*q)->path));
 }
 
+static ssize_t CollectCoderInfo(const char *pattern,
+  const CoderInfo **coder_map)
+{
+  const CoderInfo
+    *p;
+
+  ssize_t
+    i;
+
+  ResetSplayTreeIterator(coder_cache);
+  p=(const CoderInfo *) GetNextValueInSplayTree(coder_cache);
+  for (i=0; p != (const CoderInfo *) NULL; )
+  {
+    if ((p->stealth == MagickFalse) &&
+        (GlobExpression(p->name,pattern,MagickFalse) != MagickFalse))
+      coder_map[i++]=p;
+    p=(const CoderInfo *) GetNextValueInSplayTree(coder_cache);
+  }
+  return(i);
+}
+
 MagickExport const CoderInfo **GetCoderInfoList(const char *pattern,
   size_t *number_coders,ExceptionInfo *exception)
 {
@@ -329,15 +350,7 @@ MagickExport const CoderInfo **GetCoderInfoList(const char *pattern,
     Generate coder list.
   */
   LockSemaphoreInfo(coder_semaphore);
-  ResetSplayTreeIterator(coder_cache);
-  p=(const CoderInfo *) GetNextValueInSplayTree(coder_cache);
-  for (i=0; p != (const CoderInfo *) NULL; )
-  {
-    if ((p->stealth == MagickFalse) &&
-        (GlobExpression(p->name,pattern,MagickFalse) != MagickFalse))
-      coder_map[i++]=p;
-    p=(const CoderInfo *) GetNextValueInSplayTree(coder_cache);
-  }
+  i=CollectCoderInfo(pattern,coder_map);
   UnlockSemaphoreInfo(coder_semaphore);
   qsort((void *) coder_map,(size_t) i,sizeof(*coder_map),CoderInfoCompare);
   coder_map[i]=(CoderInfo *) NULL;

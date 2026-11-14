@@ -517,6 +517,13 @@ static int ReadDelegateOutput(const char *sanitize_command,char *message)
     offset+=strlen(message);
   return(pclose(file));
 }
+
+static MagickBooleanType IsCapturedDelegateOutput(
+  const MagickBooleanType asynchronous,const char *message)
+{
+  return((MagickBooleanType) ((asynchronous == MagickFalse) &&
+    (message !=  (char *) NULL)));
+}
 #endif
 
 static MagickBooleanType AcceptDelegateArguments(char **arguments,
@@ -566,6 +573,18 @@ static void ReportDelegateFailure(const char *sanitize_command,
     }
 }
 
+static MagickBooleanType AcquireDelegateArguments(const char *command,
+  char ***arguments,int *number_arguments,ExceptionInfo *exception)
+{
+  (*arguments)=StringToArgv(command,number_arguments);
+  if ((*arguments) == (char **) NULL)
+    return(MagickFalse);
+  if (AcceptDelegateArguments((*arguments),(*number_arguments),exception) ==
+      MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
   const MagickBooleanType verbose,const char *command,char *message,
   ExceptionInfo *exception)
@@ -579,17 +598,14 @@ MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
     status;
 
   status=(-1);
-  arguments=StringToArgv(command,&number_arguments);
-  if (arguments == (char **) NULL)
+  if (AcquireDelegateArguments(command,&arguments,&number_arguments,
+      exception) == MagickFalse)
     return(status);
-  if (AcceptDelegateArguments(arguments,number_arguments,exception) ==
-      MagickFalse)
-    return(-1);
   sanitize_command=PrepareDelegateCommand(asynchronous,verbose,command,
     message);
 #if defined(MAGICKCORE_POSIX_SUPPORT)
 #if defined(MAGICKCORE_HAVE_POPEN)
-  if ((asynchronous == MagickFalse) && (message !=  (char *) NULL))
+  if (IsCapturedDelegateOutput(asynchronous,message) != MagickFalse)
     status=ReadDelegateOutput(sanitize_command,message);
   else
 #endif

@@ -149,8 +149,8 @@
 
 static inline MagickBooleanType IsUnknownFormatSpecifier(const char specifier)
 {
-  return(((specifier != 'd') && (specifier != 'x') && (specifier != 'o')) ?
-    MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((specifier != 'd') && (specifier != 'x') &&
+    (specifier != 'o')));
 }
 
 static inline MagickBooleanType AreDigitsFrom(const char *start,
@@ -200,8 +200,8 @@ static inline MagickBooleanType IsValidFormatSpecifier(const char *start,
 
 static inline MagickBooleanType IsIntegerSpecifierAt(const char *cursor)
 {
-  return(((*cursor == 'd') || (*cursor == 'o') || (*cursor == 'x')) ?
-    MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((*cursor == 'd') || (*cursor == 'o') ||
+    (*cursor == 'x')));
 }
 
 static const char *GetFilenameOption(const ImageInfo *image_info,
@@ -255,12 +255,9 @@ typedef struct _FilenameTargets
     **cursor;
 } FilenameTargets;
 
-static MagickBooleanType ExpandFilenameTail(
+static MagickBooleanType ExpandFilenameOption(
   const FilenameExpansion *expansion,const FilenameTargets *targets)
 {
-  const char
-    *const start = expansion->start;
-
   char
     *const filename = expansion->filename;
 
@@ -282,35 +279,51 @@ static MagickBooleanType ExpandFilenameTail(
   char
     pattern[MagickPathExtent];
 
+  const char
+    *end = strchr((*cursor),']'),
+    *option = (const char *) NULL;
+
+  size_t
+    extent,
+    option_length;
+
+  if (end == (const char *) NULL)
+    return(MagickTrue);
+  extent=(size_t) (end-(*cursor)-1);
+  if (extent >= sizeof(pattern))
+    return(MagickTrue);
+  (void) CopyMagickString(pattern,(*cursor)+1,extent+1);
+  pattern[extent]='\0';
+  option=GetFilenameOption(image_info,image,pattern,exception);
+  if (option == (const char *) NULL)
+    return(MagickTrue);
+  option_length=strlen(option);
+  if (((*p)-filename+(ssize_t) option_length) >= MagickPathExtent)
+    return(MagickFalse);
+  (void) CopyMagickString((*p),option,(size_t) (MagickPathExtent-
+    ((*p)-filename)));
+  (*p)+=option_length;
+  (*cursor)=end+1;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ExpandFilenameTail(
+  const FilenameExpansion *expansion,const FilenameTargets *targets)
+{
+  const char
+    *const start = expansion->start;
+
+  char
+    *const filename = expansion->filename;
+
+  char
+    **const p = targets->p;
+
+  const char
+    **const cursor = targets->cursor;
+
   if (*(*cursor) == '[')
-    {
-      const char
-        *end = strchr((*cursor),']'),
-        *option = (const char *) NULL;
-
-      size_t
-        extent,
-        option_length;
-
-      if (end == (const char *) NULL)
-        return(MagickTrue);
-      extent=(size_t) (end-(*cursor)-1);
-      if (extent >= sizeof(pattern))
-        return(MagickTrue);
-      (void) CopyMagickString(pattern,(*cursor)+1,extent+1);
-      pattern[extent]='\0';
-      option=GetFilenameOption(image_info,image,pattern,exception);
-      if (option == (const char *) NULL)
-        return(MagickTrue);
-      option_length=strlen(option);
-      if (((*p)-filename+(ssize_t) option_length) >= MagickPathExtent)
-        return(MagickFalse);
-      (void) CopyMagickString((*p),option,(size_t) (MagickPathExtent-
-        ((*p)-filename)));
-      (*p)+=option_length;
-      (*cursor)=end+1;
-      return(MagickTrue);
-    }
+    return(ExpandFilenameOption(expansion,targets));
   /*
     Invalid or unsupported specifier — treat as literal.
   */
@@ -321,12 +334,9 @@ static MagickBooleanType ExpandFilenameTail(
   return(MagickTrue);
 }
 
-static MagickBooleanType ExpandFilenameSpecifier(
+static MagickBooleanType FormatFilenameSpecifier(
   const FilenameExpansion *expansion,const FilenameTargets *targets)
 {
-  const char
-    *const start = expansion->start;
-
   char
     *const filename = expansion->filename;
 
@@ -345,38 +355,54 @@ static MagickBooleanType ExpandFilenameSpecifier(
   char
     pattern[MagickPathExtent];
 
+  char
+    format_specifier[MagickPathExtent];
+
+  size_t
+    length = (size_t) ((*cursor)-specifier_start),
+    pattern_length;
+
+  ssize_t
+    count;
+
+  (void) snprintf(format_specifier,sizeof(format_specifier),
+    "%%%.*s%c",(int) length,specifier_start,*(*cursor));
+  count=FormatLocaleString(pattern,sizeof(pattern),format_specifier,
+    value);
+  pattern_length=strlen(pattern);
+  if ((count <= 0) || ((size_t) count != pattern_length))
+    return(MagickFalse);
+  if (((*p)-filename+(ssize_t) pattern_length) >= MagickPathExtent)
+    return(MagickFalse);
+  (void) CopyMagickString((*p),pattern,(size_t) (MagickPathExtent-
+    ((*p)-filename)));
+  (*p)+=pattern_length;
+  (*cursor)++;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ExpandFilenameSpecifier(
+  const FilenameExpansion *expansion,const FilenameTargets *targets)
+{
+  const char
+    *const start = expansion->start;
+
+  const char
+    *const specifier_start = expansion->specifier_start;
+
+  char
+    **const p = targets->p;
+
+  const char
+    **const cursor = targets->cursor;
+
   if (IsIntegerSpecifierAt((*cursor)) != MagickFalse)
     {
       const char
         *specifier_end = (*cursor)+1;
 
       if (IsValidFormatSpecifier(specifier_start,specifier_end) != MagickFalse)
-        {
-          char
-            format_specifier[MagickPathExtent];
-
-          size_t
-            length = (size_t) ((*cursor)-specifier_start),
-            pattern_length;
-
-          ssize_t
-            count;
-
-          (void) snprintf(format_specifier,sizeof(format_specifier),
-            "%%%.*s%c",(int) length,specifier_start,*(*cursor));
-          count=FormatLocaleString(pattern,sizeof(pattern),format_specifier,
-            value);
-          pattern_length=strlen(pattern);
-          if ((count <= 0) || ((size_t) count != pattern_length))
-            return(MagickFalse);
-          if (((*p)-filename+(ssize_t) pattern_length) >= MagickPathExtent)
-            return(MagickFalse);
-          (void) CopyMagickString((*p),pattern,(size_t) (MagickPathExtent-
-            ((*p)-filename)));
-          (*p)+=pattern_length;
-          (*cursor)++;
-          return(MagickTrue);
-        }
+        return(FormatFilenameSpecifier(expansion,targets));
       else
         {
           /*
@@ -431,6 +457,13 @@ static MagickBooleanType CopyFilenameCharacter(char **p,
   return(MagickFalse);
 }
 
+static const char *SkipFilenameDigits(const char *cursor)
+{
+  while (isdigit((int) ((unsigned char) *cursor)) != 0)
+    cursor++;
+  return(cursor);
+}
+
 MagickExport size_t InterpretImageFilename(const ImageInfo *image_info,
   Image *image,const char *format,int value,char *filename,
   ExceptionInfo *exception)
@@ -463,8 +496,7 @@ MagickExport size_t InterpretImageFilename(const ImageInfo *image_info,
     if (CopyFilenameCharacter(&p,&cursor,&start) != MagickFalse)
       continue;
     specifier_start=cursor;
-    while (isdigit((int) ((unsigned char) *cursor)) != 0)
-      cursor++;
+    cursor=SkipFilenameDigits(cursor);
     expansion.start=start;
     expansion.filename=filename;
     expansion.image_info=image_info;
