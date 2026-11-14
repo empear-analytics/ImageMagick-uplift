@@ -20703,6 +20703,9 @@ typedef struct _DisplayEventTargets
 
   XPoint
     *vid_info;
+
+  time_t
+    *timer;
 } DisplayEventTargets;
 
 static void XSelectVirtualCommand(const DisplayEventContext *context,
@@ -21995,6 +21998,64 @@ static time_t XGetDisplayTimer(const Image *display_image)
   return(GetMagickTime()+(time_t) (delay == 0 ? 1 : delay)+1);
 }
 
+static void XHandleButtonPress(const DisplayEventContext *context,
+  const DisplayEventTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const display_image = targets->display_image;
+
+  XEvent
+    *const event = targets->event;
+
+  time_t
+    *const timer = targets->timer;
+
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Button Press: 0x%lx %u +%d+%d",(*event).xbutton.window,
+      (*event).xbutton.button,(*event).xbutton.x,(*event).xbutton.y);
+  if (((*event).xbutton.button == Button3) &&
+      ((*event).xbutton.state & Mod1Mask))
+    {
+      /*
+        Convert Alt-Button3 to Button2.
+      */
+      (*event).xbutton.button=Button2;
+      (*event).xbutton.state&=(unsigned int) (~Mod1Mask);
+    }
+  if ((*event).xbutton.window == windows->backdrop.id)
+    {
+      (void) XSetInputFocus(display,(*event).xbutton.window,RevertToParent,
+        (*event).xbutton.time);
+      return;
+    }
+  if ((*event).xbutton.window == windows->image.id)
+    {
+      XPressImageWindow(context,targets);
+      return;
+    }
+  if ((*event).xbutton.window == windows->magnify.id)
+    {
+      XPressMagnifyWindow(context);
+      return;
+    }
+  if ((*event).xbutton.window == windows->pan.id)
+    {
+      XPressPanWindow(context,event);
+      return;
+    }
+  (*timer)=XGetDisplayTimer((*display_image));
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -22091,7 +22152,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
     event_context;
 
   const DisplayEventTargets
-    event_targets = { &nexus, &display_image, &event, &vid_info };
+    event_targets = { &nexus, &display_image, &event, &vid_info, &timer };
 
   assert(image != (Image **) NULL);
   assert((*image)->signature == MagickCoreSignature);
@@ -22593,41 +22654,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
     {
       case ButtonPress:
       {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Button Press: 0x%lx %u +%d+%d",event.xbutton.window,
-            event.xbutton.button,event.xbutton.x,event.xbutton.y);
-        if ((event.xbutton.button == Button3) &&
-            (event.xbutton.state & Mod1Mask))
-          {
-            /*
-              Convert Alt-Button3 to Button2.
-            */
-            event.xbutton.button=Button2;
-            event.xbutton.state&=(unsigned int) (~Mod1Mask);
-          }
-        if (event.xbutton.window == windows->backdrop.id)
-          {
-            (void) XSetInputFocus(display,event.xbutton.window,RevertToParent,
-              event.xbutton.time);
-            break;
-          }
-        if (event.xbutton.window == windows->image.id)
-          {
-            XPressImageWindow(&event_context,&event_targets);
-            break;
-          }
-        if (event.xbutton.window == windows->magnify.id)
-          {
-            XPressMagnifyWindow(&event_context);
-            break;
-          }
-        if (event.xbutton.window == windows->pan.id)
-          {
-            XPressPanWindow(&event_context,&event);
-            break;
-          }
-        timer=XGetDisplayTimer(display_image);
+        XHandleButtonPress(&event_context,&event_targets);
         break;
       }
       case ButtonRelease:
