@@ -20685,6 +20685,118 @@ static void XFillMissingTile(const XTileFillInfo *fill)
   }
 }
 
+typedef struct _XTileInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    height,
+    width;
+} XTileInput;
+
+static void XTileUpdateImage(const XTileInput *input)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  Image
+    *const image = input->image;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  const int
+    x = input->x,
+    y = input->y;
+
+  const unsigned int
+    height = input->height,
+    width = input->width;
+
+  char
+    filename[MagickPathExtent],
+    *p,
+    *q;
+
+  int
+    tile;
+
+  int
+    x_offset,
+    y_offset;
+
+  PixelInfo
+    pixel;
+
+  /*
+    Ensure all the images exist.
+  */
+  tile=0;
+  GetPixelInfo(image,&pixel);
+  for (p=image->directory; *p != '\0'; p++)
+  {
+    CacheView
+      *image_view;
+
+    q=p;
+    while ((IsTileNameCharacter(q) != MagickFalse) &&
+           ((size_t) (q-p+1) < sizeof(filename)))
+      q++;
+    (void) CopyMagickString(filename,p,(size_t) (q-p+1));
+    p=q;
+    if (IsPathAccessible(filename) != MagickFalse)
+      {
+        tile++;
+        continue;
+      }
+    /*
+      Overwrite tile with background color.
+    */
+    x_offset=((int) width*(tile % (((int) image->columns-x)/(int) width))+
+      x);
+    y_offset=((int) height*(tile/(((int) image->columns-x)/(int) width))+
+      y);
+    image_view=AcquireAuthenticCacheView(image,exception);
+    (void) GetOneCacheViewVirtualPixelInfo(image_view,0,0,&pixel,exception);
+    {
+      const XTileFillInfo
+        fill = { image, image_view, x_offset, y_offset, height, width,
+          pixel, exception };
+
+      XFillMissingTile(&fill);
+    }
+    image_view=DestroyCacheView(image_view);
+    tile++;
+  }
+  windows->image.window_changes.width=(int) image->columns;
+  windows->image.window_changes.height=(int) image->rows;
+  XConfigureImageColormap(display,resource_info,windows,image,exception);
+  (void) XConfigureImage(display,resource_info,windows,image,exception);
+}
+
 static Image *XTileImage(Display *display,XResourceInfo *resource_info,
   XWindows *windows,Image *image,XEvent *event,ExceptionInfo *exception)
 {
@@ -20736,6 +20848,9 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
   unsigned int
     height,
     width;
+
+  XTileInput
+    input;
 
   /*
     Tile image is relative to montage image configuration.
@@ -20805,6 +20920,15 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
   tile_image=NewImageList();
+  input.display=display;
+  input.resource_info=resource_info;
+  input.windows=windows;
+  input.image=image;
+  input.exception=exception;
+  input.x=x;
+  input.y=y;
+  input.height=height;
+  input.width=width;
   switch (TileCommands[id])
   {
     case TileLoadCommand:
@@ -20865,57 +20989,7 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
     }
     case TileUpdateCommand:
     {
-      int
-        x_offset,
-        y_offset;
-
-      PixelInfo
-        pixel;
-
-      /*
-        Ensure all the images exist.
-      */
-      tile=0;
-      GetPixelInfo(image,&pixel);
-      for (p=image->directory; *p != '\0'; p++)
-      {
-        CacheView
-          *image_view;
-
-        q=p;
-        while ((IsTileNameCharacter(q) != MagickFalse) &&
-               ((size_t) (q-p+1) < sizeof(filename)))
-          q++;
-        (void) CopyMagickString(filename,p,(size_t) (q-p+1));
-        p=q;
-        if (IsPathAccessible(filename) != MagickFalse)
-          {
-            tile++;
-            continue;
-          }
-        /*
-          Overwrite tile with background color.
-        */
-        x_offset=((int) width*(tile % (((int) image->columns-x)/(int) width))+
-          x);
-        y_offset=((int) height*(tile/(((int) image->columns-x)/(int) width))+
-          y);
-        image_view=AcquireAuthenticCacheView(image,exception);
-        (void) GetOneCacheViewVirtualPixelInfo(image_view,0,0,&pixel,exception);
-        {
-          const XTileFillInfo
-            fill = { image, image_view, x_offset, y_offset, height, width,
-              pixel, exception };
-
-          XFillMissingTile(&fill);
-        }
-        image_view=DestroyCacheView(image_view);
-        tile++;
-      }
-      windows->image.window_changes.width=(int) image->columns;
-      windows->image.window_changes.height=(int) image->rows;
-      XConfigureImageColormap(display,resource_info,windows,image,exception);
-      (void) XConfigureImage(display,resource_info,windows,image,exception);
+      XTileUpdateImage(&input);
       break;
     }
     default:
