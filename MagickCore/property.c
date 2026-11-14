@@ -830,6 +830,16 @@ static void Set8BIMResource(const AttributeInfo8BIM *attribute_info,
     }
 }
 
+static void Read8BIMResourceBlock(ssize_t *count,char **resource,
+  const unsigned char **info,size_t *length)
+{
+  (*count)=(ssize_t) ReadPropertyByte(info,length);
+  Read8BIMResourceName(resource,info,length,(*count));
+  if (((*count) & 0x01) == 0)
+    (void) ReadPropertyByte(info,length);
+  (*count)=(ssize_t) ReadPropertyMSBLong(info,length);
+}
+
 static void Get8BIMProperty(const Image *image,const char *key,
   ExceptionInfo *exception)
 {
@@ -897,11 +907,7 @@ static void Get8BIMProperty(const Image *image,const char *key,
     if (Skip8BIMResourceHeader(&range,&info,&length,&id) != MagickFalse)
       continue;
     Release8BIMResourceNames(&resource,&macroman_resource);
-    count=(ssize_t) ReadPropertyByte(&info,&length);
-    Read8BIMResourceName(&resource,&info,&length,count);
-    if ((count & 0x01) == 0)
-      (void) ReadPropertyByte(&info,&length);
-    count=(ssize_t) ReadPropertyMSBLong(&info,&length);
+    Read8BIMResourceBlock(&count,&resource,&info,&length);
     if ((count < 0) || ((size_t) count > length))
       {
         length=0;
