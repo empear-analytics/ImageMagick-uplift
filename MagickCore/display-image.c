@@ -10634,6 +10634,30 @@ static void XApplyCutCommand(const XMagickCommandContext *context)
   (void) XCropImage(display,resource_info,windows,*image,CutMode,exception);
 }
 
+static void XApplyCopyCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  /*
+    Copy image.
+  */
+  (void) XCropImage(display,resource_info,windows,*image,CopyMode,
+    exception);
+}
+
 static void XApplyResizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11309,14 +11333,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyCutCommand(&context);
       break;
     case CopyCommand:
-    {
-      /*
-        Copy image.
-      */
-      (void) XCropImage(display,resource_info,windows,*image,CopyMode,
-        exception);
+      XApplyCopyCommand(&context);
       break;
-    }
     case PasteCommand:
     {
       /*
