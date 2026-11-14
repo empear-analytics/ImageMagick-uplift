@@ -10600,6 +10600,53 @@ static void XApplyMapCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyQuantizeCommand(const XMagickCommandContext *context,
+  QuantizeInfo quantize_info)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  int
+    status;
+
+  static char
+    colors[MagickPathExtent] = "256";
+
+  /*
+    Query user for maximum number of colors.
+  */
+  status=XDialogWidget(display,windows,"Quantize",
+    "Maximum number of colors:",colors);
+  if (*colors == '\0')
+    return;
+  /*
+    Color reduce the image.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  quantize_info.number_colors=StringToUnsignedLong(colors);
+  quantize_info.dither_method=status != 0 ? RiemersmaDitherMethod :
+    NoDitherMethod;
+  (void) QuantizeImage(&quantize_info,*image,exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyRollCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11719,36 +11766,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyMapCommand(&context,quantize_info);
       break;
     case QuantizeCommand:
-    {
-      int
-        status;
-
-      static char
-        colors[MagickPathExtent] = "256";
-
-      /*
-        Query user for maximum number of colors.
-      */
-      status=XDialogWidget(display,windows,"Quantize",
-        "Maximum number of colors:",colors);
-      if (*colors == '\0')
-        break;
-      /*
-        Color reduce the image.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      quantize_info.number_colors=StringToUnsignedLong(colors);
-      quantize_info.dither_method=status != 0 ? RiemersmaDitherMethod :
-        NoDitherMethod;
-      (void) QuantizeImage(&quantize_info,*image,exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyQuantizeCommand(&context,quantize_info);
       break;
-    }
     case DespeckleCommand:
       XApplyDespeckleCommand(&context);
       break;
