@@ -133,6 +133,10 @@ do
       # resolved by the assembler, so its displacement moves with the code between;
       # the annotation names the target, which is what is compared.
       if ($0 ~ /# <<[^>+]+>>$/) gsub(/-?0x[0-9a-f]+\(%rip\)/,"(%rip)");
+      # arm64 `adrp xN, <page>`: unlinked, the page is the instruction'"'"'s own
+      # (objdump names whatever function it falls in); the relocation line
+      # after it names the real target.
+      if ($0 ~ /^adrp[ \t]/) sub(/,.*$/,", <page>");
       print > out }'
   # A disassembly this script cannot read is not a pass: every function must
   # have instructions, and there must be functions.
