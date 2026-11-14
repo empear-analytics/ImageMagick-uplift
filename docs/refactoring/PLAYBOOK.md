@@ -16159,6 +16159,144 @@ several calls) and FB refuses the several calls. A probe of both: `IDENTICAL` ob
 
 ---
 
+## Recipe KO - Replace Keyed Offset Groups with a Table of Bases
+
+**Use when:** CodeScene reports *Complex Method* on a function whose complexity is one `switch` on an
+integer in which several runs of labels each assign one lvalue the key minus a constant of the run,
+`V=(K-C);`, and break: `display-image.c`'s `XSelectMagnifyDigit` (the labels `XK_0` to `XK_9` store
+`key_symbol-XK_0` and the ten keypad labels `XK_KP_0` to `XK_KP_9` store `key_symbol-XK_KP_0` into
+`windows->magnify.data`: twenty labels, cc 22). The function leaves the finding and no function is added.
+
+**Not covered by:** Recipe KT, whose groups assign the result of a call on a constant; Recipe KC, whose
+groups assign a constant `v=c;`; Recipe TB, whose cases return constants; Recipe LP, whose label group
+becomes a predicate that keeps every label in a new function (two runs of ten labels give two functions of
+cc 12; a probe: the stubbed file score went from 6.12 to 6.09); Recipes SD, SR, SW and ST, which split the
+runs into shorter runs that keep every label; Recipes SV and SC, which pass the differing constant to a
+helper and keep one label per group.
+
+**How:**
+
+1. The function is `static`; the `switch (E)` lies outside every OpenMP region and holds no `#` line. `E` is
+   an integer expression with no call, assignment or increment (a cast of a parameter, `(int)
+   key_symbol`), and nothing in the `switch` writes what it reads. Every label is an integer constant, or a
+   macro that expands to one, none twice (the compiler refuses a duplicate), and the `switch` ends in
+   `default: break;`. Every other group is one or more labels, the single statement `V=(K-C);` and
+   `break;` (braces optional): the same lvalue `V` and the same operand `K` (a parameter or local that
+   nothing in the `switch` writes) in every group, and a constant `C` of one token per group. No group
+   falls through, and nothing else is in the `switch`.
+2. The function is not called per pixel or per channel (check its callers by reading): the loop of step 4
+   searches at most as many rows as there were labels, in place of a jump.
+3. Directly above the function write a `typedef struct` of two members, `key`, of the type `E` has (`int` for
+   `(int) key_symbol`), and `base`, of the type of the constants `C` (an integer constant that fits `int`,
+   or a macro that expands to one, is an `int`), and below it a `static const` array of that type with no
+   size, one row `{ L, C }` per label in the `switch`'s order (the labels of a group in order, then the next
+   group's). A comment of a label stands on its row.
+4. In the function declare `const T key = E;` (the text of `E`, its type `T`) and `size_t i;`, and replace the
+   `switch`, from `switch` to its closing brace, by `for (i=0; i < (sizeof(R)/sizeof(*R)); i++) if (R[i].key ==
+   key) { V=(K-R[i].base); break; }`, `R` the array's name, `V` and `K` as the groups wrote them. Nothing else in
+   the function changes.
+5. Run `python3 tools/keyed_offset_check.py <file> <Function> <Array>`. It prints OK when each label of the
+   old `switch` is the key of exactly one row, in order, whose base is the constant of its group; when the new
+   function is step 4's declarations and loop with the same `E`, `V` and `K`; when the typedef holds exactly
+   `key` and `base`; and when nothing else of the file changed. The types of `key` and `base` against `E` and the
+   constants stay checks by reading.
+6. `refactor_guard.py` prints `WARN` with the `0` of `i=0` added once and nothing else (a macro is not a literal
+   to it: check by reading that every `C` is one token and none is a literal that the guard would count);
+   `--calls` moves nothing.
+
+**Before:**
+
+```c
+static void XSelectMagnifyDigit(XWindows *windows,const KeySym key_symbol)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_0:
+    case XK_1:
+    ...
+    case XK_9:
+    {
+      windows->magnify.data=(key_symbol-XK_0);
+      break;
+    }
+    case XK_KP_0:
+    case XK_KP_1:
+    ...
+    case XK_KP_9:
+    {
+      windows->magnify.data=(key_symbol-XK_KP_0);
+      break;
+    }
+    default:
+      break;
+  }
+}
+```
+
+**After:**
+
+```c
+typedef struct _MagnifyDigitKey
+{
+  int
+    key,
+    base;
+} MagnifyDigitKey;
+
+static const MagnifyDigitKey
+  MagnifyDigitKeys[] =
+  {
+    { XK_0, XK_0 },
+    { XK_1, XK_0 },
+    ...
+    { XK_KP_9, XK_KP_0 }
+  };
+
+static void XSelectMagnifyDigit(XWindows *windows,const KeySym key_symbol)
+{
+  const int
+    key = (int) key_symbol;
+
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(MagnifyDigitKeys)/sizeof(*MagnifyDigitKeys)); i++)
+    if (MagnifyDigitKeys[i].key == key)
+      {
+        windows->magnify.data=(key_symbol-MagnifyDigitKeys[i].base);
+        break;
+      }
+}
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The `switch` evaluates `E` once and runs the group whose label equals the
+  value; the labels are distinct, so at most one group matches, and `default: break;` does nothing for any other
+  value. The loop compares `key`, the same value of the same type as `E` (`const T key = E;`), with each row's
+  key; the rows hold exactly the labels, once each, in the groups' order (step 5), so at most one row matches,
+  the row of the group the `switch` selected. It then runs `V=(K-R[i].base);`, the group's statement with the
+  group's constant, which `base` holds with the constant's own value and type (an `int` initialised from an
+  `int` constant, so `K-base` has the conversions `K-C` had), and leaves the loop where the group's `break;`
+  left the `switch`. A value that matches no row ends the loop with nothing stored, as `default:` did. `E` and
+  `K` have no side effect and nothing in the `switch` wrote them (step 1), so reading `E` once into `key` and `K`
+  in the store changes nothing.
+- The array is data the function only reads: `const`, `static` and never written; no existing table changes.
+- Where the oracle's cases run only some of the groups (the keypad run of `XSelectMagnifyDigit` runs in no
+  case), compile the old and the new function against the real header and compare the stored value for every
+  value of the key type: the commit quotes the count.
+
+**Evidence level:** oracle (the cases that reach the function), with step 5's script and the types checked by
+reading; for a group no case runs, the comparison of the two compiled functions over every key.
+
+**Provenance:** 2026-11-14, from `display-image.c`'s `XSelectMagnifyDigit` (campaign A, W23 round twelve lane
+b, wide build): twenty labels, cc 22, a Complex Method that no recipe reached (LP needs one group, TB, KT and KC
+assign or return constants, SD and the label-run recipes keep the labels). A probe: the file 2.76 to 2.89, the
+stubbed file (the six other finding functions emptied) 6.12 to 6.49, the function with no finding. Added by
+Claude Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -16527,3 +16665,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | AMEND | E | Step 4: a temporary the block only writes, never reads, that nothing after the block reads and that the caller keeps because other blocks use the same name, passes as a pointer `T *v` (stores written `*v`, the call passing `&v`) on the terms of the pointer paragraph before it, since declaring it in the new function leaves it set but never used (`-Wunused-but-set-variable`, an error in the CI jobs; no recipe deletes the store). The argument: the stores are the same stores of the same values, into a variable that nothing reads afterwards, so the caller's variable and a local of the new function cannot be told apart by any path | `display-image.c`'s `XMagickCommand` (campaign A, W23 round eleven lane c, wide build): the OilPaintCommand case writes `flags=ParseGeometry(radius,&geometry_info);` and reads `geometry_info` alone, so the helper's own `flags` draws the warning (`ci_linux_warnings` clang and gcc, `-DNDEBUG` scan); every other use of `flags` in `XMagickCommand` is a store, or a read after the same case's own store | owner |
 | 2026-11-14 | AMEND | CT | Step 3, event-loop form: with a targets struct that serves every block of one event loop, a case that writes only one member, or none and only reads members, moves in this form too (every member it names bound and used as `(*v)`), instead of Recipe E step 7's value form, which would carry the reads as by-value parameters past four. The argument is the struct's own: a member holds the local's address, so each access touches the same object at the same point whatever the number of members written | `display-image.c`'s `XDisplayImage`: the ConfigureNotify case writes `status` alone and reads `event`, `display_image` and `vid_info`; the event switch's cases are to share `DisplayEventTargets` so that the switch can later move whole (campaign A, W23 round eleven, lane d; Claude Code, Opus 5.5) | owner |
 | 2026-11-14 | AMEND | FT | Step 5 (*unreached functions*): the step applies to a function no case reaches at the guard level (`Verified: guard`): `refactor_guard.py` OK, `--calls` `+1` for `Q` and nothing else, steps 1 and 2 by reading. The argument: the call is a character-for-character copy of the one the next case runs, at the point where the fall-through entered it, with the same argument values, followed by the same `break;`; nothing is added, removed or reordered but that call | `display-image.c`'s `XTileImage` (campaign A, W23 round twelve lane b, wide build): the Delete case falls through into Update's `XTileUpdateImage(&input); break;`; no case reaches the function, and the guard-level recipes that move the Delete body (E step 7, N) need it to end in `break;` (Claude Code, Sonnet 5.5) | owner |
+| 2026-11-14 | NEW | KO | Replace Keyed Offset Groups with a Table of Bases: a `switch` whose label groups each assign `V=(K-C);` and break becomes a `static const` table of `{ label, base }` rows read by one loop, `V=(K-R[i].base);`. *Careful* gives the argument (labels distinct so at most one row matches, the row of the selected group; `E` and `K` unwritten and side-effect free; `base` holds the constant with its own value and type) | `display-image.c`'s `XSelectMagnifyDigit` (campaign A, W23 round twelve lane b, wide build): twenty labels in two runs, cc 22; a probe 2.76 to 2.89 and, stubbed, 6.12 to 6.49 (Claude Code, Sonnet 5.5) | owner |
