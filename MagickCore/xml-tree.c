@@ -864,6 +864,21 @@ static inline MagickBooleanType IsUTF16Surrogate(const int c)
   return(((c >= 0xd800) && (c <= 0xdfff)) ? MagickTrue : MagickFalse);
 }
 
+static int ReadUTF16Character(const char *content,const size_t *length,
+  const int encoding,ssize_t *i)
+{
+  int
+    c;
+
+  c=ReadUTF16Unit(content,(*i),encoding);
+  if ((IsUTF16Surrogate(c) != MagickFalse) &&
+      (((*i)+=2) < (ssize_t) (*length-1)))
+    {
+      c=CombineUTF16Surrogates(content,(*i),encoding,c);
+    }
+  return(c);
+}
+
 static int GetUTF16Encoding(const char *content)
 {
   int
@@ -906,12 +921,7 @@ static char *ConvertUTF16ToUTF8(const char *content,size_t *length)
   extent=(*length);
   for (i=2; i < (ssize_t) (*length-1); i+=2)
   {
-    c=ReadUTF16Unit(content,i,encoding);
-    if ((IsUTF16Surrogate(c) != MagickFalse) &&
-        ((i+=2) < (ssize_t) (*length-1)))
-      {
-        c=CombineUTF16Surrogates(content,i,encoding,c);
-      }
+    c=ReadUTF16Character(content,length,encoding,&i);
     if ((size_t) (j+MagickPathExtent) > extent)
       {
         extent=(size_t) j+MagickPathExtent;
