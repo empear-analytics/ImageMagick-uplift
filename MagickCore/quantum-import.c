@@ -3454,6 +3454,72 @@ static void Import4BitGrayQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static void ImportUnpacked10BitGrayQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span,QuantumAny range,
+  unsigned int pixel)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  if (image->endian == LSBEndian)
+    {
+      for (x=0; x < ((ssize_t) number_pixels-2); x+=3)
+      {
+        p=PushLongPixel(quantum_info->endian,p,&pixel);
+        SetPixelGray(image,ScaleAnyToQuantum((pixel >> 22) & 0x3ff,range),q);
+        q+=(ptrdiff_t) GetPixelChannels(image);
+        SetPixelGray(image,ScaleAnyToQuantum((pixel >> 12) & 0x3ff,range),q);
+        q+=(ptrdiff_t) GetPixelChannels(image);
+        SetPixelGray(image,ScaleAnyToQuantum((pixel >> 2) & 0x3ff,range),q);
+        p+=(ptrdiff_t) quantum_info->pad;
+        q+=(ptrdiff_t) GetPixelChannels(image);
+      }
+      if (x++ < ((ssize_t) number_pixels-1))
+        {
+          p=PushLongPixel(quantum_info->endian,p,&pixel);
+          SetPixelGray(image,ScaleAnyToQuantum((pixel >> 22) & 0x3ff,range),q);
+          q+=(ptrdiff_t) GetPixelChannels(image);
+        }
+      if (x++ < (ssize_t) number_pixels)
+        {
+          SetPixelGray(image,ScaleAnyToQuantum((pixel >> 12) & 0x3ff,range),q);
+          q+=(ptrdiff_t) GetPixelChannels(image);
+        }
+      return;
+    }
+  for (x=0; x < ((ssize_t) number_pixels-2); x+=3)
+  {
+    p=PushLongPixel(quantum_info->endian,p,&pixel);
+    SetPixelGray(image,ScaleAnyToQuantum((pixel >> 2) & 0x3ff,range),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+    SetPixelGray(image,ScaleAnyToQuantum((pixel >> 12) & 0x3ff,range),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+    SetPixelGray(image,ScaleAnyToQuantum((pixel >> 22) & 0x3ff,range),q);
+    p+=(ptrdiff_t) quantum_info->pad;
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  if (x++ < ((ssize_t) number_pixels-1))
+    {
+      p=PushLongPixel(quantum_info->endian,p,&pixel);
+      SetPixelGray(image,ScaleAnyToQuantum((pixel >> 2) & 0x3ff,range),q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  if (x++ < (ssize_t) number_pixels)
+    {
+      SetPixelGray(image,ScaleAnyToQuantum((pixel >> 12) & 0x3ff,range),q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+}
+
 static void Import10BitGrayQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span)
 {
@@ -3479,64 +3545,7 @@ static void Import10BitGrayQuantum(const Image *image,QuantumInfo *quantum_info,
   range=GetQuantumRange(quantum_info->depth);
   if (quantum_info->pack == MagickFalse)
     {
-      if (image->endian == LSBEndian)
-        {
-          for (x=0; x < ((ssize_t) number_pixels-2); x+=3)
-          {
-            p=PushLongPixel(quantum_info->endian,p,&pixel);
-            SetPixelGray(image,ScaleAnyToQuantum((pixel >> 22) & 0x3ff,
-              range),q);
-            q+=(ptrdiff_t) GetPixelChannels(image);
-            SetPixelGray(image,ScaleAnyToQuantum((pixel >> 12) & 0x3ff,
-              range),q);
-            q+=(ptrdiff_t) GetPixelChannels(image);
-            SetPixelGray(image,ScaleAnyToQuantum((pixel >> 2) & 0x3ff,
-              range),q);
-            p+=(ptrdiff_t) quantum_info->pad;
-            q+=(ptrdiff_t) GetPixelChannels(image);
-          }
-          if (x++ < ((ssize_t) number_pixels-1))
-            {
-              p=PushLongPixel(quantum_info->endian,p,&pixel);
-              SetPixelGray(image,ScaleAnyToQuantum((pixel >> 22) & 0x3ff,
-                range),q);
-              q+=(ptrdiff_t) GetPixelChannels(image);
-            }
-          if (x++ < (ssize_t) number_pixels)
-            {
-              SetPixelGray(image,ScaleAnyToQuantum((pixel >> 12) & 0x3ff,
-                range),q);
-              q+=(ptrdiff_t) GetPixelChannels(image);
-            }
-          return;
-        }
-      for (x=0; x < ((ssize_t) number_pixels-2); x+=3)
-      {
-        p=PushLongPixel(quantum_info->endian,p,&pixel);
-        SetPixelGray(image,ScaleAnyToQuantum((pixel >> 2) & 0x3ff,range),
-          q);
-        q+=(ptrdiff_t) GetPixelChannels(image);
-        SetPixelGray(image,ScaleAnyToQuantum((pixel >> 12) & 0x3ff,range),
-          q);
-        q+=(ptrdiff_t) GetPixelChannels(image);
-        SetPixelGray(image,ScaleAnyToQuantum((pixel >> 22) & 0x3ff,range),
-          q);
-        p+=(ptrdiff_t) quantum_info->pad;
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
-      if (x++ < ((ssize_t) number_pixels-1))
-        {
-          p=PushLongPixel(quantum_info->endian,p,&pixel);
-          SetPixelGray(image,ScaleAnyToQuantum((pixel >> 2) & 0x3ff,
-            range),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      if (x++ < (ssize_t) number_pixels)
-        {
-          SetPixelGray(image,ScaleAnyToQuantum((pixel >> 12) & 0x3ff,
-            range),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
+      ImportUnpacked10BitGrayQuantum(image,quantum_info,span,range,pixel);
       return;
     }
   for (x=0; x < (ssize_t) number_pixels; x++)
