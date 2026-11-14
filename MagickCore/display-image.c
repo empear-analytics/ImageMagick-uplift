@@ -22371,6 +22371,63 @@ static void XRecordMappedWindow(const DisplayEventContext *context,
     }
 }
 
+static void XHandleMapNotify(const DisplayEventContext *context,
+  const DisplayEventTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  Image
+    **const nexus = targets->nexus;
+
+  Image
+    **const display_image = targets->display_image;
+
+  XEvent
+    *const event = targets->event;
+
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),"Map Notify: 0x%lx",
+      (*event).xmap.window);
+  if ((*event).xmap.window == windows->backdrop.id)
+    {
+      (void) XSetInputFocus(display,(*event).xmap.window,RevertToParent,
+        CurrentTime);
+      windows->backdrop.mapped=MagickTrue;
+      return;
+    }
+  if ((*event).xmap.window == windows->image.id)
+    {
+      (*nexus)=XMapImageWindow(context,(*display_image),(*nexus));
+      return;
+    }
+  if ((*event).xmap.window == windows->magnify.id)
+    {
+      XMakeMagnifyImage(display,windows,exception);
+      windows->magnify.mapped=MagickTrue;
+      (void) XWithdrawWindow(display,windows->info.id,
+        windows->info.screen);
+      return;
+    }
+  if ((*event).xmap.window == windows->pan.id)
+    {
+      XMakePanImage(display,resource_info,windows,(*display_image),
+        exception);
+      windows->pan.mapped=MagickTrue;
+      return;
+    }
+  XRecordMappedWindow(context,targets);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -23060,37 +23117,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
       }
       case MapNotify:
       {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),"Map Notify: 0x%lx",
-            event.xmap.window);
-        if (event.xmap.window == windows->backdrop.id)
-          {
-            (void) XSetInputFocus(display,event.xmap.window,RevertToParent,
-              CurrentTime);
-            windows->backdrop.mapped=MagickTrue;
-            break;
-          }
-        if (event.xmap.window == windows->image.id)
-          {
-            nexus=XMapImageWindow(&event_context,display_image,nexus);
-            break;
-          }
-        if (event.xmap.window == windows->magnify.id)
-          {
-            XMakeMagnifyImage(display,windows,exception);
-            windows->magnify.mapped=MagickTrue;
-            (void) XWithdrawWindow(display,windows->info.id,
-              windows->info.screen);
-            break;
-          }
-        if (event.xmap.window == windows->pan.id)
-          {
-            XMakePanImage(display,resource_info,windows,display_image,
-              exception);
-            windows->pan.mapped=MagickTrue;
-            break;
-          }
-        XRecordMappedWindow(&event_context,&event_targets);
+        XHandleMapNotify(&event_context,&event_targets);
         break;
       }
       case MappingNotify:
