@@ -24467,6 +24467,45 @@ static inline MagickBooleanType IsSelectiveColormapCrossing(Display *display,
     (mode != NotifyUngrab)) ? MagickTrue : MagickFalse);
 }
 
+static void XDispatchWindowStateEvent(const DisplayEventContext *event_context,
+  const DisplayEventTargets *event_targets)
+{
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+  XEvent
+    *const event = event_targets->event;
+
+  switch ((*event).type)
+  {
+    case PropertyNotify:
+    {
+      XHandlePropertyNotify(event_context,event_targets);
+      break;
+    }
+    case ReparentNotify:
+    {
+      if (resource_info->debug != MagickFalse)
+        (void) LogMagickEvent(X11Event,GetMagickModule(),
+          "Reparent Notify: 0x%lx=>0x%lx",(*event).xreparent.parent,
+          (*event).xreparent.window);
+      break;
+    }
+    case UnmapNotify:
+    {
+      XHandleUnmapNotify(event_context,event_targets);
+      break;
+    }
+    default:
+    {
+      if (resource_info->debug != MagickFalse)
+        (void) LogMagickEvent(X11Event,GetMagickModule(),"Event type: %d",
+          (*event).type);
+      break;
+    }
+  }
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -24972,29 +25011,9 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
       }
       case NoExpose:
         break;
-      case PropertyNotify:
-      {
-        XHandlePropertyNotify(&event_context,&event_targets);
-        break;
-      }
-      case ReparentNotify:
-      {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Reparent Notify: 0x%lx=>0x%lx",event.xreparent.parent,
-            event.xreparent.window);
-        break;
-      }
-      case UnmapNotify:
-      {
-        XHandleUnmapNotify(&event_context,&event_targets);
-        break;
-      }
       default:
       {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),"Event type: %d",
-            event.type);
+        XDispatchWindowStateEvent(&event_context,&event_targets);
         break;
       }
     }
