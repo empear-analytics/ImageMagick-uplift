@@ -1275,6 +1275,18 @@ needs two copies of the block.
    nothing but that call (Recipe I step 2's exception), so while the new function runs
    each member is the only pointer to its variable in use, as step 2 requires of a
    single out-parameter.
+8. A targets struct the block passes on (2026-11-14). When the caller declares a `const`
+   struct `t` of addresses once, with the addresses as its initialiser (step 7's form,
+   or Recipe I step 2's, LB step 8's or Z step 7's), the block's only use of `t` is to
+   pass it, by value or as `&t`, to the call of another helper inside the block, and
+   nothing outside the block reads `t`, then `t` moves into the new function as a
+   parameter of the type the block passed (`const T t` or `const T *t`). A written
+   variable `v` whose address is a member of `t` is then written through that member
+   instead of a pointer parameter of its own: the new function binds `V *const v =
+   t.v;` (`t->v;`) at the top of its body, in member order, only for the members the
+   block's own text writes or reads, and writes `(*v)` as step 5 says; the call inside
+   the block passes `t` as before. The other written variables (each meeting step 2)
+   are pointer parameters as in step 4. At most four parameters in all.
 
 **Before:**
 
@@ -1352,6 +1364,17 @@ static void SelectMagnifyMethod(const char *option,
   copied, so a write a re-entrant call of the block's callees made to it would be seen
   as before, and its name, of block scope, gives no other function a path to it
   (Recipe CT's *Careful*).
+
+- Step 8: `t` holds the addresses of the caller's variables, set once by its
+  initialiser and never changed (`const`); passed by value, the new function's copy
+  holds the same addresses, so `(*t.v)` is the object the block named `v`, read and
+  written at the same points in the same order, and the inner call receives the same
+  addresses it received before (by value, a copy as before; as `&t`, the caller's own
+  struct, which the new function's `const T *` parameter is). Step 2 still holds for
+  every such `v`: its address is taken nowhere but in `t`'s initialiser (and calls that
+  keep no copy), and nothing but the block reads `t`, so while the new function runs the
+  member is the only pointer to `v` in use. A second struct of the same addresses, which
+  step 7 would add, would hold nothing new.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls`.
 
@@ -16742,3 +16765,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | KO | Replace Keyed Offset Groups with a Table of Bases: a `switch` whose label groups each assign `V=(K-C);` and break becomes a `static const` table of `{ label, base }` rows read by one loop, `V=(K-R[i].base);`. *Careful* gives the argument (labels distinct so at most one row matches, the row of the selected group; `E` and `K` unwritten and side-effect free; `base` holds the constant with its own value and type) | `display-image.c`'s `XSelectMagnifyDigit` (campaign A, W23 round twelve lane b, wide build): twenty labels in two runs, cc 22; a probe 2.76 to 2.89 and, stubbed, 6.12 to 6.49 (Claude Code, Sonnet 5.5) | owner |
 | 2026-11-14 | AMEND | LC | Step 6: a caller that already shares a Recipe N step 8 input struct and a Recipe CT step 3 loop-wide `const` targets struct between the helpers of its loop passes both to the helper (`if (Helper(&name,&targets) != MagickFalse) continue;`) in place of step 4's own struct and pointers: members bound once, targets members written `(*v)`, `&v` as `v`, `&name` as `name`, step 2's temporaries declared in the helper. *Careful* gives the argument (N step 8's fill condition for the reads, CT step 3's addresses for the writes) | `display-image.c`'s `XDisplayImage` (campaign A, W23 round twelve lane d, wide build): the command-widget test at the head of its event loop leaves the iteration through three `continue;`, writes `nexus` and `display_image` (members of `DisplayEventTargets`) and reads `event`, the command buffer and the context members; a probe of the step with the stasis test's Recipe E step: bumps 9 to 7, cc 95 to 87, the file with the other seven finding functions emptied 4.51 to 4.56, no finding on a new function | owner |
 | 2026-11-14 | AMEND | SD | Step 8, a run kept apart and shared structs: (a) a run of adjacent groups, in source order, may move with the `default` group when groups that stay stand between the run and `default` (step 6 already allowed it for its own form; C selects by label, not position, and no kept group falls through); (b) a caller that already shares a Recipe N step 8 input struct and a Recipe CT step 3 loop-wide `const` targets struct between the helpers of its loop passes both to the chain under the caller's local names (`&name` written `name` in the moved groups, members bound once, targets members as `(*v)`, the controlling expression included), with no struct, fill or local of its own. *Careful* gives the argument | `display-image.c`'s `XDisplayImage` (campaign A, W23 round twelve lane d, wide build): its 17-group event `switch` must keep `KeyPress` and `KeyRelease` in the caller (`XLookupString` takes `sizeof(command)` of the caller's array), which stand between the groups before them and `default`; the cases already share `DisplayEventContext` and `DisplayEventTargets`. A probe of the four-link chain after the crossing cases' Recipe P step: `XDisplayImage` cc 85 to 64, the file with the other seven finding functions emptied 4.56 to 4.76, no finding on a new function | owner |
+| 2026-11-14 | AMEND | O | Step 8: a written variable whose address is a member of a `const` targets struct that the block itself passes to another helper's call (nothing outside the block reading the struct) is written through that member, the struct moving in as a parameter of the type the block passed, in place of a pointer parameter of its own or a second struct of the same addresses (step 7). *Careful* gives the argument | `morphology.c`'s `MorphologyApply` (campaign A, W23 round thirteen lane a): its limit initialisation writes `method_limit`, `special` and `rslt_compose`, whose addresses its `const MorphologyIteratedLimits limits` holds, and `stage_limit`, then passes `limits` to `SelectMorphologyStageLimit`; step 4 gives seven parameters and step 7 a second struct of the same addresses in a caller held at 73 lines of *Large Method*. A probe: `MorphologyApply` leaves *Large Method*, 6.93 to 7.21, no finding on the new function. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
