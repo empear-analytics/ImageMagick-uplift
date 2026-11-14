@@ -1025,10 +1025,36 @@ static void SyncEndianFromMagickInfo(const ImageInfo *image_info,Image *image,
       image->endian=GetHostEndian();
 }
 
-static void FindFallbackEncoder(ImageInfo *write_info,Image *image,
-  const char *filename,const MagickInfo **magick_info,
-  EncodeImageHandler **encoder,ExceptionInfo *exception)
+typedef struct _EncodeFallbackInfo
 {
+  ImageInfo
+    *write_info;
+
+  Image
+    *image;
+
+  char
+    *filename;
+
+  ExceptionInfo
+    *exception;
+} EncodeFallbackInfo;
+
+static void FindFallbackEncoder(const EncodeFallbackInfo *info,
+  const MagickInfo **magick_info,EncodeImageHandler **encoder)
+{
+  ImageInfo
+    *const write_info = info->write_info;
+
+  Image
+    *const image = info->image;
+
+  const char
+    *const filename = info->filename;
+
+  ExceptionInfo
+    *const exception = info->exception;
+
   *magick_info=GetWriteMagickInfo(write_info,image,exception);
   *encoder=GetImageEncoder(*magick_info);
   if (*encoder == (EncodeImageHandler *) NULL)
@@ -1110,21 +1136,6 @@ static MagickBooleanType InvokeLockedWriteDelegate(
   return(status);
 }
 
-typedef struct _EncodeFallbackInfo
-{
-  ImageInfo
-    *write_info;
-
-  Image
-    *image;
-
-  char
-    *filename;
-
-  ExceptionInfo
-    *exception;
-} EncodeFallbackInfo;
-
 static void EncodeImageWithFallback(const EncodeFallbackInfo *info,
   MagickBooleanType *status)
 {
@@ -1162,8 +1173,7 @@ static void EncodeImageWithFallback(const EncodeFallbackInfo *info,
     }
   else
     {
-      FindFallbackEncoder(write_info,image,filename,&magick_info,&encoder,
-        exception);
+      FindFallbackEncoder(info,&magick_info,&encoder);
       if (encoder != (EncodeImageHandler *) NULL)
         {
           /*
