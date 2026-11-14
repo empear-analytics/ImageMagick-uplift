@@ -4972,6 +4972,107 @@ static inline MagickBooleanType IsRowOutsideImage(const Image *image,
     MagickTrue : MagickFalse);
 }
 
+typedef struct _DisplaceRows
+{
+  Image
+    *canvas_image,
+    *image,
+    *source_image;
+
+  PointInfo
+    center;
+
+  CompositeOperator
+    compose;
+
+  MagickRealType
+    horizontal_scale,
+    vertical_scale;
+
+  ssize_t
+    x_offset,
+    y_offset;
+
+  ExceptionInfo
+    *exception;
+} DisplaceRows;
+
+static void DisplaceCompositeRows(const DisplaceRows *rows)
+{
+  Image
+    *const canvas_image = rows->canvas_image,
+    *const image = rows->image,
+    *const source_image = rows->source_image;
+
+  const PointInfo
+    center = rows->center;
+
+  const CompositeOperator
+    compose = rows->compose;
+
+  const MagickRealType
+    horizontal_scale = rows->horizontal_scale,
+    vertical_scale = rows->vertical_scale;
+
+  const ssize_t
+    x_offset = rows->x_offset,
+    y_offset = rows->y_offset;
+
+  ExceptionInfo
+    *const exception = rows->exception;
+
+  CacheView
+    *canvas_view,
+    *image_view,
+    *source_view;
+
+  PixelInfo
+    pixel;
+
+  ssize_t
+    y;
+
+  GetPixelInfo(image,&pixel);
+  image_view=AcquireVirtualCacheView(image,exception);
+  source_view=AcquireVirtualCacheView(source_image,exception);
+  canvas_view=AcquireAuthenticCacheView(canvas_image,exception);
+  for (y=0; y < (ssize_t) source_image->rows; y++)
+  {
+    MagickBooleanType
+      sync;
+
+    const Quantum
+      *magick_restrict p;
+
+    Quantum
+      *magick_restrict q;
+
+    if (IsRowOutsideImage(image,y,y_offset) != MagickFalse)
+      continue;
+    p=GetCacheViewVirtualPixels(source_view,0,y,source_image->columns,1,
+      exception);
+    q=QueueCacheViewAuthenticPixels(canvas_view,0,y,canvas_image->columns,1,
+      exception);
+    if (IsBlendRowPairMissing(p,q) != MagickFalse)
+      break;
+    {
+      const DisplaceColumns
+        columns = { canvas_image, image, source_image, image_view, center,
+          compose, horizontal_scale, vertical_scale, x_offset, y,
+          exception };
+
+      if (DisplaceCompositeColumns(&columns,p,q,&pixel) == MagickFalse)
+        break;
+    }
+    sync=SyncCacheViewAuthenticPixels(canvas_view,exception);
+    if (sync == MagickFalse)
+      break;
+  }
+  canvas_view=DestroyCacheView(canvas_view);
+  source_view=DestroyCacheView(source_view);
+  image_view=DestroyCacheView(image_view);
+}
+
 static BlendRequest GetBlendRequest(const Image *image,const ssize_t x_offset,
   const ssize_t y_offset)
 {
@@ -5305,15 +5406,12 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     case DisplaceCompositeOp:
     case DistortCompositeOp:
     {
-      CacheView
-        *canvas_view;
+      DisplaceRows
+        rows;
 
       MagickRealType
         horizontal_scale,
         vertical_scale;
-
-      PixelInfo
-        pixel;
 
       PointInfo
         center;
@@ -5361,45 +5459,17 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
         Shift the pixel offset point as defined by the provided,
         displacement/distortion map.  -- Like a lens...
       */
-      GetPixelInfo(image,&pixel);
-      image_view=AcquireVirtualCacheView(image,exception);
-      source_view=AcquireVirtualCacheView(source_image,exception);
-      canvas_view=AcquireAuthenticCacheView(canvas_image,exception);
-      for (y=0; y < (ssize_t) source_image->rows; y++)
-      {
-        MagickBooleanType
-          sync;
-
-        const Quantum
-          *magick_restrict p;
-
-        Quantum
-          *magick_restrict q;
-
-        if (IsRowOutsideImage(image,y,y_offset) != MagickFalse)
-          continue;
-        p=GetCacheViewVirtualPixels(source_view,0,y,source_image->columns,1,
-          exception);
-        q=QueueCacheViewAuthenticPixels(canvas_view,0,y,canvas_image->columns,1,
-          exception);
-        if (IsBlendRowPairMissing(p,q) != MagickFalse)
-          break;
-        {
-          const DisplaceColumns
-            columns = { canvas_image, image, source_image, image_view, center,
-              compose, horizontal_scale, vertical_scale, x_offset, y,
-              exception };
-
-          if (DisplaceCompositeColumns(&columns,p,q,&pixel) == MagickFalse)
-            break;
-        }
-        sync=SyncCacheViewAuthenticPixels(canvas_view,exception);
-        if (sync == MagickFalse)
-          break;
-      }
-      canvas_view=DestroyCacheView(canvas_view);
-      source_view=DestroyCacheView(source_view);
-      image_view=DestroyCacheView(image_view);
+      rows.canvas_image=canvas_image;
+      rows.image=image;
+      rows.source_image=source_image;
+      rows.center=center;
+      rows.compose=compose;
+      rows.horizontal_scale=horizontal_scale;
+      rows.vertical_scale=vertical_scale;
+      rows.x_offset=x_offset;
+      rows.y_offset=y_offset;
+      rows.exception=exception;
+      DisplaceCompositeRows(&rows);
       source_image=DestroyImage(source_image);
       source_image=canvas_image;
       break;
