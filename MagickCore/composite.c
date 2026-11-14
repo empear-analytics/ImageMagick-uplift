@@ -5212,6 +5212,61 @@ static BlendRequest GetBlendRequest(const Image *image,const ssize_t x_offset,
   return(request);
 }
 
+typedef struct _ComposeArtifactTargets
+{
+  double
+    *white_luminance;
+
+  IlluminantType
+    *illuminant;
+
+  ColorspaceType
+    *colorspace;
+
+  MagickBooleanType
+    *clamp,
+    *compose_sync;
+} ComposeArtifactTargets;
+
+static void GetComposeArtifacts(const Image *image,
+  const ComposeArtifactTargets *targets)
+{
+  double
+    *const white_luminance = targets->white_luminance;
+
+  IlluminantType
+    *const illuminant = targets->illuminant;
+
+  ColorspaceType
+    *const colorspace = targets->colorspace;
+
+  MagickBooleanType
+    *const clamp = targets->clamp,
+    *const compose_sync = targets->compose_sync;
+
+  const char
+    *artifact;
+
+  (*white_luminance)=10000.0;
+  artifact=GetImageArtifact(image,"compose:white-luminance");
+  if (artifact != (const char *) NULL)
+    (*white_luminance)=StringToDouble(artifact,(char **) NULL);
+  artifact=GetImageArtifact(image,"compose:illuminant");
+  if (artifact != (const char *) NULL)
+    (*illuminant)=ParseComposeIlluminant(artifact);
+  artifact=GetImageArtifact(image,"compose:colorspace");
+  if (artifact != (const char *) NULL)
+    (*colorspace)=ParseComposeColorspace(artifact);
+  (*clamp)=MagickTrue;
+  artifact=GetImageArtifact(image,"compose:clamp");
+  if (artifact != (const char *) NULL)
+    (*clamp)=IsStringTrue(artifact);
+  (*compose_sync)=MagickTrue;
+  artifact=GetImageArtifact(image,"compose:sync");
+  if (artifact != (const char *) NULL)
+    (*compose_sync)=IsStringTrue(artifact);
+}
+
 static MagickBooleanType IsSourceInsideCanvas(const Image *image,
   const Image *source_image,const ssize_t x_offset,const ssize_t y_offset)
 {
@@ -5280,6 +5335,10 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
   ssize_t
     y;
 
+  const ComposeArtifactTargets
+    targets = { &white_luminance, &illuminant, &colorspace, &clamp,
+      &compose_sync };
+
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   assert(composite != (Image *) NULL);
@@ -5304,24 +5363,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
   amount=0.5;
   canvas_image=(Image *) NULL;
   canvas_dissolve=1.0;
-  white_luminance=10000.0;
-  artifact=GetImageArtifact(image,"compose:white-luminance");
-  if (artifact != (const char *) NULL)
-    white_luminance=StringToDouble(artifact,(char **) NULL);
-  artifact=GetImageArtifact(image,"compose:illuminant");
-  if (artifact != (const char *) NULL)
-    illuminant=ParseComposeIlluminant(artifact);
-  artifact=GetImageArtifact(image,"compose:colorspace");
-  if (artifact != (const char *) NULL)
-    colorspace=ParseComposeColorspace(artifact);
-  clamp=MagickTrue;
-  artifact=GetImageArtifact(image,"compose:clamp");
-  if (artifact != (const char *) NULL)
-    clamp=IsStringTrue(artifact);
-  compose_sync=MagickTrue;
-  artifact=GetImageArtifact(image,"compose:sync");
-  if (artifact != (const char *) NULL)
-    compose_sync=IsStringTrue(artifact);
+  GetComposeArtifacts(image,&targets);
   SetGeometryInfo(&geometry_info);
   percent_luma=100.0;
   percent_chroma=100.0;
