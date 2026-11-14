@@ -1268,6 +1268,20 @@ static MagickBooleanType LoadPolicyIncludes(const PolicyIncludeScan *scan,
   return(MagickTrue);
 }
 
+static void LoadPolicyIncludeElement(const PolicyIncludeScan *scan,
+  const char **q,MagickStatusType *status)
+{
+  ExceptionInfo
+    *const exception = scan->target->exception;
+
+  char
+    *const token = scan->token;
+
+  while (LoadPolicyIncludes(scan,q,status) == MagickFalse)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
+}
+
 static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
   const char *policy,const char *filename,const size_t depth)
 {
@@ -1323,9 +1337,7 @@ static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
         /*
           Include element.
         */
-        while (LoadPolicyIncludes(&scan,&q,&status) == MagickFalse)
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
+        LoadPolicyIncludeElement(&scan,&q,&status);
         continue;
       }
     if (LocaleCompare(keyword,"<policy") == 0)
