@@ -26,6 +26,7 @@ if ( ! GetOptions(
 # Source files to use
 #
 @srcs = ('animate.c',
+	 'animate-window.c',
 	 'annotate.c',
 	 'attribute.c',
 	 'attribute-hull.c',
@@ -52,6 +53,7 @@ if ( ! GetOptions(
 	 'draw.c',
 	 'drawing-wand.c',
 	 'display.c',
+	 'display-image.c',
 	 'effect.c',
 	 'effect-filter.c',
 	 'effect-preview.c',

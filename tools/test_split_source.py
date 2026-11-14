@@ -110,6 +110,120 @@ class SplitSource(unittest.TestCase):
         self.assertNotIn("FamilyName", old)
         self.assert_both_compile()
 
+    def test_enumeration_between_the_moved_functions_moves_and_a_shared_one_refuses(self):
+        enum = "\ntypedef enum\n{\n  FamilyOne,\n  FamilyTwo\n} FamilyChoice;\n"
+        fam = FAMILY.replace("return(FamilyHelper(x));", "return(FamilyHelper(x)+(int) FamilyTwo);")
+        helper, root = fam.split("\nMagickExport int FamilyRoot", 1)
+        r = self.split(helper + enum + "\nMagickExport int FamilyRoot" + root + KEPT)
+        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        new = open(os.path.join(self.out, "synth-family.c")).read()
+        old = open(os.path.join(self.out, "synth.c")).read()
+        self.assertEqual(new.count("} FamilyChoice;"), 1)
+        self.assertNotIn("FamilyChoice", old)
+        self.assert_both_compile()
+        # planted defect: the kept root names the enumeration too, so it may not move
+        kept = KEPT.replace("return(x*2);", "return(x*2+(int) FamilyOne);")
+        r = self.split(helper + enum + "\nMagickExport int FamilyRoot" + root + kept)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("FamilyOne, an enumerator", r.stderr + r.stdout)
+
+    def test_inline_static_helper_is_a_static(self):
+        # `inline static T Name(...)` is a static: it moves with its only caller, and a kept caller makes it shared
+        fam = FAMILY.replace("static int FamilyHelper", "inline static int FamilyHelper")
+        r = self.split(fam + KEPT)
+        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        new = open(os.path.join(self.out, "synth-family.c")).read()
+        old = open(os.path.join(self.out, "synth.c")).read()
+        self.assertEqual(new.count("inline static int FamilyHelper"), 1)
+        self.assertNotIn("FamilyHelper", old)
+        self.assert_both_compile()
+        # planted defect: a kept function calls the helper as well
+        r = self.split(fam + KEPT.replace("return(x*2);", "return(FamilyHelper(x));"))
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("FamilyHelper", r.stderr + r.stdout)
+
+    def test_forward_declaration_with_the_name_in_column_zero_moves(self):
+        # `static T` / `Name(...);` (no indent), above the first moved function and between moved functions
+        top = "static int\nFamilyHelper(int);\n\n"
+        r = self.split(top + FAMILY + KEPT)
+        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        new = open(os.path.join(self.out, "synth-family.c")).read()
+        old = open(os.path.join(self.out, "synth.c")).read()
+        self.assertEqual(new.count("FamilyHelper(int);"), 1)
+        self.assertNotIn("FamilyHelper", old)
+        self.assert_both_compile()
+        helper, root = FAMILY.split("\nMagickExport int FamilyRoot", 1)
+        r = self.split(helper + "\nstatic int\nFamilyHelper(int);\n" + "\nMagickExport int FamilyRoot" + root + KEPT)
+        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        self.assertNotIn("FamilyHelper", open(os.path.join(self.out, "synth.c")).read())
+        # planted defect: the kept root calls the helper too, so the declaration may not move
+        r = self.split(top + FAMILY + KEPT.replace("return(x*2);", "return(FamilyHelper(x));"))
+        self.assertNotEqual(r.returncode, 0)
+
+    def test_extern_c_pair_above_the_first_function_moves_with_its_comment(self):
+        opener = "#if defined(__cplusplus) || defined(c_plusplus)\nextern \"C\" {\n#endif\n"
+        closer = "#if defined(__cplusplus) || defined(c_plusplus)\n}\n#endif\n"
+        callback = "static int FamilyCallback(int x)\n{\n  return(x+2);\n}\n\n"
+        root = "MagickExport int FamilyRoot(int x)\n{\n  return(FamilyCallback(x));\n}\n\n"
+        body = "/*\n  FamilyCallback() adds two.\n*/\n" + opener + "\n" + callback + root + closer + KEPT
+        r = self.split(body)
+        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        new = open(os.path.join(self.out, "synth-family.c")).read()
+        old = open(os.path.join(self.out, "synth.c")).read()
+        self.assertEqual(new.count('extern "C" {'), 1)
+        self.assertIn("FamilyCallback() adds two.", new)
+        self.assertNotIn("extern", old)
+        self.assertNotIn("FamilyCallback", old)
+        self.assert_both_compile()
+        # planted defect: a kept function stands between the moved ones and the closer, so the pair would be left open
+        body = "/*\n  FamilyCallback() adds two.\n*/\n" + opener + "\n" + callback + KEPT + "\n" + root + closer
+        r = self.split(body)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("extern", r.stderr + r.stdout)
+
+    def test_multiline_defines_that_only_the_family_names_move_with_it(self):
+        macros = ("\n/*\n  Define declarations.\n*/\n#define FamilyScale(x) \\\n  ((x)*2+ \\\n   FamilyBias(x))\n"
+                  "#define FamilyBias(x) \\\n  ((x)+ \\\n   1)\n#define FamilyOne  1\n\n")
+        fam = FAMILY.replace("return(x+1);", "return(FamilyScale(x)+FamilyOne);")
+        r = self.split(macros + fam + KEPT)
+        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        new = open(os.path.join(self.out, "synth-family.c")).read()
+        old = open(os.path.join(self.out, "synth.c")).read()
+        for name in ("#define FamilyScale(x) \\\n  ((x)*2+ \\\n   FamilyBias(x))", "#define FamilyBias(x) \\\n  ((x)+ \\\n   1)",
+                     "#define FamilyOne  1"):
+            self.assertEqual(new.count(name), 1, name)
+        for name in ("FamilyScale", "FamilyBias", "FamilyOne"):
+            self.assertNotIn(name, old)
+        self.assert_both_compile()
+        # planted defects: the kept root names the outer macro, or the inner one the outer macro names
+        for use in ("FamilyScale(x)", "FamilyBias(x)"):
+            r = self.split(macros + fam + KEPT.replace("return(x*2);", "return(%s);" % use))
+            self.assertNotEqual(r.returncode, 0, use)
+            self.assertIn("refused", r.stderr + r.stdout)
+
+    def test_variables_that_only_the_family_names_move_with_it(self):
+        # one declaration of two mutable static arrays between the moved functions, and a mutable static scalar at the top
+        top = "static int\n  FamilyCount = 0;\n\n"
+        group = ("static int\n  FamilyTable[] =\n  {\n    1, 2\n  },\n  FamilyOffsets[] =\n  {\n    3\n  };\n\n")
+        helper, root = FAMILY.split("\nMagickExport int FamilyRoot", 1)
+        root = root.replace("return(FamilyHelper(x));",
+                            "FamilyCount++;\n  return(FamilyHelper(x)+FamilyTable[0]+FamilyOffsets[0]);")
+        body = top + helper + "\n" + group + "MagickExport int FamilyRoot" + root + KEPT
+        r = self.split(body)
+        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        new = open(os.path.join(self.out, "synth-family.c")).read()
+        old = open(os.path.join(self.out, "synth.c")).read()
+        for name in ("FamilyCount = 0;", "FamilyTable[] =", "FamilyOffsets[] ="):
+            self.assertEqual(new.count(name), 1, name)
+        for name in ("FamilyCount", "FamilyTable", "FamilyOffsets"):
+            self.assertNotIn(name, old)
+        self.assert_both_compile()
+        # planted defects: the kept root names the scalar, or one declarator of the group, so the split is refused
+        for use in ("FamilyCount", "FamilyOffsets[0]"):
+            r = self.split(body.replace("return(x*2);", "return(x*2+%s);" % use))
+            self.assertNotEqual(r.returncode, 0, use)
+            self.assertIn("refused", r.stderr + r.stdout)
+
     def test_stub_of_a_moved_root_moves_under_the_else_line(self):
         stub = "\nMagickExport int FamilyRoot(int x)\n{\n  return(-1);\n}\n"
         r = self.split("#if defined(DELEGATE)\n" + FAMILY + "#else" + stub + "#endif\n" + KEPT)
