@@ -1873,6 +1873,35 @@ static MagickBooleanType AddInternalEntityDeclaration(
   return(MagickTrue);
 }
 
+static MagickBooleanType ParseOtherDoctypeMarkup(XMLTreeRoot *root,
+  ExceptionInfo *exception,const AttributeListTargets *targets,
+  MagickBooleanType *broke)
+{
+  char
+    **const xml = targets->xml,
+    **const n = targets->n;
+
+  (*broke)=MagickFalse;
+  if (strncmp((*xml),"<!ATTLIST",9) == 0)
+    {
+      AttributeListTargets
+        attribute_list_targets;
+
+      attribute_list_targets.xml=xml;
+      attribute_list_targets.n=n;
+      if (ParseAttributeListDeclaration(root,exception,
+          &attribute_list_targets) == MagickFalse)
+        return(MagickFalse);
+    }
+  else
+    if (SkipDoctypeMarkup(root,xml) == MagickFalse)
+      {
+        (*broke)=MagickTrue;
+        return(MagickTrue);
+      }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ParseInternalDoctypeDeclarations(
   const InternalDoctypeInfo *doctype,char *xml,char *n,
   char ***predefined_entities)
@@ -1893,6 +1922,12 @@ static MagickBooleanType ParseInternalDoctypeDeclarations(
 
   EntityHeadTargets
     entity_targets;
+
+  const AttributeListTargets
+    markup_targets = { &xml, &n };
+
+  MagickBooleanType
+    broke = MagickFalse;
 
   for (xml[length]='\0'; xml != (char *) NULL; )
   {
@@ -1922,20 +1957,13 @@ static MagickBooleanType ParseInternalDoctypeDeclarations(
         }
         }
       else
-       if (strncmp(xml,"<!ATTLIST",9) == 0)
-         {
-            AttributeListTargets
-              attribute_list_targets;
-
-            attribute_list_targets.xml=(&xml);
-            attribute_list_targets.n=(&n);
-            if (ParseAttributeListDeclaration(root,exception,
-                &attribute_list_targets) == MagickFalse)
-              return(MagickFalse);
+        {
+          if (ParseOtherDoctypeMarkup(root,exception,&markup_targets,
+                &broke) == MagickFalse)
+            return(MagickFalse);
+          if (broke != MagickFalse)
+            break;
         }
-      else
-        if (SkipDoctypeMarkup(root,&xml) == MagickFalse)
-          break;
     }
   return(MagickTrue);
 }
