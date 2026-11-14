@@ -5284,6 +5284,15 @@ static void LogInterpretImageProperties(const ImageInfo *image_info,
         (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no image");
 }
 
+static void DestroyInterpretSources(const ImageInfo *image_info,
+  const Image *image,ImageInfo *property_info,Image *property_image)
+{
+  if ((property_image != image) && (property_image != (Image *) NULL))
+    property_image=DestroyImage(property_image);
+  if ((property_info != image_info) && (property_info != (ImageInfo *) NULL))
+    property_info=DestroyImageInfo(property_info);
+}
+
 MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   const char *embed_text,ExceptionInfo *exception)
 {
@@ -5369,10 +5378,7 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   *q='\0';
 
 cleanup:
-  if ((property_image != image) && (property_image != (Image *) NULL))
-    property_image=DestroyImage(property_image);
-  if ((property_info != image_info) && (property_info != (ImageInfo *) NULL))
-    property_info=DestroyImageInfo(property_info);
+  DestroyInterpretSources(image_info,image,property_info,property_image);
   if (status == MagickFalse)
     {
       if (interpret_text != (char *) NULL)
