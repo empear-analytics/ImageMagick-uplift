@@ -461,6 +461,21 @@ static char *AppendIPTCDataset(char *attribute,const StringInfo *profile,
   return(attribute);
 }
 
+static void SetIPTCAttribute(const Image *image,const char *key,
+  char *attribute,ExceptionInfo *exception)
+{
+  if ((attribute == (char *) NULL) || (*attribute == ';'))
+    {
+      if (attribute != (char *) NULL)
+        attribute=DestroyString(attribute);
+      return;
+    }
+  attribute[strlen(attribute)-1]='\0';
+  (void) SetImageProperty((Image *) image,key,(const char *) attribute,
+    exception);
+  attribute=DestroyString(attribute);
+}
+
 static void GetIPTCProperty(const Image *image,const char *key,
   ExceptionInfo *exception)
 {
@@ -506,16 +521,7 @@ static void GetIPTCProperty(const Image *image,const char *key,
     */
     i+=(((size_t) p[3] << 8) | (size_t) p[4])+5;
   }
-  if ((attribute == (char *) NULL) || (*attribute == ';'))
-    {
-      if (attribute != (char *) NULL)
-        attribute=DestroyString(attribute);
-      return;
-    }
-  attribute[strlen(attribute)-1]='\0';
-  (void) SetImageProperty((Image *) image,key,(const char *) attribute,
-    exception);
-  attribute=DestroyString(attribute);
+  SetIPTCAttribute(image,key,attribute,exception);
 }
 
 static inline int ReadPropertyByte(const unsigned char **p,size_t *length)
