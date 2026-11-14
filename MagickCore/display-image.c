@@ -1530,12 +1530,30 @@ static const unsigned char
     0xff, 0xbf, 0xff, 0x7f, 0xff, 0x7f, 0xff, 0x7f
   };
 
+typedef struct _ImageWindowKeyInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    **image;
+
+  ExceptionInfo
+    *exception;
+} ImageWindowKeyInput;
+
 /*
   Forward declarations.
 */
 static DisplayCommand
-  XImageWindowCommand(Display *,XResourceInfo *,XWindows *,
-    const MagickStatusType,KeySym,Image **,ExceptionInfo *);
+  XImageWindowCommand(const ImageWindowKeyInput *,const MagickStatusType,
+    KeySym);
 static Image
   *XMagickCommand(Display *,XResourceInfo *,XWindows *,const DisplayCommand,
     Image **,ExceptionInfo *),
@@ -10578,24 +10596,6 @@ static DisplayCommand XImmutableWindowCommand(const KeySym key_symbol)
   return(NullCommand);
 }
 
-typedef struct _ImageWindowKeyInput
-{
-  Display
-    *display;
-
-  XResourceInfo
-    *resource_info;
-
-  XWindows
-    *windows;
-
-  Image
-    **image;
-
-  ExceptionInfo
-    *exception;
-} ImageWindowKeyInput;
-
 static void XTrimVerticalEdges(XResourceInfo *resource_info,
   const KeySym key_symbol,RectangleInfo *crop_info)
 {
@@ -10704,18 +10704,26 @@ static MagickBooleanType IsImageWindowTranslateKey(const KeySym key_symbol)
   return(MagickFalse);
 }
 
-static DisplayCommand XImageWindowCommand(Display *display,
-  XResourceInfo *resource_info,XWindows *windows,const MagickStatusType state,
-  KeySym key_symbol,Image **image,ExceptionInfo *exception)
+static DisplayCommand XImageWindowCommand(const ImageWindowKeyInput *input,
+  const MagickStatusType state,KeySym key_symbol)
 {
+  Display
+    *const display = input->display;
+
+  Image
+    **const image = input->image;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
   static char
     delta[MagickPathExtent+1] = "";
 
   static KeySym
     last_symbol = XK_0;
-
-  const ImageWindowKeyInput
-    input = { display, resource_info, windows, image, exception };
 
   if ((key_symbol >= XK_0) && (key_symbol <= XK_9))
     {
@@ -10748,7 +10756,7 @@ static DisplayCommand XImageWindowCommand(Display *display,
     case XK_KP_Right:
     {
       if ((state & Mod1Mask) != 0)
-        return(XTrimImageWindowEdge(&input,key_symbol));
+        return(XTrimImageWindowEdge(input,key_symbol));
       XTranslateImage(display,windows,*image,key_symbol);
       return(NullCommand);
     }
@@ -17939,8 +17947,11 @@ static void XROIDownHelpKey(const ROIKeyInput *key_input,
     }
     default:
     {
-      (*display_command)=XImageWindowCommand(display,resource_info,windows,
-        (*event).xkey.state,key_symbol,image,exception);
+      const ImageWindowKeyInput
+        input = { display, resource_info, windows, image, exception };
+
+      (*display_command)=XImageWindowCommand(&input,(*event).xkey.state,
+        key_symbol);
       if ((*display_command) != NullCommand)
         (*state)|=UpdateRegionState;
       break;
@@ -23450,8 +23461,10 @@ static void XImageWindowKeyPress(const DisplayEventContext *context,
   DisplayCommand
     display_command;
 
-  display_command=XImageWindowCommand(display,resource_info,windows,
-    event.xkey.state,key_symbol,display_image,exception);
+  const ImageWindowKeyInput
+    input = { display, resource_info, windows, display_image, exception };
+
+  display_command=XImageWindowCommand(&input,event.xkey.state,key_symbol);
   if (display_command != NullCommand)
     (*nexus)=XMagickCommand(display,resource_info,windows,
       display_command,display_image,exception);
