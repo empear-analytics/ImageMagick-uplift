@@ -3630,6 +3630,77 @@ static const char *GetConvexHullExtremePoints(Image *image,char *value,
   return(string);
 }
 
+typedef enum
+{
+  ConvexHullPointList,
+  MinimumBoundingBoxPointList
+} PointListSide;
+
+typedef struct _PointListInputs
+{
+  Image
+    *image;
+
+  char
+    *value;
+
+  const char
+    *string,
+    *property;
+
+  ExceptionInfo
+    *exception;
+} PointListInputs;
+
+static inline const char *GetPointListProperty(const PointListInputs *inputs,
+  const PointListSide side)
+{
+  char
+    *const value = inputs->value;
+
+  const char
+    *const property = inputs->property,
+    *string = inputs->string;
+
+  ExceptionInfo
+    *const exception = inputs->exception;
+
+  Image
+    *const image = inputs->image;
+
+  char
+    *points;
+
+  PointInfo
+    *point_list;
+
+  ssize_t
+    n;
+
+  size_t
+    number_points;
+
+  point_list=((side == ConvexHullPointList) ? GetImageConvexHull(image,
+    &number_points,exception) : GetImageMinimumBoundingBox(image,
+    &number_points,exception));
+  if (point_list == (PointInfo *) NULL)
+    return(string);
+  points=AcquireString("");
+  for (n=0; n < (ssize_t) number_points; n++)
+  {
+    (void) FormatLocaleString(value,MagickPathExtent,"%g,%g ",
+      point_list[n].x,point_list[n].y);
+    (void) ConcatenateString(&points,value);
+  }
+  point_list=(PointInfo *) RelinquishMagickMemory(point_list);
+  (void) SetImageProperty(image,((side == ConvexHullPointList) ?
+    "convex-hull" : "minimum-bounding-box"),points,exception);
+  points=DestroyString(points);
+  string=GetImageProperty(image,((side == ConvexHullPointList) ?
+    "convex-hull" : property),exception);
+  return(string);
+}
+
 MagickExport const char *GetMagickProperty(ImageInfo *image_info,
   Image *image,const char *property,ExceptionInfo *exception)
 {
@@ -3728,33 +3799,11 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
         }
       if (LocaleCompare("convex-hull",property) == 0)
         {
-          char
-            *points;
-
-          PointInfo
-            *convex_hull;
-
-          ssize_t
-            n;
-
-          size_t
-            number_points;
+          const PointListInputs
+            inputs = { image, value, string, property, exception };
 
           WarnNoImageReturn("\"%%[%s]\"",property);
-          convex_hull=GetImageConvexHull(image,&number_points,exception);
-          if (convex_hull == (PointInfo *) NULL)
-            break;
-          points=AcquireString("");
-          for (n=0; n < (ssize_t) number_points; n++)
-          {
-            (void) FormatLocaleString(value,MagickPathExtent,"%g,%g ",
-              convex_hull[n].x,convex_hull[n].y);
-            (void) ConcatenateString(&points,value);
-          }
-          convex_hull=(PointInfo *) RelinquishMagickMemory(convex_hull);
-          (void) SetImageProperty(image,"convex-hull",points,exception);
-          points=DestroyString(points);
-          string=GetImageProperty(image,"convex-hull",exception);
+          string=GetPointListProperty(&inputs,ConvexHullPointList);
           break;
         }
       if (LocaleCompare("convex-hull:extreme-points",property) == 0)
@@ -3934,35 +3983,11 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
         }
       if (LocaleNCompare("minimum-bounding-box",property,20) == 0)
         {
-          char
-            *points;
-
-          PointInfo
-            *bounding_box;
-
-          ssize_t
-            n;
-
-          size_t
-            number_points;
+          const PointListInputs
+            inputs = { image, value, string, property, exception };
 
           WarnNoImageReturn("\"%%[%s]\"",property);
-          bounding_box=GetImageMinimumBoundingBox(image,&number_points,
-            exception);
-          if (bounding_box == (PointInfo *) NULL)
-            break;
-          points=AcquireString("");
-          for (n=0; n < (ssize_t) number_points; n++)
-          {
-            (void) FormatLocaleString(value,MagickPathExtent,"%g,%g ",
-              bounding_box[n].x,bounding_box[n].y);
-            (void) ConcatenateString(&points,value);
-          }
-          bounding_box=(PointInfo *) RelinquishMagickMemory(bounding_box);
-          (void) SetImageProperty(image,"minimum-bounding-box",points,
-            exception);
-          points=DestroyString(points);
-          string=GetImageProperty(image,property,exception);
+          string=GetPointListProperty(&inputs,MinimumBoundingBoxPointList);
           break;
         }
       break;
