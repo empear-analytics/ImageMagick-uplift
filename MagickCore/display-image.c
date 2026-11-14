@@ -21062,7 +21062,8 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
             filename);
           break;
         }
-      magick_fallthrough;
+      XTileUpdateImage(&input);
+      break;
     }
     case TileUpdateCommand:
     {
