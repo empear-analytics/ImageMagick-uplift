@@ -23220,6 +23220,12 @@ typedef struct _DisplayEventTargets
 
   WarningHandler
     *warning_handler;
+
+  XWindows
+    **windows;
+
+  unsigned int
+    *number_windows;
 } DisplayEventTargets;
 
 static void XSelectVirtualCommand(const DisplayEventContext *context,
@@ -26396,6 +26402,86 @@ static void XRestoreDisplayState(const WarningHandler warning_handler,
   XChangeToHomeDirectory(resource_info,exception);
 }
 
+typedef struct _DisplayWindowsInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  ExceptionInfo
+    *exception;
+
+  Image
+    **image;
+
+  char
+    *working_directory;
+
+  XWindowInfo
+    **magick_windows;
+} DisplayWindowsInput;
+
+static void XOpenDisplayWindows(const DisplayWindowsInput *input,
+  const DisplayEventTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  Image
+    *const display_image = *targets->display_image;
+
+  Image
+    **const image = input->image;
+
+  XPoint
+    *const vid_info = targets->vid_info;
+
+  WarningHandler
+    *const warning_handler = targets->warning_handler;
+
+  XWindows
+    **const windows = targets->windows;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindowInfo
+    **const magick_windows = input->magick_windows;
+
+  char
+    *const working_directory = input->working_directory;
+
+  unsigned int
+    *const number_windows = targets->number_windows;
+
+  (*warning_handler)=(WarningHandler) NULL;
+  (*windows)=XSetWindows((XWindows *) ~0);
+  if ((*windows) != (XWindows *) NULL)
+    {
+      (*warning_handler)=XRestoreWorkingDirectory(resource_info,
+        working_directory,exception);
+    }
+  else
+    {
+      /*
+        Allocate windows structure.
+      */
+      (*windows)=XAllocateDisplayWindows(display,resource_info,display_image,
+        image);
+      /*
+        Initialize window id's.
+      */
+      XInitializeWindowIds((*windows),magick_windows,number_windows);
+      (*vid_info).x=0;
+      (*vid_info).y=0;
+    }
+}
+
 typedef struct _DisplaySetUpInput
 {
   Display
@@ -26594,33 +26680,18 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
 
   const DisplayEventTargets
     event_targets = { &nexus, &display_image, &event, &vid_info, &timer,
-      &context_values, &status, &warning_handler };
+      &context_values, &status, &warning_handler, &windows, &number_windows };
 
   assert(image != (Image **) NULL);
   assert((*image)->signature == MagickCoreSignature);
   XTraceDisplayImage(image);
   display_image=(*image);
-  warning_handler=(WarningHandler) NULL;
-  windows=XSetWindows((XWindows *) ~0);
-  if (windows != (XWindows *) NULL)
-    {
-      warning_handler=XRestoreWorkingDirectory(resource_info,working_directory,
-        exception);
-    }
-  else
-    {
-      /*
-        Allocate windows structure.
-      */
-      windows=XAllocateDisplayWindows(display,resource_info,display_image,
-        image);
-      /*
-        Initialize window id's.
-      */
-      XInitializeWindowIds(windows,magick_windows,&number_windows);
-      vid_info.x=0;
-      vid_info.y=0;
-    }
+  {
+    const DisplayWindowsInput input = { display, resource_info, exception,
+      image, working_directory, magick_windows };
+
+    XOpenDisplayWindows(&input,&event_targets);
+  }
   /*
     Initialize font info.
   */
