@@ -11112,6 +11112,81 @@ static void XApplyAddBorderCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyAddFrameCommand(const XMagickCommandContext *context,
+  char *color)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  RectangleInfo
+    page_geometry;
+
+  FrameInfo
+    frame_info;
+
+  Image
+    *frame_image;
+
+  static char
+    geometry[MagickPathExtent] = "6x6";
+
+  /*
+    Query user for frame color and geometry.
+  */
+  XColorBrowserWidget(display,windows,"Select",color);
+  if (*color == '\0')
+    return;
+  (void) XDialogWidget(display,windows,"Add Frame","Enter frame geometry:",
+    geometry);
+  if (*geometry == '\0')
+    return;
+  /*
+    Surround image with an ornamental border.
+  */
+  (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
+    exception);
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) QueryColorCompliance(color,AllCompliance,&(*image)->matte_color,
+    exception);
+  (void) ParsePageGeometry(*image,geometry,&page_geometry,
+    exception);
+  frame_info.width=page_geometry.width;
+  frame_info.height=page_geometry.height;
+  frame_info.outer_bevel=page_geometry.x;
+  frame_info.inner_bevel=page_geometry.y;
+  frame_info.x=(ssize_t) frame_info.width;
+  frame_info.y=(ssize_t) frame_info.height;
+  frame_info.width=(*image)->columns+2*frame_info.width;
+  frame_info.height=(*image)->rows+2*frame_info.height;
+  frame_image=FrameImage(*image,&frame_info,(*image)->compose,exception);
+  if (frame_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=frame_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  windows->image.window_changes.width=(int) (*image)->columns;
+  windows->image.window_changes.height=(int) (*image)->rows;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12652,61 +12727,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyAddBorderCommand(&context,color);
       break;
     case AddFrameCommand:
-    {
-      FrameInfo
-        frame_info;
-
-      Image
-        *frame_image;
-
-      static char
-        geometry[MagickPathExtent] = "6x6";
-
-      /*
-        Query user for frame color and geometry.
-      */
-      XColorBrowserWidget(display,windows,"Select",color);
-      if (*color == '\0')
-        break;
-      (void) XDialogWidget(display,windows,"Add Frame","Enter frame geometry:",
-        geometry);
-      if (*geometry == '\0')
-        break;
-      /*
-        Surround image with an ornamental border.
-      */
-      (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
-        exception);
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      (void) QueryColorCompliance(color,AllCompliance,&(*image)->matte_color,
-        exception);
-      (void) ParsePageGeometry(*image,geometry,&page_geometry,
-        exception);
-      frame_info.width=page_geometry.width;
-      frame_info.height=page_geometry.height;
-      frame_info.outer_bevel=page_geometry.x;
-      frame_info.inner_bevel=page_geometry.y;
-      frame_info.x=(ssize_t) frame_info.width;
-      frame_info.y=(ssize_t) frame_info.height;
-      frame_info.width=(*image)->columns+2*frame_info.width;
-      frame_info.height=(*image)->rows+2*frame_info.height;
-      frame_image=FrameImage(*image,&frame_info,(*image)->compose,exception);
-      if (frame_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=frame_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      windows->image.window_changes.width=(int) (*image)->columns;
-      windows->image.window_changes.height=(int) (*image)->rows;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyAddFrameCommand(&context,color);
       break;
-    }
     case CommentCommand:
     {
       const char
