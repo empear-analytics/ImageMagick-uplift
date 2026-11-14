@@ -961,6 +961,22 @@ static inline MagickBooleanType IsCollapsibleSpace(const char *xml,
     (isspace((int) ((unsigned char) *xml)) != 0)) ? MagickTrue : MagickFalse);
 }
 
+static char *CopyEntityBuffer(const char *p,const size_t extent)
+{
+  char
+    *extent_xml;
+
+  extent_xml=(char *) AcquireQuantumMemory(extent+1,
+    sizeof(*extent_xml));
+  if (extent_xml != (char *) NULL)
+    {
+      memset(extent_xml,0,extent*sizeof(*extent_xml));
+      (void) CopyMagickString(extent_xml,p,extent*
+        sizeof(*extent_xml));
+    }
+  return(extent_xml);
+}
+
 static char *ResizeEntityBuffer(char *p,const char *q,const size_t extent)
 {
   if (p != q)
@@ -970,20 +986,7 @@ static char *ResizeEntityBuffer(char *p,const char *q,const size_t extent)
         p[extent]='\0';
     }
   else
-    {
-      char
-        *extent_xml;
-
-      extent_xml=(char *) AcquireQuantumMemory(extent+1,
-        sizeof(*extent_xml));
-      if (extent_xml != (char *) NULL)
-        {
-          memset(extent_xml,0,extent*sizeof(*extent_xml));
-          (void) CopyMagickString(extent_xml,p,extent*
-            sizeof(*extent_xml));
-        }
-      p=extent_xml;
-    }
+    p=CopyEntityBuffer(p,extent);
   return(p);
 }
 
