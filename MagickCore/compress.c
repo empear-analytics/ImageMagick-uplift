@@ -311,6 +311,16 @@ static void WriteAscii85Tuple(Image *image)
   }
 }
 
+static void KeepAscii85Remainder(Ascii85Info *ascii85,unsigned char *p)
+{
+  ssize_t
+    n;
+
+  p-=(ptrdiff_t)4;
+  for (n=0; n < 4; n++)
+    ascii85->buffer[n]=(*p++);
+}
+
 MagickExport void Ascii85Encode(Image *image,const unsigned char code)
 {
   unsigned char
@@ -334,9 +344,7 @@ MagickExport void Ascii85Encode(Image *image,const unsigned char code)
     p+=(ptrdiff_t) 8;
   }
   image->ascii85->offset=n;
-  p-=(ptrdiff_t)4;
-  for (n=0; n < 4; n++)
-    image->ascii85->buffer[n]=(*p++);
+  KeepAscii85Remainder(image->ascii85,p);
 }
 
 /*
