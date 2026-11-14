@@ -809,36 +809,8 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
         (void) CopyMagickString(p,p+1,MagickPathExtent);
         continue;
       }
-    switch (c)
-    {
-      case '(':
-      case ')':
-      {
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case 'x':
-      case 'X':
-      {
-        flags|=SeparatorValue;
-        p++;
-        break;
-      }
-      case '.':
-      {
-        p++;
-        flags|=DecimalValue;
-        break;
-      }
-      case ':':
-      {
-        p++;
-        flags|=AspectRatioValue;
-        break;
-      }
-      default:
-        return(NoValue);
-    }
+    if (SkipGeometrySeparator(c,&p,&flags) == MagickFalse)
+      return(NoValue);
   }
   /*
     Parse rho, sigma, xi, psi, and optionally chi.
