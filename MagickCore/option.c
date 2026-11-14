@@ -2789,6 +2789,14 @@ MagickExport const char *CommandOptionToMnemonic(const CommandOption option,
   return(option_info[i].mnemonic);
 }
 
+static void DestroyOptionList(char **option_list,ssize_t i,
+  const int number_options)
+{
+  for ( ; i < (ssize_t) number_options; i++)
+    option_list[i]=DestroyString(option_list[i]);
+  option_list=(char **) RelinquishMagickMemory(option_list);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2856,9 +2864,7 @@ MagickExport MagickBooleanType IsOptionMember(const char *option,
       }
     option_list[i]=DestroyString(option_list[i]);
   }
-  for ( ; i < (ssize_t) number_options; i++)
-    option_list[i]=DestroyString(option_list[i]);
-  option_list=(char **) RelinquishMagickMemory(option_list);
+  DestroyOptionList(option_list,i,number_options);
   return(member);
 }
 
