@@ -3892,6 +3892,56 @@ static void ApplyMVGClipPath(const MVGRenderState *state)
   (*state->status)=status;
 }
 
+static void ParseMVGDashPattern(const MVGRenderState *state)
+{
+  char
+    *next_token,
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    j = (*state->j),
+    n = (*state->n),
+    x = (*state->x);
+
+  for (j=0; j < x; j++)
+  {
+    (void) GetNextToken(q,&q,extent,token);
+    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+      ThrowPointExpectedException(token,exception);
+    if (*token == ',')
+      (void) GetNextToken(q,&q,extent,token);
+    graphic_context[n]->dash_pattern[j]=GetDrawValue(token,
+      &next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    if (graphic_context[n]->dash_pattern[j] <= 0.0)
+      status=MagickFalse;
+  }
+  if (((x & 0x01) != 0) && (j == x))
+    for ( ; j < (2*x); j++)
+      graphic_context[n]->dash_pattern[j]=
+        graphic_context[n]->dash_pattern[j-x];
+  graphic_context[n]->dash_pattern[j]=0.0;
+  (*state->q)=q;
+  (*state->status)=status;
+  (*state->j)=j;
+}
+
 static MagickBooleanType RenderMVGContent(Image *image,
   const DrawInfo *draw_info,const size_t depth,ExceptionInfo *exception)
 {
@@ -5204,25 +5254,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
                   }
                 (void) memset(graphic_context[n]->dash_pattern,0,(size_t)
                   (2*x+2)*sizeof(*graphic_context[n]->dash_pattern));
-                for (j=0; j < x; j++)
-                {
-                  (void) GetNextToken(q,&q,extent,token);
-                  if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-                    ThrowPointExpectedException(token,exception);
-                  if (*token == ',')
-                    (void) GetNextToken(q,&q,extent,token);
-                  graphic_context[n]->dash_pattern[j]=GetDrawValue(token,
-                    &next_token);
-                  if (token == next_token)
-                    ThrowPointExpectedException(token,exception);
-                  if (graphic_context[n]->dash_pattern[j] <= 0.0)
-                    status=MagickFalse;
-                }
-                if (((x & 0x01) != 0) && (j == x))
-                  for ( ; j < (2*x); j++)
-                    graphic_context[n]->dash_pattern[j]=
-                      graphic_context[n]->dash_pattern[j-x];
-                graphic_context[n]->dash_pattern[j]=0.0;
+                ParseMVGDashPattern(&render_state);
                 break;
               }
             (void) GetNextToken(q,&q,extent,token);
