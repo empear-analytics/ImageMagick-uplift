@@ -10785,6 +10785,30 @@ static void XApplyRefreshCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyCropCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  /*
+    Crop image.
+  */
+  (void) XCropImage(display,resource_info,windows,*image,CropMode,
+    exception);
+}
+
 static void XApplyResizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11487,14 +11511,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyRestoreCommand(&context);
       break;
     case CropCommand:
-    {
-      /*
-        Crop image.
-      */
-      (void) XCropImage(display,resource_info,windows,*image,CropMode,
-        exception);
+      XApplyCropCommand(&context);
       break;
-    }
     case ChopCommand:
     {
       /*
