@@ -3942,6 +3942,21 @@ static void ParseMVGDashPattern(const MVGRenderState *state)
   (*state->j)=j;
 }
 
+static ssize_t CountMVGDashValues(const char *r,const size_t extent,
+  char *token)
+{
+  ssize_t
+    x;
+
+  for (x=0; IsValidPoint(token) != MagickFalse; x++)
+  {
+    (void) GetNextToken(r,&r,extent,token);
+    if (*token == ',')
+      (void) GetNextToken(r,&r,extent,token);
+  }
+  return(x);
+}
+
 static MagickBooleanType RenderMVGContent(Image *image,
   const DrawInfo *draw_info,const size_t depth,ExceptionInfo *exception)
 {
@@ -5235,12 +5250,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
                   ThrowPointExpectedException(token,exception);
                 if (*token == ',')
                   (void) GetNextToken(r,&r,extent,token);
-                for (x=0; IsValidPoint(token) != MagickFalse; x++)
-                {
-                  (void) GetNextToken(r,&r,extent,token);
-                  if (*token == ',')
-                    (void) GetNextToken(r,&r,extent,token);
-                }
+                x=CountMVGDashValues(r,extent,token);
                 graphic_context[n]->dash_pattern=(double *)
                   AcquireQuantumMemory((size_t) (2*x+2),
                   sizeof(*graphic_context[n]->dash_pattern));
