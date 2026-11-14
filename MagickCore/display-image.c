@@ -26708,6 +26708,76 @@ static void XSetUpDisplay(const DisplaySetUpInput *input,
   (*event_context).update_time=update_time;
 }
 
+typedef struct _DisplayFinishInput
+{
+  size_t
+    *state;
+
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    *working_directory;
+
+  Image
+    **image;
+} DisplayFinishInput;
+
+static Image *XFinishDisplayImage(const DisplayFinishInput *finish_input,
+  const DisplayEventContext *event_context,const DisplayEventTargets *targets)
+{
+  Display
+    *const display = finish_input->display;
+
+  ExceptionInfo
+    *const exception = finish_input->exception;
+
+  Image
+    **const display_image = targets->display_image;
+
+  Image
+    **const image = finish_input->image;
+
+  Image
+    **const nexus = targets->nexus;
+
+  XResourceInfo
+    *const resource_info = finish_input->resource_info;
+
+  XWindows
+    *const windows = *targets->windows;
+
+  char
+    *const working_directory = finish_input->working_directory;
+
+  size_t
+    *const state = finish_input->state;
+
+  const WarningHandler
+    warning_handler = *targets->warning_handler;
+
+  {
+    const DisplayExitInputs inputs = { state, display, resource_info, windows,
+      exception };
+
+    XConfirmDisplayExit(&inputs,display_image);
+  }
+  XCloseDisplayWindows(event_context);
+  /*
+    Restore our progress monitor and warning handlers.
+  */
+  XRestoreDisplayState(warning_handler,working_directory,resource_info,
+    exception);
+  *image=(*display_image);
+  return((*nexus));
+}
+
 typedef struct _DisplayImageInput
 {
   Display
@@ -26902,18 +26972,10 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
     }
   } while (!(*state & ExitState));
   {
-    const DisplayExitInputs inputs = { state, display, resource_info, windows,
-      exception };
+    const DisplayFinishInput input = { state, display, resource_info,
+      exception, working_directory, image };
 
-    XConfirmDisplayExit(&inputs,&display_image);
+    return(XFinishDisplayImage(&input,&event_context,&event_targets));
   }
-  XCloseDisplayWindows(&event_context);
-  /*
-    Restore our progress monitor and warning handlers.
-  */
-  XRestoreDisplayState(warning_handler,working_directory,resource_info,
-    exception);
-  *image=display_image;
-  return(nexus);
 }
 #endif
