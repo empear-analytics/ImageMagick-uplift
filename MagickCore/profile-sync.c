@@ -269,24 +269,6 @@ static inline MagickBooleanType IsUnwritableDimension(const ssize_t format,
     MagickFalse);
 }
 
-static inline void WriteProfileDimension(const EndianType endian,
-  const size_t dimension,const ssize_t format,const int components,
-  unsigned char *entry,unsigned char *value)
-{
-  if (IsUnwritableDimension(format,components) != MagickFalse)
-    return;
-  if ((format == 3) && (dimension <= MAGICK_USHORT_MAX))
-    {
-      WriteProfileShort(endian,(unsigned short) dimension,value);
-      return;
-    }
-  if (dimension > UINT32_MAX)
-    return;
-  if (format == 3)
-    WriteProfileShort(endian,4,entry+2);
-  WriteProfileLong(endian,dimension,value);
-}
-
 #define MaxDirectoryStack  16
 #define EXIF_DELIMITER  "\n"
 #define EXIF_NUM_FORMATS  12
@@ -485,20 +467,11 @@ typedef struct _DirectoryInfo
     entry;
 } DirectoryInfo;
 
-static void SyncExifDimension(const ExifTagInfo *exif_tag,unsigned char *ifd,
-  const int width_tag)
+static inline void WriteProfileDimension(const ExifTagInfo *exif_tag,
+  const size_t dimension)
 {
-  const Image
-    *const image = exif_tag->image;
-
   const EndianType
     endian = exif_tag->endian;
-
-  unsigned char
-    *const directory = exif_tag->directory;
-
-  const unsigned short
-    tag_value = exif_tag->tag_value;
 
   const ssize_t
     format = exif_tag->format;
@@ -507,14 +480,40 @@ static void SyncExifDimension(const ExifTagInfo *exif_tag,unsigned char *ifd,
     components = exif_tag->components;
 
   unsigned char
-    *const q = exif_tag->q;
+    *const entry = exif_tag->q;
 
   unsigned char
-    *const p = exif_tag->p;
+    *const value = exif_tag->p;
+
+  if (IsUnwritableDimension(format,components) != MagickFalse)
+    return;
+  if ((format == 3) && (dimension <= MAGICK_USHORT_MAX))
+    {
+      WriteProfileShort(endian,(unsigned short) dimension,value);
+      return;
+    }
+  if (dimension > UINT32_MAX)
+    return;
+  if (format == 3)
+    WriteProfileShort(endian,4,entry+2);
+  WriteProfileLong(endian,dimension,value);
+}
+
+static void SyncExifDimension(const ExifTagInfo *exif_tag,unsigned char *ifd,
+  const int width_tag)
+{
+  const Image
+    *const image = exif_tag->image;
+
+  unsigned char
+    *const directory = exif_tag->directory;
+
+  const unsigned short
+    tag_value = exif_tag->tag_value;
 
   if (directory == ifd)
-    WriteProfileDimension(endian,tag_value == width_tag ?
-      image->columns : image->rows,format,components,q,p);
+    WriteProfileDimension(exif_tag,tag_value == width_tag ?
+      image->columns : image->rows);
 }
 
 static MagickBooleanType ReadExifMarker(unsigned char **exif,size_t *length,
