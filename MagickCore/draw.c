@@ -6975,6 +6975,15 @@ static MagickBooleanType ParseMVGKeyword(const MVGRenderState *state)
   return(keyword_info->parse(state));
 }
 
+static DrawInfo **DestroyMVGGraphicContexts(DrawInfo **graphic_context,
+  ssize_t n)
+{
+  for ( ; n >= 0; n--)
+    graphic_context[n]=DestroyDrawInfo(graphic_context[n]);
+  graphic_context=(DrawInfo **) RelinquishMagickMemory(graphic_context);
+  return(graphic_context);
+}
+
 static const char *SkipMVGComment(const char *q)
 {
   while ((*q != '\n') && (*q != '\0'))
@@ -7099,9 +7108,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
   if (primitive_info == (PrimitiveInfo *) NULL)
     {
       primitive=DestroyString(primitive);
-      for ( ; n >= 0; n--)
-        graphic_context[n]=DestroyDrawInfo(graphic_context[n]);
-      graphic_context=(DrawInfo **) RelinquishMagickMemory(graphic_context);
+      graphic_context=DestroyMVGGraphicContexts(graphic_context,n);
       ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
         image->filename);
     }
@@ -7211,9 +7218,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
   primitive=DestroyString(primitive);
   if (stops != (StopInfo *) NULL)
     stops=(StopInfo *) RelinquishMagickMemory(stops);
-  for ( ; n >= 0; n--)
-    graphic_context[n]=DestroyDrawInfo(graphic_context[n]);
-  graphic_context=(DrawInfo **) RelinquishMagickMemory(graphic_context);
+  graphic_context=DestroyMVGGraphicContexts(graphic_context,n);
   if ((status == MagickFalse) && (exception->severity < ErrorException))
     ThrowBinaryException(DrawError,"NonconformingDrawingPrimitiveDefinition",
       keyword);
