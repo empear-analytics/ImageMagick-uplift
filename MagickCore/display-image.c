@@ -14323,6 +14323,31 @@ static void XApplyTransformCommands(const XMagickCommandContext *context,
   }
 }
 
+static void XApplyCropFlipCommands(const XMagickCommandContext *context,
+  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
+{
+  switch (command)
+  {
+    case CropCommand:
+      XApplyCropCommand(context);
+      break;
+    case ChopCommand:
+      XApplyChopCommand(context);
+      break;
+    case FlopCommand:
+      XApplyFlopCommand(context);
+      break;
+    case FlipCommand:
+      XApplyFlipCommand(context);
+      break;
+    default:
+    {
+      XApplyTransformCommands(context,command,&(*flags),&(*nexus));
+      break;
+    }
+  }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -14429,21 +14454,9 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
     case RestoreCommand:
       XApplyRestoreCommand(&context);
       break;
-    case CropCommand:
-      XApplyCropCommand(&context);
-      break;
-    case ChopCommand:
-      XApplyChopCommand(&context);
-      break;
-    case FlopCommand:
-      XApplyFlopCommand(&context);
-      break;
-    case FlipCommand:
-      XApplyFlipCommand(&context);
-      break;
     default:
     {
-      XApplyTransformCommands(&context,command,&flags,&nexus);
+      XApplyCropFlipCommands(&context,command,&flags,&nexus);
       break;
     }
   }
