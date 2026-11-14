@@ -23217,6 +23217,9 @@ typedef struct _DisplayEventTargets
 
   MagickStatusType
     *status;
+
+  WarningHandler
+    *warning_handler;
 } DisplayEventTargets;
 
 static void XSelectVirtualCommand(const DisplayEventContext *context,
@@ -26393,6 +26396,129 @@ static void XRestoreDisplayState(const WarningHandler warning_handler,
   XChangeToHomeDirectory(resource_info,exception);
 }
 
+typedef struct _DisplaySetUpInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
+    *state;
+
+  XPixelInfo
+    *pixel;
+
+  XStandardColormap
+    *map_info;
+
+  XVisualInfo
+    *visual_info;
+
+  XFontStruct
+    *font_info;
+} DisplaySetUpInput;
+
+static void XSetUpDisplay(const DisplaySetUpInput *input,
+  DisplayEventContext *event_context,const DisplayEventTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  Image
+    *const display_image = *targets->display_image;
+
+  Image
+    **const nexus = targets->nexus;
+
+  MagickStatusType
+    *const status = targets->status;
+
+  size_t
+    *const state = input->state;
+
+  time_t
+    *const timer = targets->timer;
+
+  WarningHandler
+    *const warning_handler = targets->warning_handler;
+
+  XFontStruct
+    *const font_info = input->font_info;
+
+  XGCValues
+    *const context_values = targets->context_values;
+
+  XPixelInfo
+    *const pixel = input->pixel;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XStandardColormap
+    *const map_info = input->map_info;
+
+  XVisualInfo
+    *const visual_info = input->visual_info;
+
+  MagickStatusType
+    context_mask;
+
+  time_t
+    update_time;
+
+  (*nexus)=NewImageList();
+  XLogDisplayImage(resource_info,display_image);
+  XMakeStandardColormap(display,visual_info,resource_info,display_image,
+    map_info,pixel,exception);
+  display_image->taint=MagickFalse;
+  /*
+    Initialize graphic context.
+  */
+  XMakeContextWindow(event_context);
+  (*context_values).background=pixel->background_color.pixel;
+  (*context_values).font=font_info->fid;
+  (*context_values).foreground=pixel->foreground_color.pixel;
+  (*context_values).graphics_exposures=MagickFalse;
+  context_mask=(MagickStatusType)
+    (GCBackground | GCFont | GCForeground | GCGraphicsExposures);
+  XCreateDisplayGCs(event_context,display_image,context_mask,
+    context_values);
+  /*
+    Initialize icon window.
+  */
+  XMakeIconWindow(event_context,display_image,context_values);
+  /*
+    Initialize Image window.
+  */
+  XMakeDisplayWindows(event_context,display_image);
+  /*
+    Set our progress monitor and warning handlers.
+  */
+  (*warning_handler)=XInstallWarningHandlers(resource_info,(*warning_handler));
+  /*
+    Initialize Image and Magnify X images.
+  */
+  (*status)=XMakeDisplayXImages(event_context,display_image);
+  /*
+    Respond to events.
+  */
+  (*timer)=XGetDisplayTimer(display_image);
+  update_time=XGetUpdateTime(resource_info,display_image);
+  *state&=(unsigned int) (~FormerImageState);
+  *state&=(unsigned int) (~MontageImageState);
+  *state&=(unsigned int) (~NextImageState);
+  (*event_context).context_mask=context_mask;
+  (*event_context).update_time=update_time;
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -26407,7 +26533,6 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
     key_symbol;
 
   MagickStatusType
-    context_mask,
     status;
 
   static char
@@ -26423,8 +26548,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
     number_windows;
 
   time_t
-    timer,
-    update_time;
+    timer;
 
   WarningHandler
     warning_handler;
@@ -26470,7 +26594,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
 
   const DisplayEventTargets
     event_targets = { &nexus, &display_image, &event, &vid_info, &timer,
-      &context_values, &status };
+      &context_values, &status, &warning_handler };
 
   assert(image != (Image **) NULL);
   assert((*image)->signature == MagickCoreSignature);
@@ -26544,49 +26668,12 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   event_context.class_hints=class_hints;
   event_context.manager_hints=manager_hints;
   event_context.icon_resources=icon_resources;
-  nexus=NewImageList();
-  XLogDisplayImage(resource_info,display_image);
-  XMakeStandardColormap(display,visual_info,resource_info,display_image,
-    map_info,pixel,exception);
-  display_image->taint=MagickFalse;
-  /*
-    Initialize graphic context.
-  */
-  XMakeContextWindow(&event_context);
-  context_values.background=pixel->background_color.pixel;
-  context_values.font=font_info->fid;
-  context_values.foreground=pixel->foreground_color.pixel;
-  context_values.graphics_exposures=MagickFalse;
-  context_mask=(MagickStatusType)
-    (GCBackground | GCFont | GCForeground | GCGraphicsExposures);
-  XCreateDisplayGCs(&event_context,display_image,context_mask,
-    &context_values);
-  /*
-    Initialize icon window.
-  */
-  XMakeIconWindow(&event_context,display_image,&context_values);
-  /*
-    Initialize Image window.
-  */
-  XMakeDisplayWindows(&event_context,display_image);
-  /*
-    Set our progress monitor and warning handlers.
-  */
-  warning_handler=XInstallWarningHandlers(resource_info,warning_handler);
-  /*
-    Initialize Image and Magnify X images.
-  */
-  status=XMakeDisplayXImages(&event_context,display_image);
-  /*
-    Respond to events.
-  */
-  timer=XGetDisplayTimer(display_image);
-  update_time=XGetUpdateTime(resource_info,display_image);
-  *state&=(unsigned int) (~FormerImageState);
-  *state&=(unsigned int) (~MontageImageState);
-  *state&=(unsigned int) (~NextImageState);
-  event_context.context_mask=context_mask;
-  event_context.update_time=update_time;
+  {
+    const DisplaySetUpInput input = { display, resource_info, exception, state,
+      pixel, map_info, visual_info, font_info };
+
+    XSetUpDisplay(&input,&event_context,&event_targets);
+  }
   do
   {
     /*
