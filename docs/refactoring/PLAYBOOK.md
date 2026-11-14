@@ -5737,6 +5737,14 @@ an option: it would sit at the block's depth, as LB's *Not covered by* says of `
    unchanged. A `goto M;` whose label `M` stands inside the block, every jump to `M`
    being inside it too, is not an exit: it and its label move unchanged (step 1's "no
    `goto`" means none that leaves the block).
+7. *Forwarded results* (2026-11-14, lane c). Where the moved text then holds a group
+   `{ if (G(...) == MagickFalse) { return(MagickFalse); } return(MagickTrue); }` (an
+   earlier helper's call with its cleanup exit, followed by `continue;`, both mapped by
+   steps 4 and 6), the group becomes `return(G(...));` in the same commit, when every
+   `return` of `G` returns `MagickTrue` or `MagickFalse` (checked by reading `G`). A
+   `const` input struct that the block declares at its top, initialised from variables
+   the block does not write, becomes the new function's struct parameter: its
+   declaration moves to the caller's block that holds the call, unchanged.
 
 **Before:**
 
@@ -9227,7 +9235,11 @@ way clones the first.
    which moves whole and unchanged (Recipe N step 1's last form). And each may be the
    head of a sequential loop's body, the statements after the body's declarations up to
    a tail both copies hold and keep (Recipe PC step 1's shape outside a parallel
-   region), every `continue;` in it continuing that loop.
+   region), every `continue;` in it continuing that loop. Or each may be a block that
+   Recipe VC moves (2026-11-14, lane c: followed by `continue;`, leaving through
+   `S goto L;`), its exits mapped by VC steps 4 and 6 and the caller's form that of VC
+   step 5; a differing pair of whole `void` call statements is written `((side ==
+   NameA) ? runA : runB);` (C11 6.5.15p3 admits two `void` operands).
 2. The selector. Write `typedef enum { NameA, NameB } NameSide;` directly above the new
    function, one constant per copy, named for what that copy does (`BlackStretchLevel`,
    `WhiteStretchLevel`).
@@ -16908,8 +16920,11 @@ and refuse a `goto` (MB step 1, CK step 1); Recipes V and VC, which move a block
    E step 7) first writes each use in the block as the macro's body with the arguments
    substituted (the preprocessor's own expansion), so that its exit is the block's own
    `status=c; goto L;` and that recipe's rules apply to it; `&name` passed into the new
-   function is written `name` there. The commit that moves the last use deletes the
-   `#define`s.
+   function is written `name` there. A use that is the whole body of `if (c)` becomes,
+   once its exit is the new function's `return(MagickFalse);`, `if ((c) && (F(name,...)
+   == MagickFalse)) return(MagickFalse);` (Recipe CN, same commit: `&&` evaluates `F`
+   only when `c` holds, as the nested `if` did). The commit that moves the last use
+   deletes the `#define`s.
 7. Check by reading: (a) on the path that falls through, the function performs the same
    reads and writes of the caller's variables in the same order, through pointers to
    them; (b) on the jump path the function has made the same writes (the failed
@@ -17496,3 +17511,6 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | MC | Make a Cleanup-Jumping Statement Macro a Function: function-local statement macros whose only exit is `status=c; goto L;` get `static MagickBooleanType` functions taking a `const` struct of pointers to the caller's locals they name, and the macros become one-call wrappers that keep the jump; a block that later moves writes its uses out; evidence oracle; Lane: c | `property.c`'s `InterpretImageProperties` (seventeen uses of three buffer macros in every block; probe of the chain 3.21 to 3.44) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | VC | Step 6: the cleanup exit may be `S goto L;` (Recipe V's jump after assignments of constants, `status=MagickFalse; goto cleanup;`), the caller writing `{ S goto L; }`; a `goto` whose label is inside the block moves with it; Lane: c | `InterpretImageProperties`' braced-escape block after Recipe MC | mandate (2026-10-24) |
 | 2026-11-14 | NEW | KM | Replace Option-Parsing Arms by a Keyed Table of Member Setters: arms that parse a value against an option table and store it, cast, into one member each become one table of (key, option, setter) walked by an RV-form lookup hoisted before the selection, with a one-statement setter per member; evidence oracle; Lane: c | `property.c`'s `SetImageProperty` (ten arms, ten bumps; probe 3.27 to 3.39) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | MC | Step 6: a use that is the whole body of `if (c)` becomes `if ((c) && (F(...) == MagickFalse)) return(MagickFalse);` in the moving commit (Recipe CN's form); Lane: c | `InterpretImageProperties`' glob loops, whose nested `if` would leave each helper at depth 4 | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | VC | Step 7: a moved group `{ if (G(...) == MagickFalse) return(MagickFalse); return(MagickTrue); }` becomes `return(G(...));` when `G` returns only `MagickTrue` or `MagickFalse`; a `const` input struct declared at the block's top becomes the struct parameter; Lane: c | `InterpretImageProperties`' braced-escape block after its prefix arms moved (probe 3.27 to 3.48) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | MT | Step 1: the copies may be blocks that Recipe VC moves (in-loop, leaving through `S goto L;`); a differing pair of `void` call statements is written as a `?:` of the two calls; Lane: c | `InterpretImageProperties`' option and artifact glob loops (two helpers would be *Code Duplication*) | mandate (2026-10-24) |
