@@ -297,6 +297,18 @@ MagickExport SemaphoreInfo *AcquireSemaphoreInfo(void)
 %    o semaphore_info: Specifies a pointer to an SemaphoreInfo structure.
 %
 */
+#if !defined(MAGICKCORE_OPENMP_SUPPORT) && defined(MAGICKCORE_THREAD_SUPPORT)
+static void ExitOnMutexError(const int status,const char *message)
+{
+  if (status != 0)
+    {
+      errno=status;
+      perror(message);
+      _exit(1);
+    }
+}
+#endif
+
 MagickExport void LockSemaphoreInfo(SemaphoreInfo *semaphore_info)
 {
   assert(semaphore_info != (SemaphoreInfo *) NULL);
@@ -317,12 +329,7 @@ MagickExport void LockSemaphoreInfo(SemaphoreInfo *semaphore_info)
       status;
 
     status=pthread_mutex_lock(&semaphore_info->mutex);
-    if (status != 0)
-      {
-        errno=status;
-        perror("unable to lock mutex");
-        _exit(1);
-      }
+    ExitOnMutexError(status,"unable to lock mutex");
   }
 #elif defined(MAGICKCORE_WINDOWS_SUPPORT)
   EnterCriticalSection(&semaphore_info->mutex);
@@ -369,12 +376,7 @@ MagickExport void RelinquishSemaphoreInfo(SemaphoreInfo **semaphore_info)
       status;
 
     status=pthread_mutex_destroy(&(*semaphore_info)->mutex);
-    if (status != 0)
-      {
-        errno=status;
-        perror("unable to destroy mutex");
-        _exit(1);
-      }
+    ExitOnMutexError(status,"unable to destroy mutex");
   }
 #elif defined(MAGICKCORE_WINDOWS_SUPPORT)
   DeleteCriticalSection(&(*semaphore_info)->mutex);
@@ -476,12 +478,7 @@ MagickExport void UnlockSemaphoreInfo(SemaphoreInfo *semaphore_info)
       status;
 
     status=pthread_mutex_unlock(&semaphore_info->mutex);
-    if (status != 0)
-      {
-        errno=status;
-        perror("unable to unlock mutex");
-        _exit(1);
-      }
+    ExitOnMutexError(status,"unable to unlock mutex");
   }
 #elif defined(MAGICKCORE_WINDOWS_SUPPORT)
   LeaveCriticalSection(&semaphore_info->mutex);

@@ -188,13 +188,7 @@ static SplayTreeInfo *AcquireCoderCache(ExceptionInfo *exception)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   C o d e r C o m p o n e n t G e n e s i s                                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  CoderComponentGenesis() instantiates the coder component.
@@ -213,13 +207,7 @@ MagickPrivate MagickBooleanType CoderComponentGenesis(void)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   C o d e r C o m p o n e n t T e r m i n u s                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  CoderComponentTerminus() destroys the coder component.
@@ -242,13 +230,7 @@ MagickPrivate void CoderComponentTerminus(void)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t C o d e r I n f o                                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetCoderInfo searches the coder list for the specified name and if found
@@ -278,13 +260,7 @@ MagickExport const CoderInfo *GetCoderInfo(const char *name,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t C o d e r I n f o L i s t                                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetCoderInfoList() returns any coder_map that match the specified pattern.
@@ -303,6 +279,17 @@ MagickExport const CoderInfo *GetCoderInfo(const char *name,
 %
 */
 
+static const CoderInfo *OpenCoderList(const char *pattern,
+  size_t *number_coders,ExceptionInfo *exception)
+{
+  assert(pattern != (char *) NULL);
+  assert(number_coders != (size_t *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",pattern);
+  *number_coders=0;
+  return(GetCoderInfo("*",exception));
+}
+
 static int CoderInfoCompare(const void *x,const void *y)
 {
   const CoderInfo
@@ -314,6 +301,27 @@ static int CoderInfoCompare(const void *x,const void *y)
   if (LocaleCompare((*p)->path,(*q)->path) == 0)
     return(LocaleCompare((*p)->name,(*q)->name));
   return(LocaleCompare((*p)->path,(*q)->path));
+}
+
+static ssize_t CollectCoderInfo(const char *pattern,
+  const CoderInfo **coder_map)
+{
+  const CoderInfo
+    *p;
+
+  ssize_t
+    i;
+
+  ResetSplayTreeIterator(coder_cache);
+  p=(const CoderInfo *) GetNextValueInSplayTree(coder_cache);
+  for (i=0; p != (const CoderInfo *) NULL; )
+  {
+    if ((p->stealth == MagickFalse) &&
+        (GlobExpression(p->name,pattern,MagickFalse) != MagickFalse))
+      coder_map[i++]=p;
+    p=(const CoderInfo *) GetNextValueInSplayTree(coder_cache);
+  }
+  return(i);
 }
 
 MagickExport const CoderInfo **GetCoderInfoList(const char *pattern,
@@ -331,12 +339,7 @@ MagickExport const CoderInfo **GetCoderInfoList(const char *pattern,
   /*
     Allocate coder list.
   */
-  assert(pattern != (char *) NULL);
-  assert(number_coders != (size_t *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",pattern);
-  *number_coders=0;
-  p=GetCoderInfo("*",exception);
+  p=OpenCoderList(pattern,number_coders,exception);
   if (p == (const CoderInfo *) NULL)
     return((const CoderInfo **) NULL);
   coder_map=(const CoderInfo **) AcquireQuantumMemory((size_t)
@@ -347,15 +350,7 @@ MagickExport const CoderInfo **GetCoderInfoList(const char *pattern,
     Generate coder list.
   */
   LockSemaphoreInfo(coder_semaphore);
-  ResetSplayTreeIterator(coder_cache);
-  p=(const CoderInfo *) GetNextValueInSplayTree(coder_cache);
-  for (i=0; p != (const CoderInfo *) NULL; )
-  {
-    if ((p->stealth == MagickFalse) &&
-        (GlobExpression(p->name,pattern,MagickFalse) != MagickFalse))
-      coder_map[i++]=p;
-    p=(const CoderInfo *) GetNextValueInSplayTree(coder_cache);
-  }
+  i=CollectCoderInfo(pattern,coder_map);
   UnlockSemaphoreInfo(coder_semaphore);
   qsort((void *) coder_map,(size_t) i,sizeof(*coder_map),CoderInfoCompare);
   coder_map[i]=(CoderInfo *) NULL;
@@ -365,13 +360,7 @@ MagickExport const CoderInfo **GetCoderInfoList(const char *pattern,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t C o d e r L i s t                                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetCoderList() returns any coder_map that match the specified pattern.
@@ -417,12 +406,7 @@ MagickExport char **GetCoderList(const char *pattern,
   /*
     Allocate coder list.
   */
-  assert(pattern != (char *) NULL);
-  assert(number_coders != (size_t *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",pattern);
-  *number_coders=0;
-  p=GetCoderInfo("*",exception);
+  p=OpenCoderList(pattern,number_coders,exception);
   if (p == (const CoderInfo *) NULL)
     return((char **) NULL);
   coder_map=(char **) AcquireQuantumMemory((size_t)
@@ -451,13 +435,7 @@ MagickExport char **GetCoderList(const char *pattern,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   I s C o d e r T r e e I n s t a n t i a t e d                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  IsCoderTreeInstantiated() determines if the coder tree is instantiated.  If

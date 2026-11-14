@@ -737,6 +737,48 @@ static void GetMatrixScale(const double max_value,double *min_value,
       *scale_factor=(double) QuantumRange/(max_value-(*min_value));
 }
 
+typedef struct _MatrixPixelScale
+{
+  const MatrixInfo
+    *matrix_info;
+
+  Image
+    *image;
+
+  double
+    min_value,
+    scale_factor;
+} MatrixPixelScale;
+
+static void ScaleMatrixRow(const MatrixPixelScale *pixel_scale,const ssize_t y,
+  Quantum *q)
+{
+  const MatrixInfo
+    *const matrix_info = pixel_scale->matrix_info;
+
+  Image
+    *const image = pixel_scale->image;
+
+  const double
+    min_value = pixel_scale->min_value,
+    scale_factor = pixel_scale->scale_factor;
+
+  double
+    value;
+
+  ssize_t
+    x;
+
+    for (x=0; x < (ssize_t) image->columns; x++)
+    {
+      if (GetMatrixElement(matrix_info,x,y,&value) == MagickFalse)
+        continue;
+      value=scale_factor*(value-min_value);
+      *q=ClampToQuantum(value);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+}
+
 MagickExport Image *MatrixToImage(const MatrixInfo *matrix_info,
   ExceptionInfo *exception)
 {
@@ -783,14 +825,11 @@ MagickExport Image *MatrixToImage(const MatrixInfo *matrix_info,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    double
-      value;
+    MatrixPixelScale
+      pixel_scale;
 
     Quantum
       *q;
-
-    ssize_t
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -800,14 +839,11 @@ MagickExport Image *MatrixToImage(const MatrixInfo *matrix_info,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      if (GetMatrixElement(matrix_info,x,y,&value) == MagickFalse)
-        continue;
-      value=scale_factor*(value-min_value);
-      *q=ClampToQuantum(value);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    pixel_scale.matrix_info=matrix_info;
+    pixel_scale.image=image;
+    pixel_scale.min_value=min_value;
+    pixel_scale.scale_factor=scale_factor;
+    ScaleMatrixRow(&pixel_scale,y,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
   }

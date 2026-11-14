@@ -260,13 +260,7 @@ static MagickBooleanType
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %  A c q u i r e L o g C a c h e                                              %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  AcquireLogCache() caches one or more log configurations which provides a
@@ -361,13 +355,7 @@ static LinkedListInfo *AcquireLogCache(const char *filename,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   C l o s e M a g i c k L o g                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  CloseMagickLog() closes the Magick log.
@@ -404,13 +392,7 @@ MagickExport void CloseMagickLog(void)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t L o g E v e n t M a s k                                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetLogEventMask() returns the current log event mask.
@@ -453,13 +435,7 @@ static ElementInfo *FindLogElement(ElementInfo *p,const char *name)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t L o g I n f o                                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetLogInfo() searches the log list for the specified name and if found
@@ -514,13 +490,7 @@ static LogInfo *GetLogInfo(const char *name,ExceptionInfo *exception)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t L o g I n f o L i s t                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetLogInfoList() returns any logs that match the specified pattern.
@@ -610,13 +580,7 @@ MagickExport const LogInfo **GetLogInfoList(const char *pattern,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t L o g L i s t                                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetLogList() returns any logs that match the specified pattern.
@@ -705,13 +669,7 @@ MagickExport char **GetLogList(const char *pattern,size_t *number_preferences,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t L o g N a m e                                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetLogName() returns the current log name.
@@ -728,13 +686,7 @@ MagickExport const char *GetLogName(void)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   I s L o g C a c h e I n s t a n t i a t e d                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  IsLogCacheInstantiated() determines if the log list is instantiated.  If
@@ -788,13 +740,7 @@ static MagickBooleanType IsLogCacheInstantiated(ExceptionInfo *exception)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %  I s E v e n t L o g g i n g                                                %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  IsEventLogging() returns MagickTrue if debug of events is enabled otherwise
@@ -857,13 +803,7 @@ static void ListLogEntry(FILE *file,const LogInfo *log_info)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %  L i s t L o g I n f o                                                      %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  ListLogInfo() lists the log info to a file.
@@ -1050,15 +990,173 @@ static void SetLogInfoAttribute(LogInfo *log_info,const char *keyword,
       (log_info->handler_mask | ParseLogHandlers(token));
 }
 
+static MagickBooleanType SkipMarkupElement(const char *keyword,const char **q,
+  const size_t extent,char *token)
+{
+  if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
+    *q=SkipDoctypeElement(*q);
+  else
+    if (LocaleNCompare(keyword,"<!--",4) == 0)
+      *q=SkipCommentElement(*q,extent,token);
+    else
+      return(MagickFalse);
+  return(MagickTrue);
+}
+
+static MagickBooleanType ReadLogAttributeValue(const char **q,
+  const size_t extent,char *token)
+{
+  (void) GetNextToken(*q,(const char **) NULL,extent,token);
+  if (*token != '=')
+    return(MagickFalse);
+  (void) GetNextToken(*q,q,extent,token);
+  (void) GetNextToken(*q,q,extent,token);
+  return(MagickTrue);
+}
+
+static MagickStatusType AppendLogElement(LinkedListInfo *cache,
+  LogInfo *log_info,const char *filename,ExceptionInfo *exception)
+{
+  MagickStatusType
+    status;
+
+  status=AppendValueToLinkedList(cache,log_info);
+  if (status == MagickFalse)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ResourceLimitError,"MemoryAllocationFailed","`%s'",filename);
+  return(status);
+}
+
+typedef struct _LogIncludeInput
+{
+  const LogLoadTarget
+    *target;
+
+  const char
+    *filename;
+
+  char
+    *keyword,
+    *token;
+
+  size_t
+    extent,
+    depth;
+} LogIncludeInput;
+
+static void LoadLogIncludes(const LogIncludeInput *include,const char **q,
+  MagickStatusType *status)
+{
+  const LogLoadTarget
+    *const target = include->target;
+
+  const char
+    *const filename = include->filename;
+
+  char
+    *const keyword = include->keyword,
+    *const token = include->token;
+
+  const size_t
+    extent = include->extent,
+    depth = include->depth;
+
+  ExceptionInfo
+    *exception = target->exception;
+
+  while (IsIncludeElementOpen(token,(*q)) != MagickFalse)
+  {
+    if (IsIncludeFileAttribute(q,extent,keyword,token) == MagickFalse)
+      continue;
+    if (depth >= MagickMaxRecursionDepth)
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
+    else
+      (*status)&=(MagickStatusType) LoadLogInclude(target,filename,token,
+        depth);
+  }
+}
+
+static MagickBooleanType ReadLogMarkupElement(
+  const LogIncludeInput *include,const char **q,MagickStatusType *status)
+{
+  if (SkipMarkupElement(include->keyword,q,include->extent,include->token) !=
+      MagickFalse)
+    return(MagickTrue);
+  if (LocaleCompare(include->keyword,"<include") != 0)
+    return(MagickFalse);
+  /*
+    Include element.
+  */
+  LoadLogIncludes(include,q,status);
+  return(MagickTrue);
+}
+
+typedef struct _LogElementInput
+{
+  LinkedListInfo
+    *cache;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    *keyword,
+    *token;
+
+  const char
+    *filename;
+
+  size_t
+    extent;
+} LogElementInput;
+
+static void ParseLogElement(const LogElementInput *element,
+  LogInfo **log_info,MagickStatusType *status,const char **q)
+{
+  LinkedListInfo
+    *const cache = element->cache;
+
+  ExceptionInfo
+    *const exception = element->exception;
+
+  char
+    *const keyword = element->keyword,
+    *const token = element->token;
+
+  const char
+    *const filename = element->filename;
+
+  const size_t
+    extent = element->extent;
+
+  if (LocaleCompare(keyword,"<logmap>") == 0)
+    {
+      /*
+        Allocate memory for the log list.
+      */
+      (*log_info)=(LogInfo *) AcquireCriticalMemory(sizeof(*(*log_info)));
+      (void) memset((*log_info),0,sizeof(*(*log_info)));
+      (*log_info)->path=ConstantString(filename);
+      GetTimerInfo((TimerInfo *) &(*log_info)->timer);
+      (*log_info)->signature=MagickCoreSignature;
+      return;
+    }
+  if ((*log_info) == (LogInfo *) NULL)
+    return;
+  if (LocaleCompare(keyword,"</logmap>") == 0)
+    {
+      (*status)=AppendLogElement(cache,(*log_info),filename,exception);
+      (*log_info)=(LogInfo *) NULL;
+      return;
+    }
+  if (ReadLogAttributeValue(q,extent,token) != MagickFalse)
+    SetLogInfoAttribute((*log_info),keyword,token);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   L o a d L o g C a c h e                                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  LoadLogCache() loads the log configurations which provides a
@@ -1116,6 +1214,12 @@ static MagickBooleanType LoadLogCache(const LogLoadTarget *target,
   extent=strlen(token)+MagickPathExtent;
   for (q=(const char *) xml; *q != '\0'; )
   {
+    LogElementInput
+      element;
+
+    LogIncludeInput
+      include;
+
     /*
       Interpret XML.
     */
@@ -1123,86 +1227,32 @@ static MagickBooleanType LoadLogCache(const LogLoadTarget *target,
     if (*token == '\0')
       break;
     (void) CopyMagickString(keyword,token,MagickPathExtent);
-    if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
-      {
-        /*
-          DOCTYPE element.
-        */
-        q=SkipDoctypeElement(q);
-        continue;
-      }
-    if (LocaleNCompare(keyword,"<!--",4) == 0)
-      {
-        /*
-          Comment element.
-        */
-        q=SkipCommentElement(q,extent,token);
-        continue;
-      }
-    if (LocaleCompare(keyword,"<include") == 0)
-      {
-        /*
-          Include element.
-        */
-        while (IsIncludeElementOpen(token,q) != MagickFalse)
-        {
-          if (IsIncludeFileAttribute(&q,extent,keyword,token) == MagickFalse)
-            continue;
-          if (depth >= MagickMaxRecursionDepth)
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
-          else
-            status&=(MagickStatusType) LoadLogInclude(target,filename,token,
-              depth);
-        }
-        continue;
-      }
-    if (LocaleCompare(keyword,"<logmap>") == 0)
-      {
-        /*
-          Allocate memory for the log list.
-        */
-        log_info=(LogInfo *) AcquireCriticalMemory(sizeof(*log_info));
-        (void) memset(log_info,0,sizeof(*log_info));
-        log_info->path=ConstantString(filename);
-        GetTimerInfo((TimerInfo *) &log_info->timer);
-        log_info->signature=MagickCoreSignature;
-        continue;
-      }
-    if (log_info == (LogInfo *) NULL)
+    include.target=target;
+    include.filename=filename;
+    include.keyword=keyword;
+    include.token=token;
+    include.extent=extent;
+    include.depth=depth;
+    if (ReadLogMarkupElement(&include,&q,&status) != MagickFalse)
       continue;
-    if (LocaleCompare(keyword,"</logmap>") == 0)
-      {
-        status=AppendValueToLinkedList(cache,log_info);
-        if (status == MagickFalse)
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            ResourceLimitError,"MemoryAllocationFailed","`%s'",filename);
-        log_info=(LogInfo *) NULL;
-        continue;
-      }
-    (void) GetNextToken(q,(const char **) NULL,extent,token);
-    if (*token != '=')
-      continue;
-    (void) GetNextToken(q,&q,extent,token);
-    (void) GetNextToken(q,&q,extent,token);
-    SetLogInfoAttribute(log_info,keyword,token);
+    element.cache=cache;
+    element.exception=exception;
+    element.keyword=keyword;
+    element.token=token;
+    element.filename=filename;
+    element.extent=extent;
+    ParseLogElement(&element,&log_info,&status,&q);
   }
   token=DestroyString(token);
   if (cache == (LinkedListInfo *) NULL)
     return(MagickFalse);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (status != 0));
 }
 #endif
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   L o g C o m p o n e n t G e n e s i s                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  LogComponentGenesis() instantiates the log component.
@@ -1227,13 +1277,7 @@ MagickPrivate MagickBooleanType LogComponentGenesis(void)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   L o g C o m p o n e n t T e r m i n u s                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  LogComponentTerminus() destroys the logging component.
@@ -1324,13 +1368,7 @@ static void WriteLogToStreams(const LogInfo *log_info,const LogEventType type,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   L o g M a g i c k E v e n t                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  LogMagickEvent() logs an event as determined by the log configuration file.
@@ -1615,90 +1653,128 @@ static void TranslateLogLocationSpecifier(const LogEventText *event_text,
   }
 }
 
-static char *TranslateEvent(const LogEventLocation *location,
-  const char *domain,const char *event)
+static void TranslateLogSpecifier(const LogEventText *event_text,
+  const char *domain,const char *p,char **q)
 {
-  const char
-    *module = location->module,
-    *function = location->function;
+  char
+    *const text = event_text->text;
 
   const size_t
-    line = location->line;
+    extent = event_text->extent;
+
+  switch (*p)
+  {
+    case 'd':
+    {
+      (*q)+=(ptrdiff_t) CopyMagickString((*q),domain,extent-((*q)-text));
+      break;
+    }
+    default:
+    {
+      TranslateLogLocationSpecifier(event_text,p,q);
+      break;
+    }
+  }
+}
+
+static void FormatLogEventXML(const LogEventText *event_text,
+  const char *domain)
+{
+  char
+    *const text = event_text->text;
+
+  const size_t
+    extent = event_text->extent;
+
+  const double
+    elapsed_time = event_text->elapsed_time,
+    user_time = event_text->user_time;
+
+  const time_t
+    seconds = event_text->seconds;
+
+  const char
+    *const event = event_text->event,
+    *const function = event_text->function,
+    *const module = event_text->module;
+
+  const size_t
+    line = event_text->line;
 
   char
-    *text;
+    timestamp[MagickTimeExtent];
 
-  double
-    elapsed_time,
-    user_time;
+  /*
+    Translate event in "XML" format.
+  */
+  (void) FormatMagickTime(seconds,sizeof(timestamp),timestamp);
+  (void) FormatLocaleString(text,extent,
+    "<entry>\n"
+    "  <timestamp>%s</timestamp>\n"
+    "  <elapsed-time>%lu:%02lu.%06lu</elapsed-time>\n"
+    "  <user-time>%0.3f</user-time>\n"
+    "  <process-id>%.17g</process-id>\n"
+    "  <thread-id>%.17g</thread-id>\n"
+    "  <module>%s</module>\n"
+    "  <function>%s</function>\n"
+    "  <line>%.17g</line>\n"
+    "  <domain>%s</domain>\n"
+    "  <event>%s</event>\n"
+    "</entry>",timestamp,(unsigned long) (elapsed_time/60.0),
+    (unsigned long) floor(fmod(elapsed_time,60.0)),(unsigned long)
+    (1000000.0*(elapsed_time-floor(elapsed_time))+0.5),user_time,
+    (double) getpid(),(double) GetMagickThreadSignature(),module,function,
+    (double) line,domain,event);
+}
 
+static MagickBooleanType CopyLogFormatLiteral(const char **p,char **q)
+{
+  char
+    escape;
+
+  escape=GetLogEscape((*p));
+  if (escape != '\0')
+    {
+      *(*q)++=escape;
+      (*p)++;
+      return(MagickTrue);
+    }
+  if (*(*p) != '%')
+    {
+      *(*q)++=(*(*p));
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
+static LogInfo *GetDefaultLogInfo(void)
+{
   ExceptionInfo
     *exception;
 
   LogInfo
     *log_info;
 
+  exception=AcquireExceptionInfo();
+  log_info=GetLogInfo("*",exception);
+  exception=DestroyExceptionInfo(exception);
+  return(log_info);
+}
+
+static char *TranslateLogFormat(const char *format,char *text,size_t extent,
+  LogEventText *event_text,const char *domain)
+{
   char
-    escape,
     *q;
 
   const char
     *p;
 
-  size_t
-    extent;
-
-  time_t
-    seconds;
-
-  LogEventText
-    event_text;
-
-  exception=AcquireExceptionInfo();
-  log_info=GetLogInfo("*",exception);
-  exception=DestroyExceptionInfo(exception);
-  text=AcquireString(event);
-  if (log_info == (LogInfo *) NULL)
-    return(text);
-  seconds=GetMagickTime();
-  elapsed_time=GetElapsedTime(&log_info->timer);
-  user_time=GetUserTime(&log_info->timer);
-  if (log_info->format == (char *) NULL)
-    return(text);
-  extent=strlen(event)+MagickPathExtent;
-  if (LocaleCompare(log_info->format,"xml") == 0)
-    {
-      char
-        timestamp[MagickTimeExtent];
-
-      /*
-        Translate event in "XML" format.
-      */
-      (void) FormatMagickTime(seconds,sizeof(timestamp),timestamp);
-      (void) FormatLocaleString(text,extent,
-        "<entry>\n"
-        "  <timestamp>%s</timestamp>\n"
-        "  <elapsed-time>%lu:%02lu.%06lu</elapsed-time>\n"
-        "  <user-time>%0.3f</user-time>\n"
-        "  <process-id>%.17g</process-id>\n"
-        "  <thread-id>%.17g</thread-id>\n"
-        "  <module>%s</module>\n"
-        "  <function>%s</function>\n"
-        "  <line>%.17g</line>\n"
-        "  <domain>%s</domain>\n"
-        "  <event>%s</event>\n"
-        "</entry>",timestamp,(unsigned long) (elapsed_time/60.0),
-        (unsigned long) floor(fmod(elapsed_time,60.0)),(unsigned long)
-        (1000000.0*(elapsed_time-floor(elapsed_time))+0.5),user_time,
-        (double) getpid(),(double) GetMagickThreadSignature(),module,function,
-        (double) line,domain,event);
-      return(text);
-    }
   /*
     Translate event in "human readable" format.
   */
   q=text;
-  for (p=log_info->format; *p != '\0'; p++)
+  for (p=format; *p != '\0'; p++)
   {
     *q='\0';
     if (GrowLogEventText(&text,&q,&extent) == MagickFalse)
@@ -1723,46 +1799,73 @@ static char *TranslateEvent(const LogEventLocation *location,
         \n   newline
         \r   carriage return
     */
-    escape=GetLogEscape(p);
-    if (escape != '\0')
-      {
-        *q++=escape;
-        p++;
-        continue;
-      }
-    if (*p != '%')
-      {
-        *q++=(*p);
-        continue;
-      }
+    if (CopyLogFormatLiteral(&p,&q) != MagickFalse)
+      continue;
     p++;
     if (*p == '\0')
       break;
-    event_text.text=text;
-    event_text.extent=extent;
-    event_text.elapsed_time=elapsed_time;
-    event_text.user_time=user_time;
-    event_text.seconds=seconds;
-    event_text.event=event;
-    event_text.function=function;
-    event_text.module=module;
-    event_text.line=line;
-    switch (*p)
-    {
-      case 'd':
-      {
-        q+=(ptrdiff_t) CopyMagickString(q,domain,extent-(q-text));
-        break;
-      }
-      default:
-      {
-        TranslateLogLocationSpecifier(&event_text,p,&q);
-        break;
-      }
-    }
+    (*event_text).text=text;
+    (*event_text).extent=extent;
+    TranslateLogSpecifier(event_text,domain,p,&q);
   }
   *q='\0';
   return(text);
+}
+
+static char *TranslateEvent(const LogEventLocation *location,
+  const char *domain,const char *event)
+{
+  const char
+    *module = location->module,
+    *function = location->function;
+
+  const size_t
+    line = location->line;
+
+  char
+    *text;
+
+  double
+    elapsed_time,
+    user_time;
+
+  LogInfo
+    *log_info;
+
+  size_t
+    extent;
+
+  time_t
+    seconds;
+
+  LogEventText
+    event_text;
+
+  log_info=GetDefaultLogInfo();
+  text=AcquireString(event);
+  if (log_info == (LogInfo *) NULL)
+    return(text);
+  seconds=GetMagickTime();
+  elapsed_time=GetElapsedTime(&log_info->timer);
+  user_time=GetUserTime(&log_info->timer);
+  if (log_info->format == (char *) NULL)
+    return(text);
+  extent=strlen(event)+MagickPathExtent;
+  event_text.text=text;
+  event_text.extent=extent;
+  event_text.elapsed_time=elapsed_time;
+  event_text.user_time=user_time;
+  event_text.seconds=seconds;
+  event_text.event=event;
+  event_text.function=function;
+  event_text.module=module;
+  event_text.line=line;
+  if (LocaleCompare(log_info->format,"xml") == 0)
+    {
+      FormatLogEventXML(&event_text,domain);
+      return(text);
+    }
+  return(TranslateLogFormat(log_info->format,text,extent,&event_text,domain));
 }
 
 static void RotateLogFiles(LogInfo *log_info)
@@ -1913,13 +2016,7 @@ MagickExport MagickBooleanType LogMagickEvent(const LogEventType type,
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   P a r s e L o g H a n d l e r s                                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  ParseLogHandlers() parses a string defining which handlers takes a log
@@ -1984,13 +2081,7 @@ static LogHandlerType ParseLogHandlers(const char *handlers)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   S e t L o g E v e n t M a s k                                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SetLogEventMask() accepts a list that determines which events to log.  All
@@ -2040,13 +2131,7 @@ MagickExport LogEventType SetLogEventMask(const char *events)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   S e t L o g F o r m a t                                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SetLogFormat() sets the format for the "human readable" log record.
@@ -2082,13 +2167,7 @@ MagickExport void SetLogFormat(const char *format)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   S e t L o g M e t h o d                                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SetLogMethod() sets the method that will be called when an event is logged.
@@ -2126,13 +2205,7 @@ MagickExport void SetLogMethod(MagickLogMethod method)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   S e t L o g N a m e                                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SetLogName() sets the log name and returns it.

@@ -86,193 +86,6 @@ static const char
 static int
   IsPathDirectory(const char *);
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   A c q u i r e U n i q u e F i l e n a m e                                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  AcquireUniqueFilename() replaces the contents of path by a unique path name.
-%
-%  The format of the AcquireUniqueFilename method is:
-%
-%      MagickBooleanType AcquireUniqueFilename(char *path)
-%
-%  A description of each parameter follows.
-%
-%   o  path:  Specifies a pointer to an array of characters.  The unique path
-%      name is returned in this array.
-%
-*/
-MagickExport MagickBooleanType AcquireUniqueFilename(char *path)
-{
-  int
-    file;
-
-  file=AcquireUniqueFileResource(path);
-  if (file == -1)
-    return(MagickFalse);
-  file=close_utf8(file)-1;
-  return(MagickTrue);
-}
-
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   A c q u i r e U n i q u e S ym b o l i c L i n k                          %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  AcquireUniqueSymbolicLink() creates a unique symbolic link to the specified
-%  source path and returns MagickTrue on success otherwise MagickFalse.  If the
-%  symlink() method fails or is not available, a unique file name is generated
-%  and the source file copied to it.  When you are finished with the file, use
-%  RelinquishUniqueFileResource() to destroy it.
-%
-%  The format of the AcquireUniqueSymbolicLink method is:
-%
-%      MagickBooleanType AcquireUniqueSymbolicLink(const char *source,
-%        char destination)
-%
-%  A description of each parameter follows.
-%
-%   o  source:  the source path.
-%
-%   o  destination:  the destination path.
-%
-*/
-
-static MagickBooleanType CopyFileDescriptor(const int source_file,
-  const int destination_file,const char *destination)
-{
-  MagickBooleanType
-    status;
-
-  size_t
-    length,
-    quantum;
-
-  ssize_t
-    count;
-
-  struct stat
-    attributes;
-
-  unsigned char
-    *buffer;
-
-  quantum=(size_t) MagickMaxBufferExtent;
-  if ((fstat(source_file,&attributes) == 0) && (attributes.st_size > 0))
-    quantum=(size_t) MagickMin(attributes.st_size,MagickMaxBufferExtent);
-  buffer=(unsigned char *) AcquireQuantumMemory(quantum,sizeof(*buffer));
-  if (buffer == (unsigned char *) NULL)
-    {
-      (void) close_utf8(source_file);
-      (void) close_utf8(destination_file);
-      (void) RelinquishUniqueFileResource(destination);
-      return(MagickFalse);
-    }
-  status=MagickTrue;
-  for (length=0; ; )
-  {
-    count=(ssize_t) read(source_file,buffer,quantum);
-    if (count <= 0)
-      break;
-    length=(size_t) count;
-    count=(ssize_t) write(destination_file,buffer,length);
-    if ((size_t) count != length)
-      {
-        (void) RelinquishUniqueFileResource(destination);
-        status=MagickFalse;
-        break;
-      }
-  }
-  (void) close_utf8(destination_file);
-  (void) close_utf8(source_file);
-  buffer=(unsigned char *) RelinquishMagickMemory(buffer);
-  return(status);
-}
-
-static MagickBooleanType CopyToUniqueFile(const char *source,
-  char *destination)
-{
-  int
-    destination_file,
-    source_file;
-
-  destination_file=AcquireUniqueFileResource(destination);
-  if (destination_file == -1)
-    return(MagickFalse);
-  source_file=open_utf8(source,O_RDONLY | O_CLOEXEC | O_BINARY,0);
-  if (source_file == -1)
-    {
-      (void) close_utf8(destination_file);
-      (void) RelinquishUniqueFileResource(destination);
-      return(MagickFalse);
-    }
-  return(CopyFileDescriptor(source_file,destination_file,destination));
-}
-
-MagickExport MagickBooleanType AcquireUniqueSymbolicLink(const char *source,
-  char *destination)
-{
-  MagickBooleanType
-    status;
-
-  static ssize_t
-    passes = -1;
-
-  assert(source != (const char *) NULL);
-  assert(destination != (char *) NULL);
-#if defined(MAGICKCORE_HAVE_SYMLINK)
-  {
-    /*
-      Does policy permit symbolic links?
-    */
-    status=IsRightsAuthorizedByName(SystemPolicyDomain,"symlink",(PolicyRights)
-      (ReadPolicyRights | WritePolicyRights),"follow");
-    if (passes == -1)
-      passes=GetShredPasses();
-    if ((passes == 0) && (status != MagickFalse))
-      {
-        (void) AcquireUniqueFilename(destination);
-        (void) RelinquishUniqueFileResource(destination);
-        if (*source == *DirectorySeparator)
-          {
-            if (symlink(source,destination) == 0)
-              return(MagickTrue);
-          }
-        else
-          {
-            char
-              path[MagickPathExtent];
-
-            *path='\0';
-            if (getcwd(path,MagickPathExtent) == (char *) NULL)
-              return(MagickFalse);
-            (void) ConcatenateMagickString(path,DirectorySeparator,
-              MagickPathExtent);
-            (void) ConcatenateMagickString(path,source,MagickPathExtent);
-            if (symlink(path,destination) == 0)
-              return(MagickTrue);
-          }
-      }
-  }
-#endif
-  /*
-    Copy file from source to destination.
-  */
-  return(CopyToUniqueFile(source,destination));
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -455,6 +268,7 @@ static MagickBooleanType VerifyBase64Padding(const char *p,const int state,
           return(MagickFalse);
         }
       p++;
+      magick_fallthrough;
     }
     case 3:
     {
@@ -482,6 +296,15 @@ static MagickBooleanType VerifyBase64Terminal(const char *p,const int state,
   return(MagickTrue);
 }
 
+static void CheckBase64DecodeArguments(const char *source,
+  const size_t *length)
+{
+  assert(source != (char *) NULL);
+  assert(length != (size_t *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+}
+
 MagickExport unsigned char *Base64Decode(const char *source,size_t *length)
 {
   int
@@ -497,10 +320,7 @@ MagickExport unsigned char *Base64Decode(const char *source,size_t *length)
   unsigned char
     *decode;
 
-  assert(source != (char *) NULL);
-  assert(length != (size_t *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  CheckBase64DecodeArguments(source,length);
   *length=0;
   decode=(unsigned char *) AcquireQuantumMemory((strlen(source)+3)/4,
     3*sizeof(*decode));
@@ -695,17 +515,30 @@ static void ExpandHomeDirectory(const char *path,char *expand_path)
     }
 }
 
+static MagickBooleanType IsTildePath(const char *path)
+{
+  if (path == (char *) NULL)
+    return(MagickFalse);
+  if (*path != '~')
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static inline MagickBooleanType IsHomeDirectoryPath(const char *path)
+{
+  return(((*(path+1) == *DirectorySeparator) || (*(path+1) == '\0')) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickPrivate void ExpandFilename(char *path)
 {
   char
     expand_path[MagickPathExtent];
 
-  if (path == (char *) NULL)
-    return;
-  if (*path != '~')
+  if (IsTildePath(path) == MagickFalse)
     return;
   (void) CopyMagickString(expand_path,path,MagickPathExtent);
-  if ((*(path+1) == *DirectorySeparator) || (*(path+1) == '\0'))
+  if (IsHomeDirectoryPath(path) != MagickFalse)
     {
       /*
         Substitute ~ with $HOME.
@@ -1137,23 +970,98 @@ static void TransferFileList(const FileListTransfer *transfer,char *filename,
   }
 }
 
-MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
+typedef struct _WildcardArgument
+{
+  char
+    *option,
+    *filename,
+    *path,
+    *subimage,
+    *home_directory;
+} WildcardArgument;
+
+static void ListWildcardFiles(const WildcardArgument *wildcard,
+  char ***filelist,size_t *number_files)
+{
+  char
+    *const option = wildcard->option,
+    *const filename = wildcard->filename,
+    *const path = wildcard->path,
+    *const subimage = wildcard->subimage,
+    *const home_directory = wildcard->home_directory;
+
+  /*
+    Generate file list from wildcard filename (e.g. *.jpg).
+  */
+  GetPathComponent(option,HeadPath,path);
+  GetPathComponent(option,SubimagePath,subimage);
+  ExpandFilename(path);
+  if (*home_directory == '\0')
+    getcwd_utf8(home_directory,MagickPathExtent-1);
+  (*filelist)=ListFiles(*path == '\0' ? home_directory : path,filename,
+    number_files);
+}
+
+static MagickBooleanType ListArgumentFiles(const WildcardArgument *wildcard,
+  char ***filelist,size_t *number_files)
+{
+  char
+    *const option = wildcard->option;
+
+  if (*option != '@')
+    ListWildcardFiles(wildcard,filelist,number_files);
+  else
+    {
+      ArgumentFileTargets
+        targets;
+
+      /*
+        Generate file list from file list (e.g. @filelist.txt).
+      */
+      targets.filelist=filelist;
+      targets.number_files=number_files;
+      if (ReadFileList(option,&targets) == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType HasFileListFiles(char ***filelist,
+  const size_t number_files)
+{
+  ssize_t
+    j;
+
+  if ((*filelist) == (char **) NULL)
+    return(MagickFalse);
+  j=FindNonDirectory((*filelist),number_files);
+  if (j == (ssize_t) number_files)
+    {
+      (*filelist)=DestroyFileList((*filelist),number_files);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static void LogExpandedCommandLine(char **vector,const ssize_t count)
+{
+  if (IsEventLogging() != MagickFalse)
+    {
+      char
+        *command_line;
+
+      command_line=AcquireCommandLine(vector,count);
+      (void) LogMagickEvent(ConfigureEvent,GetMagickModule(),
+        "Command line: %s",command_line);
+      command_line=DestroyString(command_line);
+    }
+}
+
+static char **AcquireArgumentVector(const int *number_arguments,
   char ***arguments)
 {
   char
-    home_directory[MagickPathExtent],
     **vector;
-
-  ssize_t
-    i,
-    j;
-
-  size_t
-    number_files;
-
-  ssize_t
-    count,
-    parameters;
 
   /*
     Allocate argument vector.
@@ -1166,6 +1074,27 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
     sizeof(*vector));
   if (vector == (char **) NULL)
     ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
+  return(vector);
+}
+
+MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
+  char ***arguments)
+{
+  char
+    home_directory[MagickPathExtent],
+    **vector;
+
+  ssize_t
+    i;
+
+  size_t
+    number_files;
+
+  ssize_t
+    count,
+    parameters;
+
+  vector=AcquireArgumentVector(number_arguments,arguments);
   /*
     Expand any wildcard filenames.
   */
@@ -1180,9 +1109,6 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
       *option,
       path[MagickPathExtent],
       subimage[MagickPathExtent];
-
-    FileListTransfer
-      transfer;
 
     MagickBooleanType
       destroy;
@@ -1209,40 +1135,15 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
       }
     if (ParseExpandableArgument(option,filename,magick) == MagickFalse)
       continue;
-    if (*option != '@')
-      {
-        /*
-          Generate file list from wildcard filename (e.g. *.jpg).
-        */
-        GetPathComponent(option,HeadPath,path);
-        GetPathComponent(option,SubimagePath,subimage);
-        ExpandFilename(path);
-        if (*home_directory == '\0')
-          getcwd_utf8(home_directory,MagickPathExtent-1);
-        filelist=ListFiles(*path == '\0' ? home_directory : path,filename,
-          &number_files);
-      }
-    else
-      {
-        ArgumentFileTargets
-          targets;
+    {
+      const WildcardArgument wildcard = { option, filename, path, subimage,
+        home_directory };
 
-        /*
-          Generate file list from file list (e.g. @filelist.txt).
-        */
-        targets.filelist=(&filelist);
-        targets.number_files=(&number_files);
-        if (ReadFileList(option,&targets) == MagickFalse)
-          continue;
-      }
-    if (filelist == (char **) NULL)
-      continue;
-    j=FindNonDirectory(filelist,number_files);
-    if (j == (ssize_t) number_files)
-      {
-        filelist=DestroyFileList(filelist,number_files);
+      if (ListArgumentFiles(&wildcard,&filelist,&number_files) == MagickFalse)
         continue;
-      }
+    }
+    if (HasFileListFiles(&filelist,number_files) == MagickFalse)
+      continue;
     /*
       Transfer file list to argument vector.
     */
@@ -1253,26 +1154,16 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
         filelist=DestroyFileList(filelist,number_files);
         return(MagickFalse);
       }
-    transfer.vector=vector;
-    transfer.filelist=filelist;
-    transfer.number_files=number_files;
-    transfer.path=path;
-    transfer.magick=magick;
-    transfer.subimage=subimage;
-    TransferFileList(&transfer,filename,&count,&destroy);
+    {
+      const FileListTransfer transfer = { vector, filelist, number_files, path,
+        magick, subimage };
+
+      TransferFileList(&transfer,filename,&count,&destroy);
+    }
     filelist=(char **) RelinquishMagickMemory(filelist);
   }
   vector[count]=(char *) NULL;
-  if (IsEventLogging() != MagickFalse)
-    {
-      char
-        *command_line;
-
-      command_line=AcquireCommandLine(vector,count);
-      (void) LogMagickEvent(ConfigureEvent,GetMagickModule(),
-        "Command line: %s",command_line);
-      command_line=DestroyString(command_line);
-    }
+  LogExpandedCommandLine(vector,count);
   *number_arguments=(int) count;
   *arguments=vector;
   return(MagickTrue);
@@ -1804,6 +1695,36 @@ static void SelectPathTailComponent(const char *path,PathType type,
   }
 }
 
+static void CopyMagickComponent(const char *path,char *component,
+  const size_t magick_length)
+{
+  if (magick_length != 0)
+    (void) CopyMagickString(component,path,magick_length);
+  else
+    *component='\0';
+}
+
+static inline MagickBooleanType IsSubimageComponent(const size_t magick_length,
+  const size_t subimage_offset,const size_t subimage_length)
+{
+  return(((subimage_length != 0) && (magick_length < subimage_offset)) ?
+    MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType OpenPathComponent(const char *path,char *component)
+{
+  assert(path != (const char *) NULL);
+  assert(component != (char *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",path);
+  if (*path == '\0')
+    {
+      *component='\0';
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport void GetPathComponent(const char *path,PathType type,
   char *component)
 {
@@ -1815,15 +1736,8 @@ MagickExport void GetPathComponent(const char *path,PathType type,
     subimage_offset,
     subimage_length;
 
-  assert(path != (const char *) NULL);
-  assert(component != (char *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",path);
-  if (*path == '\0')
-    {
-      *component='\0';
-      return;
-    }
+  if (OpenPathComponent(path,component) == MagickFalse)
+    return;
   (void) CopyMagickString(component,path,MagickPathExtent);
   subimage_length=0;
   subimage_offset=0;
@@ -1840,10 +1754,7 @@ MagickExport void GetPathComponent(const char *path,PathType type,
   {
     case MagickPath:
     {
-      if (magick_length != 0)
-        (void) CopyMagickString(component,path,magick_length);
-      else
-        *component='\0';
+      CopyMagickComponent(path,component,magick_length);
       break;
     }
     default:
@@ -1854,7 +1765,8 @@ MagickExport void GetPathComponent(const char *path,PathType type,
     case SubimagePath:
     {
       *component='\0';
-      if ((subimage_length != 0) && (magick_length < subimage_offset))
+      if (IsSubimageComponent(magick_length,subimage_offset,subimage_length) !=
+          MagickFalse)
         (void) CopyMagickString(component,path+subimage_offset,subimage_length);
       break;
     }
@@ -2264,6 +2176,90 @@ static inline MagickBooleanType IsDotDirectoryEntry(const char *name)
     (LocaleCompare(name,"..") == 0)) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _FileListDirectoryTargets
+{
+  DIR
+    **current_directory;
+
+  size_t
+    *max_entries;
+
+  char
+    ***filelist;
+
+  struct dirent
+    **buffer;
+} FileListDirectoryTargets;
+
+static MagickBooleanType OpenFileListDirectory(const char *directory,
+  const FileListDirectoryTargets *targets)
+{
+  DIR
+    **const current_directory = targets->current_directory;
+
+  size_t
+    *const max_entries = targets->max_entries;
+
+  char
+    ***const filelist = targets->filelist;
+
+  struct dirent
+    **const buffer = targets->buffer;
+
+  (*current_directory)=opendir(directory);
+  if ((*current_directory) == (DIR *) NULL)
+    return(MagickFalse);
+  /*
+    Allocate filelist.
+  */
+  (*max_entries)=2048;
+  (*filelist)=(char **) AcquireQuantumMemory((size_t) (*max_entries),
+    sizeof(*(*filelist)));
+  if ((*filelist) == (char **) NULL)
+    {
+      (void) closedir((*current_directory));
+      return(MagickFalse);
+    }
+  /*
+    Save the current and change to the new directory.
+  */
+  (*buffer)=(struct dirent *) AcquireMagickMemory(sizeof(*(*buffer))+
+    FILENAME_MAX+1);
+  if ((*buffer) == (struct dirent *) NULL)
+    {
+      (*filelist)=(char **) RelinquishMagickMemory((*filelist));
+      (void) closedir((*current_directory));
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static char **SortFileList(char **filelist,const size_t *number_entries)
+{
+  if (filelist == (char **) NULL)
+    return((char **) NULL);
+  /*
+    Sort filelist in ascending order.
+  */
+  qsort((void *) filelist,(size_t) *number_entries,sizeof(*filelist),
+    FileCompare);
+  return(filelist);
+}
+
+static void CheckListFilesArguments(const char *directory,
+  const char *pattern,size_t *number_entries)
+{
+  /*
+    Open directory.
+  */
+  assert(directory != (const char *) NULL);
+  assert(pattern != (const char *) NULL);
+  assert(number_entries != (size_t *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",directory);
+  *number_entries=0;
+}
+
 MagickPrivate char **ListFiles(const char *directory,const char *pattern,
   size_t *number_entries)
 {
@@ -2280,39 +2276,16 @@ MagickPrivate char **ListFiles(const char *directory,const char *pattern,
   size_t
     max_entries;
 
-  /*
-    Open directory.
-  */
-  assert(directory != (const char *) NULL);
-  assert(pattern != (const char *) NULL);
-  assert(number_entries != (size_t *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",directory);
-  *number_entries=0;
-  current_directory=opendir(directory);
-  if (current_directory == (DIR *) NULL)
+  FileListDirectoryTargets
+    directory_targets;
+
+  CheckListFilesArguments(directory,pattern,number_entries);
+  directory_targets.current_directory=(&current_directory);
+  directory_targets.max_entries=(&max_entries);
+  directory_targets.filelist=(&filelist);
+  directory_targets.buffer=(&buffer);
+  if (OpenFileListDirectory(directory,&directory_targets) == MagickFalse)
     return((char **) NULL);
-  /*
-    Allocate filelist.
-  */
-  max_entries=2048;
-  filelist=(char **) AcquireQuantumMemory((size_t) max_entries,
-    sizeof(*filelist));
-  if (filelist == (char **) NULL)
-    {
-      (void) closedir(current_directory);
-      return((char **) NULL);
-    }
-  /*
-    Save the current and change to the new directory.
-  */
-  buffer=(struct dirent *) AcquireMagickMemory(sizeof(*buffer)+FILENAME_MAX+1);
-  if (buffer == (struct dirent *) NULL)
-    {
-      filelist=(char **) RelinquishMagickMemory(filelist);
-      (void) closedir(current_directory);
-      return((char **) NULL);
-    }
   while ((MagickReadDirectory(current_directory,buffer,&entry) == 0) &&
          (entry != (struct dirent *) NULL))
   {
@@ -2351,14 +2324,7 @@ MagickPrivate char **ListFiles(const char *directory,const char *pattern,
   }
   buffer=(struct dirent *) RelinquishMagickMemory(buffer);
   (void) closedir(current_directory);
-  if (filelist == (char **) NULL)
-    return((char **) NULL);
-  /*
-    Sort filelist in ascending order.
-  */
-  qsort((void *) filelist,(size_t) *number_entries,sizeof(*filelist),
-    FileCompare);
-  return(filelist);
+  return(SortFileList(filelist,number_entries));
 }
 
 /*

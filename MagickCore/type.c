@@ -147,13 +147,7 @@ static MagickBooleanType
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %  A c q u i r e T y p e S p l a y T r e e                                    %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  AcquireTypeCache() caches one or more type configuration files which
@@ -258,13 +252,7 @@ static SplayTreeInfo *AcquireTypeCache(const char *filename,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t T y p e I n f o                                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetTypeInfo searches the type list for the specified name and if found
@@ -294,13 +282,7 @@ MagickExport const TypeInfo *GetTypeInfo(const char *name,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t T y p e I n f o B y F a m i l y                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetTypeInfoByFamily() searches the type list for the specified family and if
@@ -487,7 +469,7 @@ static inline size_t GetDefaultFontWeight(const size_t weight)
   return(font_weight);
 }
 
-MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
+static const TypeInfo *GetSubstituteTypeInfo(const char *family,
   const StyleType style,const StretchType stretch,const size_t weight,
   ExceptionInfo *exception)
 {
@@ -500,9 +482,6 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
 
   const TypeInfo
     *type_info;
-
-  size_t
-    font_weight;
 
   ssize_t
     i;
@@ -518,6 +497,28 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
       { "terminal", "courier" },
       { "wingdings", "symbol" }
     };
+
+  type_info=(const TypeInfo *) NULL;
+  for (i=0; i < (ssize_t) (sizeof(fontmap)/sizeof(fontmap[0])); i++)
+  {
+    if (IsFamilyMismatch(fontmap[i].name,family) != MagickFalse)
+      continue;
+    type_info=GetTypeInfoByFamily(fontmap[i].substitute,style,stretch,weight,
+      exception);
+    break;
+  }
+  return(type_info);
+}
+
+MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
+  const StyleType style,const StretchType stretch,const size_t weight,
+  ExceptionInfo *exception)
+{
+  const TypeInfo
+    *type_info;
+
+  size_t
+    font_weight;
 
   /*
     Check for an exact type match.
@@ -538,14 +539,7 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
   /*
     Check for table-based substitution match.
   */
-  for (i=0; i < (ssize_t) (sizeof(fontmap)/sizeof(fontmap[0])); i++)
-  {
-    if (IsFamilyMismatch(fontmap[i].name,family) != MagickFalse)
-      continue;
-    type_info=GetTypeInfoByFamily(fontmap[i].substitute,style,stretch,weight,
-      exception);
-    break;
-  }
+  type_info=GetSubstituteTypeInfo(family,style,stretch,weight,exception);
   if (type_info != (const TypeInfo *) NULL)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),TypeWarning,
@@ -560,13 +554,7 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t T y p e I n f o L i s t                                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetTypeInfoList() returns any fonts that match the specified pattern.
@@ -656,13 +644,7 @@ MagickExport const TypeInfo **GetTypeInfoList(const char *pattern,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t T y p e L i s t                                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetTypeList() returns any fonts that match the specified pattern.
@@ -750,13 +732,7 @@ MagickExport char **GetTypeList(const char *pattern,size_t *number_fonts,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   I s T y p e T r e e I n s t a n t i a t e d                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  IsTypeTreeInstantiated() determines if the type tree is instantiated.  If
@@ -957,27 +933,45 @@ static void SetFontConfigTypeInfo(TypeInfo *type_info,FcPattern *font,
   type_info->glyphs=ConstantString((const char *) file);
 }
 
-MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
-  ExceptionInfo *exception)
+static void AddFontConfigFonts(SplayTreeInfo *cache,
+  const FcFontSet *font_set)
 {
-  FcBool
-    result;
-
   FcChar8
     *family,
     *file;
-
-  FcConfig
-    *font_config;
-
-  FcFontSet
-    *font_set;
 
   ssize_t
     i;
 
   TypeInfo
     *type_info;
+
+  for (i=0; i < (ssize_t) font_set->nfont; i++)
+  {
+    if (GetFontConfigFile(font_set->fonts[i],&family,&file) == MagickFalse)
+      continue;
+    type_info=(TypeInfo *) AcquireMagickMemory(sizeof(*type_info));
+    if (type_info == (TypeInfo *) NULL)
+      continue;
+    (void) memset(type_info,0,sizeof(*type_info));
+    type_info->path=ConstantString("System Fonts");
+    type_info->signature=MagickCoreSignature;
+    SetFontConfigTypeInfo(type_info,font_set->fonts[i],family,file);
+    (void) AddValueToSplayTree(cache,type_info->name,type_info);
+  }
+}
+
+MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
+  ExceptionInfo *exception)
+{
+  FcBool
+    result;
+
+  FcConfig
+    *font_config;
+
+  FcFontSet
+    *font_set;
 
   /*
     Load system fonts.
@@ -996,19 +990,7 @@ MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
       FcConfigDestroy(font_config);
       return(MagickFalse);
     }
-  for (i=0; i < (ssize_t) font_set->nfont; i++)
-  {
-    if (GetFontConfigFile(font_set->fonts[i],&family,&file) == MagickFalse)
-      continue;
-    type_info=(TypeInfo *) AcquireMagickMemory(sizeof(*type_info));
-    if (type_info == (TypeInfo *) NULL)
-      continue;
-    (void) memset(type_info,0,sizeof(*type_info));
-    type_info->path=ConstantString("System Fonts");
-    type_info->signature=MagickCoreSignature;
-    SetFontConfigTypeInfo(type_info,font_set->fonts[i],family,file);
-    (void) AddValueToSplayTree(type_cache,type_info->name,type_info);
-  }
+  AddFontConfigFonts(type_cache,font_set);
   FcFontSetDestroy(font_set);
   FcConfigDestroy(font_config);
   return(MagickTrue);
@@ -1041,119 +1023,10 @@ static MagickBooleanType IsTypeTreeInstantiated(ExceptionInfo *exception)
   return((MagickBooleanType) (type_cache != (SplayTreeInfo *) NULL));
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%  L i s t T y p e I n f o                                                    %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  ListTypeInfo() lists the fonts to a file.
-%
-%  The format of the ListTypeInfo method is:
-%
-%      MagickBooleanType ListTypeInfo(FILE *file,ExceptionInfo *exception)
-%
-%  A description of each parameter follows.
-%
-%    o file:  An pointer to a FILE.
-%
-%    o exception: return any errors or warnings in this structure.
-%
-*/
-static inline MagickBooleanType IsNewTypePath(const char *path,
-  const TypeInfo **type_info,const ssize_t i)
-{
-  return((MagickBooleanType) (((path == (const char *) NULL) ||
-    (LocaleCompare(path,type_info[i]->path) != 0)) &&
-    (type_info[i]->path != (char *) NULL)));
-}
-
-static void PrintTypeInfo(FILE *file,const TypeInfo **type_info,
-  const ssize_t i)
-{
-  const char
-    *family,
-    *glyphs,
-    *metrics,
-    *name,
-    *stretch,
-    *style;
-
-  name="not defined";
-  if (type_info[i]->name != (char *) NULL)
-    name=type_info[i]->name;
-  family="not defined";
-  if (type_info[i]->family != (char *) NULL)
-    family=type_info[i]->family;
-  style=CommandOptionToMnemonic(MagickStyleOptions,type_info[i]->style);
-  stretch=CommandOptionToMnemonic(MagickStretchOptions,type_info[i]->stretch);
-  metrics="not defined";
-  if (type_info[i]->metrics != (char *) NULL)
-    metrics=type_info[i]->metrics;
-  glyphs="not defined";
-  if (type_info[i]->glyphs != (char *) NULL)
-    glyphs=type_info[i]->glyphs;
-  (void) FormatLocaleFile(file,"  Font: %s\n",name);
-  (void) FormatLocaleFile(file,"    family: %s\n",family);
-  (void) FormatLocaleFile(file,"    style: %s\n",style);
-  (void) FormatLocaleFile(file,"    stretch: %s\n",stretch);
-  (void) FormatLocaleFile(file,"    weight: %.17g\n",(double)
-    type_info[i]->weight);
-  (void) FormatLocaleFile(file,"    metrics: %s\n",metrics);
-  (void) FormatLocaleFile(file,"    glyphs: %s\n",glyphs);
-  (void) FormatLocaleFile(file,"    index: %d\n",(int)
-    type_info[i]->face);
-}
-
-MagickExport MagickBooleanType ListTypeInfo(FILE *file,ExceptionInfo *exception)
-{
-  const char
-    *path;
-
-  const TypeInfo
-    **type_info;
-
-  ssize_t
-    i;
-
-  size_t
-    number_fonts;
-
-  if (file == (FILE *) NULL)
-    file=stdout;
-  number_fonts=0;
-  type_info=GetTypeInfoList("*",&number_fonts,exception);
-  if (type_info == (const TypeInfo **) NULL)
-    return(MagickFalse);
-  path=(const char *) NULL;
-  for (i=0; i < (ssize_t) number_fonts; i++)
-  {
-    if (type_info[i]->stealth != MagickFalse)
-      continue;
-    if (IsNewTypePath(path,type_info,i) != MagickFalse)
-      (void) FormatLocaleFile(file,"\nPath: %s\n",type_info[i]->path);
-    path=type_info[i]->path;
-    PrintTypeInfo(file,type_info,i);
-  }
-  (void) fflush(file);
-  type_info=(const TypeInfo **) RelinquishMagickMemory((void *) type_info);
-  return(MagickTrue);
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   L o a d T y p e C a c h e                                                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  LoadTypeCache() loads the type configurations which provides a mapping
@@ -1411,6 +1284,148 @@ static MagickBooleanType SkipMarkupElement(const char *keyword,
   return(MagickFalse);
 }
 
+typedef struct _TypeIncludeScan
+{
+  const TypeLoadTarget
+    *target;
+
+  const char
+    *filename;
+
+  size_t
+    depth,
+    extent;
+
+  char
+    *keyword,
+    *token;
+} TypeIncludeScan;
+
+static MagickBooleanType LoadTypeIncludes(const TypeIncludeScan *scan,
+  const char **q,MagickStatusType *status)
+{
+  while (IsIncludeElementOpen(scan->token,*q) != MagickFalse)
+  {
+    if (IsIncludeFileAttribute(q,scan->extent,scan->keyword,scan->token) ==
+        MagickFalse)
+      continue;
+    if (scan->depth >= MagickMaxRecursionDepth)
+      return(MagickFalse);
+    else
+      *status&=(MagickStatusType) LoadTypeInclude(scan->target,
+        scan->filename,scan->token,scan->depth);
+  }
+  return(MagickTrue);
+}
+
+static TypeInfo *AcquireTypeNode(const char *filename)
+{
+  TypeInfo
+    *type_info;
+
+  type_info=(TypeInfo *) AcquireCriticalMemory(sizeof(*type_info));
+  (void) memset(type_info,0,sizeof(*type_info));
+  type_info->path=ConstantString(filename);
+  type_info->signature=MagickCoreSignature;
+  return(type_info);
+}
+
+static MagickStatusType AddTypeNode(SplayTreeInfo *cache,TypeInfo *type_info,
+  ExceptionInfo *exception)
+{
+  MagickStatusType
+    status;
+
+  status=AddValueToSplayTree(cache,type_info->name,type_info);
+  if (status == MagickFalse)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ResourceLimitError,"MemoryAllocationFailed","`%s'",type_info->name);
+  return(status);
+}
+
+static void LoadTypeIncludeElement(const TypeIncludeScan *scan,
+  const char **q,MagickStatusType *status)
+{
+  ExceptionInfo
+    *const exception = scan->target->exception;
+
+  char
+    *const token = scan->token;
+
+  while (LoadTypeIncludes(scan,q,status) == MagickFalse)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ConfigureError,"IncludeNodeNestedTooDeeply","`%s'",token);
+}
+
+typedef struct _TypeElementInput
+{
+  SplayTreeInfo
+    *cache;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    *keyword,
+    *token;
+
+  const char
+    *filename;
+
+  char
+    *font_path;
+
+  size_t
+    extent;
+} TypeElementInput;
+
+static void ParseTypeElement(const TypeElementInput *element,
+  TypeInfo **type_info,MagickStatusType *status,const char **q)
+{
+  SplayTreeInfo
+    *const cache = element->cache;
+
+  ExceptionInfo
+    *const exception = element->exception;
+
+  char
+    *const keyword = element->keyword,
+    *const token = element->token;
+
+  const char
+    *const filename = element->filename;
+
+  char
+    *const font_path = element->font_path;
+
+  const size_t
+    extent = element->extent;
+
+  if (LocaleCompare(keyword,"<type") == 0)
+    {
+      /*
+        Type element.
+      */
+      (*type_info)=AcquireTypeNode(filename);
+      return;
+    }
+  if ((*type_info) == (TypeInfo *) NULL)
+    return;
+  if (IsElementEnd(keyword) != MagickFalse)
+    {
+      (*status)=AddTypeNode(cache,(*type_info),exception);
+      (*type_info)=(TypeInfo *) NULL;
+      return;
+    }
+  (void) GetNextToken(*q,(const char **) NULL,extent,token);
+  if (*token != '=')
+    return;
+  (void) GetNextToken(*q,q,extent,token);
+  (void) GetNextToken(*q,q,extent,token);
+  (*type_info)=SetTypeInfoAttribute((*type_info),keyword,token,filename,
+    font_path);
+}
+
 static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1460,6 +1475,9 @@ static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
 #endif
   for (q=(char *) xml; *q != '\0'; )
   {
+    TypeElementInput
+      element;
+
     /*
       Interpret XML.
     */
@@ -1471,51 +1489,23 @@ static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
       continue;
     if (LocaleCompare(keyword,"<include") == 0)
       {
+        const TypeIncludeScan
+          scan = { target, filename, depth, extent, keyword, token };
+
         /*
           Include element.
         */
-        while (IsIncludeElementOpen(token,q) != MagickFalse)
-        {
-          if (IsIncludeFileAttribute(&q,extent,keyword,token) == MagickFalse)
-            continue;
-          if (depth >= MagickMaxRecursionDepth)
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ConfigureError,"IncludeNodeNestedTooDeeply","`%s'",token);
-          else
-            status&=(MagickStatusType) LoadTypeInclude(target,filename,token,
-              depth);
-        }
+        LoadTypeIncludeElement(&scan,&q,&status);
         continue;
       }
-    if (LocaleCompare(keyword,"<type") == 0)
-      {
-        /*
-          Type element.
-        */
-        type_info=(TypeInfo *) AcquireCriticalMemory(sizeof(*type_info));
-        (void) memset(type_info,0,sizeof(*type_info));
-        type_info->path=ConstantString(filename);
-        type_info->signature=MagickCoreSignature;
-        continue;
-      }
-    if (type_info == (TypeInfo *) NULL)
-      continue;
-    if (IsElementEnd(keyword) != MagickFalse)
-      {
-        status=AddValueToSplayTree(cache,type_info->name,type_info);
-        if (status == MagickFalse)
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            ResourceLimitError,"MemoryAllocationFailed","`%s'",type_info->name);
-        type_info=(TypeInfo *) NULL;
-        continue;
-      }
-    (void) GetNextToken(q,(const char **) NULL,extent,token);
-    if (*token != '=')
-      continue;
-    (void) GetNextToken(q,&q,extent,token);
-    (void) GetNextToken(q,&q,extent,token);
-    type_info=SetTypeInfoAttribute(type_info,keyword,token,filename,
-      font_path);
+    element.cache=cache;
+    element.exception=exception;
+    element.keyword=keyword;
+    element.token=token;
+    element.filename=filename;
+    element.font_path=font_path;
+    element.extent=extent;
+    ParseTypeElement(&element,&type_info,&status,&q);
   }
   token=(char *) RelinquishMagickMemory(token);
   return((MagickBooleanType) (status != 0));
@@ -1523,13 +1513,7 @@ static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   T y p e C o m p o n e n t G e n e s i s                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  TypeComponentGenesis() instantiates the type component.
@@ -1548,13 +1532,7 @@ MagickPrivate MagickBooleanType TypeComponentGenesis(void)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   T y p e C o m p o n e n t T e r m i n u s                                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  TypeComponentTerminus() destroy type component.

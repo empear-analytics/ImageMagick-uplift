@@ -207,6 +207,39 @@ static inline void KeepWidestMetrics(TypeMetric *metrics,
     *metrics=extent;
 }
 
+static void DestroyMultilineText(DrawInfo *annotate_info,char **textlist,
+  const size_t count)
+{
+  annotate_info->text=(char *) NULL;
+  annotate_info=DestroyDrawInfo(annotate_info);
+  DestroyTextLines(textlist,count);
+  textlist=(char **) RelinquishMagickMemory(textlist);
+}
+
+static void ResetMultilineMetrics(DrawInfo *annotate_info,TypeMetric *metrics)
+{
+  annotate_info->render=MagickFalse;
+  annotate_info->direction=UndefinedDirection;
+  (void) memset(metrics,0,sizeof(*metrics));
+}
+
+static double GetMultilineHeight(const DrawInfo *draw_info,
+  const TypeMetric *metrics,const size_t count)
+{
+  return(count*(size_t) (metrics->ascent-metrics->descent+
+    0.5)+(count-1)*draw_info->interline_spacing);
+}
+
+static DrawInfo *CloneMultilineDrawInfo(const DrawInfo *draw_info)
+{
+  DrawInfo
+    *annotate_info;
+
+  annotate_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
+  annotate_info->text=DestroyString(annotate_info->text);
+  return(annotate_info);
+}
+
 MagickExport MagickBooleanType GetMultilineTypeMetrics(Image *image,
   const DrawInfo *draw_info,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -247,8 +280,7 @@ MagickExport MagickBooleanType GetMultilineTypeMetrics(Image *image,
         "LabelExpected","`%s'",image->filename);
       return(MagickFalse);
     }
-  annotate_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
-  annotate_info->text=DestroyString(annotate_info->text);
+  annotate_info=CloneMultilineDrawInfo(draw_info);
   /*
     Convert newlines to multiple lines of text.
   */
@@ -258,9 +290,7 @@ MagickExport MagickBooleanType GetMultilineTypeMetrics(Image *image,
       annotate_info=DestroyDrawInfo(annotate_info);
       return(MagickFalse);
     }
-  annotate_info->render=MagickFalse;
-  annotate_info->direction=UndefinedDirection;
-  (void) memset(metrics,0,sizeof(*metrics));
+  ResetMultilineMetrics(annotate_info,metrics);
   (void) memset(&extent,0,sizeof(extent));
   /*
     Find the widest of the text lines.
@@ -268,8 +298,7 @@ MagickExport MagickBooleanType GetMultilineTypeMetrics(Image *image,
   annotate_info->text=textlist[0];
   status=GetTypeMetrics(image,annotate_info,&extent,exception);
   *metrics=extent;
-  height=(count*(size_t) (metrics->ascent-metrics->descent+
-    0.5)+(count-1)*draw_info->interline_spacing);
+  height=GetMultilineHeight(draw_info,metrics,count);
   size=(MagickSizeType) fabs(height);
   if (AcquireMagickResource(HeightResource,size) == MagickFalse)
     {
@@ -294,9 +323,6 @@ MagickExport MagickBooleanType GetMultilineTypeMetrics(Image *image,
   /*
     Relinquish resources.
   */
-  annotate_info->text=(char *) NULL;
-  annotate_info=DestroyDrawInfo(annotate_info);
-  DestroyTextLines(textlist,count);
-  textlist=(char **) RelinquishMagickMemory(textlist);
+  DestroyMultilineText(annotate_info,textlist,count);
   return(status);
 }

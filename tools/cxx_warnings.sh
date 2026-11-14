@@ -15,6 +15,8 @@
 #   C4456/C4457/C4459 hides a declaration   -Wshadow
 #   C4702 unreachable code                  -Wunreachable-code
 #   C4100 unreferenced parameter            -Wunused-parameter
+#   gcc -Wimplicit-fallthrough (Linux)      -Wimplicit-fallthrough, less a
+#                                           /* fall through */ comment
 #   unused variable (Linux -Werror jobs)    -Wunused-variable
 # and C4065 (a switch with a default but no case label) is a text scan.
 #
@@ -50,9 +52,16 @@ FLAGS="-x c++ -fsyntax-only"
 diag() {  # $1 source tree, $2 file relative to it -> normalised diagnostics
   # shellcheck disable=SC2086
   (cd "$1" && eval clang++ $FLAGS -Wno-everything -Werror=return-type \
-      -Wshadow -Wunreachable-code -Wunused-parameter -Wunused-variable \
+      -Wshadow -Wunreachable-code -Wunused-parameter -Wunused-variable -Wimplicit-fallthrough \
       -I"$B" -I"$B/MagickCore" -I. $DEFS $CPPFLAGS $MAGICK_CFLAGS "$2" 2>&1) |
     grep -E "^$2:[0-9]+:[0-9]+: (error|warning):" |
+    # gcc (-Wimplicit-fallthrough in the Linux jobs' -Wextra) accepts a /* fall through */
+    # comment, clang does not: drop a fall-through whose three lines above say "fall".
+    awk -v SRC="$1/$2" 'BEGIN { while ((getline l < SRC) > 0) src[++n]=l }
+      /unannotated fall-through/ { split($0,a,":"); ok=0
+        for (k=a[2]-3; k<a[2]; k++) if (tolower(src[k]) ~ /fall/) ok=1
+        if (ok) next }
+      { print }' |
     sed -E "s/^([^:]+):[0-9]+:[0-9]+: (error|warning): /\1: \2: /; s/ \[-W/ [-W/" |
     sed -E "s/(candidate|note).*//" | sort
   # C4065: `switch (...)` whose body has `default:` and no `case`.

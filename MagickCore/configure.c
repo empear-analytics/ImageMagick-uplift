@@ -380,6 +380,14 @@ MagickExport LinkedListInfo *DestroyConfigureOptions(LinkedListInfo *options)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static const ConfigureInfo *GetConfigureElementValue(ElementInfo *p,
+  const ConfigureInfo *option)
+{
+  if (p != (ElementInfo *) NULL)
+    option=(const ConfigureInfo *) p->value;
+  return(option);
+}
+
 MagickExport const ConfigureInfo *GetConfigureInfo(const char *name,
   ExceptionInfo *exception)
 {
@@ -401,9 +409,7 @@ MagickExport const ConfigureInfo *GetConfigureInfo(const char *name,
   if ((name == (const char *) NULL) || (LocaleCompare(name,"*") == 0))
     {
       UnlockSemaphoreInfo(configure_semaphore);
-      if (p != (ElementInfo *) NULL)
-        option=(const ConfigureInfo *) p->value;
-      return(option);
+      return(GetConfigureElementValue(p,option));
     }
   while (p != (ElementInfo *) NULL)
   {
@@ -688,14 +694,47 @@ MagickExport char *GetConfigureOption(const char *option)
 %    o exception: return any errors or warnings in this structure.
 %
 */
-MagickExport LinkedListInfo *GetConfigureOptions(const char *filename,
-  ExceptionInfo *exception)
+static void ReportMissingConfigureFile(LinkedListInfo *options,
+  const char *filename,ExceptionInfo *exception)
+{
+  if (GetNumberOfElementsInLinkedList(options) == 0)
+    (void) ThrowMagickException(exception,GetMagickModule(),ConfigureWarning,
+      "UnableToOpenConfigureFile","`%s'",filename);
+}
+
+static void LoadConfigureFiles(LinkedListInfo *options,LinkedListInfo *paths,
+  const char *filename,StringInfo **xml)
 {
   char
     path[MagickPathExtent];
 
   const char
     *element;
+
+  if (paths != (LinkedListInfo *) NULL)
+    {
+      ResetLinkedListIterator(paths);
+      element=(const char *) GetNextValueInLinkedList(paths);
+      while (element != (const char *) NULL)
+      {
+        (void) FormatLocaleString(path,MagickPathExtent,"%s%s",element,
+          filename);
+        (void) LogMagickEvent(ConfigureEvent,GetMagickModule(),
+          "Searching for configure file: \"%s\"",path);
+        (*xml)=ConfigureFileToStringInfo(path);
+        if ((*xml) != (StringInfo *) NULL)
+          (void) AppendValueToLinkedList(options,(*xml));
+        element=(const char *) GetNextValueInLinkedList(paths);
+      }
+      paths=DestroyLinkedList(paths,RelinquishMagickMemory);
+    }
+}
+
+MagickExport LinkedListInfo *GetConfigureOptions(const char *filename,
+  ExceptionInfo *exception)
+{
+  char
+    path[MagickPathExtent];
 
   LinkedListInfo
     *options,
@@ -714,23 +753,7 @@ MagickExport LinkedListInfo *GetConfigureOptions(const char *filename,
   */
   options=NewLinkedList(0);
   paths=GetConfigurePaths(filename,exception);
-  if (paths != (LinkedListInfo *) NULL)
-    {
-      ResetLinkedListIterator(paths);
-      element=(const char *) GetNextValueInLinkedList(paths);
-      while (element != (const char *) NULL)
-      {
-        (void) FormatLocaleString(path,MagickPathExtent,"%s%s",element,
-          filename);
-        (void) LogMagickEvent(ConfigureEvent,GetMagickModule(),
-          "Searching for configure file: \"%s\"",path);
-        xml=ConfigureFileToStringInfo(path);
-        if (xml != (StringInfo *) NULL)
-          (void) AppendValueToLinkedList(options,xml);
-        element=(const char *) GetNextValueInLinkedList(paths);
-      }
-      paths=DestroyLinkedList(paths,RelinquishMagickMemory);
-    }
+  LoadConfigureFiles(options,paths,filename,&xml);
 #if defined(MAGICKCORE_WINDOWS_SUPPORT)
   if (GetNumberOfElementsInLinkedList(options) == 0)
     {
@@ -748,9 +771,7 @@ MagickExport LinkedListInfo *GetConfigureOptions(const char *filename,
         }
     }
 #endif
-  if (GetNumberOfElementsInLinkedList(options) == 0)
-    (void) ThrowMagickException(exception,GetMagickModule(),ConfigureWarning,
-      "UnableToOpenConfigureFile","`%s'",filename);
+  ReportMissingConfigureFile(options,filename,exception);
   ResetLinkedListIterator(options);
   return(options);
 }
@@ -1091,6 +1112,131 @@ static MagickBooleanType ReadAttributeValue(const char **q,const size_t extent,
   return(MagickTrue);
 }
 
+typedef struct _ConfigureIncludeInput
+{
+  const ConfigureLoadTarget
+    *target;
+
+  const char
+    *filename;
+
+  char
+    *token;
+
+  size_t
+    extent,
+    depth;
+} ConfigureIncludeInput;
+
+static void LoadConfigureIncludes(const ConfigureIncludeInput *include,
+  const char **q,MagickStatusType *status)
+{
+  const ConfigureLoadTarget
+    *const target = include->target;
+
+  const char
+    *const filename = include->filename;
+
+  char
+    *const token = include->token;
+
+  const size_t
+    extent = include->extent,
+    depth = include->depth;
+
+  ExceptionInfo
+    *exception = target->exception;
+
+  while (NextIncludeFile(q,extent,token) != MagickFalse)
+    if (depth >= MagickMaxRecursionDepth)
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
+    else
+      (*status)&=(MagickStatusType) LoadConfigureInclude(target,filename,
+        token,depth);
+}
+
+static MagickStatusType AppendConfigureElement(LinkedListInfo *cache,
+  ConfigureInfo *configure_info,ExceptionInfo *exception)
+{
+  MagickStatusType
+    status;
+
+  status=AppendValueToLinkedList(cache,configure_info);
+  if (status == MagickFalse)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ResourceLimitError,"MemoryAllocationFailed","`%s'",
+      configure_info->name);
+  return(status);
+}
+
+typedef struct _ConfigureElementInput
+{
+  LinkedListInfo
+    *cache;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    *keyword,
+    *token;
+
+  const char
+    *filename;
+
+  size_t
+    extent;
+} ConfigureElementInput;
+
+static void ParseConfigureElement(const ConfigureElementInput *element,
+  ConfigureInfo **configure_info,MagickStatusType *status,const char **q)
+{
+  LinkedListInfo
+    *const cache = element->cache;
+
+  ExceptionInfo
+    *const exception = element->exception;
+
+  char
+    *const keyword = element->keyword,
+    *const token = element->token;
+
+  const char
+    *const filename = element->filename;
+
+  const size_t
+    extent = element->extent;
+
+  if (LocaleCompare(keyword,"<configure") == 0)
+    {
+      /*
+        Configure element.
+      */
+      (*configure_info)=(ConfigureInfo *) AcquireCriticalMemory(
+        sizeof(*(*configure_info)));
+      (void) memset((*configure_info),0,sizeof(*(*configure_info)));
+      (*configure_info)->path=ConstantString(filename);
+      (*configure_info)->exempt=MagickFalse;
+      (*configure_info)->signature=MagickCoreSignature;
+      return;
+    }
+  if ((*configure_info) == (ConfigureInfo *) NULL)
+    return;
+  if ((LocaleCompare(keyword,"/>") == 0) ||
+      (LocaleCompare(keyword,"</policy>") == 0))
+    {
+      (*status)=AppendConfigureElement(cache,(*configure_info),exception);
+      (*configure_info)=(ConfigureInfo *) NULL;
+      return;
+    }
+  /*
+    Parse configure element.
+  */
+  if (ReadAttributeValue(q,extent,token) != MagickFalse)
+    SetConfigureAttribute((*configure_info),keyword,token);
+}
+
 static MagickBooleanType LoadConfigureCache(const ConfigureLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1127,6 +1273,9 @@ static MagickBooleanType LoadConfigureCache(const ConfigureLoadTarget *target,
   extent=strlen(token)+MagickPathExtent;
   for (q=(char *) xml; *q != '\0'; )
   {
+    ConfigureElementInput
+      element;
+
     /*
       Interpret XML.
     */
@@ -1141,46 +1290,24 @@ static MagickBooleanType LoadConfigureCache(const ConfigureLoadTarget *target,
         /*
           Include element.
         */
-        while (NextIncludeFile(&q,extent,token) != MagickFalse)
-          if (depth >= MagickMaxRecursionDepth)
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
-          else
-            status&=(MagickStatusType) LoadConfigureInclude(target,filename,
-              token,depth);
+        ConfigureIncludeInput
+          include;
+
+        include.target=target;
+        include.filename=filename;
+        include.token=token;
+        include.extent=extent;
+        include.depth=depth;
+        LoadConfigureIncludes(&include,&q,&status);
         continue;
       }
-    if (LocaleCompare(keyword,"<configure") == 0)
-      {
-        /*
-          Configure element.
-        */
-        configure_info=(ConfigureInfo *) AcquireCriticalMemory(
-          sizeof(*configure_info));
-        (void) memset(configure_info,0,sizeof(*configure_info));
-        configure_info->path=ConstantString(filename);
-        configure_info->exempt=MagickFalse;
-        configure_info->signature=MagickCoreSignature;
-        continue;
-      }
-    if (configure_info == (ConfigureInfo *) NULL)
-      continue;
-    if ((LocaleCompare(keyword,"/>") == 0) ||
-        (LocaleCompare(keyword,"</policy>") == 0))
-      {
-        status=AppendValueToLinkedList(cache,configure_info);
-        if (status == MagickFalse)
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            ResourceLimitError,"MemoryAllocationFailed","`%s'",
-            configure_info->name);
-        configure_info=(ConfigureInfo *) NULL;
-        continue;
-      }
-    /*
-      Parse configure element.
-    */
-    if (ReadAttributeValue(&q,extent,token) != MagickFalse)
-      SetConfigureAttribute(configure_info,keyword,token);
+    element.cache=cache;
+    element.exception=exception;
+    element.keyword=keyword;
+    element.token=token;
+    element.filename=filename;
+    element.extent=extent;
+    ParseConfigureElement(&element,&configure_info,&status,&q);
   }
   token=(char *) RelinquishMagickMemory(token);
   return(status != 0 ? MagickTrue : MagickFalse);

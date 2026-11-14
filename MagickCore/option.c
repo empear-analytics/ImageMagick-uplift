@@ -2628,6 +2628,15 @@ MagickExport const OptionInfo *GetCommandOptionInfo(const char *option)
   return(CommandOptions+i);
 }
 
+static ssize_t CountOptionMnemonics(const OptionInfo *option_info)
+{
+  ssize_t
+    i;
+
+  for (i=0; option_info[i].mnemonic != (const char *) NULL; i++) ;
+  return(i);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2664,7 +2673,7 @@ MagickExport char **GetCommandOptions(const CommandOption option)
   option_info=GetOptionInfo(option);
   if (option_info == (const OptionInfo *) NULL)
     return((char **) NULL);
-  for (i=0; option_info[i].mnemonic != (const char *) NULL; i++) ;
+  i=CountOptionMnemonics(option_info);
   options=(char **) AcquireQuantumMemory((size_t) i+1UL,sizeof(*options));
   if (options == (char **) NULL)
     ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
@@ -2675,6 +2684,27 @@ MagickExport char **GetCommandOptions(const CommandOption option)
 }
 
 
+static MagickBooleanType IsPedanticOptionSet(void)
+{
+  char
+    *value;
+
+  ExceptionInfo
+    *exception;
+
+  MagickBooleanType
+    pedantic;
+
+  exception=AcquireExceptionInfo();
+  value=(char *) GetImageRegistry(StringRegistryType,"option:pedantic",
+    exception);
+  exception=DestroyExceptionInfo(exception);
+  pedantic=IsStringTrue(value);
+  if (value != (char *) NULL)
+    value=DestroyString(value);
+  return(pedantic);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2706,25 +2736,13 @@ static inline MagickBooleanType IsBracketOption(const char *option)
 
 MagickExport MagickBooleanType IsCommandOption(const char *option)
 {
-  char
-    *value;
-
-  ExceptionInfo
-    *exception;
-
   MagickBooleanType
     pedantic;
 
   assert(option != (const char *) NULL);
   if ((*option != '-') && (*option != '+'))
     return(MagickFalse);
-  exception=AcquireExceptionInfo();
-  value=(char *) GetImageRegistry(StringRegistryType,"option:pedantic",
-    exception);
-  exception=DestroyExceptionInfo(exception);
-  pedantic=IsStringTrue(value);
-  if (value != (char *) NULL)
-    value=DestroyString(value);
+  pedantic=IsPedanticOptionSet();
   if ((pedantic == MagickFalse) && (IsPathAccessible(option) != MagickFalse))
     return(MagickFalse);
   if (strlen(option) == 1)
@@ -2735,6 +2753,18 @@ MagickExport MagickBooleanType IsCommandOption(const char *option)
   return(MagickTrue);
 }
 
+static ssize_t FindOptionType(const OptionInfo *option_info,
+  const ssize_t type)
+{
+  ssize_t
+    i;
+
+  for (i=0; option_info[i].mnemonic != (const char *) NULL; i++)
+    if (type == option_info[i].type)
+      break;
+  return(i);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2772,14 +2802,20 @@ MagickExport const char *CommandOptionToMnemonic(const CommandOption option,
   option_info=GetOptionInfo(option);
   if (option_info == (const OptionInfo *) NULL)
     return((const char *) NULL);
-  for (i=0; option_info[i].mnemonic != (const char *) NULL; i++)
-    if (type == option_info[i].type)
-      break;
+  i=FindOptionType(option_info,type);
   if (option_info[i].mnemonic == (const char *) NULL)
     return("Unrecognized");
   return(option_info[i].mnemonic);
 }
 
+static void DestroyOptionList(char **option_list,ssize_t i,
+  const int number_options)
+{
+  for ( ; i < (ssize_t) number_options; i++)
+    option_list[i]=DestroyString(option_list[i]);
+  option_list=(char **) RelinquishMagickMemory(option_list);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2847,12 +2883,23 @@ MagickExport MagickBooleanType IsOptionMember(const char *option,
       }
     option_list[i]=DestroyString(option_list[i]);
   }
-  for ( ; i < (ssize_t) number_options; i++)
-    option_list[i]=DestroyString(option_list[i]);
-  option_list=(char **) RelinquishMagickMemory(option_list);
+  DestroyOptionList(option_list,i,number_options);
   return(member);
 }
 
+static void ListOptionMnemonics(FILE *file,const OptionInfo *option_info)
+{
+  ssize_t
+    i;
+
+  for (i=0; option_info[i].mnemonic != (char *) NULL; i++)
+  {
+    if (option_info[i].stealth != MagickFalse)
+      continue;
+    (void) FormatLocaleFile(file,"%s\n",option_info[i].mnemonic);
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2886,21 +2933,13 @@ MagickExport MagickBooleanType ListCommandOptions(FILE *file,
   const OptionInfo
     *option_info;
 
-  ssize_t
-    i;
-
   magick_unreferenced(exception);
   if (file == (FILE *) NULL)
     file=stdout;
   option_info=GetOptionInfo(option);
   if (option_info == (const OptionInfo *) NULL)
     return(MagickFalse);
-  for (i=0; option_info[i].mnemonic != (char *) NULL; i++)
-  {
-    if (option_info[i].stealth != MagickFalse)
-      continue;
-    (void) FormatLocaleFile(file,"%s\n",option_info[i].mnemonic);
-  }
+  ListOptionMnemonics(file,option_info);
   return(MagickTrue);
 }
 
@@ -3012,6 +3051,17 @@ MagickExport ssize_t ParseChannelOption(const char *channels)
   return(channel);
 }
 
+static int GetOptionSentinel(const char *options)
+{
+  int
+    sentinel;
+
+  sentinel=',';
+  if (strchr(options,'|') != (char *) NULL)
+    sentinel='|';
+  return(sentinel);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -3069,9 +3119,7 @@ MagickExport ssize_t ParseCommandOption(const CommandOption option,
   if (option_info == (const OptionInfo *) NULL)
     return(-1);
   option_types=0;
-  sentinel=',';
-  if (strchr(options,'|') != (char *) NULL)
-    sentinel='|';
+  sentinel=GetOptionSentinel(options);
   for (p=options; p != (char *) NULL; p=strchr(p,sentinel))
   {
     p=ReadOptionToken(p,sentinel,token,&negate);

@@ -4287,6 +4287,78 @@ static MagickBooleanType CreateDistributedPixelCache(CacheInfo *cache_info,
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireListLengthResource(const Image *image,
+  MagickSizeType *length,ExceptionInfo *exception)
+{
+  if (GetMagickResourceLimit(ListLengthResource) != MagickResourceInfinity)
+    {
+      *length=GetImageListLength(image);
+      if (AcquireMagickResource(ListLengthResource,*length) == MagickFalse)
+        ThrowBinaryException(ResourceLimitError,"ListLengthExceedsLimit",
+          image->filename);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType AddMetacontentPacketSize(const Image *image,
+  CacheInfo *cache_info,size_t *packet_size,ExceptionInfo *exception)
+{
+  if (cache_info->metacontent_extent != 0)
+    {
+      if (HeapOverflowCheckAdd(*packet_size,cache_info->metacontent_extent) != MagickFalse)
+        {
+          cache_info->storage_class=UndefinedClass;
+          cache_info->length=0;
+          ThrowBinaryException(ResourceLimitError,"PixelCacheAllocationFailed",
+            image->filename);
+        }
+      *packet_size+=cache_info->metacontent_extent;
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType ExhaustPixelCacheResources(CacheInfo *cache_info,
+  const PixelCacheOpenInfo *open_info,CacheInfo source_info)
+{
+  Image
+    *const image = open_info->image;
+
+  const MapMode
+    mode = open_info->mode;
+
+  ExceptionInfo
+    *const exception = open_info->exception;
+
+  if (IsCacheSourcePending(source_info,mode) != MagickFalse)
+    RelinquishPixelCachePixels(&source_info);
+  cache_info->type=UndefinedCache;
+  (void) memset(image->channel_map,0,MaxPixelChannels*
+    sizeof(*image->channel_map));
+  (void) ThrowMagickException(exception,GetMagickModule(),CacheError,
+    "CacheResourcesExhausted","`%s'",image->filename);
+  return(MagickFalse);
+}
+
+static MagickBooleanType FailPixelCacheOnDisk(CacheInfo *cache_info,
+  const PixelCacheOpenInfo *open_info,CacheInfo source_info,const char *tag)
+{
+  Image
+    *const image = open_info->image;
+
+  const MapMode
+    mode = open_info->mode;
+
+  ExceptionInfo
+    *const exception = open_info->exception;
+
+  if (IsCacheSourcePending(source_info,mode) != MagickFalse)
+    RelinquishPixelCachePixels(&source_info);
+  cache_info->type=UndefinedCache;
+  ThrowFileException(exception,CacheError,tag,
+    image->filename);
+  return(MagickFalse);
+}
+
 static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
   ExceptionInfo *exception)
 {
@@ -4358,13 +4430,8 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
         (double) cache_info->width_limit,(double) cache_info->height_limit);
       return(MagickFalse);
     }
-  if (GetMagickResourceLimit(ListLengthResource) != MagickResourceInfinity)
-    {
-      length=GetImageListLength(image);
-      if (AcquireMagickResource(ListLengthResource,length) == MagickFalse)
-        ThrowBinaryException(ResourceLimitError,"ListLengthExceedsLimit",
-          image->filename);
-    }
+  if (AcquireListLengthResource(image,&length,exception) == MagickFalse)
+    return(MagickFalse);
   source_info=(*cache_info);
   source_info.file=(-1);
   (void) FormatLocaleString(cache_info->filename,MagickPathExtent,"%s[%.17g]",
@@ -4385,17 +4452,8 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
   cache_info->mode=mode;
   number_pixels=(MagickSizeType) cache_info->columns*cache_info->rows;
   packet_size=MagickMax(cache_info->number_channels,1)*sizeof(Quantum);
-  if (cache_info->metacontent_extent != 0)
-    {
-      if (HeapOverflowCheckAdd(packet_size,cache_info->metacontent_extent) != MagickFalse)
-        {
-          cache_info->storage_class=UndefinedClass;
-          cache_info->length=0;
-          ThrowBinaryException(ResourceLimitError,"PixelCacheAllocationFailed",
-            image->filename);
-        }
-      packet_size+=cache_info->metacontent_extent;
-    }
+  if (AddMetacontentPacketSize(image,cache_info,&packet_size,exception) == MagickFalse)
+    return(MagickFalse);
   if (CacheOverflowSanityCheckGetSize(number_pixels,packet_size,&length) != MagickFalse)
     {
       cache_info->storage_class=UndefinedClass;
@@ -4481,54 +4539,26 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
             return(CreateDistributedPixelCache(cache_info,&open_info,
               source_info,server_info));
         }
-      if (IsCacheSourcePending(source_info,mode) != MagickFalse)
-        RelinquishPixelCachePixels(&source_info);
-      cache_info->type=UndefinedCache;
-      (void) memset(image->channel_map,0,MaxPixelChannels*
-        sizeof(*image->channel_map));
-      (void) ThrowMagickException(exception,GetMagickModule(),CacheError,
-        "CacheResourcesExhausted","`%s'",image->filename);
-      return(MagickFalse);
+      return(ExhaustPixelCacheResources(cache_info,&open_info,source_info));
     }
   /*
     Create pixel cache on disk.
   */
   if (status == MagickFalse)
-    {
-      if (IsCacheSourcePending(source_info,mode) != MagickFalse)
-        RelinquishPixelCachePixels(&source_info);
-      cache_info->type=UndefinedCache;
-      (void) memset(image->channel_map,0,MaxPixelChannels*
-        sizeof(*image->channel_map));
-      (void) ThrowMagickException(exception,GetMagickModule(),CacheError,
-        "CacheResourcesExhausted","`%s'",image->filename);
-      return(MagickFalse);
-    }
+    return(ExhaustPixelCacheResources(cache_info,&open_info,source_info));
   if (IsCacheClonePending(source_info,mode,cache_info) != MagickFalse)
     {
       (void) ClosePixelCacheOnDisk(cache_info);
       *cache_info->cache_filename='\0';
     }
   if (OpenPixelCacheOnDisk(cache_info,mode) == MagickFalse)
-    {
-      if (IsCacheSourcePending(source_info,mode) != MagickFalse)
-        RelinquishPixelCachePixels(&source_info);
-      cache_info->type=UndefinedCache;
-      ThrowFileException(exception,CacheError,"UnableToOpenPixelCache",
-        image->filename);
-      return(MagickFalse);
-    }
+    return(FailPixelCacheOnDisk(cache_info,&open_info,source_info,
+      "UnableToOpenPixelCache"));
   status=SetPixelCacheExtent(image,(MagickSizeType) cache_info->offset+
     cache_info->length);
   if (status == MagickFalse)
-    {
-      if (IsCacheSourcePending(source_info,mode) != MagickFalse)
-        RelinquishPixelCachePixels(&source_info);
-      cache_info->type=UndefinedCache;
-      ThrowFileException(exception,CacheError,"UnableToExtendCache",
-        image->filename);
-      return(MagickFalse);
-    }
+    return(FailPixelCacheOnDisk(cache_info,&open_info,source_info,
+      "UnableToExtendCache"));
   cache_info->type=DiskCache;
   length=number_pixels*(cache_info->number_channels*sizeof(Quantum)+
     cache_info->metacontent_extent);

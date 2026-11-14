@@ -173,13 +173,7 @@ static MagickBooleanType
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   A n n o t a t e C o m p o n e n t G e n e s i s                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  AnnotateComponentGenesis() instantiates the annotate component.
@@ -198,13 +192,7 @@ MagickPrivate MagickBooleanType AnnotateComponentGenesis(void)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   A n n o t a t e C o m p o n e n t T e r m i n u s                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  AnnotateComponentTerminus() destroys the annotate component.
@@ -223,13 +211,7 @@ MagickPrivate void AnnotateComponentTerminus(void)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   A n n o t a t e I m a g e                                                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  AnnotateImage() annotates an image with text.
@@ -604,6 +586,45 @@ static void GetCenterGravityTextOffset(const GravityTextInfo *gravity,
   }
 }
 
+static void GetAnnotateTextOffset(const GravityTextInfo *gravity,
+  PointInfo *offset)
+{
+  DrawInfo
+    *const annotate = gravity->annotate,
+    *const annotate_info = gravity->annotate_info;
+
+  const RectangleInfo
+    geometry = gravity->geometry;
+
+  const size_t
+    height = gravity->height;
+
+  const ssize_t
+    i = gravity->i;
+
+  const TypeMetric
+    metrics = gravity->metrics;
+
+  switch (annotate->gravity)
+  {
+    default:
+    {
+      GetCenterGravityTextOffset(gravity,offset);
+      break;
+    }
+    case (GravityType) NorthWestGravity:
+    {
+      (*offset).x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+i*
+        annotate_info->affine.ry*height+annotate_info->affine.ry*
+        (metrics.ascent+metrics.descent);
+      (*offset).y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
+        (metrics.bounds.y2-metrics.ascent)+i*annotate_info->affine.sy*height+
+        annotate_info->affine.sy*metrics.ascent;
+      break;
+    }
+  }
+}
+
 typedef struct _TextDecorationInfo
 {
   Image
@@ -748,6 +769,15 @@ static void DrawTextLineThrough(const TextDecorationInfo *decoration,
   }
 }
 
+static void DestroyAnnotateText(DrawInfo *annotate_info,DrawInfo *annotate,
+  char **textlist,char *text)
+{
+  annotate_info=DestroyDrawInfo(annotate_info);
+  annotate=DestroyDrawInfo(annotate);
+  textlist=(char **) RelinquishMagickMemory(textlist);
+  text=DestroyString(text);
+}
+
 MagickExport MagickBooleanType AnnotateImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -820,10 +850,7 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
     }
   if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
     {
-      annotate_info=DestroyDrawInfo(annotate_info);
-      annotate=DestroyDrawInfo(annotate);
-      textlist=(char **) RelinquishMagickMemory(textlist);
-      text=DestroyString(text);
+      DestroyAnnotateText(annotate_info,annotate,textlist,text);
       return(MagickFalse);
     }
   if (IsGrayColorspace(image->colorspace) != MagickFalse)
@@ -854,31 +881,14 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
     if ((metrics.width == 0) || (annotate->gravity != NorthWestGravity))
       (void) GetTypeMetrics(image,annotate,&metrics,exception);
     height=GetTextLineHeight(&metrics,draw_info);
-    switch (annotate->gravity)
-    {
-      default:
-      {
-        gravity.annotate=annotate;
-        gravity.annotate_info=annotate_info;
-        gravity.geometry=geometry;
-        gravity.height=height;
-        gravity.i=i;
-        gravity.metrics=metrics;
-        gravity.number_lines=number_lines;
-        GetCenterGravityTextOffset(&gravity,&offset);
-        break;
-      }
-      case (GravityType) NorthWestGravity:
-      {
-        offset.x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+i*
-          annotate_info->affine.ry*height+annotate_info->affine.ry*
-          (metrics.ascent+metrics.descent);
-        offset.y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
-          (metrics.bounds.y2-metrics.ascent)+i*annotate_info->affine.sy*height+
-          annotate_info->affine.sy*metrics.ascent;
-        break;
-      }
-    }
+    gravity.annotate=annotate;
+    gravity.annotate_info=annotate_info;
+    gravity.geometry=geometry;
+    gravity.height=height;
+    gravity.i=i;
+    gravity.metrics=metrics;
+    gravity.number_lines=number_lines;
+    GetAnnotateTextOffset(&gravity,&offset);
     text_align.annotate=annotate;
     text_align.annotate_info=annotate_info;
     text_align.height=height;
@@ -914,10 +924,7 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
   /*
     Relinquish resources.
   */
-  annotate_info=DestroyDrawInfo(annotate_info);
-  annotate=DestroyDrawInfo(annotate);
-  textlist=(char **) RelinquishMagickMemory(textlist);
-  text=DestroyString(text);
+  DestroyAnnotateText(annotate_info,annotate,textlist,text);
   return(status);
 }
 
@@ -1129,13 +1136,7 @@ MagickExport ssize_t FormatMagickCaption(Image *image,DrawInfo *draw_info,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t T y p e M e t r i c s                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetTypeMetrics() returns the following information for the specified font
@@ -1272,13 +1273,7 @@ static const TypeInfo *GetTypeInfoByFamilyList(const DrawInfo *draw_info,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   R e n d e r T y p e                                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  RenderType() renders text on the image.  It also returns the bounding box of
@@ -1413,15 +1408,39 @@ static MagickBooleanType RenderType(const RenderTarget *target,
   return(status);
 }
 
+static PointInfo ParseDensityResolution(const DrawInfo *draw_info,
+  PointInfo resolution)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    geometry_flags;
+
+  geometry_flags=ParseGeometry(draw_info->density,&geometry_info);
+  if ((geometry_flags & RhoValue) != 0)
+    resolution.x=geometry_info.rho;
+  resolution.y=resolution.x;
+  if ((geometry_flags & SigmaValue) != 0)
+    resolution.y=geometry_info.sigma;
+  return(resolution);
+}
+
+static PointInfo GetDensityResolution(const DrawInfo *draw_info)
+{
+  PointInfo
+    resolution;
+
+  resolution.x=DefaultResolution;
+  resolution.y=DefaultResolution;
+  if (draw_info->density != (char *) NULL)
+    resolution=ParseDensityResolution(draw_info,resolution);
+  return(resolution);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   R e n d e r F r e e t y p e                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  RenderFreetype() renders text on the image with a Truetype font.  It also
@@ -1852,24 +1871,6 @@ static inline MagickBooleanType IsInterwordSpace(const DrawInfo *draw_info,
     (IsUTFSpace((int) code) == MagickFalse)) ? MagickTrue : MagickFalse);
 }
 
-static PointInfo GetFreetypeResolution(const DrawInfo *draw_info,
-  PointInfo resolution)
-{
-  GeometryInfo
-    geometry_info;
-
-  MagickStatusType
-    geometry_flags;
-
-  geometry_flags=ParseGeometry(draw_info->density,&geometry_info);
-  if ((geometry_flags & RhoValue) != 0)
-    resolution.x=geometry_info.rho;
-  resolution.y=resolution.x;
-  if ((geometry_flags & SigmaValue) != 0)
-    resolution.y=geometry_info.sigma;
-  return(resolution);
-}
-
 static void SetFreetypeMetrics(const FT_Face face,TypeMetric *metrics)
 {
   metrics->pixels_per_em.x=face->size->metrics.x_ppem;
@@ -2056,17 +2057,10 @@ static inline MagickBooleanType IsTransparentFill(const DrawInfo *draw_info)
     MagickFalse);
 }
 
-static inline MagickBooleanType IsColumnOutside(const Image *image,
-  const ssize_t x_offset)
+static inline MagickBooleanType IsOffsetOutside(const ssize_t offset,
+  const size_t extent)
 {
-  return(((x_offset < 0) || (x_offset >= (ssize_t) image->columns)) ?
-    MagickTrue : MagickFalse);
-}
-
-static inline MagickBooleanType IsRowOutside(const Image *image,
-  const ssize_t y_offset)
-{
-  return(((y_offset < 0) || (y_offset >= (ssize_t) image->rows)) ?
+  return(((offset < 0) || (offset >= (ssize_t) extent)) ?
     MagickTrue : MagickFalse);
 }
 
@@ -2268,7 +2262,7 @@ static Quantum *GetGlyphRowPixels(const GlyphRows *rows,
     *magick_restrict q;
 
   q=(Quantum *) NULL;
-  if (IsColumnOutside(image,x_offset) != MagickFalse)
+  if (IsOffsetOutside(x_offset,image->columns) != MagickFalse)
     *active=MagickFalse;
   else
     {
@@ -2277,6 +2271,32 @@ static Quantum *GetGlyphRowPixels(const GlyphRows *rows,
       *active=q != (Quantum *) NULL ? MagickTrue : MagickFalse;
     }
   return(q);
+}
+
+static double GetGlyphPixelOpacity(const GlyphRows *rows,const ssize_t n,
+  const ssize_t x,const ssize_t y)
+{
+  const FT_BitmapGlyph
+    bitmap = rows->bitmap;
+
+  unsigned char
+    *const r = rows->r;
+
+  const DrawInfo
+    *const draw_info = rows->draw_info;
+
+  double
+    fill_opacity;
+
+  GlyphRasterInfo
+    raster;
+
+  raster.bitmap=bitmap;
+  raster.r=r;
+  fill_opacity=GetGlyphFillOpacity(&raster,n,x,y);
+  if (draw_info->text_antialias == MagickFalse)
+    fill_opacity=fill_opacity >= 0.5 ? 1.0 : 0.0;
+  return(fill_opacity);
 }
 
 static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
@@ -2293,9 +2313,6 @@ static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
 
   const PointInfo
     point = rows->point;
-
-  unsigned char
-    *const r = rows->r;
 
   const MagickBooleanType
     transparent_fill = rows->transparent_fill;
@@ -2331,26 +2348,19 @@ static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
     return;
   x_offset=CastDoubleToSsizeT(ceil(point.x-0.5));
   y_offset=CastDoubleToSsizeT(ceil(point.y+y-0.5));
-  if (IsRowOutside(image,y_offset) != MagickFalse)
+  if (IsOffsetOutside(y_offset,image->rows) != MagickFalse)
     return;
   q=GetGlyphRowPixels(rows,x_offset,y_offset,&active);
   n=y*bitmap->bitmap.pitch;
   for (x=0; x < (ssize_t) bitmap->bitmap.width; x++, n++)
   {
-    GlyphRasterInfo
-      raster;
-
     x_offset=CastDoubleToSsizeT(ceil(point.x+x-0.5));
-    if (IsColumnOutside(image,x_offset) != MagickFalse)
+    if (IsOffsetOutside(x_offset,image->columns) != MagickFalse)
       {
         q=SkipGlyphPixel(image,q);
         continue;
       }
-    raster.bitmap=bitmap;
-    raster.r=r;
-    fill_opacity=GetGlyphFillOpacity(&raster,n,x,y);
-    if (draw_info->text_antialias == MagickFalse)
-      fill_opacity=fill_opacity >= 0.5 ? 1.0 : 0.0;
+    fill_opacity=GetGlyphPixelOpacity(rows,n,x,y);
     if (active == MagickFalse)
       q=GetCacheViewAuthenticPixels(image_view,x_offset,y_offset,1,1,
         exception);
@@ -2373,18 +2383,6 @@ static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
   sync=SyncCacheViewAuthenticPixels(image_view,exception);
   if (sync == MagickFalse)
     (*status)=MagickFalse;
-}
-
-static PointInfo GetFreetypeTextResolution(const DrawInfo *draw_info)
-{
-  PointInfo
-    resolution;
-
-  resolution.x=DefaultResolution;
-  resolution.y=DefaultResolution;
-  if (draw_info->density != (char *) NULL)
-    resolution=GetFreetypeResolution(draw_info,resolution);
-  return(resolution);
 }
 
 static void SelectFreetypeCharmap(FT_Face face,FT_Encoding encoding_type)
@@ -2570,6 +2568,271 @@ static FT_UInt GetFreetypeGlyphId(const GraphemeInfo *grapheme,
   return(id);
 }
 
+#define ThrowFreetypeErrorException(tag,ft_status,value) \
+{ \
+  const char *error_string = FreetypeErrorMessage(ft_status); \
+  if (error_string != (const char *) NULL) \
+    (void) ThrowMagickException(exception,GetMagickModule(),TypeError, \
+      tag,"`%s (%s)'",value, error_string); \
+  else \
+    (void) ThrowMagickException(exception,GetMagickModule(),TypeError, \
+      tag,"`%s'",value); \
+}
+
+typedef struct _FreetypeFaceTargets
+{
+  FT_Memory
+    *memory;
+
+  FT_Library
+    *library;
+
+  FT_StreamRec
+    **stream;
+
+  FT_Face
+    *face;
+} FreetypeFaceTargets;
+
+static MagickBooleanType ConfigureFreetypeFace(const FreetypeTarget *target,
+  const FreetypeFaceTargets *targets,ExceptionInfo *exception)
+{
+  FT_Memory
+    *const memory = targets->memory;
+
+  FT_Library
+    *const library = targets->library;
+
+  FT_StreamRec
+    **const stream = targets->stream;
+
+  FT_Face
+    *const face = targets->face;
+
+  const DrawInfo
+    *draw_info = target->draw_info;
+
+  const char
+    *encoding = target->encoding;
+
+  FT_Encoding
+    encoding_type;
+
+  FT_Error
+    ft_status;
+
+  PointInfo
+    resolution;
+
+  if ((draw_info->metrics != (char *) NULL) &&
+      (IsPathAccessible(draw_info->metrics) != MagickFalse))
+    (void) FT_Attach_File(*face,draw_info->metrics);
+  encoding_type=FT_ENCODING_UNICODE;
+  SelectFreetypeCharmap(*face,encoding_type);
+  if (encoding != (const char *) NULL)
+    {
+      encoding_type=SelectFreetypeEncoding(encoding,encoding_type);
+      ft_status=FT_Select_Charmap(*face,encoding_type);
+      if (ft_status != 0)
+        {
+          (void) FT_Done_Face(*face);
+          FreetypeDone(*memory,*library,*stream);
+          ThrowFreetypeErrorException("UnrecognizedFontEncoding",ft_status,
+            encoding);
+          return(MagickFalse);
+        }
+    }
+  /*
+    Set text size.
+  */
+  resolution=GetDensityResolution(draw_info);
+  ft_status=FT_Set_Char_Size(*face,(FT_F26Dot6) (64.0*draw_info->pointsize),
+    (FT_F26Dot6) (64.0*draw_info->pointsize),(FT_UInt) resolution.x,
+    (FT_UInt) resolution.y);
+  if (ft_status != 0)
+    {
+      (void) FT_Done_Face(*face);
+      FreetypeDone(*memory,*library,*stream);
+      ThrowFreetypeErrorException("UnableToReadFont",ft_status,
+        draw_info->font);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType OpenFreetypeFace(const FreetypeTarget *target,
+  const FreetypeFaceTargets *targets,ExceptionInfo *exception)
+{
+  FT_Memory
+    *const memory = targets->memory;
+
+  FT_Library
+    *const library = targets->library;
+
+  FT_StreamRec
+    **const stream = targets->stream;
+
+  FT_Face
+    *const face = targets->face;
+
+  Image
+    *image = target->image;
+
+  const DrawInfo
+    *draw_info = target->draw_info;
+
+  FT_Error
+    ft_status;
+
+  FT_Long
+    face_index;
+
+  FT_Open_Args
+    args;
+
+  /*
+    Initialize Truetype library.
+  */
+  if (IsUnauthorizedFontFile(draw_info) != MagickFalse)
+    ThrowPolicyException(draw_info->font,MagickFalse);
+  *memory=FreetypeAcquireMemoryManager();
+  if (*memory == (FT_Memory) NULL)
+    ThrowBinaryException(ResourceLimitError,"UnableToInitializeFreetypeLibrary",
+      image->filename);
+  ft_status=FreetypeInit(*memory,library);
+  if (ft_status != 0)
+    {
+      ThrowFreetypeErrorException("UnableToInitializeFreetypeLibrary",ft_status,
+        image->filename);
+      return(MagickFalse);
+    }
+  /*
+    Open font face.
+  */
+  face_index=(FT_Long) draw_info->face;
+  (void) memset(&args,0,sizeof(args));
+  SelectFreetypeFontPath(draw_info,&args,&face_index,exception);
+  /*
+    Configure streaming interface.
+  */
+  *stream=AcquireFreetypeStream(args.pathname);
+  args.flags=FT_OPEN_STREAM;
+  args.stream=*stream;
+  *face=(FT_Face) NULL;
+  ft_status=FT_Open_Face(*library,&args,face_index,face);
+  if (ft_status != 0)
+    {
+      FreetypeDone(*memory,*library,*stream);
+      ThrowFreetypeErrorException("UnableToReadFont",ft_status,args.pathname);
+      args.pathname=DestroyString(args.pathname);
+      return(MagickFalse);
+    }
+  args.pathname=DestroyString(args.pathname);
+  return(ConfigureFreetypeFace(target,targets,exception));
+}
+
+typedef struct _GlyphInfo
+{
+  FT_UInt
+    id;
+
+  FT_Vector
+    origin;
+
+  FT_Glyph
+    image;
+} GlyphInfo;
+
+static FT_Outline_Funcs
+  OutlineMethods =
+  {
+    (FT_Outline_MoveTo_Func) TraceMoveTo,
+    (FT_Outline_LineTo_Func) TraceLineTo,
+    (FT_Outline_ConicTo_Func) TraceQuadraticBezier,
+    (FT_Outline_CubicTo_Func) TraceCubicBezier,
+    0, 0
+  };
+
+typedef struct _GlyphLoadInput
+{
+  FT_Face
+    face;
+
+  FT_Int32
+    flags;
+
+  const DrawInfo
+    *draw_info;
+
+  MagickBooleanType
+    status;
+
+  DrawInfo
+    *annotate_info;
+
+  FT_Matrix
+    affine;
+
+  TypeMetric
+    *metrics;
+} GlyphLoadInput;
+
+static MagickBooleanType LoadFreetypeGlyph(const GlyphLoadInput *glyph_input,
+  GlyphInfo *glyph,FT_BBox *bounds)
+{
+  const FT_Face
+    face = glyph_input->face;
+
+  const FT_Int32
+    flags = glyph_input->flags;
+
+  const DrawInfo
+    *const draw_info = glyph_input->draw_info;
+
+  const MagickBooleanType
+    status = glyph_input->status;
+
+  DrawInfo
+    *const annotate_info = glyph_input->annotate_info;
+
+  const FT_Matrix
+    affine = glyph_input->affine;
+
+  TypeMetric
+    *const metrics = glyph_input->metrics;
+
+  FT_Error
+    ft_status;
+
+  FT_Outline
+    outline;
+
+    (*glyph).image=DestroyFreetypeGlyph((*glyph).image);
+    ft_status=FT_Load_Glyph(face,(*glyph).id,flags);
+    if (ft_status != 0)
+      return(MagickTrue);
+    ft_status=FT_Get_Glyph(face->glyph,&(*glyph).image);
+    if (ft_status != 0)
+      return(MagickTrue);
+    outline=((FT_OutlineGlyph) (*glyph).image)->outline;
+    if (IsNonOutlineGlyph((*glyph).image,outline) != MagickFalse)
+      return(MagickTrue);
+    ft_status=FT_Outline_Get_BBox(&outline,bounds);
+    if (ft_status != 0)
+      return(MagickTrue);
+    ExtendGlyphMinBounds((*bounds),metrics);
+    ExtendGlyphMaxBounds((*bounds),metrics);
+    if (IsRenderedStroke(draw_info,status) != MagickFalse)
+      TraceGlyphOutline(annotate_info,(*glyph).origin,outline,&OutlineMethods);
+    FT_Vector_Transform(&(*glyph).origin,&affine);
+    (void) FT_Glyph_Transform((*glyph).image,&affine,&(*glyph).origin);
+    ft_status=FT_Glyph_To_Bitmap(&(*glyph).image,FT_RENDER_MODE_NORMAL,
+      (FT_Vector *) NULL,MagickTrue);
+    if (ft_status != 0)
+      return(MagickTrue);
+  return(MagickFalse);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2586,29 +2849,6 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
 #define FT_OPEN_PATHNAME  ft_open_pathname
 #endif
 
-#define ThrowFreetypeErrorException(tag,ft_status,value) \
-{ \
-  const char *error_string = FreetypeErrorMessage(ft_status); \
-  if (error_string != (const char *) NULL) \
-    (void) ThrowMagickException(exception,GetMagickModule(),TypeError, \
-      tag,"`%s (%s)'",value, error_string); \
-  else \
-    (void) ThrowMagickException(exception,GetMagickModule(),TypeError, \
-      tag,"`%s'",value); \
-}
-
-  typedef struct _GlyphInfo
-  {
-    FT_UInt
-      id;
-
-    FT_Vector
-      origin;
-
-    FT_Glyph
-      image;
-  } GlyphInfo;
-
   char
     *p;
 
@@ -2621,12 +2861,6 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   FT_BitmapGlyph
     bitmap;
 
-  FT_Encoding
-    encoding_type;
-
-  FT_Error
-    ft_status;
-
   FT_Face
     face;
 
@@ -2636,17 +2870,11 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   FT_Library
     library;
 
-  FT_Long
-    face_index;
-
   FT_Matrix
     affine;
 
   FT_Memory
     memory;
-
-  FT_Open_Args
-    args;
 
   FT_StreamRec
     *stream;
@@ -2665,12 +2893,14 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   GraphemeInfo
     *grapheme;
 
+  FreetypeFaceTargets
+    targets;
+
   MagickBooleanType
     status;
 
   PointInfo
-    point,
-    resolution;
+    point;
 
   ssize_t
     i;
@@ -2682,90 +2912,15 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     code,
     last_character;
 
-  static FT_Outline_Funcs
-    OutlineMethods =
-    {
-      (FT_Outline_MoveTo_Func) TraceMoveTo,
-      (FT_Outline_LineTo_Func) TraceLineTo,
-      (FT_Outline_ConicTo_Func) TraceQuadraticBezier,
-      (FT_Outline_CubicTo_Func) TraceCubicBezier,
-      0, 0
-    };
-
   unsigned char
     *utf8;
 
-  /*
-    Initialize Truetype library.
-  */
-  if (IsUnauthorizedFontFile(draw_info) != MagickFalse)
-    ThrowPolicyException(draw_info->font,MagickFalse);
-  memory=FreetypeAcquireMemoryManager();
-  if (memory == (FT_Memory) NULL)
-    ThrowBinaryException(ResourceLimitError,"UnableToInitializeFreetypeLibrary",
-      image->filename);
-  ft_status=FreetypeInit(memory,&library);
-  if (ft_status != 0)
-    {
-      ThrowFreetypeErrorException("UnableToInitializeFreetypeLibrary",ft_status,
-        image->filename);
-      return(MagickFalse);
-    }
-  /*
-    Open font face.
-  */
-  face_index=(FT_Long) draw_info->face;
-  (void) memset(&args,0,sizeof(args));
-  SelectFreetypeFontPath(draw_info,&args,&face_index,exception);
-  /*
-    Configure streaming interface.
-  */
-  stream=AcquireFreetypeStream(args.pathname);
-  args.flags=FT_OPEN_STREAM;
-  args.stream=stream;
-  face=(FT_Face) NULL;
-  ft_status=FT_Open_Face(library,&args,face_index,&face);
-  if (ft_status != 0)
-    {
-      FreetypeDone(memory,library,stream);
-      ThrowFreetypeErrorException("UnableToReadFont",ft_status,args.pathname);
-      args.pathname=DestroyString(args.pathname);
-      return(MagickFalse);
-    }
-  args.pathname=DestroyString(args.pathname);
-  if ((draw_info->metrics != (char *) NULL) &&
-      (IsPathAccessible(draw_info->metrics) != MagickFalse))
-    (void) FT_Attach_File(face,draw_info->metrics);
-  encoding_type=FT_ENCODING_UNICODE;
-  SelectFreetypeCharmap(face,encoding_type);
-  if (encoding != (const char *) NULL)
-    {
-      encoding_type=SelectFreetypeEncoding(encoding,encoding_type);
-      ft_status=FT_Select_Charmap(face,encoding_type);
-      if (ft_status != 0)
-        {
-          (void) FT_Done_Face(face);
-          FreetypeDone(memory,library,stream);
-          ThrowFreetypeErrorException("UnrecognizedFontEncoding",ft_status,
-            encoding);
-          return(MagickFalse);
-        }
-    }
-  /*
-    Set text size.
-  */
-  resolution=GetFreetypeTextResolution(draw_info);
-  ft_status=FT_Set_Char_Size(face,(FT_F26Dot6) (64.0*draw_info->pointsize),
-    (FT_F26Dot6) (64.0*draw_info->pointsize),(FT_UInt) resolution.x,
-    (FT_UInt) resolution.y);
-  if (ft_status != 0)
-    {
-      (void) FT_Done_Face(face);
-      FreetypeDone(memory,library,stream);
-      ThrowFreetypeErrorException("UnableToReadFont",ft_status,
-        draw_info->font);
-      return(MagickFalse);
-    }
+  targets.memory=(&memory);
+  targets.library=(&library);
+  targets.stream=(&stream);
+  targets.face=(&face);
+  if (OpenFreetypeFace(target,&targets,exception) == MagickFalse)
+    return(MagickFalse);
   SetFreetypeMetrics(face,metrics);
   first_glyph_id=0;
   FT_Get_First_Char(face,&first_glyph_id);
@@ -2813,8 +2968,8 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   last_character=(ssize_t) length-1;
   for (i=0; i < (ssize_t) length; i++)
   {
-    FT_Outline
-      outline;
+    GlyphLoadInput
+      glyph_input;
 
     /*
       Render UTF-8 sequence.
@@ -2825,28 +2980,14 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     glyph.origin=origin;
     glyph.origin.x+=(FT_Pos) grapheme[i].x_offset;
     glyph.origin.y+=(FT_Pos) grapheme[i].y_offset;
-    glyph.image=DestroyFreetypeGlyph(glyph.image);
-    ft_status=FT_Load_Glyph(face,glyph.id,flags);
-    if (ft_status != 0)
-      continue;
-    ft_status=FT_Get_Glyph(face->glyph,&glyph.image);
-    if (ft_status != 0)
-      continue;
-    outline=((FT_OutlineGlyph) glyph.image)->outline;
-    if (IsNonOutlineGlyph(glyph.image,outline) != MagickFalse)
-      continue;
-    ft_status=FT_Outline_Get_BBox(&outline,&bounds);
-    if (ft_status != 0)
-      continue;
-    ExtendGlyphMinBounds(bounds,metrics);
-    ExtendGlyphMaxBounds(bounds,metrics);
-    if (IsRenderedStroke(draw_info,status) != MagickFalse)
-      TraceGlyphOutline(annotate_info,glyph.origin,outline,&OutlineMethods);
-    FT_Vector_Transform(&glyph.origin,&affine);
-    (void) FT_Glyph_Transform(glyph.image,&affine,&glyph.origin);
-    ft_status=FT_Glyph_To_Bitmap(&glyph.image,FT_RENDER_MODE_NORMAL,
-      (FT_Vector *) NULL,MagickTrue);
-    if (ft_status != 0)
+    glyph_input.face=face;
+    glyph_input.flags=flags;
+    glyph_input.draw_info=draw_info;
+    glyph_input.status=status;
+    glyph_input.annotate_info=annotate_info;
+    glyph_input.affine=affine;
+    glyph_input.metrics=metrics;
+    if (LoadFreetypeGlyph(&glyph_input,&glyph,&bounds) != MagickFalse)
       continue;
     bitmap=(FT_BitmapGlyph) glyph.image;
     point=GetGlyphBitmapPoint(offset,bitmap,origin);
@@ -2906,13 +3047,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   R e n d e r P o s t s c r i p t                                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  RenderPostscript() renders text on the image with a Postscript font.  It
@@ -3030,31 +3165,6 @@ static void WritePostscriptFont(FILE *file,const DrawInfo *draw_info)
     (void) FormatLocaleFile(file,
       "/%s-ISO dup /%s ReencodeType findfont setfont\n",draw_info->font,
       draw_info->font);
-}
-
-static PointInfo GetPostscriptResolution(const DrawInfo *draw_info)
-{
-  PointInfo
-    resolution;
-
-  resolution.x=DefaultResolution;
-  resolution.y=DefaultResolution;
-  if (draw_info->density != (char *) NULL)
-    {
-      GeometryInfo
-        geometry_info;
-
-      MagickStatusType
-        flags;
-
-      flags=ParseGeometry(draw_info->density,&geometry_info);
-      if ((flags & RhoValue) != 0)
-        resolution.x=geometry_info.rho;
-      resolution.y=resolution.x;
-      if ((flags & SigmaValue) != 0)
-        resolution.y=geometry_info.sigma;
-    }
-  return(resolution);
 }
 
 static void WritePostscriptText(FILE *file,const DrawInfo *draw_info,
@@ -3181,7 +3291,7 @@ static MagickBooleanType RenderPostscript(Image *image,
   if (annotate_image == (Image *) NULL)
     return(MagickFalse);
   (void) NegateImage(annotate_image,MagickFalse,exception);
-  resolution=GetPostscriptResolution(draw_info);
+  resolution=GetDensityResolution(draw_info);
   if (identity == MagickFalse)
     (void) TransformImage(&annotate_image,"0x0",(char *) NULL,exception);
   else
@@ -3269,13 +3379,7 @@ static MagickBooleanType RenderPostscript(Image *image,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   R e n d e r X 1 1                                                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  RenderX11() renders text on the image with an X11 font.  It also returns the

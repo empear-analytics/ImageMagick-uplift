@@ -918,6 +918,32 @@ static ssize_t CountDoubleValues(const char *string)
   return(count);
 }
 
+static void FillArrayOfDoubles(const char *string,const ssize_t count,
+  double *array)
+{
+  char
+    *q;
+
+  const char
+    *p;
+
+  ssize_t
+    i;
+
+  /*
+    Fill in the floating point values.
+  */
+  i=0;
+  p=string;
+  while ((*p != '\0') && (i < count))
+  {
+    array[i++]=StringToDouble(p,&q);
+    p=q;
+    while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == ','))
+      p++;
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -956,12 +982,6 @@ static ssize_t CountDoubleValues(const char *string)
 MagickExport double *StringToArrayOfDoubles(const char *string,ssize_t *count,
   ExceptionInfo *exception)
 {
-  char
-    *q;
-
-  const char
-    *p;
-
   double
     *array;
 
@@ -990,18 +1010,7 @@ MagickExport double *StringToArrayOfDoubles(const char *string,ssize_t *count,
         ResourceLimitError,"MemoryAllocationFailed","`%s'","");
       return((double *) NULL);
     }
-  /*
-    Fill in the floating point values.
-  */
-  i=0;
-  p=string;
-  while ((*p != '\0') && (i < *count))
-  {
-    array[i++]=StringToDouble(p,&q);
-    p=q;
-    while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == ','))
-      p++;
-  }
+  FillArrayOfDoubles(string,*count,array);
   return(array);
 }
 
@@ -1142,6 +1151,17 @@ static char **DestroyTextList(char **textlist,const ssize_t count)
   return((char **) NULL);
 }
 
+static const char *FindTextLineEnd(const char *p)
+{
+  const char
+    *q;
+
+  for (q=p; *q != '\0'; q++)
+    if ((*q == '\r') || (*q == '\n'))
+      break;
+  return(q);
+}
+
 static char **AsciiTextList(const char *text,size_t *lines)
 {
   char
@@ -1165,9 +1185,7 @@ static char **AsciiTextList(const char *text,size_t *lines)
   p=text;
   for (i=0; i < (ssize_t) *lines; i++)
   {
-    for (q=p; *q != '\0'; q++)
-      if ((*q == '\r') || (*q == '\n'))
-        break;
+    q=FindTextLineEnd(p);
     textlist[i]=(char *) AcquireQuantumMemory((size_t) (q-p)+1,
       sizeof(**textlist));
     if (textlist[i] == (char *) NULL)
@@ -1466,6 +1484,25 @@ static void ReplaceMatch(char *p,const char *replace,
 %    o replace: replace any matches with this string.
 %
 */
+static char *MakeRoomForReplacement(char **string,char *p,
+  const size_t search_extent,const size_t replace_extent)
+{
+  size_t
+    extent;
+
+  ssize_t
+    offset;
+
+  offset=(ssize_t) (p-(*string));
+  extent=strlen(*string)+replace_extent-search_extent+1;
+  *string=(char *) ResizeQuantumMemory(*string,
+    OverAllocateMemory(extent+MagickPathExtent),sizeof(*p));
+  if (*string == (char *) NULL)
+    ThrowFatalException(ResourceLimitFatalError,"UnableToAcquireString");
+  p=(*string)+offset;
+  return(p);
+}
+
 MagickExport MagickBooleanType SubstituteString(char **string,
   const char *search,const char *replace)
 {
@@ -1476,12 +1513,8 @@ MagickExport MagickBooleanType SubstituteString(char **string,
     *p;
 
   size_t
-    extent,
     replace_extent,
     search_extent;
-
-  ssize_t
-    offset;
 
   status=MagickFalse;
   search_extent=0,
@@ -1503,13 +1536,7 @@ MagickExport MagickBooleanType SubstituteString(char **string,
         /*
           Make room for the replacement string.
         */
-        offset=(ssize_t) (p-(*string));
-        extent=strlen(*string)+replace_extent-search_extent+1;
-        *string=(char *) ResizeQuantumMemory(*string,
-          OverAllocateMemory(extent+MagickPathExtent),sizeof(*p));
-        if (*string == (char *) NULL)
-          ThrowFatalException(ResourceLimitFatalError,"UnableToAcquireString");
-        p=(*string)+offset;
+        p=MakeRoomForReplacement(string,p,search_extent,replace_extent);
       }
     /*
       Replace string.

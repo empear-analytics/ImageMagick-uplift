@@ -103,6 +103,12 @@ Never, in any commit:
   build (the wide build for the X11 and shared-memory blocks) and the object comparison there
   (`tools/obj_modulo.sh` or `obj_identical.sh`) is IDENTICAL or MODULO-IDENTICAL. In every case the
   whole catalogue, narrow and wide, must stay at 0 diverged and `ci_linux_warnings.sh` must pass.
+  Rulings of 2026-11-13 (owner): a function's opening block, its `LogMagickEvent(TraceEvent,
+  GetMagickModule(),...)` call included, may move into a helper, so that trace logs name the
+  helper; and the `%` doc-comment banners above functions may be shortened or reworded by a
+  recipe (guard level: `tools/obj_identical.sh` IDENTICAL, no code token changed), keeping
+  what each says about the API, where CodeScene counts their near-identical text as Code
+  Duplication.
 - Modify a `static const` data table.
 - Fix a bug you noticed. Report it.
 

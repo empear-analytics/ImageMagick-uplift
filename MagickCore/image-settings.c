@@ -111,6 +111,16 @@
 #include "MagickCore/version.h"
 #include "MagickCore/xwindow-private.h"
 
+/*
+  Typedef declarations.
+*/
+typedef struct _FormatExceptions
+{
+  ExceptionInfo
+    *sans_exception,
+    *exception;
+} FormatExceptions;
+
 static void UpdateSceneRange(ImageInfo *image_info,size_t first,size_t last)
 {
   if (first > last)
@@ -306,9 +316,12 @@ static void AffirmUserSpecifiedFormat(ImageInfo *image_info,
 }
 
 static const MagickInfo *SetUserSpecifiedFormat(ImageInfo *image_info,
-  char *magic,char *component,ExceptionInfo *sans_exception,
-  ExceptionInfo *exception)
+  char *magic,char *component,const FormatExceptions *exceptions)
 {
+  ExceptionInfo
+    *const sans_exception = exceptions->sans_exception,
+    *const exception = exceptions->exception;
+
   const DelegateInfo
     *delegate_info;
 
@@ -602,6 +615,9 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
   ExceptionInfo
     *sans_exception;
 
+  FormatExceptions
+    exceptions;
+
   /*
     Look for 'image.format' in filename.
   */
@@ -628,8 +644,12 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
       SetImageInfoFilename(image_info,frames,component);
     }
   else
-    magick_info=SetUserSpecifiedFormat(image_info,magic,component,
-      sans_exception,exception);
+    {
+      exceptions.sans_exception=sans_exception;
+      exceptions.exception=exception;
+      magick_info=SetUserSpecifiedFormat(image_info,magic,component,
+        &exceptions);
+    }
   sans_exception=DestroyExceptionInfo(sans_exception);
   ResetUnsupportedEndian(image_info,magick_info);
   TestMultipleImageSupport(image_info,frames,component,exception);
@@ -775,27 +795,52 @@ static void ConvertResolutionUnits(Image *image,const ResolutionType units)
     }
 }
 
+static void SyncColorOption(const ImageInfo *image_info,const char *key,
+  PixelInfo *value,ExceptionInfo *exception)
+{
+  const char
+    *option;
+
+  option=GetImageOption(image_info,key);
+  if (option != (const char *) NULL)
+    (void) QueryColorCompliance(option,AllCompliance,value,exception);
+}
+
+static void SyncBooleanOption(const ImageInfo *image_info,const char *key,
+  MagickBooleanType *value)
+{
+  const char
+    *option;
+
+  option=GetImageOption(image_info,key);
+  if (option != (const char *) NULL)
+    (*value)=(MagickBooleanType) ParseCommandOption(MagickBooleanOptions,
+      MagickFalse,option);
+}
+
+static void SyncChromaticityOption(const ImageInfo *image_info,
+  const char *key,PrimaryInfo *value)
+{
+  const char
+    *option;
+
+  option=GetImageOption(image_info,key);
+  if (option != (const char *) NULL)
+    ParseChromaticityPrimary(option,value);
+}
+
 static void SyncImageColorAndCodecSettings(const ImageInfo *image_info,
   Image *image,ExceptionInfo *exception)
 {
   const char
     *option;
 
-  option=GetImageOption(image_info,"background");
-  if (option != (const char *) NULL)
-    (void) QueryColorCompliance(option,AllCompliance,&image->background_color,
-      exception);
-  option=GetImageOption(image_info,"black-point-compensation");
-  if (option != (const char *) NULL)
-    image->black_point_compensation=(MagickBooleanType) ParseCommandOption(
-      MagickBooleanOptions,MagickFalse,option);
-  option=GetImageOption(image_info,"blue-primary");
-  if (option != (const char *) NULL)
-    ParseChromaticityPrimary(option,&image->chromaticity.blue_primary);
-  option=GetImageOption(image_info,"bordercolor");
-  if (option != (const char *) NULL)
-    (void) QueryColorCompliance(option,AllCompliance,&image->border_color,
-      exception);
+  SyncColorOption(image_info,"background",&image->background_color,exception);
+  SyncBooleanOption(image_info,"black-point-compensation",
+    &image->black_point_compensation);
+  SyncChromaticityOption(image_info,"blue-primary",
+    &image->chromaticity.blue_primary);
+  SyncColorOption(image_info,"bordercolor",&image->border_color,exception);
   /* FUTURE: do not sync compose to per-image compose setting here */
   option=GetImageOption(image_info,"compose");
   if (option != (const char *) NULL)
@@ -806,10 +851,18 @@ static void SyncImageColorAndCodecSettings(const ImageInfo *image_info,
   if (option != (const char *) NULL)
     image->compression=(CompressionType) ParseCommandOption(
       MagickCompressOptions,MagickFalse,option);
-  option=GetImageOption(image_info,"debug");
+  SyncBooleanOption(image_info,"debug",&image->debug);
+}
+
+static void SyncUnsignedLongOption(const ImageInfo *image_info,
+  const char *key,size_t *value)
+{
+  const char
+    *option;
+
+  option=GetImageOption(image_info,key);
   if (option != (const char *) NULL)
-    image->debug=(MagickBooleanType) ParseCommandOption(MagickBooleanOptions,
-      MagickFalse,option);
+    (*value)=StringToUnsignedLong(option);
 }
 
 static void SyncImageDepthAndFilterSettings(const ImageInfo *image_info,
@@ -821,9 +874,7 @@ static void SyncImageDepthAndFilterSettings(const ImageInfo *image_info,
   option=GetImageOption(image_info,"density");
   if (option != (const char *) NULL)
     SetImageResolutionFromDensity(image,option);
-  option=GetImageOption(image_info,"depth");
-  if (option != (const char *) NULL)
-    image->depth=StringToUnsignedLong(option);
+  SyncUnsignedLongOption(image_info,"depth",&image->depth);
   option=GetImageOption(image_info,"endian");
   if (option != (const char *) NULL)
     image->endian=(EndianType) ParseCommandOption(MagickEndianOptions,
@@ -839,9 +890,8 @@ static void SyncImageDepthAndFilterSettings(const ImageInfo *image_info,
   if (option != (const char *) NULL)
     image->gravity=(GravityType) ParseCommandOption(MagickGravityOptions,
       MagickFalse,option);
-  option=GetImageOption(image_info,"green-primary");
-  if (option != (const char *) NULL)
-    ParseChromaticityPrimary(option,&image->chromaticity.green_primary);
+  SyncChromaticityOption(image_info,"green-primary",
+    &image->chromaticity.green_primary);
 }
 
 static void SyncImageRenderingSettings(const ImageInfo *image_info,
@@ -866,46 +916,37 @@ static void SyncImageRenderingSettings(const ImageInfo *image_info,
   if (option != (const char *) NULL)
     image->interpolate=(PixelInterpolateMethod) ParseCommandOption(
       MagickInterpolateOptions,MagickFalse,option);
-  option=GetImageOption(image_info,"loop");
-  if (option != (const char *) NULL)
-    image->iterations=StringToUnsignedLong(option);
-  option=GetImageOption(image_info,"mattecolor");
-  if (option != (const char *) NULL)
-    (void) QueryColorCompliance(option,AllCompliance,&image->matte_color,
-      exception);
+  SyncUnsignedLongOption(image_info,"loop",&image->iterations);
+  SyncColorOption(image_info,"mattecolor",&image->matte_color,exception);
   option=GetImageOption(image_info,"orient");
   if (option != (const char *) NULL)
     image->orientation=(OrientationType) ParseCommandOption(
       MagickOrientationOptions,MagickFalse,option);
 }
 
-static void SyncImagePageAndQualitySettings(const ImageInfo *image_info,
-  Image *image)
+static void SyncGeometryOption(const ImageInfo *image_info,
+  const char *key,RectangleInfo *value)
 {
   const char
     *option;
 
-  option=GetImageOption(image_info,"page");
+  option=GetImageOption(image_info,key);
   if (option != (const char *) NULL)
-    (void) ParsePageGeometryOption(option,&image->page);
-  option=GetImageOption(image_info,"quality");
-  if (option != (const char *) NULL)
-    image->quality=StringToUnsignedLong(option);
-  option=GetImageOption(image_info,"red-primary");
-  if (option != (const char *) NULL)
-    ParseChromaticityPrimary(option,&image->chromaticity.red_primary);
+    (void) ParsePageGeometryOption(option,value);
+}
+
+static void SyncImagePageAndQualitySettings(const ImageInfo *image_info,
+  Image *image)
+{
+  SyncGeometryOption(image_info,"page",&image->page);
+  SyncUnsignedLongOption(image_info,"quality",&image->quality);
+  SyncChromaticityOption(image_info,"red-primary",
+    &image->chromaticity.red_primary);
   if (image_info->quality != UndefinedCompressionQuality)
     image->quality=image_info->quality;
-  option=GetImageOption(image_info,"scene");
-  if (option != (const char *) NULL)
-    image->scene=StringToUnsignedLong(option);
-  option=GetImageOption(image_info,"taint");
-  if (option != (const char *) NULL)
-    image->taint=(MagickBooleanType) ParseCommandOption(MagickBooleanOptions,
-      MagickFalse,option);
-  option=GetImageOption(image_info,"tile-offset");
-  if (option != (const char *) NULL)
-    (void) ParsePageGeometryOption(option,&image->tile_offset);
+  SyncUnsignedLongOption(image_info,"scene",&image->scene);
+  SyncBooleanOption(image_info,"taint",&image->taint);
+  SyncGeometryOption(image_info,"tile-offset",&image->tile_offset);
 }
 
 static void SyncImageUnitsSettings(const ImageInfo *image_info,Image *image)

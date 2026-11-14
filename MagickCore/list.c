@@ -54,13 +54,7 @@
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   A p p e n d I m a g e T o L i s t                                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  AppendImageToList() appends the second image list to the end of the first
@@ -103,13 +97,7 @@ MagickExport void AppendImageToList(Image **images,const Image *append)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   C l o n e I m a g e L i s t                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  CloneImageList() returns a duplicate of the image list.
@@ -249,13 +237,7 @@ static char *SkipSceneSeparators(char *p)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   C l o n e I m a g e s                                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  CloneImages() clones one or more images from an image sequence, using a
@@ -346,13 +328,7 @@ MagickExport Image *CloneImages(const Image *images,const char *scenes,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   D e l e t e I m a g e F r o m L i s t                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  DeleteImageFromList() deletes an image from the list. List pointer
@@ -459,13 +435,7 @@ static void MarkScenesForDeletion(MagickBooleanType *delete_list,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   D e l e t e I m a g e s                                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  DeleteImages() deletes one or more images from an image sequence, using a
@@ -539,13 +509,7 @@ MagickExport void DeleteImages(Image **images,const char *scenes,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   D e s t r o y I m a g e L i s t                                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  DestroyImageList() destroys an image list.
@@ -559,13 +523,20 @@ MagickExport void DeleteImages(Image **images,const char *scenes,
 %    o image: the image sequence.
 %
 */
-MagickExport Image *DestroyImageList(Image *images)
+static MagickBooleanType IsImageListEntry(const Image *images)
 {
   if (images == (Image *) NULL)
-    return((Image *) NULL);
+    return(MagickFalse);
   assert(images->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
+  return(MagickTrue);
+}
+
+MagickExport Image *DestroyImageList(Image *images)
+{
+  if (IsImageListEntry(images) == MagickFalse)
+    return((Image *) NULL);
   while (images != (Image *) NULL)
     DeleteImageFromList(&images);
   return((Image *) NULL);
@@ -573,13 +544,7 @@ MagickExport Image *DestroyImageList(Image *images)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   D u p l i c a t e I m a g e s                                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  DuplicateImages() duplicates one or more images from an image sequence,
@@ -638,13 +603,7 @@ MagickExport Image *DuplicateImages(Image *images,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t F i r s t I m a g e I n L i s t                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetFirstImageInList() returns a pointer to the first image in the list.
@@ -658,27 +617,28 @@ MagickExport Image *DuplicateImages(Image *images,
 %    o images: the image list.
 %
 */
+static MagickBooleanType IsImageListMember(const Image *images)
+{
+  if (images == (Image *) NULL)
+    return(MagickFalse);
+  assert(images->signature == MagickCoreSignature);
+  return(MagickTrue);
+}
+
 MagickExport Image *GetFirstImageInList(const Image *images)
 {
   const Image
     *p;
 
-  if (images == (Image *) NULL)
+  if (IsImageListMember(images) == MagickFalse)
     return((Image *) NULL);
-  assert(images->signature == MagickCoreSignature);
   for (p=images; p->previous != (Image *) NULL; p=p->previous) ;
   return((Image *) p);
 }
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t I m a g e F r o m L i s t                                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetImageFromList() returns an image at the specified index from the image
@@ -726,11 +686,8 @@ MagickExport Image *GetImageFromList(const Image *images,const ssize_t index)
   ssize_t
     i;
 
-  if (images == (Image *) NULL)
+  if (IsImageListEntry(images) == MagickFalse)
     return((Image *) NULL);
-  assert(images->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
   if (index < 0)
     {
       p=GetLastImageInList(images);
@@ -745,13 +702,7 @@ MagickExport Image *GetImageFromList(const Image *images,const ssize_t index)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t I m a g e I n d e x I n L i s t                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetImageIndexInList() returns the offset in the list of the specified image.
@@ -783,13 +734,7 @@ MagickExport ssize_t GetImageIndexInList(const Image *images)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t I m a g e L i s t L e n g t h                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetImageListLength() returns the length of the list (the number of images in
@@ -809,11 +754,8 @@ MagickExport size_t GetImageListLength(const Image *images)
   size_t
     i;
 
-  if (images == (Image *) NULL)
+  if (IsImageListEntry(images) == MagickFalse)
     return(0);
-  assert(images->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
   images=GetLastImageInList(images);
   for (i=0; images != (Image *) NULL; images=images->previous)
   {
@@ -825,13 +767,7 @@ MagickExport size_t GetImageListLength(const Image *images)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t L a s t I m a g e I n L i s t                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetLastImageInList() returns a pointer to the last image in the list.
@@ -850,22 +786,15 @@ MagickExport Image *GetLastImageInList(const Image *images)
   const Image
     *p;
 
-  if (images == (Image *) NULL)
+  if (IsImageListMember(images) == MagickFalse)
     return((Image *) NULL);
-  assert(images->signature == MagickCoreSignature);
   for (p=images; p->next != (Image *) NULL; p=p->next) ;
   return((Image *) p);
 }
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t N e x t I m a g e I n L i s t                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetNextImageInList() returns the next image in the list.
@@ -881,23 +810,14 @@ MagickExport Image *GetLastImageInList(const Image *images)
 */
 MagickExport Image *GetNextImageInList(const Image *images)
 {
-  if (images == (Image *) NULL)
+  if (IsImageListEntry(images) == MagickFalse)
     return((Image *) NULL);
-  assert(images->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
   return(images->next);
 }
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t P r e v i o u s I m a g e I n L i s t                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetPreviousImageInList() returns the previous image in the list.
@@ -961,11 +881,8 @@ MagickExport Image **ImageListToArray(const Image *images,
   ssize_t
     i;
 
-  if (images == (Image *) NULL)
+  if (IsImageListEntry(images) == MagickFalse)
     return((Image **) NULL);
-  assert(images->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
   group=(Image **) AcquireQuantumMemory((size_t) GetImageListLength(images)+1UL,
     sizeof(*group));
   if (group == (Image **) NULL)
@@ -986,13 +903,7 @@ MagickExport Image **ImageListToArray(const Image *images,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   I n s e r t I m a g e I n L i s t                                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  InsertImageInList() insert the given image or image list, into the first
@@ -1030,13 +941,7 @@ MagickExport void InsertImageInList(Image **images,Image *insert)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   N e w I m a g e L i s t                                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  NewImageList() creates an empty image list.
@@ -1053,13 +958,7 @@ MagickExport Image *NewImageList(void)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   P r e p e n d I m a g e T o L i s t                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  PrependImageToList() prepends the image to the beginning of the list.
@@ -1087,13 +986,7 @@ MagickExport void PrependImageToList(Image **images,Image *prepend)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   R e m o v e I m a g e F r o m L i s t                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  RemoveImageFromList() removes and returns the image pointed to.
@@ -1111,18 +1004,25 @@ MagickExport void PrependImageToList(Image **images,Image *prepend)
 %    o images: the image list.
 %
 */
+static MagickBooleanType IsImageListHead(Image **images)
+{
+  assert(images != (Image **) NULL);
+  if ((*images) == (Image *) NULL)
+    return(MagickFalse);
+  assert((*images)->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
+      (*images)->filename);
+  return(MagickTrue);
+}
+
 MagickExport Image *RemoveImageFromList(Image **images)
 {
   Image
     *p;
 
-  assert(images != (Image **) NULL);
-  if ((*images) == (Image *) NULL)
+  if (IsImageListHead(images) == MagickFalse)
     return((Image *) NULL);
-  assert((*images)->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      (*images)->filename);
   p=(*images);
   if ((p->previous == (Image *) NULL) && (p->next == (Image *) NULL))
     *images=(Image *) NULL;
@@ -1146,13 +1046,7 @@ MagickExport Image *RemoveImageFromList(Image **images)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   R e m o v e F i r s t I m a g e F r o m L i s t                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  RemoveFirstImageFromList() removes and returns the first image in the list.
@@ -1175,13 +1069,8 @@ MagickExport Image *RemoveFirstImageFromList(Image **images)
   Image
     *image;
 
-  assert(images != (Image **) NULL);
-  if ((*images) == (Image *) NULL)
+  if (IsImageListHead(images) == MagickFalse)
     return((Image *) NULL);
-  assert((*images)->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      (*images)->filename);
   image=(*images);
   while (image->previous != (Image *) NULL)
     image=image->previous;
@@ -1197,13 +1086,7 @@ MagickExport Image *RemoveFirstImageFromList(Image **images)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   R e m o v e L a s t I m a g e F r o m L i s t                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  RemoveLastImageFromList() removes and returns the last image from the list.
@@ -1226,13 +1109,8 @@ MagickExport Image *RemoveLastImageFromList(Image **images)
   Image
     *image;
 
-  assert(images != (Image **) NULL);
-  if ((*images) == (Image *) NULL)
+  if (IsImageListHead(images) == MagickFalse)
     return((Image *) NULL);
-  assert((*images)->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      (*images)->filename);
   image=(*images);
   while (image->next != (Image *) NULL)
     image=image->next;
@@ -1248,13 +1126,7 @@ MagickExport Image *RemoveLastImageFromList(Image **images)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   R e p l a c e I m a g e I n L i s t                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  ReplaceImageInList() replaces an image in the list with the given image, or
@@ -1274,7 +1146,7 @@ MagickExport Image *RemoveLastImageFromList(Image **images)
 %    o replace: the image or image list replacing the original
 %
 */
-MagickExport void ReplaceImageInList(Image **images,Image *replace)
+static MagickBooleanType IsReplaceableImage(Image **images,Image *replace)
 {
   assert(images != (Image **) NULL);
   assert(replace != (Image *) NULL);
@@ -1282,8 +1154,15 @@ MagickExport void ReplaceImageInList(Image **images,Image *replace)
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",replace->filename);
   if ((*images) == (Image *) NULL)
-    return;
+    return(MagickFalse);
   assert((*images)->signature == MagickCoreSignature);
+  return(MagickTrue);
+}
+
+MagickExport void ReplaceImageInList(Image **images,Image *replace)
+{
+  if (IsReplaceableImage(images,replace) == MagickFalse)
+    return;
   /*
     Link next pointer.
   */
@@ -1307,13 +1186,7 @@ MagickExport void ReplaceImageInList(Image **images,Image *replace)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   R e p l a c e I m a g e I n L i s t R e t u r n L a s t                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  ReplaceImageInListReturnLast() is exactly as ReplaceImageInList() except
@@ -1368,13 +1241,7 @@ MagickExport void ReplaceImageInListReturnLast(Image **images,Image *replace)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   R e v e r s e I m a g e L i s t                                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  ReverseImageList() reverses the order of an image list.
@@ -1416,13 +1283,7 @@ MagickExport void ReverseImageList(Image **images)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   S p l i c e I m a g e I n t o L i s t                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SpliceImageIntoList() removes 'length' images from the list and replaces
@@ -1472,13 +1333,7 @@ MagickExport Image *SpliceImageIntoList(Image **images,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   S p l i t I m a g e L i s t                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SplitImageList() splits an image into two lists, after given image
@@ -1505,13 +1360,7 @@ MagickExport Image *SplitImageList(Image *images)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   S y n c I m a g e L i s t                                                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SyncImageList() synchronizes the scene numbers in an image list.
@@ -1550,13 +1399,7 @@ MagickExport void SyncImageList(Image *images)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   S y n c N e x t I m a g e I n L i s t                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SyncNextImageInList() returns the next image in the list after the blob

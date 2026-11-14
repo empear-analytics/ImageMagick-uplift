@@ -140,6 +140,8 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/configure-paths.c \
   MagickCore/configure.h \
   MagickCore/constitute.c \
+  MagickCore/constitute-codec.c \
+  MagickCore/constitute-write.c \
   MagickCore/constitute-pixels.c \
   MagickCore/constitute.h \
   MagickCore/decorate.c \
@@ -204,7 +206,11 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/identify.c \
   MagickCore/identify.h \
   MagickCore/image.c \
+  MagickCore/image-mask.c \
+  MagickCore/image-fill.c \
+  MagickCore/image-clone.c \
   MagickCore/image-settings.c \
+  MagickCore/image-append.c \
   MagickCore/image-filename.c \
   MagickCore/image.h \
   MagickCore/image-private.h \
@@ -277,6 +283,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/pixel-accessor.h \
   MagickCore/pixel-private.h \
   MagickCore/policy.c \
+  MagickCore/policy-path.c \
   MagickCore/policy.h \
   MagickCore/policy-private.h \
   MagickCore/prepress.c \
@@ -284,6 +291,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/property.c \
   MagickCore/property.h \
   MagickCore/profile.c \
+  MagickCore/profile-sync.c \
   MagickCore/profile.h \
   MagickCore/profile-private.h \
   MagickCore/quantize.c \
@@ -340,6 +348,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/statistic.h \
   MagickCore/statistic-private.h \
   MagickCore/stream.c \
+  MagickCore/stream-read.c \
   MagickCore/stream.h \
   MagickCore/stream-private.h \
   MagickCore/string.c \
@@ -371,8 +380,10 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/threshold-auto.c \
   MagickCore/threshold.h \
   MagickCore/type.c \
+  MagickCore/type-list.c \
   MagickCore/type.h \
   MagickCore/utility.c \
+  MagickCore/utility-unique.c \
   MagickCore/utility.h \
   MagickCore/utility-private.h \
   MagickCore/version.c \

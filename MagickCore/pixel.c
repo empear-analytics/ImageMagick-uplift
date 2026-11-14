@@ -220,11 +220,24 @@ static void ConformPixelColorspace(const Image *image,PixelInfo *destination)
         ConvertRGBToCMYK(destination);
     }
   else
-    if (destination->colorspace == CMYKColorspace)
-      {
-        if (IssRGBCompatibleColorspace(image->colorspace) != MagickFalse)
-          ConvertCMYKToRGB(destination);
-      }
+    if ((destination->colorspace == CMYKColorspace) &&
+        (IssRGBCompatibleColorspace(image->colorspace) != MagickFalse))
+      ConvertCMYKToRGB(destination);
+}
+
+static void ConformImageColorspace(Image *image,ExceptionInfo *exception)
+{
+  if ((IsPixelInfoGray(&image->background_color) == MagickFalse) &&
+      (IsGrayColorspace(image->colorspace) != MagickFalse))
+    (void) TransformImageColorspace(image,sRGBColorspace,exception);
+}
+
+static void ConformImageAlpha(Image *image,const PixelInfo *destination,
+  ExceptionInfo *exception)
+{
+  if ((destination->alpha_trait != UndefinedPixelTrait) &&
+      ((image->alpha_trait & BlendPixelTrait) == 0))
+    (void) SetImageAlpha(image,OpaqueAlpha,exception);
 }
 
 MagickExport void ConformPixelInfo(Image *image,const PixelInfo *source,
@@ -235,12 +248,8 @@ MagickExport void ConformPixelInfo(Image *image,const PixelInfo *source,
   assert(destination != (const PixelInfo *) NULL);
   *destination=(*source);
   ConformPixelColorspace(image,destination);
-  if ((IsPixelInfoGray(&image->background_color) == MagickFalse) &&
-      (IsGrayColorspace(image->colorspace) != MagickFalse))
-    (void) TransformImageColorspace(image,sRGBColorspace,exception);
-  if ((destination->alpha_trait != UndefinedPixelTrait) &&
-      ((image->alpha_trait & BlendPixelTrait) == 0))
-    (void) SetImageAlpha(image,OpaqueAlpha,exception);
+  ConformImageColorspace(image,exception);
+  ConformImageAlpha(image,destination,exception);
 }
 
 
@@ -2305,12 +2314,8 @@ static ssize_t SetColorChannelAttributes(const Image *image,
   return(n);
 }
 
-static ssize_t SetExtraChannelAttributes(const Image *image,ssize_t n)
+static ssize_t SetMaskChannelAttributes(const Image *image,ssize_t n)
 {
-  if (image->alpha_trait != UndefinedPixelTrait)
-    SetPixelChannelAttributes(image,AlphaPixelChannel,CopyPixelTrait,n++);
-  if (image->storage_class == PseudoClass)
-    SetPixelChannelAttributes(image,IndexPixelChannel,CopyPixelTrait,n++);
   if ((image->channels & ReadMaskChannel) != 0)
     SetPixelChannelAttributes(image,ReadMaskPixelChannel,CopyPixelTrait,n++);
   if ((image->channels & WriteMaskChannel) != 0)
@@ -2319,6 +2324,44 @@ static ssize_t SetExtraChannelAttributes(const Image *image,ssize_t n)
     SetPixelChannelAttributes(image,CompositeMaskPixelChannel,CopyPixelTrait,
       n++);
   return(n);
+}
+
+static ssize_t SetExtraChannelAttributes(const Image *image,ssize_t n)
+{
+  if (image->alpha_trait != UndefinedPixelTrait)
+    SetPixelChannelAttributes(image,AlphaPixelChannel,CopyPixelTrait,n++);
+  if (image->storage_class == PseudoClass)
+    SetPixelChannelAttributes(image,IndexPixelChannel,CopyPixelTrait,n++);
+  return(SetMaskChannelAttributes(image,n));
+}
+
+static ssize_t SetMetaChannelAttributes(const Image *image,ssize_t n)
+{
+  PixelChannel
+    meta_channel;
+
+  ssize_t
+    i;
+
+  meta_channel=MetaPixelChannels;
+  for (i=0; i < (ssize_t) image->number_meta_channels; i++)
+  {
+    SetPixelChannelAttributes(image,meta_channel,UpdatePixelTrait,n);
+    meta_channel=(PixelChannel) (meta_channel+1);
+    n++;
+  }
+  return(n);
+}
+
+static PixelTrait GetChannelMapTrait(const Image *image)
+{
+  PixelTrait
+    trait;
+
+  trait=UpdatePixelTrait;
+  if (image->alpha_trait != UndefinedPixelTrait)
+    trait=(PixelTrait) (trait | BlendPixelTrait);
+  return(trait);
 }
 
 MagickPrivate MagickBooleanType ResetPixelChannelMap(Image *image,
@@ -2334,20 +2377,12 @@ MagickPrivate MagickBooleanType ResetPixelChannelMap(Image *image,
   assert(image->signature == MagickCoreSignature);
   (void) memset(image->channel_map,0,MaxPixelChannels*
     sizeof(*image->channel_map));
-  trait=UpdatePixelTrait;
-  if (image->alpha_trait != UndefinedPixelTrait)
-    trait=(PixelTrait) (trait | BlendPixelTrait);
+  trait=GetChannelMapTrait(image);
   n=0;
   n=SetColorChannelAttributes(image,trait,n);
   n=SetExtraChannelAttributes(image,n);
   if (image->number_meta_channels != 0)
     {
-      PixelChannel
-        meta_channel;
-
-      ssize_t
-        i;
-
       if (image->number_meta_channels >= (size_t) (MaxPixelChannels-MetaPixelChannels))
         {
           image->number_channels=(size_t) n;
@@ -2356,13 +2391,7 @@ MagickPrivate MagickBooleanType ResetPixelChannelMap(Image *image,
           ThrowBinaryException(CorruptImageError,"MaximumChannelsExceeded",
             image->filename);
         }
-      meta_channel=MetaPixelChannels;
-      for (i=0; i < (ssize_t) image->number_meta_channels; i++)
-      {
-        SetPixelChannelAttributes(image,meta_channel,UpdatePixelTrait,n);
-        meta_channel=(PixelChannel) (meta_channel+1);
-        n++;
-      }
+      n=SetMetaChannelAttributes(image,n);
     }
   image->number_channels=(size_t) n;
   (void) SetPixelChannelMask(image,image->channel_mask);
@@ -2479,6 +2508,37 @@ static const char *GetPixelChannelLogName(const Image *image,
   return("undefined");
 }
 
+static void FormatPixelChannelTraits(const Image *image,
+  const PixelChannel channel,char *traits)
+{
+  *traits='\0';
+  if ((GetPixelChannelTraits(image,channel) & UpdatePixelTrait) != 0)
+    (void) ConcatenateMagickString(traits,"update,",MagickPathExtent);
+  if ((GetPixelChannelTraits(image,channel) & BlendPixelTrait) != 0)
+    (void) ConcatenateMagickString(traits,"blend,",MagickPathExtent);
+  if ((GetPixelChannelTraits(image,channel) & CopyPixelTrait) != 0)
+    (void) ConcatenateMagickString(traits,"copy,",MagickPathExtent);
+  if (*traits == '\0')
+    (void) ConcatenateMagickString(traits,"undefined,",MagickPathExtent);
+  traits[strlen(traits)-1]='\0';
+}
+
+static const char *GetPixelChannelLogLabel(const Image *image,
+  const PixelChannel channel,char *channel_name)
+{
+  const char
+    *name;
+
+  name=GetPixelChannelLogName(image,channel);
+  if (image->colorspace ==  UndefinedColorspace)
+    {
+      (void) FormatLocaleString(channel_name,MagickPathExtent,"%.17g",
+        (double) channel);
+      name=(const char *) channel_name;
+    }
+  return(name);
+}
+
 static void LogPixelChannels(const Image *image)
 {
   ssize_t
@@ -2499,26 +2559,23 @@ static void LogPixelChannels(const Image *image)
       channel;
 
     channel=GetPixelChannelChannel(image,i);
-    name=GetPixelChannelLogName(image,channel);
-    if (image->colorspace ==  UndefinedColorspace)
-      {
-        (void) FormatLocaleString(channel_name,MagickPathExtent,"%.17g",
-          (double) channel);
-        name=(const char *) channel_name;
-      }
-    *traits='\0';
-    if ((GetPixelChannelTraits(image,channel) & UpdatePixelTrait) != 0)
-      (void) ConcatenateMagickString(traits,"update,",MagickPathExtent);
-    if ((GetPixelChannelTraits(image,channel) & BlendPixelTrait) != 0)
-      (void) ConcatenateMagickString(traits,"blend,",MagickPathExtent);
-    if ((GetPixelChannelTraits(image,channel) & CopyPixelTrait) != 0)
-      (void) ConcatenateMagickString(traits,"copy,",MagickPathExtent);
-    if (*traits == '\0')
-      (void) ConcatenateMagickString(traits,"undefined,",MagickPathExtent);
-    traits[strlen(traits)-1]='\0';
+    name=GetPixelChannelLogLabel(image,channel,channel_name);
+    FormatPixelChannelTraits(image,channel,traits);
     (void) LogMagickEvent(PixelEvent,GetMagickModule(),"  %.17g: %s (%s)",
       (double) i,name,traits);
   }
+}
+
+static void SetExtraChannelMaskTraits(Image *image)
+{
+  if (image->storage_class == PseudoClass)
+    SetPixelChannelTraits(image,IndexPixelChannel,CopyPixelTrait);
+  if ((image->channels & ReadMaskChannel) != 0)
+    SetPixelChannelTraits(image,ReadMaskPixelChannel,CopyPixelTrait);
+  if ((image->channels & WriteMaskChannel) != 0)
+    SetPixelChannelTraits(image,WriteMaskPixelChannel,CopyPixelTrait);
+  if ((image->channels & CompositeMaskChannel) != 0)
+    SetPixelChannelTraits(image,CompositeMaskPixelChannel,CopyPixelTrait);
 }
 
 static void SetPixelChannelMaskTrait(Image *image,
@@ -2569,14 +2626,7 @@ MagickExport ChannelType SetPixelChannelMask(Image *image,
   image->channel_mask=channel_mask;
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
     SetPixelChannelMaskTrait(image,channel_mask,i);
-  if (image->storage_class == PseudoClass)
-    SetPixelChannelTraits(image,IndexPixelChannel,CopyPixelTrait);
-  if ((image->channels & ReadMaskChannel) != 0)
-    SetPixelChannelTraits(image,ReadMaskPixelChannel,CopyPixelTrait);
-  if ((image->channels & WriteMaskChannel) != 0)
-    SetPixelChannelTraits(image,WriteMaskPixelChannel,CopyPixelTrait);
-  if ((image->channels & CompositeMaskChannel) != 0)
-    SetPixelChannelTraits(image,CompositeMaskPixelChannel,CopyPixelTrait);
+  SetExtraChannelMaskTraits(image);
   if ((GetLogEventMask() & PixelEvent) != 0)
     LogPixelChannels(image);
   return(mask);

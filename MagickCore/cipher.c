@@ -742,6 +742,72 @@ static ssize_t CipherImageRows(const CipherRows *rows,
   return(y);
 }
 
+typedef struct _CipherKeyTargets
+{
+  AESInfo
+    **aes_info;
+
+  StringInfo
+    **nonce;
+} CipherKeyTargets;
+
+static MagickBooleanType AcquireCipherKeyAndNonce(Image *image,
+  const StringInfo *passkey,ExceptionInfo *exception,
+  const CipherKeyTargets *targets)
+{
+  AESInfo
+    **const aes_info = targets->aes_info;
+
+  StringInfo
+    **const nonce = targets->nonce;
+
+  StringInfo
+    *key;
+
+  (*aes_info)=AcquireAESInfo();
+  key=CloneStringInfo(passkey);
+  if (key == (StringInfo *) NULL)
+    {
+      (*aes_info)=DestroyAESInfo((*aes_info));
+      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
+        image->filename);
+    }
+  (*nonce)=SplitStringInfo(key,GetStringInfoLength(key)/2);
+  if ((*nonce) == (StringInfo *) NULL)
+    {
+      key=DestroyStringInfo(key);
+      (*aes_info)=DestroyAESInfo((*aes_info));
+      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
+        image->filename);
+    }
+  SetAESKey((*aes_info),key);
+  key=DestroyStringInfo(key);
+  return(MagickTrue);
+}
+
+static SignatureInfo *CopyNonceDigest(SignatureInfo *signature_info,
+  unsigned char *input_block)
+{
+  const unsigned char
+    *digest;
+
+  digest=GetStringInfoDatum(GetSignatureDigest(signature_info));
+  (void) memcpy(input_block,digest,MagickMin(AESBlocksize,
+    GetSignatureDigestsize(signature_info))*sizeof(*input_block));
+  return(DestroySignatureInfo(signature_info));
+}
+
+static void OpenCipherImage(const Image *image,
+  const ExceptionInfo *exception)
+{
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+}
+
 MagickExport MagickBooleanType PasskeyDecipherImage(Image *image,
   const StringInfo *passkey,ExceptionInfo *exception)
 {
@@ -752,9 +818,6 @@ MagickExport MagickBooleanType PasskeyDecipherImage(Image *image,
 
   CacheView
     *image_view;
-
-  const unsigned char
-    *digest;
 
   CipherRows
     rows;
@@ -772,7 +835,6 @@ MagickExport MagickBooleanType PasskeyDecipherImage(Image *image,
     y;
 
   StringInfo
-    *key,
     *nonce;
 
   unsigned char
@@ -780,41 +842,21 @@ MagickExport MagickBooleanType PasskeyDecipherImage(Image *image,
     output_block[AESBlocksize],
     *pixels;
 
+  const CipherKeyTargets
+    targets = { &aes_info, &nonce };
+
   /*
     Generate decipher key and nonce.
   */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  OpenCipherImage(image,exception);
   if (passkey == (const StringInfo *) NULL)
     return(MagickTrue);
-  aes_info=AcquireAESInfo();
-  key=CloneStringInfo(passkey);
-  if (key == (StringInfo *) NULL)
-    {
-      aes_info=DestroyAESInfo(aes_info);
-      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-        image->filename);
-    }
-  nonce=SplitStringInfo(key,GetStringInfoLength(key)/2);
-  if (nonce == (StringInfo *) NULL)
-    {
-      key=DestroyStringInfo(key);
-      aes_info=DestroyAESInfo(aes_info);
-      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-        image->filename);
-    }
-  SetAESKey(aes_info,key);
-  key=DestroyStringInfo(key);
+  if (AcquireCipherKeyAndNonce(image,passkey,exception,&targets) ==
+      MagickFalse)
+    return(MagickFalse);
   signature_info=AcquireNonceSignature(image,nonce);
   (void) memset(input_block,0,sizeof(input_block));
-  digest=GetStringInfoDatum(GetSignatureDigest(signature_info));
-  (void) memcpy(input_block,digest,MagickMin(AESBlocksize,
-    GetSignatureDigestsize(signature_info))*sizeof(*input_block));
-  signature_info=DestroySignatureInfo(signature_info);
+  signature_info=CopyNonceDigest(signature_info,input_block);
   /*
     Convert cipher pixels to plain pixels.
   */
@@ -902,6 +944,19 @@ MagickExport MagickBooleanType EncipherImage(Image *image,
   return(status);
 }
 
+static void SetCipherProperties(Image *image,
+  const SignatureInfo *signature_info,ExceptionInfo *exception)
+{
+  char
+    *signature;
+
+  signature=StringInfoToHexString(GetSignatureDigest(signature_info));
+  (void) SetImageProperty(image,"cipher:type","AES",exception);
+  (void) SetImageProperty(image,"cipher:mode","CTR",exception);
+  (void) SetImageProperty(image,"cipher:nonce",signature,exception);
+  signature=DestroyString(signature);
+}
+
 MagickExport MagickBooleanType PasskeyEncipherImage(Image *image,
   const StringInfo *passkey,ExceptionInfo *exception)
 {
@@ -912,12 +967,6 @@ MagickExport MagickBooleanType PasskeyEncipherImage(Image *image,
 
   CacheView
     *image_view;
-
-  char
-    *signature;
-
-  const unsigned char
-    *digest;
 
   CipherRows
     rows;
@@ -935,13 +984,15 @@ MagickExport MagickBooleanType PasskeyEncipherImage(Image *image,
     y;
 
   StringInfo
-    *key,
     *nonce;
 
   unsigned char
     input_block[AESBlocksize],
     output_block[AESBlocksize],
     *pixels;
+
+  const CipherKeyTargets
+    targets = { &aes_info, &nonce };
 
   /*
     Generate encipher key and nonce.
@@ -956,35 +1007,13 @@ MagickExport MagickBooleanType PasskeyEncipherImage(Image *image,
     return(MagickTrue);
   if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
     return(MagickFalse);
-  aes_info=AcquireAESInfo();
-  key=CloneStringInfo(passkey);
-  if (key == (StringInfo *) NULL)
-    {
-      aes_info=DestroyAESInfo(aes_info);
-      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-        image->filename);
-    }
-  nonce=SplitStringInfo(key,GetStringInfoLength(key)/2);
-  if (nonce == (StringInfo *) NULL)
-    {
-      key=DestroyStringInfo(key);
-      aes_info=DestroyAESInfo(aes_info);
-      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-        image->filename);
-    }
-  SetAESKey(aes_info,key);
-  key=DestroyStringInfo(key);
+  if (AcquireCipherKeyAndNonce(image,passkey,exception,&targets) ==
+      MagickFalse)
+    return(MagickFalse);
   signature_info=AcquireNonceSignature(image,nonce);
-  signature=StringInfoToHexString(GetSignatureDigest(signature_info));
-  (void) SetImageProperty(image,"cipher:type","AES",exception);
-  (void) SetImageProperty(image,"cipher:mode","CTR",exception);
-  (void) SetImageProperty(image,"cipher:nonce",signature,exception);
-  signature=DestroyString(signature);
+  SetCipherProperties(image,signature_info,exception);
   (void) memset(input_block,0,sizeof(input_block));
-  digest=GetStringInfoDatum(GetSignatureDigest(signature_info));
-  (void) memcpy(input_block,digest,MagickMin(AESBlocksize,
-    GetSignatureDigestsize(signature_info))*sizeof(*input_block));
-  signature_info=DestroySignatureInfo(signature_info);
+  signature_info=CopyNonceDigest(signature_info,input_block);
   /*
     Convert plain pixels to cipher pixels.
   */
@@ -1100,6 +1129,15 @@ static ssize_t SetAESRounds(AESInfo *aes_info,const StringInfo *key)
   return(n);
 }
 
+static void OpenSetAESKey(const AESInfo *aes_info,const StringInfo *key)
+{
+  assert(aes_info != (AESInfo *) NULL);
+  assert(aes_info->signature == MagickCoreSignature);
+  assert(key != (StringInfo *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+}
+
 static void SetAESKey(AESInfo *aes_info,const StringInfo *key)
 {
   ssize_t
@@ -1119,11 +1157,7 @@ static void SetAESKey(AESInfo *aes_info,const StringInfo *key)
   /*
     Determine the number of rounds based on the number of bits in key.
   */
-  assert(aes_info != (AESInfo *) NULL);
-  assert(aes_info->signature == MagickCoreSignature);
-  assert(key != (StringInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  OpenSetAESKey(aes_info,key);
   n=SetAESRounds(aes_info,key);
   /*
     Generate crypt key.
