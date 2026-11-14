@@ -713,6 +713,12 @@ static Image *DecodeLockedImage(const MagickInfo *magick_info,
   return(image);
 }
 
+static void RelinquishTemporaryReadFile(const ImageInfo *read_info)
+{
+  if (read_info->temporary != MagickFalse)
+    (void) RelinquishUniqueFileResource(read_info->filename);
+}
+
 static MagickBooleanType DecodeDelegateImage(ImageInfo *read_info,
   Image **image,ExceptionInfo *exception)
 {
@@ -734,8 +740,7 @@ static MagickBooleanType DecodeDelegateImage(ImageInfo *read_info,
       (void) ThrowMagickException(exception,GetMagickModule(),
         MissingDelegateError,"NoDecodeDelegateForThisImageFormat","`%s'",
         read_info->filename);
-      if (read_info->temporary != MagickFalse)
-        (void) RelinquishUniqueFileResource(read_info->filename);
+      RelinquishTemporaryReadFile(read_info);
       read_info=DestroyImageInfo(read_info);
       return(MagickFalse);
     }
