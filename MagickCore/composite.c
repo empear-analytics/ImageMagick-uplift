@@ -5258,6 +5258,13 @@ static void GetDisplaceArguments(const Image *image,
     *flags=ParseGeometry(artifact,geometry_info);
 }
 
+static inline MagickBooleanType IsSourceAlphaNeeded(const Image *image,
+  const Image *source_image)
+{
+  return(((source_image->alpha_trait == UndefinedPixelTrait) &&
+    (image->alpha_trait != UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
+}
+
 typedef struct _ComposeArtifactTargets
 {
   double
@@ -5424,8 +5431,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       if (IsSourceInsideCanvas(image,source_image,x_offset,y_offset) ==
           MagickFalse)
         break;
-      if ((source_image->alpha_trait == UndefinedPixelTrait) &&
-          (image->alpha_trait != UndefinedPixelTrait))
+      if (IsSourceAlphaNeeded(image,source_image) != MagickFalse)
         (void) SetImageAlphaChannel(source_image,OpaqueAlphaChannel,exception);
       return(CompositeCopyImage(image,source_image,&setup,exception));
     }
