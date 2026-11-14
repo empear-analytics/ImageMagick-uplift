@@ -4652,6 +4652,14 @@ static const char *InvokeMagickPropertyHandler(
   return(info->handler(request));
 }
 
+#if defined(MAGICKCORE_LCMS_DELEGATE)
+static inline MagickBooleanType IsICCProfileProperty(const char *property)
+{
+  return((LocaleCompare("profile:icc",property) == 0 ||
+    LocaleCompare("profile:icm",property) == 0) ? MagickTrue : MagickFalse);
+}
+#endif
+
 static const char *LookupMagickProperty(const MagickPropertyRequest *request,
   const char *string)
 {
@@ -4695,8 +4703,7 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
     case 'p':
     {
 #if defined(MAGICKCORE_LCMS_DELEGATE)
-      if (LocaleCompare("profile:icc",property) == 0 ||
-          LocaleCompare("profile:icm",property) == 0)
+      if (IsICCProfileProperty(property) != MagickFalse)
         {
 #if !defined(LCMS_VERSION) || (LCMS_VERSION < 2000)
 #define cmsUInt32Number  DWORD
