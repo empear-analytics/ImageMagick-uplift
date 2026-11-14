@@ -3028,6 +3028,9 @@ typedef struct _MVGRenderState
   const char
     **q;
 
+  double
+    *coordinates;
+
   ExceptionInfo
     *exception;
 
@@ -3147,6 +3150,128 @@ static void ParseMVGPrimitivePoints(const MVGRenderState *state)
   (*state->x)=x;
 }
 
+static void EstimateMVGPrimitiveExtent(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  double
+    coordinates = (*state->coordinates);
+
+  PointInfo
+    point;
+
+  PrimitiveInfo
+    *primitive_info = (*state->primitive_info);
+
+  PrimitiveType
+    primitive_type = (*state->primitive_type);
+
+  SegmentInfo
+    bounds;
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    j = (*state->j),
+    k,
+    x = (*state->x);
+
+  if (primitive_info[j].text != (char *) NULL)
+    primitive_info[j].text=DestroyString(primitive_info[j].text);
+  primitive_info[j].primitive=primitive_type;
+  primitive_info[j].coordinates=(size_t) x;
+  primitive_info[j].method=FloodfillMethod;
+  primitive_info[j].closed_subpath=MagickFalse;
+  /*
+    Circumscribe primitive within a circle.
+  */
+  bounds.x1=primitive_info[j].point.x;
+  bounds.y1=primitive_info[j].point.y;
+  bounds.x2=primitive_info[j].point.x;
+  bounds.y2=primitive_info[j].point.y;
+  for (k=1; k < (ssize_t) primitive_info[j].coordinates; k++)
+  {
+    point=primitive_info[j+k].point;
+    if (point.x < bounds.x1)
+      bounds.x1=point.x;
+    if (point.y < bounds.y1)
+      bounds.y1=point.y;
+    if (point.x > bounds.x2)
+      bounds.x2=point.x;
+    if (point.y > bounds.y2)
+      bounds.y2=point.y;
+  }
+  /*
+    Speculate how many points our primitive might consume.
+  */
+  coordinates=(double) primitive_info[j].coordinates;
+  switch (primitive_type)
+  {
+    case RectanglePrimitive:
+    {
+      coordinates*=5.0;
+      break;
+    }
+    case RoundRectanglePrimitive:
+    {
+      double
+        alpha,
+        beta,
+        radius;
+
+      alpha=bounds.x2-bounds.x1;
+      beta=bounds.y2-bounds.y1;
+      radius=hypot(alpha,beta);
+      coordinates*=5.0;
+      coordinates+=2.0*((size_t) ceil((double) MagickPI*radius))+6.0*
+        BezierQuantum+360.0;
+      break;
+    }
+    case BezierPrimitive:
+    {
+      coordinates=(BezierQuantum*(double) primitive_info[j].coordinates);
+      break;
+    }
+    case PathPrimitive:
+    {
+      char
+        *s,
+        *t;
+
+      (void) GetNextToken(q,&q,extent,token);
+      coordinates=1.0;
+      t=token;
+      for (s=token; *s != '\0'; s=t)
+      {
+        double
+          value;
+
+        value=GetDrawValue(s,&t);
+        (void) value;
+        if (s == t)
+          {
+            t++;
+            continue;
+          }
+        coordinates++;
+      }
+      for (s=token; *s != '\0'; s++)
+        if (strspn(s,"AaCcQqSsTt") != 0)
+          coordinates+=(20.0*BezierQuantum)+360.0;
+      break;
+    }
+    default:
+      break;
+  }
+  (*state->q)=q;
+  (*state->coordinates)=coordinates;
+}
+
 static MagickBooleanType RenderMVGContent(Image *image,
   const DrawInfo *draw_info,const size_t depth,ExceptionInfo *exception)
 {
@@ -3213,7 +3338,6 @@ static MagickBooleanType RenderMVGContent(Image *image,
     defsDepth,
     i,
     j,
-    k,
     n,
     symbolDepth,
     x;
@@ -3225,7 +3349,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     metrics;
 
   const MVGRenderState
-    render_state = { &token, &q, exception, &status, &mvg_info,
+    render_state = { &token, &q, &coordinates, exception, &status, &mvg_info,
       &primitive_info, &primitive_type, &extent, &number_points, &i, &j, &x };
 
   assert(image != (Image *) NULL);
@@ -4791,93 +4915,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     ParseMVGPrimitivePoints(&render_state);
     if (status == MagickFalse)
       break;
-    if (primitive_info[j].text != (char *) NULL)
-      primitive_info[j].text=DestroyString(primitive_info[j].text);
-    primitive_info[j].primitive=primitive_type;
-    primitive_info[j].coordinates=(size_t) x;
-    primitive_info[j].method=FloodfillMethod;
-    primitive_info[j].closed_subpath=MagickFalse;
-    /*
-      Circumscribe primitive within a circle.
-    */
-    bounds.x1=primitive_info[j].point.x;
-    bounds.y1=primitive_info[j].point.y;
-    bounds.x2=primitive_info[j].point.x;
-    bounds.y2=primitive_info[j].point.y;
-    for (k=1; k < (ssize_t) primitive_info[j].coordinates; k++)
-    {
-      point=primitive_info[j+k].point;
-      if (point.x < bounds.x1)
-        bounds.x1=point.x;
-      if (point.y < bounds.y1)
-        bounds.y1=point.y;
-      if (point.x > bounds.x2)
-        bounds.x2=point.x;
-      if (point.y > bounds.y2)
-        bounds.y2=point.y;
-    }
-    /*
-      Speculate how many points our primitive might consume.
-    */
-    coordinates=(double) primitive_info[j].coordinates;
-    switch (primitive_type)
-    {
-      case RectanglePrimitive:
-      {
-        coordinates*=5.0;
-        break;
-      }
-      case RoundRectanglePrimitive:
-      {
-        double
-          alpha,
-          beta,
-          radius;
-
-        alpha=bounds.x2-bounds.x1;
-        beta=bounds.y2-bounds.y1;
-        radius=hypot(alpha,beta);
-        coordinates*=5.0;
-        coordinates+=2.0*((size_t) ceil((double) MagickPI*radius))+6.0*
-          BezierQuantum+360.0;
-        break;
-      }
-      case BezierPrimitive:
-      {
-        coordinates=(BezierQuantum*(double) primitive_info[j].coordinates);
-        break;
-      }
-      case PathPrimitive:
-      {
-        char
-          *s,
-          *t;
-
-        (void) GetNextToken(q,&q,extent,token);
-        coordinates=1.0;
-        t=token;
-        for (s=token; *s != '\0'; s=t)
-        {
-          double
-            value;
-
-          value=GetDrawValue(s,&t);
-          (void) value;
-          if (s == t)
-            {
-              t++;
-              continue;
-            }
-          coordinates++;
-        }
-        for (s=token; *s != '\0'; s++)
-          if (strspn(s,"AaCcQqSsTt") != 0)
-            coordinates+=(20.0*BezierQuantum)+360.0;
-        break;
-      }
-      default:
-        break;
-    }
+    EstimateMVGPrimitiveExtent(&render_state);
     if (status == MagickFalse)
       break;
     if (((size_t) (i+coordinates)) >= number_points)
