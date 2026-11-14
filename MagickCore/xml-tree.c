@@ -2700,6 +2700,48 @@ typedef struct _DeclarationTargets
     *l;
 } DeclarationTargets;
 
+static MagickBooleanType ParseInstructionMarkup(
+  const DeclarationInfo *declaration,
+  const DeclarationTargets *declaration_targets)
+{
+  XMLTreeRoot
+    *const root = declaration->root;
+
+  const int
+    terminal = declaration->terminal;
+
+  ExceptionInfo
+    *const exception = declaration->exception;
+
+  char
+    **const p = declaration_targets->p;
+
+  char
+    **const tag = declaration_targets->tag;
+
+  if (**p == '?')
+    {
+      /*
+        Processing instructions.
+      */
+      *p=SkipProcessingInstruction(*p);
+      if (IsUnterminatedSection(*p,terminal) != MagickFalse)
+        {
+          (void) ThrowMagickException(exception,GetMagickModule(),
+            OptionWarning,"ParseError","unclosed <?");
+          return(MagickFalse);
+        }
+      ParseProcessingInstructions(root,*tag+1,(size_t) (*p-*tag-2));
+    }
+  else
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        OptionWarning,"ParseError","unexpected <");
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ParseDoctypeOrInstruction(
   const DeclarationInfo *declaration,
   const DeclarationTargets *declaration_targets)
@@ -2737,26 +2779,7 @@ static MagickBooleanType ParseDoctypeOrInstruction(
         }
     }
   else
-    if (**p == '?')
-      {
-        /*
-          Processing instructions.
-        */
-        *p=SkipProcessingInstruction(*p);
-        if (IsUnterminatedSection(*p,terminal) != MagickFalse)
-          {
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              OptionWarning,"ParseError","unclosed <?");
-            return(MagickFalse);
-          }
-        ParseProcessingInstructions(root,*tag+1,(size_t) (*p-*tag-2));
-      }
-    else
-      {
-        (void) ThrowMagickException(exception,GetMagickModule(),
-          OptionWarning,"ParseError","unexpected <");
-        return(MagickFalse);
-      }
+    return(ParseInstructionMarkup(declaration,declaration_targets));
   return(MagickTrue);
 }
 
