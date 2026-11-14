@@ -1212,6 +1212,13 @@ static MagickBooleanType TransformProfileImage(Image *image,
   return(status);
 }
 
+static void SetCMYKTargetColorspace(Image *image,const LCMSInfo *target_info,
+  ExceptionInfo *exception)
+{
+  if ((*target_info).colorspace == CMYKColorspace)
+    (void) SetImageColorspace(image,(*target_info).colorspace,exception);
+}
+
 static void CloseLCMSProfiles(const LCMSInfo *source_info,
   const LCMSInfo *target_info)
 {
@@ -1582,8 +1589,7 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
                 CloseLCMSProfiles(&source_info,&target_info);
                 return(MagickFalse);
               }
-            if (target_info.colorspace == CMYKColorspace)
-              (void) SetImageColorspace(image,target_info.colorspace,exception);
+            SetCMYKTargetColorspace(image,&target_info,exception);
             transform_in.highres=highres;
             transform_in.source_info=source_info;
             transform_in.target_info=target_info;
