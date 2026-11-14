@@ -644,6 +644,17 @@ MagickExport XMLTreeInfo *GetNextXMLTreeTag(XMLTreeInfo *xml_info)
 %    o tag: the attribute tag.
 %
 */
+static XMLTreeRoot *GetXMLTreeRoot(XMLTreeInfo *xml_info)
+{
+  XMLTreeRoot
+    *root;
+
+  root=(XMLTreeRoot *) xml_info;
+  while (root->root.parent != (XMLTreeInfo *) NULL)
+    root=(XMLTreeRoot *) root->root.parent;
+  return(root);
+}
+
 static const char *GetRootXMLAttribute(XMLTreeInfo *xml_info,const char *tag)
 {
   ssize_t
@@ -653,9 +664,7 @@ static const char *GetRootXMLAttribute(XMLTreeInfo *xml_info,const char *tag)
   XMLTreeRoot
     *root;
 
-  root=(XMLTreeRoot*) xml_info;
-  while (root->root.parent != (XMLTreeInfo *) NULL)
-    root=(XMLTreeRoot *) root->root.parent;
+  root=GetXMLTreeRoot(xml_info);
   i=0;
   while ((root->attributes[i] != (char **) NULL) &&
          (strcmp(root->attributes[i][0],xml_info->tag) != 0))
@@ -3663,9 +3672,7 @@ MagickExport char *XMLTreeInfoToXML(XMLTreeInfo *xml_info)
   xml=AcquireString((char *) NULL);
   length=0;
   extent=MagickPathExtent;
-  root=(XMLTreeRoot *) xml_info;
-  while (root->root.parent != (XMLTreeInfo *) NULL)
-    root=(XMLTreeRoot *) root->root.parent;
+  root=GetXMLTreeRoot(xml_info);
   parent=xml_info->parent;
   tag_buffer.xml_info=xml_info;
   tag_buffer.source=(&xml);
