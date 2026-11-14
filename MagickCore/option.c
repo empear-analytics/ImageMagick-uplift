@@ -2877,6 +2877,19 @@ MagickExport MagickBooleanType IsOptionMember(const char *option,
   return(member);
 }
 
+static void ListOptionMnemonics(FILE *file,const OptionInfo *option_info)
+{
+  ssize_t
+    i;
+
+  for (i=0; option_info[i].mnemonic != (char *) NULL; i++)
+  {
+    if (option_info[i].stealth != MagickFalse)
+      continue;
+    (void) FormatLocaleFile(file,"%s\n",option_info[i].mnemonic);
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2910,21 +2923,13 @@ MagickExport MagickBooleanType ListCommandOptions(FILE *file,
   const OptionInfo
     *option_info;
 
-  ssize_t
-    i;
-
   magick_unreferenced(exception);
   if (file == (FILE *) NULL)
     file=stdout;
   option_info=GetOptionInfo(option);
   if (option_info == (const OptionInfo *) NULL)
     return(MagickFalse);
-  for (i=0; option_info[i].mnemonic != (char *) NULL; i++)
-  {
-    if (option_info[i].stealth != MagickFalse)
-      continue;
-    (void) FormatLocaleFile(file,"%s\n",option_info[i].mnemonic);
-  }
+  ListOptionMnemonics(file,option_info);
   return(MagickTrue);
 }
 
