@@ -1275,14 +1275,21 @@ static int FinishDeflate(z_stream *stream)
   return(status);
 }
 
+static void WriteCompressedPixels(Image *image,
+  const unsigned char *compress_pixels,const size_t compress_packets)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) compress_packets; i++)
+    (void) WriteBlobByte(image,compress_pixels[i]);
+}
+
 MagickExport MagickBooleanType ZLIBEncodeImage(Image *image,const size_t length,
   unsigned char *magick_restrict pixels,ExceptionInfo *exception)
 {
   int
     status;
-
-  ssize_t
-    i;
 
   size_t
     compress_packets;
@@ -1320,8 +1327,7 @@ MagickExport MagickBooleanType ZLIBEncodeImage(Image *image,const size_t length,
     }
   if (status != Z_OK)
     ThrowBinaryException(CoderError,"UnableToZipCompressImage",image->filename)
-  for (i=0; i < (ssize_t) compress_packets; i++)
-    (void) WriteBlobByte(image,compress_pixels[i]);
+  WriteCompressedPixels(image,compress_pixels,compress_packets);
   compress_pixels=(unsigned char *) RelinquishMagickMemory(compress_pixels);
   return(MagickTrue);
 }
