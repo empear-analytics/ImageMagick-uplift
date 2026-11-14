@@ -1902,18 +1902,19 @@ static MagickBooleanType ParseOtherDoctypeMarkup(XMLTreeRoot *root,
   return(MagickTrue);
 }
 
-static MagickBooleanType ParseInternalDoctypeDeclarations(
-  const InternalDoctypeInfo *doctype,char *xml,char *n,
-  char ***predefined_entities)
+static MagickBooleanType ParseDoctypeDeclaration(
+  const InternalDoctypeInfo *doctype,const AttributeListTargets *targets,
+  char ***predefined_entities,MagickBooleanType *broke)
 {
   XMLTreeRoot
     *const root = doctype->root;
 
-  const size_t
-    length = doctype->length;
-
   ExceptionInfo
     *const exception = doctype->exception;
+
+  char
+    **const xml = targets->xml,
+    **const n = targets->n;
 
   char
     *c,
@@ -1922,6 +1923,52 @@ static MagickBooleanType ParseInternalDoctypeDeclarations(
 
   EntityHeadTargets
     entity_targets;
+
+  (*broke)=MagickFalse;
+  if ((strlen((*xml)) > 9) && (strncmp((*xml),"<!ENTITY",8) == 0))
+    {
+      /*
+        Parse entity definitions.
+      */
+      entity_targets.xml=xml;
+      entity_targets.c=(&c);
+      entity_targets.n=n;
+      entity_targets.v=(&v);
+      entity_targets.q=(&q);
+      if (ParseEntityDeclarationHead(&entity_targets) == MagickFalse)
+        {
+          (*broke)=MagickTrue;
+          return(MagickTrue);
+        }
+      {
+        const EntityValueInput
+          entity = { root, c, (*n), v, q, exception };
+
+        if (AddInternalEntityDeclaration(&entity,xml,
+              predefined_entities) == MagickFalse)
+          return(MagickFalse);
+      }
+      }
+    else
+      {
+        if (ParseOtherDoctypeMarkup(root,exception,targets,
+              broke) == MagickFalse)
+          return(MagickFalse);
+        if ((*broke) != MagickFalse)
+          {
+            (*broke)=MagickTrue;
+            return(MagickTrue);
+          }
+      }
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseInternalDoctypeDeclarations(
+  const InternalDoctypeInfo *doctype,char *xml,char *n,
+  char ***predefined_entities)
+{
+  const size_t
+    length = doctype->length;
 
   const AttributeListTargets
     markup_targets = { &xml, &n };
@@ -1935,35 +1982,11 @@ static MagickBooleanType ParseInternalDoctypeDeclarations(
       xml++;
     if (*xml == '\0')
       break;
-    if ((strlen(xml) > 9) && (strncmp(xml,"<!ENTITY",8) == 0))
-      {
-        /*
-          Parse entity definitions.
-        */
-        entity_targets.xml=(&xml);
-        entity_targets.c=(&c);
-        entity_targets.n=(&n);
-        entity_targets.v=(&v);
-        entity_targets.q=(&q);
-        if (ParseEntityDeclarationHead(&entity_targets) == MagickFalse)
-          break;
-        {
-          const EntityValueInput
-            entity = { root, c, n, v, q, exception };
-
-          if (AddInternalEntityDeclaration(&entity,&xml,
-                predefined_entities) == MagickFalse)
-            return(MagickFalse);
-        }
-        }
-      else
-        {
-          if (ParseOtherDoctypeMarkup(root,exception,&markup_targets,
-                &broke) == MagickFalse)
-            return(MagickFalse);
-          if (broke != MagickFalse)
-            break;
-        }
+    if (ParseDoctypeDeclaration(doctype,&markup_targets,predefined_entities,
+          &broke) == MagickFalse)
+      return(MagickFalse);
+    if (broke != MagickFalse)
+      break;
     }
   return(MagickTrue);
 }
