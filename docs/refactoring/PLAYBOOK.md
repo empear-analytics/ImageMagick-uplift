@@ -18045,6 +18045,158 @@ Lane: c
 
 ---
 
+## Recipe RM - Merge Row Functions Through a Fetch Method and a Row Method
+
+**Use when:** CodeScene reports *Code Duplication* among the row functions of one file:
+`static void` functions, each called once per row from inside a parallel row loop as
+`F(&row,y,&status)`, each binding its inputs from its own row struct, then testing
+`(*status)`, fetching the row (`QueueCacheViewAuthenticPixels` or
+`GetCacheViewAuthenticPixels`), testing the fetch, doing one row of work and syncing,
+differing only in the fetch call, the row's work and the struct they read it from:
+`image-fill.c`'s `ResetImagePixelsRow`, `SetImageAlphaRow` and `SetImageBackgroundRow`.
+
+**Not covered by:** Recipe RL, whose copies are function tails holding the parallel loop
+itself and which keeps one fetch function; here the loops stay in their callers, each
+already reduced to one row-function call, and the copies differ in the fetch they call.
+Recipe CF, whose copies are one token sequence once variables and callees are renamed;
+here each copy reads a struct of its own type and binds its own members, and the row's
+work is an inline column loop. Recipe D, which needs identical copies. Recipe E on the
+column loops, which leaves the row functions cloning each other (a probe on
+`image-fill.c`: three functions in the finding instead of two).
+
+**How:**
+
+1. Copies. Two or more `static void` row functions `F(const S *row,const ssize_t
+   y,MagickBooleanType *status)` of one file, each the only callee of the body of a
+   parallel row loop (`const S row = { ... }; F(&row,y,&status);`, the struct declared in
+   the loop body). Check by reading that each body is, in this order: `const` or plain
+   locals bound from members of `row` (`image`, `image_view`, `exception`, and the row's
+   inputs), `if ((*status) == MagickFalse) return;`, `q=G(image_view,0,y,image->
+   columns,1,exception);` with `G` an exported cache-view fetch of the type of
+   `QueueCacheViewAuthenticPixels`, the `NULL` test setting `(*status)=MagickFalse;` and
+   returning, the row's work (one call `W(image,X,q);` or an inline column loop writing
+   only its own `x` and temporaries and through `q`), and the sync test setting
+   `(*status)=MagickFalse;`. The copies differ only in `S`, the bound inputs, `G` and the
+   row's work.
+2. Row methods. Each row's work becomes a `static void` function taking `(const Image
+   *image,const void *arguments,Quantum *magick_restrict q)`: an inline column loop
+   moves under Recipe E with its `x`; an existing call's callee takes `const void
+   *arguments` under Recipe CF step 3, binding `const T *name = (const T *) arguments;`
+   (its other callers pass the pointer they passed, converted by the call). A method that
+   reads one input `v` binds `const T v = (*(const T *) arguments);`; one that reads none
+   writes `magick_unreferenced(arguments);`.
+3. Directly above the first row function write `typedef Quantum *(*NameFetch)(CacheView
+   *,const ssize_t,const ssize_t,const size_t,const size_t,ExceptionInfo *);`, `typedef
+   void (*NameMethod)(const Image *,const void *,Quantum *magick_restrict);` and a struct
+   `NameRow` with the members `Image *image`, `CacheView *image_view`, `NameFetch fetch`,
+   `NameMethod method`, `const void *arguments` and `ExceptionInfo *exception`.
+4. Below them one `static void` function `UpdateNameRow(const NameRow *row,const ssize_t
+   y,MagickBooleanType *status)`: a copy's text with the fetch written `row->fetch(...)`
+   (the same arguments) and the row's work `row->method(image,row->arguments,q);`, its
+   bindings only `image`, `image_view` and `exception`.
+5. In each caller's loop body the struct becomes `const NameRow row = { image,
+   image_view, G, W, A, exception };` (`G` and `W` function designators; `A` the address
+   of the caller's input object, `(const void *) NULL` for none) and the call
+   `UpdateNameRow(&row,y,&status);`. The copies' structs and row functions leave the file.
+6. Check by reading that every object `A` points to is a parameter or local of the caller
+   that nothing writes from the struct's fill until the loop ends, and that each caller
+   passes the `G` its copy called.
+7. All copies move in one commit; the message names each copy, its `G`, its `W` and its
+   `A`, and quotes Recipe CF step 7's timing argument (two indirect calls per row, none
+   per pixel).
+
+**Before:**
+
+```c
+static void SetImageAlphaRow(const AlphaRow *row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  ...
+  const Quantum
+    alpha = row->alpha;
+  ...
+  if ((*status) == MagickFalse)
+    return;
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    if (GetPixelWriteMask(image,q) > (QuantumRange/2))
+      SetPixelAlpha(image,alpha,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+...
+    const AlphaRow row = { image, image_view, alpha, exception };
+
+    SetImageAlphaRow(&row,y,&status);
+```
+
+**After:**
+
+```c
+static void UpdateImageRow(const UpdateRow *row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  ...
+  q=row->fetch(image_view,0,y,image->columns,1,exception);
+  ...
+  row->method(image,row->arguments,q);
+  ...
+}
+...
+static void SetAlphaPixelRow(const Image *image,const void *arguments,
+  Quantum *magick_restrict q)
+{
+  const Quantum
+    alpha = (*(const Quantum *) arguments);
+  ...
+}
+...
+    const UpdateRow row = { image, image_view, GetCacheViewAuthenticPixels,
+      SetAlphaPixelRow, &alpha, exception };
+
+    UpdateImageRow(&row,y,&status);
+```
+
+**Careful:**
+
+- Why the behaviour is the same: each row runs the same statements in the same order on
+  the same row: the status test, the fetch the copy called (now through `row->fetch`,
+  which holds that function's address, with the same arguments), the `NULL` test, the
+  copy's column work (now through `row->method`, the copy's text with the same `x`), and
+  the sync. An input the copy read from its own struct member (a copy of the caller's
+  value made in each iteration) is read through `arguments` from the caller's object,
+  which holds the same value because nothing writes it while the loop runs (step 6).
+- OpenMP: the parallel loops do not change; the struct is still declared in the loop
+  body (one per iteration and thread) and only read; `status` is written through the same
+  pointer at the same points; each method writes only through `q` and its own locals, as
+  the copy did. The objects `arguments` points to are shared and only read, as the
+  caller's variables were before.
+- `refactor_guard.py --calls` reports the fetch functions (and an existing method's
+  direct calls) as gone: their address is now taken instead of a call written. That is
+  this recipe's expected `FAIL` fingerprint, together with the row functions' removal
+  and the new functions' addition; anything else stops the step.
+- Two indirect calls per row, none per pixel (Recipe CF step 7).
+
+**Evidence level:** oracle (each caller reached by cases), with steps 1 and 6 checked by
+reading and the `--calls` fingerprint above.
+
+**Provenance:** 2026-11-14, from `image-fill.c`'s `ResetImagePixelsRow`,
+`SetImageAlphaRow` and `SetImageBackgroundRow` (campaign B, M127 lane b round 14), the
+three functions of the file's *Code Duplication* once `SetImageBackgroundRow`'s column
+loop called `FillPixelRow`; a probe 8.54 to 9.09, the finding gone. Added by Claude Code
+(Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -19943,3 +20095,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | AMEND | NS | Step 1: `k1` and `k2` may be constant macros of an installed header (`TransparentAlpha`, `OpaqueAlpha`, `QuantumRange`), or one and `0`, when the site converts the result at once to the macros' cast type, which the function returns; Lane: b | `quantum-import.c`'s `Import1BitGrayAlphaQuantum` and `Import1BitIndexAlphaQuantum` (six selections each; probe 7.65 to 8.15) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | NS | Step 1: `k1` and `k2` may be two locals or parameters of one type assigned on every path to the site (no call, assignment or increment), passed after `c`'s parameters; Lane: b | `compress.c`'s `HuffmanDecodeImage` (`(color != MagickFalse) ? mw_hash : mb_hash`; chain probe 9.44 to 10.0) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | MT | Step 3: a pair of null pointer casts to two pointer types (`(CacheInfo *) NULL` and `(Cache) NULL`), each the right operand of `==`/`!=` against the same pointer, may be a differing pair: the conditional is a `void *` null pointer and the comparison is true exactly when the pointer is null (C11 6.5.9); Lane: a | `cache.c`'s `ClipPixelCacheNexus` and `MaskPixelCacheNexus` (*Code Duplication*; with two Recipe E per-pixel helpers, both leave Code Duplication and Complex Method) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | RM | Merge Row Functions Through a Fetch Method and a Row Method: `static void` row functions called once per row inside parallel loops, differing in their row struct, the cache-view fetch they call and the row's work, become one row function reading a struct of the fetch function, a row method and a `const void *` to the input; each row's work becomes a row method; Lane: b | `image-fill.c`'s `ResetImagePixelsRow`, `SetImageAlphaRow` and `SetImageBackgroundRow` (Code Duplication; probe 8.54 to 9.09) | mandate (2026-10-24) |
