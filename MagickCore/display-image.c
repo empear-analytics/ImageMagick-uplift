@@ -13954,14 +13954,10 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
     *image_info;
 
   MagickStatusType
-    flags,
-    status;
+    flags;
 
   QuantizeInfo
     quantize_info;
-
-  RectangleInfo
-    page_geometry;
 
   static char
     color[MagickPathExtent] = "gray";
