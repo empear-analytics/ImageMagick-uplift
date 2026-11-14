@@ -785,6 +785,18 @@ static MagickBooleanType AcquireCipherKeyAndNonce(Image *image,
   return(MagickTrue);
 }
 
+static SignatureInfo *CopyNonceDigest(SignatureInfo *signature_info,
+  unsigned char *input_block)
+{
+  const unsigned char
+    *digest;
+
+  digest=GetStringInfoDatum(GetSignatureDigest(signature_info));
+  (void) memcpy(input_block,digest,MagickMin(AESBlocksize,
+    GetSignatureDigestsize(signature_info))*sizeof(*input_block));
+  return(DestroySignatureInfo(signature_info));
+}
+
 static void OpenCipherImage(const Image *image,
   const ExceptionInfo *exception)
 {
@@ -806,9 +818,6 @@ MagickExport MagickBooleanType PasskeyDecipherImage(Image *image,
 
   CacheView
     *image_view;
-
-  const unsigned char
-    *digest;
 
   CipherRows
     rows;
@@ -847,10 +856,7 @@ MagickExport MagickBooleanType PasskeyDecipherImage(Image *image,
     return(MagickFalse);
   signature_info=AcquireNonceSignature(image,nonce);
   (void) memset(input_block,0,sizeof(input_block));
-  digest=GetStringInfoDatum(GetSignatureDigest(signature_info));
-  (void) memcpy(input_block,digest,MagickMin(AESBlocksize,
-    GetSignatureDigestsize(signature_info))*sizeof(*input_block));
-  signature_info=DestroySignatureInfo(signature_info);
+  signature_info=CopyNonceDigest(signature_info,input_block);
   /*
     Convert cipher pixels to plain pixels.
   */
@@ -952,9 +958,6 @@ MagickExport MagickBooleanType PasskeyEncipherImage(Image *image,
   char
     *signature;
 
-  const unsigned char
-    *digest;
-
   CipherRows
     rows;
 
@@ -1004,10 +1007,7 @@ MagickExport MagickBooleanType PasskeyEncipherImage(Image *image,
   (void) SetImageProperty(image,"cipher:nonce",signature,exception);
   signature=DestroyString(signature);
   (void) memset(input_block,0,sizeof(input_block));
-  digest=GetStringInfoDatum(GetSignatureDigest(signature_info));
-  (void) memcpy(input_block,digest,MagickMin(AESBlocksize,
-    GetSignatureDigestsize(signature_info))*sizeof(*input_block));
-  signature_info=DestroySignatureInfo(signature_info);
+  signature_info=CopyNonceDigest(signature_info,input_block);
   /*
     Convert plain pixels to cipher pixels.
   */
