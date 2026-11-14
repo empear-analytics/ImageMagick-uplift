@@ -10423,6 +10423,27 @@ typedef struct _XMagickCommandContext
     *exception;
 } XMagickCommandContext;
 
+static Image *XApplyOpenCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    *nexus;
+
+  /*
+    Load image.
+  */
+  nexus=XOpenImage(display,resource_info,windows,MagickFalse);
+  return(nexus);
+}
+
 static void XApplyResizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11068,13 +11089,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   switch (command)
   {
     case OpenCommand:
-    {
-      /*
-        Load image.
-      */
-      nexus=XOpenImage(display,resource_info,windows,MagickFalse);
+      nexus=XApplyOpenCommand(&context);
       break;
-    }
     case NextCommand:
     {
       /*
