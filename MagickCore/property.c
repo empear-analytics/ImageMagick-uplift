@@ -840,6 +840,13 @@ static void Read8BIMResourceBlock(ssize_t *count,char **resource,
   (*count)=(ssize_t) ReadPropertyMSBLong(info,length);
 }
 
+static inline MagickBooleanType IsInvalid8BIMResourceCount(const ssize_t count,
+  const size_t length)
+{
+  return(((count < 0) || ((size_t) count > length)) ? MagickTrue :
+    MagickFalse);
+}
+
 static void Get8BIMProperty(const Image *image,const char *key,
   ExceptionInfo *exception)
 {
@@ -908,7 +915,7 @@ static void Get8BIMProperty(const Image *image,const char *key,
       continue;
     Release8BIMResourceNames(&resource,&macroman_resource);
     Read8BIMResourceBlock(&count,&resource,&info,&length);
-    if ((count < 0) || ((size_t) count > length))
+    if (IsInvalid8BIMResourceCount(count,length) != MagickFalse)
       {
         length=0;
         continue;
