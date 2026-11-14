@@ -1265,9 +1265,22 @@ static ssize_t SkipMatchingEntities(char **entities,const char *xml)
   return(i);
 }
 
-static MagickBooleanType ValidateEntities(char *tag,char *xml,
-  const int delimiter,const size_t depth,char **entities)
+typedef struct _EntityCheckInfo
 {
+  char
+    *tag;
+
+  char
+    **entities;
+} EntityCheckInfo;
+
+static MagickBooleanType ValidateEntities(const EntityCheckInfo *check,
+  char *xml,const int delimiter,const size_t depth)
+{
+  char
+    *tag = check->tag,
+    **entities = check->entities;
+
   ssize_t
     i;
 
@@ -1285,7 +1298,7 @@ static MagickBooleanType ValidateEntities(char *tag,char *xml,
       return(MagickFalse);
     i=SkipMatchingEntities(entities,xml);
     if ((entities[i] != (char *) NULL) &&
-        (ValidateEntities(tag,entities[i+1],delimiter,depth+1,entities) == MagickFalse))
+        (ValidateEntities(check,entities[i+1],delimiter,depth+1) == MagickFalse))
       return(MagickFalse);
   }
 }
@@ -1728,8 +1741,11 @@ static ssize_t CountXMLEntities(char **entities)
 
 static MagickBooleanType IsNonCircularEntity(char *n,char *v,char **entities)
 {
-  return(((ValidateEntities(n,v,'%',0,entities) != MagickFalse) &&
-    (ValidateEntities(n,v,'&',0,entities) != MagickFalse)) ? MagickTrue :
+  const EntityCheckInfo
+    check = { n, entities };
+
+  return(((ValidateEntities(&check,v,'%',0) != MagickFalse) &&
+    (ValidateEntities(&check,v,'&',0) != MagickFalse)) ? MagickTrue :
     MagickFalse);
 }
 
