@@ -10325,6 +10325,22 @@ typedef struct _ImageWindowKeyInput
     *exception;
 } ImageWindowKeyInput;
 
+static void XTrimVerticalEdges(XResourceInfo *resource_info,
+  const KeySym key_symbol,RectangleInfo *crop_info)
+{
+  if ((key_symbol == XK_Up) || (key_symbol == XK_KP_Up))
+    {
+      XClampTrimTopQuantum(resource_info,(*crop_info));
+      (*crop_info).height-=(size_t) resource_info->quantum;
+    }
+  if ((key_symbol == XK_Down) || (key_symbol == XK_KP_Down))
+    {
+      XClampTrimBottomQuantum(resource_info,(*crop_info));
+      (*crop_info).y+=resource_info->quantum;
+      (*crop_info).height-=(size_t) resource_info->quantum;
+    }
+}
+
 static DisplayCommand XTrimImageWindowEdge(const ImageWindowKeyInput *input,
   const KeySym key_symbol)
 {
@@ -10353,17 +10369,7 @@ static DisplayCommand XTrimImageWindowEdge(const ImageWindowKeyInput *input,
   crop_info.y=0;
   crop_info.width=(size_t) windows->image.ximage->width;
   crop_info.height=(size_t) windows->image.ximage->height;
-  if ((key_symbol == XK_Up) || (key_symbol == XK_KP_Up))
-    {
-      XClampTrimTopQuantum(resource_info,crop_info);
-      crop_info.height-=(size_t) resource_info->quantum;
-    }
-  if ((key_symbol == XK_Down) || (key_symbol == XK_KP_Down))
-    {
-      XClampTrimBottomQuantum(resource_info,crop_info);
-      crop_info.y+=resource_info->quantum;
-      crop_info.height-=(size_t) resource_info->quantum;
-    }
+  XTrimVerticalEdges(resource_info,key_symbol,&crop_info);
   if ((key_symbol == XK_Left) || (key_symbol == XK_KP_Left))
     {
       XClampTrimLeftQuantum(resource_info,crop_info);
