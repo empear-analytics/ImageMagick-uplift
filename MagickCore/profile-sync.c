@@ -1546,6 +1546,11 @@ static inline MagickBooleanType IsOverlong8BimResource(const ssize_t count,
     MagickFalse);
 }
 
+static inline MagickBooleanType IsClipPathResource(const ssize_t id)
+{
+  return(((id > 1999) && (id < 2999)) ? MagickTrue : MagickFalse);
+}
+
 static void Update8BIMResource(const ClipPathResizeInfo *resize,
   unsigned char **info,size_t *length)
 {
@@ -1568,7 +1573,7 @@ static void Update8BIMResource(const ClipPathResizeInfo *resize,
       (*length)=0;
       return;
     }
-  if ((id > 1999) && (id < 2999))
+  if (IsClipPathResource(id) != MagickFalse)
     UpdateClipPath((*info),(size_t) count,resize);
   (*info)+=count;
   (*length)-=(size_t) MagickMin((*length),(size_t) count);
