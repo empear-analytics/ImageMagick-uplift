@@ -3034,6 +3034,9 @@ typedef struct _MVGRenderState
   ExceptionInfo
     *exception;
 
+  Image
+    *image;
+
   MagickStatusType
     *status;
 
@@ -3272,6 +3275,64 @@ static void EstimateMVGPrimitiveExtent(const MVGRenderState *state)
   (*state->coordinates)=coordinates;
 }
 
+static void ReserveMVGPrimitiveExtent(const MVGRenderState *state)
+{
+  double
+    coordinates = (*state->coordinates);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  Image
+    *image = state->image;
+
+  MagickStatusType
+    status = (*state->status);
+
+  MVGInfo
+    mvg_info = (*state->mvg_info);
+
+  PrimitiveInfo
+    *primitive_info = (*state->primitive_info);
+
+  size_t
+    *number_points = state->number_points;
+
+  ssize_t
+    i = (*state->i);
+
+  do
+  {
+    if (((size_t) (i+coordinates)) >= (*number_points))
+      {
+        /*
+          Resize based on speculative points required by primitive.
+        */
+        (*number_points)+=(size_t) coordinates+1;
+        if ((*number_points) < (size_t) coordinates)
+          {
+            (void) ThrowMagickException(exception,GetMagickModule(),
+              ResourceLimitError,"MemoryAllocationFailed","`%s'",
+              image->filename);
+            status=MagickFalse;
+            break;
+          }
+        mvg_info.offset=i;
+        status&=CheckPrimitiveExtent(&mvg_info,(double) (*number_points)+
+          (double) coordinates+1.0);
+        primitive_info=(*mvg_info.primitive_info);
+        if (status == MagickFalse)
+          break;
+      }
+    status&=(MagickStatusType) CheckPrimitiveExtent(&mvg_info,
+      PrimitiveExtentPad);
+    primitive_info=(*mvg_info.primitive_info);
+  } while (0);
+  (*state->status)=status;
+  (*state->mvg_info)=mvg_info;
+  (*state->primitive_info)=primitive_info;
+}
+
 static MagickBooleanType RenderMVGContent(Image *image,
   const DrawInfo *draw_info,const size_t depth,ExceptionInfo *exception)
 {
@@ -3349,8 +3410,9 @@ static MagickBooleanType RenderMVGContent(Image *image,
     metrics;
 
   const MVGRenderState
-    render_state = { &token, &q, &coordinates, exception, &status, &mvg_info,
-      &primitive_info, &primitive_type, &extent, &number_points, &i, &j, &x };
+    render_state = { &token, &q, &coordinates, exception, image, &status,
+      &mvg_info, &primitive_info, &primitive_type, &extent, &number_points, &i,
+      &j, &x };
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -4918,30 +4980,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     EstimateMVGPrimitiveExtent(&render_state);
     if (status == MagickFalse)
       break;
-    if (((size_t) (i+coordinates)) >= number_points)
-      {
-        /*
-          Resize based on speculative points required by primitive.
-        */
-        number_points+=(size_t) coordinates+1;
-        if (number_points < (size_t) coordinates)
-          {
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","`%s'",
-              image->filename);
-            status=MagickFalse;
-            break;
-          }
-        mvg_info.offset=i;
-        status&=CheckPrimitiveExtent(&mvg_info,(double) number_points+
-          (double) coordinates+1.0);
-        primitive_info=(*mvg_info.primitive_info);
-        if (status == MagickFalse)
-          break;
-      }
-    status&=(MagickStatusType) CheckPrimitiveExtent(&mvg_info,
-      PrimitiveExtentPad);
-    primitive_info=(*mvg_info.primitive_info);
+    ReserveMVGPrimitiveExtent(&render_state);
     if (status == MagickFalse)
       break;
     mvg_info.offset=j;
