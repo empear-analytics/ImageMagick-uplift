@@ -4782,6 +4782,37 @@ static MagickBooleanType AppendOptionOrArtifact(
   return(AppendInterpretString(text,string));
 }
 
+static MagickBooleanType AppendPrefixedProperty(
+  const InterpretSources *sources,const InterpretText *text,
+  const BracedPattern *braced)
+{
+  char
+    *const pattern = braced->pattern;
+
+  const char
+    *string;
+
+  const ssize_t
+    offset = braced->offset;
+
+  ExceptionInfo
+    *const exception = sources->exception;
+
+  Image
+    *const property_image = sources->property_image;
+
+  /*
+    Property - direct image property lookup (with glob).
+  */
+  if (IsGlob(pattern+9) != MagickFalse)
+    return(AppendGlobbedProperties(text,property_image,pattern,
+      exception));
+  string=GetImageProperty(property_image,pattern+9,exception);
+  if (string == (char *) NULL)
+    return(WarnUnknownProperty(exception,pattern,offset));
+  return(AppendInterpretString(text,string));
+}
+
 static MagickBooleanType InterpretBracedEscape(
   const InterpretSources *sources,const InterpretText *text,const char **p)
 {
@@ -4845,18 +4876,7 @@ static MagickBooleanType InterpretBracedEscape(
   if (LocaleNCompare("artifact:",pattern,9) == 0)
     return(AppendOptionOrArtifact(sources,text,&braced,ArtifactGlobSide));
   if (LocaleNCompare("property:",pattern,9) == 0)
-    {
-      /*
-        Property - direct image property lookup (with glob).
-      */
-      if (IsGlob(pattern+9) != MagickFalse)
-        return(AppendGlobbedProperties(text,property_image,pattern,
-          exception));
-      string=GetImageProperty(property_image,pattern+9,exception);
-      if (string == (char *) NULL)
-        return(WarnUnknownProperty(exception,pattern,offset));
-      return(AppendInterpretString(text,string));
-    }
+    return(AppendPrefixedProperty(sources,text,&braced));
   /*
     Properties without special prefix.
   */
