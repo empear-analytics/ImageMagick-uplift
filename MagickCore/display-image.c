@@ -11329,6 +11329,70 @@ static void XApplyImplodeCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyVignetteCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  Image
+    *vignette_image;
+
+  static char
+    geometry[MagickPathExtent] = "0x20";
+
+  /*
+    Query user for the vignette geometry.
+  */
+  (void) XDialogWidget(display,windows,"Vignette",
+    "Enter the radius, sigma, and x and y offsets:",geometry);
+  if (*geometry == '\0')
+    return;
+  /*
+    Soften the edges of the image in vignette style
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flags=ParseGeometry(geometry,&geometry_info);
+  if ((flags & SigmaValue) == 0)
+    geometry_info.sigma=1.0;
+  if ((flags & XiValue) == 0)
+    geometry_info.xi=0.1*(*image)->columns;
+  if ((flags & PsiValue) == 0)
+    geometry_info.psi=0.1*(*image)->rows;
+  vignette_image=VignetteImage(*image,geometry_info.rho,0.0,(ssize_t)
+    ceil(geometry_info.xi-0.5),(ssize_t) ceil(geometry_info.psi-0.5),
+    exception);
+  if (vignette_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=vignette_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyRollCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12499,48 +12563,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyImplodeCommand(&context,&flags);
       break;
     case VignetteCommand:
-    {
-      Image
-        *vignette_image;
-
-      static char
-        geometry[MagickPathExtent] = "0x20";
-
-      /*
-        Query user for the vignette geometry.
-      */
-      (void) XDialogWidget(display,windows,"Vignette",
-        "Enter the radius, sigma, and x and y offsets:",geometry);
-      if (*geometry == '\0')
-        break;
-      /*
-        Soften the edges of the image in vignette style
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      flags=ParseGeometry(geometry,&geometry_info);
-      if ((flags & SigmaValue) == 0)
-        geometry_info.sigma=1.0;
-      if ((flags & XiValue) == 0)
-        geometry_info.xi=0.1*(*image)->columns;
-      if ((flags & PsiValue) == 0)
-        geometry_info.psi=0.1*(*image)->rows;
-      vignette_image=VignetteImage(*image,geometry_info.rho,0.0,(ssize_t)
-        ceil(geometry_info.xi-0.5),(ssize_t) ceil(geometry_info.psi-0.5),
-        exception);
-      if (vignette_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=vignette_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyVignetteCommand(&context);
       break;
-    }
     case WaveCommand:
     {
       Image
