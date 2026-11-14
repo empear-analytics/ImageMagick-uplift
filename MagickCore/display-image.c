@@ -10886,6 +10886,38 @@ static void XApplyCharcoalDrawCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyAnnotateCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  MagickStatusType
+    status;
+
+  /*
+    Annotate the image with text.
+  */
+  status=XAnnotateEditImage(display,resource_info,windows,*image,exception);
+  if (status == MagickFalse)
+    {
+      XNoticeWidget(display,windows,"Unable to annotate X image",
+        (*image)->filename);
+      return;
+    }
+}
+
 static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12408,19 +12440,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyCharcoalDrawCommand(&context);
       break;
     case AnnotateCommand:
-    {
-      /*
-        Annotate the image with text.
-      */
-      status=XAnnotateEditImage(display,resource_info,windows,*image,exception);
-      if (status == MagickFalse)
-        {
-          XNoticeWidget(display,windows,"Unable to annotate X image",
-            (*image)->filename);
-          break;
-        }
+      XApplyAnnotateCommand(&context);
       break;
-    }
     case DrawCommand:
     {
       /*
