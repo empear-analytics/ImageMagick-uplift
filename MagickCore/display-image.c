@@ -20709,6 +20709,9 @@ typedef struct _XTileInput
   unsigned int
     height,
     width;
+
+  char
+    *filename;
 } XTileInput;
 
 static void XTileUpdateImage(const XTileInput *input)
@@ -20795,6 +20798,40 @@ static void XTileUpdateImage(const XTileInput *input)
   windows->image.window_changes.height=(int) image->rows;
   XConfigureImageColormap(display,resource_info,windows,image,exception);
   (void) XConfigureImage(display,resource_info,windows,image,exception);
+}
+
+static Image *XTileLoadImage(const XTileInput *input)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  char
+    *const filename = input->filename;
+
+  Image
+    *tile_image;
+
+  /*
+    Load tile image.
+  */
+  XCheckRefreshWindows(display,windows);
+  (void) CopyMagickString(resource_info->image_info->magick,"MIFF",
+    MagickPathExtent);
+  (void) CopyMagickString(resource_info->image_info->filename,filename,
+    MagickPathExtent);
+  tile_image=ReadImage(resource_info->image_info,exception);
+  CatchException(exception);
+  (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+  return(tile_image);
 }
 
 static Image *XTileImage(Display *display,XResourceInfo *resource_info,
@@ -20929,21 +20966,12 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
   input.y=y;
   input.height=height;
   input.width=width;
+  input.filename=filename;
   switch (TileCommands[id])
   {
     case TileLoadCommand:
     {
-      /*
-        Load tile image.
-      */
-      XCheckRefreshWindows(display,windows);
-      (void) CopyMagickString(resource_info->image_info->magick,"MIFF",
-        MagickPathExtent);
-      (void) CopyMagickString(resource_info->image_info->filename,filename,
-        MagickPathExtent);
-      tile_image=ReadImage(resource_info->image_info,exception);
-      CatchException(exception);
-      (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+      tile_image=XTileLoadImage(&input);
       break;
     }
     case TileNextCommand:
