@@ -4426,6 +4426,14 @@ function).
    *targets`, after the input struct, each `&targets` of the groups written `targets`
    (Recipe N step 2's pass-through of an address the block passes to a callee); the
    groups' own text is otherwise unchanged (2026-11-12).
+   Widening (2026-11-14): the moved groups may also write, on paths that do not return,
+   up to three plain locals the caller reads after the `switch`, on Recipe W step 3's
+   widened terms (each a pointer, `(*v)` at every use, counted among the four
+   parameters; `R` reads none of them, W's `return(v);` exception included). When a
+   `static` function of the file is already, token for token, the function step 4 would
+   write from the moved groups (another site's helper), the call group of step 5 calls it
+   and no copy is written (Recipe D); check by script that the moved groups' text, after
+   the rewriting of this step, equals that function's `switch` body.
 4. Cut the moved groups, labels and bodies, in their order, into a new `static
    MagickBooleanType` function directly above the caller, whose body is `switch (e)
    { ... }` with the same text of `e`, followed by `return(MagickTrue);`. Each
@@ -4564,6 +4572,12 @@ test, a returning `default`) holds about half of its cc 39; SD refuses it for th
 `return`s, W for the cc of a single helper. A probe of three functions (`O`/`P`/`R`,
 `G`/`I`, `A`/`B`, each with the `default` chain): 6.20 to 6.40, no finding on any new
 function. Added by Claude Code (Claude Opus 5.5), under the mandate of 2026-10-24.
+Step 3's widening and reuse (2026-11-14, campaign B, M127 lane b round 13):
+`geometry-parse.c`'s `ParseGeometry`, whose separator `switch` writes `p` and `flags` and
+is `GetGeometry`'s but for one kept group (`'/'`, `p++`) and its `return(NoValue);`; the
+moved groups are exactly `GetGeometry`'s `SkipGeometrySeparator`. A probe 8.33 to 8.39, no
+new finding. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
 
 ---
 
@@ -4598,7 +4612,11 @@ Recipe D, whose copies are moved whole and so may not leave the caller.
    (2026-11-13): up to three plain locals the caller reads after the block may be written,
    on Recipe RV step 6(b)'s terms (Recipe O step 2): each goes as a pointer, written
    `(*v)` at every use, `&v` passed on to a callee written `v`, and counts among step 5's
-   four parameters; `R` (step 2) must not read one of them.
+   four parameters; `R` (step 2) must not read one of them, except (2026-11-14) when `R`
+   is that local itself, `return(v);`: every write through `(*v)` lands in the caller's
+   `v` before the helper returns, so the caller's `return(v);` reads what the block's
+   `return(v);` read (`geometry-parse.c`'s `GetGeometry`, whose separator `switch` ORs
+   into `flags` and whose `default:` returns `flags`).
 4. Cut the block into a new `static MagickBooleanType` function directly above the
    caller. Each `return(R);` becomes `return(MagickFalse);`, and the function ends with
    `return(MagickTrue);`. Nothing else in the text changes.
@@ -4688,6 +4706,11 @@ and leaves through `return;` when it fails; as a helper it takes the function ou
 `length` and `endian` for the walk that follows. Added by Claude Code (Claude Opus 5.5)
 under the mandate of 2026-10-24.
 Lane: c
+Step 3's `return(v);` exception (2026-11-14, campaign B, M127 lane b round 13):
+`geometry-parse.c`'s `GetGeometry`, whose separator `switch` writes `p` and `flags` and
+leaves through `return(flags);` at its `default:`; a probe 7.90 to 8.04. Added by Claude
+Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
 
 ---
 
@@ -7083,6 +7106,16 @@ SD, which move statements: the decision moves with them and the helper inherits 
    replaces it without parentheses. It need not recur: a single site is enough when the
    step takes its function out of *Complex Method*, and `k1` and `k2` may be signed
    integer literals (`1` and `-1`).
+   Constant macros (2026-11-14): `k1` and `k2` may also be object-like macros of an
+   installed header that expand to a cast constant (`TransparentAlpha`, `((Quantum) 0)`;
+   `OpaqueAlpha`; `QuantumRange`), or one such macro and the literal `0`, when the site
+   converts the selection at once to that cast's type (`(Quantum) (pixel == 0 ? 0 :
+   QuantumRange)`, an argument of type `Quantum`) or both are of that type; the function
+   then returns that type (`Quantum`). The macros stay unexpanded in its body.
+   Variables (2026-11-14): `k1` and `k2` may instead be two locals or parameters of one
+   type that every path to the site has assigned (`mw_hash`, `mb_hash`, tables allocated
+   and checked before the loop), with no call, assignment or increment; they become
+   parameters of that type after those of `c`, and the function returns that type.
 2. Write a `static inline` function directly above the first function that uses it,
    with one parameter per variable expression of `c` (`const size_t extent` for
    `geometry.width`), of that expression's exact type, returning the type of `k1`:
@@ -7134,6 +7167,15 @@ static inline double GravityOffsetSign(const size_t extent)
   prove it for this build on every input, reached or not.
 - The variant with the constants swapped is a different function, not a negated
   argument: `!c` would be a new expression.
+- Under the variable form the call reads both variables where the `?:` read one of
+  them: reading an assigned local has no side effect, so only the value the test
+  selects reaches the site. A variable some path leaves unassigned would make that
+  extra read undefined; step 1 refuses it.
+- Under the constant-macro form the conditional's own type may differ from the return
+  type (`0 : QuantumRange` is `int` against `unsigned short` in a Q16 non-HDRI build,
+  `float` in HDRI); both operands are exactly representable in `Quantum`, and the site
+  converts the result to `Quantum` at once, so returning `Quantum` gives the site the
+  value it got. `obj_identical.sh` checks this build; the argument covers the others.
 
 **Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
 `HEAD`; `refactor_guard.py` reports `WARN` (copies removed, every value still
@@ -7147,6 +7189,16 @@ function; a probe: cc 56 to 38 with `IDENTICAL` object code), and which Recipe S
 split only once they are gone (a helper of three gravity cases would otherwise be a
 *Complex Method*). Added by Claude Code (Claude Opus 5.5) during task M115 (campaign B),
 under the mandate of 2026-10-24.
+Constant-macro form (2026-11-14, campaign B, M127 lane b round 13): `quantum-import.c`'s
+`Import1BitGrayAlphaQuantum` and `Import1BitIndexAlphaQuantum`, whose six `?:` each
+(`TransparentAlpha : OpaqueAlpha`, `0 : QuantumRange`, `0 : 1`, `0x00 : 0x01`) make them
+*Complex Methods* (cc 12 and 11); a probe 7.65 to 8.15. Added by Claude Code (Claude
+Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
+Variable form (2026-11-14, same lane): `compress.c`'s `HuffmanDecodeImage`, whose
+`(color != MagickFalse) ? mw_hash : mb_hash` is the last decision that keeps its scanline
+loop, as a helper, at cc 9; a probe of the chain 9.44 to 10.0.
+Lane: b
 
 ---
 
@@ -18125,6 +18177,12 @@ labels in a `switch` of the new function; Recipe EC, which names an equality cha
 4. *Several sites.* A loop in another function whose group has the same labels as a set
    uses the same predicate. A group with some further label keeps that label alone as a
    group of the same body in its `switch` (`ParseGeometry`'s `/`).
+   Or (2026-11-14), when that further group `case L: { p++; break; }` is still in the
+   `switch` of a loop that already calls the predicate as step 3 wrote it, the group may
+   leave the `switch` and its label join the call's test: `if ((Name(c) !=
+   MagickFalse) || (c == L))`, the body unchanged. `L` is in no other group and is not
+   one of the predicate's labels, so the test holds for exactly the values that ran
+   `p++;` before, and `c` is not written between the test and the `switch`.
 5. Check by script that the predicate's labels are exactly the peeled labels, each once,
    and that nothing else in the `switch` changed.
 
@@ -18187,6 +18245,11 @@ Step 1's widening (2026-11-13, campaign B, M127 lane c): `profile.c`'s `UpdateCl
 whose knot group is a call on a `ssize_t` selector. Added by Claude Code (Claude Opus 5.5)
 under the mandate of 2026-10-24.
 Lane: c
+Step 4's `||` form (2026-11-14, campaign B, M127 lane b round 13): `ParseGeometry`'s `/`
+group, the last label between its separator `switch` and the `switch` `GetGeometry` shares
+through `SkipGeometrySeparator`; a probe flat at 8.33, then 8.47 once the `switch` is
+the shared call. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
 
 ---
 
@@ -19089,6 +19152,153 @@ Lane: b
 
 ---
 
+## Recipe WS - Extract Statement-Macro Twins Through a Writer Struct of the Macro's Locals
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Complex Method*, *Large Method* or
+*Deep, Nested Complexity* on a function whose loop holds two or more copies of a block that
+emits through a function-like statement macro whose body names the caller's plain locals,
+the copies differing only in some constants, as `compress.c`'s `HuffmanEncodeImage` does:
+its white and black run blocks (`if (runlength >= 64) { entry=HuffmanMakeupEntry(MWTable,
+runlength); runlength-=(long) entry->count; HuffmanOutputCode(entry); } entry=TWTable+
+MagickMin((size_t) runlength,63); HuffmanOutputCode(entry);`, then `MBTable`, `TBTable`)
+expand `OutputBit`, which reads `image_info`, `image` and `one` and writes `byte`, `bit`
+and `mask`.
+
+**Not covered by:** Recipe MB, which copies struct locals through one pointer each (here
+the bound locals are five plain locals, with the run length and two tables seven
+parameters); Recipe SC, which passes no pointer to a written local and whose constants
+travel in a struct of their own; Recipe GS, which groups locals released by a cleanup
+macro, not written by an emitting one; Recipes O and I, which write `(*v)` at every use,
+inside the macro body too.
+
+**How:**
+
+1. The copies lie outside every OpenMP region with no `#` line, meet Recipe E steps 1 and
+   3 (no `return`, `goto`, or `break` or `continue` that leaves them) and are the same
+   token sequence once some constants (literals, enumeration constants or the names of
+   `static const` tables) are replaced by role names, checked by script. The macros they
+   use are defined above the new function, unchanged.
+2. List the caller's locals the macro bodies name. Each one the copies only read keeps
+   one value from a point before the first copy on (checked by reading: no statement
+   after that point assigns it); each one they write, `w`, is a plain local of the
+   caller that the caller otherwise uses only by value or as `&w` passed to calls
+   (never kept). Every other variable a copy writes is a Recipe E step 4 temporary
+   (the copy writes it before reading it, nothing after reads it) or the copy's one
+   by-value input (the copy reads it first, nothing after reads the copy's writes).
+3. Directly above the new function write a `typedef struct` with one member per bound
+   local of step 2, the read ones first, each of the local's exact type and name.
+4. The new function is `static void`, taking a pointer to that struct first, then one
+   parameter per role (each of its constants' type) and the by-value input: at most
+   four. At the top it declares, with the copy's temporaries, one local per member of
+   the member's name and type, initialised from it (`unsigned char byte = writer->byte`),
+   then holds one copy's text with each constant replaced by its role's name, then
+   assigns each written member back (`writer->byte=byte;`), in member order.
+5. In the caller, declare one local of the struct; directly after the last assignment of
+   the read locals (step 2) assign the read members from them, and replace each written
+   local `w` by the member everywhere in the caller (its initialisation, `&w` passed to
+   calls, reads): the caller's `w` declarations go. Replace each copy by the call
+   with `&` the struct, its constants and its input. A declaration the caller no longer
+   uses leaves it (Recipe E step 4).
+6. Check by script that each copy equals the new function's block with its constants put
+   back, and that each macro's `#define` is byte for byte the same.
+7. *One block* (2026-11-14). A single block (no copies, no roles) moves the same way.
+   Besides the macro-bound locals, plain locals the block writes and the caller reads
+   after it may join the struct as written members (`code`, `length` of a code being
+   read bit by bit), replaced in the caller as step 5 says, and one more such local may
+   go by pointer, copied in and out as Recipe MB steps 4 and 5 do. A flag the block
+   sets on every path (`bail=MagickFalse;` first) and the caller tests after it is the
+   new function's return value, of the flag's own type: the function declares the
+   flag, ends with `return(flag);`, and the caller writes `flag=Helper(...);`. Every
+   `break` in the block leaves a loop inside it (the `break` hidden in a macro
+   included), never the block.
+
+**Before:**
+
+```c
+      runlength=CountHuffmanRun(&q,&n,MagickFalse);
+      if (runlength >= 64)
+        {
+          entry=HuffmanMakeupEntry(MWTable,runlength);
+          runlength-=(long) entry->count;
+          HuffmanOutputCode(entry);
+        }
+      entry=TWTable+MagickMin((size_t) runlength,63);
+      HuffmanOutputCode(entry);
+```
+
+**After:**
+
+```c
+static void OutputHuffmanRun(HuffmanBitWriter *writer,
+  const HuffmanTable *makeup_table,const HuffmanTable *terminating_table,
+  int runlength)
+{
+  ...
+  unsigned char
+    byte = writer->byte,
+    bit = writer->bit;
+
+  if (runlength >= 64)
+    {
+      entry=HuffmanMakeupEntry(makeup_table,runlength);
+      runlength-=(long) entry->count;
+      HuffmanOutputCode(entry);
+    }
+  entry=terminating_table+MagickMin((size_t) runlength,63);
+  HuffmanOutputCode(entry);
+  writer->byte=byte;
+  writer->bit=bit;
+}
+...
+      runlength=CountHuffmanRun(&q,&n,MagickFalse);
+      OutputHuffmanRun(&writer,MWTable,TWTable,runlength);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. A written local now lives in the struct member for the
+  whole of the caller's run: every statement that read or wrote `w`, or passed `&w`,
+  reads, writes or passes the member, one object of the same type, so the values are
+  the same at every point. Inside the new function the local copy starts with the
+  member's value, only the copy's text writes it, and the copy-back stores its final
+  value before the caller goes on (pass-by-value-result, as Recipe MB argues); nothing
+  else reaches the member while the function runs.
+- A read member holds the value the local had at every copy, because no statement after
+  its assignment writes that local (step 2). The macro expansions are the same tokens,
+  and each name in them resolves to a local of the same name and type.
+- A role's constant is passed where the copy named it: a table name decays to the same
+  pointer, a literal converts to the parameter's type as it converted in the copy's
+  expression (choose the parameter type so that it does not change, step 4).
+- The by-value input (`runlength`) is the copy's value at its start; the copy's own
+  writes to it stay inside the new function, and step 2 requires that nothing after the
+  copy reads them.
+- Taking the members' addresses (`&writer.byte`) for the calls that took `&byte` keeps
+  those calls' behaviour: they wrote through the pointer then and do now.
+- Under step 7 a `break` in the block, the one a macro hides included (`InputBit`'s on
+  `EOF`), leaves the loop inside the block, in the new function as before, and control
+  reaches the copy-back and the `return(flag);` on every path, since the block has no
+  exit of its own; the flag returned is the value the caller's flag held after the
+  block.
+
+**Evidence level:** oracle (the cases that reach the caller), with `refactor_guard.py
+--calls` (`+2` for the new function and `+1` per further copy, the macros' uses dropping
+by the copies removed) and step 6's script.
+
+**Provenance:** 2026-11-14, from `compress.c`'s `HuffmanEncodeImage` (campaign B, M127 lane
+b round 13): the white and black run blocks, which need seven parameters as Recipe MB
+or SC would write them (the five locals `OutputBit` and `HuffmanOutputCode` bind, two
+tables and the run length). A probe: 8.06 to 8.13, then with the scanline loop as a
+helper and the page head and tail extracted, `HuffmanEncodeImage` out of every category,
+8.59. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Step 7 (2026-11-14, same lane): `compress.c`'s `HuffmanDecodeImage`, whose code-reading
+`do` loop expands `InputBit` (binding `image`, `byte`, `mask` and `runlength`, with a
+hidden `break` of the `do`) and writes `code`, `length`, `null_lines` and the `bail`
+flag; a probe 8.59 to 9.32, the function out of *Deep, Nested Complexity* and *Bumpy
+Road Ahead*.
+Lane: b
+
+---
+
 ## Recipe TP - Extract a Nested Test Path as a Predicate Writing One Local
 
 **Use when:** CodeScene reports *Bumpy Road Ahead* (or *Deep, Nested Complexity*) on a
@@ -19718,3 +19928,10 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | QF | Share a Single Pixel Fetch Through Row Functions: many `static void` copies opening with one fetch (`GetAuthenticPixelQueue`) and an early `return;` on `NULL`, differing in the column loop and the buffer type, become one `void` function taking a `const` row struct, a row-function pointer and `void *pixels`; each copy keeps its name as a `void` row function; Lane: c | `stream.c`'s 56 `Stream<Type><Map>Pixels`/`Stream<Type>MapPixels`: 6.89 to 7.32, `magick stream` timing equal on five commands | mandate (2026-10-24) |
 | 2026-11-14 | NEW | JT | Replace Jumps to a Returning Tail by Calls of the Tail: a function-ending `L: S return(R);` reached by `goto L;` from nested arms moves to a `static` helper of the return type taking the (at most four) variables it reads; each `goto L;` and the label's tail become `return(Helper(...));`; Lane: c | `property.c`'s `InterpretBracedEscape` (three lookup arms jumping to `PropertyLookupFailure:`): the first step of a chain that takes the function out of every finding, 3.62 to 3.64 | mandate (2026-10-24) |
 | 2026-11-14 | NEW | XP | Share Mirrored Extreme-Search Loops Through Per-Direction Predicates: copies of a loop keeping the most extreme array element, differing in their tests' operands and operators, become one `static` search taking a predicate pointer, each copy's tests a `MagickBooleanType` predicate returning `MagickTrue` where the copy assigned; Lane: c | `property.c`'s `GetConvexHullExtremePoints` (top, right, bottom, left loops; cc 26, four bumps): leaves every finding, 3.64 to 3.66 | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | W | Step 3's widening: `R` may be a widened local itself, `return(v);`, since every write through `(*v)` lands in the caller's `v` before the helper returns and the caller's `return(v);` reads that value; Lane: b | `geometry-parse.c`'s `GetGeometry` (separator `switch` writing `p` and `flags`, `default:` returning `flags`; probe 7.90 to 8.04) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | SR | Step 3: the moved groups may write up to three plain locals the caller reads after the `switch`, on W step 3's widened terms; when a `static` helper of the file already is the function step 4 would write, the call group calls it (Recipe D), checked by script; Lane: b | `geometry-parse.c`'s `ParseGeometry` (separator `switch` writing `p` and `flags`, the moved groups equal to `GetGeometry`'s `SkipGeometrySeparator`; probe 8.33 to 8.39) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | PA | Step 4: a further single-label group `case L: { p++; break; }` may leave the `switch` and join the predicate call's test as an `or` with `(c == L)` when the loop already calls the predicate; Lane: b | `geometry-parse.c`'s `ParseGeometry` (`/`, whose removal leaves the `switch` equal to `GetGeometry`'s shared `SkipGeometrySeparator`; probe flat at 8.33, then 8.47) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | WS | Extract Statement-Macro Twins Through a Writer Struct of the Macro's Locals: copies of a block emitting through a statement macro that binds the caller's plain locals, differing in constants, become one `static void` function taking a struct of those locals (read members, and written members that replace the caller's locals), the constants and the block's input; the function binds members as locals and copies written ones back; Lane: b | `compress.c`'s `HuffmanEncodeImage` (white and black run blocks through `HuffmanOutputCode`/`OutputBit`; seven parameters otherwise; probe 8.06 to 8.13, chain to 8.59) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | WS | Step 7: one block (no copies) moves the same way; further written locals read after it may join the struct as written members, one more may go by pointer (MB's copy in and out), and a flag the block sets on every path is the return value; Lane: b | `compress.c`'s `HuffmanDecodeImage` (the `InputBit` code-reading `do` loop; probe 8.59 to 9.32) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | NS | Step 1: `k1` and `k2` may be constant macros of an installed header (`TransparentAlpha`, `OpaqueAlpha`, `QuantumRange`), or one and `0`, when the site converts the result at once to the macros' cast type, which the function returns; Lane: b | `quantum-import.c`'s `Import1BitGrayAlphaQuantum` and `Import1BitIndexAlphaQuantum` (six selections each; probe 7.65 to 8.15) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | NS | Step 1: `k1` and `k2` may be two locals or parameters of one type assigned on every path to the site (no call, assignment or increment), passed after `c`'s parameters; Lane: b | `compress.c`'s `HuffmanDecodeImage` (`(color != MagickFalse) ? mw_hash : mb_hash`; chain probe 9.44 to 10.0) | mandate (2026-10-24) |
