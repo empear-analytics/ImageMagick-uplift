@@ -1416,6 +1416,21 @@ static MagickBooleanType ReadEXIFHeader(const unsigned char **exif,
   return(MagickTrue);
 }
 
+static MagickBooleanType OrEXIFHexDigit(const int c,size_t *tag)
+{
+  if ((c >= '0') && (c <= '9'))
+    (*tag)|=(size_t) (c-'0');
+  else
+    if ((c >= 'A') && (c <= 'F'))
+      (*tag)|=(size_t) (c-('A'-10));
+    else
+      if ((c >= 'a') && (c <= 'f'))
+        (*tag)|=(size_t) (c-('a'-10));
+      else
+        return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType ParseEXIFHexTag(const char **property,size_t *tag)
 {
   int
@@ -1440,16 +1455,8 @@ static MagickBooleanType ParseEXIFHexTag(const char **property,size_t *tag)
     {
       c=(*(*property)++);
       (*tag)<<=4;
-      if ((c >= '0') && (c <= '9'))
-        (*tag)|=(size_t) (c-'0');
-      else
-        if ((c >= 'A') && (c <= 'F'))
-          (*tag)|=(size_t) (c-('A'-10));
-        else
-          if ((c >= 'a') && (c <= 'f'))
-            (*tag)|=(size_t) (c-('a'-10));
-          else
-            return(MagickFalse);
+      if (OrEXIFHexDigit(c,tag) == MagickFalse)
+        return(MagickFalse);
     }
   } while (*(*property) != '\0');
   return(MagickTrue);
