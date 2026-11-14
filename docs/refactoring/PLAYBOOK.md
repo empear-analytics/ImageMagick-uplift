@@ -12795,6 +12795,12 @@ moves a run of skip tests as one predicate.
    `return(MagickTrue);`. Each test's text is copied character for character.
 3. The tests in the loop become `if (Is<Name>(<inputs>) == MagickFalse) continue;`.
 4. The tests that followed the run stay where they were.
+5. *Function form (2026-11-14).* The run may instead open a function's body (after its
+   declarations): `if (<test>) return;` statements of a `void` function, or `if
+   (<test>) return(c);` with one and the same constant `c`, under steps 1 and 2's
+   conditions. The run becomes `if (Is<Name>(<inputs>) == MagickFalse) return;` (or
+   `return(c);`), as `utility.c`'s `ExpandFilename` (`if (path == (char *) NULL)
+   return; if (*path != '~') return;`). Lane: a
 
 **Before:**
 
@@ -18122,3 +18128,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | SA | Pass the Sum a Callee Only Reads Whole: two `const` parameters of one integer type that a `static` function reads only as `(a+b)` become one parameter, each call passing `ea+eb` of side-effect-free operands; Lane: a | `image-append.c`'s `IsRightGapEdge` and `IsBottomGapEdge` (*Excess Number of Function Arguments*; probe 8.54 to 8.81) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | MX | Merge Axis Twins Through a Side Selector and a Struct of Two Parts: a chain of `static` functions and its other-axis mirror (columns for rows, swapped coordinate pairs, two struct types) become one chain over one struct with a side constant, `static inline` selectors and one function per swapped call; the two entries stay as one-call wrappers; Lane: a | `image-append.c`'s horizontal and vertical smush chains (*Code Duplication*, 8 functions; probe 8.81 to 10.0) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | HF | Hoist a Struct Fill That Both Paths Repeat: a member-by-member fill in an early-returning branch moves before the branch, and the later fill keeps only the members whose sources change in between; Lane: a | `log.c`'s `TranslateEvent` (nine `event_text` stores in the `xml` branch and in the format loop; with E, out of *Large Method*, probe 7.93 to 8.03) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | LF | Step 5, function form: a function body's leading run of `if (<test>) return;` (or `return(c);` of one constant) becomes one predicate call with the same exit; Lane: a | `utility.c`'s `ExpandFilename` (`path == NULL` and `*path != '~'` guards; cc 9, *Complex Method*) | mandate (2026-10-24) |
