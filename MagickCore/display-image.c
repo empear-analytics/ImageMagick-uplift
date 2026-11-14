@@ -11219,6 +11219,61 @@ static void XApplySolarizeCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplySwirlCommand(const XMagickCommandContext *context,
+  MagickStatusType *flags)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *swirl_image;
+
+  static char
+    degrees[MagickPathExtent] = "60";
+
+  /*
+    Query user for swirl angle.
+  */
+  (void) XDialogWidget(display,windows,"Swirl","Enter the swirl angle:",
+    degrees);
+  if (*degrees == '\0')
+    return;
+  /*
+    Swirl image pixels about the center.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(degrees,&geometry_info);
+  swirl_image=SwirlImage(*image,geometry_info.rho,(*image)->interpolate,
+    exception);
+  if (swirl_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=swirl_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyRollCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12383,41 +12438,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplySolarizeCommand(&context);
       break;
     case SwirlCommand:
-    {
-      Image
-        *swirl_image;
-
-      static char
-        degrees[MagickPathExtent] = "60";
-
-      /*
-        Query user for swirl angle.
-      */
-      (void) XDialogWidget(display,windows,"Swirl","Enter the swirl angle:",
-        degrees);
-      if (*degrees == '\0')
-        break;
-      /*
-        Swirl image pixels about the center.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      flags=ParseGeometry(degrees,&geometry_info);
-      swirl_image=SwirlImage(*image,geometry_info.rho,(*image)->interpolate,
-        exception);
-      if (swirl_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=swirl_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplySwirlCommand(&context,&flags);
       break;
-    }
     case ImplodeCommand:
     {
       Image
