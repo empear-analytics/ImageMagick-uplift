@@ -211,13 +211,18 @@ MagickExport MagickBooleanType DefineImageArtifact(Image *image,
 %    o artifact: the image artifact.
 %
 */
-MagickExport MagickBooleanType DeleteImageArtifact(Image *image,
-  const char *artifact)
+static void CheckArtifactImage(const Image *image)
 {
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+}
+
+MagickExport MagickBooleanType DeleteImageArtifact(Image *image,
+  const char *artifact)
+{
+  CheckArtifactImage(image);
   if (image->artifacts == (void *) NULL)
     return(MagickFalse);
   return(DeleteNodeFromSplayTree((SplayTreeInfo *) image->artifacts,artifact));
@@ -248,10 +253,7 @@ MagickExport MagickBooleanType DeleteImageArtifact(Image *image,
 */
 MagickExport void DestroyImageArtifacts(Image *image)
 {
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  CheckArtifactImage(image);
   if (image->artifacts != (void *) NULL)
     image->artifacts=(void *) DestroySplayTree((SplayTreeInfo *)
       image->artifacts);
@@ -292,10 +294,7 @@ MagickExport const char *GetImageArtifact(const Image *image,
   const char
     *p;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  CheckArtifactImage(image);
   p=(const char *) NULL;
   if (image->artifacts != (void *) NULL)
     {
@@ -338,10 +337,7 @@ MagickExport const char *GetImageArtifact(const Image *image,
 */
 MagickExport const char *GetNextImageArtifact(const Image *image)
 {
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  CheckArtifactImage(image);
   if (image->artifacts == (void *) NULL)
     return((const char *) NULL);
   return((const char *) GetNextKeyInSplayTree(
@@ -421,10 +417,7 @@ MagickExport char *RemoveImageArtifact(Image *image,const char *artifact)
 */
 MagickExport void ResetImageArtifactIterator(const Image *image)
 {
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  CheckArtifactImage(image);
   if (image->artifacts == (void *) NULL)
     return;
   ResetSplayTreeIterator((SplayTreeInfo *) image->artifacts);
@@ -467,10 +460,7 @@ MagickExport MagickBooleanType SetImageArtifact(Image *image,
   MagickBooleanType
     status;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  CheckArtifactImage(image);
   /*
     Create tree if needed - specify how key,values are to be freed.
   */

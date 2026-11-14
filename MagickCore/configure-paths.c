@@ -92,6 +92,61 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void AppendConfigurePathList(LinkedListInfo *paths,char *path,
+  char *configure_path)
+{
+  if (configure_path != (char *) NULL)
+    {
+      char
+        *p,
+        *q;
+
+      for (p=configure_path-1; p != (char *) NULL; )
+      {
+        (void) CopyMagickString(path,p+1,MagickPathExtent);
+        q=strchr(path,DirectoryListSeparator);
+        if (q != (char *) NULL)
+          *q='\0';
+        q=path+strlen(path)-1;
+        if ((q >= path) && (*q != *DirectorySeparator))
+          (void) ConcatenateMagickString(path,DirectorySeparator,
+            MagickPathExtent);
+        (void) AppendValueToLinkedList(paths,ConstantString(path));
+        p=strchr(p+1,DirectoryListSeparator);
+      }
+      configure_path=DestroyString(configure_path);
+    }
+}
+
+static void AppendXDGConfigPath(LinkedListInfo *paths,char *path,char *home)
+{
+  if (home != (char *) NULL)
+    {
+      /*
+        Search $XDG_CONFIG_HOME/ImageMagick.
+      */
+      (void) FormatLocaleString(path,MagickPathExtent,"%s%sImageMagick%s",
+        home,DirectorySeparator,DirectorySeparator);
+      (void) AppendValueToLinkedList(paths,ConstantString(path));
+      home=DestroyString(home);
+    }
+}
+
+static void AppendHomeConfigPath(LinkedListInfo *paths,char *path,char *home)
+{
+  if (home != (char *) NULL)
+    {
+      /*
+        Search $HOME/.config/ImageMagick.
+      */
+      (void) FormatLocaleString(path,MagickPathExtent,
+        "%s%s.config%sImageMagick%s",home,DirectorySeparator,
+        DirectorySeparator,DirectorySeparator);
+      (void) AppendValueToLinkedList(paths,ConstantString(path));
+      home=DestroyString(home);
+    }
+}
+
 MagickExport LinkedListInfo *GetConfigurePaths(const char *filename,
   ExceptionInfo *exception)
 {
@@ -115,27 +170,7 @@ MagickExport LinkedListInfo *GetConfigurePaths(const char *filename,
       Search $MAGICK_CONFIGURE_PATH.
     */
     configure_path=GetEnvironmentValue("MAGICK_CONFIGURE_PATH");
-    if (configure_path != (char *) NULL)
-      {
-        char
-          *p,
-          *q;
-
-        for (p=configure_path-1; p != (char *) NULL; )
-        {
-          (void) CopyMagickString(path,p+1,MagickPathExtent);
-          q=strchr(path,DirectoryListSeparator);
-          if (q != (char *) NULL)
-            *q='\0';
-          q=path+strlen(path)-1;
-          if ((q >= path) && (*q != *DirectorySeparator))
-            (void) ConcatenateMagickString(path,DirectorySeparator,
-              MagickPathExtent);
-          (void) AppendValueToLinkedList(paths,ConstantString(path));
-          p=strchr(p+1,DirectoryListSeparator);
-        }
-        configure_path=DestroyString(configure_path);
-      }
+    AppendConfigurePathList(paths,path,configure_path);
   }
 #if defined(MAGICKCORE_INSTALLED_SUPPORT)
 #if defined(MAGICKCORE_SHARE_PATH)
@@ -244,28 +279,9 @@ MagickExport LinkedListInfo *GetConfigurePaths(const char *filename,
     if (home == (char *) NULL)
       home=GetEnvironmentValue("USERPROFILE");
 #endif
-    if (home != (char *) NULL)
-      {
-        /*
-          Search $XDG_CONFIG_HOME/ImageMagick.
-        */
-        (void) FormatLocaleString(path,MagickPathExtent,"%s%sImageMagick%s",
-          home,DirectorySeparator,DirectorySeparator);
-        (void) AppendValueToLinkedList(paths,ConstantString(path));
-        home=DestroyString(home);
-      }
+    AppendXDGConfigPath(paths,path,home);
     home=GetEnvironmentValue("HOME");
-    if (home != (char *) NULL)
-      {
-        /*
-          Search $HOME/.config/ImageMagick.
-        */
-        (void) FormatLocaleString(path,MagickPathExtent,
-          "%s%s.config%sImageMagick%s",home,DirectorySeparator,
-          DirectorySeparator,DirectorySeparator);
-        (void) AppendValueToLinkedList(paths,ConstantString(path));
-        home=DestroyString(home);
-      }
+    AppendHomeConfigPath(paths,path,home);
   }
 #if defined(MAGICKCORE_WINDOWS_SUPPORT)
   {

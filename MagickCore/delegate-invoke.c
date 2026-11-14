@@ -1330,6 +1330,16 @@ static inline MagickBooleanType IsDelegateNameDenied(const char *name)
      MagickFalse)) ? MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType AuthorizeDelegateNames(const char *decode,
+  const char *encode,ExceptionInfo *exception)
+{
+  if (IsDelegateNameDenied(decode) != MagickFalse)
+    ThrowPolicyException(decode,MagickFalse);
+  if (IsDelegateNameDenied(encode) != MagickFalse)
+    ThrowPolicyException(encode,MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType AcquireDelegateInputFilename(Image *image,
   const MagickBooleanType temporary,ExceptionInfo *exception)
 {
@@ -1377,10 +1387,8 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (IsDelegateNameDenied(decode) != MagickFalse)
-    ThrowPolicyException(decode,MagickFalse);
-  if (IsDelegateNameDenied(encode) != MagickFalse)
-    ThrowPolicyException(encode,MagickFalse);
+  if (AuthorizeDelegateNames(decode,encode,exception) == MagickFalse)
+    return(MagickFalse);
   temporary=(*image->filename == '\0') ? MagickTrue : MagickFalse;
   if (AcquireDelegateInputFilename(image,temporary,exception) == MagickFalse)
     return(MagickFalse);
@@ -1397,16 +1405,10 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
     return(MagickFalse);
   if (IsTwoStepDelegate(delegate_info,decode,encode) != MagickFalse)
     {
-      DelegateInvocation
-        request;
+      const DelegateInvocation
+        request = { image_info, image, decode, encode, exception,
+          delegate_info, temporary };
 
-      request.image_info=image_info;
-      request.image=image;
-      request.decode=decode;
-      request.encode=encode;
-      request.exception=exception;
-      request.delegate_info=delegate_info;
-      request.temporary=temporary;
       if (ConvertDelegateInput(&request) == MagickFalse)
         return(MagickFalse);
     }

@@ -218,23 +218,12 @@ static void *GetRegistryValueAsString(const RegistryInfo *registry_info)
 %    o exception: the exception.
 %
 */
-MagickExport void *GetImageRegistry(const RegistryType type,const char *key,
-  ExceptionInfo *exception)
+static void *CloneRegistryValue(const RegistryType type,
+  const RegistryInfo *registry_info,ExceptionInfo *exception)
 {
   void
     *value;
 
-  RegistryInfo
-    *registry_info;
-
-  assert(key != (const char *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",key);
-  if (registry == (void *) NULL)
-    return((void *) NULL);
-  registry_info=(RegistryInfo *) GetValueFromSplayTree(registry,key);
-  if (registry_info == (void *) NULL)
-    return((void *) NULL);
   value=(void *) NULL;
   switch (type)
   {
@@ -259,6 +248,23 @@ MagickExport void *GetImageRegistry(const RegistryType type,const char *key,
       break;
   }
   return(value);
+}
+
+MagickExport void *GetImageRegistry(const RegistryType type,const char *key,
+  ExceptionInfo *exception)
+{
+  RegistryInfo
+    *registry_info;
+
+  assert(key != (const char *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",key);
+  if (registry == (void *) NULL)
+    return((void *) NULL);
+  registry_info=(RegistryInfo *) GetValueFromSplayTree(registry,key);
+  if (registry_info == (void *) NULL)
+    return((void *) NULL);
+  return(CloneRegistryValue(type,registry_info,exception));
 }
 
 /*
@@ -444,7 +450,6 @@ static void *DestroyRegistryNode(void *registry_info)
   p=(RegistryInfo *) registry_info;
   switch (p->type)
   {
-    case StringRegistryType:
     default:
     {
       p->value=RelinquishMagickMemory(p->value);
@@ -478,12 +483,50 @@ static void InstantiateRegistry(void)
     }
 }
 
-MagickExport MagickBooleanType SetImageRegistry(const RegistryType type,
-  const char *key,const void *value,ExceptionInfo *exception)
+static void *CloneRegistryString(const char *key,const void *value)
+{
+  const char
+    *string;
+
+  string=(const char *) value;
+  if (LocaleCompare(key,"date:precision") == 0)
+    SetMagickDatePrecision((size_t) StringToInteger(string));
+  return((void *) ConstantString(string));
+}
+
+static MagickBooleanType AddRegistryValue(const RegistryType type,
+  const char *key,void *clone_value)
 {
   RegistryInfo
     *registry_info;
 
+  if (clone_value == (void *) NULL)
+    return(MagickFalse);
+  registry_info=(RegistryInfo *) AcquireCriticalMemory(sizeof(*registry_info));
+  (void) memset(registry_info,0,sizeof(*registry_info));
+  registry_info->type=type;
+  registry_info->value=clone_value;
+  registry_info->signature=MagickCoreSignature;
+  InstantiateRegistry();
+  return(AddValueToSplayTree(registry,ConstantString(key),registry_info));
+}
+
+static inline MagickBooleanType IsInvalidRegistryImage(const Image *image)
+{
+  return(((image == (const Image *) NULL) ||
+    (image->signature != MagickCoreSignature)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsInvalidRegistryImageInfo(
+  const ImageInfo *image_info)
+{
+  return(((image_info == (const ImageInfo *) NULL) ||
+    (image_info->signature != MagickCoreSignature)) ? MagickTrue : MagickFalse);
+}
+
+MagickExport MagickBooleanType SetImageRegistry(const RegistryType type,
+  const char *key,const void *value,ExceptionInfo *exception)
+{
   void
     *clone_value;
 
@@ -495,16 +538,9 @@ MagickExport MagickBooleanType SetImageRegistry(const RegistryType type,
   clone_value=(void *) NULL;
   switch (type)
   {
-    case StringRegistryType:
     default:
     {
-      const char
-        *string;
-
-      string=(const char *) value;
-      if (LocaleCompare(key,"date:precision") == 0)
-        SetMagickDatePrecision((size_t) StringToInteger(string));
-      clone_value=(void *) ConstantString(string);
+      clone_value=CloneRegistryString(key,value);
       break;
     }
     case ImageRegistryType:
@@ -513,8 +549,7 @@ MagickExport MagickBooleanType SetImageRegistry(const RegistryType type,
         *image;
 
       image=(const Image *) value;
-      if ((image == (const Image *) NULL) ||
-          (image->signature != MagickCoreSignature))
+      if (IsInvalidRegistryImage(image) != MagickFalse)
         {
           (void) ThrowMagickException(exception,GetMagickModule(),RegistryError,
             "UnableToSetRegistry","%s",key);
@@ -529,8 +564,7 @@ MagickExport MagickBooleanType SetImageRegistry(const RegistryType type,
         *image_info;
 
       image_info=(const ImageInfo *) value;
-      if ((image_info == (const ImageInfo *) NULL) ||
-          (image_info->signature != MagickCoreSignature))
+      if (IsInvalidRegistryImageInfo(image_info) != MagickFalse)
         {
           (void) ThrowMagickException(exception,GetMagickModule(),RegistryError,
             "UnableToSetRegistry","%s",key);
@@ -540,13 +574,5 @@ MagickExport MagickBooleanType SetImageRegistry(const RegistryType type,
       break;
     }
   }
-  if (clone_value == (void *) NULL)
-    return(MagickFalse);
-  registry_info=(RegistryInfo *) AcquireCriticalMemory(sizeof(*registry_info));
-  (void) memset(registry_info,0,sizeof(*registry_info));
-  registry_info->type=type;
-  registry_info->value=clone_value;
-  registry_info->signature=MagickCoreSignature;
-  InstantiateRegistry();
-  return(AddValueToSplayTree(registry,ConstantString(key),registry_info));
+  return(AddRegistryValue(type,key,clone_value));
 }

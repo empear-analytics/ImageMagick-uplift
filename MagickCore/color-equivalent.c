@@ -114,12 +114,118 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _EquivalentSearch
+{
+  const Image
+    *image,
+    *target_image;
+
+  CacheView
+    *image_view,
+    *target_view;
+
+  ssize_t
+    *x_offset,
+    y;
+
+  ExceptionInfo
+    *exception;
+} EquivalentSearch;
+
+static ssize_t MatchEquivalentTarget(const EquivalentSearch *search,
+  const ssize_t x,PixelInfo *pixel,PixelInfo *target)
+{
+  const Image
+    *const image = search->image,
+    *const target_image = search->target_image;
+
+  CacheView
+    *const image_view = search->image_view,
+    *const target_view = search->target_view;
+
+  const ssize_t
+    y = search->y;
+
+  ExceptionInfo
+    *const exception = search->exception;
+
+  const Quantum
+    *p,
+    *q;
+
+  ssize_t
+    i,
+    j;
+
+  for (j=0; j < (ssize_t) target_image->rows; j++)
+  {
+    for (i=0; i < (ssize_t) target_image->columns; i++)
+    {
+      p=GetCacheViewVirtualPixels(image_view,x+i,y+j,1,1,exception);
+      if (p == (const Quantum *) NULL)
+        break;
+      GetPixelInfoPixel(image,p,pixel);
+      q=GetCacheViewVirtualPixels(target_view,i,j,1,1,exception);
+      if (q == (const Quantum *) NULL)
+        break;
+      GetPixelInfoPixel(image,q,target);
+      if (IsFuzzyEquivalencePixelInfo(pixel,target) == MagickFalse)
+        break;
+    }
+    if (i < (ssize_t) target_image->columns)
+      break;
+  }
+  return(j);
+}
+
+static ssize_t ScanEquivalentRow(const EquivalentSearch *search,
+  PixelInfo *pixel,PixelInfo *target)
+{
+  const Image
+    *const image = search->image,
+    *const target_image = search->target_image;
+
+  ssize_t
+    *const x_offset = search->x_offset;
+
+  const ssize_t
+    y = search->y;
+
+  ssize_t
+    j,
+    x;
+
+  for (x=y == 0 ? *x_offset : 0; x < (ssize_t) image->columns; x++)
+  {
+    j=MatchEquivalentTarget(search,x,pixel,target);
+    if (j == (ssize_t) target_image->rows)
+      break;
+  }
+  return(x);
+}
+
+static MagickBooleanType SetEquivalentProgress(const Image *image,
+  const ssize_t y,MagickBooleanType status)
+{
+#define SearchImageText  "  Searching image...  "
+
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      proceed=SetImageProgress(image,SearchImageText,(MagickOffsetType) y,
+        image->rows);
+      if (proceed == MagickFalse)
+        status=MagickFalse;
+    }
+  return(status);
+}
+
 MagickExport MagickBooleanType IsEquivalentImage(const Image *image,
   const Image *target_image,ssize_t *x_offset,ssize_t *y_offset,
   ExceptionInfo *exception)
 {
-#define SearchImageText  "  Searching image...  "
-
   CacheView
     *image_view,
     *target_view;
@@ -131,16 +237,10 @@ MagickExport MagickBooleanType IsEquivalentImage(const Image *image,
     target,
     pixel;
 
-  const Quantum
-    *p,
-    *q;
-
   ssize_t
-    i,
     x;
 
   ssize_t
-    j,
     y;
 
   assert(image != (Image *) NULL);
@@ -160,41 +260,20 @@ MagickExport MagickBooleanType IsEquivalentImage(const Image *image,
   target_view=AcquireVirtualCacheView(target_image,exception);
   for (y=(*y_offset); y < (ssize_t) image->rows; y++)
   {
-    for (x=y == 0 ? *x_offset : 0; x < (ssize_t) image->columns; x++)
-    {
-      for (j=0; j < (ssize_t) target_image->rows; j++)
-      {
-        for (i=0; i < (ssize_t) target_image->columns; i++)
-        {
-          p=GetCacheViewVirtualPixels(image_view,x+i,y+j,1,1,exception);
-          if (p == (const Quantum *) NULL)
-            break;
-          GetPixelInfoPixel(image,p,&pixel);
-          q=GetCacheViewVirtualPixels(target_view,i,j,1,1,exception);
-          if (q == (const Quantum *) NULL)
-            break;
-          GetPixelInfoPixel(image,q,&target);
-          if (IsFuzzyEquivalencePixelInfo(&pixel,&target) == MagickFalse)
-            break;
-        }
-        if (i < (ssize_t) target_image->columns)
-          break;
-      }
-      if (j == (ssize_t) target_image->rows)
-        break;
-    }
+    EquivalentSearch
+      search;
+
+    search.image=image;
+    search.target_image=target_image;
+    search.image_view=image_view;
+    search.target_view=target_view;
+    search.x_offset=x_offset;
+    search.y=y;
+    search.exception=exception;
+    x=ScanEquivalentRow(&search,&pixel,&target);
     if (x < (ssize_t) image->columns)
       break;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-        proceed=SetImageProgress(image,SearchImageText,(MagickOffsetType) y,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
+    status=SetEquivalentProgress(image,y,status);
   }
   target_view=DestroyCacheView(target_view);
   image_view=DestroyCacheView(image_view);

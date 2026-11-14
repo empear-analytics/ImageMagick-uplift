@@ -93,6 +93,12 @@ Never, in any commit:
   quoted in the commit, plus the cases that reach it run with `OMP_NUM_THREADS=1` and
   `=4` and compared; an NS step may accept a reached function whose object code differs;
   an error call moved into a helper may name the helper in `GetMagickModule()`.
+  Rulings of 2026-11-13 (owner): a function's opening block, its `LogMagickEvent(TraceEvent,
+  GetMagickModule(),...)` call included, may move into a helper, so that trace logs name the
+  helper; and the `%` doc-comment banners above functions may be shortened or reworded by a
+  recipe (guard level: `tools/obj_identical.sh` IDENTICAL, no code token changed), keeping
+  what each says about the API, where CodeScene counts their near-identical text as Code
+  Duplication.
 - Modify a `static const` data table.
 - Fix a bug you noticed. Report it.
 

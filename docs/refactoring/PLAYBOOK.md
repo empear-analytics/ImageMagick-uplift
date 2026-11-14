@@ -1548,6 +1548,18 @@ merges code, not parameters.
 7. At each call, replace the group with `&name`, and check by reading that every member
    is initialised from the argument it replaces.
 8. Build: a call left with the old arguments does not compile.
+   Existing input struct (2026-11-13). When every caller is a helper that binds `const`
+   locals from the members of one `const Name *name` input struct of Recipe N (step 4's
+   form), and the group's arguments at every call are exactly such locals, each bound
+   from the member of its own name and type (`AppendTokenChar(token,extent,...)` in
+   helpers that bind `token = input->token` and `extent = input->extent`), the group
+   may be replaced by `const Name *name` itself instead of a new struct, although `Name`
+   has members the group lacks: the callee binds the group's members as `const` locals
+   of their old names (step 3), and each call passes `name` for the group. A caller's
+   local bound only for those calls, now unused, is deleted with its binding (Recipe DV
+   step 3's reasoning: `-Wunused-variable` shows it). The callee reads the same members
+   of the same struct the caller read, which nothing writes, so each use sees the value
+   the argument carried.
 
 **Before:**
 
@@ -13066,7 +13078,10 @@ keep every label.
 1. The `switch (e)` lies outside every OpenMP region and holds no `#` line; `e` is a
    variable or parameter of an integer or enumeration type, or an expression with no call,
    assignment or increment, and nothing in the `switch` writes what it reads. Every label
-   is an integer literal or an enumeration constant, or `default:`. Each group but the
+   is an integer literal, an enumeration constant or a character constant, or `default:`
+   (2026-11-13: a character constant has type `int` in C, so `key` is `int` and keeps the
+   value the `case` compared with the promoted `e`, as Recipe TB's *Integer labels* says;
+   `string-si.c`'s `GetSiPrefixExponent`, keyed on `(int) ((unsigned char) *q)`). Each group but the
    `default:` one is one or more labels followed by `v=c;` and `break;`, the same variable
    `v` in every group, `c` a numeric literal (comments aside); no group falls through. The
    `default:` group, whatever its statements, ends with `break;` or falls out of the
@@ -14898,6 +14913,320 @@ Lane: b
 
 ---
 
+## Recipe RS - Extract a Loop Body of Status-Call Exits, Returning the Calls' Status
+
+**Use when:** CodeScene reports *Complex Method* or *Bumpy Road Ahead* on a function whose
+sequential loop's body is a dispatch: a run of tests, each holding a call of a helper that
+returns `MagickBooleanType`, an exit `return(c);` (one constant `c`) when it returns
+`MagickFalse`, and `continue;` otherwise, as `token.c`'s `Tokenizer` is once its four
+character classes are helpers: `if (i >= 0) { if (TokenizeBreakChar(...) == MagickFalse)
+return(0); continue; }` three times over, then `if (TokenizeTokenChar(...) ==
+MagickFalse) return(0);` at the body's end. Each such `if` in an `if` is a bump.
+
+**Not covered by:** Recipe CR (b), which moves the same body but keeps each `if (H(...) ==
+MagickFalse) return(MagickFalse); return(MagickTrue);` pair as two statements, so the new
+function keeps every bump and is refused by the gate; Recipe BC, whose block leaves through
+`break;` and has no `return`; Recipe LC, whose block is followed by statements that stay.
+
+**How:**
+
+1. The block is the whole body of a sequential loop `Lp`, outside every OpenMP region, with
+   no `#` line. It holds no `goto` and no `break` that leaves it; every `continue;` in it
+   continues `Lp`; every `return` in it is `return(c);` with one constant `c`, written
+   alike.
+2. Variables of the caller that the block writes: temporaries it writes before reading
+   that nothing after it reads (the character `c`, the index `i`) are declared in the new
+   function (Recipe E step 4); it writes nothing else of the caller but through pointers
+   it already uses or through members of an input struct the caller already passes to
+   the helpers it calls (Recipe N step 8's siblings), which the new function takes in
+   their place, unchanged, binding the members the block reads (`const` locals of their
+   own names, Recipe N step 4). At most four parameters.
+3. Cut the body into a new `static MagickBooleanType` function directly above the caller,
+   as Recipe CR step 3 says: each `continue;` becomes `return(MagickTrue);`, each
+   `return(c);` becomes `return(MagickFalse);`, and the function ends with
+   `return(MagickTrue);`. A call that passed `&name` passes `name`.
+4. Then, in the new function only, each pair `if (H(...) == MagickFalse)
+   return(MagickFalse);` followed directly by `return(MagickTrue);` (or by the function's
+   end, which returns `MagickTrue`) becomes `return(H(...));`, where `H` is a `static`
+   function of the file every `return` of which returns the literal `MagickTrue` or
+   `MagickFalse` (checked by reading `H`'s body). A pair inside braces loses the braces
+   when nothing else is left in them.
+5. Where the body stood write `if (Helper(...) == MagickFalse) return(c);` as `Lp`'s whole
+   body, and check every argument by reading.
+
+**Before:**
+
+```c
+  for (token_info->offset=0; (int) line[*next] != 0; (*next)++)
+  {
+    c=(int) line[*next];
+    i=sindex(c,break_set);
+    if (i >= 0)
+      {
+        if (TokenizeBreakChar(&tokenizer,c,i) == MagickFalse)
+          return(0);
+        continue;
+      }
+    ...
+    if (TokenizeTokenChar(&tokenizer,c) == MagickFalse)
+      return(0);
+  }
+```
+
+**After:**
+
+```c
+static MagickBooleanType TokenizeChar(const TokenizerState *tokenizer)
+{
+  ...
+  c=(int) line[*next];
+  i=sindex(c,break_set);
+  if (i >= 0)
+    return(TokenizeBreakChar(tokenizer,c,i));
+  ...
+  return(TokenizeTokenChar(tokenizer,c));
+}
+...
+  for (token_info->offset=0; (int) line[*next] != 0; (*next)++)
+    if (TokenizeChar(&tokenizer) == MagickFalse)
+      return(0);
+```
+
+**Careful:**
+
+- Steps 1 to 3 are Recipe CR (b): the helper runs the body's statements up to the exit the
+  body took; `return(MagickTrue);` is followed by the caller's loop step, as `continue;`
+  was, and `return(MagickFalse);` by the caller's `return(c);`.
+- Step 4: when `H` returns `MagickFalse`, both forms return `MagickFalse`; when it returns
+  `MagickTrue`, the pair falls to `return(MagickTrue);` and the new form returns `H`'s
+  `MagickTrue`. `H` returns no other value (step 4's reading), so the two forms return the
+  same value on every path, and `H` is called once, at the same point, in both. The
+  caller tests `== MagickFalse`, as before.
+- A pair whose `return(MagickTrue);` does not follow directly (a statement between) is
+  left as it is.
+
+**Evidence level:** oracle, for the caller (`casemap.py` first), with
+`refactor_guard.py --calls` and step 4's reading of each `H`.
+
+**Provenance:** 2026-11-13, from `token.c`'s `Tokenizer` (campaign B, M127 lane c round
+4): after Recipe Y moved its four character classes into helpers, the body is three
+`if (i >= 0) { if (H(...) == MagickFalse) return(0); continue; }` dispatches (three bumps,
+cc 15); CR alone would move all three bumps into the new function. Added by Claude Code
+(Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: c
+
+---
+
+## Recipe IX - Inline a Constant Extent Local into Its Loop Bound
+
+**Use when:** CodeScene reports *Code Duplication* between short functions of one file
+that each declare an extent local, set it from the same integer constant expression and
+use it only as a loop bound, as `static.c`'s `UnregisterStaticModule` and
+`UnregisterStaticModules` do with `extent=sizeof(MagickModules)/sizeof(MagickModules[0]);`
+once Recipe D has moved their shared loop body to a helper.
+
+**Not covered by:** Recipe D, which moves a duplicated block to a helper (here the
+duplicated text is a declaration and one assignment, and a helper returning the constant
+would be one more copy); Recipe RT, which rolls a run of copies into a table loop; Recipe
+DV, which drops a parameter, not a local.
+
+**How:**
+
+1. The local `n` is of an unsigned integer type, declared in the function and assigned
+   exactly once, by `n=<expr>;` where `<expr>` is an integer constant expression built
+   only from `sizeof` of file-scope objects or types, integer literals and `/` or `*`
+   (no call, no variable read).
+2. Every other use of `n` reads it, after the assignment, in the controlling expression
+   of a `for` loop (`i < (ssize_t) n`); its address is not taken and nothing assigns it
+   again.
+3. Replace each read `n` by `(<expr>)`, parenthesised, keeping every cast around it
+   as written: `i < (ssize_t) (sizeof(A)/sizeof(A[0]))`.
+4. Delete the assignment and the declaration of `n`.
+5. Run `sh tools/obj_identical.sh <file>`: it must print `IDENTICAL`; otherwise revert.
+   Run `tools/ci_warnings.sh <file>` and `tools/cxx_warnings.sh <file>`: both `OK`.
+
+**Before:**
+
+```c
+MagickExport void UnregisterStaticModules(void)
+{
+  size_t
+    extent;
+
+  ssize_t
+    i;
+
+  extent=sizeof(MagickModules)/sizeof(MagickModules[0]);
+  for (i=0; i < (ssize_t) extent; i++)
+    UnregisterStaticModuleEntry(i);
+}
+```
+
+**After:**
+
+```c
+MagickExport void UnregisterStaticModules(void)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) (sizeof(MagickModules)/sizeof(MagickModules[0])); i++)
+    UnregisterStaticModuleEntry(i);
+}
+```
+
+**Careful:**
+
+- Why the behaviour is the same. `<expr>` is an integer constant expression of type
+  `size_t` (step 1), so `n` held that value from its assignment on and nothing changed it
+  (step 2); the parenthesised expression has the same value and type as the local, and
+  the cast converts it as it converted `n`. Evaluating it again on each test reads
+  nothing and writes nothing.
+- An expression that reads a variable, calls a function or depends on a variable-length
+  array is not constant: step 1 refuses it.
+- The object code is the compiler's to judge; step 5 is the proof.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
+`HEAD` and `tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`.
+
+**Provenance:** 2026-11-13, from `static.c`'s `UnregisterStaticModules` (campaign B,
+M127 lane b round 4): after Recipe D the file kept *Code Duplication* between
+`UnregisterStaticModule` and `UnregisterStaticModules`; the probe 9.09 to 9.68, object
+code identical. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
+
+---
+
+## Recipe TR - Extract a Loop Whose Throw Resumes It
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Complex
+Method* or *Large Method*, and the block that would fix it is a `while` loop that reports
+an error with `ThrowMagickException(...GetMagickModule()...)` as one statement of its body
+and then goes on looping, as the include loops of `type.c`'s `LoadTypeCache` and
+`policy.c`'s `LoadPolicyCache` do (`if (depth >= MagickMaxRecursionDepth)
+(void) ThrowMagickException(...,"IncludeNodeNestedTooDeeply",...); else
+status&=(MagickStatusType) LoadTypeInclude(...);`, the last statement of the body).
+
+**Not covered by:** Recipes E, N, O and LC, which would move the throw into the helper,
+where `GetMagickModule()` names the helper, against the rule that a throw stays in the
+function that holds it; Recipe LB, whose `break;` ends the loop, while here the loop goes
+on after the throw; Recipe EX, whose exits leave the block, while the throw is no exit;
+Recipe LT, whose test after the loop repeats its condition.
+
+**How:**
+
+1. The loop is `while (C) B` outside every OpenMP region, with no `#` line in it. `C`
+   has no side effect but through the calls it makes, and `B` contains no `return`,
+   `goto` or `break` that leaves the loop; a `continue;` of the loop stays as it is. The
+   throw is one statement `T;` of `B` whose expression is a call of
+   `ThrowMagickException` with operands that are constants or variables that neither `C`
+   nor `B` writes but through a pointer the helper also holds, and after `T` nothing in
+   `B` runs on its path: it is the last statement of `B`, or the whole branch of an
+   `if`/`else` (or of `if` statements nested so) that is the last statement of `B`,
+   checked by reading.
+2. The variables of the caller that the loop writes and that the caller reads after it,
+   a cursor `q` say, meet Recipe O step 2 and go by pointer, written `(*v)` at every
+   use and `&v` passed on written `v`; an array or a buffer the loop only writes through
+   (`keyword`, `token`) goes as a pointer member of the input struct. What the loop only
+   reads goes in a `const` input struct (Recipe N steps 2 to 6) whose local is declared
+   with an initialiser (Recipe FI step 4) at the top of the block that holds the loop,
+   when every value is fixed there; at most four parameters in all.
+3. Cut the loop into a new `static MagickBooleanType` function directly above the caller.
+   `T;` becomes `return(MagickFalse);`, and the function ends with `return(MagickTrue);`
+   after the loop. Nothing else in the text changes.
+4. Where the loop stood, write `while (Helper(...) == MagickFalse) T;`, `T` unchanged.
+   Check every argument and member against its parameter by reading, and that `T` names
+   only what step 1 allows.
+
+**Before:**
+
+```c
+    if (LocaleCompare(keyword,"<include") == 0)
+      {
+        /*
+          Include element.
+        */
+        while (IsIncludeElementOpen(token,q) != MagickFalse)
+        {
+          if (IsIncludeFileAttribute(&q,extent,keyword,token) == MagickFalse)
+            continue;
+          if (depth >= MagickMaxRecursionDepth)
+            (void) ThrowMagickException(exception,GetMagickModule(),
+              ConfigureError,"IncludeNodeNestedTooDeeply","`%s'",token);
+          else
+            status&=(MagickStatusType) LoadTypeInclude(target,filename,token,
+              depth);
+        }
+        continue;
+      }
+```
+
+**After:**
+
+```c
+static MagickBooleanType LoadTypeIncludes(const TypeIncludeScan *scan,
+  const char **q,MagickStatusType *status)
+{
+  while (IsIncludeElementOpen(scan->token,*q) != MagickFalse)
+  {
+    if (IsIncludeFileAttribute(q,scan->extent,scan->keyword,scan->token) ==
+        MagickFalse)
+      continue;
+    if (scan->depth >= MagickMaxRecursionDepth)
+      return(MagickFalse);
+    else
+      *status&=(MagickStatusType) LoadTypeInclude(scan->target,
+        scan->filename,scan->token,scan->depth);
+  }
+  return(MagickTrue);
+}
+...
+    if (LocaleCompare(keyword,"<include") == 0)
+      {
+        const TypeIncludeScan
+          scan = { target, filename, depth, extent, keyword, token };
+
+        /*
+          Include element.
+        */
+        while (LoadTypeIncludes(&scan,&q,&status) == MagickFalse)
+          (void) ThrowMagickException(exception,GetMagickModule(),
+            ConfigureError,"IncludeNodeNestedTooDeeply","`%s'",token);
+        continue;
+      }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. Before, after `T` the iteration ends (step 1), so the
+  next thing the loop does is evaluate `C`. After, the helper returns at the point where
+  `T` stood, having run the same statements; the caller runs `T`, the same call with the
+  same operands (none of them written but through the pointers the caller shares), and
+  calls the helper again, which starts by evaluating `C` on the same state, since every
+  variable the loop carries lives in the caller and travels by pointer. When `C` is
+  false the helper returns `MagickTrue` and the caller's `while` ends, as the loop did.
+  A path that never reaches `T` is the old loop run once.
+- The throw stays in the caller: `GetMagickModule()` names the same function and line
+  range as before, so the exception text is unchanged.
+- The input struct holds copies taken where nothing writes them again before the loop
+  ends (step 2): `keyword` and `token` are pointers whose targets the loop writes through,
+  as it did, and whose values do not change.
+- The number of calls to the helper grows by one per throw; it has no state of its own.
+
+**Evidence level:** oracle (the cases that reach the caller), with steps 1 and 2 checked
+by reading and `refactor_guard.py --calls` (`+2` for the new function: its definition and
+its call). The throw itself is usually reached by no case (a recursion limit): check by
+reading that its text is unchanged.
+
+**Provenance:** 2026-11-13, from `type.c`'s `LoadTypeCache` (campaign B, M127 lane a
+round 3): the include loop's throw was what held the earlier passes (M121: "throw in the
+include loop"); a probe of this step took the function out of *Deep, Nested Complexity*,
+6.90 to 7.39. The same loop stands in `policy.c`'s `LoadPolicyCache`. Added by Claude
+Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: a
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -16291,3 +16620,8 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | NEW | KP | Peel a run of one-label groups that OR a different enumeration constant into a flags variable out of a loop's character `switch`, through a `static const` table of `{ key, flag }` and a lookup before the `switch`; evidence oracle; Lane: b | `geometry-parse.c`'s `GetGeometry` and `ParseGeometry` (seven meta characters each; probe 7.40 to 7.60); PA needs one shared body, KL a string and a numeric literal | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | W | Step 2: `R` may be a plain local of the caller that the block neither writes nor takes the address of; Lane: b | `splay-tree.c`'s `RemoveNodeFromSplayTree` (`return(value);`, `value` set before the block), the twin of `DeleteNodeFromSplayTree`'s `return(MagickFalse);` block (probe 8.54 to 8.81) | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | RT | Step 8: copies differing in a numeric and a string literal (a table of two-member records), each writing its own renamed local, in a `void` caller whose exits are `return;`; Lane: b | `resource.c`'s `FormatTimeToLive` (six unit copies); with it the file's line budget admits the helpers of `AcquireMagickResource` (probe 8.46 to 8.97 over three steps) | mandate (2026-10-24) |
+| 2026-11-13 | NEW | IX | Inline a Constant Extent Local into Its Loop Bound: a local set once from an integer constant expression of `sizeof`s and read only in `for` bounds is replaced by the parenthesised expression; evidence guard (`obj_identical.sh`); Lane: b | `static.c`'s `UnregisterStaticModules` (after Recipe D, *Code Duplication* with `UnregisterStaticModule` left; probe 9.09 to 9.68, object code identical) | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | KC | Step 1: a label may be a character constant (type `int`; `key` of type `int`); Lane: b | `string-si.c`'s `GetSiPrefixExponent` (twenty-four letter labels each assigning a `double` exponent, cc 26; probe 8.50 to 9.09) | mandate (2026-10-24) |
+| 2026-11-13 | NEW | RS | Extract a Loop Body of Status-Call Exits, Returning the Calls' Status: a sequential loop's whole body whose exits are `continue;` and `return(c);` after status calls moves as in Recipe CR (b), and in the new function each `if (H(...) == MagickFalse) return(MagickFalse); return(MagickTrue);` pair becomes `return(H(...));` when `H` returns only `MagickTrue` or `MagickFalse`; evidence oracle | `token.c`'s `Tokenizer` (cc 15, three bumps after Recipe Y); CR alone keeps the bumps in the new function | mandate (2026-10-24) |
+| 2026-11-13 | AMEND | B | Existing input struct: when every caller binds the group's arguments as `const` locals from one Recipe N input struct, the group may become that struct's pointer instead of a new struct (members the group lacks are allowed); the callers' bindings left unused are deleted | `token-next.c`'s `AppendTokenChar(token,extent,p,i)`, called only from the `Scan*Token` helpers that bind `token` and `extent` from `NextTokenInput`: *String Heavy Function Arguments* leaves the file, 9.09 to 9.38 in a probe | mandate (2026-10-24) |
+| 2026-11-13 | NEW | TR | Extract a `while` loop whose body reports an error through `ThrowMagickException` and goes on looping: the throw becomes `return(MagickFalse);` in the helper and the caller writes `while (Helper(...) == MagickFalse) T;`, so the throw stays in its function; evidence oracle; Lane: a | `type.c`'s `LoadTypeCache` (include loop; probe 6.90 to 7.39, out of *Deep, Nested Complexity*) and `policy.c`'s `LoadPolicyCache` (the same loop) | mandate (2026-10-24) |
