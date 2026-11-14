@@ -25232,6 +25232,32 @@ static MagickBooleanType XCheckMappedImageTimer(
   return(MagickFalse);
 }
 
+static MagickBooleanType XNextDisplayEvent(const DisplayEventContext *context,
+  const DisplayEventTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  XEvent
+    *const event = targets->event;
+
+  time_t
+    timestamp;
+
+  if (XCheckMappedImageTimer(context,targets) != MagickFalse)
+    return(MagickTrue);
+  timestamp=GetMagickTime();
+  (void) XNextEvent(display,event);
+  XUpdateWindowStasis(windows,timestamp);
+  if (XSelectCommandWidgetEvent(context,targets) !=
+      MagickFalse)
+    return(MagickTrue);
+  return(MagickFalse);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -25264,7 +25290,6 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
 
   time_t
     timer,
-    timestamp,
     update_time;
 
   WarningHandler
@@ -25434,13 +25459,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
     /*
       Handle a window event.
     */
-    if (XCheckMappedImageTimer(&event_context,&event_targets) != MagickFalse)
-      continue;
-    timestamp=GetMagickTime();
-    (void) XNextEvent(display,&event);
-    XUpdateWindowStasis(windows,timestamp);
-    if (XSelectCommandWidgetEvent(&event_context,&event_targets) !=
-        MagickFalse)
+    if (XNextDisplayEvent(&event_context,&event_targets) != MagickFalse)
       continue;
     switch (event.type)
     {
