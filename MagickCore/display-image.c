@@ -22929,14 +22929,82 @@ static void XMakeMagnifyWindow(const DisplayEventContext *context,
       "Window id: 0x%lx (magnify)",windows->magnify.id);
 }
 
+static void XMakePanWindow(const DisplayEventContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  XPixelInfo
+    *const pixel = context->pixel;
+
+  XStandardColormap
+    *const map_info = context->map_info;
+
+  const Window
+    root_window = context->root_window;
+
+  XVisualInfo
+    *const visual_info = context->visual_info;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  char
+    **const argv = context->argv;
+
+  const int
+    argc = context->argc;
+
+  XClassHint
+    *const class_hints = context->class_hints;
+
+  XWMHints
+    *const manager_hints = context->manager_hints;
+
+  char
+    resource_name[MagickPathExtent];
+
+  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
+    resource_info,&windows->pan);
+  (void) CloneString(&windows->pan.name,"Pan Icon");
+  windows->pan.width=windows->icon.width;
+  windows->pan.height=windows->icon.height;
+  (void) FormatLocaleString(resource_name,MagickPathExtent,"%s.pan",
+    resource_info->client_name);
+  windows->pan.geometry=XGetResourceClass(resource_info->resource_database,
+    resource_name,"geometry",(char *) NULL);
+  (void) XParseGeometry(windows->pan.geometry,&windows->pan.x,&windows->pan.y,
+    &windows->pan.width,&windows->pan.height);
+  windows->pan.flags|=PPosition;
+  windows->pan.immutable=MagickTrue;
+  windows->pan.attributes.event_mask=ButtonMotionMask | ButtonPressMask |
+    ButtonReleaseMask | ExposureMask | KeyPressMask | KeyReleaseMask |
+    StructureNotifyMask;
+  manager_hints->flags=InputHint | StateHint | WindowGroupHint;
+  manager_hints->input=MagickFalse;
+  manager_hints->initial_state=NormalState;
+  manager_hints->window_group=windows->image.id;
+  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
+    &windows->pan);
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),"Window id: 0x%lx (pan)",
+      windows->pan.id);
+  (void) XSetTransientForHint(display,windows->pan.id,windows->image.id);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
   char
     command[MagickPathExtent],
     *directory,
-    geometry[MagickPathExtent],
-    resource_name[MagickPathExtent];
+    geometry[MagickPathExtent];
 
   DisplayCommand
     display_command;
@@ -23267,32 +23335,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   /*
     Initialize panning window.
   */
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->pan);
-  (void) CloneString(&windows->pan.name,"Pan Icon");
-  windows->pan.width=windows->icon.width;
-  windows->pan.height=windows->icon.height;
-  (void) FormatLocaleString(resource_name,MagickPathExtent,"%s.pan",
-    resource_info->client_name);
-  windows->pan.geometry=XGetResourceClass(resource_info->resource_database,
-    resource_name,"geometry",(char *) NULL);
-  (void) XParseGeometry(windows->pan.geometry,&windows->pan.x,&windows->pan.y,
-    &windows->pan.width,&windows->pan.height);
-  windows->pan.flags|=PPosition;
-  windows->pan.immutable=MagickTrue;
-  windows->pan.attributes.event_mask=ButtonMotionMask | ButtonPressMask |
-    ButtonReleaseMask | ExposureMask | KeyPressMask | KeyReleaseMask |
-    StructureNotifyMask;
-  manager_hints->flags=InputHint | StateHint | WindowGroupHint;
-  manager_hints->input=MagickFalse;
-  manager_hints->initial_state=NormalState;
-  manager_hints->window_group=windows->image.id;
-  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-    &windows->pan);
-  if (resource_info->debug != MagickFalse)
-    (void) LogMagickEvent(X11Event,GetMagickModule(),"Window id: 0x%lx (pan)",
-      windows->pan.id);
-  (void) XSetTransientForHint(display,windows->pan.id,windows->image.id);
+  XMakePanWindow(&event_context);
   if (windows->info.mapped != MagickFalse)
     (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
   if ((windows->image.mapped == MagickFalse) ||
