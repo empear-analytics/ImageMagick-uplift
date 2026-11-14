@@ -4525,6 +4525,31 @@ static void InterpretBackslash(char **q,const char **p)
   }
 }
 
+static MagickBooleanType InterpretCharacter(char **q,const char **p)
+{
+  switch (**p)
+  {
+    case '\\':
+    {
+      InterpretBackslash(q,p);
+      return(MagickTrue);
+    }
+    case '&':
+    {
+      InterpretXMLEntity(q,p);
+      return(MagickTrue);
+    }
+    case '%':
+      break;  /* continue to next set of handlers */
+    default:
+    {
+      *(*q)++=(**p);  /* any thing else is 'as normal' */
+      return(MagickTrue);
+    }
+  }
+  return(MagickFalse);
+}
+
 MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   const char *embed_text,ExceptionInfo *exception)
 {
@@ -4638,26 +4663,8 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
     */
     *q='\0';
     ExtendInterpretText(MagickPathExtent);
-    switch (*p)
-    {
-      case '\\':
-      {
-        InterpretBackslash(&q,&p);
-        continue;
-      }
-      case '&':
-      {
-        InterpretXMLEntity(&q,&p);
-        continue;
-      }
-      case '%':
-        break;  /* continue to next set of handlers */
-      default:
-      {
-        *q++=(*p);  /* any thing else is 'as normal' */
-        continue;
-      }
-    }
+    if (InterpretCharacter(&q,&p) != MagickFalse)
+      continue;
     p++; /* advance beyond the percent */
     /*
       Doubled Percent - or percent at end of string.
