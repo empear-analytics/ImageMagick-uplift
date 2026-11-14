@@ -1077,6 +1077,71 @@ static MagickBooleanType InvokeLockedWriteDelegate(
   return(status);
 }
 
+typedef struct _EncodeFallbackInfo
+{
+  ImageInfo
+    *write_info;
+
+  Image
+    *image;
+
+  char
+    *filename;
+
+  ExceptionInfo
+    *exception;
+} EncodeFallbackInfo;
+
+static void EncodeImageWithFallback(const EncodeFallbackInfo *info,
+  MagickBooleanType *status)
+{
+  ImageInfo
+    *const write_info = info->write_info;
+
+  Image
+    *const image = info->image;
+
+  char
+    *const filename = info->filename;
+
+  ExceptionInfo
+    *const exception = info->exception;
+
+  const DelegateInfo
+    *delegate_info;
+
+  const MagickInfo
+    *magick_info;
+
+  EncodeImageHandler
+    *encoder;
+
+  delegate_info=GetDelegateInfo((char *) NULL,write_info->magick,exception);
+  if (delegate_info != (DelegateInfo *) NULL)
+    {
+      /*
+        Process the image with delegate.
+      */
+      *write_info->filename='\0';
+      (*status)=InvokeLockedWriteDelegate(delegate_info,write_info,image,
+        exception);
+      (void) CopyMagickString(image->filename,filename,MagickPathExtent);
+    }
+  else
+    {
+      FindFallbackEncoder(write_info,image,filename,&magick_info,&encoder,
+        exception);
+      if (encoder != (EncodeImageHandler *) NULL)
+        {
+          /*
+            Call appropriate image writer based on image type.
+          */
+          (*status)=EncodeImageWithInfo(magick_info,encoder,write_info,
+            image,exception);
+        }
+    }
+}
+
 MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
   Image *image,ExceptionInfo *exception)
 {
@@ -1187,30 +1252,14 @@ MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
     }
   else
     {
-      delegate_info=GetDelegateInfo((char *) NULL,write_info->magick,exception);
-      if (delegate_info != (DelegateInfo *) NULL)
-        {
-          /*
-            Process the image with delegate.
-          */
-          *write_info->filename='\0';
-          status=InvokeLockedWriteDelegate(delegate_info,write_info,image,
-            exception);
-          (void) CopyMagickString(image->filename,filename,MagickPathExtent);
-        }
-      else
-        {
-          FindFallbackEncoder(write_info,image,filename,&magick_info,&encoder,
-            exception);
-          if (encoder != (EncodeImageHandler *) NULL)
-            {
-              /*
-                Call appropriate image writer based on image type.
-              */
-              status=EncodeImageWithInfo(magick_info,encoder,write_info,
-                image,exception);
-            }
-        }
+      EncodeFallbackInfo
+        fallback;
+
+      fallback.write_info=write_info;
+      fallback.image=image;
+      fallback.filename=filename;
+      fallback.exception=exception;
+      EncodeImageWithFallback(&fallback,&status);
     }
   if (temporary != MagickFalse)
     status=CopyTemporaryImageFile(write_info,image,exception);
