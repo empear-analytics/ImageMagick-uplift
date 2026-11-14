@@ -18640,6 +18640,143 @@ Lane: c
 
 ---
 
+## Recipe QF - Share a Single Pixel Fetch Through Row Functions
+
+**Use when:** CodeScene reports *Code Duplication* (often with *Overall Code Complexity*)
+in a file where many `void` `static` functions open with the same single fetch of the
+pixels and an early `return;` when it fails (`p=GetAuthenticPixelQueue(image); if (p ==
+(const Quantum *) NULL) return;`), followed by a column loop that differs from copy to
+copy and writes through a buffer pointer of the copy's own type: `stream.c`'s 49
+`Stream<Type><Map>Pixels` and seven `Stream<Type>MapPixels`.
+
+**Not covered by:** Recipe RW, whose copies walk rows (`for (y=...)`, a fetch per row, a
+`MagickBooleanType` result) and whose row functions return the advanced pointer for the
+next row; here there is one fetch, no result and nothing carried, so the shared function
+is `void` and the row functions return nothing. Recipe RL (parallel loop), Recipe CF
+(one inlined copy per caller keeps the duplication), Recipe D (copies differ in a loop
+body, not a value).
+
+**How:**
+
+1. Copies. Two or more `static void` functions of one file, outside every OpenMP region,
+   each declaring `const Quantum *p;` and the loop counters, then `p=Fetch(image); if (p ==
+   (const Quantum *) NULL) return;` with the same `Fetch`, then a column loop `C` (the
+   rest of the body) that reads `p`, writes through its buffer parameter `b`, and reads
+   only parameters. Check by script that every copy matches this template once `C` is
+   taken out.
+2. Write, directly above the first copy, a `typedef struct NameRowInfo` with one member
+   per parameter any copy takes besides `b` (`image`, `quantum_info`, `quantum_map`,
+   `length`), each of its parameter's type without top-level `const`, and `typedef void
+   (*NameRowMethod)(const NameRowInfo *,const Quantum *,void *);`.
+3. Below them, `static void Name(const NameRowInfo *row,const NameRowMethod
+   method,void *pixels)`: the copies' `p` declaration, the fetch on `row->image`, the
+   `NULL` test with its `return;`, then `method(row,p,pixels);`.
+4. Each copy keeps its name as a row function `static void F(const NameRowInfo *row,const
+   Quantum *p,void *pixels)`: first `const` bindings of the members it took as
+   parameters, under their names (Recipe N step 4), then `b` as `T *b = (T *) pixels;`,
+   its loop counters, and `C` unchanged.
+5. In each caller (a per-type dispatcher), the local that converted the untyped buffer to
+   `b`'s type gives way to `NameRowInfo row;`, filled member by member (Recipe B step 5)
+   where the conversion stood, with the values the calls passed; each call `F(image,...,b);`
+   becomes `Name(&row,F,untyped buffer);`. A member no copy of that caller reads stays
+   unfilled.
+6. All copies move in one commit (rule 1). `refactor_guard.py --calls` with `--fnptr` for
+   each row function must print PASS, with only the fetch's count dropping and `Name`'s
+   rising.
+7. Check by reading that each row function's body is its copy's loop verbatim and that
+   every member a row function binds was filled by every caller that passes it.
+8. Time it as Recipe RW step 8 does, through the public entry (`magick stream` for
+   `stream.c`); slower by more than 3% stops the step.
+
+**Before:**
+
+```c
+static void StreamCharBGRPixels(const Image *image,unsigned char *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
+    ...
+  }
+}
+...
+  q=(unsigned char *) stream_info->pixels;
+  if (LocaleCompare(stream_info->map,"BGR") == 0)
+    {
+      StreamCharBGRPixels(image,q);
+      return;
+    }
+```
+
+**After:**
+
+```c
+static void StreamPixelQueue(const StreamRowInfo *row,
+  const StreamRowMethod method,void *pixels)
+{
+  const Quantum
+    *p;
+
+  p=GetAuthenticPixelQueue(row->image);
+  if (p == (const Quantum *) NULL)
+    return;
+  method(row,p,pixels);
+}
+
+static void StreamCharBGRPixels(const StreamRowInfo *row,const Quantum *p,
+  void *pixels)
+{
+  const Image
+    *image = row->image;
+
+  unsigned char
+    *q = (unsigned char *) pixels;
+  ...
+}
+...
+  row.image=image;
+  row.quantum_map=quantum_map;
+  row.length=length;
+  if (LocaleCompare(stream_info->map,"BGR") == 0)
+    {
+      StreamPixelQueue(&row,StreamCharBGRPixels,stream_info->pixels);
+      return;
+    }
+```
+
+**Careful:**
+
+- Values: the same fetch on the same image, the same early return, then the copy's loop on
+  the same pointer; the buffer converted to `void *` and back to its type compares equal
+  (C11 6.3.2.3p1). The call goes through the row functions' exact type, which the
+  typedef makes the build check.
+- The buffer conversion moves from the caller into the row function; it was the caller's
+  first use of the buffer and has no side effect.
+- C++ (Windows CI): the `void *` to typed pointer conversion needs step 4's explicit cast.
+
+**Evidence level:** oracle (the callers' cases), with `refactor_guard.py --calls` and step
+8's timing.
+
+**Provenance:** 2026-11-14, from `stream.c` (campaign B, M127 lane c round 9), right after
+Recipe RW on `pixel-export.c` and `pixel-import.c`: 6.89 to 7.32 (*Overall Code
+Complexity* gone, *Code Duplication* 77 functions, Excess Arguments 4 to 2 functions).
+`magick stream` on a 3000x3000 image, five runs per sample, medians of nine alternating
+samples base/cand: char rgb 0.57/0.57 s, double bgra 0.59/0.59, short i 0.70/0.70, float
+argb 0.88/0.88, quantum rgbp 0.56/0.56. Added by Claude Code (Claude Opus 5.5) under the
+mandate of 2026-10-24.
+Lane: c
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -19039,3 +19176,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | AMEND | CS | Step 1: in form A the segment may be a run of statements nested inside the loop body (a `switch` group, an `if` block, an inner loop's body) when nothing in it leaves it; Lane: c | `RenderMVGContent`'s `clip-path` and `stroke-dasharray` arms, whose nested blocks hold the depth 4 their keyword handlers would keep | mandate (2026-10-24) |
 | 2026-11-14 | NEW | KH | Replace a Keyword Switch by a Table of Arm Handlers: each `LocaleCompare` arm of a first-letter keyword `switch` moves to a handler taking the caller's state struct (copies in and out, `do { } while (0);` around an arm with inner exits), a nested token chain gets its own table, and the `switch` becomes a table lookup that keeps the misses' `status=MagickFalse;`; Lane: c | `draw.c`'s `RenderMVGContent` (69 keywords, 74 bumps, depth 6; 2.99 to 3.19 after the Recipe CS steps) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | RW | Share a Sequential Row Walk Through Row Functions Returning the Advanced Pointer: many `static` copies of one sequential row walk (fetch, `NULL` break, optional sync, `y < height` result) differing in the column loop and the buffer pointer type become one walk taking a `const` row struct, a row-function pointer and `void *pixels`; each copy keeps its name as a row function `void *F(const RowInfo *,row pointer,void *)` returning the advanced pointer; Lane: c | `pixel-export.c`'s 56 `Export<Type><Map>Pixels`/`Export<Type>MapPixels` walks: 6.89 to 7.32, timing equal (five commands, within 0.6%) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | QF | Share a Single Pixel Fetch Through Row Functions: many `static void` copies opening with one fetch (`GetAuthenticPixelQueue`) and an early `return;` on `NULL`, differing in the column loop and the buffer type, become one `void` function taking a `const` row struct, a row-function pointer and `void *pixels`; each copy keeps its name as a `void` row function; Lane: c | `stream.c`'s 56 `Stream<Type><Map>Pixels`/`Stream<Type>MapPixels`: 6.89 to 7.32, `magick stream` timing equal on five commands | mandate (2026-10-24) |
