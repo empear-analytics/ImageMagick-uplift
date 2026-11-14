@@ -93,6 +93,18 @@
 /*
   Typedef declarations.
 */
+typedef struct _InterpretedPropertyTarget
+{
+  ImageInfo
+    *read_info;
+
+  Image
+    *next;
+
+  ExceptionInfo
+    *exception;
+} InterpretedPropertyTarget;
+
 typedef struct _ConstituteInfo
 {
   const char
@@ -426,9 +438,18 @@ static void SyncResolutionFromProperties(Image *image,
     }
 }
 
-static void SetInterpretedProperty(ImageInfo *read_info,Image *next,
-  const char *name,const char *value,ExceptionInfo *exception)
+static void SetInterpretedProperty(const InterpretedPropertyTarget *target,
+  const char *name,const char *value)
 {
+  ImageInfo
+    *const read_info = target->read_info;
+
+  Image
+    *const next = target->next;
+
+  ExceptionInfo
+    *const exception = target->exception;
+
   char
     *property;
 
@@ -511,6 +532,9 @@ static void SetReadImageNames(Image *next,const char *magick,
 static void SyncReadImageMetadata(ImageInfo *read_info,Image *next,
   ConstituteInfo *constitute_info,ExceptionInfo *exception)
 {
+  const InterpretedPropertyTarget
+    target = { read_info, next, exception };
+
   if (next->magick_columns == 0)
     next->magick_columns=next->columns;
   if (next->magick_rows == 0)
@@ -525,12 +549,9 @@ static void SyncReadImageMetadata(ImageInfo *read_info,Image *next,
     next->page.width=next->columns;
   if (next->page.height == 0)
     next->page.height=next->rows;
-  SetInterpretedProperty(read_info,next,"caption",constitute_info->caption,
-    exception);
-  SetInterpretedProperty(read_info,next,"comment",constitute_info->comment,
-    exception);
-  SetInterpretedProperty(read_info,next,"label",constitute_info->label,
-    exception);
+  SetInterpretedProperty(&target,"caption",constitute_info->caption);
+  SetInterpretedProperty(&target,"comment",constitute_info->comment);
+  SetInterpretedProperty(&target,"label",constitute_info->label);
   if (LocaleCompare(next->magick,"TEXT") == 0)
     (void) ParseAbsoluteGeometry("0x0+0+0",&next->page);
 }
