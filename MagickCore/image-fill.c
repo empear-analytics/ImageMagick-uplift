@@ -157,15 +157,11 @@ static void FillPixelRow(const Image *image,const PixelInfo *color,
   }
 }
 
-MagickExport Image *NewMagickImage(const ImageInfo *image_info,
-  const size_t width,const size_t height,const PixelInfo *background,
-  ExceptionInfo *exception)
+static MagickBooleanType FillImagePixels(Image *image,
+  const PixelInfo *background,ExceptionInfo *exception)
 {
   CacheView
     *image_view;
-
-  Image
-    *image;
 
   MagickBooleanType
     status;
@@ -173,18 +169,6 @@ MagickExport Image *NewMagickImage(const ImageInfo *image_info,
   ssize_t
     y;
 
-  assert(image_info != (const ImageInfo *) NULL);
-  assert(image_info->signature == MagickCoreSignature);
-  assert(background != (const PixelInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  image=AcquireImage(image_info,exception);
-  image->columns=width;
-  image->rows=height;
-  image->colorspace=background->colorspace;
-  image->alpha_trait=background->alpha_trait;
-  image->fuzz=background->fuzz;
-  image->depth=background->depth;
   status=MagickTrue;
   image_view=AcquireAuthenticCacheView(image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -209,6 +193,32 @@ MagickExport Image *NewMagickImage(const ImageInfo *image_info,
       status=MagickFalse;
   }
   image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+MagickExport Image *NewMagickImage(const ImageInfo *image_info,
+  const size_t width,const size_t height,const PixelInfo *background,
+  ExceptionInfo *exception)
+{
+  Image
+    *image;
+
+  MagickBooleanType
+    status;
+
+  assert(image_info != (const ImageInfo *) NULL);
+  assert(image_info->signature == MagickCoreSignature);
+  assert(background != (const PixelInfo *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  image=AcquireImage(image_info,exception);
+  image->columns=width;
+  image->rows=height;
+  image->colorspace=background->colorspace;
+  image->alpha_trait=background->alpha_trait;
+  image->fuzz=background->fuzz;
+  image->depth=background->depth;
+  status=FillImagePixels(image,background,exception);
   if (status == MagickFalse)
     image=DestroyImage(image);
   return(image);
