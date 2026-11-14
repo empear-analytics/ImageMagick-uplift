@@ -464,6 +464,22 @@ static void FillHuffmanBlackRun(unsigned char *scanline,const size_t columns,
       scanline[(*x)++]=(unsigned char) 1;
 }
 
+static const HuffmanTable *LookupHuffmanWhiteEntry(HuffmanTable **hash,
+  const size_t length,const size_t code)
+{
+  if (length < 4)
+    return((const HuffmanTable *) NULL);
+  return(hash[((length+MWHashA)*(code+MWHashB)) % HashSize]);
+}
+
+static const HuffmanTable *LookupHuffmanBlackEntry(HuffmanTable **hash,
+  const size_t length,const size_t code)
+{
+  if (length < 2)
+    return((const HuffmanTable *) NULL);
+  return(hash[((length+MBHashA)*(code+MBHashB)) % HashSize]);
+}
+
 static const HuffmanTable *LookupHuffmanEntry(HuffmanTable **hash,
   const unsigned int color,const size_t length,const size_t code)
 {
@@ -471,17 +487,9 @@ static const HuffmanTable *LookupHuffmanEntry(HuffmanTable **hash,
     *entry;
 
   if (color != MagickFalse)
-    {
-      if (length < 4)
-        return((const HuffmanTable *) NULL);
-      entry=hash[((length+MWHashA)*(code+MWHashB)) % HashSize];
-    }
+    entry=LookupHuffmanWhiteEntry(hash,length,code);
   else
-    {
-      if (length < 2)
-        return((const HuffmanTable *) NULL);
-      entry=hash[((length+MBHashA)*(code+MBHashB)) % HashSize];
-    }
+    entry=LookupHuffmanBlackEntry(hash,length,code);
   if (entry == (const HuffmanTable *) NULL)
     return((const HuffmanTable *) NULL);
   if ((entry->length != length) || (entry->code != code))
@@ -558,6 +566,38 @@ static MagickBooleanType TransferHuffmanScanline(
   if (proceed == MagickFalse)
     return(MagickFalse);
   return(MagickTrue);
+}
+
+static size_t CountHuffmanNullLine(size_t null_lines,const ssize_t x)
+{
+  null_lines++;
+  if (x != 0)
+    null_lines=0;
+  return(null_lines);
+}
+
+static unsigned int ApplyHuffmanTerminator(const HuffmanTransfer *transfer,
+  const unsigned int color,ssize_t *x,ssize_t *count)
+{
+  Image
+    *image = transfer->image;
+
+  unsigned char
+    *scanline = transfer->scanline;
+
+  if ((*x+*count) > (ssize_t) image->columns)
+    *count=(ssize_t) image->columns-*x;
+  if (*count > 0)
+    {
+      if (color != MagickFalse)
+        {
+          *x+=*count;
+          *count=0;
+        }
+      else
+        FillHuffmanBlackRun(scanline,image->columns,x,count);
+    }
+  return((unsigned int) (color == MagickFalse));
 }
 
 static void SetFaxResolution(Image *image)
@@ -681,9 +721,7 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
             InputBit(bit);
             if ((int) bit != 0)
               {
-                null_lines++;
-                if (x != 0)
-                  null_lines=0;
+                null_lines=CountHuffmanNullLine(null_lines,x);
                 bail=MagickTrue;
                 break;
               }
@@ -708,19 +746,7 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
         case TBId:
         {
           count+=(ssize_t) entry->count;
-          if ((x+count) > (ssize_t) image->columns)
-            count=(ssize_t) image->columns-x;
-          if (count > 0)
-            {
-              if (color != MagickFalse)
-                {
-                  x+=count;
-                  count=0;
-                }
-              else
-                FillHuffmanBlackRun(scanline,image->columns,&x,&count);
-            }
-          color=(unsigned int) (color == MagickFalse);
+          color=ApplyHuffmanTerminator(&transfer,color,&x,&count);
           break;
         }
         case MWId:

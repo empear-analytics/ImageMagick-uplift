@@ -17138,6 +17138,95 @@ Lane: c
 
 ---
 
+## Recipe CE - Chain a Continuing Block into an Else Before the Loop's Tail
+
+**Use when:** CodeScene reports *Complex Method* (or *Bumpy Road Ahead*, *Large Method*) on
+a loop whose body ends in a run of element handlers, each `if (c) { S; continue; }`,
+followed by the body's last statement: CodeScene counts every `continue` as a branch
+(`locale.c`'s `LoadLocaleCache`, cc 18 to 17 for one `continue` dropped, nothing else
+changed). The usual case is an XML loader's keyword loop.
+
+**Not covered by:** Recipe TC, which deletes a bare `if (cond) continue;` that is itself the
+last statement (here the block has statements of its own and a statement follows it);
+Recipe EI, which joins the `if`s inside an `else` and keeps their exits; Recipe G, which adds
+an exit rather than removing one; Recipe EJ, which joins an `else` and its sole `if`.
+
+**How:**
+
+1. In the body of a `for`, `while` or `do` loop, find `if (c) { S continue; }` with no
+   `else`, where `S` is one or more statements with no `break`, `continue`, `return` or
+   `goto` and no label, and the `continue` belongs to this loop (no `switch` or inner loop
+   between). The `if` is followed, inside the body, by exactly one statement `T` and then
+   the body's closing brace.
+2. `T` is a single statement: an expression statement, a compound statement, or an `if`
+   (with or without `else`, an earlier application of this recipe included).
+3. Delete the line `continue;`, keep `S` and its braces, and write `else` and `T` after the
+   closing brace: `if (c) { S } else T`. When `T` is an `if`, write `else if (...)` on one
+   line and re-indent `T`'s branches one level less, their text unchanged; otherwise
+   indent `T` under the `else`.
+4. Repeat upward: a block `if (c') { S' continue; }` directly before the `if` the last step
+   made has that `if` statement as its `T`. Stop at the first statement before the chain
+   that is not such a block (a bare `if (...) continue;` stays).
+5. Check by reading that nothing but `T` stood between the block and the body's closing
+   brace, and that `c` is still evaluated exactly once, before `S` or `T`.
+6. Run the oracle on the function (`tools/oracle/oracle.py run --function F`);
+   `tools/obj_identical.sh` may differ (the compiler lays the branches out anew).
+
+**Before:**
+
+```c
+    if (LocaleCompare(keyword,"<message") == 0)
+      {
+        ...
+        q++;
+        continue;
+      }
+    if (*keyword == '<')
+      {
+        AppendSubpathElement(keyword,token,tag);
+        continue;
+      }
+    (void) GetNextToken(q,(const char **) NULL,extent,token);
+  }
+```
+
+**After:**
+
+```c
+    if (LocaleCompare(keyword,"<message") == 0)
+      {
+        ...
+        q++;
+      }
+    else if (*keyword == '<')
+      {
+        AppendSubpathElement(keyword,token,tag);
+      }
+    else
+      (void) GetNextToken(q,(const char **) NULL,extent,token);
+  }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. When `c` holds, `S` runs and the `continue` went to the
+  end of the body; now `S` runs and the `else` skips `T`, which was the only statement
+  before the end of the body, so the next step is again the loop's increment and test.
+  When `c` fails, `T` ran next and still does. `c` is evaluated once in both forms.
+- A `break`, `return` or `goto` inside `S` would leave by another way; step 1 refuses it.
+  A `continue` of an inner loop in `S` is not this loop's; step 1 refuses that too.
+- Do not use it when a statement other than `T` follows the block, or when `T` declares
+  a variable (a declaration cannot be the statement of an `else`).
+
+**Evidence level:** oracle (the object code changes layout).
+
+**Provenance:** 2026-11-14, from `locale.c`'s `LoadLocaleCache` (campaign B, M127 lane b
+round 9): the message and subpath blocks and the token-skip tail, cc 18 to 16 and 8.85 to
+8.90 in a probe. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -18860,3 +18949,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | CS | Extract a Loop-Body Segment Through a State of the Caller's Addresses: a segment of a loop body moves to a `void` helper taking one `const` struct of the caller's addresses, copying locals in and out (Recipe CK's form); a local aliased through another struct is bound by address and written `(*v)`; a segment whose loop exits all have the status false is wrapped in `do { } while (0);` and the caller's status test follows; Lane: c | `draw.c`'s `RenderMVGContent` (the primitive tail: segments writing up to eight loop locals, `number_points` and `primitive_info` aliased through `mvg_info`) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | CS | Step 1: in form A the segment may be a run of statements nested inside the loop body (a `switch` group, an `if` block, an inner loop's body) when nothing in it leaves it; Lane: c | `RenderMVGContent`'s `clip-path` and `stroke-dasharray` arms, whose nested blocks hold the depth 4 their keyword handlers would keep | mandate (2026-10-24) |
 | 2026-11-14 | NEW | KH | Replace a Keyword Switch by a Table of Arm Handlers: each `LocaleCompare` arm of a first-letter keyword `switch` moves to a handler taking the caller's state struct (copies in and out, `do { } while (0);` around an arm with inner exits), a nested token chain gets its own table, and the `switch` becomes a table lookup that keeps the misses' `status=MagickFalse;`; Lane: c | `draw.c`'s `RenderMVGContent` (69 keywords, 74 bumps, depth 6; 2.99 to 3.19 after the Recipe CS steps) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | CE | Chain a Continuing Block into an Else Before the Loop's Tail: `if (c) { S continue; } T` at the end of a loop body becomes `if (c) { S } else T`, repeated upward into an `else if` chain; CodeScene counts each `continue` as a branch; Lane: b | `locale.c`'s `LoadLocaleCache` (cc 18 to 16, 8.85 to 8.90 in a probe) | mandate (2026-10-24) |

@@ -1511,21 +1511,20 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
         (void) ConcatenateMagickString(tag,message,MagickLocaleExtent);
         (void) ConcatenateMagickString(tag,"\n",MagickLocaleExtent);
         q++;
-        continue;
       }
-    if (*keyword == '<')
+    else if (*keyword == '<')
       {
         /*
           Subpath element.
         */
         AppendSubpathElement(keyword,token,tag);
-        continue;
       }
-    (void) GetNextToken(q,(const char **) NULL,extent,token);
+    else
+      (void) GetNextToken(q,(const char **) NULL,extent,token);
   }
   token=(char *) RelinquishMagickMemory(token);
   (void) SetFatalErrorHandler(fatal_handler);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (status != 0));
 }
 
 /*
