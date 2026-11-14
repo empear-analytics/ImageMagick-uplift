@@ -328,6 +328,19 @@ def note_banner(lines, n, titles):
     if n >= 3 and lines[n - 3] == "/*" and lines[n - 1] == "*/" and lines[n - 2].startswith("  "):
         titles.append(lines[n - 2].strip())
 
+def is_function_head_next(lines, j):
+    """Whether a function definition opens within twelve lines from LINES[j]: a line `{` on its own comes before
+    any line ending in `;`."""
+    for k in range(j, min(j + 12, len(lines))):
+        if lines[k] == "{": return True
+        if lines[k].rstrip().endswith(";"): return False
+    return False
+
+def has_nothing_under(lines, j):
+    """Whether LINES[j], the first line that is not blank under a banner, ends the banner's section: the end of
+    LINES, another banner, or a function definition."""
+    return j >= len(lines) or lines[j].startswith("/*") or is_function_head_next(lines, j)
+
 def drop_banner_if_empty(lines, title):
     """Remove the first `/* title */` banner of LINES that has nothing under it: the next line that is not blank
     opens another banner, or a function definition (a statement ending in `{` on a line of its own)."""
@@ -335,12 +348,7 @@ def drop_banner_if_empty(lines, title):
         if lines[b:b + 3] != ["/*", "  " + title, "*/"]: continue
         j = b + 3
         while j < len(lines) and not lines[j].strip(): j += 1
-        empty = j >= len(lines) or lines[j].startswith("/*")
-        if not empty:
-            for k in range(j, min(j + 12, len(lines))):
-                if lines[k] == "{": empty = True; break
-                if lines[k].rstrip().endswith(";"): break
-        if empty:
+        if has_nothing_under(lines, j):
             del lines[b:j]
             return
 
