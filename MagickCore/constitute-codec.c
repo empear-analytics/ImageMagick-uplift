@@ -1061,6 +1061,22 @@ static MagickBooleanType CloseSeekableWriteBlob(ImageInfo *write_info,
   return(CloseBlob(image));
 }
 
+static MagickBooleanType InvokeLockedWriteDelegate(
+  const DelegateInfo *delegate_info,ImageInfo *write_info,Image *image,
+  ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  if (GetDelegateThreadSupport(delegate_info) == MagickFalse)
+    LockSemaphoreInfo(delegate_info->semaphore);
+  status=InvokeDelegate(write_info,image,(char *) NULL,
+    write_info->magick,exception);
+  if (GetDelegateThreadSupport(delegate_info) == MagickFalse)
+    UnlockSemaphoreInfo(delegate_info->semaphore);
+  return(status);
+}
+
 MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
   Image *image,ExceptionInfo *exception)
 {
@@ -1178,12 +1194,8 @@ MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
             Process the image with delegate.
           */
           *write_info->filename='\0';
-          if (GetDelegateThreadSupport(delegate_info) == MagickFalse)
-            LockSemaphoreInfo(delegate_info->semaphore);
-          status=InvokeDelegate(write_info,image,(char *) NULL,
-            write_info->magick,exception);
-          if (GetDelegateThreadSupport(delegate_info) == MagickFalse)
-            UnlockSemaphoreInfo(delegate_info->semaphore);
+          status=InvokeLockedWriteDelegate(delegate_info,write_info,image,
+            exception);
           (void) CopyMagickString(image->filename,filename,MagickPathExtent);
         }
       else
