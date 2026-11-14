@@ -10702,6 +10702,61 @@ static void XApplyReduceNoiseCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplySharpenCommand(const XMagickCommandContext *context,
+  MagickStatusType *flags)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *sharp_image;
+
+  static char
+    radius[MagickPathExtent] = "0.0x1.0";
+
+  /*
+    Query user for sharpen radius.
+  */
+  (void) XDialogWidget(display,windows,"Sharpen",
+    "Enter the sharpen radius and standard deviation:",radius);
+  if (*radius == '\0')
+    return;
+  /*
+    Sharpen image scanlines.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(radius,&geometry_info);
+  sharp_image=SharpenImage(*image,geometry_info.rho,geometry_info.sigma,
+    exception);
+  if (sharp_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=sharp_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyRollCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11836,41 +11891,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyAddNoiseCommand(&context);
       break;
     case SharpenCommand:
-    {
-      Image
-        *sharp_image;
-
-      static char
-        radius[MagickPathExtent] = "0.0x1.0";
-
-      /*
-        Query user for sharpen radius.
-      */
-      (void) XDialogWidget(display,windows,"Sharpen",
-        "Enter the sharpen radius and standard deviation:",radius);
-      if (*radius == '\0')
-        break;
-      /*
-        Sharpen image scanlines.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      flags=ParseGeometry(radius,&geometry_info);
-      sharp_image=SharpenImage(*image,geometry_info.rho,geometry_info.sigma,
-        exception);
-      if (sharp_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=sharp_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplySharpenCommand(&context,&flags);
       break;
-    }
     case BlurCommand:
     {
       Image
