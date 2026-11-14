@@ -3701,6 +3701,25 @@ static inline const char *GetPointListProperty(const PointListInputs *inputs,
   return(string);
 }
 
+static void FormatPaperSizeProperty(const char *property,char *value)
+{
+  char
+    *papersize;
+
+  *value='\0';
+  papersize=GetPageGeometry(property+10);
+  if (papersize != (const char *) NULL)
+    {
+      RectangleInfo
+        page = { 0, 0, 0, 0 };
+
+      (void) ParseAbsoluteGeometry(papersize,&page);
+      (void) FormatLocaleString(value,MagickPathExtent,"%.17gx%.17g",
+        (double) page.width,(double) page.height);
+      papersize=DestroyString(papersize);
+    }
+}
+
 MagickExport const char *GetMagickProperty(ImageInfo *image_info,
   Image *image,const char *property,ExceptionInfo *exception)
 {
@@ -4027,22 +4046,8 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
         }
       if (LocaleNCompare("papersize:",property,10) == 0)
         {
-          char
-            *papersize;
-
           WarnNoImageReturn("\"%%[%s]\"",property);
-          *value='\0';
-          papersize=GetPageGeometry(property+10);
-          if (papersize != (const char *) NULL)
-            {
-              RectangleInfo
-                page = { 0, 0, 0, 0 };
-
-              (void) ParseAbsoluteGeometry(papersize,&page);
-              (void) FormatLocaleString(value,MagickPathExtent,"%.17gx%.17g",
-                (double) page.width,(double) page.height);
-              papersize=DestroyString(papersize);
-            }
+          FormatPaperSizeProperty(property,value);
           break;
         }
 #if defined(MAGICKCORE_LCMS_DELEGATE)
