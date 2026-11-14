@@ -9436,9 +9436,6 @@ static MagickBooleanType XDrawEditImage(Display *display,
   XSegment
     line_info;
 
-  DrawEditContext
-    draw_context;
-
   const DrawShapeTargets
     shape_targets = { &line_info, &rectangle_info, &coordinate_info, &state,
       &number_coordinates, &max_coordinates };
@@ -9465,38 +9462,34 @@ static MagickBooleanType XDrawEditImage(Display *display,
   draw_info.stencil=OpaqueStencil;
   status=MagickTrue;
   cursor=XCreateFontCursor(display,XC_tcross);
-  draw_context.display=display;
-  draw_context.resource_info=resource_info;
-  draw_context.windows=windows;
-  draw_context.DrawMenu=DrawEditMenu;
-  draw_context.command=command;
-  draw_context.root_window=root_window;
-  draw_context.exception=exception;
-  draw_context.image=image;
-  draw_context.cursor=cursor;
-  draw_context.DrawCommands=DrawEditCommands;
-  for ( ; ; )
   {
-    XWaitForDrawStart(&draw_context,&pointer_targets,&style_targets);
-    if ((state & EscapeState) != 0)
-      break;
-    /*
-      Draw element as pointer moves until the button is released.
-    */
-    distance=0;
-    XStartDrawElement(&pointer_targets,&shape_targets);
-    XTrackDrawElement(&draw_context,&pointer_targets,&shape_targets,&distance);
-    if (XFitDrawBounds(&pointer_targets,&shape_targets,distance) != MagickFalse)
-      continue;
-    /*
-      Drawing is relative to image configuration.
-    */
-    XPrepareDrawInfo(&draw_context,&pointer_targets,&shape_targets,
-      &style_targets);
-    /*
-      Draw element on image.
-    */
-    status=XDrawElementImage(&draw_context,&draw_info);
+    const DrawEditContext
+      draw_context = { display, resource_info, windows, DrawEditMenu, command,
+        root_window, exception, image, cursor, DrawEditCommands };
+
+    for ( ; ; )
+    {
+      XWaitForDrawStart(&draw_context,&pointer_targets,&style_targets);
+      if ((state & EscapeState) != 0)
+        break;
+      /*
+        Draw element as pointer moves until the button is released.
+      */
+      distance=0;
+      XStartDrawElement(&pointer_targets,&shape_targets);
+      XTrackDrawElement(&draw_context,&pointer_targets,&shape_targets,&distance);
+      if (XFitDrawBounds(&pointer_targets,&shape_targets,distance) != MagickFalse)
+        continue;
+      /*
+        Drawing is relative to image configuration.
+      */
+      XPrepareDrawInfo(&draw_context,&pointer_targets,&shape_targets,
+        &style_targets);
+      /*
+        Draw element on image.
+      */
+      status=XDrawElementImage(&draw_context,&draw_info);
+    }
   }
   XSetCursorState(display,windows,MagickFalse);
   coordinate_info=(XPoint *) RelinquishMagickMemory(coordinate_info);
