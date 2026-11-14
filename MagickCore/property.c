@@ -2851,6 +2851,97 @@ static void StartPSClippathSubpath(char *message,PointInfo *first,
   }
 }
 
+typedef struct _PSClippathState
+{
+  const unsigned char
+    **blob;
+
+  size_t
+    *length;
+
+  char
+    **path,
+    **message;
+
+  MagickBooleanType
+    *in_subpath;
+
+  PointInfo
+    *first,
+    *last,
+    *point;
+
+  ssize_t
+    *knot_count;
+} PSClippathState;
+
+static void AddPSClippathKnot(const PSClippathState *state)
+{
+  const unsigned char
+    *blob = (*state->blob);
+
+  size_t
+    length = (*state->length);
+
+  char
+    *path = (*state->path);
+
+  char
+    *const message = (*state->message);
+
+  MagickBooleanType
+    in_subpath = (*state->in_subpath);
+
+  PointInfo
+    *first = state->first,
+    *last = state->last,
+    *point = state->point;
+
+  ssize_t
+    knot_count = (*state->knot_count);
+
+  ssize_t
+    i,
+    x,
+    y;
+
+  /*
+    Add sub-path knot
+  */
+  for (i=0; i < 3; i++)
+  {
+    y=(ssize_t) ReadPropertyMSBLong(&blob,&length);
+    x=(ssize_t) ReadPropertyMSBLong(&blob,&length);
+    point[i].x=(double) x/4096.0/4096.0;
+    point[i].y=1.0-(double) y/4096.0/4096.0;
+  }
+  if (in_subpath == MagickFalse)
+    StartPSClippathSubpath(message,first,last,point);
+  else
+    FormatPSClippathKnot(message,last,point);
+  (void) ConcatenateString(&path,message);
+  in_subpath=MagickTrue;
+  knot_count--;
+  /*
+    Close the subpath if there are no more knots.
+  */
+  if (knot_count == 0)
+    {
+      /*
+        Same special handling as above except we compare to the
+        first point in the path and close the path.
+      */
+      FormatPSClippathClose(message,last,first);
+      (void) ConcatenateString(&path,message);
+      in_subpath=MagickFalse;
+    }
+  (*state->blob)=blob;
+  (*state->length)=length;
+  (*state->path)=path;
+  (*state->in_subpath)=in_subpath;
+  (*state->knot_count)=knot_count;
+}
+
 static char *TracePSClippath(const unsigned char *blob,size_t length)
 {
   char
@@ -2866,13 +2957,12 @@ static char *TracePSClippath(const unsigned char *blob,size_t length)
     point[3];
 
   ssize_t
-    i,
-    x;
-
-  ssize_t
     knot_count,
-    selector,
-    y;
+    selector;
+
+  const PSClippathState
+    state = { &blob, &length, &path, &message, &in_subpath, first, last,
+      point, &knot_count };
 
   path=AcquireString((char *) NULL);
   if (path == (char *) NULL)
@@ -2947,36 +3037,7 @@ static char *TracePSClippath(const unsigned char *blob,size_t length)
             length=(size_t) ((ssize_t) length-MagickMin(24,(ssize_t) length));
             break;
           }
-        /*
-          Add sub-path knot
-        */
-        for (i=0; i < 3; i++)
-        {
-          y=(ssize_t) ReadPropertyMSBLong(&blob,&length);
-          x=(ssize_t) ReadPropertyMSBLong(&blob,&length);
-          point[i].x=(double) x/4096.0/4096.0;
-          point[i].y=1.0-(double) y/4096.0/4096.0;
-        }
-        if (in_subpath == MagickFalse)
-          StartPSClippathSubpath(message,first,last,point);
-        else
-          FormatPSClippathKnot(message,last,point);
-        (void) ConcatenateString(&path,message);
-        in_subpath=MagickTrue;
-        knot_count--;
-        /*
-          Close the subpath if there are no more knots.
-        */
-        if (knot_count == 0)
-          {
-            /*
-              Same special handling as above except we compare to the
-              first point in the path and close the path.
-            */
-            FormatPSClippathClose(message,last,first);
-            (void) ConcatenateString(&path,message);
-            in_subpath=MagickFalse;
-          }
+        AddPSClippathKnot(&state);
         break;
       }
       default:
