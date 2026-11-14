@@ -816,9 +816,8 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
     if ((IsGeometryAdvanceCharacter(c) != MagickFalse) || (c == '/'))
       {
         p++;
-        continue;
       }
-    if (SkipGeometryCharacter(c,&p,&flags) == MagickFalse)
+    else if (SkipGeometryCharacter(c,&p,&flags) == MagickFalse)
       return(NoValue);
   }
   /*
