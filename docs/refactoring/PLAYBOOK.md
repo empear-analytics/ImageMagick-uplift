@@ -18777,6 +18777,108 @@ Lane: c
 
 ---
 
+## Recipe JT - Replace Jumps to a Returning Tail by Calls of the Tail
+
+**Use when:** CodeScene reports *Complex Method*, *Bumpy Road Ahead* or *Large Method* on
+a value-returning function whose last statements are a label and a tail that ends the
+function, `L: S return(R);`, reached by `goto L;` from inside nested arms as well as by
+falling through: `property.c`'s `InterpretBracedEscape`, whose `option:`, `artifact:`
+and `property:` arms jump to `PropertyLookupFailure:` (truncate the pattern, warn,
+`return(MagickTrue);`). Each `goto` keeps its arm from moving out (Recipe E step 1 and
+Recipe V refuse a jump to a label that stays behind), so the arms' bumps stay.
+
+**Not covered by:** Recipe V, VC and MC, whose jumps go to a cleanup label after which
+the caller goes on (`goto cleanup;` then releases and a final return): their block moves
+and the jump stays as `if (Helper(...) == MagickFalse) goto L;`, while here the jumps go
+and the tail moves; Recipe E step 7, which moves a tail reached only by falling through;
+Recipe ST and AT, which copy the tail into a helper that also takes an arm, not a label's
+tail jumped to from several places.
+
+**How:**
+
+1. The label `L` stands in the function's outermost block, followed only by the tail:
+   statements `S` and a final `return(R);`. No other label lies in the tail; the tail
+   holds no `goto`, no `#pragma` line, and lies outside every OpenMP region. Every
+   `goto L;` of the function, and nothing else, jumps to `L`.
+2. The tail reads at most four variables of the caller (parameters or locals); it writes
+   none of them except through a pointer (an array the caller declared, passed as a
+   pointer to its first element, Recipe V step 2). Nothing the caller does after the
+   tail exists, since the tail returns.
+3. Cut `S return(R);` into a new `static` function of the caller's return type directly
+   above the caller, taking those variables by value (an array as `T *v`), each of its
+   declared type and qualifiers. Nothing else in the text changes; macros used only by
+   the tail move with it (Recipe E step 7).
+4. Replace each `goto L;` by `return(Helper(...));`, and the label with its tail by the
+   same `return(Helper(...));`, passing the variables by name. Check by reading that
+   every argument fills its parameter.
+5. Run `tools/ci_warnings.sh` and `tools/cxx_warnings.sh` (both `OK`) and the oracle for
+   the function (or its caller, when the case map does not know it).
+
+**Before:**
+
+```c
+      string=GetImageOption(property_info,pattern+7);
+      if (string == (char *) NULL)
+        goto PropertyLookupFailure;
+      return(AppendInterpretString(text,string));
+  ...
+  string=GetImageOption(property_info,pattern);
+  if (string != (char *) NULL)
+    return(AppendInterpretString(text,string));
+
+PropertyLookupFailure:
+  TruncatePatternForMessage(pattern,offset);
+  (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+    "UnknownImageProperty","\"%%[%s]\"",pattern);
+  return(MagickTrue);
+}
+```
+
+**After:**
+
+```c
+static MagickBooleanType WarnUnknownProperty(ExceptionInfo *exception,
+  char *pattern,const ssize_t offset)
+{
+  TruncatePatternForMessage(pattern,offset);
+  (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+    "UnknownImageProperty","\"%%[%s]\"",pattern);
+  return(MagickTrue);
+}
+...
+      if (string == (char *) NULL)
+        return(WarnUnknownProperty(exception,pattern,offset));
+  ...
+  if (string != (char *) NULL)
+    return(AppendInterpretString(text,string));
+  return(WarnUnknownProperty(exception,pattern,offset));
+}
+```
+
+**Careful:**
+
+- Why the behaviour is the same. A `goto L;` runs no statement between itself and the
+  tail, so the tail reads the variables with the values they hold at the jump; the call
+  passes exactly those values, and the helper runs `S` and returns `R` on them; the
+  caller returns that value at once, as the tail did. The fall-through path reaches the
+  same call with the same values. Writes through a passed array land in the caller's
+  array, which nothing reads after the return.
+- A `ThrowMagickException` moved into the helper names the helper in
+  `GetMagickModule()` (owner, 2026-11-12, AGENTS.md).
+- A tail that reads a local written on some path but not on another (uninitialised on
+  one jump) must not move: passing it by value reads it. Check each jump's path.
+
+**Evidence level:** oracle (the cases that reach the function or its caller).
+
+**Provenance:** 2026-11-14, from `property.c`'s `InterpretBracedEscape` (campaign B, M127
+lane c round 9): alone 3.62 to 3.62 (cc 24 to 21); with Recipe MT on the `option:` and
+`artifact:` arms and Recipe E on the `property:` arm, the tail and the prefix dispatch,
+the function leaves *Bumpy Road Ahead*, *Complex Method* and *Large Method*, 3.62 to 3.64.
+Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: c
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -19177,3 +19279,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | KH | Replace a Keyword Switch by a Table of Arm Handlers: each `LocaleCompare` arm of a first-letter keyword `switch` moves to a handler taking the caller's state struct (copies in and out, `do { } while (0);` around an arm with inner exits), a nested token chain gets its own table, and the `switch` becomes a table lookup that keeps the misses' `status=MagickFalse;`; Lane: c | `draw.c`'s `RenderMVGContent` (69 keywords, 74 bumps, depth 6; 2.99 to 3.19 after the Recipe CS steps) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | RW | Share a Sequential Row Walk Through Row Functions Returning the Advanced Pointer: many `static` copies of one sequential row walk (fetch, `NULL` break, optional sync, `y < height` result) differing in the column loop and the buffer pointer type become one walk taking a `const` row struct, a row-function pointer and `void *pixels`; each copy keeps its name as a row function `void *F(const RowInfo *,row pointer,void *)` returning the advanced pointer; Lane: c | `pixel-export.c`'s 56 `Export<Type><Map>Pixels`/`Export<Type>MapPixels` walks: 6.89 to 7.32, timing equal (five commands, within 0.6%) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | QF | Share a Single Pixel Fetch Through Row Functions: many `static void` copies opening with one fetch (`GetAuthenticPixelQueue`) and an early `return;` on `NULL`, differing in the column loop and the buffer type, become one `void` function taking a `const` row struct, a row-function pointer and `void *pixels`; each copy keeps its name as a `void` row function; Lane: c | `stream.c`'s 56 `Stream<Type><Map>Pixels`/`Stream<Type>MapPixels`: 6.89 to 7.32, `magick stream` timing equal on five commands | mandate (2026-10-24) |
+| 2026-11-14 | NEW | JT | Replace Jumps to a Returning Tail by Calls of the Tail: a function-ending `L: S return(R);` reached by `goto L;` from nested arms moves to a `static` helper of the return type taking the (at most four) variables it reads; each `goto L;` and the label's tail become `return(Helper(...));`; Lane: c | `property.c`'s `InterpretBracedEscape` (three lookup arms jumping to `PropertyLookupFailure:`): the first step of a chain that takes the function out of every finding, 3.62 to 3.64 | mandate (2026-10-24) |
