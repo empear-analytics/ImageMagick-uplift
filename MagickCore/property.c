@@ -4860,6 +4860,24 @@ PropertyLookupFailure:
   return(MagickTrue);
 }
 
+static MagickBooleanType ReadInterpretTextFile(const char *p,
+  char **interpret_text,ExceptionInfo *exception,char **result)
+{
+  if ((*p == '@') && (IsPathAccessible(p+1) != MagickFalse))
+    {
+      /*
+        Handle a '@' replace string from file.
+      */
+      (*interpret_text)=FileToString(p,~0UL,exception);
+      if ((*interpret_text) != (char *) NULL)
+        {
+          (*result)=(*interpret_text);
+          return(MagickTrue);
+        }
+    }
+  return(MagickFalse);
+}
+
 MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   const char *embed_text,ExceptionInfo *exception)
 {
@@ -4883,7 +4901,8 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
 
   char
     *interpret_text = (char *) NULL,
-    *q;  /* current position in interpret_text */
+    *q,  /* current position in interpret_text */
+    *returned;
 
   const char
     *p;  /* position in embed_text string being expanded */
@@ -4920,15 +4939,9 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
     p++;
   if (*p == '\0')
     return(ConstantString(""));
-  if ((*p == '@') && (IsPathAccessible(p+1) != MagickFalse))
-    {
-      /*
-        Handle a '@' replace string from file.
-      */
-      interpret_text=FileToString(p,~0UL,exception);
-      if (interpret_text != (char *) NULL)
-        return(interpret_text);
-    }
+  if (ReadInterpretTextFile(p,&interpret_text,exception,&returned) !=
+      MagickFalse)
+    return(returned);
   /*
     Translate any embedded format characters.
   */
