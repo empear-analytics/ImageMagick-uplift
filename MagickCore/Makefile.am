@@ -140,6 +140,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/configure.h \
   MagickCore/constitute.c \
   MagickCore/constitute-codec.c \
+  MagickCore/constitute-write.c \
   MagickCore/constitute-pixels.c \
   MagickCore/constitute.h \
   MagickCore/decorate.c \
