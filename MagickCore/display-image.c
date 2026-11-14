@@ -9358,37 +9358,37 @@ static MagickBooleanType XAcquireDrawCoordinates(ExceptionInfo *exception,
   return(MagickTrue);
 }
 
+static const char
+  *const DrawEditMenu[] =
+  {
+    "Element",
+    "Color",
+    "Stipple",
+    "Width",
+    "Undo",
+    "Help",
+    "Dismiss",
+    (char *) NULL
+  };
+
+static const ModeType
+  DrawEditCommands[] =
+  {
+    DrawElementCommand,
+    DrawColorCommand,
+    DrawStippleCommand,
+    DrawWidthCommand,
+    DrawUndoCommand,
+    DrawHelpCommand,
+    DrawDismissCommand
+  };
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
 {
-  const char
-    *const DrawMenu[] =
-    {
-      "Element",
-      "Color",
-      "Stipple",
-      "Width",
-      "Undo",
-      "Help",
-      "Dismiss",
-      (char *) NULL
-    };
-
   static ElementType
     element = PointElement;
-
-  static const ModeType
-    DrawCommands[] =
-    {
-      DrawElementCommand,
-      DrawColorCommand,
-      DrawStippleCommand,
-      DrawWidthCommand,
-      DrawUndoCommand,
-      DrawHelpCommand,
-      DrawDismissCommand
-    };
 
   static Pixmap
     stipple = (Pixmap) NULL;
@@ -9457,7 +9457,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
   /*
     Map Command widget.
   */
-  XMapDrawCommandWidget(display,windows,DrawMenu);
+  XMapDrawCommandWidget(display,windows,DrawEditMenu);
   /*
     Wait for first button press.
   */
@@ -9468,13 +9468,13 @@ static MagickBooleanType XDrawEditImage(Display *display,
   draw_context.display=display;
   draw_context.resource_info=resource_info;
   draw_context.windows=windows;
-  draw_context.DrawMenu=DrawMenu;
+  draw_context.DrawMenu=DrawEditMenu;
   draw_context.command=command;
   draw_context.root_window=root_window;
   draw_context.exception=exception;
   draw_context.image=image;
   draw_context.cursor=cursor;
-  draw_context.DrawCommands=DrawCommands;
+  draw_context.DrawCommands=DrawEditCommands;
   for ( ; ; )
   {
     XWaitForDrawStart(&draw_context,&pointer_targets,&style_targets);
