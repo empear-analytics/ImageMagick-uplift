@@ -517,6 +517,22 @@ MagickExport MagickRealType GetPixelIntensity(
     (image->colorspace == GRAYColorspace) ? DecodePixelGamma : NULL,sample));
 }
 
+static void LoadAlphaWeightedPixels(const Image *magick_restrict image,
+  const PixelChannel channel,const Quantum *magick_restrict p,
+  const ssize_t count,double *alpha,double *pixels)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) count; i++)
+  {
+    alpha[i]=QuantumScale*(double) GetPixelAlpha(image,p+i*
+      (ssize_t) GetPixelChannels(image));
+    pixels[i]=alpha[i]*(double) p[i*(ssize_t) GetPixelChannels(image)+
+      GetPixelChannelOffset(image,channel)];
+  }
+}
+
 static void LoadInterpolatePixels(const Image *magick_restrict image,
   const PixelChannel channel,const PixelTrait traits,
   const Quantum *magick_restrict p,const ssize_t count,double *alpha,
@@ -533,13 +549,7 @@ static void LoadInterpolatePixels(const Image *magick_restrict image,
         GetPixelChannelOffset(image,channel)];
     }
   else
-    for (i=0; i < (ssize_t) count; i++)
-    {
-      alpha[i]=QuantumScale*(double) GetPixelAlpha(image,p+i*
-        (ssize_t) GetPixelChannels(image));
-      pixels[i]=alpha[i]*(double) p[i*(ssize_t) GetPixelChannels(image)+
-        GetPixelChannelOffset(image,channel)];
-    }
+    LoadAlphaWeightedPixels(image,channel,p,count,alpha,pixels);
 }
 
 /*
