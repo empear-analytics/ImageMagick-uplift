@@ -3022,6 +3022,10 @@ static inline MagickBooleanType IsRenderableClass(DrawInfo **graphic_context,
 
 typedef struct _MVGRenderState
 {
+  AffineMatrix
+    *affine,
+    *current;
+
   char
     **token;
 
@@ -3786,6 +3790,31 @@ static void DrawMVGPrimitive(const MVGRenderState *state)
   (*state->status)=status;
 }
 
+static void ApplyMVGAffine(const MVGRenderState *state)
+{
+  AffineMatrix
+    affine = (*state->affine),
+    current = (*state->current);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ssize_t
+    n = (*state->n);
+
+  if (IsNonIdentityAffine(affine) != MagickFalse)
+    {
+      graphic_context[n]->affine.sx=current.sx*affine.sx+current.ry*affine.rx;
+      graphic_context[n]->affine.rx=current.rx*affine.sx+current.sy*affine.rx;
+      graphic_context[n]->affine.ry=current.sx*affine.ry+current.ry*affine.sy;
+      graphic_context[n]->affine.sy=current.rx*affine.ry+current.sy*affine.sy;
+      graphic_context[n]->affine.tx=current.sx*affine.tx+current.ry*affine.ty+
+        current.tx;
+      graphic_context[n]->affine.ty=current.rx*affine.tx+current.sy*affine.ty+
+        current.ty;
+    }
+}
+
 static MagickBooleanType RenderMVGContent(Image *image,
   const DrawInfo *draw_info,const size_t depth,ExceptionInfo *exception)
 {
@@ -3860,9 +3889,10 @@ static MagickBooleanType RenderMVGContent(Image *image,
     metrics;
 
   const MVGRenderState
-    render_state = { &token, &p, &q, &coordinates, &cursor, &graphic_context,
-      draw_info, exception, image, &status, &mvg_info, &primitive_info,
-      &primitive_type, &extent, &number_points, &macros, &i, &j, &n, &x };
+    render_state = { &affine, &current, &token, &p, &q, &coordinates, &cursor,
+      &graphic_context, draw_info, exception, image, &status, &mvg_info,
+      &primitive_info, &primitive_type, &extent, &number_points, &macros, &i,
+      &j, &n, &x };
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -5387,17 +5417,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     }
     if (status == MagickFalse)
       break;
-    if (IsNonIdentityAffine(affine) != MagickFalse)
-      {
-        graphic_context[n]->affine.sx=current.sx*affine.sx+current.ry*affine.rx;
-        graphic_context[n]->affine.rx=current.rx*affine.sx+current.sy*affine.rx;
-        graphic_context[n]->affine.ry=current.sx*affine.ry+current.ry*affine.sy;
-        graphic_context[n]->affine.sy=current.rx*affine.ry+current.sy*affine.sy;
-        graphic_context[n]->affine.tx=current.sx*affine.tx+current.ry*affine.ty+
-          current.tx;
-        graphic_context[n]->affine.ty=current.rx*affine.tx+current.sy*affine.ty+
-          current.ty;
-      }
+    ApplyMVGAffine(&render_state);
     if (primitive_type == UndefinedPrimitive)
       {
         if (*q == '\0')
