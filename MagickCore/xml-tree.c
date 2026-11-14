@@ -2376,6 +2376,13 @@ static MagickBooleanType ParseDoctype(XMLTreeRoot *root,const int terminal,
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsUnclosedComment(char **p,
+  const int terminal)
+{
+  return(((*p == (char *) NULL) || ((*(*p+=2) != '>') && (**p != '\0')) ||
+    ((**p == '\0') && (terminal != '>'))) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType SkipComment(char **p,const int terminal,
   ExceptionInfo *exception)
 {
@@ -2383,8 +2390,7 @@ static MagickBooleanType SkipComment(char **p,const int terminal,
     Comment.
   */
   *p=strstr(*p+3,"--");
-  if ((*p == (char *) NULL) || ((*(*p+=2) != '>') && (**p != '\0')) ||
-      ((**p == '\0') && (terminal != '>')))
+  if (IsUnclosedComment(p,terminal) != MagickFalse)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),
         OptionWarning,"ParseError","unclosed <!--");
