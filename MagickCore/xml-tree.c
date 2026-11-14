@@ -2875,25 +2875,79 @@ static MagickBooleanType ConvertXMLTreeToUTF8(const char *xml,
   return(MagickTrue);
 }
 
-MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
+static MagickBooleanType ParseXMLTreeTags(XMLTreeRoot *root,char *p,
+  const int terminal,ExceptionInfo *exception)
 {
   char
     **attribute,
     **attributes,
-    *p,
-    *tag,
-    *utf8;
+    *tag;
 
   int
-    c,
-    terminal;
+    c;
 
   size_t
-    ignore_depth,
-    length;
+    ignore_depth;
 
   ssize_t
     l;
+
+  attribute=(char **) NULL;
+  l=0;
+  ignore_depth=0;
+  for (p++; ; p++)
+  {
+    attributes=(char **) sentinel;
+    tag=p;
+    c=(*p);
+    if (IsXMLNameStart(p,c) != MagickFalse)
+      {
+        const XMLStartTagTargets
+          start_targets = { &attribute, &attributes, &p, &l, &ignore_depth };
+
+        XMLStartTagInput
+          start_input;
+
+        start_input.root=root;
+        start_input.tag=tag;
+        start_input.terminal=terminal;
+        start_input.exception=exception;
+        if (ParseXMLStartTag(&start_input,&start_targets) == MagickFalse)
+          return(MagickFalse);
+      }
+    else
+      {
+        MarkupTargets
+          markup;
+
+        markup.p=(&p);
+        markup.tag=(&tag);
+        markup.l=(&l);
+        markup.ignore_depth=(&ignore_depth);
+        if (ParseMarkup(root,terminal,exception,&markup) == MagickFalse)
+          return(MagickFalse);
+      }
+     if ((p == (char *) NULL) || (*p == '\0'))
+       break;
+     *p++='\0';
+     tag=p;
+     if (ParseTagCharacterContent(root,tag,ignore_depth,&p) == MagickFalse)
+       break;
+  }
+  return(MagickTrue);
+}
+
+MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
+{
+  char
+    *p,
+    *utf8;
+
+  int
+    terminal;
+
+  size_t
+    length;
 
   XMLTreeRoot
     *root;
@@ -2923,54 +2977,11 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
       utf8=DestroyString(utf8);
       return((XMLTreeInfo *) NULL);
     }
-  attribute=(char **) NULL;
-  l=0;
-  ignore_depth=0;
-  for (p++; ; p++)
-  {
-    attributes=(char **) sentinel;
-    tag=p;
-    c=(*p);
-    if (IsXMLNameStart(p,c) != MagickFalse)
-      {
-        const XMLStartTagTargets
-          start_targets = { &attribute, &attributes, &p, &l, &ignore_depth };
-
-        XMLStartTagInput
-          start_input;
-
-        start_input.root=root;
-        start_input.tag=tag;
-        start_input.terminal=terminal;
-        start_input.exception=exception;
-        if (ParseXMLStartTag(&start_input,&start_targets) == MagickFalse)
-          {
-            utf8=DestroyString(utf8);
-            return(&root->root);
-          }
-      }
-    else
-      {
-        MarkupTargets
-          markup;
-
-        markup.p=(&p);
-        markup.tag=(&tag);
-        markup.l=(&l);
-        markup.ignore_depth=(&ignore_depth);
-        if (ParseMarkup(root,terminal,exception,&markup) == MagickFalse)
-          {
-            utf8=DestroyString(utf8);
-            return(&root->root);
-          }
-      }
-     if ((p == (char *) NULL) || (*p == '\0'))
-       break;
-     *p++='\0';
-     tag=p;
-     if (ParseTagCharacterContent(root,tag,ignore_depth,&p) == MagickFalse)
-       break;
-  }
+  if (ParseXMLTreeTags(root,p,terminal,exception) == MagickFalse)
+    {
+      utf8=DestroyString(utf8);
+      return(&root->root);
+    }
   utf8=DestroyString(utf8);
   return(CheckXMLTreeClosed(root,exception));
 }
