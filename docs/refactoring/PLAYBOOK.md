@@ -5740,8 +5740,11 @@ an option: it would sit at the block's depth, as LB's *Not covered by* says of `
 7. *Forwarded results* (2026-11-14, lane c). Where the moved text then holds a group
    `{ if (G(...) == MagickFalse) { return(MagickFalse); } return(MagickTrue); }` (an
    earlier helper's call with its cleanup exit, followed by `continue;`, both mapped by
-   steps 4 and 6), the group becomes `return(G(...));` in the same commit, when every
-   `return` of `G` returns `MagickTrue` or `MagickFalse` (checked by reading `G`). A
+   steps 4 and 6), or ends a block with the two statements `if (G(...) == MagickFalse)
+   return(MagickFalse); return(MagickTrue);` (a written-out use of Recipe MC step 6
+   followed by `continue;`), the group or the two statements become `return(G(...));`
+   in the same commit, when every `return` of `G` returns `MagickTrue` or `MagickFalse`
+   (checked by reading `G`). A
    `const` input struct that the block declares at its top, initialised from variables
    the block does not write, becomes the new function's struct parameter: its
    declaration moves to the caller's block that holds the call, unchanged.
@@ -17512,5 +17515,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | AMEND | VC | Step 6: the cleanup exit may be `S goto L;` (Recipe V's jump after assignments of constants, `status=MagickFalse; goto cleanup;`), the caller writing `{ S goto L; }`; a `goto` whose label is inside the block moves with it; Lane: c | `InterpretImageProperties`' braced-escape block after Recipe MC | mandate (2026-10-24) |
 | 2026-11-14 | NEW | KM | Replace Option-Parsing Arms by a Keyed Table of Member Setters: arms that parse a value against an option table and store it, cast, into one member each become one table of (key, option, setter) walked by an RV-form lookup hoisted before the selection, with a one-statement setter per member; evidence oracle; Lane: c | `property.c`'s `SetImageProperty` (ten arms, ten bumps; probe 3.27 to 3.39) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | MC | Step 6: a use that is the whole body of `if (c)` becomes `if ((c) && (F(...) == MagickFalse)) return(MagickFalse);` in the moving commit (Recipe CN's form); Lane: c | `InterpretImageProperties`' glob loops, whose nested `if` would leave each helper at depth 4 | mandate (2026-10-24) |
-| 2026-11-14 | AMEND | VC | Step 7: a moved group `{ if (G(...) == MagickFalse) return(MagickFalse); return(MagickTrue); }` becomes `return(G(...));` when `G` returns only `MagickTrue` or `MagickFalse`; a `const` input struct declared at the block's top becomes the struct parameter; Lane: c | `InterpretImageProperties`' braced-escape block after its prefix arms moved (probe 3.27 to 3.48) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | VC | Step 7: a moved group `{ if (G(...) == MagickFalse) return(MagickFalse); return(MagickTrue); }`, or those two statements ending a block, become `return(G(...));` when `G` returns only `MagickTrue` or `MagickFalse`; a `const` input struct declared at the block's top becomes the struct parameter; Lane: c | `InterpretImageProperties`' braced-escape block after its prefix arms moved (probe 3.27 to 3.48) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | MT | Step 1: the copies may be blocks that Recipe VC moves (in-loop, leaving through `S goto L;`); a differing pair of `void` call statements is written as a `?:` of the two calls; Lane: c | `InterpretImageProperties`' option and artifact glob loops (two helpers would be *Code Duplication*) | mandate (2026-10-24) |
