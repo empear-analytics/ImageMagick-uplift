@@ -24394,6 +24394,58 @@ static void XMakePanWindow(const DisplayEventContext *context)
   (void) XSetTransientForHint(display,windows->pan.id,windows->image.id);
 }
 
+static MagickBooleanType XSelectCommandWidgetEvent(
+  const DisplayEventContext *context,const DisplayEventTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  char
+    *const command = context->command;
+
+  Image
+    **const nexus = targets->nexus,
+    **const display_image = targets->display_image;
+
+  XEvent
+    *const event = targets->event;
+
+  DisplayCommand
+    display_command;
+
+  int
+    id;
+
+  if ((*event).xany.window == windows->command.id)
+    {
+      /*
+        Select a command from the Command widget.
+      */
+      id=XCommandWidget(display,windows,CommandMenu,event);
+      if (id < 0)
+        return(MagickTrue);
+      (void) CopyMagickString(command,CommandMenu[id],MagickPathExtent);
+      display_command=CommandMenus[id];
+      if (XSelectCommandMenuEntry(context,id,&display_command) !=
+          MagickFalse)
+        return(MagickTrue);
+      if (display_command != NullCommand)
+        (*nexus)=XMagickCommand(display,resource_info,windows,display_command,
+          display_image,exception);
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -24402,15 +24454,9 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
     *directory,
     geometry[MagickPathExtent];
 
-  DisplayCommand
-    display_command;
-
   Image
     *display_image,
     *nexus;
-
-  int
-    id;
 
   KeySym
     key_symbol;
@@ -24807,24 +24853,9 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
             windows->magnify.stasis=MagickTrue;
           }
       }
-    if (event.xany.window == windows->command.id)
-      {
-        /*
-          Select a command from the Command widget.
-        */
-        id=XCommandWidget(display,windows,CommandMenu,&event);
-        if (id < 0)
-          continue;
-        (void) CopyMagickString(command,CommandMenu[id],MagickPathExtent);
-        display_command=CommandMenus[id];
-        if (XSelectCommandMenuEntry(&event_context,id,&display_command) !=
-            MagickFalse)
-          continue;
-        if (display_command != NullCommand)
-          nexus=XMagickCommand(display,resource_info,windows,display_command,
-            &display_image,exception);
-        continue;
-      }
+    if (XSelectCommandWidgetEvent(&event_context,&event_targets) !=
+        MagickFalse)
+      continue;
     switch (event.type)
     {
       case ButtonPress:
