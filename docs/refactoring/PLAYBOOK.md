@@ -19618,6 +19618,17 @@ shape; Recipe SD, which keeps every arm in a `switch` (a new *Complex Method*).
    which binds as `const` locals the members that macro names (Recipe N step 4's choice
    member by member). Twin handlers that differ in one constant argument share a helper
    taking it (Recipe SV), each handler one `return` of its call.
+8. *Character keys* (2026-11-14, lane c). A `switch (c)` on a character parameter, each
+   `case 'x':` group one arm ending in its only `break;`, takes rows `{ 'x', requirement,
+   Handler }` and a lookup comparing `row.c == c` (labels are distinct, so the row is
+   the group). When the caller itself has every name the guard macros use, the guards
+   run in the caller under `if (row->requirement == ...)` before the handler call, and
+   the macro returns from the caller as before; no `Invoke` function. A handler whose
+   body (after step 3) is the text of an existing handler's is that handler (Recipe D):
+   the row names it, and its definition, with the types the table needs, moves up to
+   stand above the first function that uses it (declarations only; `obj_same_code.sh`
+   is not needed, the oracle covers the step). A group holding `#` lines or a second
+   guard stays in the `switch`.
 
 **Before:**
 
@@ -20105,3 +20116,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | AMEND | DL | Step 4: in a `switch` with no `default:`, a group that is `break;` alone, with its labels, may be deleted (a value matching no label leaves the `switch` where the `break;` went); `obj_identical.sh` IDENTICAL; Lane: c | `property.c`'s `SetImageProperty` (fourteen letter groups emptied by Recipes PK and KA) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | KB | Peel Keyed Arms Writing a Result out of a First-Letter Switch into a Table of Handlers: arms of a name `switch` that write a result local or buffer and `break;` to a common tail become handlers taking an input struct and returning the result, a key table whose rows also name the guard macro the arm opened with (run by one dispatcher), and one lookup before the `switch`; Lane: c | `property.c`'s `GetMagickProperty` (45 handlers for 47 keys; 3.69 to 3.99) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | KB | Step 7: prefix arms (`LocaleNCompare` with a length) become rows with a length member; an arm with a second guard inside a branch keeps it in the handler, binding the members it names; twin handlers share a helper taking the differing constant; Lane: c | `property.c`'s `GetMagickProperty` (`minimum-bounding-box`, `papersize:`, `scene`; 3.69 to 4.44 with DL) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | KB | Step 8: a `switch` on a character parameter takes rows keyed by the character; the guards run in the caller when it has their names; a handler identical to an existing one reuses it, moving it and the shared types above the first user; Lane: c | `property.c`'s `GetMagickPropertyLetter` (39 letters; 4.53 to 5.15) | mandate (2026-10-24) |
