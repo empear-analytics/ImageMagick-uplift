@@ -2337,6 +2337,17 @@ static ssize_t SetMetaChannelAttributes(const Image *image,ssize_t n)
   return(n);
 }
 
+static PixelTrait GetChannelMapTrait(const Image *image)
+{
+  PixelTrait
+    trait;
+
+  trait=UpdatePixelTrait;
+  if (image->alpha_trait != UndefinedPixelTrait)
+    trait=(PixelTrait) (trait | BlendPixelTrait);
+  return(trait);
+}
+
 MagickPrivate MagickBooleanType ResetPixelChannelMap(Image *image,
   ExceptionInfo *exception)
 {
@@ -2350,9 +2361,7 @@ MagickPrivate MagickBooleanType ResetPixelChannelMap(Image *image,
   assert(image->signature == MagickCoreSignature);
   (void) memset(image->channel_map,0,MaxPixelChannels*
     sizeof(*image->channel_map));
-  trait=UpdatePixelTrait;
-  if (image->alpha_trait != UndefinedPixelTrait)
-    trait=(PixelTrait) (trait | BlendPixelTrait);
+  trait=GetChannelMapTrait(image);
   n=0;
   n=SetColorChannelAttributes(image,trait,n);
   n=SetExtraChannelAttributes(image,n);
