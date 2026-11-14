@@ -18879,6 +18879,115 @@ Lane: c
 
 ---
 
+## Recipe XP - Share Mirrored Extreme-Search Loops Through Per-Direction Predicates
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Complex Method* or *Large Method* on
+a function holding several copies of one search loop that keeps the most extreme element
+of an array, each copy differing only in the operands and comparison operators of its
+tests: `property.c`'s `GetConvexHullExtremePoints`, whose top, right, bottom and left
+loops each run `if (h[n].A op1 e.A) { e=h[n]; continue; } if (h[n].A != e.A) continue;
+if (h[n].B op2 e.B) e=h[n];` with their own axes and operators.
+
+**Not covered by:** Recipe MT, which merges two copies through a selector and writes each
+differing run as a conditional (four copies with two runs each would put six `?:` into
+one loop, a *Complex Method* of its own); Recipe CF, whose copies already differ only in
+the function they call; Recipe P, which names one expression, while each copy's tests
+are a sequence with `continue`; Recipe E, which would give four helper loops that clone
+one another.
+
+**How:**
+
+1. Copies. Two or more loops in one function, outside every OpenMP region, each
+   `e=h[0]; for (n=0; n < (ssize_t) count; n++) { T }` where `T` is a sequence of tests
+   on `h[n]` and `e` that only assign `e=h[n];` and `continue;`, reads nothing the loop
+   writes but `e` and `n`, and calls nothing. Check by script that every copy matches one
+   template once its tests' operands and operators are taken out.
+2. For each copy write a `static MagickBooleanType` predicate directly above the
+   function, taking `(const T *point,const T *extreme)`: `T` with `h[n]` written
+   `point->`, `e` written `extreme->`, each `e=h[n]; continue;` (or `e=h[n];` ending the
+   body) written `return(MagickTrue);`, each lone `continue;` `return(MagickFalse);`,
+   and a final test `if (c) e=h[n];` written `return((MagickBooleanType) (c));`. The
+   tests, their operands and operators, and their order are unchanged.
+3. Write `typedef MagickBooleanType (*NameMethod)(const T *,const T *);` and one
+   `static T` search taking `(const T *h,const size_t count,const NameMethod method)`:
+   `e=h[0];`, the copies' `for` header, `if (method(h+n,&e) != MagickFalse) e=h[n];`,
+   `return(e);`.
+4. Each copy becomes `e=Search(h,count,Predicate);`, its comment kept; the statements
+   after each copy stay. The loop counter leaves the caller when nothing else uses it.
+5. All copies move in one commit (rule 1); the message names each copy and predicate.
+6. Check by reading that each predicate returns `MagickTrue` exactly on the paths where
+   its copy assigned `e`, and that no path assigned twice.
+7. Run the oracle for the function's caller, and compare base and candidate by hand on
+   inputs with ties in the first test (equal coordinates), where the second test decides.
+
+**Before:**
+
+```c
+  extreme=convex_hull[0];  /* top */
+  for (n=0; n < (ssize_t) number_points; n++)
+  {
+    if (convex_hull[n].y < extreme.y)
+      {
+        extreme=convex_hull[n];
+        continue;
+      }
+    if (convex_hull[n].y != extreme.y)
+      continue;
+    if (convex_hull[n].x < extreme.x)
+      extreme=convex_hull[n];
+  }
+```
+
+**After:**
+
+```c
+static MagickBooleanType IsTopHullPoint(const PointInfo *point,
+  const PointInfo *extreme)
+{
+  if (point->y < extreme->y)
+    return(MagickTrue);
+  if (point->y != extreme->y)
+    return(MagickFalse);
+  return((MagickBooleanType) (point->x < extreme->x));
+}
+...
+static PointInfo GetHullExtremePoint(const PointInfo *convex_hull,
+  const size_t number_points,const HullPointMethod method)
+{
+  ...
+  extreme=convex_hull[0];
+  for (n=0; n < (ssize_t) number_points; n++)
+    if (method(convex_hull+n,&extreme) != MagickFalse)
+      extreme=convex_hull[n];
+  return(extreme);
+}
+...
+  extreme=GetHullExtremePoint(convex_hull,number_points,  /* top */
+    IsTopHullPoint);
+```
+
+**Careful:**
+
+- Values. Each iteration evaluates the copy's tests in the same order on the same
+  values (`point` addresses `h[n]`, `extreme` the search's current `e`, which holds what
+  the copy's `e` held), and assigns `e=h[n]` exactly when the copy did: every path of
+  `T` ends either in an assignment (then nothing else of `T` runs, by its `continue` or
+  by being the last statement) or without one. Floating-point comparisons, NaN included,
+  are the same operators on the same operands.
+- C++ (Windows CI): the final comparison is `bool` there; step 2's cast to
+  `MagickBooleanType` is required (Recipe DT).
+- The predicates are small look-alikes; measure that *Code Duplication* does not appear.
+
+**Evidence level:** oracle (the caller's cases), with the hand comparison of step 7.
+
+**Provenance:** 2026-11-14, from `property.c`'s `GetConvexHullExtremePoints` (campaign
+B, M127 lane c round 9), cc 26, 87 lines, four bumps: the function leaves every
+finding and the file goes from 3.64 to 3.66, with no *Code Duplication* among the four
+predicates. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: c
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -19280,3 +19389,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | RW | Share a Sequential Row Walk Through Row Functions Returning the Advanced Pointer: many `static` copies of one sequential row walk (fetch, `NULL` break, optional sync, `y < height` result) differing in the column loop and the buffer pointer type become one walk taking a `const` row struct, a row-function pointer and `void *pixels`; each copy keeps its name as a row function `void *F(const RowInfo *,row pointer,void *)` returning the advanced pointer; Lane: c | `pixel-export.c`'s 56 `Export<Type><Map>Pixels`/`Export<Type>MapPixels` walks: 6.89 to 7.32, timing equal (five commands, within 0.6%) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | QF | Share a Single Pixel Fetch Through Row Functions: many `static void` copies opening with one fetch (`GetAuthenticPixelQueue`) and an early `return;` on `NULL`, differing in the column loop and the buffer type, become one `void` function taking a `const` row struct, a row-function pointer and `void *pixels`; each copy keeps its name as a `void` row function; Lane: c | `stream.c`'s 56 `Stream<Type><Map>Pixels`/`Stream<Type>MapPixels`: 6.89 to 7.32, `magick stream` timing equal on five commands | mandate (2026-10-24) |
 | 2026-11-14 | NEW | JT | Replace Jumps to a Returning Tail by Calls of the Tail: a function-ending `L: S return(R);` reached by `goto L;` from nested arms moves to a `static` helper of the return type taking the (at most four) variables it reads; each `goto L;` and the label's tail become `return(Helper(...));`; Lane: c | `property.c`'s `InterpretBracedEscape` (three lookup arms jumping to `PropertyLookupFailure:`): the first step of a chain that takes the function out of every finding, 3.62 to 3.64 | mandate (2026-10-24) |
+| 2026-11-14 | NEW | XP | Share Mirrored Extreme-Search Loops Through Per-Direction Predicates: copies of a loop keeping the most extreme array element, differing in their tests' operands and operators, become one `static` search taking a predicate pointer, each copy's tests a `MagickBooleanType` predicate returning `MagickTrue` where the copy assigned; Lane: c | `property.c`'s `GetConvexHullExtremePoints` (top, right, bottom, left loops; cc 26, four bumps): leaves every finding, 3.64 to 3.66 | mandate (2026-10-24) |
