@@ -4728,6 +4728,138 @@ static MagickBooleanType AppendGlobbedProperties(const InterpretText *text,
   return(MagickTrue);
 }
 
+static MagickBooleanType InterpretBracedEscape(
+  const InterpretSources *sources,const InterpretText *text,const char **p)
+{
+  char
+    pattern[2*MagickPathExtent] = "\0";
+
+  const char
+    *string;
+
+  ssize_t
+    depth,
+    offset;
+
+  ExceptionInfo
+    *const exception = sources->exception;
+
+  Image
+    *const property_image = sources->property_image;
+
+  ImageInfo
+    *const property_info = sources->property_info;
+
+  /*
+    Braced Percent Escape %[...].
+  */
+  (*p)++;  /* advance p to just inside the opening brace */
+  depth=1;
+  if (**p == ']')
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+        "UnknownImageProperty","\"%%[]\"");
+      return(MagickFalse);
+    }
+  ScanBracedPattern(pattern,&offset,&depth,p);
+  if (depth != 0)
+    {
+      /*
+        Check for unmatched final ']' for "%[...]".
+      */
+      TruncatePatternForMessage(pattern,offset);
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "UnbalancedBraces","\"%%[%s\"",pattern);
+      return(MagickFalse);
+    }
+  /*
+    Special Lookup Prefixes %[prefix:...].
+  */
+  if (LocaleNCompare("fx:",pattern,3) == 0)
+    return(AppendFxValue(text,property_image,pattern,exception));
+  if (LocaleNCompare("hex:",pattern,4) == 0)
+    return(AppendHexValue(text,property_image,pattern,exception));
+  if (LocaleNCompare("pixel:",pattern,6) == 0)
+    return(AppendPixelValue(text,property_image,pattern,exception));
+  if (LocaleNCompare("option:",pattern,7) == 0)
+    {
+      /*
+        Option - direct global option lookup (with globbing).
+      */
+      if (IsGlob(pattern+7) != MagickFalse)
+        return(AppendGlobbedValues(sources,text,pattern+7,
+          OptionGlobSide));
+      string=GetImageOption(property_info,pattern+7);
+      if (string == (char *) NULL)
+        goto PropertyLookupFailure;
+      return(AppendInterpretString(text,string));
+    }
+  if (LocaleNCompare("artifact:",pattern,9) == 0)
+    {
+      /*
+        Artifact - direct image artifact lookup (with glob).
+      */
+      if (IsGlob(pattern+9) != MagickFalse)
+        return(AppendGlobbedValues(sources,text,pattern+9,
+          ArtifactGlobSide));
+      string=GetImageArtifact(property_image,pattern+9);
+      if (string == (char *) NULL)
+        goto PropertyLookupFailure;
+      return(AppendInterpretString(text,string));
+    }
+  if (LocaleNCompare("property:",pattern,9) == 0)
+    {
+      /*
+        Property - direct image property lookup (with glob).
+      */
+      if (IsGlob(pattern+9) != MagickFalse)
+        return(AppendGlobbedProperties(text,property_image,pattern,
+          exception));
+      string=GetImageProperty(property_image,pattern+9,exception);
+      if (string == (char *) NULL)
+        goto PropertyLookupFailure;
+      return(AppendInterpretString(text,string));
+    }
+  /*
+    Properties without special prefix.
+  */
+  string=GetImageProperty(property_image,pattern,exception);
+  if (string != (const char *) NULL)
+    {
+      if (AppendInterpretString(text,string) == MagickFalse)
+        return(MagickFalse);
+      (void) DeleteImageArtifact(property_image,"magick-property");
+      (void) DeleteImageOption(property_info,"magick-property");
+      return(MagickTrue);
+    }
+  if (IsGlob(pattern) != MagickFalse)
+    return(AppendGlobbedProperties(text,property_image,pattern,exception));
+  /*
+    Known property or attribute.
+  */
+  string=GetMagickProperty(property_info,property_image,pattern,exception);
+  if (string != (const char *) NULL)
+    return(AppendInterpretString(text,string));
+  /*
+    Per-image artifact.
+  */
+  string=GetImageArtifact(property_image,pattern);
+  if (string != (char *) NULL)
+    return(AppendInterpretString(text,string));
+  /*
+    Direct option lookup.
+  */
+  string=GetImageOption(property_info,pattern);
+  if (string != (char *) NULL)
+    return(AppendInterpretString(text,string));
+
+PropertyLookupFailure:
+  TruncatePatternForMessage(pattern,offset);
+  (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+    "UnknownImageProperty","\"%%[%s]\"",pattern);
+  return(MagickTrue);
+}
+
 MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   const char *embed_text,ExceptionInfo *exception)
 {
@@ -4875,192 +5007,14 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
         continue;
       }
     {
-      char
-        pattern[2*MagickPathExtent] = "\0";
-
-      const char
-        *string;
-
-      ssize_t
-        depth,
-        offset;
-
       const InterpretSources
         sources = { property_info, property_image, exception };
 
-      /*
-        Braced Percent Escape %[...].
-      */
-      p++;  /* advance p to just inside the opening brace */
-      depth=1;
-      if (*p == ']')
+      if (InterpretBracedEscape(&sources,&text,&p) == MagickFalse)
         {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-            "UnknownImageProperty","\"%%[]\"");
           status=MagickFalse;
           goto cleanup;
         }
-      ScanBracedPattern(pattern,&offset,&depth,&p);
-      if (depth != 0)
-        {
-          /*
-            Check for unmatched final ']' for "%[...]".
-          */
-          TruncatePatternForMessage(pattern,offset);
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-            "UnbalancedBraces","\"%%[%s\"",pattern);
-          status=MagickFalse;
-          goto cleanup;
-        }
-      /*
-        Special Lookup Prefixes %[prefix:...].
-      */
-      if (LocaleNCompare("fx:",pattern,3) == 0)
-        {
-          if (AppendFxValue(&text,property_image,pattern,exception) ==
-              MagickFalse)
-            {
-              status=MagickFalse;
-              goto cleanup;
-            }
-          continue;
-        }
-      if (LocaleNCompare("hex:",pattern,4) == 0)
-        {
-          if (AppendHexValue(&text,property_image,pattern,exception) ==
-              MagickFalse)
-            {
-              status=MagickFalse;
-              goto cleanup;
-            }
-          continue;
-        }
-      if (LocaleNCompare("pixel:",pattern,6) == 0)
-        {
-          if (AppendPixelValue(&text,property_image,pattern,exception) ==
-              MagickFalse)
-            {
-              status=MagickFalse;
-              goto cleanup;
-            }
-          continue;
-        }
-      if (LocaleNCompare("option:",pattern,7) == 0)
-        {
-          /*
-            Option - direct global option lookup (with globbing).
-          */
-          if (IsGlob(pattern+7) != MagickFalse)
-            {
-              if (AppendGlobbedValues(&sources,&text,pattern+7,
-                  OptionGlobSide) == MagickFalse)
-                {
-                  status=MagickFalse;
-                  goto cleanup;
-                }
-              continue;
-            }
-          string=GetImageOption(property_info,pattern+7);
-          if (string == (char *) NULL)
-            goto PropertyLookupFailure;
-          AppendString2Text(string);
-          continue;
-        }
-      if (LocaleNCompare("artifact:",pattern,9) == 0)
-        {
-          /*
-            Artifact - direct image artifact lookup (with glob).
-          */
-          if (IsGlob(pattern+9) != MagickFalse)
-            {
-              if (AppendGlobbedValues(&sources,&text,pattern+9,
-                  ArtifactGlobSide) == MagickFalse)
-                {
-                  status=MagickFalse;
-                  goto cleanup;
-                }
-              continue;
-            }
-          string=GetImageArtifact(property_image,pattern+9);
-          if (string == (char *) NULL)
-            goto PropertyLookupFailure;
-          AppendString2Text(string);
-          continue;
-        }
-      if (LocaleNCompare("property:",pattern,9) == 0)
-        {
-          /*
-            Property - direct image property lookup (with glob).
-          */
-          if (IsGlob(pattern+9) != MagickFalse)
-            {
-              if (AppendGlobbedProperties(&text,property_image,pattern,
-                  exception) == MagickFalse)
-                {
-                  status=MagickFalse;
-                  goto cleanup;
-                }
-              continue;
-            }
-          string=GetImageProperty(property_image,pattern+9,exception);
-          if (string == (char *) NULL)
-            goto PropertyLookupFailure;
-          AppendString2Text(string);
-          continue;
-        }
-      /*
-        Properties without special prefix.
-      */
-      string=GetImageProperty(property_image,pattern,exception);
-      if (string != (const char *) NULL)
-        {
-          AppendString2Text(string);
-          (void) DeleteImageArtifact(property_image,"magick-property");
-          (void) DeleteImageOption(property_info,"magick-property");
-          continue;
-        }
-      if (IsGlob(pattern) != MagickFalse)
-        {
-          if (AppendGlobbedProperties(&text,property_image,pattern,exception) ==
-              MagickFalse)
-            {
-              status=MagickFalse;
-              goto cleanup;
-            }
-          continue;
-        }
-      /*
-        Known property or attribute.
-      */
-      string=GetMagickProperty(property_info,property_image,pattern,exception);
-      if (string != (const char *) NULL)
-        {
-          AppendString2Text(string);
-          continue;
-        }
-      /*
-        Per-image artifact.
-      */
-      string=GetImageArtifact(property_image,pattern);
-      if (string != (char *) NULL)
-        {
-          AppendString2Text(string);
-          continue;
-        }
-      /*
-        Direct option lookup.
-      */
-      string=GetImageOption(property_info,pattern);
-      if (string != (char *) NULL)
-        {
-          AppendString2Text(string);
-          continue;
-        }
-
-PropertyLookupFailure:
-      TruncatePatternForMessage(pattern,offset);
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-        "UnknownImageProperty","\"%%[%s]\"",pattern);
     }
   }
   *q='\0';
