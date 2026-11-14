@@ -22428,6 +22428,50 @@ static void XHandleMapNotify(const DisplayEventContext *context,
   XRecordMappedWindow(context,targets);
 }
 
+static void XRecordUnmappedWindow(const DisplayEventContext *context,
+  const DisplayEventTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const display_image = targets->display_image;
+
+  XEvent
+    *const event = targets->event;
+
+  if ((*event).xunmap.window == windows->info.id)
+    {
+      windows->info.mapped=MagickFalse;
+      return;
+    }
+  if ((*event).xunmap.window == windows->icon.id)
+    {
+      XUnmapIconWindow(context,(*display_image));
+      return;
+    }
+  if ((*event).xunmap.window == windows->command.id)
+    {
+      windows->command.mapped=MagickFalse;
+      return;
+    }
+  if ((*event).xunmap.window == windows->popup.id)
+    {
+      XFocusImageWindow(display,windows);
+      windows->popup.mapped=MagickFalse;
+      return;
+    }
+  if ((*event).xunmap.window == windows->widget.id)
+    {
+      XFocusImageWindow(display,windows);
+      windows->widget.mapped=MagickFalse;
+      return;
+    }
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -23206,33 +23250,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
             windows->pan.mapped=MagickFalse;
             break;
           }
-        if (event.xunmap.window == windows->info.id)
-          {
-            windows->info.mapped=MagickFalse;
-            break;
-          }
-        if (event.xunmap.window == windows->icon.id)
-          {
-            XUnmapIconWindow(&event_context,display_image);
-            break;
-          }
-        if (event.xunmap.window == windows->command.id)
-          {
-            windows->command.mapped=MagickFalse;
-            break;
-          }
-        if (event.xunmap.window == windows->popup.id)
-          {
-            XFocusImageWindow(display,windows);
-            windows->popup.mapped=MagickFalse;
-            break;
-          }
-        if (event.xunmap.window == windows->widget.id)
-          {
-            XFocusImageWindow(display,windows);
-            windows->widget.mapped=MagickFalse;
-            break;
-          }
+        XRecordUnmappedWindow(&event_context,&event_targets);
         break;
       }
       default:
