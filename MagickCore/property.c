@@ -847,6 +847,13 @@ static inline MagickBooleanType IsInvalid8BIMResourceCount(const ssize_t count,
     MagickFalse);
 }
 
+static void Convert8BIMResourceName(char *resource,char **macroman_resource)
+{
+  if (resource != (char *) NULL)
+    (*macroman_resource)=(char *) ConvertMacRomanToUTF8((unsigned char *)
+      resource);
+}
+
 static void Get8BIMProperty(const Image *image,const char *key,
   ExceptionInfo *exception)
 {
@@ -920,9 +927,7 @@ static void Get8BIMProperty(const Image *image,const char *key,
         length=0;
         continue;
       }
-    if (resource != (char *) NULL)
-      macroman_resource=(char *) ConvertMacRomanToUTF8((unsigned char *)
-        resource);
+    Convert8BIMResourceName(resource,&macroman_resource);
     match.name=name;
     match.resource=resource;
     match.macroman_resource=macroman_resource;
