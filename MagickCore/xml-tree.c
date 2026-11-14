@@ -1364,6 +1364,19 @@ static void AppendProcessingInstruction(XMLTreeRoot *root,const ssize_t i,
   root->processing_instructions[i][j+1]=(char *) NULL;
 }
 
+static ssize_t FindProcessingInstruction(const XMLTreeRoot *root,
+  const char *target)
+{
+  ssize_t
+    i;
+
+  i=0;
+  while ((root->processing_instructions[i] != (char **) NULL) &&
+         (strcmp(target,root->processing_instructions[i][0]) != 0))
+    i++;
+  return(i);
+}
+
 static void ParseProcessingInstructions(XMLTreeRoot *root,char *xml,
   size_t length)
 {
@@ -1395,10 +1408,7 @@ static void ParseProcessingInstructions(XMLTreeRoot *root,char *xml,
         *root->processing_instructions));
       *root->processing_instructions=(char **) NULL;
     }
-  i=0;
-  while ((root->processing_instructions[i] != (char **) NULL) &&
-         (strcmp(target,root->processing_instructions[i][0]) != 0))
-    i++;
+  i=FindProcessingInstruction(root,target);
   AddProcessingInstructionTarget(root,i,target);
   AppendProcessingInstruction(root,i,xml);
 }
