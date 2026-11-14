@@ -17170,6 +17170,85 @@ Lane: b
 
 ---
 
+## Recipe FG - Fold a Function into the Twin Taking Its Derived Argument
+
+**Use when:** a file sits at CodeScene's *Number of Functions in a Single Module*
+threshold, so that the helper the next step needs would trip it, and two `static`
+functions of the file are twins in which one computes, from one of its parameters, the
+value the other takes as a parameter: `xml-tree.c`'s `ExtendXMLBuffer(source,length,
+extent,text)`, whose body is `ExtendXMLBufferBy(source,length,extent,size)`'s with
+`strlen(text)` at each place the twin has `size`. Removing the first function frees a
+place for the helper.
+
+**Not covered by:** Recipe D, which needs blocks that are the same text once variables
+are renamed (here one has a call where the other has a parameter) and leaves both
+functions; Recipe CF, whose copies differ in the function they call; Recipe TI and MT,
+which merge two copies into a new function with a selector; Recipe DV, which drops a
+parameter instead of a function.
+
+**How:**
+
+1. `F(p1,...,pn,t)` and `G(p1,...,pn,s)` are `static`, in one file, and neither's address
+   is taken (`grep`). With `s` written as `E(t)` at each of its places, `G`'s body is
+   `F`'s character for character, `E(t)` being an expression of `t` alone that calls
+   only functions without side effects (`strlen`) and contains no assignment or
+   increment. Check by script.
+2. `E(t)` gives the same value at each of its places in `F`: nothing in `F` before its
+   last `E(t)` writes `t` or the object it points to (by reading; a call that receives
+   neither and writes no memory `t` can reach does not count), so evaluating it once,
+   at the call, and passing the value is the same as evaluating it at each place.
+3. `E(t)` converts to `s`'s declared type without change (`strlen` returns `size_t`, and
+   `s` is `const size_t`).
+4. Replace each call `F(a1,...,an,b)` by `G(a1,...,an,E(b))`, `E(b)` being `E` with the
+   argument `b` substituted for `t`; `b` must have no side effect (an identifier, a member
+   access or an array element of identifiers), as it is evaluated in the same order
+   relative to the other arguments as C's unspecified argument order already allowed.
+5. Delete `F`. Build: a call left behind does not compile.
+
+**Before:**
+
+```c
+static MagickBooleanType ExtendXMLBuffer(char **source,const size_t *length,
+  size_t *extent,const char *text)
+{
+  if ((*length+strlen(text)+MagickPathExtent) > *extent)
+    {
+      *extent=(*length)+strlen(text)+MagickPathExtent;
+      ...
+}
+...
+  if (ExtendXMLBuffer(source,length,extent,xml_info->tag) == MagickFalse)
+```
+
+**After:**
+
+```c
+  if (ExtendXMLBufferBy(source,length,extent,strlen(xml_info->tag)) == MagickFalse)
+```
+
+**Careful:**
+
+- `F` evaluated `E(t)` before anything it did changed `t` (step 2), so the value passed
+  is the value each place read; `G` uses it at the same places, so every comparison,
+  assignment and call sees the same operands. `strlen` called once instead of twice
+  changes no output.
+- `G` may sit below `F`'s callers: declare nothing new; move `G` above the first caller
+  verbatim only if the build needs it (a move of a whole `static` function changes no
+  instruction).
+- The step adds nothing and removes a function: it is flat, or pays a little through the
+  file's mean complexity; it is kept for the place it frees (rule 2), and the commit
+  names the step that uses that place.
+
+**Evidence level:** oracle (the cases that reach each caller).
+
+**Provenance:** 2026-11-14, from `xml-tree.c`'s `ExtendXMLBuffer` and `ExtendXMLBufferBy`
+(campaign B, M127 lane b round 8): the file had 111 functions, the 112th trips *Number
+of Functions* (5.83 to 5.66), and clearing *Complex Conditional* needs predicates.
+Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -17550,3 +17629,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | PL | Step 6, tail form: in a `void` function whose last statement is the `switch`, a group of statements ending in its one `break;` counts as leaving and is peeled as `{ <statements> return; }`; Lane: b | `quantum-type.c`'s `SetQuantumImageType` (seven colour-separation labels setting `image->type`) | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | KC | Step 7: groups `v=x; break;` with a non-literal `x` stay, with `default:`, in a kept `switch` that is step 4's `else` branch; Lane: b | `quantum-type.c`'s `GetQuantumChannels` (twelve literal channel counts and `MultispectralQuantum`'s `GetImageChannels(image)`) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | PT | Peel a Leaving Label Set out of a Selection into a Membership Table: PL's peel with TB's table predicate in one step, for a file of six functions where PL's label-run predicate and the seventh function each dip; Lane: b | `quantum-type.c`'s `SetQuantumImageType` (PL alone 8.92, PT alone 9.09, with PL on the index labels 10.0 from 9.58) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | FG | Fold a Function into the Twin Taking Its Derived Argument: `F(...,t)` whose body is `G(...,s)`'s with `E(t)` for `s` loses its calls to `G(...,E(b))` and is deleted, freeing a place under the function-count threshold; Lane: b | `xml-tree.c`'s `ExtendXMLBuffer`/`ExtendXMLBufferBy` (111 functions; the 112th costs 0.17) | mandate (2026-10-24) |
