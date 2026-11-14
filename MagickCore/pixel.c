@@ -2477,6 +2477,21 @@ static const char *GetPixelChannelLogName(const Image *image,
   return("undefined");
 }
 
+static void FormatPixelChannelTraits(const Image *image,
+  const PixelChannel channel,char *traits)
+{
+  *traits='\0';
+  if ((GetPixelChannelTraits(image,channel) & UpdatePixelTrait) != 0)
+    (void) ConcatenateMagickString(traits,"update,",MagickPathExtent);
+  if ((GetPixelChannelTraits(image,channel) & BlendPixelTrait) != 0)
+    (void) ConcatenateMagickString(traits,"blend,",MagickPathExtent);
+  if ((GetPixelChannelTraits(image,channel) & CopyPixelTrait) != 0)
+    (void) ConcatenateMagickString(traits,"copy,",MagickPathExtent);
+  if (*traits == '\0')
+    (void) ConcatenateMagickString(traits,"undefined,",MagickPathExtent);
+  traits[strlen(traits)-1]='\0';
+}
+
 static void LogPixelChannels(const Image *image)
 {
   ssize_t
@@ -2504,16 +2519,7 @@ static void LogPixelChannels(const Image *image)
           (double) channel);
         name=(const char *) channel_name;
       }
-    *traits='\0';
-    if ((GetPixelChannelTraits(image,channel) & UpdatePixelTrait) != 0)
-      (void) ConcatenateMagickString(traits,"update,",MagickPathExtent);
-    if ((GetPixelChannelTraits(image,channel) & BlendPixelTrait) != 0)
-      (void) ConcatenateMagickString(traits,"blend,",MagickPathExtent);
-    if ((GetPixelChannelTraits(image,channel) & CopyPixelTrait) != 0)
-      (void) ConcatenateMagickString(traits,"copy,",MagickPathExtent);
-    if (*traits == '\0')
-      (void) ConcatenateMagickString(traits,"undefined,",MagickPathExtent);
-    traits[strlen(traits)-1]='\0';
+    FormatPixelChannelTraits(image,channel,traits);
     (void) LogMagickEvent(PixelEvent,GetMagickModule(),"  %.17g: %s (%s)",
       (double) i,name,traits);
   }
