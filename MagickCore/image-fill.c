@@ -652,9 +652,6 @@ MagickExport MagickBooleanType SetImageColor(Image *image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     q=QueueCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -663,11 +660,7 @@ MagickExport MagickBooleanType SetImageColor(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      SetPixelViaPixelInfo(image,color,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    FillPixelRow(image,color,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
   }
