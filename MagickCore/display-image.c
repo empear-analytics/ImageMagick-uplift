@@ -10658,6 +10658,38 @@ static void XApplyCopyCommand(const XMagickCommandContext *context)
     exception);
 }
 
+static void XApplyPasteCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  MagickStatusType
+    status;
+
+  /*
+    Paste image.
+  */
+  status=XPasteImage(display,resource_info,windows,*image,exception);
+  if (status == MagickFalse)
+    {
+      XNoticeWidget(display,windows,"Unable to paste X image",
+        (*image)->filename);
+      return;
+    }
+}
+
 static void XApplyResizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11336,19 +11368,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyCopyCommand(&context);
       break;
     case PasteCommand:
-    {
-      /*
-        Paste image.
-      */
-      status=XPasteImage(display,resource_info,windows,*image,exception);
-      if (status == MagickFalse)
-        {
-          XNoticeWidget(display,windows,"Unable to paste X image",
-            (*image)->filename);
-          break;
-        }
+      XApplyPasteCommand(&context);
       break;
-    }
     case HalfSizeCommand:
     {
       /*
