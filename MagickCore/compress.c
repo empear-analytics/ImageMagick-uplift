@@ -294,11 +294,25 @@ MagickExport void Ascii85Flush(Image *image)
   (void) WriteBlobByte(image,'\n');
 }
 
-MagickExport void Ascii85Encode(Image *image,const unsigned char code)
+static void WriteAscii85Tuple(Image *image)
 {
   char
     *q;
 
+  for (q=image->ascii85->tuple; *q != '\0'; q++)
+  {
+    image->ascii85->line_break--;
+    if ((image->ascii85->line_break < 0) && (*q != '%'))
+      {
+        (void) WriteBlobByte(image,'\n');
+        image->ascii85->line_break=2*MaxLineExtent;
+      }
+    (void) WriteBlobByte(image,(unsigned char) *q);
+  }
+}
+
+MagickExport void Ascii85Encode(Image *image,const unsigned char code)
+{
   unsigned char
     *p;
 
@@ -316,16 +330,7 @@ MagickExport void Ascii85Encode(Image *image,const unsigned char code)
   for (n=image->ascii85->offset; n >= 4; n-=4)
   {
     Ascii85Tuple(image->ascii85,p);
-    for (q=image->ascii85->tuple; *q != '\0'; q++)
-    {
-      image->ascii85->line_break--;
-      if ((image->ascii85->line_break < 0) && (*q != '%'))
-        {
-          (void) WriteBlobByte(image,'\n');
-          image->ascii85->line_break=2*MaxLineExtent;
-        }
-      (void) WriteBlobByte(image,(unsigned char) *q);
-    }
+    WriteAscii85Tuple(image);
     p+=(ptrdiff_t) 8;
   }
   image->ascii85->offset=n;
