@@ -2675,6 +2675,27 @@ MagickExport char **GetCommandOptions(const CommandOption option)
 }
 
 
+static MagickBooleanType IsPedanticOptionSet(void)
+{
+  char
+    *value;
+
+  ExceptionInfo
+    *exception;
+
+  MagickBooleanType
+    pedantic;
+
+  exception=AcquireExceptionInfo();
+  value=(char *) GetImageRegistry(StringRegistryType,"option:pedantic",
+    exception);
+  exception=DestroyExceptionInfo(exception);
+  pedantic=IsStringTrue(value);
+  if (value != (char *) NULL)
+    value=DestroyString(value);
+  return(pedantic);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2706,25 +2727,13 @@ static inline MagickBooleanType IsBracketOption(const char *option)
 
 MagickExport MagickBooleanType IsCommandOption(const char *option)
 {
-  char
-    *value;
-
-  ExceptionInfo
-    *exception;
-
   MagickBooleanType
     pedantic;
 
   assert(option != (const char *) NULL);
   if ((*option != '-') && (*option != '+'))
     return(MagickFalse);
-  exception=AcquireExceptionInfo();
-  value=(char *) GetImageRegistry(StringRegistryType,"option:pedantic",
-    exception);
-  exception=DestroyExceptionInfo(exception);
-  pedantic=IsStringTrue(value);
-  if (value != (char *) NULL)
-    value=DestroyString(value);
+  pedantic=IsPedanticOptionSet();
   if ((pedantic == MagickFalse) && (IsPathAccessible(option) != MagickFalse))
     return(MagickFalse);
   if (strlen(option) == 1)
