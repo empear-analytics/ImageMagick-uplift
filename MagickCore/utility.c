@@ -1044,6 +1044,26 @@ static void LogExpandedCommandLine(char **vector,const ssize_t count)
     }
 }
 
+static char **AcquireArgumentVector(const int *number_arguments,
+  char ***arguments)
+{
+  char
+    **vector;
+
+  /*
+    Allocate argument vector.
+  */
+  assert(number_arguments != (int *) NULL);
+  assert(arguments != (char ***) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  vector=(char **) AcquireQuantumMemory((size_t) (*number_arguments+1),
+    sizeof(*vector));
+  if (vector == (char **) NULL)
+    ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
+  return(vector);
+}
+
 MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
   char ***arguments)
 {
@@ -1061,17 +1081,7 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
     count,
     parameters;
 
-  /*
-    Allocate argument vector.
-  */
-  assert(number_arguments != (int *) NULL);
-  assert(arguments != (char ***) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  vector=(char **) AcquireQuantumMemory((size_t) (*number_arguments+1),
-    sizeof(*vector));
-  if (vector == (char **) NULL)
-    ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
+  vector=AcquireArgumentVector(number_arguments,arguments);
   /*
     Expand any wildcard filenames.
   */
