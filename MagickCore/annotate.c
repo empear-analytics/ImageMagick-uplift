@@ -2054,17 +2054,10 @@ static inline MagickBooleanType IsTransparentFill(const DrawInfo *draw_info)
     MagickFalse);
 }
 
-static inline MagickBooleanType IsColumnOutside(const Image *image,
-  const ssize_t x_offset)
+static inline MagickBooleanType IsOffsetOutside(const ssize_t offset,
+  const size_t extent)
 {
-  return(((x_offset < 0) || (x_offset >= (ssize_t) image->columns)) ?
-    MagickTrue : MagickFalse);
-}
-
-static inline MagickBooleanType IsRowOutside(const Image *image,
-  const ssize_t y_offset)
-{
-  return(((y_offset < 0) || (y_offset >= (ssize_t) image->rows)) ?
+  return(((offset < 0) || (offset >= (ssize_t) extent)) ?
     MagickTrue : MagickFalse);
 }
 
@@ -2266,7 +2259,7 @@ static Quantum *GetGlyphRowPixels(const GlyphRows *rows,
     *magick_restrict q;
 
   q=(Quantum *) NULL;
-  if (IsColumnOutside(image,x_offset) != MagickFalse)
+  if (IsOffsetOutside(x_offset,image->columns) != MagickFalse)
     *active=MagickFalse;
   else
     {
@@ -2352,14 +2345,14 @@ static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
     return;
   x_offset=CastDoubleToSsizeT(ceil(point.x-0.5));
   y_offset=CastDoubleToSsizeT(ceil(point.y+y-0.5));
-  if (IsRowOutside(image,y_offset) != MagickFalse)
+  if (IsOffsetOutside(y_offset,image->rows) != MagickFalse)
     return;
   q=GetGlyphRowPixels(rows,x_offset,y_offset,&active);
   n=y*bitmap->bitmap.pitch;
   for (x=0; x < (ssize_t) bitmap->bitmap.width; x++, n++)
   {
     x_offset=CastDoubleToSsizeT(ceil(point.x+x-0.5));
-    if (IsColumnOutside(image,x_offset) != MagickFalse)
+    if (IsOffsetOutside(x_offset,image->columns) != MagickFalse)
       {
         q=SkipGlyphPixel(image,q);
         continue;
