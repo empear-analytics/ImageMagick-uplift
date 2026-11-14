@@ -2187,6 +2187,30 @@ static MagickBooleanType ReadEXIFProfileHeader(const StringInfo *profile,
   return(MagickTrue);
 }
 
+static void PopEXIFDirectory(const EXIFWalkTargets *targets,
+  const unsigned char **directory,ssize_t *tag_offset)
+{
+  ssize_t
+    *const level = targets->level;
+
+  size_t
+    *const entry = targets->entry;
+
+  DirectoryInfo
+    *const directory_stack = targets->directory_stack;
+
+  /*
+    If there is anything on the stack then pop it off.
+  */
+  if ((*level) > 0)
+    {
+      (*level)--;
+      (*directory)=directory_stack[(*level)].directory;
+      (*entry)=directory_stack[(*level)].entry;
+      (*tag_offset)=directory_stack[(*level)].offset;
+    }
+}
+
 static inline MagickBooleanType IsEXIFDirectoryOutside(
   const unsigned char *directory,const unsigned char *exif,const size_t length)
 {
@@ -2257,16 +2281,7 @@ static void GetEXIFProperty(const Image *image,const char *property,
     (void *(*)(void *)) NULL,(void *(*)(void *)) NULL);
   do
   {
-    /*
-      If there is anything on the stack then pop it off.
-    */
-    if (level > 0)
-      {
-        level--;
-        directory=directory_stack[level].directory;
-        entry=directory_stack[level].entry;
-        tag_offset=directory_stack[level].offset;
-      }
+    PopEXIFDirectory(&targets,&directory,&tag_offset);
     if (IsEXIFDirectoryOutside(directory,exif,length) != MagickFalse)
       break;
     walk.image=image;
