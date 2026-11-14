@@ -17422,6 +17422,123 @@ Lane: b
 
 ---
 
+## Recipe FC - Fold a Function into the Twin That Calls Out Its Block
+
+**Use when:** a file sits at CodeScene's *Number of Functions in a Single Module*
+threshold, so that the helper the next step needs would trip it, and two `static`
+functions of the file compute the same value, one with a block inline and the other by
+calling a `static` helper whose body is that block: `annotate.c`'s
+`GetPostscriptResolution(draw_info)` parses `draw_info->density` into its `resolution`
+in a nested block, and `GetFreetypeTextResolution(draw_info)` is the same function with
+that block replaced by `resolution=GetFreetypeResolution(draw_info,resolution);`.
+Deleting the first frees a place for a helper.
+
+**Not covered by:** Recipe FG and FW, whose twins differ in a derived argument or in how
+they advance an output pointer, not in a block called out; Recipe D, which deduplicates
+blocks and keeps both functions (its reuse forms would leave the inline twin calling the
+helper and still a function of its own); Recipe TI and MT, which merge two copies into a
+new function with a selector.
+
+**How:**
+
+1. `G` (inline block) and `F` (calling `H`) are `static`, in one file, and the address of
+   none of `G`, `F`, `H` is taken (`grep`). `H` is called only by `F`.
+2. `F`'s body is `G`'s with one block `B` of `G` written as `r=H(a1,...,an,r);`, where `r`
+   is a local of `G` (a struct or arithmetic value) and `H(p1,...,pn,r)` takes `r` by
+   value, runs `B` with `p1,...,pn` for `a1,...,an` (each an identifier `F` and `G` both
+   read, unchanged inside `B`), and returns `r`. `H`'s own locals are `B`'s, renamed at
+   most. Check by reading; `B` writes no other variable of `G` and leaves only by its end.
+3. Then `F` and `G` return the same value for the same arguments: `H` starts from the
+   value `r` had where `B` began, does to its copy what `B` did to `r`, and `F` stores the
+   result back into `r` before anything else reads it.
+4. Replace each call of `G` by a call of `F` with the same arguments, delete `G`, and
+   move `F` and `H` (whole, verbatim but for a rename) above the first caller. When `F` and
+   `H` sat inside an `#if` region that `G` did not (a delegate guard), they move out of it
+   to a place every configuration compiles; they must then name nothing declared only
+   under that `#if` (check by reading), so that a build without it compiles them as it
+   compiled `G`.
+5. `F` and `H` may take names that fit both callers (`GetDensityResolution`); run
+   `refactor_guard.py --calls --renamed` with each rename.
+
+**Before:**
+
+```c
+static PointInfo GetFreetypeResolution(const DrawInfo *draw_info,
+  PointInfo resolution)
+{
+  ...
+  geometry_flags=ParseGeometry(draw_info->density,&geometry_info);
+  if ((geometry_flags & RhoValue) != 0)
+    resolution.x=geometry_info.rho;
+  ...
+  return(resolution);
+}
+
+static PointInfo GetFreetypeTextResolution(const DrawInfo *draw_info)
+{
+  ...
+  if (draw_info->density != (char *) NULL)
+    resolution=GetFreetypeResolution(draw_info,resolution);
+  return(resolution);
+}
+...
+static PointInfo GetPostscriptResolution(const DrawInfo *draw_info)
+{
+  ...
+  if (draw_info->density != (char *) NULL)
+    {
+      ...
+      flags=ParseGeometry(draw_info->density,&geometry_info);
+      if ((flags & RhoValue) != 0)
+        resolution.x=geometry_info.rho;
+      ...
+    }
+  return(resolution);
+}
+...
+  resolution=GetPostscriptResolution(draw_info);
+```
+
+**After:**
+
+```c
+static PointInfo ParseDensityResolution(const DrawInfo *draw_info,
+  PointInfo resolution)
+...
+static PointInfo GetDensityResolution(const DrawInfo *draw_info)
+...
+  resolution=GetDensityResolution(draw_info);
+```
+
+with both moved above the `#if defined(MAGICKCORE_FREETYPE_DELEGATE)` region and
+`GetPostscriptResolution` gone.
+
+**Careful:**
+
+- Same value (step 3): `H` receives `r` by value, so its copy holds what `r` held when
+  `B` began; `B`'s statements run on it in the same order with the same operands; the
+  copy is returned and assigned to `r` before the next statement, so every later read of
+  `r` sees what it saw after `B`. No pointer to `r` exists (it is a local whose address
+  `B` does not take).
+- A call moves to a function that was compiled under the `#if` and now is compiled in
+  every configuration: step 4 checks it names nothing that only the `#if` declares; in a
+  configuration without the delegate it is now the only definition, reached by the calls
+  that reached `G`.
+- The step removes a function and a nested block: it may be flat; it is kept for the
+  place it frees (rule 2), and the commit names the step that uses that place.
+
+**Evidence level:** oracle (the cases that reach each caller of `G` and of `F`).
+
+**Provenance:** 2026-11-14, from `annotate.c`'s `GetPostscriptResolution`,
+`GetFreetypeTextResolution` and `GetFreetypeResolution` (campaign B, M127 lane b round
+10): the file had 113 functions, the 114th trips *Number of Functions* (5.69 to 5.51 in a
+probe), and the glyph loop of `RenderFreetype` needs two helpers. A probe of this fold:
+5.69 to 5.69, 112 functions. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-10-24.
+Lane: b
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -17805,3 +17922,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | FG | Fold a Function into the Twin Taking Its Derived Argument: `F(...,t)` whose body is `G(...,s)`'s with `E(t)` for `s` loses its calls to `G(...,E(b))` and is deleted, freeing a place under the function-count threshold; Lane: b | `xml-tree.c`'s `ExtendXMLBuffer`/`ExtendXMLBufferBy` (111 functions; the 112th costs 0.17) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | FW | Fold a Pointer-Advancing Writer into Its Index-Returning Twin: `p=F(p,...);` becomes `p+=G(p,0,...);` when `G` writes at `b[j++]` the bytes `F` writes at `*x++`, and `F` is deleted, freeing a place under the function-count threshold; Lane: b | `xml-tree.c`'s `WriteUTF8Sequence`/`WriteUTF8Bytes` (110 functions; the 112th costs 0.17) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | CE | Chain a Continuing Block into an Else Before the Loop's Tail: `if (c) { S continue; } T` at the end of a loop body becomes `if (c) { S } else T`, repeated upward into an `else if` chain; CodeScene counts each `continue` as a branch; Lane: b | `locale.c`'s `LoadLocaleCache` (cc 18 to 16, 8.85 to 8.90 in a probe) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | FC | Fold a Function into the Twin That Calls Out Its Block: `G`, whose block `B` is the body of `F`'s callee `H` (taking and returning the written local `r` by value), loses its calls to `F` and is deleted; `F` and `H` move whole above the first caller, out of a delegate `#if` when they name nothing it declares, freeing a place under the function-count threshold; Lane: b | `annotate.c`'s `GetPostscriptResolution`/`GetFreetypeTextResolution` (113 functions; the 114th costs 0.18; fold probe 5.69 flat) | mandate (2026-10-24) |
