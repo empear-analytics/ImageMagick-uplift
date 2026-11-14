@@ -22047,8 +22047,8 @@ typedef struct _DirectoryLoadInput
     *background_resources;
 } DirectoryLoadInput;
 
-static Image *XLoadDirectoryImages(const DirectoryLoadInput *load_input,
-  Image *images)
+static void XLoadBackdropImage(const DirectoryLoadInput *load_input,
+  Image *next_image)
 {
   Display
     *const display = load_input->display;
@@ -22056,11 +22056,25 @@ static Image *XLoadDirectoryImages(const DirectoryLoadInput *load_input,
   ExceptionInfo
     *const exception = load_input->exception;
 
-  ImageInfo
-    *const read_info = load_input->read_info;
-
   XWindows
     *const windows = load_input->windows;
+
+  XResourceInfo
+    *const background_resources = load_input->background_resources;
+
+  (void) XDisplayBackgroundImage(display,background_resources,next_image,
+    exception);
+  XSetCursorState(display,windows,MagickTrue);
+}
+
+static Image *XLoadDirectoryImages(const DirectoryLoadInput *load_input,
+  Image *images)
+{
+  ExceptionInfo
+    *const exception = load_input->exception;
+
+  ImageInfo
+    *const read_info = load_input->read_info;
 
   char
     **const filelist = load_input->filelist;
@@ -22070,9 +22084,6 @@ static Image *XLoadDirectoryImages(const DirectoryLoadInput *load_input,
 
   const MagickBooleanType
     backdrop = load_input->backdrop;
-
-  XResourceInfo
-    *const background_resources = load_input->background_resources;
 
   Image
     *next_image,
@@ -22106,11 +22117,7 @@ static Image *XLoadDirectoryImages(const DirectoryLoadInput *load_input,
         next_image=thumbnail_image;
       }
     if (backdrop)
-      {
-        (void) XDisplayBackgroundImage(display,background_resources,
-          next_image,exception);
-        XSetCursorState(display,windows,MagickTrue);
-      }
+      XLoadBackdropImage(load_input,next_image);
     AppendImageToList(&images,next_image);
     if (images->progress_monitor != (MagickProgressMonitor) NULL)
       {
