@@ -26708,6 +26708,99 @@ static void XSetUpDisplay(const DisplaySetUpInput *input,
   (*event_context).update_time=update_time;
 }
 
+typedef struct _DisplayImageInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  ExceptionInfo
+    *exception;
+
+  Image
+    **image;
+
+  char
+    *working_directory;
+
+  XWindowInfo
+    **magick_windows;
+
+  size_t
+    *state;
+
+  char
+    *command;
+
+  char
+    **argv;
+
+  int
+    argc;
+} DisplayImageInput;
+
+static void XInitializeDisplayImage(const DisplayImageInput *image_input,
+  DisplayEventContext *event_context,const DisplayEventTargets *targets)
+{
+  Display
+    *const display = image_input->display;
+
+  ExceptionInfo
+    *const exception = image_input->exception;
+
+  Image
+    **const image = image_input->image;
+
+  XResourceInfo
+    *const resource_info = image_input->resource_info;
+
+  XWindowInfo
+    **const magick_windows = image_input->magick_windows;
+
+  XWindows
+    **const windows = targets->windows;
+
+  char
+    *const command = image_input->command;
+
+  char
+    *const working_directory = image_input->working_directory;
+
+  char
+    **const argv = image_input->argv;
+
+  const int
+    argc = image_input->argc;
+
+  size_t
+    *const state = image_input->state;
+
+  unsigned int
+    *const number_windows = targets->number_windows;
+
+  {
+    const DisplayWindowsInput input = { display, resource_info, exception,
+      image, working_directory, magick_windows };
+
+    XOpenDisplayWindows(&input,targets);
+  }
+  {
+    const DisplayContextInput input = { display, resource_info, (*windows),
+      exception, magick_windows, (*number_windows), state, command, image, argv,
+      argc };
+
+    XFillDisplayEventContext(&input,event_context);
+  }
+  {
+    const DisplaySetUpInput input = { display, resource_info, exception,
+      state };
+
+    XSetUpDisplay(&input,event_context,targets);
+  }
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -26763,23 +26856,10 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   XTraceDisplayImage(image);
   display_image=(*image);
   {
-    const DisplayWindowsInput input = { display, resource_info, exception,
-      image, working_directory, magick_windows };
+    const DisplayImageInput input = { display, resource_info, exception, image,
+      working_directory, magick_windows, state, command, argv, argc };
 
-    XOpenDisplayWindows(&input,&event_targets);
-  }
-  {
-    const DisplayContextInput input = { display, resource_info, windows,
-      exception, magick_windows, number_windows, state, command, image, argv,
-      argc };
-
-    XFillDisplayEventContext(&input,&event_context);
-  }
-  {
-    const DisplaySetUpInput input = { display, resource_info, exception,
-      state };
-
-    XSetUpDisplay(&input,&event_context,&event_targets);
+    XInitializeDisplayImage(&input,&event_context,&event_targets);
   }
   do
   {
