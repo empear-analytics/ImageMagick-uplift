@@ -14708,41 +14708,52 @@ static void XMagnifyImage(Display *display,XWindows *windows,XEvent *event,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _MagnifyDigitKey
+{
+  int
+    key,
+    base;
+} MagnifyDigitKey;
+
+static const MagnifyDigitKey
+  MagnifyDigitKeys[] =
+  {
+    { XK_0, XK_0 },
+    { XK_1, XK_0 },
+    { XK_2, XK_0 },
+    { XK_3, XK_0 },
+    { XK_4, XK_0 },
+    { XK_5, XK_0 },
+    { XK_6, XK_0 },
+    { XK_7, XK_0 },
+    { XK_8, XK_0 },
+    { XK_9, XK_0 },
+    { XK_KP_0, XK_KP_0 },
+    { XK_KP_1, XK_KP_0 },
+    { XK_KP_2, XK_KP_0 },
+    { XK_KP_3, XK_KP_0 },
+    { XK_KP_4, XK_KP_0 },
+    { XK_KP_5, XK_KP_0 },
+    { XK_KP_6, XK_KP_0 },
+    { XK_KP_7, XK_KP_0 },
+    { XK_KP_8, XK_KP_0 },
+    { XK_KP_9, XK_KP_0 }
+  };
+
 static void XSelectMagnifyDigit(XWindows *windows,const KeySym key_symbol)
 {
-  switch ((int) key_symbol)
-  {
-    case XK_0:
-    case XK_1:
-    case XK_2:
-    case XK_3:
-    case XK_4:
-    case XK_5:
-    case XK_6:
-    case XK_7:
-    case XK_8:
-    case XK_9:
-    {
-      windows->magnify.data=(key_symbol-XK_0);
-      break;
-    }
-    case XK_KP_0:
-    case XK_KP_1:
-    case XK_KP_2:
-    case XK_KP_3:
-    case XK_KP_4:
-    case XK_KP_5:
-    case XK_KP_6:
-    case XK_KP_7:
-    case XK_KP_8:
-    case XK_KP_9:
-    {
-      windows->magnify.data=(key_symbol-XK_KP_0);
-      break;
-    }
-    default:
-      break;
-  }
+  const int
+    key = (int) key_symbol;
+
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(MagnifyDigitKeys)/sizeof(*MagnifyDigitKeys)); i++)
+    if (MagnifyDigitKeys[i].key == key)
+      {
+        windows->magnify.data=(key_symbol-MagnifyDigitKeys[i].base);
+        break;
+      }
 }
 
 static void XMoveMagnifyRightDown(XWindows *windows,const unsigned int quantum,
