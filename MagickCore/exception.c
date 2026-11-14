@@ -881,14 +881,21 @@ MagickExport WarningHandler SetWarningHandler(WarningHandler handler)
 %    o description: the exception description.
 %
 */
+typedef struct _ExceptionText
+{
+  const char
+    *reason,
+    *description;
+} ExceptionText;
+
 static inline MagickBooleanType IsRepeatedException(const ExceptionInfo *p,
   const ExceptionType severity,const ExceptionInfo *exception,
-  const char *reason,const char *description)
+  const ExceptionText *text)
 {
   return(((p != (ExceptionInfo *) NULL) && (p->severity == severity) &&
-    (LocaleCompare(exception->reason,reason) == 0) &&
-    (LocaleCompare(exception->description,description) == 0)) ? MagickTrue :
-    MagickFalse);
+    (LocaleCompare(exception->reason,text->reason) == 0) &&
+    (LocaleCompare(exception->description,text->description) == 0)) ?
+    MagickTrue : MagickFalse);
 }
 
 static MagickBooleanType IsExceptionListSaturated(LinkedListInfo *exceptions,
@@ -916,6 +923,9 @@ MagickExport MagickBooleanType ThrowException(ExceptionInfo *exception,
   ExceptionInfo
     *p;
 
+  const ExceptionText
+    text = { reason, description };
+
   assert(exception != (ExceptionInfo *) NULL);
   assert(exception->signature == MagickCoreSignature);
   LockSemaphoreInfo(exception->semaphore);
@@ -926,8 +936,7 @@ MagickExport MagickBooleanType ThrowException(ExceptionInfo *exception,
       return(MagickTrue);
     }
   p=(ExceptionInfo *) GetLastValueInLinkedList(exceptions);
-  if (IsRepeatedException(p,severity,exception,reason,description) !=
-      MagickFalse)
+  if (IsRepeatedException(p,severity,exception,&text) != MagickFalse)
     {
       UnlockSemaphoreInfo(exception->semaphore);
       return(MagickTrue);
