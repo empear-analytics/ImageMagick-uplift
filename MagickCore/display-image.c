@@ -14171,6 +14171,37 @@ static void XApplyEffectsCommands(const XMagickCommandContext *context,
   }
 }
 
+static void XApplyFilterCommands(const XMagickCommandContext *context,
+  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
+{
+  switch (command)
+  {
+    case DespeckleCommand:
+      XApplyDespeckleCommand(context);
+      break;
+    case EmbossCommand:
+      XApplyEmbossCommand(context);
+      break;
+    case ReduceNoiseCommand:
+      XApplyReduceNoiseCommand(context,&(*flags));
+      break;
+    case AddNoiseCommand:
+      XApplyAddNoiseCommand(context);
+      break;
+    case SharpenCommand:
+      XApplySharpenCommand(context,&(*flags));
+      break;
+    case BlurCommand:
+      XApplyBlurCommand(context,&(*flags));
+      break;
+    default:
+    {
+      XApplyEffectsCommands(context,command,&(*flags),&(*nexus));
+      break;
+    }
+  }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -14348,27 +14379,9 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
     case QuantizeCommand:
       XApplyQuantizeCommand(&context,quantize_info);
       break;
-    case DespeckleCommand:
-      XApplyDespeckleCommand(&context);
-      break;
-    case EmbossCommand:
-      XApplyEmbossCommand(&context);
-      break;
-    case ReduceNoiseCommand:
-      XApplyReduceNoiseCommand(&context,&flags);
-      break;
-    case AddNoiseCommand:
-      XApplyAddNoiseCommand(&context);
-      break;
-    case SharpenCommand:
-      XApplySharpenCommand(&context,&flags);
-      break;
-    case BlurCommand:
-      XApplyBlurCommand(&context,&flags);
-      break;
     default:
     {
-      XApplyEffectsCommands(&context,command,&flags,&nexus);
+      XApplyFilterCommands(&context,command,&flags,&nexus);
       break;
     }
   }
