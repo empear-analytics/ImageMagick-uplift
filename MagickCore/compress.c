@@ -688,6 +688,22 @@ static MagickBooleanType NextHuffmanCode(Image *image,const ssize_t x,
   return(MagickTrue);
 }
 
+static void AddHuffmanMakeupCount(const HuffmanTable *entry,ssize_t *count)
+{
+  switch (entry->id)
+  {
+    case MWId:
+    case MBId:
+    case EXId:
+    {
+      (*count)+=(ssize_t) entry->count;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static void SetFaxResolution(Image *image)
 {
   image->resolution.x=204.0;
@@ -800,15 +816,11 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
           color=ApplyHuffmanTerminator(&transfer,color,&x,&count);
           break;
         }
-        case MWId:
-        case MBId:
-        case EXId:
+        default:
         {
-          count+=(ssize_t) entry->count;
+          AddHuffmanMakeupCount(entry,&count);
           break;
         }
-        default:
-          break;
       }
       reader.code=0;
       reader.length=0;
