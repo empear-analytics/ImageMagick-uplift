@@ -10950,6 +10950,38 @@ static void XApplyDrawCommand(const XMagickCommandContext *context)
     }
 }
 
+static void XApplyColorCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  MagickStatusType
+    status;
+
+  /*
+    Color edit.
+  */
+  status=XColorEditImage(display,resource_info,windows,image,exception);
+  if (status == MagickFalse)
+    {
+      XNoticeWidget(display,windows,"Unable to pixel edit X image",
+        (*image)->filename);
+      return;
+    }
+}
+
 static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12478,19 +12510,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyDrawCommand(&context);
       break;
     case ColorCommand:
-    {
-      /*
-        Color edit.
-      */
-      status=XColorEditImage(display,resource_info,windows,image,exception);
-      if (status == MagickFalse)
-        {
-          XNoticeWidget(display,windows,"Unable to pixel edit X image",
-            (*image)->filename);
-          break;
-        }
+      XApplyColorCommand(&context);
       break;
-    }
     case MatteCommand:
     {
       /*
