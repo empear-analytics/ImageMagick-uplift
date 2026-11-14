@@ -1565,8 +1565,7 @@ static Image
 static MagickBooleanType
   XAnnotateEditImage(Display *,XResourceInfo *,XWindows *,Image *,
     ExceptionInfo *),
-  XBackgroundImage(Display *,XResourceInfo *,XWindows *,Image **,
-    ExceptionInfo *),
+  XBackgroundImage(const ImageWindowKeyInput *),
   XChopImage(Display *,XResourceInfo *,XWindows *,Image **,
     ExceptionInfo *),
   XCropImage(Display *,XResourceInfo *,XWindows *,Image *,const ClipboardMode,
@@ -3629,10 +3628,24 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static MagickBooleanType XBackgroundImage(Display *display,
-  XResourceInfo *resource_info,XWindows *windows,Image **image,
-  ExceptionInfo *exception)
+static MagickBooleanType XBackgroundImage(
+  const ImageWindowKeyInput *window_input)
 {
+  Display
+    *const display = window_input->display;
+
+  ExceptionInfo
+    *const exception = window_input->exception;
+
+  Image
+    **const image = window_input->image;
+
+  XResourceInfo
+    *const resource_info = window_input->resource_info;
+
+  XWindows
+    *const windows = window_input->windows;
+
 #define BackgroundImageTag  "Background/Image"
 
   int
@@ -13985,10 +13998,13 @@ static Image *XApplyBackgroundCommand(const XMagickCommandContext *context,
   MagickStatusType
     status;
 
+  const ImageWindowKeyInput
+    window_input = { display, resource_info, windows, image, exception };
+
   /*
     Background image.
   */
-  status=XBackgroundImage(display,resource_info,windows,image,exception);
+  status=XBackgroundImage(&window_input);
   if (status == MagickFalse)
     return(nexus);
   nexus=CloneImage(*image,0,0,MagickTrue,exception);
