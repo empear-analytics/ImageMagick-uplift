@@ -2628,6 +2628,15 @@ MagickExport const OptionInfo *GetCommandOptionInfo(const char *option)
   return(CommandOptions+i);
 }
 
+static ssize_t CountOptionMnemonics(const OptionInfo *option_info)
+{
+  ssize_t
+    i;
+
+  for (i=0; option_info[i].mnemonic != (const char *) NULL; i++) ;
+  return(i);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2664,7 +2673,7 @@ MagickExport char **GetCommandOptions(const CommandOption option)
   option_info=GetOptionInfo(option);
   if (option_info == (const OptionInfo *) NULL)
     return((char **) NULL);
-  for (i=0; option_info[i].mnemonic != (const char *) NULL; i++) ;
+  i=CountOptionMnemonics(option_info);
   options=(char **) AcquireQuantumMemory((size_t) i+1UL,sizeof(*options));
   if (options == (char **) NULL)
     ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
