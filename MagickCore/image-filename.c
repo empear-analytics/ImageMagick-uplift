@@ -457,6 +457,13 @@ static MagickBooleanType CopyFilenameCharacter(char **p,
   return(MagickFalse);
 }
 
+static const char *SkipFilenameDigits(const char *cursor)
+{
+  while (isdigit((int) ((unsigned char) *cursor)) != 0)
+    cursor++;
+  return(cursor);
+}
+
 MagickExport size_t InterpretImageFilename(const ImageInfo *image_info,
   Image *image,const char *format,int value,char *filename,
   ExceptionInfo *exception)
@@ -489,8 +496,7 @@ MagickExport size_t InterpretImageFilename(const ImageInfo *image_info,
     if (CopyFilenameCharacter(&p,&cursor,&start) != MagickFalse)
       continue;
     specifier_start=cursor;
-    while (isdigit((int) ((unsigned char) *cursor)) != 0)
-      cursor++;
+    cursor=SkipFilenameDigits(cursor);
     expansion.start=start;
     expansion.filename=filename;
     expansion.image_info=image_info;
