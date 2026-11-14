@@ -6402,6 +6402,26 @@ static MagickBooleanType ApplyMorphologyMethodPrimitives(
   return(MagickTrue);
 }
 
+static void InitializeMorphologyLimits(const MorphologyMethod method,
+  const CompositeOperator compose,const MorphologyIteratedLimits limits,
+  size_t *stage_limit)
+{
+  size_t
+    *const method_limit = limits.method_limit;
+
+  MagickBooleanType
+    *const special = limits.special;
+
+  CompositeOperator
+    *const rslt_compose = limits.rslt_compose;
+
+  (*method_limit) = 1;       /* just do method once, unless otherwise set */
+  (*stage_limit) = 1;        /* assume method is not a compound */
+  (*special) = MagickFalse;   /* assume it is NOT a direct modify primitive */
+  (*rslt_compose) = compose; /* and we are composing multi-kernels as given */
+  (*stage_limit)=SelectMorphologyStageLimit(method,(*stage_limit),limits);
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -6471,11 +6491,7 @@ MagickPrivate Image *MorphologyApply(const Image *image,
    * + how many primitives make up the compound morphology
    * + multi-kernel compose method to use (by default)
    */
-  method_limit = 1;       /* just do method once, unless otherwise set */
-  stage_limit = 1;        /* assume method is not a compound */
-  special = MagickFalse;   /* assume it is NOT a direct modify primitive */
-  rslt_compose = compose; /* and we are composing multi-kernels as given */
-  stage_limit=SelectMorphologyStageLimit(method,stage_limit,limits);
+  InitializeMorphologyLimits(method,compose,limits,&stage_limit);
 
   {
     const MorphologyApplyStages
