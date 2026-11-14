@@ -24,6 +24,18 @@ step added (Recipe LP, steps 2 to 6). The script prints OK when all of these hol
     CALLER's body replaced by a marker, the two files are equal, and PREDICATE stands directly
     above CALLER.
 
+With --split, the step is Recipe LP step 7: CALLER names an old predicate of the shape above and
+PREDICATE the second predicate the step wrote directly above it. The script prints OK when:
+
+  - PREDICATE is static, new, of the same parameter and controlling expression, and has the
+    shape above (labels, `default: break;`, `return(MagickFalse);`);
+  - CALLER still has that shape except that its tail is `return(PREDICATE(x));` for its own
+    parameter `x`;
+  - CALLER's new labels followed by PREDICATE's labels are exactly CALLER's old labels, in order,
+    each once, both runs of at least two labels;
+  - the rest of the file is the same token stream with PREDICATE cut out and CALLER replaced by a
+    marker, and PREDICATE stands directly above CALLER.
+
 It cannot check that every path of the group returns (step 1: read it), the types, or the
 instructions the compiler emits: the build, the oracle and `tools/obj_modulo.sh` do.
 """
@@ -71,21 +83,25 @@ def is_membership_run(gs):
     return list(gs[0][1]) == TRUE_RETURN and gs[1] == DEFAULT_GROUP
 
 
-def predicate_groups(src, fn, name):
-    """(switch, groups) of the predicate's body: `switch {...} return(MagickFalse);`."""
+def predicate_groups(src, fn, name, tail=FALSE_RETURN):
+    """(switch, groups) of the predicate's body: `switch {...}` then the statement `tail`."""
     found = S.switch_at(src.toks, fn.body_open + 1)
-    if not found or src.toks[found[3] + 1:fn.body_close] != FALSE_RETURN:
-        raise Refused("%s is not `switch {...} return(MagickFalse);`" % name)
+    if not found or src.toks[found[3] + 1:fn.body_close] != tail:
+        raise Refused("%s is not `switch {...}` followed by %s" % (name, " ".join(tail)))
     gs = S.groups(src.toks, found[2] + 1, found[3])
     if not is_membership_run(gs):
         raise Refused("%s: groups are not labels, return(MagickTrue), default: break;" % name)
     return found, gs
 
 
-def predicate_shape(src, name):
-    """(parameter, controlling expression, labels) of the predicate `name`, else Refused."""
+def predicate_shape(src, name, chained_to=None):
+    """(parameter, controlling expression, labels) of the predicate `name`, else Refused.
+
+    chained_to: the predicate whose call ends it (`return(chained_to(x));`), else step 2's
+    `return(MagickFalse);`."""
     fn, param = predicate_function(src, name)
-    found, gs = predicate_groups(src, fn, name)
+    tail = FALSE_RETURN if chained_to is None else ["return", "(", chained_to, "(", param, ")", ")", ";"]
+    found, gs = predicate_groups(src, fn, name, tail)
     labels = list(gs[0][0])
     if len(set(labels)) != len(labels):
         raise Refused("%s: a label stands twice" % name)
@@ -241,6 +257,48 @@ def check(old_text, new_text, caller, pred_name):
         pred_name, len(labels), len(cut.gs[cut.k][1]), len(cut.gs) - 1)
 
 
+def check_split_rest(old, new, first, second):
+    """Tokens outside both predicates are unchanged; the second stands directly above the first."""
+    p = new.funcs[second]
+    cut = new.toks[:p.start] + new.toks[p.body_close + 1:]
+    new_first, old_first = S.functions(cut)[first], old.funcs[first]
+    marker = ["<predicate>"]
+    old_rest = old.toks[:old_first.start] + marker + old.toks[old_first.body_close + 1:]
+    new_rest = cut[:new_first.start] + marker + cut[new_first.body_close + 1:]
+    if old_rest != new_rest:
+        raise Refused("something outside the two predicates changed")
+    if p.body_close + 1 != new.funcs[first].start:
+        raise Refused("%s does not stand directly above %s" % (second, first))
+
+
+def split_shapes(old, new, first, second):
+    """The shapes of the old predicate, the chained first and the second; one parameter and
+    controlling expression throughout."""
+    shapes = (predicate_shape(old, first), predicate_shape(new, first, second),
+              predicate_shape(new, second))
+    if len({(shape[0], shape[1]) for shape in shapes}) != 1:
+        raise Refused("the predicates differ in parameter or controlling expression")
+    return shapes
+
+
+def check_split_labels(old_labels, first_labels, second_labels):
+    if first_labels + second_labels != old_labels:
+        raise Refused("the two label runs together are not the old run, in order")
+    if min(len(first_labels), len(second_labels)) < 2:
+        raise Refused("a run of fewer than two labels")
+
+
+def check_split(old_text, new_text, first, second):
+    """A one-line account of an LP step 7 split, or Refused."""
+    old, new = S.parse(old_text), S.parse(new_text)
+    if second in old.funcs:
+        raise Refused("%s already existed" % second)
+    shape_old, shape_first, shape_second = split_shapes(old, new, first, second)
+    check_split_labels(shape_old[2], shape_first[2], shape_second[2])
+    check_split_rest(old, new, first, second)
+    return "%s keeps %d labels, %s takes %d" % (first, len(shape_first[2]), second, len(shape_second[2]))
+
+
 def committed(path, rev):
     out = subprocess.run(["git", "show", "%s:%s" % (rev, path)], capture_output=True,
                          text=True, errors="surrogateescape")
@@ -255,10 +313,12 @@ def main():
     ap.add_argument("caller")
     ap.add_argument("predicate")
     ap.add_argument("--rev", default="HEAD")
+    ap.add_argument("--split", action="store_true", help="check a Recipe LP step 7 split")
     a = ap.parse_args()
     new_text = open(a.file, encoding="utf-8", errors="surrogateescape").read()
     try:
-        print("OK: " + check(committed(a.file, a.rev), new_text, a.caller, a.predicate))
+        step = check_split if a.split else check
+        print("OK: " + step(committed(a.file, a.rev), new_text, a.caller, a.predicate))
     except Refused as e:
         print("FAIL: %s" % e)
         return 1

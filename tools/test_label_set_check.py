@@ -11,6 +11,12 @@ moved body, a changed statement of the kept group, a changed statement outside t
 predicate away from its caller, a predicate that was there before, a wrong argument, a moved body
 holding a `break`, a kept group that falls out of the `switch`, and an argument written in the
 `switch`, must be refused.
+
+A second fixture tests `--split` (Recipe LP step 7): a four-label predicate splits into two chained
+predicates of two labels. The correct split must print OK; a lost label, an added label, a doubled
+label, the runs in the wrong order, a wrong argument in the chaining call, a tail that is still
+`return(MagickFalse);`, a run of one label, an edit elsewhere, a second predicate away from the
+first and one that already existed must be refused.
 """
 import os
 import sys
@@ -165,6 +171,110 @@ class LabelSetCheck(unittest.TestCase):
         new = NEW.replace("      x++;\n      return(3);", "      x++;").replace(
             "      if (state != 0)\n        return(2);\n", "")
         self.assertIn("2 labels", run(new, old=old))
+
+
+SPLIT_OLD = """
+static int Before(int a)
+{
+  return(a+1);
+}
+
+static MagickBooleanType IsArrow(const KeySym key_symbol)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_Up:
+    case XK_Down:
+    case XK_Left:
+    case XK_Right:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+"""
+
+SPLIT_NEW = SPLIT_OLD[:SPLIT_OLD.index("static MagickBooleanType")] + """static MagickBooleanType IsHorizontal(const KeySym key_symbol)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_Left:
+    case XK_Right:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
+static MagickBooleanType IsArrow(const KeySym key_symbol)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_Up:
+    case XK_Down:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(IsHorizontal(key_symbol));
+}
+"""
+
+
+def split(new, old=SPLIT_OLD):
+    return L.check_split(old, new, "IsArrow", "IsHorizontal")
+
+
+def case(name):
+    return "    case %s:\n" % name
+
+
+def swap_labels(text, a, b):
+    """text with the labels `a` and `b` exchanged."""
+    return text.replace(case(a), "<A>").replace(case(b), case(a)).replace("<A>", case(b))
+
+
+class SplitCheck(unittest.TestCase):
+    def refused(self, new, **kw):
+        with self.assertRaises(L.Refused):
+            split(new, **kw)
+
+    def test_correct_split(self):
+        self.assertIn("takes 2", split(SPLIT_NEW))
+
+    def test_lost_label(self):
+        self.refused(SPLIT_NEW.replace(case("XK_Right"), "", 1))
+
+    def test_added_label(self):
+        self.refused(SPLIT_NEW.replace(case("XK_Down"), case("XK_Down") + case("XK_Menu")))
+
+    def test_doubled_label(self):
+        self.refused(SPLIT_NEW.replace(case("XK_Down"), case("XK_Down") + case("XK_Left")))
+
+    def test_runs_in_the_wrong_order(self):
+        self.refused(swap_labels(swap_labels(SPLIT_NEW, "XK_Up", "XK_Left"), "XK_Down", "XK_Right"))
+
+    def test_wrong_argument(self):
+        self.refused(SPLIT_NEW.replace("IsHorizontal(key_symbol)", "IsHorizontal(0)"))
+
+    def test_tail_not_chained(self):
+        self.refused(SPLIT_NEW.replace("return(IsHorizontal(key_symbol));", "return(MagickFalse);"))
+
+    def test_run_of_one_label(self):
+        self.refused(SPLIT_NEW.replace(case("XK_Down"), ""), old=SPLIT_OLD.replace(case("XK_Down"), ""))
+
+    def test_edit_elsewhere(self):
+        self.refused(SPLIT_NEW.replace("return(a+1);", "return(a+2);"))
+
+    def test_second_away_from_first(self):
+        a = SPLIT_NEW.index("static MagickBooleanType IsHorizontal")
+        b = SPLIT_NEW.index("static MagickBooleanType IsArrow")
+        self.refused(SPLIT_NEW[:a] + SPLIT_NEW[b:] + "\n" + SPLIT_NEW[a:b])
+
+    def test_second_existed(self):
+        self.refused(SPLIT_NEW, old=SPLIT_NEW)
 
 
 if __name__ == "__main__":
