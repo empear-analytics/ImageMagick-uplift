@@ -2108,6 +2108,16 @@ static void MaskPixelChannels(const Image *image,const double alpha,
   }
 }
 
+static void MaskNexusPixel(const Image *image,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  double
+    alpha;
+
+  alpha=(double) GetPixelCompositeMask(image,p);
+  MaskPixelChannels(image,alpha,p,q);
+}
+
 static MagickBooleanType MaskPixelCacheNexus(Image *image,NexusInfo *nexus_info,
   ExceptionInfo *exception)
 {
@@ -2146,11 +2156,7 @@ static MagickBooleanType MaskPixelCacheNexus(Image *image,NexusInfo *nexus_info,
 
     for (x=0; x < (ssize_t) nexus_info->region.width; x++)
     {
-      double
-        alpha;
-
-      alpha=(double) GetPixelCompositeMask(image,p);
-      MaskPixelChannels(image,alpha,p,q);
+      MaskNexusPixel(image,p,q);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
