@@ -2492,6 +2492,22 @@ static void FormatPixelChannelTraits(const Image *image,
   traits[strlen(traits)-1]='\0';
 }
 
+static const char *GetPixelChannelLogLabel(const Image *image,
+  const PixelChannel channel,char *channel_name)
+{
+  const char
+    *name;
+
+  name=GetPixelChannelLogName(image,channel);
+  if (image->colorspace ==  UndefinedColorspace)
+    {
+      (void) FormatLocaleString(channel_name,MagickPathExtent,"%.17g",
+        (double) channel);
+      name=(const char *) channel_name;
+    }
+  return(name);
+}
+
 static void LogPixelChannels(const Image *image)
 {
   ssize_t
@@ -2512,13 +2528,7 @@ static void LogPixelChannels(const Image *image)
       channel;
 
     channel=GetPixelChannelChannel(image,i);
-    name=GetPixelChannelLogName(image,channel);
-    if (image->colorspace ==  UndefinedColorspace)
-      {
-        (void) FormatLocaleString(channel_name,MagickPathExtent,"%.17g",
-          (double) channel);
-        name=(const char *) channel_name;
-      }
+    name=GetPixelChannelLogLabel(image,channel,channel_name);
     FormatPixelChannelTraits(image,channel,traits);
     (void) LogMagickEvent(PixelEvent,GetMagickModule(),"  %.17g: %s (%s)",
       (double) i,name,traits);
