@@ -8885,6 +8885,11 @@ that clones the first (the *Code Duplication* cliff, W14).
    role's own name. Literals and operators are not renamed; whitespace, line breaks and
    comments are ignored, and so is the order of the declarators of a declaration that
    initialises none of them (the script compares them sorted).
+   A copy that writes a loop as `v=e;` directly followed by `for ( ; c; i)`, an empty
+   first clause, compares as `for (v=e; c; i)` (2026-11-14, `constitute.c`'s
+   `ReadSceneImages` beside `PingSceneImages`), and the new function's body takes the
+   form with the clause: C11 6.8.5.3 evaluates the first clause once, before the first
+   test, exactly where the statement ran, and `v` stays the variable the copy declared.
 2. The method type. Every function a copy calls at the role is a function of the file,
    or a function that a header the file includes declares (`static inline` in a private
    header, or exported), and all have the same type: the same return type and the same
@@ -18425,3 +18430,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | MX | Merge Axis Twins Through a Side Selector and a Struct of Two Parts: a chain of `static` functions and its other-axis mirror (columns for rows, swapped coordinate pairs, two struct types) become one chain over one struct with a side constant, `static inline` selectors and one function per swapped call; the two entries stay as one-call wrappers; Lane: a | `image-append.c`'s horizontal and vertical smush chains (*Code Duplication*, 8 functions; probe 8.81 to 10.0) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | HF | Hoist a Struct Fill That Both Paths Repeat: a member-by-member fill in an early-returning branch moves before the branch, and the later fill keeps only the members whose sources change in between; Lane: a | `log.c`'s `TranslateEvent` (nine `event_text` stores in the `xml` branch and in the format loop; with E, out of *Large Method*, probe 7.93 to 8.03) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | LF | Step 5, function form: a function body's leading run of `if (<test>) return;` (or `return(c);` of one constant) becomes one predicate call with the same exit; Lane: a | `utility.c`'s `ExpandFilename` (`path == NULL` and `*path != '~'` guards; cc 9, *Complex Method*) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | CF | Step 1: a copy whose loop is `v=e;` followed by `for ( ; c; i)` compares as `for (v=e; c; i)`, the merged body taking the clause form (C11 6.8.5.3); Lane: a | `constitute.c`'s `ReadSceneImages` and `PingSceneImages` (*Code Duplication*; probe 8.81 to 10.0) | mandate (2026-10-24) |
