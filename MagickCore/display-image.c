@@ -10812,6 +10812,50 @@ static void XApplyBlurCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyThresholdCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  double
+    threshold;
+
+  static char
+    factor[MagickPathExtent] = "128";
+
+  /*
+    Query user for threshold value.
+  */
+  (void) XDialogWidget(display,windows,"Threshold",
+    "Enter threshold value:",factor);
+  if (*factor == '\0')
+    return;
+  /*
+    Gamma correct image.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  threshold=StringToDoubleInterval(factor,(double) QuantumRange+1.0);
+  (void) BilevelImage(*image,threshold,exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyRollCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11952,34 +11996,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyBlurCommand(&context,&flags);
       break;
     case ThresholdCommand:
-    {
-      double
-        threshold;
-
-      static char
-        factor[MagickPathExtent] = "128";
-
-      /*
-        Query user for threshold value.
-      */
-      (void) XDialogWidget(display,windows,"Threshold",
-        "Enter threshold value:",factor);
-      if (*factor == '\0')
-        break;
-      /*
-        Gamma correct image.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      threshold=StringToDoubleInterval(factor,(double) QuantumRange+1.0);
-      (void) BilevelImage(*image,threshold,exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyThresholdCommand(&context);
       break;
-    }
     case EdgeDetectCommand:
     {
       Image
