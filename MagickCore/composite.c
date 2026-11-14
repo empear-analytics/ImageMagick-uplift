@@ -5350,6 +5350,103 @@ static void BlurCompositeGeometry(const BlurGeometryInputs *geometry)
   }
 }
 
+typedef struct _DisplaceCanvasInputs
+{
+  Image
+    *canvas_image,
+    *image,
+    *source_image;
+
+  CompositeOperator
+    compose;
+
+  MagickStatusType
+    flags;
+
+  GeometryInfo
+    geometry_info;
+
+  ssize_t
+    x_offset,
+    y_offset;
+
+  ExceptionInfo
+    *exception;
+} DisplaceCanvasInputs;
+
+static void DisplaceCompositeCanvas(const DisplaceCanvasInputs *canvas)
+{
+  Image
+    *const canvas_image = canvas->canvas_image,
+    *const image = canvas->image,
+    *const source_image = canvas->source_image;
+
+  const CompositeOperator
+    compose = canvas->compose;
+
+  const MagickStatusType
+    flags = canvas->flags;
+
+  const GeometryInfo
+    geometry_info = canvas->geometry_info;
+
+  const ssize_t
+    x_offset = canvas->x_offset,
+    y_offset = canvas->y_offset;
+
+  ExceptionInfo
+    *const exception = canvas->exception;
+
+  DisplaceRows
+    rows;
+
+  MagickRealType
+    horizontal_scale,
+    vertical_scale;
+
+  PointInfo
+    center;
+
+  {
+    const DisplaceSetup
+      displace = { compose, flags, geometry_info, image, source_image,
+        x_offset, y_offset };
+
+    if ((flags & (WidthValue | HeightValue)) == 0 )
+      SetDisplaceScaleDefaults(&displace,&horizontal_scale,
+        &vertical_scale);
+    else
+      SetDisplaceScaleArguments(&displace,&horizontal_scale,
+        &vertical_scale);
+    /*
+      Determine fixed center point for absolute distortion map
+       Absolute distort ==
+         Displace offset relative to a fixed absolute point
+         Select that point according to +X+Y user inputs.
+         default = center of overlay image
+         arg flag '!' = locations/percentage relative to background image
+    */
+    center.x=(MagickRealType) x_offset;
+    center.y=(MagickRealType) y_offset;
+    SetDistortCenter(&displace,&center);
+  }
+  /*
+    Shift the pixel offset point as defined by the provided,
+    displacement/distortion map.  -- Like a lens...
+  */
+  rows.canvas_image=canvas_image;
+  rows.image=image;
+  rows.source_image=source_image;
+  rows.center=center;
+  rows.compose=compose;
+  rows.horizontal_scale=horizontal_scale;
+  rows.vertical_scale=vertical_scale;
+  rows.x_offset=x_offset;
+  rows.y_offset=y_offset;
+  rows.exception=exception;
+  DisplaceCompositeRows(&rows);
+}
+
 typedef struct _ComposeArtifactTargets
 {
   double
@@ -5627,15 +5724,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     case DisplaceCompositeOp:
     case DistortCompositeOp:
     {
-      DisplaceRows
-        rows;
-
-      MagickRealType
-        horizontal_scale,
-        vertical_scale;
-
-      PointInfo
-        center;
+      DisplaceCanvasInputs
+        canvas;
 
       /*
         Displace/Distort based on overlay gradient map:
@@ -5649,44 +5739,16 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
           return(MagickFalse);
         }
       GetDisplaceArguments(image,&geometry_info,&flags);
-      {
-        const DisplaceSetup
-          displace = { compose, flags, geometry_info, image, source_image,
-            x_offset, y_offset };
-
-        if ((flags & (WidthValue | HeightValue)) == 0 )
-          SetDisplaceScaleDefaults(&displace,&horizontal_scale,
-            &vertical_scale);
-        else
-          SetDisplaceScaleArguments(&displace,&horizontal_scale,
-            &vertical_scale);
-        /*
-          Determine fixed center point for absolute distortion map
-           Absolute distort ==
-             Displace offset relative to a fixed absolute point
-             Select that point according to +X+Y user inputs.
-             default = center of overlay image
-             arg flag '!' = locations/percentage relative to background image
-        */
-        center.x=(MagickRealType) x_offset;
-        center.y=(MagickRealType) y_offset;
-        SetDistortCenter(&displace,&center);
-      }
-      /*
-        Shift the pixel offset point as defined by the provided,
-        displacement/distortion map.  -- Like a lens...
-      */
-      rows.canvas_image=canvas_image;
-      rows.image=image;
-      rows.source_image=source_image;
-      rows.center=center;
-      rows.compose=compose;
-      rows.horizontal_scale=horizontal_scale;
-      rows.vertical_scale=vertical_scale;
-      rows.x_offset=x_offset;
-      rows.y_offset=y_offset;
-      rows.exception=exception;
-      DisplaceCompositeRows(&rows);
+      canvas.canvas_image=canvas_image;
+      canvas.image=image;
+      canvas.source_image=source_image;
+      canvas.compose=compose;
+      canvas.flags=flags;
+      canvas.geometry_info=geometry_info;
+      canvas.x_offset=x_offset;
+      canvas.y_offset=y_offset;
+      canvas.exception=exception;
+      DisplaceCompositeCanvas(&canvas);
       source_image=DestroyImage(source_image);
       source_image=canvas_image;
       break;
