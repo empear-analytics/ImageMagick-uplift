@@ -5332,6 +5332,77 @@ static char *FinishInterpretText(const MagickBooleanType status,
   return(interpret_text);
 }
 
+typedef struct _InterpretRequest
+{
+  ImageInfo
+    *image_info;
+
+  Image
+    *image;
+
+  const char
+    *embed_text;
+
+  ImageInfo
+    *property_info;
+
+  ExceptionInfo
+    *exception;
+} InterpretRequest;
+
+static MagickBooleanType InterpretEmbeddedText(const InterpretRequest *request,
+  Image **property_image,const InterpretText *text,const char **p)
+{
+  ImageInfo
+    *const image_info = request->image_info;
+
+  Image
+    *const image = request->image;
+
+  const char
+    *const embed_text = request->embed_text;
+
+  ImageInfo
+    *const property_info = request->property_info;
+
+  ExceptionInfo
+    *const exception = request->exception;
+
+  char
+    **const interpret_text = text->interpret_text,
+    **const q = text->q;
+
+  size_t
+    *const extent = text->extent;
+
+  MagickBooleanType
+    number;
+
+  if (AcquireInterpretImage(image_info,image,exception,property_image) ==
+      MagickFalse)
+    return(MagickFalse);
+  (*interpret_text)=AcquireString(embed_text); /* new string with extra space */
+  if ((*interpret_text) == (char *) NULL)
+    return(MagickFalse);
+  (*extent)=MagickPathExtent;                  /* allocated space in string */
+  number=MagickFalse;                       /* is last char a number? */
+  for ((*q)=(*interpret_text); *(*p)!='\0'; number=isdigit((int) ((unsigned char) *(*p))) ? MagickTrue : MagickFalse,(*p)++)
+  {
+    InterpretLetterInputs
+      inputs;
+
+    inputs.property_info=property_info;
+    inputs.image=image;
+    inputs.property_image=(*property_image);
+    inputs.exception=exception;
+    inputs.number=number;
+    if (InterpretEscapeCharacter(&inputs,text,p) == MagickFalse)
+      return(MagickFalse);
+  }
+  *(*q)='\0';
+  return(MagickTrue);
+}
+
 MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   const char *embed_text,ExceptionInfo *exception)
 {
@@ -5349,8 +5420,10 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   ImageInfo
     *property_info = (ImageInfo *) NULL;
 
+  InterpretRequest
+    request;
+
   MagickBooleanType
-    number,
     status = MagickTrue;
 
   size_t
@@ -5375,37 +5448,16 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
     property_info=image_info;
   else
     property_info=CloneImageInfo(image_info);
-  if (AcquireInterpretImage(image_info,image,exception,&property_image) ==
-      MagickFalse)
+  request.image_info=image_info;
+  request.image=image;
+  request.embed_text=embed_text;
+  request.property_info=property_info;
+  request.exception=exception;
+  if (InterpretEmbeddedText(&request,&property_image,&text,&p) == MagickFalse)
     {
       status=MagickFalse;
       goto cleanup;
     }
-  interpret_text=AcquireString(embed_text); /* new string with extra space */
-  if (interpret_text == (char *) NULL)
-    {
-      status=MagickFalse;
-      goto cleanup;
-    }
-  extent=MagickPathExtent;                  /* allocated space in string */
-  number=MagickFalse;                       /* is last char a number? */
-  for (q=interpret_text; *p!='\0'; number=isdigit((int) ((unsigned char) *p)) ? MagickTrue : MagickFalse,p++)
-  {
-    InterpretLetterInputs
-      inputs;
-
-    inputs.property_info=property_info;
-    inputs.image=image;
-    inputs.property_image=property_image;
-    inputs.exception=exception;
-    inputs.number=number;
-    if (InterpretEscapeCharacter(&inputs,&text,&p) == MagickFalse)
-      {
-        status=MagickFalse;
-        goto cleanup;
-      }
-  }
-  *q='\0';
 
 cleanup:
   DestroyInterpretSources(image_info,image,property_info,property_image);
