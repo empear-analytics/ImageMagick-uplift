@@ -3452,6 +3452,24 @@ static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,const XMLBufferInfo *buffer,
   return(content);
 }
 
+static void AppendRootInstruction(const TagBufferInfo *tag_buffer,
+  const char skip,const char *q,const char *p)
+{
+  char
+    **const source = tag_buffer->source;
+
+  size_t
+    *const extent = tag_buffer->extent,
+    *const length = tag_buffer->length;
+
+  if (skip == '>')
+    *length+=(size_t) FormatLocaleString(*source+(*length),*extent,
+      "<?%s%s%s?>\n",q,*p != '\0' ? " " : "",p);
+  else
+    *length+=(size_t) FormatLocaleString(*source+(*length),*extent,
+      "\n<?%s%s%s?>",q,*p != '\0' ? " " : "",p);
+}
+
 static MagickBooleanType AppendRootInstructions(const XMLTreeRoot *root,
   const char skip,const TagBufferInfo *tag_buffer)
 {
@@ -3487,12 +3505,7 @@ static MagickBooleanType AppendRootInstructions(const XMLTreeRoot *root,
       if (ExtendXMLBufferBy(source,length,extent,strlen(p)+strlen(q)) ==
           MagickFalse)
         return(MagickFalse);
-      if (skip == '>')
-        *length+=(size_t) FormatLocaleString(*source+(*length),*extent,
-          "<?%s%s%s?>\n",q,*p != '\0' ? " " : "",p);
-      else
-        *length+=(size_t) FormatLocaleString(*source+(*length),*extent,
-          "\n<?%s%s%s?>",q,*p != '\0' ? " " : "",p);
+      AppendRootInstruction(tag_buffer,skip,q,p);
       p=root->processing_instructions[i][j];
     }
   }
