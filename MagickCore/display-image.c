@@ -24720,6 +24720,14 @@ static void XFreeDisplayResources(const DisplayEventContext *context)
     }
 }
 
+static void XLogKeyRelease(const XResourceInfo *resource_info,
+  const KeySym key_symbol,const char *command)
+{
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Key release: 0x%lx (%c)",(unsigned long) key_symbol,*command);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -25145,9 +25153,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
         */
         (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
           sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Key release: 0x%lx (%c)",(unsigned long) key_symbol,*command);
+        XLogKeyRelease(resource_info,key_symbol,command);
         break;
       }
       default:
