@@ -144,9 +144,12 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static void FillPixelRow(const Image *image,const PixelInfo *color,
+static void FillPixelRow(const Image *image,const void *arguments,
   Quantum *magick_restrict q)
 {
+  const PixelInfo
+    *color = (const PixelInfo *) arguments;
+
   ssize_t
     x;
 
@@ -224,7 +227,14 @@ MagickExport Image *NewMagickImage(const ImageInfo *image_info,
   return(image);
 }
 
-typedef struct _ResetRow
+typedef Quantum
+  *(*FetchRowMethod)(CacheView *,const ssize_t,const ssize_t,const size_t,
+    const size_t,ExceptionInfo *);
+
+typedef void
+  (*UpdateRowMethod)(const Image *,const void *,Quantum *magick_restrict);
+
+typedef struct _UpdateRow
 {
   Image
     *image;
@@ -232,11 +242,20 @@ typedef struct _ResetRow
   CacheView
     *image_view;
 
+  FetchRowMethod
+    fetch;
+
+  UpdateRowMethod
+    method;
+
+  const void
+    *arguments;
+
   ExceptionInfo
     *exception;
-} ResetRow;
+} UpdateRow;
 
-static void ResetImagePixelsRow(const ResetRow *row,const ssize_t y,
+static void UpdateImageRow(const UpdateRow *row,const ssize_t y,
   MagickBooleanType *status)
 {
   Image
@@ -251,24 +270,31 @@ static void ResetImagePixelsRow(const ResetRow *row,const ssize_t y,
   Quantum
     *magick_restrict q;
 
-  ssize_t
-    x;
-
   if ((*status) == MagickFalse)
     return;
-  q=QueueCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  q=row->fetch(image_view,0,y,image->columns,1,exception);
   if (q == (Quantum *) NULL)
     {
       (*status)=MagickFalse;
       return;
     }
+  row->method(image,row->arguments,q);
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
+static void ResetPixelRow(const Image *image,const void *arguments,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  magick_unreferenced(arguments);
   for (x=0; x < (ssize_t) image->columns; x++)
   {
     (void) memset(q,0,GetPixelChannels(image)*sizeof(Quantum));
     q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-    (*status)=MagickFalse;
 }
 
 /*
@@ -339,66 +365,30 @@ MagickExport MagickBooleanType ResetImagePixels(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const ResetRow row = { image, image_view, exception };
+    const UpdateRow row = { image, image_view, QueueCacheViewAuthenticPixels,
+      ResetPixelRow, (const void *) NULL, exception };
 
-    ResetImagePixelsRow(&row,y,&status);
+    UpdateImageRow(&row,y,&status);
   }
   image_view=DestroyCacheView(image_view);
   return(status);
 }
 
-typedef struct _AlphaRow
+static void SetAlphaPixelRow(const Image *image,const void *arguments,
+  Quantum *magick_restrict q)
 {
-  Image
-    *image;
-
-  CacheView
-    *image_view;
-
-  Quantum
-    alpha;
-
-  ExceptionInfo
-    *exception;
-} AlphaRow;
-
-static void SetImageAlphaRow(const AlphaRow *row,const ssize_t y,
-  MagickBooleanType *status)
-{
-  Image
-    *image = row->image;
-
-  CacheView
-    *image_view = row->image_view;
-
   const Quantum
-    alpha = row->alpha;
-
-  ExceptionInfo
-    *exception = row->exception;
-
-  Quantum
-    *magick_restrict q;
+    alpha = (*(const Quantum *) arguments);
 
   ssize_t
     x;
 
-  if ((*status) == MagickFalse)
-    return;
-  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-  if (q == (Quantum *) NULL)
-    {
-      (*status)=MagickFalse;
-      return;
-    }
   for (x=0; x < (ssize_t) image->columns; x++)
   {
     if (GetPixelWriteMask(image,q) > (QuantumRange/2))
       SetPixelAlpha(image,alpha,q);
     q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-    (*status)=MagickFalse;
 }
 
 /*
@@ -460,61 +450,16 @@ MagickExport MagickBooleanType SetImageAlpha(Image *image,const Quantum alpha,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const AlphaRow row = { image, image_view, alpha, exception };
+    const UpdateRow row = { image, image_view, GetCacheViewAuthenticPixels,
+      SetAlphaPixelRow, &alpha, exception };
 
-    SetImageAlphaRow(&row,y,&status);
+    UpdateImageRow(&row,y,&status);
   }
   image_view=DestroyCacheView(image_view);
   image->mask_trait=original_mask;
   return(status);
 }
 
-typedef struct _BackgroundRow
-{
-  Image
-    *image;
-
-  CacheView
-    *image_view;
-
-  PixelInfo
-    background;
-
-  ExceptionInfo
-    *exception;
-} BackgroundRow;
-
-static void SetImageBackgroundRow(const BackgroundRow *row,const ssize_t y,
-  MagickBooleanType *status)
-{
-  Image
-    *image = row->image;
-
-  CacheView
-    *image_view = row->image_view;
-
-  const PixelInfo
-    background = row->background;
-
-  ExceptionInfo
-    *exception = row->exception;
-
-  Quantum
-    *magick_restrict q;
-
-  if ((*status) == MagickFalse)
-    return;
-  q=QueueCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-  if (q == (Quantum *) NULL)
-    {
-      (*status)=MagickFalse;
-      return;
-    }
-  FillPixelRow(image,&background,q);
-  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-    (*status)=MagickFalse;
-}
-
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -578,9 +523,10 @@ MagickExport MagickBooleanType SetImageBackgroundColor(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const BackgroundRow row = { image, image_view, background, exception };
+    const UpdateRow row = { image, image_view, QueueCacheViewAuthenticPixels,
+      FillPixelRow, &background, exception };
 
-    SetImageBackgroundRow(&row,y,&status);
+    UpdateImageRow(&row,y,&status);
   }
   image_view=DestroyCacheView(image_view);
   return(status);
