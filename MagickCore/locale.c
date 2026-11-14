@@ -130,13 +130,7 @@ static MagickBooleanType
 #if defined(MAGICKCORE_LOCALE_SUPPORT)
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   A c q u i r e C L o c a l e                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  AcquireCLocale() allocates the C locale object, or (locale_t) 0 with
@@ -259,13 +253,7 @@ static SplayTreeInfo *AcquireLocaleSplayTree(const char *filename,
 #if defined(MAGICKCORE_LOCALE_SUPPORT)
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   D e s t r o y C L o c a l e                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  DestroyCLocale() releases the resources allocated for a locale object
@@ -290,13 +278,7 @@ static void DestroyCLocale(void)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   D e s t r o y L o c a l e O p t i o n s                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  DestroyLocaleOptions() releases memory associated with an locale
@@ -484,13 +466,7 @@ MagickPrivate ssize_t FormatLocaleStringList(char *magick_restrict string,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t L o c a l e I n f o _                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetLocaleInfo_() searches the locale list for the specified tag and if
@@ -532,13 +508,7 @@ MagickExport const LocaleInfo *GetLocaleInfo_(const char *tag,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t L o c a l e I n f o L i s t                                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetLocaleInfoList() returns any locale messages that match the
@@ -630,13 +600,7 @@ MagickExport const LocaleInfo **GetLocaleInfoList(const char *pattern,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t L o c a l e L i s t                                                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetLocaleList() returns any locale messages that match the specified
@@ -722,13 +686,7 @@ MagickExport char **GetLocaleList(const char *pattern,size_t *number_messages,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t L o c a l e M e s s a g e                                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetLocaleMessage() returns a message in the current locale that matches the
@@ -857,13 +815,7 @@ MagickExport LinkedListInfo *GetLocaleOptions(const char *filename,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t L o c a l e V a l u e                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetLocaleValue() returns the message associated with the locale info.
@@ -913,13 +865,7 @@ static char *AcquireLocaleName(void)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   I s L o c a l e T r e e I n s t a n t i a t e d                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  IsLocaleTreeInstantiated() determines if the locale tree is instantiated.
@@ -957,13 +903,7 @@ static MagickBooleanType IsLocaleTreeInstantiated(ExceptionInfo *exception)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   I n t e r p r e t L o c a l e V a l u e                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  InterpretLocaleValue() interprets the string as a floating point number in
@@ -1105,13 +1045,7 @@ MagickExport MagickBooleanType ListLocaleInfo(FILE *file,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   L o a d L o c a l e C a c h e                                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  LoadLocaleCache() loads the locale configurations which provides a mapping
@@ -1398,6 +1332,51 @@ static MagickBooleanType SkipLocaleElement(const char **q,
   return(MagickFalse);
 }
 
+static LocaleInfo *AcquireLocaleMessage(const char *filename,const char *tag,
+  const char *message)
+{
+  LocaleInfo
+    *locale_info;
+
+  locale_info=(LocaleInfo *) AcquireCriticalMemory(sizeof(*locale_info));
+  (void) memset(locale_info,0,sizeof(*locale_info));
+  locale_info->path=ConstantString(filename);
+  locale_info->tag=ConstantString(tag);
+  locale_info->message=ConstantString(message);
+  locale_info->signature=MagickCoreSignature;
+  return(locale_info);
+}
+
+static MagickStatusType AddLocaleMessage(SplayTreeInfo *cache,
+  LocaleInfo *locale_info,ExceptionInfo *exception)
+{
+  MagickStatusType
+    status;
+
+  status=AddValueToSplayTree(cache,locale_info->tag,locale_info);
+  if (status == MagickFalse)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ResourceLimitError,"MemoryAllocationFailed","`%s'",
+      locale_info->tag);
+  return(status);
+}
+
+static MagickStatusType LoadIncludedLocaleFile(const LocaleLoadTarget *target,
+  const char *filename,const char *token,const size_t depth,
+  MagickStatusType status)
+{
+  ExceptionInfo
+    *exception = target->exception;
+
+  if (depth >= MagickMaxRecursionDepth)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
+  else
+    status&=(MagickStatusType) LoadLocaleInclude(target,filename,
+      token,depth);
+  return(status);
+}
+
 static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1463,14 +1442,7 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
           Include element.
         */
         while (NextIncludeFile(&q,extent,token,locale) != MagickFalse)
-        {
-          if (depth >= MagickMaxRecursionDepth)
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
-          else
-            status&=(MagickStatusType) LoadLocaleInclude(target,filename,
-              token,depth);
-        }
+          status=LoadIncludedLocaleFile(target,filename,token,depth,status);
         continue;
       }
     if (LocaleCompare(keyword,"<locale") == 0)
@@ -1490,17 +1462,8 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
         */
         q=ReadMessageName(q,extent,token,tag);
         q=ReadMessageText(q,message);
-        locale_info=(LocaleInfo *) AcquireCriticalMemory(sizeof(*locale_info));
-        (void) memset(locale_info,0,sizeof(*locale_info));
-        locale_info->path=ConstantString(filename);
-        locale_info->tag=ConstantString(tag);
-        locale_info->message=ConstantString(message);
-        locale_info->signature=MagickCoreSignature;
-        status=AddValueToSplayTree(cache,locale_info->tag,locale_info);
-        if (status == MagickFalse)
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            ResourceLimitError,"MemoryAllocationFailed","`%s'",
-            locale_info->tag);
+        locale_info=AcquireLocaleMessage(filename,tag,message);
+        status=AddLocaleMessage(cache,locale_info,exception);
         (void) ConcatenateMagickString(tag,message,MagickLocaleExtent);
         (void) ConcatenateMagickString(tag,"\n",MagickLocaleExtent);
         q++;
@@ -1523,13 +1486,7 @@ static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   L o c a l e C o m p a r e                                                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  LocaleCompare() performs a case-insensitive comparison of two strings
@@ -1574,13 +1531,7 @@ MagickExport int LocaleCompare(const char *p,const char *q)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   L o c a l e L o w e r                                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  LocaleLower() transforms all of the characters in the supplied
@@ -1607,13 +1558,7 @@ MagickExport void LocaleLower(char *string)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   L o c a l e L o w e r c a s e                                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  LocaleLowercase() converts the character to lowercase.
@@ -1634,13 +1579,7 @@ MagickExport int LocaleLowercase(const int c)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   L o c a l e N C o m p a r e                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  LocaleNCompare() performs a case-insensitive comparison of two strings
@@ -1715,13 +1654,7 @@ MagickExport int LocaleNCompare(const char *p,const char *q,const size_t length)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   L o c a l e U p p e r                                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  LocaleUpper() transforms all of the characters in the supplied
@@ -1748,13 +1681,7 @@ MagickExport void LocaleUpper(char *string)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   L o c a l e U p p e r c a s e                                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  LocaleUppercase() converts the character to uppercase.
@@ -1775,13 +1702,7 @@ MagickExport int LocaleUppercase(const int c)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   L o c a l e C o m p o n e n t G e n e s i s                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  LocaleComponentGenesis() instantiates the locale component.
@@ -1803,13 +1724,7 @@ MagickPrivate MagickBooleanType LocaleComponentGenesis(void)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   L o c a l e C o m p o n e n t T e r m i n u s                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  LocaleComponentTerminus() destroys the locale component.

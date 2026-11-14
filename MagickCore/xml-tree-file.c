@@ -141,6 +141,70 @@ static MagickBooleanType ReadXMLFileContent(int file,char *xml,
   return(MagickTrue);
 }
 
+static size_t GetXMLReadQuantum(int file)
+{
+  size_t
+    quantum;
+
+  struct stat
+    file_stats;
+
+  quantum=(size_t) MagickMaxBufferExtent;
+  if ((fstat(file,&file_stats) == 0) && (file_stats.st_size > 0))
+    quantum=(size_t) MagickMin(file_stats.st_size,MagickMaxBufferExtent);
+  return(quantum);
+}
+
+static char *CloseXMLFile(const char *filename,int file,char *xml)
+{
+  if (LocaleCompare(filename,"-") != 0)
+    file=close_utf8(file);
+  if (file == -1)
+    xml=(char *) RelinquishMagickMemory(xml);
+  return(xml);
+}
+
+static char *ReadUnseekableXMLFile(const char *filename,int file,
+  const size_t extent,ssize_t count)
+{
+  char
+    *xml;
+
+  size_t
+    i,
+    length,
+    quantum;
+
+  quantum=GetXMLReadQuantum(file);
+  xml=(char *) AcquireQuantumMemory(quantum,sizeof(*xml));
+  for (i=0; xml != (char *) NULL; i+=(size_t) count)
+  {
+    count=MagickRead(file,xml+i,quantum);
+    if (count <= 0)
+      break;
+    if (~((size_t) i) < (quantum+1))
+      {
+        xml=(char *) RelinquishMagickMemory(xml);
+        break;
+      }
+    xml=(char *) ResizeQuantumMemory(xml,i+quantum+1,sizeof(*xml));
+    if ((i+(size_t) count) >= extent)
+      break;
+  }
+  if (LocaleCompare(filename,"-") != 0)
+    file=close_utf8(file);
+  if (xml == (char *) NULL)
+    return((char *) NULL);
+  if (file == -1)
+    {
+      xml=(char *) RelinquishMagickMemory(xml);
+      return((char *) NULL);
+    }
+  length=MagickMin(i+(size_t) count,extent);
+  xml[length]='\0';
+  return(xml);
+}
+
 MagickPrivate char *FileToXML(const char *filename,const size_t extent)
 {
   char
@@ -153,7 +217,6 @@ MagickPrivate char *FileToXML(const char *filename,const size_t extent)
     offset;
 
   size_t
-    i,
     length;
 
   ssize_t
@@ -170,46 +233,11 @@ MagickPrivate char *FileToXML(const char *filename,const size_t extent)
   count=0;
   if (IsUnseekableXMLFile(file,offset) != MagickFalse)
     {
-      size_t
-        quantum;
-
-      struct stat
-        file_stats;
-
       /*
         Stream is not seekable.
       */
       offset=(MagickOffsetType) lseek(file,0,SEEK_SET);
-      quantum=(size_t) MagickMaxBufferExtent;
-      if ((fstat(file,&file_stats) == 0) && (file_stats.st_size > 0))
-        quantum=(size_t) MagickMin(file_stats.st_size,MagickMaxBufferExtent);
-      xml=(char *) AcquireQuantumMemory(quantum,sizeof(*xml));
-      for (i=0; xml != (char *) NULL; i+=(size_t) count)
-      {
-        count=MagickRead(file,xml+i,quantum);
-        if (count <= 0)
-          break;
-        if (~((size_t) i) < (quantum+1))
-          {
-            xml=(char *) RelinquishMagickMemory(xml);
-            break;
-          }
-        xml=(char *) ResizeQuantumMemory(xml,i+quantum+1,sizeof(*xml));
-        if ((i+(size_t) count) >= extent)
-          break;
-      }
-      if (LocaleCompare(filename,"-") != 0)
-        file=close_utf8(file);
-      if (xml == (char *) NULL)
-        return((char *) NULL);
-      if (file == -1)
-        {
-          xml=(char *) RelinquishMagickMemory(xml);
-          return((char *) NULL);
-        }
-      length=MagickMin(i+(size_t) count,extent);
-      xml[length]='\0';
-      return(xml);
+      return(ReadUnseekableXMLFile(filename,file,extent,count));
     }
   length=(size_t) MagickMin(offset,(MagickOffsetType) extent);
   xml=(char *) NULL;
@@ -223,9 +251,5 @@ MagickPrivate char *FileToXML(const char *filename,const size_t extent)
   if (ReadXMLFileContent(file,xml,length) == MagickFalse)
     return((char *) NULL);
   xml[length]='\0';
-  if (LocaleCompare(filename,"-") != 0)
-    file=close_utf8(file);
-  if (file == -1)
-    xml=(char *) RelinquishMagickMemory(xml);
-  return(xml);
+  return(CloseXMLFile(filename,file,xml));
 }

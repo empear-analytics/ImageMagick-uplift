@@ -125,15 +125,14 @@
 
 static inline MagickBooleanType IsImageInfoLetter(const char letter)
 {
-  return(((letter != '\0') && (strchr("aouS",letter) != (char *) NULL)) ?
-    MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((letter != '\0') && (strchr("aouS",letter)
+    != (char *) NULL)));
 }
 
 static inline MagickBooleanType IsImageLetter(const char letter)
 {
-  return(((letter != '\0') &&
-    (strchr("bdefghimpqrstwxyzACDFGHIMOPQTUWXY~@#",letter) != (char *) NULL)) ?
-    MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((letter != '\0') &&
+    (strchr("bdefghimpqrstwxyzACDFGHIMOPQTUWXY~@#",letter) != (char *) NULL)));
 }
 
 static const char *GetListProperty(const Image *image,const char letter,
@@ -483,6 +482,16 @@ static const char *GetImageInfoProperty(const ImageInfo *image_info,
   }
 }
 
+static void OpenMagickPropertyLetter(const ImageInfo *image_info,
+  const Image *image)
+{
+  if ((image != (Image *) NULL) && (IsEventLogging() != MagickFalse))
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  else
+    if ((image_info != (ImageInfo *) NULL) && (IsEventLogging() != MagickFalse))
+      (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no-images");
+}
+
 static char *GetMagickPropertyLetter(ImageInfo *image_info,Image *image,
   const char letter,ExceptionInfo *exception)
 {
@@ -492,11 +501,7 @@ static char *GetMagickPropertyLetter(ImageInfo *image_info,Image *image,
   const char
     *string;
 
-  if ((image != (Image *) NULL) && (IsEventLogging() != MagickFalse))
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  else
-    if ((image_info != (ImageInfo *) NULL) && (IsEventLogging() != MagickFalse))
-      (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no-images");
+  OpenMagickPropertyLetter(image_info,image);
   /*
     Get properties that are directly defined by images.
   */
@@ -520,8 +525,7 @@ static char *GetMagickPropertyLetter(ImageInfo *image_info,Image *image,
 
 static inline MagickBooleanType IsPropertyEnd(const char *p)
 {
-  return(((*p == '\0') || (*p == '\'') || (*p == '"')) ? MagickTrue :
-    MagickFalse);
+  return((MagickBooleanType) ((*p == '\0') || (*p == '\'') || (*p == '"')));
 }
 
 static void DecodeDelegateEscape(const char **p,char **q)
@@ -706,6 +710,18 @@ static MagickBooleanType IsEmptyDelegateText(const char *embed_text,
   return(MagickFalse);
 }
 
+static void OpenInterpretDelegateProperties(const ImageInfo *image_info,
+  const Image *image)
+{
+  assert(image == NULL || image->signature == MagickCoreSignature);
+  assert(image_info == NULL || image_info->signature == MagickCoreSignature);
+  if ((image != (Image *) NULL) && (IsEventLogging() != MagickFalse))
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  else
+   if ((image_info != (ImageInfo *) NULL) && (IsEventLogging() != MagickFalse))
+     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no-image");
+}
+
 static char *InterpretDelegateProperties(ImageInfo *image_info,
   Image *image,const char *embed_text,ExceptionInfo *exception)
 {
@@ -726,13 +742,7 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
   MagickBooleanType
     number;
 
-  assert(image == NULL || image->signature == MagickCoreSignature);
-  assert(image_info == NULL || image_info->signature == MagickCoreSignature);
-  if ((image != (Image *) NULL) && (IsEventLogging() != MagickFalse))
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  else
-   if ((image_info != (ImageInfo *) NULL) && (IsEventLogging() != MagickFalse))
-     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no-image");
+  OpenInterpretDelegateProperties(image_info,image);
   if (IsEmptyDelegateText(embed_text,&p,&returned) != MagickFalse)
     return(returned);
   /*
@@ -862,9 +872,8 @@ static inline MagickBooleanType IsKeptDestination(
   const MagickBooleanType overwrite,const char *destination,
   struct stat *attributes)
 {
-  return(((overwrite == MagickFalse) &&
-    (GetPathAttributes(destination,attributes) != MagickFalse)) ? MagickTrue :
-    MagickFalse);
+  return((MagickBooleanType) ((overwrite == MagickFalse) &&
+    (GetPathAttributes(destination,attributes) != MagickFalse)));
 }
 
 static size_t GetDelegateCopyQuantum(const int source_file)
@@ -990,10 +999,11 @@ static MagickBooleanType CopyDelegateFile(const char *source,
 static inline MagickBooleanType IsTwoStepDelegate(
   const DelegateInfo *delegate_info,const char *decode,const char *encode)
 {
-  return(((delegate_info->mode != 0) && (((decode != (const char *) NULL) &&
+  return((MagickBooleanType) ((delegate_info->mode != 0) &&
+    (((decode != (const char *) NULL) &&
     (delegate_info->encode != (char *) NULL)) ||
     ((encode != (const char *) NULL) &&
-    (delegate_info->decode != (char *) NULL)))) ? MagickTrue : MagickFalse);
+    (delegate_info->decode != (char *) NULL)))));
 }
 
 static void WaitForDelegateInput(const Image *image)
@@ -1325,9 +1335,9 @@ static MagickBooleanType AcquireDelegateOutputFilename(ImageInfo *image_info,
 
 static inline MagickBooleanType IsDelegateNameDenied(const char *name)
 {
-  return(((name != (const char *) NULL) &&
+  return((MagickBooleanType) ((name != (const char *) NULL) &&
     (IsRightsAuthorized(DelegatePolicyDomain,ExecutePolicyRights,name) ==
-     MagickFalse)) ? MagickTrue : MagickFalse);
+     MagickFalse)));
 }
 
 static MagickBooleanType AuthorizeDelegateNames(const char *decode,
@@ -1360,16 +1370,93 @@ static char **DestroyDelegateCommands(char **commands,ssize_t i)
   return((char **) RelinquishMagickMemory(commands));
 }
 
+typedef struct _DelegateCommandRun
+{
+  const DelegateInfo
+    *delegate_info;
+
+  ImageInfo
+    *image_info;
+
+  Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    **commands;
+} DelegateCommandRun;
+
+static void RunDelegateCommands(const DelegateCommandRun *run,
+  MagickBooleanType *status,ssize_t *i)
+{
+  const DelegateInfo
+    *const delegate_info = run->delegate_info;
+
+  ImageInfo
+    *const image_info = run->image_info;
+
+  Image
+    *const image = run->image;
+
+  ExceptionInfo
+    *const exception = run->exception;
+
+  char
+    **const commands = run->commands;
+
+  char
+    input_filename[MagickPathExtent],
+    output_filename[MagickPathExtent];
+
+  *status=MagickTrue;
+  (void) CopyMagickString(output_filename,image_info->filename,
+    MagickPathExtent);
+  (void) CopyMagickString(input_filename,image->filename,MagickPathExtent);
+  for (*i=0; commands[*i] != (char *) NULL; (*i)++)
+  {
+    const DelegateExecution
+      execution = { delegate_info, image_info, image, exception,
+        input_filename, output_filename, commands[*i] };
+
+    if (RunDelegateStep(&execution,status) == MagickFalse)
+      break;
+    if (*status == MagickFalse)
+      {
+        (void) ThrowMagickException(exception,GetMagickModule(),DelegateError,
+          "DelegateFailed","`%s'",commands[*i]);
+        break;
+      }
+    commands[*i]=DestroyString(commands[*i]);
+  }
+  (void) CopyMagickString(image_info->filename,output_filename,
+    MagickPathExtent);
+  (void) CopyMagickString(image->filename,input_filename,MagickPathExtent);
+}
+
+static void OpenInvokeDelegate(const ImageInfo *image_info,
+  const Image *image)
+{
+  assert(image_info != (ImageInfo *) NULL);
+  assert(image_info->signature == MagickCoreSignature);
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+}
+
 MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   Image *image,const char *decode,const char *encode,ExceptionInfo *exception)
 {
   char
-    **commands,
-    input_filename[MagickPathExtent],
-    output_filename[MagickPathExtent];
+    **commands;
 
   const DelegateInfo
     *delegate_info;
+
+  DelegateCommandRun
+    run;
 
   MagickBooleanType
     status,
@@ -1381,15 +1468,10 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   /*
     Get delegate.
   */
-  assert(image_info != (ImageInfo *) NULL);
-  assert(image_info->signature == MagickCoreSignature);
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  OpenInvokeDelegate(image_info,image);
   if (AuthorizeDelegateNames(decode,encode,exception) == MagickFalse)
     return(MagickFalse);
-  temporary=(*image->filename == '\0') ? MagickTrue : MagickFalse;
+  temporary=(MagickBooleanType) (*image->filename == '\0');
   if (AcquireDelegateInputFilename(image,temporary,exception) == MagickFalse)
     return(MagickFalse);
   delegate_info=GetDelegateInfo(decode,encode,exception);
@@ -1424,29 +1506,12 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
         decode ? decode : encode);
       return(MagickFalse);
     }
-  status=MagickTrue;
-  (void) CopyMagickString(output_filename,image_info->filename,
-    MagickPathExtent);
-  (void) CopyMagickString(input_filename,image->filename,MagickPathExtent);
-  for (i=0; commands[i] != (char *) NULL; i++)
-  {
-    const DelegateExecution
-      execution = { delegate_info, image_info, image, exception,
-        input_filename, output_filename, commands[i] };
-
-    if (RunDelegateStep(&execution,&status) == MagickFalse)
-      break;
-    if (status == MagickFalse)
-      {
-        (void) ThrowMagickException(exception,GetMagickModule(),DelegateError,
-          "DelegateFailed","`%s'",commands[i]);
-        break;
-      }
-    commands[i]=DestroyString(commands[i]);
-  }
-  (void) CopyMagickString(image_info->filename,output_filename,
-    MagickPathExtent);
-  (void) CopyMagickString(image->filename,input_filename,MagickPathExtent);
+  run.delegate_info=delegate_info;
+  run.image_info=image_info;
+  run.image=image;
+  run.exception=exception;
+  run.commands=commands;
+  RunDelegateCommands(&run,&status,&i);
   /*
     Relinquish resources.
   */

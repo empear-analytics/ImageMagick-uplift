@@ -2439,6 +2439,21 @@ static MagickBooleanType ReadHexRGBADigits(const char *name,const size_t n,
   return(MagickTrue);
 }
 
+static MagickBooleanType QueryHexRGBAColor(const char *name,const size_t n,
+  PixelInfo *color,ExceptionInfo *exception)
+{
+  PixelPacket
+    pixel = { 0, 0, 0, 0, 0 };
+
+  size_t
+    depth;
+
+  if (ReadHexRGBADigits(name,n,&pixel,exception) == MagickFalse)
+    return(MagickFalse);
+  depth=4*(n/4);
+  return(SetHexColor(color,&pixel,depth,n));
+}
+
 static MagickBooleanType QueryHexColor(const char *name,PixelInfo *color,
   ExceptionInfo *exception)
 {
@@ -2461,11 +2476,7 @@ static MagickBooleanType QueryHexColor(const char *name,PixelInfo *color,
       depth=4*(n/3);
     }
   else
-    {
-      if (ReadHexRGBADigits(name,n,&pixel,exception) == MagickFalse)
-        return(MagickFalse);
-      depth=4*(n/4);
-    }
+    return(QueryHexRGBAColor(name,n,color,exception));
   return(SetHexColor(color,&pixel,depth,n));
 }
 

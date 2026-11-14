@@ -1050,6 +1050,170 @@ static void SetLogInfoAttribute(LogInfo *log_info,const char *keyword,
       (log_info->handler_mask | ParseLogHandlers(token));
 }
 
+static MagickBooleanType SkipMarkupElement(const char *keyword,const char **q,
+  const size_t extent,char *token)
+{
+  if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
+    *q=SkipDoctypeElement(*q);
+  else
+    if (LocaleNCompare(keyword,"<!--",4) == 0)
+      *q=SkipCommentElement(*q,extent,token);
+    else
+      return(MagickFalse);
+  return(MagickTrue);
+}
+
+static MagickBooleanType ReadLogAttributeValue(const char **q,
+  const size_t extent,char *token)
+{
+  (void) GetNextToken(*q,(const char **) NULL,extent,token);
+  if (*token != '=')
+    return(MagickFalse);
+  (void) GetNextToken(*q,q,extent,token);
+  (void) GetNextToken(*q,q,extent,token);
+  return(MagickTrue);
+}
+
+static MagickStatusType AppendLogElement(LinkedListInfo *cache,
+  LogInfo *log_info,const char *filename,ExceptionInfo *exception)
+{
+  MagickStatusType
+    status;
+
+  status=AppendValueToLinkedList(cache,log_info);
+  if (status == MagickFalse)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ResourceLimitError,"MemoryAllocationFailed","`%s'",filename);
+  return(status);
+}
+
+typedef struct _LogIncludeInput
+{
+  const LogLoadTarget
+    *target;
+
+  const char
+    *filename;
+
+  char
+    *keyword,
+    *token;
+
+  size_t
+    extent,
+    depth;
+} LogIncludeInput;
+
+static void LoadLogIncludes(const LogIncludeInput *include,const char **q,
+  MagickStatusType *status)
+{
+  const LogLoadTarget
+    *const target = include->target;
+
+  const char
+    *const filename = include->filename;
+
+  char
+    *const keyword = include->keyword,
+    *const token = include->token;
+
+  const size_t
+    extent = include->extent,
+    depth = include->depth;
+
+  ExceptionInfo
+    *exception = target->exception;
+
+  while (IsIncludeElementOpen(token,(*q)) != MagickFalse)
+  {
+    if (IsIncludeFileAttribute(q,extent,keyword,token) == MagickFalse)
+      continue;
+    if (depth >= MagickMaxRecursionDepth)
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
+    else
+      (*status)&=(MagickStatusType) LoadLogInclude(target,filename,token,
+        depth);
+  }
+}
+
+static MagickBooleanType ReadLogMarkupElement(
+  const LogIncludeInput *include,const char **q,MagickStatusType *status)
+{
+  if (SkipMarkupElement(include->keyword,q,include->extent,include->token) !=
+      MagickFalse)
+    return(MagickTrue);
+  if (LocaleCompare(include->keyword,"<include") != 0)
+    return(MagickFalse);
+  /*
+    Include element.
+  */
+  LoadLogIncludes(include,q,status);
+  return(MagickTrue);
+}
+
+typedef struct _LogElementInput
+{
+  LinkedListInfo
+    *cache;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    *keyword,
+    *token;
+
+  const char
+    *filename;
+
+  size_t
+    extent;
+} LogElementInput;
+
+static void ParseLogElement(const LogElementInput *element,
+  LogInfo **log_info,MagickStatusType *status,const char **q)
+{
+  LinkedListInfo
+    *const cache = element->cache;
+
+  ExceptionInfo
+    *const exception = element->exception;
+
+  char
+    *const keyword = element->keyword,
+    *const token = element->token;
+
+  const char
+    *const filename = element->filename;
+
+  const size_t
+    extent = element->extent;
+
+  if (LocaleCompare(keyword,"<logmap>") == 0)
+    {
+      /*
+        Allocate memory for the log list.
+      */
+      (*log_info)=(LogInfo *) AcquireCriticalMemory(sizeof(*(*log_info)));
+      (void) memset((*log_info),0,sizeof(*(*log_info)));
+      (*log_info)->path=ConstantString(filename);
+      GetTimerInfo((TimerInfo *) &(*log_info)->timer);
+      (*log_info)->signature=MagickCoreSignature;
+      return;
+    }
+  if ((*log_info) == (LogInfo *) NULL)
+    return;
+  if (LocaleCompare(keyword,"</logmap>") == 0)
+    {
+      (*status)=AppendLogElement(cache,(*log_info),filename,exception);
+      (*log_info)=(LogInfo *) NULL;
+      return;
+    }
+  if (ReadLogAttributeValue(q,extent,token) != MagickFalse)
+    SetLogInfoAttribute((*log_info),keyword,token);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1116,6 +1280,12 @@ static MagickBooleanType LoadLogCache(const LogLoadTarget *target,
   extent=strlen(token)+MagickPathExtent;
   for (q=(const char *) xml; *q != '\0'; )
   {
+    LogElementInput
+      element;
+
+    LogIncludeInput
+      include;
+
     /*
       Interpret XML.
     */
@@ -1123,74 +1293,26 @@ static MagickBooleanType LoadLogCache(const LogLoadTarget *target,
     if (*token == '\0')
       break;
     (void) CopyMagickString(keyword,token,MagickPathExtent);
-    if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
-      {
-        /*
-          DOCTYPE element.
-        */
-        q=SkipDoctypeElement(q);
-        continue;
-      }
-    if (LocaleNCompare(keyword,"<!--",4) == 0)
-      {
-        /*
-          Comment element.
-        */
-        q=SkipCommentElement(q,extent,token);
-        continue;
-      }
-    if (LocaleCompare(keyword,"<include") == 0)
-      {
-        /*
-          Include element.
-        */
-        while (IsIncludeElementOpen(token,q) != MagickFalse)
-        {
-          if (IsIncludeFileAttribute(&q,extent,keyword,token) == MagickFalse)
-            continue;
-          if (depth >= MagickMaxRecursionDepth)
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
-          else
-            status&=(MagickStatusType) LoadLogInclude(target,filename,token,
-              depth);
-        }
-        continue;
-      }
-    if (LocaleCompare(keyword,"<logmap>") == 0)
-      {
-        /*
-          Allocate memory for the log list.
-        */
-        log_info=(LogInfo *) AcquireCriticalMemory(sizeof(*log_info));
-        (void) memset(log_info,0,sizeof(*log_info));
-        log_info->path=ConstantString(filename);
-        GetTimerInfo((TimerInfo *) &log_info->timer);
-        log_info->signature=MagickCoreSignature;
-        continue;
-      }
-    if (log_info == (LogInfo *) NULL)
+    include.target=target;
+    include.filename=filename;
+    include.keyword=keyword;
+    include.token=token;
+    include.extent=extent;
+    include.depth=depth;
+    if (ReadLogMarkupElement(&include,&q,&status) != MagickFalse)
       continue;
-    if (LocaleCompare(keyword,"</logmap>") == 0)
-      {
-        status=AppendValueToLinkedList(cache,log_info);
-        if (status == MagickFalse)
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            ResourceLimitError,"MemoryAllocationFailed","`%s'",filename);
-        log_info=(LogInfo *) NULL;
-        continue;
-      }
-    (void) GetNextToken(q,(const char **) NULL,extent,token);
-    if (*token != '=')
-      continue;
-    (void) GetNextToken(q,&q,extent,token);
-    (void) GetNextToken(q,&q,extent,token);
-    SetLogInfoAttribute(log_info,keyword,token);
+    element.cache=cache;
+    element.exception=exception;
+    element.keyword=keyword;
+    element.token=token;
+    element.filename=filename;
+    element.extent=extent;
+    ParseLogElement(&element,&log_info,&status,&q);
   }
   token=DestroyString(token);
   if (cache == (LinkedListInfo *) NULL)
     return(MagickFalse);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (status != 0));
 }
 #endif
 
@@ -1615,6 +1737,100 @@ static void TranslateLogLocationSpecifier(const LogEventText *event_text,
   }
 }
 
+static void TranslateLogSpecifier(const LogEventText *event_text,
+  const char *domain,const char *p,char **q)
+{
+  char
+    *const text = event_text->text;
+
+  const size_t
+    extent = event_text->extent;
+
+  switch (*p)
+  {
+    case 'd':
+    {
+      (*q)+=(ptrdiff_t) CopyMagickString((*q),domain,extent-((*q)-text));
+      break;
+    }
+    default:
+    {
+      TranslateLogLocationSpecifier(event_text,p,q);
+      break;
+    }
+  }
+}
+
+static void FormatLogEventXML(const LogEventText *event_text,
+  const char *domain)
+{
+  char
+    *const text = event_text->text;
+
+  const size_t
+    extent = event_text->extent;
+
+  const double
+    elapsed_time = event_text->elapsed_time,
+    user_time = event_text->user_time;
+
+  const time_t
+    seconds = event_text->seconds;
+
+  const char
+    *const event = event_text->event,
+    *const function = event_text->function,
+    *const module = event_text->module;
+
+  const size_t
+    line = event_text->line;
+
+  char
+    timestamp[MagickTimeExtent];
+
+  /*
+    Translate event in "XML" format.
+  */
+  (void) FormatMagickTime(seconds,sizeof(timestamp),timestamp);
+  (void) FormatLocaleString(text,extent,
+    "<entry>\n"
+    "  <timestamp>%s</timestamp>\n"
+    "  <elapsed-time>%lu:%02lu.%06lu</elapsed-time>\n"
+    "  <user-time>%0.3f</user-time>\n"
+    "  <process-id>%.17g</process-id>\n"
+    "  <thread-id>%.17g</thread-id>\n"
+    "  <module>%s</module>\n"
+    "  <function>%s</function>\n"
+    "  <line>%.17g</line>\n"
+    "  <domain>%s</domain>\n"
+    "  <event>%s</event>\n"
+    "</entry>",timestamp,(unsigned long) (elapsed_time/60.0),
+    (unsigned long) floor(fmod(elapsed_time,60.0)),(unsigned long)
+    (1000000.0*(elapsed_time-floor(elapsed_time))+0.5),user_time,
+    (double) getpid(),(double) GetMagickThreadSignature(),module,function,
+    (double) line,domain,event);
+}
+
+static MagickBooleanType CopyLogFormatLiteral(const char **p,char **q)
+{
+  char
+    escape;
+
+  escape=GetLogEscape((*p));
+  if (escape != '\0')
+    {
+      *(*q)++=escape;
+      (*p)++;
+      return(MagickTrue);
+    }
+  if (*(*p) != '%')
+    {
+      *(*q)++=(*(*p));
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 static char *TranslateEvent(const LogEventLocation *location,
   const char *domain,const char *event)
 {
@@ -1639,7 +1855,6 @@ static char *TranslateEvent(const LogEventLocation *location,
     *log_info;
 
   char
-    escape,
     *q;
 
   const char
@@ -1668,30 +1883,16 @@ static char *TranslateEvent(const LogEventLocation *location,
   extent=strlen(event)+MagickPathExtent;
   if (LocaleCompare(log_info->format,"xml") == 0)
     {
-      char
-        timestamp[MagickTimeExtent];
-
-      /*
-        Translate event in "XML" format.
-      */
-      (void) FormatMagickTime(seconds,sizeof(timestamp),timestamp);
-      (void) FormatLocaleString(text,extent,
-        "<entry>\n"
-        "  <timestamp>%s</timestamp>\n"
-        "  <elapsed-time>%lu:%02lu.%06lu</elapsed-time>\n"
-        "  <user-time>%0.3f</user-time>\n"
-        "  <process-id>%.17g</process-id>\n"
-        "  <thread-id>%.17g</thread-id>\n"
-        "  <module>%s</module>\n"
-        "  <function>%s</function>\n"
-        "  <line>%.17g</line>\n"
-        "  <domain>%s</domain>\n"
-        "  <event>%s</event>\n"
-        "</entry>",timestamp,(unsigned long) (elapsed_time/60.0),
-        (unsigned long) floor(fmod(elapsed_time,60.0)),(unsigned long)
-        (1000000.0*(elapsed_time-floor(elapsed_time))+0.5),user_time,
-        (double) getpid(),(double) GetMagickThreadSignature(),module,function,
-        (double) line,domain,event);
+      event_text.text=text;
+      event_text.extent=extent;
+      event_text.elapsed_time=elapsed_time;
+      event_text.user_time=user_time;
+      event_text.seconds=seconds;
+      event_text.event=event;
+      event_text.function=function;
+      event_text.module=module;
+      event_text.line=line;
+      FormatLogEventXML(&event_text,domain);
       return(text);
     }
   /*
@@ -1723,18 +1924,8 @@ static char *TranslateEvent(const LogEventLocation *location,
         \n   newline
         \r   carriage return
     */
-    escape=GetLogEscape(p);
-    if (escape != '\0')
-      {
-        *q++=escape;
-        p++;
-        continue;
-      }
-    if (*p != '%')
-      {
-        *q++=(*p);
-        continue;
-      }
+    if (CopyLogFormatLiteral(&p,&q) != MagickFalse)
+      continue;
     p++;
     if (*p == '\0')
       break;
@@ -1747,19 +1938,7 @@ static char *TranslateEvent(const LogEventLocation *location,
     event_text.function=function;
     event_text.module=module;
     event_text.line=line;
-    switch (*p)
-    {
-      case 'd':
-      {
-        q+=(ptrdiff_t) CopyMagickString(q,domain,extent-(q-text));
-        break;
-      }
-      default:
-      {
-        TranslateLogLocationSpecifier(&event_text,p,&q);
-        break;
-      }
-    }
+    TranslateLogSpecifier(&event_text,domain,p,&q);
   }
   *q='\0';
   return(text);
