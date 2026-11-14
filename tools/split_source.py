@@ -184,13 +184,9 @@ def split_top_level(text):
     pieces.append(text[start:])
     return pieces
 
-def static_table(L, n):
-    """(last line, names) of a file-scope `static` declaration of constant tables, variables or arrays declared from
-    L[n]: every declarator is a plain name with optional array dimensions (no function declarator), else None."""
-    if not re.match(r"^static\b[^(]*$", L[n]): return None
-    e = next((k for k in range(n, len(L)) if re.match(r"^[^{]*;\s*$|^\s*\};\s*$", L[k])), None)
-    if e is None: return None
-    full = " ".join(x.strip() for x in L[n:e + 1]).rstrip().rstrip(";")
+def plain_declarator_names(full):
+    """The names declared by the comma-separated declarators of FULL when each is a plain name with optional array
+    dimensions (no function declarator), else None."""
     names = []
     for piece in split_top_level(full):
         decl = piece.split("=")[0].strip()
@@ -198,7 +194,16 @@ def static_table(L, n):
         named = re.findall(r"(\w+)\s*(?:\[[^\]]*\])*$", decl)
         if not named: return None
         names.append(named[0])
-    return e, names
+    return names
+
+def static_table(L, n):
+    """(last line, names) of a file-scope `static` declaration of constant tables, variables or arrays declared from
+    L[n]: every declarator is a plain name with optional array dimensions (no function declarator), else None."""
+    if not re.match(r"^static\b[^(]*$", L[n]): return None
+    e = next((k for k in range(n, len(L)) if re.match(r"^[^{]*;\s*$|^\s*\};\s*$", L[k])), None)
+    if e is None: return None
+    names = plain_declarator_names(" ".join(x.strip() for x in L[n:e + 1]).rstrip().rstrip(";"))
+    return (e, names) if names is not None else None
 
 def family_only_define(lines, name):
     """The one-line `#define NAME ...` of LINES when no other line of LINES names NAME, else None."""
