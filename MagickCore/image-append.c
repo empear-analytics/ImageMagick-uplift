@@ -1056,12 +1056,7 @@ MagickExport Image *SmushImages(const Image *images,
   /*
     Compute maximum area of smushed area.
   */
-  assert(images != (Image *) NULL);
-  assert(images->signature == MagickCoreSignature);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
+  CheckAppendArguments(images,exception);
   image=images;
   ComputeSmushExtent(image,stack,offset,&targets);
   /*
