@@ -361,8 +361,10 @@ and quoted in its message:
 Why this proves the step: identical bytes are the same compiled code for every function of
 the file, the shortened caller included (the compiler inlined the helper back where the
 block stood), so the library behaves the same on every input, reached by a case or not
-(Recipe D, *Careful*). Another copy of the block (W step 7) then calls the helper under
-Recipe D's *Unreached functions* form, with that form's own proof.
+(Recipe D, *Careful*). Another copy of the block (W step 7) calls the helper the same way,
+one commit per caller, on the same three items (`--calls` then moves the copy's callees
+down and the helper up by one, as for D); `reuse_check.py` does not apply, since the
+caller keeps the block's `return(R);`.
 
 The guard has two blind spots: reordered statements, which the prohibitions already
 forbid, and **transposed arguments**. For every call the step adds, check by reading
@@ -19185,3 +19187,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | FM | Fold Twin Functions Differing in the Member They Read into One Taking the Value: `F(s,a)` and `G(s,b)`, the same text but for reading `s->m` and `s->n` once each, become one `H(a,v)` taking the member's value; calls pass `e->m` or `e->n`; both twins are deleted, freeing a place under the function-count threshold; Lane: b | `annotate.c`'s `IsColumnOutside`/`IsRowOutside` (113 functions; fold flat, with the helper it frees 5.79 to 5.81 in a probe) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | CF | Step 1: a copy whose loop is `v=e;` followed by `for ( ; c; i)` compares as `for (v=e; c; i)`, the merged body taking the clause form (C11 6.8.5.3); Lane: a | `constitute.c`'s `ReadSceneImages` and `PingSceneImages` (*Code Duplication*; probe 8.81 to 10.0) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | W | *Two levels of evidence*, *Unreached functions: Recipe W*: W may be applied to a function no case reaches, `Verified: guard`, with steps 1 to 6 checked by reading, `refactor_guard.py` `OK` with `--calls` `+2` only, and `obj_identical.sh` printing `IDENTICAL` for the whole object file (D's proof; `MODULO-IDENTICAL` does not suffice); awaits the owner's confirmation; Lane: b | `image-view.c`'s iterators (no case reaches them): the storage-class check `status=SetImageStorageClass(...); if (status == MagickFalse) return(MagickFalse);` of `DuplexTransferImageViewIterator`, IDENTICAL, 6.63 to 6.83 | mandate (2026-10-24) |
+| 2026-11-14 | WORDING | W | *Unreached functions: Recipe W*: another copy of the block (W step 7) is proven on the same three items, not by `reuse_check.py`, which refuses a call that keeps the block's `return(R);` in the caller; Lane: b | `image-view.c`'s `SetImageViewIterator` (reuse_check FAIL on the kept return) | mandate (2026-10-24) |
