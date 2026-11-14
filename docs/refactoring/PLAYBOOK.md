@@ -175,8 +175,8 @@ start new runs (`mutate.py`, Mull builds, `night3.sh`) to gate a step.
 **Guard-verified.** No case executes the function. It may still
 be refactored, as an earlier campaign refactored a program with no tests at all, but only with the
 recipes whose guard fingerprint is exact: **E, G and P** (and B, N and I with the
-checks of *Unreached functions: B and N* and *Unreached functions: Recipe I* below, and SD with
-*Unreached functions: Recipe SD*). The proof is the build
+checks of *Unreached functions: B and N* and *Unreached functions: Recipe I* below, SD with
+*Unreached functions: Recipe SD* and BC with *Unreached functions: Recipe BC*). The proof is the build
 and `refactor_guard.py` reporting `OK` with `--calls`; a `WARN` stops the commit.
 For E and P, which add a function, `OK` means the exact fingerprint the guard names as
 expected: the literal check `OK`, and `--calls` moving nothing but `+2` for each new
@@ -339,6 +339,37 @@ type of every argument. Planted errors on `widget.c`'s `XNoticeWidget` and on a 
 (`tools/test_switch_split_check.py`) were each caught: a label dropped, a callee changed, a write to
 `state` dropped, a transposed argument, a kept group edited, a statement added after the loop, a
 member bound from another member.
+
+**Unreached functions: Recipe BC** (2026-11-14, owner's OK of 2026-11-10 to evolve the recipes; added by
+Claude Sonnet 5.5, campaign A W23 round thirteen lane c; awaits the owner's confirmation). Recipe BC may
+also be applied to a function no case reaches (`casemap.py` 0 for it and for each of its callers, and no
+executed line in a line-coverage profile of the loop), `Verified: guard`, on the terms of the sections
+above. The step moves the tail of a loop's body and turns its exits into constants, so the proof is
+that the moved text is the old text with exactly those rewrites. Each of these is run before the commit
+and quoted in its message:
+
+1. The step is BC's own step, every condition of its *How* met and checked by reading (steps 1 to 5:
+   the block's exits, its written variables under Recipe O step 2, the parameters). A block that
+   throws through `GetMagickModule()` does not move at this level.
+2. `refactor_guard.py` prints `OK`, and `--calls` moves nothing but `+2` for the new function.
+3. `python3 tools/loop_tail_check.py <file> <Caller> <Helper>` prints `OK`: the helper is static, new,
+   returns `MagickBooleanType` and has at most four parameters; the caller holds `if
+   (Helper(a1,...) != MagickFalse) break;` once as the last statement of its block, each argument one
+   identifier and the identifiers the helper's parameter names in order; the caller's old body is its
+   new body with that statement replaced by the helper's body, each `return(MagickTrue);` read as
+   `break;`, each other `return(MagickFalse);` as `continue;` and the last one as the end of the body;
+   the helper holds no `goto`, `#pragma` or other `return`; the rest of the file is the same token
+   stream, the helper standing directly above the caller.
+4. `sh tools/obj_modulo.sh <file> <Caller> <Helper>` prints `IDENTICAL` or `MODULO-IDENTICAL`, as item 4
+   of *Unreached functions: B and N* (`WIDE=1` for a wide-build file; `NOINLINE=<Caller>,...` when the
+   caller's own callers inline it).
+
+Why this proves the step: `obj_modulo.sh` shows that nothing outside the caller and the helper changed;
+`loop_tail_check.py` shows that the helper's statements are the old block's, token for token, with the
+exits BC step 3 rewrites, and that the call passes the parameters by name in their order, so no
+statement was edited, added or dropped and no argument transposed. What it leaves to reading is BC step
+1 (every path of the block ends the iteration through a `break;` or `continue;` of that loop) and the
+types. Planted errors on a synthetic fixture (`tools/test_loop_tail_check.py`) were each caught.
 
 The guard has two blind spots: reordered statements, which the prohibitions already
 forbid, and **transposed arguments**. For every call the step adds, check by reading
@@ -15826,12 +15857,14 @@ static MagickBooleanType PushExifDirectory(const ExifWalkInfo *walk,
   member's variable before reading it.
 
 **Evidence level:** oracle, for the function the step changes (`casemap.py` first; name
-the original caller), with `refactor_guard.py --calls`.
+the original caller), with `refactor_guard.py --calls`. For a function no case reaches: guard, with
+*Unreached functions: Recipe BC* (`tools/loop_tail_check.py`, `tools/obj_modulo.sh`; 2026-11-14).
 
 **Provenance:** 2026-11-13, from `profile.c`'s `SyncExifDirectory` (campaign B, M127 lane
 c): the push tail as `PushExifDirectory`, 3.84 to 3.90; LX would have needed five
 parameters. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
 Lane: c
+Unreached form: 2026-11-14, from `display-image.c`'s `XLoadDirectoryImages` (campaign A, W23 round thirteen lane c, wide build): the progress block at the end of the load loop of a function no case runs; a probe of the step 5.52 to 5.56 with the backdrop block's Recipe N step (Bumpy Road gone). Added by Claude Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
@@ -16770,3 +16803,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | AMEND | LC | Step 6: a caller that already shares a Recipe N step 8 input struct and a Recipe CT step 3 loop-wide `const` targets struct between the helpers of its loop passes both to the helper (`if (Helper(&name,&targets) != MagickFalse) continue;`) in place of step 4's own struct and pointers: members bound once, targets members written `(*v)`, `&v` as `v`, `&name` as `name`, step 2's temporaries declared in the helper. *Careful* gives the argument (N step 8's fill condition for the reads, CT step 3's addresses for the writes) | `display-image.c`'s `XDisplayImage` (campaign A, W23 round twelve lane d, wide build): the command-widget test at the head of its event loop leaves the iteration through three `continue;`, writes `nexus` and `display_image` (members of `DisplayEventTargets`) and reads `event`, the command buffer and the context members; a probe of the step with the stasis test's Recipe E step: bumps 9 to 7, cc 95 to 87, the file with the other seven finding functions emptied 4.51 to 4.56, no finding on a new function | owner |
 | 2026-11-14 | AMEND | SD | Step 8, a run kept apart and shared structs: (a) a run of adjacent groups, in source order, may move with the `default` group when groups that stay stand between the run and `default` (step 6 already allowed it for its own form; C selects by label, not position, and no kept group falls through); (b) a caller that already shares a Recipe N step 8 input struct and a Recipe CT step 3 loop-wide `const` targets struct between the helpers of its loop passes both to the chain under the caller's local names (`&name` written `name` in the moved groups, members bound once, targets members as `(*v)`, the controlling expression included), with no struct, fill or local of its own. *Careful* gives the argument | `display-image.c`'s `XDisplayImage` (campaign A, W23 round twelve lane d, wide build): its 17-group event `switch` must keep `KeyPress` and `KeyRelease` in the caller (`XLookupString` takes `sizeof(command)` of the caller's array), which stand between the groups before them and `default`; the cases already share `DisplayEventContext` and `DisplayEventTargets`. A probe of the four-link chain after the crossing cases' Recipe P step: `XDisplayImage` cc 85 to 64, the file with the other seven finding functions emptied 4.56 to 4.76, no finding on a new function | owner |
 | 2026-11-14 | AMEND | LP | Step 7 (*chain form*): a step-2 predicate whose one label group holds four or more labels and is a *Complex Method* splits at a label boundary into two chained predicates: the later run (two labels or more) moves to a second predicate directly above the first, whose tail `return(MagickFalse);` becomes `return(<Second>(x));`. *Careful* gives the argument (the chain returns `MagickTrue` exactly for the original labels). Checked by `tools/label_set_check.py --split` | `display-image.c`'s `IsImageWindowArrowKey` (campaign A, W23 round thirteen lane c, wide build): eight labels, cc 10; a probe of the vertical/horizontal split 5.36 to 5.52 with no finding on either predicate (Claude Code, Sonnet 5.5) | owner |
+| 2026-11-14 | AMEND | BC | *Unreached functions: Recipe BC* (new paragraph of *Two levels of evidence*, BC's evidence line, the guard-level list): BC may be applied to a function no case reaches, `Verified: guard`, with BC's steps read, `refactor_guard.py` and `--calls` (+2), `tools/loop_tail_check.py` printing OK (the helper's body is the old block with each exit rewritten as BC step 3 gives, the call passes the parameter names in order, the rest of the file the same token stream) and `tools/obj_modulo.sh` IDENTICAL or MODULO-IDENTICAL | `display-image.c`'s `XLoadDirectoryImages` (campaign A, W23 round thirteen lane c, wide build): its progress block is the second bump of a Bumpy Road, the function and its callers run in no case, and no guard-level recipe takes a block that breaks; a probe with the backdrop block's Recipe N step 5.52 to 5.56 (Claude Code, Sonnet 5.5) | owner |
