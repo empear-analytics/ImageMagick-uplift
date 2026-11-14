@@ -11209,6 +11209,78 @@ static void XStoreEditedComment(const XMagickCommandContext *context)
     }
 }
 
+static void XApplyCommentCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ImageInfo
+    *const image_info = context->image_info;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  MagickStatusType
+    status;
+
+  const char
+    *value;
+
+  FILE
+    *file;
+
+  int
+    unique_file;
+
+  /*
+    Edit image comment.
+  */
+  unique_file=AcquireUniqueFileResource(image_info->filename);
+  if (unique_file == -1)
+    {
+      XNoticeWidget(display,windows,"Unable to edit image comment",
+        image_info->filename);
+      return;
+    }
+  value=GetImageProperty(*image,"comment",exception);
+  if (value == (char *) NULL)
+    unique_file=close_utf8(unique_file)-1;
+  else
+    {
+      const char
+        *p;
+
+      file=fdopen(unique_file,"w");
+      if (file == (FILE *) NULL)
+        {
+          XNoticeWidget(display,windows,"Unable to edit image comment",
+            image_info->filename);
+          return;
+        }
+      for (p=value; *p != '\0'; p++)
+        (void) fputc((int) *p,file);
+      (void) fputc('\n',file);
+      (void) fclose(file);
+    }
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  status=InvokeDelegate(image_info,*image,"edit",(char *) NULL,
+    exception);
+  if (status == MagickFalse)
+    XNoticeWidget(display,windows,"Unable to edit image comment",
+      (char *) NULL);
+  else
+    XStoreEditedComment(context);
+  (void) RelinquishUniqueFileResource(image_info->filename);
+  XSetCursorState(display,windows,MagickFalse);
+}
+
 static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12752,59 +12824,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyAddFrameCommand(&context,color);
       break;
     case CommentCommand:
-    {
-      const char
-        *value;
-
-      FILE
-        *file;
-
-      int
-        unique_file;
-
-      /*
-        Edit image comment.
-      */
-      unique_file=AcquireUniqueFileResource(image_info->filename);
-      if (unique_file == -1)
-        {
-          XNoticeWidget(display,windows,"Unable to edit image comment",
-            image_info->filename);
-          break;
-        }
-      value=GetImageProperty(*image,"comment",exception);
-      if (value == (char *) NULL)
-        unique_file=close_utf8(unique_file)-1;
-      else
-        {
-          const char
-            *p;
-
-          file=fdopen(unique_file,"w");
-          if (file == (FILE *) NULL)
-            {
-              XNoticeWidget(display,windows,"Unable to edit image comment",
-                image_info->filename);
-              break;
-            }
-          for (p=value; *p != '\0'; p++)
-            (void) fputc((int) *p,file);
-          (void) fputc('\n',file);
-          (void) fclose(file);
-        }
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      status=InvokeDelegate(image_info,*image,"edit",(char *) NULL,
-        exception);
-      if (status == MagickFalse)
-        XNoticeWidget(display,windows,"Unable to edit image comment",
-          (char *) NULL);
-      else
-        XStoreEditedComment(&context);
-      (void) RelinquishUniqueFileResource(image_info->filename);
-      XSetCursorState(display,windows,MagickFalse);
+      XApplyCommentCommand(&context);
       break;
-    }
     case LaunchCommand:
     {
       /*
