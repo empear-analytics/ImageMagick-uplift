@@ -24847,6 +24847,42 @@ static void XConfirmDisplayExit(const DisplayExitInputs *inputs,
       }
 }
 
+static void XCloseDisplayWindows(const DisplayEventContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  size_t
+    *const state = context->state;
+
+  XWithdrawDynamicWindows(display,windows);
+  if (windows->pan.mapped != MagickFalse)
+    (void) XWithdrawWindow(display,windows->pan.id,windows->pan.screen);
+  if ((resource_info->backdrop == MagickFalse) && (windows->backdrop.mapped))
+    {
+      (void) XWithdrawWindow(display,windows->backdrop.id,
+        windows->backdrop.screen);
+      (void) XDestroyWindow(display,windows->backdrop.id);
+      windows->backdrop.id=(Window) NULL;
+      (void) XWithdrawWindow(display,windows->image.id,
+        windows->image.screen);
+      (void) XDestroyWindow(display,windows->image.id);
+      windows->image.id=(Window) NULL;
+    }
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  if (((*state & FormerImageState) != 0) || ((*state & NextImageState) != 0))
+    *state&=(unsigned int) (~ExitState);
+  XFreeDisplayResources(context);
+  (void) XSync(display,MagickFalse);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -25260,26 +25296,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
 
     XConfirmDisplayExit(&inputs,&display_image);
   }
-  XWithdrawDynamicWindows(display,windows);
-  if (windows->pan.mapped != MagickFalse)
-    (void) XWithdrawWindow(display,windows->pan.id,windows->pan.screen);
-  if ((resource_info->backdrop == MagickFalse) && (windows->backdrop.mapped))
-    {
-      (void) XWithdrawWindow(display,windows->backdrop.id,
-        windows->backdrop.screen);
-      (void) XDestroyWindow(display,windows->backdrop.id);
-      windows->backdrop.id=(Window) NULL;
-      (void) XWithdrawWindow(display,windows->image.id,
-        windows->image.screen);
-      (void) XDestroyWindow(display,windows->image.id);
-      windows->image.id=(Window) NULL;
-    }
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  if (((*state & FormerImageState) != 0) || ((*state & NextImageState) != 0))
-    *state&=(unsigned int) (~ExitState);
-  XFreeDisplayResources(&event_context);
-  (void) XSync(display,MagickFalse);
+  XCloseDisplayWindows(&event_context);
   /*
     Restore our progress monitor and warning handlers.
   */
