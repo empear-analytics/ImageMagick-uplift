@@ -193,6 +193,15 @@ static void SetBuiltInPolicyInfo(PolicyInfo *policy_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void ThrowPolicyAllocationError(ExceptionInfo *exception,
+  const PolicyMapInfo *p)
+{
+  (void) ThrowMagickException(exception,GetMagickModule(),
+    ResourceLimitError,"MemoryAllocationFailed","`%s'",
+    p->name == (char *) NULL ? "" : p->name);
+  CatchException(exception);
+}
+
 static LinkedListInfo *AcquirePolicyCache(const char *filename,
   ExceptionInfo *exception)
 {
@@ -255,20 +264,14 @@ static LinkedListInfo *AcquirePolicyCache(const char *filename,
     policy_info=(PolicyInfo *) AcquireMagickMemory(sizeof(*policy_info));
     if (policy_info == (PolicyInfo *) NULL)
       {
-        (void) ThrowMagickException(exception,GetMagickModule(),
-          ResourceLimitError,"MemoryAllocationFailed","`%s'",
-          p->name == (char *) NULL ? "" : p->name);
-        CatchException(exception);
+        ThrowPolicyAllocationError(exception,p);
         continue;
       }
     SetBuiltInPolicyInfo(policy_info,p);
     status=AppendValueToLinkedList(cache,policy_info);
     if (status == MagickFalse)
       {
-        (void) ThrowMagickException(exception,GetMagickModule(),
-          ResourceLimitError,"MemoryAllocationFailed","`%s'",
-          p->name == (char *) NULL ? "" : p->name);
-        CatchException(exception);
+        ThrowPolicyAllocationError(exception,p);
       }
   }
   return(cache);
