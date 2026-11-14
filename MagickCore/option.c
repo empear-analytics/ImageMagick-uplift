@@ -2753,6 +2753,18 @@ MagickExport MagickBooleanType IsCommandOption(const char *option)
   return(MagickTrue);
 }
 
+static ssize_t FindOptionType(const OptionInfo *option_info,
+  const ssize_t type)
+{
+  ssize_t
+    i;
+
+  for (i=0; option_info[i].mnemonic != (const char *) NULL; i++)
+    if (type == option_info[i].type)
+      break;
+  return(i);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2790,9 +2802,7 @@ MagickExport const char *CommandOptionToMnemonic(const CommandOption option,
   option_info=GetOptionInfo(option);
   if (option_info == (const OptionInfo *) NULL)
     return((const char *) NULL);
-  for (i=0; option_info[i].mnemonic != (const char *) NULL; i++)
-    if (type == option_info[i].type)
-      break;
+  i=FindOptionType(option_info,type);
   if (option_info[i].mnemonic == (const char *) NULL)
     return("Unrecognized");
   return(option_info[i].mnemonic);
