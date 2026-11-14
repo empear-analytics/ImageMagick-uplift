@@ -20935,6 +20935,42 @@ static MagickBooleanType XLocateTile(Display *display,Image *image,
   return(MagickTrue);
 }
 
+static void XTileDeleteImage(const XTileInput *input)
+{
+  Display
+    *const display = input->display;
+
+  XWindows
+    *const windows = input->windows;
+
+  char
+    *const filename = input->filename;
+
+  int
+    status;
+
+  /*
+    Delete tile image.
+  */
+  if (IsPathAccessible(filename) == MagickFalse)
+    {
+      XNoticeWidget(display,windows,"Image file does not exist:",filename);
+      return;
+    }
+  status=XConfirmWidget(display,windows,"Really delete tile",filename);
+  if (status <= 0)
+    return;
+  status=ShredFile(filename) == MagickFalse ? 0 : 1;
+  status|=remove_utf8(filename);
+  if (status != MagickFalse)
+    {
+      XNoticeWidget(display,windows,"Unable to delete image file:",
+        filename);
+      return;
+    }
+  XTileUpdateImage(input);
+}
+
 static Image *XTileImage(Display *display,XResourceInfo *resource_info,
   XWindows *windows,Image *image,XEvent *event,ExceptionInfo *exception)
 {
@@ -20968,7 +21004,6 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
 
   int
     id,
-    status,
     x,
     y;
 
@@ -21043,26 +21078,7 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
     }
     case TileDeleteCommand:
     {
-      /*
-        Delete tile image.
-      */
-      if (IsPathAccessible(filename) == MagickFalse)
-        {
-          XNoticeWidget(display,windows,"Image file does not exist:",filename);
-          break;
-        }
-      status=XConfirmWidget(display,windows,"Really delete tile",filename);
-      if (status <= 0)
-        break;
-      status=ShredFile(filename) == MagickFalse ? 0 : 1;
-      status|=remove_utf8(filename);
-      if (status != MagickFalse)
-        {
-          XNoticeWidget(display,windows,"Unable to delete image file:",
-            filename);
-          break;
-        }
-      XTileUpdateImage(&input);
+      XTileDeleteImage(&input);
       break;
     }
     case TileUpdateCommand:
