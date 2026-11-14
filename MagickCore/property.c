@@ -3926,6 +3926,545 @@ static void FormatPaperSizeProperty(const char *property,char *value)
     }
 }
 
+static const char *FormatMagickPropertyPrecision(char *value,
+  const double number)
+{
+  (void) FormatLocaleString(value,MagickPathExtent,"%.*g",
+    GetMagickPrecision(),number);
+  return((const char *) NULL);
+}
+
+typedef struct _MagickPropertyRequest
+{
+  ImageInfo
+    *image_info;
+
+  Image
+    *image;
+
+  const char
+    *property;
+
+  char
+    *value;
+
+  ExceptionInfo
+    *exception;
+} MagickPropertyRequest;
+
+typedef enum
+{
+  NoPropertyRequirement,
+  ImagePropertyRequirement,
+  ImageInfoPropertyRequirement
+} MagickPropertyRequirement;
+
+typedef const char
+  *(*MagickPropertyHandler)(const MagickPropertyRequest *);
+
+typedef struct _MagickPropertyHandlerInfo
+{
+  const char
+    *key;
+
+  MagickPropertyRequirement
+    requirement;
+
+  MagickPropertyHandler
+    handler;
+} MagickPropertyHandlerInfo;
+
+static const char *MagickPropertyBasename(const MagickPropertyRequest *request)
+{
+  const char
+    *string = (char *) NULL;
+
+  string=GetPathComponentProperty(request->image,BasePath,request->value,string);
+  return(string);
+}
+
+static const char *MagickPropertyBitDepth(const MagickPropertyRequest *request)
+{
+  (void) FormatLocaleString(request->value,MagickPathExtent,"%.17g",(double)
+    GetImageDepth(request->image,request->exception));
+  return((const char *) NULL);
+}
+
+static const char *MagickPropertyBoundingBox(const MagickPropertyRequest *request)
+{
+  RectangleInfo
+    geometry;
+
+  geometry=GetImageBoundingBox(request->image,request->exception);
+  (void) FormatLocaleString(request->value,MagickPathExtent,"%g,%g %g,%g",
+    (double) geometry.x,(double) geometry.y,
+    (double) geometry.x+geometry.width,
+    (double) geometry.y+geometry.height);
+  return((const char *) NULL);
+}
+
+static const char *MagickPropertyChannels(const MagickPropertyRequest *request)
+{
+  (void) FormatLocaleString(request->value,MagickPathExtent,"%s%s %g.%g",
+    CommandOptionToMnemonic(MagickColorspaceOptions,(ssize_t)
+    request->image->colorspace),request->image->alpha_trait != UndefinedPixelTrait ?
+    "a" : " ",(double) request->image->number_channels,(double)
+    request->image->number_meta_channels);
+  LocaleLower(request->value);
+  return((const char *) NULL);
+}
+
+static const char *MagickPropertyColors(const MagickPropertyRequest *request)
+{
+  request->image->colors=GetNumberColors(request->image,(FILE *) NULL,request->exception);
+  (void) FormatLocaleString(request->value,MagickPathExtent,"%.17g",(double)
+    request->image->colors);
+  return((const char *) NULL);
+}
+
+static const char *MagickPropertyColorspace(const MagickPropertyRequest *request)
+{
+  const char
+    *string = (char *) NULL;
+
+  string=CommandOptionToMnemonic(MagickColorspaceOptions,(ssize_t)
+    request->image->colorspace);
+  return(string);
+}
+
+static const char *MagickPropertyCompose(const MagickPropertyRequest *request)
+{
+  const char
+    *string = (char *) NULL;
+
+  string=CommandOptionToMnemonic(MagickComposeOptions,(ssize_t)
+    request->image->compose);
+  return(string);
+}
+
+static const char *MagickPropertyCompression(const MagickPropertyRequest *request)
+{
+  const char
+    *string = (char *) NULL;
+
+  string=CommandOptionToMnemonic(MagickCompressOptions,(ssize_t)
+    request->image->compression);
+  return(string);
+}
+
+static const char *MagickPropertyConvexHull(const MagickPropertyRequest *request)
+{
+  const char
+    *string = (char *) NULL;
+
+  const PointListInputs
+    inputs = { request->image, request->value, string, request->property, request->exception };
+
+  string=GetPointListProperty(&inputs,ConvexHullPointList);
+  return(string);
+}
+
+static const char *MagickPropertyConvexHullExtremePoints(const MagickPropertyRequest *request)
+{
+  const char
+    *string = (char *) NULL;
+
+  string=GetConvexHullExtremePoints(request->image,request->value,string,request->exception);
+  return(string);
+}
+
+static const char *MagickPropertyCopyright(const MagickPropertyRequest *request)
+{
+  (void) CopyMagickString(request->value,GetMagickCopyright(),MagickPathExtent);
+  return((const char *) NULL);
+}
+
+static const char *MagickPropertyDepth(const MagickPropertyRequest *request)
+{
+  (void) FormatLocaleString(request->value,MagickPathExtent,"%.17g",(double)
+    request->image->depth);
+  return((const char *) NULL);
+}
+
+static const char *MagickPropertyDirectory(const MagickPropertyRequest *request)
+{
+  const char
+    *string = (char *) NULL;
+
+  string=GetPathComponentProperty(request->image,HeadPath,request->value,string);
+  return(string);
+}
+
+static const char *MagickPropertyEntropy(const MagickPropertyRequest *request)
+{
+  double
+    entropy;
+
+  (void) GetImageEntropy(request->image,&entropy,request->exception);
+  return(FormatMagickPropertyPrecision(request->value,entropy));
+}
+
+static const char *MagickPropertyExtension(const MagickPropertyRequest *request)
+{
+  const char
+    *string = (char *) NULL;
+
+  string=GetPathComponentProperty(request->image,ExtensionPath,request->value,string);
+  return(string);
+}
+
+static const char *MagickPropertyGamma(const MagickPropertyRequest *request)
+{
+  (void) FormatLocaleString(request->value,MagickPathExtent,"%.*g",
+    GetMagickPrecision(),request->image->gamma);
+  return((const char *) NULL);
+}
+
+static const char *MagickPropertyHeight(const MagickPropertyRequest *request)
+{
+  (void) FormatLocaleString(request->value,MagickPathExtent,"%.17g",
+    request->image->magick_rows != 0 ? (double) request->image->magick_rows : 256.0);
+  return((const char *) NULL);
+}
+
+static const char *MagickPropertyInput(const MagickPropertyRequest *request)
+{
+  const char
+    *string = (char *) NULL;
+
+  string=request->image->filename;
+  return(string);
+}
+
+static const char *MagickPropertyInterlace(const MagickPropertyRequest *request)
+{
+  const char
+    *string = (char *) NULL;
+
+  string=CommandOptionToMnemonic(MagickInterlaceOptions,(ssize_t)
+    request->image->interlace);
+  return(string);
+}
+
+static const char *MagickPropertyKurtosis(const MagickPropertyRequest *request)
+{
+  double
+    kurtosis,
+    skewness;
+
+  (void) GetImageKurtosis(request->image,&kurtosis,&skewness,request->exception);
+  return(FormatMagickPropertyPrecision(request->value,kurtosis));
+}
+
+static const char *MagickPropertyMagick(const MagickPropertyRequest *request)
+{
+  const char
+    *string = (char *) NULL;
+
+  string=request->image->magick;
+  return(string);
+}
+
+static const char *MagickPropertyMaxima(const MagickPropertyRequest *request)
+{
+  double
+    maximum,
+    minimum;
+
+  (void) GetImageRange(request->image,&minimum,&maximum,request->exception);
+  return(FormatMagickPropertyPrecision(request->value,maximum));
+}
+
+static const char *MagickPropertyMean(const MagickPropertyRequest *request)
+{
+  double
+    mean,
+    standard_deviation;
+
+  (void) GetImageMean(request->image,&mean,&standard_deviation,request->exception);
+  return(FormatMagickPropertyPrecision(request->value,mean));
+}
+
+static const char *MagickPropertyMedian(const MagickPropertyRequest *request)
+{
+  double
+    median;
+
+  (void) GetImageMedian(request->image,&median,request->exception);
+  return(FormatMagickPropertyPrecision(request->value,median));
+}
+
+static const char *MagickPropertyMimeType(const MagickPropertyRequest *request)
+{
+  const MagickInfo
+    *magick_info;
+
+  magick_info=GetMagickInfo(request->image->magick,request->exception);
+  if ((magick_info != (const MagickInfo *) NULL) &&
+      (GetMagickMimeType(magick_info) != (const char *) NULL))
+    (void) CopyMagickString(request->value,GetMagickMimeType(magick_info),
+      MagickPathExtent);
+  return((const char *) NULL);
+}
+
+static const char *MagickPropertyMinima(const MagickPropertyRequest *request)
+{
+  double
+    maximum,
+    minimum;
+
+  (void) GetImageRange(request->image,&minimum,&maximum,request->exception);
+  return(FormatMagickPropertyPrecision(request->value,minimum));
+}
+
+static const char *MagickPropertyOpaque(const MagickPropertyRequest *request)
+{
+  const char
+    *string = (char *) NULL;
+
+  string=CommandOptionToMnemonic(MagickBooleanOptions,(ssize_t)
+    IsImageOpaque(request->image,request->exception));
+  return(string);
+}
+
+static const char *MagickPropertyOrientation(const MagickPropertyRequest *request)
+{
+  const char
+    *string = (char *) NULL;
+
+  string=CommandOptionToMnemonic(MagickOrientationOptions,(ssize_t)
+    request->image->orientation);
+  return(string);
+}
+
+static const char *MagickPropertyOutput(const MagickPropertyRequest *request)
+{
+  (void) CopyMagickString(request->value,request->image_info->filename,MagickPathExtent);
+  return((const char *) NULL);
+}
+
+static const char *MagickPropertyPage(const MagickPropertyRequest *request)
+{
+  (void) FormatLocaleString(request->value,MagickPathExtent,"%.17gx%.17g",
+    (double) request->image->page.width,(double) request->image->page.height);
+  return((const char *) NULL);
+}
+
+static const char *MagickPropertyPrintsizeX(const MagickPropertyRequest *request)
+{
+  (void) FormatLocaleString(request->value,MagickPathExtent,"%.*g",
+    GetMagickPrecision(),(double) MagickSafeReciprocal(
+      request->image->resolution.x)*request->image->columns);
+  return((const char *) NULL);
+}
+
+static const char *MagickPropertyPrintsizeY(const MagickPropertyRequest *request)
+{
+  (void) FormatLocaleString(request->value,MagickPathExtent,"%.*g",
+    GetMagickPrecision(),(double) MagickSafeReciprocal(
+      request->image->resolution.y)*request->image->rows);
+  return((const char *) NULL);
+}
+
+static const char *MagickPropertyProfiles(const MagickPropertyRequest *request)
+{
+  GetProfilesProperty(request->image,request->value);
+  return((const char *) NULL);
+}
+
+static const char *MagickPropertyQuality(const MagickPropertyRequest *request)
+{
+  (void) FormatLocaleString(request->value,MagickPathExtent,"%.17g",(double)
+    request->image->quality);
+  return((const char *) NULL);
+}
+
+static const char *MagickPropertyResolutionX(const MagickPropertyRequest *request)
+{
+  (void) FormatLocaleString(request->value,MagickPathExtent,"%g",
+    request->image->resolution.x);
+  return((const char *) NULL);
+}
+
+static const char *MagickPropertyResolutionY(const MagickPropertyRequest *request)
+{
+  (void) FormatLocaleString(request->value,MagickPathExtent,"%g",
+    request->image->resolution.y);
+  return((const char *) NULL);
+}
+
+static const char *MagickPropertyScenes(const MagickPropertyRequest *request)
+{
+  /* FUTURE: equivalent to %n? */
+  (void) FormatLocaleString(request->value,MagickPathExtent,"%.17g",(double)
+    GetImageListLength(request->image));
+  return((const char *) NULL);
+}
+
+static const char *MagickPropertySize(const MagickPropertyRequest *request)
+{
+  (void) FormatMagickSize(GetBlobSize(request->image),MagickFalse,"B",
+    MagickPathExtent,request->value);
+  return((const char *) NULL);
+}
+
+static const char *MagickPropertySkewness(const MagickPropertyRequest *request)
+{
+  double
+    kurtosis,
+    skewness;
+
+  (void) GetImageKurtosis(request->image,&kurtosis,&skewness,request->exception);
+  return(FormatMagickPropertyPrecision(request->value,skewness));
+}
+
+static const char *MagickPropertyStandardDeviation(const MagickPropertyRequest *request)
+{
+  double
+    mean,
+    standard_deviation;
+
+  (void) GetImageMean(request->image,&mean,&standard_deviation,request->exception);
+  return(FormatMagickPropertyPrecision(request->value,standard_deviation));
+}
+
+static const char *MagickPropertyType(const MagickPropertyRequest *request)
+{
+  const char
+    *string = (char *) NULL;
+
+  string=CommandOptionToMnemonic(MagickTypeOptions,(ssize_t)
+    IdentifyImageType(request->image,request->exception));
+  return(string);
+}
+
+static const char *MagickPropertyUnique(const MagickPropertyRequest *request)
+{
+  const char
+    *string = (char *) NULL;
+
+  string=request->image_info->unique;
+  return(string);
+}
+
+static const char *MagickPropertyUnits(const MagickPropertyRequest *request)
+{
+  const char
+    *string = (char *) NULL;
+
+  string=CommandOptionToMnemonic(MagickResolutionOptions,(ssize_t)
+    request->image->units);
+  return(string);
+}
+
+static const char *MagickPropertyVersion(const MagickPropertyRequest *request)
+{
+  const char
+    *string = (char *) NULL;
+
+  magick_unreferenced(request);
+  string=GetMagickVersion((size_t *) NULL);
+  return(string);
+}
+
+static const char *MagickPropertyWidth(const MagickPropertyRequest *request)
+{
+  (void) FormatLocaleString(request->value,MagickPathExtent,"%.17g",(double)
+    (request->image->magick_columns != 0 ? request->image->magick_columns : 256));
+  return((const char *) NULL);
+}
+
+static const MagickPropertyHandlerInfo
+  MagickPropertyHandlers[] =
+  {
+    { "basename", ImagePropertyRequirement, MagickPropertyBasename },
+    { "bit-depth", ImagePropertyRequirement, MagickPropertyBitDepth },
+    { "bounding-box", ImagePropertyRequirement, MagickPropertyBoundingBox },
+    { "channels", ImagePropertyRequirement, MagickPropertyChannels },
+    { "colors", ImagePropertyRequirement, MagickPropertyColors },
+    { "colorspace", ImagePropertyRequirement, MagickPropertyColorspace },
+    { "compose", ImagePropertyRequirement, MagickPropertyCompose },
+    { "compression", ImagePropertyRequirement, MagickPropertyCompression },
+    { "convex-hull", ImagePropertyRequirement, MagickPropertyConvexHull },
+    { "convex-hull:extreme-points", ImagePropertyRequirement, MagickPropertyConvexHullExtremePoints },
+    { "copyright", NoPropertyRequirement, MagickPropertyCopyright },
+    { "depth", ImagePropertyRequirement, MagickPropertyDepth },
+    { "directory", ImagePropertyRequirement, MagickPropertyDirectory },
+    { "entropy", ImagePropertyRequirement, MagickPropertyEntropy },
+    { "extension", ImagePropertyRequirement, MagickPropertyExtension },
+    { "gamma", ImagePropertyRequirement, MagickPropertyGamma },
+    { "height", ImagePropertyRequirement, MagickPropertyHeight },
+    { "input", ImagePropertyRequirement, MagickPropertyInput },
+    { "interlace", ImagePropertyRequirement, MagickPropertyInterlace },
+    { "kurtosis", ImagePropertyRequirement, MagickPropertyKurtosis },
+    { "magick", ImagePropertyRequirement, MagickPropertyMagick },
+    { "maxima", ImagePropertyRequirement, MagickPropertyMaxima },
+    { "max", ImagePropertyRequirement, MagickPropertyMaxima },
+    { "mean", ImagePropertyRequirement, MagickPropertyMean },
+    { "median", ImagePropertyRequirement, MagickPropertyMedian },
+    { "mime:type", NoPropertyRequirement, MagickPropertyMimeType },
+    { "minima", ImagePropertyRequirement, MagickPropertyMinima },
+    { "min", ImagePropertyRequirement, MagickPropertyMinima },
+    { "opaque", ImagePropertyRequirement, MagickPropertyOpaque },
+    { "orientation", ImagePropertyRequirement, MagickPropertyOrientation },
+    { "output", ImageInfoPropertyRequirement, MagickPropertyOutput },
+    { "page", ImagePropertyRequirement, MagickPropertyPage },
+    { "printsize.x", ImagePropertyRequirement, MagickPropertyPrintsizeX },
+    { "printsize.y", ImagePropertyRequirement, MagickPropertyPrintsizeY },
+    { "profiles", ImagePropertyRequirement, MagickPropertyProfiles },
+    { "quality", ImagePropertyRequirement, MagickPropertyQuality },
+    { "resolution.x", ImagePropertyRequirement, MagickPropertyResolutionX },
+    { "resolution.y", ImagePropertyRequirement, MagickPropertyResolutionY },
+    { "scenes", ImagePropertyRequirement, MagickPropertyScenes },
+    { "size", ImagePropertyRequirement, MagickPropertySize },
+    { "skewness", ImagePropertyRequirement, MagickPropertySkewness },
+    { "standard-deviation", ImagePropertyRequirement, MagickPropertyStandardDeviation },
+    { "type", ImagePropertyRequirement, MagickPropertyType },
+    { "unique", ImageInfoPropertyRequirement, MagickPropertyUnique },
+    { "units", ImagePropertyRequirement, MagickPropertyUnits },
+    { "version", NoPropertyRequirement, MagickPropertyVersion },
+    { "width", ImagePropertyRequirement, MagickPropertyWidth }
+  };
+
+static const MagickPropertyHandlerInfo *GetMagickPropertyHandlerInfo(
+  const char *property)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(MagickPropertyHandlers)/sizeof(*MagickPropertyHandlers)); i++)
+    if ((*property == *MagickPropertyHandlers[i].key) &&
+        (LocaleCompare(MagickPropertyHandlers[i].key,property) == 0))
+      return(MagickPropertyHandlers+i);
+  return((const MagickPropertyHandlerInfo *) NULL);
+}
+
+static const char *InvokeMagickPropertyHandler(
+  const MagickPropertyHandlerInfo *info,const MagickPropertyRequest *request)
+{
+  ImageInfo
+    *const image_info = request->image_info;
+
+  Image
+    *const image = request->image;
+
+  const char
+    *const property = request->property;
+
+  ExceptionInfo
+    *const exception = request->exception;
+
+  if (info->requirement == ImagePropertyRequirement)
+    {
+      WarnNoImageReturn("\"%%[%s]\"",property);
+    }
+  if (info->requirement == ImageInfoPropertyRequirement)
+    {
+      WarnNoImageInfoReturn("\"%%[%s]\"",property);
+    }
+  return(info->handler(request));
+}
+
 MagickExport const char *GetMagickProperty(ImageInfo *image_info,
   Image *image,const char *property,ExceptionInfo *exception)
 {
@@ -3934,6 +4473,12 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
 
   const char
     *string;
+
+  const MagickPropertyHandlerInfo
+    *info;
+
+  MagickPropertyRequest
+    request;
 
   assert(property != (const char *) NULL);
   assert(property[0] != '\0');
@@ -3948,264 +4493,50 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
       (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no-images");
   *value='\0';           /* formated string */
   string=(char *) NULL;  /* constant string reference */
+  request.image_info=image_info;
+  request.image=image;
+  request.property=property;
+  request.value=value;
+  request.exception=exception;
+  info=GetMagickPropertyHandlerInfo(property);
+  if (info != (const MagickPropertyHandlerInfo *) NULL)
+    string=InvokeMagickPropertyHandler(info,&request);
   switch (*property)
   {
     case 'b':
     {
-      if (LocaleCompare("basename",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          string=GetPathComponentProperty(image,BasePath,value,string);
-          break;
-        }
-      if (LocaleCompare("bit-depth",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-            GetImageDepth(image,exception));
-          break;
-        }
-      if (LocaleCompare("bounding-box",property) == 0)
-        {
-          RectangleInfo
-            geometry;
-
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          geometry=GetImageBoundingBox(image,exception);
-          (void) FormatLocaleString(value,MagickPathExtent,"%g,%g %g,%g",
-            (double) geometry.x,(double) geometry.y,
-            (double) geometry.x+geometry.width,
-            (double) geometry.y+geometry.height);
-          break;
-        }
       break;
     }
     case 'c':
     {
-      if (LocaleCompare("channels",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          (void) FormatLocaleString(value,MagickPathExtent,"%s%s %g.%g",
-            CommandOptionToMnemonic(MagickColorspaceOptions,(ssize_t)
-            image->colorspace),image->alpha_trait != UndefinedPixelTrait ?
-            "a" : " ",(double) image->number_channels,(double)
-            image->number_meta_channels);
-          LocaleLower(value);
-          break;
-        }
-      if (LocaleCompare("colors",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          image->colors=GetNumberColors(image,(FILE *) NULL,exception);
-          (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-            image->colors);
-          break;
-        }
-      if (LocaleCompare("colorspace",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          string=CommandOptionToMnemonic(MagickColorspaceOptions,(ssize_t)
-            image->colorspace);
-          break;
-        }
-      if (LocaleCompare("compose",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          string=CommandOptionToMnemonic(MagickComposeOptions,(ssize_t)
-            image->compose);
-          break;
-        }
-      if (LocaleCompare("compression",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          string=CommandOptionToMnemonic(MagickCompressOptions,(ssize_t)
-            image->compression);
-          break;
-        }
-      if (LocaleCompare("convex-hull",property) == 0)
-        {
-          const PointListInputs
-            inputs = { image, value, string, property, exception };
-
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          string=GetPointListProperty(&inputs,ConvexHullPointList);
-          break;
-        }
-      if (LocaleCompare("convex-hull:extreme-points",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          string=GetConvexHullExtremePoints(image,value,string,exception);
-          break;
-        }
-      if (LocaleCompare("copyright",property) == 0)
-        {
-          (void) CopyMagickString(value,GetMagickCopyright(),MagickPathExtent);
-          break;
-        }
       break;
     }
     case 'd':
     {
-      if (LocaleCompare("depth",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-            image->depth);
-          break;
-        }
-      if (LocaleCompare("directory",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          string=GetPathComponentProperty(image,HeadPath,value,string);
-          break;
-        }
       break;
     }
     case 'e':
     {
-      if (LocaleCompare("entropy",property) == 0)
-        {
-          double
-            entropy;
-
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          (void) GetImageEntropy(image,&entropy,exception);
-          (void) FormatLocaleString(value,MagickPathExtent,"%.*g",
-            GetMagickPrecision(),entropy);
-          break;
-        }
-      if (LocaleCompare("extension",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          string=GetPathComponentProperty(image,ExtensionPath,value,string);
-          break;
-        }
       break;
     }
     case 'g':
     {
-      if (LocaleCompare("gamma",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          (void) FormatLocaleString(value,MagickPathExtent,"%.*g",
-            GetMagickPrecision(),image->gamma);
-          break;
-        }
       break;
     }
     case 'h':
     {
-      if (LocaleCompare("height",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          (void) FormatLocaleString(value,MagickPathExtent,"%.17g",
-            image->magick_rows != 0 ? (double) image->magick_rows : 256.0);
-          break;
-        }
       break;
     }
     case 'i':
     {
-      if (LocaleCompare("input",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          string=image->filename;
-          break;
-        }
-      if (LocaleCompare("interlace",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          string=CommandOptionToMnemonic(MagickInterlaceOptions,(ssize_t)
-            image->interlace);
-          break;
-        }
       break;
     }
     case 'k':
     {
-      if (LocaleCompare("kurtosis",property) == 0)
-        {
-          double
-            kurtosis,
-            skewness;
-
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          (void) GetImageKurtosis(image,&kurtosis,&skewness,exception);
-          (void) FormatLocaleString(value,MagickPathExtent,"%.*g",
-            GetMagickPrecision(),kurtosis);
-          break;
-        }
       break;
     }
     case 'm':
     {
-      if (LocaleCompare("magick",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          string=image->magick;
-          break;
-        }
-      if ((LocaleCompare("maxima",property) == 0) ||
-          (LocaleCompare("max",property) == 0))
-        {
-          double
-            maximum,
-            minimum;
-
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          (void) GetImageRange(image,&minimum,&maximum,exception);
-          (void) FormatLocaleString(value,MagickPathExtent,"%.*g",
-            GetMagickPrecision(),maximum);
-          break;
-        }
-      if (LocaleCompare("mean",property) == 0)
-        {
-          double
-            mean,
-            standard_deviation;
-
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          (void) GetImageMean(image,&mean,&standard_deviation,exception);
-          (void) FormatLocaleString(value,MagickPathExtent,"%.*g",
-            GetMagickPrecision(),mean);
-          break;
-        }
-      if (LocaleCompare("median",property) == 0)
-        {
-          double
-            median;
-
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          (void) GetImageMedian(image,&median,exception);
-          (void) FormatLocaleString(value,MagickPathExtent,"%.*g",
-            GetMagickPrecision(),median);
-          break;
-        }
-      if (LocaleCompare("mime:type",property) == 0)
-        {
-          const MagickInfo
-            *magick_info;
-
-          magick_info=GetMagickInfo(image->magick,exception);
-          if ((magick_info != (const MagickInfo *) NULL) &&
-              (GetMagickMimeType(magick_info) != (const char *) NULL))
-            (void) CopyMagickString(value,GetMagickMimeType(magick_info),
-              MagickPathExtent);
-          break;
-        }
-      if ((LocaleCompare("minima",property) == 0) ||
-          (LocaleCompare("min",property) == 0))
-        {
-          double
-            maximum,
-            minimum;
-
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          (void) GetImageRange(image,&minimum,&maximum,exception);
-          (void) FormatLocaleString(value,MagickPathExtent,"%.*g",
-            GetMagickPrecision(),minimum);
-          break;
-        }
       if (LocaleNCompare("minimum-bounding-box",property,20) == 0)
         {
           const PointListInputs
@@ -4219,37 +4550,10 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
     }
     case 'o':
     {
-      if (LocaleCompare("opaque",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          string=CommandOptionToMnemonic(MagickBooleanOptions,(ssize_t)
-            IsImageOpaque(image,exception));
-          break;
-        }
-      if (LocaleCompare("orientation",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          string=CommandOptionToMnemonic(MagickOrientationOptions,(ssize_t)
-            image->orientation);
-          break;
-        }
-      if (LocaleCompare("output",property) == 0)
-        {
-          WarnNoImageInfoReturn("\"%%[%s]\"",property);
-          (void) CopyMagickString(value,image_info->filename,MagickPathExtent);
-          break;
-        }
       break;
     }
     case 'p':
     {
-      if (LocaleCompare("page",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          (void) FormatLocaleString(value,MagickPathExtent,"%.17gx%.17g",
-            (double) image->page.width,(double) image->page.height);
-          break;
-        }
       if (LocaleNCompare("papersize:",property,10) == 0)
         {
           WarnNoImageReturn("\"%%[%s]\"",property);
@@ -4288,57 +4592,14 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
             }
       }
 #endif
-      if (LocaleCompare("printsize.x",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          (void) FormatLocaleString(value,MagickPathExtent,"%.*g",
-            GetMagickPrecision(),(double) MagickSafeReciprocal(
-              image->resolution.x)*image->columns);
-          break;
-        }
-      if (LocaleCompare("printsize.y",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          (void) FormatLocaleString(value,MagickPathExtent,"%.*g",
-            GetMagickPrecision(),(double) MagickSafeReciprocal(
-              image->resolution.y)*image->rows);
-          break;
-        }
-      if (LocaleCompare("profiles",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          GetProfilesProperty(image,value);
-          break;
-        }
       break;
     }
     case 'q':
     {
-      if (LocaleCompare("quality",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-            image->quality);
-          break;
-        }
       break;
     }
     case 'r':
     {
-      if (LocaleCompare("resolution.x",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          (void) FormatLocaleString(value,MagickPathExtent,"%g",
-            image->resolution.x);
-          break;
-        }
-      if (LocaleCompare("resolution.y",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          (void) FormatLocaleString(value,MagickPathExtent,"%g",
-            image->resolution.y);
-          break;
-        }
       break;
     }
     case 's':
@@ -4356,93 +4617,22 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
           }
           break;
         }
-      if (LocaleCompare("scenes",property) == 0)
-        {
-          /* FUTURE: equivalent to %n? */
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-            GetImageListLength(image));
-          break;
-        }
-      if (LocaleCompare("size",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          (void) FormatMagickSize(GetBlobSize(image),MagickFalse,"B",
-            MagickPathExtent,value);
-          break;
-        }
-      if (LocaleCompare("skewness",property) == 0)
-        {
-          double
-            kurtosis,
-            skewness;
-
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          (void) GetImageKurtosis(image,&kurtosis,&skewness,exception);
-          (void) FormatLocaleString(value,MagickPathExtent,"%.*g",
-            GetMagickPrecision(),skewness);
-          break;
-        }
-      if (LocaleCompare("standard-deviation",property) == 0)
-        {
-          double
-            mean,
-            standard_deviation;
-
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          (void) GetImageMean(image,&mean,&standard_deviation,exception);
-          (void) FormatLocaleString(value,MagickPathExtent,"%.*g",
-            GetMagickPrecision(),standard_deviation);
-          break;
-        }
       break;
     }
     case 't':
     {
-      if (LocaleCompare("type",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          string=CommandOptionToMnemonic(MagickTypeOptions,(ssize_t)
-            IdentifyImageType(image,exception));
-          break;
-        }
        break;
     }
     case 'u':
     {
-      if (LocaleCompare("unique",property) == 0)
-        {
-          WarnNoImageInfoReturn("\"%%[%s]\"",property);
-          string=image_info->unique;
-          break;
-        }
-      if (LocaleCompare("units",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          string=CommandOptionToMnemonic(MagickResolutionOptions,(ssize_t)
-            image->units);
-          break;
-        }
       break;
     }
     case 'v':
     {
-      if (LocaleCompare("version",property) == 0)
-        {
-          string=GetMagickVersion((size_t *) NULL);
-          break;
-        }
       break;
     }
     case 'w':
     {
-      if (LocaleCompare("width",property) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-            (image->magick_columns != 0 ? image->magick_columns : 256));
-          break;
-        }
       break;
     }
   }
