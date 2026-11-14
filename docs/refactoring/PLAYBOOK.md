@@ -12999,6 +12999,17 @@ moves a run of skip tests as one predicate.
    `return(MagickTrue);`. Each test's text is copied character for character.
 3. The tests in the loop become `if (Is<Name>(<inputs>) == MagickFalse) continue;`.
 4. The tests that followed the run stay where they were.
+5. *Case form* (2026-11-14). The first statements of a `switch` group's compound block
+   (after its declarations) may be the run instead: `if (<test>) break;` statements of
+   that `switch`, one or more, each a single `if` with no `else` whose body is `break;`
+   alone, under steps 1 and 2's conditions (no test writes anything; the `break;`
+   leaves the `switch`, not a loop nested in the group). The run becomes
+   `if (Is<Name>(<inputs>) == MagickFalse) break;`, the predicate written as step 2
+   says. When two groups of one `switch` open with the same run (identical character
+   for character once each group's variables are named by the same parameters, checked
+   by script), one predicate serves both, under Recipe P's *Several sites* conditions:
+   every argument an identifier, `refactor_guard.py --calls` `+2` for the predicate and
+   `+1` for the second site, nothing else.
 
 **Before:**
 
@@ -13023,12 +13034,24 @@ moves a run of skip tests as one predicate.
   before.
 - The helper's tests are the original's; a pointer parameter keeps the type the caller
   has.
+- Step 5: a `break;` at the top level of a group's block leaves the `switch`, as a
+  `continue;` at the top level of a loop body ends the iteration. The predicate returns
+  `MagickFalse` at the first test that holds, after running the same earlier tests and
+  no later one, and the caller's `break;` then leaves the `switch` from the same point;
+  when no test holds, the predicate returns `MagickTrue` and the group goes on with the
+  statement that followed the run, as before. The tests have no side effect, so moving
+  their evaluation into a callee changes no value anyone reads.
 
 **Evidence level:** oracle, for the function the step changes (`casemap.py` first).
 
 **Provenance:** 2026-11-12, from `policy.c`'s `IsRightsAuthorizedByName` (campaign B,
 M120), 5.88 to 5.93. Added by Claude Code (Claude Sonnet 5.5) under the mandate of
-2026-10-24.
+2026-10-24. Step 5 (case form): 2026-11-14, from `composite.c`'s `CompositeImage`
+(campaign A, W23 round thirteen lane b), whose `CopyCompositeOp` and
+`IntensityCompositeOp` groups both open with the same three placement tests, each `if
+(...) break;` to fall back on the general composite; a probe of the shared predicate
+3.90 to 3.91, no finding on the helper. Added by Claude Code (Claude Opus 5.5) under the
+owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
@@ -16742,3 +16765,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | KO | Replace Keyed Offset Groups with a Table of Bases: a `switch` whose label groups each assign `V=(K-C);` and break becomes a `static const` table of `{ label, base }` rows read by one loop, `V=(K-R[i].base);`. *Careful* gives the argument (labels distinct so at most one row matches, the row of the selected group; `E` and `K` unwritten and side-effect free; `base` holds the constant with its own value and type) | `display-image.c`'s `XSelectMagnifyDigit` (campaign A, W23 round twelve lane b, wide build): twenty labels in two runs, cc 22; a probe 2.76 to 2.89 and, stubbed, 6.12 to 6.49 (Claude Code, Sonnet 5.5) | owner |
 | 2026-11-14 | AMEND | LC | Step 6: a caller that already shares a Recipe N step 8 input struct and a Recipe CT step 3 loop-wide `const` targets struct between the helpers of its loop passes both to the helper (`if (Helper(&name,&targets) != MagickFalse) continue;`) in place of step 4's own struct and pointers: members bound once, targets members written `(*v)`, `&v` as `v`, `&name` as `name`, step 2's temporaries declared in the helper. *Careful* gives the argument (N step 8's fill condition for the reads, CT step 3's addresses for the writes) | `display-image.c`'s `XDisplayImage` (campaign A, W23 round twelve lane d, wide build): the command-widget test at the head of its event loop leaves the iteration through three `continue;`, writes `nexus` and `display_image` (members of `DisplayEventTargets`) and reads `event`, the command buffer and the context members; a probe of the step with the stasis test's Recipe E step: bumps 9 to 7, cc 95 to 87, the file with the other seven finding functions emptied 4.51 to 4.56, no finding on a new function | owner |
 | 2026-11-14 | AMEND | SD | Step 8, a run kept apart and shared structs: (a) a run of adjacent groups, in source order, may move with the `default` group when groups that stay stand between the run and `default` (step 6 already allowed it for its own form; C selects by label, not position, and no kept group falls through); (b) a caller that already shares a Recipe N step 8 input struct and a Recipe CT step 3 loop-wide `const` targets struct between the helpers of its loop passes both to the chain under the caller's local names (`&name` written `name` in the moved groups, members bound once, targets members as `(*v)`, the controlling expression included), with no struct, fill or local of its own. *Careful* gives the argument | `display-image.c`'s `XDisplayImage` (campaign A, W23 round twelve lane d, wide build): its 17-group event `switch` must keep `KeyPress` and `KeyRelease` in the caller (`XLookupString` takes `sizeof(command)` of the caller's array), which stand between the groups before them and `default`; the cases already share `DisplayEventContext` and `DisplayEventTargets`. A probe of the four-link chain after the crossing cases' Recipe P step: `XDisplayImage` cc 85 to 64, the file with the other seven finding functions emptied 4.56 to 4.76, no finding on a new function | owner |
+| 2026-11-14 | AMEND | LF | Step 5, *case form*: the leading run of `if (<test>) break;` statements of a `switch` group (each `break;` leaving the `switch`, tests with no side effect) becomes `if (Is<Name>(...) == MagickFalse) break;`; two groups opening with the same run share the predicate under Recipe P's *Several sites* conditions. *Careful* gives the argument (a top-level `break;` of a group ends it as a top-level `continue;` ends an iteration; the same tests in the same order) | `composite.c`'s `CompositeImage` (campaign A, W23 round thirteen lane b): the Copy and Intensity groups open with the same three placement tests; LF's loop form does not take a `break;`, and Recipe P names one expression and keeps its `if`; a probe 3.90 to 3.91 (Claude Code, Opus 5.5) | owner |
