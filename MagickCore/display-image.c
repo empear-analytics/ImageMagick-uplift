@@ -25024,6 +25024,73 @@ static void XMakeDisplayWindows(const DisplayEventContext *context,
     (void) XMapWindow(display,windows->image.id);
 }
 
+static void XMakeIconWindow(const DisplayEventContext *context,
+  Image *display_image,XGCValues *context_values)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info,
+    *const icon_resources = context->icon_resources;
+
+  XWindows
+    *const windows = context->windows;
+
+  XVisualInfo
+    *const icon_visual = context->icon_visual;
+
+  XStandardColormap
+    *const icon_map = context->icon_map;
+
+  XPixelInfo
+    *const icon_pixel = context->icon_pixel;
+
+  const Window
+    root_window = context->root_window;
+
+  char
+    **const argv = context->argv;
+
+  const int
+    argc = context->argc;
+
+  XClassHint
+    *const class_hints = context->class_hints;
+
+  XWMHints
+    *const manager_hints = context->manager_hints;
+
+  XGetWindowInfo(display,icon_visual,icon_map,icon_pixel,(XFontStruct *) NULL,
+    icon_resources,&windows->icon);
+  windows->icon.geometry=resource_info->icon_geometry;
+  XBestIconSize(display,&windows->icon,display_image);
+  windows->icon.attributes.colormap=XDefaultColormap(display,
+    icon_visual->screen);
+  windows->icon.attributes.event_mask=ExposureMask | StructureNotifyMask;
+  manager_hints->flags=InputHint | StateHint;
+  manager_hints->input=MagickFalse;
+  manager_hints->initial_state=IconicState;
+  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
+    &windows->icon);
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),"Window id: 0x%lx (icon)",
+      windows->icon.id);
+  /*
+    Initialize graphic context for icon window.
+  */
+  if (icon_pixel->annotate_context != (GC) NULL)
+    (void) XFreeGC(display,icon_pixel->annotate_context);
+  (*context_values).background=icon_pixel->background_color.pixel;
+  (*context_values).foreground=icon_pixel->foreground_color.pixel;
+  icon_pixel->annotate_context=XCreateGC(display,windows->icon.id,
+    (size_t) (GCBackground | GCForeground),context_values);
+  if (icon_pixel->annotate_context == (GC) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
+      display_image->filename);
+  windows->icon.annotate_context=icon_pixel->annotate_context;
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -25242,34 +25309,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   /*
     Initialize icon window.
   */
-  XGetWindowInfo(display,icon_visual,icon_map,icon_pixel,(XFontStruct *) NULL,
-    icon_resources,&windows->icon);
-  windows->icon.geometry=resource_info->icon_geometry;
-  XBestIconSize(display,&windows->icon,display_image);
-  windows->icon.attributes.colormap=XDefaultColormap(display,
-    icon_visual->screen);
-  windows->icon.attributes.event_mask=ExposureMask | StructureNotifyMask;
-  manager_hints->flags=InputHint | StateHint;
-  manager_hints->input=MagickFalse;
-  manager_hints->initial_state=IconicState;
-  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-    &windows->icon);
-  if (resource_info->debug != MagickFalse)
-    (void) LogMagickEvent(X11Event,GetMagickModule(),"Window id: 0x%lx (icon)",
-      windows->icon.id);
-  /*
-    Initialize graphic context for icon window.
-  */
-  if (icon_pixel->annotate_context != (GC) NULL)
-    (void) XFreeGC(display,icon_pixel->annotate_context);
-  context_values.background=icon_pixel->background_color.pixel;
-  context_values.foreground=icon_pixel->foreground_color.pixel;
-  icon_pixel->annotate_context=XCreateGC(display,windows->icon.id,
-    (size_t) (GCBackground | GCForeground),&context_values);
-  if (icon_pixel->annotate_context == (GC) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
-      display_image->filename);
-  windows->icon.annotate_context=icon_pixel->annotate_context;
+  XMakeIconWindow(&event_context,display_image,&context_values);
   /*
     Initialize Image window.
   */
