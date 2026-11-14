@@ -1065,6 +1065,21 @@ MagickExport MagickBooleanType ListLocaleInfo(FILE *file,
   return(MagickTrue);
 }
 
+static ssize_t ChopLocalePathComponents(const char *path,char *p,
+  const size_t components)
+{
+  ssize_t
+    count;
+
+  for (count=0; (count < (ssize_t) components) && (p > path); p--)
+    if (*p == '/')
+      {
+        *p='\0';
+        count++;
+      }
+  return(count);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 +   L o a d L o c a l e C a c h e                                             %
@@ -1104,12 +1119,7 @@ static void ChopLocaleComponents(char *path,const size_t components)
   p=path+strlen(path)-1;
   if (*p == '/')
     *p='\0';
-  for (count=0; (count < (ssize_t) components) && (p > path); p--)
-    if (*p == '/')
-      {
-        *p='\0';
-        count++;
-      }
+  count=ChopLocalePathComponents(path,p,components);
   if (count < (ssize_t) components)
     *path='\0';
 }
