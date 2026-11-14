@@ -803,6 +803,26 @@ static MagickBooleanType TryStripGeometryInfo(char *pedantic_geometry,
   return(MagickFalse);
 }
 
+static MagickStatusType FinishGeometryInfo(char *p,
+  const char *pedantic_geometry,MagickStatusType flags,
+  GeometryInfo *geometry_info)
+{
+  flags=ParseGeometryFields(p,pedantic_geometry,flags,geometry_info);
+#if 0
+  /* Debugging Geometry */
+  (void) fprintf(stderr,"ParseGeometry...\n");
+  (void) fprintf(stderr,"Flags: %c %c %s %s %s\n",
+    (flags & RhoValue) ? 'W' : ' ',(flags & SigmaValue) ? 'H' : ' ',
+    (flags & XiValue) ? ((flags & XiNegative) ? "-X" : "+X") : "  ",
+    (flags & PsiValue) ? ((flags & PsiNegative) ? "-Y" : "+Y") : "  ",
+    (flags & ChiValue) ? ((flags & ChiNegative) ? "-Z" : "+Z") : "  ");
+  (void) fprintf(stderr,"Geometry: %lg,%lg,%lg,%lg,%lg\n",geometry_info->rho,
+    geometry_info->sigma,geometry_info->xi,geometry_info->psi,
+    geometry_info->chi);
+#endif
+  return(flags);
+}
+
 MagickExport MagickStatusType ParseGeometry(const char *geometry,
   GeometryInfo *geometry_info)
 {
@@ -852,18 +872,5 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
   p=pedantic_geometry;
   if (*p == '\0')
     return(flags);
-  flags=ParseGeometryFields(p,pedantic_geometry,flags,geometry_info);
-#if 0
-  /* Debugging Geometry */
-  (void) fprintf(stderr,"ParseGeometry...\n");
-  (void) fprintf(stderr,"Flags: %c %c %s %s %s\n",
-    (flags & RhoValue) ? 'W' : ' ',(flags & SigmaValue) ? 'H' : ' ',
-    (flags & XiValue) ? ((flags & XiNegative) ? "-X" : "+X") : "  ",
-    (flags & PsiValue) ? ((flags & PsiNegative) ? "-Y" : "+Y") : "  ",
-    (flags & ChiValue) ? ((flags & ChiNegative) ? "-Z" : "+Z") : "  ");
-  (void) fprintf(stderr,"Geometry: %lg,%lg,%lg,%lg,%lg\n",geometry_info->rho,
-    geometry_info->sigma,geometry_info->xi,geometry_info->psi,
-    geometry_info->chi);
-#endif
-  return(flags);
+  return(FinishGeometryInfo(p,pedantic_geometry,flags,geometry_info));
 }
