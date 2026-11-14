@@ -5206,6 +5206,21 @@ static MagickBooleanType SetImageColorspaceProperty(Image *image,
   return(SetImageColorspace(image,(ColorspaceType) colorspace,exception));
 }
 
+static MagickBooleanType SetImageDensityProperty(Image *image,
+  const char *value,MagickStatusType *flags)
+{
+  GeometryInfo
+    geometry_info;
+
+  (*flags)=ParseGeometry(value,&geometry_info);
+  if (((*flags) & RhoValue) != 0)
+    image->resolution.x=geometry_info.rho;
+  image->resolution.y=image->resolution.x;
+  if (((*flags) & SigmaValue) != 0)
+    image->resolution.y=geometry_info.sigma;
+  return(MagickTrue);
+}
+
 typedef void
   (*SetImageMemberMethod)(Image *,const ssize_t);
 
@@ -5408,16 +5423,7 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
         }
       if (LocaleCompare("density",property) == 0)
         {
-          GeometryInfo
-            geometry_info;
-
-          flags=ParseGeometry(value,&geometry_info);
-          if ((flags & RhoValue) != 0)
-            image->resolution.x=geometry_info.rho;
-          image->resolution.y=image->resolution.x;
-          if ((flags & SigmaValue) != 0)
-            image->resolution.y=geometry_info.sigma;
-          return(MagickTrue);
+          return(SetImageDensityProperty(image,value,&flags));
         }
       if (LocaleCompare("depth",property) == 0)
         {
