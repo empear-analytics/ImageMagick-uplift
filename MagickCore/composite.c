@@ -5265,6 +5265,12 @@ static inline MagickBooleanType IsSourceAlphaNeeded(const Image *image,
     (image->alpha_trait != UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
 }
 
+static void SetCanvasAlphaChannel(Image *image,ExceptionInfo *exception)
+{
+  if ((image->alpha_trait & BlendPixelTrait) == 0)
+    (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
+}
+
 typedef struct _ComposeArtifactTargets
 {
   double
@@ -5492,8 +5498,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
         Modify canvas outside the overlaid region and require an alpha
         channel to exist, to add transparency.
       */
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
+      SetCanvasAlphaChannel(image,exception);
       break;
     }
     case BlurCompositeOp:
