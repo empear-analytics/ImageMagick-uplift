@@ -966,6 +966,51 @@ static void SetSmushExtent(Image *smush_image,const MagickBooleanType stack,
     smush_image->rows=(size_t) y_offset;
 }
 
+typedef struct _SmushExtentTargets
+{
+  PixelTrait
+    *alpha_trait;
+
+  size_t
+    *number_images,
+    *width,
+    *height;
+} SmushExtentTargets;
+
+static void ComputeSmushExtent(const Image *image,
+  const MagickBooleanType stack,const ssize_t offset,
+  const SmushExtentTargets *targets)
+{
+  PixelTrait
+    *const alpha_trait = targets->alpha_trait;
+
+  size_t
+    *const number_images = targets->number_images,
+    *const width = targets->width,
+    *const height = targets->height;
+
+  const Image
+    *next;
+
+  (*alpha_trait)=image->alpha_trait;
+  (*number_images)=1;
+  (*width)=image->columns;
+  (*height)=image->rows;
+  next=GetNextImageInList(image);
+  for ( ; next != (Image *) NULL; next=GetNextImageInList(next))
+  {
+    if (next->alpha_trait != UndefinedPixelTrait)
+      (*alpha_trait)=BlendPixelTrait;
+    (*number_images)++;
+    if (stack != MagickFalse)
+      {
+        AddSmushStackExtent(next,offset,width,height);
+        continue;
+      }
+    AddSmushRowExtent(next,offset,width,height);
+  }
+}
+
 MagickExport Image *SmushImages(const Image *images,
   const MagickBooleanType stack,const ssize_t offset,ExceptionInfo *exception)
 {
@@ -990,9 +1035,6 @@ MagickExport Image *SmushImages(const Image *images,
   RectangleInfo
     geometry;
 
-  const Image
-    *next;
-
   size_t
     height,
     number_images,
@@ -1001,6 +1043,9 @@ MagickExport Image *SmushImages(const Image *images,
   ssize_t
     x_offset,
     y_offset;
+
+  const SmushExtentTargets targets = { &alpha_trait, &number_images, &width,
+    &height };
 
   /*
     Compute maximum area of smushed area.
@@ -1012,23 +1057,7 @@ MagickExport Image *SmushImages(const Image *images,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
   image=images;
-  alpha_trait=image->alpha_trait;
-  number_images=1;
-  width=image->columns;
-  height=image->rows;
-  next=GetNextImageInList(image);
-  for ( ; next != (Image *) NULL; next=GetNextImageInList(next))
-  {
-    if (next->alpha_trait != UndefinedPixelTrait)
-      alpha_trait=BlendPixelTrait;
-    number_images++;
-    if (stack != MagickFalse)
-      {
-        AddSmushStackExtent(next,offset,&width,&height);
-        continue;
-      }
-    AddSmushRowExtent(next,offset,&width,&height);
-  }
+  ComputeSmushExtent(image,stack,offset,&targets);
   /*
     Smush images.
   */
