@@ -10825,6 +10825,67 @@ static void XApplyOilPaintCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyCharcoalDrawCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  Image
+    *charcoal_image;
+
+  static char
+    radius[MagickPathExtent] = "0x1";
+
+  /*
+    Query user for charcoal radius.
+  */
+  (void) XDialogWidget(display,windows,"Charcoal Draw",
+    "Enter the charcoal radius and sigma:",radius);
+  if (*radius == '\0')
+    return;
+  /*
+    Charcoal the image.
+  */
+  (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
+    exception);
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flags=ParseGeometry(radius,&geometry_info);
+  if ((flags & SigmaValue) == 0)
+    geometry_info.sigma=geometry_info.rho;
+  charcoal_image=CharcoalImage(*image,geometry_info.rho,geometry_info.sigma,
+    exception);
+  if (charcoal_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=charcoal_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12344,45 +12405,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyOilPaintCommand(&context,&flags);
       break;
     case CharcoalDrawCommand:
-    {
-      Image
-        *charcoal_image;
-
-      static char
-        radius[MagickPathExtent] = "0x1";
-
-      /*
-        Query user for charcoal radius.
-      */
-      (void) XDialogWidget(display,windows,"Charcoal Draw",
-        "Enter the charcoal radius and sigma:",radius);
-      if (*radius == '\0')
-        break;
-      /*
-        Charcoal the image.
-      */
-      (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
-        exception);
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      flags=ParseGeometry(radius,&geometry_info);
-      if ((flags & SigmaValue) == 0)
-        geometry_info.sigma=geometry_info.rho;
-      charcoal_image=CharcoalImage(*image,geometry_info.rho,geometry_info.sigma,
-        exception);
-      if (charcoal_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=charcoal_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyCharcoalDrawCommand(&context);
       break;
-    }
     case AnnotateCommand:
     {
       /*
