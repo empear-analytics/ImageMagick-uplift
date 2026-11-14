@@ -1291,6 +1291,13 @@ static void GetXMPNumeratorAndDenominator(double value,
   GetXMPContinuedFraction(value,numerator,denominator);
 }
 
+static inline MagickBooleanType IsDistinctXMPYResolution(const Image *image,
+  const char *value)
+{
+  return(((fabs(image->resolution.x-image->resolution.y) > MagickEpsilon) ||
+    (*value == '\0')) ? MagickTrue : MagickFalse);
+}
+
 static void SyncXMPProfile(const Image *image,StringInfo *profile)
 {
   char
@@ -1315,8 +1322,7 @@ static void SyncXMPProfile(const Image *image,StringInfo *profile)
     }
   if (GetXMPOffsets(profile,"tiff:YResolution",&start,&end) != MagickFalse)
     {
-      if ((fabs(image->resolution.x-image->resolution.y) > MagickEpsilon) ||
-          (*value == '\0'))
+      if (IsDistinctXMPYResolution(image,value) != MagickFalse)
         {
           GetXMPNumeratorAndDenominator(image->resolution.y,&numerator,
             &denominator);
