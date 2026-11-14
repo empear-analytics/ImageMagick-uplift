@@ -10522,6 +10522,44 @@ static Image *XApplySelectCommand(const XMagickCommandContext *context)
   return(nexus);
 }
 
+static void XApplyPrintCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  MagickStatusType
+    status;
+
+  /*
+    Print image.
+  */
+  status=XPrintImage(display,resource_info,windows,*image,exception);
+  if (status == MagickFalse)
+    {
+      char
+        message[MagickPathExtent];
+
+      (void) FormatLocaleString(message,MagickPathExtent,"%s:%s",
+        exception->reason != (char *) NULL ? exception->reason : "",
+        exception->description != (char *) NULL ? exception->description :
+        "");
+      XNoticeWidget(display,windows,"Unable to print file:",message);
+      return;
+    }
+}
+
 static void XApplyResizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11179,25 +11217,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplySaveCommand(&context);
       break;
     case PrintCommand:
-    {
-      /*
-        Print image.
-      */
-      status=XPrintImage(display,resource_info,windows,*image,exception);
-      if (status == MagickFalse)
-        {
-          char
-            message[MagickPathExtent];
-
-          (void) FormatLocaleString(message,MagickPathExtent,"%s:%s",
-            exception->reason != (char *) NULL ? exception->reason : "",
-            exception->description != (char *) NULL ? exception->description :
-            "");
-          XNoticeWidget(display,windows,"Unable to print file:",message);
-          break;
-        }
+      XApplyPrintCommand(&context);
       break;
-    }
     case DeleteCommand:
     {
       static char
