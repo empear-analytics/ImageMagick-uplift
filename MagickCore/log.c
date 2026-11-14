@@ -1797,17 +1797,17 @@ static char *TranslateEvent(const LogEventLocation *location,
   if (log_info->format == (char *) NULL)
     return(text);
   extent=strlen(event)+MagickPathExtent;
+  event_text.text=text;
+  event_text.extent=extent;
+  event_text.elapsed_time=elapsed_time;
+  event_text.user_time=user_time;
+  event_text.seconds=seconds;
+  event_text.event=event;
+  event_text.function=function;
+  event_text.module=module;
+  event_text.line=line;
   if (LocaleCompare(log_info->format,"xml") == 0)
     {
-      event_text.text=text;
-      event_text.extent=extent;
-      event_text.elapsed_time=elapsed_time;
-      event_text.user_time=user_time;
-      event_text.seconds=seconds;
-      event_text.event=event;
-      event_text.function=function;
-      event_text.module=module;
-      event_text.line=line;
       FormatLogEventXML(&event_text,domain);
       return(text);
     }
@@ -1847,13 +1847,6 @@ static char *TranslateEvent(const LogEventLocation *location,
       break;
     event_text.text=text;
     event_text.extent=extent;
-    event_text.elapsed_time=elapsed_time;
-    event_text.user_time=user_time;
-    event_text.seconds=seconds;
-    event_text.event=event;
-    event_text.function=function;
-    event_text.module=module;
-    event_text.line=line;
     TranslateLogSpecifier(&event_text,domain,p,&q);
   }
   *q='\0';
