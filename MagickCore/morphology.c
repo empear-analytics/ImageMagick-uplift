@@ -502,8 +502,8 @@ static double GetKernelNormalizeScale(const KernelInfo *kernel)
   return(pos_scale);
 }
 
-static void ApplyKernelScaling(KernelInfo *kernel,
-  const double scaling_factor,const double pos_scale,const double neg_scale)
+static void ScaleKernelValues(KernelInfo *kernel,const double pos_scale,
+  const double neg_scale)
 {
   ssize_t
     i;
@@ -511,6 +511,12 @@ static void ApplyKernelScaling(KernelInfo *kernel,
   for (i=0; i < (ssize_t) (kernel->width*kernel->height); i++)
     if (!IsNaN(kernel->values[i]))
       kernel->values[i] *= (kernel->values[i] >= 0) ? pos_scale : neg_scale;
+}
+
+static void ApplyKernelScaling(KernelInfo *kernel,
+  const double scaling_factor,const double pos_scale,const double neg_scale)
+{
+  ScaleKernelValues(kernel,pos_scale,neg_scale);
 
   /* convolution output range */
   kernel->positive_range *= pos_scale;
