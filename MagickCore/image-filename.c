@@ -149,8 +149,8 @@
 
 static inline MagickBooleanType IsUnknownFormatSpecifier(const char specifier)
 {
-  return(((specifier != 'd') && (specifier != 'x') && (specifier != 'o')) ?
-    MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((specifier != 'd') && (specifier != 'x') &&
+    (specifier != 'o')));
 }
 
 static inline MagickBooleanType AreDigitsFrom(const char *start,
@@ -200,8 +200,8 @@ static inline MagickBooleanType IsValidFormatSpecifier(const char *start,
 
 static inline MagickBooleanType IsIntegerSpecifierAt(const char *cursor)
 {
-  return(((*cursor == 'd') || (*cursor == 'o') || (*cursor == 'x')) ?
-    MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((*cursor == 'd') || (*cursor == 'o') ||
+    (*cursor == 'x')));
 }
 
 static const char *GetFilenameOption(const ImageInfo *image_info,
