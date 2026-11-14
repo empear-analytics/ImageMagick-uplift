@@ -18148,6 +18148,12 @@ labels in a `switch` of the new function; Recipe EC, which names an equality cha
 4. *Several sites.* A loop in another function whose group has the same labels as a set
    uses the same predicate. A group with some further label keeps that label alone as a
    group of the same body in its `switch` (`ParseGeometry`'s `/`).
+   Or (2026-11-14), when that further group `case L: { p++; break; }` is still in the
+   `switch` of a loop that already calls the predicate as step 3 wrote it, the group may
+   leave the `switch` and its label join the call's test: `if ((Name(c) !=
+   MagickFalse) || (c == L))`, the body unchanged. `L` is in no other group and is not
+   one of the predicate's labels, so the test holds for exactly the values that ran
+   `p++;` before, and `c` is not written between the test and the `switch`.
 5. Check by script that the predicate's labels are exactly the peeled labels, each once,
    and that nothing else in the `switch` changed.
 
@@ -18210,6 +18216,11 @@ Step 1's widening (2026-11-13, campaign B, M127 lane c): `profile.c`'s `UpdateCl
 whose knot group is a call on a `ssize_t` selector. Added by Claude Code (Claude Opus 5.5)
 under the mandate of 2026-10-24.
 Lane: c
+Step 4's `||` form (2026-11-14, campaign B, M127 lane b round 13): `ParseGeometry`'s `/`
+group, the last label between its separator `switch` and the `switch` `GetGeometry` shares
+through `SkipGeometrySeparator`; a probe flat at 8.33, then 8.47 once the `switch` is
+the shared call. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
 
 ---
 
@@ -19743,3 +19754,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | XP | Share Mirrored Extreme-Search Loops Through Per-Direction Predicates: copies of a loop keeping the most extreme array element, differing in their tests' operands and operators, become one `static` search taking a predicate pointer, each copy's tests a `MagickBooleanType` predicate returning `MagickTrue` where the copy assigned; Lane: c | `property.c`'s `GetConvexHullExtremePoints` (top, right, bottom, left loops; cc 26, four bumps): leaves every finding, 3.64 to 3.66 | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | W | Step 3's widening: `R` may be a widened local itself, `return(v);`, since every write through `(*v)` lands in the caller's `v` before the helper returns and the caller's `return(v);` reads that value; Lane: b | `geometry-parse.c`'s `GetGeometry` (separator `switch` writing `p` and `flags`, `default:` returning `flags`; probe 7.90 to 8.04) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | SR | Step 3: the moved groups may write up to three plain locals the caller reads after the `switch`, on W step 3's widened terms; when a `static` helper of the file already is the function step 4 would write, the call group calls it (Recipe D), checked by script; Lane: b | `geometry-parse.c`'s `ParseGeometry` (separator `switch` writing `p` and `flags`, the moved groups equal to `GetGeometry`'s `SkipGeometrySeparator`; probe 8.33 to 8.39) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | PA | Step 4: a further single-label group `case L: { p++; break; }` may leave the `switch` and join the predicate call's test as an `or` with `(c == L)` when the loop already calls the predicate; Lane: b | `geometry-parse.c`'s `ParseGeometry` (`/`, whose removal leaves the `switch` equal to `GetGeometry`'s shared `SkipGeometrySeparator`; probe flat at 8.33, then 8.47) | mandate (2026-10-24) |
