@@ -374,12 +374,9 @@ static void
   MaskNexusPixel(const Image *,const Quantum *magick_restrict,
     Quantum *magick_restrict);
 
-static inline MagickBooleanType ApplyNexusMask(Image *image,
+static MagickBooleanType ApplyNexusMaskPixels(Image *image,
   NexusInfo *nexus_info,const NexusMaskSide side,ExceptionInfo *exception)
 {
-  CacheInfo
-    *magick_restrict cache_info;
-
   Quantum
     *magick_restrict p,
     *magick_restrict q;
@@ -387,20 +384,6 @@ static inline MagickBooleanType ApplyNexusMask(Image *image,
   ssize_t
     y;
 
-  /*
-    Apply clip mask.
-  */
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((image->channels & ((side == ClipNexusMask) ?
-    WriteMaskChannel : CompositeMaskChannel)) == 0)
-    return(MagickTrue);
-  if ((nexus_info->region.width == 0) || (nexus_info->region.height == 0))
-    return(MagickTrue);
-  cache_info=(CacheInfo *) image->cache;
-  if (cache_info == ((side == ClipNexusMask) ? (CacheInfo *) NULL :
-      (Cache) NULL))
-    return(MagickFalse);
   p=GetAuthenticPixelCacheNexus(image,nexus_info->region.x,nexus_info->region.y,
     nexus_info->region.width,nexus_info->region.height,
     nexus_info->virtual_nexus,exception);
@@ -421,6 +404,29 @@ static inline MagickBooleanType ApplyNexusMask(Image *image,
     }
   }
   return(MagickTrue);
+}
+
+static inline MagickBooleanType ApplyNexusMask(Image *image,
+  NexusInfo *nexus_info,const NexusMaskSide side,ExceptionInfo *exception)
+{
+  CacheInfo
+    *magick_restrict cache_info;
+
+  /*
+    Apply clip mask.
+  */
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if ((image->channels & ((side == ClipNexusMask) ?
+    WriteMaskChannel : CompositeMaskChannel)) == 0)
+    return(MagickTrue);
+  if ((nexus_info->region.width == 0) || (nexus_info->region.height == 0))
+    return(MagickTrue);
+  cache_info=(CacheInfo *) image->cache;
+  if (cache_info == ((side == ClipNexusMask) ? (CacheInfo *) NULL :
+      (Cache) NULL))
+    return(MagickFalse);
+  return(ApplyNexusMaskPixels(image,nexus_info,side,exception));
 }
 
 static MagickBooleanType ClipPixelCacheNexus(Image *image,
