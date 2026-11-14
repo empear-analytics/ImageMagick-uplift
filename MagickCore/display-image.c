@@ -22472,6 +22472,44 @@ static void XRecordUnmappedWindow(const DisplayEventContext *context,
     }
 }
 
+static void XHandleUnmapNotify(const DisplayEventContext *context,
+  const DisplayEventTargets *targets)
+{
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  XEvent
+    *const event = targets->event;
+
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Unmap Notify: 0x%lx",(*event).xunmap.window);
+  if ((*event).xunmap.window == windows->backdrop.id)
+    {
+      windows->backdrop.mapped=MagickFalse;
+      return;
+    }
+  if ((*event).xunmap.window == windows->image.id)
+    {
+      windows->image.mapped=MagickFalse;
+      return;
+    }
+  if ((*event).xunmap.window == windows->magnify.id)
+    {
+      windows->magnify.mapped=MagickFalse;
+      return;
+    }
+  if ((*event).xunmap.window == windows->pan.id)
+    {
+      windows->pan.mapped=MagickFalse;
+      return;
+    }
+  XRecordUnmappedWindow(context,targets);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -23227,30 +23265,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
       }
       case UnmapNotify:
       {
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Unmap Notify: 0x%lx",event.xunmap.window);
-        if (event.xunmap.window == windows->backdrop.id)
-          {
-            windows->backdrop.mapped=MagickFalse;
-            break;
-          }
-        if (event.xunmap.window == windows->image.id)
-          {
-            windows->image.mapped=MagickFalse;
-            break;
-          }
-        if (event.xunmap.window == windows->magnify.id)
-          {
-            windows->magnify.mapped=MagickFalse;
-            break;
-          }
-        if (event.xunmap.window == windows->pan.id)
-          {
-            windows->pan.mapped=MagickFalse;
-            break;
-          }
-        XRecordUnmappedWindow(&event_context,&event_targets);
+        XHandleUnmapNotify(&event_context,&event_targets);
         break;
       }
       default:
