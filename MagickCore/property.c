@@ -476,31 +476,15 @@ static void SetIPTCAttribute(const Image *image,const char *key,
   attribute=DestroyString(attribute);
 }
 
-static void GetIPTCProperty(const Image *image,const char *key,
-  ExceptionInfo *exception)
+static char *CollectIPTCAttribute(const StringInfo *profile,
+  const long dataset,const long record)
 {
   char
     *attribute;
 
-  const StringInfo
-    *profile;
-
-  long
-    count,
-    dataset,
-    record;
-
   ssize_t
     i;
 
-  profile=GetImageProfile(image,"iptc");
-  if (profile == (StringInfo *) NULL)
-    profile=GetImageProfile(image,"8bim");
-  if (profile == (StringInfo *) NULL)
-    return;
-  count=MagickSscanf(key,"IPTC:%ld:%ld",&dataset,&record);
-  if (count != 2)
-    return;
   attribute=(char *) NULL;
   for (i=0; i < (ssize_t) GetStringInfoLength(profile)-5; )
   {
@@ -521,6 +505,32 @@ static void GetIPTCProperty(const Image *image,const char *key,
     */
     i+=(((size_t) p[3] << 8) | (size_t) p[4])+5;
   }
+  return(attribute);
+}
+
+static void GetIPTCProperty(const Image *image,const char *key,
+  ExceptionInfo *exception)
+{
+  char
+    *attribute;
+
+  const StringInfo
+    *profile;
+
+  long
+    count,
+    dataset,
+    record;
+
+  profile=GetImageProfile(image,"iptc");
+  if (profile == (StringInfo *) NULL)
+    profile=GetImageProfile(image,"8bim");
+  if (profile == (StringInfo *) NULL)
+    return;
+  count=MagickSscanf(key,"IPTC:%ld:%ld",&dataset,&record);
+  if (count != 2)
+    return;
+  attribute=CollectIPTCAttribute(profile,dataset,record);
   SetIPTCAttribute(image,key,attribute,exception);
 }
 
