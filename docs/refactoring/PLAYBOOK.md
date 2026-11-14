@@ -17273,6 +17273,86 @@ Lane: b
 
 ---
 
+## Recipe NC - Share a NULL-Tested Copy Through a Helper Taking the Destination
+
+**Use when:** CodeScene reports *Overall Code Complexity* (the mean cyclomatic
+complexity of the file's functions) on a file whose functions copy members one by one
+and guard each pointer copy with its own test, `if (s->m != (char *) NULL) (void)
+F(&d->m,s->m);`, as `image-clone.c`'s `CloneImageInfo`, `CloneImageInfoRenderStrings`
+and `CloneMontageStrings` do with `CloneString` (eleven copies, eleven `if`s).
+
+**Not covered by:** Recipe OS, whose copies look an option up by name and store a
+converted value, not a member tested for `NULL` and passed with a destination's
+address; Recipe MA, whose lvalue's address is never taken and whose copies lie in one
+function; Recipe D and SV, which need reported duplication or one differing value
+(here two differing member designators, one of them under `&`).
+
+**How:**
+
+1. Copies. Statements of the form `if (S != (T) NULL) (void) F(&D,S);` outside every
+   OpenMP region, where `S` is a chain of member selections through a pointer parameter
+   or local (no call, no subscript, no side effect), `D` is a chain of member selections
+   through a pointer the function guarantees non-`NULL` at that point, and `F` is one
+   function whose first parameter is `P *` and whose second takes `S`'s type. Copies that
+   share a helper have the same text once `S` and `D` are set aside.
+2. Write, directly above the first function of the file that will call it, `static void
+   Name(P *destination,const T source)` whose body is the copy with `S` replaced by
+   `source` and `&D` by `destination`, nothing else changed.
+3. Each copy becomes `Name(&D,S);` where it stood.
+4. All copies of one file may go in one commit when *Overall Code Complexity* is the
+   finding they lower (rule 1's set); the message lists the functions and copies.
+5. Check by script that substituting each call's arguments into the helper's text gives
+   the copy it replaced, token for token. Run `tools/ci_warnings.sh` and
+   `tools/cxx_warnings.sh` (`OK`) and the oracle for each changed function.
+
+**Before:**
+
+```c
+  if (image_info->size != (char *) NULL)
+    (void) CloneString(&clone_info->size,image_info->size);
+  if (image_info->extract != (char *) NULL)
+    (void) CloneString(&clone_info->extract,image_info->extract);
+```
+
+**After:**
+
+```c
+static void CloneStringIfSet(char **destination,const char *source)
+{
+  if (source != (char *) NULL)
+    (void) CloneString(destination,source);
+}
+...
+  CloneStringIfSet(&clone_info->size,image_info->size);
+  CloneStringIfSet(&clone_info->extract,image_info->extract);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The copy read `S` for the test and again as the
+  argument, with nothing written in between; the call reads it once, as an argument,
+  and the helper tests and passes that value, so the same value is tested and passed.
+  `&D` is the same address the copy passed; it is now computed also when `S` is `NULL`,
+  which reads nothing (an address of a member through a valid pointer), so step 1
+  requires that pointer to be valid wherever the call stands. When `S` is `NULL`
+  neither form calls `F`.
+- The test's cast `(T) NULL` and the discarded result `(void)` stay in the helper as
+  written; `const` on the parameter only qualifies the helper's own copy of the pointer
+  value (`const char *` here, as `CloneString`'s own parameter), and `S` converts to it
+  without change.
+- `S` must have no side effect: the copy evaluated it twice, the call once.
+
+**Evidence level:** oracle (the cases that reach each changed function), with
+`tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`.
+
+**Provenance:** 2026-11-14, from `image-clone.c` (campaign B, M127 lane a round 6):
+*Overall Code Complexity* and two public five-argument functions held the file at
+9.09; a probe sharing the eleven `CloneString` copies cleared the mean (9.68). Added by
+Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: a
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -17654,3 +17734,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | KC | Step 7: groups `v=x; break;` with a non-literal `x` stay, with `default:`, in a kept `switch` that is step 4's `else` branch; Lane: b | `quantum-type.c`'s `GetQuantumChannels` (twelve literal channel counts and `MultispectralQuantum`'s `GetImageChannels(image)`) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | PT | Peel a Leaving Label Set out of a Selection into a Membership Table: PL's peel with TB's table predicate in one step, for a file of six functions where PL's label-run predicate and the seventh function each dip; Lane: b | `quantum-type.c`'s `SetQuantumImageType` (PL alone 8.92, PT alone 9.09, with PL on the index labels 10.0 from 9.58) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | SM | Extract a Block Reading Its Inputs Through the Members of a Struct It Passes On: a block that passes `&s` (a `const` struct local) to a callee and reads caller variables holding members of `s` moves into a function taking `const Name *s`, binding those variables from their member paths; at most four parameters; Lane: a | `type.c`'s `LoadTypeCache` and `policy.c`'s `LoadPolicyCache`: the include element's retry loop and throw read `exception` and `token`, which are `scan.target->exception` and `scan.token`; probes 8.13 to 8.22 and 7.89 to 7.97 | mandate (2026-10-24) |
+| 2026-11-14 | NEW | NC | Share a NULL-Tested Copy Through a Helper Taking the Destination: copies `if (S != (T) NULL) (void) F(&D,S);` become calls of one `static void` helper taking `&D` and `S`; Lane: a | `image-clone.c`'s eleven `CloneString` copies in `CloneImageInfo`, `CloneImageInfoRenderStrings` and `CloneMontageStrings` (probe 9.09 to 9.68, *Overall Code Complexity* gone) | mandate (2026-10-24) |
