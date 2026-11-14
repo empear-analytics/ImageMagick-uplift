@@ -117,15 +117,22 @@ def object_header_names(path):
     objects = set(re.findall(r"(?m)^(?!typedef|static|extern|return|#)(?:const\s+)?\w[\w \t\*]*?[ \t\*](\w+)\s*(?:\[[^\]]*\])?\s*=(?!=)", text))
     return objects | set(re.findall(r"(?m)^\s*#\s*define\s+(\w+)", text)) if objects else set()
 
-def macro_block_start(L, c):
-    """First line of the #define, or the #if ... #endif holding one, that ends at L[c - 1]."""
-    if L[c - 1].strip().startswith("#endif"):
-        u = conditional_start(L, c - 1)
-        block = "\n".join(L[u:c]) if u is not None else ""
-        return u if "#define" in block and "#include" not in block else None
+def conditional_macro_start(L, c):
+    """First line of the #if ... #endif that ends at L[c - 1] when it holds a #define and no #include, else None."""
+    u = conditional_start(L, c - 1)
+    block = "\n".join(L[u:c]) if u is not None else ""
+    return u if "#define" in block and "#include" not in block else None
+
+def define_start(L, c):
+    """First line of the #define (its backslash-continued lines included) that ends at L[c - 1], else None."""
     u = c - 1
     while u > 0 and L[u - 1].rstrip().endswith("\\"): u -= 1
     return u if L[u].lstrip().startswith("#define") else None
+
+def macro_block_start(L, c):
+    """First line of the #define, or the #if ... #endif holding one, that ends at L[c - 1]."""
+    if L[c - 1].strip().startswith("#endif"): return conditional_macro_start(L, c)
+    return define_start(L, c)
 
 def typedef_names(L, starts):
     """The names closing each `typedef struct [_X]` that begins at one of the lines STARTS."""
