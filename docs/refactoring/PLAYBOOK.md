@@ -4237,6 +4237,20 @@ time (E, O or Z on its body) leaves every label in the caller, and the cc with i
    helper binds each member once (`T *const v = targets->v;`), writes `(*v)` as Z step 4
    says, and passes `&(*v)` on to the earlier step's helper. Each variable meets Recipe
    O step 2.
+   *Context form* (2026-11-14). When the caller already has such a struct, filled member
+   by member directly before the `switch` (Recipe N step 8's sibling fill, as a context
+   that per-case helpers take by `const Name *`), that struct is the tile: the step
+   declares no other. A member the moved groups read that the struct lacks is appended at
+   the end of its typedef, with its fill `x.m=m;` (or `x.m=&m;` for a struct-valued local,
+   bound `T *const m = x->m;` and used `(*m)`) directly after the existing fills, in the
+   same order. A moved group that passes the tile's address on (`F(&context,...)`)
+   passes the helper's `context`, the same address, as a `default:` call does. The
+   `switch`'s controlling expression, when it is a `const` parameter of the caller that
+   no group writes, passes by value under its own type and name, as step 6 passes a
+   caller's parameters. The written variables follow Z steps 3 and 4: one pointer each,
+   in the order the moved groups (the `default:` call included) first write them,
+   `(*v)` at every use and `&(*v)` for `&v`, at most four parameters in all. Check the
+   step with `tools/switch_split_check.py`, which reads this form.
 
 **Before:**
 
@@ -4396,6 +4410,14 @@ static void ApplyUnaryComplexOperator(const ComplexUnaryOperands *unary,
   pass the same `tile` and the same addresses (`&(*v)` is `v`) down to the helper whose
   `switch` holds the group, so each written variable is the caller's own, written at
   the points it was.
+- Under step 8's context form, every helper reads the members the caller assigned
+  once before the `switch`, as the struct form above argues; a member appended by a step
+  is filled from its variable after the others and before the `switch`, so the call sees
+  the value the group saw. A group that passed `&context` to a callee now passes
+  `context`, which holds that address, so the callee reads the same object. The
+  controlling parameter is `const`, so the value each helper's `switch` tests is the one
+  the caller's tested: the chain selects as the first point of *Careful* says. Each
+  written variable is the caller's own through its pointer, as Z step 4 argues.
 - Under step 8's `targets` form the argument is Recipe Z step 7's: only the addresses
   travel, fixed at the declaration and bound once to `*const` locals, so each `(*v)` is
   the caller's own variable, written at the points it was; they are the addresses of
@@ -16501,3 +16523,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | S | Step 2: a multi-line `#define` (backslash continuation) moves verbatim with the family on the terms of a one-line define: no line of the kept part names it, and the multi-line defines it names move with it (a macro that anything staying names refuses the split). The amendment gives the argument (a macro is text; the kept part names none of them, and the moved functions are their only users, so every expansion gives the tokens it gave before) | `xwindow.c`'s `XGammaPixel`, `XGammaPacket`, `XRedGamma`, `XGreenGamma`, `XBlueGamma` and `XStandardPixel` (campaign A, W23 lane b, split scan): used only by the `XMakeImage`, `XGetPixelInfo` and `XMakeStandardColormap` families, they refused every split that moves those; `tools/split_source.py` takes the form (`tools/test_split_source.py`: nested multi-line defines move, and a kept root naming the outer or the inner macro is refused) | owner |
 | 2026-11-14 | AMEND | E | Step 4: a temporary the block only writes, never reads, that nothing after the block reads and that the caller keeps because other blocks use the same name, passes as a pointer `T *v` (stores written `*v`, the call passing `&v`) on the terms of the pointer paragraph before it, since declaring it in the new function leaves it set but never used (`-Wunused-but-set-variable`, an error in the CI jobs; no recipe deletes the store). The argument: the stores are the same stores of the same values, into a variable that nothing reads afterwards, so the caller's variable and a local of the new function cannot be told apart by any path | `display-image.c`'s `XMagickCommand` (campaign A, W23 round eleven lane c, wide build): the OilPaintCommand case writes `flags=ParseGeometry(radius,&geometry_info);` and reads `geometry_info` alone, so the helper's own `flags` draws the warning (`ci_linux_warnings` clang and gcc, `-DNDEBUG` scan); every other use of `flags` in `XMagickCommand` is a store, or a read after the same case's own store | owner |
 | 2026-11-14 | AMEND | CT | Step 3, event-loop form: with a targets struct that serves every block of one event loop, a case that writes only one member, or none and only reads members, moves in this form too (every member it names bound and used as `(*v)`), instead of Recipe E step 7's value form, which would carry the reads as by-value parameters past four. The argument is the struct's own: a member holds the local's address, so each access touches the same object at the same point whatever the number of members written | `display-image.c`'s `XDisplayImage`: the ConfigureNotify case writes `status` alone and reads `event`, `display_image` and `vid_info`; the event switch's cases are to share `DisplayEventTargets` so that the switch can later move whole (campaign A, W23 round eleven, lane d; Claude Code, Opus 5.5) | owner |
+| 2026-11-14 | AMEND | SD | Step 8, *context form*: a caller that already fills a context struct member by member before its `switch` (N step 8) uses it as the tile; members a step needs are appended at the end of the typedef and filled directly after the existing fills; a group's `&context` is passed on as `context`; the `switch`'s `const` controlling parameter passes by value under its own name (as step 6 passes parameters); written variables as Z steps 3 and 4. *Careful* gives the argument (fill once before the `switch`, the same address, a `const` selector) | `display-image.c`'s `XMagickCommand` (campaign A, W23 round twelve lane a, wide build): an 86-label `switch` of `XApply<Name>Command(&context,...)` calls, cc 88, 305 lines; a probe of the chain in sixteen menu-sized helpers clears its Complex and Large Method findings (stubbed score 5.01 to 6.12) | owner |
