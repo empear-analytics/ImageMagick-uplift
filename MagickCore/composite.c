@@ -5245,6 +5245,19 @@ static void GetDissolveArguments(const Image *image,GeometryInfo *geometry_info,
     }
 }
 
+static void GetDisplaceArguments(const Image *image,
+  GeometryInfo *geometry_info,MagickStatusType *flags)
+{
+  const char
+    *artifact;
+
+  SetGeometryInfo(geometry_info);
+  *flags=NoValue;
+  artifact=GetImageArtifact(image,"compose:args");
+  if (artifact != (char *) NULL)
+    *flags=ParseGeometry(artifact,geometry_info);
+}
+
 typedef struct _ComposeArtifactTargets
 {
   double
@@ -5563,11 +5576,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
           source_image=DestroyImage(source_image);
           return(MagickFalse);
         }
-      SetGeometryInfo(&geometry_info);
-      flags=NoValue;
-      artifact=GetImageArtifact(image,"compose:args");
-      if (artifact != (char *) NULL)
-        flags=ParseGeometry(artifact,&geometry_info);
+      GetDisplaceArguments(image,&geometry_info,&flags);
       {
         const DisplaceSetup
           displace = { compose, flags, geometry_info, image, source_image,
