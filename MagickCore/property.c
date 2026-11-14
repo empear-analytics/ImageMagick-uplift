@@ -4618,6 +4618,51 @@ static MagickBooleanType AppendHexValue(const InterpretText *text,
   return(MagickTrue);
 }
 
+static MagickBooleanType AppendPixelValue(const InterpretText *text,
+  Image *property_image,const char *pattern,ExceptionInfo *exception)
+{
+  const char
+    *string;
+
+  FxInfo
+    *fx_info;
+
+  MagickStatusType
+    fx_status;
+
+  PixelInfo
+    pixel;
+
+  /*
+    Pixel - color value calculator.
+  */
+  GetPixelInfo(property_image,&pixel);
+  fx_info=AcquireFxInfo(property_image,pattern+6,exception);
+  if (fx_info == (FxInfo *) NULL)
+    return(MagickTrue);
+  fx_status=EvaluatePixelExpression(fx_info,property_image,&pixel,
+    exception);
+  fx_info=DestroyFxInfo(fx_info);
+  if (fx_status != MagickFalse)
+    {
+      char
+        name[MagickPathExtent];
+
+      GetColorTuple(&pixel,MagickFalse,name);
+      string=GetImageArtifact(property_image,"pixel:compliance");
+      if (string != (char *) NULL)
+        {
+          ComplianceType compliance=(ComplianceType) ParseCommandOption(
+            MagickComplianceOptions,MagickFalse,string);
+          (void) QueryColorname(property_image,&pixel,compliance,name,
+            exception);
+        }
+      if (AppendInterpretString(text,name) == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   const char *embed_text,ExceptionInfo *exception)
 {
@@ -4834,40 +4879,11 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
         }
       if (LocaleNCompare("pixel:",pattern,6) == 0)
         {
-          FxInfo
-            *fx_info;
-
-          MagickStatusType
-            fx_status;
-
-          PixelInfo
-            pixel;
-
-          /*
-            Pixel - color value calculator.
-          */
-          GetPixelInfo(property_image,&pixel);
-          fx_info=AcquireFxInfo(property_image,pattern+6,exception);
-          if (fx_info == (FxInfo *) NULL)
-            continue;
-          fx_status=EvaluatePixelExpression(fx_info,property_image,&pixel,
-            exception);
-          fx_info=DestroyFxInfo(fx_info);
-          if (fx_status != MagickFalse)
+          if (AppendPixelValue(&text,property_image,pattern,exception) ==
+              MagickFalse)
             {
-              char
-                name[MagickPathExtent];
-
-              GetColorTuple(&pixel,MagickFalse,name);
-              string=GetImageArtifact(property_image,"pixel:compliance");
-              if (string != (char *) NULL)
-                {
-                  ComplianceType compliance=(ComplianceType) ParseCommandOption(
-                    MagickComplianceOptions,MagickFalse,string);
-                  (void) QueryColorname(property_image,&pixel,compliance,name,
-                    exception);
-                }
-              AppendString2Text(name);
+              status=MagickFalse;
+              goto cleanup;
             }
           continue;
         }
