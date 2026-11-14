@@ -10611,6 +10611,29 @@ static Image *XApplyVisualDirectoryCommand(const XMagickCommandContext *context)
   return(nexus);
 }
 
+static void XApplyCutCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  /*
+    Cut image.
+  */
+  (void) XCropImage(display,resource_info,windows,*image,CutMode,exception);
+}
+
 static void XApplyResizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11283,13 +11306,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyQuitCommand(&context);
       break;
     case CutCommand:
-    {
-      /*
-        Cut image.
-      */
-      (void) XCropImage(display,resource_info,windows,*image,CutMode,exception);
+      XApplyCutCommand(&context);
       break;
-    }
     case CopyCommand:
     {
       /*
