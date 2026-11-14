@@ -5212,6 +5212,24 @@ static BlendRequest GetBlendRequest(const Image *image,const ssize_t x_offset,
   return(request);
 }
 
+static void GetDissolveArguments(const Image *image,GeometryInfo *geometry_info,
+  MagickRealType *source_dissolve,MagickRealType *canvas_dissolve)
+{
+  const char
+    *artifact;
+
+  MagickStatusType
+    flags;
+
+  artifact=GetImageArtifact(image,"compose:args");
+  if (artifact != (char *) NULL)
+    {
+      flags=ParseGeometry(artifact,geometry_info);
+      SetDissolveFactors((*geometry_info),flags,source_dissolve,
+        canvas_dissolve);
+    }
+}
+
 typedef struct _ComposeArtifactTargets
 {
   double
@@ -5587,13 +5605,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       /*
         Geometry arguments to dissolve factors.
       */
-      artifact=GetImageArtifact(image,"compose:args");
-      if (artifact != (char *) NULL)
-        {
-          flags=ParseGeometry(artifact,&geometry_info);
-          SetDissolveFactors(geometry_info,flags,&source_dissolve,
-            &canvas_dissolve);
-        }
+      GetDissolveArguments(image,&geometry_info,&source_dissolve,
+        &canvas_dissolve);
       break;
     }
     case BlendCompositeOp:
