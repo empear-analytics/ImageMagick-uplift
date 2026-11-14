@@ -10991,6 +10991,38 @@ static void XApplyRotateRightCommand(const XMagickCommandContext *context)
     }
 }
 
+static void XApplyRotateLeftCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  MagickStatusType
+    status;
+
+  /*
+    Rotate image 90 degrees counter-clockwise.
+  */
+  status=XRotateImage(display,resource_info,windows,-90.0,image,exception);
+  if (status == MagickFalse)
+    {
+      XNoticeWidget(display,windows,"Unable to rotate X image",
+        (*image)->filename);
+      return;
+    }
+}
+
 static void XApplyResizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11700,19 +11732,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyRotateRightCommand(&context);
       break;
     case RotateLeftCommand:
-    {
-      /*
-        Rotate image 90 degrees counter-clockwise.
-      */
-      status=XRotateImage(display,resource_info,windows,-90.0,image,exception);
-      if (status == MagickFalse)
-        {
-          XNoticeWidget(display,windows,"Unable to rotate X image",
-            (*image)->filename);
-          break;
-        }
+      XApplyRotateLeftCommand(&context);
       break;
-    }
     case RotateCommand:
     {
       /*
