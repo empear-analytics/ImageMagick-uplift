@@ -5271,6 +5271,15 @@ static void SetCanvasAlphaChannel(Image *image,ExceptionInfo *exception)
     (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
 }
 
+static void GetBlurEllipseSize(const GeometryInfo geometry_info,
+  const MagickStatusType flags,double *width,double *height)
+{
+  *width=2.0*geometry_info.rho;
+  *height=*width;
+  if ((flags & HeightValue) != 0)
+    *height=2.0*geometry_info.sigma;
+}
+
 typedef struct _ComposeArtifactTargets
 {
   double
@@ -5543,10 +5552,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
         The filter defaults to a sigma of 0.5 so to make this match the users
         input the ellipse size needs to be doubled.
       */
-      width=2.0*geometry_info.rho;
-      height=width;
-      if ((flags & HeightValue) != 0)
-        height=2.0*geometry_info.sigma;
+      GetBlurEllipseSize(geometry_info,flags,&width,&height);
       /*
         Default the unrotated ellipse width and height axis vectors.
       */
