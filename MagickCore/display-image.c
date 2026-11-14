@@ -11026,6 +11026,52 @@ static void XApplyShadeCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyRaiseCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  RectangleInfo
+    page_geometry;
+
+  static char
+    bevel_width[MagickPathExtent] = "10";
+
+  /*
+    Query user for bevel width.
+  */
+  (void) XDialogWidget(display,windows,"Raise","Bevel width:",bevel_width);
+  if (*bevel_width == '\0')
+    return;
+  /*
+    Raise an image.
+  */
+  (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
+    exception);
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) ParsePageGeometry(*image,bevel_width,&page_geometry,
+    exception);
+  (void) RaiseImage(*image,&page_geometry,MagickTrue,exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyRollCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12178,33 +12224,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyShadeCommand(&context);
       break;
     case RaiseCommand:
-    {
-      static char
-        bevel_width[MagickPathExtent] = "10";
-
-      /*
-        Query user for bevel width.
-      */
-      (void) XDialogWidget(display,windows,"Raise","Bevel width:",bevel_width);
-      if (*bevel_width == '\0')
-        break;
-      /*
-        Raise an image.
-      */
-      (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
-        exception);
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      (void) ParsePageGeometry(*image,bevel_width,&page_geometry,
-        exception);
-      (void) RaiseImage(*image,&page_geometry,MagickTrue,exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyRaiseCommand(&context);
       break;
-    }
     case SegmentCommand:
     {
       static char
