@@ -6074,37 +6074,135 @@ static void XCompositeScaleLocation(const Image *image,
     (*composite_info).height+0.5);
 }
 
+static const char
+  *const CompositeEditMenu[] =
+  {
+    "Operators",
+    "Dissolve",
+    "Displace",
+    "Help",
+    "Dismiss",
+    (char *) NULL
+  };
+
+static const ModeType
+  CompositeEditCommands[] =
+  {
+    CompositeOperatorsCommand,
+    CompositeDissolveCommand,
+    CompositeDisplaceCommand,
+    CompositeHelpCommand,
+    CompositeDismissCommand
+  };
+
+static MagickBooleanType XCompositeIntoImage(
+  const CompositeCommandInput *input,Image *image,Image *composite_image,
+  RectangleInfo composite_info)
+{
+  char
+    *const displacement_geometry = input->displacement_geometry;
+
+  CompositeOperator
+    *const compose = input->targets.compose;
+
+  Display
+    *const display = input->display;
+
+  double
+    *const blend = input->targets.blend;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  /*
+    Image compositing is relative to image configuration.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  XCompositeScaleLocation(image,windows,&composite_info);
+  if ((composite_info.width != composite_image->columns) ||
+      (composite_info.height != composite_image->rows))
+    {
+      Image
+        *resize_image;
+
+      /*
+        Scale composite image.
+      */
+      resize_image=ResizeImage(composite_image,composite_info.width,
+        composite_info.height,composite_image->filter,exception);
+      composite_image=DestroyImage(composite_image);
+      if (resize_image == (Image *) NULL)
+        {
+          XSetCursorState(display,windows,MagickFalse);
+          return(MagickFalse);
+        }
+      composite_image=resize_image;
+    }
+  if ((*compose) == DisplaceCompositeOp)
+    (void) SetImageArtifact(composite_image,"compose:args",
+      displacement_geometry);
+  if (XCreateBlendMattes(image,composite_image,(*blend),exception) == MagickFalse)
+    return(MagickFalse);
+  /*
+    Composite image with X Image window.
+  */
+  (void) CompositeImage(image,composite_image,(*compose),MagickTrue,
+    composite_info.x,composite_info.y,exception);
+  composite_image=DestroyImage(composite_image);
+  XSetCursorState(display,windows,MagickFalse);
+  /*
+    Update image configuration.
+  */
+  XConfigureImageColormap(display,resource_info,windows,image,exception);
+  (void) XConfigureImage(display,resource_info,windows,image,exception);
+  return(MagickTrue);
+}
+
+static Image *XReadCompositeImage(const CompositeCommandInput *input,
+  const char *filename)
+{
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  Image
+    *composite_image;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) CopyMagickString(resource_info->image_info->filename,filename,
+    MagickPathExtent);
+  composite_image=ReadImage(resource_info->image_info,exception);
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  return(composite_image);
+}
+
 static MagickBooleanType XCompositeImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
 {
-  const char
-    *const CompositeMenu[] =
-    {
-      "Operators",
-      "Dissolve",
-      "Displace",
-      "Help",
-      "Dismiss",
-      (char *) NULL
-    };
-
   static char
     displacement_geometry[MagickPathExtent] = "30x30",
     filename[MagickPathExtent] = "\0";
 
   static CompositeOperator
     compose = CopyCompositeOp;
-
-  static const ModeType
-    CompositeCommands[] =
-    {
-      CompositeOperatorsCommand,
-      CompositeDissolveCommand,
-      CompositeDisplaceCommand,
-      CompositeHelpCommand,
-      CompositeDismissCommand
-    };
 
   Cursor
     cursor;
@@ -6133,8 +6231,8 @@ static MagickBooleanType XCompositeImage(Display *display,
       &compose };
 
   const CompositeCommandInput
-    command_input = { display, resource_info, windows, CompositeCommands,
-      CompositeMenu, displacement_geometry, targets, exception };
+    command_input = { display, resource_info, windows, CompositeEditCommands,
+      CompositeEditMenu, displacement_geometry, targets, exception };
 
   /*
     Request image file name from user.
@@ -6145,13 +6243,7 @@ static MagickBooleanType XCompositeImage(Display *display,
   /*
     Read image.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) CopyMagickString(resource_info->image_info->filename,filename,
-    MagickPathExtent);
-  composite_image=ReadImage(resource_info->image_info,exception);
-  CatchException(exception);
-  XSetCursorState(display,windows,MagickFalse);
+  composite_image=XReadCompositeImage(&command_input,filename);
   if (composite_image == (Image *) NULL)
     return(MagickFalse);
   /*
@@ -6159,7 +6251,7 @@ static MagickBooleanType XCompositeImage(Display *display,
   */
   (void) CloneString(&windows->command.name,"Composite");
   windows->command.data=1;
-  (void) XCommandWidget(display,windows,CompositeMenu,(XEvent *) NULL);
+  (void) XCommandWidget(display,windows,CompositeEditMenu,(XEvent *) NULL);
   (void) XMapRaised(display,windows->command.id);
   XClientMessage(display,windows->image.id,windows->im_protocols,
     windows->im_update_widget,CurrentTime);
@@ -6188,49 +6280,8 @@ static MagickBooleanType XCompositeImage(Display *display,
   (void) XFreeCursor(display,cursor);
   if ((state & EscapeState) != 0)
     return(MagickTrue);
-  /*
-    Image compositing is relative to image configuration.
-  */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  XCompositeScaleLocation(image,windows,&composite_info);
-  if ((composite_info.width != composite_image->columns) ||
-      (composite_info.height != composite_image->rows))
-    {
-      Image
-        *resize_image;
-
-      /*
-        Scale composite image.
-      */
-      resize_image=ResizeImage(composite_image,composite_info.width,
-        composite_info.height,composite_image->filter,exception);
-      composite_image=DestroyImage(composite_image);
-      if (resize_image == (Image *) NULL)
-        {
-          XSetCursorState(display,windows,MagickFalse);
-          return(MagickFalse);
-        }
-      composite_image=resize_image;
-    }
-  if (compose == DisplaceCompositeOp)
-    (void) SetImageArtifact(composite_image,"compose:args",
-      displacement_geometry);
-  if (XCreateBlendMattes(image,composite_image,blend,exception) == MagickFalse)
-    return(MagickFalse);
-  /*
-    Composite image with X Image window.
-  */
-  (void) CompositeImage(image,composite_image,compose,MagickTrue,
-    composite_info.x,composite_info.y,exception);
-  composite_image=DestroyImage(composite_image);
-  XSetCursorState(display,windows,MagickFalse);
-  /*
-    Update image configuration.
-  */
-  XConfigureImageColormap(display,resource_info,windows,image,exception);
-  (void) XConfigureImage(display,resource_info,windows,image,exception);
-  return(MagickTrue);
+  return(XCompositeIntoImage(&command_input,image,composite_image,
+    composite_info));
 }
 
 /*
@@ -7996,6 +8047,9 @@ typedef struct _DrawStyleTargets
 
   int
     *y;
+
+  MagickStatusType
+    *status;
 } DrawStyleTargets;
 
 static void XSelectDrawColor(const DrawEditContext *context,const int id,
@@ -9629,37 +9683,85 @@ static MagickBooleanType XAcquireDrawCoordinates(ExceptionInfo *exception,
   return(MagickTrue);
 }
 
+static const char
+  *const DrawEditMenu[] =
+  {
+    "Element",
+    "Color",
+    "Stipple",
+    "Width",
+    "Undo",
+    "Help",
+    "Dismiss",
+    (char *) NULL
+  };
+
+static const ModeType
+  DrawEditCommands[] =
+  {
+    DrawElementCommand,
+    DrawColorCommand,
+    DrawStippleCommand,
+    DrawWidthCommand,
+    DrawUndoCommand,
+    DrawHelpCommand,
+    DrawDismissCommand
+  };
+
+static MagickBooleanType XTrackDrawStroke(const DrawEditContext *context,
+  const DrawPointerTargets *pointer_targets,
+  const DrawShapeTargets *shape_targets,const DrawStyleTargets *style_targets)
+{
+  unsigned int
+    distance;
+
+  /*
+    Draw element as pointer moves until the button is released.
+  */
+  distance=0;
+  XStartDrawElement(pointer_targets,shape_targets);
+  XTrackDrawElement(context,pointer_targets,shape_targets,&distance);
+  if (XFitDrawBounds(pointer_targets,shape_targets,distance) != MagickFalse)
+    return(MagickTrue);
+  /*
+    Drawing is relative to image configuration.
+  */
+  XPrepareDrawInfo(context,pointer_targets,shape_targets,style_targets);
+  return(MagickFalse);
+}
+
+static MagickBooleanType XDrawEditStep(const DrawEditContext *context,
+  const DrawPointerTargets *pointer_targets,
+  const DrawShapeTargets *shape_targets,const DrawStyleTargets *style_targets)
+{
+  MagickStatusType
+    *const status = style_targets->status;
+
+  size_t
+    *const state = pointer_targets->state;
+
+  XDrawInfo
+    *const draw_info = style_targets->draw_info;
+
+  XWaitForDrawStart(context,pointer_targets,style_targets);
+  if (((*state) & EscapeState) != 0)
+    return(MagickTrue);
+  if (XTrackDrawStroke(context,pointer_targets,shape_targets,style_targets) !=
+      MagickFalse)
+    return(MagickFalse);
+  /*
+    Draw element on image.
+  */
+  (*status)=XDrawElementImage(context,draw_info);
+  return(MagickFalse);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
 {
-  const char
-    *const DrawMenu[] =
-    {
-      "Element",
-      "Color",
-      "Stipple",
-      "Width",
-      "Undo",
-      "Help",
-      "Dismiss",
-      (char *) NULL
-    };
-
   static ElementType
     element = PointElement;
-
-  static const ModeType
-    DrawCommands[] =
-    {
-      DrawElementCommand,
-      DrawColorCommand,
-      DrawStippleCommand,
-      DrawWidthCommand,
-      DrawUndoCommand,
-      DrawHelpCommand,
-      DrawDismissCommand
-    };
 
   static Pixmap
     stipple = (Pixmap) NULL;
@@ -9686,7 +9788,6 @@ static MagickBooleanType XDrawEditImage(Display *display,
     rectangle_info;
 
   unsigned int
-    distance,
     max_coordinates;
 
   size_t
@@ -9707,9 +9808,6 @@ static MagickBooleanType XDrawEditImage(Display *display,
   XSegment
     line_info;
 
-  DrawEditContext
-    draw_context;
-
   const DrawShapeTargets
     shape_targets = { &line_info, &rectangle_info, &coordinate_info, &state,
       &number_coordinates, &max_coordinates };
@@ -9718,7 +9816,8 @@ static MagickBooleanType XDrawEditImage(Display *display,
     pointer_targets = { &x, &y, &state, &event, &element };
 
   const DrawStyleTargets
-    style_targets = { &draw_info, &pen_id, &line_width, &stipple, &x, &y };
+    style_targets = { &draw_info, &pen_id, &line_width, &stipple, &x, &y,
+      &status };
 
   /*
     Allocate polygon info.
@@ -9728,7 +9827,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
   /*
     Map Command widget.
   */
-  XMapDrawCommandWidget(display,windows,DrawMenu);
+  XMapDrawCommandWidget(display,windows,DrawEditMenu);
   /*
     Wait for first button press.
   */
@@ -9736,38 +9835,17 @@ static MagickBooleanType XDrawEditImage(Display *display,
   draw_info.stencil=OpaqueStencil;
   status=MagickTrue;
   cursor=XCreateFontCursor(display,XC_tcross);
-  draw_context.display=display;
-  draw_context.resource_info=resource_info;
-  draw_context.windows=windows;
-  draw_context.DrawMenu=DrawMenu;
-  draw_context.command=command;
-  draw_context.root_window=root_window;
-  draw_context.exception=exception;
-  draw_context.image=image;
-  draw_context.cursor=cursor;
-  draw_context.DrawCommands=DrawCommands;
-  for ( ; ; )
   {
-    XWaitForDrawStart(&draw_context,&pointer_targets,&style_targets);
-    if ((state & EscapeState) != 0)
-      break;
-    /*
-      Draw element as pointer moves until the button is released.
-    */
-    distance=0;
-    XStartDrawElement(&pointer_targets,&shape_targets);
-    XTrackDrawElement(&draw_context,&pointer_targets,&shape_targets,&distance);
-    if (XFitDrawBounds(&pointer_targets,&shape_targets,distance) != MagickFalse)
-      continue;
-    /*
-      Drawing is relative to image configuration.
-    */
-    XPrepareDrawInfo(&draw_context,&pointer_targets,&shape_targets,
-      &style_targets);
-    /*
-      Draw element on image.
-    */
-    status=XDrawElementImage(&draw_context,&draw_info);
+    const DrawEditContext
+      draw_context = { display, resource_info, windows, DrawEditMenu, command,
+        root_window, exception, image, cursor, DrawEditCommands };
+
+    for ( ; ; )
+    {
+      if (XDrawEditStep(&draw_context,&pointer_targets,&shape_targets,
+          &style_targets) != MagickFalse)
+        break;
+    }
   }
   XSetCursorState(display,windows,MagickFalse);
   coordinate_info=(XPoint *) RelinquishMagickMemory(coordinate_info);
@@ -10477,6 +10555,140 @@ static DisplayCommand XLookupKeyCommand(const int key,
   return(NullCommand);
 }
 
+static DisplayCommand XImmutableWindowCommand(const KeySym key_symbol)
+{
+  /*
+    Virtual image window has a restricted command set.
+  */
+  switch (key_symbol)
+  {
+    case XK_question:
+      return(InfoCommand);
+    case XK_p:
+    case XK_Print:
+      return(PrintCommand);
+    case XK_space:
+      return(NextCommand);
+    case XK_q:
+    case XK_Escape:
+      return(QuitCommand);
+    default:
+      break;
+  }
+  return(NullCommand);
+}
+
+typedef struct _ImageWindowKeyInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    **image;
+
+  ExceptionInfo
+    *exception;
+} ImageWindowKeyInput;
+
+static void XTrimVerticalEdges(XResourceInfo *resource_info,
+  const KeySym key_symbol,RectangleInfo *crop_info)
+{
+  if ((key_symbol == XK_Up) || (key_symbol == XK_KP_Up))
+    {
+      XClampTrimTopQuantum(resource_info,(*crop_info));
+      (*crop_info).height-=(size_t) resource_info->quantum;
+    }
+  if ((key_symbol == XK_Down) || (key_symbol == XK_KP_Down))
+    {
+      XClampTrimBottomQuantum(resource_info,(*crop_info));
+      (*crop_info).y+=resource_info->quantum;
+      (*crop_info).height-=(size_t) resource_info->quantum;
+    }
+}
+
+static DisplayCommand XTrimImageWindowEdge(const ImageWindowKeyInput *input,
+  const KeySym key_symbol)
+{
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  Image
+    **const image = input->image;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  RectangleInfo
+    crop_info;
+
+  /*
+    Trim one pixel from edge of image.
+  */
+  crop_info.x=0;
+  crop_info.y=0;
+  crop_info.width=(size_t) windows->image.ximage->width;
+  crop_info.height=(size_t) windows->image.ximage->height;
+  XTrimVerticalEdges(resource_info,key_symbol,&crop_info);
+  if ((key_symbol == XK_Left) || (key_symbol == XK_KP_Left))
+    {
+      XClampTrimLeftQuantum(resource_info,crop_info);
+      crop_info.width-=(size_t) resource_info->quantum;
+    }
+  if ((key_symbol == XK_Right) || (key_symbol == XK_KP_Right))
+    {
+      XClampTrimRightQuantum(resource_info,crop_info);
+      crop_info.x+=resource_info->quantum;
+      crop_info.width-=(size_t) resource_info->quantum;
+    }
+  if ((windows->image.x+(int) windows->image.width) > (int) crop_info.width)
+    windows->image.x=(int) (crop_info.width-windows->image.width);
+  if ((windows->image.y+(int) windows->image.height) > (int) crop_info.height)
+    windows->image.y=(int) (crop_info.height-windows->image.height);
+  XSetCropGeometry(display,windows,&crop_info,*image);
+  windows->image.window_changes.width=(int) crop_info.width;
+  windows->image.window_changes.height=(int) crop_info.height;
+  (void) XSetWindowBackgroundPixmap(display,windows->image.id,None);
+  (void) XConfigureImage(display,resource_info,windows,*image,
+    exception);
+  return(NullCommand);
+}
+
+static const char
+  Digits[] = "01234567890";
+
+static void XEnterWindowDigit(XResourceInfo *resource_info,
+  const KeySym key_symbol,char *delta,KeySym *last_symbol)
+{
+  size_t
+    length;
+
+  if ((((*last_symbol) < XK_0) || ((*last_symbol) > XK_9)))
+    {
+      *delta='\0';
+      resource_info->quantum=1;
+    }
+  (*last_symbol)=key_symbol;
+  length=strlen(delta);
+  if (length < MagickPathExtent)
+    {
+      delta[length]=Digits[key_symbol-XK_0];
+      delta[length+1]='\0';
+    }
+  resource_info->quantum=StringToLong(delta);
+}
+
 static DisplayCommand XImageWindowCommand(Display *display,
   XResourceInfo *resource_info,XWindows *windows,const MagickStatusType state,
   KeySym key_symbol,Image **image,ExceptionInfo *exception)
@@ -10484,55 +10696,20 @@ static DisplayCommand XImageWindowCommand(Display *display,
   static char
     delta[MagickPathExtent+1] = "";
 
-  static const char
-    Digits[] = "01234567890";
-
   static KeySym
     last_symbol = XK_0;
 
+  const ImageWindowKeyInput
+    input = { display, resource_info, windows, image, exception };
+
   if ((key_symbol >= XK_0) && (key_symbol <= XK_9))
     {
-      size_t
-        length;
-
-      if (((last_symbol < XK_0) || (last_symbol > XK_9)))
-        {
-          *delta='\0';
-          resource_info->quantum=1;
-        }
-      last_symbol=key_symbol;
-      length=strlen(delta);
-      if (length < MagickPathExtent)
-        {
-          delta[length]=Digits[key_symbol-XK_0];
-          delta[length+1]='\0';
-        }
-      resource_info->quantum=StringToLong(delta);
+      XEnterWindowDigit(resource_info,key_symbol,delta,&last_symbol);
       return(NullCommand);
     }
   last_symbol=key_symbol;
   if (resource_info->immutable)
-    {
-      /*
-        Virtual image window has a restricted command set.
-      */
-      switch (key_symbol)
-      {
-        case XK_question:
-          return(InfoCommand);
-        case XK_p:
-        case XK_Print:
-          return(PrintCommand);
-        case XK_space:
-          return(NextCommand);
-        case XK_q:
-        case XK_Escape:
-          return(QuitCommand);
-        default:
-          break;
-      }
-      return(NullCommand);
-    }
+    return(XImmutableWindowCommand(key_symbol));
   switch ((int) key_symbol)
   {
     case XK_P:
@@ -10564,51 +10741,7 @@ static DisplayCommand XImageWindowCommand(Display *display,
     case XK_KP_Right:
     {
       if ((state & Mod1Mask) != 0)
-        {
-          RectangleInfo
-            crop_info;
-
-          /*
-            Trim one pixel from edge of image.
-          */
-          crop_info.x=0;
-          crop_info.y=0;
-          crop_info.width=(size_t) windows->image.ximage->width;
-          crop_info.height=(size_t) windows->image.ximage->height;
-          if ((key_symbol == XK_Up) || (key_symbol == XK_KP_Up))
-            {
-              XClampTrimTopQuantum(resource_info,crop_info);
-              crop_info.height-=(size_t) resource_info->quantum;
-            }
-          if ((key_symbol == XK_Down) || (key_symbol == XK_KP_Down))
-            {
-              XClampTrimBottomQuantum(resource_info,crop_info);
-              crop_info.y+=resource_info->quantum;
-              crop_info.height-=(size_t) resource_info->quantum;
-            }
-          if ((key_symbol == XK_Left) || (key_symbol == XK_KP_Left))
-            {
-              XClampTrimLeftQuantum(resource_info,crop_info);
-              crop_info.width-=(size_t) resource_info->quantum;
-            }
-          if ((key_symbol == XK_Right) || (key_symbol == XK_KP_Right))
-            {
-              XClampTrimRightQuantum(resource_info,crop_info);
-              crop_info.x+=resource_info->quantum;
-              crop_info.width-=(size_t) resource_info->quantum;
-            }
-          if ((windows->image.x+(int) windows->image.width) > (int) crop_info.width)
-            windows->image.x=(int) (crop_info.width-windows->image.width);
-          if ((windows->image.y+(int) windows->image.height) > (int) crop_info.height)
-            windows->image.y=(int) (crop_info.height-windows->image.height);
-          XSetCropGeometry(display,windows,&crop_info,*image);
-          windows->image.window_changes.width=(int) crop_info.width;
-          windows->image.window_changes.height=(int) crop_info.height;
-          (void) XSetWindowBackgroundPixmap(display,windows->image.id,None);
-          (void) XConfigureImage(display,resource_info,windows,*image,
-            exception);
-          return(NullCommand);
-        }
+        return(XTrimImageWindowEdge(&input,key_symbol));
       XTranslateImage(display,windows,*image,key_symbol);
       return(NullCommand);
     }
@@ -21759,23 +21892,85 @@ static MagickBooleanType XTrimImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static Image *XVisualDirectoryImage(Display *display,
-  XResourceInfo *resource_info,XWindows *windows,ExceptionInfo *exception)
+typedef struct _DirectoryInput
 {
-#define TileImageTag  "Scale/Image"
-#define XClientName  "montage"
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
 
   char
-    **filelist;
+    *filename;
+
+  ExceptionInfo
+    *exception;
+} DirectoryInput;
+
+static Image *XMontageImageDirectory(const DirectoryInput *input,
+  ImageInfo *read_info,Image *images)
+{
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
 
   Image
-    *images,
-    *montage_image,
-    *next_image,
-    *thumbnail_image;
+    *montage_image;
+
+  MontageInfo
+    *montage_info;
+
+  char
+    *const filename = input->filename;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  /*
+    Create the Visual Image Directory.
+  */
+  montage_info=CloneMontageInfo(read_info,(MontageInfo *) NULL);
+  montage_info->pointsize=10;
+  if (resource_info->font != (char *) NULL)
+    (void) CloneString(&montage_info->font,resource_info->font);
+  (void) CopyMagickString(montage_info->filename,filename,MagickPathExtent);
+  montage_image=MontageImageList(read_info,montage_info,GetFirstImageInList(
+    images),exception);
+  images=DestroyImageList(images);
+  montage_info=DestroyMontageInfo(montage_info);
+  read_info=DestroyImageInfo(read_info);
+  XSetCursorState(display,windows,MagickFalse);
+  if (montage_image == (Image *) NULL)
+    return(montage_image);
+  XClientMessage(display,windows->image.id,windows->im_protocols,
+    windows->im_next_image,CurrentTime);
+  return(montage_image);
+}
+
+typedef struct _DirectoryLoadInput
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  ExceptionInfo
+    *exception;
 
   ImageInfo
     *read_info;
+
+  char
+    **filelist;
 
   int
     number_files;
@@ -21783,11 +21978,40 @@ static Image *XVisualDirectoryImage(Display *display,
   MagickBooleanType
     backdrop;
 
-  MagickStatusType
-    status;
+  XResourceInfo
+    *background_resources;
+} DirectoryLoadInput;
 
-  MontageInfo
-    *montage_info;
+static Image *XLoadDirectoryImages(const DirectoryLoadInput *load_input,
+  Image *images)
+{
+  Display
+    *const display = load_input->display;
+
+  ExceptionInfo
+    *const exception = load_input->exception;
+
+  ImageInfo
+    *const read_info = load_input->read_info;
+
+  XWindows
+    *const windows = load_input->windows;
+
+  char
+    **const filelist = load_input->filelist;
+
+  const int
+    number_files = load_input->number_files;
+
+  const MagickBooleanType
+    backdrop = load_input->backdrop;
+
+  XResourceInfo
+    *const background_resources = load_input->background_resources;
+
+  Image
+    *next_image,
+    *thumbnail_image;
 
   RectangleInfo
     geometry;
@@ -21795,62 +22019,6 @@ static Image *XVisualDirectoryImage(Display *display,
   int
     i;
 
-  static char
-    filename[MagickPathExtent] = "\0",
-    filenames[MagickPathExtent] = "*";
-
-  XResourceInfo
-    background_resources;
-
-  /*
-    Request file name from user.
-  */
-  XFileBrowserWidget(display,windows,"Directory",filenames);
-  if (*filenames == '\0')
-    return((Image *) NULL);
-  /*
-    Expand the filenames.
-  */
-  filelist=(char **) AcquireMagickMemory(sizeof(*filelist));
-  if (filelist == (char **) NULL)
-    {
-      ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
-        filenames);
-      return((Image *) NULL);
-    }
-  number_files=1;
-  filelist[0]=filenames;
-  status=ExpandFilenames(&number_files,&filelist);
-  if ((status == MagickFalse) || (number_files == 0))
-    {
-      if (number_files == 0)
-        ThrowXWindowException(ImageError,"NoImagesWereFound",filenames)
-      else
-        ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
-          filenames);
-      return((Image *) NULL);
-    }
-  /*
-    Set image background resources.
-  */
-  background_resources=(*resource_info);
-  background_resources.window_id=AcquireString("");
-  (void) FormatLocaleString(background_resources.window_id,MagickPathExtent,
-    "0x%lx",windows->image.id);
-  background_resources.backdrop=MagickTrue;
-  /*
-    Read each image and convert them to a tile.
-  */
-  backdrop=((windows->visual_info->klass == TrueColor) ||
-    (windows->visual_info->klass == DirectColor)) ? MagickTrue : MagickFalse;
-  read_info=CloneImageInfo(resource_info->image_info);
-  (void) SetImageOption(read_info,"jpeg:size","120x120");
-  (void) CloneString(&read_info->size,DefaultTileGeometry);
-  (void) SetImageInfoProgressMonitor(read_info,(MagickProgressMonitor) NULL,
-    (void *) NULL);
-  images=NewImageList();
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
   for (i=0; i < (int) number_files; i++)
   {
     (void) CopyMagickString(read_info->filename,filelist[i],MagickPathExtent);
@@ -21874,7 +22042,7 @@ static Image *XVisualDirectoryImage(Display *display,
       }
     if (backdrop)
       {
-        (void) XDisplayBackgroundImage(display,&background_resources,
+        (void) XDisplayBackgroundImage(display,background_resources,
           next_image,exception);
         XSetCursorState(display,windows,MagickTrue);
       }
@@ -21890,6 +22058,125 @@ static Image *XVisualDirectoryImage(Display *display,
           break;
       }
   }
+  return(images);
+}
+
+typedef struct _DirectoryListTargets
+{
+  char
+    ***filelist;
+
+  int
+    *number_files;
+} DirectoryListTargets;
+
+static MagickBooleanType XExpandDirectoryFiles(char *filenames,
+  const DirectoryListTargets *targets)
+{
+  char
+    ***const filelist = targets->filelist;
+
+  int
+    *const number_files = targets->number_files;
+
+  MagickStatusType
+    status;
+
+  /*
+    Expand the filenames.
+  */
+  (*filelist)=(char **) AcquireMagickMemory(sizeof(**filelist));
+  if ((*filelist) == (char **) NULL)
+    {
+      ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
+        filenames);
+      return(MagickFalse);
+    }
+  (*number_files)=1;
+  (*filelist)[0]=filenames;
+  status=ExpandFilenames(number_files,filelist);
+  if ((status == MagickFalse) || ((*number_files) == 0))
+    {
+      if ((*number_files) == 0)
+        ThrowXWindowException(ImageError,"NoImagesWereFound",filenames)
+      else
+        ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
+          filenames);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static Image *XVisualDirectoryImage(Display *display,
+  XResourceInfo *resource_info,XWindows *windows,ExceptionInfo *exception)
+{
+#define TileImageTag  "Scale/Image"
+#define XClientName  "montage"
+
+  char
+    **filelist;
+
+  Image
+    *images;
+
+  ImageInfo
+    *read_info;
+
+  int
+    number_files;
+
+  MagickBooleanType
+    backdrop;
+
+  static char
+    filename[MagickPathExtent] = "\0",
+    filenames[MagickPathExtent] = "*";
+
+  XResourceInfo
+    background_resources;
+
+  const DirectoryInput
+    input = { display, resource_info, windows, filename, exception };
+
+  const DirectoryListTargets
+    list_targets = { &filelist, &number_files };
+
+  /*
+    Request file name from user.
+  */
+  XFileBrowserWidget(display,windows,"Directory",filenames);
+  if (*filenames == '\0')
+    return((Image *) NULL);
+  if (XExpandDirectoryFiles(filenames,&list_targets) == MagickFalse)
+    return((Image *) NULL);
+  /*
+    Set image background resources.
+  */
+  background_resources=(*resource_info);
+  background_resources.window_id=AcquireString("");
+  (void) FormatLocaleString(background_resources.window_id,MagickPathExtent,
+    "0x%lx",windows->image.id);
+  background_resources.backdrop=MagickTrue;
+  /*
+    Read each image and convert them to a tile.
+  */
+  backdrop=((windows->visual_info->klass == TrueColor) ||
+    (windows->visual_info->klass == DirectColor)) ? MagickTrue : MagickFalse;
+  read_info=CloneImageInfo(resource_info->image_info);
+  (void) SetImageOption(read_info,"jpeg:size","120x120");
+  (void) CloneString(&read_info->size,DefaultTileGeometry);
+  (void) SetImageInfoProgressMonitor(read_info,(MagickProgressMonitor) NULL,
+    (void *) NULL);
+  images=NewImageList();
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  {
+    const DirectoryLoadInput
+      load_input = { display, windows, exception, read_info, filelist,
+        number_files, backdrop, &background_resources };
+
+    images=XLoadDirectoryImages(&load_input,images);
+  }
   filelist=(char **) RelinquishMagickMemory(filelist);
   if (images == (Image *) NULL)
     {
@@ -21901,22 +22188,7 @@ static Image *XVisualDirectoryImage(Display *display,
   /*
     Create the Visual Image Directory.
   */
-  montage_info=CloneMontageInfo(read_info,(MontageInfo *) NULL);
-  montage_info->pointsize=10;
-  if (resource_info->font != (char *) NULL)
-    (void) CloneString(&montage_info->font,resource_info->font);
-  (void) CopyMagickString(montage_info->filename,filename,MagickPathExtent);
-  montage_image=MontageImageList(read_info,montage_info,GetFirstImageInList(
-    images),exception);
-  images=DestroyImageList(images);
-  montage_info=DestroyMontageInfo(montage_info);
-  read_info=DestroyImageInfo(read_info);
-  XSetCursorState(display,windows,MagickFalse);
-  if (montage_image == (Image *) NULL)
-    return(montage_image);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_next_image,CurrentTime);
-  return(montage_image);
+  return(XMontageImageDirectory(&input,read_info,images));
 }
 
 /*
