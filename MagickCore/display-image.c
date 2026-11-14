@@ -11122,6 +11122,59 @@ static void XApplySegmentCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplySepiaToneCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  double
+    threshold;
+
+  Image
+    *sepia_image;
+
+  static char
+    factor[MagickPathExtent] = "80%";
+
+  /*
+    Query user for sepia-tone factor.
+  */
+  (void) XDialogWidget(display,windows,"Sepia Tone",
+    "Enter the sepia tone factor (0 - 99.9%):",factor);
+  if (*factor == '\0')
+    return;
+  /*
+    Sepia tone image pixels.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  threshold=StringToDoubleInterval(factor,(double) QuantumRange+1.0);
+  sepia_image=SepiaToneImage(*image,threshold,exception);
+  if (sepia_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=sepia_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyRollCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12280,43 +12333,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplySegmentCommand(&context);
       break;
     case SepiaToneCommand:
-    {
-      double
-        threshold;
-
-      Image
-        *sepia_image;
-
-      static char
-        factor[MagickPathExtent] = "80%";
-
-      /*
-        Query user for sepia-tone factor.
-      */
-      (void) XDialogWidget(display,windows,"Sepia Tone",
-        "Enter the sepia tone factor (0 - 99.9%):",factor);
-      if (*factor == '\0')
-        break;
-      /*
-        Sepia tone image pixels.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      threshold=StringToDoubleInterval(factor,(double) QuantumRange+1.0);
-      sepia_image=SepiaToneImage(*image,threshold,exception);
-      if (sepia_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=sepia_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplySepiaToneCommand(&context);
       break;
-    }
     case SolarizeCommand:
     {
       double
