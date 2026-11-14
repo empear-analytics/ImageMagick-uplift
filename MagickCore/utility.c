@@ -1682,6 +1682,20 @@ static inline MagickBooleanType IsSubimageComponent(const size_t magick_length,
     MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType OpenPathComponent(const char *path,char *component)
+{
+  assert(path != (const char *) NULL);
+  assert(component != (char *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",path);
+  if (*path == '\0')
+    {
+      *component='\0';
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport void GetPathComponent(const char *path,PathType type,
   char *component)
 {
@@ -1693,15 +1707,8 @@ MagickExport void GetPathComponent(const char *path,PathType type,
     subimage_offset,
     subimage_length;
 
-  assert(path != (const char *) NULL);
-  assert(component != (char *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",path);
-  if (*path == '\0')
-    {
-      *component='\0';
-      return;
-    }
+  if (OpenPathComponent(path,component) == MagickFalse)
+    return;
   (void) CopyMagickString(component,path,MagickPathExtent);
   subimage_length=0;
   subimage_offset=0;
