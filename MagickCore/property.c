@@ -4663,6 +4663,52 @@ static MagickBooleanType AppendPixelValue(const InterpretText *text,
   return(MagickTrue);
 }
 
+typedef struct _InterpretSources
+{
+  ImageInfo
+    *property_info;
+
+  Image
+    *property_image;
+
+  ExceptionInfo
+    *exception;
+} InterpretSources;
+
+typedef enum
+{
+  OptionGlobSide,
+  ArtifactGlobSide
+} GlobSide;
+
+static MagickBooleanType AppendGlobbedValues(const InterpretSources *sources,
+  const InterpretText *text,const char *glob,const GlobSide side)
+{
+  const char
+    *key,
+    *string;
+
+  Image
+    *const property_image = sources->property_image;
+
+  ImageInfo
+    *const property_info = sources->property_info;
+
+  ((side == OptionGlobSide) ? ResetImageOptionIterator(property_info) :
+    ResetImageArtifactIterator(property_image));
+  while ((key=((side == OptionGlobSide) ? GetNextImageOption(property_info) :
+         GetNextImageArtifact(property_image))) != (const char *) NULL)
+    if (GlobExpression(key,glob,MagickTrue) != MagickFalse)
+      {
+        string=((side == OptionGlobSide) ? GetImageOption(property_info,key) :
+          GetImageArtifact(property_image,key));
+        if ((string != (const char *) NULL) &&
+            (AppendInterpretKeyValue(text,key,string) == MagickFalse))
+          return(MagickFalse);
+      }
+  return(MagickTrue);
+}
+
 MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   const char *embed_text,ExceptionInfo *exception)
 {
@@ -4830,6 +4876,9 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
         depth,
         offset;
 
+      const InterpretSources
+        sources = { property_info, property_image, exception };
+
       /*
         Braced Percent Escape %[...].
       */
@@ -4894,14 +4943,12 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
           */
           if (IsGlob(pattern+7) != MagickFalse)
             {
-              ResetImageOptionIterator(property_info);
-              while ((key=GetNextImageOption(property_info)) != (const char *) NULL)
-                if (GlobExpression(key,pattern+7,MagickTrue) != MagickFalse)
-                  {
-                    string=GetImageOption(property_info,key);
-                    if (string != (const char *) NULL)
-                      AppendKeyValue2Text(key,string);
-                  }
+              if (AppendGlobbedValues(&sources,&text,pattern+7,
+                  OptionGlobSide) == MagickFalse)
+                {
+                  status=MagickFalse;
+                  goto cleanup;
+                }
               continue;
             }
           string=GetImageOption(property_info,pattern+7);
@@ -4917,14 +4964,12 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
           */
           if (IsGlob(pattern+9) != MagickFalse)
             {
-              ResetImageArtifactIterator(property_image);
-              while ((key=GetNextImageArtifact(property_image)) != (const char *) NULL)
-                if (GlobExpression(key,pattern+9,MagickTrue) != MagickFalse)
-                  {
-                    string=GetImageArtifact(property_image,key);
-                    if (string != (const char *) NULL)
-                      AppendKeyValue2Text(key,string);
-                  }
+              if (AppendGlobbedValues(&sources,&text,pattern+9,
+                  ArtifactGlobSide) == MagickFalse)
+                {
+                  status=MagickFalse;
+                  goto cleanup;
+                }
               continue;
             }
           string=GetImageArtifact(property_image,pattern+9);
