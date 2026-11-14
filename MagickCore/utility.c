@@ -1100,6 +1100,15 @@ static MagickBooleanType CollectArgumentFiles(
   return(MagickTrue);
 }
 
+static void FinishArgumentVector(int *number_arguments,char ***arguments,
+  char **vector,const ssize_t count)
+{
+  vector[count]=(char *) NULL;
+  LogExpandedCommandLine(vector,count);
+  *number_arguments=(int) count;
+  *arguments=vector;
+}
+
 MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
   char ***arguments)
 {
@@ -1182,10 +1191,7 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
     }
     filelist=(char **) RelinquishMagickMemory(filelist);
   }
-  vector[count]=(char *) NULL;
-  LogExpandedCommandLine(vector,count);
-  *number_arguments=(int) count;
-  *arguments=vector;
+  FinishArgumentVector(number_arguments,arguments,vector,count);
   return(MagickTrue);
 }
 
