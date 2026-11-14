@@ -11332,6 +11332,30 @@ static Image *XApplyLaunchCommand(const XMagickCommandContext *context,
   return(nexus);
 }
 
+static void XApplyZoomCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  /*
+    Zoom image.
+  */
+  if (windows->magnify.mapped != MagickFalse)
+    (void) XRaiseWindow(display,windows->magnify.id);
+  else
+    {
+      /*
+        Make magnify image.
+      */
+      XSetCursorState(display,windows,MagickTrue);
+      (void) XMapRaised(display,windows->magnify.id);
+      XSetCursorState(display,windows,MagickFalse);
+    }
+}
+
 static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12891,23 +12915,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
     case InfoCommand:
       break;
     case ZoomCommand:
-    {
-      /*
-        Zoom image.
-      */
-      if (windows->magnify.mapped != MagickFalse)
-        (void) XRaiseWindow(display,windows->magnify.id);
-      else
-        {
-          /*
-            Make magnify image.
-          */
-          XSetCursorState(display,windows,MagickTrue);
-          (void) XMapRaised(display,windows->magnify.id);
-          XSetCursorState(display,windows,MagickFalse);
-        }
+      XApplyZoomCommand(&context);
       break;
-    }
     case ShowPreviewCommand:
     {
       char
