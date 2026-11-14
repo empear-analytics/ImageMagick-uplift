@@ -940,6 +940,17 @@ static inline MagickBooleanType IsInvalidExifOffset(const ssize_t offset,
     MagickFalse);
 }
 
+static void PopExifDirectory(const DirectoryInfo *directory_stack,
+  ssize_t *level,unsigned char **directory,size_t *entry)
+{
+  if ((*level) > 0)
+    {
+      (*level)--;
+      (*directory)=directory_stack[(*level)].directory;
+      (*entry)=directory_stack[(*level)].entry;
+    }
+}
+
 static inline MagickBooleanType IsOutsideExifProfile(
   const unsigned char *directory,const unsigned char *exif,const size_t length)
 {
@@ -994,12 +1005,7 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
     (void *(*)(void *)) NULL,(void *(*)(void *)) NULL);
   do
   {
-    if (level > 0)
-      {
-        level--;
-        directory=directory_stack[level].directory;
-        entry=directory_stack[level].entry;
-      }
+    PopExifDirectory(directory_stack,&level,&directory,&entry);
     if (IsOutsideExifProfile(directory,exif,length) != MagickFalse)
       break;
     walk.image=image;
