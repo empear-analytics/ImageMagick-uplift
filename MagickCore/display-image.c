@@ -20864,6 +20864,77 @@ static void XScaleTileEvent(Image *image,XWindows *windows,XEvent *event)
   event->xbutton.y=(int) (scale_factor*event->xbutton.y+y+0.5);
 }
 
+typedef struct _XTileLocationTargets
+{
+  unsigned int
+    *width,
+    *height;
+
+  int
+    *x,
+    *y;
+
+  char
+    **p;
+} XTileLocationTargets;
+
+static MagickBooleanType XLocateTile(Display *display,Image *image,
+  XEvent *event,const XTileLocationTargets *targets)
+{
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  char
+    **const p = targets->p;
+
+  unsigned int
+    *const width = targets->width,
+    *const height = targets->height;
+
+  int
+    i,
+    tile;
+
+  /*
+    Determine size and location of each tile in the visual image directory.
+  */
+  (*width)=(unsigned int) image->columns;
+  (*height)=(unsigned int) image->rows;
+  (*x)=0;
+  (*y)=0;
+  (void) XParseGeometry(image->montage,x,y,width,height);
+  tile=((event->xbutton.y-(*y))/(int) (*height))*(((int) image->columns-(*x))/(int)
+    (*width))+(event->xbutton.x-(*x))/(int) (*width);
+  if (tile < 0)
+    {
+      /*
+        Button press is outside any tile.
+      */
+      (void) XBell(display,0);
+      return(MagickFalse);
+    }
+  /*
+    Determine file name from the tile directory.
+  */
+  (*p)=image->directory;
+  for (i=tile; (i != 0) && (*(*p) != '\0'); )
+  {
+    if (*(*p) == '\xff')
+      i--;
+    (*p)++;
+  }
+  if (*(*p) == '\0')
+    {
+      /*
+        Button press is outside any tile.
+      */
+      (void) XBell(display,0);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static Image *XTileImage(Display *display,XResourceInfo *resource_info,
   XWindows *windows,Image *image,XEvent *event,ExceptionInfo *exception)
 {
@@ -20898,16 +20969,12 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
   int
     id,
     status,
-    tile,
     x,
     y;
 
   char
     *p,
     *q;
-
-  int
-    i;
 
   unsigned int
     height,
@@ -20916,43 +20983,12 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
   XTileInput
     input;
 
+  const XTileLocationTargets
+    location = { &width, &height, &x, &y, &p };
+
   XScaleTileEvent(image,windows,event);
-  /*
-    Determine size and location of each tile in the visual image directory.
-  */
-  width=(unsigned int) image->columns;
-  height=(unsigned int) image->rows;
-  x=0;
-  y=0;
-  (void) XParseGeometry(image->montage,&x,&y,&width,&height);
-  tile=((event->xbutton.y-y)/(int) height)*(((int) image->columns-x)/(int)
-    width)+(event->xbutton.x-x)/(int) width;
-  if (tile < 0)
-    {
-      /*
-        Button press is outside any tile.
-      */
-      (void) XBell(display,0);
-      return((Image *) NULL);
-    }
-  /*
-    Determine file name from the tile directory.
-  */
-  p=image->directory;
-  for (i=tile; (i != 0) && (*p != '\0'); )
-  {
-    if (*p == '\xff')
-      i--;
-    p++;
-  }
-  if (*p == '\0')
-    {
-      /*
-        Button press is outside any tile.
-      */
-      (void) XBell(display,0);
-      return((Image *) NULL);
-    }
+  if (XLocateTile(display,image,event,&location) == MagickFalse)
+    return((Image *) NULL);
   /*
     Select a command from the pop-up menu.
   */
