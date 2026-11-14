@@ -3029,7 +3029,11 @@ typedef struct _MVGRenderState
     **q;
 
   double
-    *coordinates;
+    *coordinates,
+    *cursor;
+
+  DrawInfo
+    ***graphic_context;
 
   ExceptionInfo
     *exception;
@@ -3056,6 +3060,7 @@ typedef struct _MVGRenderState
   ssize_t
     *i,
     *j,
+    *n,
     *x;
 } MVGRenderState;
 
@@ -3333,6 +3338,314 @@ static void ReserveMVGPrimitiveExtent(const MVGRenderState *state)
   (*state->primitive_info)=primitive_info;
 }
 
+static void TraceMVGPrimitive(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  double
+    coordinates = (*state->coordinates),
+    cursor = (*state->cursor);
+
+  DrawInfo
+    *clone_info,
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  Image
+    *image = state->image;
+
+  MagickStatusType
+    status = (*state->status);
+
+  MVGInfo
+    mvg_info = (*state->mvg_info);
+
+  PrimitiveInfo
+    *primitive_info = (*state->primitive_info);
+
+  PrimitiveType
+    primitive_type = (*state->primitive_type);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    i = (*state->i),
+    j = (*state->j),
+    n = (*state->n);
+
+  TypeMetric
+    metrics;
+
+  mvg_info.offset=j;
+  switch (primitive_type)
+  {
+    case PointPrimitive:
+    default:
+    {
+      if (primitive_info[j].coordinates != 1)
+        {
+          status=MagickFalse;
+          break;
+        }
+      status&=(MagickStatusType) TracePoint(primitive_info+j,
+        primitive_info[j].point);
+      primitive_info=(*mvg_info.primitive_info);
+      if (status == MagickFalse)
+        break;
+      i=j+(ssize_t) primitive_info[j].coordinates;
+      break;
+    }
+    case LinePrimitive:
+    {
+      if (primitive_info[j].coordinates != 2)
+        {
+          status=MagickFalse;
+          break;
+        }
+      status&=(MagickStatusType) TraceLine(primitive_info+j,
+        primitive_info[j].point,primitive_info[j+1].point);
+      primitive_info=(*mvg_info.primitive_info);
+      if (status == MagickFalse)
+        break;
+      i=j+(ssize_t) primitive_info[j].coordinates;
+      break;
+    }
+    case RectanglePrimitive:
+    {
+      if (primitive_info[j].coordinates != 2)
+        {
+          status=MagickFalse;
+          break;
+        }
+      status&=(MagickStatusType) TraceRectangle(primitive_info+j,
+        primitive_info[j].point,primitive_info[j+1].point);
+      primitive_info=(*mvg_info.primitive_info);
+      if (status == MagickFalse)
+        break;
+      i=j+(ssize_t) primitive_info[j].coordinates;
+      break;
+    }
+    case RoundRectanglePrimitive:
+    {
+      if (primitive_info[j].coordinates != 3)
+        {
+          status=MagickFalse;
+          break;
+        }
+      if ((primitive_info[j+2].point.x < 0.0) ||
+          (primitive_info[j+2].point.y < 0.0))
+        {
+          status=MagickFalse;
+          break;
+        }
+      if ((primitive_info[j+1].point.x-primitive_info[j].point.x) < 0.0)
+        {
+          status=MagickFalse;
+          break;
+        }
+      if ((primitive_info[j+1].point.y-primitive_info[j].point.y) < 0.0)
+        {
+          status=MagickFalse;
+          break;
+        }
+      status&=(MagickStatusType) TraceRoundRectangle(&mvg_info,
+        primitive_info[j].point,primitive_info[j+1].point,
+        primitive_info[j+2].point);
+      primitive_info=(*mvg_info.primitive_info);
+      if (status == MagickFalse)
+        break;
+      i=j+(ssize_t) primitive_info[j].coordinates;
+      break;
+    }
+    case ArcPrimitive:
+    {
+      if (primitive_info[j].coordinates != 3)
+        {
+          status=MagickFalse;
+          break;
+        }
+      status&=(MagickStatusType) TraceArc(&mvg_info,primitive_info[j].point,
+        primitive_info[j+1].point,primitive_info[j+2].point);
+      primitive_info=(*mvg_info.primitive_info);
+      if (status == MagickFalse)
+        break;
+      i=j+(ssize_t) primitive_info[j].coordinates;
+      break;
+    }
+    case EllipsePrimitive:
+    {
+      if (primitive_info[j].coordinates != 3)
+        {
+          status=MagickFalse;
+          break;
+        }
+      if ((primitive_info[j+1].point.x < 0.0) ||
+          (primitive_info[j+1].point.y < 0.0))
+        {
+          status=MagickFalse;
+          break;
+        }
+      status&=(MagickStatusType) TraceEllipse(&mvg_info,
+        primitive_info[j].point,primitive_info[j+1].point,
+        primitive_info[j+2].point);
+      primitive_info=(*mvg_info.primitive_info);
+      if (status == MagickFalse)
+        break;
+      i=j+(ssize_t) primitive_info[j].coordinates;
+      break;
+    }
+    case CirclePrimitive:
+    {
+      if (primitive_info[j].coordinates != 2)
+        {
+          status=MagickFalse;
+          break;
+        }
+      status&=(MagickStatusType) TraceCircle(&mvg_info,
+        primitive_info[j].point,primitive_info[j+1].point);
+      primitive_info=(*mvg_info.primitive_info);
+      if (status == MagickFalse)
+        break;
+      i=j+(ssize_t) primitive_info[j].coordinates;
+      break;
+    }
+    case PolylinePrimitive:
+    {
+      if (primitive_info[j].coordinates < 1)
+        {
+          status=MagickFalse;
+          break;
+        }
+      break;
+    }
+    case PolygonPrimitive:
+    {
+      if (primitive_info[j].coordinates < 3)
+        {
+          status=MagickFalse;
+          break;
+        }
+      primitive_info[i]=primitive_info[j];
+      primitive_info[i].coordinates=0;
+      primitive_info[j].coordinates++;
+      primitive_info[j].closed_subpath=MagickTrue;
+      i++;
+      break;
+    }
+    case BezierPrimitive:
+    {
+      if (primitive_info[j].coordinates < 3)
+        {
+          status=MagickFalse;
+          break;
+        }
+      status&=(MagickStatusType) TraceBezier(&mvg_info,
+        primitive_info[j].coordinates);
+      primitive_info=(*mvg_info.primitive_info);
+      if (status == MagickFalse)
+        break;
+      i=j+(ssize_t) primitive_info[j].coordinates;
+      break;
+    }
+    case PathPrimitive:
+    {
+      coordinates=(double) TracePath(&mvg_info,token,exception);
+      primitive_info=(*mvg_info.primitive_info);
+      if (status == MagickFalse)
+        break;
+      if (coordinates < 0.0)
+        {
+          status=MagickFalse;
+          break;
+        }
+      i=(ssize_t) (j+coordinates);
+      break;
+    }
+    case AlphaPrimitive:
+    case ColorPrimitive:
+    {
+      ssize_t
+        method;
+
+      if (primitive_info[j].coordinates != 1)
+        {
+          status=MagickFalse;
+          break;
+        }
+      (void) GetNextToken(q,&q,extent,token);
+      method=ParseCommandOption(MagickMethodOptions,MagickFalse,token);
+      if (method == -1)
+        {
+          status=MagickFalse;
+          break;
+        }
+      primitive_info[j].method=(PaintMethod) method;
+      break;
+    }
+    case TextPrimitive:
+    {
+      if (primitive_info[j].coordinates != 1)
+        {
+          status=MagickFalse;
+          break;
+        }
+      if (*token != ',')
+        (void) GetNextToken(q,&q,extent,token);
+      (void) CloneString(&primitive_info[j].text,token);
+      /*
+        Compute text cursor offset.
+      */
+      clone_info=CloneDrawInfo((ImageInfo *) NULL,graphic_context[n]);
+      if ((fabs(mvg_info.point.x-primitive_info->point.x) < MagickEpsilon) &&
+          (fabs(mvg_info.point.y-primitive_info->point.y) < MagickEpsilon))
+        {
+          mvg_info.point=primitive_info->point;
+          primitive_info->point.x+=cursor;
+        }
+      else
+        {
+          mvg_info.point=primitive_info->point;
+          cursor=0.0;
+        }
+      clone_info->render=MagickFalse;
+      clone_info->text=AcquireString(token);
+      status&=(MagickStatusType) GetTypeMetrics(image,clone_info,
+        &metrics,exception);
+      clone_info=DestroyDrawInfo(clone_info);
+      cursor+=metrics.width;
+      if (graphic_context[n]->compliance != SVGCompliance)
+        cursor=0.0;
+      break;
+    }
+    case ImagePrimitive:
+    {
+      if (primitive_info[j].coordinates != 2)
+        {
+          status=MagickFalse;
+          break;
+        }
+      (void) GetNextToken(q,&q,extent,token);
+      (void) CloneString(&primitive_info[j].text,token);
+      break;
+    }
+  }
+  mvg_info.offset=i;
+  (*state->q)=q;
+  (*state->coordinates)=coordinates;
+  (*state->cursor)=cursor;
+  (*state->status)=status;
+  (*state->mvg_info)=mvg_info;
+  (*state->primitive_info)=primitive_info;
+  (*state->i)=i;
+}
+
 static MagickBooleanType RenderMVGContent(Image *image,
   const DrawInfo *draw_info,const size_t depth,ExceptionInfo *exception)
 {
@@ -3410,9 +3723,9 @@ static MagickBooleanType RenderMVGContent(Image *image,
     metrics;
 
   const MVGRenderState
-    render_state = { &token, &q, &coordinates, exception, image, &status,
-      &mvg_info, &primitive_info, &primitive_type, &extent, &number_points, &i,
-      &j, &x };
+    render_state = { &token, &q, &coordinates, &cursor, &graphic_context,
+      exception, image, &status, &mvg_info, &primitive_info, &primitive_type,
+      &extent, &number_points, &i, &j, &n, &x };
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -4983,260 +5296,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     ReserveMVGPrimitiveExtent(&render_state);
     if (status == MagickFalse)
       break;
-    mvg_info.offset=j;
-    switch (primitive_type)
-    {
-      case PointPrimitive:
-      default:
-      {
-        if (primitive_info[j].coordinates != 1)
-          {
-            status=MagickFalse;
-            break;
-          }
-        status&=(MagickStatusType) TracePoint(primitive_info+j,
-          primitive_info[j].point);
-        primitive_info=(*mvg_info.primitive_info);
-        if (status == MagickFalse)
-          break;
-        i=j+(ssize_t) primitive_info[j].coordinates;
-        break;
-      }
-      case LinePrimitive:
-      {
-        if (primitive_info[j].coordinates != 2)
-          {
-            status=MagickFalse;
-            break;
-          }
-        status&=(MagickStatusType) TraceLine(primitive_info+j,
-          primitive_info[j].point,primitive_info[j+1].point);
-        primitive_info=(*mvg_info.primitive_info);
-        if (status == MagickFalse)
-          break;
-        i=j+(ssize_t) primitive_info[j].coordinates;
-        break;
-      }
-      case RectanglePrimitive:
-      {
-        if (primitive_info[j].coordinates != 2)
-          {
-            status=MagickFalse;
-            break;
-          }
-        status&=(MagickStatusType) TraceRectangle(primitive_info+j,
-          primitive_info[j].point,primitive_info[j+1].point);
-        primitive_info=(*mvg_info.primitive_info);
-        if (status == MagickFalse)
-          break;
-        i=j+(ssize_t) primitive_info[j].coordinates;
-        break;
-      }
-      case RoundRectanglePrimitive:
-      {
-        if (primitive_info[j].coordinates != 3)
-          {
-            status=MagickFalse;
-            break;
-          }
-        if ((primitive_info[j+2].point.x < 0.0) ||
-            (primitive_info[j+2].point.y < 0.0))
-          {
-            status=MagickFalse;
-            break;
-          }
-        if ((primitive_info[j+1].point.x-primitive_info[j].point.x) < 0.0)
-          {
-            status=MagickFalse;
-            break;
-          }
-        if ((primitive_info[j+1].point.y-primitive_info[j].point.y) < 0.0)
-          {
-            status=MagickFalse;
-            break;
-          }
-        status&=(MagickStatusType) TraceRoundRectangle(&mvg_info,
-          primitive_info[j].point,primitive_info[j+1].point,
-          primitive_info[j+2].point);
-        primitive_info=(*mvg_info.primitive_info);
-        if (status == MagickFalse)
-          break;
-        i=j+(ssize_t) primitive_info[j].coordinates;
-        break;
-      }
-      case ArcPrimitive:
-      {
-        if (primitive_info[j].coordinates != 3)
-          {
-            status=MagickFalse;
-            break;
-          }
-        status&=(MagickStatusType) TraceArc(&mvg_info,primitive_info[j].point,
-          primitive_info[j+1].point,primitive_info[j+2].point);
-        primitive_info=(*mvg_info.primitive_info);
-        if (status == MagickFalse)
-          break;
-        i=j+(ssize_t) primitive_info[j].coordinates;
-        break;
-      }
-      case EllipsePrimitive:
-      {
-        if (primitive_info[j].coordinates != 3)
-          {
-            status=MagickFalse;
-            break;
-          }
-        if ((primitive_info[j+1].point.x < 0.0) ||
-            (primitive_info[j+1].point.y < 0.0))
-          {
-            status=MagickFalse;
-            break;
-          }
-        status&=(MagickStatusType) TraceEllipse(&mvg_info,
-          primitive_info[j].point,primitive_info[j+1].point,
-          primitive_info[j+2].point);
-        primitive_info=(*mvg_info.primitive_info);
-        if (status == MagickFalse)
-          break;
-        i=j+(ssize_t) primitive_info[j].coordinates;
-        break;
-      }
-      case CirclePrimitive:
-      {
-        if (primitive_info[j].coordinates != 2)
-          {
-            status=MagickFalse;
-            break;
-          }
-        status&=(MagickStatusType) TraceCircle(&mvg_info,
-          primitive_info[j].point,primitive_info[j+1].point);
-        primitive_info=(*mvg_info.primitive_info);
-        if (status == MagickFalse)
-          break;
-        i=j+(ssize_t) primitive_info[j].coordinates;
-        break;
-      }
-      case PolylinePrimitive:
-      {
-        if (primitive_info[j].coordinates < 1)
-          {
-            status=MagickFalse;
-            break;
-          }
-        break;
-      }
-      case PolygonPrimitive:
-      {
-        if (primitive_info[j].coordinates < 3)
-          {
-            status=MagickFalse;
-            break;
-          }
-        primitive_info[i]=primitive_info[j];
-        primitive_info[i].coordinates=0;
-        primitive_info[j].coordinates++;
-        primitive_info[j].closed_subpath=MagickTrue;
-        i++;
-        break;
-      }
-      case BezierPrimitive:
-      {
-        if (primitive_info[j].coordinates < 3)
-          {
-            status=MagickFalse;
-            break;
-          }
-        status&=(MagickStatusType) TraceBezier(&mvg_info,
-          primitive_info[j].coordinates);
-        primitive_info=(*mvg_info.primitive_info);
-        if (status == MagickFalse)
-          break;
-        i=j+(ssize_t) primitive_info[j].coordinates;
-        break;
-      }
-      case PathPrimitive:
-      {
-        coordinates=(double) TracePath(&mvg_info,token,exception);
-        primitive_info=(*mvg_info.primitive_info);
-        if (status == MagickFalse)
-          break;
-        if (coordinates < 0.0)
-          {
-            status=MagickFalse;
-            break;
-          }
-        i=(ssize_t) (j+coordinates);
-        break;
-      }
-      case AlphaPrimitive:
-      case ColorPrimitive:
-      {
-        ssize_t
-          method;
-
-        if (primitive_info[j].coordinates != 1)
-          {
-            status=MagickFalse;
-            break;
-          }
-        (void) GetNextToken(q,&q,extent,token);
-        method=ParseCommandOption(MagickMethodOptions,MagickFalse,token);
-        if (method == -1)
-          {
-            status=MagickFalse;
-            break;
-          }
-        primitive_info[j].method=(PaintMethod) method;
-        break;
-      }
-      case TextPrimitive:
-      {
-        if (primitive_info[j].coordinates != 1)
-          {
-            status=MagickFalse;
-            break;
-          }
-        if (*token != ',')
-          (void) GetNextToken(q,&q,extent,token);
-        (void) CloneString(&primitive_info[j].text,token);
-        /*
-          Compute text cursor offset.
-        */
-        clone_info=CloneDrawInfo((ImageInfo *) NULL,graphic_context[n]);
-        if ((fabs(mvg_info.point.x-primitive_info->point.x) < MagickEpsilon) &&
-            (fabs(mvg_info.point.y-primitive_info->point.y) < MagickEpsilon))
-          {
-            mvg_info.point=primitive_info->point;
-            primitive_info->point.x+=cursor;
-          }
-        else
-          {
-            mvg_info.point=primitive_info->point;
-            cursor=0.0;
-          }
-        clone_info->render=MagickFalse;
-        clone_info->text=AcquireString(token);
-        status&=(MagickStatusType) GetTypeMetrics(image,clone_info,
-          &metrics,exception);
-        clone_info=DestroyDrawInfo(clone_info);
-        cursor+=metrics.width;
-        if (graphic_context[n]->compliance != SVGCompliance)
-          cursor=0.0;
-        break;
-      }
-      case ImagePrimitive:
-      {
-        if (primitive_info[j].coordinates != 2)
-          {
-            status=MagickFalse;
-            break;
-          }
-        (void) GetNextToken(q,&q,extent,token);
-        (void) CloneString(&primitive_info[j].text,token);
-        break;
-      }
-    }
-    mvg_info.offset=i;
+    TraceMVGPrimitive(&render_state);
     if (status == 0)
       break;
     primitive_info[i].primitive=UndefinedPrimitive;
