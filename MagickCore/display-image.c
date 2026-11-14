@@ -20834,6 +20834,36 @@ static Image *XTileLoadImage(const XTileInput *input)
   return(tile_image);
 }
 
+static void XScaleTileEvent(Image *image,XWindows *windows,XEvent *event)
+{
+  double
+    scale_factor;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    height,
+    width;
+
+  /*
+    Tile image is relative to montage image configuration.
+  */
+  x=0;
+  y=0;
+  width=(unsigned int) image->columns;
+  height=(unsigned int) image->rows;
+  if (windows->image.crop_geometry != (char *) NULL)
+    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
+  scale_factor=(double) width/windows->image.ximage->width;
+  event->xbutton.x+=windows->image.x;
+  event->xbutton.x=(int) (scale_factor*event->xbutton.x+x+0.5);
+  scale_factor=(double) height/windows->image.ximage->height;
+  event->xbutton.y+=windows->image.y;
+  event->xbutton.y=(int) (scale_factor*event->xbutton.y+y+0.5);
+}
+
 static Image *XTileImage(Display *display,XResourceInfo *resource_info,
   XWindows *windows,Image *image,XEvent *event,ExceptionInfo *exception)
 {
@@ -20872,9 +20902,6 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
     x,
     y;
 
-  double
-    scale_factor;
-
   char
     *p,
     *q;
@@ -20889,21 +20916,7 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
   XTileInput
     input;
 
-  /*
-    Tile image is relative to montage image configuration.
-  */
-  x=0;
-  y=0;
-  width=(unsigned int) image->columns;
-  height=(unsigned int) image->rows;
-  if (windows->image.crop_geometry != (char *) NULL)
-    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
-  scale_factor=(double) width/windows->image.ximage->width;
-  event->xbutton.x+=windows->image.x;
-  event->xbutton.x=(int) (scale_factor*event->xbutton.x+x+0.5);
-  scale_factor=(double) height/windows->image.ximage->height;
-  event->xbutton.y+=windows->image.y;
-  event->xbutton.y=(int) (scale_factor*event->xbutton.y+y+0.5);
+  XScaleTileEvent(image,windows,event);
   /*
     Determine size and location of each tile in the visual image directory.
   */
