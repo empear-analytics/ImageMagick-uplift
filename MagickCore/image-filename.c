@@ -255,12 +255,9 @@ typedef struct _FilenameTargets
     **cursor;
 } FilenameTargets;
 
-static MagickBooleanType ExpandFilenameTail(
+static MagickBooleanType ExpandFilenameOption(
   const FilenameExpansion *expansion,const FilenameTargets *targets)
 {
-  const char
-    *const start = expansion->start;
-
   char
     *const filename = expansion->filename;
 
@@ -282,35 +279,51 @@ static MagickBooleanType ExpandFilenameTail(
   char
     pattern[MagickPathExtent];
 
+  const char
+    *end = strchr((*cursor),']'),
+    *option = (const char *) NULL;
+
+  size_t
+    extent,
+    option_length;
+
+  if (end == (const char *) NULL)
+    return(MagickTrue);
+  extent=(size_t) (end-(*cursor)-1);
+  if (extent >= sizeof(pattern))
+    return(MagickTrue);
+  (void) CopyMagickString(pattern,(*cursor)+1,extent+1);
+  pattern[extent]='\0';
+  option=GetFilenameOption(image_info,image,pattern,exception);
+  if (option == (const char *) NULL)
+    return(MagickTrue);
+  option_length=strlen(option);
+  if (((*p)-filename+(ssize_t) option_length) >= MagickPathExtent)
+    return(MagickFalse);
+  (void) CopyMagickString((*p),option,(size_t) (MagickPathExtent-
+    ((*p)-filename)));
+  (*p)+=option_length;
+  (*cursor)=end+1;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ExpandFilenameTail(
+  const FilenameExpansion *expansion,const FilenameTargets *targets)
+{
+  const char
+    *const start = expansion->start;
+
+  char
+    *const filename = expansion->filename;
+
+  char
+    **const p = targets->p;
+
+  const char
+    **const cursor = targets->cursor;
+
   if (*(*cursor) == '[')
-    {
-      const char
-        *end = strchr((*cursor),']'),
-        *option = (const char *) NULL;
-
-      size_t
-        extent,
-        option_length;
-
-      if (end == (const char *) NULL)
-        return(MagickTrue);
-      extent=(size_t) (end-(*cursor)-1);
-      if (extent >= sizeof(pattern))
-        return(MagickTrue);
-      (void) CopyMagickString(pattern,(*cursor)+1,extent+1);
-      pattern[extent]='\0';
-      option=GetFilenameOption(image_info,image,pattern,exception);
-      if (option == (const char *) NULL)
-        return(MagickTrue);
-      option_length=strlen(option);
-      if (((*p)-filename+(ssize_t) option_length) >= MagickPathExtent)
-        return(MagickFalse);
-      (void) CopyMagickString((*p),option,(size_t) (MagickPathExtent-
-        ((*p)-filename)));
-      (*p)+=option_length;
-      (*cursor)=end+1;
-      return(MagickTrue);
-    }
+    return(ExpandFilenameOption(expansion,targets));
   /*
     Invalid or unsupported specifier — treat as literal.
   */
