@@ -460,6 +460,12 @@ MagickExport MagickBooleanType SetImageAlpha(Image *image,const Quantum alpha,
   return(status);
 }
 
+static inline MagickBooleanType IsBackgroundAlphaPending(const Image *image)
+{
+  return(((image->background_color.alpha_trait != UndefinedPixelTrait) &&
+    ((image->alpha_trait & BlendPixelTrait) == 0)) ? MagickTrue : MagickFalse);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -508,8 +514,7 @@ MagickExport MagickBooleanType SetImageBackgroundColor(Image *image,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
   if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
     return(MagickFalse);
-  if ((image->background_color.alpha_trait != UndefinedPixelTrait) &&
-      ((image->alpha_trait & BlendPixelTrait) == 0))
+  if (IsBackgroundAlphaPending(image) != MagickFalse)
     (void) SetImageAlphaChannel(image,ActivateAlphaChannel,exception);
   ConformPixelInfo(image,&image->background_color,&background,exception);
   /*
