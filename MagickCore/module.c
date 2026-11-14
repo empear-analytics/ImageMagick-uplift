@@ -402,6 +402,20 @@ static MagickBooleanType IsModuleMatch(const char *name,const char *pattern,
   return(GlobExpression(name,pattern,MagickFalse));
 }
 
+static void StripModuleNamePrefix(char *module)
+{
+  if (LocaleNCompare("IM_MOD_",module,7) == 0)
+    {
+      (void) CopyMagickString(module,module+10,MagickPathExtent);
+      module[strlen(module)-1]='\0';
+    }
+  else if (LocaleNCompare("FILTER_",module,7) == 0)
+    {
+      (void) CopyMagickString(module,module+10,MagickPathExtent);
+      module[strlen(module)-1]='\0';
+    }
+}
+
 static MagickBooleanType GetModuleListPath(const MagickModuleType type,
   char *module_path,ExceptionInfo *exception)
 {
@@ -501,16 +515,7 @@ MagickExport char **GetModuleList(const char *pattern,
     */
     modules[i]=AcquireString((char *) NULL);
     GetPathComponent(entry->d_name,BasePath,modules[i]);
-    if (LocaleNCompare("IM_MOD_",modules[i],7) == 0)
-      {
-        (void) CopyMagickString(modules[i],modules[i]+10,MagickPathExtent);
-        modules[i][strlen(modules[i])-1]='\0';
-      }
-    else if (LocaleNCompare("FILTER_",modules[i],7) == 0)
-      {
-        (void) CopyMagickString(modules[i],modules[i]+10,MagickPathExtent);
-        modules[i][strlen(modules[i])-1]='\0';
-      }
+    StripModuleNamePrefix(modules[i]);
     i++;
   }
   buffer=(struct dirent *) RelinquishMagickMemory(buffer);
