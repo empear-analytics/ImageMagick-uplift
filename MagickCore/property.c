@@ -2187,6 +2187,13 @@ static MagickBooleanType ReadEXIFProfileHeader(const StringInfo *profile,
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsEXIFDirectoryOutside(
+  const unsigned char *directory,const unsigned char *exif,const size_t length)
+{
+  return(((directory < exif) || (directory > (exif+length-2))) ? MagickTrue :
+    MagickFalse);
+}
+
 static void GetEXIFProperty(const Image *image,const char *property,
   ExceptionInfo *exception)
 {
@@ -2260,7 +2267,7 @@ static void GetEXIFProperty(const Image *image,const char *property,
         entry=directory_stack[level].entry;
         tag_offset=directory_stack[level].offset;
       }
-    if ((directory < exif) || (directory > (exif+length-2)))
+    if (IsEXIFDirectoryOutside(directory,exif,length) != MagickFalse)
       break;
     walk.image=image;
     walk.property=property;
