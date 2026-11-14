@@ -17048,6 +17048,128 @@ Lane: b
 
 ---
 
+## Recipe PT - Peel a Leaving Label Set out of a Selection into a Membership Table
+
+**Use when:** CodeScene reports *Complex Method* on a function whose `switch` holds a
+group of many labels that Recipe PL would peel, and the file has six functions or fewer,
+so that PL's label-run predicate (itself a *Complex Method*) and the seventh function it
+adds (which switches *Overall Code Complexity* on) each lower the score, and Recipe TB
+could only follow in a later commit. `quantum-type.c`'s `SetQuantumImageType`: seven
+colour-separation quantum types set `image->type=ColorSeparationType;` (cc 15); PL alone
+measured 9.58 to 8.92, PL and TB as two steps can never pass the pre-commit gate.
+
+**Not covered by:** Recipe PL, whose predicate keeps the labels as a `switch` and whose
+step 5 sends Recipe TB to a commit of its own; Recipe TB, which replaces a function that
+already is the label run, and never moves a group out of a `switch`; Recipe KP, whose
+peeled groups each carry their own constant; Recipe EM, which starts from an `||`
+chain.
+
+**How:**
+
+1. The `switch (e)` and the peeled group `G` meet Recipe PL step 1 (or its step 6 tail
+   form), every label of `G` an enumeration constant, and `G` has at least two labels.
+   The function is not called per pixel or per channel (check its callers by reading).
+2. Directly above the function (above its doc-comment banner) write Recipe TB step 3's
+   membership table: `static const T Names[] = { L1, ..., Ln };`, `T` the declared type
+   of `e`, the labels of `G` in their order, one per line.
+3. Below the table write the predicate as TB step 4 writes it: `static MagickBooleanType
+   IsName(const T x)` with a local `size_t i;`, the loop `for (i=0; i <
+   (sizeof(Names)/sizeof(*Names)); i++) if (Names[i] == x) return(MagickTrue);` and
+   `return(MagickFalse);`.
+4. Replace `G` as Recipe PL step 3 (or step 6) does: delete it from the `switch`, and
+   directly before the `switch` write `if (IsName(e) != MagickFalse)` followed by `G`'s
+   statement (step 6: `{ <statements> return; }`).
+5. Check by script that the table holds exactly the labels of `G`, each once and in
+   their order, and that the kept `switch` is the original with `G` taken out.
+   `refactor_guard.py`: `WARN` listing only the loop's `0` added; `--calls` adds only the
+   predicate.
+6. When a smaller step on the same function (Recipe PL on a short group whose predicate
+   is no *Complex Method*) dips alone because it adds the seventh function, it may join
+   this step under rule 1 (blocks of one function, different recipes), the message
+   giving each one's score alone.
+
+**Before:**
+
+```c
+  switch (quantum_type)
+  {
+    case IndexQuantum:
+    ...
+    case CyanQuantum:
+    case MagentaQuantum:
+    ...
+    case MultispectralQuantum:
+    {
+      image->type=ColorSeparationType;
+      break;
+    }
+    default:
+    {
+      image->type=TrueColorType;
+      break;
+    }
+  }
+}
+```
+
+**After:**
+
+```c
+static const QuantumType
+  ColorSeparationQuantums[] =
+  {
+    CyanQuantum,
+    MagentaQuantum,
+    ...
+    MultispectralQuantum
+  };
+
+static MagickBooleanType IsColorSeparationQuantum(
+  const QuantumType quantum_type)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(ColorSeparationQuantums)/sizeof(*ColorSeparationQuantums)); i++)
+    if (ColorSeparationQuantums[i] == quantum_type)
+      return(MagickTrue);
+  return(MagickFalse);
+}
+...
+  if (IsColorSeparationQuantum(quantum_type) != MagickFalse)
+    {
+      image->type=ColorSeparationType;
+      return;
+    }
+  switch (quantum_type)
+  {
+    case IndexQuantum:
+    ...
+```
+
+**Careful:**
+
+- Why the behaviour is the same: Recipe PL's argument (the label sets are disjoint, so
+  removing `G` sends every other value where it went; in the tail form `return;` goes
+  where `G`'s `break;` went) combined with Recipe TB's membership argument (the loop
+  returns `MagickTrue` exactly for the table's elements, which are `G`'s labels, each of
+  `e`'s type). The predicate is the composition of the two recipes' results; nothing
+  else differs from doing them one after the other.
+- `e` is read once more, by the predicate, before the `switch`: it must have no side
+  effect (PL step 1 already requires no call, assignment or increment).
+- The lookup costs up to `n` comparisons instead of one jump; step 1 keeps it off
+  per-pixel paths.
+
+**Evidence level:** oracle (the cases that reach the function).
+
+**Provenance:** 2026-11-14, from `quantum-type.c`'s `SetQuantumImageType` (campaign B,
+M127 lane b round 7): six functions at 9.58, where PL alone (8.92), PL on the two index
+labels alone (9.02) and this step alone (9.09) each dip, and both together reach 10.0.
+Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -17427,3 +17549,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | LP | Step 6: `e` may be `*p` (a character read, the predicate takes `const char`), and `B` may be statements that stay in the function ending in the group's one `break;`, which the `if` form drops; Lane: b | `token-isglob.c`'s `IsGlob` (six glob characters setting `status=MagickTrue; break;`, cc 11) | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | PL | Step 6, tail form: in a `void` function whose last statement is the `switch`, a group of statements ending in its one `break;` counts as leaving and is peeled as `{ <statements> return; }`; Lane: b | `quantum-type.c`'s `SetQuantumImageType` (seven colour-separation labels setting `image->type`) | mandate (2026-10-24) |
 | 2026-11-13 | AMEND | KC | Step 7: groups `v=x; break;` with a non-literal `x` stay, with `default:`, in a kept `switch` that is step 4's `else` branch; Lane: b | `quantum-type.c`'s `GetQuantumChannels` (twelve literal channel counts and `MultispectralQuantum`'s `GetImageChannels(image)`) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | PT | Peel a Leaving Label Set out of a Selection into a Membership Table: PL's peel with TB's table predicate in one step, for a file of six functions where PL's label-run predicate and the seventh function each dip; Lane: b | `quantum-type.c`'s `SetQuantumImageType` (PL alone 8.92, PT alone 9.09, with PL on the index labels 10.0 from 9.58) | mandate (2026-10-24) |

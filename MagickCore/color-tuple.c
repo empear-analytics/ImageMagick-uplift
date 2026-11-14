@@ -193,6 +193,22 @@ static void SelectIndexComponent(const PixelInfo *pixel,
   }
 }
 
+static void SetBlueComponent(const PixelInfo *pixel,double *color,
+  double *scale)
+{
+  *color=pixel->blue;
+  if (IsHueCompatibleColorspace(pixel->colorspace) != MagickFalse)
+    *scale=100.0f;
+  if (pixel->colorspace == LabColorspace)
+    (*color)-=QuantumRange/2.0;
+  if (IsLCHColorspace(pixel->colorspace) != MagickFalse)
+    (*color)*=360.0/255.0;
+  if (pixel->colorspace == XYZColorspace)
+    (*color)/=2.55;
+  if (pixel->colorspace == OklchColorspace)
+    *scale=1.0;
+}
+
 static void SelectBlueComponent(const PixelInfo *pixel,
   const PixelChannel channel,double *color,double *scale)
 {
@@ -200,17 +216,7 @@ static void SelectBlueComponent(const PixelInfo *pixel,
   {
     case BluePixelChannel:
     {
-      *color=pixel->blue;
-      if (IsHueCompatibleColorspace(pixel->colorspace) != MagickFalse)
-        *scale=100.0f;
-      if (pixel->colorspace == LabColorspace)
-        (*color)-=QuantumRange/2.0;
-      if (IsLCHColorspace(pixel->colorspace) != MagickFalse)
-        (*color)*=360.0/255.0;
-      if (pixel->colorspace == XYZColorspace)
-        (*color)/=2.55;
-      if (pixel->colorspace == OklchColorspace)
-        *scale=1.0;
+      SetBlueComponent(pixel,color,scale);
       break;
     }
     default:
@@ -243,6 +249,17 @@ static void AdjustGreenComponent(const PixelInfo *pixel,
   if ((compliance != NoCompliance) &&
       (IsLabCompatibleColorspace(pixel->colorspace) != MagickFalse))
     (*color)-=QuantumRange/2.0;
+}
+
+static void SetGreenComponent(const PixelInfo *pixel,
+  const ComplianceType compliance,double *color,double *scale)
+{
+  *color=pixel->green;
+  AdjustGreenComponent(pixel,compliance,color,scale);
+  if (pixel->colorspace == XYZColorspace)
+    (*color)/=2.55;
+  if (pixel->colorspace == OklchColorspace)
+    *scale=1.0;
 }
 
 static void SetAlphaComponent(const PixelInfo *pixel,
@@ -284,12 +301,7 @@ MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
     }
     case GreenPixelChannel:
     {
-      color=pixel->green;
-      AdjustGreenComponent(pixel,compliance,&color,&scale);
-      if (pixel->colorspace == XYZColorspace)
-        color/=2.55;
-      if (pixel->colorspace == OklchColorspace)
-        scale=1.0;
+      SetGreenComponent(pixel,compliance,&color,&scale);
       break;
     }
     case AlphaPixelChannel:
@@ -433,19 +445,22 @@ static void ConcatenateHexColor(const PixelInfo *pixel,char *tuple)
     ConcatenateHexColorComponent(pixel,AlphaPixelChannel,tuple);
 }
 
+static void ConcatenateRGBComponents(const PixelInfo *color,char *tuple)
+{
+  ConcatenateColorComponent(color,RedPixelChannel,SVGCompliance,tuple);
+  (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+  ConcatenateColorComponent(color,GreenPixelChannel,SVGCompliance,tuple);
+  (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+  ConcatenateColorComponent(color,BluePixelChannel,SVGCompliance,tuple);
+}
+
 static void ConcatenateColorComponents(const PixelInfo *color,char *tuple)
 {
   if ((color->colorspace == LinearGRAYColorspace) ||
       (color->colorspace == GRAYColorspace))
     ConcatenateColorComponent(color,GrayPixelChannel,SVGCompliance,tuple);
   else
-    {
-      ConcatenateColorComponent(color,RedPixelChannel,SVGCompliance,tuple);
-      (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-      ConcatenateColorComponent(color,GreenPixelChannel,SVGCompliance,tuple);
-      (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-      ConcatenateColorComponent(color,BluePixelChannel,SVGCompliance,tuple);
-    }
+    ConcatenateRGBComponents(color,tuple);
   if (color->colorspace == CMYKColorspace)
     {
       (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
@@ -458,22 +473,11 @@ static void ConcatenateColorComponents(const PixelInfo *color,char *tuple)
     }
 }
 
-MagickExport void GetColorTuple(const PixelInfo *pixel,
-  const MagickBooleanType hex,char *tuple)
+static void ConcatenateColorFunction(const PixelInfo *pixel,char *tuple)
 {
   PixelInfo
     color;
 
-  assert(pixel != (const PixelInfo *) NULL);
-  assert(tuple != (char *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",tuple);
-  *tuple='\0';
-  if (hex != MagickFalse)
-    {
-      ConcatenateHexColor(pixel,tuple);
-      return;
-    }
   /*
     Convert pixel to rgb() or cmyk() color.
   */
@@ -488,5 +492,21 @@ MagickExport void GetColorTuple(const PixelInfo *pixel,
   ConcatenateColorComponents(&color,tuple);
   (void) ConcatenateMagickString(tuple,")",MagickPathExtent);
   LocaleLower(tuple);
+}
+
+MagickExport void GetColorTuple(const PixelInfo *pixel,
+  const MagickBooleanType hex,char *tuple)
+{
+  assert(pixel != (const PixelInfo *) NULL);
+  assert(tuple != (char *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",tuple);
+  *tuple='\0';
+  if (hex != MagickFalse)
+    {
+      ConcatenateHexColor(pixel,tuple);
+      return;
+    }
+  ConcatenateColorFunction(pixel,tuple);
   return;
 }

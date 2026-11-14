@@ -814,6 +814,21 @@ static MagickBooleanType
     const size_t);
 #endif
 
+static void SetBuiltinColorInfo(ColorInfo *color_info,const ColormapInfo *p)
+{
+  (void) memset(color_info,0,sizeof(*color_info));
+  color_info->path=(char *) "[built-in]";
+  color_info->name=(char *) p->name;
+  GetPixelInfo((Image *) NULL,&color_info->color);
+  color_info->color.red=(double) ScaleCharToQuantum(p->red);
+  color_info->color.green=(double) ScaleCharToQuantum(p->green);
+  color_info->color.blue=(double) ScaleCharToQuantum(p->blue);
+  color_info->color.alpha=(double) QuantumRange*(double) p->alpha;
+  color_info->compliance=(ComplianceType) p->compliance;
+  color_info->exempt=MagickTrue;
+  color_info->signature=MagickCoreSignature;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -899,17 +914,7 @@ static LinkedListInfo *AcquireColorCache(const char *filename,
           ResourceLimitError,"MemoryAllocationFailed","`%s'",p->name);
         continue;
       }
-    (void) memset(color_info,0,sizeof(*color_info));
-    color_info->path=(char *) "[built-in]";
-    color_info->name=(char *) p->name;
-    GetPixelInfo((Image *) NULL,&color_info->color);
-    color_info->color.red=(double) ScaleCharToQuantum(p->red);
-    color_info->color.green=(double) ScaleCharToQuantum(p->green);
-    color_info->color.blue=(double) ScaleCharToQuantum(p->blue);
-    color_info->color.alpha=(double) QuantumRange*(double) p->alpha;
-    color_info->compliance=(ComplianceType) p->compliance;
-    color_info->exempt=MagickTrue;
-    color_info->signature=MagickCoreSignature;
+    SetBuiltinColorInfo(color_info,p);
     status&=(MagickStatusType) AppendValueToLinkedList(cache,color_info);
     if (status == MagickFalse)
       (void) ThrowMagickException(exception,GetMagickModule(),
@@ -1048,6 +1053,14 @@ static const ColorInfo *GetFirstColorInfo(const ElementInfo *p,
   return(color);
 }
 
+static void CopyColorName(const char *name,char *colorname)
+{
+  *colorname='\0';
+  if (name != (const char *) NULL)
+    (void) CopyMagickString(colorname,name,MagickPathExtent);
+  StripColorNameWhitespace(colorname);
+}
+
 MagickExport const ColorInfo *GetColorCompliance(const char *name,
   const ComplianceType compliance,ExceptionInfo *exception)
 {
@@ -1066,10 +1079,7 @@ MagickExport const ColorInfo *GetColorCompliance(const char *name,
   /*
     Strip names of whitespace.
   */
-  *colorname='\0';
-  if (name != (const char *) NULL)
-    (void) CopyMagickString(colorname,name,MagickPathExtent);
-  StripColorNameWhitespace(colorname);
+  CopyColorName(name,colorname);
   /*
     Search for color tag.
   */
@@ -1186,14 +1196,47 @@ static int ColorInfoCompare(const void *x,const void *y)
 }
 #endif
 
+static ssize_t CollectColorInfo(const char *pattern,const ColorInfo **colors)
+{
+  ElementInfo
+    *p;
+
+  ssize_t
+    i;
+
+  p=GetHeadElementInLinkedList(color_cache);
+  for (i=0; p != (ElementInfo *) NULL; )
+  {
+    const ColorInfo
+      *color;
+
+    color=(const ColorInfo *) p->value;
+    if ((color->stealth == MagickFalse) &&
+        (GlobExpression(color->name,pattern,MagickFalse) != MagickFalse))
+      colors[i++]=color;
+    p=p->next;
+  }
+  return(i);
+}
+
+static const ColorInfo **SortColorInfoList(const ColorInfo **colors,
+  const ssize_t i)
+{
+  if (i == 0)
+    colors=(const ColorInfo **) RelinquishMagickMemory((void*) colors);
+  else
+    {
+      qsort((void *) colors,(size_t) i,sizeof(*colors),ColorInfoCompare);
+      colors[i]=(ColorInfo *) NULL;
+    }
+  return(colors);
+}
+
 MagickExport const ColorInfo **GetColorInfoList(const char *pattern,
   size_t *number_colors,ExceptionInfo *exception)
 {
   const ColorInfo
     **colors;
-
-  ElementInfo
-    *p;
 
   ssize_t
     i;
@@ -1210,26 +1253,9 @@ MagickExport const ColorInfo **GetColorInfoList(const char *pattern,
   if (colors == (const ColorInfo **) NULL)
     return((const ColorInfo **) NULL);
   LockSemaphoreInfo(color_semaphore);
-  p=GetHeadElementInLinkedList(color_cache);
-  for (i=0; p != (ElementInfo *) NULL; )
-  {
-    const ColorInfo
-      *color;
-
-    color=(const ColorInfo *) p->value;
-    if ((color->stealth == MagickFalse) &&
-        (GlobExpression(color->name,pattern,MagickFalse) != MagickFalse))
-      colors[i++]=color;
-    p=p->next;
-  }
+  i=CollectColorInfo(pattern,colors);
   UnlockSemaphoreInfo(color_semaphore);
-  if (i == 0)
-    colors=(const ColorInfo **) RelinquishMagickMemory((void*) colors);
-  else
-    {
-      qsort((void *) colors,(size_t) i,sizeof(*colors),ColorInfoCompare);
-      colors[i]=(ColorInfo *) NULL;
-    }
+  colors=SortColorInfoList(colors,i);
   *number_colors=(size_t) i;
   return(colors);
 }
@@ -1507,12 +1533,27 @@ static void ListColorCompliance(FILE *file,const ColorInfo *color_info)
     (void) FormatLocaleFile(file,"XPM ");
 }
 
-MagickExport MagickBooleanType ListColorInfo(FILE *file,
-  ExceptionInfo *exception)
+static const char *ListColorEntry(FILE *file,const ColorInfo *color_info,
+  const char *path)
 {
   char
     tuple[MagickPathExtent];
 
+  if ((path == (const char *) NULL) ||
+      (LocaleCompare(path,color_info->path) != 0))
+    ListColorHeader(file,color_info);
+  path=color_info->path;
+  (void) FormatLocaleFile(file,"%-21.21s ",color_info->name);
+  GetColorTuple(&color_info->color,MagickFalse,tuple);
+  (void) FormatLocaleFile(file,"%-45.45s ",tuple);
+  ListColorCompliance(file,color_info);
+  (void) FormatLocaleFile(file,"\n");
+  return(path);
+}
+
+MagickExport MagickBooleanType ListColorInfo(FILE *file,
+  ExceptionInfo *exception)
+{
   const char
     *path;
 
@@ -1538,15 +1579,7 @@ MagickExport MagickBooleanType ListColorInfo(FILE *file,
   {
     if (color_info[i]->stealth != MagickFalse)
       continue;
-    if ((path == (const char *) NULL) ||
-        (LocaleCompare(path,color_info[i]->path) != 0))
-      ListColorHeader(file,color_info[i]);
-    path=color_info[i]->path;
-    (void) FormatLocaleFile(file,"%-21.21s ",color_info[i]->name);
-    GetColorTuple(&color_info[i]->color,MagickFalse,tuple);
-    (void) FormatLocaleFile(file,"%-45.45s ",tuple);
-    ListColorCompliance(file,color_info[i]);
-    (void) FormatLocaleFile(file,"\n");
+    path=ListColorEntry(file,color_info[i],path);
   }
   color_info=(const ColorInfo **) RelinquishMagickMemory((void *) color_info);
   (void) fflush(file);
@@ -2291,6 +2324,19 @@ static void SetQueriedColorspace(PixelInfo *color,const ssize_t type,
     }
 }
 
+static MagickStatusType ParseQueriedColorGeometry(const char *name,
+  const ssize_t i,GeometryInfo *geometry_info)
+{
+  MagickStatusType
+    flags;
+
+  if (i >= (ssize_t) strlen(name))
+    flags=ParseCSSColor(name,geometry_info);
+  else
+    flags=ParseCSSColor(name+i+1,geometry_info);
+  return(flags);
+}
+
 static MagickBooleanType QueryColorFunction(const char *name,
   const char *q,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2336,10 +2382,7 @@ static MagickBooleanType QueryColorFunction(const char *name,
       return(MagickFalse);
     }
   SetQueriedColorspace(color,type,icc_color);
-  if (i >= (ssize_t) strlen(name))
-    flags=ParseCSSColor(name,&geometry_info);
-  else
-    flags=ParseCSSColor(name+i+1,&geometry_info);
+  flags=ParseQueriedColorGeometry(name,i,&geometry_info);
   if (flags == 0)
     return(QueryColorFromCSSName(name,i,color,exception));
   SetColorFromGeometry(color,geometry_info,flags,scale);
@@ -2504,6 +2547,13 @@ static const char *GetQueryColorName(const char *name)
   return(name);
 }
 
+static const char *SkipColorNameSpaces(const char *name)
+{
+  while (isspace((int) ((unsigned char) *name)) != 0)
+    name++;
+  return(name);
+}
+
 MagickExport MagickBooleanType QueryColorCompliance(const char *name,
   const ComplianceType compliance,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2526,8 +2576,7 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
         "UnrecognizedColor","`%s'",name);
       return(MagickFalse);
     }
-  while (isspace((int) ((unsigned char) *name)) != 0)
-    name++;
+  name=SkipColorNameSpaces(name);
   GetPixelInfo((Image *) NULL,color);
   if (*name == '#')
     return(QueryHexColor(name,color,exception));
