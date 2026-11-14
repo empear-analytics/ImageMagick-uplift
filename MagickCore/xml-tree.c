@@ -2554,6 +2554,49 @@ static MagickBooleanType ThrowMissingTagEnd(const ssize_t l,
   return(MagickFalse);
 }
 
+static MagickBooleanType EndSelfClosingTag(const StartTagInfo *start_tag,
+  const StartTagTargets *targets)
+{
+  XMLTreeRoot
+    *const root = start_tag->root;
+
+  char
+    *const tag = start_tag->tag;
+
+  char
+    **const attributes = start_tag->attributes;
+
+  const ssize_t
+    l = start_tag->l;
+
+  const int
+    terminal = start_tag->terminal;
+
+  ExceptionInfo
+    *const exception = start_tag->exception;
+
+  char
+    **const p = targets->p;
+
+  size_t
+    *const ignore_depth = targets->ignore_depth;
+
+  /*
+    Self closing tag.
+  */
+  *(*p)++='\0';
+  if (IsTagNotClosed(*p,terminal) != MagickFalse)
+    return(ThrowMissingTagEnd(l,attributes,exception));
+  if ((*ignore_depth != 0) || (IsSkipTag(tag) != MagickFalse))
+    (void) DestroyXMLTreeAttributes(attributes);
+  else
+    {
+      ParseOpenTag(root,tag,attributes);
+      (void) ParseCloseTag(root,tag,exception);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType EndStartTag(const StartTagInfo *start_tag,
   const StartTagTargets *targets)
 {
@@ -2585,21 +2628,7 @@ static MagickBooleanType EndStartTag(const StartTagInfo *start_tag,
     c;
 
   if (**p == '/')
-    {
-      /*
-        Self closing tag.
-      */
-      *(*p)++='\0';
-      if (IsTagNotClosed(*p,terminal) != MagickFalse)
-        return(ThrowMissingTagEnd(l,attributes,exception));
-      if ((*ignore_depth != 0) || (IsSkipTag(tag) != MagickFalse))
-        (void) DestroyXMLTreeAttributes(attributes);
-      else
-        {
-          ParseOpenTag(root,tag,attributes);
-          (void) ParseCloseTag(root,tag,exception);
-        }
-    }
+    return(EndSelfClosingTag(start_tag,targets));
   else
     {
       c=(**p);
