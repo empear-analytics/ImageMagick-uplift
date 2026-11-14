@@ -364,8 +364,18 @@ static void ClipNexusPixel(const Image *image,
     ClipPixelChannels(image,mask,p,q);
 }
 
-static MagickBooleanType ClipPixelCacheNexus(Image *image,
-  NexusInfo *nexus_info,ExceptionInfo *exception)
+typedef enum
+{
+  ClipNexusMask,
+  CompositeNexusMask
+} NexusMaskSide;
+
+static void
+  MaskNexusPixel(const Image *,const Quantum *magick_restrict,
+    Quantum *magick_restrict);
+
+static inline MagickBooleanType ApplyNexusMask(Image *image,
+  NexusInfo *nexus_info,const NexusMaskSide side,ExceptionInfo *exception)
 {
   CacheInfo
     *magick_restrict cache_info;
@@ -382,12 +392,14 @@ static MagickBooleanType ClipPixelCacheNexus(Image *image,
   */
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((image->channels & WriteMaskChannel) == 0)
+  if ((image->channels & ((side == ClipNexusMask) ?
+    WriteMaskChannel : CompositeMaskChannel)) == 0)
     return(MagickTrue);
   if ((nexus_info->region.width == 0) || (nexus_info->region.height == 0))
     return(MagickTrue);
   cache_info=(CacheInfo *) image->cache;
-  if (cache_info == (CacheInfo *) NULL)
+  if (cache_info == ((side == ClipNexusMask) ? (CacheInfo *) NULL :
+      (Cache) NULL))
     return(MagickFalse);
   p=GetAuthenticPixelCacheNexus(image,nexus_info->region.x,nexus_info->region.y,
     nexus_info->region.width,nexus_info->region.height,
@@ -402,12 +414,19 @@ static MagickBooleanType ClipPixelCacheNexus(Image *image,
 
     for (x=0; x < (ssize_t) nexus_info->region.width; x++)
     {
-      ClipNexusPixel(image,p,q);
+      ((side == ClipNexusMask) ? ClipNexusPixel(image,p,q) :
+        MaskNexusPixel(image,p,q));
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
   }
   return(MagickTrue);
+}
+
+static MagickBooleanType ClipPixelCacheNexus(Image *image,
+  NexusInfo *nexus_info,ExceptionInfo *exception)
+{
+  return(ApplyNexusMask(image,nexus_info,ClipNexusMask,exception));
 }
 
 
@@ -2121,47 +2140,7 @@ static void MaskNexusPixel(const Image *image,
 static MagickBooleanType MaskPixelCacheNexus(Image *image,NexusInfo *nexus_info,
   ExceptionInfo *exception)
 {
-  CacheInfo
-    *magick_restrict cache_info;
-
-  Quantum
-    *magick_restrict p,
-    *magick_restrict q;
-
-  ssize_t
-    y;
-
-  /*
-    Apply composite mask.
-  */
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((image->channels & CompositeMaskChannel) == 0)
-    return(MagickTrue);
-  if ((nexus_info->region.width == 0) || (nexus_info->region.height == 0))
-    return(MagickTrue);
-  cache_info=(CacheInfo *) image->cache;
-  if (cache_info == (Cache) NULL)
-    return(MagickFalse);
-  p=GetAuthenticPixelCacheNexus(image,nexus_info->region.x,nexus_info->region.y,
-    nexus_info->region.width,nexus_info->region.height,
-    nexus_info->virtual_nexus,exception);
-  q=nexus_info->pixels;
-  if ((p == (Quantum *) NULL) || (q == (Quantum *) NULL))
-    return(MagickFalse);
-  for (y=0; y < (ssize_t) nexus_info->region.height; y++)
-  {
-    ssize_t
-      x;
-
-    for (x=0; x < (ssize_t) nexus_info->region.width; x++)
-    {
-      MaskNexusPixel(image,p,q);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-  }
-  return(MagickTrue);
+  return(ApplyNexusMask(image,nexus_info,CompositeNexusMask,exception));
 }
 
 /*
