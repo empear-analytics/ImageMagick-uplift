@@ -17645,6 +17645,97 @@ Lane: a
 
 ---
 
+## Recipe HF - Hoist a Struct Fill That Both Paths Repeat
+
+**Use when:** CodeScene reports *Large Method* (or *Code Duplication* inside one
+function) on a function that fills one struct local member by member in two places, one
+in an early-returning branch and one later (in a loop, say), the second repeating most
+of the first's assignments from values nothing changes in between, as `log.c`'s
+`TranslateEvent`: nine `event_text.<m>=<m>;` lines before `FormatLogEventXML` in the
+`xml` branch, which returns, and the same nine before every `TranslateLogSpecifier` in
+the format loop, where only `text` and `extent` change from one iteration to the next.
+
+**Not covered by:** Recipe RF, whose earlier fill already runs on every path to the
+later one; here the earlier fill sits in a branch the later one never follows. Recipe
+FI, which turns one fill into an initialiser; Recipe D, whose copies become calls.
+
+**How:**
+
+1. Two fills `F1` (in the branch `if (C) { F1 ... return ...; }`) and `F2` (after the
+   branch) of one struct local `s`, each a run of `s.m=e;` with `e` an identifier or a
+   member access, `F2` assigning a subset `K` of `F1`'s members from the same
+   expressions as `F1` plus the rest (`R`) from the same expressions too.
+2. Nothing from the statement before the branch to `F2`'s every execution writes a
+   variable that an expression of `K` reads, or writes `s` (check by reading every
+   statement and callee on those paths, loop back edges included: `&s` may only go to
+   `const` pointer parameters). The test `C` neither reads `s` nor has an effect on
+   anything the fill reads (a call such as `LocaleCompare` on other data).
+3. Move `F1` unchanged to directly before the branch; the branch keeps the rest.
+4. Delete from `F2` the assignments of the members of `K` whose expressions read
+   nothing written between the moved `F1` and `F2`; those of members whose expressions
+   do change (`text`, `extent`) stay in `F2`, in order.
+5. Run the oracle for the function; `obj_identical.sh` may differ (the stores move).
+
+**Before:**
+
+```c
+  extent=strlen(event)+MagickPathExtent;
+  if (LocaleCompare(log_info->format,"xml") == 0)
+    {
+      event_text.text=text;
+      ...
+      event_text.line=line;
+      FormatLogEventXML(&event_text,domain);
+      return(text);
+    }
+  ...
+    event_text.text=text;
+    event_text.extent=extent;
+    event_text.elapsed_time=elapsed_time;
+    ...
+    event_text.line=line;
+    TranslateLogSpecifier(&event_text,domain,p,&q);
+```
+
+**After:**
+
+```c
+  extent=strlen(event)+MagickPathExtent;
+  event_text.text=text;
+  ...
+  event_text.line=line;
+  if (LocaleCompare(log_info->format,"xml") == 0)
+    {
+      FormatLogEventXML(&event_text,domain);
+      return(text);
+    }
+  ...
+    event_text.text=text;
+    event_text.extent=extent;
+    TranslateLogSpecifier(&event_text,domain,p,&q);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. Stores to a local struct have no effect until it is
+  read. On the branch path the moved fill stores the same values (nothing between its
+  new and old place writes what it reads, step 2) before the same call reads them. On
+  the other path the members of `K` hold, at each `F2`, the values `F2` would have
+  stored, since nothing writes them or what their expressions read (step 2); the
+  members whose sources change are still stored where `F2` stored them.
+- A member a callee writes through a non-`const` `&s` refuses the deletion.
+
+**Evidence level:** oracle (cases that reach the function), with step 2 checked by
+reading.
+
+**Provenance:** 2026-11-14, from `log.c`'s `TranslateEvent` (campaign B, M127 lane a
+round 6): *Large Method* (78 lines) and *Complex Method*; this step and an E step on
+the log-info lookup took it out of *Large Method* (probe 7.93 to 8.03). Added by Claude
+Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: a
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -18030,3 +18121,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | SK | Name the Constant a Keyed Switch's Groups Differ In: a `static` function whose `switch` groups are one statement differing in one enumeration constant becomes that statement with a call of a new `switch` returning the constants; a sibling with the same key-to-constant map shares it; Lane: a | `image-mask.c`'s `AddImageMaskChannel` and `RemoveRegionMaskChannel` (*Code Duplication*, probe 8.81 to 9.38) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | SA | Pass the Sum a Callee Only Reads Whole: two `const` parameters of one integer type that a `static` function reads only as `(a+b)` become one parameter, each call passing `ea+eb` of side-effect-free operands; Lane: a | `image-append.c`'s `IsRightGapEdge` and `IsBottomGapEdge` (*Excess Number of Function Arguments*; probe 8.54 to 8.81) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | MX | Merge Axis Twins Through a Side Selector and a Struct of Two Parts: a chain of `static` functions and its other-axis mirror (columns for rows, swapped coordinate pairs, two struct types) become one chain over one struct with a side constant, `static inline` selectors and one function per swapped call; the two entries stay as one-call wrappers; Lane: a | `image-append.c`'s horizontal and vertical smush chains (*Code Duplication*, 8 functions; probe 8.81 to 10.0) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | HF | Hoist a Struct Fill That Both Paths Repeat: a member-by-member fill in an early-returning branch moves before the branch, and the later fill keeps only the members whose sources change in between; Lane: a | `log.c`'s `TranslateEvent` (nine `event_text` stores in the `xml` branch and in the format loop; with E, out of *Large Method*, probe 7.93 to 8.03) | mandate (2026-10-24) |
