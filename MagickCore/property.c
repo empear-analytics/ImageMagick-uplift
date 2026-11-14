@@ -4887,12 +4887,17 @@ static void TruncatePatternForMessage(char *pattern,const ssize_t offset)
     }
 }
 
+static inline MagickBooleanType IsEscapedPatternCharacter(const char *p)
+{
+  return(((*p == '\\') && (*(p+1) != '\0')) ? MagickTrue : MagickFalse);
+}
+
 static void ScanBracedPattern(char *pattern,ssize_t *offset,ssize_t *depth,
   const char **p)
 {
   for ((*offset)=0; (*offset) < (MagickPathExtent-1L) && (*(*p) != '\0'); )
   {
-    if ((*(*p) == '\\') && (*((*p)+1) != '\0'))
+    if (IsEscapedPatternCharacter(*p) != MagickFalse)
       {
         /*
           Skip escaped braces within braced pattern.
