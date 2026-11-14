@@ -1449,14 +1449,9 @@ MagickExport const Quantum *GetVirtualPixelQueue(const Image *image)
 %        const ssize_t y,const size_t columns,const size_t rows,
 %        ExceptionInfo *exception)
 %
-%  A description of each parameter follows:
-%
-%    o image: the image.
-%
-%    o x,y,columns,rows:  These values define the perimeter of a region of
-%      pixels.
-%
-%    o exception: return any errors or warnings in this structure.
+%  Its parameters are the image, the values x, y, columns and rows that define
+%  the perimeter of a region of pixels, and the exception structure that
+%  returns any errors or warnings.
 %
 */
 MagickExport const Quantum *GetVirtualPixels(const Image *image,
