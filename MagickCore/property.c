@@ -5193,6 +5193,106 @@ static MagickBooleanType SetImageDelayProperty(Image *image,
   return(MagickTrue);
 }
 
+typedef void
+  (*SetImageMemberMethod)(Image *,const ssize_t);
+
+typedef struct _EnumeratedPropertyInfo
+{
+  const char
+    *property;
+
+  CommandOption
+    option;
+
+  SetImageMemberMethod
+    set_member;
+} EnumeratedPropertyInfo;
+
+static void SetImageComposeMember(Image *image,const ssize_t value)
+{
+  image->compose=(CompositeOperator) value;
+}
+
+static void SetImageCompressionMember(Image *image,const ssize_t value)
+{
+  image->compression=(CompressionType) value;
+}
+
+static void SetImageDisposeMember(Image *image,const ssize_t value)
+{
+  image->dispose=(DisposeType) value;
+}
+
+static void SetImageGravityMember(Image *image,const ssize_t value)
+{
+  image->gravity=(GravityType) value;
+}
+
+static void SetImageIntensityMember(Image *image,const ssize_t value)
+{
+  image->intensity=(PixelIntensityMethod) value;
+}
+
+static void SetImageRenderingIntentMember(Image *image,const ssize_t value)
+{
+  image->rendering_intent=(RenderingIntent) value;
+}
+
+static void SetImageInterpolateMember(Image *image,const ssize_t value)
+{
+  image->interpolate=(PixelInterpolateMethod) value;
+}
+
+static void SetImageTypeMember(Image *image,const ssize_t value)
+{
+  image->type=(ImageType) value;
+}
+
+static void SetImageUnitsMember(Image *image,const ssize_t value)
+{
+  image->units=(ResolutionType) value;
+}
+
+static const EnumeratedPropertyInfo
+  EnumeratedProperties[] =
+  {
+    { "compose", MagickComposeOptions, SetImageComposeMember },
+    { "compress", MagickCompressOptions, SetImageCompressionMember },
+    { "dispose", MagickDisposeOptions, SetImageDisposeMember },
+    { "gravity", MagickGravityOptions, SetImageGravityMember },
+    { "intensity", MagickIntensityOptions, SetImageIntensityMember },
+    { "intent", MagickIntentOptions, SetImageRenderingIntentMember },
+    { "interpolate", MagickInterpolateOptions, SetImageInterpolateMember },
+    { "rendering-intent", MagickIntentOptions, SetImageRenderingIntentMember },
+    { "type", MagickTypeOptions, SetImageTypeMember },
+    { "units", MagickResolutionOptions, SetImageUnitsMember }
+  };
+
+static MagickBooleanType SetEnumeratedProperty(Image *image,
+  const char *property,const char *value,MagickBooleanType *result)
+{
+  ssize_t
+    i,
+    option;
+
+  for (i=0; i < (ssize_t) (sizeof(EnumeratedProperties)/
+       sizeof(*EnumeratedProperties)); i++)
+    if (LocaleCompare(EnumeratedProperties[i].property,property) == 0)
+      {
+        option=ParseCommandOption(EnumeratedProperties[i].option,MagickFalse,
+          value);
+        if (option < 0)
+          {
+            (*result)=MagickFalse;
+            return(MagickTrue);
+          }
+        EnumeratedProperties[i].set_member(image,option);
+        (*result)=MagickTrue;
+        return(MagickTrue);
+      }
+  return(MagickFalse);
+}
+
 MagickExport MagickBooleanType SetImageProperty(Image *image,
   const char *property,const char *value,ExceptionInfo *exception)
 {
@@ -5235,6 +5335,8 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
     Set attributes with known names or special prefixes
     return result is found, or break to set a free form property
   */
+  if (SetEnumeratedProperty(image,property,value,&status) != MagickFalse)
+    return(status);
   status=MagickTrue;
   switch (*property)
   {
@@ -5283,29 +5385,6 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
             return(MagickFalse); /* FUTURE: value exception?? */
           return(SetImageColorspace(image,(ColorspaceType) colorspace,exception));
         }
-      if (LocaleCompare("compose",property) == 0)
-        {
-          ssize_t
-            compose;
-
-          compose=ParseCommandOption(MagickComposeOptions,MagickFalse,value);
-          if (compose < 0)
-            return(MagickFalse); /* FUTURE: value exception?? */
-          image->compose=(CompositeOperator) compose;
-          return(MagickTrue);
-        }
-      if (LocaleCompare("compress",property) == 0)
-        {
-          ssize_t
-            compression;
-
-          compression=ParseCommandOption(MagickCompressOptions,MagickFalse,
-            value);
-          if (compression < 0)
-            return(MagickFalse); /* FUTURE: value exception?? */
-          image->compression=(CompressionType) compression;
-          return(MagickTrue);
-        }
       break; /* not an attribute, add as a property */
     }
     case 'D':
@@ -5337,17 +5416,6 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
       if (LocaleCompare("depth",property) == 0)
         {
           image->depth=StringToUnsignedLong(value);
-          return(MagickTrue);
-        }
-      if (LocaleCompare("dispose",property) == 0)
-        {
-          ssize_t
-            dispose;
-
-          dispose=ParseCommandOption(MagickDisposeOptions,MagickFalse,value);
-          if (dispose < 0)
-            return(MagickFalse); /* FUTURE: value exception?? */
-          image->dispose=(DisposeType) dispose;
           return(MagickTrue);
         }
       break; /* not an attribute, add as a property */
@@ -5385,17 +5453,6 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
           image->gamma=StringToDouble(value,(char **) NULL);
           return(MagickTrue);
         }
-      if (LocaleCompare("gravity",property) == 0)
-        {
-          ssize_t
-            gravity;
-
-          gravity=ParseCommandOption(MagickGravityOptions,MagickFalse,value);
-          if (gravity < 0)
-            return(MagickFalse); /* FUTURE: value exception?? */
-          image->gravity=(GravityType) gravity;
-          return(MagickTrue);
-        }
       break; /* not an attribute, add as a property */
     }
     case 'H':
@@ -5412,42 +5469,6 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
     case 'I':
     case 'i':
     {
-      if (LocaleCompare("intensity",property) == 0)
-        {
-          ssize_t
-            intensity;
-
-          intensity=ParseCommandOption(MagickIntensityOptions,MagickFalse,
-            value);
-          if (intensity < 0)
-            return(MagickFalse);
-          image->intensity=(PixelIntensityMethod) intensity;
-          return(MagickTrue);
-        }
-      if (LocaleCompare("intent",property) == 0)
-        {
-          ssize_t
-            rendering_intent;
-
-          rendering_intent=ParseCommandOption(MagickIntentOptions,MagickFalse,
-            value);
-          if (rendering_intent < 0)
-            return(MagickFalse); /* FUTURE: value exception?? */
-          image->rendering_intent=(RenderingIntent) rendering_intent;
-          return(MagickTrue);
-        }
-      if (LocaleCompare("interpolate",property) == 0)
-        {
-          ssize_t
-            interpolate;
-
-          interpolate=ParseCommandOption(MagickInterpolateOptions,MagickFalse,
-            value);
-          if (interpolate < 0)
-            return(MagickFalse); /* FUTURE: value exception?? */
-          image->interpolate=(PixelInterpolateMethod) interpolate;
-          return(MagickTrue);
-        }
 #if 0  /* Percent escape's sets values with this prefix: for later use
           Throwing an exception causes this setting to fail */
       if (LocaleNCompare("iptc:",property,5) == 0)
@@ -5523,18 +5544,6 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
     case 'R':
     case 'r':
     {
-      if (LocaleCompare("rendering-intent",property) == 0)
-        {
-          ssize_t
-            rendering_intent;
-
-          rendering_intent=ParseCommandOption(MagickIntentOptions,MagickFalse,
-            value);
-          if (rendering_intent < 0)
-            return(MagickFalse); /* FUTURE: value exception?? */
-          image->rendering_intent=(RenderingIntent) rendering_intent;
-          return(MagickTrue);
-        }
       break; /* not an attribute, add as a property */
     }
     case 'S':
@@ -5559,33 +5568,11 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
           geometry=DestroyString(geometry);
           return(MagickTrue);
         }
-      if (LocaleCompare("type",property) == 0)
-        {
-          ssize_t
-            type;
-
-          type=ParseCommandOption(MagickTypeOptions,MagickFalse,value);
-          if (type < 0)
-            return(MagickFalse);
-          image->type=(ImageType) type;
-          return(MagickTrue);
-        }
       break; /* not an attribute, add as a property */
     }
     case 'U':
     case 'u':
     {
-      if (LocaleCompare("units",property) == 0)
-        {
-          ssize_t
-            units;
-
-          units=ParseCommandOption(MagickResolutionOptions,MagickFalse,value);
-          if (units < 0)
-            return(MagickFalse); /* FUTURE: value exception?? */
-          image->units=(ResolutionType) units;
-          return(MagickTrue);
-        }
       break; /* not an attribute, add as a property */
     }
     case 'V':
