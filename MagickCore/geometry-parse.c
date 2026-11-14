@@ -361,6 +361,43 @@ static MagickBooleanType SkipGeometrySeparator(const int c,char **p,
   return(MagickTrue);
 }
 
+static MagickBooleanType StripGeometry(char *pedantic_geometry,
+  MagickStatusType *flags)
+{
+  char
+    *p;
+
+  int
+    c;
+
+  MagickStatusType
+    flag;
+
+  for (p=pedantic_geometry; *p != '\0'; )
+  {
+    if (isspace((int) ((unsigned char) *p)) != 0)
+      {
+        (void) CopyMagickString(p,p+1,MagickPathExtent);
+        continue;
+      }
+    c=(int) *p;
+    if (IsGeometryAdvanceCharacter(c) != MagickFalse)
+      {
+        p++;
+        continue;
+      }
+    flag=GetGeometryMetaFlag(c);
+    if (flag != NoValue)
+      {
+        (*flags)|=flag;
+        (void) CopyMagickString(p,p+1,MagickPathExtent);
+      }
+    else if (SkipGeometrySeparator(c,&p,flags) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickStatusType FinishGeometryFlags(MagickStatusType flags,
   size_t *width,size_t *height)
 {
@@ -387,11 +424,7 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
     *p,
     pedantic_geometry[MagickPathExtent];
 
-  int
-    c;
-
   MagickStatusType
-    flag,
     flags;
 
   /*
@@ -403,28 +436,8 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
   if (strlen(geometry) >= (MagickPathExtent-1))
     return(flags);
   (void) CopyMagickString(pedantic_geometry,geometry,MagickPathExtent);
-  for (p=pedantic_geometry; *p != '\0'; )
-  {
-    if (isspace((int) ((unsigned char) *p)) != 0)
-      {
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        continue;
-      }
-    c=(int) *p;
-    if (IsGeometryAdvanceCharacter(c) != MagickFalse)
-      {
-        p++;
-        continue;
-      }
-    flag=GetGeometryMetaFlag(c);
-    if (flag != NoValue)
-      {
-        flags|=flag;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-      }
-    else if (SkipGeometrySeparator(c,&p,&flags) == MagickFalse)
-      return(flags);
-  }
+  if (StripGeometry(pedantic_geometry,&flags) == MagickFalse)
+    return(flags);
   /*
     Parse width, height, x, and y.
   */
