@@ -1275,6 +1275,18 @@ needs two copies of the block.
    nothing but that call (Recipe I step 2's exception), so while the new function runs
    each member is the only pointer to its variable in use, as step 2 requires of a
    single out-parameter.
+8. A targets struct the block passes on (2026-11-14). When the caller declares a `const`
+   struct `t` of addresses once, with the addresses as its initialiser (step 7's form,
+   or Recipe I step 2's, LB step 8's or Z step 7's), the block's only use of `t` is to
+   pass it, by value or as `&t`, to the call of another helper inside the block, and
+   nothing outside the block reads `t`, then `t` moves into the new function as a
+   parameter of the type the block passed (`const T t` or `const T *t`). A written
+   variable `v` whose address is a member of `t` is then written through that member
+   instead of a pointer parameter of its own: the new function binds `V *const v =
+   t.v;` (`t->v;`) at the top of its body, in member order, only for the members the
+   block's own text writes or reads, and writes `(*v)` as step 5 says; the call inside
+   the block passes `t` as before. The other written variables (each meeting step 2)
+   are pointer parameters as in step 4. At most four parameters in all.
 
 **Before:**
 
@@ -1352,6 +1364,17 @@ static void SelectMagnifyMethod(const char *option,
   copied, so a write a re-entrant call of the block's callees made to it would be seen
   as before, and its name, of block scope, gives no other function a path to it
   (Recipe CT's *Careful*).
+
+- Step 8: `t` holds the addresses of the caller's variables, set once by its
+  initialiser and never changed (`const`); passed by value, the new function's copy
+  holds the same addresses, so `(*t.v)` is the object the block named `v`, read and
+  written at the same points in the same order, and the inner call receives the same
+  addresses it received before (by value, a copy as before; as `&t`, the caller's own
+  struct, which the new function's `const T *` parameter is). Step 2 still holds for
+  every such `v`: its address is taken nowhere but in `t`'s initialiser (and calls that
+  keep no copy), and nothing but the block reads `t`, so while the new function runs the
+  member is the only pointer to `v` in use. A second struct of the same addresses, which
+  step 7 would add, would hold nothing new.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls`.
 
@@ -8478,6 +8501,14 @@ does work would receive the moved labels' values first); Recipe RV, whose block 
    `default:` group, before the new call that passes `&name`, and the moved group is the
    call alone, passing the new function's `name` for `&name`. The new function takes the
    same `const Name *name` and binds only the members its groups read.
+8. No tail (2026-11-14). When every group of the `switch`, `default:` included, ends
+   every path with `return(R);`, no group holds a `break` of this `switch`, and the
+   `switch` is the function's last statement (nothing may follow it: MSVC C4702 refuses
+   unreachable code), step 1's `return(R_T);` is absent: the new function's body is the
+   `switch` alone, with no copy of a tail, and step 3's written plain locals are none
+   (every path returns). The run keeps at least one group in the caller (a `switch` of
+   `default:` alone is refused by `tools/ci_linux_warnings.sh`); steps 2 and 4 to 7
+   apply unchanged.
 
 **Before:**
 
@@ -8579,6 +8610,16 @@ static MagickBooleanType SetBackgroundAlpha(Image *image,
   Nothing writes the struct after the fill. The moved group's call passes the same
   object's address the caller's call passed (`name` in the new function is `&name` of the
   caller), so the next function reads the same members.
+
+- Step 8. Every path of the original ended in a `return` inside the `switch`, and it
+  still does: a kept group returns as before; a moved label, or a value of no label,
+  reaches the caller's `default:`, which returns what the new function returns, and the
+  new function's `switch` selects the same group (as the first bullet argues), which
+  returns the same value after the same statements. The new function ends in a `switch`
+  with a `default:` whose every group returns, the form the caller had, so no compiler
+  warns that control reaches its end (`-Wreturn-type`), and nothing follows either
+  `switch` (C4702). `refactor_guard.py --calls` shows `+2` for the new function and
+  nothing else, there being no tail to copy.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function and
 `+1` for the function `R_T` calls, its copy; nothing else moved), a case for each moved
@@ -20408,3 +20449,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | QF | Share a Single Pixel Fetch Through Row Functions: many `static void` copies opening with one fetch (`GetAuthenticPixelQueue`) and an early `return;` on `NULL`, differing in the column loop and the buffer type, become one `void` function taking a `const` row struct, a row-function pointer and `void *pixels`; each copy keeps its name as a `void` row function; Lane: c | `stream.c`'s 56 `Stream<Type><Map>Pixels`/`Stream<Type>MapPixels`: 6.89 to 7.32, `magick stream` timing equal on five commands | mandate (2026-10-24) |
 | 2026-11-14 | NEW | JT | Replace Jumps to a Returning Tail by Calls of the Tail: a function-ending `L: S return(R);` reached by `goto L;` from nested arms moves to a `static` helper of the return type taking the (at most four) variables it reads; each `goto L;` and the label's tail become `return(Helper(...));`; Lane: c | `property.c`'s `InterpretBracedEscape` (three lookup arms jumping to `PropertyLookupFailure:`): the first step of a chain that takes the function out of every finding, 3.62 to 3.64 | mandate (2026-10-24) |
 | 2026-11-14 | NEW | XP | Share Mirrored Extreme-Search Loops Through Per-Direction Predicates: copies of a loop keeping the most extreme array element, differing in their tests' operands and operators, become one `static` search taking a predicate pointer, each copy's tests a `MagickBooleanType` predicate returning `MagickTrue` where the copy assigned; Lane: c | `property.c`'s `GetConvexHullExtremePoints` (top, right, bottom, left loops; cc 26, four bumps): leaves every finding, 3.64 to 3.66 | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | O | Step 8: a written variable whose address is a member of a `const` targets struct that the block itself passes to another helper's call (nothing outside the block reading the struct) is written through that member, the struct moving in as a parameter of the type the block passed, in place of a pointer parameter of its own or a second struct of the same addresses (step 7). *Careful* gives the argument | `morphology.c`'s `MorphologyApply` (campaign A, W23 round thirteen lane a): its limit initialisation writes `method_limit`, `special` and `rslt_compose`, whose addresses its `const MorphologyIteratedLimits limits` holds, and `stage_limit`, then passes `limits` to `SelectMorphologyStageLimit`; step 4 gives seven parameters and step 7 a second struct of the same addresses in a caller held at 73 lines of *Large Method*. A probe: `MorphologyApply` leaves *Large Method*, 6.93 to 7.21, no finding on the new function. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
+| 2026-11-14 | AMEND | ST | Step 8 (no tail): a `switch` whose every group, `default:` included, ends every path with `return(R);`, with no `break` of it and nothing after it (the function's last statement; MSVC C4702 forbids a tail) splits as steps 2 and 4 to 7 say with no `return(R_T);` to copy: the new function's body is the `switch` alone, at least one group stays in the caller. *Careful* gives the argument | `morphology.c`'s (now `morphology-apply.c`'s) `AcquireKernelBuiltIn` (campaign A, W23 round thirteen lane a): its second `switch` returns on every path and ends the function since bb1745ee8 dropped the unreachable `return(kernel);` after it; step 1 refuses it, SW refuses its working `default:`. A probe moving the Blur, Comet, Binomial, Laplacian and `default:` groups: 7.21 to 7.29, cc 50 to 46, no finding on the new function. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
