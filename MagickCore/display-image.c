@@ -10910,6 +10910,60 @@ static void XApplyEdgeDetectCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplySpreadCommand(const XMagickCommandContext *context,
+  MagickStatusType *flags)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *spread_image;
+
+  static char
+    amount[MagickPathExtent] = "2";
+
+  /*
+    Query user for spread amount.
+  */
+  (void) XDialogWidget(display,windows,"Spread",
+    "Enter the displacement amount:",amount);
+  if (*amount == '\0')
+    return;
+  /*
+    Displace image pixels by a random amount.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(amount,&geometry_info);
+  spread_image=EdgeImage(*image,geometry_info.rho,exception);
+  if (spread_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=spread_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyRollCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12056,40 +12110,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyEdgeDetectCommand(&context,&flags);
       break;
     case SpreadCommand:
-    {
-      Image
-        *spread_image;
-
-      static char
-        amount[MagickPathExtent] = "2";
-
-      /*
-        Query user for spread amount.
-      */
-      (void) XDialogWidget(display,windows,"Spread",
-        "Enter the displacement amount:",amount);
-      if (*amount == '\0')
-        break;
-      /*
-        Displace image pixels by a random amount.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      flags=ParseGeometry(amount,&geometry_info);
-      spread_image=EdgeImage(*image,geometry_info.rho,exception);
-      if (spread_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=spread_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplySpreadCommand(&context,&flags);
       break;
-    }
     case ShadeCommand:
     {
       Image
