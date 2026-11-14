@@ -3348,6 +3348,98 @@ static MagickBooleanType XAcquireAnnotateInfo(
   return(MagickTrue);
 }
 
+static MagickBooleanType XAnnotateText(AnnotateContext *context,
+  const AnnotateTargets *targets,XFontStruct *font_info,Image *image)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const unsigned int
+    box_id = *context->box_color_targets->box_id,
+    pen_id = *context->font_color_targets->pen_id;
+
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+
+  char
+    **const p = targets->p;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  XEvent
+    *const text_event = targets->text_event,
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  Cursor
+    cursor;
+
+  GC
+    annotate_context;
+
+  /*
+    Create cursor and set graphic context.
+  */
+  cursor=XCreateFontCursor(display,XC_pencil);
+  (void) XCheckDefineCursor(display,windows->image.id,cursor);
+  annotate_context=windows->image.annotate_context;
+  (void) XSetFont(display,annotate_context,font_info->fid);
+  (void) XSetBackground(display,annotate_context,
+    windows->pixel_info->pen_colors[box_id].pixel);
+  (void) XSetForeground(display,annotate_context,
+    windows->pixel_info->pen_colors[pen_id].pixel);
+  /*
+    Begin annotating the image with text.
+  */
+  (void) CloneString(&windows->command.name,"Text");
+  windows->command.data=0;
+  (void) XCommandWidget(display,windows,TextMenu,(XEvent *) NULL);
+  (*state)=DefaultState;
+  (void) XDrawString(display,windows->image.id,annotate_context,(*x),(*y),"_",
+    1);
+  (*text_event).xexpose.width=(int) font_info->max_bounds.width;
+  (*text_event).xexpose.height=font_info->max_bounds.ascent+
+    font_info->max_bounds.descent;
+  (*p)=(*annotate_info)->text;
+  context->cursor=cursor;
+  context->annotate_context=annotate_context;
+  context->font_info=font_info;
+  context->box_id=box_id;
+  context->pen_id=pen_id;
+  do
+  {
+    /*
+      Display text cursor.
+    */
+    *(*p)='\0';
+    (void) XDrawString(display,windows->image.id,annotate_context,(*x),(*y),
+      "_",1);
+    /*
+      Wait for next event.
+    */
+    XScreenEvent(display,windows,event,exception);
+    if ((*event).xany.window == windows->command.id)
+      {
+        XAnnotateTextCommand(context,targets);
+        continue;
+      }
+    if (XAnnotateTextEvent(context,targets) == MagickFalse)
+      return(MagickFalse);
+  } while (((*state) & ExitState) == 0);
+  (void) XFreeCursor(display,cursor);
+  return(XAnnotateRenderLines(context,(*annotate_info),image));
+}
+
 static MagickBooleanType XAnnotateEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -3371,9 +3463,6 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
 
   Cursor
     cursor;
-
-  GC
-    annotate_context;
 
   int
     x,
@@ -3458,55 +3547,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
   */
   if (XAcquireAnnotateInfo(&context,&targets,font_info) == MagickFalse)
     return(MagickFalse);
-  /*
-    Create cursor and set graphic context.
-  */
-  cursor=XCreateFontCursor(display,XC_pencil);
-  (void) XCheckDefineCursor(display,windows->image.id,cursor);
-  annotate_context=windows->image.annotate_context;
-  (void) XSetFont(display,annotate_context,font_info->fid);
-  (void) XSetBackground(display,annotate_context,
-    windows->pixel_info->pen_colors[box_id].pixel);
-  (void) XSetForeground(display,annotate_context,
-    windows->pixel_info->pen_colors[pen_id].pixel);
-  /*
-    Begin annotating the image with text.
-  */
-  (void) CloneString(&windows->command.name,"Text");
-  windows->command.data=0;
-  (void) XCommandWidget(display,windows,TextMenu,(XEvent *) NULL);
-  state=DefaultState;
-  (void) XDrawString(display,windows->image.id,annotate_context,x,y,"_",1);
-  text_event.xexpose.width=(int) font_info->max_bounds.width;
-  text_event.xexpose.height=font_info->max_bounds.ascent+
-    font_info->max_bounds.descent;
-  p=annotate_info->text;
-  context.cursor=cursor;
-  context.annotate_context=annotate_context;
-  context.font_info=font_info;
-  context.box_id=box_id;
-  context.pen_id=pen_id;
-  do
-  {
-    /*
-      Display text cursor.
-    */
-    *p='\0';
-    (void) XDrawString(display,windows->image.id,annotate_context,x,y,"_",1);
-    /*
-      Wait for next event.
-    */
-    XScreenEvent(display,windows,&event,exception);
-    if (event.xany.window == windows->command.id)
-      {
-        XAnnotateTextCommand(&context,&targets);
-        continue;
-      }
-    if (XAnnotateTextEvent(&context,&targets) == MagickFalse)
-      return(MagickFalse);
-  } while ((state & ExitState) == 0);
-  (void) XFreeCursor(display,cursor);
-  return(XAnnotateRenderLines(&context,annotate_info,image));
+  return(XAnnotateText(&context,&targets,font_info,image));
 }
 
 /*
