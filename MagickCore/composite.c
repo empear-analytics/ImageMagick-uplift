@@ -5724,9 +5724,6 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     case DisplaceCompositeOp:
     case DistortCompositeOp:
     {
-      DisplaceCanvasInputs
-        canvas;
-
       /*
         Displace/Distort based on overlay gradient map:
           X = red_channel;  Y = green_channel;
@@ -5739,16 +5736,13 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
           return(MagickFalse);
         }
       GetDisplaceArguments(image,&geometry_info,&flags);
-      canvas.canvas_image=canvas_image;
-      canvas.image=image;
-      canvas.source_image=source_image;
-      canvas.compose=compose;
-      canvas.flags=flags;
-      canvas.geometry_info=geometry_info;
-      canvas.x_offset=x_offset;
-      canvas.y_offset=y_offset;
-      canvas.exception=exception;
-      DisplaceCompositeCanvas(&canvas);
+      {
+        const DisplaceCanvasInputs
+          canvas = { canvas_image, image, source_image, compose, flags,
+            geometry_info, x_offset, y_offset, exception };
+
+        DisplaceCompositeCanvas(&canvas);
+      }
       source_image=DestroyImage(source_image);
       source_image=canvas_image;
       break;
