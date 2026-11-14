@@ -10809,6 +10809,38 @@ static void XApplyCropCommand(const XMagickCommandContext *context)
     exception);
 }
 
+static void XApplyChopCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  MagickStatusType
+    status;
+
+  /*
+    Chop image.
+  */
+  status=XChopImage(display,resource_info,windows,image,exception);
+  if (status == MagickFalse)
+    {
+      XNoticeWidget(display,windows,"Unable to cut X image",
+        (*image)->filename);
+      return;
+    }
+}
+
 static void XApplyResizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11514,19 +11546,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyCropCommand(&context);
       break;
     case ChopCommand:
-    {
-      /*
-        Chop image.
-      */
-      status=XChopImage(display,resource_info,windows,image,exception);
-      if (status == MagickFalse)
-        {
-          XNoticeWidget(display,windows,"Unable to cut X image",
-            (*image)->filename);
-          break;
-        }
+      XApplyChopCommand(&context);
       break;
-    }
     case FlopCommand:
     {
       Image
