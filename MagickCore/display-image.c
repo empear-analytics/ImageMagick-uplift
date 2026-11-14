@@ -24897,6 +24897,58 @@ static void XChangeToHomeDirectory(XResourceInfo *resource_info,
       "UnableToOpenFile","%s",resource_info->home_directory);
 }
 
+static MagickStatusType XMakeDisplayXImages(const DisplayEventContext *context,
+  Image *display_image)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  MagickStatusType
+    status;
+
+  unsigned int
+    height,
+    width;
+
+  windows->image.x=0;
+  windows->image.y=0;
+  windows->magnify.shape=MagickFalse;
+  width=(unsigned int) display_image->columns;
+  height=(unsigned int) display_image->rows;
+  if ((display_image->columns != width) || (display_image->rows != height))
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
+      display_image->filename);
+  status=XMakeImage(display,resource_info,&windows->image,display_image,
+    width,height,exception);
+  if (status == MagickFalse)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
+      display_image->filename);
+  status=XMakeImage(display,resource_info,&windows->magnify,(Image *) NULL,
+    windows->magnify.width,windows->magnify.height,exception);
+  if (status == MagickFalse)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
+      display_image->filename);
+  if (windows->magnify.mapped != MagickFalse)
+    (void) XMapRaised(display,windows->magnify.id);
+  if (windows->pan.mapped != MagickFalse)
+    (void) XMapRaised(display,windows->pan.id);
+  windows->image.window_changes.width=(int) display_image->columns;
+  windows->image.window_changes.height=(int) display_image->rows;
+  (void) XConfigureImage(display,resource_info,windows,display_image,exception);
+  (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+  (void) XSync(display,MagickFalse);
+  return(status);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -24935,10 +24987,6 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
     timer,
     timestamp,
     update_time;
-
-  unsigned int
-    height,
-    width;
 
   WarningHandler
     warning_handler;
@@ -25219,33 +25267,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   /*
     Initialize Image and Magnify X images.
   */
-  windows->image.x=0;
-  windows->image.y=0;
-  windows->magnify.shape=MagickFalse;
-  width=(unsigned int) display_image->columns;
-  height=(unsigned int) display_image->rows;
-  if ((display_image->columns != width) || (display_image->rows != height))
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
-      display_image->filename);
-  status=XMakeImage(display,resource_info,&windows->image,display_image,
-    width,height,exception);
-  if (status == MagickFalse)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
-      display_image->filename);
-  status=XMakeImage(display,resource_info,&windows->magnify,(Image *) NULL,
-    windows->magnify.width,windows->magnify.height,exception);
-  if (status == MagickFalse)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXImage",
-      display_image->filename);
-  if (windows->magnify.mapped != MagickFalse)
-    (void) XMapRaised(display,windows->magnify.id);
-  if (windows->pan.mapped != MagickFalse)
-    (void) XMapRaised(display,windows->pan.id);
-  windows->image.window_changes.width=(int) display_image->columns;
-  windows->image.window_changes.height=(int) display_image->rows;
-  (void) XConfigureImage(display,resource_info,windows,display_image,exception);
-  (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
-  (void) XSync(display,MagickFalse);
+  status=XMakeDisplayXImages(&event_context,display_image);
   /*
     Respond to events.
   */
