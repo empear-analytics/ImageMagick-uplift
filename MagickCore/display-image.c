@@ -10900,6 +10900,65 @@ static void XApplyFlopCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyFlipCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    height,
+    width;
+
+  Image
+    *flip_image;
+
+  /*
+    Flip image scanlines.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flip_image=FlipImage(*image,exception);
+  if (flip_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=flip_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.crop_geometry != (char *) NULL)
+    {
+      /*
+        Flip crop geometry.
+      */
+      width=(unsigned int) (*image)->columns;
+      height=(unsigned int) (*image)->rows;
+      (void) XParseGeometry(windows->image.crop_geometry,&x,&y,
+        &width,&height);
+      (void) FormatLocaleString(windows->image.crop_geometry,
+        MagickPathExtent,"%ux%u%+d%+d",width,height,x,(int) (*image)->rows-
+        (int) height-y);
+    }
+  if (windows->image.orphan != MagickFalse)
+    return;
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyResizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11498,10 +11557,6 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   ImageInfo
     *image_info;
 
-  int
-    x,
-    y;
-
   MagickStatusType
     flags,
     status;
@@ -11514,10 +11569,6 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
 
   static char
     color[MagickPathExtent] = "gray";
-
-  unsigned int
-    height,
-    width;
 
   XMagickCommandContext
     context;
@@ -11611,41 +11662,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyFlopCommand(&context);
       break;
     case FlipCommand:
-    {
-      Image
-        *flip_image;
-
-      /*
-        Flip image scanlines.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      flip_image=FlipImage(*image,exception);
-      if (flip_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=flip_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.crop_geometry != (char *) NULL)
-        {
-          /*
-            Flip crop geometry.
-          */
-          width=(unsigned int) (*image)->columns;
-          height=(unsigned int) (*image)->rows;
-          (void) XParseGeometry(windows->image.crop_geometry,&x,&y,
-            &width,&height);
-          (void) FormatLocaleString(windows->image.crop_geometry,
-            MagickPathExtent,"%ux%u%+d%+d",width,height,x,(int) (*image)->rows-
-            (int) height-y);
-        }
-      if (windows->image.orphan != MagickFalse)
-        break;
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyFlipCommand(&context);
       break;
-    }
     case RotateRightCommand:
     {
       /*
