@@ -1641,6 +1641,9 @@ typedef struct _AnnotateTargets
 
   XEvent
     *event;
+
+  Cursor
+    *cursor;
 } AnnotateTargets;
 
 static void XGoToPreviousTextLine(const AnnotateTargets *targets)
@@ -2979,259 +2982,227 @@ static void XAnnotateTextPress(const AnnotateContext *context,
     }
 }
 
-static MagickBooleanType XAnnotateEditImage(Display *display,
-  XResourceInfo *resource_info,XWindows *windows,Image *image,
-  ExceptionInfo *exception)
+static MagickBooleanType XAnnotateTextKeyEvent(
+  const AnnotateContext *context,const AnnotateTargets *targets)
 {
-  static MagickBooleanType
-    transparent_box = MagickTrue,
-    transparent_pen = MagickFalse;
-
-  static double
-    degrees = 0.0;
-
-  static unsigned int
-    box_id = MaxNumberPens-2,
-    font_id = 0,
-    pen_id = 0;
-
   char
-    command[MagickPathExtent],
-    *p,
-    text[MagickPathExtent];
-
-  Cursor
-    cursor;
-
-  GC
-    annotate_context;
-
-  int
-    status,
-    x,
-    y;
+    command[MagickPathExtent];
 
   KeySym
     key_symbol;
 
+  XEvent
+    *const event = targets->event;
+
   size_t
-    state;
+    *const state = targets->state;
+
+  switch ((*event).type)
+  {
+    case KeyPress:
+    {
+      if ((*event).xkey.window != context->windows->image.id)
+        break;
+      if (XAnnotateTextKey(context,targets) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+    case KeyRelease:
+    {
+      /*
+        Respond to a user key release.
+      */
+      (void) XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+        sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+      (*state)&=(size_t) (~ModifierState);
+      break;
+    }
+    case SelectionNotify:
+    {
+      if (XAnnotateTextPaste(context,targets) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+    default:
+      break;
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType XAnnotateTextEvent(const AnnotateContext *context,
+  const AnnotateTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  const GC
+    annotate_context = context->annotate_context;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  XEvent
+    *const text_event = targets->text_event;
+
+  XEvent
+    *const event = targets->event;
+
+  /*
+    Erase text cursor.
+  */
+  (*text_event).xexpose.x=(*x);
+  (*text_event).xexpose.y=(*y)-font_info->max_bounds.ascent;
+  (void) XClearArea(display,windows->image.id,(*x),(*text_event).xexpose.y,
+    (unsigned int) (*text_event).xexpose.width,(unsigned int)
+    (*text_event).xexpose.height,MagickFalse);
+  XRefreshWindow(display,&windows->image,text_event);
+  switch ((*event).type)
+  {
+    case ButtonPress:
+    {
+      XAnnotateTextPress(context,targets);
+      break;
+    }
+    case Expose:
+    {
+      if ((*event).xexpose.count == 0)
+        {
+          /*
+            Refresh Image window.
+          */
+          XRefreshWindow(display,&windows->image,(XEvent *) NULL);
+          XRedrawTextLines(display,windows,(*annotate_info),annotate_context);
+          (void) XDrawString(display,windows->image.id,annotate_context,
+            (*x),(*y),"_",1);
+        }
+      break;
+    }
+    default:
+    {
+      if (XAnnotateTextKeyEvent(context,targets) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
+typedef struct _AnnotateRenderInput
+{
+  Image
+    *image;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    height,
+    width;
+} AnnotateRenderInput;
+
+static MagickBooleanType XAnnotateRenderLine(const AnnotateContext *context,
+  const AnnotateRenderInput *input,XAnnotateInfo *annotate_info)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  const unsigned int
+    box_id = context->box_id,
+    pen_id = context->pen_id;
+
+  Image
+    *const image = input->image;
+
+  const int
+    x = input->x,
+    y = input->y;
+
+  const unsigned int
+    height = input->height,
+    width = input->width;
+
+  int
+    status;
+
+  /*
+    Determine pixel index for box and pen color.
+  */
+  XSetBoxPixelIndex(windows,box_id);
+  XSetPenPixelIndex(windows,pen_id);
+  /*
+    Define the annotate geometry string.
+  */
+  annotate_info->x=(int)
+    width*(annotate_info->x+windows->image.x)/windows->image.ximage->width;
+  annotate_info->y=(int) height*(annotate_info->y-font_info->ascent+
+    windows->image.y)/windows->image.ximage->height;
+  (void) FormatLocaleString(annotate_info->geometry,MagickPathExtent,
+    "%gx%g%+g%+g",(double) width*annotate_info->width/
+    windows->image.ximage->width,(double) height*annotate_info->height/
+    windows->image.ximage->height,(double) annotate_info->x+x,(double)
+    annotate_info->y+y);
+  /*
+    Annotate image with text.
+  */
+  status=XAnnotateImage(display,windows->pixel_info,annotate_info,image,
+    exception) == MagickFalse ? 0 : 1;
+  if (status == 0)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static MagickBooleanType XAnnotateRenderLines(const AnnotateContext *context,
+  XAnnotateInfo *annotate_info,Image *image)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const GC
+    annotate_context = context->annotate_context;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  int
+    x,
+    y;
 
   unsigned int
     height,
     width;
 
   XAnnotateInfo
-    *annotate_info,
     *previous_info;
 
-  XColor
-    color;
-
-  XFontStruct
-    *font_info;
-
-  XEvent
-    event,
-    text_event;
-
-  AnnotateContext
-    context;
-
-  const AnnotateTargets
-    targets = { &annotate_info, &p, &x, &y, &text_event, &state, &event };
-
-  const AnnotateRotateTargets
-    rotate_targets = { &degrees };
-
-  const AnnotateBoxColorTargets
-    box_color_targets = { &transparent_box, &color, &box_id };
-
-  const AnnotateFontColorTargets
-    font_color_targets = { &transparent_pen, &color, &pen_id };
-
-  const AnnotateFontTargets
-    font_targets = { &font_id };
-
-  /*
-    Map Command widget.
-  */
-  (void) CloneString(&windows->command.name,"Annotate");
-  windows->command.data=4;
-  (void) XCommandWidget(display,windows,AnnotateMenu,(XEvent *) NULL);
-  (void) XMapRaised(display,windows->command.id);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_update_widget,CurrentTime);
-  /*
-    Track pointer until button 1 is pressed.
-  */
-  XQueryPosition(display,windows->image.id,&x,&y);
-  (void) XSelectInput(display,windows->image.id,
-    windows->image.attributes.event_mask | PointerMotionMask);
-  cursor=XCreateFontCursor(display,XC_left_side);
-  (void) XCheckDefineCursor(display,windows->image.id,cursor);
-  state=DefaultState;
-  context.display=display;
-  context.resource_info=resource_info;
-  context.windows=windows;
-  context.command=command;
-  context.font_targets=&font_targets;
-  context.font_color_targets=&font_color_targets;
-  context.box_color_targets=&box_color_targets;
-  context.rotate_targets=&rotate_targets;
-  context.exception=exception;
-  context.text=text;
-  context.cursor=cursor;
-  XAnnotateTrackPointer(&context,&targets);
-  (void) XSelectInput(display,windows->image.id,
-    windows->image.attributes.event_mask);
-  (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
-  if ((state & EscapeState) != 0)
-    return(MagickTrue);
-  /*
-    Set font info and check boundary conditions.
-  */
-  font_info=XLoadQueryFont(display,resource_info->font_name[font_id]);
-  if (font_info == (XFontStruct *) NULL)
-    {
-      XNoticeWidget(display,windows,"Unable to load font:",
-        resource_info->font_name[font_id]);
-      font_info=windows->font_info;
-    }
-  if ((x+font_info->max_bounds.width) >= (int) windows->image.width)
-    x=(int) windows->image.width-font_info->max_bounds.width;
-  if (y < (int) (font_info->ascent+font_info->descent))
-    y=(int) font_info->ascent+font_info->descent;
-  if (((int) font_info->max_bounds.width > (int) windows->image.width) ||
-      ((font_info->ascent+font_info->descent) >= (int) windows->image.height))
-    return(MagickFalse);
-  /*
-    Initialize annotate structure.
-  */
-  annotate_info=(XAnnotateInfo *) AcquireMagickMemory(sizeof(*annotate_info));
-  if (annotate_info == (XAnnotateInfo *) NULL)
-    return(MagickFalse);
-  XGetAnnotateInfo(annotate_info);
-  annotate_info->x=x;
-  annotate_info->y=y;
-  if ((transparent_box == MagickFalse) && (transparent_pen == MagickFalse))
-    annotate_info->stencil=OpaqueStencil;
-  else
-    if (transparent_box == MagickFalse)
-      annotate_info->stencil=BackgroundStencil;
-    else
-      annotate_info->stencil=ForegroundStencil;
-  annotate_info->height=(unsigned int) (font_info->ascent+font_info->descent);
-  annotate_info->degrees=degrees;
-  annotate_info->font_info=font_info;
-  annotate_info->text=(char *) AcquireQuantumMemory((size_t) 
-    windows->image.width/(size_t) MagickMax(font_info->min_bounds.width,1)+2UL,
-    sizeof(*annotate_info->text));
-  if (annotate_info->text == (char *) NULL)
-    return(MagickFalse);
-  /*
-    Create cursor and set graphic context.
-  */
-  cursor=XCreateFontCursor(display,XC_pencil);
-  (void) XCheckDefineCursor(display,windows->image.id,cursor);
-  annotate_context=windows->image.annotate_context;
-  (void) XSetFont(display,annotate_context,font_info->fid);
-  (void) XSetBackground(display,annotate_context,
-    windows->pixel_info->pen_colors[box_id].pixel);
-  (void) XSetForeground(display,annotate_context,
-    windows->pixel_info->pen_colors[pen_id].pixel);
-  /*
-    Begin annotating the image with text.
-  */
-  (void) CloneString(&windows->command.name,"Text");
-  windows->command.data=0;
-  (void) XCommandWidget(display,windows,TextMenu,(XEvent *) NULL);
-  state=DefaultState;
-  (void) XDrawString(display,windows->image.id,annotate_context,x,y,"_",1);
-  text_event.xexpose.width=(int) font_info->max_bounds.width;
-  text_event.xexpose.height=font_info->max_bounds.ascent+
-    font_info->max_bounds.descent;
-  p=annotate_info->text;
-  context.cursor=cursor;
-  context.annotate_context=annotate_context;
-  context.font_info=font_info;
-  context.box_id=box_id;
-  context.pen_id=pen_id;
-  do
-  {
-    /*
-      Display text cursor.
-    */
-    *p='\0';
-    (void) XDrawString(display,windows->image.id,annotate_context,x,y,"_",1);
-    /*
-      Wait for next event.
-    */
-    XScreenEvent(display,windows,&event,exception);
-    if (event.xany.window == windows->command.id)
-      {
-        XAnnotateTextCommand(&context,&targets);
-        continue;
-      }
-    /*
-      Erase text cursor.
-    */
-    text_event.xexpose.x=x;
-    text_event.xexpose.y=y-font_info->max_bounds.ascent;
-    (void) XClearArea(display,windows->image.id,x,text_event.xexpose.y,
-      (unsigned int) text_event.xexpose.width,(unsigned int)
-      text_event.xexpose.height,MagickFalse);
-    XRefreshWindow(display,&windows->image,&text_event);
-    switch (event.type)
-    {
-      case ButtonPress:
-      {
-        XAnnotateTextPress(&context,&targets);
-        break;
-      }
-      case Expose:
-      {
-        if (event.xexpose.count == 0)
-          {
-            /*
-              Refresh Image window.
-            */
-            XRefreshWindow(display,&windows->image,(XEvent *) NULL);
-            XRedrawTextLines(display,windows,annotate_info,annotate_context);
-            (void) XDrawString(display,windows->image.id,annotate_context,
-              x,y,"_",1);
-          }
-        break;
-      }
-      case KeyPress:
-      {
-        if (event.xkey.window != windows->image.id)
-          break;
-        if (XAnnotateTextKey(&context,&targets) == MagickFalse)
-          return(MagickFalse);
-        break;
-      }
-      case KeyRelease:
-      {
-        /*
-          Respond to a user key release.
-        */
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        state&=(size_t) (~ModifierState);
-        break;
-      }
-      case SelectionNotify:
-      {
-        if (XAnnotateTextPaste(&context,&targets) == MagickFalse)
-          return(MagickFalse);
-        break;
-      }
-      default:
-        break;
-    }
-  } while ((state & ExitState) == 0);
-  (void) XFreeCursor(display,cursor);
   /*
     Annotation is relative to image configuration.
   */
@@ -3260,30 +3231,13 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
         annotate_info=previous_info;
         continue;
       }
-    /*
-      Determine pixel index for box and pen color.
-    */
-    XSetBoxPixelIndex(windows,box_id);
-    XSetPenPixelIndex(windows,pen_id);
-    /*
-      Define the annotate geometry string.
-    */
-    annotate_info->x=(int)
-      width*(annotate_info->x+windows->image.x)/windows->image.ximage->width;
-    annotate_info->y=(int) height*(annotate_info->y-font_info->ascent+
-      windows->image.y)/windows->image.ximage->height;
-    (void) FormatLocaleString(annotate_info->geometry,MagickPathExtent,
-      "%gx%g%+g%+g",(double) width*annotate_info->width/
-      windows->image.ximage->width,(double) height*annotate_info->height/
-      windows->image.ximage->height,(double) annotate_info->x+x,(double)
-      annotate_info->y+y);
-    /*
-      Annotate image with text.
-    */
-    status=XAnnotateImage(display,windows->pixel_info,annotate_info,image,
-      exception) == MagickFalse ? 0 : 1;
-    if (status == 0)
-      return(MagickFalse);
+    {
+      const AnnotateRenderInput
+        input = { image, x, y, height, width };
+
+      if (XAnnotateRenderLine(context,&input,annotate_info) == MagickFalse)
+        return(MagickFalse);
+    }
     /*
       Free up memory.
     */
@@ -3305,6 +3259,323 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
   XConfigureImageColormap(display,resource_info,windows,image,exception);
   (void) XConfigureImage(display,resource_info,windows,image,exception);
   return(MagickTrue);
+}
+
+static MagickBooleanType XAnnotateLoadFont(const AnnotateContext *context,
+  const AnnotateTargets *targets,XFontStruct **font_info)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    font_id = *context->font_targets->font_id;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  /*
+    Set font info and check boundary conditions.
+  */
+  (*font_info)=XLoadQueryFont(display,resource_info->font_name[font_id]);
+  if ((*font_info) == (XFontStruct *) NULL)
+    {
+      XNoticeWidget(display,windows,"Unable to load font:",
+        resource_info->font_name[font_id]);
+      (*font_info)=windows->font_info;
+    }
+  if (((*x)+(*font_info)->max_bounds.width) >= (int) windows->image.width)
+    (*x)=(int) windows->image.width-(*font_info)->max_bounds.width;
+  if ((*y) < (int) ((*font_info)->ascent+(*font_info)->descent))
+    (*y)=(int) (*font_info)->ascent+(*font_info)->descent;
+  if (((int) (*font_info)->max_bounds.width > (int) windows->image.width) ||
+      (((*font_info)->ascent+(*font_info)->descent) >=
+       (int) windows->image.height))
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static MagickBooleanType XAcquireAnnotateInfo(
+  const AnnotateContext *context,const AnnotateTargets *targets,
+  XFontStruct *font_info)
+{
+  XWindows
+    *const windows = context->windows;
+
+  const MagickBooleanType
+    transparent_box = *context->box_color_targets->transparent_box,
+    transparent_pen = *context->font_color_targets->transparent_pen;
+
+  const double
+    degrees = *context->rotate_targets->degrees;
+
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  /*
+    Initialize annotate structure.
+  */
+  (*annotate_info)=(XAnnotateInfo *) AcquireMagickMemory(
+    sizeof(*(*annotate_info)));
+  if ((*annotate_info) == (XAnnotateInfo *) NULL)
+    return(MagickFalse);
+  XGetAnnotateInfo((*annotate_info));
+  (*annotate_info)->x=(*x);
+  (*annotate_info)->y=(*y);
+  if ((transparent_box == MagickFalse) && (transparent_pen == MagickFalse))
+    (*annotate_info)->stencil=OpaqueStencil;
+  else
+    if (transparent_box == MagickFalse)
+      (*annotate_info)->stencil=BackgroundStencil;
+    else
+      (*annotate_info)->stencil=ForegroundStencil;
+  (*annotate_info)->height=(unsigned int) (font_info->ascent+
+    font_info->descent);
+  (*annotate_info)->degrees=degrees;
+  (*annotate_info)->font_info=font_info;
+  (*annotate_info)->text=(char *) AcquireQuantumMemory((size_t) 
+    windows->image.width/(size_t) MagickMax(font_info->min_bounds.width,1)+2UL,
+    sizeof(*(*annotate_info)->text));
+  if ((*annotate_info)->text == (char *) NULL)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static MagickBooleanType XAnnotateText(AnnotateContext *context,
+  const AnnotateTargets *targets,XFontStruct *font_info,Image *image)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  const unsigned int
+    box_id = *context->box_color_targets->box_id,
+    pen_id = *context->font_color_targets->pen_id;
+
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+
+  char
+    **const p = targets->p;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  XEvent
+    *const text_event = targets->text_event,
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  Cursor
+    cursor;
+
+  GC
+    annotate_context;
+
+  /*
+    Create cursor and set graphic context.
+  */
+  cursor=XCreateFontCursor(display,XC_pencil);
+  (void) XCheckDefineCursor(display,windows->image.id,cursor);
+  annotate_context=windows->image.annotate_context;
+  (void) XSetFont(display,annotate_context,font_info->fid);
+  (void) XSetBackground(display,annotate_context,
+    windows->pixel_info->pen_colors[box_id].pixel);
+  (void) XSetForeground(display,annotate_context,
+    windows->pixel_info->pen_colors[pen_id].pixel);
+  /*
+    Begin annotating the image with text.
+  */
+  (void) CloneString(&windows->command.name,"Text");
+  windows->command.data=0;
+  (void) XCommandWidget(display,windows,TextMenu,(XEvent *) NULL);
+  (*state)=DefaultState;
+  (void) XDrawString(display,windows->image.id,annotate_context,(*x),(*y),"_",
+    1);
+  (*text_event).xexpose.width=(int) font_info->max_bounds.width;
+  (*text_event).xexpose.height=font_info->max_bounds.ascent+
+    font_info->max_bounds.descent;
+  (*p)=(*annotate_info)->text;
+  context->cursor=cursor;
+  context->annotate_context=annotate_context;
+  context->font_info=font_info;
+  context->box_id=box_id;
+  context->pen_id=pen_id;
+  do
+  {
+    /*
+      Display text cursor.
+    */
+    *(*p)='\0';
+    (void) XDrawString(display,windows->image.id,annotate_context,(*x),(*y),
+      "_",1);
+    /*
+      Wait for next event.
+    */
+    XScreenEvent(display,windows,event,exception);
+    if ((*event).xany.window == windows->command.id)
+      {
+        XAnnotateTextCommand(context,targets);
+        continue;
+      }
+    if (XAnnotateTextEvent(context,targets) == MagickFalse)
+      return(MagickFalse);
+  } while (((*state) & ExitState) == 0);
+  (void) XFreeCursor(display,cursor);
+  return(XAnnotateRenderLines(context,(*annotate_info),image));
+}
+
+static void XStartAnnotateTracking(Display *display,XWindows *windows,
+  const AnnotateTargets *targets)
+{
+  Cursor
+    *const cursor = targets->cursor;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  size_t
+    *const state = targets->state;
+
+  /*
+    Map Command widget.
+  */
+  (void) CloneString(&windows->command.name,"Annotate");
+  windows->command.data=4;
+  (void) XCommandWidget(display,windows,AnnotateMenu,(XEvent *) NULL);
+  (void) XMapRaised(display,windows->command.id);
+  XClientMessage(display,windows->image.id,windows->im_protocols,
+    windows->im_update_widget,CurrentTime);
+  /*
+    Track pointer until button 1 is pressed.
+  */
+  XQueryPosition(display,windows->image.id,x,y);
+  (void) XSelectInput(display,windows->image.id,
+    windows->image.attributes.event_mask | PointerMotionMask);
+  (*cursor)=XCreateFontCursor(display,XC_left_side);
+  (void) XCheckDefineCursor(display,windows->image.id,(*cursor));
+  (*state)=DefaultState;
+}
+
+static MagickBooleanType XFinishAnnotateTracking(Display *display,
+  XWindows *windows,const size_t state)
+{
+  (void) XSelectInput(display,windows->image.id,
+    windows->image.attributes.event_mask);
+  (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+  if ((state & EscapeState) != 0)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static MagickBooleanType XAnnotateEditImage(Display *display,
+  XResourceInfo *resource_info,XWindows *windows,Image *image,
+  ExceptionInfo *exception)
+{
+  static MagickBooleanType
+    transparent_box = MagickTrue,
+    transparent_pen = MagickFalse;
+
+  static double
+    degrees = 0.0;
+
+  static unsigned int
+    box_id = MaxNumberPens-2,
+    font_id = 0,
+    pen_id = 0;
+
+  char
+    command[MagickPathExtent],
+    *p,
+    text[MagickPathExtent];
+
+  Cursor
+    cursor;
+
+  int
+    x,
+    y;
+
+  size_t
+    state;
+
+  XAnnotateInfo
+    *annotate_info;
+
+  XColor
+    color;
+
+  XFontStruct
+    *font_info;
+
+  XEvent
+    event,
+    text_event;
+
+  AnnotateContext
+    context;
+
+  const AnnotateTargets
+    targets = { &annotate_info, &p, &x, &y, &text_event, &state, &event,
+      &cursor };
+
+  const AnnotateRotateTargets
+    rotate_targets = { &degrees };
+
+  const AnnotateBoxColorTargets
+    box_color_targets = { &transparent_box, &color, &box_id };
+
+  const AnnotateFontColorTargets
+    font_color_targets = { &transparent_pen, &color, &pen_id };
+
+  const AnnotateFontTargets
+    font_targets = { &font_id };
+
+  XStartAnnotateTracking(display,windows,&targets);
+  context.display=display;
+  context.resource_info=resource_info;
+  context.windows=windows;
+  context.command=command;
+  context.font_targets=&font_targets;
+  context.font_color_targets=&font_color_targets;
+  context.box_color_targets=&box_color_targets;
+  context.rotate_targets=&rotate_targets;
+  context.exception=exception;
+  context.text=text;
+  context.cursor=cursor;
+  XAnnotateTrackPointer(&context,&targets);
+  if (XFinishAnnotateTracking(display,windows,state) == MagickFalse)
+    return(MagickTrue);
+  /*
+    Set font info and check boundary conditions.
+  */
+  if (XAnnotateLoadFont(&context,&targets,&font_info) == MagickFalse)
+    return(MagickFalse);
+  /*
+    Initialize annotate structure.
+  */
+  if (XAcquireAnnotateInfo(&context,&targets,font_info) == MagickFalse)
+    return(MagickFalse);
+  return(XAnnotateText(&context,&targets,font_info,image));
 }
 
 /*
@@ -14689,41 +14960,52 @@ static void XMagnifyImage(Display *display,XWindows *windows,XEvent *event,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _MagnifyDigitKey
+{
+  int
+    key,
+    base;
+} MagnifyDigitKey;
+
+static const MagnifyDigitKey
+  MagnifyDigitKeys[] =
+  {
+    { XK_0, XK_0 },
+    { XK_1, XK_0 },
+    { XK_2, XK_0 },
+    { XK_3, XK_0 },
+    { XK_4, XK_0 },
+    { XK_5, XK_0 },
+    { XK_6, XK_0 },
+    { XK_7, XK_0 },
+    { XK_8, XK_0 },
+    { XK_9, XK_0 },
+    { XK_KP_0, XK_KP_0 },
+    { XK_KP_1, XK_KP_0 },
+    { XK_KP_2, XK_KP_0 },
+    { XK_KP_3, XK_KP_0 },
+    { XK_KP_4, XK_KP_0 },
+    { XK_KP_5, XK_KP_0 },
+    { XK_KP_6, XK_KP_0 },
+    { XK_KP_7, XK_KP_0 },
+    { XK_KP_8, XK_KP_0 },
+    { XK_KP_9, XK_KP_0 }
+  };
+
 static void XSelectMagnifyDigit(XWindows *windows,const KeySym key_symbol)
 {
-  switch ((int) key_symbol)
-  {
-    case XK_0:
-    case XK_1:
-    case XK_2:
-    case XK_3:
-    case XK_4:
-    case XK_5:
-    case XK_6:
-    case XK_7:
-    case XK_8:
-    case XK_9:
-    {
-      windows->magnify.data=(key_symbol-XK_0);
-      break;
-    }
-    case XK_KP_0:
-    case XK_KP_1:
-    case XK_KP_2:
-    case XK_KP_3:
-    case XK_KP_4:
-    case XK_KP_5:
-    case XK_KP_6:
-    case XK_KP_7:
-    case XK_KP_8:
-    case XK_KP_9:
-    {
-      windows->magnify.data=(key_symbol-XK_KP_0);
-      break;
-    }
-    default:
-      break;
-  }
+  const int
+    key = (int) key_symbol;
+
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(MagnifyDigitKeys)/sizeof(*MagnifyDigitKeys)); i++)
+    if (MagnifyDigitKeys[i].key == key)
+      {
+        windows->magnify.data=(key_symbol-MagnifyDigitKeys[i].base);
+        break;
+      }
 }
 
 static void XMoveMagnifyRightDown(XWindows *windows,const unsigned int quantum,
@@ -20666,6 +20948,363 @@ static void XFillMissingTile(const XTileFillInfo *fill)
   }
 }
 
+typedef struct _XTileInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    height,
+    width;
+
+  char
+    *filename;
+
+  const ModeType
+    *TileCommands;
+
+  int
+    id;
+} XTileInput;
+
+static void XTileUpdateImage(const XTileInput *input)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  Image
+    *const image = input->image;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  const int
+    x = input->x,
+    y = input->y;
+
+  const unsigned int
+    height = input->height,
+    width = input->width;
+
+  char
+    filename[MagickPathExtent],
+    *p,
+    *q;
+
+  int
+    tile;
+
+  int
+    x_offset,
+    y_offset;
+
+  PixelInfo
+    pixel;
+
+  /*
+    Ensure all the images exist.
+  */
+  tile=0;
+  GetPixelInfo(image,&pixel);
+  for (p=image->directory; *p != '\0'; p++)
+  {
+    CacheView
+      *image_view;
+
+    q=p;
+    while ((IsTileNameCharacter(q) != MagickFalse) &&
+           ((size_t) (q-p+1) < sizeof(filename)))
+      q++;
+    (void) CopyMagickString(filename,p,(size_t) (q-p+1));
+    p=q;
+    if (IsPathAccessible(filename) != MagickFalse)
+      {
+        tile++;
+        continue;
+      }
+    /*
+      Overwrite tile with background color.
+    */
+    x_offset=((int) width*(tile % (((int) image->columns-x)/(int) width))+
+      x);
+    y_offset=((int) height*(tile/(((int) image->columns-x)/(int) width))+
+      y);
+    image_view=AcquireAuthenticCacheView(image,exception);
+    (void) GetOneCacheViewVirtualPixelInfo(image_view,0,0,&pixel,exception);
+    {
+      const XTileFillInfo
+        fill = { image, image_view, x_offset, y_offset, height, width,
+          pixel, exception };
+
+      XFillMissingTile(&fill);
+    }
+    image_view=DestroyCacheView(image_view);
+    tile++;
+  }
+  windows->image.window_changes.width=(int) image->columns;
+  windows->image.window_changes.height=(int) image->rows;
+  XConfigureImageColormap(display,resource_info,windows,image,exception);
+  (void) XConfigureImage(display,resource_info,windows,image,exception);
+}
+
+static Image *XTileLoadImage(const XTileInput *input)
+{
+  Display
+    *const display = input->display;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  char
+    *const filename = input->filename;
+
+  Image
+    *tile_image;
+
+  /*
+    Load tile image.
+  */
+  XCheckRefreshWindows(display,windows);
+  (void) CopyMagickString(resource_info->image_info->magick,"MIFF",
+    MagickPathExtent);
+  (void) CopyMagickString(resource_info->image_info->filename,filename,
+    MagickPathExtent);
+  tile_image=ReadImage(resource_info->image_info,exception);
+  CatchException(exception);
+  (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+  return(tile_image);
+}
+
+static void XScaleTileEvent(Image *image,XWindows *windows,XEvent *event)
+{
+  double
+    scale_factor;
+
+  int
+    x,
+    y;
+
+  unsigned int
+    height,
+    width;
+
+  /*
+    Tile image is relative to montage image configuration.
+  */
+  x=0;
+  y=0;
+  width=(unsigned int) image->columns;
+  height=(unsigned int) image->rows;
+  if (windows->image.crop_geometry != (char *) NULL)
+    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
+  scale_factor=(double) width/windows->image.ximage->width;
+  event->xbutton.x+=windows->image.x;
+  event->xbutton.x=(int) (scale_factor*event->xbutton.x+x+0.5);
+  scale_factor=(double) height/windows->image.ximage->height;
+  event->xbutton.y+=windows->image.y;
+  event->xbutton.y=(int) (scale_factor*event->xbutton.y+y+0.5);
+}
+
+typedef struct _XTileLocationTargets
+{
+  unsigned int
+    *width,
+    *height;
+
+  int
+    *x,
+    *y;
+
+  char
+    **p;
+} XTileLocationTargets;
+
+static MagickBooleanType XLocateTile(Display *display,Image *image,
+  XEvent *event,const XTileLocationTargets *targets)
+{
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  char
+    **const p = targets->p;
+
+  unsigned int
+    *const width = targets->width,
+    *const height = targets->height;
+
+  int
+    i,
+    tile;
+
+  /*
+    Determine size and location of each tile in the visual image directory.
+  */
+  (*width)=(unsigned int) image->columns;
+  (*height)=(unsigned int) image->rows;
+  (*x)=0;
+  (*y)=0;
+  (void) XParseGeometry(image->montage,x,y,width,height);
+  tile=((event->xbutton.y-(*y))/(int) (*height))*(((int) image->columns-(*x))/(int)
+    (*width))+(event->xbutton.x-(*x))/(int) (*width);
+  if (tile < 0)
+    {
+      /*
+        Button press is outside any tile.
+      */
+      (void) XBell(display,0);
+      return(MagickFalse);
+    }
+  /*
+    Determine file name from the tile directory.
+  */
+  (*p)=image->directory;
+  for (i=tile; (i != 0) && (*(*p) != '\0'); )
+  {
+    if (*(*p) == '\xff')
+      i--;
+    (*p)++;
+  }
+  if (*(*p) == '\0')
+    {
+      /*
+        Button press is outside any tile.
+      */
+      (void) XBell(display,0);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static void XTileDeleteImage(const XTileInput *input)
+{
+  Display
+    *const display = input->display;
+
+  XWindows
+    *const windows = input->windows;
+
+  char
+    *const filename = input->filename;
+
+  int
+    status;
+
+  /*
+    Delete tile image.
+  */
+  if (IsPathAccessible(filename) == MagickFalse)
+    {
+      XNoticeWidget(display,windows,"Image file does not exist:",filename);
+      return;
+    }
+  status=XConfirmWidget(display,windows,"Really delete tile",filename);
+  if (status <= 0)
+    return;
+  status=ShredFile(filename) == MagickFalse ? 0 : 1;
+  status|=remove_utf8(filename);
+  if (status != MagickFalse)
+    {
+      XNoticeWidget(display,windows,"Unable to delete image file:",
+        filename);
+      return;
+    }
+  XTileUpdateImage(input);
+}
+
+static Image *XTileCommand(const XTileInput *input)
+{
+  Display
+    *const display = input->display;
+
+  XWindows
+    *const windows = input->windows;
+
+  const ModeType
+    *const TileCommands = input->TileCommands;
+
+  const int
+    id = input->id;
+
+  Image
+    *tile_image;
+
+  /*
+    Perform command for the selected tile.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  tile_image=NewImageList();
+  switch (TileCommands[id])
+  {
+    case TileLoadCommand:
+    {
+      tile_image=XTileLoadImage(input);
+      break;
+    }
+    case TileNextCommand:
+    {
+      /*
+        Display next image.
+      */
+      XClientMessage(display,windows->image.id,windows->im_protocols,
+        windows->im_next_image,CurrentTime);
+      break;
+    }
+    case TileFormerCommand:
+    {
+      /*
+        Display former image.
+      */
+      XClientMessage(display,windows->image.id,windows->im_protocols,
+        windows->im_former_image,CurrentTime);
+      break;
+    }
+    case TileDeleteCommand:
+    {
+      XTileDeleteImage(input);
+      break;
+    }
+    case TileUpdateCommand:
+    {
+      XTileUpdateImage(input);
+      break;
+    }
+    default:
+      break;
+  }
+  XSetCursorState(display,windows,MagickFalse);
+  return(tile_image);
+}
+
 static Image *XTileImage(Display *display,XResourceInfo *resource_info,
   XWindows *windows,Image *image,XEvent *event,ExceptionInfo *exception)
 {
@@ -20694,81 +21333,28 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
     command[MagickPathExtent],
     filename[MagickPathExtent];
 
-  Image
-    *tile_image;
-
   int
     id,
-    status,
-    tile,
     x,
     y;
-
-  double
-    scale_factor;
 
   char
     *p,
     *q;
 
-  int
-    i;
-
   unsigned int
     height,
     width;
 
-  /*
-    Tile image is relative to montage image configuration.
-  */
-  x=0;
-  y=0;
-  width=(unsigned int) image->columns;
-  height=(unsigned int) image->rows;
-  if (windows->image.crop_geometry != (char *) NULL)
-    (void) XParseGeometry(windows->image.crop_geometry,&x,&y,&width,&height);
-  scale_factor=(double) width/windows->image.ximage->width;
-  event->xbutton.x+=windows->image.x;
-  event->xbutton.x=(int) (scale_factor*event->xbutton.x+x+0.5);
-  scale_factor=(double) height/windows->image.ximage->height;
-  event->xbutton.y+=windows->image.y;
-  event->xbutton.y=(int) (scale_factor*event->xbutton.y+y+0.5);
-  /*
-    Determine size and location of each tile in the visual image directory.
-  */
-  width=(unsigned int) image->columns;
-  height=(unsigned int) image->rows;
-  x=0;
-  y=0;
-  (void) XParseGeometry(image->montage,&x,&y,&width,&height);
-  tile=((event->xbutton.y-y)/(int) height)*(((int) image->columns-x)/(int)
-    width)+(event->xbutton.x-x)/(int) width;
-  if (tile < 0)
-    {
-      /*
-        Button press is outside any tile.
-      */
-      (void) XBell(display,0);
-      return((Image *) NULL);
-    }
-  /*
-    Determine file name from the tile directory.
-  */
-  p=image->directory;
-  for (i=tile; (i != 0) && (*p != '\0'); )
-  {
-    if (*p == '\xff')
-      i--;
-    p++;
-  }
-  if (*p == '\0')
-    {
-      /*
-        Button press is outside any tile.
-      */
-      (void) XBell(display,0);
-      return((Image *) NULL);
-    }
+  XTileInput
+    input;
+
+  const XTileLocationTargets
+    location = { &width, &height, &x, &y, &p };
+
+  XScaleTileEvent(image,windows,event);
+  if (XLocateTile(display,image,event,&location) == MagickFalse)
+    return((Image *) NULL);
   /*
     Select a command from the pop-up menu.
   */
@@ -20780,135 +21366,19 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
          ((size_t) (q-p+1) < sizeof(filename)))
     q++;
   (void) CopyMagickString(filename,p,(size_t) (q-p+1));
-  /*
-    Perform command for the selected tile.
-  */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  tile_image=NewImageList();
-  switch (TileCommands[id])
-  {
-    case TileLoadCommand:
-    {
-      /*
-        Load tile image.
-      */
-      XCheckRefreshWindows(display,windows);
-      (void) CopyMagickString(resource_info->image_info->magick,"MIFF",
-        MagickPathExtent);
-      (void) CopyMagickString(resource_info->image_info->filename,filename,
-        MagickPathExtent);
-      tile_image=ReadImage(resource_info->image_info,exception);
-      CatchException(exception);
-      (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
-      break;
-    }
-    case TileNextCommand:
-    {
-      /*
-        Display next image.
-      */
-      XClientMessage(display,windows->image.id,windows->im_protocols,
-        windows->im_next_image,CurrentTime);
-      break;
-    }
-    case TileFormerCommand:
-    {
-      /*
-        Display former image.
-      */
-      XClientMessage(display,windows->image.id,windows->im_protocols,
-        windows->im_former_image,CurrentTime);
-      break;
-    }
-    case TileDeleteCommand:
-    {
-      /*
-        Delete tile image.
-      */
-      if (IsPathAccessible(filename) == MagickFalse)
-        {
-          XNoticeWidget(display,windows,"Image file does not exist:",filename);
-          break;
-        }
-      status=XConfirmWidget(display,windows,"Really delete tile",filename);
-      if (status <= 0)
-        break;
-      status=ShredFile(filename) == MagickFalse ? 0 : 1;
-      status|=remove_utf8(filename);
-      if (status != MagickFalse)
-        {
-          XNoticeWidget(display,windows,"Unable to delete image file:",
-            filename);
-          break;
-        }
-      magick_fallthrough;
-    }
-    case TileUpdateCommand:
-    {
-      int
-        x_offset,
-        y_offset;
-
-      PixelInfo
-        pixel;
-
-      /*
-        Ensure all the images exist.
-      */
-      tile=0;
-      GetPixelInfo(image,&pixel);
-      for (p=image->directory; *p != '\0'; p++)
-      {
-        CacheView
-          *image_view;
-
-        XTileFillInfo
-          fill;
-
-        q=p;
-        while ((IsTileNameCharacter(q) != MagickFalse) &&
-               ((size_t) (q-p+1) < sizeof(filename)))
-          q++;
-        (void) CopyMagickString(filename,p,(size_t) (q-p+1));
-        p=q;
-        if (IsPathAccessible(filename) != MagickFalse)
-          {
-            tile++;
-            continue;
-          }
-        /*
-          Overwrite tile with background color.
-        */
-        x_offset=((int) width*(tile % (((int) image->columns-x)/(int) width))+
-          x);
-        y_offset=((int) height*(tile/(((int) image->columns-x)/(int) width))+
-          y);
-        image_view=AcquireAuthenticCacheView(image,exception);
-        (void) GetOneCacheViewVirtualPixelInfo(image_view,0,0,&pixel,exception);
-        fill.image=image;
-        fill.image_view=image_view;
-        fill.x_offset=x_offset;
-        fill.y_offset=y_offset;
-        fill.height=height;
-        fill.width=width;
-        fill.pixel=pixel;
-        fill.exception=exception;
-        XFillMissingTile(&fill);
-        image_view=DestroyCacheView(image_view);
-        tile++;
-      }
-      windows->image.window_changes.width=(int) image->columns;
-      windows->image.window_changes.height=(int) image->rows;
-      XConfigureImageColormap(display,resource_info,windows,image,exception);
-      (void) XConfigureImage(display,resource_info,windows,image,exception);
-      break;
-    }
-    default:
-      break;
-  }
-  XSetCursorState(display,windows,MagickFalse);
-  return(tile_image);
+  input.display=display;
+  input.resource_info=resource_info;
+  input.windows=windows;
+  input.image=image;
+  input.exception=exception;
+  input.x=x;
+  input.y=y;
+  input.height=height;
+  input.width=width;
+  input.filename=filename;
+  input.TileCommands=TileCommands;
+  input.id=id;
+  return(XTileCommand(&input));
 }
 
 static void XClampImageOffset(XWindows *windows)
