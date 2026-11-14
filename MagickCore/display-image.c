@@ -20882,9 +20882,6 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
         CacheView
           *image_view;
 
-        XTileFillInfo
-          fill;
-
         q=p;
         while ((IsTileNameCharacter(q) != MagickFalse) &&
                ((size_t) (q-p+1) < sizeof(filename)))
@@ -20905,15 +20902,13 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
           y);
         image_view=AcquireAuthenticCacheView(image,exception);
         (void) GetOneCacheViewVirtualPixelInfo(image_view,0,0,&pixel,exception);
-        fill.image=image;
-        fill.image_view=image_view;
-        fill.x_offset=x_offset;
-        fill.y_offset=y_offset;
-        fill.height=height;
-        fill.width=width;
-        fill.pixel=pixel;
-        fill.exception=exception;
-        XFillMissingTile(&fill);
+        {
+          const XTileFillInfo
+            fill = { image, image_view, x_offset, y_offset, height, width,
+              pixel, exception };
+
+          XFillMissingTile(&fill);
+        }
         image_view=DestroyCacheView(image_view);
         tile++;
       }
