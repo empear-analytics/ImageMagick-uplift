@@ -1020,6 +1020,21 @@ static void OutputHuffmanEndOfPage(const ImageInfo *image_info,Image *image,
   }
 }
 
+static void FinishHuffmanPage(const ImageInfo *image_info,Image *image,
+  HuffmanBitWriter *writer)
+{
+  /*
+    End of page.
+  */
+  OutputHuffmanEndOfPage(image_info,image,&(*writer).byte,&(*writer).bit);
+  /*
+    Flush bits.
+  */
+  FlushHuffmanBits(image_info,image,(*writer).byte,(*writer).bit);
+  if (LocaleCompare(image_info->magick,"FAX") != 0)
+    Ascii85Flush(image);
+}
+
 MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
   Image *image,Image *inject_image,ExceptionInfo *exception)
 {
@@ -1107,16 +1122,7 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
     if (UpdateHuffmanProgress(huffman_image,y) == MagickFalse)
       break;
   }
-  /*
-    End of page.
-  */
-  OutputHuffmanEndOfPage(image_info,image,&writer.byte,&writer.bit);
-  /*
-    Flush bits.
-  */
-  FlushHuffmanBits(image_info,image,writer.byte,writer.bit);
-  if (LocaleCompare(image_info->magick,"FAX") != 0)
-    Ascii85Flush(image);
+  FinishHuffmanPage(image_info,image,&writer);
   huffman_image=DestroyImage(huffman_image);
   scanline=(unsigned char *) RelinquishMagickMemory(scanline);
   return(MagickTrue);
