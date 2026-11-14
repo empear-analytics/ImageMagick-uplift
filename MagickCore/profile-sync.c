@@ -940,6 +940,13 @@ static inline MagickBooleanType IsInvalidExifOffset(const ssize_t offset,
     MagickFalse);
 }
 
+static inline MagickBooleanType IsOutsideExifProfile(
+  const unsigned char *directory,const unsigned char *exif,const size_t length)
+{
+  return(((directory < exif) || (directory > (exif+length-2))) ? MagickTrue :
+    MagickFalse);
+}
+
 static void SyncExifProfile(const Image *image,unsigned char *exif,
   size_t length)
 {
@@ -993,7 +1000,7 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
         directory=directory_stack[level].directory;
         entry=directory_stack[level].entry;
       }
-    if ((directory < exif) || (directory > (exif+length-2)))
+    if (IsOutsideExifProfile(directory,exif,length) != MagickFalse)
       break;
     walk.image=image;
     walk.endian=endian;
