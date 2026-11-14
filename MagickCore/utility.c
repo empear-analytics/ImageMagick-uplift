@@ -1077,6 +1077,29 @@ static char **AcquireArgumentVector(const int *number_arguments,
   return(vector);
 }
 
+static MagickBooleanType CollectArgumentFiles(
+  const WildcardArgument *wildcard,char *magick,
+  const ArgumentFileTargets *targets)
+{
+  char
+    *const option = wildcard->option,
+    *const filename = wildcard->filename;
+
+  char
+    ***const filelist = targets->filelist;
+
+  size_t
+    *const number_files = targets->number_files;
+
+  if (ParseExpandableArgument(option,filename,magick) == MagickFalse)
+    return(MagickFalse);
+  if (ListArgumentFiles(wildcard,filelist,number_files) == MagickFalse)
+    return(MagickFalse);
+  if (HasFileListFiles(filelist,*number_files) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
   char ***arguments)
 {
@@ -1133,17 +1156,14 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
         CopyArgumentParameters(&list,&i,&count);
         continue;
       }
-    if (ParseExpandableArgument(option,filename,magick) == MagickFalse)
-      continue;
     {
       const WildcardArgument wildcard = { option, filename, path, subimage,
         home_directory };
+      const ArgumentFileTargets targets = { &filelist, &number_files };
 
-      if (ListArgumentFiles(&wildcard,&filelist,&number_files) == MagickFalse)
+      if (CollectArgumentFiles(&wildcard,magick,&targets) == MagickFalse)
         continue;
     }
-    if (HasFileListFiles(&filelist,number_files) == MagickFalse)
-      continue;
     /*
       Transfer file list to argument vector.
     */
