@@ -11833,6 +11833,17 @@ end in `break;`.
    is, entered by its own label.
 4. Check by reading that `A` now ends in `break;` on every path and `B` is untouched; the
    next step is the Recipe that moves `A` (CT, whose helper then holds the call).
+5. A function no case reaches (2026-11-14). The step applies at the guard level as it stands:
+   `Verified: guard`, with `casemap.py` printing 0 for the function and its callers' reach
+   stated, `refactor_guard.py` printing `OK` for the literals, `--calls` reporting `+1` for `Q`
+   (the one added call) and nothing else, and steps 1 and 2 checked by reading, every argument
+   of the added call against the call it copies (the text is a character-for-character copy,
+   so a transposed argument cannot arise). Where the compiler merges the two identical tails (a
+   call and a jump), `WIDE=1 NOINLINE=<Caller>,<Q> sh tools/obj_modulo.sh <file> <Caller> <Q>`
+   prints `IDENTICAL` (the whole object byte for byte, with the caller and `Q` kept out of line on
+   both sides), and that is the proof, as for Recipe D; where it does not, the function's own
+   instructions differ and the guard above stands alone. The case the step opens is Recipe E step 7
+   or Recipe N on `A`, which is itself a guard-level recipe.
 
 **Before:**
 
@@ -11895,19 +11906,33 @@ end in `break;`.
   (the one added call), which is this recipe's expected movement and nothing else.
 - Removing `magick_fallthrough;` removes a `-Wimplicit-fallthrough` annotation the case no
   longer needs, as `A` now ends in `break;`.
+- On a function no case runs (step 5) the behaviour argument is the same and exact: the only
+  change is where the call stands. Every execution that reached `magick_fallthrough;` ran, in
+  order, the entry of `B`'s group (its label is a jump target only, nothing runs at it), `B`'s one
+  call with the argument values of that point (step 2: names declared outside both cases, none
+  written between), and `B`'s `break;`; now the same call with the same values and the same
+  `break;` run inside `A`. The paths that left `A` earlier, and a dispatch on `B`'s label, run what
+  they ran. No statement is added, removed or reordered but the call itself.
 - Step 2 is about scope, not values: arguments such as `&event_input` and `crop_info` name
   objects declared in the loop body or the function, outside the `switch`; a call whose
   argument is a local of `B`'s own block (declared inside it) is refused.
 
 **Evidence level:** oracle (the fall-through path is the one most cases take), with
-`refactor_guard.py --calls` (`+1` for `Q`) and steps 1 and 2 checked by reading.
+`refactor_guard.py --calls` (`+1` for `Q`) and steps 1 and 2 checked by reading; on a function
+no case reaches, guard on step 5's terms.
 
 **Provenance:** 2026-11-11, from `display.c`'s `XCropImage` (campaign A, W18 lane b, wide
 build): its ButtonPress case ends `magick_fallthrough;` into ButtonRelease, so CT step 1
 refuses it and its four corner tests keep the function at depth 4; SD would hold twelve
 decisions in one helper. A probe of the chain (Recipe N on ButtonRelease, this recipe,
 CT on ButtonPress): the cases leave the depth-4 sites. Added by Claude Code (Claude
-Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes. Step 5 (2026-11-14, W23
+round twelve lane b, wide build): `display-image.c`'s `XTileImage`, which no case reaches (0 cases
+of 14,200): its Delete case ends `magick_fallthrough;` into the Update case, which Recipe N made
+`XTileUpdateImage(&input); break;`; every guard-level recipe that could move the Delete body (E step
+7, N) needs the case to end in `break;`, and SD's `switch_split_check.py` refuses the input-struct
+form. Added by Claude Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the
+recipes, for the owner's confirmation.
 
 ---
 
@@ -16501,3 +16526,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | S | Step 2: a multi-line `#define` (backslash continuation) moves verbatim with the family on the terms of a one-line define: no line of the kept part names it, and the multi-line defines it names move with it (a macro that anything staying names refuses the split). The amendment gives the argument (a macro is text; the kept part names none of them, and the moved functions are their only users, so every expansion gives the tokens it gave before) | `xwindow.c`'s `XGammaPixel`, `XGammaPacket`, `XRedGamma`, `XGreenGamma`, `XBlueGamma` and `XStandardPixel` (campaign A, W23 lane b, split scan): used only by the `XMakeImage`, `XGetPixelInfo` and `XMakeStandardColormap` families, they refused every split that moves those; `tools/split_source.py` takes the form (`tools/test_split_source.py`: nested multi-line defines move, and a kept root naming the outer or the inner macro is refused) | owner |
 | 2026-11-14 | AMEND | E | Step 4: a temporary the block only writes, never reads, that nothing after the block reads and that the caller keeps because other blocks use the same name, passes as a pointer `T *v` (stores written `*v`, the call passing `&v`) on the terms of the pointer paragraph before it, since declaring it in the new function leaves it set but never used (`-Wunused-but-set-variable`, an error in the CI jobs; no recipe deletes the store). The argument: the stores are the same stores of the same values, into a variable that nothing reads afterwards, so the caller's variable and a local of the new function cannot be told apart by any path | `display-image.c`'s `XMagickCommand` (campaign A, W23 round eleven lane c, wide build): the OilPaintCommand case writes `flags=ParseGeometry(radius,&geometry_info);` and reads `geometry_info` alone, so the helper's own `flags` draws the warning (`ci_linux_warnings` clang and gcc, `-DNDEBUG` scan); every other use of `flags` in `XMagickCommand` is a store, or a read after the same case's own store | owner |
 | 2026-11-14 | AMEND | CT | Step 3, event-loop form: with a targets struct that serves every block of one event loop, a case that writes only one member, or none and only reads members, moves in this form too (every member it names bound and used as `(*v)`), instead of Recipe E step 7's value form, which would carry the reads as by-value parameters past four. The argument is the struct's own: a member holds the local's address, so each access touches the same object at the same point whatever the number of members written | `display-image.c`'s `XDisplayImage`: the ConfigureNotify case writes `status` alone and reads `event`, `display_image` and `vid_info`; the event switch's cases are to share `DisplayEventTargets` so that the switch can later move whole (campaign A, W23 round eleven, lane d; Claude Code, Opus 5.5) | owner |
+| 2026-11-14 | AMEND | FT | Step 5 (*unreached functions*): the step applies to a function no case reaches at the guard level (`Verified: guard`): `refactor_guard.py` OK, `--calls` `+1` for `Q` and nothing else, steps 1 and 2 by reading. The argument: the call is a character-for-character copy of the one the next case runs, at the point where the fall-through entered it, with the same argument values, followed by the same `break;`; nothing is added, removed or reordered but that call | `display-image.c`'s `XTileImage` (campaign A, W23 round twelve lane b, wide build): the Delete case falls through into Update's `XTileUpdateImage(&input); break;`; no case reaches the function, and the guard-level recipes that move the Delete body (E step 7, N) need it to end in `break;` (Claude Code, Sonnet 5.5) | owner |
