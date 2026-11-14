@@ -17249,6 +17249,90 @@ Lane: b
 
 ---
 
+## Recipe FW - Fold a Pointer-Advancing Writer into Its Index-Returning Twin
+
+**Use when:** a file sits at CodeScene's *Number of Functions in a Single Module*
+threshold, so that the helper the next step needs would trip it, and two `static`
+functions of the file write the same bytes, one through a pointer it advances and
+returns, the other at an index of a buffer it advances and returns: `xml-tree.c`'s
+`WriteUTF8Sequence(xml,c)`, which writes the UTF-8 bytes of `c` at `*xml`, `xml++` after
+each, and returns `xml`, and `WriteUTF8Bytes(utf8,j,c)`, which writes the same bytes at
+`utf8[j]`, `j++` after each, and returns `j`. Removing the first frees a place for a
+helper.
+
+**Not covered by:** Recipe D, whose copies are the same text under renaming (here a
+pointer write `*xml=e; xml++;` faces an indexed one `utf8[j++]=e;`, and a counting local
+differs in type); Recipe FG, whose twin differs only by an expression of a parameter;
+Recipe TI and MT, which merge two copies into a new function.
+
+**How:**
+
+1. `F(T *x,a1,...,an)` returns `T *` and `G(T *b,ssize_t j,a1,...,an)` returns `ssize_t`;
+   both `static`, in one file, neither's address taken (`grep`).
+2. Align the statements one to one (by script after the renames below, then by reading):
+   each `*x=e; x++;` (or `*x++=e;`) of `F` faces `b[j]=e; j++;` (or `b[j++]=e;`) of `G`
+   with the same `e`; `return(x);` faces `return(j);`; every other statement is the same
+   text once `F`'s locals are renamed to `G`'s. Neither reads `x`/`b` or `j` except at
+   those writes, and neither writes through any other pointer.
+3. A local that differs only in its integer type (`ssize_t i` against `int bits`) is
+   allowed when every value it takes fits both types, so each expression that reads it
+   has the same value (by reading: a bit count of an `int` stays within 0..32). Numeric
+   literals that differ only in spelling (`0x3F` against `0x3f`) are the same value.
+4. Then `F(p,a1,...,an)` writes what `G(p,0,a1,...,an)` writes, at the same addresses in
+   the same order, and returns `p+G(p,0,a1,...,an)`. Replace each call statement
+   `p=F(p,a1,...,an);` by `p+=G(p,0,a1,...,an);`, where `p` has no side effect (a
+   variable or `*v`); `p` is read once for the base and once for the sum, both before
+   anything is written to it.
+5. Delete `F`. Build: a call left behind does not compile. Run `refactor_guard.py
+   --calls --renamed F=G`.
+
+**Before:**
+
+```c
+static char *WriteUTF8Sequence(char *xml,const int c)
+{
+  ...
+  *xml=(char) ((0xFF << (7-i)) | (c >> (6*i)));
+  xml++;
+  while (i != 0)
+  {
+    i--;
+    *xml=(char) (0x80 | ((c >> (6*i)) & 0x3F));
+    xml++;
+  }
+  return(xml);
+}
+...
+      *xml=WriteUTF8Sequence(*xml,c);
+```
+
+**After:**
+
+```c
+      *xml+=WriteUTF8Bytes(*xml,0,c);
+```
+
+**Careful:**
+
+- The bytes, their addresses and their order are those of step 2's alignment: `G` with
+  `b=p` and `j=0` writes `p[0]`, `p[1]`, ... where `F` wrote `*p`, then `*(p+1)`, ...
+- A shift count or other operand computed from the retyped local has the same value in
+  both (step 3); a shift past the width of `int` is undefined in both alike, with the same
+  count, so the step adds no new undefined case.
+- `p+=G(...)` evaluates `p` before the call for the argument and after it for the sum;
+  `G` writes only bytes of the buffer, never `p` itself (it receives `p`'s value).
+
+**Evidence level:** oracle (the cases that reach `F`'s callers; at least one case runs
+`F`).
+
+**Provenance:** 2026-11-14, from `xml-tree.c`'s `WriteUTF8Sequence` and `WriteUTF8Bytes`
+(campaign B, M127 lane b round 8), noted as near twins by lane a; the file's 112th
+function trips *Number of Functions*. Added by Claude Code (Claude Opus 5.5) under the
+mandate of 2026-10-24.
+Lane: b
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -17630,3 +17714,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | KC | Step 7: groups `v=x; break;` with a non-literal `x` stay, with `default:`, in a kept `switch` that is step 4's `else` branch; Lane: b | `quantum-type.c`'s `GetQuantumChannels` (twelve literal channel counts and `MultispectralQuantum`'s `GetImageChannels(image)`) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | PT | Peel a Leaving Label Set out of a Selection into a Membership Table: PL's peel with TB's table predicate in one step, for a file of six functions where PL's label-run predicate and the seventh function each dip; Lane: b | `quantum-type.c`'s `SetQuantumImageType` (PL alone 8.92, PT alone 9.09, with PL on the index labels 10.0 from 9.58) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | FG | Fold a Function into the Twin Taking Its Derived Argument: `F(...,t)` whose body is `G(...,s)`'s with `E(t)` for `s` loses its calls to `G(...,E(b))` and is deleted, freeing a place under the function-count threshold; Lane: b | `xml-tree.c`'s `ExtendXMLBuffer`/`ExtendXMLBufferBy` (111 functions; the 112th costs 0.17) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | FW | Fold a Pointer-Advancing Writer into Its Index-Returning Twin: `p=F(p,...);` becomes `p+=G(p,0,...);` when `G` writes at `b[j++]` the bytes `F` writes at `*x++`, and `F` is deleted, freeing a place under the function-count threshold; Lane: b | `xml-tree.c`'s `WriteUTF8Sequence`/`WriteUTF8Bytes` (110 functions; the 112th costs 0.17) | mandate (2026-10-24) |
