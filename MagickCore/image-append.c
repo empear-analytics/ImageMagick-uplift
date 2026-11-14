@@ -303,6 +303,17 @@ static void SubtractAppendGeometry(const RectangleInfo *geometry,
     (*y_offset)-=geometry->y;
 }
 
+static void CheckAppendArguments(const Image *images,
+  ExceptionInfo *exception)
+{
+  assert(images != (Image *) NULL);
+  assert(images->signature == MagickCoreSignature);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
+}
+
 MagickExport Image *AppendImages(const Image *images,
   const MagickBooleanType stack,ExceptionInfo *exception)
 {
@@ -347,12 +358,7 @@ MagickExport Image *AppendImages(const Image *images,
   /*
     Compute maximum area of appended area.
   */
-  assert(images != (Image *) NULL);
-  assert(images->signature == MagickCoreSignature);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
+  CheckAppendArguments(images,exception);
   alpha_trait=images->alpha_trait;
   number_images=1;
   width=images->columns;
