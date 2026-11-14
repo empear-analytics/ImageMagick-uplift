@@ -3319,6 +3319,14 @@ static const char *CloneMagickPropertyValue(ImageInfo *image_info,
     return((const char *) NULL); \
   }
 
+static const char *SelectMagickPropertyValue(ImageInfo *image_info,
+  Image *image,const char *string,const char *value)
+{
+  if (string != (char *) NULL)
+    return(string);
+  return(CloneMagickPropertyValue(image_info,image,value));
+}
+
 static void LogMagickPropertyRequest(const ImageInfo *image_info,
   const Image *image)
 {
@@ -4714,9 +4722,7 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
       break;
     }
   }
-  if (string != (char *) NULL)
-    return(string);
-  return(CloneMagickPropertyValue(image_info,image,value));
+  return(SelectMagickPropertyValue(image_info,image,string,value));
 }
 #undef WarnNoImageReturn
 
