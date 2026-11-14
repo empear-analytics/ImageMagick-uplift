@@ -24553,6 +24553,70 @@ static void XDispatchMapEvent(const DisplayEventContext *event_context,
   }
 }
 
+static void XDispatchExposeEvent(const DisplayEventContext *event_context,
+  const DisplayEventTargets *event_targets)
+{
+  Display
+    *const display = event_context->display;
+
+  XResourceInfo
+    *const resource_info = event_context->resource_info;
+
+  XWindows
+    *const windows = event_context->windows;
+
+  XStandardColormap
+    *const map_info = event_context->map_info;
+
+  size_t
+    *const state = event_context->state;
+
+  XVisualInfo
+    *const visual_info = event_context->visual_info;
+
+  XEvent
+    *const event = event_targets->event;
+
+  switch ((*event).type)
+  {
+    case DestroyNotify:
+    {
+      /*
+        Group leader has exited.
+      */
+      if (resource_info->debug != MagickFalse)
+        (void) LogMagickEvent(X11Event,GetMagickModule(),
+          "Destroy Notify: 0x%lx",(*event).xdestroywindow.window);
+      if ((*event).xdestroywindow.window == windows->group_leader.id)
+        {
+          *state|=ExitState;
+          break;
+        }
+      break;
+    }
+    case EnterNotify:
+    {
+      /*
+        Selectively install colormap.
+      */
+      if (IsSelectiveColormapCrossing(display,map_info,visual_info,
+            (*event).xcrossing.mode) != MagickFalse)
+        XInstallColormap(display,map_info->colormap);
+      break;
+    }
+    case Expose:
+    {
+      XHandleExpose(event_context,event_targets);
+      break;
+    }
+    default:
+    {
+      XDispatchMapEvent(event_context,event_targets);
+      break;
+    }
+  }
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -24980,36 +25044,6 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
         XHandleConfigureNotify(&event_context,&event_targets);
         break;
       }
-      case DestroyNotify:
-      {
-        /*
-          Group leader has exited.
-        */
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Destroy Notify: 0x%lx",event.xdestroywindow.window);
-        if (event.xdestroywindow.window == windows->group_leader.id)
-          {
-            *state|=ExitState;
-            break;
-          }
-        break;
-      }
-      case EnterNotify:
-      {
-        /*
-          Selectively install colormap.
-        */
-        if (IsSelectiveColormapCrossing(display,map_info,visual_info,
-              event.xcrossing.mode) != MagickFalse)
-          XInstallColormap(display,map_info->colormap);
-        break;
-      }
-      case Expose:
-      {
-        XHandleExpose(&event_context,&event_targets);
-        break;
-      }
       case KeyPress:
       {
         int
@@ -25038,7 +25072,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
       }
       default:
       {
-        XDispatchMapEvent(&event_context,&event_targets);
+        XDispatchExposeEvent(&event_context,&event_targets);
         break;
       }
     }
