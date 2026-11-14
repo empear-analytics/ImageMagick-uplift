@@ -10547,6 +10547,59 @@ static void XApplyDespeckleCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyMapCommand(const XMagickCommandContext *context,
+  QuantizeInfo quantize_info)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ImageInfo
+    *const image_info = context->image_info;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  Image
+    *affinity_image;
+
+  static char
+    filename[MagickPathExtent] = "\0";
+
+  /*
+    Request image file name from user.
+  */
+  XFileBrowserWidget(display,windows,"Map",filename);
+  if (*filename == '\0')
+    return;
+  /*
+    Map image.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) CopyMagickString(image_info->filename,filename,MagickPathExtent);
+  affinity_image=ReadImage(image_info,exception);
+  if (affinity_image != (Image *) NULL)
+    {
+      (void) RemapImage(&quantize_info,*image,affinity_image,exception);
+      affinity_image=DestroyImage(affinity_image);
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyRollCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11663,39 +11716,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       break;
     }
     case MapCommand:
-    {
-      Image
-        *affinity_image;
-
-      static char
-        filename[MagickPathExtent] = "\0";
-
-      /*
-        Request image file name from user.
-      */
-      XFileBrowserWidget(display,windows,"Map",filename);
-      if (*filename == '\0')
-        break;
-      /*
-        Map image.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      (void) CopyMagickString(image_info->filename,filename,MagickPathExtent);
-      affinity_image=ReadImage(image_info,exception);
-      if (affinity_image != (Image *) NULL)
-        {
-          (void) RemapImage(&quantize_info,*image,affinity_image,exception);
-          affinity_image=DestroyImage(affinity_image);
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyMapCommand(&context,quantize_info);
       break;
-    }
     case QuantizeCommand:
     {
       int
