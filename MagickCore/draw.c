@@ -3027,6 +3027,8 @@ typedef struct _MVGRenderState
     *current;
 
   char
+    *keyword,
+    **primitive,
     **token;
 
   const char
@@ -3062,6 +3064,7 @@ typedef struct _MVGRenderState
     *primitive_type;
 
   size_t
+    depth,
     *extent,
     *number_points,
     *number_stops;
@@ -3070,9 +3073,12 @@ typedef struct _MVGRenderState
     **macros;
 
   ssize_t
+    *classDepth,
+    *defsDepth,
     *i,
     *j,
     *n,
+    *symbolDepth,
     *x;
 
   StopInfo
@@ -3957,6 +3963,3018 @@ static ssize_t CountMVGDashValues(const char *r,const size_t extent,
   return(x);
 }
 
+typedef MagickBooleanType
+  (*ParseMVGKeywordMethod)(const MVGRenderState *);
+
+typedef struct _MVGKeywordInfo
+{
+  const char
+    *keyword;
+
+  PrimitiveType
+    primitive;
+
+  ParseMVGKeywordMethod
+    parse;
+} MVGKeywordInfo;
+
+static const MVGKeywordInfo *GetMVGKeywordInfo(const MVGKeywordInfo *keywords,
+  const size_t number_keywords,const char *name)
+{
+  size_t
+    i;
+
+  for (i=0; i < number_keywords; i++)
+    if (LocaleCompare(keywords[i].keyword,name) == 0)
+      return(keywords+i);
+  return((const MVGKeywordInfo *) NULL);
+}
+
+static MagickBooleanType ParseMVGPopDefs(const MVGRenderState *state)
+{
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ssize_t
+    defsDepth = (*state->defsDepth),
+    n = (*state->n);
+
+  defsDepth--;
+  graphic_context[n]->render=defsDepth > 0 ? MagickFalse :
+    MagickTrue;
+  (*state->defsDepth)=defsDepth;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGPopGraphicContext(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  Image
+    *image = state->image;
+
+  MagickStatusType
+    status = (*state->status);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    if (n <= 0)
+      {
+        (void) ThrowMagickException(exception,GetMagickModule(),
+          DrawError,"UnbalancedGraphicContextPushPop","`%s'",token);
+        status=MagickFalse;
+        n=0;
+        break;
+      }
+    if ((graphic_context[n]->clip_mask != (char *) NULL) &&
+        (graphic_context[n]->compliance != SVGCompliance))
+      if (LocaleCompare(graphic_context[n]->clip_mask,
+          graphic_context[n-1]->clip_mask) != 0)
+        status=SetImageMask(image,WritePixelMask,(Image *) NULL,
+          exception);
+    graphic_context[n]=DestroyDrawInfo(graphic_context[n]);
+    n--;
+    break;
+  } while (0);
+  (*state->status)=status;
+  (*state->n)=n;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGPopSymbol(const MVGRenderState *state)
+{
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ssize_t
+    n = (*state->n),
+    symbolDepth = (*state->symbolDepth);
+
+  symbolDepth--;
+  graphic_context[n]->render=symbolDepth > 0 ? MagickFalse :
+    MagickTrue;
+  (*state->symbolDepth)=symbolDepth;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGPushClass(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *p = (*state->p),
+    *q = (*state->q);
+
+  size_t
+    extent = (*state->extent);
+
+  do
+  {
+    /*
+      Class context.
+    */
+    for (p=q; *q != '\0'; )
+    {
+      if (GetNextToken(q,&q,extent,token) < 1)
+        break;
+      if (LocaleCompare(token,"pop") != 0)
+        continue;
+      (void) GetNextToken(q,(const char **) NULL,extent,token);
+      if (LocaleCompare(token,"class") != 0)
+        continue;
+      break;
+    }
+    (void) GetNextToken(q,&q,extent,token);
+    break;
+  } while (0);
+  (*state->p)=p;
+  (*state->q)=q;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGPushClipPath(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *p = (*state->p),
+    *q = (*state->q);
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  do
+  {
+    (void) GetNextToken(q,&q,extent,token);
+    for (p=q; *q != '\0'; )
+    {
+      if (GetNextToken(q,&q,extent,token) < 1)
+        break;
+      if (LocaleCompare(token,"pop") != 0)
+        continue;
+      (void) GetNextToken(q,(const char **) NULL,extent,token);
+      if (LocaleCompare(token,"clip-path") != 0)
+        continue;
+      break;
+    }
+    if (IsMVGBlockEndMissing(q,p) != MagickFalse)
+      {
+        status=MagickFalse;
+        break;
+      }
+    (void) GetNextToken(q,&q,extent,token);
+    break;
+  } while (0);
+  (*state->p)=p;
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGPushDefs(const MVGRenderState *state)
+{
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ssize_t
+    defsDepth = (*state->defsDepth),
+    n = (*state->n);
+
+  defsDepth++;
+  graphic_context[n]->render=defsDepth > 0 ? MagickFalse :
+    MagickTrue;
+  (*state->defsDepth)=defsDepth;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGPushGradient(const MVGRenderState *state)
+{
+  char
+    geometry[MagickPathExtent],
+    *next_token,
+    *token = (*state->token);
+
+  const char
+    *p = (*state->p),
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  Image
+    *image = state->image;
+
+  MagickStatusType
+    status = (*state->status);
+
+  SegmentInfo
+    bounds;
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    char
+      key[2*MagickPathExtent],
+      name[MagickPathExtent],
+      type[MagickPathExtent];
+
+    SegmentInfo
+      segment;
+
+    (void) GetNextToken(q,&q,extent,token);
+    (void) CopyMagickString(name,token,MagickPathExtent);
+    (void) GetNextToken(q,&q,extent,token);
+    (void) CopyMagickString(type,token,MagickPathExtent);
+    (void) GetNextToken(q,&q,extent,token);
+    segment.x1=GetDrawValue(token,&next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    (void) GetNextToken(q,&q,extent,token);
+    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+      ThrowPointExpectedException(token,exception);
+    if (*token == ',')
+      (void) GetNextToken(q,&q,extent,token);
+    segment.y1=GetDrawValue(token,&next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    (void) GetNextToken(q,&q,extent,token);
+    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+      ThrowPointExpectedException(token,exception);
+    if (*token == ',')
+      (void) GetNextToken(q,&q,extent,token);
+    segment.x2=GetDrawValue(token,&next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    (void) GetNextToken(q,&q,extent,token);
+    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+      ThrowPointExpectedException(token,exception);
+    if (*token == ',')
+      (void) GetNextToken(q,&q,extent,token);
+    segment.y2=GetDrawValue(token,&next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    if (LocaleCompare(type,"radial") == 0)
+      {
+        (void) GetNextToken(q,&q,extent,token);
+        if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+          ThrowPointExpectedException(token,exception);
+        if (*token == ',')
+          (void) GetNextToken(q,&q,extent,token);
+      }
+    for (p=q; *q != '\0'; )
+    {
+      if (GetNextToken(q,&q,extent,token) < 1)
+        break;
+      if (LocaleCompare(token,"pop") != 0)
+        continue;
+      (void) GetNextToken(q,(const char **) NULL,extent,token);
+      if (LocaleCompare(token,"gradient") != 0)
+        continue;
+      break;
+    }
+    if (IsMVGBlockEndInvalid(q,p,extent) != MagickFalse)
+      {
+        status=MagickFalse;
+        break;
+      }
+    (void) CopyMagickString(token,p,(size_t) (q-p-4+1));
+    bounds.x1=graphic_context[n]->affine.sx*segment.x1+
+      graphic_context[n]->affine.ry*segment.y1+
+      graphic_context[n]->affine.tx;
+    bounds.y1=graphic_context[n]->affine.rx*segment.x1+
+      graphic_context[n]->affine.sy*segment.y1+
+      graphic_context[n]->affine.ty;
+    bounds.x2=graphic_context[n]->affine.sx*segment.x2+
+      graphic_context[n]->affine.ry*segment.y2+
+      graphic_context[n]->affine.tx;
+    bounds.y2=graphic_context[n]->affine.rx*segment.x2+
+      graphic_context[n]->affine.sy*segment.y2+
+      graphic_context[n]->affine.ty;
+    (void) FormatLocaleString(key,MagickPathExtent,"%s",name);
+    (void) SetImageArtifact(image,key,token);
+    (void) FormatLocaleString(key,MagickPathExtent,"%s-type",name);
+    (void) SetImageArtifact(image,key,type);
+    (void) FormatLocaleString(key,MagickPathExtent,"%s-geometry",
+      name);
+    (void) FormatLocaleString(geometry,MagickPathExtent,
+      "%gx%g%+.15g%+.15g",
+      MagickMax(fabs(bounds.x2-bounds.x1+1.0),1.0),
+      MagickMax(fabs(bounds.y2-bounds.y1+1.0),1.0),
+      bounds.x1,bounds.y1);
+    (void) SetImageArtifact(image,key,geometry);
+    (void) GetNextToken(q,&q,extent,token);
+    break;
+  } while (0);
+  (*state->p)=p;
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGPushGraphicContext(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  Image
+    *image = state->image;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    n++;
+    graphic_context=(DrawInfo **) ResizeQuantumMemory(
+      graphic_context,(size_t) (n+1),sizeof(*graphic_context));
+    if (graphic_context == (DrawInfo **) NULL)
+      {
+        (void) ThrowMagickException(exception,GetMagickModule(),
+          ResourceLimitError,"MemoryAllocationFailed","`%s'",
+          image->filename);
+        status=MagickFalse;
+        break;
+      }
+    graphic_context[n]=CloneDrawInfo((ImageInfo *) NULL,
+      graphic_context[n-1]);
+    if (*q == '"')
+      {
+        (void) GetNextToken(q,&q,extent,token);
+        (void) CloneString(&graphic_context[n]->id,token);
+      }
+    if (n >= MagickMaxRecursionDepth)
+      {
+        (void) ThrowMagickException(exception,GetMagickModule(),
+          DrawError,"VectorGraphicsNestedTooDeeply","`%s'",
+          image->filename);
+        status=MagickFalse;
+      }
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->graphic_context)=graphic_context;
+  (*state->status)=status;
+  (*state->n)=n;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGPushMask(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  size_t
+    extent = (*state->extent);
+
+  (void) GetNextToken(q,&q,extent,token);
+  (*state->q)=q;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGPushPattern(const MVGRenderState *state)
+{
+  char
+    geometry[MagickPathExtent],
+    *next_token,
+    *token = (*state->token);
+
+  const char
+    *p = (*state->p),
+    *q = (*state->q);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  Image
+    *image = state->image;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  do
+  {
+    char
+      key[2*MagickPathExtent],
+      name[MagickPathExtent];
+
+    RectangleInfo
+      region;
+
+    (void) GetNextToken(q,&q,extent,token);
+    (void) CopyMagickString(name,token,MagickPathExtent);
+    (void) GetNextToken(q,&q,extent,token);
+    region.x=CastDoubleToSsizeT(ceil(GetDrawValue(token,
+      &next_token)-0.5));
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    (void) GetNextToken(q,&q,extent,token);
+    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+      ThrowPointExpectedException(token,exception);
+    if (*token == ',')
+      (void) GetNextToken(q,&q,extent,token);
+    region.y=CastDoubleToSsizeT(ceil(GetDrawValue(token,
+      &next_token)-0.5));
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    (void) GetNextToken(q,&q,extent,token);
+    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+      ThrowPointExpectedException(token,exception);
+    if (*token == ',')
+      (void) GetNextToken(q,&q,extent,token);
+    region.width=CastDoubleToSizeT(floor(GetDrawValue(token,
+      &next_token)+0.5));
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    (void) GetNextToken(q,&q,extent,token);
+    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+      ThrowPointExpectedException(token,exception);
+    if (*token == ',')
+      (void) GetNextToken(q,&q,extent,token);
+    region.height=CastDoubleToSizeT(GetDrawValue(token,
+      &next_token)+0.5);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    for (p=q; *q != '\0'; )
+    {
+      if (GetNextToken(q,&q,extent,token) < 1)
+        break;
+      if (LocaleCompare(token,"pop") != 0)
+        continue;
+      (void) GetNextToken(q,(const char **) NULL,extent,token);
+      if (LocaleCompare(token,"pattern") != 0)
+        continue;
+      break;
+    }
+    if (IsMVGBlockEndOutside(q,p,extent) != MagickFalse)
+      {
+        status=MagickFalse;
+        break;
+      }
+    (void) CopyMagickString(token,p,(size_t) (q-p-4+1));
+    (void) FormatLocaleString(key,MagickPathExtent,"%s",name);
+    (void) SetImageArtifact(image,key,token);
+    (void) FormatLocaleString(key,MagickPathExtent,"%s-geometry",
+      name);
+    (void) FormatLocaleString(geometry,MagickPathExtent,
+      "%.17gx%.17g%+.20g%+.20g",(double) region.width,(double)
+      region.height,(double) region.x,(double) region.y);
+    (void) SetImageArtifact(image,key,geometry);
+    (void) GetNextToken(q,&q,extent,token);
+    break;
+  } while (0);
+  (*state->p)=p;
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGPushSymbol(const MVGRenderState *state)
+{
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ssize_t
+    n = (*state->n),
+    symbolDepth = (*state->symbolDepth);
+
+  symbolDepth++;
+  graphic_context[n]->render=symbolDepth > 0 ? MagickFalse :
+    MagickTrue;
+  (*state->symbolDepth)=symbolDepth;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGAffine(const MVGRenderState *state)
+{
+  AffineMatrix
+    affine = (*state->affine);
+
+  char
+    *next_token,
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  do
+  {
+    (void) GetNextToken(q,&q,extent,token);
+    affine.sx=GetDrawValue(token,&next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    (void) GetNextToken(q,&q,extent,token);
+    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+      ThrowPointExpectedException(token,exception);
+    if (*token == ',')
+      (void) GetNextToken(q,&q,extent,token);
+    affine.ry=GetDrawValue(token,&next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    (void) GetNextToken(q,&q,extent,token);
+    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+      ThrowPointExpectedException(token,exception);
+    if (*token == ',')
+      (void) GetNextToken(q,&q,extent,token);
+    affine.rx=GetDrawValue(token,&next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    (void) GetNextToken(q,&q,extent,token);
+    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+      ThrowPointExpectedException(token,exception);
+    if (*token == ',')
+      (void) GetNextToken(q,&q,extent,token);
+    affine.sy=GetDrawValue(token,&next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    (void) GetNextToken(q,&q,extent,token);
+    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+      ThrowPointExpectedException(token,exception);
+    if (*token == ',')
+      (void) GetNextToken(q,&q,extent,token);
+    affine.tx=GetDrawValue(token,&next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    (void) GetNextToken(q,&q,extent,token);
+    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+      ThrowPointExpectedException(token,exception);
+    if (*token == ',')
+      (void) GetNextToken(q,&q,extent,token);
+    affine.ty=GetDrawValue(token,&next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    break;
+  } while (0);
+  (*state->affine)=affine;
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGBorderColor(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  (void) GetNextToken(q,&q,extent,token);
+  status&=(MagickStatusType) QueryColorCompliance(token,AllCompliance,
+    &graphic_context[n]->border_color,exception);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGClass(const MVGRenderState *state)
+{
+  char
+    *primitive = (*state->primitive),
+    *token = (*state->token);
+
+  const char
+    *p = (*state->p),
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  SplayTreeInfo
+    *macros = (*state->macros);
+
+  ssize_t
+    classDepth = (*state->classDepth),
+    i,
+    n = (*state->n);
+
+  do
+  {
+    const char
+      *mvg_class;
+
+    (void) GetNextToken(q,&q,extent,token);
+    if ((*token == '\0') || (*token == ';'))
+      {
+        status=MagickFalse;
+        break;
+      }
+    /*
+      Identify recursion.
+    */
+    for (i=0; i <= n; i++)
+      if (LocaleCompare(token,graphic_context[i]->id) == 0)
+        break;
+    if (i <= n)
+      break;
+    if (classDepth++ >= MagickMaxRecursionDepth)
+      {
+        (void) ThrowMagickException(exception,GetMagickModule(),
+          DrawError,"VectorGraphicsNestedTooDeeply","`%s'",token);
+        status=MagickFalse;
+        break;
+      }
+    mvg_class=(const char *) GetValueFromSplayTree(macros,token);
+    if (IsRenderableClass(graphic_context,n,mvg_class,p,primitive) !=
+        MagickFalse)
+      {
+        char
+          *elements;
+
+        ssize_t
+          offset;
+
+        /*
+          Inject class elements in stream.
+        */
+        (void) CloneString(&graphic_context[n]->id,token);
+        offset=(ssize_t) (p-primitive);
+        elements=AcquireString(primitive);
+        elements[offset]='\0';
+        (void) ConcatenateString(&elements,mvg_class);
+        (void) ConcatenateString(&elements,"\n");
+        (void) ConcatenateString(&elements,q);
+        primitive=DestroyString(primitive);
+        primitive=elements;
+        q=primitive+offset;
+      }
+    break;
+  } while (0);
+  (*state->primitive)=primitive;
+  (*state->q)=q;
+  (*state->status)=status;
+  (*state->classDepth)=classDepth;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGClipPath(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  Image
+    *image = state->image;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  SplayTreeInfo
+    *macros = (*state->macros);
+
+  ssize_t
+    n = (*state->n);
+
+  const MVGRenderState
+    arm_state = { state->affine, state->current, state->keyword,
+      state->primitive, &token, state->p, &q, state->coordinates,
+      state->cursor, &graphic_context, state->draw_info, state->exception,
+      state->image, &status, state->mvg_info, state->primitive_info,
+      state->primitive_type, state->depth, &extent, state->number_points,
+      state->number_stops, &macros, state->classDepth, state->defsDepth,
+      state->i, state->j, &n, state->symbolDepth, state->x, state->stops };
+
+  do
+  {
+    const char
+      *clip_path;
+
+    /*
+      Take a node from within the MVG document, and duplicate it here.
+    */
+    (void) GetNextToken(q,&q,extent,token);
+    if (*token == '\0')
+      {
+        status=MagickFalse;
+        break;
+      }
+    (void) CloneString(&graphic_context[n]->clip_mask,token);
+    clip_path=(const char *) GetValueFromSplayTree(macros,token);
+    if (clip_path != (const char *) NULL)
+      {
+        if (graphic_context[n]->clipping_mask != (Image *) NULL)
+          graphic_context[n]->clipping_mask=
+            DestroyImage(graphic_context[n]->clipping_mask);
+        graphic_context[n]->clipping_mask=DrawClippingMask(image,
+          graphic_context[n],token,clip_path,exception);
+        if (graphic_context[n]->compliance != SVGCompliance)
+          {
+            ApplyMVGClipPath(&arm_state);
+          }
+      }
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGClipRule(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    ssize_t
+      fill_rule;
+
+    (void) GetNextToken(q,&q,extent,token);
+    fill_rule=ParseCommandOption(MagickFillRuleOptions,MagickFalse,
+      token);
+    if (fill_rule == -1)
+      {
+        status=MagickFalse;
+        break;
+      }
+    graphic_context[n]->fill_rule=(FillRule) fill_rule;
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGClipUnits(const MVGRenderState *state)
+{
+  AffineMatrix
+    affine = (*state->affine),
+    current = (*state->current);
+
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  const DrawInfo
+    *draw_info = state->draw_info;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    ssize_t
+      clip_units;
+
+    (void) GetNextToken(q,&q,extent,token);
+    clip_units=ParseCommandOption(MagickClipPathOptions,MagickFalse,
+      token);
+    if (clip_units == -1)
+      {
+        status=MagickFalse;
+        break;
+      }
+    graphic_context[n]->clip_units=(ClipPathUnits) clip_units;
+    if (clip_units == ObjectBoundingBox)
+      {
+        GetAffineMatrix(&current);
+        affine.sx=draw_info->bounds.x2;
+        affine.sy=draw_info->bounds.y2;
+        affine.tx=draw_info->bounds.x1;
+        affine.ty=draw_info->bounds.y1;
+        break;
+      }
+    break;
+  } while (0);
+  (*state->affine)=affine;
+  (*state->current)=current;
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGCompliance(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  /*
+    MVG compliance associates a clipping mask with an image; SVG
+    compliance associates a clipping mask with a graphics context.
+  */
+  (void) GetNextToken(q,&q,extent,token);
+  graphic_context[n]->compliance=(ComplianceType) ParseCommandOption(
+    MagickComplianceOptions,MagickFalse,token);
+  (*state->q)=q;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGCurrentColor(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  size_t
+    extent = (*state->extent);
+
+  (void) GetNextToken(q,&q,extent,token);
+  (*state->q)=q;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGDecorate(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    ssize_t
+      decorate;
+
+    (void) GetNextToken(q,&q,extent,token);
+    decorate=ParseCommandOption(MagickDecorateOptions,MagickFalse,
+      token);
+    if (decorate == -1)
+      {
+        status=MagickFalse;
+        break;
+      }
+    graphic_context[n]->decorate=(DecorationType) decorate;
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGDensity(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  (void) GetNextToken(q,&q,extent,token);
+  (void) CloneString(&graphic_context[n]->density,token);
+  (*state->q)=q;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGDirection(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  ssize_t
+    direction;
+
+  (void) GetNextToken(q,&q,extent,token);
+  direction=ParseCommandOption(MagickDirectionOptions,MagickFalse,
+    token);
+  if (direction == -1)
+    status=MagickFalse;
+  else
+    graphic_context[n]->direction=(DirectionType) direction;
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGEncoding(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  (void) GetNextToken(q,&q,extent,token);
+  (void) CloneString(&graphic_context[n]->encoding,token);
+  (*state->q)=q;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGFill(const MVGRenderState *state)
+{
+  char
+    pattern[MagickPathExtent],
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  const DrawInfo
+    *draw_info = state->draw_info;
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  Image
+    *image = state->image;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  SplayTreeInfo
+    *macros = (*state->macros);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    const char
+      *mvg_class;
+
+    (void) GetNextToken(q,&q,extent,token);
+    if (graphic_context[n]->clip_path != MagickFalse)
+      break;
+    mvg_class=(const char *) GetValueFromSplayTree(macros,token);
+    if (mvg_class != (const char *) NULL)
+      {
+        (void) DrawPatternPath(image,draw_info,mvg_class,
+          &graphic_context[n]->fill_pattern,exception);
+        break;
+      }
+    (void) FormatLocaleString(pattern,MagickPathExtent,"%s",token);
+    if (GetImageArtifact(image,pattern) != (const char *) NULL)
+      {
+        (void) DrawPatternPath(image,draw_info,token,
+          &graphic_context[n]->fill_pattern,exception);
+        break;
+      }
+    status&=(MagickStatusType) QueryColorCompliance(token,AllCompliance,
+      &graphic_context[n]->fill,exception);
+    if (graphic_context[n]->fill_alpha != (double) OpaqueAlpha)
+      graphic_context[n]->fill.alpha=graphic_context[n]->fill_alpha;
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGFillOpacity(const MVGRenderState *state)
+{
+  char
+    *next_token,
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  double
+    factor;
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    double
+      opacity;
+
+    (void) GetNextToken(q,&q,extent,token);
+    if (graphic_context[n]->clip_path != MagickFalse)
+      break;
+    factor=strchr(token,'%') != (char *) NULL ? 0.01 : 1.0;
+    opacity=MagickMin(MagickMax(factor*
+      GetDrawValue(token,&next_token),0.0),1.0);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    if (graphic_context[n]->compliance == SVGCompliance)
+      graphic_context[n]->fill_alpha*=opacity;
+    else
+      graphic_context[n]->fill_alpha=(double) QuantumRange*opacity;
+    if (graphic_context[n]->fill.alpha != (double) TransparentAlpha)
+      graphic_context[n]->fill.alpha=graphic_context[n]->fill_alpha;
+    else
+      graphic_context[n]->fill.alpha=(MagickRealType)
+        ClampToQuantum((double) QuantumRange*opacity);
+    graphic_context[n]->fill.alpha_trait=BlendPixelTrait;
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGFillRule(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    ssize_t
+      fill_rule;
+
+    (void) GetNextToken(q,&q,extent,token);
+    fill_rule=ParseCommandOption(MagickFillRuleOptions,MagickFalse,
+      token);
+    if (fill_rule == -1)
+      {
+        status=MagickFalse;
+        break;
+      }
+    graphic_context[n]->fill_rule=(FillRule) fill_rule;
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGFont(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  (void) GetNextToken(q,&q,extent,token);
+  (void) CloneString(&graphic_context[n]->font,token);
+  if (LocaleCompare("none",token) == 0)
+    graphic_context[n]->font=(char *) RelinquishMagickMemory(
+      graphic_context[n]->font);
+  (*state->q)=q;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGFontFamily(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  (void) GetNextToken(q,&q,extent,token);
+  (void) CloneString(&graphic_context[n]->family,token);
+  (*state->q)=q;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGFontSize(const MVGRenderState *state)
+{
+  char
+    *next_token,
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    (void) GetNextToken(q,&q,extent,token);
+    graphic_context[n]->pointsize=GetDrawValue(token,&next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGFontStretch(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    ssize_t
+      stretch;
+
+    (void) GetNextToken(q,&q,extent,token);
+    stretch=ParseCommandOption(MagickStretchOptions,MagickFalse,token);
+    if (stretch == -1)
+      {
+        status=MagickFalse;
+        break;
+      }
+    graphic_context[n]->stretch=(StretchType) stretch;
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGFontStyle(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    ssize_t
+      style;
+
+    (void) GetNextToken(q,&q,extent,token);
+    style=ParseCommandOption(MagickStyleOptions,MagickFalse,token);
+    if (style == -1)
+      {
+        status=MagickFalse;
+        break;
+      }
+    graphic_context[n]->style=(StyleType) style;
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGFontWeight(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  ssize_t
+    weight;
+
+  (void) GetNextToken(q,&q,extent,token);
+  weight=ParseCommandOption(MagickWeightOptions,MagickFalse,token);
+  if (weight == -1)
+    weight=(ssize_t) StringToUnsignedLong(token);
+  graphic_context[n]->weight=(size_t) weight;
+  (*state->q)=q;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGGradientUnits(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  size_t
+    extent = (*state->extent);
+
+  (void) GetNextToken(q,&q,extent,token);
+  (*state->q)=q;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGGravity(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    ssize_t
+      gravity;
+
+    (void) GetNextToken(q,&q,extent,token);
+    gravity=ParseCommandOption(MagickGravityOptions,MagickFalse,token);
+    if (gravity == -1)
+      {
+        status=MagickFalse;
+        break;
+      }
+    graphic_context[n]->gravity=(GravityType) gravity;
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGImage(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  MagickStatusType
+    status = (*state->status);
+
+  PrimitiveType
+    primitive_type = (*state->primitive_type);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    ssize_t
+      compose;
+
+    primitive_type=ImagePrimitive;
+    (void) GetNextToken(q,&q,extent,token);
+    compose=ParseCommandOption(MagickComposeOptions,MagickFalse,token);
+    if (compose == -1)
+      {
+        status=MagickFalse;
+        break;
+      }
+    graphic_context[n]->compose=(CompositeOperator) compose;
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  (*state->primitive_type)=primitive_type;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGInterlineSpacing(const MVGRenderState *state)
+{
+  char
+    *next_token,
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    (void) GetNextToken(q,&q,extent,token);
+    graphic_context[n]->interline_spacing=GetDrawValue(token,
+      &next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGInterwordSpacing(const MVGRenderState *state)
+{
+  char
+    *next_token,
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    (void) GetNextToken(q,&q,extent,token);
+    graphic_context[n]->interword_spacing=GetDrawValue(token,
+      &next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGKerning(const MVGRenderState *state)
+{
+  char
+    *next_token,
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    (void) GetNextToken(q,&q,extent,token);
+    graphic_context[n]->kerning=GetDrawValue(token,&next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGLetterSpacing(const MVGRenderState *state)
+{
+  char
+    *next_token,
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    *clone_info,
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  Image
+    *image = state->image;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  TypeMetric
+    metrics;
+
+  do
+  {
+    (void) GetNextToken(q,&q,extent,token);
+    if (IsValidPoint(token) == MagickFalse)
+      break;
+    clone_info=CloneDrawInfo((ImageInfo *) NULL,graphic_context[n]);
+    clone_info->text=AcquireString(" ");
+    status&=(MagickStatusType) GetTypeMetrics(image,clone_info,&metrics,
+      exception);
+    graphic_context[n]->kerning=metrics.width*
+      GetDrawValue(token,&next_token);
+    clone_info=DestroyDrawInfo(clone_info);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGMask(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  Image
+    *image = state->image;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  SplayTreeInfo
+    *macros = (*state->macros);
+
+  ssize_t
+    n = (*state->n);
+
+  const char
+    *mask_path;
+
+  /*
+    Take a node from within the MVG document, and duplicate it here.
+  */
+  (void) GetNextToken(q,&q,extent,token);
+  mask_path=(const char *) GetValueFromSplayTree(macros,token);
+  if (mask_path != (const char *) NULL)
+    {
+      if (graphic_context[n]->composite_mask != (Image *) NULL)
+        graphic_context[n]->composite_mask=
+          DestroyImage(graphic_context[n]->composite_mask);
+      graphic_context[n]->composite_mask=DrawCompositeMask(image,
+        graphic_context[n],token,mask_path,exception);
+      if (graphic_context[n]->compliance != SVGCompliance)
+        status=SetImageMask(image,CompositePixelMask,
+          graphic_context[n]->composite_mask,exception);
+    }
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGOffset(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  size_t
+    extent = (*state->extent);
+
+  (void) GetNextToken(q,&q,extent,token);
+  (*state->q)=q;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGOpacity(const MVGRenderState *state)
+{
+  char
+    *next_token,
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  double
+    factor;
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    double
+      opacity;
+
+    (void) GetNextToken(q,&q,extent,token);
+    if (graphic_context[n]->clip_path != MagickFalse)
+      break;
+    factor=strchr(token,'%') != (char *) NULL ? 0.01 : 1.0;
+    opacity=MagickMin(MagickMax(factor*
+      GetDrawValue(token,&next_token),0.0),1.0);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    if (graphic_context[n]->compliance == SVGCompliance)
+      {
+        graphic_context[n]->fill_alpha*=opacity;
+        graphic_context[n]->stroke_alpha*=opacity;
+      }
+    else
+      {
+        graphic_context[n]->fill_alpha=(double) QuantumRange*opacity;
+        graphic_context[n]->stroke_alpha=(double) QuantumRange*opacity;
+      }
+    if (graphic_context[n]->fill.alpha != (double) TransparentAlpha)
+      {
+        graphic_context[n]->fill.alpha=graphic_context[n]->fill_alpha;
+        graphic_context[n]->stroke.alpha=
+          graphic_context[n]->stroke_alpha;
+      }
+    else
+      {
+        graphic_context[n]->fill.alpha=(MagickRealType)
+          ClampToQuantum((double) QuantumRange*opacity);
+        graphic_context[n]->stroke.alpha=(MagickRealType)
+          ClampToQuantum((double) QuantumRange*opacity);
+      }
+    graphic_context[n]->fill.alpha_trait=BlendPixelTrait;
+    graphic_context[n]->stroke.alpha_trait=BlendPixelTrait;
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGRotate(const MVGRenderState *state)
+{
+  AffineMatrix
+    affine = (*state->affine);
+
+  char
+    *next_token,
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  double
+    angle;
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  do
+  {
+    (void) GetNextToken(q,&q,extent,token);
+    angle=GetDrawValue(token,&next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    affine.sx=cos(DegreesToRadians(fmod((double) angle,360.0)));
+    affine.rx=sin(DegreesToRadians(fmod((double) angle,360.0)));
+    affine.ry=(-sin(DegreesToRadians(fmod((double) angle,360.0))));
+    affine.sy=cos(DegreesToRadians(fmod((double) angle,360.0)));
+    break;
+  } while (0);
+  (*state->affine)=affine;
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGScale(const MVGRenderState *state)
+{
+  AffineMatrix
+    affine = (*state->affine);
+
+  char
+    *next_token,
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  do
+  {
+    (void) GetNextToken(q,&q,extent,token);
+    affine.sx=GetDrawValue(token,&next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    (void) GetNextToken(q,&q,extent,token);
+    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+      ThrowPointExpectedException(token,exception);
+    if (*token == ',')
+      (void) GetNextToken(q,&q,extent,token);
+    affine.sy=GetDrawValue(token,&next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    break;
+  } while (0);
+  (*state->affine)=affine;
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGSkewX(const MVGRenderState *state)
+{
+  AffineMatrix
+    affine = (*state->affine);
+
+  char
+    *next_token,
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  double
+    angle;
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  do
+  {
+    (void) GetNextToken(q,&q,extent,token);
+    angle=GetDrawValue(token,&next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    affine.ry=sin(DegreesToRadians(angle));
+    break;
+  } while (0);
+  (*state->affine)=affine;
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGSkewY(const MVGRenderState *state)
+{
+  AffineMatrix
+    affine = (*state->affine);
+
+  char
+    *next_token,
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  double
+    angle;
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  do
+  {
+    (void) GetNextToken(q,&q,extent,token);
+    angle=GetDrawValue(token,&next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    affine.rx=(-tan(DegreesToRadians(angle)/2.0));
+    break;
+  } while (0);
+  (*state->affine)=affine;
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGStopColor(const MVGRenderState *state)
+{
+  char
+    *next_token,
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  double
+    factor;
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  Image
+    *image = state->image;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent),
+    number_stops = (*state->number_stops);
+
+  StopInfo
+    *stops = (*state->stops);
+
+  do
+  {
+    PixelInfo
+      stop_color;
+
+    number_stops++;
+    if (number_stops == 1)
+      stops=(StopInfo *) AcquireQuantumMemory(2,sizeof(*stops));
+    else
+      if (number_stops > 2)
+        stops=(StopInfo *) ResizeQuantumMemory(stops,number_stops,
+          sizeof(*stops));
+    if (stops == (StopInfo *) NULL)
+      {
+        (void) ThrowMagickException(exception,GetMagickModule(),
+          ResourceLimitError,"MemoryAllocationFailed","`%s'",
+          image->filename);
+        status=MagickFalse;
+        break;
+      }
+    (void) GetNextToken(q,&q,extent,token);
+    status&=(MagickStatusType) QueryColorCompliance(token,AllCompliance,
+      &stop_color,exception);
+    stops[number_stops-1].color=stop_color;
+    (void) GetNextToken(q,&q,extent,token);
+    factor=strchr(token,'%') != (char *) NULL ? 0.01 : 1.0;
+    stops[number_stops-1].offset=factor*GetDrawValue(token,
+      &next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  (*state->number_stops)=number_stops;
+  (*state->stops)=stops;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGStroke(const MVGRenderState *state)
+{
+  char
+    pattern[MagickPathExtent],
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  const DrawInfo
+    *draw_info = state->draw_info;
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  Image
+    *image = state->image;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  SplayTreeInfo
+    *macros = (*state->macros);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    const char
+      *mvg_class;
+
+    (void) GetNextToken(q,&q,extent,token);
+    if (graphic_context[n]->clip_path != MagickFalse)
+      break;
+    mvg_class=(const char *) GetValueFromSplayTree(macros,token);
+    if (mvg_class != (const char *) NULL)
+      {
+        (void) DrawPatternPath(image,draw_info,mvg_class,
+          &graphic_context[n]->stroke_pattern,exception);
+        break;
+      }
+    (void) FormatLocaleString(pattern,MagickPathExtent,"%s",token);
+    if (GetImageArtifact(image,pattern) != (const char *) NULL)
+      {
+        (void) DrawPatternPath(image,draw_info,token,
+          &graphic_context[n]->stroke_pattern,exception);
+        break;
+      }
+    status&=(MagickStatusType) QueryColorCompliance(token,AllCompliance,
+      &graphic_context[n]->stroke,exception);
+    if (graphic_context[n]->stroke_alpha != (double) OpaqueAlpha)
+      graphic_context[n]->stroke.alpha=
+        graphic_context[n]->stroke_alpha;
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGStrokeAntialias(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  (void) GetNextToken(q,&q,extent,token);
+  graphic_context[n]->stroke_antialias=StringToLong(token) != 0 ?
+    MagickTrue : MagickFalse;
+  (*state->q)=q;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGStrokeDasharray(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  Image
+    *image = state->image;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n),
+    x;
+
+  const MVGRenderState
+    arm_state = { state->affine, state->current, state->keyword,
+      state->primitive, &token, state->p, &q, state->coordinates,
+      state->cursor, &graphic_context, state->draw_info, state->exception,
+      state->image, &status, state->mvg_info, state->primitive_info,
+      state->primitive_type, state->depth, &extent, state->number_points,
+      state->number_stops, state->macros, state->classDepth, state->defsDepth,
+      state->i, state->j, &n, state->symbolDepth, &x, state->stops };
+
+  do
+  {
+    if (graphic_context[n]->dash_pattern != (double *) NULL)
+      graphic_context[n]->dash_pattern=(double *)
+        RelinquishMagickMemory(graphic_context[n]->dash_pattern);
+    if (IsValidPoint(q) != MagickFalse)
+      {
+        const char
+          *r;
+
+        r=q;
+        (void) GetNextToken(r,&r,extent,token);
+        if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+          ThrowPointExpectedException(token,exception);
+        if (*token == ',')
+          (void) GetNextToken(r,&r,extent,token);
+        x=CountMVGDashValues(r,extent,token);
+        graphic_context[n]->dash_pattern=(double *)
+          AcquireQuantumMemory((size_t) (2*x+2),
+          sizeof(*graphic_context[n]->dash_pattern));
+        if (graphic_context[n]->dash_pattern == (double *) NULL)
+          {
+            (void) ThrowMagickException(exception,GetMagickModule(),
+              ResourceLimitError,"MemoryAllocationFailed","`%s'",
+              image->filename);
+            status=MagickFalse;
+            break;
+          }
+        (void) memset(graphic_context[n]->dash_pattern,0,(size_t)
+          (2*x+2)*sizeof(*graphic_context[n]->dash_pattern));
+        ParseMVGDashPattern(&arm_state);
+        break;
+      }
+    (void) GetNextToken(q,&q,extent,token);
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGStrokeDashoffset(const MVGRenderState *state)
+{
+  char
+    *next_token,
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    (void) GetNextToken(q,&q,extent,token);
+    graphic_context[n]->dash_offset=GetDrawValue(token,&next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGStrokeLinecap(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    ssize_t
+      linecap;
+
+    (void) GetNextToken(q,&q,extent,token);
+    linecap=ParseCommandOption(MagickLineCapOptions,MagickFalse,token);
+    if (linecap == -1)
+      {
+        status=MagickFalse;
+        break;
+      }
+    graphic_context[n]->linecap=(LineCap) linecap;
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGStrokeLinejoin(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    ssize_t
+      linejoin;
+
+    (void) GetNextToken(q,&q,extent,token);
+    linejoin=ParseCommandOption(MagickLineJoinOptions,MagickFalse,
+      token);
+    if (linejoin == -1)
+      {
+        status=MagickFalse;
+        break;
+      }
+    graphic_context[n]->linejoin=(LineJoin) linejoin;
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGStrokeMiterlimit(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  (void) GetNextToken(q,&q,extent,token);
+  graphic_context[n]->miterlimit=StringToUnsignedLong(token);
+  (*state->q)=q;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGStrokeOpacity(const MVGRenderState *state)
+{
+  char
+    *next_token,
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  double
+    factor;
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    double
+      opacity;
+
+    (void) GetNextToken(q,&q,extent,token);
+    if (graphic_context[n]->clip_path != MagickFalse)
+      break;
+    factor=strchr(token,'%') != (char *) NULL ? 0.01 : 1.0;
+    opacity=MagickMin(MagickMax(factor*GetDrawValue(token,&next_token),
+      0.0),1.0);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    if (graphic_context[n]->compliance == SVGCompliance)
+      graphic_context[n]->stroke_alpha*=opacity;
+    else
+      graphic_context[n]->stroke_alpha=(double) QuantumRange*opacity;
+    if (graphic_context[n]->stroke.alpha != (double) TransparentAlpha)
+      graphic_context[n]->stroke.alpha=graphic_context[n]->stroke_alpha;
+    else
+      graphic_context[n]->stroke.alpha=(MagickRealType)
+        ClampToQuantum((double) QuantumRange*opacity);
+    graphic_context[n]->stroke.alpha_trait=BlendPixelTrait;
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGStrokeWidth(const MVGRenderState *state)
+{
+  char
+    *next_token,
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    (void) GetNextToken(q,&q,extent,token);
+    if (graphic_context[n]->clip_path != MagickFalse)
+      break;
+    graphic_context[n]->stroke_width=GetDrawValue(token,&next_token);
+    if ((token == next_token) ||
+        (graphic_context[n]->stroke_width < 0.0))
+      ThrowPointExpectedException(token,exception);
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGText(const MVGRenderState *state)
+{
+  double
+    cursor = (*state->cursor);
+
+  PrimitiveType
+    primitive_type = (*state->primitive_type);
+
+  primitive_type=TextPrimitive;
+  cursor=0.0;
+  (*state->cursor)=cursor;
+  (*state->primitive_type)=primitive_type;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGTextAlign(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    ssize_t
+      align;
+
+    (void) GetNextToken(q,&q,extent,token);
+    align=ParseCommandOption(MagickAlignOptions,MagickFalse,token);
+    if (align == -1)
+      {
+        status=MagickFalse;
+        break;
+      }
+    graphic_context[n]->align=(AlignType) align;
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGTextAnchor(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    ssize_t
+      align;
+
+    (void) GetNextToken(q,&q,extent,token);
+    align=ParseCommandOption(MagickAlignOptions,MagickFalse,token);
+    if (align == -1)
+      {
+        status=MagickFalse;
+        break;
+      }
+    graphic_context[n]->align=(AlignType) align;
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGTextAntialias(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  (void) GetNextToken(q,&q,extent,token);
+  graphic_context[n]->text_antialias=StringToLong(token) != 0 ?
+    MagickTrue : MagickFalse;
+  (*state->q)=q;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGTextUndercolor(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  (void) GetNextToken(q,&q,extent,token);
+  status&=(MagickStatusType) QueryColorCompliance(token,AllCompliance,
+    &graphic_context[n]->undercolor,exception);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGTranslate(const MVGRenderState *state)
+{
+  AffineMatrix
+    affine = (*state->affine);
+
+  char
+    *next_token,
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  double
+    cursor = (*state->cursor);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  do
+  {
+    (void) GetNextToken(q,&q,extent,token);
+    affine.tx=GetDrawValue(token,&next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    (void) GetNextToken(q,&q,extent,token);
+    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+      ThrowPointExpectedException(token,exception);
+    if (*token == ',')
+      (void) GetNextToken(q,&q,extent,token);
+    affine.ty=GetDrawValue(token,&next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    cursor=0.0;
+    break;
+  } while (0);
+  (*state->affine)=affine;
+  (*state->q)=q;
+  (*state->cursor)=cursor;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGUse(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    *clone_info,
+    **graphic_context = (*state->graphic_context);
+
+  const DrawInfo
+    *draw_info = state->draw_info;
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  Image
+    *image = state->image;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    depth = state->depth,
+    extent = (*state->extent);
+
+  SplayTreeInfo
+    *macros = (*state->macros);
+
+  ssize_t
+    n = (*state->n);
+
+  const char
+    *use;
+
+  /*
+    Get a macro from the MVG document, and "use" it here.
+  */
+  (void) GetNextToken(q,&q,extent,token);
+  use=(const char *) GetValueFromSplayTree(macros,token);
+  if (use != (const char *) NULL)
+    {
+      clone_info=CloneDrawInfo((ImageInfo *) NULL,graphic_context[n]);
+      if (draw_info->macro_expansion != (size_t *) NULL)
+        {
+          if (*draw_info->macro_expansion >= MacroExpansionLimit)
+            {
+              (void) ThrowMagickException(exception,GetMagickModule(),
+                DrawError,"NonconformingDrawingPrimitiveDefinition",
+                "`%s'",token);
+              clone_info=DestroyDrawInfo(clone_info);
+              return(MagickFalse);
+            }
+          (*draw_info->macro_expansion)++;
+        }
+      (void) CloneString(&clone_info->primitive,use);
+      status=RenderMVGContent(image,clone_info,depth+1,exception);
+      clone_info=DestroyDrawInfo(clone_info);
+    }
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGViewbox(const MVGRenderState *state)
+{
+  char
+    *next_token,
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    (void) GetNextToken(q,&q,extent,token);
+    graphic_context[n]->viewbox.x=CastDoubleToSsizeT(ceil(
+      GetDrawValue(token,&next_token)-0.5));
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    (void) GetNextToken(q,&q,extent,token);
+    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+      ThrowPointExpectedException(token,exception);
+    if (*token == ',')
+      (void) GetNextToken(q,&q,extent,token);
+    graphic_context[n]->viewbox.y=CastDoubleToSsizeT(
+      ceil(GetDrawValue(token,&next_token)-0.5));
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    (void) GetNextToken(q,&q,extent,token);
+    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+      ThrowPointExpectedException(token,exception);
+    if (*token == ',')
+      (void) GetNextToken(q,&q,extent,token);
+    graphic_context[n]->viewbox.width=CastDoubleToSizeT(floor(
+      GetDrawValue(token,&next_token)+0.5));
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    (void) GetNextToken(q,&q,extent,token);
+    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+      ThrowPointExpectedException(token,exception);
+    if (*token == ',')
+      (void) GetNextToken(q,&q,extent,token);
+    graphic_context[n]->viewbox.height=CastDoubleToSizeT(floor(
+      GetDrawValue(token,&next_token)+0.5));
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseMVGWordSpacing(const MVGRenderState *state)
+{
+  char
+    *next_token,
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  MagickStatusType
+    status = (*state->status);
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    n = (*state->n);
+
+  do
+  {
+    (void) GetNextToken(q,&q,extent,token);
+    graphic_context[n]->interword_spacing=GetDrawValue(token,
+      &next_token);
+    if (token == next_token)
+      ThrowPointExpectedException(token,exception);
+    break;
+  } while (0);
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+
+static const MVGKeywordInfo
+  MVGPopKeywords[] =
+  {
+    { "class", UndefinedPrimitive, (ParseMVGKeywordMethod) NULL },
+    { "clip-path", UndefinedPrimitive, (ParseMVGKeywordMethod) NULL },
+    { "defs", UndefinedPrimitive, ParseMVGPopDefs },
+    { "gradient", UndefinedPrimitive, (ParseMVGKeywordMethod) NULL },
+    { "graphic-context", UndefinedPrimitive, ParseMVGPopGraphicContext },
+    { "mask", UndefinedPrimitive, (ParseMVGKeywordMethod) NULL },
+    { "pattern", UndefinedPrimitive, (ParseMVGKeywordMethod) NULL },
+    { "symbol", UndefinedPrimitive, ParseMVGPopSymbol }
+  };
+
+static const MVGKeywordInfo
+  MVGPushKeywords[] =
+  {
+    { "class", UndefinedPrimitive, ParseMVGPushClass },
+    { "clip-path", UndefinedPrimitive, ParseMVGPushClipPath },
+    { "defs", UndefinedPrimitive, ParseMVGPushDefs },
+    { "gradient", UndefinedPrimitive, ParseMVGPushGradient },
+    { "graphic-context", UndefinedPrimitive, ParseMVGPushGraphicContext },
+    { "mask", UndefinedPrimitive, ParseMVGPushMask },
+    { "pattern", UndefinedPrimitive, ParseMVGPushPattern },
+    { "symbol", UndefinedPrimitive, ParseMVGPushSymbol }
+  };
+
+static MagickBooleanType ParseMVGPop(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  const MVGKeywordInfo
+    *keyword_info;
+
+  size_t
+    extent = (*state->extent);
+
+  if (GetNextToken(q,&q,extent,token) < 1)
+    {
+      (*state->q)=q;
+      return(MagickTrue);
+    }
+  (*state->q)=q;
+  keyword_info=GetMVGKeywordInfo(MVGPopKeywords,sizeof(MVGPopKeywords)/
+    sizeof(*MVGPopKeywords),token);
+  if (keyword_info == (const MVGKeywordInfo *) NULL)
+    {
+      (*state->status)=MagickFalse;
+      return(MagickTrue);
+    }
+  if (keyword_info->parse == (ParseMVGKeywordMethod) NULL)
+    return(MagickTrue);
+  return(keyword_info->parse(state));
+}
+
+static MagickBooleanType ParseMVGPush(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  const MVGKeywordInfo
+    *keyword_info;
+
+  size_t
+    extent = (*state->extent);
+
+  if (GetNextToken(q,&q,extent,token) < 1)
+    {
+      (*state->q)=q;
+      return(MagickTrue);
+    }
+  (*state->q)=q;
+  keyword_info=GetMVGKeywordInfo(MVGPushKeywords,sizeof(MVGPushKeywords)/
+    sizeof(*MVGPushKeywords),token);
+  if (keyword_info == (const MVGKeywordInfo *) NULL)
+    {
+      (*state->status)=MagickFalse;
+      return(MagickTrue);
+    }
+  if (keyword_info->parse == (ParseMVGKeywordMethod) NULL)
+    return(MagickTrue);
+  return(keyword_info->parse(state));
+}
+
+static const MVGKeywordInfo
+  MVGKeywords[] =
+  {
+    { "affine", UndefinedPrimitive, ParseMVGAffine },
+    { "alpha", AlphaPrimitive, (ParseMVGKeywordMethod) NULL },
+    { "arc", ArcPrimitive, (ParseMVGKeywordMethod) NULL },
+    { "bezier", BezierPrimitive, (ParseMVGKeywordMethod) NULL },
+    { "border-color", UndefinedPrimitive, ParseMVGBorderColor },
+    { "class", UndefinedPrimitive, ParseMVGClass },
+    { "clip-path", UndefinedPrimitive, ParseMVGClipPath },
+    { "clip-rule", UndefinedPrimitive, ParseMVGClipRule },
+    { "clip-units", UndefinedPrimitive, ParseMVGClipUnits },
+    { "circle", CirclePrimitive, (ParseMVGKeywordMethod) NULL },
+    { "color", ColorPrimitive, (ParseMVGKeywordMethod) NULL },
+    { "compliance", UndefinedPrimitive, ParseMVGCompliance },
+    { "currentColor", UndefinedPrimitive, ParseMVGCurrentColor },
+    { "decorate", UndefinedPrimitive, ParseMVGDecorate },
+    { "density", UndefinedPrimitive, ParseMVGDensity },
+    { "direction", UndefinedPrimitive, ParseMVGDirection },
+    { "ellipse", EllipsePrimitive, (ParseMVGKeywordMethod) NULL },
+    { "encoding", UndefinedPrimitive, ParseMVGEncoding },
+    { "fill", UndefinedPrimitive, ParseMVGFill },
+    { "fill-opacity", UndefinedPrimitive, ParseMVGFillOpacity },
+    { "fill-rule", UndefinedPrimitive, ParseMVGFillRule },
+    { "font", UndefinedPrimitive, ParseMVGFont },
+    { "font-family", UndefinedPrimitive, ParseMVGFontFamily },
+    { "font-size", UndefinedPrimitive, ParseMVGFontSize },
+    { "font-stretch", UndefinedPrimitive, ParseMVGFontStretch },
+    { "font-style", UndefinedPrimitive, ParseMVGFontStyle },
+    { "font-weight", UndefinedPrimitive, ParseMVGFontWeight },
+    { "gradient-units", UndefinedPrimitive, ParseMVGGradientUnits },
+    { "gravity", UndefinedPrimitive, ParseMVGGravity },
+    { "image", UndefinedPrimitive, ParseMVGImage },
+    { "interline-spacing", UndefinedPrimitive, ParseMVGInterlineSpacing },
+    { "interword-spacing", UndefinedPrimitive, ParseMVGInterwordSpacing },
+    { "kerning", UndefinedPrimitive, ParseMVGKerning },
+    { "letter-spacing", UndefinedPrimitive, ParseMVGLetterSpacing },
+    { "line", LinePrimitive, (ParseMVGKeywordMethod) NULL },
+    { "mask", UndefinedPrimitive, ParseMVGMask },
+    { "offset", UndefinedPrimitive, ParseMVGOffset },
+    { "opacity", UndefinedPrimitive, ParseMVGOpacity },
+    { "path", PathPrimitive, (ParseMVGKeywordMethod) NULL },
+    { "point", PointPrimitive, (ParseMVGKeywordMethod) NULL },
+    { "polyline", PolylinePrimitive, (ParseMVGKeywordMethod) NULL },
+    { "polygon", PolygonPrimitive, (ParseMVGKeywordMethod) NULL },
+    { "pop", UndefinedPrimitive, ParseMVGPop },
+    { "push", UndefinedPrimitive, ParseMVGPush },
+    { "rectangle", RectanglePrimitive, (ParseMVGKeywordMethod) NULL },
+    { "rotate", UndefinedPrimitive, ParseMVGRotate },
+    { "roundRectangle", RoundRectanglePrimitive, (ParseMVGKeywordMethod) NULL },
+    { "scale", UndefinedPrimitive, ParseMVGScale },
+    { "skewX", UndefinedPrimitive, ParseMVGSkewX },
+    { "skewY", UndefinedPrimitive, ParseMVGSkewY },
+    { "stop-color", UndefinedPrimitive, ParseMVGStopColor },
+    { "stroke", UndefinedPrimitive, ParseMVGStroke },
+    { "stroke-antialias", UndefinedPrimitive, ParseMVGStrokeAntialias },
+    { "stroke-dasharray", UndefinedPrimitive, ParseMVGStrokeDasharray },
+    { "stroke-dashoffset", UndefinedPrimitive, ParseMVGStrokeDashoffset },
+    { "stroke-linecap", UndefinedPrimitive, ParseMVGStrokeLinecap },
+    { "stroke-linejoin", UndefinedPrimitive, ParseMVGStrokeLinejoin },
+    { "stroke-miterlimit", UndefinedPrimitive, ParseMVGStrokeMiterlimit },
+    { "stroke-opacity", UndefinedPrimitive, ParseMVGStrokeOpacity },
+    { "stroke-width", UndefinedPrimitive, ParseMVGStrokeWidth },
+    { "text", UndefinedPrimitive, ParseMVGText },
+    { "text-align", UndefinedPrimitive, ParseMVGTextAlign },
+    { "text-anchor", UndefinedPrimitive, ParseMVGTextAnchor },
+    { "text-antialias", UndefinedPrimitive, ParseMVGTextAntialias },
+    { "text-undercolor", UndefinedPrimitive, ParseMVGTextUndercolor },
+    { "translate", UndefinedPrimitive, ParseMVGTranslate },
+    { "use", UndefinedPrimitive, ParseMVGUse },
+    { "viewbox", UndefinedPrimitive, ParseMVGViewbox },
+    { "word-spacing", UndefinedPrimitive, ParseMVGWordSpacing }
+  };
+
+static MagickBooleanType ParseMVGKeyword(const MVGRenderState *state)
+{
+  const MVGKeywordInfo
+    *keyword_info;
+
+  keyword_info=GetMVGKeywordInfo(MVGKeywords,sizeof(MVGKeywords)/
+    sizeof(*MVGKeywords),state->keyword);
+  if (keyword_info == (const MVGKeywordInfo *) NULL)
+    {
+      if (*state->keyword != ';')
+        (*state->status)=MagickFalse;
+      return(MagickTrue);
+    }
+  if (keyword_info->primitive != UndefinedPrimitive)
+    (*state->primitive_type)=keyword_info->primitive;
+  if (keyword_info->parse == (ParseMVGKeywordMethod) NULL)
+    return(MagickTrue);
+  return(keyword_info->parse(state));
+}
+
 static MagickBooleanType RenderMVGContent(Image *image,
   const DrawInfo *draw_info,const size_t depth,ExceptionInfo *exception)
 {
@@ -3968,9 +6986,6 @@ static MagickBooleanType RenderMVGContent(Image *image,
 
   char
     keyword[MagickPathExtent],
-    geometry[MagickPathExtent],
-    *next_token,
-    pattern[MagickPathExtent],
     *primitive,
     *token;
 
@@ -3979,14 +6994,11 @@ static MagickBooleanType RenderMVGContent(Image *image,
     *q;
 
   double
-    angle,
     coordinates,
     cursor,
-    factor,
     primitive_extent;
 
   DrawInfo
-    *clone_info,
     **graphic_context;
 
   MagickBooleanType
@@ -4003,9 +7015,6 @@ static MagickBooleanType RenderMVGContent(Image *image,
 
   PrimitiveType
     primitive_type;
-
-  SegmentInfo
-    bounds;
 
   size_t
     extent,
@@ -4027,14 +7036,12 @@ static MagickBooleanType RenderMVGContent(Image *image,
   StopInfo
     *stops;
 
-  TypeMetric
-    metrics;
-
   const MVGRenderState
-    render_state = { &affine, &current, &token, &p, &q, &coordinates, &cursor,
-      &graphic_context, draw_info, exception, image, &status, &mvg_info,
-      &primitive_info, &primitive_type, &extent, &number_points, &number_stops,
-      &macros, &i, &j, &n, &x, &stops };
+    render_state = { &affine, &current, keyword, &primitive, &token, &p, &q,
+      &coordinates, &cursor, &graphic_context, draw_info, exception, image,
+      &status, &mvg_info, &primitive_info, &primitive_type, depth, &extent,
+      &number_points, &number_stops, &macros, &classDepth, &defsDepth, &i, &j,
+      &n, &symbolDepth, &x, &stops };
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -4136,1397 +7143,8 @@ static MagickBooleanType RenderMVGContent(Image *image,
     current=graphic_context[n]->affine;
     GetAffineMatrix(&affine);
     *token='\0';
-    switch (*keyword)
-    {
-      case ';':
-        break;
-      case 'a':
-      case 'A':
-      {
-        if (LocaleCompare("affine",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            affine.sx=GetDrawValue(token,&next_token);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            (void) GetNextToken(q,&q,extent,token);
-            if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-              ThrowPointExpectedException(token,exception);
-            if (*token == ',')
-              (void) GetNextToken(q,&q,extent,token);
-            affine.ry=GetDrawValue(token,&next_token);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            (void) GetNextToken(q,&q,extent,token);
-            if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-              ThrowPointExpectedException(token,exception);
-            if (*token == ',')
-              (void) GetNextToken(q,&q,extent,token);
-            affine.rx=GetDrawValue(token,&next_token);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            (void) GetNextToken(q,&q,extent,token);
-            if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-              ThrowPointExpectedException(token,exception);
-            if (*token == ',')
-              (void) GetNextToken(q,&q,extent,token);
-            affine.sy=GetDrawValue(token,&next_token);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            (void) GetNextToken(q,&q,extent,token);
-            if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-              ThrowPointExpectedException(token,exception);
-            if (*token == ',')
-              (void) GetNextToken(q,&q,extent,token);
-            affine.tx=GetDrawValue(token,&next_token);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            (void) GetNextToken(q,&q,extent,token);
-            if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-              ThrowPointExpectedException(token,exception);
-            if (*token == ',')
-              (void) GetNextToken(q,&q,extent,token);
-            affine.ty=GetDrawValue(token,&next_token);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            break;
-          }
-        if (LocaleCompare("alpha",keyword) == 0)
-          {
-            primitive_type=AlphaPrimitive;
-            break;
-          }
-        if (LocaleCompare("arc",keyword) == 0)
-          {
-            primitive_type=ArcPrimitive;
-            break;
-          }
-        status=MagickFalse;
-        break;
-      }
-      case 'b':
-      case 'B':
-      {
-        if (LocaleCompare("bezier",keyword) == 0)
-          {
-            primitive_type=BezierPrimitive;
-            break;
-          }
-        if (LocaleCompare("border-color",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            status&=(MagickStatusType) QueryColorCompliance(token,AllCompliance,
-              &graphic_context[n]->border_color,exception);
-            break;
-          }
-        status=MagickFalse;
-        break;
-      }
-      case 'c':
-      case 'C':
-      {
-        if (LocaleCompare("class",keyword) == 0)
-          {
-            const char
-              *mvg_class;
-
-            (void) GetNextToken(q,&q,extent,token);
-            if ((*token == '\0') || (*token == ';'))
-              {
-                status=MagickFalse;
-                break;
-              }
-            /*
-              Identify recursion.
-            */
-            for (i=0; i <= n; i++)
-              if (LocaleCompare(token,graphic_context[i]->id) == 0)
-                break;
-            if (i <= n)
-              break;
-            if (classDepth++ >= MagickMaxRecursionDepth)
-              {
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  DrawError,"VectorGraphicsNestedTooDeeply","`%s'",token);
-                status=MagickFalse;
-                break;
-              }
-            mvg_class=(const char *) GetValueFromSplayTree(macros,token);
-            if (IsRenderableClass(graphic_context,n,mvg_class,p,primitive) !=
-                MagickFalse)
-              {
-                char
-                  *elements;
-
-                ssize_t
-                  offset;
-
-                /*
-                  Inject class elements in stream.
-                */
-                (void) CloneString(&graphic_context[n]->id,token);
-                offset=(ssize_t) (p-primitive);
-                elements=AcquireString(primitive);
-                elements[offset]='\0';
-                (void) ConcatenateString(&elements,mvg_class);
-                (void) ConcatenateString(&elements,"\n");
-                (void) ConcatenateString(&elements,q);
-                primitive=DestroyString(primitive);
-                primitive=elements;
-                q=primitive+offset;
-              }
-            break;
-          }
-        if (LocaleCompare("clip-path",keyword) == 0)
-          {
-            const char
-              *clip_path;
-
-            /*
-              Take a node from within the MVG document, and duplicate it here.
-            */
-            (void) GetNextToken(q,&q,extent,token);
-            if (*token == '\0')
-              {
-                status=MagickFalse;
-                break;
-              }
-            (void) CloneString(&graphic_context[n]->clip_mask,token);
-            clip_path=(const char *) GetValueFromSplayTree(macros,token);
-            if (clip_path != (const char *) NULL)
-              {
-                if (graphic_context[n]->clipping_mask != (Image *) NULL)
-                  graphic_context[n]->clipping_mask=
-                    DestroyImage(graphic_context[n]->clipping_mask);
-                graphic_context[n]->clipping_mask=DrawClippingMask(image,
-                  graphic_context[n],token,clip_path,exception);
-                if (graphic_context[n]->compliance != SVGCompliance)
-                  {
-                    ApplyMVGClipPath(&render_state);
-                  }
-              }
-            break;
-          }
-        if (LocaleCompare("clip-rule",keyword) == 0)
-          {
-            ssize_t
-              fill_rule;
-
-            (void) GetNextToken(q,&q,extent,token);
-            fill_rule=ParseCommandOption(MagickFillRuleOptions,MagickFalse,
-              token);
-            if (fill_rule == -1)
-              {
-                status=MagickFalse;
-                break;
-              }
-            graphic_context[n]->fill_rule=(FillRule) fill_rule;
-            break;
-          }
-        if (LocaleCompare("clip-units",keyword) == 0)
-          {
-            ssize_t
-              clip_units;
-
-            (void) GetNextToken(q,&q,extent,token);
-            clip_units=ParseCommandOption(MagickClipPathOptions,MagickFalse,
-              token);
-            if (clip_units == -1)
-              {
-                status=MagickFalse;
-                break;
-              }
-            graphic_context[n]->clip_units=(ClipPathUnits) clip_units;
-            if (clip_units == ObjectBoundingBox)
-              {
-                GetAffineMatrix(&current);
-                affine.sx=draw_info->bounds.x2;
-                affine.sy=draw_info->bounds.y2;
-                affine.tx=draw_info->bounds.x1;
-                affine.ty=draw_info->bounds.y1;
-                break;
-              }
-            break;
-          }
-        if (LocaleCompare("circle",keyword) == 0)
-          {
-            primitive_type=CirclePrimitive;
-            break;
-          }
-        if (LocaleCompare("color",keyword) == 0)
-          {
-            primitive_type=ColorPrimitive;
-            break;
-          }
-        if (LocaleCompare("compliance",keyword) == 0)
-          {
-            /*
-              MVG compliance associates a clipping mask with an image; SVG
-              compliance associates a clipping mask with a graphics context.
-            */
-            (void) GetNextToken(q,&q,extent,token);
-            graphic_context[n]->compliance=(ComplianceType) ParseCommandOption(
-              MagickComplianceOptions,MagickFalse,token);
-            break;
-          }
-        if (LocaleCompare("currentColor",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            break;
-          }
-        status=MagickFalse;
-        break;
-      }
-      case 'd':
-      case 'D':
-      {
-        if (LocaleCompare("decorate",keyword) == 0)
-          {
-            ssize_t
-              decorate;
-
-            (void) GetNextToken(q,&q,extent,token);
-            decorate=ParseCommandOption(MagickDecorateOptions,MagickFalse,
-              token);
-            if (decorate == -1)
-              {
-                status=MagickFalse;
-                break;
-              }
-            graphic_context[n]->decorate=(DecorationType) decorate;
-            break;
-          }
-        if (LocaleCompare("density",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            (void) CloneString(&graphic_context[n]->density,token);
-            break;
-          }
-        if (LocaleCompare("direction",keyword) == 0)
-          {
-            ssize_t
-              direction;
-
-            (void) GetNextToken(q,&q,extent,token);
-            direction=ParseCommandOption(MagickDirectionOptions,MagickFalse,
-              token);
-            if (direction == -1)
-              status=MagickFalse;
-            else
-              graphic_context[n]->direction=(DirectionType) direction;
-            break;
-          }
-        status=MagickFalse;
-        break;
-      }
-      case 'e':
-      case 'E':
-      {
-        if (LocaleCompare("ellipse",keyword) == 0)
-          {
-            primitive_type=EllipsePrimitive;
-            break;
-          }
-        if (LocaleCompare("encoding",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            (void) CloneString(&graphic_context[n]->encoding,token);
-            break;
-          }
-        status=MagickFalse;
-        break;
-      }
-      case 'f':
-      case 'F':
-      {
-        if (LocaleCompare("fill",keyword) == 0)
-          {
-            const char
-              *mvg_class;
-
-            (void) GetNextToken(q,&q,extent,token);
-            if (graphic_context[n]->clip_path != MagickFalse)
-              break;
-            mvg_class=(const char *) GetValueFromSplayTree(macros,token);
-            if (mvg_class != (const char *) NULL)
-              {
-                (void) DrawPatternPath(image,draw_info,mvg_class,
-                  &graphic_context[n]->fill_pattern,exception);
-                break;
-              }
-            (void) FormatLocaleString(pattern,MagickPathExtent,"%s",token);
-            if (GetImageArtifact(image,pattern) != (const char *) NULL)
-              {
-                (void) DrawPatternPath(image,draw_info,token,
-                  &graphic_context[n]->fill_pattern,exception);
-                break;
-              }
-            status&=(MagickStatusType) QueryColorCompliance(token,AllCompliance,
-              &graphic_context[n]->fill,exception);
-            if (graphic_context[n]->fill_alpha != (double) OpaqueAlpha)
-              graphic_context[n]->fill.alpha=graphic_context[n]->fill_alpha;
-            break;
-          }
-        if (LocaleCompare("fill-opacity",keyword) == 0)
-          {
-            double
-              opacity;
-
-            (void) GetNextToken(q,&q,extent,token);
-            if (graphic_context[n]->clip_path != MagickFalse)
-              break;
-            factor=strchr(token,'%') != (char *) NULL ? 0.01 : 1.0;
-            opacity=MagickMin(MagickMax(factor*
-              GetDrawValue(token,&next_token),0.0),1.0);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            if (graphic_context[n]->compliance == SVGCompliance)
-              graphic_context[n]->fill_alpha*=opacity;
-            else
-              graphic_context[n]->fill_alpha=(double) QuantumRange*opacity;
-            if (graphic_context[n]->fill.alpha != (double) TransparentAlpha)
-              graphic_context[n]->fill.alpha=graphic_context[n]->fill_alpha;
-            else
-              graphic_context[n]->fill.alpha=(MagickRealType)
-                ClampToQuantum((double) QuantumRange*opacity);
-            graphic_context[n]->fill.alpha_trait=BlendPixelTrait;
-            break;
-          }
-        if (LocaleCompare("fill-rule",keyword) == 0)
-          {
-            ssize_t
-              fill_rule;
-
-            (void) GetNextToken(q,&q,extent,token);
-            fill_rule=ParseCommandOption(MagickFillRuleOptions,MagickFalse,
-              token);
-            if (fill_rule == -1)
-              {
-                status=MagickFalse;
-                break;
-              }
-            graphic_context[n]->fill_rule=(FillRule) fill_rule;
-            break;
-          }
-        if (LocaleCompare("font",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            (void) CloneString(&graphic_context[n]->font,token);
-            if (LocaleCompare("none",token) == 0)
-              graphic_context[n]->font=(char *) RelinquishMagickMemory(
-                graphic_context[n]->font);
-            break;
-          }
-        if (LocaleCompare("font-family",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            (void) CloneString(&graphic_context[n]->family,token);
-            break;
-          }
-        if (LocaleCompare("font-size",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            graphic_context[n]->pointsize=GetDrawValue(token,&next_token);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            break;
-          }
-        if (LocaleCompare("font-stretch",keyword) == 0)
-          {
-            ssize_t
-              stretch;
-
-            (void) GetNextToken(q,&q,extent,token);
-            stretch=ParseCommandOption(MagickStretchOptions,MagickFalse,token);
-            if (stretch == -1)
-              {
-                status=MagickFalse;
-                break;
-              }
-            graphic_context[n]->stretch=(StretchType) stretch;
-            break;
-          }
-        if (LocaleCompare("font-style",keyword) == 0)
-          {
-            ssize_t
-              style;
-
-            (void) GetNextToken(q,&q,extent,token);
-            style=ParseCommandOption(MagickStyleOptions,MagickFalse,token);
-            if (style == -1)
-              {
-                status=MagickFalse;
-                break;
-              }
-            graphic_context[n]->style=(StyleType) style;
-            break;
-          }
-        if (LocaleCompare("font-weight",keyword) == 0)
-          {
-            ssize_t
-              weight;
-
-            (void) GetNextToken(q,&q,extent,token);
-            weight=ParseCommandOption(MagickWeightOptions,MagickFalse,token);
-            if (weight == -1)
-              weight=(ssize_t) StringToUnsignedLong(token);
-            graphic_context[n]->weight=(size_t) weight;
-            break;
-          }
-        status=MagickFalse;
-        break;
-      }
-      case 'g':
-      case 'G':
-      {
-        if (LocaleCompare("gradient-units",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            break;
-          }
-        if (LocaleCompare("gravity",keyword) == 0)
-          {
-            ssize_t
-              gravity;
-
-            (void) GetNextToken(q,&q,extent,token);
-            gravity=ParseCommandOption(MagickGravityOptions,MagickFalse,token);
-            if (gravity == -1)
-              {
-                status=MagickFalse;
-                break;
-              }
-            graphic_context[n]->gravity=(GravityType) gravity;
-            break;
-          }
-        status=MagickFalse;
-        break;
-      }
-      case 'i':
-      case 'I':
-      {
-        if (LocaleCompare("image",keyword) == 0)
-          {
-            ssize_t
-              compose;
-
-            primitive_type=ImagePrimitive;
-            (void) GetNextToken(q,&q,extent,token);
-            compose=ParseCommandOption(MagickComposeOptions,MagickFalse,token);
-            if (compose == -1)
-              {
-                status=MagickFalse;
-                break;
-              }
-            graphic_context[n]->compose=(CompositeOperator) compose;
-            break;
-          }
-        if (LocaleCompare("interline-spacing",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            graphic_context[n]->interline_spacing=GetDrawValue(token,
-              &next_token);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            break;
-          }
-        if (LocaleCompare("interword-spacing",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            graphic_context[n]->interword_spacing=GetDrawValue(token,
-              &next_token);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            break;
-          }
-        status=MagickFalse;
-        break;
-      }
-      case 'k':
-      case 'K':
-      {
-        if (LocaleCompare("kerning",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            graphic_context[n]->kerning=GetDrawValue(token,&next_token);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            break;
-          }
-        status=MagickFalse;
-        break;
-      }
-      case 'l':
-      case 'L':
-      {
-        if (LocaleCompare("letter-spacing",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            if (IsValidPoint(token) == MagickFalse)
-              break;
-            clone_info=CloneDrawInfo((ImageInfo *) NULL,graphic_context[n]);
-            clone_info->text=AcquireString(" ");
-            status&=(MagickStatusType) GetTypeMetrics(image,clone_info,&metrics,
-              exception);
-            graphic_context[n]->kerning=metrics.width*
-              GetDrawValue(token,&next_token);
-            clone_info=DestroyDrawInfo(clone_info);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            break;
-          }
-        if (LocaleCompare("line",keyword) == 0)
-          {
-            primitive_type=LinePrimitive;
-            break;
-          }
-        status=MagickFalse;
-        break;
-      }
-      case 'm':
-      case 'M':
-      {
-        if (LocaleCompare("mask",keyword) == 0)
-          {
-            const char
-              *mask_path;
-
-            /*
-              Take a node from within the MVG document, and duplicate it here.
-            */
-            (void) GetNextToken(q,&q,extent,token);
-            mask_path=(const char *) GetValueFromSplayTree(macros,token);
-            if (mask_path != (const char *) NULL)
-              {
-                if (graphic_context[n]->composite_mask != (Image *) NULL)
-                  graphic_context[n]->composite_mask=
-                    DestroyImage(graphic_context[n]->composite_mask);
-                graphic_context[n]->composite_mask=DrawCompositeMask(image,
-                  graphic_context[n],token,mask_path,exception);
-                if (graphic_context[n]->compliance != SVGCompliance)
-                  status=SetImageMask(image,CompositePixelMask,
-                    graphic_context[n]->composite_mask,exception);
-              }
-            break;
-          }
-        status=MagickFalse;
-        break;
-      }
-      case 'o':
-      case 'O':
-      {
-        if (LocaleCompare("offset",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            break;
-          }
-        if (LocaleCompare("opacity",keyword) == 0)
-          {
-            double
-              opacity;
-
-            (void) GetNextToken(q,&q,extent,token);
-            if (graphic_context[n]->clip_path != MagickFalse)
-              break;
-            factor=strchr(token,'%') != (char *) NULL ? 0.01 : 1.0;
-            opacity=MagickMin(MagickMax(factor*
-              GetDrawValue(token,&next_token),0.0),1.0);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            if (graphic_context[n]->compliance == SVGCompliance)
-              {
-                graphic_context[n]->fill_alpha*=opacity;
-                graphic_context[n]->stroke_alpha*=opacity;
-              }
-            else
-              {
-                graphic_context[n]->fill_alpha=(double) QuantumRange*opacity;
-                graphic_context[n]->stroke_alpha=(double) QuantumRange*opacity;
-              }
-            if (graphic_context[n]->fill.alpha != (double) TransparentAlpha)
-              {
-                graphic_context[n]->fill.alpha=graphic_context[n]->fill_alpha;
-                graphic_context[n]->stroke.alpha=
-                  graphic_context[n]->stroke_alpha;
-              }
-            else
-              {
-                graphic_context[n]->fill.alpha=(MagickRealType)
-                  ClampToQuantum((double) QuantumRange*opacity);
-                graphic_context[n]->stroke.alpha=(MagickRealType)
-                  ClampToQuantum((double) QuantumRange*opacity);
-              }
-            graphic_context[n]->fill.alpha_trait=BlendPixelTrait;
-            graphic_context[n]->stroke.alpha_trait=BlendPixelTrait;
-            break;
-          }
-        status=MagickFalse;
-        break;
-      }
-      case 'p':
-      case 'P':
-      {
-        if (LocaleCompare("path",keyword) == 0)
-          {
-            primitive_type=PathPrimitive;
-            break;
-          }
-        if (LocaleCompare("point",keyword) == 0)
-          {
-            primitive_type=PointPrimitive;
-            break;
-          }
-        if (LocaleCompare("polyline",keyword) == 0)
-          {
-            primitive_type=PolylinePrimitive;
-            break;
-          }
-        if (LocaleCompare("polygon",keyword) == 0)
-          {
-            primitive_type=PolygonPrimitive;
-            break;
-          }
-        if (LocaleCompare("pop",keyword) == 0)
-          {
-            if (GetNextToken(q,&q,extent,token) < 1)
-              break;
-            if (LocaleCompare("class",token) == 0)
-              break;
-            if (LocaleCompare("clip-path",token) == 0)
-              break;
-            if (LocaleCompare("defs",token) == 0)
-              {
-                defsDepth--;
-                graphic_context[n]->render=defsDepth > 0 ? MagickFalse :
-                  MagickTrue;
-                break;
-              }
-            if (LocaleCompare("gradient",token) == 0)
-              break;
-            if (LocaleCompare("graphic-context",token) == 0)
-              {
-                if (n <= 0)
-                  {
-                    (void) ThrowMagickException(exception,GetMagickModule(),
-                      DrawError,"UnbalancedGraphicContextPushPop","`%s'",token);
-                    status=MagickFalse;
-                    n=0;
-                    break;
-                  }
-                if ((graphic_context[n]->clip_mask != (char *) NULL) &&
-                    (graphic_context[n]->compliance != SVGCompliance))
-                  if (LocaleCompare(graphic_context[n]->clip_mask,
-                      graphic_context[n-1]->clip_mask) != 0)
-                    status=SetImageMask(image,WritePixelMask,(Image *) NULL,
-                      exception);
-                graphic_context[n]=DestroyDrawInfo(graphic_context[n]);
-                n--;
-                break;
-              }
-            if (LocaleCompare("mask",token) == 0)
-              break;
-            if (LocaleCompare("pattern",token) == 0)
-              break;
-            if (LocaleCompare("symbol",token) == 0)
-              {
-                symbolDepth--;
-                graphic_context[n]->render=symbolDepth > 0 ? MagickFalse :
-                  MagickTrue;
-                break;
-              }
-            status=MagickFalse;
-            break;
-          }
-        if (LocaleCompare("push",keyword) == 0)
-          {
-            if (GetNextToken(q,&q,extent,token) < 1)
-              break;
-            if (LocaleCompare("class",token) == 0)
-              {
-                /*
-                  Class context.
-                */
-                for (p=q; *q != '\0'; )
-                {
-                  if (GetNextToken(q,&q,extent,token) < 1)
-                    break;
-                  if (LocaleCompare(token,"pop") != 0)
-                    continue;
-                  (void) GetNextToken(q,(const char **) NULL,extent,token);
-                  if (LocaleCompare(token,"class") != 0)
-                    continue;
-                  break;
-                }
-                (void) GetNextToken(q,&q,extent,token);
-                break;
-              }
-            if (LocaleCompare("clip-path",token) == 0)
-              {
-                (void) GetNextToken(q,&q,extent,token);
-                for (p=q; *q != '\0'; )
-                {
-                  if (GetNextToken(q,&q,extent,token) < 1)
-                    break;
-                  if (LocaleCompare(token,"pop") != 0)
-                    continue;
-                  (void) GetNextToken(q,(const char **) NULL,extent,token);
-                  if (LocaleCompare(token,"clip-path") != 0)
-                    continue;
-                  break;
-                }
-                if (IsMVGBlockEndMissing(q,p) != MagickFalse)
-                  {
-                    status=MagickFalse;
-                    break;
-                  }
-                (void) GetNextToken(q,&q,extent,token);
-                break;
-              }
-            if (LocaleCompare("defs",token) == 0)
-              {
-                defsDepth++;
-                graphic_context[n]->render=defsDepth > 0 ? MagickFalse :
-                  MagickTrue;
-                break;
-              }
-            if (LocaleCompare("gradient",token) == 0)
-              {
-                char
-                  key[2*MagickPathExtent],
-                  name[MagickPathExtent],
-                  type[MagickPathExtent];
-
-                SegmentInfo
-                  segment;
-
-                (void) GetNextToken(q,&q,extent,token);
-                (void) CopyMagickString(name,token,MagickPathExtent);
-                (void) GetNextToken(q,&q,extent,token);
-                (void) CopyMagickString(type,token,MagickPathExtent);
-                (void) GetNextToken(q,&q,extent,token);
-                segment.x1=GetDrawValue(token,&next_token);
-                if (token == next_token)
-                  ThrowPointExpectedException(token,exception);
-                (void) GetNextToken(q,&q,extent,token);
-                if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-                  ThrowPointExpectedException(token,exception);
-                if (*token == ',')
-                  (void) GetNextToken(q,&q,extent,token);
-                segment.y1=GetDrawValue(token,&next_token);
-                if (token == next_token)
-                  ThrowPointExpectedException(token,exception);
-                (void) GetNextToken(q,&q,extent,token);
-                if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-                  ThrowPointExpectedException(token,exception);
-                if (*token == ',')
-                  (void) GetNextToken(q,&q,extent,token);
-                segment.x2=GetDrawValue(token,&next_token);
-                if (token == next_token)
-                  ThrowPointExpectedException(token,exception);
-                (void) GetNextToken(q,&q,extent,token);
-                if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-                  ThrowPointExpectedException(token,exception);
-                if (*token == ',')
-                  (void) GetNextToken(q,&q,extent,token);
-                segment.y2=GetDrawValue(token,&next_token);
-                if (token == next_token)
-                  ThrowPointExpectedException(token,exception);
-                if (LocaleCompare(type,"radial") == 0)
-                  {
-                    (void) GetNextToken(q,&q,extent,token);
-                    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-                      ThrowPointExpectedException(token,exception);
-                    if (*token == ',')
-                      (void) GetNextToken(q,&q,extent,token);
-                  }
-                for (p=q; *q != '\0'; )
-                {
-                  if (GetNextToken(q,&q,extent,token) < 1)
-                    break;
-                  if (LocaleCompare(token,"pop") != 0)
-                    continue;
-                  (void) GetNextToken(q,(const char **) NULL,extent,token);
-                  if (LocaleCompare(token,"gradient") != 0)
-                    continue;
-                  break;
-                }
-                if (IsMVGBlockEndInvalid(q,p,extent) != MagickFalse)
-                  {
-                    status=MagickFalse;
-                    break;
-                  }
-                (void) CopyMagickString(token,p,(size_t) (q-p-4+1));
-                bounds.x1=graphic_context[n]->affine.sx*segment.x1+
-                  graphic_context[n]->affine.ry*segment.y1+
-                  graphic_context[n]->affine.tx;
-                bounds.y1=graphic_context[n]->affine.rx*segment.x1+
-                  graphic_context[n]->affine.sy*segment.y1+
-                  graphic_context[n]->affine.ty;
-                bounds.x2=graphic_context[n]->affine.sx*segment.x2+
-                  graphic_context[n]->affine.ry*segment.y2+
-                  graphic_context[n]->affine.tx;
-                bounds.y2=graphic_context[n]->affine.rx*segment.x2+
-                  graphic_context[n]->affine.sy*segment.y2+
-                  graphic_context[n]->affine.ty;
-                (void) FormatLocaleString(key,MagickPathExtent,"%s",name);
-                (void) SetImageArtifact(image,key,token);
-                (void) FormatLocaleString(key,MagickPathExtent,"%s-type",name);
-                (void) SetImageArtifact(image,key,type);
-                (void) FormatLocaleString(key,MagickPathExtent,"%s-geometry",
-                  name);
-                (void) FormatLocaleString(geometry,MagickPathExtent,
-                  "%gx%g%+.15g%+.15g",
-                  MagickMax(fabs(bounds.x2-bounds.x1+1.0),1.0),
-                  MagickMax(fabs(bounds.y2-bounds.y1+1.0),1.0),
-                  bounds.x1,bounds.y1);
-                (void) SetImageArtifact(image,key,geometry);
-                (void) GetNextToken(q,&q,extent,token);
-                break;
-              }
-            if (LocaleCompare("graphic-context",token) == 0)
-              {
-                n++;
-                graphic_context=(DrawInfo **) ResizeQuantumMemory(
-                  graphic_context,(size_t) (n+1),sizeof(*graphic_context));
-                if (graphic_context == (DrawInfo **) NULL)
-                  {
-                    (void) ThrowMagickException(exception,GetMagickModule(),
-                      ResourceLimitError,"MemoryAllocationFailed","`%s'",
-                      image->filename);
-                    status=MagickFalse;
-                    break;
-                  }
-                graphic_context[n]=CloneDrawInfo((ImageInfo *) NULL,
-                  graphic_context[n-1]);
-                if (*q == '"')
-                  {
-                    (void) GetNextToken(q,&q,extent,token);
-                    (void) CloneString(&graphic_context[n]->id,token);
-                  }
-                if (n >= MagickMaxRecursionDepth)
-                  {
-                    (void) ThrowMagickException(exception,GetMagickModule(),
-                      DrawError,"VectorGraphicsNestedTooDeeply","`%s'",
-                      image->filename);
-                    status=MagickFalse;
-                  }
-                break;
-              }
-            if (LocaleCompare("mask",token) == 0)
-              {
-                (void) GetNextToken(q,&q,extent,token);
-                break;
-              }
-            if (LocaleCompare("pattern",token) == 0)
-              {
-                char
-                  key[2*MagickPathExtent],
-                  name[MagickPathExtent];
-
-                RectangleInfo
-                  region;
-
-                (void) GetNextToken(q,&q,extent,token);
-                (void) CopyMagickString(name,token,MagickPathExtent);
-                (void) GetNextToken(q,&q,extent,token);
-                region.x=CastDoubleToSsizeT(ceil(GetDrawValue(token,
-                  &next_token)-0.5));
-                if (token == next_token)
-                  ThrowPointExpectedException(token,exception);
-                (void) GetNextToken(q,&q,extent,token);
-                if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-                  ThrowPointExpectedException(token,exception);
-                if (*token == ',')
-                  (void) GetNextToken(q,&q,extent,token);
-                region.y=CastDoubleToSsizeT(ceil(GetDrawValue(token,
-                  &next_token)-0.5));
-                if (token == next_token)
-                  ThrowPointExpectedException(token,exception);
-                (void) GetNextToken(q,&q,extent,token);
-                if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-                  ThrowPointExpectedException(token,exception);
-                if (*token == ',')
-                  (void) GetNextToken(q,&q,extent,token);
-                region.width=CastDoubleToSizeT(floor(GetDrawValue(token,
-                  &next_token)+0.5));
-                if (token == next_token)
-                  ThrowPointExpectedException(token,exception);
-                (void) GetNextToken(q,&q,extent,token);
-                if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-                  ThrowPointExpectedException(token,exception);
-                if (*token == ',')
-                  (void) GetNextToken(q,&q,extent,token);
-                region.height=CastDoubleToSizeT(GetDrawValue(token,
-                  &next_token)+0.5);
-                if (token == next_token)
-                  ThrowPointExpectedException(token,exception);
-                for (p=q; *q != '\0'; )
-                {
-                  if (GetNextToken(q,&q,extent,token) < 1)
-                    break;
-                  if (LocaleCompare(token,"pop") != 0)
-                    continue;
-                  (void) GetNextToken(q,(const char **) NULL,extent,token);
-                  if (LocaleCompare(token,"pattern") != 0)
-                    continue;
-                  break;
-                }
-                if (IsMVGBlockEndOutside(q,p,extent) != MagickFalse)
-                  {
-                    status=MagickFalse;
-                    break;
-                  }
-                (void) CopyMagickString(token,p,(size_t) (q-p-4+1));
-                (void) FormatLocaleString(key,MagickPathExtent,"%s",name);
-                (void) SetImageArtifact(image,key,token);
-                (void) FormatLocaleString(key,MagickPathExtent,"%s-geometry",
-                  name);
-                (void) FormatLocaleString(geometry,MagickPathExtent,
-                  "%.17gx%.17g%+.20g%+.20g",(double) region.width,(double)
-                  region.height,(double) region.x,(double) region.y);
-                (void) SetImageArtifact(image,key,geometry);
-                (void) GetNextToken(q,&q,extent,token);
-                break;
-              }
-            if (LocaleCompare("symbol",token) == 0)
-              {
-                symbolDepth++;
-                graphic_context[n]->render=symbolDepth > 0 ? MagickFalse :
-                  MagickTrue;
-                break;
-              }
-            status=MagickFalse;
-            break;
-          }
-        status=MagickFalse;
-        break;
-      }
-      case 'r':
-      case 'R':
-      {
-        if (LocaleCompare("rectangle",keyword) == 0)
-          {
-            primitive_type=RectanglePrimitive;
-            break;
-          }
-        if (LocaleCompare("rotate",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            angle=GetDrawValue(token,&next_token);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            affine.sx=cos(DegreesToRadians(fmod((double) angle,360.0)));
-            affine.rx=sin(DegreesToRadians(fmod((double) angle,360.0)));
-            affine.ry=(-sin(DegreesToRadians(fmod((double) angle,360.0))));
-            affine.sy=cos(DegreesToRadians(fmod((double) angle,360.0)));
-            break;
-          }
-        if (LocaleCompare("roundRectangle",keyword) == 0)
-          {
-            primitive_type=RoundRectanglePrimitive;
-            break;
-          }
-        status=MagickFalse;
-        break;
-      }
-      case 's':
-      case 'S':
-      {
-        if (LocaleCompare("scale",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            affine.sx=GetDrawValue(token,&next_token);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            (void) GetNextToken(q,&q,extent,token);
-            if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-              ThrowPointExpectedException(token,exception);
-            if (*token == ',')
-              (void) GetNextToken(q,&q,extent,token);
-            affine.sy=GetDrawValue(token,&next_token);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            break;
-          }
-        if (LocaleCompare("skewX",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            angle=GetDrawValue(token,&next_token);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            affine.ry=sin(DegreesToRadians(angle));
-            break;
-          }
-        if (LocaleCompare("skewY",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            angle=GetDrawValue(token,&next_token);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            affine.rx=(-tan(DegreesToRadians(angle)/2.0));
-            break;
-          }
-        if (LocaleCompare("stop-color",keyword) == 0)
-          {
-            PixelInfo
-              stop_color;
-
-            number_stops++;
-            if (number_stops == 1)
-              stops=(StopInfo *) AcquireQuantumMemory(2,sizeof(*stops));
-            else
-              if (number_stops > 2)
-                stops=(StopInfo *) ResizeQuantumMemory(stops,number_stops,
-                  sizeof(*stops));
-            if (stops == (StopInfo *) NULL)
-              {
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  ResourceLimitError,"MemoryAllocationFailed","`%s'",
-                  image->filename);
-                status=MagickFalse;
-                break;
-              }
-            (void) GetNextToken(q,&q,extent,token);
-            status&=(MagickStatusType) QueryColorCompliance(token,AllCompliance,
-              &stop_color,exception);
-            stops[number_stops-1].color=stop_color;
-            (void) GetNextToken(q,&q,extent,token);
-            factor=strchr(token,'%') != (char *) NULL ? 0.01 : 1.0;
-            stops[number_stops-1].offset=factor*GetDrawValue(token,
-              &next_token);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            break;
-          }
-        if (LocaleCompare("stroke",keyword) == 0)
-          {
-            const char
-              *mvg_class;
-
-            (void) GetNextToken(q,&q,extent,token);
-            if (graphic_context[n]->clip_path != MagickFalse)
-              break;
-            mvg_class=(const char *) GetValueFromSplayTree(macros,token);
-            if (mvg_class != (const char *) NULL)
-              {
-                (void) DrawPatternPath(image,draw_info,mvg_class,
-                  &graphic_context[n]->stroke_pattern,exception);
-                break;
-              }
-            (void) FormatLocaleString(pattern,MagickPathExtent,"%s",token);
-            if (GetImageArtifact(image,pattern) != (const char *) NULL)
-              {
-                (void) DrawPatternPath(image,draw_info,token,
-                  &graphic_context[n]->stroke_pattern,exception);
-                break;
-              }
-            status&=(MagickStatusType) QueryColorCompliance(token,AllCompliance,
-              &graphic_context[n]->stroke,exception);
-            if (graphic_context[n]->stroke_alpha != (double) OpaqueAlpha)
-              graphic_context[n]->stroke.alpha=
-                graphic_context[n]->stroke_alpha;
-            break;
-          }
-        if (LocaleCompare("stroke-antialias",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            graphic_context[n]->stroke_antialias=StringToLong(token) != 0 ?
-              MagickTrue : MagickFalse;
-            break;
-          }
-        if (LocaleCompare("stroke-dasharray",keyword) == 0)
-          {
-            if (graphic_context[n]->dash_pattern != (double *) NULL)
-              graphic_context[n]->dash_pattern=(double *)
-                RelinquishMagickMemory(graphic_context[n]->dash_pattern);
-            if (IsValidPoint(q) != MagickFalse)
-              {
-                const char
-                  *r;
-
-                r=q;
-                (void) GetNextToken(r,&r,extent,token);
-                if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-                  ThrowPointExpectedException(token,exception);
-                if (*token == ',')
-                  (void) GetNextToken(r,&r,extent,token);
-                x=CountMVGDashValues(r,extent,token);
-                graphic_context[n]->dash_pattern=(double *)
-                  AcquireQuantumMemory((size_t) (2*x+2),
-                  sizeof(*graphic_context[n]->dash_pattern));
-                if (graphic_context[n]->dash_pattern == (double *) NULL)
-                  {
-                    (void) ThrowMagickException(exception,GetMagickModule(),
-                      ResourceLimitError,"MemoryAllocationFailed","`%s'",
-                      image->filename);
-                    status=MagickFalse;
-                    break;
-                  }
-                (void) memset(graphic_context[n]->dash_pattern,0,(size_t)
-                  (2*x+2)*sizeof(*graphic_context[n]->dash_pattern));
-                ParseMVGDashPattern(&render_state);
-                break;
-              }
-            (void) GetNextToken(q,&q,extent,token);
-            break;
-          }
-        if (LocaleCompare("stroke-dashoffset",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            graphic_context[n]->dash_offset=GetDrawValue(token,&next_token);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            break;
-          }
-        if (LocaleCompare("stroke-linecap",keyword) == 0)
-          {
-            ssize_t
-              linecap;
-
-            (void) GetNextToken(q,&q,extent,token);
-            linecap=ParseCommandOption(MagickLineCapOptions,MagickFalse,token);
-            if (linecap == -1)
-              {
-                status=MagickFalse;
-                break;
-              }
-            graphic_context[n]->linecap=(LineCap) linecap;
-            break;
-          }
-        if (LocaleCompare("stroke-linejoin",keyword) == 0)
-          {
-            ssize_t
-              linejoin;
-
-            (void) GetNextToken(q,&q,extent,token);
-            linejoin=ParseCommandOption(MagickLineJoinOptions,MagickFalse,
-              token);
-            if (linejoin == -1)
-              {
-                status=MagickFalse;
-                break;
-              }
-            graphic_context[n]->linejoin=(LineJoin) linejoin;
-            break;
-          }
-        if (LocaleCompare("stroke-miterlimit",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            graphic_context[n]->miterlimit=StringToUnsignedLong(token);
-            break;
-          }
-        if (LocaleCompare("stroke-opacity",keyword) == 0)
-          {
-            double
-              opacity;
-
-            (void) GetNextToken(q,&q,extent,token);
-            if (graphic_context[n]->clip_path != MagickFalse)
-              break;
-            factor=strchr(token,'%') != (char *) NULL ? 0.01 : 1.0;
-            opacity=MagickMin(MagickMax(factor*GetDrawValue(token,&next_token),
-              0.0),1.0);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            if (graphic_context[n]->compliance == SVGCompliance)
-              graphic_context[n]->stroke_alpha*=opacity;
-            else
-              graphic_context[n]->stroke_alpha=(double) QuantumRange*opacity;
-            if (graphic_context[n]->stroke.alpha != (double) TransparentAlpha)
-              graphic_context[n]->stroke.alpha=graphic_context[n]->stroke_alpha;
-            else
-              graphic_context[n]->stroke.alpha=(MagickRealType)
-                ClampToQuantum((double) QuantumRange*opacity);
-            graphic_context[n]->stroke.alpha_trait=BlendPixelTrait;
-            break;
-          }
-        if (LocaleCompare("stroke-width",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            if (graphic_context[n]->clip_path != MagickFalse)
-              break;
-            graphic_context[n]->stroke_width=GetDrawValue(token,&next_token);
-            if ((token == next_token) ||
-                (graphic_context[n]->stroke_width < 0.0))
-              ThrowPointExpectedException(token,exception);
-            break;
-          }
-        status=MagickFalse;
-        break;
-      }
-      case 't':
-      case 'T':
-      {
-        if (LocaleCompare("text",keyword) == 0)
-          {
-            primitive_type=TextPrimitive;
-            cursor=0.0;
-            break;
-          }
-        if (LocaleCompare("text-align",keyword) == 0)
-          {
-            ssize_t
-              align;
-
-            (void) GetNextToken(q,&q,extent,token);
-            align=ParseCommandOption(MagickAlignOptions,MagickFalse,token);
-            if (align == -1)
-              {
-                status=MagickFalse;
-                break;
-              }
-            graphic_context[n]->align=(AlignType) align;
-            break;
-          }
-        if (LocaleCompare("text-anchor",keyword) == 0)
-          {
-            ssize_t
-              align;
-
-            (void) GetNextToken(q,&q,extent,token);
-            align=ParseCommandOption(MagickAlignOptions,MagickFalse,token);
-            if (align == -1)
-              {
-                status=MagickFalse;
-                break;
-              }
-            graphic_context[n]->align=(AlignType) align;
-            break;
-          }
-        if (LocaleCompare("text-antialias",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            graphic_context[n]->text_antialias=StringToLong(token) != 0 ?
-              MagickTrue : MagickFalse;
-            break;
-          }
-        if (LocaleCompare("text-undercolor",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            status&=(MagickStatusType) QueryColorCompliance(token,AllCompliance,
-              &graphic_context[n]->undercolor,exception);
-            break;
-          }
-        if (LocaleCompare("translate",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            affine.tx=GetDrawValue(token,&next_token);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            (void) GetNextToken(q,&q,extent,token);
-            if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-              ThrowPointExpectedException(token,exception);
-            if (*token == ',')
-              (void) GetNextToken(q,&q,extent,token);
-            affine.ty=GetDrawValue(token,&next_token);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            cursor=0.0;
-            break;
-          }
-        status=MagickFalse;
-        break;
-      }
-      case 'u':
-      case 'U':
-      {
-        if (LocaleCompare("use",keyword) == 0)
-          {
-            const char
-              *use;
-
-            /*
-              Get a macro from the MVG document, and "use" it here.
-            */
-            (void) GetNextToken(q,&q,extent,token);
-            use=(const char *) GetValueFromSplayTree(macros,token);
-            if (use != (const char *) NULL)
-              {
-                clone_info=CloneDrawInfo((ImageInfo *) NULL,graphic_context[n]);
-                if (draw_info->macro_expansion != (size_t *) NULL)
-                  {
-                    if (*draw_info->macro_expansion >= MacroExpansionLimit)
-                      {
-                        (void) ThrowMagickException(exception,GetMagickModule(),
-                          DrawError,"NonconformingDrawingPrimitiveDefinition",
-                          "`%s'",token);
-                        clone_info=DestroyDrawInfo(clone_info);
-                        return(MagickFalse);
-                      }
-                    (*draw_info->macro_expansion)++;
-                  }
-                (void) CloneString(&clone_info->primitive,use);
-                status=RenderMVGContent(image,clone_info,depth+1,exception);
-                clone_info=DestroyDrawInfo(clone_info);
-              }
-            break;
-          }
-        status=MagickFalse;
-        break;
-      }
-      case 'v':
-      case 'V':
-      {
-        if (LocaleCompare("viewbox",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            graphic_context[n]->viewbox.x=CastDoubleToSsizeT(ceil(
-              GetDrawValue(token,&next_token)-0.5));
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            (void) GetNextToken(q,&q,extent,token);
-            if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-              ThrowPointExpectedException(token,exception);
-            if (*token == ',')
-              (void) GetNextToken(q,&q,extent,token);
-            graphic_context[n]->viewbox.y=CastDoubleToSsizeT(
-              ceil(GetDrawValue(token,&next_token)-0.5));
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            (void) GetNextToken(q,&q,extent,token);
-            if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-              ThrowPointExpectedException(token,exception);
-            if (*token == ',')
-              (void) GetNextToken(q,&q,extent,token);
-            graphic_context[n]->viewbox.width=CastDoubleToSizeT(floor(
-              GetDrawValue(token,&next_token)+0.5));
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            (void) GetNextToken(q,&q,extent,token);
-            if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-              ThrowPointExpectedException(token,exception);
-            if (*token == ',')
-              (void) GetNextToken(q,&q,extent,token);
-            graphic_context[n]->viewbox.height=CastDoubleToSizeT(floor(
-              GetDrawValue(token,&next_token)+0.5));
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            break;
-          }
-        status=MagickFalse;
-        break;
-      }
-      case 'w':
-      case 'W':
-      {
-        if (LocaleCompare("word-spacing",keyword) == 0)
-          {
-            (void) GetNextToken(q,&q,extent,token);
-            graphic_context[n]->interword_spacing=GetDrawValue(token,
-              &next_token);
-            if (token == next_token)
-              ThrowPointExpectedException(token,exception);
-            break;
-          }
-        status=MagickFalse;
-        break;
-      }
-      default:
-      {
-        status=MagickFalse;
-        break;
-      }
-    }
+    if (ParseMVGKeyword(&render_state) == MagickFalse)
+      return(MagickFalse);
     if (status == MagickFalse)
       break;
     ApplyMVGAffine(&render_state);
