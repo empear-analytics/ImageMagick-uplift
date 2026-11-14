@@ -25258,6 +25258,12 @@ static MagickBooleanType XNextDisplayEvent(const DisplayEventContext *context,
   return(MagickFalse);
 }
 
+static void XTraceDisplayImage(Image **image)
+{
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",(*image)->filename);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -25340,8 +25346,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
 
   assert(image != (Image **) NULL);
   assert((*image)->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",(*image)->filename);
+  XTraceDisplayImage(image);
   display_image=(*image);
   warning_handler=(WarningHandler) NULL;
   windows=XSetWindows((XWindows *) ~0);
