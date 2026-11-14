@@ -2387,6 +2387,32 @@ static MagickBooleanType FinishPixelCacheOpen(CacheInfo *cache_info,
   return(MagickTrue);
 }
 
+static void LogMemoryPixelCacheOpen(const CacheInfo *cache_info)
+{
+  char
+    format[MagickPathExtent],
+    message[MagickPathExtent];
+
+  const char
+    *type;
+
+  if (cache_info->debug != MagickFalse)
+    {
+      (void) FormatMagickSize(cache_info->length,MagickTrue,"B",
+        MagickPathExtent,format);
+      type=CommandOptionToMnemonic(MagickCacheOptions,(ssize_t)
+        cache_info->type);
+      (void) FormatLocaleString(message,MagickPathExtent,
+        "open %s (%s %s, %.17gx%.17gx%.17g %s)",
+        cache_info->filename,cache_info->mapped != MagickFalse ?
+        "Anonymous" : "Heap",type,(double) cache_info->columns,
+        (double) cache_info->rows,(double)
+        cache_info->number_channels,format);
+      (void) LogMagickEvent(CacheEvent,GetMagickModule(),"%s",
+        message);
+    }
+}
+
 static MagickBooleanType CreateMemoryPixelCache(CacheInfo *cache_info,
   const PixelCacheOpenInfo *open_info,CacheInfo source_info,
   MagickBooleanType status)
@@ -2403,13 +2429,6 @@ static MagickBooleanType CreateMemoryPixelCache(CacheInfo *cache_info,
   ExceptionInfo
     *const exception = open_info->exception;
 
-  char
-    format[MagickPathExtent],
-    message[MagickPathExtent];
-
-  const char
-    *type;
-
   /*
     Create memory pixel cache.
   */
@@ -2420,21 +2439,7 @@ static MagickBooleanType CreateMemoryPixelCache(CacheInfo *cache_info,
       cache_info->number_channels*number_pixels);
   if (IsCacheSourcePending(source_info,mode) != MagickFalse)
     status=CloneCacheSource(cache_info,&source_info,exception);
-  if (cache_info->debug != MagickFalse)
-    {
-      (void) FormatMagickSize(cache_info->length,MagickTrue,"B",
-        MagickPathExtent,format);
-      type=CommandOptionToMnemonic(MagickCacheOptions,(ssize_t)
-        cache_info->type);
-      (void) FormatLocaleString(message,MagickPathExtent,
-        "open %s (%s %s, %.17gx%.17gx%.17g %s)",
-        cache_info->filename,cache_info->mapped != MagickFalse ?
-        "Anonymous" : "Heap",type,(double) cache_info->columns,
-        (double) cache_info->rows,(double)
-        cache_info->number_channels,format);
-      (void) LogMagickEvent(CacheEvent,GetMagickModule(),"%s",
-        message);
-    }
+  LogMemoryPixelCacheOpen(cache_info);
   cache_info->storage_class=image->storage_class;
   return(FinishPixelCacheOpen(cache_info,&source_info,mode,status));
 }
