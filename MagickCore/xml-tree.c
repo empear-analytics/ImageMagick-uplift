@@ -655,6 +655,19 @@ static XMLTreeRoot *GetXMLTreeRoot(XMLTreeInfo *xml_info)
   return(root);
 }
 
+static ssize_t FindAttributeTagIndex(char ***attributes,
+  const XMLTreeInfo *xml_info)
+{
+  ssize_t
+    i;
+
+  i=0;
+  while ((attributes[i] != (char **) NULL) &&
+         (strcmp(attributes[i][0],xml_info->tag) != 0))
+    i++;
+  return(i);
+}
+
 static const char *GetRootXMLAttribute(XMLTreeInfo *xml_info,const char *tag)
 {
   ssize_t
@@ -665,10 +678,7 @@ static const char *GetRootXMLAttribute(XMLTreeInfo *xml_info,const char *tag)
     *root;
 
   root=GetXMLTreeRoot(xml_info);
-  i=0;
-  while ((root->attributes[i] != (char **) NULL) &&
-         (strcmp(root->attributes[i][0],xml_info->tag) != 0))
-    i++;
+  i=FindAttributeTagIndex(root->attributes,xml_info);
   if (root->attributes[i] == (char **) NULL)
     return((const char *) NULL);
   j=1;
@@ -3410,19 +3420,6 @@ static MagickBooleanType AppendTagAttributes(XMLTreeInfo *xml_info,
     *length+=(size_t) FormatLocaleString(*source+(*length),*extent,"\"");
   }
   return(MagickTrue);
-}
-
-static ssize_t FindAttributeTagIndex(char ***attributes,
-  const XMLTreeInfo *xml_info)
-{
-  ssize_t
-    i;
-
-  i=0;
-  while ((attributes[i] != (char **) NULL) &&
-         (strcmp(attributes[i][0],xml_info->tag) != 0))
-    i++;
-  return(i);
 }
 
 typedef struct _TagBufferInfo
