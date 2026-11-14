@@ -14011,6 +14011,36 @@ static void XApplySessionCommands(const XMagickCommandContext *context,
   }
 }
 
+static void XApplyMiscellanyCommands(const XMagickCommandContext *context,
+  const DisplayCommand command,Image **nexus)
+{
+  switch (command)
+  {
+    case InfoCommand:
+      break;
+    case ZoomCommand:
+      XApplyZoomCommand(context);
+      break;
+    case ShowPreviewCommand:
+      XApplyShowPreviewCommand(context);
+      break;
+    case ShowHistogramCommand:
+      XApplyShowHistogramCommand(context);
+      break;
+    case ShowMatteCommand:
+      XApplyShowMatteCommand(context);
+      break;
+    case BackgroundCommand:
+      (*nexus)=XApplyBackgroundCommand(context,(*nexus));
+      break;
+    default:
+    {
+      XApplySessionCommands(context,command,&(*nexus));
+      break;
+    }
+  }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -14277,26 +14307,9 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
     case RegionOfInterestCommand:
       XApplyRegionOfInterestCommand(&context);
       break;
-    case InfoCommand:
-      break;
-    case ZoomCommand:
-      XApplyZoomCommand(&context);
-      break;
-    case ShowPreviewCommand:
-      XApplyShowPreviewCommand(&context);
-      break;
-    case ShowHistogramCommand:
-      XApplyShowHistogramCommand(&context);
-      break;
-    case ShowMatteCommand:
-      XApplyShowMatteCommand(&context);
-      break;
-    case BackgroundCommand:
-      nexus=XApplyBackgroundCommand(&context,nexus);
-      break;
     default:
     {
-      XApplySessionCommands(&context,command,&nexus);
+      XApplyMiscellanyCommands(&context,command,&nexus);
       break;
     }
   }
