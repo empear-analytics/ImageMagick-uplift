@@ -515,6 +515,12 @@ static void ExpandHomeDirectory(const char *path,char *expand_path)
     }
 }
 
+static inline MagickBooleanType IsHomeDirectoryPath(const char *path)
+{
+  return(((*(path+1) == *DirectorySeparator) || (*(path+1) == '\0')) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickPrivate void ExpandFilename(char *path)
 {
   char
@@ -525,7 +531,7 @@ MagickPrivate void ExpandFilename(char *path)
   if (*path != '~')
     return;
   (void) CopyMagickString(expand_path,path,MagickPathExtent);
-  if ((*(path+1) == *DirectorySeparator) || (*(path+1) == '\0'))
+  if (IsHomeDirectoryPath(path) != MagickFalse)
     {
       /*
         Substitute ~ with $HOME.
