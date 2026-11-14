@@ -10715,6 +10715,31 @@ static void XApplyHalfSizeCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyOriginalSizeCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  /*
+    Original image size.
+  */
+  windows->image.window_changes.width=(int) (*image)->columns;
+  windows->image.window_changes.height=(int) (*image)->rows;
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyResizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11399,15 +11424,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyHalfSizeCommand(&context);
       break;
     case OriginalSizeCommand:
-    {
-      /*
-        Original image size.
-      */
-      windows->image.window_changes.width=(int) (*image)->columns;
-      windows->image.window_changes.height=(int) (*image)->rows;
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyOriginalSizeCommand(&context);
       break;
-    }
     case DoubleSizeCommand:
     {
       /*
