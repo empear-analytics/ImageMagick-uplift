@@ -172,13 +172,7 @@ static void SeedFromSecretKey(RandomInfo *random_info)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   A c q u i r e R a n d o m I n f o                                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  AcquireRandomInfo() allocates the RandomInfo structure.
@@ -260,13 +254,7 @@ MagickExport RandomInfo *AcquireRandomInfo(void)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   D e s t r o y R a n d o m I n f o                                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  DestroyRandomInfo() deallocates memory associated with the random
@@ -305,13 +293,7 @@ MagickExport RandomInfo *DestroyRandomInfo(RandomInfo *random_info)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e n e r a t e E n t r o p i c C h a o s                                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GenerateEntropicChaos() generate entropic chaos used to initialize the
@@ -326,6 +308,8 @@ MagickExport RandomInfo *DestroyRandomInfo(RandomInfo *random_info)
 %    o random_info: the random info.
 %
 */
+
+#define MaxEntropyExtent  64  /* max permitted: 256 */
 
 #if !defined(MAGICKCORE_WINDOWS_SUPPORT)
 static ssize_t ReadRandom(int file,unsigned char *source,size_t length)
@@ -353,21 +337,165 @@ static ssize_t ReadRandom(int file,unsigned char *source,size_t length)
   }
   return(offset);
 }
+
+static void GatherTrueRandomEntropy(StringInfo *entropy,StringInfo *chaos)
+{
+  char
+    *filename;
+
+  int
+    file;
+
+  ssize_t
+    count;
+
+  StringInfo
+    *device;
+
+  /*
+    Our best hope for true entropy.
+  */
+  filename=AcquireString("/dev/random");
+  device=StringToStringInfo(filename);
+  device=DestroyStringInfo(device);
+  file=open_utf8(filename,O_RDONLY | O_CLOEXEC | O_BINARY,0);
+  filename=DestroyString(filename);
+  if (file == -1)
+    {
+      filename=AcquireString("/dev/srandom");
+      device=StringToStringInfo(filename);
+      device=DestroyStringInfo(device);
+      file=open_utf8(filename,O_RDONLY | O_CLOEXEC | O_BINARY,0);
+    }
+  if (file != -1)
+    {
+      SetStringInfoLength(chaos,MaxEntropyExtent);
+      count=ReadRandom(file,GetStringInfoDatum(chaos),MaxEntropyExtent);
+      (void) close_utf8(file);
+      SetStringInfoLength(chaos,(size_t) count);
+      ConcatenateStringInfo(entropy,chaos);
+    }
+}
+
+static void GatherDeviceEntropy(StringInfo *entropy,StringInfo *chaos)
+{
+  char
+    *filename;
+
+  int
+    file;
+
+  ssize_t
+    count;
+
+  StringInfo
+    *device;
+
+  /*
+    Not cryptographically strong but better than nothing.
+  */
+  if (environ != (char **) NULL)
+    {
+      ssize_t
+        i;
+
+      /*
+        Squeeze some entropy from the sometimes unpredictable environment.
+      */
+      for (i=0; environ[i] != (char *) NULL; i++)
+      {
+        SetStringInfoLength(chaos,strlen(environ[i]));
+        SetStringInfoDatum(chaos,(unsigned char *) environ[i]);
+        ConcatenateStringInfo(entropy,chaos);
+      }
+    }
+  filename=AcquireString("/dev/urandom");
+  device=StringToStringInfo(filename);
+  device=DestroyStringInfo(device);
+  file=open_utf8(filename,O_RDONLY | O_CLOEXEC | O_BINARY,0);
+  filename=DestroyString(filename);
+  if (file != -1)
+    {
+      SetStringInfoLength(chaos,MaxEntropyExtent);
+      count=ReadRandom(file,GetStringInfoDatum(chaos),MaxEntropyExtent);
+      (void) close_utf8(file);
+      SetStringInfoLength(chaos,(size_t) count);
+      ConcatenateStringInfo(entropy,chaos);
+    }
+  if (gather_true_random != MagickFalse)
+    GatherTrueRandomEntropy(entropy,chaos);
+}
 #endif
 
-static StringInfo *GenerateEntropicChaos(RandomInfo *random_info)
+static void AppendProcessEntropy(StringInfo *entropy,StringInfo *chaos)
 {
-#define MaxEntropyExtent  64  /* max permitted: 256 */
-
   MagickThreadType
     tid;
 
+  ssize_t
+    pid;
+
+  pid=(ssize_t) getpid();
+  SetStringInfoLength(chaos,sizeof(pid));
+  SetStringInfoDatum(chaos,(unsigned char *) &pid);
+  ConcatenateStringInfo(entropy,chaos);
+  tid=GetMagickThreadId();
+  SetStringInfoLength(chaos,sizeof(tid));
+  SetStringInfoDatum(chaos,(unsigned char *) &tid);
+  ConcatenateStringInfo(entropy,chaos);
+#if defined(MAGICKCORE_HAVE_SYSCONF) && defined(_SC_PHYS_PAGES)
+  {
+    ssize_t
+      pages;
+
+    pages=(ssize_t) sysconf(_SC_PHYS_PAGES);
+    SetStringInfoLength(chaos,sizeof(pages));
+    SetStringInfoDatum(chaos,(unsigned char *) &pages);
+    ConcatenateStringInfo(entropy,chaos);
+  }
+#endif
+#if defined(MAGICKCORE_HAVE_GETRUSAGE) && defined(RUSAGE_SELF)
+  {
+    struct rusage
+      usage;
+
+    if (getrusage(RUSAGE_SELF,&usage) == 0)
+      {
+        SetStringInfoLength(chaos,sizeof(usage));
+        SetStringInfoDatum(chaos,(unsigned char *) &usage);
+      }
+  }
+#endif
+}
+
+static void AppendProcessorTimeEntropy(StringInfo *entropy,StringInfo *chaos)
+{
+  time_t
+    nanoseconds;
+
+  nanoseconds=0;
+#if defined(MAGICKCORE_HAVE_CLOCK)
+  nanoseconds=clock();
+#endif
+#if defined(MAGICKCORE_HAVE_TIMES)
+  {
+    struct tms
+      timer;
+
+    (void) times(&timer);
+    nanoseconds=timer.tms_utime+timer.tms_stime;
+  }
+#endif
+  SetStringInfoLength(chaos,sizeof(nanoseconds));
+  SetStringInfoDatum(chaos,(unsigned char *) &nanoseconds);
+  ConcatenateStringInfo(entropy,chaos);
+}
+
+static StringInfo *GenerateEntropicChaos(RandomInfo *random_info)
+{
   StringInfo
     *chaos,
     *entropy;
-
-  ssize_t
-    pid;
 
   time_t
     nanoseconds,
@@ -410,37 +538,7 @@ static StringInfo *GenerateEntropicChaos(RandomInfo *random_info)
   ConcatenateStringInfo(entropy,chaos);
   SetStringInfoDatum(chaos,(unsigned char *) entropy);
   ConcatenateStringInfo(entropy,chaos);
-  pid=(ssize_t) getpid();
-  SetStringInfoLength(chaos,sizeof(pid));
-  SetStringInfoDatum(chaos,(unsigned char *) &pid);
-  ConcatenateStringInfo(entropy,chaos);
-  tid=GetMagickThreadId();
-  SetStringInfoLength(chaos,sizeof(tid));
-  SetStringInfoDatum(chaos,(unsigned char *) &tid);
-  ConcatenateStringInfo(entropy,chaos);
-#if defined(MAGICKCORE_HAVE_SYSCONF) && defined(_SC_PHYS_PAGES)
-  {
-    ssize_t
-      pages;
-
-    pages=(ssize_t) sysconf(_SC_PHYS_PAGES);
-    SetStringInfoLength(chaos,sizeof(pages));
-    SetStringInfoDatum(chaos,(unsigned char *) &pages);
-    ConcatenateStringInfo(entropy,chaos);
-  }
-#endif
-#if defined(MAGICKCORE_HAVE_GETRUSAGE) && defined(RUSAGE_SELF)
-  {
-    struct rusage
-      usage;
-
-    if (getrusage(RUSAGE_SELF,&usage) == 0)
-      {
-        SetStringInfoLength(chaos,sizeof(usage));
-        SetStringInfoDatum(chaos,(unsigned char *) &usage);
-      }
-  }
-#endif
+  AppendProcessEntropy(entropy,chaos);
   seconds=time((time_t *) 0);
   nanoseconds=0;
 #if defined(MAGICKCORE_HAVE_GETTIMEOFDAY)
@@ -473,22 +571,7 @@ static StringInfo *GenerateEntropicChaos(RandomInfo *random_info)
   SetStringInfoLength(chaos,sizeof(nanoseconds));
   SetStringInfoDatum(chaos,(unsigned char *) &nanoseconds);
   ConcatenateStringInfo(entropy,chaos);
-  nanoseconds=0;
-#if defined(MAGICKCORE_HAVE_CLOCK)
-  nanoseconds=clock();
-#endif
-#if defined(MAGICKCORE_HAVE_TIMES)
-  {
-    struct tms
-      timer;
-
-    (void) times(&timer);
-    nanoseconds=timer.tms_utime+timer.tms_stime;
-  }
-#endif
-  SetStringInfoLength(chaos,sizeof(nanoseconds));
-  SetStringInfoDatum(chaos,(unsigned char *) &nanoseconds);
-  ConcatenateStringInfo(entropy,chaos);
+  AppendProcessorTimeEntropy(entropy,chaos);
 #if defined(MAGICKCORE_WINDOWS_SUPPORT)
   {
     double
@@ -518,77 +601,7 @@ static StringInfo *GenerateEntropicChaos(RandomInfo *random_info)
     ConcatenateStringInfo(entropy,chaos);
   }
 #else
-  {
-    char
-      *filename;
-
-    int
-      file;
-
-    ssize_t
-      count;
-
-    StringInfo
-      *device;
-
-    /*
-      Not cryptographically strong but better than nothing.
-    */
-    if (environ != (char **) NULL)
-      {
-        ssize_t
-          i;
-
-        /*
-          Squeeze some entropy from the sometimes unpredictable environment.
-        */
-        for (i=0; environ[i] != (char *) NULL; i++)
-        {
-          SetStringInfoLength(chaos,strlen(environ[i]));
-          SetStringInfoDatum(chaos,(unsigned char *) environ[i]);
-          ConcatenateStringInfo(entropy,chaos);
-        }
-      }
-    filename=AcquireString("/dev/urandom");
-    device=StringToStringInfo(filename);
-    device=DestroyStringInfo(device);
-    file=open_utf8(filename,O_RDONLY | O_CLOEXEC | O_BINARY,0);
-    filename=DestroyString(filename);
-    if (file != -1)
-      {
-        SetStringInfoLength(chaos,MaxEntropyExtent);
-        count=ReadRandom(file,GetStringInfoDatum(chaos),MaxEntropyExtent);
-        (void) close_utf8(file);
-        SetStringInfoLength(chaos,(size_t) count);
-        ConcatenateStringInfo(entropy,chaos);
-      }
-    if (gather_true_random != MagickFalse)
-      {
-        /*
-          Our best hope for true entropy.
-        */
-        filename=AcquireString("/dev/random");
-        device=StringToStringInfo(filename);
-        device=DestroyStringInfo(device);
-        file=open_utf8(filename,O_RDONLY | O_CLOEXEC | O_BINARY,0);
-        filename=DestroyString(filename);
-        if (file == -1)
-          {
-            filename=AcquireString("/dev/srandom");
-            device=StringToStringInfo(filename);
-            device=DestroyStringInfo(device);
-            file=open_utf8(filename,O_RDONLY | O_CLOEXEC | O_BINARY,0);
-          }
-        if (file != -1)
-          {
-            SetStringInfoLength(chaos,MaxEntropyExtent);
-            count=ReadRandom(file,GetStringInfoDatum(chaos),MaxEntropyExtent);
-            (void) close_utf8(file);
-            SetStringInfoLength(chaos,(size_t) count);
-            ConcatenateStringInfo(entropy,chaos);
-          }
-      }
-  }
+  GatherDeviceEntropy(entropy,chaos);
 #endif
   chaos=DestroyStringInfo(chaos);
   UnlockSemaphoreInfo(random_info->semaphore);
@@ -597,13 +610,7 @@ static StringInfo *GenerateEntropicChaos(RandomInfo *random_info)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t P s e u d o R a n d o m V a l u e                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetPseudoRandomValue() is a Xoshiro generator that returns a non-negative
@@ -639,13 +646,7 @@ MagickExport double GetPseudoRandomValue(
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t R a n d o m I n f o N o r m a l i z e                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetRandomInfoNormalize() returns the random normalize value.
@@ -667,13 +668,7 @@ MagickPrivate double GetRandomInfoNormalize(const RandomInfo *random_info)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   G e t R a n d o m I n f o S e e d                                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetRandomInfoSeed() returns the random seed.
@@ -695,13 +690,7 @@ MagickPrivate unsigned long *GetRandomInfoSeed(RandomInfo *random_info)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t R a n d o m K e y                                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetRandomKey() gets a random key from the reservoir.
@@ -731,13 +720,7 @@ MagickExport StringInfo *GetRandomKey(RandomInfo *random_info,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t R a n d o m S e c r e t K e y                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetRandomSecretKey() returns the random secret key.
@@ -757,13 +740,7 @@ MagickExport unsigned long GetRandomSecretKey(const RandomInfo *random_info)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t R a n d o m V a l u e                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetRandomValue() return a non-negative double-precision floating-point
@@ -791,13 +768,7 @@ MagickExport double GetRandomValue(RandomInfo *random_info)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   R a n d o m C o m p o n e n t G e n e s i s                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  RandomComponentGenesis() instantiates the random component.
@@ -816,13 +787,7 @@ MagickPrivate MagickBooleanType RandomComponentGenesis(void)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   R a n d o m C o m p o n e n t T e r m i n u s                             %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  RandomComponentTerminus() destroys the random component.
@@ -841,13 +806,7 @@ MagickPrivate void RandomComponentTerminus(void)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   S e t R a n d o m K e y                                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SetRandomKey() sets a random key from the reservoir.
@@ -954,13 +913,7 @@ MagickExport void SetRandomKey(RandomInfo *random_info,const size_t length,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   S e t R a n d o m S e c r e t K e y                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SetRandomSecretKey() sets the pseudo-random number generator secret key.
@@ -981,13 +934,7 @@ MagickExport void SetRandomSecretKey(const unsigned long key)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   S e t R a n d o m T r u e R a n d o m                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  SetRandomTrueRandom() declares your intentions to use true random numbers.

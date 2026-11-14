@@ -118,6 +118,39 @@ static inline MagickBooleanType IsPolicyPathComponentCharacter(const char c)
     (IsPolicyPathSeparator(c) == MagickFalse)));
 }
 
+static MagickBooleanType AppendPolicyPathRoot(char *partial,
+  const size_t extent,ssize_t *offset,const char **p)
+{
+  if (IsPolicyPathSeparator(*(*p)) != MagickFalse)
+    {
+      /*
+        Path starts with a directory separator, include it.
+      */
+      if (((*offset)+1) >= (ssize_t) extent)
+        return(MagickFalse);
+      partial[(*offset)++]=(*DirectorySeparator);
+      (*p)++;
+      partial[(*offset)]='\0';
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType AppendPolicyPathSeparator(char *partial,
+  const size_t extent,ssize_t *offset)
+{
+  if (((*offset) > 0) && (partial[(*offset)-1] != *DirectorySeparator))
+    {
+      /*
+        Append separator if needed.
+      */
+      if (((*offset)+1) >= (ssize_t) extent)
+        return MagickFalse;
+      partial[(*offset)++]=(*DirectorySeparator);
+      partial[(*offset)]='\0';
+    }
+  return(MagickTrue);
+}
+
 static inline MagickBooleanType IsPathContainsSymlink(const char *path)
 {
   char
@@ -133,17 +166,8 @@ static inline MagickBooleanType IsPathContainsSymlink(const char *path)
     return(MagickFalse);
   *partial='\0';
   p=path;
-  if (IsPolicyPathSeparator(*p) != MagickFalse)
-    {
-      /*
-        Path starts with a directory separator, include it.
-      */
-      if ((offset+1) >= (ssize_t) sizeof(partial))
-        return(MagickFalse);
-      partial[offset++]=(*DirectorySeparator);
-      p++;
-      partial[offset]='\0';
-    }
+  if (AppendPolicyPathRoot(partial,sizeof(partial),&offset,&p) == MagickFalse)
+    return(MagickFalse);
   while (*p != '\0')
   {
     char
@@ -168,16 +192,8 @@ static inline MagickBooleanType IsPathContainsSymlink(const char *path)
           p++;
         continue;
       }
-    if ((offset > 0) && (partial[offset-1] != *DirectorySeparator))
-      {
-        /*
-          Append separator if needed.
-        */
-        if ((offset+1) >= (ssize_t) sizeof(partial))
-          return MagickFalse;
-        partial[offset++]=(*DirectorySeparator);
-        partial[offset]='\0';
-      }
+    if (AppendPolicyPathSeparator(partial,sizeof(partial),&offset) == MagickFalse)
+      return MagickFalse;
     /*
       Append component.
     */

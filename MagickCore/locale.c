@@ -551,6 +551,27 @@ static int LocaleInfoCompare(const void *x,const void *y)
 }
 #endif
 
+static ssize_t CollectLocaleInfo(const char *pattern,
+  const LocaleInfo **messages)
+{
+  const LocaleInfo
+    *p;
+
+  ssize_t
+    i;
+
+  ResetSplayTreeIterator(locale_cache);
+  p=(const LocaleInfo *) GetNextValueInSplayTree(locale_cache);
+  for (i=0; p != (const LocaleInfo *) NULL; )
+  {
+    if ((p->stealth == MagickFalse) &&
+        (GlobExpression(p->tag,pattern,MagickTrue) != MagickFalse))
+      messages[i++]=p;
+    p=(const LocaleInfo *) GetNextValueInSplayTree(locale_cache);
+  }
+  return(i);
+}
+
 MagickExport const LocaleInfo **GetLocaleInfoList(const char *pattern,
   size_t *number_messages,ExceptionInfo *exception)
 {
@@ -582,15 +603,7 @@ MagickExport const LocaleInfo **GetLocaleInfoList(const char *pattern,
     Generate locale list.
   */
   LockSemaphoreInfo(locale_semaphore);
-  ResetSplayTreeIterator(locale_cache);
-  p=(const LocaleInfo *) GetNextValueInSplayTree(locale_cache);
-  for (i=0; p != (const LocaleInfo *) NULL; )
-  {
-    if ((p->stealth == MagickFalse) &&
-        (GlobExpression(p->tag,pattern,MagickTrue) != MagickFalse))
-      messages[i++]=p;
-    p=(const LocaleInfo *) GetNextValueInSplayTree(locale_cache);
-  }
+  i=CollectLocaleInfo(pattern,messages);
   UnlockSemaphoreInfo(locale_semaphore);
   qsort((void *) messages,(size_t) i,sizeof(*messages),LocaleInfoCompare);
   messages[i]=(LocaleInfo *) NULL;
@@ -838,6 +851,21 @@ MagickExport const char *GetLocaleValue(const LocaleInfo *locale_info)
   return(locale_info->message);
 }
 
+static char *GetEnvironmentLocaleName(char *locale)
+{
+  if (locale == (char *) NULL)
+    locale=GetEnvironmentValue("LC_ALL");
+  if (locale == (char *) NULL)
+    locale=GetEnvironmentValue("LC_MESSAGES");
+  if (locale == (char *) NULL)
+    locale=GetEnvironmentValue("LC_CTYPE");
+  if (locale == (char *) NULL)
+    locale=GetEnvironmentValue("LANG");
+  if (locale == (char *) NULL)
+    locale=ConstantString("C");
+  return(locale);
+}
+
 static char *AcquireLocaleName(void)
 {
   char
@@ -850,17 +878,18 @@ static char *AcquireLocaleName(void)
   p=setlocale(LC_CTYPE,(const char *) NULL);
   if (p != (const char *) NULL)
     locale=ConstantString(p);
-  if (locale == (char *) NULL)
-    locale=GetEnvironmentValue("LC_ALL");
-  if (locale == (char *) NULL)
-    locale=GetEnvironmentValue("LC_MESSAGES");
-  if (locale == (char *) NULL)
-    locale=GetEnvironmentValue("LC_CTYPE");
-  if (locale == (char *) NULL)
-    locale=GetEnvironmentValue("LANG");
-  if (locale == (char *) NULL)
-    locale=ConstantString("C");
+  locale=GetEnvironmentLocaleName(locale);
   return(locale);
+}
+
+static void InstantiateLocaleCache(ExceptionInfo *exception)
+{
+  char
+    *locale;
+
+  locale=AcquireLocaleName();
+  locale_cache=AcquireLocaleSplayTree(LocaleFilename,locale,exception);
+  locale=DestroyString(locale);
 }
 
 /*
@@ -888,14 +917,7 @@ static MagickBooleanType IsLocaleTreeInstantiated(ExceptionInfo *exception)
         ActivateSemaphoreInfo(&locale_semaphore);
       LockSemaphoreInfo(locale_semaphore);
       if (locale_cache == (SplayTreeInfo *) NULL)
-        {
-          char
-            *locale;
-
-          locale=AcquireLocaleName();
-          locale_cache=AcquireLocaleSplayTree(LocaleFilename,locale,exception);
-          locale=DestroyString(locale);
-        }
+        InstantiateLocaleCache(exception);
       UnlockSemaphoreInfo(locale_semaphore);
     }
   return(locale_cache != (SplayTreeInfo *) NULL ? MagickTrue : MagickFalse);
@@ -1009,17 +1031,29 @@ static const char *ListLocaleEntry(FILE *file,const LocaleInfo **locale_info,
   return(path);
 }
 
-MagickExport MagickBooleanType ListLocaleInfo(FILE *file,
-  ExceptionInfo *exception)
+static void ListLocaleEntries(FILE *file,const LocaleInfo **locale_info,
+  const size_t number_messages)
 {
   const char
     *path;
 
-  const LocaleInfo
-    **locale_info;
-
   ssize_t
     i;
+
+  path=(const char *) NULL;
+  for (i=0; i < (ssize_t) number_messages; i++)
+  {
+    if (locale_info[i]->stealth != MagickFalse)
+      continue;
+    path=ListLocaleEntry(file,locale_info,i,path);
+  }
+}
+
+MagickExport MagickBooleanType ListLocaleInfo(FILE *file,
+  ExceptionInfo *exception)
+{
+  const LocaleInfo
+    **locale_info;
 
   size_t
     number_messages;
@@ -1030,19 +1064,28 @@ MagickExport MagickBooleanType ListLocaleInfo(FILE *file,
   locale_info=GetLocaleInfoList("*",&number_messages,exception);
   if (locale_info == (const LocaleInfo **) NULL)
     return(MagickFalse);
-  path=(const char *) NULL;
-  for (i=0; i < (ssize_t) number_messages; i++)
-  {
-    if (locale_info[i]->stealth != MagickFalse)
-      continue;
-    path=ListLocaleEntry(file,locale_info,i,path);
-  }
+  ListLocaleEntries(file,locale_info,number_messages);
   (void) fflush(file);
   locale_info=(const LocaleInfo **)
     RelinquishMagickMemory((void *) locale_info);
   return(MagickTrue);
 }
 
+static ssize_t ChopLocalePathComponents(const char *path,char *p,
+  const size_t components)
+{
+  ssize_t
+    count;
+
+  for (count=0; (count < (ssize_t) components) && (p > path); p--)
+    if (*p == '/')
+      {
+        *p='\0';
+        count++;
+      }
+  return(count);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 +   L o a d L o c a l e C a c h e                                             %
@@ -1082,12 +1125,7 @@ static void ChopLocaleComponents(char *path,const size_t components)
   p=path+strlen(path)-1;
   if (*p == '/')
     *p='\0';
-  for (count=0; (count < (ssize_t) components) && (p > path); p--)
-    if (*p == '/')
-      {
-        *p='\0';
-        count++;
-      }
+  count=ChopLocalePathComponents(path,p,components);
   if (count < (ssize_t) components)
     *path='\0';
 }
@@ -1204,6 +1242,14 @@ static const char *SkipCommentElement(const char *q,const size_t extent,
   return(q);
 }
 
+static const char *TrimMessageEnd(const char *p,const char *q)
+{
+  q--;
+  while ((isspace((int) ((unsigned char) *q)) != 0) && (q > p))
+    q--;
+  return(q);
+}
+
 static const char *ReadMessageText(const char *q,char *message)
 {
   const char
@@ -1212,9 +1258,7 @@ static const char *ReadMessageText(const char *q,char *message)
   for (p=q; (*q != '<') && (*q != '\0'); q++) ;
   while (isspace((int) ((unsigned char) *p)) != 0)
     p++;
-  q--;
-  while ((isspace((int) ((unsigned char) *q)) != 0) && (q > p))
-    q--;
+  q=TrimMessageEnd(p,q);
   (void) CopyMagickString(message,p,MagickMin((size_t) (q-p+2),
     MagickLocaleExtent));
   return(q);

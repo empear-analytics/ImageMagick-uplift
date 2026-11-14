@@ -99,6 +99,9 @@ $call Make hashmap.c
 $call Make histogram.c
 $call Make identify.c
 $call Make image.c
+$call Make image-mask.c
+$call Make image-fill.c
+$call Make image-clone.c
 $call Make image-settings.c
 $call Make image-append.c
 $call Make image-filename.c

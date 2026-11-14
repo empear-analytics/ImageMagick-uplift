@@ -175,6 +175,24 @@ static void CheckLZWEncodeArguments(const Image *image,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
 }
 
+static MagickBooleanType IsLZWCodeWidthOverflow(const size_t next_index,
+  size_t *code_width)
+{
+  if ((next_index >> (*code_width)) != 0)
+    {
+      (*code_width)++;
+      if ((*code_width) > 12)
+        {
+          /*
+            Did we overflow the max bit width?
+          */
+          (*code_width)--;
+          return(MagickTrue);
+        }
+    }
+  return(MagickFalse);
+}
+
 MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
   unsigned char *magick_restrict pixels,ExceptionInfo *exception)
 {
@@ -231,21 +249,13 @@ MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
     /*
       Did we just move up to next bit width?
     */
-    if ((next_index >> code_width) != 0)
+    if (IsLZWCodeWidthOverflow(next_index,&code_width) != MagickFalse)
       {
-        code_width++;
-        if (code_width > 12)
-          {
-            /*
-              Did we overflow the max bit width?
-            */
-            code_width--;
-            OutputCode(LZWClr);
-            ResetLZWTable(table);
-            next_index=LZWEod+1;
-            code_width=9;
-          }
-        }
+        OutputCode(LZWClr);
+        ResetLZWTable(table);
+        next_index=LZWEod+1;
+        code_width=9;
+      }
       last_code=(size_t) pixels[i];
   }
   /*
