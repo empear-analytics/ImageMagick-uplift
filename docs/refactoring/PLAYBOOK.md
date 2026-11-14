@@ -16265,7 +16265,9 @@ variables or one that leaves the loop.
    leaves it, ending the loop, is reached only with the status local `s` false
    (`s=MagickFalse; break;`, `if (s == MagickFalse) break;`, a macro that sets `s` false
    and breaks) and the caller's statement after the segment is
-   `if (s == MagickFalse) break;` (or `== 0`) (form B).
+   `if (s == MagickFalse) break;` (or `== 0`) (form B). In form A the segment may also
+   be a run of statements nested inside the body (in a `switch` group, an `if` block or
+   an inner loop's body), when no `break`, `continue` or `return` in it leaves it.
 2. Variables as Recipe CK step 2: locals, parameters, arrays; temporaries (written
    before read on every path through the segment, read by nothing after it before being
    written again) are declared in the helper, and leave the caller when nothing else
@@ -18075,3 +18077,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | AMEND | VC | Step 7: a moved group `{ if (G(...) == MagickFalse) return(MagickFalse); return(MagickTrue); }`, or those two statements ending a block, become `return(G(...));` when `G` returns only `MagickTrue` or `MagickFalse`; a `const` input struct declared at the block's top becomes the struct parameter; Lane: c | `InterpretImageProperties`' braced-escape block after its prefix arms moved (probe 3.27 to 3.48) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | MT | Step 1: the copies may be blocks that Recipe VC moves (in-loop, leaving through `S goto L;`); a differing pair of `void` call statements is written as a `?:` of the two calls; Lane: c | `InterpretImageProperties`' option and artifact glob loops (two helpers would be *Code Duplication*) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | CS | Extract a Loop-Body Segment Through a State of the Caller's Addresses: a segment of a loop body moves to a `void` helper taking one `const` struct of the caller's addresses, copying locals in and out (Recipe CK's form); a local aliased through another struct is bound by address and written `(*v)`; a segment whose loop exits all have the status false is wrapped in `do { } while (0);` and the caller's status test follows; Lane: c | `draw.c`'s `RenderMVGContent` (the primitive tail: segments writing up to eight loop locals, `number_points` and `primitive_info` aliased through `mvg_info`) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | CS | Step 1: in form A the segment may be a run of statements nested inside the loop body (a `switch` group, an `if` block, an inner loop's body) when nothing in it leaves it; Lane: c | `RenderMVGContent`'s `clip-path` and `stroke-dasharray` arms, whose nested blocks hold the depth 4 their keyword handlers would keep | mandate (2026-10-24) |
