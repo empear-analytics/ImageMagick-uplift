@@ -915,10 +915,7 @@ MagickExport MagickBooleanType GetOneVirtualPixelInfo(const Image *image,
     *magick_restrict p;
 
   assert(image != (const Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(image->cache != (Cache) NULL);
-  cache_info=(CacheInfo *) image->cache;
-  assert(cache_info->signature == MagickCoreSignature);
+  cache_info=GetImageCacheInfo(image);
   assert(id < (int) cache_info->number_threads);
   GetPixelInfo(image,pixel);
   p=GetVirtualPixelCacheNexus(image,virtual_pixel_method,x,y,1UL,1UL,
