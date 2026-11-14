@@ -1601,6 +1601,61 @@ static char *AcquireEXIFTagStringValue(const EXIFWalkInfo *walk,
   return(value);
 }
 
+static char *AcquireEXIFTagFractionValue(const EXIFWalkInfo *walk,
+  const EXIFTagInfo *exif_tag,char *buffer,char *value)
+{
+  const EndianType
+    endian = walk->endian;
+
+  const size_t
+    tag_value = exif_tag->tag_value,
+    format = exif_tag->format;
+
+  ssize_t
+    components = exif_tag->components;
+
+  const ssize_t
+    number_bytes = exif_tag->number_bytes;
+
+  unsigned char
+    *const p = exif_tag->p;
+
+  switch (format)
+  {
+    case EXIF_FMT_URATIONAL:
+    {
+      if (IsGPSFractionTag(tag_value) != MagickFalse)
+        {
+          if (number_bytes < 24)
+            break;  /* reads three rationals */
+          components=1;
+          EXIFGPSFractions("%.17g/%.17g,%.17g/%.17g,%.17g/%.17g",
+            (double) ReadPropertyUnsignedLong(endian,p),
+            (double) ReadPropertyUnsignedLong(endian,p+4),
+            (double) ReadPropertyUnsignedLong(endian,p+8),
+            (double) ReadPropertyUnsignedLong(endian,p+12),
+            (double) ReadPropertyUnsignedLong(endian,p+16),
+            (double) ReadPropertyUnsignedLong(endian,p+20));
+          break;
+        }
+      EXIFMultipleFractions("%.17g/%.17g",(double)
+        ReadPropertyUnsignedLong(endian,p),(double)
+        ReadPropertyUnsignedLong(endian,p+4));
+      break;
+    }
+    case EXIF_FMT_SRATIONAL:
+    {
+      EXIFMultipleFractions("%.17g/%.17g",(double)
+        ReadPropertySignedLong(endian,p),(double)
+        ReadPropertySignedLong(endian,p+4));
+      break;
+    }
+    default:
+      return(AcquireEXIFTagStringValue(walk,exif_tag,buffer,value));
+  }
+  return(value);
+}
+
 static char *AcquireEXIFTagValue(const EXIFWalkInfo *walk,
   const EXIFTagInfo *exif_tag)
 {
@@ -1608,7 +1663,6 @@ static char *AcquireEXIFTagValue(const EXIFWalkInfo *walk,
     endian = walk->endian;
 
   const size_t
-    tag_value = exif_tag->tag_value,
     format = exif_tag->format;
 
   ssize_t
@@ -1660,36 +1714,8 @@ static char *AcquireEXIFTagValue(const EXIFWalkInfo *walk,
         ReadPropertySignedLong(endian,p));
       break;
     }
-    case EXIF_FMT_URATIONAL:
-    {
-      if (IsGPSFractionTag(tag_value) != MagickFalse)
-        {
-          if (number_bytes < 24)
-            break;  /* reads three rationals */
-          components=1;
-          EXIFGPSFractions("%.17g/%.17g,%.17g/%.17g,%.17g/%.17g",
-            (double) ReadPropertyUnsignedLong(endian,p),
-            (double) ReadPropertyUnsignedLong(endian,p+4),
-            (double) ReadPropertyUnsignedLong(endian,p+8),
-            (double) ReadPropertyUnsignedLong(endian,p+12),
-            (double) ReadPropertyUnsignedLong(endian,p+16),
-            (double) ReadPropertyUnsignedLong(endian,p+20));
-          break;
-        }
-      EXIFMultipleFractions("%.17g/%.17g",(double)
-        ReadPropertyUnsignedLong(endian,p),(double)
-        ReadPropertyUnsignedLong(endian,p+4));
-      break;
-    }
-    case EXIF_FMT_SRATIONAL:
-    {
-      EXIFMultipleFractions("%.17g/%.17g",(double)
-        ReadPropertySignedLong(endian,p),(double)
-        ReadPropertySignedLong(endian,p+4));
-      break;
-    }
     default:
-      return(AcquireEXIFTagStringValue(walk,exif_tag,buffer,value));
+      return(AcquireEXIFTagFractionValue(walk,exif_tag,buffer,value));
   }
   return(value);
 }
