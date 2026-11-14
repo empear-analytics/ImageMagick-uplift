@@ -2706,6 +2706,17 @@ static void AddXMPRDFValues(const Image *image,XMLTreeInfo *rdf)
   }
 }
 
+static const char *FindXMPPacketStart(const char *xmp_profile)
+{
+  const char
+    *p;
+
+  for (p=xmp_profile; *p != '\0'; p++)
+    if ((*p == '<') && (*(p+1) == 'x'))
+      break;
+  return(p);
+}
+
 static void GetXMPProperty(const Image *image,const char *property)
 {
   char
@@ -2734,9 +2745,7 @@ static void GetXMPProperty(const Image *image,const char *property)
   xmp_profile=StringInfoToString(profile);
   if (xmp_profile == (char *) NULL)
     return;
-  for (p=xmp_profile; *p != '\0'; p++)
-    if ((*p == '<') && (*(p+1) == 'x'))
-      break;
+  p=FindXMPPacketStart(xmp_profile);
   exception=AcquireExceptionInfo();
   xmp=NewXMLTree((char *) p,exception);
   xmp_profile=DestroyString(xmp_profile);
