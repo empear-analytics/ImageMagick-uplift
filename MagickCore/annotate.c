@@ -2757,6 +2757,86 @@ static FT_Outline_Funcs
     0, 0
   };
 
+typedef struct _GlyphLoadInput
+{
+  FT_Face
+    face;
+
+  FT_Int32
+    flags;
+
+  const DrawInfo
+    *draw_info;
+
+  MagickBooleanType
+    status;
+
+  DrawInfo
+    *annotate_info;
+
+  FT_Matrix
+    affine;
+
+  TypeMetric
+    *metrics;
+} GlyphLoadInput;
+
+static MagickBooleanType LoadFreetypeGlyph(const GlyphLoadInput *glyph_input,
+  GlyphInfo *glyph,FT_BBox *bounds)
+{
+  const FT_Face
+    face = glyph_input->face;
+
+  const FT_Int32
+    flags = glyph_input->flags;
+
+  const DrawInfo
+    *const draw_info = glyph_input->draw_info;
+
+  const MagickBooleanType
+    status = glyph_input->status;
+
+  DrawInfo
+    *const annotate_info = glyph_input->annotate_info;
+
+  const FT_Matrix
+    affine = glyph_input->affine;
+
+  TypeMetric
+    *const metrics = glyph_input->metrics;
+
+  FT_Error
+    ft_status;
+
+  FT_Outline
+    outline;
+
+    (*glyph).image=DestroyFreetypeGlyph((*glyph).image);
+    ft_status=FT_Load_Glyph(face,(*glyph).id,flags);
+    if (ft_status != 0)
+      return(MagickTrue);
+    ft_status=FT_Get_Glyph(face->glyph,&(*glyph).image);
+    if (ft_status != 0)
+      return(MagickTrue);
+    outline=((FT_OutlineGlyph) (*glyph).image)->outline;
+    if (IsNonOutlineGlyph((*glyph).image,outline) != MagickFalse)
+      return(MagickTrue);
+    ft_status=FT_Outline_Get_BBox(&outline,bounds);
+    if (ft_status != 0)
+      return(MagickTrue);
+    ExtendGlyphMinBounds((*bounds),metrics);
+    ExtendGlyphMaxBounds((*bounds),metrics);
+    if (IsRenderedStroke(draw_info,status) != MagickFalse)
+      TraceGlyphOutline(annotate_info,(*glyph).origin,outline,&OutlineMethods);
+    FT_Vector_Transform(&(*glyph).origin,&affine);
+    (void) FT_Glyph_Transform((*glyph).image,&affine,&(*glyph).origin);
+    ft_status=FT_Glyph_To_Bitmap(&(*glyph).image,FT_RENDER_MODE_NORMAL,
+      (FT_Vector *) NULL,MagickTrue);
+    if (ft_status != 0)
+      return(MagickTrue);
+  return(MagickFalse);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2784,9 +2864,6 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
 
   FT_BitmapGlyph
     bitmap;
-
-  FT_Error
-    ft_status;
 
   FT_Face
     face;
@@ -2895,8 +2972,8 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   last_character=(ssize_t) length-1;
   for (i=0; i < (ssize_t) length; i++)
   {
-    FT_Outline
-      outline;
+    GlyphLoadInput
+      glyph_input;
 
     /*
       Render UTF-8 sequence.
@@ -2907,28 +2984,14 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     glyph.origin=origin;
     glyph.origin.x+=(FT_Pos) grapheme[i].x_offset;
     glyph.origin.y+=(FT_Pos) grapheme[i].y_offset;
-    glyph.image=DestroyFreetypeGlyph(glyph.image);
-    ft_status=FT_Load_Glyph(face,glyph.id,flags);
-    if (ft_status != 0)
-      continue;
-    ft_status=FT_Get_Glyph(face->glyph,&glyph.image);
-    if (ft_status != 0)
-      continue;
-    outline=((FT_OutlineGlyph) glyph.image)->outline;
-    if (IsNonOutlineGlyph(glyph.image,outline) != MagickFalse)
-      continue;
-    ft_status=FT_Outline_Get_BBox(&outline,&bounds);
-    if (ft_status != 0)
-      continue;
-    ExtendGlyphMinBounds(bounds,metrics);
-    ExtendGlyphMaxBounds(bounds,metrics);
-    if (IsRenderedStroke(draw_info,status) != MagickFalse)
-      TraceGlyphOutline(annotate_info,glyph.origin,outline,&OutlineMethods);
-    FT_Vector_Transform(&glyph.origin,&affine);
-    (void) FT_Glyph_Transform(glyph.image,&affine,&glyph.origin);
-    ft_status=FT_Glyph_To_Bitmap(&glyph.image,FT_RENDER_MODE_NORMAL,
-      (FT_Vector *) NULL,MagickTrue);
-    if (ft_status != 0)
+    glyph_input.face=face;
+    glyph_input.flags=flags;
+    glyph_input.draw_info=draw_info;
+    glyph_input.status=status;
+    glyph_input.annotate_info=annotate_info;
+    glyph_input.affine=affine;
+    glyph_input.metrics=metrics;
+    if (LoadFreetypeGlyph(&glyph_input,&glyph,&bounds) != MagickFalse)
       continue;
     bitmap=(FT_BitmapGlyph) glyph.image;
     point=GetGlyphBitmapPoint(offset,bitmap,origin);
