@@ -277,76 +277,6 @@ static void DestroyQuantumPixels(QuantumInfo *quantum_info)
     quantum_info->pixels);
 }
 
-static size_t GetQuantumChannels(const Image *image,
-  const QuantumType quantum_type)
-{
-  size_t
-    channels;
-
-  channels=1;
-  switch (quantum_type)
-  {
-    case GrayAlphaQuantum: channels=2; break;
-    case IndexAlphaQuantum: channels=2; break;
-    case RGBQuantum: channels=3; break;
-    case BGRQuantum: channels=3; break;
-    case RGBAQuantum: channels=4; break;
-    case RGBOQuantum: channels=4; break;
-    case BGRAQuantum: channels=4; break;
-    case CMYKQuantum: channels=4; break;
-    case CMYKAQuantum: channels=5; break;
-    case MultispectralQuantum: channels=GetImageChannels(image); break;
-    case CbYCrAQuantum: channels=4; break;
-    case CbYCrQuantum: channels=3; break;
-    case CbYCrYQuantum: channels=4; break;
-    default: break;
-  }
-  return(channels);
-}
-
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   G e t Q u a n t u m E x t e n t                                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  GetQuantumExtent() returns the quantum pixel buffer extent.
-%
-%  The format of the GetQuantumExtent method is:
-%
-%      size_t GetQuantumExtent(Image *image,const QuantumInfo *quantum_info,
-%        const QuantumType quantum_type)
-%
-%  A description of each parameter follows:
-%
-%    o image: the image.
-%
-%    o quantum_info: the quantum info.
-%
-%    o quantum_type: Declare which pixel components to transfer (red, green,
-%      blue, opacity, RGB, or RGBA).
-%
-*/
-MagickExport size_t GetQuantumExtent(const Image *image,
-  const QuantumInfo *quantum_info,const QuantumType quantum_type)
-{
-  size_t
-    channels;
-
-  assert(quantum_info != (QuantumInfo *) NULL);
-  assert(quantum_info->signature == MagickCoreSignature);
-  channels=GetQuantumChannels(image,quantum_type);
-  if (quantum_info->pack == MagickFalse)
-    return((size_t) (channels*image->columns*((quantum_info->depth+7)/8))+
-      (quantum_info->pad*image->columns));
-  return((size_t) ((channels*image->columns*quantum_info->depth+7)/8)+
-    (quantum_info->pad*image->columns));
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -516,65 +446,6 @@ MagickExport unsigned char *GetQuantumPixels(const QuantumInfo *quantum_info)
   return((unsigned char *) GetVirtualMemoryBlob(quantum_info->pixels[id]));
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   G e t Q u a n t u m T y p e                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  GetQuantumType() returns the quantum type of the image.
-%
-%  The format of the GetQuantumType method is:
-%
-%      QuantumType GetQuantumType(Image *image,ExceptionInfo *exception)
-%
-%  A description of each parameter follows:
-%
-%    o image: the image.
-%
-%    o exception: return any errors or warnings in this structure.
-%
-*/
-MagickExport QuantumType GetQuantumType(Image *image,ExceptionInfo *exception)
-{
-  QuantumType
-    quantum_type;
-
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  (void) exception;
-  quantum_type=RGBQuantum;
-  if (image->alpha_trait != UndefinedPixelTrait)
-    quantum_type=RGBAQuantum;
-  if (image->colorspace == CMYKColorspace)
-    {
-      quantum_type=CMYKQuantum;
-      if (image->alpha_trait != UndefinedPixelTrait)
-        quantum_type=CMYKAQuantum;
-    }
-  if (IsGrayColorspace(image->colorspace) != MagickFalse)
-    {
-      quantum_type=GrayQuantum;
-      if (image->alpha_trait != UndefinedPixelTrait)
-        quantum_type=GrayAlphaQuantum;
-    }
-  if (image->storage_class == PseudoClass)
-    {
-      quantum_type=IndexQuantum;
-      if (image->alpha_trait != UndefinedPixelTrait)
-        quantum_type=IndexAlphaQuantum;
-    }
-  if (image->number_meta_channels != 0)
-    quantum_type=MultispectralQuantum;
-  return(quantum_type);
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -844,73 +715,6 @@ MagickExport MagickBooleanType SetQuantumFormat(const Image *image,
   return(SetQuantumExtent(image,quantum_info));
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   S e t Q u a n t u m I m a g e T y p e                                     %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  SetQuantumImageType() sets the image type based on the quantum type.
-%
-%  The format of the SetQuantumImageType method is:
-%
-%      void ImageType SetQuantumImageType(Image *image,
-%        const QuantumType quantum_type)
-%
-%  A description of each parameter follows:
-%
-%    o image: the image.
-%
-%    o quantum_type: Declare which pixel components to transfer (red, green,
-%      blue, opacity, RGB, or RGBA).
-%
-*/
-MagickExport void SetQuantumImageType(Image *image,
-  const QuantumType quantum_type)
-{
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  switch (quantum_type)
-  {
-    case IndexQuantum:
-    case IndexAlphaQuantum:
-    {
-      image->type=PaletteType;
-      break;
-    }
-    case GrayQuantum:
-    case GrayAlphaQuantum:
-    {
-      image->type=GrayscaleType;
-      if (image->depth == 1)
-        image->type=BilevelType;
-      break;
-    }
-    case CyanQuantum:
-    case MagentaQuantum:
-    case YellowQuantum:
-    case BlackQuantum:
-    case CMYKQuantum:
-    case CMYKAQuantum:
-    case MultispectralQuantum:
-    {
-      image->type=ColorSeparationType;
-      break;
-    }
-    default:
-    {
-      image->type=TrueColorType;
-      break;
-    }
-  }
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
