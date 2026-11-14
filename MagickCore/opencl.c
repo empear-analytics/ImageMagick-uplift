@@ -367,13 +367,26 @@ static void SetOpenCLCacheDirectory(char *home,char *path,char *temp)
   cache_directory=temp;
 }
 
+static const char *GetOpenCLCacheDirectoryValue(void)
+{
+  if (*cache_directory == '?')
+    return((const char *) NULL);
+  return(cache_directory);
+}
+
+static void LockOpenCLCacheDirectory(void)
+{
+  if (cache_directory_lock == (SemaphoreInfo *) NULL)
+    ActivateSemaphoreInfo(&cache_directory_lock);
+  LockSemaphoreInfo(cache_directory_lock);
+}
+
 static const char *GetOpenCLCacheDirectory()
 {
-  if (cache_directory == (char *) NULL)
-    {
-      if (cache_directory_lock == (SemaphoreInfo *) NULL)
-        ActivateSemaphoreInfo(&cache_directory_lock);
-      LockSemaphoreInfo(cache_directory_lock);
+  if (cache_directory != (char *) NULL)
+    return(GetOpenCLCacheDirectoryValue());
+  {
+      LockOpenCLCacheDirectory();
       if (cache_directory == (char *) NULL)
         {
           char
@@ -399,10 +412,8 @@ static const char *GetOpenCLCacheDirectory()
           SetOpenCLCacheDirectory(home,path,temp);
         }
       UnlockSemaphoreInfo(cache_directory_lock);
-    }
-  if (*cache_directory == '?')
-    return((const char *) NULL);
-  return(cache_directory);
+  }
+  return(GetOpenCLCacheDirectoryValue());
 }
 
 static void EnableSameOpenCLDevices(MagickCLEnv clEnv,MagickCLDevice device,
@@ -1672,10 +1683,24 @@ static void ReplaceIllegalFileNameCharacters(char *ptr)
   }
 }
 
-static MagickBooleanType CompileOpenCLKernel(MagickCLDevice device,
-  const char *kernel,const char *options,size_t signature,
-  ExceptionInfo *exception)
+typedef struct _OpenCLKernelBuild
 {
+  const char
+    *options;
+
+  ExceptionInfo
+    *exception;
+} OpenCLKernelBuild;
+
+static MagickBooleanType CompileOpenCLKernel(MagickCLDevice device,
+  const char *kernel,const OpenCLKernelBuild *build,size_t signature)
+{
+  const char
+    *const options = build->options;
+
+  ExceptionInfo
+    *const exception = build->exception;
+
   char
     deviceName[MagickPathExtent],
     filename[MagickPathExtent],
@@ -2221,6 +2246,9 @@ static MagickBooleanType CompileOpenCLDevices(
   ExceptionInfo
     *const exception = compile->exception;
 
+  const OpenCLKernelBuild
+    build = { options, exception };
+
   MagickBooleanType
     status;
 
@@ -2248,8 +2276,8 @@ static MagickBooleanType CompileOpenCLDevices(
     }
     device_signature=signature;
     device_signature^=StringSignature(device->platform_name);
-    status=CompileOpenCLKernel(device,accelerateKernelsBuffer,options,
-      device_signature,exception);
+    status=CompileOpenCLKernel(device,accelerateKernelsBuffer,&build,
+      device_signature);
     UnlockSemaphoreInfo(device->lock);
     if (status == MagickFalse)
       break;
