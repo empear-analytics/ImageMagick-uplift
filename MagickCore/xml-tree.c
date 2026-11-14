@@ -2700,14 +2700,12 @@ typedef struct _DeclarationTargets
     *l;
 } DeclarationTargets;
 
-static MagickBooleanType ParseDeclaration(const DeclarationInfo *declaration,
+static MagickBooleanType ParseDoctypeOrInstruction(
+  const DeclarationInfo *declaration,
   const DeclarationTargets *declaration_targets)
 {
   XMLTreeRoot
     *const root = declaration->root;
-
-  const size_t
-    ignore_depth = declaration->ignore_depth;
 
   const int
     terminal = declaration->terminal;
@@ -2723,6 +2721,62 @@ static MagickBooleanType ParseDeclaration(const DeclarationInfo *declaration,
 
   ssize_t
     *const l = declaration_targets->l;
+
+  if (strncmp(*p,"!DOCTYPE",8) == 0)
+    {
+      DoctypeTargets
+        targets;
+
+      targets.p=p;
+      targets.tag=tag;
+      targets.l=l;
+      if (ParseDoctype(root,terminal,exception,&targets) ==
+          MagickFalse)
+        {
+          return(MagickFalse);
+        }
+    }
+  else
+    if (**p == '?')
+      {
+        /*
+          Processing instructions.
+        */
+        *p=SkipProcessingInstruction(*p);
+        if (IsUnterminatedSection(*p,terminal) != MagickFalse)
+          {
+            (void) ThrowMagickException(exception,GetMagickModule(),
+              OptionWarning,"ParseError","unclosed <?");
+            return(MagickFalse);
+          }
+        ParseProcessingInstructions(root,*tag+1,(size_t) (*p-*tag-2));
+      }
+    else
+      {
+        (void) ThrowMagickException(exception,GetMagickModule(),
+          OptionWarning,"ParseError","unexpected <");
+        return(MagickFalse);
+      }
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseDeclaration(const DeclarationInfo *declaration,
+  const DeclarationTargets *declaration_targets)
+{
+  XMLTreeRoot
+    *const root = declaration->root;
+
+  const size_t
+    ignore_depth = declaration->ignore_depth;
+
+  ExceptionInfo
+    *const exception = declaration->exception;
+
+  char
+    **const p = declaration_targets->p;
+
+  char
+    **const tag = declaration_targets->tag;
 
   if (strncmp(*p,"![CDATA[",8) == 0)
     {
@@ -2742,41 +2796,7 @@ static MagickBooleanType ParseDeclaration(const DeclarationInfo *declaration,
         }
     }
   else
-    if (strncmp(*p,"!DOCTYPE",8) == 0)
-      {
-        DoctypeTargets
-          targets;
-
-        targets.p=p;
-        targets.tag=tag;
-        targets.l=l;
-        if (ParseDoctype(root,terminal,exception,&targets) ==
-            MagickFalse)
-          {
-            return(MagickFalse);
-          }
-      }
-    else
-      if (**p == '?')
-        {
-          /*
-            Processing instructions.
-          */
-          *p=SkipProcessingInstruction(*p);
-          if (IsUnterminatedSection(*p,terminal) != MagickFalse)
-            {
-              (void) ThrowMagickException(exception,GetMagickModule(),
-                OptionWarning,"ParseError","unclosed <?");
-              return(MagickFalse);
-            }
-          ParseProcessingInstructions(root,*tag+1,(size_t) (*p-*tag-2));
-        }
-      else
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            OptionWarning,"ParseError","unexpected <");
-          return(MagickFalse);
-        }
+    return(ParseDoctypeOrInstruction(declaration,declaration_targets));
   return(MagickTrue);
 }
 
