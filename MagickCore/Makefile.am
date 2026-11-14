@@ -78,6 +78,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/accelerate-private.h \
   MagickCore/accelerate-kernels-private.h \
   MagickCore/animate.c \
+  MagickCore/animate-window.c \
   MagickCore/animate.h \
   MagickCore/animate-private.h \
   MagickCore/annotate.c \
@@ -153,6 +154,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/deprecate.c \
   MagickCore/deprecate.h \
   MagickCore/display.c \
+  MagickCore/display-image.c \
   MagickCore/display.h \
   MagickCore/display-private.h \
   MagickCore/distort.c \
@@ -405,6 +407,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/xml-tree.h \
   MagickCore/xml-tree-private.h \
   MagickCore/xwindow.c \
+  MagickCore/xwindow-image.c \
   MagickCore/xwindow-visual.c \
   MagickCore/xwindow-import.c \
   MagickCore/xwindow.h

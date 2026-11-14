@@ -2109,6 +2109,113 @@ static FrameDisposalExit SelectFrameDisposal(const DuplicateFrameTrial *trial,
   return(FrameDisposalChosen);
 }
 
+typedef struct _LayerFramePairs
+{
+  const Image
+    *image,
+    *curr;
+
+  MagickBooleanType
+    add_frames;
+
+  RectangleInfo
+    *bounds;
+
+  DisposeType
+    *disposals;
+
+  ExceptionInfo
+    *exception;
+
+  Image
+    *prev_image;
+
+  ssize_t
+    i;
+} LayerFramePairs;
+
+static Image *CompareLayerFramePairs(const LayerFramePairs *pairs)
+{
+  const Image
+    *const image = pairs->image,
+    *curr = pairs->curr;
+
+  const MagickBooleanType
+    add_frames = pairs->add_frames;
+
+  RectangleInfo
+    *const bounds = pairs->bounds;
+
+  DisposeType
+    *const disposals = pairs->disposals;
+
+  ExceptionInfo
+    *const exception = pairs->exception;
+
+  Image
+    *prev_image = pairs->prev_image,
+    *dup_image,
+    *bgnd_image;
+
+  RectangleInfo
+    dup_bounds;
+
+  MagickBooleanType
+    cleared;
+
+  ssize_t
+    i = pairs->i;
+
+  const DisposeChoiceTargets
+    choice_targets = { &bgnd_image, &prev_image, &dup_image, &i };
+
+  const DuplicateFrameTargets
+    targets = { &dup_image, &dup_bounds, &cleared, &bgnd_image, &i };
+
+  bgnd_image=(Image *) NULL;
+  dup_image=(Image *) NULL;
+  dup_bounds.width=0;
+  dup_bounds.height=0;
+  dup_bounds.x=0;
+  dup_bounds.y=0;
+  curr=GetNextImageInList(curr);
+  for ( ; curr != (const Image *) NULL; curr=GetNextImageInList(curr))
+  {
+    const DuplicateFrameTrial
+      trial = { add_frames, curr, bounds, disposals, i, exception,
+        prev_image };
+
+    cleared=AssumeNoneDisposal(&trial);
+    switch (SelectFrameDisposal(&trial,&targets))
+    {
+      case FrameDisposalSkipped:
+        continue;
+      case FrameDisposalPreviousFailed:
+        return(ReleaseFrameListsAndPrevious(bounds,disposals,prev_image));
+      case FrameDisposalImagesFailed:
+        return(ReleaseFrameListsAndImages(bounds,disposals,prev_image,
+          dup_image));
+      default:
+        break;
+    }
+    /*
+       Finalise choice of dispose, set new prev_image,
+       and junk any extra images as appropriate,
+    */
+    {
+      const DisposeChoice
+        choice = { curr, bounds, disposals, dup_bounds };
+
+      if (FinaliseDisposeChoice(&choice,&choice_targets) == MagickFalse)
+        return(ReleaseFrameLists(bounds,disposals));
+    }
+    RecordInterimDisposal(prev_image,disposals,i);
+    i++;
+  }
+  prev_image=DestroyImage(prev_image);
+  return(OptimizeImageFrames(image,bounds,disposals,exception));
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -2119,26 +2226,19 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     *disposals;
 
   Image
-    *prev_image,
-    *dup_image,
-    *bgnd_image;
+    *prev_image;
+
+  LayerFramePairs
+    pairs;
 
   RectangleInfo
-    dup_bounds,
     *bounds;
 
   MagickBooleanType
-    add_frames,
-    cleared;
+    add_frames;
 
   ssize_t
     i;
-
-  const DisposeChoiceTargets
-    choice_targets = { &bgnd_image, &prev_image, &dup_image, &i };
-
-  const DuplicateFrameTargets
-    targets = { &dup_image, &dup_bounds, &cleared, &bgnd_image, &i };
 
   const FrameListTargets
     lists = { &curr, &bounds, &disposals };
@@ -2184,48 +2284,15 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     Compute the bounding box of changes for each pair of images.
   */
   i=1;
-  bgnd_image=(Image *) NULL;
-  dup_image=(Image *) NULL;
-  dup_bounds.width=0;
-  dup_bounds.height=0;
-  dup_bounds.x=0;
-  dup_bounds.y=0;
-  curr=GetNextImageInList(curr);
-  for ( ; curr != (const Image *) NULL; curr=GetNextImageInList(curr))
-  {
-    const DuplicateFrameTrial
-      trial = { add_frames, curr, bounds, disposals, i, exception,
-        prev_image };
-
-    cleared=AssumeNoneDisposal(&trial);
-    switch (SelectFrameDisposal(&trial,&targets))
-    {
-      case FrameDisposalSkipped:
-        continue;
-      case FrameDisposalPreviousFailed:
-        return(ReleaseFrameListsAndPrevious(bounds,disposals,prev_image));
-      case FrameDisposalImagesFailed:
-        return(ReleaseFrameListsAndImages(bounds,disposals,prev_image,
-          dup_image));
-      default:
-        break;
-    }
-    /*
-       Finalise choice of dispose, set new prev_image,
-       and junk any extra images as appropriate,
-    */
-    {
-      const DisposeChoice
-        choice = { curr, bounds, disposals, dup_bounds };
-
-      if (FinaliseDisposeChoice(&choice,&choice_targets) == MagickFalse)
-        return(ReleaseFrameLists(bounds,disposals));
-    }
-    RecordInterimDisposal(prev_image,disposals,i);
-    i++;
-  }
-  prev_image=DestroyImage(prev_image);
-  return(OptimizeImageFrames(image,bounds,disposals,exception));
+  pairs.image=image;
+  pairs.curr=curr;
+  pairs.add_frames=add_frames;
+  pairs.bounds=bounds;
+  pairs.disposals=disposals;
+  pairs.exception=exception;
+  pairs.prev_image=prev_image;
+  pairs.i=i;
+  return(CompareLayerFramePairs(&pairs));
 }
 
 /*

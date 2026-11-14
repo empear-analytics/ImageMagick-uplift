@@ -1734,17 +1734,211 @@ static void RecordFeatureGrays(const Image *image,const Quantum *p,
   }
 }
 
-MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
-  const size_t distance,ExceptionInfo *exception)
+typedef struct _TextureFeatureState
 {
-  CacheView
-    *image_view;
+  const Image
+    *image;
 
   ChannelFeatures
     *channel_features;
 
+  FeatureStatistics
+    **cooccurrence,
+    *density_x,
+    *density_xy,
+    *density_y,
+    **Q,
+    *sum;
+
+  unsigned int
+    number_grays;
+
+  FeatureStatistics
+    correlation,
+    entropy_x,
+    entropy_xy,
+    entropy_xy1,
+    entropy_xy2,
+    entropy_y,
+    mean;
+} TextureFeatureState;
+
+static void ComputeDifferenceAndContrastFeatures(
+  const TextureFeatureState *state,MagickBooleanType status)
+{
+  const Image
+    *const image = state->image;
+
+  ChannelFeatures
+    *const channel_features = state->channel_features;
+
+  FeatureStatistics
+    **const cooccurrence = state->cooccurrence,
+    *const density_x = state->density_x,
+    *const density_xy = state->density_xy,
+    *const density_y = state->density_y,
+    **const Q = state->Q,
+    *const sum = state->sum;
+
+  const unsigned int
+    number_grays = state->number_grays;
+
+  FeatureStatistics
+    correlation = state->correlation,
+    entropy_x = state->entropy_x,
+    entropy_xy = state->entropy_xy,
+    entropy_xy1 = state->entropy_xy1,
+    entropy_xy2 = state->entropy_xy2,
+    entropy_y = state->entropy_y,
+    mean = state->mean,
+    sum_squares,
+    variance;
+
+  ssize_t
+    i;
+
+  (void) status;
+  (void) memset(&variance,0,sizeof(variance));
+  (void) memset(&sum_squares,0,sizeof(sum_squares));
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,number_grays,1)
+#endif
+  for (i=0; i < 4; i++)
+  {
+    const TextureDirection
+      texture = { image, channel_features, cooccurrence, density_x,
+        density_xy, density_y, Q, sum, number_grays, i };
+
+    const TextureSlots
+      slots = { &correlation.direction[i], &entropy_x.direction[i],
+        &entropy_xy.direction[i], &entropy_xy1.direction[i],
+        &entropy_xy2.direction[i], &entropy_y.direction[i],
+        &mean.direction[i], &sum_squares.direction[i],
+        &variance.direction[i] };
+
+    ComputeDifferenceFeatures(&texture,&slots);
+  }
+  /*
+    Compute more texture features.
+  */
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,number_grays,1)
+#endif
+  for (i=0; i < 4; i++)
+  {
+    const TextureDirection
+      texture = { image, channel_features, cooccurrence, density_x,
+        density_xy, density_y, Q, sum, number_grays, i };
+
+    ComputeContrastFeatures(&texture);
+  }
+}
+
+static MagickBooleanType FillFeatureGrays(const Image *image,
+  PixelPacket *grays,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    r;
+
+  status=MagickTrue;
+  image_view=AcquireVirtualCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,1)
+#endif
+  for (r=0; r < (ssize_t) image->rows; r++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    const FeatureGrayRow
+      row = { image, image_view, exception };
+
+    if (FetchFeatureGrayRow(&row,r,&p,&status) == MagickFalse)
+      continue;
+    RecordFeatureGrays(image,p,grays);
+  }
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+typedef struct _FeatureGraysForm
+{
+  const Image
+    *image;
+
+  ChannelFeatures
+    *channel_features;
+
+  ExceptionInfo
+    *exception;
+
+  PixelPacket
+    **grays,
+    *gray;
+} FeatureGraysForm;
+
+static MagickBooleanType FormFeatureGrays(const FeatureGraysForm *form,
+  ChannelFeatures **result)
+{
+  const Image
+    *const image = form->image;
+
+  ChannelFeatures
+    *channel_features = form->channel_features;
+
+  ExceptionInfo
+    *const exception = form->exception;
+
+  PixelPacket
+    **const grays = form->grays,
+    *const gray = form->gray;
+
+  MagickBooleanType
+    status;
+
+  (*grays)=(PixelPacket *) AcquireQuantumMemory(MaxMap+1UL,sizeof(*(*grays)));
+  if ((*grays) == (PixelPacket *) NULL)
+    {
+      channel_features=(ChannelFeatures *) RelinquishMagickMemory(
+        channel_features);
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+      (*result)=channel_features;
+      return(MagickTrue);
+    }
+  InitializeFeatureGrays((*grays));
+  status=FillFeatureGrays(image,(*grays),exception);
+  if (status == MagickFalse)
+    {
+      channel_features=RelinquishFeatureGrays((*grays),channel_features);
+      (*result)=channel_features;
+      return(MagickTrue);
+    }
+  (*gray)=CompactFeatureGrays(image,(*grays));
+  return(MagickFalse);
+}
+
+MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
+  const size_t distance,ExceptionInfo *exception)
+{
+  ChannelFeatures
+    *channel_features,
+    *returned;
+
   FeatureBuffers
     buffers;
+
+  FeatureGraysForm
+    form;
 
   FeatureMatrixInputs
     matrix;
@@ -1774,8 +1968,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     status;
 
   ssize_t
-    i,
-    r;
+    i;
 
   size_t
     length;
@@ -1806,41 +1999,13 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   /*
     Form grays.
   */
-  grays=(PixelPacket *) AcquireQuantumMemory(MaxMap+1UL,sizeof(*grays));
-  if (grays == (PixelPacket *) NULL)
-    {
-      channel_features=(ChannelFeatures *) RelinquishMagickMemory(
-        channel_features);
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
-      return(channel_features);
-    }
-  InitializeFeatureGrays(grays);
-  status=MagickTrue;
-  image_view=AcquireVirtualCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(image,image,image->rows,1)
-#endif
-  for (r=0; r < (ssize_t) image->rows; r++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    const FeatureGrayRow
-      row = { image, image_view, exception };
-
-    if (FetchFeatureGrayRow(&row,r,&p,&status) == MagickFalse)
-      continue;
-    RecordFeatureGrays(image,p,grays);
-  }
-  image_view=DestroyCacheView(image_view);
-  if (status == MagickFalse)
-    {
-      channel_features=RelinquishFeatureGrays(grays,channel_features);
-      return(channel_features);
-    }
-  gray=CompactFeatureGrays(image,grays);
+  form.image=image;
+  form.channel_features=channel_features;
+  form.exception=exception;
+  form.grays=(&grays);
+  form.gray=(&gray);
+  if (FormFeatureGrays(&form,&returned) != MagickFalse)
+    return(returned);
   /*
     Allocate spatial dependence matrix.
   */
@@ -1966,41 +2131,13 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   /*
     Compute more texture features.
   */
-  (void) memset(&variance,0,sizeof(variance));
-  (void) memset(&sum_squares,0,sizeof(sum_squares));
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(image,image,number_grays,1)
-#endif
-  for (i=0; i < 4; i++)
   {
-    const TextureDirection
-      texture = { image, channel_features, cooccurrence, density_x,
-        density_xy, density_y, Q, sum, number_grays, i };
+    const TextureFeatureState
+      state = { image, channel_features, cooccurrence, density_x, density_xy,
+        density_y, Q, sum, number_grays, correlation, entropy_x, entropy_xy,
+        entropy_xy1, entropy_xy2, entropy_y, mean };
 
-    const TextureSlots
-      slots = { &correlation.direction[i], &entropy_x.direction[i],
-        &entropy_xy.direction[i], &entropy_xy1.direction[i],
-        &entropy_xy2.direction[i], &entropy_y.direction[i],
-        &mean.direction[i], &sum_squares.direction[i],
-        &variance.direction[i] };
-
-    ComputeDifferenceFeatures(&texture,&slots);
-  }
-  /*
-    Compute more texture features.
-  */
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(image,image,number_grays,1)
-#endif
-  for (i=0; i < 4; i++)
-  {
-    const TextureDirection
-      texture = { image, channel_features, cooccurrence, density_x,
-        density_xy, density_y, Q, sum, number_grays, i };
-
-    ComputeContrastFeatures(&texture);
+    ComputeDifferenceAndContrastFeatures(&state,status);
   }
   /*
     Relinquish resources.

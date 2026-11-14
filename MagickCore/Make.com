@@ -25,6 +25,7 @@ $
 $write sys$output "Making MagickCore..."
 $call Make accelerate.c
 $call Make animate.c
+$call Make animate-window.c
 $call Make annotate.c
 $call Make annotate-metrics.c
 $call Make artifact.c
@@ -69,6 +70,7 @@ $call Make delegate.c
 $call Make delegate-invoke.c
 $call Make deprecate.c
 $call Make display.c
+$call Make display-image.c
 $call Make distort.c
 $call Make distort-affine.c
 $call Make distort-resize.c
@@ -206,6 +208,7 @@ $call Make widget.c
 $call Make xml-tree.c
 $call Make xml-tree-file.c
 $call Make xwindow.c
+$call Make xwindow-image.c
 $call Make xwindow-visual.c
 $call Make xwindow-import.c
 $ set default [-.filters]
