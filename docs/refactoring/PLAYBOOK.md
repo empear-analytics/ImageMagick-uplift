@@ -19123,6 +19123,133 @@ Lane: b
 
 ---
 
+## Recipe WS - Extract Statement-Macro Twins Through a Writer Struct of the Macro's Locals
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Complex Method*, *Large Method* or
+*Deep, Nested Complexity* on a function whose loop holds two or more copies of a block that
+emits through a function-like statement macro whose body names the caller's plain locals,
+the copies differing only in some constants, as `compress.c`'s `HuffmanEncodeImage` does:
+its white and black run blocks (`if (runlength >= 64) { entry=HuffmanMakeupEntry(MWTable,
+runlength); runlength-=(long) entry->count; HuffmanOutputCode(entry); } entry=TWTable+
+MagickMin((size_t) runlength,63); HuffmanOutputCode(entry);`, then `MBTable`, `TBTable`)
+expand `OutputBit`, which reads `image_info`, `image` and `one` and writes `byte`, `bit`
+and `mask`.
+
+**Not covered by:** Recipe MB, which copies struct locals through one pointer each (here
+the bound locals are five plain locals, with the run length and two tables seven
+parameters); Recipe SC, which passes no pointer to a written local and whose constants
+travel in a struct of their own; Recipe GS, which groups locals released by a cleanup
+macro, not written by an emitting one; Recipes O and I, which write `(*v)` at every use,
+inside the macro body too.
+
+**How:**
+
+1. The copies lie outside every OpenMP region with no `#` line, meet Recipe E steps 1 and
+   3 (no `return`, `goto`, or `break` or `continue` that leaves them) and are the same
+   token sequence once some constants (literals, enumeration constants or the names of
+   `static const` tables) are replaced by role names, checked by script. The macros they
+   use are defined above the new function, unchanged.
+2. List the caller's locals the macro bodies name. Each one the copies only read keeps
+   one value from a point before the first copy on (checked by reading: no statement
+   after that point assigns it); each one they write, `w`, is a plain local of the
+   caller that the caller otherwise uses only by value or as `&w` passed to calls
+   (never kept). Every other variable a copy writes is a Recipe E step 4 temporary
+   (the copy writes it before reading it, nothing after reads it) or the copy's one
+   by-value input (the copy reads it first, nothing after reads the copy's writes).
+3. Directly above the new function write a `typedef struct` with one member per bound
+   local of step 2, the read ones first, each of the local's exact type and name.
+4. The new function is `static void`, taking a pointer to that struct first, then one
+   parameter per role (each of its constants' type) and the by-value input: at most
+   four. At the top it declares, with the copy's temporaries, one local per member of
+   the member's name and type, initialised from it (`unsigned char byte = writer->byte`),
+   then holds one copy's text with each constant replaced by its role's name, then
+   assigns each written member back (`writer->byte=byte;`), in member order.
+5. In the caller, declare one local of the struct; directly after the last assignment of
+   the read locals (step 2) assign the read members from them, and replace each written
+   local `w` by the member everywhere in the caller (its initialisation, `&w` passed to
+   calls, reads): the caller's `w` declarations go. Replace each copy by the call
+   with `&` the struct, its constants and its input. A declaration the caller no longer
+   uses leaves it (Recipe E step 4).
+6. Check by script that each copy equals the new function's block with its constants put
+   back, and that each macro's `#define` is byte for byte the same.
+
+**Before:**
+
+```c
+      runlength=CountHuffmanRun(&q,&n,MagickFalse);
+      if (runlength >= 64)
+        {
+          entry=HuffmanMakeupEntry(MWTable,runlength);
+          runlength-=(long) entry->count;
+          HuffmanOutputCode(entry);
+        }
+      entry=TWTable+MagickMin((size_t) runlength,63);
+      HuffmanOutputCode(entry);
+```
+
+**After:**
+
+```c
+static void OutputHuffmanRun(HuffmanBitWriter *writer,
+  const HuffmanTable *makeup_table,const HuffmanTable *terminating_table,
+  int runlength)
+{
+  ...
+  unsigned char
+    byte = writer->byte,
+    bit = writer->bit;
+
+  if (runlength >= 64)
+    {
+      entry=HuffmanMakeupEntry(makeup_table,runlength);
+      runlength-=(long) entry->count;
+      HuffmanOutputCode(entry);
+    }
+  entry=terminating_table+MagickMin((size_t) runlength,63);
+  HuffmanOutputCode(entry);
+  writer->byte=byte;
+  writer->bit=bit;
+}
+...
+      runlength=CountHuffmanRun(&q,&n,MagickFalse);
+      OutputHuffmanRun(&writer,MWTable,TWTable,runlength);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. A written local now lives in the struct member for the
+  whole of the caller's run: every statement that read or wrote `w`, or passed `&w`,
+  reads, writes or passes the member, one object of the same type, so the values are
+  the same at every point. Inside the new function the local copy starts with the
+  member's value, only the copy's text writes it, and the copy-back stores its final
+  value before the caller goes on (pass-by-value-result, as Recipe MB argues); nothing
+  else reaches the member while the function runs.
+- A read member holds the value the local had at every copy, because no statement after
+  its assignment writes that local (step 2). The macro expansions are the same tokens,
+  and each name in them resolves to a local of the same name and type.
+- A role's constant is passed where the copy named it: a table name decays to the same
+  pointer, a literal converts to the parameter's type as it converted in the copy's
+  expression (choose the parameter type so that it does not change, step 4).
+- The by-value input (`runlength`) is the copy's value at its start; the copy's own
+  writes to it stay inside the new function, and step 2 requires that nothing after the
+  copy reads them.
+- Taking the members' addresses (`&writer.byte`) for the calls that took `&byte` keeps
+  those calls' behaviour: they wrote through the pointer then and do now.
+
+**Evidence level:** oracle (the cases that reach the caller), with `refactor_guard.py
+--calls` (`+2` for the new function and `+1` per further copy, the macros' uses dropping
+by the copies removed) and step 6's script.
+
+**Provenance:** 2026-11-14, from `compress.c`'s `HuffmanEncodeImage` (campaign B, M127 lane
+b round 13): the white and black run blocks, which need seven parameters as Recipe MB
+or SC would write them (the five locals `OutputBit` and `HuffmanOutputCode` bind, two
+tables and the run length). A probe: 8.06 to 8.13, then with the scanline loop as a
+helper and the page head and tail extracted, `HuffmanEncodeImage` out of every category,
+8.59. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
+
+---
+
 ## Recipe TP - Extract a Nested Test Path as a Predicate Writing One Local
 
 **Use when:** CodeScene reports *Bumpy Road Ahead* (or *Deep, Nested Complexity*) on a
@@ -19755,3 +19882,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | AMEND | W | Step 3's widening: `R` may be a widened local itself, `return(v);`, since every write through `(*v)` lands in the caller's `v` before the helper returns and the caller's `return(v);` reads that value; Lane: b | `geometry-parse.c`'s `GetGeometry` (separator `switch` writing `p` and `flags`, `default:` returning `flags`; probe 7.90 to 8.04) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | SR | Step 3: the moved groups may write up to three plain locals the caller reads after the `switch`, on W step 3's widened terms; when a `static` helper of the file already is the function step 4 would write, the call group calls it (Recipe D), checked by script; Lane: b | `geometry-parse.c`'s `ParseGeometry` (separator `switch` writing `p` and `flags`, the moved groups equal to `GetGeometry`'s `SkipGeometrySeparator`; probe 8.33 to 8.39) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | PA | Step 4: a further single-label group `case L: { p++; break; }` may leave the `switch` and join the predicate call's test as an `or` with `(c == L)` when the loop already calls the predicate; Lane: b | `geometry-parse.c`'s `ParseGeometry` (`/`, whose removal leaves the `switch` equal to `GetGeometry`'s shared `SkipGeometrySeparator`; probe flat at 8.33, then 8.47) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | WS | Extract Statement-Macro Twins Through a Writer Struct of the Macro's Locals: copies of a block emitting through a statement macro that binds the caller's plain locals, differing in constants, become one `static void` function taking a struct of those locals (read members, and written members that replace the caller's locals), the constants and the block's input; the function binds members as locals and copies written ones back; Lane: b | `compress.c`'s `HuffmanEncodeImage` (white and black run blocks through `HuffmanOutputCode`/`OutputBit`; seven parameters otherwise; probe 8.06 to 8.13, chain to 8.59) | mandate (2026-10-24) |
