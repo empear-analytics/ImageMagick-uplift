@@ -5280,6 +5280,76 @@ static void GetBlurEllipseSize(const GeometryInfo geometry_info,
     *height=2.0*geometry_info.sigma;
 }
 
+typedef struct _BlurGeometryInputs
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  Image
+    *canvas_image,
+    *image,
+    *source_image;
+
+  ssize_t
+    x_offset,
+    y_offset;
+
+  ExceptionInfo
+    *exception;
+} BlurGeometryInputs;
+
+static void BlurCompositeGeometry(const BlurGeometryInputs *geometry)
+{
+  const GeometryInfo
+    geometry_info = geometry->geometry_info;
+
+  const MagickStatusType
+    flags = geometry->flags;
+
+  Image
+    *const canvas_image = geometry->canvas_image,
+    *const image = geometry->image,
+    *const source_image = geometry->source_image;
+
+  const ssize_t
+    x_offset = geometry->x_offset,
+    y_offset = geometry->y_offset;
+
+  ExceptionInfo
+    *const exception = geometry->exception;
+
+  double
+    angle_range,
+    angle_start,
+    height,
+    width;
+
+  SegmentInfo
+    blur;
+
+  /*
+    Users input sigma now needs to be converted to the EWA ellipse size.
+    The filter defaults to a sigma of 0.5 so to make this match the users
+    input the ellipse size needs to be doubled.
+  */
+  GetBlurEllipseSize(geometry_info,flags,&width,&height);
+  /*
+    Default the unrotated ellipse width and height axis vectors.
+  */
+  blur=GetBlurAxes(geometry_info,flags,width,height);
+  GetBlurAngleRange(geometry_info,flags,&angle_start,&angle_range);
+  {
+    const BlurCanvasInputs
+      inputs = { angle_range, angle_start, height, width, canvas_image,
+        image, source_image, x_offset, y_offset, exception };
+
+    BlurCompositeCanvas(&inputs,blur);
+  }
+}
+
 typedef struct _ComposeArtifactTargets
 {
   double
@@ -5512,14 +5582,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     }
     case BlurCompositeOp:
     {
-      double
-        angle_range,
-        angle_start,
-        height,
-        width;
-
-      SegmentInfo
-        blur;
+      BlurGeometryInputs
+        geometry;
 
       /*
         Blur Image by resampling dictated by an overlay gradient map:
@@ -5547,24 +5611,15 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
           canvas_image=DestroyImage(canvas_image);
           return(MagickFalse);
         }
-      /*
-        Users input sigma now needs to be converted to the EWA ellipse size.
-        The filter defaults to a sigma of 0.5 so to make this match the users
-        input the ellipse size needs to be doubled.
-      */
-      GetBlurEllipseSize(geometry_info,flags,&width,&height);
-      /*
-        Default the unrotated ellipse width and height axis vectors.
-      */
-      blur=GetBlurAxes(geometry_info,flags,width,height);
-      GetBlurAngleRange(geometry_info,flags,&angle_start,&angle_range);
-      {
-        const BlurCanvasInputs
-          inputs = { angle_range, angle_start, height, width, canvas_image,
-            image, source_image, x_offset, y_offset, exception };
-
-        BlurCompositeCanvas(&inputs,blur);
-      }
+      geometry.geometry_info=geometry_info;
+      geometry.flags=flags;
+      geometry.canvas_image=canvas_image;
+      geometry.image=image;
+      geometry.source_image=source_image;
+      geometry.x_offset=x_offset;
+      geometry.y_offset=y_offset;
+      geometry.exception=exception;
+      BlurCompositeGeometry(&geometry);
       source_image=DestroyImage(source_image);
       source_image=canvas_image;
       break;
