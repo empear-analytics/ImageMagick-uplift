@@ -11647,6 +11647,852 @@ static void XApplyDespeckleCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyMapCommand(const XMagickCommandContext *context,
+  QuantizeInfo quantize_info)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ImageInfo
+    *const image_info = context->image_info;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  Image
+    *affinity_image;
+
+  static char
+    filename[MagickPathExtent] = "\0";
+
+  /*
+    Request image file name from user.
+  */
+  XFileBrowserWidget(display,windows,"Map",filename);
+  if (*filename == '\0')
+    return;
+  /*
+    Map image.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) CopyMagickString(image_info->filename,filename,MagickPathExtent);
+  affinity_image=ReadImage(image_info,exception);
+  if (affinity_image != (Image *) NULL)
+    {
+      (void) RemapImage(&quantize_info,*image,affinity_image,exception);
+      affinity_image=DestroyImage(affinity_image);
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyQuantizeCommand(const XMagickCommandContext *context,
+  QuantizeInfo quantize_info)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  int
+    status;
+
+  static char
+    colors[MagickPathExtent] = "256";
+
+  /*
+    Query user for maximum number of colors.
+  */
+  status=XDialogWidget(display,windows,"Quantize",
+    "Maximum number of colors:",colors);
+  if (*colors == '\0')
+    return;
+  /*
+    Color reduce the image.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  quantize_info.number_colors=StringToUnsignedLong(colors);
+  quantize_info.dither_method=status != 0 ? RiemersmaDitherMethod :
+    NoDitherMethod;
+  (void) QuantizeImage(&quantize_info,*image,exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyReduceNoiseCommand(const XMagickCommandContext *context,
+  MagickStatusType *flags)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *noise_image;
+
+  static char
+    radius[MagickPathExtent] = "0";
+
+  /*
+    Query user for noise radius.
+  */
+  (void) XDialogWidget(display,windows,"Reduce Noise",
+    "Enter the noise radius:",radius);
+  if (*radius == '\0')
+    return;
+  /*
+    Reduce noise in the image.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(radius,&geometry_info);
+  noise_image=StatisticImage(*image,NonpeakStatistic,(size_t)
+    geometry_info.rho,(size_t) geometry_info.rho,exception);
+  if (noise_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=noise_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplySharpenCommand(const XMagickCommandContext *context,
+  MagickStatusType *flags)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *sharp_image;
+
+  static char
+    radius[MagickPathExtent] = "0.0x1.0";
+
+  /*
+    Query user for sharpen radius.
+  */
+  (void) XDialogWidget(display,windows,"Sharpen",
+    "Enter the sharpen radius and standard deviation:",radius);
+  if (*radius == '\0')
+    return;
+  /*
+    Sharpen image scanlines.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(radius,&geometry_info);
+  sharp_image=SharpenImage(*image,geometry_info.rho,geometry_info.sigma,
+    exception);
+  if (sharp_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=sharp_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyBlurCommand(const XMagickCommandContext *context,
+  MagickStatusType *flags)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *blur_image;
+
+  static char
+    radius[MagickPathExtent] = "0.0x1.0";
+
+  /*
+    Query user for blur radius.
+  */
+  (void) XDialogWidget(display,windows,"Blur",
+    "Enter the blur radius and standard deviation:",radius);
+  if (*radius == '\0')
+    return;
+  /*
+    Blur an image.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(radius,&geometry_info);
+  blur_image=BlurImage(*image,geometry_info.rho,geometry_info.sigma,
+    exception);
+  if (blur_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=blur_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyThresholdCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  double
+    threshold;
+
+  static char
+    factor[MagickPathExtent] = "128";
+
+  /*
+    Query user for threshold value.
+  */
+  (void) XDialogWidget(display,windows,"Threshold",
+    "Enter threshold value:",factor);
+  if (*factor == '\0')
+    return;
+  /*
+    Gamma correct image.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  threshold=StringToDoubleInterval(factor,(double) QuantumRange+1.0);
+  (void) BilevelImage(*image,threshold,exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyEdgeDetectCommand(const XMagickCommandContext *context,
+  MagickStatusType *flags)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *edge_image;
+
+  static char
+    radius[MagickPathExtent] = "0";
+
+  /*
+    Query user for edge factor.
+  */
+  (void) XDialogWidget(display,windows,"Detect Edges",
+    "Enter the edge detect radius:",radius);
+  if (*radius == '\0')
+    return;
+  /*
+    Detect edge in image.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(radius,&geometry_info);
+  edge_image=EdgeImage(*image,geometry_info.rho,exception);
+  if (edge_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=edge_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplySpreadCommand(const XMagickCommandContext *context,
+  MagickStatusType *flags)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *spread_image;
+
+  static char
+    amount[MagickPathExtent] = "2";
+
+  /*
+    Query user for spread amount.
+  */
+  (void) XDialogWidget(display,windows,"Spread",
+    "Enter the displacement amount:",amount);
+  if (*amount == '\0')
+    return;
+  /*
+    Displace image pixels by a random amount.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(amount,&geometry_info);
+  spread_image=EdgeImage(*image,geometry_info.rho,exception);
+  if (spread_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=spread_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyShadeCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  Image
+    *shade_image;
+
+  int
+    status;
+
+  static char
+    geometry[MagickPathExtent] = "30x30";
+
+  /*
+    Query user for the shade geometry.
+  */
+  status=XDialogWidget(display,windows,"Shade",
+    "Enter the azimuth and elevation of the light source:",geometry);
+  if (*geometry == '\0')
+    return;
+  /*
+    Shade image pixels.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flags=ParseGeometry(geometry,&geometry_info);
+  if ((flags & SigmaValue) == 0)
+    geometry_info.sigma=1.0;
+  shade_image=ShadeImage(*image,status != 0 ? MagickTrue : MagickFalse,
+    geometry_info.rho,geometry_info.sigma,exception);
+  if (shade_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=shade_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyRaiseCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  RectangleInfo
+    page_geometry;
+
+  static char
+    bevel_width[MagickPathExtent] = "10";
+
+  /*
+    Query user for bevel width.
+  */
+  (void) XDialogWidget(display,windows,"Raise","Bevel width:",bevel_width);
+  if (*bevel_width == '\0')
+    return;
+  /*
+    Raise an image.
+  */
+  (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
+    exception);
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) ParsePageGeometry(*image,bevel_width,&page_geometry,
+    exception);
+  (void) RaiseImage(*image,&page_geometry,MagickTrue,exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplySegmentCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  static char
+    threshold[MagickPathExtent] = "1.0x1.5";
+
+  /*
+    Query user for smoothing threshold.
+  */
+  (void) XDialogWidget(display,windows,"Segment","Smooth threshold:",
+    threshold);
+  if (*threshold == '\0')
+    return;
+  /*
+    Segment an image.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flags=ParseGeometry(threshold,&geometry_info);
+  if ((flags & SigmaValue) == 0)
+    geometry_info.sigma=1.0;
+  (void) SegmentImage(*image,sRGBColorspace,MagickFalse,geometry_info.rho,
+    geometry_info.sigma,exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplySepiaToneCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  double
+    threshold;
+
+  Image
+    *sepia_image;
+
+  static char
+    factor[MagickPathExtent] = "80%";
+
+  /*
+    Query user for sepia-tone factor.
+  */
+  (void) XDialogWidget(display,windows,"Sepia Tone",
+    "Enter the sepia tone factor (0 - 99.9%):",factor);
+  if (*factor == '\0')
+    return;
+  /*
+    Sepia tone image pixels.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  threshold=StringToDoubleInterval(factor,(double) QuantumRange+1.0);
+  sepia_image=SepiaToneImage(*image,threshold,exception);
+  if (sepia_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=sepia_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplySolarizeCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  double
+    threshold;
+
+  static char
+    factor[MagickPathExtent] = "60%";
+
+  /*
+    Query user for solarize factor.
+  */
+  (void) XDialogWidget(display,windows,"Solarize",
+    "Enter the solarize factor (0 - 99.9%):",factor);
+  if (*factor == '\0')
+    return;
+  /*
+    Solarize image pixels.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  threshold=StringToDoubleInterval(factor,(double) QuantumRange+1.0);
+  (void) SolarizeImage(*image,threshold,exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplySwirlCommand(const XMagickCommandContext *context,
+  MagickStatusType *flags)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *swirl_image;
+
+  static char
+    degrees[MagickPathExtent] = "60";
+
+  /*
+    Query user for swirl angle.
+  */
+  (void) XDialogWidget(display,windows,"Swirl","Enter the swirl angle:",
+    degrees);
+  if (*degrees == '\0')
+    return;
+  /*
+    Swirl image pixels about the center.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(degrees,&geometry_info);
+  swirl_image=SwirlImage(*image,geometry_info.rho,(*image)->interpolate,
+    exception);
+  if (swirl_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=swirl_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyImplodeCommand(const XMagickCommandContext *context,
+  MagickStatusType *flags)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *implode_image;
+
+  static char
+    factor[MagickPathExtent] = "0.3";
+
+  /*
+    Query user for implode factor.
+  */
+  (void) XDialogWidget(display,windows,"Implode",
+    "Enter the implosion/explosion factor (-1.0 - 1.0):",factor);
+  if (*factor == '\0')
+    return;
+  /*
+    Implode image pixels about the center.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(factor,&geometry_info);
+  implode_image=ImplodeImage(*image,geometry_info.rho,(*image)->interpolate,
+    exception);
+  if (implode_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=implode_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyVignetteCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  Image
+    *vignette_image;
+
+  static char
+    geometry[MagickPathExtent] = "0x20";
+
+  /*
+    Query user for the vignette geometry.
+  */
+  (void) XDialogWidget(display,windows,"Vignette",
+    "Enter the radius, sigma, and x and y offsets:",geometry);
+  if (*geometry == '\0')
+    return;
+  /*
+    Soften the edges of the image in vignette style
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flags=ParseGeometry(geometry,&geometry_info);
+  if ((flags & SigmaValue) == 0)
+    geometry_info.sigma=1.0;
+  if ((flags & XiValue) == 0)
+    geometry_info.xi=0.1*(*image)->columns;
+  if ((flags & PsiValue) == 0)
+    geometry_info.psi=0.1*(*image)->rows;
+  vignette_image=VignetteImage(*image,geometry_info.rho,0.0,(ssize_t)
+    ceil(geometry_info.xi-0.5),(ssize_t) ceil(geometry_info.psi-0.5),
+    exception);
+  if (vignette_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=vignette_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyRollCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12282,70 +13128,11 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyGrayscaleCommand(&context);
       break;
     case MapCommand:
-    {
-      Image
-        *affinity_image;
-
-      static char
-        filename[MagickPathExtent] = "\0";
-
-      /*
-        Request image file name from user.
-      */
-      XFileBrowserWidget(display,windows,"Map",filename);
-      if (*filename == '\0')
-        break;
-      /*
-        Map image.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      (void) CopyMagickString(image_info->filename,filename,MagickPathExtent);
-      affinity_image=ReadImage(image_info,exception);
-      if (affinity_image != (Image *) NULL)
-        {
-          (void) RemapImage(&quantize_info,*image,affinity_image,exception);
-          affinity_image=DestroyImage(affinity_image);
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyMapCommand(&context,quantize_info);
       break;
-    }
     case QuantizeCommand:
-    {
-      int
-        status;
-
-      static char
-        colors[MagickPathExtent] = "256";
-
-      /*
-        Query user for maximum number of colors.
-      */
-      status=XDialogWidget(display,windows,"Quantize",
-        "Maximum number of colors:",colors);
-      if (*colors == '\0')
-        break;
-      /*
-        Color reduce the image.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      quantize_info.number_colors=StringToUnsignedLong(colors);
-      quantize_info.dither_method=status != 0 ? RiemersmaDitherMethod :
-        NoDitherMethod;
-      (void) QuantizeImage(&quantize_info,*image,exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyQuantizeCommand(&context,quantize_info);
       break;
-    }
     case DespeckleCommand:
       XApplyDespeckleCommand(&context);
       break;
@@ -12353,495 +13140,50 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyEmbossCommand(&context);
       break;
     case ReduceNoiseCommand:
-    {
-      Image
-        *noise_image;
-
-      static char
-        radius[MagickPathExtent] = "0";
-
-      /*
-        Query user for noise radius.
-      */
-      (void) XDialogWidget(display,windows,"Reduce Noise",
-        "Enter the noise radius:",radius);
-      if (*radius == '\0')
-        break;
-      /*
-        Reduce noise in the image.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      flags=ParseGeometry(radius,&geometry_info);
-      noise_image=StatisticImage(*image,NonpeakStatistic,(size_t)
-        geometry_info.rho,(size_t) geometry_info.rho,exception);
-      if (noise_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=noise_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyReduceNoiseCommand(&context,&flags);
       break;
-    }
     case AddNoiseCommand:
       XApplyAddNoiseCommand(&context);
       break;
     case SharpenCommand:
-    {
-      Image
-        *sharp_image;
-
-      static char
-        radius[MagickPathExtent] = "0.0x1.0";
-
-      /*
-        Query user for sharpen radius.
-      */
-      (void) XDialogWidget(display,windows,"Sharpen",
-        "Enter the sharpen radius and standard deviation:",radius);
-      if (*radius == '\0')
-        break;
-      /*
-        Sharpen image scanlines.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      flags=ParseGeometry(radius,&geometry_info);
-      sharp_image=SharpenImage(*image,geometry_info.rho,geometry_info.sigma,
-        exception);
-      if (sharp_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=sharp_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplySharpenCommand(&context,&flags);
       break;
-    }
     case BlurCommand:
-    {
-      Image
-        *blur_image;
-
-      static char
-        radius[MagickPathExtent] = "0.0x1.0";
-
-      /*
-        Query user for blur radius.
-      */
-      (void) XDialogWidget(display,windows,"Blur",
-        "Enter the blur radius and standard deviation:",radius);
-      if (*radius == '\0')
-        break;
-      /*
-        Blur an image.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      flags=ParseGeometry(radius,&geometry_info);
-      blur_image=BlurImage(*image,geometry_info.rho,geometry_info.sigma,
-        exception);
-      if (blur_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=blur_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyBlurCommand(&context,&flags);
       break;
-    }
     case ThresholdCommand:
-    {
-      double
-        threshold;
-
-      static char
-        factor[MagickPathExtent] = "128";
-
-      /*
-        Query user for threshold value.
-      */
-      (void) XDialogWidget(display,windows,"Threshold",
-        "Enter threshold value:",factor);
-      if (*factor == '\0')
-        break;
-      /*
-        Gamma correct image.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      threshold=StringToDoubleInterval(factor,(double) QuantumRange+1.0);
-      (void) BilevelImage(*image,threshold,exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyThresholdCommand(&context);
       break;
-    }
     case EdgeDetectCommand:
-    {
-      Image
-        *edge_image;
-
-      static char
-        radius[MagickPathExtent] = "0";
-
-      /*
-        Query user for edge factor.
-      */
-      (void) XDialogWidget(display,windows,"Detect Edges",
-        "Enter the edge detect radius:",radius);
-      if (*radius == '\0')
-        break;
-      /*
-        Detect edge in image.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      flags=ParseGeometry(radius,&geometry_info);
-      edge_image=EdgeImage(*image,geometry_info.rho,exception);
-      if (edge_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=edge_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyEdgeDetectCommand(&context,&flags);
       break;
-    }
     case SpreadCommand:
-    {
-      Image
-        *spread_image;
-
-      static char
-        amount[MagickPathExtent] = "2";
-
-      /*
-        Query user for spread amount.
-      */
-      (void) XDialogWidget(display,windows,"Spread",
-        "Enter the displacement amount:",amount);
-      if (*amount == '\0')
-        break;
-      /*
-        Displace image pixels by a random amount.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      flags=ParseGeometry(amount,&geometry_info);
-      spread_image=EdgeImage(*image,geometry_info.rho,exception);
-      if (spread_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=spread_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplySpreadCommand(&context,&flags);
       break;
-    }
     case ShadeCommand:
-    {
-      Image
-        *shade_image;
-
-      int
-        status;
-
-      static char
-        geometry[MagickPathExtent] = "30x30";
-
-      /*
-        Query user for the shade geometry.
-      */
-      status=XDialogWidget(display,windows,"Shade",
-        "Enter the azimuth and elevation of the light source:",geometry);
-      if (*geometry == '\0')
-        break;
-      /*
-        Shade image pixels.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      flags=ParseGeometry(geometry,&geometry_info);
-      if ((flags & SigmaValue) == 0)
-        geometry_info.sigma=1.0;
-      shade_image=ShadeImage(*image,status != 0 ? MagickTrue : MagickFalse,
-        geometry_info.rho,geometry_info.sigma,exception);
-      if (shade_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=shade_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyShadeCommand(&context);
       break;
-    }
     case RaiseCommand:
-    {
-      static char
-        bevel_width[MagickPathExtent] = "10";
-
-      /*
-        Query user for bevel width.
-      */
-      (void) XDialogWidget(display,windows,"Raise","Bevel width:",bevel_width);
-      if (*bevel_width == '\0')
-        break;
-      /*
-        Raise an image.
-      */
-      (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
-        exception);
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      (void) ParsePageGeometry(*image,bevel_width,&page_geometry,
-        exception);
-      (void) RaiseImage(*image,&page_geometry,MagickTrue,exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyRaiseCommand(&context);
       break;
-    }
     case SegmentCommand:
-    {
-      static char
-        threshold[MagickPathExtent] = "1.0x1.5";
-
-      /*
-        Query user for smoothing threshold.
-      */
-      (void) XDialogWidget(display,windows,"Segment","Smooth threshold:",
-        threshold);
-      if (*threshold == '\0')
-        break;
-      /*
-        Segment an image.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      flags=ParseGeometry(threshold,&geometry_info);
-      if ((flags & SigmaValue) == 0)
-        geometry_info.sigma=1.0;
-      (void) SegmentImage(*image,sRGBColorspace,MagickFalse,geometry_info.rho,
-        geometry_info.sigma,exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplySegmentCommand(&context);
       break;
-    }
     case SepiaToneCommand:
-    {
-      double
-        threshold;
-
-      Image
-        *sepia_image;
-
-      static char
-        factor[MagickPathExtent] = "80%";
-
-      /*
-        Query user for sepia-tone factor.
-      */
-      (void) XDialogWidget(display,windows,"Sepia Tone",
-        "Enter the sepia tone factor (0 - 99.9%):",factor);
-      if (*factor == '\0')
-        break;
-      /*
-        Sepia tone image pixels.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      threshold=StringToDoubleInterval(factor,(double) QuantumRange+1.0);
-      sepia_image=SepiaToneImage(*image,threshold,exception);
-      if (sepia_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=sepia_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplySepiaToneCommand(&context);
       break;
-    }
     case SolarizeCommand:
-    {
-      double
-        threshold;
-
-      static char
-        factor[MagickPathExtent] = "60%";
-
-      /*
-        Query user for solarize factor.
-      */
-      (void) XDialogWidget(display,windows,"Solarize",
-        "Enter the solarize factor (0 - 99.9%):",factor);
-      if (*factor == '\0')
-        break;
-      /*
-        Solarize image pixels.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      threshold=StringToDoubleInterval(factor,(double) QuantumRange+1.0);
-      (void) SolarizeImage(*image,threshold,exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplySolarizeCommand(&context);
       break;
-    }
     case SwirlCommand:
-    {
-      Image
-        *swirl_image;
-
-      static char
-        degrees[MagickPathExtent] = "60";
-
-      /*
-        Query user for swirl angle.
-      */
-      (void) XDialogWidget(display,windows,"Swirl","Enter the swirl angle:",
-        degrees);
-      if (*degrees == '\0')
-        break;
-      /*
-        Swirl image pixels about the center.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      flags=ParseGeometry(degrees,&geometry_info);
-      swirl_image=SwirlImage(*image,geometry_info.rho,(*image)->interpolate,
-        exception);
-      if (swirl_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=swirl_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplySwirlCommand(&context,&flags);
       break;
-    }
     case ImplodeCommand:
-    {
-      Image
-        *implode_image;
-
-      static char
-        factor[MagickPathExtent] = "0.3";
-
-      /*
-        Query user for implode factor.
-      */
-      (void) XDialogWidget(display,windows,"Implode",
-        "Enter the implosion/explosion factor (-1.0 - 1.0):",factor);
-      if (*factor == '\0')
-        break;
-      /*
-        Implode image pixels about the center.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      flags=ParseGeometry(factor,&geometry_info);
-      implode_image=ImplodeImage(*image,geometry_info.rho,(*image)->interpolate,
-        exception);
-      if (implode_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=implode_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyImplodeCommand(&context,&flags);
       break;
-    }
     case VignetteCommand:
-    {
-      Image
-        *vignette_image;
-
-      static char
-        geometry[MagickPathExtent] = "0x20";
-
-      /*
-        Query user for the vignette geometry.
-      */
-      (void) XDialogWidget(display,windows,"Vignette",
-        "Enter the radius, sigma, and x and y offsets:",geometry);
-      if (*geometry == '\0')
-        break;
-      /*
-        Soften the edges of the image in vignette style
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      flags=ParseGeometry(geometry,&geometry_info);
-      if ((flags & SigmaValue) == 0)
-        geometry_info.sigma=1.0;
-      if ((flags & XiValue) == 0)
-        geometry_info.xi=0.1*(*image)->columns;
-      if ((flags & PsiValue) == 0)
-        geometry_info.psi=0.1*(*image)->rows;
-      vignette_image=VignetteImage(*image,geometry_info.rho,0.0,(ssize_t)
-        ceil(geometry_info.xi-0.5),(ssize_t) ceil(geometry_info.psi-0.5),
-        exception);
-      if (vignette_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=vignette_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyVignetteCommand(&context);
       break;
-    }
     case WaveCommand:
     {
       Image
