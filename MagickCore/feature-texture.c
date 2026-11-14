@@ -2075,6 +2075,13 @@ static void ComputeTextureDirections(
   }
 }
 
+static inline MagickBooleanType IsFeatureDistanceBeyondImage(
+  const Image *image,const size_t distance)
+{
+  return(((image->columns < (distance+1)) || (image->rows < (distance+1))) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -2131,7 +2138,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((image->columns < (distance+1)) || (image->rows < (distance+1)))
+  if (IsFeatureDistanceBeyondImage(image,distance) != MagickFalse)
     return((ChannelFeatures *) NULL);
   length=MaxPixelChannels+1UL;
   channel_features=(ChannelFeatures *) AcquireQuantumMemory(length,
