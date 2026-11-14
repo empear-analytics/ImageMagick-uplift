@@ -11055,6 +11055,50 @@ static void XApplyRotateCommand(const XMagickCommandContext *context)
     }
 }
 
+static void XApplyTrimCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  MagickStatusType
+    status;
+
+  static char
+    fuzz[MagickPathExtent];
+
+  /*
+    Query user for the fuzz factor.
+  */
+  (void) FormatLocaleString(fuzz,MagickPathExtent,"%g%%",100.0*
+    (*image)->fuzz/((double) QuantumRange+1.0));
+  (void) XDialogWidget(display,windows,"Trim","Enter fuzz factor:",fuzz);
+  if (*fuzz == '\0')
+    return;
+  (*image)->fuzz=StringToDoubleInterval(fuzz,(double) QuantumRange+1.0);
+  /*
+    Trim image.
+  */
+  status=XTrimImage(display,resource_info,windows,*image,exception);
+  if (status == MagickFalse)
+    {
+      XNoticeWidget(display,windows,"Unable to trim X image",
+        (*image)->filename);
+      return;
+    }
+}
+
 static void XApplyResizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11776,31 +11820,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyRollCommand(&context);
       break;
     case TrimCommand:
-    {
-      static char
-        fuzz[MagickPathExtent];
-
-      /*
-        Query user for the fuzz factor.
-      */
-      (void) FormatLocaleString(fuzz,MagickPathExtent,"%g%%",100.0*
-        (*image)->fuzz/((double) QuantumRange+1.0));
-      (void) XDialogWidget(display,windows,"Trim","Enter fuzz factor:",fuzz);
-      if (*fuzz == '\0')
-        break;
-      (*image)->fuzz=StringToDoubleInterval(fuzz,(double) QuantumRange+1.0);
-      /*
-        Trim image.
-      */
-      status=XTrimImage(display,resource_info,windows,*image,exception);
-      if (status == MagickFalse)
-        {
-          XNoticeWidget(display,windows,"Unable to trim X image",
-            (*image)->filename);
-          break;
-        }
+      XApplyTrimCommand(&context);
       break;
-    }
     case HueCommand:
       XApplyHueCommand(&context);
       break;
