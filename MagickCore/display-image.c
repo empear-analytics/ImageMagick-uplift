@@ -24784,6 +24784,69 @@ static void XInitializeWindowIds(XWindows *windows,
     magick_windows[i]->id=(Window) NULL;
 }
 
+typedef struct _DisplayExitInputs
+{
+  size_t
+    *state;
+
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  ExceptionInfo
+    *exception;
+} DisplayExitInputs;
+
+static void XConfirmDisplayExit(const DisplayExitInputs *inputs,
+  Image **display_image)
+{
+  size_t
+    *const state = inputs->state;
+
+  Display
+    *const display = inputs->display;
+
+  XResourceInfo
+    *const resource_info = inputs->resource_info;
+
+  XWindows
+    *const windows = inputs->windows;
+
+  ExceptionInfo
+    *const exception = inputs->exception;
+
+  if ((*state & ExitState) == 0)
+    (void) XMagickCommand(display,resource_info,windows,FreeBuffersCommand,
+      &(*display_image),exception);
+  else
+    if (resource_info->confirm_edit != MagickFalse)
+      {
+        /*
+          Query user if image has changed.
+        */
+        if ((resource_info->immutable == MagickFalse) &&
+            (*display_image)->taint != MagickFalse)
+          {
+            int
+              status;
+
+            status=XConfirmWidget(display,windows,"Your image changed.",
+              "Do you want to save it");
+            if (status == 0)
+              *state&=(unsigned int) (~ExitState);
+            else
+              if (status > 0)
+                (void) XMagickCommand(display,resource_info,windows,SaveCommand,
+                  &(*display_image),exception);
+          }
+      }
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -25191,31 +25254,12 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
       }
     }
   } while (!(*state & ExitState));
-  if ((*state & ExitState) == 0)
-    (void) XMagickCommand(display,resource_info,windows,FreeBuffersCommand,
-      &display_image,exception);
-  else
-    if (resource_info->confirm_edit != MagickFalse)
-      {
-        /*
-          Query user if image has changed.
-        */
-        if ((resource_info->immutable == MagickFalse) &&
-            display_image->taint != MagickFalse)
-          {
-            int
-              status;
+  {
+    const DisplayExitInputs inputs = { state, display, resource_info, windows,
+      exception };
 
-            status=XConfirmWidget(display,windows,"Your image changed.",
-              "Do you want to save it");
-            if (status == 0)
-              *state&=(unsigned int) (~ExitState);
-            else
-              if (status > 0)
-                (void) XMagickCommand(display,resource_info,windows,SaveCommand,
-                  &display_image,exception);
-          }
-      }
+    XConfirmDisplayExit(&inputs,&display_image);
+  }
   XWithdrawDynamicWindows(display,windows);
   if (windows->pan.mapped != MagickFalse)
     (void) XWithdrawWindow(display,windows->pan.id,windows->pan.screen);
