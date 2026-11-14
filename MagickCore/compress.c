@@ -568,6 +568,30 @@ static MagickBooleanType TransferHuffmanScanline(
   return(MagickTrue);
 }
 
+static unsigned int ApplyHuffmanTerminator(const HuffmanTransfer *transfer,
+  const unsigned int color,ssize_t *x,ssize_t *count)
+{
+  Image
+    *image = transfer->image;
+
+  unsigned char
+    *scanline = transfer->scanline;
+
+  if ((*x+*count) > (ssize_t) image->columns)
+    *count=(ssize_t) image->columns-*x;
+  if (*count > 0)
+    {
+      if (color != MagickFalse)
+        {
+          *x+=*count;
+          *count=0;
+        }
+      else
+        FillHuffmanBlackRun(scanline,image->columns,x,count);
+    }
+  return((unsigned int) (color == MagickFalse));
+}
+
 static void SetFaxResolution(Image *image)
 {
   image->resolution.x=204.0;
@@ -716,19 +740,7 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
         case TBId:
         {
           count+=(ssize_t) entry->count;
-          if ((x+count) > (ssize_t) image->columns)
-            count=(ssize_t) image->columns-x;
-          if (count > 0)
-            {
-              if (color != MagickFalse)
-                {
-                  x+=count;
-                  count=0;
-                }
-              else
-                FillHuffmanBlackRun(scanline,image->columns,&x,&count);
-            }
-          color=(unsigned int) (color == MagickFalse);
+          color=ApplyHuffmanTerminator(&transfer,color,&x,&count);
           break;
         }
         case MWId:
