@@ -3239,9 +3239,16 @@ static MagickBooleanType AppendDefaultTagAttributes(
   return(MagickTrue);
 }
 
-static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,char **source,size_t *length,
-  size_t *extent,size_t start,char ***attributes)
+static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,const XMLBufferInfo *buffer,
+  size_t start,char ***attributes)
 {
+  char
+    **const source = buffer->destination;
+
+  size_t
+    *const length = buffer->length,
+    *const extent = buffer->extent;
+
   char
     *content;
 
@@ -3251,15 +3258,12 @@ static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,char **source,size_t *length,
   TagBufferInfo
     tag_buffer;
 
-  const XMLBufferInfo
-    buffer = { source, length, extent };
-
   content=(char *) "";
   if (xml_info->parent != (XMLTreeInfo *) NULL)
     content=xml_info->parent->content;
   offset=0;
   *source=EncodePredefinedEntities(content+start,(ssize_t) (xml_info->offset-
-    start),&buffer,MagickFalse);
+    start),buffer,MagickFalse);
   if (ExtendXMLBuffer(source,length,extent,xml_info->tag) == MagickFalse)
     return(*source);
   *length+=(size_t) FormatLocaleString(*source+(*length),*extent,
@@ -3276,9 +3280,9 @@ static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,char **source,size_t *length,
   *length+=(size_t) FormatLocaleString(*source+(*length),*extent,
     *xml_info->content ? ">" : "/>");
   if (xml_info->child != (XMLTreeInfo *) NULL)
-    *source=XMLTreeTagToXML(xml_info->child,source,length,extent,0,attributes);
+    *source=XMLTreeTagToXML(xml_info->child,buffer,0,attributes);
   else
-    *source=EncodePredefinedEntities(xml_info->content,-1,&buffer,MagickFalse);
+    *source=EncodePredefinedEntities(xml_info->content,-1,buffer,MagickFalse);
   if (ExtendXMLBuffer(source,length,extent,xml_info->tag) == MagickFalse)
     return((char *) NULL);
   if (*xml_info->content != '\0')
@@ -3287,10 +3291,9 @@ static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,char **source,size_t *length,
   while ((offset < xml_info->offset) && (content[offset] != '\0'))
     offset++;
   if (xml_info->ordered != (XMLTreeInfo *) NULL)
-    content=XMLTreeTagToXML(xml_info->ordered,source,length,extent,offset,
-      attributes);
+    content=XMLTreeTagToXML(xml_info->ordered,buffer,offset,attributes);
   else
-    content=EncodePredefinedEntities(content+offset,-1,&buffer,MagickFalse);
+    content=EncodePredefinedEntities(content+offset,-1,buffer,MagickFalse);
   return(content);
 }
 
@@ -3366,6 +3369,9 @@ MagickExport char *XMLTreeInfoToXML(XMLTreeInfo *xml_info)
   TagBufferInfo
     tag_buffer;
 
+  const XMLBufferInfo
+    buffer = { &xml, &length, &extent };
+
   XMLTreeInfo
     *ordered,
     *parent;
@@ -3398,7 +3404,7 @@ MagickExport char *XMLTreeInfoToXML(XMLTreeInfo *xml_info)
   ordered=xml_info->ordered;
   xml_info->parent=(XMLTreeInfo *) NULL;
   xml_info->ordered=(XMLTreeInfo *) NULL;
-  xml=XMLTreeTagToXML(xml_info,&xml,&length,&extent,0,root->attributes);
+  xml=XMLTreeTagToXML(xml_info,&buffer,0,root->attributes);
   xml_info->parent=parent;
   xml_info->ordered=ordered;
   if ((parent == (XMLTreeInfo *) NULL) &&
