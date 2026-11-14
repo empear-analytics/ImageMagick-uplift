@@ -709,11 +709,11 @@ static inline MagickBooleanType IsLeftGapEdge(const Image *left_image,
 }
 
 static inline MagickBooleanType IsRightGapEdge(const Image *right_image,
-  const Quantum *p,const ssize_t x,const ssize_t i,const size_t gap)
+  const Quantum *p,const ssize_t extent,const size_t gap)
 {
   return(((p == (const Quantum *) NULL) ||
     (GetPixelAlpha(right_image,p) != TransparentAlpha) ||
-    ((x+i) >= (ssize_t) gap)) ? MagickTrue : MagickFalse);
+    (extent >= (ssize_t) gap)) ? MagickTrue : MagickFalse);
 }
 
 typedef struct _SmushXRows
@@ -766,7 +766,7 @@ static ssize_t FindRightGapEdge(const SmushXRows *rows,const ssize_t y,
   {
     p=GetCacheViewVirtualPixels(rows->right_view,x,rows->right_geometry.y+y,1,1,
       rows->exception);
-    if (IsRightGapEdge(rows->right_image,p,x,i,gap) != MagickFalse)
+    if (IsRightGapEdge(rows->right_image,p,x+i,gap) != MagickFalse)
       break;
   }
   return(x);
@@ -851,11 +851,11 @@ static inline MagickBooleanType IsTopGapEdge(const Image *top_image,
 }
 
 static inline MagickBooleanType IsBottomGapEdge(const Image *bottom_image,
-  const Quantum *p,const ssize_t y,const ssize_t i,const size_t gap)
+  const Quantum *p,const ssize_t extent,const size_t gap)
 {
   return(((p == (const Quantum *) NULL) ||
     (GetPixelAlpha(bottom_image,p) != TransparentAlpha) ||
-    ((y+i) >= (ssize_t) gap)) ? MagickTrue : MagickFalse);
+    (extent >= (ssize_t) gap)) ? MagickTrue : MagickFalse);
 }
 
 typedef struct _SmushYRows
@@ -908,7 +908,7 @@ static ssize_t FindBottomGapEdge(const SmushYRows *rows,const ssize_t x,
   {
     p=GetCacheViewVirtualPixels(rows->bottom_view,rows->bottom_geometry.x+x,y,1,
       1,rows->exception);
-    if (IsBottomGapEdge(rows->bottom_image,p,y,i,gap) != MagickFalse)
+    if (IsBottomGapEdge(rows->bottom_image,p,y+i,gap) != MagickFalse)
       break;
   }
   return(y);
