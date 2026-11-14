@@ -1942,6 +1942,21 @@ static MagickBooleanType ParseOtherDoctypeMarkup(XMLTreeRoot *root,
   return(MagickTrue);
 }
 
+static MagickBooleanType ParseOtherDoctypeDeclaration(XMLTreeRoot *root,
+  ExceptionInfo *exception,const AttributeListTargets *targets,
+  MagickBooleanType *broke)
+{
+  if (ParseOtherDoctypeMarkup(root,exception,targets,
+        broke) == MagickFalse)
+    return(MagickFalse);
+  if ((*broke) != MagickFalse)
+    {
+      (*broke)=MagickTrue;
+      return(MagickTrue);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ParseDoctypeDeclaration(
   const InternalDoctypeInfo *doctype,const AttributeListTargets *targets,
   char ***predefined_entities,MagickBooleanType *broke)
@@ -1990,16 +2005,7 @@ static MagickBooleanType ParseDoctypeDeclaration(
       }
       }
     else
-      {
-        if (ParseOtherDoctypeMarkup(root,exception,targets,
-              broke) == MagickFalse)
-          return(MagickFalse);
-        if ((*broke) != MagickFalse)
-          {
-            (*broke)=MagickTrue;
-            return(MagickTrue);
-          }
-      }
+      return(ParseOtherDoctypeDeclaration(root,exception,targets,broke));
   return(MagickTrue);
 }
 
