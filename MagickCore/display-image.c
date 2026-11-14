@@ -10444,6 +10444,28 @@ static Image *XApplyOpenCommand(const XMagickCommandContext *context)
   return(nexus);
 }
 
+static void XApplyNextCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  int
+    i;
+
+  /*
+    Display next image.
+  */
+  for (i=0; i < resource_info->quantum; i++)
+    XClientMessage(display,windows->image.id,windows->im_protocols,
+      windows->im_next_image,CurrentTime);
+}
+
 static void XApplyResizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11092,15 +11114,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       nexus=XApplyOpenCommand(&context);
       break;
     case NextCommand:
-    {
-      /*
-        Display next image.
-      */
-      for (i=0; i < resource_info->quantum; i++)
-        XClientMessage(display,windows->image.id,windows->im_protocols,
-          windows->im_next_image,CurrentTime);
+      XApplyNextCommand(&context);
       break;
-    }
     case FormerCommand:
     {
       /*
