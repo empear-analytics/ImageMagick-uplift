@@ -3858,6 +3858,40 @@ static void FinishMVGGradient(const MVGRenderState *state)
   (*state->stops)=stops;
 }
 
+static void ApplyMVGClipPath(const MVGRenderState *state)
+{
+  const char
+    *clip_path;
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  Image
+    *image = state->image;
+
+  MagickStatusType
+    status = (*state->status);
+
+  SplayTreeInfo
+    *macros = (*state->macros);
+
+  ssize_t
+    n = (*state->n);
+
+  clip_path=(const char *) GetValueFromSplayTree(macros,
+    graphic_context[n]->clip_mask);
+  if (clip_path != (const char *) NULL)
+    (void) SetImageArtifact(image,
+      graphic_context[n]->clip_mask,clip_path);
+  status&=(MagickStatusType) DrawClipPath(image,
+    graphic_context[n],graphic_context[n]->clip_mask,
+    exception);
+  (*state->status)=status;
+}
+
 static MagickBooleanType RenderMVGContent(Image *image,
   const DrawInfo *draw_info,const size_t depth,ExceptionInfo *exception)
 {
@@ -4203,14 +4237,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
                   graphic_context[n],token,clip_path,exception);
                 if (graphic_context[n]->compliance != SVGCompliance)
                   {
-                    clip_path=(const char *) GetValueFromSplayTree(macros,
-                      graphic_context[n]->clip_mask);
-                    if (clip_path != (const char *) NULL)
-                      (void) SetImageArtifact(image,
-                        graphic_context[n]->clip_mask,clip_path);
-                    status&=(MagickStatusType) DrawClipPath(image,
-                      graphic_context[n],graphic_context[n]->clip_mask,
-                      exception);
+                    ApplyMVGClipPath(&render_state);
                   }
               }
             break;
