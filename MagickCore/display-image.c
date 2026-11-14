@@ -24506,6 +24506,53 @@ static void XDispatchWindowStateEvent(const DisplayEventContext *event_context,
   }
 }
 
+static void XDispatchMapEvent(const DisplayEventContext *event_context,
+  const DisplayEventTargets *event_targets)
+{
+  Display
+    *const display = event_context->display;
+
+  XStandardColormap
+    *const map_info = event_context->map_info;
+
+  XVisualInfo
+    *const visual_info = event_context->visual_info;
+
+  XEvent
+    *const event = event_targets->event;
+
+  switch ((*event).type)
+  {
+    case LeaveNotify:
+    {
+      /*
+        Selectively uninstall colormap.
+      */
+      if (IsSelectiveColormapCrossing(display,map_info,visual_info,
+            (*event).xcrossing.mode) != MagickFalse)
+        XUninstallColormap(display,map_info->colormap);
+      break;
+    }
+    case MapNotify:
+    {
+      XHandleMapNotify(event_context,event_targets);
+      break;
+    }
+    case MappingNotify:
+    {
+      (void) XRefreshKeyboardMapping(&(*event).xmapping);
+      break;
+    }
+    case NoExpose:
+      break;
+    default:
+    {
+      XDispatchWindowStateEvent(event_context,event_targets);
+      break;
+    }
+  }
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -24989,31 +25036,9 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
             "Key release: 0x%lx (%c)",(unsigned long) key_symbol,*command);
         break;
       }
-      case LeaveNotify:
-      {
-        /*
-          Selectively uninstall colormap.
-        */
-        if (IsSelectiveColormapCrossing(display,map_info,visual_info,
-              event.xcrossing.mode) != MagickFalse)
-          XUninstallColormap(display,map_info->colormap);
-        break;
-      }
-      case MapNotify:
-      {
-        XHandleMapNotify(&event_context,&event_targets);
-        break;
-      }
-      case MappingNotify:
-      {
-        (void) XRefreshKeyboardMapping(&event.xmapping);
-        break;
-      }
-      case NoExpose:
-        break;
       default:
       {
-        XDispatchWindowStateEvent(&event_context,&event_targets);
+        XDispatchMapEvent(&event_context,&event_targets);
         break;
       }
     }
