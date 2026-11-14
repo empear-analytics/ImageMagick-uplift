@@ -3148,6 +3148,20 @@ static inline MagickOffsetType ReadPixelCacheRegion(
   return(i);
 }
 
+static MagickBooleanType LockPixelCacheOnDisk(CacheInfo *cache_info,
+  ExceptionInfo *exception)
+{
+  LockSemaphoreInfo(cache_info->file_semaphore);
+  if (OpenPixelCacheOnDisk(cache_info,IOMode) == MagickFalse)
+    {
+      ThrowFileException(exception,FileOpenError,"UnableToOpenFile",
+        cache_info->cache_filename);
+      UnlockSemaphoreInfo(cache_info->file_semaphore);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ReadPixelCacheMetacontent(
   CacheInfo *magick_restrict cache_info,NexusInfo *magick_restrict nexus_info,
   ExceptionInfo *exception)
@@ -3216,14 +3230,8 @@ static MagickBooleanType ReadPixelCacheMetacontent(
       /*
         Read meta content from disk.
       */
-      LockSemaphoreInfo(cache_info->file_semaphore);
-      if (OpenPixelCacheOnDisk(cache_info,IOMode) == MagickFalse)
-        {
-          ThrowFileException(exception,FileOpenError,"UnableToOpenFile",
-            cache_info->cache_filename);
-          UnlockSemaphoreInfo(cache_info->file_semaphore);
-          return(MagickFalse);
-        }
+      if (LockPixelCacheOnDisk(cache_info,exception) == MagickFalse)
+        return(MagickFalse);
       if ((cache_info->columns == nexus_info->region.width) &&
           (extent <= MagickMaxBufferExtent))
         {
