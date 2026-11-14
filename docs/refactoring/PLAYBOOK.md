@@ -19172,6 +19172,16 @@ inside the macro body too.
    uses leaves it (Recipe E step 4).
 6. Check by script that each copy equals the new function's block with its constants put
    back, and that each macro's `#define` is byte for byte the same.
+7. *One block* (2026-11-14). A single block (no copies, no roles) moves the same way.
+   Besides the macro-bound locals, plain locals the block writes and the caller reads
+   after it may join the struct as written members (`code`, `length` of a code being
+   read bit by bit), replaced in the caller as step 5 says, and one more such local may
+   go by pointer, copied in and out as Recipe MB steps 4 and 5 do. A flag the block
+   sets on every path (`bail=MagickFalse;` first) and the caller tests after it is the
+   new function's return value, of the flag's own type: the function declares the
+   flag, ends with `return(flag);`, and the caller writes `flag=Helper(...);`. Every
+   `break` in the block leaves a loop inside it (the `break` hidden in a macro
+   included), never the block.
 
 **Before:**
 
@@ -19235,6 +19245,11 @@ static void OutputHuffmanRun(HuffmanBitWriter *writer,
   copy reads them.
 - Taking the members' addresses (`&writer.byte`) for the calls that took `&byte` keeps
   those calls' behaviour: they wrote through the pointer then and do now.
+- Under step 7 a `break` in the block, the one a macro hides included (`InputBit`'s on
+  `EOF`), leaves the loop inside the block, in the new function as before, and control
+  reaches the copy-back and the `return(flag);` on every path, since the block has no
+  exit of its own; the flag returned is the value the caller's flag held after the
+  block.
 
 **Evidence level:** oracle (the cases that reach the caller), with `refactor_guard.py
 --calls` (`+2` for the new function and `+1` per further copy, the macros' uses dropping
@@ -19246,6 +19261,11 @@ or SC would write them (the five locals `OutputBit` and `HuffmanOutputCode` bind
 tables and the run length). A probe: 8.06 to 8.13, then with the scanline loop as a
 helper and the page head and tail extracted, `HuffmanEncodeImage` out of every category,
 8.59. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Step 7 (2026-11-14, same lane): `compress.c`'s `HuffmanDecodeImage`, whose code-reading
+`do` loop expands `InputBit` (binding `image`, `byte`, `mask` and `runlength`, with a
+hidden `break` of the `do`) and writes `code`, `length`, `null_lines` and the `bail`
+flag; a probe 8.59 to 9.32, the function out of *Deep, Nested Complexity* and *Bumpy
+Road Ahead*.
 Lane: b
 
 ---
@@ -19883,3 +19903,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | AMEND | SR | Step 3: the moved groups may write up to three plain locals the caller reads after the `switch`, on W step 3's widened terms; when a `static` helper of the file already is the function step 4 would write, the call group calls it (Recipe D), checked by script; Lane: b | `geometry-parse.c`'s `ParseGeometry` (separator `switch` writing `p` and `flags`, the moved groups equal to `GetGeometry`'s `SkipGeometrySeparator`; probe 8.33 to 8.39) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | PA | Step 4: a further single-label group `case L: { p++; break; }` may leave the `switch` and join the predicate call's test as an `or` with `(c == L)` when the loop already calls the predicate; Lane: b | `geometry-parse.c`'s `ParseGeometry` (`/`, whose removal leaves the `switch` equal to `GetGeometry`'s shared `SkipGeometrySeparator`; probe flat at 8.33, then 8.47) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | WS | Extract Statement-Macro Twins Through a Writer Struct of the Macro's Locals: copies of a block emitting through a statement macro that binds the caller's plain locals, differing in constants, become one `static void` function taking a struct of those locals (read members, and written members that replace the caller's locals), the constants and the block's input; the function binds members as locals and copies written ones back; Lane: b | `compress.c`'s `HuffmanEncodeImage` (white and black run blocks through `HuffmanOutputCode`/`OutputBit`; seven parameters otherwise; probe 8.06 to 8.13, chain to 8.59) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | WS | Step 7: one block (no copies) moves the same way; further written locals read after it may join the struct as written members, one more may go by pointer (MB's copy in and out), and a flag the block sets on every path is the return value; Lane: b | `compress.c`'s `HuffmanDecodeImage` (the `InputBit` code-reading `do` loop; probe 8.59 to 9.32) | mandate (2026-10-24) |
