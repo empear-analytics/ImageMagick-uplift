@@ -5270,6 +5270,20 @@ static MagickBooleanType InterpretEscapeCharacter(
   }
 }
 
+static void LogInterpretImageProperties(const ImageInfo *image_info,
+  const Image *image)
+{
+  if ((image != (Image *) NULL) && (IsEventLogging() != MagickFalse))
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  else
+    if ((image_info != (ImageInfo *) NULL) && (IsEventLogging() != MagickFalse))
+      (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
+        image_info->filename);
+    else
+      if (IsEventLogging() != MagickFalse)
+        (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no image");
+}
+
 MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   const char *embed_text,ExceptionInfo *exception)
 {
@@ -5297,15 +5311,7 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   const InterpretText
     text = { &interpret_text, &q, &extent };
 
-  if ((image != (Image *) NULL) && (IsEventLogging() != MagickFalse))
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  else
-    if ((image_info != (ImageInfo *) NULL) && (IsEventLogging() != MagickFalse))
-      (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-        image_info->filename);
-    else
-      if (IsEventLogging() != MagickFalse)
-        (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no image");
+  LogInterpretImageProperties(image_info,image);
   if (embed_text == (const char *) NULL)
     return(ConstantString(""));
   p=embed_text;
