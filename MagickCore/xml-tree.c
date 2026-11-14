@@ -3369,6 +3369,25 @@ static size_t SkipTagContentOffset(const XMLTreeInfo *xml_info,
   return(offset);
 }
 
+static MagickBooleanType AppendCloseTag(const XMLTreeInfo *xml_info,
+  const XMLBufferInfo *buffer)
+{
+  char
+    **const source = buffer->destination;
+
+  size_t
+    *const length = buffer->length,
+    *const extent = buffer->extent;
+
+  if (ExtendXMLBufferBy(source,length,extent,strlen(xml_info->tag)) ==
+      MagickFalse)
+    return(MagickFalse);
+  if (*xml_info->content != '\0')
+    *length+=(size_t) FormatLocaleString(*source+(*length),*extent,"</%s>",
+      xml_info->tag);
+  return(MagickTrue);
+}
+
 static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,const XMLBufferInfo *buffer,
   size_t start,char ***attributes)
 {
@@ -3404,12 +3423,8 @@ static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,const XMLBufferInfo *buffer,
     *source=XMLTreeTagToXML(xml_info->child,buffer,0,attributes);
   else
     *source=EncodePredefinedEntities(xml_info->content,-1,buffer,MagickFalse);
-  if (ExtendXMLBufferBy(source,length,extent,strlen(xml_info->tag)) ==
-      MagickFalse)
+  if (AppendCloseTag(xml_info,buffer) == MagickFalse)
     return((char *) NULL);
-  if (*xml_info->content != '\0')
-    *length+=(size_t) FormatLocaleString(*source+(*length),*extent,"</%s>",
-      xml_info->tag);
   offset=SkipTagContentOffset(xml_info,content,offset);
   if (xml_info->ordered != (XMLTreeInfo *) NULL)
     content=XMLTreeTagToXML(xml_info->ordered,buffer,offset,attributes);
