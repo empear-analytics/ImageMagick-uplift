@@ -1566,6 +1566,18 @@ typedef struct _XImageCacheContext
     *exception;
 } XImageCacheContext;
 
+typedef struct _MagnifyWindowInput
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  ExceptionInfo
+    *exception;
+} MagnifyWindowInput;
+
 /*
   Forward declarations.
 */
@@ -1610,8 +1622,8 @@ static void
   XMagnifyImage(Display *,XWindows *,XEvent *,ExceptionInfo *),
   XMakePanImage(Display *,XResourceInfo *,XWindows *,Image *,ExceptionInfo *),
   XPanImage(Display *,XWindows *,XEvent *,ExceptionInfo *),
-  XMagnifyWindowCommand(Display *,XWindows *,const MagickStatusType,
-    const KeySym,ExceptionInfo *),
+  XMagnifyWindowCommand(const MagnifyWindowInput *,const MagickStatusType,
+    const KeySym),
   XSetCropGeometry(Display *,XWindows *,RectangleInfo *,Image *),
   XScreenEvent(Display *,XWindows *,XEvent *,ExceptionInfo *),
   XTranslateImage(Display *,XWindows *,Image *,const KeySym);
@@ -15266,9 +15278,18 @@ static void XMoveMagnifyPosition(XWindows *windows,const unsigned int quantum,
   }
 }
 
-static void XMagnifyWindowCommand(Display *display,XWindows *windows,
-  const MagickStatusType state,const KeySym key_symbol,ExceptionInfo *exception)
+static void XMagnifyWindowCommand(const MagnifyWindowInput *input,
+  const MagickStatusType state,const KeySym key_symbol)
 {
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  XWindows
+    *const windows = input->windows;
+
   unsigned int
     quantum;
 
@@ -20826,6 +20847,9 @@ static void XScreenKeyPress(Display *display,XWindows *windows,XEvent *event,
   KeySym
     key_symbol;
 
+  const MagnifyWindowInput
+    input = { display, windows, exception };
+
   if (event->xkey.window != windows->magnify.id)
     return;
   /*
@@ -20833,8 +20857,7 @@ static void XScreenKeyPress(Display *display,XWindows *windows,XEvent *event,
   */
   (void) XLookupString((XKeyEvent *) &event->xkey,command,(int)
     sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-  XMagnifyWindowCommand(display,windows,event->xkey.state,key_symbol,
-    exception);
+  XMagnifyWindowCommand(&input,event->xkey.state,key_symbol);
 }
 
 static void XScreenMap(Display *display,XWindows *windows,XEvent *event)
@@ -23441,6 +23464,9 @@ static void XPressMagnifyWindow(const DisplayEventContext *context)
   int
     factor;
 
+  const MagnifyWindowInput
+    input = { display, windows, exception };
+
   static KeySym
     MagnifyCommands[] =
     {
@@ -23459,8 +23485,7 @@ static void XPressMagnifyWindow(const DisplayEventContext *context)
   */
   factor=XMenuWidget(display,windows,"Magnify",MagnifyMenu,command);
   if (factor >= 0)
-    XMagnifyWindowCommand(display,windows,0,MagnifyCommands[factor],
-      exception);
+    XMagnifyWindowCommand(&input,0,MagnifyCommands[factor]);
 }
 
 static void XPressPanWindow(const DisplayEventContext *context,XEvent *event)
@@ -24758,6 +24783,9 @@ static void XHandleKeyPress(const DisplayEventContext *context,
   time_t
     *const timer = targets->timer;
 
+  const MagnifyWindowInput
+    input = { display, windows, exception };
+
   if (resource_info->debug != MagickFalse)
     (void) LogMagickEvent(X11Event,GetMagickModule(),
       "Key press: %d 0x%lx (%s)",(*event).xkey.state,(unsigned long)
@@ -24768,8 +24796,7 @@ static void XHandleKeyPress(const DisplayEventContext *context,
         targets);
     }
   if ((*event).xkey.window == windows->magnify.id)
-    XMagnifyWindowCommand(display,windows,(*event).xkey.state,key_symbol,
-      exception);
+    XMagnifyWindowCommand(&input,(*event).xkey.state,key_symbol);
   if ((*event).xkey.window == windows->pan.id)
     {
       XPanWindowKeyPress(context,key_symbol);
