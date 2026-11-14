@@ -2363,6 +2363,17 @@ typedef struct _PixelCacheOpenInfo
     *exception;
 } PixelCacheOpenInfo;
 
+static MagickBooleanType CloneCacheSource(CacheInfo *cache_info,
+  CacheInfo *source_info,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  status=ClonePixelCacheRepository(cache_info,source_info,exception);
+  RelinquishPixelCachePixels(source_info);
+  return(status);
+}
+
 static MagickBooleanType CreateMemoryPixelCache(CacheInfo *cache_info,
   const PixelCacheOpenInfo *open_info,CacheInfo source_info,
   MagickBooleanType status)
@@ -2395,11 +2406,7 @@ static MagickBooleanType CreateMemoryPixelCache(CacheInfo *cache_info,
     cache_info->metacontent=(void *) (cache_info->pixels+
       cache_info->number_channels*number_pixels);
   if (IsCacheSourcePending(source_info,mode) != MagickFalse)
-    {
-      status=ClonePixelCacheRepository(cache_info,&source_info,
-        exception);
-      RelinquishPixelCachePixels(&source_info);
-    }
+    status=CloneCacheSource(cache_info,&source_info,exception);
   if (cache_info->debug != MagickFalse)
     {
       (void) FormatMagickSize(cache_info->length,MagickTrue,"B",
