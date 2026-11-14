@@ -10284,6 +10284,29 @@ static DisplayCommand XLookupKeyCommand(const int key,
   return(NullCommand);
 }
 
+static DisplayCommand XImmutableWindowCommand(const KeySym key_symbol)
+{
+  /*
+    Virtual image window has a restricted command set.
+  */
+  switch (key_symbol)
+  {
+    case XK_question:
+      return(InfoCommand);
+    case XK_p:
+    case XK_Print:
+      return(PrintCommand);
+    case XK_space:
+      return(NextCommand);
+    case XK_q:
+    case XK_Escape:
+      return(QuitCommand);
+    default:
+      break;
+  }
+  return(NullCommand);
+}
+
 static DisplayCommand XImageWindowCommand(Display *display,
   XResourceInfo *resource_info,XWindows *windows,const MagickStatusType state,
   KeySym key_symbol,Image **image,ExceptionInfo *exception)
@@ -10319,27 +10342,7 @@ static DisplayCommand XImageWindowCommand(Display *display,
     }
   last_symbol=key_symbol;
   if (resource_info->immutable)
-    {
-      /*
-        Virtual image window has a restricted command set.
-      */
-      switch (key_symbol)
-      {
-        case XK_question:
-          return(InfoCommand);
-        case XK_p:
-        case XK_Print:
-          return(PrintCommand);
-        case XK_space:
-          return(NextCommand);
-        case XK_q:
-        case XK_Escape:
-          return(QuitCommand);
-        default:
-          break;
-      }
-      return(NullCommand);
-    }
+    return(XImmutableWindowCommand(key_symbol));
   switch ((int) key_symbol)
   {
     case XK_P:
