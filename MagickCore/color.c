@@ -814,6 +814,21 @@ static MagickBooleanType
     const size_t);
 #endif
 
+static void SetBuiltinColorInfo(ColorInfo *color_info,const ColormapInfo *p)
+{
+  (void) memset(color_info,0,sizeof(*color_info));
+  color_info->path=(char *) "[built-in]";
+  color_info->name=(char *) p->name;
+  GetPixelInfo((Image *) NULL,&color_info->color);
+  color_info->color.red=(double) ScaleCharToQuantum(p->red);
+  color_info->color.green=(double) ScaleCharToQuantum(p->green);
+  color_info->color.blue=(double) ScaleCharToQuantum(p->blue);
+  color_info->color.alpha=(double) QuantumRange*(double) p->alpha;
+  color_info->compliance=(ComplianceType) p->compliance;
+  color_info->exempt=MagickTrue;
+  color_info->signature=MagickCoreSignature;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -899,17 +914,7 @@ static LinkedListInfo *AcquireColorCache(const char *filename,
           ResourceLimitError,"MemoryAllocationFailed","`%s'",p->name);
         continue;
       }
-    (void) memset(color_info,0,sizeof(*color_info));
-    color_info->path=(char *) "[built-in]";
-    color_info->name=(char *) p->name;
-    GetPixelInfo((Image *) NULL,&color_info->color);
-    color_info->color.red=(double) ScaleCharToQuantum(p->red);
-    color_info->color.green=(double) ScaleCharToQuantum(p->green);
-    color_info->color.blue=(double) ScaleCharToQuantum(p->blue);
-    color_info->color.alpha=(double) QuantumRange*(double) p->alpha;
-    color_info->compliance=(ComplianceType) p->compliance;
-    color_info->exempt=MagickTrue;
-    color_info->signature=MagickCoreSignature;
+    SetBuiltinColorInfo(color_info,p);
     status&=(MagickStatusType) AppendValueToLinkedList(cache,color_info);
     if (status == MagickFalse)
       (void) ThrowMagickException(exception,GetMagickModule(),
