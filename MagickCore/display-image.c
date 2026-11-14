@@ -11485,6 +11485,67 @@ static void XApplyShowHistogramCommand(const XMagickCommandContext *context)
   XSetCursorState(display,windows,MagickFalse);
 }
 
+static void XApplyShowMatteCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ImageInfo
+    *const image_info = context->image_info;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  MagickStatusType
+    status;
+
+  char
+    filename[MagickPathExtent];
+
+  Image
+    *matte_image;
+
+  if ((*image)->alpha_trait == UndefinedPixelTrait)
+    {
+      XNoticeWidget(display,windows,
+        "Image does not have any matte information",(*image)->filename);
+      return;
+    }
+  /*
+    Show image matte.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) FormatImageProperty(*image,"group","%.17g",(double)
+    windows->image.id);
+  (void) DeleteImageProperty(*image,"label");
+  (void) SetImageProperty(*image,"label","Matte",exception);
+  (void) AcquireUniqueFilename(filename);
+  (void) FormatLocaleString((*image)->filename,MagickPathExtent,"matte:%s",
+    filename);
+  status=WriteImage(image_info,*image,exception);
+  (void) CopyMagickString(image_info->filename,filename,MagickPathExtent);
+  matte_image=ReadImage(image_info,exception);
+  (void) RelinquishUniqueFileResource(filename);
+  if (matte_image == (Image *) NULL)
+    return;
+  (void) FormatLocaleString(matte_image->filename,MagickPathExtent,
+    "show:%s",filename);
+  status=WriteImage(image_info,matte_image,exception);
+  matte_image=DestroyImage(matte_image);
+  if (status == MagickFalse)
+    XNoticeWidget(display,windows,"Unable to show matte",
+      (*image)->filename);
+  XDelay(display,1500);
+  XSetCursorState(display,windows,MagickFalse);
+}
+
 static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11783,7 +11844,6 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   ExceptionInfo *exception)
 {
   char
-    filename[MagickPathExtent],
     modulate_factors[MagickPathExtent];
 
   GeometryInfo
@@ -13053,45 +13113,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyShowHistogramCommand(&context);
       break;
     case ShowMatteCommand:
-    {
-      Image
-        *matte_image;
-
-      if ((*image)->alpha_trait == UndefinedPixelTrait)
-        {
-          XNoticeWidget(display,windows,
-            "Image does not have any matte information",(*image)->filename);
-          break;
-        }
-      /*
-        Show image matte.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      (void) FormatImageProperty(*image,"group","%.17g",(double)
-        windows->image.id);
-      (void) DeleteImageProperty(*image,"label");
-      (void) SetImageProperty(*image,"label","Matte",exception);
-      (void) AcquireUniqueFilename(filename);
-      (void) FormatLocaleString((*image)->filename,MagickPathExtent,"matte:%s",
-        filename);
-      status=WriteImage(image_info,*image,exception);
-      (void) CopyMagickString(image_info->filename,filename,MagickPathExtent);
-      matte_image=ReadImage(image_info,exception);
-      (void) RelinquishUniqueFileResource(filename);
-      if (matte_image == (Image *) NULL)
-        break;
-      (void) FormatLocaleString(matte_image->filename,MagickPathExtent,
-        "show:%s",filename);
-      status=WriteImage(image_info,matte_image,exception);
-      matte_image=DestroyImage(matte_image);
-      if (status == MagickFalse)
-        XNoticeWidget(display,windows,"Unable to show matte",
-          (*image)->filename);
-      XDelay(display,1500);
-      XSetCursorState(display,windows,MagickFalse);
+      XApplyShowMatteCommand(&context);
       break;
-    }
     case BackgroundCommand:
     {
       /*
