@@ -702,14 +702,39 @@ static void ReportMissingConfigureFile(LinkedListInfo *options,
       "UnableToOpenConfigureFile","`%s'",filename);
 }
 
-MagickExport LinkedListInfo *GetConfigureOptions(const char *filename,
-  ExceptionInfo *exception)
+static void LoadConfigureFiles(LinkedListInfo *options,LinkedListInfo *paths,
+  const char *filename,StringInfo **xml)
 {
   char
     path[MagickPathExtent];
 
   const char
     *element;
+
+  if (paths != (LinkedListInfo *) NULL)
+    {
+      ResetLinkedListIterator(paths);
+      element=(const char *) GetNextValueInLinkedList(paths);
+      while (element != (const char *) NULL)
+      {
+        (void) FormatLocaleString(path,MagickPathExtent,"%s%s",element,
+          filename);
+        (void) LogMagickEvent(ConfigureEvent,GetMagickModule(),
+          "Searching for configure file: \"%s\"",path);
+        (*xml)=ConfigureFileToStringInfo(path);
+        if ((*xml) != (StringInfo *) NULL)
+          (void) AppendValueToLinkedList(options,(*xml));
+        element=(const char *) GetNextValueInLinkedList(paths);
+      }
+      paths=DestroyLinkedList(paths,RelinquishMagickMemory);
+    }
+}
+
+MagickExport LinkedListInfo *GetConfigureOptions(const char *filename,
+  ExceptionInfo *exception)
+{
+  char
+    path[MagickPathExtent];
 
   LinkedListInfo
     *options,
@@ -728,23 +753,7 @@ MagickExport LinkedListInfo *GetConfigureOptions(const char *filename,
   */
   options=NewLinkedList(0);
   paths=GetConfigurePaths(filename,exception);
-  if (paths != (LinkedListInfo *) NULL)
-    {
-      ResetLinkedListIterator(paths);
-      element=(const char *) GetNextValueInLinkedList(paths);
-      while (element != (const char *) NULL)
-      {
-        (void) FormatLocaleString(path,MagickPathExtent,"%s%s",element,
-          filename);
-        (void) LogMagickEvent(ConfigureEvent,GetMagickModule(),
-          "Searching for configure file: \"%s\"",path);
-        xml=ConfigureFileToStringInfo(path);
-        if (xml != (StringInfo *) NULL)
-          (void) AppendValueToLinkedList(options,xml);
-        element=(const char *) GetNextValueInLinkedList(paths);
-      }
-      paths=DestroyLinkedList(paths,RelinquishMagickMemory);
-    }
+  LoadConfigureFiles(options,paths,filename,&xml);
 #if defined(MAGICKCORE_WINDOWS_SUPPORT)
   if (GetNumberOfElementsInLinkedList(options) == 0)
     {
