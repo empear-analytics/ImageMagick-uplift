@@ -704,6 +704,12 @@ static void AddHuffmanMakeupCount(const HuffmanTable *entry,ssize_t *count)
   }
 }
 
+static inline HuffmanTable **SelectHuffmanHash(const unsigned int color,
+  HuffmanTable **mw_hash,HuffmanTable **mb_hash)
+{
+  return((color != MagickFalse) ? mw_hash : mb_hash);
+}
+
 static void SetFaxResolution(Image *image)
 {
   image->resolution.x=204.0;
@@ -803,7 +809,7 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
     {
       if (NextHuffmanCode(image,x,&reader) == MagickFalse)
         break;
-      entry=LookupHuffmanEntry((color != MagickFalse) ? mw_hash : mb_hash,color,
+      entry=LookupHuffmanEntry(SelectHuffmanHash(color,mw_hash,mb_hash),color,
         reader.length,reader.code);
       if (entry == (const HuffmanTable *) NULL)
         continue;
