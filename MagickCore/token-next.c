@@ -242,6 +242,23 @@ static void ScanSlashToken(const NextTokenInput *input,
     }
 }
 
+static void ScanNumberDigits(const NextTokenInput *input,
+  const NextTokenTargets *targets,const char *magick_restrict q)
+{
+  const char
+    *magick_restrict *const p = targets->p;
+
+  ssize_t
+    *const i = targets->i;
+
+  for ( ; ((*p) < q) && (*(*p) != ','); (*p)++)
+  {
+    AppendTokenChar(input,(*p),i);
+    if (IsTokenExtentReached(input,targets) != MagickFalse)
+      break;
+  }
+}
+
 static MagickBooleanType ScanNumberToken(const NextTokenInput *input,
   const NextTokenTargets *targets)
 {
@@ -261,12 +278,7 @@ static MagickBooleanType ScanNumberToken(const NextTokenInput *input,
   (void) value;
   if (((*p) != q) && (*(*p) != ','))
     {
-      for ( ; ((*p) < q) && (*(*p) != ','); (*p)++)
-      {
-        AppendTokenChar(input,(*p),i);
-        if (IsTokenExtentReached(input,targets) != MagickFalse)
-          break;
-      }
+      ScanNumberDigits(input,targets,q);
       if (*(*p) == '%')
         {
           AppendTokenChar(input,(*p),i);
