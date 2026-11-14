@@ -2735,26 +2735,11 @@ static KernelInfo *AcquireKernelOfType(KernelInfo *kernel,
   }
 }
 
-MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
-  const GeometryInfo *args,ExceptionInfo *exception)
+static MagickBooleanType IsBaseKernelNeeded(const KernelInfoType type)
 {
-  BuiltInKernelInputs
-    builtin;
-
-  KernelInfo
-    *kernel;
-
-  double
-    nan = sqrt(-1.0);  /* Special Value : Not A Number */
-
-  /* Generate a new empty kernel if needed */
-  kernel=(KernelInfo *) NULL;
   switch(type) {
     case UndefinedKernel:    /* These should not call this function */
     case UserDefinedKernel:
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-        "InvalidOption","`%s'","Should not call this function");
-      return((KernelInfo *) NULL);
     case LaplacianKernel:   /* Named Discrete Convolution Kernels */
     case SobelKernel:       /* these are defined using other kernels */
     case RobertsKernel:
@@ -2771,7 +2756,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
     case ConvexHullKernel:
     case SkeletonKernel:
     case ThinSEKernel:
-      break;               /* A pre-generated kernel is not needed */
+      return(MagickFalse); /* A pre-generated kernel is not needed */
 #if 0
     /* set to 1 to do a compile-time check that we haven't missed anything */
     case UnityKernel:
@@ -2797,6 +2782,36 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
 #else
     default:
 #endif
+      return(MagickTrue);
+  }
+  return(MagickFalse);
+}
+
+MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
+  const GeometryInfo *args,ExceptionInfo *exception)
+{
+  BuiltInKernelInputs
+    builtin;
+
+  KernelInfo
+    *kernel;
+
+  double
+    nan = sqrt(-1.0);  /* Special Value : Not A Number */
+
+  /* Generate a new empty kernel if needed */
+  kernel=(KernelInfo *) NULL;
+  switch(type) {
+    case UndefinedKernel:    /* These should not call this function */
+    case UserDefinedKernel:
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+        "InvalidOption","`%s'","Should not call this function");
+      return((KernelInfo *) NULL);
+    default:
+      break;
+  }
+  if (IsBaseKernelNeeded(type) != MagickFalse)
+    {
       /* Generate the base Kernel Structure */
       kernel=(KernelInfo *) AcquireMagickMemory(sizeof(*kernel));
       if (kernel == (KernelInfo *) NULL)
@@ -2807,8 +2822,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       kernel->type = type;
       kernel->next = (KernelInfo *) NULL;
       kernel->signature=MagickCoreSignature;
-      break;
-  }
+    }
 
   builtin.args=args;
   builtin.nan=nan;
