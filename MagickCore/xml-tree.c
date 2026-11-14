@@ -3077,12 +3077,12 @@ MagickExport XMLTreeInfo *SetXMLTreeContent(XMLTreeInfo *xml_info,
 %
 */
 
-static MagickBooleanType ExtendXMLBuffer(char **source,const size_t *length,
-  size_t *extent,const char *text)
+static MagickBooleanType ExtendXMLBufferBy(char **source,const size_t *length,
+  size_t *extent,const size_t size)
 {
-  if ((*length+strlen(text)+MagickPathExtent) > *extent)
+  if ((*length+size+MagickPathExtent) > *extent)
     {
-      *extent=(*length)+strlen(text)+MagickPathExtent;
+      *extent=(*length)+size+MagickPathExtent;
       *source=(char *) ResizeQuantumMemory(*source,*extent,sizeof(**source));
       if (*source == (char *) NULL)
         return(MagickFalse);
@@ -3127,8 +3127,8 @@ static char *EncodePredefinedEntities(const char *source,ssize_t offset,
     }
   if (canonical_content == (char *) NULL)
     return(*destination);
-  if (ExtendXMLBuffer(destination,length,extent,
-        canonical_content) == MagickFalse)
+  if (ExtendXMLBufferBy(destination,length,extent,
+        strlen(canonical_content)) == MagickFalse)
     return(*destination);
   *length+=(size_t) FormatLocaleString(*destination+(*length),*extent,"%s",
     canonical_content);
@@ -3153,8 +3153,8 @@ static MagickBooleanType AppendTagAttributes(XMLTreeInfo *xml_info,
     attribute=GetXMLTreeAttribute(xml_info,xml_info->attributes[i]);
     if (attribute != xml_info->attributes[i+1])
       continue;
-    if (ExtendXMLBuffer(source,length,extent,
-          xml_info->attributes[i]) == MagickFalse)
+    if (ExtendXMLBufferBy(source,length,extent,
+          strlen(xml_info->attributes[i])) == MagickFalse)
       return(MagickFalse);
     *length+=(size_t) FormatLocaleString(*source+(*length),*extent," %s=\"",
       xml_info->attributes[i]);
@@ -3228,7 +3228,8 @@ static MagickBooleanType AppendDefaultTagAttributes(
         j+=3;
         continue;
       }
-    if (ExtendXMLBuffer(source,length,extent,attributes[i][j]) == MagickFalse)
+    if (ExtendXMLBufferBy(source,length,extent,strlen(attributes[i][j])) ==
+        MagickFalse)
       return(MagickFalse);
     *length+=(size_t) FormatLocaleString(*source+(*length),*extent," %s=\"",
       attributes[i][j]);
@@ -3264,7 +3265,8 @@ static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,const XMLBufferInfo *buffer,
   offset=0;
   *source=EncodePredefinedEntities(content+start,(ssize_t) (xml_info->offset-
     start),buffer,MagickFalse);
-  if (ExtendXMLBuffer(source,length,extent,xml_info->tag) == MagickFalse)
+  if (ExtendXMLBufferBy(source,length,extent,strlen(xml_info->tag)) ==
+      MagickFalse)
     return(*source);
   *length+=(size_t) FormatLocaleString(*source+(*length),*extent,
     "<%s",xml_info->tag);
@@ -3283,7 +3285,8 @@ static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,const XMLBufferInfo *buffer,
     *source=XMLTreeTagToXML(xml_info->child,buffer,0,attributes);
   else
     *source=EncodePredefinedEntities(xml_info->content,-1,buffer,MagickFalse);
-  if (ExtendXMLBuffer(source,length,extent,xml_info->tag) == MagickFalse)
+  if (ExtendXMLBufferBy(source,length,extent,strlen(xml_info->tag)) ==
+      MagickFalse)
     return((char *) NULL);
   if (*xml_info->content != '\0')
     *length+=(size_t) FormatLocaleString(*source+(*length),*extent,"</%s>",
@@ -3295,19 +3298,6 @@ static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,const XMLBufferInfo *buffer,
   else
     content=EncodePredefinedEntities(content+offset,-1,buffer,MagickFalse);
   return(content);
-}
-
-static MagickBooleanType ExtendXMLBufferBy(char **source,const size_t *length,
-  size_t *extent,const size_t size)
-{
-  if ((*length+size+MagickPathExtent) > *extent)
-    {
-      *extent=(*length)+size+MagickPathExtent;
-      *source=(char *) ResizeQuantumMemory(*source,*extent,sizeof(**source));
-      if (*source == (char *) NULL)
-        return(MagickFalse);
-    }
-  return(MagickTrue);
 }
 
 static MagickBooleanType AppendRootInstructions(const XMLTreeRoot *root,
