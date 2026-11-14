@@ -741,6 +741,23 @@ static MagickBooleanType DecodeDelegateImage(ImageInfo *read_info,
   return(MagickTrue);
 }
 
+static MagickBooleanType HasPingImageSizes(const ImageInfo *read_info,
+  Image *image)
+{
+  Image
+    *next;
+
+  if (read_info->ping != MagickFalse)
+    {
+      for (next=image; next != (Image *) NULL; next=GetNextImageInList(next))
+      {
+        if (IsEmptyImageSize(image) != MagickFalse)
+          return(MagickFalse);
+      }
+    }
+  return(MagickTrue);
+}
+
 static void CheckReadImageArguments(const ImageInfo *image_info,
   const ExceptionInfo *exception)
 {
@@ -835,16 +852,10 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
       "notify the developers",image->magick,exception->severity);
   if (IsBlobTemporary(image) != MagickFalse)
     (void) RelinquishUniqueFileResource(read_info->filename);
-  if (read_info->ping != MagickFalse)
+  if (HasPingImageSizes(read_info,image) == MagickFalse)
     {
-      for (next=image; next != (Image *) NULL; next=GetNextImageInList(next))
-      {
-        if (IsEmptyImageSize(image) != MagickFalse)
-          {
-            read_info=DestroyImageInfo(read_info);
-            ThrowReaderException(ImageError,"NegativeOrZeroImageSize");
-          }
-      }
+      read_info=DestroyImageInfo(read_info);
+      ThrowReaderException(ImageError,"NegativeOrZeroImageSize");
     }
   if (IsSceneSelection(read_info,image) != MagickFalse)
     {
