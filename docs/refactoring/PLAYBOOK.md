@@ -8590,6 +8590,18 @@ whole `switch` with the tail of the function.
    `B` without its last `break;`, braced when it holds more than one statement. The other
    groups and `default: break;` stay as they were; steps 2 and 5 apply unchanged.
 
+7. *Chain form* (2026-11-14). A predicate of step 2's shape whose one group holds four or
+   more labels `L1 ... Ln` and is a *Complex Method* (cc is the labels plus 2: the base
+   and `default`) may be split at a label boundary into a chain. Choose `k` with `2 <= k <=
+   n-2` and write directly above it a second `static MagickBooleanType <Name2>(const T x)`
+   of the same shape (the same parameter name and type, the same controlling expression,
+   `default: break;`, `return(MagickFalse);`) whose labels are `L(k+1) ... Ln`, in order,
+   named for what they have in common. Delete those labels from the first predicate's
+   `switch` and replace its closing `return(MagickFalse);` by `return(<Name2>(x));`. Every
+   label stands once, in the first or the second; the two runs are adjacent in the original
+   order. Step 5's script is `python3 tools/label_set_check.py --split <file> <First>
+   <Second>`.
+
 **Before:**
 
 ```c
@@ -8675,9 +8687,19 @@ static MagickBooleanType IsGenericColorspace(const ColorspaceType colorspace)
   than seven labels it is a *Complex Method* of its own, allowed for label-run helpers by
   the owner's ruling of 2026-11-07, and it holds nothing but the labels.
 
+- Why the chain form (step 7) behaves the same. The first predicate returns `MagickTrue` for
+  `L1 ... Lk` as before. Any other value reaches its `default: break;` and its tail, which now
+  returns the second predicate's result; the second returns `MagickTrue` exactly for
+  `L(k+1) ... Ln` and `MagickFalse` for every other value, so the chain returns `MagickTrue`
+  exactly for `L1 ... Ln` and `MagickFalse` otherwise, the value the one predicate returned.
+  Both functions read their argument and write nothing; the extra call is the only change of
+  what runs. Each keeps `default: break;`, so `-Wswitch` stays quiet; each run is sized so that
+  its function has cc 8 or less (six labels at most), which is what takes the label run out of
+  *Complex Method*.
+
 **Evidence level:** oracle (the cases that reach each caller), with `refactor_guard.py
 --calls` (`+2` for the new function, `+1` for each further site, nothing else moved) and
-step 5's script.
+step 5's script (`tools/label_set_check.py`, with `--split` for step 7).
 
 **Provenance:** 2026-11-10, from `colorspace.c`'s `sRGBTransformImage` and
 `GenericOrLogTosRGB` (campaign A, W16 lane c): the same twenty-eight-label generic group,
@@ -8691,6 +8713,11 @@ nine lane b, wide build): sixty labels save the image to the undo cache and brea
 redo and info tests after the `switch`, beside the free-buffers and undo groups, which
 return; the label run is cc 60 of the function's 75 once the save body is a helper. Added
 by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+Step 7 (chain form): 2026-11-14, from `display-image.c`'s `IsImageWindowArrowKey` (campaign A, W23
+round thirteen lane c, wide build): the eight arrow labels of the key switch of `XImageWindowKeyCommand`,
+cc 10, the file's only *Complex Method*; a probe of the split into the vertical and the horizontal run
+(four labels each, cc 6) 5.36 to 5.52, no finding on either predicate. Added by Claude Code (Claude
+Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
@@ -16742,3 +16769,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | KO | Replace Keyed Offset Groups with a Table of Bases: a `switch` whose label groups each assign `V=(K-C);` and break becomes a `static const` table of `{ label, base }` rows read by one loop, `V=(K-R[i].base);`. *Careful* gives the argument (labels distinct so at most one row matches, the row of the selected group; `E` and `K` unwritten and side-effect free; `base` holds the constant with its own value and type) | `display-image.c`'s `XSelectMagnifyDigit` (campaign A, W23 round twelve lane b, wide build): twenty labels in two runs, cc 22; a probe 2.76 to 2.89 and, stubbed, 6.12 to 6.49 (Claude Code, Sonnet 5.5) | owner |
 | 2026-11-14 | AMEND | LC | Step 6: a caller that already shares a Recipe N step 8 input struct and a Recipe CT step 3 loop-wide `const` targets struct between the helpers of its loop passes both to the helper (`if (Helper(&name,&targets) != MagickFalse) continue;`) in place of step 4's own struct and pointers: members bound once, targets members written `(*v)`, `&v` as `v`, `&name` as `name`, step 2's temporaries declared in the helper. *Careful* gives the argument (N step 8's fill condition for the reads, CT step 3's addresses for the writes) | `display-image.c`'s `XDisplayImage` (campaign A, W23 round twelve lane d, wide build): the command-widget test at the head of its event loop leaves the iteration through three `continue;`, writes `nexus` and `display_image` (members of `DisplayEventTargets`) and reads `event`, the command buffer and the context members; a probe of the step with the stasis test's Recipe E step: bumps 9 to 7, cc 95 to 87, the file with the other seven finding functions emptied 4.51 to 4.56, no finding on a new function | owner |
 | 2026-11-14 | AMEND | SD | Step 8, a run kept apart and shared structs: (a) a run of adjacent groups, in source order, may move with the `default` group when groups that stay stand between the run and `default` (step 6 already allowed it for its own form; C selects by label, not position, and no kept group falls through); (b) a caller that already shares a Recipe N step 8 input struct and a Recipe CT step 3 loop-wide `const` targets struct between the helpers of its loop passes both to the chain under the caller's local names (`&name` written `name` in the moved groups, members bound once, targets members as `(*v)`, the controlling expression included), with no struct, fill or local of its own. *Careful* gives the argument | `display-image.c`'s `XDisplayImage` (campaign A, W23 round twelve lane d, wide build): its 17-group event `switch` must keep `KeyPress` and `KeyRelease` in the caller (`XLookupString` takes `sizeof(command)` of the caller's array), which stand between the groups before them and `default`; the cases already share `DisplayEventContext` and `DisplayEventTargets`. A probe of the four-link chain after the crossing cases' Recipe P step: `XDisplayImage` cc 85 to 64, the file with the other seven finding functions emptied 4.56 to 4.76, no finding on a new function | owner |
+| 2026-11-14 | AMEND | LP | Step 7 (*chain form*): a step-2 predicate whose one label group holds four or more labels and is a *Complex Method* splits at a label boundary into two chained predicates: the later run (two labels or more) moves to a second predicate directly above the first, whose tail `return(MagickFalse);` becomes `return(<Second>(x));`. *Careful* gives the argument (the chain returns `MagickTrue` exactly for the original labels). Checked by `tools/label_set_check.py --split` | `display-image.c`'s `IsImageWindowArrowKey` (campaign A, W23 round thirteen lane c, wide build): eight labels, cc 10; a probe of the vertical/horizontal split 5.36 to 5.52 with no finding on either predicate (Claude Code, Sonnet 5.5) | owner |
