@@ -722,6 +722,13 @@ static void Release8BIMResourceNames(char **resource,
     (*resource)=DestroyString((*resource));
 }
 
+static void Skip8BIMResourceData(const unsigned char **info,size_t *length,
+  const ssize_t count)
+{
+  (*info)+=count;
+  (*length)=(size_t) ((ssize_t) (*length)-MagickMin(count,(ssize_t) (*length)));
+}
+
 static void Get8BIMProperty(const Image *image,const char *key,
   ExceptionInfo *exception)
 {
@@ -809,8 +816,7 @@ static void Get8BIMProperty(const Image *image,const char *key,
         /*
           No name match, scroll forward and try next.
         */
-        info+=count;
-        length=(size_t) ((ssize_t) length-MagickMin(count,(ssize_t) length));
+        Skip8BIMResourceData(&info,&length,count);
         continue;
       }
     if ((*name == '#') && (sub_number != 1))
@@ -819,8 +825,7 @@ static void Get8BIMProperty(const Image *image,const char *key,
           No numbered match, scroll forward and try next.
         */
         sub_number--;
-        info+=count;
-        length=(size_t) ((ssize_t) length-MagickMin(count,(ssize_t) length));
+        Skip8BIMResourceData(&info,&length,count);
         continue;
       }
     /*
@@ -837,8 +842,7 @@ static void Get8BIMProperty(const Image *image,const char *key,
 
         (void) memcpy(attribute,(char *) info,(size_t) count);
         attribute[count]='\0';
-        info+=count;
-        length=(size_t) ((ssize_t) length-MagickMin(count,(ssize_t) length));
+        Skip8BIMResourceData(&info,&length,count);
         attribute_info.image=image;
         attribute_info.key=key;
         attribute_info.format=format;
