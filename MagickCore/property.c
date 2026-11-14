@@ -3319,6 +3319,17 @@ static const char *CloneMagickPropertyValue(ImageInfo *image_info,
     return((const char *) NULL); \
   }
 
+static void LogMagickPropertyRequest(const ImageInfo *image_info,
+  const Image *image)
+{
+  if ((image != (Image *) NULL) && (IsEventLogging() != MagickFalse))
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  else
+    if ((image_info != (ImageInfo *) NULL) &&
+        (IsEventLogging() != MagickFalse))
+      (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no-images");
+}
+
 typedef struct _MagickPropertyRequest
 {
   ImageInfo
@@ -3785,12 +3796,7 @@ static const char *GetMagickPropertyLetter(ImageInfo *image_info,
   MagickPropertyRequest
     request;
 
-  if ((image != (Image *) NULL) && (IsEventLogging() != MagickFalse))
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  else
-    if ((image_info != (ImageInfo *) NULL) &&
-        (IsEventLogging() != MagickFalse))
-      (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no-images");
+  LogMagickPropertyRequest(image_info,image);
   *value='\0';           /* formatted string */
   string=(char *) NULL;  /* constant string reference */
   request.image_info=image_info;
@@ -4105,17 +4111,6 @@ static const char *FormatMagickPropertyPrecision(char *value,
   (void) FormatLocaleString(value,MagickPathExtent,"%.*g",
     GetMagickPrecision(),number);
   return((const char *) NULL);
-}
-
-static void LogMagickPropertyRequest(const ImageInfo *image_info,
-  const Image *image)
-{
-  if ((image != (Image *) NULL) && (IsEventLogging() != MagickFalse))
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  else
-    if ((image_info != (ImageInfo *) NULL) &&
-        (IsEventLogging() != MagickFalse))
-      (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no-images");
 }
 
 typedef struct _MagickPropertyHandlerInfo
