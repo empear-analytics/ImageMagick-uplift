@@ -5803,37 +5803,37 @@ static void XCompositeScaleLocation(const Image *image,
     (*composite_info).height+0.5);
 }
 
+static const char
+  *const CompositeEditMenu[] =
+  {
+    "Operators",
+    "Dissolve",
+    "Displace",
+    "Help",
+    "Dismiss",
+    (char *) NULL
+  };
+
+static const ModeType
+  CompositeEditCommands[] =
+  {
+    CompositeOperatorsCommand,
+    CompositeDissolveCommand,
+    CompositeDisplaceCommand,
+    CompositeHelpCommand,
+    CompositeDismissCommand
+  };
+
 static MagickBooleanType XCompositeImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
 {
-  const char
-    *const CompositeMenu[] =
-    {
-      "Operators",
-      "Dissolve",
-      "Displace",
-      "Help",
-      "Dismiss",
-      (char *) NULL
-    };
-
   static char
     displacement_geometry[MagickPathExtent] = "30x30",
     filename[MagickPathExtent] = "\0";
 
   static CompositeOperator
     compose = CopyCompositeOp;
-
-  static const ModeType
-    CompositeCommands[] =
-    {
-      CompositeOperatorsCommand,
-      CompositeDissolveCommand,
-      CompositeDisplaceCommand,
-      CompositeHelpCommand,
-      CompositeDismissCommand
-    };
 
   Cursor
     cursor;
@@ -5862,8 +5862,8 @@ static MagickBooleanType XCompositeImage(Display *display,
       &compose };
 
   const CompositeCommandInput
-    command_input = { display, resource_info, windows, CompositeCommands,
-      CompositeMenu, displacement_geometry, targets, exception };
+    command_input = { display, resource_info, windows, CompositeEditCommands,
+      CompositeEditMenu, displacement_geometry, targets, exception };
 
   /*
     Request image file name from user.
@@ -5888,7 +5888,7 @@ static MagickBooleanType XCompositeImage(Display *display,
   */
   (void) CloneString(&windows->command.name,"Composite");
   windows->command.data=1;
-  (void) XCommandWidget(display,windows,CompositeMenu,(XEvent *) NULL);
+  (void) XCommandWidget(display,windows,CompositeEditMenu,(XEvent *) NULL);
   (void) XMapRaised(display,windows->command.id);
   XClientMessage(display,windows->image.id,windows->im_protocols,
     windows->im_update_widget,CurrentTime);
