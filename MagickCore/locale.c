@@ -551,6 +551,27 @@ static int LocaleInfoCompare(const void *x,const void *y)
 }
 #endif
 
+static ssize_t CollectLocaleInfo(const char *pattern,
+  const LocaleInfo **messages)
+{
+  const LocaleInfo
+    *p;
+
+  ssize_t
+    i;
+
+  ResetSplayTreeIterator(locale_cache);
+  p=(const LocaleInfo *) GetNextValueInSplayTree(locale_cache);
+  for (i=0; p != (const LocaleInfo *) NULL; )
+  {
+    if ((p->stealth == MagickFalse) &&
+        (GlobExpression(p->tag,pattern,MagickTrue) != MagickFalse))
+      messages[i++]=p;
+    p=(const LocaleInfo *) GetNextValueInSplayTree(locale_cache);
+  }
+  return(i);
+}
+
 MagickExport const LocaleInfo **GetLocaleInfoList(const char *pattern,
   size_t *number_messages,ExceptionInfo *exception)
 {
@@ -582,15 +603,7 @@ MagickExport const LocaleInfo **GetLocaleInfoList(const char *pattern,
     Generate locale list.
   */
   LockSemaphoreInfo(locale_semaphore);
-  ResetSplayTreeIterator(locale_cache);
-  p=(const LocaleInfo *) GetNextValueInSplayTree(locale_cache);
-  for (i=0; p != (const LocaleInfo *) NULL; )
-  {
-    if ((p->stealth == MagickFalse) &&
-        (GlobExpression(p->tag,pattern,MagickTrue) != MagickFalse))
-      messages[i++]=p;
-    p=(const LocaleInfo *) GetNextValueInSplayTree(locale_cache);
-  }
+  i=CollectLocaleInfo(pattern,messages);
   UnlockSemaphoreInfo(locale_semaphore);
   qsort((void *) messages,(size_t) i,sizeof(*messages),LocaleInfoCompare);
   messages[i]=(LocaleInfo *) NULL;
