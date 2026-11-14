@@ -568,6 +568,14 @@ static MagickBooleanType TransferHuffmanScanline(
   return(MagickTrue);
 }
 
+static size_t CountHuffmanNullLine(size_t null_lines,const ssize_t x)
+{
+  null_lines++;
+  if (x != 0)
+    null_lines=0;
+  return(null_lines);
+}
+
 static unsigned int ApplyHuffmanTerminator(const HuffmanTransfer *transfer,
   const unsigned int color,ssize_t *x,ssize_t *count)
 {
@@ -713,9 +721,7 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
             InputBit(bit);
             if ((int) bit != 0)
               {
-                null_lines++;
-                if (x != 0)
-                  null_lines=0;
+                null_lines=CountHuffmanNullLine(null_lines,x);
                 bail=MagickTrue;
                 break;
               }
