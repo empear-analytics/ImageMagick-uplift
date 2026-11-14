@@ -19431,6 +19431,121 @@ Lane: c
 
 ---
 
+## Recipe KA - Peel Keyed Returning Arms out of a First-Letter Switch into a Table of Handlers
+
+**Use when:** CodeScene reports *Complex Method* or *Large Method* on a function that
+selects on a name with a first-letter `switch`, where arms in several groups compare the
+name with a key and run a short body that ends in `return(...)`, each body different:
+`property.c`'s `SetImageProperty` (`colorspace`, `delay`, `density`, `depth`, `gamma`,
+`loop`, `page`, `tile-offset`), each setting an image member from the value.
+
+**Not covered by:** Recipe KM, whose arms share one parse-and-store shape; Recipe PK,
+whose arms share one body; Recipe KD, whose run is a flat ladder of
+`return(F(args));` with no `switch` around it and no body to move; Recipe KH, whose
+arms sit in a loop and leave through `break` with a status macro.
+
+**How:**
+
+1. Arms. Each is `if (LocaleCompare("K",n) == 0) { S }` (or with braces around a single
+   `return`), outside every OpenMP region and `#if` branch, whose every exit is a
+   `return` of the function's return type `R`, with no `goto`, `break` or `continue`
+   leaving it; `n` is a parameter nothing in the function writes. Keys are distinct.
+   `S` reads only parameters of the function, constants, and locals it declares, and
+   writes only through those parameters and locals of the caller that nothing reads
+   (a status `flags` written by every arm that touches it and read by none; checked by
+   `grep`).
+2. Hoisting: Recipe KM step 2 for every key (point `P0`, false side-effect-free
+   comparisons only, both letters label the group).
+3. Handlers. Choose one signature `R (*)(T1 p1,...)` over the function's parameters
+   other than `n` (at most four). An arm whose `S` is `return(F(p...));` with `F` a
+   `static` function of exactly that signature and argument order uses `F`. Every other
+   arm becomes `static R Set<K>Handler(T1 p1,...)` directly above the function: the
+   caller-local temporaries of step 1 declared in it, then `S` unchanged, a parameter
+   `S` does not read named in `magick_unreferenced(p);` as its first statement. Two
+   arms whose `S` differ only in the member whose address they pass (`&image->page`,
+   `&image->tile_offset`) share a helper taking that address and a pointer to the
+   temporary (`SetImageGeometryMember(value,&image->page,&flags)`), each handler one
+   `return` of its call: this keeps *Code Duplication* off the handlers and the
+   temporary from being set but unused (clang's `-Wunused-but-set-variable`).
+4. Table and lookup. Above the handlers, `typedef R (*NameMethod)(T1,...);` and a
+   struct of `const char *key` and `NameMethod handler`; below them a `static const`
+   array, one element `{ "K", Handler }` per arm in source order, and `static NameMethod
+   GetName(const char *n)` walking it with `LocaleCompare(table[i].key,n) == 0`,
+   returning the element's handler, or `(NameMethod) NULL` at the end.
+5. Delete the arms. At `P0` write `handler=GetName(n); if (handler != (NameMethod) NULL)
+   return(handler(p1,...));`, `handler` a new local of the function. A caller local
+   left unused is deleted.
+6. Check by script that every arm is one element and its handler's body is the arm's
+   `S`, and by reading steps 1 and 2; `refactor_guard.py --calls`, the CI and C++
+   warning checks (MSVC C4101 on the deleted local), the oracle on the function's
+   cases.
+
+**Before:**
+
+```c
+    case 'D':
+    case 'd':
+    {
+      if (LocaleCompare("delay",property) == 0)
+        {
+          return(SetImageDelayProperty(image,value));
+        }
+      ...
+      if (LocaleCompare("depth",property) == 0)
+        {
+          image->depth=StringToUnsignedLong(value);
+          return(MagickTrue);
+        }
+      break; /* not an attribute, add as a property */
+    }
+```
+
+**After:**
+
+```c
+static MagickBooleanType SetImageDepthHandler(Image *image,const char *value,
+  ExceptionInfo *exception)
+{
+  magick_unreferenced(exception);
+  image->depth=StringToUnsignedLong(value);
+  return(MagickTrue);
+}
+...
+  handler=GetImagePropertyHandler(property);
+  if (handler != (ImagePropertyHandler) NULL)
+    return(handler(image,value,exception));
+  switch (*property)
+  {
+    ...
+    case 'D':
+    case 'd':
+    {
+      break; /* not an attribute, add as a property */
+    }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. A name equal to a key ran, before, only false
+  comparisons and then its arm's `S`; now it runs the table's comparisons (no side
+  effect) and the handler, whose body is `S` on the same parameter values, returning
+  what `S` returned. A name equal to no key ran no arm before and gets `NULL` now; the
+  `switch` then runs without the arms that would not have fired.
+- A caller temporary moved into a handler was written and never read (step 1), so its
+  value cannot be missed.
+- `magick_unreferenced(p)` expands to `(p)` or nothing: no effect.
+- The lookup compares up to all keys; off every per-pixel path.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` and steps 1 and 2 checked by
+reading.
+
+**Provenance:** 2026-11-14, from `property.c`'s `SetImageProperty` (campaign B, M127 lane
+c round 10), after Recipe PK peeled its read-only keys. Added by Claude Code (Claude Opus
+5.5) under the mandate of 2026-10-24.
+Lane: c
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -19839,3 +19954,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | XP | Share Mirrored Extreme-Search Loops Through Per-Direction Predicates: copies of a loop keeping the most extreme array element, differing in their tests' operands and operators, become one `static` search taking a predicate pointer, each copy's tests a `MagickBooleanType` predicate returning `MagickTrue` where the copy assigned; Lane: c | `property.c`'s `GetConvexHullExtremePoints` (top, right, bottom, left loops; cc 26, four bumps): leaves every finding, 3.64 to 3.66 | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | V | Step 9: the cleanup exit may be `S goto L;` with `S` assignments of constants to caller variables (`status=MagickFalse; goto cleanup;`), the caller writing `{ S goto L; }`, as VC step 6 does in a loop; Lane: c | `property.c`'s `InterpretImageProperties` (scratch image and text allocation) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | PK | Peel Keyed Arms That Share One Body out of a First-Letter Switch into a Key Table: arms in many groups of a name `switch` that compare the name with keys (or call a predicate joining key comparisons) and run one leaving body become one `static const` key table, a `LocaleCompare` membership lookup, and one `if` before the `switch` holding the body; Lane: c | `property.c`'s `SetImageProperty` (fifteen read-only keys in nine groups) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | KA | Peel Keyed Returning Arms out of a First-Letter Switch into a Table of Handlers: arms in several groups of a name `switch` that compare the name with a key and return become handlers of one signature (an existing function when an arm is one call of it), a `static const` key table, a lookup returning the handler, and one call before the `switch`; Lane: c | `property.c`'s `SetImageProperty` (eight setter keys) | mandate (2026-10-24) |
