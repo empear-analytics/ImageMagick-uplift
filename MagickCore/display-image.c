@@ -10424,6 +10424,9 @@ typedef struct _XMagickCommandContext
 
   char
     *color;
+
+  QuantizeInfo
+    *quantize_info;
 } XMagickCommandContext;
 
 static Image *XApplyOpenCommand(const XMagickCommandContext *context)
@@ -14202,6 +14205,34 @@ static void XApplyFilterCommands(const XMagickCommandContext *context,
   }
 }
 
+static void XApplyColorMapCommands(const XMagickCommandContext *context,
+  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
+{
+  QuantizeInfo
+    *const quantize_info = context->quantize_info;
+
+  switch (command)
+  {
+    case NegateCommand:
+      XApplyNegateCommand(context);
+      break;
+    case GrayscaleCommand:
+      XApplyGrayscaleCommand(context);
+      break;
+    case MapCommand:
+      XApplyMapCommand(context,(*quantize_info));
+      break;
+    case QuantizeCommand:
+      XApplyQuantizeCommand(context,(*quantize_info));
+      break;
+    default:
+    {
+      XApplyFilterCommands(context,command,&(*flags),&(*nexus));
+      break;
+    }
+  }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -14245,6 +14276,7 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   context.image_info=image_info;
   context.exception=exception;
   context.color=color;
+  context.quantize_info=&quantize_info;
   switch (command)
   {
     case OpenCommand:
@@ -14367,21 +14399,9 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
     case EqualizeCommand:
       XApplyEqualizeCommand(&context);
       break;
-    case NegateCommand:
-      XApplyNegateCommand(&context);
-      break;
-    case GrayscaleCommand:
-      XApplyGrayscaleCommand(&context);
-      break;
-    case MapCommand:
-      XApplyMapCommand(&context,quantize_info);
-      break;
-    case QuantizeCommand:
-      XApplyQuantizeCommand(&context,quantize_info);
-      break;
     default:
     {
-      XApplyFilterCommands(&context,command,&flags,&nexus);
+      XApplyColorMapCommands(&context,command,&flags,&nexus);
       break;
     }
   }
