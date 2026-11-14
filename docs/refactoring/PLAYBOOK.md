@@ -9271,7 +9271,14 @@ way clones the first.
    holds and the pair is converted to one target, an assignment's left side or a
    parameter, as each copy's run was (`j=0` and `j=(ssize_t) MaxMap`). A pair whose runs
    are statements' whole expressions (`j++`, `j--`) has its value discarded, and needs
-   only scalar types.
+   only scalar types. A pair of null pointer casts to two different pointer types
+   (`(CacheInfo *) NULL` and `(Cache) NULL`, `Cache` being `void *`), each the right
+   operand of `==` or `!=` whose left operand is the same pointer in both copies, may
+   differ too (2026-11-14): the conditional of the two has type `void *` (C11 6.5.15p6)
+   and is a null pointer either way, and comparing a pointer with a null pointer of any
+   object or `void` pointer type is true exactly when the pointer is null (6.5.9p5-6),
+   so the comparison gives what each copy's gave; `tools/cxx_warnings.sh` checks the
+   C++ build, where the composite pointer type is `void *` as well.
 4. Write one `static inline` function directly above the first caller: its parameters are
    the variables a copy reads (Recipe E step 3) and `const NameSide side`, at most four in
    all; when that would make five or more, the selector and the read values that differ
@@ -19159,3 +19166,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | FC | Fold a Function into the Twin That Calls Out Its Block: `G`, whose block `B` is the body of `F`'s callee `H` (taking and returning the written local `r` by value), loses its calls to `F` and is deleted; `F` and `H` move whole above the first caller, out of a delegate `#if` when they name nothing it declares, freeing a place under the function-count threshold; Lane: b | `annotate.c`'s `GetPostscriptResolution`/`GetFreetypeTextResolution` (113 functions; the 114th costs 0.18; fold probe 5.69 flat) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | FM | Fold Twin Functions Differing in the Member They Read into One Taking the Value: `F(s,a)` and `G(s,b)`, the same text but for reading `s->m` and `s->n` once each, become one `H(a,v)` taking the member's value; calls pass `e->m` or `e->n`; both twins are deleted, freeing a place under the function-count threshold; Lane: b | `annotate.c`'s `IsColumnOutside`/`IsRowOutside` (113 functions; fold flat, with the helper it frees 5.79 to 5.81 in a probe) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | CF | Step 1: a copy whose loop is `v=e;` followed by `for ( ; c; i)` compares as `for (v=e; c; i)`, the merged body taking the clause form (C11 6.8.5.3); Lane: a | `constitute.c`'s `ReadSceneImages` and `PingSceneImages` (*Code Duplication*; probe 8.81 to 10.0) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | MT | Step 3: a pair of null pointer casts to two pointer types (`(CacheInfo *) NULL` and `(Cache) NULL`), each the right operand of `==`/`!=` against the same pointer, may be a differing pair: the conditional is a `void *` null pointer and the comparison is true exactly when the pointer is null (C11 6.5.9); Lane: a | `cache.c`'s `ClipPixelCacheNexus` and `MaskPixelCacheNexus` (*Code Duplication*; with two Recipe E per-pixel helpers, both leave Code Duplication and Complex Method) | mandate (2026-10-24) |
