@@ -10560,6 +10560,33 @@ static void XApplyPrintCommand(const XMagickCommandContext *context)
     }
 }
 
+static void XApplyDeleteCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  MagickStatusType
+    status;
+
+  static char
+    filename[MagickPathExtent] = "\0";
+
+  /*
+    Delete image file.
+  */
+  XFileBrowserWidget(display,windows,"Delete",filename);
+  if (*filename == '\0')
+    return;
+  status=ShredFile(filename);
+  if (remove_utf8(filename) < 0)
+    status=MagickTrue;
+  if (status != MagickFalse)
+    XNoticeWidget(display,windows,"Unable to delete image file:",filename);
+}
+
 static void XApplyResizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11220,23 +11247,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyPrintCommand(&context);
       break;
     case DeleteCommand:
-    {
-      static char
-        filename[MagickPathExtent] = "\0";
-
-      /*
-        Delete image file.
-      */
-      XFileBrowserWidget(display,windows,"Delete",filename);
-      if (*filename == '\0')
-        break;
-      status=ShredFile(filename);
-      if (remove_utf8(filename) < 0)
-        status=MagickTrue;
-      if (status != MagickFalse)
-        XNoticeWidget(display,windows,"Unable to delete image file:",filename);
+      XApplyDeleteCommand(&context);
       break;
-    }
     case NewCommand:
       nexus=XApplyNewCommand(&context,nexus);
       break;
