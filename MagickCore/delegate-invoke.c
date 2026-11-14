@@ -1435,6 +1435,11 @@ static void RunDelegateCommands(const DelegateCommandRun *run,
   (void) CopyMagickString(image->filename,input_filename,MagickPathExtent);
 }
 
+static const char *DelegateTag(const char *decode,const char *encode)
+{
+  return(decode ? decode : encode);
+}
+
 static void OpenInvokeDelegate(const ImageInfo *image_info,
   const Image *image)
 {
@@ -1479,7 +1484,7 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
     {
       RelinquishTemporaryInput(image,temporary);
       (void) ThrowMagickException(exception,GetMagickModule(),DelegateError,
-        "NoTagFound","`%s'",decode ? decode : encode);
+        "NoTagFound","`%s'",DelegateTag(decode,encode));
       return(MagickFalse);
     }
   if (AcquireDelegateOutputFilename(image_info,image,temporary,exception) ==
@@ -1503,7 +1508,7 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
       RelinquishTemporaryInput(image,temporary);
       (void) ThrowMagickException(exception,GetMagickModule(),
         ResourceLimitError,"MemoryAllocationFailed","`%s'",
-        decode ? decode : encode);
+        DelegateTag(decode,encode));
       return(MagickFalse);
     }
   run.delegate_info=delegate_info;
