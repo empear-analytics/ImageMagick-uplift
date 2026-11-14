@@ -241,6 +241,14 @@ MagickExport MagickBooleanType CloneImageProfiles(Image *image,
   return(MagickTrue);
 }
 
+static void TraceImageProfiles(const Image *image)
+{
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -267,10 +275,7 @@ MagickExport MagickBooleanType CloneImageProfiles(Image *image,
 */
 MagickExport MagickBooleanType DeleteImageProfile(Image *image,const char *name)
 {
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceImageProfiles(image);
   if (image->profiles == (SplayTreeInfo *) NULL)
     return(MagickFalse);
   WriteTo8BimProfile(image,name,(StringInfo *) NULL);
@@ -335,10 +340,7 @@ MagickExport const StringInfo *GetImageProfile(const Image *image,
   const StringInfo
     *profile;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceImageProfiles(image);
   if (image->profiles == (SplayTreeInfo *) NULL)
     return((StringInfo *) NULL);
   profile=(const StringInfo *) GetValueFromSplayTree((SplayTreeInfo *)
@@ -370,10 +372,7 @@ MagickExport const StringInfo *GetImageProfile(const Image *image,
 */
 MagickExport char *GetNextImageProfile(const Image *image)
 {
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceImageProfiles(image);
   if (image->profiles == (SplayTreeInfo *) NULL)
     return((char *) NULL);
   return((char *) GetNextKeyInSplayTree((SplayTreeInfo *) image->profiles));
@@ -1635,10 +1634,7 @@ MagickExport StringInfo *RemoveImageProfile(Image *image,const char *name)
   StringInfo
     *profile;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceImageProfiles(image);
   if (image->profiles == (SplayTreeInfo *) NULL)
     return((StringInfo *) NULL);
   WriteTo8BimProfile(image,name,(StringInfo *) NULL);
@@ -1673,10 +1669,7 @@ MagickExport StringInfo *RemoveImageProfile(Image *image,const char *name)
 */
 MagickExport void ResetImageProfileIterator(const Image *image)
 {
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceImageProfiles(image);
   if (image->profiles == (SplayTreeInfo *) NULL)
     return;
   ResetSplayTreeIterator((SplayTreeInfo *) image->profiles);
