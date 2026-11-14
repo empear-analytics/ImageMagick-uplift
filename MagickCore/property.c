@@ -5320,6 +5320,18 @@ static const char *SkipInterpretSpaces(const char *embed_text)
   return(p);
 }
 
+static char *FinishInterpretText(const MagickBooleanType status,
+  char *interpret_text)
+{
+  if (status == MagickFalse)
+    {
+      if (interpret_text != (char *) NULL)
+        interpret_text=DestroyString(interpret_text);
+      return((char *) NULL);
+    }
+  return(interpret_text);
+}
+
 MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   const char *embed_text,ExceptionInfo *exception)
 {
@@ -5397,13 +5409,7 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
 
 cleanup:
   DestroyInterpretSources(image_info,image,property_info,property_image);
-  if (status == MagickFalse)
-    {
-      if (interpret_text != (char *) NULL)
-        interpret_text=DestroyString(interpret_text);
-      return((char *) NULL);
-    }
-  return(interpret_text);
+  return(FinishInterpretText(status,interpret_text));
 }
 
 /*
