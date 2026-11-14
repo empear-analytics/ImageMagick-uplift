@@ -757,6 +757,14 @@ static inline MagickBooleanType IsUnpushableExifDirectory(
     ((*level) >= (MaxDirectoryStack-2))) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsExifSubdirectoryTag(
+  const unsigned char *directory,const unsigned char *ifd0,
+  const unsigned short tag_value)
+{
+  return(((directory == ifd0) && (tag_value == TAG_EXIF_OFFSET)) ?
+    MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType PushExifDirectory(const ExifWalkInfo *walk,
   const ExifTagInfo *exif_tag,const size_t number_entries,
   const ExifWalkTargets *targets)
@@ -810,7 +818,7 @@ static MagickBooleanType PushExifDirectory(const ExifWalkInfo *walk,
   offset=(ssize_t) ReadProfileLong(endian,p);
   if (IsUnpushableExifDirectory(offset,length,level) != MagickFalse)
     return(MagickFalse);
-  if ((directory == ifd0) && (tag_value == TAG_EXIF_OFFSET))
+  if (IsExifSubdirectoryTag(directory,ifd0,tag_value) != MagickFalse)
     (*exif_directory)=exif+offset;
   directory_stack[(*level)].directory=directory;
   (*entry)++;
