@@ -12612,6 +12612,14 @@ replaces the `switch` by tests.
 4. The `break;` of a group that matched leaves the `switch`, and code after the `switch`
    runs; the chain gives the same, by falling off its last `else if`. A `switch` followed
    by code that reads which group ran refuses the step.
+5. *Prefix keys and several arms* (2026-11-14, lane c). A group may hold several arms
+   in order, each `if (<test>) { <statement> break; }`, where `<test>` is
+   `LocaleNCompare("P",keyword,L) == 0` with `L` the length of `"P"`, or two such tests
+   joined by `||` whose prefixes share their first letter; step 2's argument holds for
+   the prefix's first character (a digit labels its one group). An arm's statement may
+   be a call standing alone under one `#if defined(...)` / `#endif`, which moves with
+   it, its lines unchanged, in a braced block. The chain keeps the arms in the order of
+   their groups and, within a group, of the source.
 
 **Before:**
 
@@ -20123,3 +20131,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | AMEND | KB | Step 7: prefix arms (`LocaleNCompare` with a length) become rows with a length member; an arm with a second guard inside a branch keeps it in the handler, binding the members it names; twin handlers share a helper taking the differing constant; Lane: c | `property.c`'s `GetMagickProperty` (`minimum-bounding-box`, `papersize:`, `scene`; 3.69 to 4.44 with DL) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | KB | Step 8: a `switch` on a character parameter takes rows keyed by the character; the guards run in the caller when it has their names; a handler identical to an existing one reuses it, moving it and the shared types above the first user; Lane: c | `property.c`'s `GetMagickPropertyLetter` (39 letters; 4.53 to 5.15) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | KB | Step 8: a group whose only `#` lines are one `#if 0`/`#else`/`#endif` may move, the `#if 0` branch verbatim, the handler binding the members the `#else` branch names, its first guard going to the row; twins differing in several constants share a helper (Recipe SC); Lane: c | `property.c`'s `GetMagickPropertyLetter` (`s`, `S`, `n`, `N`; 5.18 to 5.47) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | SF | Step 5: arms testing a prefix with `LocaleNCompare` and its length (or two such tests joined by `or`), several arms in a group, and a statement that is one call under `#if defined(...)` moving with its lines; Lane: c | `property.c`'s `GetProfileProperty` (8bim:, exif:, icc:/icm:, iptc:, xmp:) | mandate (2026-10-24) |
