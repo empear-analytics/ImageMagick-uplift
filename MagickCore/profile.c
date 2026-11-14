@@ -1251,8 +1251,10 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
     return(MagickFalse);
   SetStringInfoDatum(profile,(unsigned char *) datum);
   if ((LocaleCompare(name,"icc") != 0) && (LocaleCompare(name,"icm") != 0))
-    status=SetImageProfilePrivate(image,profile,exception);
-  else
+    {
+      status=SetImageProfilePrivate(image,profile,exception);
+      return(status);
+    }
     {
       const StringInfo
         *icc_profile;
