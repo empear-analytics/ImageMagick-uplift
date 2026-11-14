@@ -797,7 +797,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
       }
     if ((c == '(') && (*(p+1) == ')'))
       return(flags);
-    if (IsGeometryAdvanceCharacter(c) != MagickFalse)
+    if ((IsGeometryAdvanceCharacter(c) != MagickFalse) || (c == '/'))
       {
         p++;
         continue;
@@ -821,11 +821,6 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
       case 'X':
       {
         flags|=SeparatorValue;
-        p++;
-        break;
-      }
-      case '/':
-      {
         p++;
         break;
       }
