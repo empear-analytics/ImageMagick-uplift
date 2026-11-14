@@ -965,6 +965,37 @@ static void OutputHuffmanRun(HuffmanBitWriter *writer,
   writer->bit=bit;
 }
 
+static void EncodeHuffmanScanline(HuffmanBitWriter *writer,
+  unsigned char *scanline,const size_t width)
+{
+  int
+    runlength;
+
+  ssize_t
+    n;
+
+  unsigned char
+    *q;
+
+  q=scanline;
+  for (n=(ssize_t) width; n > 0; )
+  {
+    /*
+      Output white run.
+    */
+    runlength=CountHuffmanRun(&q,&n,MagickFalse);
+    OutputHuffmanRun(writer,MWTable,TWTable,runlength);
+    if (n != 0)
+      {
+        /*
+          Output black run.
+        */
+        runlength=CountHuffmanRun(&q,&n,MagickTrue);
+        OutputHuffmanRun(writer,MBTable,TBTable,runlength);
+      }
+  }
+}
+
 static size_t GetHuffmanWidth(const ImageInfo *image_info,
   const Image *inject_image)
 {
@@ -995,9 +1026,6 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
   HuffmanBitWriter
     writer;
 
-  int
-    runlength;
-
   Image
     *huffman_image;
 
@@ -1012,7 +1040,6 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
     width;
 
   ssize_t
-    n,
     y;
 
   unsigned char
@@ -1071,23 +1098,7 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
     /*
       Huffman encode scanline.
     */
-    q=scanline;
-    for (n=(ssize_t) width; n > 0; )
-    {
-      /*
-        Output white run.
-      */
-      runlength=CountHuffmanRun(&q,&n,MagickFalse);
-      OutputHuffmanRun(&writer,MWTable,TWTable,runlength);
-      if (n != 0)
-        {
-          /*
-            Output black run.
-          */
-          runlength=CountHuffmanRun(&q,&n,MagickTrue);
-          OutputHuffmanRun(&writer,MBTable,TBTable,runlength);
-        }
-    }
+    EncodeHuffmanScanline(&writer,scanline,width);
     /*
       End of line.
     */
