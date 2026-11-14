@@ -11640,6 +11640,67 @@ static Image *XApplyPreferencesCommand(const XMagickCommandContext *context,
   return(nexus);
 }
 
+static void XApplyBrowseDocumentationCommand(
+  const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ImageInfo
+    *const image_info = context->image_info;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  MagickStatusType
+    status;
+
+  Atom
+    mozilla_atom;
+
+  Window
+    mozilla_window,
+    root_window;
+
+  /*
+    Browse the ImageMagick documentation.
+  */
+  root_window=XRootWindow(display,XDefaultScreen(display));
+  mozilla_atom=XInternAtom(display,"_MOZILLA_VERSION",MagickFalse);
+  mozilla_window=XWindowByProperty(display,root_window,mozilla_atom);
+  if (mozilla_window != (Window) NULL)
+    {
+      char
+        command[MagickPathExtent];
+
+      /*
+        Display documentation using Netscape remote control.
+      */
+      (void) FormatLocaleString(command,MagickPathExtent,
+        "openurl(%s,new-tab)",MagickAuthoritativeURL);
+      mozilla_atom=XInternAtom(display,"_MOZILLA_COMMAND",MagickFalse);
+      (void) XChangeProperty(display,mozilla_window,mozilla_atom,XA_STRING,
+        8,PropModeReplace,(unsigned char *) command,(int) strlen(command));
+      XSetCursorState(display,windows,MagickFalse);
+      return;
+    }
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  status=InvokeDelegate(image_info,*image,"browse",(char *) NULL,
+    exception);
+  if (status == MagickFalse)
+    XNoticeWidget(display,windows,"Unable to browse documentation",
+      (char *) NULL);
+  XDelay(display,1500);
+  XSetCursorState(display,windows,MagickFalse);
+}
+
 static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
 {
   Display
@@ -13228,47 +13289,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       break;
     }
     case BrowseDocumentationCommand:
-    {
-      Atom
-        mozilla_atom;
-
-      Window
-        mozilla_window,
-        root_window;
-
-      /*
-        Browse the ImageMagick documentation.
-      */
-      root_window=XRootWindow(display,XDefaultScreen(display));
-      mozilla_atom=XInternAtom(display,"_MOZILLA_VERSION",MagickFalse);
-      mozilla_window=XWindowByProperty(display,root_window,mozilla_atom);
-      if (mozilla_window != (Window) NULL)
-        {
-          char
-            command[MagickPathExtent];
-
-          /*
-            Display documentation using Netscape remote control.
-          */
-          (void) FormatLocaleString(command,MagickPathExtent,
-            "openurl(%s,new-tab)",MagickAuthoritativeURL);
-          mozilla_atom=XInternAtom(display,"_MOZILLA_COMMAND",MagickFalse);
-          (void) XChangeProperty(display,mozilla_window,mozilla_atom,XA_STRING,
-            8,PropModeReplace,(unsigned char *) command,(int) strlen(command));
-          XSetCursorState(display,windows,MagickFalse);
-          break;
-        }
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      status=InvokeDelegate(image_info,*image,"browse",(char *) NULL,
-        exception);
-      if (status == MagickFalse)
-        XNoticeWidget(display,windows,"Unable to browse documentation",
-          (char *) NULL);
-      XDelay(display,1500);
-      XSetCursorState(display,windows,MagickFalse);
+      XApplyBrowseDocumentationCommand(&context);
       break;
-    }
     case VersionCommand:
     {
       XNoticeWidget(display,windows,GetMagickVersion((size_t *) NULL),
