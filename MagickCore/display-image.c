@@ -10587,6 +10587,30 @@ static void XApplyDeleteCommand(const XMagickCommandContext *context)
     XNoticeWidget(display,windows,"Unable to delete image file:",filename);
 }
 
+static Image *XApplyVisualDirectoryCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  Image
+    *nexus;
+
+  /*
+    Visual Image directory.
+  */
+  nexus=XVisualDirectoryImage(display,resource_info,windows,exception);
+  return(nexus);
+}
+
 static void XApplyResizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11253,13 +11277,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       nexus=XApplyNewCommand(&context,nexus);
       break;
     case VisualDirectoryCommand:
-    {
-      /*
-        Visual Image directory.
-      */
-      nexus=XVisualDirectoryImage(display,resource_info,windows,exception);
+      nexus=XApplyVisualDirectoryCommand(&context);
       break;
-    }
     case QuitCommand:
       XApplyQuitCommand(&context);
       break;
