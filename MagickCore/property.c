@@ -4737,6 +4737,51 @@ static MagickBooleanType WarnUnknownProperty(ExceptionInfo *exception,
   return(MagickTrue);
 }
 
+typedef struct _BracedPattern
+{
+  char
+    *pattern;
+
+  ssize_t
+    offset;
+} BracedPattern;
+
+static MagickBooleanType AppendOptionOrArtifact(
+  const InterpretSources *sources,const InterpretText *text,
+  const BracedPattern *braced,const GlobSide side)
+{
+  char
+    *const pattern = braced->pattern;
+
+  const char
+    *string;
+
+  const ssize_t
+    offset = braced->offset;
+
+  ExceptionInfo
+    *const exception = sources->exception;
+
+  Image
+    *const property_image = sources->property_image;
+
+  ImageInfo
+    *const property_info = sources->property_info;
+
+  /*
+    Option - direct global option lookup (with globbing).
+    Artifact - direct image artifact lookup (with glob).
+  */
+  if (IsGlob(((side == OptionGlobSide) ? pattern+7 : pattern+9)) != MagickFalse)
+    return(AppendGlobbedValues(sources,text,((side == OptionGlobSide) ?
+      pattern+7 : pattern+9),side));
+  string=((side == OptionGlobSide) ? GetImageOption(property_info,pattern+7) :
+    GetImageArtifact(property_image,pattern+9));
+  if (string == (char *) NULL)
+    return(WarnUnknownProperty(exception,pattern,offset));
+  return(AppendInterpretString(text,string));
+}
+
 static MagickBooleanType InterpretBracedEscape(
   const InterpretSources *sources,const InterpretText *text,const char **p)
 {
@@ -4745,6 +4790,9 @@ static MagickBooleanType InterpretBracedEscape(
 
   const char
     *string;
+
+  BracedPattern
+    braced;
 
   ssize_t
     depth,
@@ -4781,6 +4829,8 @@ static MagickBooleanType InterpretBracedEscape(
         "UnbalancedBraces","\"%%[%s\"",pattern);
       return(MagickFalse);
     }
+  braced.pattern=pattern;
+  braced.offset=offset;
   /*
     Special Lookup Prefixes %[prefix:...].
   */
@@ -4791,31 +4841,9 @@ static MagickBooleanType InterpretBracedEscape(
   if (LocaleNCompare("pixel:",pattern,6) == 0)
     return(AppendPixelValue(text,property_image,pattern,exception));
   if (LocaleNCompare("option:",pattern,7) == 0)
-    {
-      /*
-        Option - direct global option lookup (with globbing).
-      */
-      if (IsGlob(pattern+7) != MagickFalse)
-        return(AppendGlobbedValues(sources,text,pattern+7,
-          OptionGlobSide));
-      string=GetImageOption(property_info,pattern+7);
-      if (string == (char *) NULL)
-        return(WarnUnknownProperty(exception,pattern,offset));
-      return(AppendInterpretString(text,string));
-    }
+    return(AppendOptionOrArtifact(sources,text,&braced,OptionGlobSide));
   if (LocaleNCompare("artifact:",pattern,9) == 0)
-    {
-      /*
-        Artifact - direct image artifact lookup (with glob).
-      */
-      if (IsGlob(pattern+9) != MagickFalse)
-        return(AppendGlobbedValues(sources,text,pattern+9,
-          ArtifactGlobSide));
-      string=GetImageArtifact(property_image,pattern+9);
-      if (string == (char *) NULL)
-        return(WarnUnknownProperty(exception,pattern,offset));
-      return(AppendInterpretString(text,string));
-    }
+    return(AppendOptionOrArtifact(sources,text,&braced,ArtifactGlobSide));
   if (LocaleNCompare("property:",pattern,9) == 0)
     {
       /*
