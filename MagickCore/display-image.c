@@ -10757,6 +10757,61 @@ static void XApplySharpenCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyBlurCommand(const XMagickCommandContext *context,
+  MagickStatusType *flags)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *blur_image;
+
+  static char
+    radius[MagickPathExtent] = "0.0x1.0";
+
+  /*
+    Query user for blur radius.
+  */
+  (void) XDialogWidget(display,windows,"Blur",
+    "Enter the blur radius and standard deviation:",radius);
+  if (*radius == '\0')
+    return;
+  /*
+    Blur an image.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(radius,&geometry_info);
+  blur_image=BlurImage(*image,geometry_info.rho,geometry_info.sigma,
+    exception);
+  if (blur_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=blur_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyRollCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11894,41 +11949,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplySharpenCommand(&context,&flags);
       break;
     case BlurCommand:
-    {
-      Image
-        *blur_image;
-
-      static char
-        radius[MagickPathExtent] = "0.0x1.0";
-
-      /*
-        Query user for blur radius.
-      */
-      (void) XDialogWidget(display,windows,"Blur",
-        "Enter the blur radius and standard deviation:",radius);
-      if (*radius == '\0')
-        break;
-      /*
-        Blur an image.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      flags=ParseGeometry(radius,&geometry_info);
-      blur_image=BlurImage(*image,geometry_info.rho,geometry_info.sigma,
-        exception);
-      if (blur_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=blur_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyBlurCommand(&context,&flags);
       break;
-    }
     case ThresholdCommand:
     {
       double
