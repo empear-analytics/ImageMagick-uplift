@@ -2793,7 +2793,7 @@ typedef struct _MarkupTargets
     *ignore_depth;
 } MarkupTargets;
 
-static MagickBooleanType ParseCommentOrDeclaration(XMLTreeRoot *root,
+static MagickBooleanType ParseMarkupDeclaration(XMLTreeRoot *root,
   const int terminal,ExceptionInfo *exception,const MarkupTargets *markup)
 {
   char
@@ -2808,6 +2808,33 @@ static MagickBooleanType ParseCommentOrDeclaration(XMLTreeRoot *root,
   size_t
     *const ignore_depth = markup->ignore_depth;
 
+  DeclarationInfo
+    declaration;
+
+  DeclarationTargets
+    declaration_targets;
+
+  declaration.root=root;
+  declaration.ignore_depth=*ignore_depth;
+  declaration.terminal=terminal;
+  declaration.exception=exception;
+  declaration_targets.p=p;
+  declaration_targets.tag=tag;
+  declaration_targets.l=l;
+  if (ParseDeclaration(&declaration,&declaration_targets) ==
+      MagickFalse)
+    {
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType ParseCommentOrDeclaration(XMLTreeRoot *root,
+  const int terminal,ExceptionInfo *exception,const MarkupTargets *markup)
+{
+  char
+    **const p = markup->p;
+
   if (strncmp(*p,"!--",3) == 0)
     {
       if (SkipComment(p,terminal,exception) == MagickFalse)
@@ -2816,26 +2843,7 @@ static MagickBooleanType ParseCommentOrDeclaration(XMLTreeRoot *root,
         }
     }
   else
-    {
-      DeclarationInfo
-        declaration;
-
-      DeclarationTargets
-        declaration_targets;
-
-      declaration.root=root;
-      declaration.ignore_depth=*ignore_depth;
-      declaration.terminal=terminal;
-      declaration.exception=exception;
-      declaration_targets.p=p;
-      declaration_targets.tag=tag;
-      declaration_targets.l=l;
-      if (ParseDeclaration(&declaration,&declaration_targets) ==
-          MagickFalse)
-        {
-          return(MagickFalse);
-        }
-    }
+    return(ParseMarkupDeclaration(root,terminal,exception,markup));
   return(MagickTrue);
 }
 
