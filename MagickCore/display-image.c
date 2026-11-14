@@ -10307,6 +10307,87 @@ static DisplayCommand XImmutableWindowCommand(const KeySym key_symbol)
   return(NullCommand);
 }
 
+typedef struct _ImageWindowKeyInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    **image;
+
+  ExceptionInfo
+    *exception;
+} ImageWindowKeyInput;
+
+static DisplayCommand XTrimImageWindowEdge(const ImageWindowKeyInput *input,
+  const KeySym key_symbol)
+{
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  Image
+    **const image = input->image;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  RectangleInfo
+    crop_info;
+
+  /*
+    Trim one pixel from edge of image.
+  */
+  crop_info.x=0;
+  crop_info.y=0;
+  crop_info.width=(size_t) windows->image.ximage->width;
+  crop_info.height=(size_t) windows->image.ximage->height;
+  if ((key_symbol == XK_Up) || (key_symbol == XK_KP_Up))
+    {
+      XClampTrimTopQuantum(resource_info,crop_info);
+      crop_info.height-=(size_t) resource_info->quantum;
+    }
+  if ((key_symbol == XK_Down) || (key_symbol == XK_KP_Down))
+    {
+      XClampTrimBottomQuantum(resource_info,crop_info);
+      crop_info.y+=resource_info->quantum;
+      crop_info.height-=(size_t) resource_info->quantum;
+    }
+  if ((key_symbol == XK_Left) || (key_symbol == XK_KP_Left))
+    {
+      XClampTrimLeftQuantum(resource_info,crop_info);
+      crop_info.width-=(size_t) resource_info->quantum;
+    }
+  if ((key_symbol == XK_Right) || (key_symbol == XK_KP_Right))
+    {
+      XClampTrimRightQuantum(resource_info,crop_info);
+      crop_info.x+=resource_info->quantum;
+      crop_info.width-=(size_t) resource_info->quantum;
+    }
+  if ((windows->image.x+(int) windows->image.width) > (int) crop_info.width)
+    windows->image.x=(int) (crop_info.width-windows->image.width);
+  if ((windows->image.y+(int) windows->image.height) > (int) crop_info.height)
+    windows->image.y=(int) (crop_info.height-windows->image.height);
+  XSetCropGeometry(display,windows,&crop_info,*image);
+  windows->image.window_changes.width=(int) crop_info.width;
+  windows->image.window_changes.height=(int) crop_info.height;
+  (void) XSetWindowBackgroundPixmap(display,windows->image.id,None);
+  (void) XConfigureImage(display,resource_info,windows,*image,
+    exception);
+  return(NullCommand);
+}
+
 static DisplayCommand XImageWindowCommand(Display *display,
   XResourceInfo *resource_info,XWindows *windows,const MagickStatusType state,
   KeySym key_symbol,Image **image,ExceptionInfo *exception)
@@ -10319,6 +10400,9 @@ static DisplayCommand XImageWindowCommand(Display *display,
 
   static KeySym
     last_symbol = XK_0;
+
+  const ImageWindowKeyInput
+    input = { display, resource_info, windows, image, exception };
 
   if ((key_symbol >= XK_0) && (key_symbol <= XK_9))
     {
@@ -10374,51 +10458,7 @@ static DisplayCommand XImageWindowCommand(Display *display,
     case XK_KP_Right:
     {
       if ((state & Mod1Mask) != 0)
-        {
-          RectangleInfo
-            crop_info;
-
-          /*
-            Trim one pixel from edge of image.
-          */
-          crop_info.x=0;
-          crop_info.y=0;
-          crop_info.width=(size_t) windows->image.ximage->width;
-          crop_info.height=(size_t) windows->image.ximage->height;
-          if ((key_symbol == XK_Up) || (key_symbol == XK_KP_Up))
-            {
-              XClampTrimTopQuantum(resource_info,crop_info);
-              crop_info.height-=(size_t) resource_info->quantum;
-            }
-          if ((key_symbol == XK_Down) || (key_symbol == XK_KP_Down))
-            {
-              XClampTrimBottomQuantum(resource_info,crop_info);
-              crop_info.y+=resource_info->quantum;
-              crop_info.height-=(size_t) resource_info->quantum;
-            }
-          if ((key_symbol == XK_Left) || (key_symbol == XK_KP_Left))
-            {
-              XClampTrimLeftQuantum(resource_info,crop_info);
-              crop_info.width-=(size_t) resource_info->quantum;
-            }
-          if ((key_symbol == XK_Right) || (key_symbol == XK_KP_Right))
-            {
-              XClampTrimRightQuantum(resource_info,crop_info);
-              crop_info.x+=resource_info->quantum;
-              crop_info.width-=(size_t) resource_info->quantum;
-            }
-          if ((windows->image.x+(int) windows->image.width) > (int) crop_info.width)
-            windows->image.x=(int) (crop_info.width-windows->image.width);
-          if ((windows->image.y+(int) windows->image.height) > (int) crop_info.height)
-            windows->image.y=(int) (crop_info.height-windows->image.height);
-          XSetCropGeometry(display,windows,&crop_info,*image);
-          windows->image.window_changes.width=(int) crop_info.width;
-          windows->image.window_changes.height=(int) crop_info.height;
-          (void) XSetWindowBackgroundPixmap(display,windows->image.id,None);
-          (void) XConfigureImage(display,resource_info,windows,*image,
-            exception);
-          return(NullCommand);
-        }
+        return(XTrimImageWindowEdge(&input,key_symbol));
       XTranslateImage(display,windows,*image,key_symbol);
       return(NullCommand);
     }
