@@ -25201,6 +25201,17 @@ static WarningHandler XInstallWarningHandlers(
   return(warning_handler);
 }
 
+static void XLoadDisplayFont(Display *display,XResourceInfo *resource_info,
+  XWindows *windows)
+{
+  if (windows->font_info != (XFontStruct *) NULL)
+    (void) XFreeFont(display,windows->font_info);
+  windows->font_info=XBestFont(display,resource_info,MagickFalse);
+  if (windows->font_info == (XFontStruct *) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToLoadFont",
+      resource_info->font);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -25311,12 +25322,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   /*
     Initialize font info.
   */
-  if (windows->font_info != (XFontStruct *) NULL)
-    (void) XFreeFont(display,windows->font_info);
-  windows->font_info=XBestFont(display,resource_info,MagickFalse);
-  if (windows->font_info == (XFontStruct *) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToLoadFont",
-      resource_info->font);
+  XLoadDisplayFont(display,resource_info,windows);
   /*
     Initialize Standard Colormap.
   */
