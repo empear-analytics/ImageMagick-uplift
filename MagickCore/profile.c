@@ -663,6 +663,34 @@ static void TransformDoublePixels(const int id,const Image* image,
   StoreTargetDoublePixels(id,image,target_info,q);
 }
 
+static void StoreTargetQuantumPixels(const int id,const Image* image,
+  const LCMSInfo *target_info,Quantum *q)
+{
+  Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=(Quantum *) target_info->pixels[id];
+  q-=GetPixelChannels(image)*image->columns;
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    if (target_info->channels == 1)
+      SetPixelGray(image,*p++,q);
+    else
+      SetPixelRed(image,*p++,q);
+    if (target_info->channels > 1)
+      {
+        SetPixelGreen(image,*p++,q);
+        SetPixelBlue(image,*p++,q);
+      }
+    if (target_info->channels > 3)
+      SetPixelBlack(image,*p++,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static void TransformQuantumPixels(const int id,const Image* image,
   const LCMSInfo *source_info,const LCMSInfo *target_info,
   const cmsHTRANSFORM *transform,Quantum *q)
@@ -688,23 +716,7 @@ static void TransformQuantumPixels(const int id,const Image* image,
   }
   cmsDoTransform(transform[id],source_info->pixels[id],target_info->pixels[id],
     (unsigned int) image->columns);
-  p=(Quantum *) target_info->pixels[id];
-  q-=GetPixelChannels(image)*image->columns;
-  for (x=0; x < (ssize_t) image->columns; x++)
-  {
-    if (target_info->channels == 1)
-      SetPixelGray(image,*p++,q);
-    else
-      SetPixelRed(image,*p++,q);
-    if (target_info->channels > 1)
-      {
-        SetPixelGreen(image,*p++,q);
-        SetPixelBlue(image,*p++,q);
-      }
-    if (target_info->channels > 3)
-      SetPixelBlack(image,*p++,q);
-    q+=(ptrdiff_t) GetPixelChannels(image);
-  }
+  StoreTargetQuantumPixels(id,image,target_info,q);
 }
 
 static inline void SetLCMSInfoTranslate(LCMSInfo *info,const double translate)
