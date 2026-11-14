@@ -514,10 +514,7 @@ MagickExport Quantum *GetAuthenticPixels(Image *image,const ssize_t x,
     *pixels;
 
   assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(image->cache != (Cache) NULL);
-  cache_info=(CacheInfo *) image->cache;
-  assert(cache_info->signature == MagickCoreSignature);
+  cache_info=GetImageCacheInfo(image);
   if (cache_info->methods.get_authentic_pixels_handler !=
       (GetAuthenticPixelsHandler) NULL)
     {
