@@ -4401,61 +4401,90 @@ static void InterpretXMLEntity(char **q,const char **p)
         *(*q)++=(*(*p));
 }
 
+typedef struct _InterpretText
+{
+  char
+    **interpret_text,
+    **q;
+
+  size_t
+    *extent;
+} InterpretText;
+
+static MagickBooleanType ExtendInterpretBuffer(const InterpretText *text,
+  const size_t string_length)
+{
+  size_t
+    length = (string_length);
+
+  if ((size_t) ((*text->q)-(*text->interpret_text)+(ssize_t) length+1) >=
+      (*text->extent))
+    {
+      (*text->extent)+=length;
+      (*text->interpret_text)=(char *) ResizeQuantumMemory(
+        (*text->interpret_text),(*text->extent)+MagickPathExtent,
+        sizeof(*(*text->interpret_text)));
+      if ((*text->interpret_text) == (char *) NULL)
+        return(MagickFalse);
+      (*text->q)=(*text->interpret_text)+strlen((*text->interpret_text));
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType AppendInterpretKeyValue(const InterpretText *text,
+  const char *key,const char *value)
+{
+  size_t
+    length = strlen(key)+strlen(value)+2;
+
+  if (ExtendInterpretBuffer(text,length) == MagickFalse)
+    return(MagickFalse);
+  (*text->q)+=(ptrdiff_t) FormatLocaleString((*text->q),(*text->extent),
+    "%s=%s\n",(key),(value));
+  return(MagickTrue);
+}
+
+static MagickBooleanType AppendInterpretString(const InterpretText *text,
+  const char *string)
+{
+  size_t
+    length = strlen((string));
+
+  if (ExtendInterpretBuffer(text,length) == MagickFalse)
+    return(MagickFalse);
+  (void) CopyMagickString((*text->q),(string),(*text->extent));
+  (*text->q)+=(ptrdiff_t) length;
+  return(MagickTrue);
+}
+
 MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   const char *embed_text,ExceptionInfo *exception)
 {
 #define ExtendInterpretText(string_length) \
 { \
-  size_t length=(string_length); \
-  if ((size_t) (q-interpret_text+(ssize_t) length+1) >= extent) \
+  if (ExtendInterpretBuffer(&text,(string_length)) == MagickFalse) \
     { \
-      extent+=length; \
-      interpret_text=(char *) ResizeQuantumMemory(interpret_text,extent+ \
-        MagickPathExtent,sizeof(*interpret_text)); \
-      if (interpret_text == (char *) NULL) \
-        { \
-          status=MagickFalse; \
-          goto cleanup; \
-        } \
-      q=interpret_text+strlen(interpret_text); \
-   } \
+      status=MagickFalse; \
+      goto cleanup; \
+    } \
 }
 
 #define AppendKeyValue2Text(key,value)\
 { \
-  size_t length=strlen(key)+strlen(value)+2; \
-  if ((size_t) (q-interpret_text+(ssize_t) length+1) >= extent) \
+  if (AppendInterpretKeyValue(&text,(key),(value)) == MagickFalse) \
     { \
-      extent+=length; \
-      interpret_text=(char *) ResizeQuantumMemory(interpret_text,extent+ \
-        MagickPathExtent,sizeof(*interpret_text)); \
-      if (interpret_text == (char *) NULL) \
-        { \
-          status=MagickFalse; \
-          goto cleanup; \
-        } \
-      q=interpret_text+strlen(interpret_text); \
-     } \
-   q+=(ptrdiff_t) FormatLocaleString(q,extent,"%s=%s\n",(key),(value)); \
+      status=MagickFalse; \
+      goto cleanup; \
+    } \
 }
 
 #define AppendString2Text(string) \
 { \
-  size_t length = strlen((string)); \
-  if ((size_t) (q-interpret_text+(ssize_t) length+1) >= extent) \
+  if (AppendInterpretString(&text,(string)) == MagickFalse) \
     { \
-      extent+=length; \
-      interpret_text=(char *) ResizeQuantumMemory(interpret_text,extent+ \
-        MagickPathExtent,sizeof(*interpret_text)); \
-      if (interpret_text == (char *) NULL) \
-        { \
-          status=MagickFalse; \
-          goto cleanup; \
-        } \
-      q=interpret_text+strlen(interpret_text); \
+      status=MagickFalse; \
+      goto cleanup; \
     } \
-  (void) CopyMagickString(q,(string),extent); \
-  q+=(ptrdiff_t) length; \
 }
 
   char
@@ -4477,6 +4506,9 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
 
   size_t
     extent;  /* allocated length of interpret_text */
+
+  const InterpretText
+    text = { &interpret_text, &q, &extent };
 
   if ((image != (Image *) NULL) && (IsEventLogging() != MagickFalse))
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
