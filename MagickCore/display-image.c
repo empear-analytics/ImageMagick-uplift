@@ -10647,6 +10647,61 @@ static void XApplyQuantizeCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyReduceNoiseCommand(const XMagickCommandContext *context,
+  MagickStatusType *flags)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *noise_image;
+
+  static char
+    radius[MagickPathExtent] = "0";
+
+  /*
+    Query user for noise radius.
+  */
+  (void) XDialogWidget(display,windows,"Reduce Noise",
+    "Enter the noise radius:",radius);
+  if (*radius == '\0')
+    return;
+  /*
+    Reduce noise in the image.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(radius,&geometry_info);
+  noise_image=StatisticImage(*image,NonpeakStatistic,(size_t)
+    geometry_info.rho,(size_t) geometry_info.rho,exception);
+  if (noise_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=noise_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyRollCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11775,41 +11830,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyEmbossCommand(&context);
       break;
     case ReduceNoiseCommand:
-    {
-      Image
-        *noise_image;
-
-      static char
-        radius[MagickPathExtent] = "0";
-
-      /*
-        Query user for noise radius.
-      */
-      (void) XDialogWidget(display,windows,"Reduce Noise",
-        "Enter the noise radius:",radius);
-      if (*radius == '\0')
-        break;
-      /*
-        Reduce noise in the image.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      flags=ParseGeometry(radius,&geometry_info);
-      noise_image=StatisticImage(*image,NonpeakStatistic,(size_t)
-        geometry_info.rho,(size_t) geometry_info.rho,exception);
-      if (noise_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=noise_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyReduceNoiseCommand(&context,&flags);
       break;
-    }
     case AddNoiseCommand:
       XApplyAddNoiseCommand(&context);
       break;
