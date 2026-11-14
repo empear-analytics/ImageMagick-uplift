@@ -11274,6 +11274,61 @@ static void XApplySwirlCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyImplodeCommand(const XMagickCommandContext *context,
+  MagickStatusType *flags)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *implode_image;
+
+  static char
+    factor[MagickPathExtent] = "0.3";
+
+  /*
+    Query user for implode factor.
+  */
+  (void) XDialogWidget(display,windows,"Implode",
+    "Enter the implosion/explosion factor (-1.0 - 1.0):",factor);
+  if (*factor == '\0')
+    return;
+  /*
+    Implode image pixels about the center.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(factor,&geometry_info);
+  implode_image=ImplodeImage(*image,geometry_info.rho,(*image)->interpolate,
+    exception);
+  if (implode_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=implode_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyRollCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12441,41 +12496,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplySwirlCommand(&context,&flags);
       break;
     case ImplodeCommand:
-    {
-      Image
-        *implode_image;
-
-      static char
-        factor[MagickPathExtent] = "0.3";
-
-      /*
-        Query user for implode factor.
-      */
-      (void) XDialogWidget(display,windows,"Implode",
-        "Enter the implosion/explosion factor (-1.0 - 1.0):",factor);
-      if (*factor == '\0')
-        break;
-      /*
-        Implode image pixels about the center.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      flags=ParseGeometry(factor,&geometry_info);
-      implode_image=ImplodeImage(*image,geometry_info.rho,(*image)->interpolate,
-        exception);
-      if (implode_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=implode_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyImplodeCommand(&context,&flags);
       break;
-    }
     case VignetteCommand:
     {
       Image
