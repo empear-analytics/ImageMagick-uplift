@@ -2314,12 +2314,8 @@ static ssize_t SetColorChannelAttributes(const Image *image,
   return(n);
 }
 
-static ssize_t SetExtraChannelAttributes(const Image *image,ssize_t n)
+static ssize_t SetMaskChannelAttributes(const Image *image,ssize_t n)
 {
-  if (image->alpha_trait != UndefinedPixelTrait)
-    SetPixelChannelAttributes(image,AlphaPixelChannel,CopyPixelTrait,n++);
-  if (image->storage_class == PseudoClass)
-    SetPixelChannelAttributes(image,IndexPixelChannel,CopyPixelTrait,n++);
   if ((image->channels & ReadMaskChannel) != 0)
     SetPixelChannelAttributes(image,ReadMaskPixelChannel,CopyPixelTrait,n++);
   if ((image->channels & WriteMaskChannel) != 0)
@@ -2328,6 +2324,15 @@ static ssize_t SetExtraChannelAttributes(const Image *image,ssize_t n)
     SetPixelChannelAttributes(image,CompositeMaskPixelChannel,CopyPixelTrait,
       n++);
   return(n);
+}
+
+static ssize_t SetExtraChannelAttributes(const Image *image,ssize_t n)
+{
+  if (image->alpha_trait != UndefinedPixelTrait)
+    SetPixelChannelAttributes(image,AlphaPixelChannel,CopyPixelTrait,n++);
+  if (image->storage_class == PseudoClass)
+    SetPixelChannelAttributes(image,IndexPixelChannel,CopyPixelTrait,n++);
+  return(SetMaskChannelAttributes(image,n));
 }
 
 static ssize_t SetMetaChannelAttributes(const Image *image,ssize_t n)
