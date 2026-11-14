@@ -851,6 +851,21 @@ MagickExport const char *GetLocaleValue(const LocaleInfo *locale_info)
   return(locale_info->message);
 }
 
+static char *GetEnvironmentLocaleName(char *locale)
+{
+  if (locale == (char *) NULL)
+    locale=GetEnvironmentValue("LC_ALL");
+  if (locale == (char *) NULL)
+    locale=GetEnvironmentValue("LC_MESSAGES");
+  if (locale == (char *) NULL)
+    locale=GetEnvironmentValue("LC_CTYPE");
+  if (locale == (char *) NULL)
+    locale=GetEnvironmentValue("LANG");
+  if (locale == (char *) NULL)
+    locale=ConstantString("C");
+  return(locale);
+}
+
 static char *AcquireLocaleName(void)
 {
   char
@@ -863,16 +878,7 @@ static char *AcquireLocaleName(void)
   p=setlocale(LC_CTYPE,(const char *) NULL);
   if (p != (const char *) NULL)
     locale=ConstantString(p);
-  if (locale == (char *) NULL)
-    locale=GetEnvironmentValue("LC_ALL");
-  if (locale == (char *) NULL)
-    locale=GetEnvironmentValue("LC_MESSAGES");
-  if (locale == (char *) NULL)
-    locale=GetEnvironmentValue("LC_CTYPE");
-  if (locale == (char *) NULL)
-    locale=GetEnvironmentValue("LANG");
-  if (locale == (char *) NULL)
-    locale=ConstantString("C");
+  locale=GetEnvironmentLocaleName(locale);
   return(locale);
 }
 
