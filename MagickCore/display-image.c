@@ -22247,6 +22247,52 @@ static void XHandleExpose(const DisplayEventContext *context,
     }
 }
 
+static void XHandleKeyPress(const DisplayEventContext *context,
+  const KeySym key_symbol,const DisplayEventTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  char
+    *const command = context->command;
+
+  Image
+    **const display_image = targets->display_image;
+
+  XEvent
+    *const event = targets->event;
+
+  time_t
+    *const timer = targets->timer;
+
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Key press: %d 0x%lx (%s)",(*event).xkey.state,(unsigned long)
+      key_symbol,command);
+  if ((*event).xkey.window == windows->image.id)
+    {
+      XImageWindowKeyPress(context,(*event),key_symbol,
+        targets);
+    }
+  if ((*event).xkey.window == windows->magnify.id)
+    XMagnifyWindowCommand(display,windows,(*event).xkey.state,key_symbol,
+      exception);
+  if ((*event).xkey.window == windows->pan.id)
+    {
+      XPanWindowKeyPress(context,key_symbol);
+    }
+  (*timer)=XGetDisplayTimer((*display_image));
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -22908,23 +22954,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
         length=XLookupString((XKeyEvent *) &event.xkey,command,(int)
           sizeof(command),&key_symbol,(XComposeStatus *) NULL);
         *(command+length)='\0';
-        if (resource_info->debug != MagickFalse)
-          (void) LogMagickEvent(X11Event,GetMagickModule(),
-            "Key press: %d 0x%lx (%s)",event.xkey.state,(unsigned long)
-            key_symbol,command);
-        if (event.xkey.window == windows->image.id)
-          {
-            XImageWindowKeyPress(&event_context,event,key_symbol,
-              &event_targets);
-          }
-        if (event.xkey.window == windows->magnify.id)
-          XMagnifyWindowCommand(display,windows,event.xkey.state,key_symbol,
-            exception);
-        if (event.xkey.window == windows->pan.id)
-          {
-            XPanWindowKeyPress(&event_context,key_symbol);
-          }
-        timer=XGetDisplayTimer(display_image);
+        XHandleKeyPress(&event_context,key_symbol,&event_targets);
         break;
       }
       case KeyRelease:
