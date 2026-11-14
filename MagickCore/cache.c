@@ -2522,11 +2522,7 @@ static MagickBooleanType CreateDistributedPixelCache(CacheInfo *cache_info,
     GetDistributeCachePort((DistributeCacheInfo *)
     cache_info->server_info));
   if (IsCacheSourcePending(source_info,mode) != MagickFalse)
-    {
-      status=ClonePixelCacheRepository(cache_info,&source_info,
-        exception);
-      RelinquishPixelCachePixels(&source_info);
-    }
+    status=CloneCacheSource(cache_info,&source_info,exception);
   if (cache_info->debug != MagickFalse)
     {
       (void) FormatMagickSize(cache_info->length,MagickFalse,"B",
