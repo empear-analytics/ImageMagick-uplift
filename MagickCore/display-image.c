@@ -24659,6 +24659,24 @@ static void XDispatchButtonEvent(const DisplayEventContext *event_context,
   }
 }
 
+static void XWithdrawDynamicWindows(Display *display,XWindows *windows)
+{
+  if (IsDynamicVisualClass(windows->visual_info->klass) != MagickFalse)
+    {
+      /*
+        Withdraw pan and Magnify window.
+      */
+      if (windows->info.mapped != MagickFalse)
+        (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+      if (windows->magnify.mapped != MagickFalse)
+        (void) XWithdrawWindow(display,windows->magnify.id,
+          windows->magnify.screen);
+      if (windows->command.mapped != MagickFalse)
+        (void) XWithdrawWindow(display,windows->command.id,
+          windows->command.screen);
+    }
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -25121,20 +25139,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
                   &display_image,exception);
           }
       }
-  if (IsDynamicVisualClass(windows->visual_info->klass) != MagickFalse)
-    {
-      /*
-        Withdraw pan and Magnify window.
-      */
-      if (windows->info.mapped != MagickFalse)
-        (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
-      if (windows->magnify.mapped != MagickFalse)
-        (void) XWithdrawWindow(display,windows->magnify.id,
-          windows->magnify.screen);
-      if (windows->command.mapped != MagickFalse)
-        (void) XWithdrawWindow(display,windows->command.id,
-          windows->command.screen);
-    }
+  XWithdrawDynamicWindows(display,windows);
   if (windows->pan.mapped != MagickFalse)
     (void) XWithdrawWindow(display,windows->pan.id,windows->pan.screen);
   if ((resource_info->backdrop == MagickFalse) && (windows->backdrop.mapped))
