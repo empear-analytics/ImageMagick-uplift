@@ -5293,6 +5293,22 @@ static void DestroyInterpretSources(const ImageInfo *image_info,
     property_info=DestroyImageInfo(property_info);
 }
 
+static MagickBooleanType AcquireInterpretImage(const ImageInfo *image_info,
+  Image *image,ExceptionInfo *exception,Image **property_image)
+{
+  if (IsNonEmptyImage(image) != MagickFalse)
+    (*property_image)=image;
+  else
+    {
+      (*property_image)=AcquireImage(image_info,exception);
+      if ((*property_image) == (Image *) NULL)
+        return(MagickFalse);
+      (void) SetImageExtent((*property_image),1,1,exception);
+      (void) SetImageBackgroundColor((*property_image),exception);
+    }
+  return(MagickTrue);
+}
+
 MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   const char *embed_text,ExceptionInfo *exception)
 {
@@ -5338,18 +5354,11 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
     property_info=image_info;
   else
     property_info=CloneImageInfo(image_info);
-  if (IsNonEmptyImage(image) != MagickFalse)
-    property_image=image;
-  else
+  if (AcquireInterpretImage(image_info,image,exception,&property_image) ==
+      MagickFalse)
     {
-      property_image=AcquireImage(image_info,exception);
-      if (property_image == (Image *) NULL)
-        {
-          status=MagickFalse;
-          goto cleanup;
-        }
-      (void) SetImageExtent(property_image,1,1,exception);
-      (void) SetImageBackgroundColor(property_image,exception);
+      status=MagickFalse;
+      goto cleanup;
     }
   interpret_text=AcquireString(embed_text); /* new string with extra space */
   if (interpret_text == (char *) NULL)
