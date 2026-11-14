@@ -8885,6 +8885,11 @@ that clones the first (the *Code Duplication* cliff, W14).
    role's own name. Literals and operators are not renamed; whitespace, line breaks and
    comments are ignored, and so is the order of the declarators of a declaration that
    initialises none of them (the script compares them sorted).
+   A copy that writes a loop as `v=e;` directly followed by `for ( ; c; i)`, an empty
+   first clause, compares as `for (v=e; c; i)` (2026-11-14, `constitute.c`'s
+   `ReadSceneImages` beside `PingSceneImages`), and the new function's body takes the
+   form with the clause: C11 6.8.5.3 evaluates the first clause once, before the first
+   test, exactly where the statement ran, and `v` stays the variable the copy declared.
 2. The method type. Every function a copy calls at the role is a function of the file,
    or a function that a header the file includes declares (`static inline` in a private
    header, or exported), and all have the same type: the same return type and the same
@@ -19153,3 +19158,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | CE | Chain a Continuing Block into an Else Before the Loop's Tail: `if (c) { S continue; } T` at the end of a loop body becomes `if (c) { S } else T`, repeated upward into an `else if` chain; CodeScene counts each `continue` as a branch; Lane: b | `locale.c`'s `LoadLocaleCache` (cc 18 to 16, 8.85 to 8.90 in a probe) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | FC | Fold a Function into the Twin That Calls Out Its Block: `G`, whose block `B` is the body of `F`'s callee `H` (taking and returning the written local `r` by value), loses its calls to `F` and is deleted; `F` and `H` move whole above the first caller, out of a delegate `#if` when they name nothing it declares, freeing a place under the function-count threshold; Lane: b | `annotate.c`'s `GetPostscriptResolution`/`GetFreetypeTextResolution` (113 functions; the 114th costs 0.18; fold probe 5.69 flat) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | FM | Fold Twin Functions Differing in the Member They Read into One Taking the Value: `F(s,a)` and `G(s,b)`, the same text but for reading `s->m` and `s->n` once each, become one `H(a,v)` taking the member's value; calls pass `e->m` or `e->n`; both twins are deleted, freeing a place under the function-count threshold; Lane: b | `annotate.c`'s `IsColumnOutside`/`IsRowOutside` (113 functions; fold flat, with the helper it frees 5.79 to 5.81 in a probe) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | CF | Step 1: a copy whose loop is `v=e;` followed by `for ( ; c; i)` compares as `for (v=e; c; i)`, the merged body taking the clause form (C11 6.8.5.3); Lane: a | `constitute.c`'s `ReadSceneImages` and `PingSceneImages` (*Code Duplication*; probe 8.81 to 10.0) | mandate (2026-10-24) |
