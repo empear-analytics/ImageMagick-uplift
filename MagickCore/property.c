@@ -1833,6 +1833,19 @@ static MagickBooleanType GetEXIFTagProperty(const EXIFWalkInfo *walk,
   return(MagickTrue);
 }
 
+static MagickBooleanType IsNewEXIFDirectory(
+  const DirectoryInfo *directory_stack,const ssize_t *level,
+  const unsigned char *exif,const ssize_t tag_offset1)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (*level); i++)
+    if (directory_stack[i].directory == (exif+tag_offset1))
+      return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType PushEXIFDirectory(const EXIFWalkInfo *walk,
   const EXIFTagInfo *exif_tag,const size_t number_entries,
   const EXIFWalkTargets *targets)
@@ -1868,7 +1881,6 @@ static MagickBooleanType PushEXIFDirectory(const EXIFWalkInfo *walk,
     *const directory_stack = targets->directory_stack;
 
   ssize_t
-    i,
     tag_offset1;
 
   if (IsSubdirectoryTag(tag_value) == MagickFalse)
@@ -1890,10 +1902,8 @@ static MagickBooleanType PushEXIFDirectory(const EXIFWalkInfo *walk,
       /*
         Check for duplicate tag.
       */
-      for (i=0; i < (*level); i++)
-        if (directory_stack[i].directory == (exif+tag_offset1))
-          break;
-      if (i < (*level))
+      if (IsNewEXIFDirectory(directory_stack,level,exif,tag_offset1) ==
+          MagickFalse)
         return(MagickTrue);  /* duplicate tag */
       directory_stack[(*level)].directory=exif+tag_offset1;
       directory_stack[(*level)].offset=tag_offset2;
