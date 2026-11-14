@@ -150,14 +150,38 @@ typedef struct _ImportPixelBuffer
 %
 */
 
-static MagickBooleanType ImportCharBGRPixels(Image *image,const RectangleInfo *roi,
-  const unsigned char *magick_restrict p,ExceptionInfo *exception)
+typedef struct _ImportRowInfo
 {
+  Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const QuantumType
+    *quantum_map;
+
+  size_t
+    length;
+} ImportRowInfo;
+
+typedef const void
+  *(*ImportRowMethod)(const ImportRowInfo *,Quantum *magick_restrict,
+    const void *);
+
+static MagickBooleanType ImportPixelRows(const ImportRowInfo *row,
+  const ImportRowMethod method,const void *pixels,ExceptionInfo *exception)
+{
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
   Quantum
     *magick_restrict q;
 
   ssize_t
-    x,
     y;
 
   for (y=0; y < (ssize_t) roi->height; y++)
@@ -165,245 +189,240 @@ static MagickBooleanType ImportCharBGRPixels(Image *image,const RectangleInfo *r
     q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
     if (q == (Quantum *) NULL)
       break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
-      SetPixelRed(image,ScaleCharToQuantum(*p++),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    pixels=method(row,q,pixels);
     if (SyncAuthenticPixels(image,exception) == MagickFalse)
       break;
   }
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static MagickBooleanType ImportCharBGRAPixels(Image *image,const RectangleInfo *roi,
-  const unsigned char *magick_restrict p,ExceptionInfo *exception)
+static const void *ImportCharBGRPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const unsigned char
+    *magick_restrict p = (const unsigned char *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
-      SetPixelRed(image,ScaleCharToQuantum(*p++),q);
-      SetPixelAlpha(image,ScaleCharToQuantum(*p++),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
+    SetPixelRed(image,ScaleCharToQuantum(*p++),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportCharBGROPixels(Image *image,const RectangleInfo *roi,
-  const unsigned char *magick_restrict p,ExceptionInfo *exception)
+static const void *ImportCharBGRAPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const unsigned char
+    *magick_restrict p = (const unsigned char *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
-      SetPixelRed(image,ScaleCharToQuantum(*p++),q);
-      SetPixelAlpha(image,ScaleCharToQuantum(*p++),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
+    SetPixelRed(image,ScaleCharToQuantum(*p++),q);
+    SetPixelAlpha(image,ScaleCharToQuantum(*p++),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportCharBGRPPixels(Image *image,const RectangleInfo *roi,
-  const unsigned char *magick_restrict p,ExceptionInfo *exception)
+static const void *ImportCharBGROPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const unsigned char
+    *magick_restrict p = (const unsigned char *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
-      SetPixelRed(image,ScaleCharToQuantum(*p++),q);
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
+    SetPixelRed(image,ScaleCharToQuantum(*p++),q);
+    SetPixelAlpha(image,ScaleCharToQuantum(*p++),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportCharIPixels(Image *image,const RectangleInfo *roi,
-  const unsigned char *magick_restrict p,ExceptionInfo *exception)
+static const void *ImportCharBGRPPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const unsigned char
+    *magick_restrict p = (const unsigned char *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelGray(image,ScaleCharToQuantum(*p++),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
+    SetPixelRed(image,ScaleCharToQuantum(*p++),q);
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportCharRGBPixels(Image *image,const RectangleInfo *roi,
-  const unsigned char *magick_restrict p,ExceptionInfo *exception)
+static const void *ImportCharIPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const unsigned char
+    *magick_restrict p = (const unsigned char *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelRed(image,ScaleCharToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
-      SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelGray(image,ScaleCharToQuantum(*p++),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportCharRGBAPixels(Image *image,const RectangleInfo *roi,
-  const unsigned char *magick_restrict p,ExceptionInfo *exception)
+static const void *ImportCharRGBPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const unsigned char
+    *magick_restrict p = (const unsigned char *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelRed(image,ScaleCharToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
-      SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
-      SetPixelAlpha(image,ScaleCharToQuantum(*p++),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelRed(image,ScaleCharToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
+    SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportCharRGBOPixels(Image *image,const RectangleInfo *roi,
-  const unsigned char *magick_restrict p,ExceptionInfo *exception)
+static const void *ImportCharRGBAPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const unsigned char
+    *magick_restrict p = (const unsigned char *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelRed(image,ScaleCharToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
-      SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
-      SetPixelAlpha(image,ScaleCharToQuantum(*p++),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelRed(image,ScaleCharToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
+    SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
+    SetPixelAlpha(image,ScaleCharToQuantum(*p++),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportCharRGBPPixels(Image *image,const RectangleInfo *roi,
-  const unsigned char *magick_restrict p,ExceptionInfo *exception)
+static const void *ImportCharRGBOPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const unsigned char
+    *magick_restrict p = (const unsigned char *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelRed(image,ScaleCharToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
-      SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelRed(image,ScaleCharToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
+    SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
+    SetPixelAlpha(image,ScaleCharToQuantum(*p++),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
+}
+
+static const void *ImportCharRGBPPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
+{
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const unsigned char
+    *magick_restrict p = (const unsigned char *) pixels;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) roi->width; x++)
+  {
+    SetPixelRed(image,ScaleCharToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
+    SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(p);
 }
 
 static void ImportCharAlphaIndexQuantum(const Image *image,
@@ -468,24 +487,12 @@ static void ImportCharQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
-typedef struct _ImportCharRowInfo
+static const void *ImportCharMapRow(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Image
-    *image;
+  const unsigned char
+    *magick_restrict p = (const unsigned char *) pixels;
 
-  const RectangleInfo
-    *roi;
-
-  const QuantumType
-    *quantum_map;
-
-  size_t
-    length;
-} ImportCharRowInfo;
-
-static const unsigned char *ImportCharMapRow(const ImportCharRowInfo *row,
-  const unsigned char *magick_restrict p,Quantum *magick_restrict q)
-{
   Image
     *image = row->image;
 
@@ -516,79 +523,13 @@ static const unsigned char *ImportCharMapRow(const ImportCharRowInfo *row,
   return(p);
 }
 
-typedef struct _ImportCharMapLoop
-{
-  Image
-    *image;
-
-  const RectangleInfo
-    *roi;
-
-  const char
-    *map;
-
-  const QuantumType
-    *quantum_map;
-
-  ExceptionInfo
-    *exception;
-} ImportCharMapLoop;
-
-static MagickBooleanType ImportCharMapPixels(const ImportCharMapLoop *loop,
-  const unsigned char *magick_restrict p)
-{
-  Image
-    *image = loop->image;
-
-  const RectangleInfo
-    *roi = loop->roi;
-
-  const char
-    *map = loop->map;
-
-  const QuantumType
-    *quantum_map = loop->quantum_map;
-
-  ExceptionInfo
-    *exception = loop->exception;
-
-  Quantum
-    *magick_restrict q;
-
-  size_t
-    length;
-
-  ssize_t
-    y;
-
-  length=strlen(map);
-  for (y=0; y < (ssize_t) roi->height; y++)
-  {
-    ImportCharRowInfo
-      row;
-
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    row.image=image;
-    row.roi=roi;
-    row.quantum_map=quantum_map;
-    row.length=length;
-    p=ImportCharMapRow(&row,p,q);
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
-  }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-}
-
 typedef struct _ImportCharMapInfo
 {
   const char
     *map;
 
-  MagickBooleanType
-    (*import_pixels)(Image *,const RectangleInfo *,const unsigned char *,
-      ExceptionInfo *);
+  ImportRowMethod
+    import_pixels;
 } ImportCharMapInfo;
 
 static const ImportCharMapInfo
@@ -618,243 +559,218 @@ static MagickBooleanType ImportCharPixel(Image *image,
   const void
     *pixels = buffer->pixels;
 
-  const unsigned char
-    *magick_restrict p;
-
-  ImportCharMapLoop
-    loop;
+  ImportRowInfo
+    row;
 
   size_t
     i;
 
-  p=(const unsigned char *) pixels;
+  row.image=image;
+  row.roi=roi;
+  row.quantum_map=quantum_map;
   for (i=0; i < (sizeof(ImportCharMaps)/sizeof(*ImportCharMaps)); i++)
     if (LocaleCompare(map,ImportCharMaps[i].map) == 0)
-      return(ImportCharMaps[i].import_pixels(image,roi,p,exception));
-  loop.image=image;
-  loop.roi=roi;
-  loop.map=map;
-  loop.quantum_map=quantum_map;
-  loop.exception=exception;
-  return(ImportCharMapPixels(&loop,p));
+      return(ImportPixelRows(&row,ImportCharMaps[i].import_pixels,pixels,
+        exception));
+  row.length=strlen(map);
+  return(ImportPixelRows(&row,ImportCharMapRow,pixels,exception));
 }
 
-static MagickBooleanType ImportDoubleBGRPixels(Image *image,const RectangleInfo *roi,
-  const double *magick_restrict p,ExceptionInfo *exception)
+static const void *ImportDoubleBGRPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const double
+    *magick_restrict p = (const double *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      p++;
-      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      p++;
-      SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+    p++;
+    SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+    p++;
+    SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportDoubleBGRAPixels(Image *image,const RectangleInfo *roi,
-  const double *magick_restrict p,ExceptionInfo *exception)
+static const void *ImportDoubleBGRAPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const double
+    *magick_restrict p = (const double *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      p++;
-      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      p++;
-      SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      p++;
-      SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+    p++;
+    SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+    p++;
+    SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+    p++;
+    SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportDoubleBGRPPixels(Image *image,const RectangleInfo *roi,
-  const double *magick_restrict p,ExceptionInfo *exception)
+static const void *ImportDoubleBGRPPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const double
+    *magick_restrict p = (const double *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      p++;
-      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      p++;
-      SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      p++;
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+    p++;
+    SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+    p++;
+    SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+    p++;
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportDoubleIPixels(Image *image,const RectangleInfo *roi,
-  const double *magick_restrict p,ExceptionInfo *exception)
+static const void *ImportDoubleIPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const double
+    *magick_restrict p = (const double *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelGray(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelGray(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportDoubleRGBPixels(Image *image,const RectangleInfo *roi,
-  const double *magick_restrict p,ExceptionInfo *exception)
+static const void *ImportDoubleRGBPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const double
+    *magick_restrict p = (const double *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      p++;
-      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      p++;
-      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+    p++;
+    SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+    p++;
+    SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportDoubleRGBAPixels(Image *image,const RectangleInfo *roi,
-  const double *magick_restrict p,ExceptionInfo *exception)
+static const void *ImportDoubleRGBAPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const double
+    *magick_restrict p = (const double *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      p++;
-      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      p++;
-      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      p++;
-      SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+    p++;
+    SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+    p++;
+    SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+    p++;
+    SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportDoubleRGBPPixels(Image *image,const RectangleInfo *roi,
-  const double *magick_restrict p,ExceptionInfo *exception)
+static const void *ImportDoubleRGBPPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const double
+    *magick_restrict p = (const double *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      p++;
-      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      p++;
-      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+    p++;
+    SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+    p++;
+    SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
 static void ImportDoubleAlphaIndexQuantum(const Image *image,
@@ -919,24 +835,12 @@ static void ImportDoubleQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
-typedef struct _ImportDoubleRowInfo
+static const void *ImportDoubleMapRow(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Image
-    *image;
+  const double
+    *magick_restrict p = (const double *) pixels;
 
-  const RectangleInfo
-    *roi;
-
-  const QuantumType
-    *quantum_map;
-
-  size_t
-    length;
-} ImportDoubleRowInfo;
-
-static const double *ImportDoubleMapRow(const ImportDoubleRowInfo *row,
-  const double *magick_restrict p,Quantum *magick_restrict q)
-{
   Image
     *image = row->image;
 
@@ -967,71 +871,6 @@ static const double *ImportDoubleMapRow(const ImportDoubleRowInfo *row,
   return(p);
 }
 
-typedef struct _ImportDoubleMapLoop
-{
-  Image
-    *image;
-
-  const RectangleInfo
-    *roi;
-
-  const char
-    *map;
-
-  const QuantumType
-    *quantum_map;
-
-  ExceptionInfo
-    *exception;
-} ImportDoubleMapLoop;
-
-static MagickBooleanType ImportDoubleMapPixels(const ImportDoubleMapLoop *loop,
-  const double *magick_restrict p)
-{
-  Image
-    *image = loop->image;
-
-  const RectangleInfo
-    *roi = loop->roi;
-
-  const char
-    *map = loop->map;
-
-  const QuantumType
-    *quantum_map = loop->quantum_map;
-
-  ExceptionInfo
-    *exception = loop->exception;
-
-  Quantum
-    *magick_restrict q;
-
-  size_t
-    length;
-
-  ssize_t
-    y;
-
-   length=strlen(map);
-  for (y=0; y < (ssize_t) roi->height; y++)
-  {
-    ImportDoubleRowInfo
-      row;
-
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    row.image=image;
-    row.roi=roi;
-    row.quantum_map=quantum_map;
-    row.length=length;
-    p=ImportDoubleMapRow(&row,p,q);
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
-  }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-}
-
 static MagickBooleanType ImportDoublePixel(Image *image,
   const RectangleInfo *roi,const ImportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -1045,279 +884,253 @@ static MagickBooleanType ImportDoublePixel(Image *image,
   const void
     *pixels = buffer->pixels;
 
-  const double
-    *magick_restrict p;
+  ImportRowInfo
+    row;
 
-  ImportDoubleMapLoop
-    loop;
-
-  p=(const double *) pixels;
+  row.image=image;
+  row.roi=roi;
+  row.quantum_map=quantum_map;
   if (LocaleCompare(map,"BGR") == 0)
-    return(ImportDoubleBGRPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportDoubleBGRPixels,pixels,
+      exception));
   if (LocaleCompare(map,"BGRA") == 0)
-    return(ImportDoubleBGRAPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportDoubleBGRAPixels,pixels,
+      exception));
   if (LocaleCompare(map,"BGRP") == 0)
-    return(ImportDoubleBGRPPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportDoubleBGRPPixels,pixels,
+      exception));
   if (LocaleCompare(map,"I") == 0)
-    return(ImportDoubleIPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportDoubleIPixels,pixels,
+      exception));
   if (LocaleCompare(map,"RGB") == 0)
-    return(ImportDoubleRGBPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportDoubleRGBPixels,pixels,
+      exception));
   if (LocaleCompare(map,"RGBA") == 0)
-    return(ImportDoubleRGBAPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportDoubleRGBAPixels,pixels,
+      exception));
   if (LocaleCompare(map,"RGBP") == 0)
-    return(ImportDoubleRGBPPixels(image,roi,p,exception));
-  loop.image=image;
-  loop.roi=roi;
-  loop.map=map;
-  loop.quantum_map=quantum_map;
-  loop.exception=exception;
-  return(ImportDoubleMapPixels(&loop,p));
+    return(ImportPixelRows(&row,ImportDoubleRGBPPixels,pixels,
+      exception));
+  row.length=strlen(map);
+  return(ImportPixelRows(&row,ImportDoubleMapRow,pixels,exception));
 }
 
-static MagickBooleanType ImportFloatBGRPixels(Image *image,
-  const RectangleInfo *roi,const float *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportFloatBGRPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const float
+    *magick_restrict p = (const float *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(double)
-        (*p)),q);
-      p++;
-      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(double)
-        (*p)),q);
-      p++;
-      SetPixelRed(image,ClampToQuantum((double) QuantumRange*(double)
-        (*p)),q);
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+    p++;
+    SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+    p++;
+    SetPixelRed(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportFloatBGRAPixels(Image *image,
-  const RectangleInfo *roi,const float *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportFloatBGRAPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const float
+    *magick_restrict p = (const float *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(double)
-        (*p)),q);
-      p++;
-      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(double)
-        (*p)),q);
-      p++;
-      SetPixelRed(image,ClampToQuantum((double) QuantumRange*(double)
-        (*p)),q);
-      p++;
-      SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(double)
-        (*p)),q);
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+    p++;
+    SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+    p++;
+    SetPixelRed(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+    p++;
+    SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportFloatBGRPPixels(Image *image,
-  const RectangleInfo *roi,const float *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportFloatBGRPPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const float
+    *magick_restrict p = (const float *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(double)
-        (*p)),q);
-      p++;
-      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(double)
-        (*p)),q);
-      p++;
-      SetPixelRed(image,ClampToQuantum((double) QuantumRange*(double)
-        (*p)),q);
-      p++;
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+    p++;
+    SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+    p++;
+    SetPixelRed(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+    p++;
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportFloatIPixels(Image *image,
-  const RectangleInfo *roi,const float *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportFloatIPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const float
+    *magick_restrict p = (const float *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelGray(image,ClampToQuantum((double) QuantumRange*(double)
-        (*p)),q);
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelGray(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportFloatRGBPixels(Image *image,
-  const RectangleInfo *roi,const float *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportFloatRGBPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const float
+    *magick_restrict p = (const float *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelRed(image,ClampToQuantum((double) QuantumRange*(double)
-        (*p)),q);
-      p++;
-      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(double)
-        (*p)),q);
-      p++;
-      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(double)
-        (*p)),q);
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelRed(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+    p++;
+    SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+    p++;
+    SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportFloatRGBAPixels(Image *image,
-  const RectangleInfo *roi,const float *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportFloatRGBAPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const float
+    *magick_restrict p = (const float *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelRed(image,ClampToQuantum((double) QuantumRange*(double)
-        (*p)),q);
-      p++;
-      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(double)
-        (*p)),q);
-      p++;
-      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(double)
-        (*p)),q);
-      p++;
-      SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(double)
-        (*p)),q);
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelRed(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+    p++;
+    SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+    p++;
+    SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+    p++;
+    SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportFloatRGBPPixels(Image *image,
-  const RectangleInfo *roi,const float *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportFloatRGBPPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const float
+    *magick_restrict p = (const float *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelRed(image,ClampToQuantum((double) QuantumRange*(double)
-        (*p)),q);
-      p++;
-      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(double)
-        (*p)),q);
-      p++;
-      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(double)
-        (*p)),q);
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelRed(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+    p++;
+    SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+    p++;
+    SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
 static void ImportFloatAlphaIndexQuantum(const Image *image,
@@ -1389,24 +1202,12 @@ static void ImportFloatQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
-typedef struct _ImportFloatRowInfo
+static const void *ImportFloatMapRow(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Image
-    *image;
+  const float
+    *magick_restrict p = (const float *) pixels;
 
-  const RectangleInfo
-    *roi;
-
-  const QuantumType
-    *quantum_map;
-
-  size_t
-    length;
-} ImportFloatRowInfo;
-
-static const float *ImportFloatMapRow(const ImportFloatRowInfo *row,
-  const float *magick_restrict p,Quantum *magick_restrict q)
-{
   Image
     *image = row->image;
 
@@ -1437,71 +1238,6 @@ static const float *ImportFloatMapRow(const ImportFloatRowInfo *row,
   return(p);
 }
 
-typedef struct _ImportFloatMapLoop
-{
-  Image
-    *image;
-
-  const RectangleInfo
-    *roi;
-
-  const char
-    *map;
-
-  const QuantumType
-    *quantum_map;
-
-  ExceptionInfo
-    *exception;
-} ImportFloatMapLoop;
-
-static MagickBooleanType ImportFloatMapPixels(const ImportFloatMapLoop *loop,
-  const float *magick_restrict p)
-{
-  Image
-    *image = loop->image;
-
-  const RectangleInfo
-    *roi = loop->roi;
-
-  const char
-    *map = loop->map;
-
-  const QuantumType
-    *quantum_map = loop->quantum_map;
-
-  ExceptionInfo
-    *exception = loop->exception;
-
-  Quantum
-    *magick_restrict q;
-
-  size_t
-    length;
-
-  ssize_t
-    y;
-
-  length=strlen(map);
-  for (y=0; y < (ssize_t) roi->height; y++)
-  {
-    ImportFloatRowInfo
-      row;
-
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    row.image=image;
-    row.roi=roi;
-    row.quantum_map=quantum_map;
-    row.length=length;
-    p=ImportFloatMapRow(&row,p,q);
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
-  }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-}
-
 static MagickBooleanType ImportFloatPixel(Image *image,
   const RectangleInfo *roi,const ImportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -1515,238 +1251,212 @@ static MagickBooleanType ImportFloatPixel(Image *image,
   const void
     *pixels = buffer->pixels;
 
-  const float
-    *magick_restrict p;
+  ImportRowInfo
+    row;
 
-  ImportFloatMapLoop
-    loop;
-
-  p=(const float *) pixels;
+  row.image=image;
+  row.roi=roi;
+  row.quantum_map=quantum_map;
   if (LocaleCompare(map,"BGR") == 0)
-    return(ImportFloatBGRPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportFloatBGRPixels,pixels,
+      exception));
   if (LocaleCompare(map,"BGRA") == 0)
-    return(ImportFloatBGRAPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportFloatBGRAPixels,pixels,
+      exception));
   if (LocaleCompare(map,"BGRP") == 0)
-    return(ImportFloatBGRPPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportFloatBGRPPixels,pixels,
+      exception));
   if (LocaleCompare(map,"I") == 0)
-    return(ImportFloatIPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportFloatIPixels,pixels,
+      exception));
   if (LocaleCompare(map,"RGB") == 0)
-    return(ImportFloatRGBPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportFloatRGBPixels,pixels,
+      exception));
   if (LocaleCompare(map,"RGBA") == 0)
-    return(ImportFloatRGBAPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportFloatRGBAPixels,pixels,
+      exception));
   if (LocaleCompare(map,"RGBP") == 0)
-    return(ImportFloatRGBPPixels(image,roi,p,exception));
-  loop.image=image;
-  loop.roi=roi;
-  loop.map=map;
-  loop.quantum_map=quantum_map;
-  loop.exception=exception;
-  return(ImportFloatMapPixels(&loop,p));
+    return(ImportPixelRows(&row,ImportFloatRGBPPixels,pixels,
+      exception));
+  row.length=strlen(map);
+  return(ImportPixelRows(&row,ImportFloatMapRow,pixels,exception));
 }
 
-static MagickBooleanType ImportLongBGRPixels(Image *image,
-  const RectangleInfo *roi,const unsigned int *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportLongBGRPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const unsigned int
+    *magick_restrict p = (const unsigned int *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelBlue(image,ScaleLongToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleLongToQuantum(*p++),q);
-      SetPixelRed(image,ScaleLongToQuantum(*p++),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelBlue(image,ScaleLongToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleLongToQuantum(*p++),q);
+    SetPixelRed(image,ScaleLongToQuantum(*p++),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportLongBGRAPixels(Image *image,
-  const RectangleInfo *roi,const unsigned int *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportLongBGRAPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const unsigned int
+    *magick_restrict p = (const unsigned int *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelBlue(image,ScaleLongToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleLongToQuantum(*p++),q);
-      SetPixelRed(image,ScaleLongToQuantum(*p++),q);
-      SetPixelAlpha(image,ScaleLongToQuantum(*p++),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelBlue(image,ScaleLongToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleLongToQuantum(*p++),q);
+    SetPixelRed(image,ScaleLongToQuantum(*p++),q);
+    SetPixelAlpha(image,ScaleLongToQuantum(*p++),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportLongBGRPPixels(Image *image,
-  const RectangleInfo *roi,const unsigned int *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportLongBGRPPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const unsigned int
+    *magick_restrict p = (const unsigned int *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelBlue(image,ScaleLongToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleLongToQuantum(*p++),q);
-      SetPixelRed(image,ScaleLongToQuantum(*p++),q);
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelBlue(image,ScaleLongToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleLongToQuantum(*p++),q);
+    SetPixelRed(image,ScaleLongToQuantum(*p++),q);
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportLongIPixels(Image *image,
-  const RectangleInfo *roi,const unsigned int *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportLongIPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const unsigned int
+    *magick_restrict p = (const unsigned int *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelGray(image,ScaleLongToQuantum(*p++),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelGray(image,ScaleLongToQuantum(*p++),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportLongRGBPixels(Image *image,
-  const RectangleInfo *roi,const unsigned int *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportLongRGBPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const unsigned int
+    *magick_restrict p = (const unsigned int *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelRed(image,ScaleLongToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleLongToQuantum(*p++),q);
-      SetPixelBlue(image,ScaleLongToQuantum(*p++),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelRed(image,ScaleLongToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleLongToQuantum(*p++),q);
+    SetPixelBlue(image,ScaleLongToQuantum(*p++),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportLongRGBAPixels(Image *image,
-  const RectangleInfo *roi,const unsigned int *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportLongRGBAPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const unsigned int
+    *magick_restrict p = (const unsigned int *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelRed(image,ScaleLongToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleLongToQuantum(*p++),q);
-      SetPixelBlue(image,ScaleLongToQuantum(*p++),q);
-      SetPixelAlpha(image,ScaleLongToQuantum(*p++),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelRed(image,ScaleLongToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleLongToQuantum(*p++),q);
+    SetPixelBlue(image,ScaleLongToQuantum(*p++),q);
+    SetPixelAlpha(image,ScaleLongToQuantum(*p++),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportLongRGBPPixels(Image *image,
-  const RectangleInfo *roi,const unsigned int *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportLongRGBPPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const unsigned int
+    *magick_restrict p = (const unsigned int *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelRed(image,ScaleLongToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleLongToQuantum(*p++),q);
-      SetPixelBlue(image,ScaleLongToQuantum(*p++),q);
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelRed(image,ScaleLongToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleLongToQuantum(*p++),q);
+    SetPixelBlue(image,ScaleLongToQuantum(*p++),q);
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
 static void ImportLongAlphaIndexQuantum(const Image *image,
@@ -1811,24 +1521,12 @@ static void ImportLongQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
-typedef struct _ImportLongRowInfo
+static const void *ImportLongMapRow(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Image
-    *image;
+  const unsigned int
+    *magick_restrict p = (const unsigned int *) pixels;
 
-  const RectangleInfo
-    *roi;
-
-  const QuantumType
-    *quantum_map;
-
-  size_t
-    length;
-} ImportLongRowInfo;
-
-static const unsigned int *ImportLongMapRow(const ImportLongRowInfo *row,
-  const unsigned int *magick_restrict p,Quantum *magick_restrict q)
-{
   Image
     *image = row->image;
 
@@ -1859,71 +1557,6 @@ static const unsigned int *ImportLongMapRow(const ImportLongRowInfo *row,
   return(p);
 }
 
-typedef struct _ImportLongMapLoop
-{
-  Image
-    *image;
-
-  const RectangleInfo
-    *roi;
-
-  const char
-    *map;
-
-  const QuantumType
-    *quantum_map;
-
-  ExceptionInfo
-    *exception;
-} ImportLongMapLoop;
-
-static MagickBooleanType ImportLongMapPixels(const ImportLongMapLoop *loop,
-  const unsigned int *magick_restrict p)
-{
-  Image
-    *image = loop->image;
-
-  const RectangleInfo
-    *roi = loop->roi;
-
-  const char
-    *map = loop->map;
-
-  const QuantumType
-    *quantum_map = loop->quantum_map;
-
-  ExceptionInfo
-    *exception = loop->exception;
-
-  Quantum
-    *magick_restrict q;
-
-  size_t
-    length;
-
-  ssize_t
-    y;
-
-  length=strlen(map);
-  for (y=0; y < (ssize_t) roi->height; y++)
-  {
-    ImportLongRowInfo
-      row;
-
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    row.image=image;
-    row.roi=roi;
-    row.quantum_map=quantum_map;
-    row.length=length;
-    p=ImportLongMapRow(&row,p,q);
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
-  }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-}
-
 static MagickBooleanType ImportLongPixel(Image *image,
   const RectangleInfo *roi,const ImportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -1937,238 +1570,212 @@ static MagickBooleanType ImportLongPixel(Image *image,
   const void
     *pixels = buffer->pixels;
 
-  const unsigned int
-    *magick_restrict p;
+  ImportRowInfo
+    row;
 
-  ImportLongMapLoop
-    loop;
-
-  p=(const unsigned int *) pixels;
+  row.image=image;
+  row.roi=roi;
+  row.quantum_map=quantum_map;
   if (LocaleCompare(map,"BGR") == 0)
-    return(ImportLongBGRPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportLongBGRPixels,pixels,
+      exception));
   if (LocaleCompare(map,"BGRA") == 0)
-    return(ImportLongBGRAPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportLongBGRAPixels,pixels,
+      exception));
   if (LocaleCompare(map,"BGRP") == 0)
-    return(ImportLongBGRPPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportLongBGRPPixels,pixels,
+      exception));
   if (LocaleCompare(map,"I") == 0)
-    return(ImportLongIPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportLongIPixels,pixels,
+      exception));
   if (LocaleCompare(map,"RGB") == 0)
-    return(ImportLongRGBPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportLongRGBPixels,pixels,
+      exception));
   if (LocaleCompare(map,"RGBA") == 0)
-    return(ImportLongRGBAPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportLongRGBAPixels,pixels,
+      exception));
   if (LocaleCompare(map,"RGBP") == 0)
-    return(ImportLongRGBPPixels(image,roi,p,exception));
-  loop.image=image;
-  loop.roi=roi;
-  loop.map=map;
-  loop.quantum_map=quantum_map;
-  loop.exception=exception;
-  return(ImportLongMapPixels(&loop,p));
+    return(ImportPixelRows(&row,ImportLongRGBPPixels,pixels,
+      exception));
+  row.length=strlen(map);
+  return(ImportPixelRows(&row,ImportLongMapRow,pixels,exception));
 }
 
-static MagickBooleanType ImportLongLongBGRPixels(Image *image,
-  const RectangleInfo *roi,const MagickSizeType *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportLongLongBGRPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const MagickSizeType
+    *magick_restrict p = (const MagickSizeType *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelBlue(image,ScaleLongLongToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleLongLongToQuantum(*p++),q);
-      SetPixelRed(image,ScaleLongLongToQuantum(*p++),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelBlue(image,ScaleLongLongToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleLongLongToQuantum(*p++),q);
+    SetPixelRed(image,ScaleLongLongToQuantum(*p++),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportLongLongBGRAPixels(Image *image,
-  const RectangleInfo *roi,const MagickSizeType *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportLongLongBGRAPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const MagickSizeType
+    *magick_restrict p = (const MagickSizeType *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelBlue(image,ScaleLongLongToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleLongLongToQuantum(*p++),q);
-      SetPixelRed(image,ScaleLongLongToQuantum(*p++),q);
-      SetPixelAlpha(image,ScaleLongLongToQuantum(*p++),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelBlue(image,ScaleLongLongToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleLongLongToQuantum(*p++),q);
+    SetPixelRed(image,ScaleLongLongToQuantum(*p++),q);
+    SetPixelAlpha(image,ScaleLongLongToQuantum(*p++),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportLongLongBGRPPixels(Image *image,
-  const RectangleInfo *roi,const MagickSizeType *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportLongLongBGRPPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const MagickSizeType
+    *magick_restrict p = (const MagickSizeType *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelBlue(image,ScaleLongLongToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleLongLongToQuantum(*p++),q);
-      SetPixelRed(image,ScaleLongLongToQuantum(*p++),q);
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelBlue(image,ScaleLongLongToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleLongLongToQuantum(*p++),q);
+    SetPixelRed(image,ScaleLongLongToQuantum(*p++),q);
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportLongLongIPixels(Image *image,
-  const RectangleInfo *roi,const MagickSizeType *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportLongLongIPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const MagickSizeType
+    *magick_restrict p = (const MagickSizeType *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelGray(image,ScaleLongLongToQuantum(*p++),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelGray(image,ScaleLongLongToQuantum(*p++),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportLongLongRGBPixels(Image *image,
-  const RectangleInfo *roi,const MagickSizeType *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportLongLongRGBPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const MagickSizeType
+    *magick_restrict p = (const MagickSizeType *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelRed(image,ScaleLongLongToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleLongLongToQuantum(*p++),q);
-      SetPixelBlue(image,ScaleLongLongToQuantum(*p++),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelRed(image,ScaleLongLongToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleLongLongToQuantum(*p++),q);
+    SetPixelBlue(image,ScaleLongLongToQuantum(*p++),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportLongLongRGBAPixels(Image *image,
-  const RectangleInfo *roi,const MagickSizeType *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportLongLongRGBAPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const MagickSizeType
+    *magick_restrict p = (const MagickSizeType *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelRed(image,ScaleLongLongToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleLongLongToQuantum(*p++),q);
-      SetPixelBlue(image,ScaleLongLongToQuantum(*p++),q);
-      SetPixelAlpha(image,ScaleLongLongToQuantum(*p++),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelRed(image,ScaleLongLongToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleLongLongToQuantum(*p++),q);
+    SetPixelBlue(image,ScaleLongLongToQuantum(*p++),q);
+    SetPixelAlpha(image,ScaleLongLongToQuantum(*p++),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportLongLongRGBPPixels(Image *image,
-  const RectangleInfo *roi,const MagickSizeType *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportLongLongRGBPPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const MagickSizeType
+    *magick_restrict p = (const MagickSizeType *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelRed(image,ScaleLongLongToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleLongLongToQuantum(*p++),q);
-      SetPixelBlue(image,ScaleLongLongToQuantum(*p++),q);
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelRed(image,ScaleLongLongToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleLongLongToQuantum(*p++),q);
+    SetPixelBlue(image,ScaleLongLongToQuantum(*p++),q);
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
 static void ImportLongLongAlphaIndexQuantum(const Image *image,
@@ -2233,25 +1840,12 @@ static void ImportLongLongQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
-typedef struct _ImportLongLongRowInfo
+static const void *ImportLongLongMapRow(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Image
-    *image;
+  const MagickSizeType
+    *magick_restrict p = (const MagickSizeType *) pixels;
 
-  const RectangleInfo
-    *roi;
-
-  const QuantumType
-    *quantum_map;
-
-  size_t
-    length;
-} ImportLongLongRowInfo;
-
-static const MagickSizeType *ImportLongLongMapRow(
-  const ImportLongLongRowInfo *row,const MagickSizeType *magick_restrict p,
-  Quantum *magick_restrict q)
-{
   Image
     *image = row->image;
 
@@ -2282,71 +1876,6 @@ static const MagickSizeType *ImportLongLongMapRow(
   return(p);
 }
 
-typedef struct _ImportLongLongMapLoop
-{
-  Image
-    *image;
-
-  const RectangleInfo
-    *roi;
-
-  const char
-    *map;
-
-  const QuantumType
-    *quantum_map;
-
-  ExceptionInfo
-    *exception;
-} ImportLongLongMapLoop;
-
-static MagickBooleanType ImportLongLongMapPixels(
-  const ImportLongLongMapLoop *loop,const MagickSizeType *magick_restrict p)
-{
-  Image
-    *image = loop->image;
-
-  const RectangleInfo
-    *roi = loop->roi;
-
-  const char
-    *map = loop->map;
-
-  const QuantumType
-    *quantum_map = loop->quantum_map;
-
-  ExceptionInfo
-    *exception = loop->exception;
-
-  Quantum
-    *magick_restrict q;
-
-  size_t
-    length;
-
-  ssize_t
-    y;
-
-  length=strlen(map);
-  for (y=0; y < (ssize_t) roi->height; y++)
-  {
-    ImportLongLongRowInfo
-      row;
-
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    row.image=image;
-    row.roi=roi;
-    row.quantum_map=quantum_map;
-    row.length=length;
-    p=ImportLongLongMapRow(&row,p,q);
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
-  }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-}
-
 static MagickBooleanType ImportLongLongPixel(Image *image,
   const RectangleInfo *roi,const ImportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -2360,238 +1889,212 @@ static MagickBooleanType ImportLongLongPixel(Image *image,
   const void
     *pixels = buffer->pixels;
 
-  const MagickSizeType
-    *magick_restrict p;
+  ImportRowInfo
+    row;
 
-  ImportLongLongMapLoop
-    loop;
-
-  p=(const MagickSizeType *) pixels;
+  row.image=image;
+  row.roi=roi;
+  row.quantum_map=quantum_map;
   if (LocaleCompare(map,"BGR") == 0)
-    return(ImportLongLongBGRPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportLongLongBGRPixels,pixels,
+      exception));
   if (LocaleCompare(map,"BGRA") == 0)
-    return(ImportLongLongBGRAPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportLongLongBGRAPixels,pixels,
+      exception));
   if (LocaleCompare(map,"BGRP") == 0)
-    return(ImportLongLongBGRPPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportLongLongBGRPPixels,pixels,
+      exception));
   if (LocaleCompare(map,"I") == 0)
-    return(ImportLongLongIPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportLongLongIPixels,pixels,
+      exception));
   if (LocaleCompare(map,"RGB") == 0)
-    return(ImportLongLongRGBPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportLongLongRGBPixels,pixels,
+      exception));
   if (LocaleCompare(map,"RGBA") == 0)
-    return(ImportLongLongRGBAPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportLongLongRGBAPixels,pixels,
+      exception));
   if (LocaleCompare(map,"RGBP") == 0)
-    return(ImportLongLongRGBPPixels(image,roi,p,exception));
-  loop.image=image;
-  loop.roi=roi;
-  loop.map=map;
-  loop.quantum_map=quantum_map;
-  loop.exception=exception;
-  return(ImportLongLongMapPixels(&loop,p));
+    return(ImportPixelRows(&row,ImportLongLongRGBPPixels,pixels,
+      exception));
+  row.length=strlen(map);
+  return(ImportPixelRows(&row,ImportLongLongMapRow,pixels,exception));
 }
 
-static MagickBooleanType ImportQuantumBGRPixels(Image *image,
-  const RectangleInfo *roi,const Quantum *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportQuantumBGRPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const Quantum
+    *magick_restrict p = (const Quantum *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelBlue(image,*p++,q);
-      SetPixelGreen(image,*p++,q);
-      SetPixelRed(image,*p++,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelBlue(image,*p++,q);
+    SetPixelGreen(image,*p++,q);
+    SetPixelRed(image,*p++,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportQuantumBGRAPixels(Image *image,
-  const RectangleInfo *roi,const Quantum *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportQuantumBGRAPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const Quantum
+    *magick_restrict p = (const Quantum *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelBlue(image,*p++,q);
-      SetPixelGreen(image,*p++,q);
-      SetPixelRed(image,*p++,q);
-      SetPixelAlpha(image,*p++,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelBlue(image,*p++,q);
+    SetPixelGreen(image,*p++,q);
+    SetPixelRed(image,*p++,q);
+    SetPixelAlpha(image,*p++,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportQuantumBGRPPixels(Image *image,
-  const RectangleInfo *roi,const Quantum *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportQuantumBGRPPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const Quantum
+    *magick_restrict p = (const Quantum *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelBlue(image,*p++,q);
-      SetPixelGreen(image,*p++,q);
-      SetPixelRed(image,*p++,q);
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelBlue(image,*p++,q);
+    SetPixelGreen(image,*p++,q);
+    SetPixelRed(image,*p++,q);
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportQuantumIPixels(Image *image,
-  const RectangleInfo *roi,const Quantum *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportQuantumIPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const Quantum
+    *magick_restrict p = (const Quantum *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelGray(image,*p++,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelGray(image,*p++,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportQuantumRGBPixels(Image *image,
-  const RectangleInfo *roi,const Quantum *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportQuantumRGBPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const Quantum
+    *magick_restrict p = (const Quantum *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelRed(image,*p++,q);
-      SetPixelGreen(image,*p++,q);
-      SetPixelBlue(image,*p++,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelRed(image,*p++,q);
+    SetPixelGreen(image,*p++,q);
+    SetPixelBlue(image,*p++,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportQuantumRGBAPixels(Image *image,
-  const RectangleInfo *roi,const Quantum *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportQuantumRGBAPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const Quantum
+    *magick_restrict p = (const Quantum *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelRed(image,*p++,q);
-      SetPixelGreen(image,*p++,q);
-      SetPixelBlue(image,*p++,q);
-      SetPixelAlpha(image,*p++,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelRed(image,*p++,q);
+    SetPixelGreen(image,*p++,q);
+    SetPixelBlue(image,*p++,q);
+    SetPixelAlpha(image,*p++,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportQuantumRGBPPixels(Image *image,
-  const RectangleInfo *roi,const Quantum *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportQuantumRGBPPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const Quantum
+    *magick_restrict p = (const Quantum *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelRed(image,*p++,q);
-      SetPixelGreen(image,*p++,q);
-      SetPixelBlue(image,*p++,q);
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelRed(image,*p++,q);
+    SetPixelGreen(image,*p++,q);
+    SetPixelBlue(image,*p++,q);
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
 static void ImportQuantumAlphaIndexQuantum(const Image *image,
@@ -2656,24 +2159,12 @@ static void ImportQuantumQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
-typedef struct _ImportQuantumRowInfo
+static const void *ImportQuantumMapRow(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Image
-    *image;
+  const Quantum
+    *magick_restrict p = (const Quantum *) pixels;
 
-  const RectangleInfo
-    *roi;
-
-  const QuantumType
-    *quantum_map;
-
-  size_t
-    length;
-} ImportQuantumRowInfo;
-
-static const Quantum *ImportQuantumMapRow(const ImportQuantumRowInfo *row,
-  const Quantum *magick_restrict p,Quantum *magick_restrict q)
-{
   Image
     *image = row->image;
 
@@ -2704,71 +2195,6 @@ static const Quantum *ImportQuantumMapRow(const ImportQuantumRowInfo *row,
   return(p);
 }
 
-typedef struct _ImportQuantumMapLoop
-{
-  Image
-    *image;
-
-  const RectangleInfo
-    *roi;
-
-  const char
-    *map;
-
-  const QuantumType
-    *quantum_map;
-
-  ExceptionInfo
-    *exception;
-} ImportQuantumMapLoop;
-
-static MagickBooleanType ImportQuantumMapPixels(
-  const ImportQuantumMapLoop *loop,const Quantum *magick_restrict p)
-{
-  Image
-    *image = loop->image;
-
-  const RectangleInfo
-    *roi = loop->roi;
-
-  const char
-    *map = loop->map;
-
-  const QuantumType
-    *quantum_map = loop->quantum_map;
-
-  ExceptionInfo
-    *exception = loop->exception;
-
-  Quantum
-    *magick_restrict q;
-
-  size_t
-    length;
-
-  ssize_t
-    y;
-
-  length=strlen(map);
-  for (y=0; y < (ssize_t) roi->height; y++)
-  {
-    ImportQuantumRowInfo
-      row;
-
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    row.image=image;
-    row.roi=roi;
-    row.quantum_map=quantum_map;
-    row.length=length;
-    p=ImportQuantumMapRow(&row,p,q);
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
-  }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-}
-
 static MagickBooleanType ImportQuantumPixel(Image *image,
   const RectangleInfo *roi,const ImportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -2782,238 +2208,212 @@ static MagickBooleanType ImportQuantumPixel(Image *image,
   const void
     *pixels = buffer->pixels;
 
-  const Quantum
-    *magick_restrict p;
+  ImportRowInfo
+    row;
 
-  ImportQuantumMapLoop
-    loop;
-
-  p=(const Quantum *) pixels;
+  row.image=image;
+  row.roi=roi;
+  row.quantum_map=quantum_map;
   if (LocaleCompare(map,"BGR") == 0)
-    return(ImportQuantumBGRPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportQuantumBGRPixels,pixels,
+      exception));
   if (LocaleCompare(map,"BGRA") == 0)
-    return(ImportQuantumBGRAPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportQuantumBGRAPixels,pixels,
+      exception));
   if (LocaleCompare(map,"BGRP") == 0)
-    return(ImportQuantumBGRPPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportQuantumBGRPPixels,pixels,
+      exception));
   if (LocaleCompare(map,"I") == 0)
-    return(ImportQuantumIPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportQuantumIPixels,pixels,
+      exception));
   if (LocaleCompare(map,"RGB") == 0)
-    return(ImportQuantumRGBPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportQuantumRGBPixels,pixels,
+      exception));
   if (LocaleCompare(map,"RGBA") == 0)
-    return(ImportQuantumRGBAPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportQuantumRGBAPixels,pixels,
+      exception));
   if (LocaleCompare(map,"RGBP") == 0)
-    return(ImportQuantumRGBPPixels(image,roi,p,exception));
-  loop.image=image;
-  loop.roi=roi;
-  loop.map=map;
-  loop.quantum_map=quantum_map;
-  loop.exception=exception;
-  return(ImportQuantumMapPixels(&loop,p));
+    return(ImportPixelRows(&row,ImportQuantumRGBPPixels,pixels,
+      exception));
+  row.length=strlen(map);
+  return(ImportPixelRows(&row,ImportQuantumMapRow,pixels,exception));
 }
 
-static MagickBooleanType ImportShortBGRPixels(Image *image,
-  const RectangleInfo *roi,const unsigned short *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportShortBGRPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const unsigned short
+    *magick_restrict p = (const unsigned short *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelBlue(image,ScaleShortToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleShortToQuantum(*p++),q);
-      SetPixelRed(image,ScaleShortToQuantum(*p++),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelBlue(image,ScaleShortToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleShortToQuantum(*p++),q);
+    SetPixelRed(image,ScaleShortToQuantum(*p++),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportShortBGRAPixels(Image *image,
-  const RectangleInfo *roi,const unsigned short *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportShortBGRAPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const unsigned short
+    *magick_restrict p = (const unsigned short *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelBlue(image,ScaleShortToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleShortToQuantum(*p++),q);
-      SetPixelRed(image,ScaleShortToQuantum(*p++),q);
-      SetPixelAlpha(image,ScaleShortToQuantum(*p++),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelBlue(image,ScaleShortToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleShortToQuantum(*p++),q);
+    SetPixelRed(image,ScaleShortToQuantum(*p++),q);
+    SetPixelAlpha(image,ScaleShortToQuantum(*p++),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportShortBGRPPixels(Image *image,
-  const RectangleInfo *roi,const unsigned short *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportShortBGRPPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const unsigned short
+    *magick_restrict p = (const unsigned short *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelBlue(image,ScaleShortToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleShortToQuantum(*p++),q);
-      SetPixelRed(image,ScaleShortToQuantum(*p++),q);
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelBlue(image,ScaleShortToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleShortToQuantum(*p++),q);
+    SetPixelRed(image,ScaleShortToQuantum(*p++),q);
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportShortIPixels(Image *image,
-  const RectangleInfo *roi,const unsigned short *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportShortIPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const unsigned short
+    *magick_restrict p = (const unsigned short *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelGray(image,ScaleShortToQuantum(*p++),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelGray(image,ScaleShortToQuantum(*p++),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportShortRGBPixels(Image *image,
-  const RectangleInfo *roi,const unsigned short *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportShortRGBPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const unsigned short
+    *magick_restrict p = (const unsigned short *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelRed(image,ScaleShortToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleShortToQuantum(*p++),q);
-      SetPixelBlue(image,ScaleShortToQuantum(*p++),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelRed(image,ScaleShortToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleShortToQuantum(*p++),q);
+    SetPixelBlue(image,ScaleShortToQuantum(*p++),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportShortRGBAPixels(Image *image,
-  const RectangleInfo *roi,const unsigned short *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportShortRGBAPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const unsigned short
+    *magick_restrict p = (const unsigned short *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelRed(image,ScaleShortToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleShortToQuantum(*p++),q);
-      SetPixelBlue(image,ScaleShortToQuantum(*p++),q);
-      SetPixelAlpha(image,ScaleShortToQuantum(*p++),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelRed(image,ScaleShortToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleShortToQuantum(*p++),q);
+    SetPixelBlue(image,ScaleShortToQuantum(*p++),q);
+    SetPixelAlpha(image,ScaleShortToQuantum(*p++),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
-static MagickBooleanType ImportShortRGBPPixels(Image *image,
-  const RectangleInfo *roi,const unsigned short *magick_restrict p,
-  ExceptionInfo *exception)
+static const void *ImportShortRGBPPixels(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Quantum
-    *magick_restrict q;
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const unsigned short
+    *magick_restrict p = (const unsigned short *) pixels;
 
   ssize_t
-    x,
-    y;
+    x;
 
-  for (y=0; y < (ssize_t) roi->height; y++)
+  for (x=0; x < (ssize_t) roi->width; x++)
   {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      SetPixelRed(image,ScaleShortToQuantum(*p++),q);
-      SetPixelGreen(image,ScaleShortToQuantum(*p++),q);
-      SetPixelBlue(image,ScaleShortToQuantum(*p++),q);
-      p++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
+    SetPixelRed(image,ScaleShortToQuantum(*p++),q);
+    SetPixelGreen(image,ScaleShortToQuantum(*p++),q);
+    SetPixelBlue(image,ScaleShortToQuantum(*p++),q);
+    p++;
+    q+=(ptrdiff_t) GetPixelChannels(image);
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(p);
 }
 
 static void ImportShortAlphaIndexQuantum(const Image *image,
@@ -3078,24 +2478,12 @@ static void ImportShortQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
-typedef struct _ImportShortRowInfo
+static const void *ImportShortMapRow(const ImportRowInfo *row,
+  Quantum *magick_restrict q,const void *pixels)
 {
-  Image
-    *image;
+  const unsigned short
+    *magick_restrict p = (const unsigned short *) pixels;
 
-  const RectangleInfo
-    *roi;
-
-  const QuantumType
-    *quantum_map;
-
-  size_t
-    length;
-} ImportShortRowInfo;
-
-static const unsigned short *ImportShortMapRow(const ImportShortRowInfo *row,
-  const unsigned short *magick_restrict p,Quantum *magick_restrict q)
-{
   Image
     *image = row->image;
 
@@ -3126,71 +2514,6 @@ static const unsigned short *ImportShortMapRow(const ImportShortRowInfo *row,
   return(p);
 }
 
-typedef struct _ImportShortMapLoop
-{
-  Image
-    *image;
-
-  const RectangleInfo
-    *roi;
-
-  const char
-    *map;
-
-  const QuantumType
-    *quantum_map;
-
-  ExceptionInfo
-    *exception;
-} ImportShortMapLoop;
-
-static MagickBooleanType ImportShortMapPixels(const ImportShortMapLoop *loop,
-  const unsigned short *magick_restrict p)
-{
-  Image
-    *image = loop->image;
-
-  const RectangleInfo
-    *roi = loop->roi;
-
-  const char
-    *map = loop->map;
-
-  const QuantumType
-    *quantum_map = loop->quantum_map;
-
-  ExceptionInfo
-    *exception = loop->exception;
-
-  Quantum
-    *magick_restrict q;
-
-  size_t
-    length;
-
-  ssize_t
-    y;
-
-  length=strlen(map);
-  for (y=0; y < (ssize_t) roi->height; y++)
-  {
-    ImportShortRowInfo
-      row;
-
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    row.image=image;
-    row.roi=roi;
-    row.quantum_map=quantum_map;
-    row.length=length;
-    p=ImportShortMapRow(&row,p,q);
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
-  }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-}
-
 static MagickBooleanType ImportShortPixel(Image *image,
   const RectangleInfo *roi,const ImportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -3204,33 +2527,35 @@ static MagickBooleanType ImportShortPixel(Image *image,
   const void
     *pixels = buffer->pixels;
 
-  const unsigned short
-    *magick_restrict p;
+  ImportRowInfo
+    row;
 
-  ImportShortMapLoop
-    loop;
-
-  p=(const unsigned short *) pixels;
+  row.image=image;
+  row.roi=roi;
+  row.quantum_map=quantum_map;
   if (LocaleCompare(map,"BGR") == 0)
-    return(ImportShortBGRPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportShortBGRPixels,pixels,
+      exception));
   if (LocaleCompare(map,"BGRA") == 0)
-    return(ImportShortBGRAPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportShortBGRAPixels,pixels,
+      exception));
   if (LocaleCompare(map,"BGRP") == 0)
-    return(ImportShortBGRPPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportShortBGRPPixels,pixels,
+      exception));
   if (LocaleCompare(map,"I") == 0)
-    return(ImportShortIPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportShortIPixels,pixels,
+      exception));
   if (LocaleCompare(map,"RGB") == 0)
-    return(ImportShortRGBPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportShortRGBPixels,pixels,
+      exception));
   if (LocaleCompare(map,"RGBA") == 0)
-    return(ImportShortRGBAPixels(image,roi,p,exception));
+    return(ImportPixelRows(&row,ImportShortRGBAPixels,pixels,
+      exception));
   if (LocaleCompare(map,"RGBP") == 0)
-    return(ImportShortRGBPPixels(image,roi,p,exception));
-  loop.image=image;
-  loop.roi=roi;
-  loop.map=map;
-  loop.quantum_map=quantum_map;
-  loop.exception=exception;
-  return(ImportShortMapPixels(&loop,p));
+    return(ImportPixelRows(&row,ImportShortRGBPPixels,pixels,
+      exception));
+  row.length=strlen(map);
+  return(ImportPixelRows(&row,ImportShortMapRow,pixels,exception));
 }
 
 static MagickBooleanType ImportMapQuantumGPR(const char *map,const ssize_t i,
