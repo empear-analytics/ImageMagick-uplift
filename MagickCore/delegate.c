@@ -517,6 +517,13 @@ static int ReadDelegateOutput(const char *sanitize_command,char *message)
     offset+=strlen(message);
   return(pclose(file));
 }
+
+static MagickBooleanType IsCapturedDelegateOutput(
+  const MagickBooleanType asynchronous,const char *message)
+{
+  return((MagickBooleanType) ((asynchronous == MagickFalse) &&
+    (message !=  (char *) NULL)));
+}
 #endif
 
 static MagickBooleanType AcceptDelegateArguments(char **arguments,
@@ -598,7 +605,7 @@ MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
     message);
 #if defined(MAGICKCORE_POSIX_SUPPORT)
 #if defined(MAGICKCORE_HAVE_POPEN)
-  if ((asynchronous == MagickFalse) && (message !=  (char *) NULL))
+  if (IsCapturedDelegateOutput(asynchronous,message) != MagickFalse)
     status=ReadDelegateOutput(sanitize_command,message);
   else
 #endif
