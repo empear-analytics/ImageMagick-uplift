@@ -10722,14 +10722,10 @@ static DisplayCommand XImageWindowArrowCommand(const ImageWindowKeyInput *input,
   return(NullCommand);
 }
 
-static MagickBooleanType IsImageWindowArrowKey(const KeySym key_symbol)
+static MagickBooleanType IsImageWindowHorizontalKey(const KeySym key_symbol)
 {
   switch ((int) key_symbol)
   {
-    case XK_Up:
-    case XK_KP_Up:
-    case XK_Down:
-    case XK_KP_Down:
     case XK_Left:
     case XK_KP_Left:
     case XK_Right:
@@ -10739,6 +10735,21 @@ static MagickBooleanType IsImageWindowArrowKey(const KeySym key_symbol)
       break;
   }
   return(MagickFalse);
+}
+
+static MagickBooleanType IsImageWindowArrowKey(const KeySym key_symbol)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_Up:
+    case XK_KP_Up:
+    case XK_Down:
+    case XK_KP_Down:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(IsImageWindowHorizontalKey(key_symbol));
 }
 
 static DisplayCommand XImageWindowKeyCommand(const ImageWindowKeyInput *input,
