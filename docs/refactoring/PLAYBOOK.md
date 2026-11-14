@@ -18462,6 +18462,184 @@ Lane: b
 
 ---
 
+## Recipe RW - Share a Sequential Row Walk Through Row Functions Returning the Advanced Pointer
+
+**Use when:** CodeScene reports *Code Duplication* (often with *Overall Code Complexity*)
+in a file where many `static` functions hold the same sequential row walk over a
+rectangle of the pixel cache (fetch one row, stop on a `NULL` row, optionally sync the
+row and stop when the sync fails, return whether every row was done), differing only in
+the column loop that converts one row and in the type of the caller's buffer pointer,
+which that loop advances: `pixel-export.c`'s 49 `Export<Type><Map>Pixels` and seven
+`Export<Type>MapPixels` (one per storage type and fixed map, `GetVirtualPixels`), and
+`pixel-import.c`'s `Import<Type><Map>Pixels` (`GetAuthenticPixels` and
+`SyncAuthenticPixels`).
+
+**Not covered by:** Recipe RL, whose copies hold a parallel loop with a progress block and
+whose row function writes only through the row pointer, while here the walk is sequential
+and the buffer pointer that the column loop advances must carry from one row to the next
+(the row function returns it); Recipe CF, whose new function is `static inline` and called
+with a designator, which would leave one inlined copy of the walk in each caller (the
+duplication stays) and refuses copies whose types differ; Recipe TI and MT, which merge
+two copies into one function selecting their differences, not a walk shared by dozens;
+Recipe D, whose copies differ in a value, not in a loop body and a pointer type.
+
+**How:**
+
+1. Copies. Two or more `static` functions of one file, outside every OpenMP region, each
+   `for (y=0; y < (ssize_t) roi->height; y++) { R=Fetch(image,roi->x,roi->y+y,roi->width,1,exception);
+   if (R == NULL) break; C [if (Sync(image,exception) == MagickFalse) break;] }
+   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);` with the same `Fetch`,
+   the same optional sync, and a column loop `C` (or a call of a row function) that reads
+   the row pointer `R`, advances the caller's buffer pointer `b` (a parameter of a
+   pointer type, possibly `const`), and writes no other local the walk reads. Check by
+   script that every copy matches this template once `C` is taken out.
+2. Write, directly above the first copy, a `typedef struct NameRowInfo` holding what the
+   column loops read besides `R` and `b` (`image`, `roi`, and any per-call input such as
+   the generic map loop's `quantum_map` and `length`), and `typedef void
+   *(*NameRowMethod)(const NameRowInfo *,R's type,void *);` (for a `const` buffer,
+   `const void *` in both places). When the copies already used per-type row structs of
+   the same members (`ExportCharRowInfo`), the one struct replaces them.
+3. Below them, one `static MagickBooleanType` walk taking `(const NameRowInfo *row,const
+   NameRowMethod method,void *pixels,ExceptionInfo *exception)`: `image` and `roi` bound
+   from `row` (Recipe N step 4), then the copies' text with `C` written
+   `pixels=method(row,R,pixels);`, nothing else changed.
+4. Each copy becomes its row function, keeping its name: `static void *F(const
+   NameRowInfo *row,R's type R,void *pixels)`, binding first the members `C` reads under
+   their old names and `b` as `T *magick_restrict b = (T *) pixels;` (its old
+   qualifiers, its own type), then `C` unchanged (one level less indented) and
+   `return(b);`. A copy whose row work was already a row function's call (`q=F(&row,p,q)`
+   of a generic map row) leaves the file, and that row function takes this signature.
+5. Each caller's `return(F(image,roi,b,exception));` becomes
+   `return(NameRows(&row,F,pixels,exception));`, with `row` a local of the caller filled
+   member by member (Recipe B step 5) before the first such call; a member only some
+   paths read is filled directly before the call that needs it, in the copy's order (the
+   generic map path's `length=strlen(map)`). The caller passes its untyped buffer itself;
+   a local that only converted it to the copy's pointer type goes.
+6. All copies move in one commit (rule 1); the message lists the families and quotes
+   step 8's timing. `refactor_guard.py --calls` with `--renamed` for each walk that left
+   (`ExportCharMapPixels=ExportPixelRows`) and `--fnptr` for each row function must print
+   PASS, with only the fetch's count dropping and the walk's rising.
+7. Check by reading that each row function's body is its copy's column loop verbatim,
+   that the pointer it returns is the one the loop advanced, and that `C` wrote nothing
+   the walk reads (`y`, `roi`, `image`, `exception`).
+8. Time it: the walk now makes one indirect call per row, and each column loop is
+   compiled in a function of its own. Build the baseline and the candidate against a
+   small driver calling the public entry on a large image (2000x2000, 20 calls), alternate
+   them nine runs each per command over several types and maps (fixed and generic), and
+   quote the medians; a candidate slower by more than 3% stops the step.
+
+**Before:**
+
+```c
+static MagickBooleanType ExportCharBGRPixels(const Image *image,
+  const RectangleInfo *roi,unsigned char *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
+      *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToChar(GetPixelRed(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+...
+  q=(unsigned char *) pixels;
+  if (LocaleCompare(map,"BGR") == 0)
+    return(ExportCharBGRPixels(image,roi,q,exception));
+```
+
+**After:**
+
+```c
+static MagickBooleanType ExportPixelRows(const ExportRowInfo *row,
+  const ExportRowMethod method,void *pixels,ExceptionInfo *exception)
+{
+  ...
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    pixels=method(row,p,pixels);
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static void *ExportCharBGRPixels(const ExportRowInfo *row,
+  const Quantum *magick_restrict p,void *pixels)
+{
+  ...
+  unsigned char
+    *magick_restrict q = (unsigned char *) pixels;
+  ...
+  for (x=0; x < (ssize_t) roi->width; x++)
+  {
+    *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
+    ...
+  }
+  return(q);
+}
+...
+  row.image=image;
+  row.roi=roi;
+  row.quantum_map=quantum_map;
+  if (LocaleCompare(map,"BGR") == 0)
+    return(ExportPixelRows(&row,ExportCharBGRPixels,pixels,
+      exception));
+```
+
+**Careful:**
+
+- Values. The walk runs the same fetches with the same arguments in the same order, and
+  each row runs the copy's column loop on the same row pointer. The buffer pointer leaves
+  each row function as the loop advanced it and enters the next row as `pixels`: a pointer
+  to an object converted to `void *` and back to its own type compares equal to the
+  original (C11 6.3.2.3p1), so every element lands at the same address. The call goes
+  through a pointer of the row functions' exact type (the typedef makes the build check
+  it). `magick_restrict` on the row function's local promises what the copy's parameter
+  promised: within the call, the buffer is reached only through it.
+- A member read on only one path (`length`) stays unfilled on the others, which never
+  read it; nothing passes the struct by value.
+- C++ (Windows CI): the conversion from `void *` to the typed pointer needs the explicit
+  cast of step 4; the return to `void *` is implicit in both languages. Run
+  `tools/cxx_warnings.sh`.
+- Speed. One indirect call per row is negligible next to a row of pixels, but the column
+  loop now sits in a function of its own: step 8 is the evidence that the compiler still
+  vectorises and schedules it as before.
+
+**Evidence level:** oracle (the cases that reach the callers; name the callers, since the
+case map knows the copies only as callees), with `refactor_guard.py --calls` and step 8's
+timing.
+
+**Provenance:** 2026-11-14, from `pixel-export.c` (campaign B, M127 lane c round 9): its
+56 row walks (seven storage types, seven fixed maps and the generic map) held *Code
+Duplication* over 90 functions and *Overall Code Complexity*; the step took the file from
+6.89 to 7.32 (*Overall Code Complexity* gone, *Code Duplication* over 83 functions).
+Timing medians of nine alternating runs, 2000x2000, 20 exports each, base against
+candidate: char RGB 0.2342/0.2326 s, quantum RGBP 0.0515/0.0516, double RGBA
+0.0914/0.0916, longlong ARGB (generic map) 0.7825/0.7828, float I 0.3423/0.3431.
+Merging the seven per-type dispatchers into one table-driven function on top was flat
+(7.32) and not kept. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-10-24.
+Lane: c
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -18860,3 +19038,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | CS | Extract a Loop-Body Segment Through a State of the Caller's Addresses: a segment of a loop body moves to a `void` helper taking one `const` struct of the caller's addresses, copying locals in and out (Recipe CK's form); a local aliased through another struct is bound by address and written `(*v)`; a segment whose loop exits all have the status false is wrapped in `do { } while (0);` and the caller's status test follows; Lane: c | `draw.c`'s `RenderMVGContent` (the primitive tail: segments writing up to eight loop locals, `number_points` and `primitive_info` aliased through `mvg_info`) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | CS | Step 1: in form A the segment may be a run of statements nested inside the loop body (a `switch` group, an `if` block, an inner loop's body) when nothing in it leaves it; Lane: c | `RenderMVGContent`'s `clip-path` and `stroke-dasharray` arms, whose nested blocks hold the depth 4 their keyword handlers would keep | mandate (2026-10-24) |
 | 2026-11-14 | NEW | KH | Replace a Keyword Switch by a Table of Arm Handlers: each `LocaleCompare` arm of a first-letter keyword `switch` moves to a handler taking the caller's state struct (copies in and out, `do { } while (0);` around an arm with inner exits), a nested token chain gets its own table, and the `switch` becomes a table lookup that keeps the misses' `status=MagickFalse;`; Lane: c | `draw.c`'s `RenderMVGContent` (69 keywords, 74 bumps, depth 6; 2.99 to 3.19 after the Recipe CS steps) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | RW | Share a Sequential Row Walk Through Row Functions Returning the Advanced Pointer: many `static` copies of one sequential row walk (fetch, `NULL` break, optional sync, `y < height` result) differing in the column loop and the buffer pointer type become one walk taking a `const` row struct, a row-function pointer and `void *pixels`; each copy keeps its name as a row function `void *F(const RowInfo *,row pointer,void *)` returning the advanced pointer; Lane: c | `pixel-export.c`'s 56 `Export<Type><Map>Pixels`/`Export<Type>MapPixels` walks: 6.89 to 7.32, timing equal (five commands, within 0.6%) | mandate (2026-10-24) |
