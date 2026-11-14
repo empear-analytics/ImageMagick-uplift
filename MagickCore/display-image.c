@@ -10704,6 +10704,24 @@ static MagickBooleanType IsImageWindowTranslateKey(const KeySym key_symbol)
   return(MagickFalse);
 }
 
+static DisplayCommand XImageWindowArrowCommand(const ImageWindowKeyInput *input,
+  const MagickStatusType state,const KeySym key_symbol)
+{
+  Display
+    *const display = input->display;
+
+  Image
+    **const image = input->image;
+
+  XWindows
+    *const windows = input->windows;
+
+  if ((state & Mod1Mask) != 0)
+    return(XTrimImageWindowEdge(input,key_symbol));
+  XTranslateImage(display,windows,*image,key_symbol);
+  return(NullCommand);
+}
+
 static DisplayCommand XImageWindowKeyCommand(const ImageWindowKeyInput *input,
   const MagickStatusType state,const KeySym key_symbol)
 {
@@ -10737,12 +10755,7 @@ static DisplayCommand XImageWindowKeyCommand(const ImageWindowKeyInput *input,
     case XK_KP_Left:
     case XK_Right:
     case XK_KP_Right:
-    {
-      if ((state & Mod1Mask) != 0)
-        return(XTrimImageWindowEdge(input,key_symbol));
-      XTranslateImage(display,windows,*image,key_symbol);
-      return(NullCommand);
-    }
+      return(XImageWindowArrowCommand(input,state,key_symbol));
     default:
       break;
   }
