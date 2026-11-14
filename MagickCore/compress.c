@@ -710,6 +710,56 @@ static inline HuffmanTable **SelectHuffmanHash(const unsigned int color,
   return((color != MagickFalse) ? mw_hash : mb_hash);
 }
 
+static void DecodeHuffmanScanline(const HuffmanTransfer *transfer,
+  HuffmanTable **mb_hash,HuffmanTable **mw_hash,HuffmanBitReader *reader)
+{
+  Image
+    *image = transfer->image;
+
+  const HuffmanTable
+    *entry;
+
+  ssize_t
+    count,
+    x;
+
+  unsigned int
+    color;
+
+  color=MagickTrue;
+  (*reader).code=0;
+  count=0;
+  (*reader).length=0;
+  (*reader).runlength=0;
+  x=0;
+  for ( ; ; )
+  {
+    if (NextHuffmanCode(image,x,reader) == MagickFalse)
+      break;
+    entry=LookupHuffmanEntry(SelectHuffmanHash(color,mw_hash,mb_hash),color,
+      (*reader).length,(*reader).code);
+    if (entry == (const HuffmanTable *) NULL)
+      continue;
+    switch (entry->id)
+    {
+      case TWId:
+      case TBId:
+      {
+        count+=(ssize_t) entry->count;
+        color=ApplyHuffmanTerminator(transfer,color,&x,&count);
+        break;
+      }
+      default:
+      {
+        AddHuffmanMakeupCount(entry,&count);
+        break;
+      }
+    }
+    (*reader).code=0;
+    (*reader).length=0;
+  }
+}
+
 static void SetFaxResolution(Image *image)
 {
   image->resolution.x=204.0;
@@ -723,9 +773,6 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   CacheView
     *image_view;
 
-  const HuffmanTable
-    *entry;
-
   HuffmanBitReader
     reader;
 
@@ -736,16 +783,11 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   HuffmanTransfer
     transfer;
 
-
   ssize_t
-    count,
     y;
 
   unsigned char
     *scanline;
-
-  unsigned int
-    color;
 
   /*
     Allocate buffers.
@@ -789,9 +831,6 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   transfer.exception=exception;
   for (y=0; ((y < (ssize_t) image->rows) && (reader.null_lines < 3)); )
   {
-    ssize_t
-      x;
-
     /*
       Initialize scanline to white.
     */
@@ -799,38 +838,7 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
     /*
       Decode Huffman encoded scanline.
     */
-    color=MagickTrue;
-    reader.code=0;
-    count=0;
-    reader.length=0;
-    reader.runlength=0;
-    x=0;
-    for ( ; ; )
-    {
-      if (NextHuffmanCode(image,x,&reader) == MagickFalse)
-        break;
-      entry=LookupHuffmanEntry(SelectHuffmanHash(color,mw_hash,mb_hash),color,
-        reader.length,reader.code);
-      if (entry == (const HuffmanTable *) NULL)
-        continue;
-      switch (entry->id)
-      {
-        case TWId:
-        case TBId:
-        {
-          count+=(ssize_t) entry->count;
-          color=ApplyHuffmanTerminator(&transfer,color,&x,&count);
-          break;
-        }
-        default:
-        {
-          AddHuffmanMakeupCount(entry,&count);
-          break;
-        }
-      }
-      reader.code=0;
-      reader.length=0;
-    }
+    DecodeHuffmanScanline(&transfer,mb_hash,mw_hash,&reader);
     if (TransferHuffmanScanline(&transfer,y) == MagickFalse)
       break;
     y++;
