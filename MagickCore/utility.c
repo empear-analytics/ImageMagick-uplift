@@ -2246,6 +2246,20 @@ static char **SortFileList(char **filelist,const size_t *number_entries)
   return(filelist);
 }
 
+static void CheckListFilesArguments(const char *directory,
+  const char *pattern,size_t *number_entries)
+{
+  /*
+    Open directory.
+  */
+  assert(directory != (const char *) NULL);
+  assert(pattern != (const char *) NULL);
+  assert(number_entries != (size_t *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",directory);
+  *number_entries=0;
+}
+
 MagickPrivate char **ListFiles(const char *directory,const char *pattern,
   size_t *number_entries)
 {
@@ -2265,15 +2279,7 @@ MagickPrivate char **ListFiles(const char *directory,const char *pattern,
   FileListDirectoryTargets
     directory_targets;
 
-  /*
-    Open directory.
-  */
-  assert(directory != (const char *) NULL);
-  assert(pattern != (const char *) NULL);
-  assert(number_entries != (size_t *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",directory);
-  *number_entries=0;
+  CheckListFilesArguments(directory,pattern,number_entries);
   directory_targets.current_directory=(&current_directory);
   directory_targets.max_entries=(&max_entries);
   directory_targets.filelist=(&filelist);
