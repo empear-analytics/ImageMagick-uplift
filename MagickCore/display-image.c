@@ -11281,6 +11281,57 @@ static void XApplyCommentCommand(const XMagickCommandContext *context)
   XSetCursorState(display,windows,MagickFalse);
 }
 
+static Image *XApplyLaunchCommand(const XMagickCommandContext *context,
+  Image *nexus)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ImageInfo
+    *const image_info = context->image_info;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  MagickStatusType
+    status;
+
+  char
+    filename[MagickPathExtent];
+
+  /*
+    Launch program.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) AcquireUniqueFilename(filename);
+  (void) FormatLocaleString((*image)->filename,MagickPathExtent,"launch:%s",
+    filename);
+  status=WriteImage(image_info,*image,exception);
+  if (status == MagickFalse)
+    XNoticeWidget(display,windows,"Unable to launch image editor",
+      (char *) NULL);
+  else
+    {
+      nexus=ReadImage(resource_info->image_info,exception);
+      CatchException(exception);
+      XClientMessage(display,windows->image.id,windows->im_protocols,
+        windows->im_next_image,CurrentTime);
+    }
+  (void) RelinquishUniqueFileResource(filename);
+  XSetCursorState(display,windows,MagickFalse);
+  return(nexus);
+}
+
 static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12827,30 +12878,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyCommentCommand(&context);
       break;
     case LaunchCommand:
-    {
-      /*
-        Launch program.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      (void) AcquireUniqueFilename(filename);
-      (void) FormatLocaleString((*image)->filename,MagickPathExtent,"launch:%s",
-        filename);
-      status=WriteImage(image_info,*image,exception);
-      if (status == MagickFalse)
-        XNoticeWidget(display,windows,"Unable to launch image editor",
-          (char *) NULL);
-      else
-        {
-          nexus=ReadImage(resource_info->image_info,exception);
-          CatchException(exception);
-          XClientMessage(display,windows->image.id,windows->im_protocols,
-            windows->im_next_image,CurrentTime);
-        }
-      (void) RelinquishUniqueFileResource(filename);
-      XSetCursorState(display,windows,MagickFalse);
+      nexus=XApplyLaunchCommand(&context,nexus);
       break;
-    }
     case RegionOfInterestCommand:
     {
       /*
