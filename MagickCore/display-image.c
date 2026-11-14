@@ -21178,6 +21178,112 @@ static Image *XMontageImageDirectory(const DirectoryInput *input,
   return(montage_image);
 }
 
+typedef struct _DirectoryLoadInput
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  ExceptionInfo
+    *exception;
+
+  ImageInfo
+    *read_info;
+
+  char
+    **filelist;
+
+  int
+    number_files;
+
+  MagickBooleanType
+    backdrop;
+
+  XResourceInfo
+    *background_resources;
+} DirectoryLoadInput;
+
+static Image *XLoadDirectoryImages(const DirectoryLoadInput *load_input,
+  Image *images)
+{
+  Display
+    *const display = load_input->display;
+
+  ExceptionInfo
+    *const exception = load_input->exception;
+
+  ImageInfo
+    *const read_info = load_input->read_info;
+
+  XWindows
+    *const windows = load_input->windows;
+
+  char
+    **const filelist = load_input->filelist;
+
+  const int
+    number_files = load_input->number_files;
+
+  const MagickBooleanType
+    backdrop = load_input->backdrop;
+
+  XResourceInfo
+    *const background_resources = load_input->background_resources;
+
+  Image
+    *next_image,
+    *thumbnail_image;
+
+  RectangleInfo
+    geometry;
+
+  int
+    i;
+
+  for (i=0; i < (int) number_files; i++)
+  {
+    (void) CopyMagickString(read_info->filename,filelist[i],MagickPathExtent);
+    filelist[i]=DestroyString(filelist[i]);
+    *read_info->magick='\0';
+    next_image=ReadImage(read_info,exception);
+    CatchException(exception);
+    if (next_image == (Image *) NULL)
+      continue;
+    (void) DeleteImageProperty(next_image,"label");
+    (void) SetImageProperty(next_image,"label",InterpretImageProperties(
+      read_info,next_image,DefaultTileLabel,exception),exception);
+    (void) ParseRegionGeometry(next_image,read_info->size,&geometry,
+      exception);
+    thumbnail_image=ThumbnailImage(next_image,geometry.width,
+      geometry.height,exception);
+    if (thumbnail_image != (Image *) NULL)
+      {
+        next_image=DestroyImage(next_image);
+        next_image=thumbnail_image;
+      }
+    if (backdrop)
+      {
+        (void) XDisplayBackgroundImage(display,background_resources,
+          next_image,exception);
+        XSetCursorState(display,windows,MagickTrue);
+      }
+    AppendImageToList(&images,next_image);
+    if (images->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+        MagickBooleanType
+          proceed;
+
+        proceed=SetImageProgress(images,LoadImageTag,(MagickOffsetType) i,
+          (MagickSizeType) number_files);
+        if (proceed == MagickFalse)
+          break;
+      }
+  }
+  return(images);
+}
+
 static Image *XVisualDirectoryImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,ExceptionInfo *exception)
 {
@@ -21188,9 +21294,7 @@ static Image *XVisualDirectoryImage(Display *display,
     **filelist;
 
   Image
-    *images,
-    *next_image,
-    *thumbnail_image;
+    *images;
 
   ImageInfo
     *read_info;
@@ -21203,12 +21307,6 @@ static Image *XVisualDirectoryImage(Display *display,
 
   MagickStatusType
     status;
-
-  RectangleInfo
-    geometry;
-
-  int
-    i;
 
   static char
     filename[MagickPathExtent] = "\0",
@@ -21269,44 +21367,12 @@ static Image *XVisualDirectoryImage(Display *display,
   images=NewImageList();
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
-  for (i=0; i < (int) number_files; i++)
   {
-    (void) CopyMagickString(read_info->filename,filelist[i],MagickPathExtent);
-    filelist[i]=DestroyString(filelist[i]);
-    *read_info->magick='\0';
-    next_image=ReadImage(read_info,exception);
-    CatchException(exception);
-    if (next_image == (Image *) NULL)
-      continue;
-    (void) DeleteImageProperty(next_image,"label");
-    (void) SetImageProperty(next_image,"label",InterpretImageProperties(
-      read_info,next_image,DefaultTileLabel,exception),exception);
-    (void) ParseRegionGeometry(next_image,read_info->size,&geometry,
-      exception);
-    thumbnail_image=ThumbnailImage(next_image,geometry.width,
-      geometry.height,exception);
-    if (thumbnail_image != (Image *) NULL)
-      {
-        next_image=DestroyImage(next_image);
-        next_image=thumbnail_image;
-      }
-    if (backdrop)
-      {
-        (void) XDisplayBackgroundImage(display,&background_resources,
-          next_image,exception);
-        XSetCursorState(display,windows,MagickTrue);
-      }
-    AppendImageToList(&images,next_image);
-    if (images->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
+    const DirectoryLoadInput
+      load_input = { display, windows, exception, read_info, filelist,
+        number_files, backdrop, &background_resources };
 
-        proceed=SetImageProgress(images,LoadImageTag,(MagickOffsetType) i,
-          (MagickSizeType) number_files);
-        if (proceed == MagickFalse)
-          break;
-      }
+    images=XLoadDirectoryImages(&load_input,images);
   }
   filelist=(char **) RelinquishMagickMemory(filelist);
   if (images == (Image *) NULL)
