@@ -314,11 +314,11 @@ static void CheckAppendArguments(const Image *images,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
 }
 
+#define AppendImageTag  "Append/Image"
+
 MagickExport Image *AppendImages(const Image *images,
   const MagickBooleanType stack,ExceptionInfo *exception)
 {
-#define AppendImageTag  "Append/Image"
-
   CacheView
     *append_view;
 
