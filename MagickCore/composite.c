@@ -5197,9 +5197,6 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       SegmentInfo
         blur;
 
-      BlurComposite
-        blur_composite;
-
       /*
         Blur Image by resampling dictated by an overlay gradient map:
           X = red_channel; Y = green_channel; compose:args =
@@ -5283,20 +5280,14 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       GetPixelInfo(image,&pixel);
       source_view=AcquireVirtualCacheView(source_image,exception);
       canvas_view=AcquireAuthenticCacheView(canvas_image,exception);
-      blur_composite.angle_range=angle_range;
-      blur_composite.angle_start=angle_start;
-      blur_composite.height=height;
-      blur_composite.width=width;
-      blur_composite.canvas_image=canvas_image;
-      blur_composite.image=image;
-      blur_composite.source_image=source_image;
-      blur_composite.canvas_view=canvas_view;
-      blur_composite.source_view=source_view;
-      blur_composite.resample_filter=resample_filter;
-      blur_composite.x_offset=x_offset;
-      blur_composite.y_offset=y_offset;
-      blur_composite.exception=exception;
-      BlurCompositeRows(&blur_composite,&blur,&pixel);
+      {
+        const BlurComposite
+          blur_composite = { angle_range, angle_start, height, width,
+            canvas_image, image, source_image, canvas_view, source_view,
+            resample_filter, x_offset, y_offset, exception };
+
+        BlurCompositeRows(&blur_composite,&blur,&pixel);
+      }
       resample_filter=DestroyResampleFilter(resample_filter);
       source_view=DestroyCacheView(source_view);
       canvas_view=DestroyCacheView(canvas_view);
@@ -5380,9 +5371,6 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
         Quantum
           *magick_restrict q;
 
-        DisplaceColumns
-          columns;
-
         if (((y+y_offset) < 0) || ((y+y_offset) >= (ssize_t) image->rows))
           continue;
         p=GetCacheViewVirtualPixels(source_view,0,y,source_image->columns,1,
@@ -5391,19 +5379,15 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
           exception);
         if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
           break;
-        columns.canvas_image=canvas_image;
-        columns.image=image;
-        columns.source_image=source_image;
-        columns.image_view=image_view;
-        columns.center=center;
-        columns.compose=compose;
-        columns.horizontal_scale=horizontal_scale;
-        columns.vertical_scale=vertical_scale;
-        columns.x_offset=x_offset;
-        columns.y=y;
-        columns.exception=exception;
-        if (DisplaceCompositeColumns(&columns,p,q,&pixel) == MagickFalse)
-          break;
+        {
+          const DisplaceColumns
+            columns = { canvas_image, image, source_image, image_view, center,
+              compose, horizontal_scale, vertical_scale, x_offset, y,
+              exception };
+
+          if (DisplaceCompositeColumns(&columns,p,q,&pixel) == MagickFalse)
+            break;
+        }
         sync=SyncCacheViewAuthenticPixels(canvas_view,exception);
         if (sync == MagickFalse)
           break;
