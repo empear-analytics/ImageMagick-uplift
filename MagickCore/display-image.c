@@ -21115,6 +21115,69 @@ static MagickBooleanType XTrimImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _DirectoryInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  char
+    *filename;
+
+  ExceptionInfo
+    *exception;
+} DirectoryInput;
+
+static Image *XMontageImageDirectory(const DirectoryInput *input,
+  ImageInfo *read_info,Image *images)
+{
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  Image
+    *montage_image;
+
+  MontageInfo
+    *montage_info;
+
+  char
+    *const filename = input->filename;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindows
+    *const windows = input->windows;
+
+  /*
+    Create the Visual Image Directory.
+  */
+  montage_info=CloneMontageInfo(read_info,(MontageInfo *) NULL);
+  montage_info->pointsize=10;
+  if (resource_info->font != (char *) NULL)
+    (void) CloneString(&montage_info->font,resource_info->font);
+  (void) CopyMagickString(montage_info->filename,filename,MagickPathExtent);
+  montage_image=MontageImageList(read_info,montage_info,GetFirstImageInList(
+    images),exception);
+  images=DestroyImageList(images);
+  montage_info=DestroyMontageInfo(montage_info);
+  read_info=DestroyImageInfo(read_info);
+  XSetCursorState(display,windows,MagickFalse);
+  if (montage_image == (Image *) NULL)
+    return(montage_image);
+  XClientMessage(display,windows->image.id,windows->im_protocols,
+    windows->im_next_image,CurrentTime);
+  return(montage_image);
+}
+
 static Image *XVisualDirectoryImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,ExceptionInfo *exception)
 {
@@ -21126,7 +21189,6 @@ static Image *XVisualDirectoryImage(Display *display,
 
   Image
     *images,
-    *montage_image,
     *next_image,
     *thumbnail_image;
 
@@ -21142,9 +21204,6 @@ static Image *XVisualDirectoryImage(Display *display,
   MagickStatusType
     status;
 
-  MontageInfo
-    *montage_info;
-
   RectangleInfo
     geometry;
 
@@ -21157,6 +21216,9 @@ static Image *XVisualDirectoryImage(Display *display,
 
   XResourceInfo
     background_resources;
+
+  const DirectoryInput
+    input = { display, resource_info, windows, filename, exception };
 
   /*
     Request file name from user.
@@ -21257,22 +21319,7 @@ static Image *XVisualDirectoryImage(Display *display,
   /*
     Create the Visual Image Directory.
   */
-  montage_info=CloneMontageInfo(read_info,(MontageInfo *) NULL);
-  montage_info->pointsize=10;
-  if (resource_info->font != (char *) NULL)
-    (void) CloneString(&montage_info->font,resource_info->font);
-  (void) CopyMagickString(montage_info->filename,filename,MagickPathExtent);
-  montage_image=MontageImageList(read_info,montage_info,GetFirstImageInList(
-    images),exception);
-  images=DestroyImageList(images);
-  montage_info=DestroyMontageInfo(montage_info);
-  read_info=DestroyImageInfo(read_info);
-  XSetCursorState(display,windows,MagickFalse);
-  if (montage_image == (Image *) NULL)
-    return(montage_image);
-  XClientMessage(display,windows->image.id,windows->im_protocols,
-    windows->im_next_image,CurrentTime);
-  return(montage_image);
+  return(XMontageImageDirectory(&input,read_info,images));
 }
 
 /*
