@@ -768,6 +768,41 @@ static MagickBooleanType SkipGeometryCharacter(const int c,char **p,
   return(MagickTrue);
 }
 
+static MagickBooleanType TryStripGeometryInfo(char *pedantic_geometry,
+  MagickStatusType *flags,MagickStatusType *result)
+{
+  char
+    *p;
+
+  int
+    c;
+
+  for (p=pedantic_geometry; *p != '\0'; )
+  {
+    c=(int) ((unsigned char) *p);
+    if (isspace((int) ((unsigned char) c)) != 0)
+      {
+        (void) CopyMagickString(p,p+1,MagickPathExtent);
+        continue;
+      }
+    if (IsGeometryEmptyGroup(c,p) != MagickFalse)
+      {
+        (*result)=(*flags);
+        return(MagickTrue);
+      }
+    if ((IsGeometryAdvanceCharacter(c) != MagickFalse) || (c == '/'))
+      {
+        p++;
+      }
+    else if (SkipGeometryCharacter(c,&p,flags) == MagickFalse)
+      {
+        (*result)=NoValue;
+        return(MagickTrue);
+      }
+  }
+  return(MagickFalse);
+}
+
 MagickExport MagickStatusType ParseGeometry(const char *geometry,
   GeometryInfo *geometry_info)
 {
@@ -809,23 +844,8 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
       return(flags);
     }
   (void) CopyMagickString(pedantic_geometry,geometry,MagickPathExtent);
-  for (p=pedantic_geometry; *p != '\0'; )
-  {
-    c=(int) ((unsigned char) *p);
-    if (isspace((int) ((unsigned char) c)) != 0)
-      {
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        continue;
-      }
-    if (IsGeometryEmptyGroup(c,p) != MagickFalse)
-      return(flags);
-    if ((IsGeometryAdvanceCharacter(c) != MagickFalse) || (c == '/'))
-      {
-        p++;
-      }
-    else if (SkipGeometryCharacter(c,&p,&flags) == MagickFalse)
-      return(NoValue);
-  }
+  if (TryStripGeometryInfo(pedantic_geometry,&flags,&flags) != MagickFalse)
+    return(flags);
   /*
     Parse rho, sigma, xi, psi, and optionally chi.
   */
