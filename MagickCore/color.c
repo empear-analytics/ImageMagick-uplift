@@ -1214,6 +1214,19 @@ static ssize_t CollectColorInfo(const char *pattern,const ColorInfo **colors)
   return(i);
 }
 
+static const ColorInfo **SortColorInfoList(const ColorInfo **colors,
+  const ssize_t i)
+{
+  if (i == 0)
+    colors=(const ColorInfo **) RelinquishMagickMemory((void*) colors);
+  else
+    {
+      qsort((void *) colors,(size_t) i,sizeof(*colors),ColorInfoCompare);
+      colors[i]=(ColorInfo *) NULL;
+    }
+  return(colors);
+}
+
 MagickExport const ColorInfo **GetColorInfoList(const char *pattern,
   size_t *number_colors,ExceptionInfo *exception)
 {
@@ -1237,13 +1250,7 @@ MagickExport const ColorInfo **GetColorInfoList(const char *pattern,
   LockSemaphoreInfo(color_semaphore);
   i=CollectColorInfo(pattern,colors);
   UnlockSemaphoreInfo(color_semaphore);
-  if (i == 0)
-    colors=(const ColorInfo **) RelinquishMagickMemory((void*) colors);
-  else
-    {
-      qsort((void *) colors,(size_t) i,sizeof(*colors),ColorInfoCompare);
-      colors[i]=(ColorInfo *) NULL;
-    }
+  colors=SortColorInfoList(colors,i);
   *number_colors=(size_t) i;
   return(colors);
 }
