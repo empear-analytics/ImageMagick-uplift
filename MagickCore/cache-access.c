@@ -1262,6 +1262,16 @@ static const void *GetVirtualMetacontentFromCache(const Image *image)
 %    o nexus_info: the cache nexus to return the meta-content.
 %
 */
+static inline CacheInfo *GetCacheInfo(const Cache cache)
+{
+  CacheInfo
+    *magick_restrict cache_info;
+
+  cache_info=(CacheInfo *) cache;
+  assert(cache_info->signature == MagickCoreSignature);
+  return(cache_info);
+}
+
 MagickPrivate const void *GetVirtualMetacontentFromNexus(const Cache cache,
   NexusInfo *magick_restrict nexus_info)
 {
@@ -1269,8 +1279,7 @@ MagickPrivate const void *GetVirtualMetacontentFromNexus(const Cache cache,
     *magick_restrict cache_info;
 
   assert(cache != (Cache) NULL);
-  cache_info=(CacheInfo *) cache;
-  assert(cache_info->signature == MagickCoreSignature);
+  cache_info=GetCacheInfo(cache);
   if (cache_info->storage_class == UndefinedClass)
     return((void *) NULL);
   return(nexus_info->metacontent);
