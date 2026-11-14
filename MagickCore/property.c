@@ -860,24 +860,42 @@ static inline MagickBooleanType Is8BIMScanPending(const size_t length,
   return(((length > 0) && (status == MagickFalse)) ? MagickTrue : MagickFalse);
 }
 
-static void Get8BIMProperty(const Image *image,const char *key,
-  ExceptionInfo *exception)
+typedef struct _Request8BIM
 {
-  char
-    format[MagickPathExtent],
-    *macroman_resource = (char *) NULL,
-    name[MagickPathExtent],
-    *resource = (char *) NULL;
+  const Image
+    *image;
+
+  const char
+    *key;
+
+  ExceptionInfo
+    *exception;
 
   const StringInfo
     *profile;
 
-  const unsigned char
-    *info;
-
   long
     start,
     stop;
+
+  const char
+    *name;
+
+  char
+    *format;
+
+  ssize_t
+    sub_number;
+} Request8BIM;
+
+static void Get8BIMResources(const Request8BIM *request)
+{
+  char
+    *macroman_resource = (char *) NULL,
+    *resource = (char *) NULL;
+
+  const unsigned char
+    *info;
 
   MagickBooleanType
     status;
@@ -888,6 +906,74 @@ static void Get8BIMProperty(const Image *image,const char *key,
   ssize_t
     count,
     id,
+    sub_number = request->sub_number;
+
+  status=MagickFalse;
+  length=GetStringInfoLength(request->profile);
+  info=GetStringInfoDatum(request->profile);
+  while (Is8BIMScanPending(length,status) != MagickFalse)
+  {
+    AttributeInfo8BIM
+      attribute_info;
+
+    Match8BIM
+      match;
+
+    Range8BIM
+      range;
+
+    range.start=request->start;
+    range.stop=request->stop;
+    if (Skip8BIMResourceHeader(&range,&info,&length,&id) != MagickFalse)
+      continue;
+    Release8BIMResourceNames(&resource,&macroman_resource);
+    Read8BIMResourceBlock(&count,&resource,&info,&length);
+    if (IsInvalid8BIMResourceCount(count,length) != MagickFalse)
+      {
+        length=0;
+        continue;
+      }
+    Convert8BIMResourceName(resource,&macroman_resource);
+    match.name=request->name;
+    match.resource=resource;
+    match.macroman_resource=macroman_resource;
+    match.count=count;
+    if (Skip8BIMUnmatchedResource(&match,&info,&length,&sub_number) !=
+        MagickFalse)
+      continue;
+    /*
+      We have the resource of interest.
+    */
+    attribute_info.image=request->image;
+    attribute_info.key=request->key;
+    attribute_info.format=request->format;
+    attribute_info.count=count;
+    attribute_info.id=id;
+    attribute_info.exception=request->exception;
+    Set8BIMResource(&attribute_info,&info,&length,&status);
+  }
+  Release8BIMResourceNames(&resource,&macroman_resource);
+}
+
+static void Get8BIMProperty(const Image *image,const char *key,
+  ExceptionInfo *exception)
+{
+  char
+    format[MagickPathExtent],
+    name[MagickPathExtent];
+
+  const StringInfo
+    *profile;
+
+  long
+    start,
+    stop;
+
+  Request8BIM
+    request;
+
+  ssize_t
+    count,
     sub_number;
 
   /*
@@ -908,51 +994,16 @@ static void Get8BIMProperty(const Image *image,const char *key,
   if (*name == '#')
     sub_number=(ssize_t) StringToLong(&name[1]);
   sub_number=MagickMax(sub_number,1L);
-  status=MagickFalse;
-  length=GetStringInfoLength(profile);
-  info=GetStringInfoDatum(profile);
-  while (Is8BIMScanPending(length,status) != MagickFalse)
-  {
-    AttributeInfo8BIM
-      attribute_info;
-
-    Match8BIM
-      match;
-
-    Range8BIM
-      range;
-
-    range.start=start;
-    range.stop=stop;
-    if (Skip8BIMResourceHeader(&range,&info,&length,&id) != MagickFalse)
-      continue;
-    Release8BIMResourceNames(&resource,&macroman_resource);
-    Read8BIMResourceBlock(&count,&resource,&info,&length);
-    if (IsInvalid8BIMResourceCount(count,length) != MagickFalse)
-      {
-        length=0;
-        continue;
-      }
-    Convert8BIMResourceName(resource,&macroman_resource);
-    match.name=name;
-    match.resource=resource;
-    match.macroman_resource=macroman_resource;
-    match.count=count;
-    if (Skip8BIMUnmatchedResource(&match,&info,&length,&sub_number) !=
-        MagickFalse)
-      continue;
-    /*
-      We have the resource of interest.
-    */
-    attribute_info.image=image;
-    attribute_info.key=key;
-    attribute_info.format=format;
-    attribute_info.count=count;
-    attribute_info.id=id;
-    attribute_info.exception=exception;
-    Set8BIMResource(&attribute_info,&info,&length,&status);
-  }
-  Release8BIMResourceNames(&resource,&macroman_resource);
+  request.image=image;
+  request.key=key;
+  request.exception=exception;
+  request.profile=profile;
+  request.start=start;
+  request.stop=stop;
+  request.name=name;
+  request.format=format;
+  request.sub_number=sub_number;
+  Get8BIMResources(&request);
 }
 
 static inline signed int ReadPropertySignedLong(const EndianType endian,
