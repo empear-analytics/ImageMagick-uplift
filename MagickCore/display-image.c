@@ -10711,6 +10711,65 @@ static void XApplyEmbossCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyWaveCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  Image
+    *wave_image;
+
+  static char
+    geometry[MagickPathExtent] = "25x150";
+
+  /*
+    Query user for the wave geometry.
+  */
+  (void) XDialogWidget(display,windows,"Wave",
+    "Enter the amplitude and length of the wave:",geometry);
+  if (*geometry == '\0')
+    return;
+  /*
+    Alter an image along a sine wave.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flags=ParseGeometry(geometry,&geometry_info);
+  if ((flags & SigmaValue) == 0)
+    geometry_info.sigma=1.0;
+  wave_image=WaveImage(*image,geometry_info.rho,geometry_info.sigma,
+    (*image)->interpolate,exception);
+  if (wave_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=wave_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12224,43 +12283,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       break;
     }
     case WaveCommand:
-    {
-      Image
-        *wave_image;
-
-      static char
-        geometry[MagickPathExtent] = "25x150";
-
-      /*
-        Query user for the wave geometry.
-      */
-      (void) XDialogWidget(display,windows,"Wave",
-        "Enter the amplitude and length of the wave:",geometry);
-      if (*geometry == '\0')
-        break;
-      /*
-        Alter an image along a sine wave.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      flags=ParseGeometry(geometry,&geometry_info);
-      if ((flags & SigmaValue) == 0)
-        geometry_info.sigma=1.0;
-      wave_image=WaveImage(*image,geometry_info.rho,geometry_info.sigma,
-        (*image)->interpolate,exception);
-      if (wave_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=wave_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyWaveCommand(&context);
       break;
-    }
     case OilPaintCommand:
     {
       Image
