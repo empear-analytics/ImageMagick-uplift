@@ -9383,6 +9383,28 @@ static const ModeType
     DrawDismissCommand
   };
 
+static MagickBooleanType XTrackDrawStroke(const DrawEditContext *context,
+  const DrawPointerTargets *pointer_targets,
+  const DrawShapeTargets *shape_targets,const DrawStyleTargets *style_targets)
+{
+  unsigned int
+    distance;
+
+  /*
+    Draw element as pointer moves until the button is released.
+  */
+  distance=0;
+  XStartDrawElement(pointer_targets,shape_targets);
+  XTrackDrawElement(context,pointer_targets,shape_targets,&distance);
+  if (XFitDrawBounds(pointer_targets,shape_targets,distance) != MagickFalse)
+    return(MagickTrue);
+  /*
+    Drawing is relative to image configuration.
+  */
+  XPrepareDrawInfo(context,pointer_targets,shape_targets,style_targets);
+  return(MagickFalse);
+}
+
 static MagickBooleanType XDrawEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image **image,
   ExceptionInfo *exception)
@@ -9415,7 +9437,6 @@ static MagickBooleanType XDrawEditImage(Display *display,
     rectangle_info;
 
   unsigned int
-    distance,
     max_coordinates;
 
   size_t
@@ -9472,19 +9493,9 @@ static MagickBooleanType XDrawEditImage(Display *display,
       XWaitForDrawStart(&draw_context,&pointer_targets,&style_targets);
       if ((state & EscapeState) != 0)
         break;
-      /*
-        Draw element as pointer moves until the button is released.
-      */
-      distance=0;
-      XStartDrawElement(&pointer_targets,&shape_targets);
-      XTrackDrawElement(&draw_context,&pointer_targets,&shape_targets,&distance);
-      if (XFitDrawBounds(&pointer_targets,&shape_targets,distance) != MagickFalse)
+      if (XTrackDrawStroke(&draw_context,&pointer_targets,&shape_targets,
+          &style_targets) != MagickFalse)
         continue;
-      /*
-        Drawing is relative to image configuration.
-      */
-      XPrepareDrawInfo(&draw_context,&pointer_targets,&shape_targets,
-        &style_targets);
       /*
         Draw element on image.
       */
