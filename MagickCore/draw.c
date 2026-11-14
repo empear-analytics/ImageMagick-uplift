@@ -3697,6 +3697,48 @@ static void CheckMVGPrimitiveExtent(const MVGRenderState *state)
   (*state->primitive_info)=primitive_info;
 }
 
+static void TransformMVGPrimitive(const MVGRenderState *state)
+{
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  PointInfo
+    point;
+
+  PrimitiveInfo
+    *primitive_info = (*state->primitive_info);
+
+  size_t
+    *number_points = state->number_points;
+
+  ssize_t
+    i = (*state->i),
+    n = (*state->n);
+
+  for (i=0; primitive_info[i].primitive != UndefinedPrimitive; i++)
+  {
+    point=primitive_info[i].point;
+    primitive_info[i].point.x=graphic_context[n]->affine.sx*point.x+
+      graphic_context[n]->affine.ry*point.y+graphic_context[n]->affine.tx;
+    primitive_info[i].point.y=graphic_context[n]->affine.rx*point.x+
+      graphic_context[n]->affine.sy*point.y+graphic_context[n]->affine.ty;
+    point=primitive_info[i].point;
+    if (point.x < graphic_context[n]->bounds.x1)
+      graphic_context[n]->bounds.x1=point.x;
+    if (point.y < graphic_context[n]->bounds.y1)
+      graphic_context[n]->bounds.y1=point.y;
+    if (point.x > graphic_context[n]->bounds.x2)
+      graphic_context[n]->bounds.x2=point.x;
+    if (point.y > graphic_context[n]->bounds.y2)
+      graphic_context[n]->bounds.y2=point.y;
+    if (primitive_info[i].primitive == ImagePrimitive)
+      break;
+    if (i >= (ssize_t) (*number_points))
+      ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
+  }
+  (*state->i)=i;
+}
+
 static MagickBooleanType RenderMVGContent(Image *image,
   const DrawInfo *draw_info,const size_t depth,ExceptionInfo *exception)
 {
@@ -3737,9 +3779,6 @@ static MagickBooleanType RenderMVGContent(Image *image,
 
   MVGInfo
     mvg_info;
-
-  PointInfo
-    point;
 
   PrimitiveInfo
     *primitive_info;
@@ -5358,27 +5397,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     /*
       Transform points.
     */
-    for (i=0; primitive_info[i].primitive != UndefinedPrimitive; i++)
-    {
-      point=primitive_info[i].point;
-      primitive_info[i].point.x=graphic_context[n]->affine.sx*point.x+
-        graphic_context[n]->affine.ry*point.y+graphic_context[n]->affine.tx;
-      primitive_info[i].point.y=graphic_context[n]->affine.rx*point.x+
-        graphic_context[n]->affine.sy*point.y+graphic_context[n]->affine.ty;
-      point=primitive_info[i].point;
-      if (point.x < graphic_context[n]->bounds.x1)
-        graphic_context[n]->bounds.x1=point.x;
-      if (point.y < graphic_context[n]->bounds.y1)
-        graphic_context[n]->bounds.y1=point.y;
-      if (point.x > graphic_context[n]->bounds.x2)
-        graphic_context[n]->bounds.x2=point.x;
-      if (point.y > graphic_context[n]->bounds.y2)
-        graphic_context[n]->bounds.y2=point.y;
-      if (primitive_info[i].primitive == ImagePrimitive)
-        break;
-      if (i >= (ssize_t) number_points)
-        ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
-    }
+    TransformMVGPrimitive(&render_state);
     if (graphic_context[n]->render != MagickFalse)
       {
         if (IsClipMaskChanged(graphic_context,n) != MagickFalse)
