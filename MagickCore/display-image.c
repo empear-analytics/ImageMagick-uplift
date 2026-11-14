@@ -14289,6 +14289,40 @@ static void XApplyToneCommands(const XMagickCommandContext *context,
   }
 }
 
+static void XApplyTransformCommands(const XMagickCommandContext *context,
+  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
+{
+  char
+    *const color = context->color;
+
+  switch (command)
+  {
+    case RotateRightCommand:
+      XApplyRotateRightCommand(context);
+      break;
+    case RotateLeftCommand:
+      XApplyRotateLeftCommand(context);
+      break;
+    case RotateCommand:
+      XApplyRotateCommand(context);
+      break;
+    case ShearCommand:
+      XApplyShearCommand(context,color);
+      break;
+    case RollCommand:
+      XApplyRollCommand(context);
+      break;
+    case TrimCommand:
+      XApplyTrimCommand(context);
+      break;
+    default:
+    {
+      XApplyToneCommands(context,command,&(*flags),&(*nexus));
+      break;
+    }
+  }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -14407,27 +14441,9 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
     case FlipCommand:
       XApplyFlipCommand(&context);
       break;
-    case RotateRightCommand:
-      XApplyRotateRightCommand(&context);
-      break;
-    case RotateLeftCommand:
-      XApplyRotateLeftCommand(&context);
-      break;
-    case RotateCommand:
-      XApplyRotateCommand(&context);
-      break;
-    case ShearCommand:
-      XApplyShearCommand(&context,color);
-      break;
-    case RollCommand:
-      XApplyRollCommand(&context);
-      break;
-    case TrimCommand:
-      XApplyTrimCommand(&context);
-      break;
     default:
     {
-      XApplyToneCommands(&context,command,&flags,&nexus);
+      XApplyTransformCommands(&context,command,&flags,&nexus);
       break;
     }
   }
