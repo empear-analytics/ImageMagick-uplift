@@ -745,6 +745,12 @@ static MagickStatusType ParseGeometryFields(char *p,
   return(flags);
 }
 
+static inline MagickBooleanType IsGeometryEmptyGroup(const int c,
+  const char *p)
+{
+  return(((c == '(') && (*(p+1) == ')')) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType SkipGeometryCharacter(const int c,char **p,
   MagickStatusType *flags)
 {
@@ -811,7 +817,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
         (void) CopyMagickString(p,p+1,MagickPathExtent);
         continue;
       }
-    if ((c == '(') && (*(p+1) == ')'))
+    if (IsGeometryEmptyGroup(c,p) != MagickFalse)
       return(flags);
     if ((IsGeometryAdvanceCharacter(c) != MagickFalse) || (c == '/'))
       {
