@@ -5311,9 +5311,6 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       PointInfo
         center;
 
-      DisplaceSetup
-        displace;
-
       /*
         Displace/Distort based on overlay gradient map:
           X = red_channel;  Y = green_channel;
@@ -5330,28 +5327,29 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       artifact=GetImageArtifact(image,"compose:args");
       if (artifact != (char *) NULL)
         flags=ParseGeometry(artifact,&geometry_info);
-      displace.compose=compose;
-      displace.flags=flags;
-      displace.geometry_info=geometry_info;
-      displace.image=image;
-      displace.source_image=source_image;
-      displace.x_offset=x_offset;
-      displace.y_offset=y_offset;
-      if ((flags & (WidthValue | HeightValue)) == 0 )
-        SetDisplaceScaleDefaults(&displace,&horizontal_scale,&vertical_scale);
-      else
-        SetDisplaceScaleArguments(&displace,&horizontal_scale,&vertical_scale);
-      /*
-        Determine fixed center point for absolute distortion map
-         Absolute distort ==
-           Displace offset relative to a fixed absolute point
-           Select that point according to +X+Y user inputs.
-           default = center of overlay image
-           arg flag '!' = locations/percentage relative to background image
-      */
-      center.x=(MagickRealType) x_offset;
-      center.y=(MagickRealType) y_offset;
-      SetDistortCenter(&displace,&center);
+      {
+        const DisplaceSetup
+          displace = { compose, flags, geometry_info, image, source_image,
+            x_offset, y_offset };
+
+        if ((flags & (WidthValue | HeightValue)) == 0 )
+          SetDisplaceScaleDefaults(&displace,&horizontal_scale,
+            &vertical_scale);
+        else
+          SetDisplaceScaleArguments(&displace,&horizontal_scale,
+            &vertical_scale);
+        /*
+          Determine fixed center point for absolute distortion map
+           Absolute distort ==
+             Displace offset relative to a fixed absolute point
+             Select that point according to +X+Y user inputs.
+             default = center of overlay image
+             arg flag '!' = locations/percentage relative to background image
+        */
+        center.x=(MagickRealType) x_offset;
+        center.y=(MagickRealType) y_offset;
+        SetDistortCenter(&displace,&center);
+      }
       /*
         Shift the pixel offset point as defined by the provided,
         displacement/distortion map.  -- Like a lens...
