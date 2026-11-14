@@ -4036,6 +4036,29 @@ static void ImportGrayQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static inline Quantum GetAlphaBitQuantum(const unsigned char octet,
+  const ssize_t bit)
+{
+  return(((octet) & (1UL << (unsigned char) (6-bit))) == 0 ?
+    TransparentAlpha : OpaqueAlpha);
+}
+
+static inline Quantum GetGrayBitQuantum(const unsigned char pixel)
+{
+  return(pixel == 0 ? 0 : QuantumRange);
+}
+
+static inline Quantum GetInverseGrayBitQuantum(const unsigned char pixel)
+{
+  return(pixel != 0 ? 0 : QuantumRange);
+}
+
+static inline int GetInverseGrayBit(const unsigned char octet,
+  const ssize_t bit)
+{
+  return(((octet) & (1 << (7-bit))) != 0 ? 0x00 : 0x01);
+}
+
 static void Import1BitGrayAlphaQuantum(const Image *image,
   const QuantumPixelSpan *span)
 {
@@ -4062,10 +4085,9 @@ static void Import1BitGrayAlphaQuantum(const Image *image,
   {
     for (bit=0; bit < 8; bit+=2)
     {
-      pixel=(unsigned char) (((*p) & (1 << (7-bit))) != 0 ? 0x00 : 0x01);
-      SetPixelGray(image,(Quantum) (pixel == 0 ? 0 : QuantumRange),q);
-      SetPixelAlpha(image,((*p) & (1UL << (unsigned char) (6-bit))) == 0 ?
-        TransparentAlpha : OpaqueAlpha,q);
+      pixel=(unsigned char) GetInverseGrayBit(*p,bit);
+      SetPixelGray(image,(Quantum) GetGrayBitQuantum(pixel),q);
+      SetPixelAlpha(image,GetAlphaBitQuantum(*p,bit),q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     p++;
@@ -4073,10 +4095,9 @@ static void Import1BitGrayAlphaQuantum(const Image *image,
   if ((number_pixels % 4) != 0)
     for (bit=3; bit >= (ssize_t) (4-(number_pixels % 4)); bit-=2)
     {
-      pixel=(unsigned char) (((*p) & (1 << (7-bit))) != 0 ? 0x00 : 0x01);
-      SetPixelGray(image,(Quantum) (pixel != 0 ? 0 : QuantumRange),q);
-      SetPixelAlpha(image,((*p) & (1UL << (unsigned char) (6-bit))) == 0 ?
-        TransparentAlpha : OpaqueAlpha,q);
+      pixel=(unsigned char) GetInverseGrayBit(*p,bit);
+      SetPixelGray(image,(Quantum) GetInverseGrayBitQuantum(pixel),q);
+      SetPixelAlpha(image,GetAlphaBitQuantum(*p,bit),q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
   if (bit != 0)
