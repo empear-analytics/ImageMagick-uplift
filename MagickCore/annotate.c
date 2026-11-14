@@ -1405,6 +1405,36 @@ static MagickBooleanType RenderType(const RenderTarget *target,
   return(status);
 }
 
+static PointInfo ParseDensityResolution(const DrawInfo *draw_info,
+  PointInfo resolution)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    geometry_flags;
+
+  geometry_flags=ParseGeometry(draw_info->density,&geometry_info);
+  if ((geometry_flags & RhoValue) != 0)
+    resolution.x=geometry_info.rho;
+  resolution.y=resolution.x;
+  if ((geometry_flags & SigmaValue) != 0)
+    resolution.y=geometry_info.sigma;
+  return(resolution);
+}
+
+static PointInfo GetDensityResolution(const DrawInfo *draw_info)
+{
+  PointInfo
+    resolution;
+
+  resolution.x=DefaultResolution;
+  resolution.y=DefaultResolution;
+  if (draw_info->density != (char *) NULL)
+    resolution=ParseDensityResolution(draw_info,resolution);
+  return(resolution);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 +   R e n d e r F r e e t y p e                                               %
@@ -1836,24 +1866,6 @@ static inline MagickBooleanType IsInterwordSpace(const DrawInfo *draw_info,
   return(((fabs(draw_info->interword_spacing) >= MagickEpsilon) &&
     (IsUTFSpace(GetUTFCode(text)) != MagickFalse) &&
     (IsUTFSpace((int) code) == MagickFalse)) ? MagickTrue : MagickFalse);
-}
-
-static PointInfo GetFreetypeResolution(const DrawInfo *draw_info,
-  PointInfo resolution)
-{
-  GeometryInfo
-    geometry_info;
-
-  MagickStatusType
-    geometry_flags;
-
-  geometry_flags=ParseGeometry(draw_info->density,&geometry_info);
-  if ((geometry_flags & RhoValue) != 0)
-    resolution.x=geometry_info.rho;
-  resolution.y=resolution.x;
-  if ((geometry_flags & SigmaValue) != 0)
-    resolution.y=geometry_info.sigma;
-  return(resolution);
 }
 
 static void SetFreetypeMetrics(const FT_Face face,TypeMetric *metrics)
@@ -2377,18 +2389,6 @@ static void RasterizeGlyphRow(const GlyphRows *rows,const ssize_t y,
     (*status)=MagickFalse;
 }
 
-static PointInfo GetFreetypeTextResolution(const DrawInfo *draw_info)
-{
-  PointInfo
-    resolution;
-
-  resolution.x=DefaultResolution;
-  resolution.y=DefaultResolution;
-  if (draw_info->density != (char *) NULL)
-    resolution=GetFreetypeResolution(draw_info,resolution);
-  return(resolution);
-}
-
 static void SelectFreetypeCharmap(FT_Face face,FT_Encoding encoding_type)
 {
   FT_Error
@@ -2649,7 +2649,7 @@ static MagickBooleanType ConfigureFreetypeFace(const FreetypeTarget *target,
   /*
     Set text size.
   */
-  resolution=GetFreetypeTextResolution(draw_info);
+  resolution=GetDensityResolution(draw_info);
   ft_status=FT_Set_Char_Size(*face,(FT_F26Dot6) (64.0*draw_info->pointsize),
     (FT_F26Dot6) (64.0*draw_info->pointsize),(FT_UInt) resolution.x,
     (FT_UInt) resolution.y);
@@ -3108,31 +3108,6 @@ static void WritePostscriptFont(FILE *file,const DrawInfo *draw_info)
       draw_info->font);
 }
 
-static PointInfo GetPostscriptResolution(const DrawInfo *draw_info)
-{
-  PointInfo
-    resolution;
-
-  resolution.x=DefaultResolution;
-  resolution.y=DefaultResolution;
-  if (draw_info->density != (char *) NULL)
-    {
-      GeometryInfo
-        geometry_info;
-
-      MagickStatusType
-        flags;
-
-      flags=ParseGeometry(draw_info->density,&geometry_info);
-      if ((flags & RhoValue) != 0)
-        resolution.x=geometry_info.rho;
-      resolution.y=resolution.x;
-      if ((flags & SigmaValue) != 0)
-        resolution.y=geometry_info.sigma;
-    }
-  return(resolution);
-}
-
 static void WritePostscriptText(FILE *file,const DrawInfo *draw_info,
   const MagickBooleanType identity,ExceptionInfo *exception)
 {
@@ -3257,7 +3232,7 @@ static MagickBooleanType RenderPostscript(Image *image,
   if (annotate_image == (Image *) NULL)
     return(MagickFalse);
   (void) NegateImage(annotate_image,MagickFalse,exception);
-  resolution=GetPostscriptResolution(draw_info);
+  resolution=GetDensityResolution(draw_info);
   if (identity == MagickFalse)
     (void) TransformImage(&annotate_image,"0x0",(char *) NULL,exception);
   else
