@@ -2319,6 +2319,24 @@ static ssize_t SetExtraChannelAttributes(const Image *image,ssize_t n)
   return(n);
 }
 
+static ssize_t SetMetaChannelAttributes(const Image *image,ssize_t n)
+{
+  PixelChannel
+    meta_channel;
+
+  ssize_t
+    i;
+
+  meta_channel=MetaPixelChannels;
+  for (i=0; i < (ssize_t) image->number_meta_channels; i++)
+  {
+    SetPixelChannelAttributes(image,meta_channel,UpdatePixelTrait,n);
+    meta_channel=(PixelChannel) (meta_channel+1);
+    n++;
+  }
+  return(n);
+}
+
 MagickPrivate MagickBooleanType ResetPixelChannelMap(Image *image,
   ExceptionInfo *exception)
 {
@@ -2340,12 +2358,6 @@ MagickPrivate MagickBooleanType ResetPixelChannelMap(Image *image,
   n=SetExtraChannelAttributes(image,n);
   if (image->number_meta_channels != 0)
     {
-      PixelChannel
-        meta_channel;
-
-      ssize_t
-        i;
-
       if (image->number_meta_channels >= (size_t) (MaxPixelChannels-MetaPixelChannels))
         {
           image->number_channels=(size_t) n;
@@ -2354,13 +2366,7 @@ MagickPrivate MagickBooleanType ResetPixelChannelMap(Image *image,
           ThrowBinaryException(CorruptImageError,"MaximumChannelsExceeded",
             image->filename);
         }
-      meta_channel=MetaPixelChannels;
-      for (i=0; i < (ssize_t) image->number_meta_channels; i++)
-      {
-        SetPixelChannelAttributes(image,meta_channel,UpdatePixelTrait,n);
-        meta_channel=(PixelChannel) (meta_channel+1);
-        n++;
-      }
+      n=SetMetaChannelAttributes(image,n);
     }
   image->number_channels=(size_t) n;
   (void) SetPixelChannelMask(image,image->channel_mask);
