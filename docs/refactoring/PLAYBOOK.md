@@ -20137,6 +20137,175 @@ Lane: b
 
 ---
 
+## Recipe DG - Guard a Default Group's Body by a Predicate of Its Labels
+
+**Use when:** CodeScene reports *Complex Method* (and *Large Method*) on a function whose
+`switch` selects, besides groups that return, one group `N` of many labels whose body is
+`break;` alone and the `default:` group `D`, which does the work; the labels written with
+`default:` in `D` cannot leave the function because they stand in a never-compiled `#if 0`
+branch whose `#else` holds `default:` alone, as `morphology-apply.c`'s
+`AcquireKernelBuiltIn` writes them: Undefined and UserDefined throw and return, sixteen
+kernels `break;` (no base kernel is needed), and the twenty kernels of the `#if 0` branch,
+or `default:` in the build, allocate the base kernel. The labels are 38 of the function's
+cc 41, and every function that holds the `#if 0` labels counts them.
+
+**Not covered by:** Recipe LP, whose `switch` has `default: break;` beside the label set
+(steps 1 and 6) and holds no preprocessor line; Recipe PL and Recipe PT, whose peeled
+groups leave the function; Recipes SD, SR and ST, which move groups with their labels, so
+the new function keeps the `#if 0` labels and the body and is a *Complex Method* that is no
+label run; Recipe DL, which deletes labels that fall into `default:`, which no recipe may do
+to the text of an `#if 0` branch (the branch is the author's compile-time check, AGENTS.md).
+
+**How:**
+
+1. The `switch (e)` lies outside every OpenMP region; `e` is a parameter or a local of an
+   enumeration type that no statement of the `switch` writes, with no call, assignment or
+   increment. Its groups are: kept groups, each ending every path with a `return`; one
+   group `N` whose body is `break;` alone; and the group `D` that carries `default:`, whose
+   body is statements, which may leave the function by `return`, followed by its one
+   `break;`, with no other `break` of this `switch` and no `continue`, `goto`, `case`
+   label or `#pragma` line. No group falls into another.
+2. `D`'s other labels may stand in an `#if 0` branch whose `#else` holds `default:` alone
+   (the branch no configuration compiles, *Preprocessor branches*); no other `#` line
+   stands in the `switch`.
+3. Write `static MagickBooleanType <Name>(const T x)` directly above the function (`T` the
+   declared type of `e`), named for what `D`'s values have in common. Its body is `switch
+   (x) { <the label lines of every kept group and of N, in their order, their comments
+   with them> return(MagickFalse); <D's label lines verbatim, with the #if 0, #else and
+   #endif lines and their comments> return(MagickTrue); } return(MagickFalse);`. A comment
+   on `N`'s `break;` line moves to the line of the first `return(MagickFalse);`.
+4. In the caller, delete `N` (its labels and `break;`) and write `D` as `default:` and
+   `break;` alone (the `#if 0` lines, `D`'s other labels and its comment lines leave the
+   caller: step 3 holds them). The kept groups stay as they were.
+5. Directly after the `switch`'s closing brace write `if (<Name>(e) != MagickFalse)`
+   followed by `D`'s body without its last `break;`, braced, two columns deeper than the
+   `if`, nothing else changed (a comment line moves with its statement).
+6. Check by reading the diff that the predicate's labels are exactly the original
+   `switch`'s labels, each once, the `#if 0` text unchanged, and that the caller's new
+   body is the old one with only steps 4 and 5's changes. Run `refactor_guard.py` and
+   `--calls` (+2 for the predicate, nothing else moved) and the oracle on the function.
+
+**Before:**
+
+```c
+  kernel=(KernelInfo *) NULL;
+  switch(type) {
+    case UndefinedKernel:    /* These should not call this function */
+    case UserDefinedKernel:
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+        "InvalidOption","`%s'","Should not call this function");
+      return((KernelInfo *) NULL);
+    case LaplacianKernel:   /* Named Discrete Convolution Kernels */
+    ...
+    case ThinSEKernel:
+      break;               /* A pre-generated kernel is not needed */
+#if 0
+    /* set to 1 to do a compile-time check that we haven't missed anything */
+    case UnityKernel:
+    ...
+    case EuclideanKernel:
+#else
+    default:
+#endif
+      /* Generate the base Kernel Structure */
+      kernel=(KernelInfo *) AcquireMagickMemory(sizeof(*kernel));
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      ...
+      break;
+  }
+```
+
+**After:**
+
+```c
+static MagickBooleanType IsBaseKernelNeeded(const KernelInfoType type)
+{
+  switch(type) {
+    case UndefinedKernel:    /* These should not call this function */
+    case UserDefinedKernel:
+    case LaplacianKernel:   /* Named Discrete Convolution Kernels */
+    ...
+    case ThinSEKernel:
+      return(MagickFalse); /* A pre-generated kernel is not needed */
+#if 0
+    /* set to 1 to do a compile-time check that we haven't missed anything */
+    case UnityKernel:
+    ...
+    case EuclideanKernel:
+#else
+    default:
+#endif
+      return(MagickTrue);
+  }
+  return(MagickFalse);
+}
+...
+  kernel=(KernelInfo *) NULL;
+  switch(type) {
+    case UndefinedKernel:    /* These should not call this function */
+    case UserDefinedKernel:
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+        "InvalidOption","`%s'","Should not call this function");
+      return((KernelInfo *) NULL);
+    default:
+      break;
+  }
+  if (IsBaseKernelNeeded(type) != MagickFalse)
+    {
+      /* Generate the base Kernel Structure */
+      kernel=(KernelInfo *) AcquireMagickMemory(sizeof(*kernel));
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      ...
+    }
+```
+
+**Careful:**
+
+- Why the behaviour is the same, value by value. In the build the `#if 0` branch is not
+  compiled, so the original `switch` selects the kept groups and `N` by their labels and
+  `D` by `default:`. A value of a kept group runs that group as before; it returns on
+  every path (step 1), so the new `if` is never reached, as the statements after the
+  `switch` were not. A value of `N` ran `break;` alone and went on after the `switch`;
+  now it reaches `default: break;`, which also does nothing, and the `if` calls the
+  predicate on `e`, which has no side effect and which nothing in the `switch` wrote
+  (step 1), so the predicate sees the value the `switch` selected on and returns
+  `MagickFalse` for `N`'s labels: nothing runs, and control goes on where it went. Any
+  other value reached `D`; now it reaches `default: break;`, the predicate returns
+  `MagickTrue` (its `default:`), and `D`'s statements run in their order on the same
+  state: a `return` among them leaves the function as it did, and the end of the body
+  goes on after the `if`, where `D`'s `break;` went. The predicate only reads its
+  argument; its parameter has `e`'s own type, so passing converts nothing.
+- The never-compiled configuration. With `#if 0` changed to `#if 1` by hand, the
+  original `switch` had no `default:` and `-Wswitch` named every enumerator it missed; the
+  predicate's `switch` holds every label of the original (step 3), so the same check
+  names the same enumerators, and a value no label names gets `MagickFalse`, as it ran no
+  group before. The `#if 0` text moves verbatim (the 2026-11-01 ruling), next to the same
+  `default:` it stood beside.
+- The kept groups' labels stand in both functions; the caller returns for them before
+  the predicate is called, so the predicate's answer for them is never used. Both
+  `switch` statements of the build have `default:`, so `-Wswitch` warns about neither.
+- The predicate is a label run (allowed as a *Complex Method* by the owner's ruling of
+  2026-11-07). The cost is a call and a second read of `e` outside any pixel loop; check
+  the function's callers by reading, and time it as Recipe CF step 7 says otherwise.
+
+**Evidence level:** oracle (the cases that reach the function), with step 6's reading
+and `refactor_guard.py --calls`.
+
+**Provenance:** 2026-11-14, from `morphology-apply.c`'s `AcquireKernelBuiltIn` (campaign
+A, W25 lane c): its first `switch`'s twenty `#if 0` labels kept it a *Complex Method*
+(cc 41) and a *Large Method* (73 lines) after rounds eleven to thirteen had moved its
+second `switch`. Measured on the step (cs-mcp 1.5.16): 7.39 to 7.41,
+`AcquireKernelBuiltIn` leaving both findings, the predicate a label run (cc 40, the
+kept groups' two labels included) and the file's only *Complex Method*. Without the
+kept groups' labels the predicate measured cc 38 and 7.45, but the `#if 1`
+configuration would then warn about two enumerators the caller handles.
+Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the
+recipes.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -20568,3 +20737,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | AMEND | BC | *Unreached functions: Recipe BC* (new paragraph of *Two levels of evidence*, BC's evidence line, the guard-level list): BC may be applied to a function no case reaches, `Verified: guard`, with BC's steps read, `refactor_guard.py` and `--calls` (+2), `tools/loop_tail_check.py` printing OK (the helper's body is the old block with each exit rewritten as BC step 3 gives, the call passes the parameter names in order, the rest of the file the same token stream) and `tools/obj_modulo.sh` IDENTICAL or MODULO-IDENTICAL | `display-image.c`'s `XLoadDirectoryImages` (campaign A, W23 round thirteen lane c, wide build): its progress block is the second bump of a Bumpy Road, the function and its callers run in no case, and no guard-level recipe takes a block that breaks; a probe with the backdrop block's Recipe N step 5.52 to 5.56 (Claude Code, Sonnet 5.5) | owner |
 | 2026-11-14 | AMEND | N | Step 8, the shared-struct form (a struct the caller already fills for another `static` function serving a later block): the block may also read up to three variables that are not members, which it only reads, each a by-value parameter of its exact type after `name` (Recipe E step 3), at most four parameters in all; the members' condition stands. The step gives the argument (each parameter holds the value its variable has at the call, never written by the block) | `feature-texture.c`'s `GetImageFeatures` (campaign A, W23 round thirteen lane d): the closing release of the six buffers (`sum`, `Q`, `density_y`, `density_xy`, `density_x`, `cooccurrence`) reads the six members of the `FeatureBuffers buffers` filled for `IsFeatureMemoryMissing` and `number_grays` for the two `DestroyFeatureMatrix` calls; a struct of its own would repeat the typedef and a six-line fill. A probe 8.70 to 8.72, `GetImageFeatures` 134 to 129 lines, no finding on the new function. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
 | 2026-11-14 | AMEND | S | Step 2 (*Careful*): a struct both parts name, one definition `struct TAG` / `{` ... `};` with no preprocessor line that a header completes into a type name, is defined again, verbatim, in the new file's *Typedef declarations* block (`split_source.py --copy-struct TAG`, committed with six tests in `41a035502`), the original keeping its definition. The step gives the argument (each translation unit holds the one definition; the two are compatible types by C11 6.2.7; layout follows from the same members) and the *Careful* bullet names the drift risk; the object comparison is the check. Enumerations, typedef'd structs and function-pointer typedefs stay refused | `threshold.c` (campaign A, W25 round fourteen lane a): `struct _ThresholdMap` is named by `OrderedDitherImage` and its helpers (the nine-root family of 63 functions) and by `GetThresholdMap`, `DestroyThresholdMap` and their statics (the roots that stay); `split_source.py` refused every split ("type ThresholdMap defined outside the region and used in it") and no other closed root set lifts Lines of Code from the kept file: the one with the maps out leaves 9.09 and the one with the nine roots out scores 10.0 for the kept file, 9.09 for the new one (the original's own score). Added by Claude Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
+| 2026-11-14 | NEW | DG | a `switch` of returning groups, a `break;`-only label group `N` and the `default:` group `D` (whose other labels may stand in an `#if 0` branch with `default:` alone in its `#else`) keeps its returning groups and `default: break;`; after it, `if (<Name>(e) != MagickFalse)` runs `D`'s body without its `break;`. The predicate returns `MagickFalse` for the kept groups' and `N`'s labels and `MagickTrue` for `D`'s label lines, moved verbatim with the `#if 0` lines. *Careful* gives the argument (one more read of `e`, no write; the never-compiled configuration checks the same label set). Not an LP amendment: LP has eight steps already | `morphology-apply.c`'s `AcquireKernelBuiltIn` (campaign A, W25 lane c): the twenty `#if 0` labels of the default group keep any function holding the group a *Complex Method*; LP needs `default: break;` and no `#` line, PL and PT need groups that leave. Measured 7.39 to 7.41, the predicate a label run (cc 40) | owner |
