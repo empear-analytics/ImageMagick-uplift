@@ -5955,16 +5955,6 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
         }
       break; /* not an attribute, add as a property */
     }
-    case 'C':
-    case 'c':
-    {
-      break; /* not an attribute, add as a property */
-    }
-    case 'D':
-    case 'd':
-    {
-      break; /* not an attribute, add as a property */
-    }
 #if 0  /* Percent escape's sets values with this prefix: for later use
           Throwing an exception causes this setting to fail */
     case 'E':
@@ -5990,16 +5980,6 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
       break; /* not an attribute, add as a property */
     }
 #endif
-    case 'G':
-    case 'g':
-    {
-      break; /* not an attribute, add as a property */
-    }
-    case 'H':
-    case 'h':
-    {
-      break; /* not an attribute, add as a property */
-    }
     case 'I':
     case 'i':
     {
@@ -6014,20 +5994,6 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
 #endif
       break; /* not an attribute, add as a property */
     }
-    case 'K':
-    case 'k':
-      break; /* not an attribute, add as a property */
-    case 'L':
-    case 'l':
-    {
-      break; /* not an attribute, add as a property */
-    }
-    case 'M':
-    case 'm':
-      break; /* not an attribute, add as a property */
-    case 'O':
-    case 'o':
-      break; /* not an attribute, add as a property */
     case 'P':
     case 'p':
     {
@@ -6040,34 +6006,6 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
           return(MagickFalse);
         }
 #endif
-      break; /* not an attribute, add as a property */
-    }
-    case 'R':
-    case 'r':
-    {
-      break; /* not an attribute, add as a property */
-    }
-    case 'S':
-    case 's':
-      break; /* not an attribute, add as a property */
-    case 'T':
-    case 't':
-    {
-      break; /* not an attribute, add as a property */
-    }
-    case 'U':
-    case 'u':
-    {
-      break; /* not an attribute, add as a property */
-    }
-    case 'V':
-    case 'v':
-    {
-      break; /* not an attribute, add as a property */
-    }
-    case 'W':
-    case 'w':
-    {
       break; /* not an attribute, add as a property */
     }
 #if 0  /* Percent escape's sets values with this prefix: for later use
