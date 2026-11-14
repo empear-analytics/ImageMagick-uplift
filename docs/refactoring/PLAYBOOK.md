@@ -16708,6 +16708,169 @@ Lane: a
 
 ---
 
+## Recipe FG - Fold a Function into the Twin Taking Its Derived Argument
+
+**Use when:** a file sits at CodeScene's *Number of Functions in a Single Module*
+threshold, so that the helper the next step needs would trip it, and two `static`
+functions of the file are twins in which one computes, from one of its parameters, the
+value the other takes as a parameter: `xml-tree.c`'s `ExtendXMLBuffer(source,length,
+extent,text)`, whose body is `ExtendXMLBufferBy(source,length,extent,size)`'s with
+`strlen(text)` at each place the twin has `size`. Removing the first function frees a
+place for the helper.
+
+**Not covered by:** Recipe D, which needs blocks that are the same text once variables
+are renamed (here one has a call where the other has a parameter) and leaves both
+functions; Recipe CF, whose copies differ in the function they call; Recipe TI and MT,
+which merge two copies into a new function with a selector; Recipe DV, which drops a
+parameter instead of a function.
+
+**How:**
+
+1. `F(p1,...,pn,t)` and `G(p1,...,pn,s)` are `static`, in one file, and neither's address
+   is taken (`grep`). With `s` written as `E(t)` at each of its places, `G`'s body is
+   `F`'s character for character, `E(t)` being an expression of `t` alone that calls
+   only functions without side effects (`strlen`) and contains no assignment or
+   increment. Check by script.
+2. `E(t)` gives the same value at each of its places in `F`: nothing in `F` before its
+   last `E(t)` writes `t` or the object it points to (by reading; a call that receives
+   neither and writes no memory `t` can reach does not count), so evaluating it once,
+   at the call, and passing the value is the same as evaluating it at each place.
+3. `E(t)` converts to `s`'s declared type without change (`strlen` returns `size_t`, and
+   `s` is `const size_t`).
+4. Replace each call `F(a1,...,an,b)` by `G(a1,...,an,E(b))`, `E(b)` being `E` with the
+   argument `b` substituted for `t`; `b` must have no side effect (an identifier, a member
+   access or an array element of identifiers), as it is evaluated in the same order
+   relative to the other arguments as C's unspecified argument order already allowed.
+5. Delete `F`. Build: a call left behind does not compile.
+
+**Before:**
+
+```c
+static MagickBooleanType ExtendXMLBuffer(char **source,const size_t *length,
+  size_t *extent,const char *text)
+{
+  if ((*length+strlen(text)+MagickPathExtent) > *extent)
+    {
+      *extent=(*length)+strlen(text)+MagickPathExtent;
+      ...
+}
+...
+  if (ExtendXMLBuffer(source,length,extent,xml_info->tag) == MagickFalse)
+```
+
+**After:**
+
+```c
+  if (ExtendXMLBufferBy(source,length,extent,strlen(xml_info->tag)) == MagickFalse)
+```
+
+**Careful:**
+
+- `F` evaluated `E(t)` before anything it did changed `t` (step 2), so the value passed
+  is the value each place read; `G` uses it at the same places, so every comparison,
+  assignment and call sees the same operands. `strlen` called once instead of twice
+  changes no output.
+- `G` may sit below `F`'s callers: declare nothing new; move `G` above the first caller
+  verbatim only if the build needs it (a move of a whole `static` function changes no
+  instruction).
+- The step adds nothing and removes a function: it is flat, or pays a little through the
+  file's mean complexity; it is kept for the place it frees (rule 2), and the commit
+  names the step that uses that place.
+
+**Evidence level:** oracle (the cases that reach each caller).
+
+**Provenance:** 2026-11-14, from `xml-tree.c`'s `ExtendXMLBuffer` and `ExtendXMLBufferBy`
+(campaign B, M127 lane b round 8): the file had 111 functions, the 112th trips *Number
+of Functions* (5.83 to 5.66), and clearing *Complex Conditional* needs predicates.
+Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
+
+---
+
+## Recipe FW - Fold a Pointer-Advancing Writer into Its Index-Returning Twin
+
+**Use when:** a file sits at CodeScene's *Number of Functions in a Single Module*
+threshold, so that the helper the next step needs would trip it, and two `static`
+functions of the file write the same bytes, one through a pointer it advances and
+returns, the other at an index of a buffer it advances and returns: `xml-tree.c`'s
+`WriteUTF8Sequence(xml,c)`, which writes the UTF-8 bytes of `c` at `*xml`, `xml++` after
+each, and returns `xml`, and `WriteUTF8Bytes(utf8,j,c)`, which writes the same bytes at
+`utf8[j]`, `j++` after each, and returns `j`. Removing the first frees a place for a
+helper.
+
+**Not covered by:** Recipe D, whose copies are the same text under renaming (here a
+pointer write `*xml=e; xml++;` faces an indexed one `utf8[j++]=e;`, and a counting local
+differs in type); Recipe FG, whose twin differs only by an expression of a parameter;
+Recipe TI and MT, which merge two copies into a new function.
+
+**How:**
+
+1. `F(T *x,a1,...,an)` returns `T *` and `G(T *b,ssize_t j,a1,...,an)` returns `ssize_t`;
+   both `static`, in one file, neither's address taken (`grep`).
+2. Align the statements one to one (by script after the renames below, then by reading):
+   each `*x=e; x++;` (or `*x++=e;`) of `F` faces `b[j]=e; j++;` (or `b[j++]=e;`) of `G`
+   with the same `e`; `return(x);` faces `return(j);`; every other statement is the same
+   text once `F`'s locals are renamed to `G`'s. Neither reads `x`/`b` or `j` except at
+   those writes, and neither writes through any other pointer.
+3. A local that differs only in its integer type (`ssize_t i` against `int bits`) is
+   allowed when every value it takes fits both types, so each expression that reads it
+   has the same value (by reading: a bit count of an `int` stays within 0..32). Numeric
+   literals that differ only in spelling (`0x3F` against `0x3f`) are the same value.
+4. Then `F(p,a1,...,an)` writes what `G(p,0,a1,...,an)` writes, at the same addresses in
+   the same order, and returns `p+G(p,0,a1,...,an)`. Replace each call statement
+   `p=F(p,a1,...,an);` by `p+=G(p,0,a1,...,an);`, where `p` has no side effect (a
+   variable or `*v`); `p` is read once for the base and once for the sum, both before
+   anything is written to it.
+5. Delete `F`. Build: a call left behind does not compile. Run `refactor_guard.py
+   --calls --renamed F=G`.
+
+**Before:**
+
+```c
+static char *WriteUTF8Sequence(char *xml,const int c)
+{
+  ...
+  *xml=(char) ((0xFF << (7-i)) | (c >> (6*i)));
+  xml++;
+  while (i != 0)
+  {
+    i--;
+    *xml=(char) (0x80 | ((c >> (6*i)) & 0x3F));
+    xml++;
+  }
+  return(xml);
+}
+...
+      *xml=WriteUTF8Sequence(*xml,c);
+```
+
+**After:**
+
+```c
+      *xml+=WriteUTF8Bytes(*xml,0,c);
+```
+
+**Careful:**
+
+- The bytes, their addresses and their order are those of step 2's alignment: `G` with
+  `b=p` and `j=0` writes `p[0]`, `p[1]`, ... where `F` wrote `*p`, then `*(p+1)`, ...
+- A shift count or other operand computed from the retyped local has the same value in
+  both (step 3); a shift past the width of `int` is undefined in both alike, with the same
+  count, so the step adds no new undefined case.
+- `p+=G(...)` evaluates `p` before the call for the argument and after it for the sum;
+  `G` writes only bytes of the buffer, never `p` itself (it receives `p`'s value).
+
+**Evidence level:** oracle (the cases that reach `F`'s callers; at least one case runs
+`F`).
+
+**Provenance:** 2026-11-14, from `xml-tree.c`'s `WriteUTF8Sequence` and `WriteUTF8Bytes`
+(campaign B, M127 lane b round 8), noted as near twins by lane a; the file's 112th
+function trips *Number of Functions*. Added by Claude Code (Claude Opus 5.5) under the
+mandate of 2026-10-24.
+Lane: b
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -18425,3 +18588,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | MX | Merge Axis Twins Through a Side Selector and a Struct of Two Parts: a chain of `static` functions and its other-axis mirror (columns for rows, swapped coordinate pairs, two struct types) become one chain over one struct with a side constant, `static inline` selectors and one function per swapped call; the two entries stay as one-call wrappers; Lane: a | `image-append.c`'s horizontal and vertical smush chains (*Code Duplication*, 8 functions; probe 8.81 to 10.0) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | HF | Hoist a Struct Fill That Both Paths Repeat: a member-by-member fill in an early-returning branch moves before the branch, and the later fill keeps only the members whose sources change in between; Lane: a | `log.c`'s `TranslateEvent` (nine `event_text` stores in the `xml` branch and in the format loop; with E, out of *Large Method*, probe 7.93 to 8.03) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | LF | Step 5, function form: a function body's leading run of `if (<test>) return;` (or `return(c);` of one constant) becomes one predicate call with the same exit; Lane: a | `utility.c`'s `ExpandFilename` (`path == NULL` and `*path != '~'` guards; cc 9, *Complex Method*) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | FG | Fold a Function into the Twin Taking Its Derived Argument: `F(...,t)` whose body is `G(...,s)`'s with `E(t)` for `s` loses its calls to `G(...,E(b))` and is deleted, freeing a place under the function-count threshold; Lane: b | `xml-tree.c`'s `ExtendXMLBuffer`/`ExtendXMLBufferBy` (111 functions; the 112th costs 0.17) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | FW | Fold a Pointer-Advancing Writer into Its Index-Returning Twin: `p=F(p,...);` becomes `p+=G(p,0,...);` when `G` writes at `b[j++]` the bytes `F` writes at `*x++`, and `F` is deleted, freeing a place under the function-count threshold; Lane: b | `xml-tree.c`'s `WriteUTF8Sequence`/`WriteUTF8Bytes` (110 functions; the 112th costs 0.17) | mandate (2026-10-24) |

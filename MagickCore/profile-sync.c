@@ -742,6 +742,38 @@ static MagickBooleanType ReadExifEntry(const ExifWalkInfo *walk,
   return(MagickTrue);
 }
 
+static void PushCurrentExifDirectory(DirectoryInfo *directory_stack,
+  ssize_t *level,unsigned char *directory,size_t *entry)
+{
+  directory_stack[(*level)].directory=directory;
+  (*entry)++;
+  directory_stack[(*level)].entry=(*entry);
+  (*level)++;
+}
+
+static void PushExifStackEntry(DirectoryInfo *directory_stack,ssize_t *level,
+  unsigned char *exif,const ssize_t offset)
+{
+  directory_stack[(*level)].directory=exif+offset;
+  directory_stack[(*level)].entry=0;
+  (*level)++;
+}
+
+static inline MagickBooleanType IsUnpushableExifDirectory(
+  const ssize_t offset,const size_t length,const ssize_t *level)
+{
+  return((((size_t) offset >= (length-1)) ||
+    ((*level) >= (MaxDirectoryStack-2))) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsExifSubdirectoryTag(
+  const unsigned char *directory,const unsigned char *ifd0,
+  const unsigned short tag_value)
+{
+  return(((directory == ifd0) && (tag_value == TAG_EXIF_OFFSET)) ?
+    MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType PushExifDirectory(const ExifWalkInfo *walk,
   const ExifTagInfo *exif_tag,const size_t number_entries,
   const ExifWalkTargets *targets)
@@ -793,27 +825,19 @@ static MagickBooleanType PushExifDirectory(const ExifWalkInfo *walk,
       MagickFalse)
     return(MagickFalse);
   offset=(ssize_t) ReadProfileLong(endian,p);
-  if (((size_t) offset >= (length-1)) ||
-      ((*level) >= (MaxDirectoryStack-2)))
+  if (IsUnpushableExifDirectory(offset,length,level) != MagickFalse)
     return(MagickFalse);
-  if ((directory == ifd0) && (tag_value == TAG_EXIF_OFFSET))
+  if (IsExifSubdirectoryTag(directory,ifd0,tag_value) != MagickFalse)
     (*exif_directory)=exif+offset;
-  directory_stack[(*level)].directory=directory;
-  (*entry)++;
-  directory_stack[(*level)].entry=(*entry);
-  (*level)++;
-  directory_stack[(*level)].directory=exif+offset;
-  directory_stack[(*level)].entry=0;
-  (*level)++;
+  PushCurrentExifDirectory(directory_stack,level,directory,entry);
+  PushExifStackEntry(directory_stack,level,exif,offset);
   if ((directory+2+(12*number_entries)) > (exif+length))
     return(MagickTrue);
   offset=(ssize_t) ReadProfileLong(endian,directory+2+(12*
     number_entries));
   if (IsNextDirectoryOffset(offset,length,(*level)) != MagickFalse)
     {
-      directory_stack[(*level)].directory=exif+offset;
-      directory_stack[(*level)].entry=0;
-      (*level)++;
+      PushExifStackEntry(directory_stack,level,exif,offset);
     }
   return(MagickTrue);
 }
@@ -933,6 +957,31 @@ static void SyncExifDirectory(const ExifWalkInfo *walk,
   }
 }
 
+static inline MagickBooleanType IsInvalidExifOffset(const ssize_t offset,
+  const size_t length)
+{
+  return(((offset < 0) || ((size_t) offset >= length)) ? MagickTrue :
+    MagickFalse);
+}
+
+static void PopExifDirectory(const DirectoryInfo *directory_stack,
+  ssize_t *level,unsigned char **directory,size_t *entry)
+{
+  if ((*level) > 0)
+    {
+      (*level)--;
+      (*directory)=directory_stack[(*level)].directory;
+      (*entry)=directory_stack[(*level)].entry;
+    }
+}
+
+static inline MagickBooleanType IsOutsideExifProfile(
+  const unsigned char *directory,const unsigned char *exif,const size_t length)
+{
+  return(((directory < exif) || (directory > (exif+length-2))) ? MagickTrue :
+    MagickFalse);
+}
+
 static void SyncExifProfile(const Image *image,unsigned char *exif,
   size_t length)
 {
@@ -969,7 +1018,7 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
     This the offset to the first IFD.
   */
   offset=(ssize_t) ReadProfileLong(endian,exif+4);
-  if ((offset < 0) || ((size_t) offset >= length))
+  if (IsInvalidExifOffset(offset,length) != MagickFalse)
     return;
   directory=exif+offset;
   exif_directory=(unsigned char *) NULL;
@@ -980,13 +1029,8 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
     (void *(*)(void *)) NULL,(void *(*)(void *)) NULL);
   do
   {
-    if (level > 0)
-      {
-        level--;
-        directory=directory_stack[level].directory;
-        entry=directory_stack[level].entry;
-      }
-    if ((directory < exif) || (directory > (exif+length-2)))
+    PopExifDirectory(directory_stack,&level,&directory,&entry);
+    if (IsOutsideExifProfile(directory,exif,length) != MagickFalse)
       break;
     walk.image=image;
     walk.endian=endian;
@@ -1071,6 +1115,12 @@ static void Sync8BimResource(const Image *image,const unsigned short id,
     SyncExifProfile(image,p,(size_t) count);
 }
 
+static void Skip8BimBytes(unsigned char **p,size_t *length,const ssize_t count)
+{
+  (*p)+=(ptrdiff_t) count;
+  (*length)-=(size_t) count;
+}
+
 static void Sync8BimProfile(const Image *image,const StringInfo *profile)
 {
   size_t
@@ -1102,16 +1152,14 @@ static void Sync8BimProfile(const Image *image,const StringInfo *profile)
     count=(ssize_t) ReadProfileByte(&p,&length);
     if (IsInvalid8BimNameCount(count,length) != MagickFalse)
       return;
-    p+=(ptrdiff_t) count;
-    length-=(size_t) count;
+    Skip8BimBytes(&p,&length,count);
     if ((*p & 0x01) == 0)
       (void) ReadProfileByte(&p,&length);
     count=(ssize_t) ReadProfileMSBLong(&p,&length);
     if (IsInvalid8BimResourceCount(count,length) != MagickFalse)
       return;
     Sync8BimResource(image,id,count,p);
-    p+=(ptrdiff_t) count;
-    length-=(size_t) count;
+    Skip8BimBytes(&p,&length,count);
   }
   return;
 }
@@ -1267,6 +1315,13 @@ static void GetXMPNumeratorAndDenominator(double value,
   GetXMPContinuedFraction(value,numerator,denominator);
 }
 
+static inline MagickBooleanType IsDistinctXMPYResolution(const Image *image,
+  const char *value)
+{
+  return(((fabs(image->resolution.x-image->resolution.y) > MagickEpsilon) ||
+    (*value == '\0')) ? MagickTrue : MagickFalse);
+}
+
 static void SyncXMPProfile(const Image *image,StringInfo *profile)
 {
   char
@@ -1291,8 +1346,7 @@ static void SyncXMPProfile(const Image *image,StringInfo *profile)
     }
   if (GetXMPOffsets(profile,"tiff:YResolution",&start,&end) != MagickFalse)
     {
-      if ((fabs(image->resolution.x-image->resolution.y) > MagickEpsilon) ||
-          (*value == '\0'))
+      if (IsDistinctXMPYResolution(image,value) != MagickFalse)
         {
           GetXMPNumeratorAndDenominator(image->resolution.y,&numerator,
             &denominator);
@@ -1508,6 +1562,25 @@ static MagickBooleanType Skip8BIMClipPathMarker(unsigned char **info,
   return(MagickFalse);
 }
 
+static inline MagickBooleanType IsSkippable8BimName(const ssize_t count,
+  const size_t *length)
+{
+  return(((count != 0) && ((size_t) count <= (*length))) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsOverlong8BimResource(const ssize_t count,
+  const size_t *length)
+{
+  return(((count < 0) || ((size_t) count > (*length))) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsClipPathResource(const ssize_t id)
+{
+  return(((id > 1999) && (id < 2999)) ? MagickTrue : MagickFalse);
+}
+
 static void Update8BIMResource(const ClipPathResizeInfo *resize,
   unsigned char **info,size_t *length)
 {
@@ -1517,7 +1590,7 @@ static void Update8BIMResource(const ClipPathResizeInfo *resize,
 
   id=(ssize_t) ReadProfileMSBShort(info,length);
   count=(ssize_t) ReadProfileByte(info,length);
-  if ((count != 0) && ((size_t) count <= (*length)))
+  if (IsSkippable8BimName(count,length) != MagickFalse)
     {
       (*info)+=count;
       (*length)-=(size_t) count;
@@ -1525,12 +1598,12 @@ static void Update8BIMResource(const ClipPathResizeInfo *resize,
   if ((count & 0x01) == 0)
     (void) ReadProfileByte(info,length);
   count=(ssize_t) ReadProfileMSBLong(info,length);
-  if ((count < 0) || ((size_t) count > (*length)))
+  if (IsOverlong8BimResource(count,length) != MagickFalse)
     {
       (*length)=0;
       return;
     }
-  if ((id > 1999) && (id < 2999))
+  if (IsClipPathResource(id) != MagickFalse)
     UpdateClipPath((*info),(size_t) count,resize);
   (*info)+=count;
   (*length)-=(size_t) MagickMin((*length),(size_t) count);

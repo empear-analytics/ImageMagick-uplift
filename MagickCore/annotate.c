@@ -173,13 +173,7 @@ static MagickBooleanType
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   A n n o t a t e C o m p o n e n t G e n e s i s                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  AnnotateComponentGenesis() instantiates the annotate component.
@@ -198,13 +192,7 @@ MagickPrivate MagickBooleanType AnnotateComponentGenesis(void)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   A n n o t a t e C o m p o n e n t T e r m i n u s                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  AnnotateComponentTerminus() destroys the annotate component.
@@ -223,13 +211,7 @@ MagickPrivate void AnnotateComponentTerminus(void)
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   A n n o t a t e I m a g e                                                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  AnnotateImage() annotates an image with text.
@@ -1151,13 +1133,7 @@ MagickExport ssize_t FormatMagickCaption(Image *image,DrawInfo *draw_info,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %   G e t T y p e M e t r i c s                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  GetTypeMetrics() returns the following information for the specified font
@@ -1294,13 +1270,7 @@ static const TypeInfo *GetTypeInfoByFamilyList(const DrawInfo *draw_info,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   R e n d e r T y p e                                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  RenderType() renders text on the image.  It also returns the bounding box of
@@ -1437,13 +1407,7 @@ static MagickBooleanType RenderType(const RenderTarget *target,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   R e n d e r F r e e t y p e                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  RenderFreetype() renders text on the image with a Truetype font.  It also
@@ -3024,13 +2988,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   R e n d e r P o s t s c r i p t                                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  RenderPostscript() renders text on the image with a Postscript font.  It
@@ -3387,13 +3345,7 @@ static MagickBooleanType RenderPostscript(Image *image,
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
 +   R e n d e r X 1 1                                                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 %  RenderX11() renders text on the image with an X11 font.  It also returns the
