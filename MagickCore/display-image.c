@@ -25264,12 +25264,28 @@ static void XTraceDisplayImage(Image **image)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",(*image)->filename);
 }
 
+static void XRestoreDisplayState(const WarningHandler warning_handler,
+  char *working_directory,XResourceInfo *resource_info,
+  ExceptionInfo *exception)
+{
+  char
+    *directory;
+
+  (void) SetErrorHandler(warning_handler);
+  (void) SetWarningHandler(warning_handler);
+  /*
+    Change to home directory.
+  */
+  directory=getcwd(working_directory,MagickPathExtent);
+  (void) directory;
+  XChangeToHomeDirectory(resource_info,exception);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
   char
-    command[MagickPathExtent],
-    *directory;
+    command[MagickPathExtent];
 
   Image
     *display_image,
@@ -25509,14 +25525,8 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   /*
     Restore our progress monitor and warning handlers.
   */
-  (void) SetErrorHandler(warning_handler);
-  (void) SetWarningHandler(warning_handler);
-  /*
-    Change to home directory.
-  */
-  directory=getcwd(working_directory,MagickPathExtent);
-  (void) directory;
-  XChangeToHomeDirectory(resource_info,exception);
+  XRestoreDisplayState(warning_handler,working_directory,resource_info,
+    exception);
   *image=display_image;
   return(nexus);
 }
