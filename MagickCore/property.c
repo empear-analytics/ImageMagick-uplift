@@ -4652,6 +4652,18 @@ static const char *InvokeMagickPropertyHandler(
   return(info->handler(request));
 }
 
+static const char *LookupMagickProperty(const MagickPropertyRequest *request,
+  const char *string)
+{
+  const MagickPropertyHandlerInfo
+    *info;
+
+  info=GetMagickPropertyHandlerInfo(request->property);
+  if (info != (const MagickPropertyHandlerInfo *) NULL)
+    string=InvokeMagickPropertyHandler(info,request);
+  return(string);
+}
+
 MagickExport const char *GetMagickProperty(ImageInfo *image_info,
   Image *image,const char *property,ExceptionInfo *exception)
 {
@@ -4660,9 +4672,6 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
 
   const char
     *string;
-
-  const MagickPropertyHandlerInfo
-    *info;
 
   MagickPropertyRequest
     request;
@@ -4680,9 +4689,7 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
   request.property=property;
   request.value=value;
   request.exception=exception;
-  info=GetMagickPropertyHandlerInfo(property);
-  if (info != (const MagickPropertyHandlerInfo *) NULL)
-    string=InvokeMagickPropertyHandler(info,&request);
+  string=LookupMagickProperty(&request,string);
   switch (*property)
   {
     case 'p':
