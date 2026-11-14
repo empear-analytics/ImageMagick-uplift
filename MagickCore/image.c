@@ -409,16 +409,21 @@ MagickExport ImageInfo *AcquireImageInfo(void)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void CheckTracedImage(const Image *image)
+{
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+}
+
 MagickExport void AcquireNextImage(const ImageInfo *image_info,Image *image,
   ExceptionInfo *exception)
 {
   /*
     Allocate image structure.
   */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  CheckTracedImage(image);
   image->next=AcquireImage(image_info,exception);
   if (GetNextImageInList(image) == (Image *) NULL)
     return;
@@ -1154,10 +1159,7 @@ MagickExport Image *DestroyImage(Image *image)
   /*
     Dereference image.
   */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  CheckTracedImage(image);
   destroy=MagickFalse;
   LockSemaphoreInfo(image->semaphore);
   image->reference_count--;
@@ -1267,10 +1269,7 @@ MagickExport ImageInfo *DestroyImageInfo(ImageInfo *image_info)
 */
 MagickExport void DisassociateImageStream(Image *image)
 {
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  CheckTracedImage(image);
   DisassociateBlob(image);
 }
 
@@ -1422,10 +1421,7 @@ MagickExport ssize_t GetImageReferenceCount(Image *image)
 */
 MagickExport VirtualPixelMethod GetImageVirtualPixelMethod(const Image *image)
 {
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  CheckTracedImage(image);
   return(GetPixelCacheVirtualMethod(image));
 }
 
@@ -1530,10 +1526,7 @@ MagickExport MagickBooleanType IsHighDynamicRangeImage(const Image *image,
   ssize_t
     y;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  CheckTracedImage(image);
   image_view=AcquireVirtualCacheView(image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
   #pragma omp parallel for schedule(static) shared(hdri) \
@@ -1887,10 +1880,7 @@ MagickExport MagickBooleanType ResetImagePage(Image *image,const char *page)
   RectangleInfo
     geometry;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  CheckTracedImage(image);
   flags=ParseAbsoluteGeometry(page,&geometry);
   if ((flags & WidthValue) != 0)
     {
