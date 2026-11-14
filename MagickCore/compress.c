@@ -885,6 +885,18 @@ static MagickBooleanType UpdateHuffmanProgress(Image *huffman_image,
   return(MagickTrue);
 }
 
+static size_t GetHuffmanWidth(const ImageInfo *image_info,
+  const Image *inject_image)
+{
+  size_t
+    width;
+
+  width=inject_image->columns;
+  if (LocaleCompare(image_info->magick,"FAX") == 0)
+    width=(size_t) MagickMax(inject_image->columns,1728);
+  return(width);
+}
+
 MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
   Image *image,Image *inject_image,ExceptionInfo *exception)
 {
@@ -932,9 +944,7 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
   assert(inject_image != (Image *) NULL);
   assert(inject_image->signature == MagickCoreSignature);
   one=1;
-  width=inject_image->columns;
-  if (LocaleCompare(image_info->magick,"FAX") == 0)
-    width=(size_t) MagickMax(inject_image->columns,1728);
+  width=GetHuffmanWidth(image_info,inject_image);
   scanline=(unsigned char *) AcquireQuantumMemory((size_t) width+1UL,
     sizeof(*scanline));
   if (scanline == (unsigned char *) NULL)
