@@ -3298,6 +3298,56 @@ static MagickBooleanType XAnnotateLoadFont(const AnnotateContext *context,
   return(MagickTrue);
 }
 
+static MagickBooleanType XAcquireAnnotateInfo(
+  const AnnotateContext *context,const AnnotateTargets *targets,
+  XFontStruct *font_info)
+{
+  XWindows
+    *const windows = context->windows;
+
+  const MagickBooleanType
+    transparent_box = *context->box_color_targets->transparent_box,
+    transparent_pen = *context->font_color_targets->transparent_pen;
+
+  const double
+    degrees = *context->rotate_targets->degrees;
+
+  XAnnotateInfo
+    **const annotate_info = targets->annotate_info;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  /*
+    Initialize annotate structure.
+  */
+  (*annotate_info)=(XAnnotateInfo *) AcquireMagickMemory(
+    sizeof(*(*annotate_info)));
+  if ((*annotate_info) == (XAnnotateInfo *) NULL)
+    return(MagickFalse);
+  XGetAnnotateInfo((*annotate_info));
+  (*annotate_info)->x=(*x);
+  (*annotate_info)->y=(*y);
+  if ((transparent_box == MagickFalse) && (transparent_pen == MagickFalse))
+    (*annotate_info)->stencil=OpaqueStencil;
+  else
+    if (transparent_box == MagickFalse)
+      (*annotate_info)->stencil=BackgroundStencil;
+    else
+      (*annotate_info)->stencil=ForegroundStencil;
+  (*annotate_info)->height=(unsigned int) (font_info->ascent+
+    font_info->descent);
+  (*annotate_info)->degrees=degrees;
+  (*annotate_info)->font_info=font_info;
+  (*annotate_info)->text=(char *) AcquireQuantumMemory((size_t) 
+    windows->image.width/(size_t) MagickMax(font_info->min_bounds.width,1)+2UL,
+    sizeof(*(*annotate_info)->text));
+  if ((*annotate_info)->text == (char *) NULL)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType XAnnotateEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -3406,26 +3456,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
   /*
     Initialize annotate structure.
   */
-  annotate_info=(XAnnotateInfo *) AcquireMagickMemory(sizeof(*annotate_info));
-  if (annotate_info == (XAnnotateInfo *) NULL)
-    return(MagickFalse);
-  XGetAnnotateInfo(annotate_info);
-  annotate_info->x=x;
-  annotate_info->y=y;
-  if ((transparent_box == MagickFalse) && (transparent_pen == MagickFalse))
-    annotate_info->stencil=OpaqueStencil;
-  else
-    if (transparent_box == MagickFalse)
-      annotate_info->stencil=BackgroundStencil;
-    else
-      annotate_info->stencil=ForegroundStencil;
-  annotate_info->height=(unsigned int) (font_info->ascent+font_info->descent);
-  annotate_info->degrees=degrees;
-  annotate_info->font_info=font_info;
-  annotate_info->text=(char *) AcquireQuantumMemory((size_t) 
-    windows->image.width/(size_t) MagickMax(font_info->min_bounds.width,1)+2UL,
-    sizeof(*annotate_info->text));
-  if (annotate_info->text == (char *) NULL)
+  if (XAcquireAnnotateInfo(&context,&targets,font_info) == MagickFalse)
     return(MagickFalse);
   /*
     Create cursor and set graphic context.
