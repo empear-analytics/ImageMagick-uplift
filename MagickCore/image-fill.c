@@ -283,7 +283,7 @@ static void UpdateImageRow(const UpdateRow *row,const ssize_t y,
     (*status)=MagickFalse;
 }
 
-static void ResetPixelRow(const Image *image,const void *arguments,
+static void ResetPixelRow(const Image *image,const void *magick_unused(arguments),
   Quantum *magick_restrict q)
 {
   ssize_t

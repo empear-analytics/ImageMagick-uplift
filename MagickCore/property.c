@@ -3829,7 +3829,7 @@ static const char *MagickPropertyLetterUpperY(const MagickPropertyRequest *reque
   return((const char *) NULL);
 }
 
-static const char *MagickPropertyLetterPercent(const MagickPropertyRequest *request)
+static const char *MagickPropertyLetterPercent(const MagickPropertyRequest *magick_unused(request))
 {
   const char
     *string = (char *) NULL;
@@ -4629,7 +4629,7 @@ static const char *MagickPropertyType(const MagickPropertyRequest *request)
   return(string);
 }
 
-static const char *MagickPropertyVersion(const MagickPropertyRequest *request)
+static const char *MagickPropertyVersion(const MagickPropertyRequest *magick_unused(request))
 {
   const char
     *string = (char *) NULL;
@@ -6203,14 +6203,14 @@ typedef struct _ImagePropertyHandlerInfo
 } ImagePropertyHandlerInfo;
 
 static MagickBooleanType SetImageDelayHandler(Image *image,const char *value,
-  ExceptionInfo *exception)
+  ExceptionInfo *magick_unused(exception))
 {
   magick_unreferenced(exception);
   return(SetImageDelayProperty(image,value));
 }
 
 static MagickBooleanType SetImageDensityHandler(Image *image,const char *value,
-  ExceptionInfo *exception)
+  ExceptionInfo *magick_unused(exception))
 {
   MagickStatusType
     flags;
@@ -6220,7 +6220,7 @@ static MagickBooleanType SetImageDensityHandler(Image *image,const char *value,
 }
 
 static MagickBooleanType SetImageDepthHandler(Image *image,const char *value,
-  ExceptionInfo *exception)
+  ExceptionInfo *magick_unused(exception))
 {
   magick_unreferenced(exception);
   image->depth=StringToUnsignedLong(value);
@@ -6228,7 +6228,7 @@ static MagickBooleanType SetImageDepthHandler(Image *image,const char *value,
 }
 
 static MagickBooleanType SetImageGammaHandler(Image *image,const char *value,
-  ExceptionInfo *exception)
+  ExceptionInfo *magick_unused(exception))
 {
   magick_unreferenced(exception);
   image->gamma=StringToDouble(value,(char **) NULL);
@@ -6236,7 +6236,7 @@ static MagickBooleanType SetImageGammaHandler(Image *image,const char *value,
 }
 
 static MagickBooleanType SetImageLoopHandler(Image *image,const char *value,
-  ExceptionInfo *exception)
+  ExceptionInfo *magick_unused(exception))
 {
   magick_unreferenced(exception);
   image->iterations=StringToUnsignedLong(value);
@@ -6256,7 +6256,7 @@ static MagickBooleanType SetImageGeometryMember(const char *value,
 }
 
 static MagickBooleanType SetImagePageHandler(Image *image,const char *value,
-  ExceptionInfo *exception)
+  ExceptionInfo *magick_unused(exception))
 {
   MagickStatusType
     flags;
@@ -6266,7 +6266,7 @@ static MagickBooleanType SetImagePageHandler(Image *image,const char *value,
 }
 
 static MagickBooleanType SetImageTileOffsetHandler(Image *image,const char *value,
-  ExceptionInfo *exception)
+  ExceptionInfo *magick_unused(exception))
 {
   MagickStatusType
     flags;

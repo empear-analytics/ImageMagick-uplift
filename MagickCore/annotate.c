@@ -2098,7 +2098,7 @@ static FT_Encoding SelectAdobeBig5Encoding(const char *encoding,
 static FT_Encoding SelectCjkLatinEncoding(const char *encoding,
   FT_Encoding encoding_type)
 {
-  magick_unreferenced(encoding);
+  (void) encoding;
 #if defined(FT_ENCODING_PRC)
   if (LocaleCompare(encoding,"GB2312") == 0)
     encoding_type=FT_ENCODING_PRC;
