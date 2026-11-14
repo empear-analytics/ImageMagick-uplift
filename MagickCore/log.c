@@ -1747,6 +1747,20 @@ static MagickBooleanType CopyLogFormatLiteral(const char **p,char **q)
   return(MagickFalse);
 }
 
+static LogInfo *GetDefaultLogInfo(void)
+{
+  ExceptionInfo
+    *exception;
+
+  LogInfo
+    *log_info;
+
+  exception=AcquireExceptionInfo();
+  log_info=GetLogInfo("*",exception);
+  exception=DestroyExceptionInfo(exception);
+  return(log_info);
+}
+
 static char *TranslateEvent(const LogEventLocation *location,
   const char *domain,const char *event)
 {
@@ -1763,9 +1777,6 @@ static char *TranslateEvent(const LogEventLocation *location,
   double
     elapsed_time,
     user_time;
-
-  ExceptionInfo
-    *exception;
 
   LogInfo
     *log_info;
@@ -1785,9 +1796,7 @@ static char *TranslateEvent(const LogEventLocation *location,
   LogEventText
     event_text;
 
-  exception=AcquireExceptionInfo();
-  log_info=GetLogInfo("*",exception);
-  exception=DestroyExceptionInfo(exception);
+  log_info=GetDefaultLogInfo();
   text=AcquireString(event);
   if (log_info == (LogInfo *) NULL)
     return(text);
