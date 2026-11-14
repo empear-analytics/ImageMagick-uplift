@@ -1031,17 +1031,29 @@ static const char *ListLocaleEntry(FILE *file,const LocaleInfo **locale_info,
   return(path);
 }
 
-MagickExport MagickBooleanType ListLocaleInfo(FILE *file,
-  ExceptionInfo *exception)
+static void ListLocaleEntries(FILE *file,const LocaleInfo **locale_info,
+  const size_t number_messages)
 {
   const char
     *path;
 
-  const LocaleInfo
-    **locale_info;
-
   ssize_t
     i;
+
+  path=(const char *) NULL;
+  for (i=0; i < (ssize_t) number_messages; i++)
+  {
+    if (locale_info[i]->stealth != MagickFalse)
+      continue;
+    path=ListLocaleEntry(file,locale_info,i,path);
+  }
+}
+
+MagickExport MagickBooleanType ListLocaleInfo(FILE *file,
+  ExceptionInfo *exception)
+{
+  const LocaleInfo
+    **locale_info;
 
   size_t
     number_messages;
@@ -1052,13 +1064,7 @@ MagickExport MagickBooleanType ListLocaleInfo(FILE *file,
   locale_info=GetLocaleInfoList("*",&number_messages,exception);
   if (locale_info == (const LocaleInfo **) NULL)
     return(MagickFalse);
-  path=(const char *) NULL;
-  for (i=0; i < (ssize_t) number_messages; i++)
-  {
-    if (locale_info[i]->stealth != MagickFalse)
-      continue;
-    path=ListLocaleEntry(file,locale_info,i,path);
-  }
+  ListLocaleEntries(file,locale_info,number_messages);
   (void) fflush(file);
   locale_info=(const LocaleInfo **)
     RelinquishMagickMemory((void *) locale_info);
