@@ -1530,12 +1530,60 @@ static const unsigned char
     0xff, 0xbf, 0xff, 0x7f, 0xff, 0x7f, 0xff, 0x7f
   };
 
+typedef struct _ImageWindowKeyInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    **image;
+
+  ExceptionInfo
+    *exception;
+} ImageWindowKeyInput;
+
+typedef struct _XImageCacheContext
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  Image
+    **image;
+
+  ExceptionInfo
+    *exception;
+} XImageCacheContext;
+
+typedef struct _MagnifyWindowInput
+{
+  Display
+    *display;
+
+  XWindows
+    *windows;
+
+  ExceptionInfo
+    *exception;
+} MagnifyWindowInput;
+
 /*
   Forward declarations.
 */
 static DisplayCommand
-  XImageWindowCommand(Display *,XResourceInfo *,XWindows *,
-    const MagickStatusType,KeySym,Image **,ExceptionInfo *);
+  XImageWindowCommand(const ImageWindowKeyInput *,const MagickStatusType,
+    KeySym);
 static Image
   *XMagickCommand(Display *,XResourceInfo *,XWindows *,const DisplayCommand,
     Image **,ExceptionInfo *),
@@ -1547,8 +1595,7 @@ static Image
 static MagickBooleanType
   XAnnotateEditImage(Display *,XResourceInfo *,XWindows *,Image *,
     ExceptionInfo *),
-  XBackgroundImage(Display *,XResourceInfo *,XWindows *,Image **,
-    ExceptionInfo *),
+  XBackgroundImage(const ImageWindowKeyInput *),
   XChopImage(Display *,XResourceInfo *,XWindows *,Image **,
     ExceptionInfo *),
   XCropImage(Display *,XResourceInfo *,XWindows *,Image *,const ClipboardMode,
@@ -1571,13 +1618,12 @@ static MagickBooleanType
   XTrimImage(Display *,XResourceInfo *,XWindows *,Image *,ExceptionInfo *);
 static void
   XDrawPanRectangle(Display *,XWindows *),
-  XImageCache(Display *,XResourceInfo *,XWindows *,const DisplayCommand,Image **,
-    ExceptionInfo *),
+  XImageCache(const XImageCacheContext *,const DisplayCommand),
   XMagnifyImage(Display *,XWindows *,XEvent *,ExceptionInfo *),
   XMakePanImage(Display *,XResourceInfo *,XWindows *,Image *,ExceptionInfo *),
   XPanImage(Display *,XWindows *,XEvent *,ExceptionInfo *),
-  XMagnifyWindowCommand(Display *,XWindows *,const MagickStatusType,
-    const KeySym,ExceptionInfo *),
+  XMagnifyWindowCommand(const MagnifyWindowInput *,const MagickStatusType,
+    const KeySym),
   XSetCropGeometry(Display *,XWindows *,RectangleInfo *,Image *),
   XScreenEvent(Display *,XWindows *,XEvent *,ExceptionInfo *),
   XTranslateImage(Display *,XWindows *,Image *,const KeySym);
@@ -3611,10 +3657,24 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static MagickBooleanType XBackgroundImage(Display *display,
-  XResourceInfo *resource_info,XWindows *windows,Image **image,
-  ExceptionInfo *exception)
+static MagickBooleanType XBackgroundImage(
+  const ImageWindowKeyInput *window_input)
 {
+  Display
+    *const display = window_input->display;
+
+  ExceptionInfo
+    *const exception = window_input->exception;
+
+  Image
+    **const image = window_input->image;
+
+  XResourceInfo
+    *const resource_info = window_input->resource_info;
+
+  XWindows
+    *const windows = window_input->windows;
+
 #define BackgroundImageTag  "Background/Image"
 
   int
@@ -9985,24 +10045,6 @@ static void XTrimUndoCache(const XResourceInfo *resource_info,size_t *bytes,
     }
 }
 
-typedef struct _XImageCacheContext
-{
-  Display
-    *display;
-
-  XResourceInfo
-    *resource_info;
-
-  XWindows
-    *windows;
-
-  Image
-    **image;
-
-  ExceptionInfo
-    *exception;
-} XImageCacheContext;
-
 static Image *XSaveUndoImage(const XImageCacheContext *cache_context,
   Image *undo_image)
 {
@@ -10253,9 +10295,8 @@ static void XRedoOrShowImageCache(const XImageCacheContext *cache_context,
   XSetCursorState(display,windows,MagickFalse);
 }
 
-static void XImageCache(Display *display,XResourceInfo *resource_info,
-  XWindows *windows,const DisplayCommand command,Image **image,
-  ExceptionInfo *exception)
+static void XImageCache(const XImageCacheContext *cache_context,
+  const DisplayCommand command)
 {
   Image
     *cache_image;
@@ -10264,14 +10305,6 @@ static void XImageCache(Display *display,XResourceInfo *resource_info,
     *redo_image = (Image *) NULL,
     *undo_image = (Image *) NULL;
 
-  XImageCacheContext
-    cache_context;
-
-  cache_context.display=display;
-  cache_context.resource_info=resource_info;
-  cache_context.windows=windows;
-  cache_context.image=image;
-  cache_context.exception=exception;
   switch (command)
   {
     case FreeBuffersCommand:
@@ -10294,15 +10327,15 @@ static void XImageCache(Display *display,XResourceInfo *resource_info,
     }
     case UndoCommand:
     {
-      XUndoImageCache(&cache_context,&undo_image,&redo_image);
+      XUndoImageCache(cache_context,&undo_image,&redo_image);
       return;
     }
     default:
       break;
   }
   if (IsUndoCacheCommand(command) != MagickFalse)
-    undo_image=XSaveUndoImage(&cache_context,undo_image);
-  XRedoOrShowImageCache(&cache_context,command,&redo_image,undo_image);
+    undo_image=XSaveUndoImage(cache_context,undo_image);
+  XRedoOrShowImageCache(cache_context,command,&redo_image,undo_image);
 }
 
 /*
@@ -10578,24 +10611,6 @@ static DisplayCommand XImmutableWindowCommand(const KeySym key_symbol)
   return(NullCommand);
 }
 
-typedef struct _ImageWindowKeyInput
-{
-  Display
-    *display;
-
-  XResourceInfo
-    *resource_info;
-
-  XWindows
-    *windows;
-
-  Image
-    **image;
-
-  ExceptionInfo
-    *exception;
-} ImageWindowKeyInput;
-
 static void XTrimVerticalEdges(XResourceInfo *resource_info,
   const KeySym key_symbol,RectangleInfo *crop_info)
 {
@@ -10689,27 +10704,81 @@ static void XEnterWindowDigit(XResourceInfo *resource_info,
   resource_info->quantum=StringToLong(delta);
 }
 
-static DisplayCommand XImageWindowCommand(Display *display,
-  XResourceInfo *resource_info,XWindows *windows,const MagickStatusType state,
-  KeySym key_symbol,Image **image,ExceptionInfo *exception)
+static MagickBooleanType IsImageWindowTranslateKey(const KeySym key_symbol)
 {
-  static char
-    delta[MagickPathExtent+1] = "";
+  switch ((int) key_symbol)
+  {
+    case XK_Next:
+    case XK_Prior:
+    case XK_Home:
+    case XK_KP_Home:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
 
-  static KeySym
-    last_symbol = XK_0;
+static DisplayCommand XImageWindowArrowCommand(const ImageWindowKeyInput *input,
+  const MagickStatusType state,const KeySym key_symbol)
+{
+  Display
+    *const display = input->display;
 
-  const ImageWindowKeyInput
-    input = { display, resource_info, windows, image, exception };
+  Image
+    **const image = input->image;
 
-  if ((key_symbol >= XK_0) && (key_symbol <= XK_9))
-    {
-      XEnterWindowDigit(resource_info,key_symbol,delta,&last_symbol);
-      return(NullCommand);
-    }
-  last_symbol=key_symbol;
-  if (resource_info->immutable)
-    return(XImmutableWindowCommand(key_symbol));
+  XWindows
+    *const windows = input->windows;
+
+  if ((state & Mod1Mask) != 0)
+    return(XTrimImageWindowEdge(input,key_symbol));
+  XTranslateImage(display,windows,*image,key_symbol);
+  return(NullCommand);
+}
+
+static MagickBooleanType IsImageWindowHorizontalKey(const KeySym key_symbol)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_Left:
+    case XK_KP_Left:
+    case XK_Right:
+    case XK_KP_Right:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
+static MagickBooleanType IsImageWindowArrowKey(const KeySym key_symbol)
+{
+  switch ((int) key_symbol)
+  {
+    case XK_Up:
+    case XK_KP_Up:
+    case XK_Down:
+    case XK_KP_Down:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(IsImageWindowHorizontalKey(key_symbol));
+}
+
+static DisplayCommand XImageWindowKeyCommand(const ImageWindowKeyInput *input,
+  const MagickStatusType state,const KeySym key_symbol)
+{
+  Display
+    *const display = input->display;
+
+  Image
+    **const image = input->image;
+
+  XWindows
+    *const windows = input->windows;
+
   switch ((int) key_symbol)
   {
     case XK_P:
@@ -10723,32 +10792,40 @@ static DisplayCommand XImageWindowCommand(Display *display,
       (void) XMapRaised(display,windows->command.id);
       return(NullCommand);
     }
-    case XK_Next:
-    case XK_Prior:
-    case XK_Home:
-    case XK_KP_Home:
-    {
-      XTranslateImage(display,windows,*image,key_symbol);
-      return(NullCommand);
-    }
-    case XK_Up:
-    case XK_KP_Up:
-    case XK_Down:
-    case XK_KP_Down:
-    case XK_Left:
-    case XK_KP_Left:
-    case XK_Right:
-    case XK_KP_Right:
-    {
-      if ((state & Mod1Mask) != 0)
-        return(XTrimImageWindowEdge(&input,key_symbol));
-      XTranslateImage(display,windows,*image,key_symbol);
-      return(NullCommand);
-    }
     default:
       break;
   }
+  if (IsImageWindowArrowKey(key_symbol) != MagickFalse)
+    return(XImageWindowArrowCommand(input,state,key_symbol));
+  if (IsImageWindowTranslateKey(key_symbol) != MagickFalse)
+    {
+      XTranslateImage(display,windows,*image,key_symbol);
+      return(NullCommand);
+    }
   return(XLookupKeyCommand((int) key_symbol,state));
+}
+
+static DisplayCommand XImageWindowCommand(const ImageWindowKeyInput *input,
+  const MagickStatusType state,KeySym key_symbol)
+{
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  static char
+    delta[MagickPathExtent+1] = "";
+
+  static KeySym
+    last_symbol = XK_0;
+
+  if ((key_symbol >= XK_0) && (key_symbol <= XK_9))
+    {
+      XEnterWindowDigit(resource_info,key_symbol,delta,&last_symbol);
+      return(NullCommand);
+    }
+  last_symbol=key_symbol;
+  if (resource_info->immutable)
+    return(XImmutableWindowCommand(key_symbol));
+  return(XImageWindowKeyCommand(input,state,key_symbol));
 }
 
 /*
@@ -13923,10 +14000,13 @@ static Image *XApplyBackgroundCommand(const XMagickCommandContext *context,
   MagickStatusType
     status;
 
+  const ImageWindowKeyInput
+    window_input = { display, resource_info, windows, image, exception };
+
   /*
     Background image.
   */
-  status=XBackgroundImage(display,resource_info,windows,image,exception);
+  status=XBackgroundImage(&window_input);
   if (status == MagickFalse)
     return(nexus);
   nexus=CloneImage(*image,0,0,MagickTrue,exception);
@@ -14877,11 +14957,14 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XMagickCommandContext
     context;
 
+  const XImageCacheContext
+    cache_context = { display, resource_info, windows, image, exception };
+
   /*
     Process user command.
   */
   XCheckRefreshWindows(display,windows);
-  XImageCache(display,resource_info,windows,command,image,exception);
+  XImageCache(&cache_context,command);
   nexus=NewImageList();
   windows->image.window_changes.width=windows->image.ximage->width;
   windows->image.window_changes.height=windows->image.ximage->height;
@@ -15195,9 +15278,18 @@ static void XMoveMagnifyPosition(XWindows *windows,const unsigned int quantum,
   }
 }
 
-static void XMagnifyWindowCommand(Display *display,XWindows *windows,
-  const MagickStatusType state,const KeySym key_symbol,ExceptionInfo *exception)
+static void XMagnifyWindowCommand(const MagnifyWindowInput *input,
+  const MagickStatusType state,const KeySym key_symbol)
 {
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  XWindows
+    *const windows = input->windows;
+
   unsigned int
     quantum;
 
@@ -17927,8 +18019,11 @@ static void XROIDownHelpKey(const ROIKeyInput *key_input,
     }
     default:
     {
-      (*display_command)=XImageWindowCommand(display,resource_info,windows,
-        (*event).xkey.state,key_symbol,image,exception);
+      const ImageWindowKeyInput
+        input = { display, resource_info, windows, image, exception };
+
+      (*display_command)=XImageWindowCommand(&input,(*event).xkey.state,
+        key_symbol);
       if ((*display_command) != NullCommand)
         (*state)|=UpdateRegionState;
       break;
@@ -20752,6 +20847,9 @@ static void XScreenKeyPress(Display *display,XWindows *windows,XEvent *event,
   KeySym
     key_symbol;
 
+  const MagnifyWindowInput
+    input = { display, windows, exception };
+
   if (event->xkey.window != windows->magnify.id)
     return;
   /*
@@ -20759,8 +20857,7 @@ static void XScreenKeyPress(Display *display,XWindows *windows,XEvent *event,
   */
   (void) XLookupString((XKeyEvent *) &event->xkey,command,(int)
     sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-  XMagnifyWindowCommand(display,windows,event->xkey.state,key_symbol,
-    exception);
+  XMagnifyWindowCommand(&input,event->xkey.state,key_symbol);
 }
 
 static void XScreenMap(Display *display,XWindows *windows,XEvent *event)
@@ -21982,8 +22079,8 @@ typedef struct _DirectoryLoadInput
     *background_resources;
 } DirectoryLoadInput;
 
-static Image *XLoadDirectoryImages(const DirectoryLoadInput *load_input,
-  Image *images)
+static void XLoadBackdropImage(const DirectoryLoadInput *load_input,
+  Image *next_image)
 {
   Display
     *const display = load_input->display;
@@ -21991,11 +22088,41 @@ static Image *XLoadDirectoryImages(const DirectoryLoadInput *load_input,
   ExceptionInfo
     *const exception = load_input->exception;
 
-  ImageInfo
-    *const read_info = load_input->read_info;
-
   XWindows
     *const windows = load_input->windows;
+
+  XResourceInfo
+    *const background_resources = load_input->background_resources;
+
+  (void) XDisplayBackgroundImage(display,background_resources,next_image,
+    exception);
+  XSetCursorState(display,windows,MagickTrue);
+}
+
+static MagickBooleanType IsDirectoryLoadCancelled(Image *images,const int i,
+  const int number_files)
+{
+  if (images->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      proceed=SetImageProgress(images,LoadImageTag,(MagickOffsetType) i,
+        (MagickSizeType) number_files);
+      if (proceed == MagickFalse)
+        return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
+static Image *XLoadDirectoryImages(const DirectoryLoadInput *load_input,
+  Image *images)
+{
+  ExceptionInfo
+    *const exception = load_input->exception;
+
+  ImageInfo
+    *const read_info = load_input->read_info;
 
   char
     **const filelist = load_input->filelist;
@@ -22005,9 +22132,6 @@ static Image *XLoadDirectoryImages(const DirectoryLoadInput *load_input,
 
   const MagickBooleanType
     backdrop = load_input->backdrop;
-
-  XResourceInfo
-    *const background_resources = load_input->background_resources;
 
   Image
     *next_image,
@@ -22041,22 +22165,10 @@ static Image *XLoadDirectoryImages(const DirectoryLoadInput *load_input,
         next_image=thumbnail_image;
       }
     if (backdrop)
-      {
-        (void) XDisplayBackgroundImage(display,background_resources,
-          next_image,exception);
-        XSetCursorState(display,windows,MagickTrue);
-      }
+      XLoadBackdropImage(load_input,next_image);
     AppendImageToList(&images,next_image);
-    if (images->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-        proceed=SetImageProgress(images,LoadImageTag,(MagickOffsetType) i,
-          (MagickSizeType) number_files);
-        if (proceed == MagickFalse)
-          break;
-      }
+    if (IsDirectoryLoadCancelled(images,i,number_files) != MagickFalse)
+      break;
   }
   return(images);
 }
@@ -23105,6 +23217,15 @@ typedef struct _DisplayEventTargets
 
   MagickStatusType
     *status;
+
+  WarningHandler
+    *warning_handler;
+
+  XWindows
+    **windows;
+
+  unsigned int
+    *number_windows;
 } DisplayEventTargets;
 
 static void XSelectVirtualCommand(const DisplayEventContext *context,
@@ -23352,6 +23473,9 @@ static void XPressMagnifyWindow(const DisplayEventContext *context)
   int
     factor;
 
+  const MagnifyWindowInput
+    input = { display, windows, exception };
+
   static KeySym
     MagnifyCommands[] =
     {
@@ -23370,8 +23494,7 @@ static void XPressMagnifyWindow(const DisplayEventContext *context)
   */
   factor=XMenuWidget(display,windows,"Magnify",MagnifyMenu,command);
   if (factor >= 0)
-    XMagnifyWindowCommand(display,windows,0,MagnifyCommands[factor],
-      exception);
+    XMagnifyWindowCommand(&input,0,MagnifyCommands[factor]);
 }
 
 static void XPressPanWindow(const DisplayEventContext *context,XEvent *event)
@@ -23438,8 +23561,10 @@ static void XImageWindowKeyPress(const DisplayEventContext *context,
   DisplayCommand
     display_command;
 
-  display_command=XImageWindowCommand(display,resource_info,windows,
-    event.xkey.state,key_symbol,display_image,exception);
+  const ImageWindowKeyInput
+    input = { display, resource_info, windows, display_image, exception };
+
+  display_command=XImageWindowCommand(&input,event.xkey.state,key_symbol);
   if (display_command != NullCommand)
     (*nexus)=XMagickCommand(display,resource_info,windows,
       display_command,display_image,exception);
@@ -24667,6 +24792,9 @@ static void XHandleKeyPress(const DisplayEventContext *context,
   time_t
     *const timer = targets->timer;
 
+  const MagnifyWindowInput
+    input = { display, windows, exception };
+
   if (resource_info->debug != MagickFalse)
     (void) LogMagickEvent(X11Event,GetMagickModule(),
       "Key press: %d 0x%lx (%s)",(*event).xkey.state,(unsigned long)
@@ -24677,8 +24805,7 @@ static void XHandleKeyPress(const DisplayEventContext *context,
         targets);
     }
   if ((*event).xkey.window == windows->magnify.id)
-    XMagnifyWindowCommand(display,windows,(*event).xkey.state,key_symbol,
-      exception);
+    XMagnifyWindowCommand(&input,(*event).xkey.state,key_symbol);
   if ((*event).xkey.window == windows->pan.id)
     {
       XPanWindowKeyPress(context,key_symbol);
@@ -26275,56 +26402,53 @@ static void XRestoreDisplayState(const WarningHandler warning_handler,
   XChangeToHomeDirectory(resource_info,exception);
 }
 
-MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
-  char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
+typedef struct _DisplayContextInput
 {
-  char
-    command[MagickPathExtent];
+  Display
+    *display;
 
-  Image
-    *display_image,
-    *nexus;
+  XResourceInfo
+    *resource_info;
 
-  KeySym
-    key_symbol;
+  XWindows
+    *windows;
 
-  MagickStatusType
-    context_mask,
-    status;
+  ExceptionInfo
+    *exception;
 
-  static char
-    working_directory[MagickPathExtent];
+  XWindowInfo
+    **magick_windows;
 
-  static XPoint
-    vid_info;
-
-  static XWindowInfo
-    *magick_windows[MaxXWindows];
-
-  static unsigned int
+  unsigned int
     number_windows;
 
-  time_t
-    timer,
-    update_time;
+  size_t
+    *state;
 
-  WarningHandler
-    warning_handler;
+  char
+    *command;
 
+  Image
+    **image;
+
+  char
+    **argv;
+
+  int
+    argc;
+} DisplayContextInput;
+
+static void XFillDisplayEventContext(const DisplayContextInput *input,
+  DisplayEventContext *event_context)
+{
   Window
     root_window;
 
   XClassHint
     *class_hints;
 
-  XEvent
-    event;
-
   XFontStruct
     *font_info;
-
-  XGCValues
-    context_values;
 
   XPixelInfo
     *icon_pixel,
@@ -26341,92 +26465,205 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
     *icon_visual,
     *visual_info;
 
-  XWindows
-    *windows;
-
   XWMHints
     *manager_hints;
 
-  DisplayEventContext
-    event_context;
+  /*
+    Initialize font info.
+  */
+  XLoadDisplayFont(input->display,input->resource_info,input->windows);
+  /*
+    Initialize Standard Colormap.
+  */
+  map_info=input->windows->map_info;
+  icon_map=input->windows->icon_map;
+  visual_info=input->windows->visual_info;
+  icon_visual=input->windows->icon_visual;
+  pixel=input->windows->pixel_info;
+  icon_pixel=input->windows->icon_pixel;
+  font_info=input->windows->font_info;
+  icon_resources=input->windows->icon_resources;
+  class_hints=input->windows->class_hints;
+  manager_hints=input->windows->manager_hints;
+  root_window=XRootWindow(input->display,visual_info->screen);
+  (*event_context).display=input->display;
+  (*event_context).resource_info=input->resource_info;
+  (*event_context).windows=input->windows;
+  (*event_context).exception=input->exception;
+  (*event_context).pixel=pixel;
+  (*event_context).map_info=map_info;
+  (*event_context).magick_windows=input->magick_windows;
+  (*event_context).number_windows=input->number_windows;
+  (*event_context).state=input->state;
+  (*event_context).root_window=root_window;
+  (*event_context).CommandMenu=CommandMenu;
+  (*event_context).command=input->command;
+  (*event_context).visual_info=visual_info;
+  (*event_context).VirtualMenu=VirtualMenu;
+  (*event_context).VirtualCommands=VirtualCommands;
+  (*event_context).ShortCutsMenu=ShortCutsMenu;
+  (*event_context).ShortCutsCommands=ShortCutsCommands;
+  (*event_context).image=input->image;
+  (*event_context).icon_visual=icon_visual;
+  (*event_context).icon_map=icon_map;
+  (*event_context).icon_pixel=icon_pixel;
+  (*event_context).Menus=Menus;
+  (*event_context).Commands=Commands;
+  (*event_context).font_info=font_info;
+  (*event_context).argv=input->argv;
+  (*event_context).argc=input->argc;
+  (*event_context).class_hints=class_hints;
+  (*event_context).manager_hints=manager_hints;
+  (*event_context).icon_resources=icon_resources;
+}
 
-  const DisplayEventTargets
-    event_targets = { &nexus, &display_image, &event, &vid_info, &timer,
-      &context_values, &status };
+typedef struct _DisplayWindowsInput
+{
+  Display
+    *display;
 
-  assert(image != (Image **) NULL);
-  assert((*image)->signature == MagickCoreSignature);
-  XTraceDisplayImage(image);
-  display_image=(*image);
-  warning_handler=(WarningHandler) NULL;
-  windows=XSetWindows((XWindows *) ~0);
-  if (windows != (XWindows *) NULL)
+  XResourceInfo
+    *resource_info;
+
+  ExceptionInfo
+    *exception;
+
+  Image
+    **image;
+
+  char
+    *working_directory;
+
+  XWindowInfo
+    **magick_windows;
+} DisplayWindowsInput;
+
+static void XOpenDisplayWindows(const DisplayWindowsInput *input,
+  const DisplayEventTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  Image
+    *const display_image = *targets->display_image;
+
+  Image
+    **const image = input->image;
+
+  XPoint
+    *const vid_info = targets->vid_info;
+
+  WarningHandler
+    *const warning_handler = targets->warning_handler;
+
+  XWindows
+    **const windows = targets->windows;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XWindowInfo
+    **const magick_windows = input->magick_windows;
+
+  char
+    *const working_directory = input->working_directory;
+
+  unsigned int
+    *const number_windows = targets->number_windows;
+
+  (*warning_handler)=(WarningHandler) NULL;
+  (*windows)=XSetWindows((XWindows *) ~0);
+  if ((*windows) != (XWindows *) NULL)
     {
-      warning_handler=XRestoreWorkingDirectory(resource_info,working_directory,
-        exception);
+      (*warning_handler)=XRestoreWorkingDirectory(resource_info,
+        working_directory,exception);
     }
   else
     {
       /*
         Allocate windows structure.
       */
-      windows=XAllocateDisplayWindows(display,resource_info,display_image,
+      (*windows)=XAllocateDisplayWindows(display,resource_info,display_image,
         image);
       /*
         Initialize window id's.
       */
-      XInitializeWindowIds(windows,magick_windows,&number_windows);
-      vid_info.x=0;
-      vid_info.y=0;
+      XInitializeWindowIds((*windows),magick_windows,number_windows);
+      (*vid_info).x=0;
+      (*vid_info).y=0;
     }
-  /*
-    Initialize font info.
-  */
-  XLoadDisplayFont(display,resource_info,windows);
-  /*
-    Initialize Standard Colormap.
-  */
-  map_info=windows->map_info;
-  icon_map=windows->icon_map;
-  visual_info=windows->visual_info;
-  icon_visual=windows->icon_visual;
-  pixel=windows->pixel_info;
-  icon_pixel=windows->icon_pixel;
-  font_info=windows->font_info;
-  icon_resources=windows->icon_resources;
-  class_hints=windows->class_hints;
-  manager_hints=windows->manager_hints;
-  root_window=XRootWindow(display,visual_info->screen);
-  event_context.display=display;
-  event_context.resource_info=resource_info;
-  event_context.windows=windows;
-  event_context.exception=exception;
-  event_context.pixel=pixel;
-  event_context.map_info=map_info;
-  event_context.magick_windows=magick_windows;
-  event_context.number_windows=number_windows;
-  event_context.state=state;
-  event_context.root_window=root_window;
-  event_context.CommandMenu=CommandMenu;
-  event_context.command=command;
-  event_context.visual_info=visual_info;
-  event_context.VirtualMenu=VirtualMenu;
-  event_context.VirtualCommands=VirtualCommands;
-  event_context.ShortCutsMenu=ShortCutsMenu;
-  event_context.ShortCutsCommands=ShortCutsCommands;
-  event_context.image=image;
-  event_context.icon_visual=icon_visual;
-  event_context.icon_map=icon_map;
-  event_context.icon_pixel=icon_pixel;
-  event_context.Menus=Menus;
-  event_context.Commands=Commands;
-  event_context.font_info=font_info;
-  event_context.argv=argv;
-  event_context.argc=argc;
-  event_context.class_hints=class_hints;
-  event_context.manager_hints=manager_hints;
-  event_context.icon_resources=icon_resources;
-  nexus=NewImageList();
+}
+
+typedef struct _DisplaySetUpInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
+    *state;
+} DisplaySetUpInput;
+
+static void XSetUpDisplay(const DisplaySetUpInput *input,
+  DisplayEventContext *event_context,const DisplayEventTargets *targets)
+{
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  Image
+    *const display_image = *targets->display_image;
+
+  Image
+    **const nexus = targets->nexus;
+
+  MagickStatusType
+    *const status = targets->status;
+
+  size_t
+    *const state = input->state;
+
+  time_t
+    *const timer = targets->timer;
+
+  WarningHandler
+    *const warning_handler = targets->warning_handler;
+
+  XFontStruct
+    *const font_info = event_context->font_info;
+
+  XGCValues
+    *const context_values = targets->context_values;
+
+  XPixelInfo
+    *const pixel = event_context->pixel;
+
+  XResourceInfo
+    *const resource_info = input->resource_info;
+
+  XStandardColormap
+    *const map_info = event_context->map_info;
+
+  XVisualInfo
+    *const visual_info = event_context->visual_info;
+
+  MagickStatusType
+    context_mask;
+
+  time_t
+    update_time;
+
+  (*nexus)=NewImageList();
   XLogDisplayImage(resource_info,display_image);
   XMakeStandardColormap(display,visual_info,resource_info,display_image,
     map_info,pixel,exception);
@@ -26434,41 +26671,266 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   /*
     Initialize graphic context.
   */
-  XMakeContextWindow(&event_context);
-  context_values.background=pixel->background_color.pixel;
-  context_values.font=font_info->fid;
-  context_values.foreground=pixel->foreground_color.pixel;
-  context_values.graphics_exposures=MagickFalse;
+  XMakeContextWindow(event_context);
+  (*context_values).background=pixel->background_color.pixel;
+  (*context_values).font=font_info->fid;
+  (*context_values).foreground=pixel->foreground_color.pixel;
+  (*context_values).graphics_exposures=MagickFalse;
   context_mask=(MagickStatusType)
     (GCBackground | GCFont | GCForeground | GCGraphicsExposures);
-  XCreateDisplayGCs(&event_context,display_image,context_mask,
-    &context_values);
+  XCreateDisplayGCs(event_context,display_image,context_mask,
+    context_values);
   /*
     Initialize icon window.
   */
-  XMakeIconWindow(&event_context,display_image,&context_values);
+  XMakeIconWindow(event_context,display_image,context_values);
   /*
     Initialize Image window.
   */
-  XMakeDisplayWindows(&event_context,display_image);
+  XMakeDisplayWindows(event_context,display_image);
   /*
     Set our progress monitor and warning handlers.
   */
-  warning_handler=XInstallWarningHandlers(resource_info,warning_handler);
+  (*warning_handler)=XInstallWarningHandlers(resource_info,(*warning_handler));
   /*
     Initialize Image and Magnify X images.
   */
-  status=XMakeDisplayXImages(&event_context,display_image);
+  (*status)=XMakeDisplayXImages(event_context,display_image);
   /*
     Respond to events.
   */
-  timer=XGetDisplayTimer(display_image);
+  (*timer)=XGetDisplayTimer(display_image);
   update_time=XGetUpdateTime(resource_info,display_image);
   *state&=(unsigned int) (~FormerImageState);
   *state&=(unsigned int) (~MontageImageState);
   *state&=(unsigned int) (~NextImageState);
-  event_context.context_mask=context_mask;
-  event_context.update_time=update_time;
+  (*event_context).context_mask=context_mask;
+  (*event_context).update_time=update_time;
+}
+
+typedef struct _DisplayFinishInput
+{
+  size_t
+    *state;
+
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    *working_directory;
+
+  Image
+    **image;
+} DisplayFinishInput;
+
+static Image *XFinishDisplayImage(const DisplayFinishInput *finish_input,
+  const DisplayEventContext *event_context,const DisplayEventTargets *targets)
+{
+  Display
+    *const display = finish_input->display;
+
+  ExceptionInfo
+    *const exception = finish_input->exception;
+
+  Image
+    **const display_image = targets->display_image;
+
+  Image
+    **const image = finish_input->image;
+
+  Image
+    **const nexus = targets->nexus;
+
+  XResourceInfo
+    *const resource_info = finish_input->resource_info;
+
+  XWindows
+    *const windows = *targets->windows;
+
+  char
+    *const working_directory = finish_input->working_directory;
+
+  size_t
+    *const state = finish_input->state;
+
+  const WarningHandler
+    warning_handler = *targets->warning_handler;
+
+  {
+    const DisplayExitInputs inputs = { state, display, resource_info, windows,
+      exception };
+
+    XConfirmDisplayExit(&inputs,display_image);
+  }
+  XCloseDisplayWindows(event_context);
+  /*
+    Restore our progress monitor and warning handlers.
+  */
+  XRestoreDisplayState(warning_handler,working_directory,resource_info,
+    exception);
+  *image=(*display_image);
+  return((*nexus));
+}
+
+typedef struct _DisplayImageInput
+{
+  Display
+    *display;
+
+  XResourceInfo
+    *resource_info;
+
+  ExceptionInfo
+    *exception;
+
+  Image
+    **image;
+
+  char
+    *working_directory;
+
+  XWindowInfo
+    **magick_windows;
+
+  size_t
+    *state;
+
+  char
+    *command;
+
+  char
+    **argv;
+
+  int
+    argc;
+} DisplayImageInput;
+
+static void XInitializeDisplayImage(const DisplayImageInput *image_input,
+  DisplayEventContext *event_context,const DisplayEventTargets *targets)
+{
+  Display
+    *const display = image_input->display;
+
+  ExceptionInfo
+    *const exception = image_input->exception;
+
+  Image
+    **const image = image_input->image;
+
+  XResourceInfo
+    *const resource_info = image_input->resource_info;
+
+  XWindowInfo
+    **const magick_windows = image_input->magick_windows;
+
+  XWindows
+    **const windows = targets->windows;
+
+  char
+    *const command = image_input->command;
+
+  char
+    *const working_directory = image_input->working_directory;
+
+  char
+    **const argv = image_input->argv;
+
+  const int
+    argc = image_input->argc;
+
+  size_t
+    *const state = image_input->state;
+
+  unsigned int
+    *const number_windows = targets->number_windows;
+
+  {
+    const DisplayWindowsInput input = { display, resource_info, exception,
+      image, working_directory, magick_windows };
+
+    XOpenDisplayWindows(&input,targets);
+  }
+  {
+    const DisplayContextInput input = { display, resource_info, (*windows),
+      exception, magick_windows, (*number_windows), state, command, image, argv,
+      argc };
+
+    XFillDisplayEventContext(&input,event_context);
+  }
+  {
+    const DisplaySetUpInput input = { display, resource_info, exception,
+      state };
+
+    XSetUpDisplay(&input,event_context,targets);
+  }
+}
+
+MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
+  char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
+{
+  char
+    command[MagickPathExtent];
+
+  Image
+    *display_image,
+    *nexus;
+
+  KeySym
+    key_symbol;
+
+  MagickStatusType
+    status;
+
+  static char
+    working_directory[MagickPathExtent];
+
+  static XPoint
+    vid_info;
+
+  static XWindowInfo
+    *magick_windows[MaxXWindows];
+
+  static unsigned int
+    number_windows;
+
+  time_t
+    timer;
+
+  WarningHandler
+    warning_handler;
+
+  XEvent
+    event;
+
+  XGCValues
+    context_values;
+
+  XWindows
+    *windows;
+
+  DisplayEventContext
+    event_context;
+
+  const DisplayEventTargets
+    event_targets = { &nexus, &display_image, &event, &vid_info, &timer,
+      &context_values, &status, &warning_handler, &windows, &number_windows };
+
+  assert(image != (Image **) NULL);
+  assert((*image)->signature == MagickCoreSignature);
+  XTraceDisplayImage(image);
+  display_image=(*image);
+  {
+    const DisplayImageInput input = { display, resource_info, exception, image,
+      working_directory, magick_windows, state, command, argv, argc };
+
+    XInitializeDisplayImage(&input,&event_context,&event_targets);
+  }
   do
   {
     /*
@@ -26510,18 +26972,10 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
     }
   } while (!(*state & ExitState));
   {
-    const DisplayExitInputs inputs = { state, display, resource_info, windows,
-      exception };
+    const DisplayFinishInput input = { state, display, resource_info,
+      exception, working_directory, image };
 
-    XConfirmDisplayExit(&inputs,&display_image);
+    return(XFinishDisplayImage(&input,&event_context,&event_targets));
   }
-  XCloseDisplayWindows(&event_context);
-  /*
-    Restore our progress monitor and warning handlers.
-  */
-  XRestoreDisplayState(warning_handler,working_directory,resource_info,
-    exception);
-  *image=display_image;
-  return(nexus);
 }
 #endif

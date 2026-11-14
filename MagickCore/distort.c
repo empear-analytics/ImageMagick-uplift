@@ -3827,9 +3827,6 @@ static void SetDistortNoBestFit(const DistortMethod method,
 #if 0
       case QuadrilateralDistortion:
 #endif
-      case PolynomialDistortion:
-      case BarrelDistortion:
-      case BarrelInverseDistortion:
       default:
         /* no calculated bestfit available for these distortions */
         (*bestfit) = MagickFalse;

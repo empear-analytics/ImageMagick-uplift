@@ -175,8 +175,8 @@ start new runs (`mutate.py`, Mull builds, `night3.sh`) to gate a step.
 **Guard-verified.** No case executes the function. It may still
 be refactored, as an earlier campaign refactored a program with no tests at all, but only with the
 recipes whose guard fingerprint is exact: **E, G and P** (and B, N and I with the
-checks of *Unreached functions: B and N* and *Unreached functions: Recipe I* below, and SD with
-*Unreached functions: Recipe SD*). The proof is the build
+checks of *Unreached functions: B and N* and *Unreached functions: Recipe I* below, SD with
+*Unreached functions: Recipe SD* and BC with *Unreached functions: Recipe BC*). The proof is the build
 and `refactor_guard.py` reporting `OK` with `--calls`; a `WARN` stops the commit.
 For E and P, which add a function, `OK` means the exact fingerprint the guard names as
 expected: the literal check `OK`, and `--calls` moving nothing but `+2` for each new
@@ -339,6 +339,37 @@ type of every argument. Planted errors on `widget.c`'s `XNoticeWidget` and on a 
 (`tools/test_switch_split_check.py`) were each caught: a label dropped, a callee changed, a write to
 `state` dropped, a transposed argument, a kept group edited, a statement added after the loop, a
 member bound from another member.
+
+**Unreached functions: Recipe BC** (2026-11-14, owner's OK of 2026-11-10 to evolve the recipes; added by
+Claude Sonnet 5.5, campaign A W23 round thirteen lane c; awaits the owner's confirmation). Recipe BC may
+also be applied to a function no case reaches (`casemap.py` 0 for it and for each of its callers, and no
+executed line in a line-coverage profile of the loop), `Verified: guard`, on the terms of the sections
+above. The step moves the tail of a loop's body and turns its exits into constants, so the proof is
+that the moved text is the old text with exactly those rewrites. Each of these is run before the commit
+and quoted in its message:
+
+1. The step is BC's own step, every condition of its *How* met and checked by reading (steps 1 to 5:
+   the block's exits, its written variables under Recipe O step 2, the parameters). A block that
+   throws through `GetMagickModule()` does not move at this level.
+2. `refactor_guard.py` prints `OK`, and `--calls` moves nothing but `+2` for the new function.
+3. `python3 tools/loop_tail_check.py <file> <Caller> <Helper>` prints `OK`: the helper is static, new,
+   returns `MagickBooleanType` and has at most four parameters; the caller holds `if
+   (Helper(a1,...) != MagickFalse) break;` once as the last statement of its block, each argument one
+   identifier and the identifiers the helper's parameter names in order; the caller's old body is its
+   new body with that statement replaced by the helper's body, each `return(MagickTrue);` read as
+   `break;`, each other `return(MagickFalse);` as `continue;` and the last one as the end of the body;
+   the helper holds no `goto`, `#pragma` or other `return`; the rest of the file is the same token
+   stream, the helper standing directly above the caller.
+4. `sh tools/obj_modulo.sh <file> <Caller> <Helper>` prints `IDENTICAL` or `MODULO-IDENTICAL`, as item 4
+   of *Unreached functions: B and N* (`WIDE=1` for a wide-build file; `NOINLINE=<Caller>,...` when the
+   caller's own callers inline it).
+
+Why this proves the step: `obj_modulo.sh` shows that nothing outside the caller and the helper changed;
+`loop_tail_check.py` shows that the helper's statements are the old block's, token for token, with the
+exits BC step 3 rewrites, and that the call passes the parameters by name in their order, so no
+statement was edited, added or dropped and no argument transposed. What it leaves to reading is BC step
+1 (every path of the block ends the iteration through a `break;` or `continue;` of that loop) and the
+types. Planted errors on a synthetic fixture (`tools/test_loop_tail_check.py`) were each caught.
 
 The guard has two blind spots: reordered statements, which the prohibitions already
 forbid, and **transposed arguments**. For every call the step adds, check by reading
@@ -1275,6 +1306,18 @@ needs two copies of the block.
    nothing but that call (Recipe I step 2's exception), so while the new function runs
    each member is the only pointer to its variable in use, as step 2 requires of a
    single out-parameter.
+8. A targets struct the block passes on (2026-11-14). When the caller declares a `const`
+   struct `t` of addresses once, with the addresses as its initialiser (step 7's form,
+   or Recipe I step 2's, LB step 8's or Z step 7's), the block's only use of `t` is to
+   pass it, by value or as `&t`, to the call of another helper inside the block, and
+   nothing outside the block reads `t`, then `t` moves into the new function as a
+   parameter of the type the block passed (`const T t` or `const T *t`). A written
+   variable `v` whose address is a member of `t` is then written through that member
+   instead of a pointer parameter of its own: the new function binds `V *const v =
+   t.v;` (`t->v;`) at the top of its body, in member order, only for the members the
+   block's own text writes or reads, and writes `(*v)` as step 5 says; the call inside
+   the block passes `t` as before. The other written variables (each meeting step 2)
+   are pointer parameters as in step 4. At most four parameters in all.
 
 **Before:**
 
@@ -1352,6 +1395,17 @@ static void SelectMagnifyMethod(const char *option,
   copied, so a write a re-entrant call of the block's callees made to it would be seen
   as before, and its name, of block scope, gives no other function a path to it
   (Recipe CT's *Careful*).
+
+- Step 8: `t` holds the addresses of the caller's variables, set once by its
+  initialiser and never changed (`const`); passed by value, the new function's copy
+  holds the same addresses, so `(*t.v)` is the object the block named `v`, read and
+  written at the same points in the same order, and the inner call receives the same
+  addresses it received before (by value, a copy as before; as `&t`, the caller's own
+  struct, which the new function's `const T *` parameter is). Step 2 still holds for
+  every such `v`: its address is taken nowhere but in `t`'s initialiser (and calls that
+  keep no copy), and nothing but the block reads `t`, so while the new function runs the
+  member is the only pointer to `v` in use. A second struct of the same addresses, which
+  step 7 would add, would hold nothing new.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls`.
 
@@ -2175,6 +2229,14 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    reads as step 4 does (a member the block reads and then writes, and that nothing
    after the block reads, as step 2's read-then-written local without `const`); no
    typedef, local or fill is added, and the call passes `&name` as the earlier one does.
+   The block may also read up to three variables that are not members of the struct
+   (2026-11-14), when it only reads them (no assignment, increment, or `&v` passed on):
+   each is a by-value parameter of its exact type after `name`, Recipe E step 3's input,
+   at most four parameters in all; the condition on the members stands as written.
+   Why the behaviour is the same: each such parameter holds the value its variable has
+   at the call, and the block, which never writes it, reads that value at every use as
+   it read the variable; the members are bound as above, from a struct whose members'
+   variables nothing has written since its fill.
    Sibling blocks need not be the cases of one `switch` (2026-11-10): blocks of one
    function that all lie after one point of it (the cases of two `switch` statements
    in the branches of an `if`, the branches of an `if` chain inside a case, a loop
@@ -8478,6 +8540,14 @@ does work would receive the moved labels' values first); Recipe RV, whose block 
    `default:` group, before the new call that passes `&name`, and the moved group is the
    call alone, passing the new function's `name` for `&name`. The new function takes the
    same `const Name *name` and binds only the members its groups read.
+8. No tail (2026-11-14). When every group of the `switch`, `default:` included, ends
+   every path with `return(R);`, no group holds a `break` of this `switch`, and the
+   `switch` is the function's last statement (nothing may follow it: MSVC C4702 refuses
+   unreachable code), step 1's `return(R_T);` is absent: the new function's body is the
+   `switch` alone, with no copy of a tail, and step 3's written plain locals are none
+   (every path returns). The run keeps at least one group in the caller (a `switch` of
+   `default:` alone is refused by `tools/ci_linux_warnings.sh`); steps 2 and 4 to 7
+   apply unchanged.
 
 **Before:**
 
@@ -8580,6 +8650,16 @@ static MagickBooleanType SetBackgroundAlpha(Image *image,
   object's address the caller's call passed (`name` in the new function is `&name` of the
   caller), so the next function reads the same members.
 
+- Step 8. Every path of the original ended in a `return` inside the `switch`, and it
+  still does: a kept group returns as before; a moved label, or a value of no label,
+  reaches the caller's `default:`, which returns what the new function returns, and the
+  new function's `switch` selects the same group (as the first bullet argues), which
+  returns the same value after the same statements. The new function ends in a `switch`
+  with a `default:` whose every group returns, the form the caller had, so no compiler
+  warns that control reaches its end (`-Wreturn-type`), and nothing follows either
+  `switch` (C4702). `refactor_guard.py --calls` shows `+2` for the new function and
+  nothing else, there being no tail to copy.
+
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function and
 `+1` for the function `R_T` calls, its copy; nothing else moved), a case for each moved
 label where one exists, and steps 1 to 3 and 5 checked by reading.
@@ -8651,6 +8731,18 @@ whole `switch` with the tail of the function.
    which then is the last statement of `B` and is dropped in step 3 (the end of the `if`
    goes where the `break` went: to the statement after the `switch`). `B` holds no other
    `break`, `continue` or label.
+
+7. *Chain form* (2026-11-14). A predicate of step 2's shape whose one group holds four or
+   more labels `L1 ... Ln` and is a *Complex Method* (cc is the labels plus 2: the base
+   and `default`) may be split at a label boundary into a chain. Choose `k` with `2 <= k <=
+   n-2` and write directly above it a second `static MagickBooleanType <Name2>(const T x)`
+   of the same shape (the same parameter name and type, the same controlling expression,
+   `default: break;`, `return(MagickFalse);`) whose labels are `L(k+1) ... Ln`, in order,
+   named for what they have in common. Delete those labels from the first predicate's
+   `switch` and replace its closing `return(MagickFalse);` by `return(<Name2>(x));`. Every
+   label stands once, in the first or the second; the two runs are adjacent in the original
+   order. Step 5's script is `python3 tools/label_set_check.py --split <file> <First>
+   <Second>`.
 
 **Before:**
 
@@ -8737,9 +8829,19 @@ static MagickBooleanType IsGenericColorspace(const ColorspaceType colorspace)
   than seven labels it is a *Complex Method* of its own, allowed for label-run helpers by
   the owner's ruling of 2026-11-07, and it holds nothing but the labels.
 
+- Why the chain form (step 7) behaves the same. The first predicate returns `MagickTrue` for
+  `L1 ... Lk` as before. Any other value reaches its `default: break;` and its tail, which now
+  returns the second predicate's result; the second returns `MagickTrue` exactly for
+  `L(k+1) ... Ln` and `MagickFalse` for every other value, so the chain returns `MagickTrue`
+  exactly for `L1 ... Ln` and `MagickFalse` otherwise, the value the one predicate returned.
+  Both functions read their argument and write nothing; the extra call is the only change of
+  what runs. Each keeps `default: break;`, so `-Wswitch` stays quiet; each run is sized so that
+  its function has cc 8 or less (six labels at most), which is what takes the label run out of
+  *Complex Method*.
+
 **Evidence level:** oracle (the cases that reach each caller), with `refactor_guard.py
 --calls` (`+2` for the new function, `+1` for each further site, nothing else moved) and
-step 5's script.
+step 5's script (`tools/label_set_check.py`, with `--split` for step 7).
 
 **Provenance:** 2026-11-10, from `colorspace.c`'s `sRGBTransformImage` and
 `GenericOrLogTosRGB` (campaign A, W16 lane c): the same twenty-eight-label generic group,
@@ -8753,6 +8855,11 @@ nine lane b, wide build): sixty labels save the image to the undo cache and brea
 redo and info tests after the `switch`, beside the free-buffers and undo groups, which
 return; the label run is cc 60 of the function's 75 once the save body is a helper. Added
 by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+Step 7 (chain form): 2026-11-14, from `display-image.c`'s `IsImageWindowArrowKey` (campaign A, W23
+round thirteen lane c, wide build): the eight arrow labels of the key switch of `XImageWindowKeyCommand`,
+cc 10, the file's only *Complex Method*; a probe of the split into the vertical and the horizontal run
+(four labels each, cc 6) 5.36 to 5.52, no finding on either predicate. Added by Claude Code (Claude
+Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
@@ -13107,6 +13214,17 @@ moves a run of skip tests as one predicate.
    conditions. The run becomes `if (Is<Name>(<inputs>) == MagickFalse) return;` (or
    `return(c);`), as `utility.c`'s `ExpandFilename` (`if (path == (char *) NULL)
    return; if (*path != '~') return;`). Lane: a
+5. *Case form* (2026-11-14). The first statements of a `switch` group's compound block
+   (after its declarations) may be the run instead: `if (<test>) break;` statements of
+   that `switch`, one or more, each a single `if` with no `else` whose body is `break;`
+   alone, under steps 1 and 2's conditions (no test writes anything; the `break;`
+   leaves the `switch`, not a loop nested in the group). The run becomes
+   `if (Is<Name>(<inputs>) == MagickFalse) break;`, the predicate written as step 2
+   says. When two groups of one `switch` open with the same run (identical character
+   for character once each group's variables are named by the same parameters, checked
+   by script), one predicate serves both, under Recipe P's *Several sites* conditions:
+   every argument an identifier, `refactor_guard.py --calls` `+2` for the predicate and
+   `+1` for the second site, nothing else.
 
 **Before:**
 
@@ -13131,12 +13249,24 @@ moves a run of skip tests as one predicate.
   before.
 - The helper's tests are the original's; a pointer parameter keeps the type the caller
   has.
+- Step 5: a `break;` at the top level of a group's block leaves the `switch`, as a
+  `continue;` at the top level of a loop body ends the iteration. The predicate returns
+  `MagickFalse` at the first test that holds, after running the same earlier tests and
+  no later one, and the caller's `break;` then leaves the `switch` from the same point;
+  when no test holds, the predicate returns `MagickTrue` and the group goes on with the
+  statement that followed the run, as before. The tests have no side effect, so moving
+  their evaluation into a callee changes no value anyone reads.
 
 **Evidence level:** oracle, for the function the step changes (`casemap.py` first).
 
 **Provenance:** 2026-11-12, from `policy.c`'s `IsRightsAuthorizedByName` (campaign B,
 M120), 5.88 to 5.93. Added by Claude Code (Claude Sonnet 5.5) under the mandate of
-2026-10-24.
+2026-10-24. Step 5 (case form): 2026-11-14, from `composite.c`'s `CompositeImage`
+(campaign A, W23 round thirteen lane b), whose `CopyCompositeOp` and
+`IntensityCompositeOp` groups both open with the same three placement tests, each `if
+(...) break;` to fall back on the general composite; a probe of the shared predicate
+3.90 to 3.91, no finding on the helper. Added by Claude Code (Claude Opus 5.5) under the
+owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
@@ -19119,12 +19249,14 @@ static MagickBooleanType PushExifDirectory(const ExifWalkInfo *walk,
   member's variable before reading it.
 
 **Evidence level:** oracle, for the function the step changes (`casemap.py` first; name
-the original caller), with `refactor_guard.py --calls`.
+the original caller), with `refactor_guard.py --calls`. For a function no case reaches: guard, with
+*Unreached functions: Recipe BC* (`tools/loop_tail_check.py`, `tools/obj_modulo.sh`; 2026-11-14).
 
 **Provenance:** 2026-11-13, from `profile.c`'s `SyncExifDirectory` (campaign B, M127 lane
 c): the push tail as `PushExifDirectory`, 3.84 to 3.90; LX would have needed five
 parameters. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
 Lane: c
+Unreached form: 2026-11-14, from `display-image.c`'s `XLoadDirectoryImages` (campaign A, W23 round thirteen lane c, wide build): the progress block at the end of the load loop of a function no case runs; a probe of the step 5.52 to 5.56 with the backdrop block's Recipe N step (Bumpy Road gone). Added by Claude Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
@@ -20408,3 +20540,9 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | QF | Share a Single Pixel Fetch Through Row Functions: many `static void` copies opening with one fetch (`GetAuthenticPixelQueue`) and an early `return;` on `NULL`, differing in the column loop and the buffer type, become one `void` function taking a `const` row struct, a row-function pointer and `void *pixels`; each copy keeps its name as a `void` row function; Lane: c | `stream.c`'s 56 `Stream<Type><Map>Pixels`/`Stream<Type>MapPixels`: 6.89 to 7.32, `magick stream` timing equal on five commands | mandate (2026-10-24) |
 | 2026-11-14 | NEW | JT | Replace Jumps to a Returning Tail by Calls of the Tail: a function-ending `L: S return(R);` reached by `goto L;` from nested arms moves to a `static` helper of the return type taking the (at most four) variables it reads; each `goto L;` and the label's tail become `return(Helper(...));`; Lane: c | `property.c`'s `InterpretBracedEscape` (three lookup arms jumping to `PropertyLookupFailure:`): the first step of a chain that takes the function out of every finding, 3.62 to 3.64 | mandate (2026-10-24) |
 | 2026-11-14 | NEW | XP | Share Mirrored Extreme-Search Loops Through Per-Direction Predicates: copies of a loop keeping the most extreme array element, differing in their tests' operands and operators, become one `static` search taking a predicate pointer, each copy's tests a `MagickBooleanType` predicate returning `MagickTrue` where the copy assigned; Lane: c | `property.c`'s `GetConvexHullExtremePoints` (top, right, bottom, left loops; cc 26, four bumps): leaves every finding, 3.64 to 3.66 | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | O | Step 8: a written variable whose address is a member of a `const` targets struct that the block itself passes to another helper's call (nothing outside the block reading the struct) is written through that member, the struct moving in as a parameter of the type the block passed, in place of a pointer parameter of its own or a second struct of the same addresses (step 7). *Careful* gives the argument | `morphology.c`'s `MorphologyApply` (campaign A, W23 round thirteen lane a): its limit initialisation writes `method_limit`, `special` and `rslt_compose`, whose addresses its `const MorphologyIteratedLimits limits` holds, and `stage_limit`, then passes `limits` to `SelectMorphologyStageLimit`; step 4 gives seven parameters and step 7 a second struct of the same addresses in a caller held at 73 lines of *Large Method*. A probe: `MorphologyApply` leaves *Large Method*, 6.93 to 7.21, no finding on the new function. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
+| 2026-11-14 | AMEND | ST | Step 8 (no tail): a `switch` whose every group, `default:` included, ends every path with `return(R);`, with no `break` of it and nothing after it (the function's last statement; MSVC C4702 forbids a tail) splits as steps 2 and 4 to 7 say with no `return(R_T);` to copy: the new function's body is the `switch` alone, at least one group stays in the caller. *Careful* gives the argument | `morphology.c`'s (now `morphology-apply.c`'s) `AcquireKernelBuiltIn` (campaign A, W23 round thirteen lane a): its second `switch` returns on every path and ends the function since bb1745ee8 dropped the unreachable `return(kernel);` after it; step 1 refuses it, SW refuses its working `default:`. A probe moving the Blur, Comet, Binomial, Laplacian and `default:` groups: 7.21 to 7.29, cc 50 to 46, no finding on the new function. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
+| 2026-11-14 | AMEND | LF | Step 5, *case form*: the leading run of `if (<test>) break;` statements of a `switch` group (each `break;` leaving the `switch`, tests with no side effect) becomes `if (Is<Name>(...) == MagickFalse) break;`; two groups opening with the same run share the predicate under Recipe P's *Several sites* conditions. *Careful* gives the argument (a top-level `break;` of a group ends it as a top-level `continue;` ends an iteration; the same tests in the same order) | `composite.c`'s `CompositeImage` (campaign A, W23 round thirteen lane b): the Copy and Intensity groups open with the same three placement tests; LF's loop form does not take a `break;`, and Recipe P names one expression and keeps its `if`; a probe 3.90 to 3.91 (Claude Code, Opus 5.5) | owner |
+| 2026-11-14 | AMEND | LP | Step 7 (*chain form*): a step-2 predicate whose one label group holds four or more labels and is a *Complex Method* splits at a label boundary into two chained predicates: the later run (two labels or more) moves to a second predicate directly above the first, whose tail `return(MagickFalse);` becomes `return(<Second>(x));`. *Careful* gives the argument (the chain returns `MagickTrue` exactly for the original labels). Checked by `tools/label_set_check.py --split` | `display-image.c`'s `IsImageWindowArrowKey` (campaign A, W23 round thirteen lane c, wide build): eight labels, cc 10; a probe of the vertical/horizontal split 5.36 to 5.52 with no finding on either predicate (Claude Code, Sonnet 5.5) | owner |
+| 2026-11-14 | AMEND | BC | *Unreached functions: Recipe BC* (new paragraph of *Two levels of evidence*, BC's evidence line, the guard-level list): BC may be applied to a function no case reaches, `Verified: guard`, with BC's steps read, `refactor_guard.py` and `--calls` (+2), `tools/loop_tail_check.py` printing OK (the helper's body is the old block with each exit rewritten as BC step 3 gives, the call passes the parameter names in order, the rest of the file the same token stream) and `tools/obj_modulo.sh` IDENTICAL or MODULO-IDENTICAL | `display-image.c`'s `XLoadDirectoryImages` (campaign A, W23 round thirteen lane c, wide build): its progress block is the second bump of a Bumpy Road, the function and its callers run in no case, and no guard-level recipe takes a block that breaks; a probe with the backdrop block's Recipe N step 5.52 to 5.56 (Claude Code, Sonnet 5.5) | owner |
+| 2026-11-14 | AMEND | N | Step 8, the shared-struct form (a struct the caller already fills for another `static` function serving a later block): the block may also read up to three variables that are not members, which it only reads, each a by-value parameter of its exact type after `name` (Recipe E step 3), at most four parameters in all; the members' condition stands. The step gives the argument (each parameter holds the value its variable has at the call, never written by the block) | `feature-texture.c`'s `GetImageFeatures` (campaign A, W23 round thirteen lane d): the closing release of the six buffers (`sum`, `Q`, `density_y`, `density_xy`, `density_x`, `cooccurrence`) reads the six members of the `FeatureBuffers buffers` filled for `IsFeatureMemoryMissing` and `number_grays` for the two `DestroyFeatureMatrix` calls; a struct of its own would repeat the typedef and a six-line fill. A probe 8.70 to 8.72, `GetImageFeatures` 134 to 129 lines, no finding on the new function. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
