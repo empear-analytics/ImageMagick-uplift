@@ -11950,6 +11950,21 @@ block with a `continue` that leaves it.
    When the reads and writes are four or fewer, no struct.
 5. Where the block stood write `if (Helper(...) != MagickFalse) continue;`, and check every
    argument against its parameter by reading.
+6. The caller's shared structs (2026-11-14). When the caller already declares an input
+   struct that Recipe N step 8 fills once for the sibling helpers of the loop `Lp`, and a
+   `const` targets struct of Recipe CT step 3's loop-wide form whose members include every
+   variable of step 2 that goes by pointer, the helper takes those two, `const Name *name`
+   and `const T *targets`, in place of step 4's struct and pointers (CT step 4's form):
+   each member the block reads or writes is bound once at the top of the helper,
+   `T *const v = name->v;` or `T *const v = targets->v;`, a targets member is written
+   `(*v)` at every use and `&v` as `v`, and `&name` and `&targets` in the block are
+   written `name` and `targets`. Step 2's temporaries are still declared in the helper.
+   An array of the caller that the input struct already holds as a pointer to its first
+   element (`char *command` for `char command[MagickPathExtent]`) is written through that
+   member, bound as the others; a use of `sizeof` on the array refuses the step.
+   A variable the block names that is neither a member nor a temporary (a file-scope
+   table) stays as written. The call is `if (Helper(&name,&targets) != MagickFalse)
+   continue;`.
 
 **Before:**
 
@@ -12015,6 +12030,12 @@ static MagickBooleanType XROIUpdateRegion(const ROIRegionInput *region_input,
   block, so the helper's own copies hold every value the caller's did. The input struct holds
   copies taken directly before the call of variables the block does not write (Recipe N's
   argument).
+- Under step 6 the reads go through the input struct that N step 8 filled before the loop,
+  and nothing from that fill to the call writes a member's variable (N step 8's
+  condition, which the loop's other helpers already rely on), so each read sees the value
+  the block saw; the writes go through the addresses in the targets struct, so each
+  `(*v)` is the caller's own local, written at the point the block wrote it (CT step 3).
+  A callee the block passed `&name` or `&v` now receives `name` or `v`, the same address.
 - The helper's result is a status of the block, not a value of the function: the caller
   tests it for `continue;` only. A block with a `break;` leaving `Lp` is Recipe LB, one with
   a `return` Recipe W, RV or V.
@@ -16501,3 +16522,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-13 | AMEND | S | Step 2: a multi-line `#define` (backslash continuation) moves verbatim with the family on the terms of a one-line define: no line of the kept part names it, and the multi-line defines it names move with it (a macro that anything staying names refuses the split). The amendment gives the argument (a macro is text; the kept part names none of them, and the moved functions are their only users, so every expansion gives the tokens it gave before) | `xwindow.c`'s `XGammaPixel`, `XGammaPacket`, `XRedGamma`, `XGreenGamma`, `XBlueGamma` and `XStandardPixel` (campaign A, W23 lane b, split scan): used only by the `XMakeImage`, `XGetPixelInfo` and `XMakeStandardColormap` families, they refused every split that moves those; `tools/split_source.py` takes the form (`tools/test_split_source.py`: nested multi-line defines move, and a kept root naming the outer or the inner macro is refused) | owner |
 | 2026-11-14 | AMEND | E | Step 4: a temporary the block only writes, never reads, that nothing after the block reads and that the caller keeps because other blocks use the same name, passes as a pointer `T *v` (stores written `*v`, the call passing `&v`) on the terms of the pointer paragraph before it, since declaring it in the new function leaves it set but never used (`-Wunused-but-set-variable`, an error in the CI jobs; no recipe deletes the store). The argument: the stores are the same stores of the same values, into a variable that nothing reads afterwards, so the caller's variable and a local of the new function cannot be told apart by any path | `display-image.c`'s `XMagickCommand` (campaign A, W23 round eleven lane c, wide build): the OilPaintCommand case writes `flags=ParseGeometry(radius,&geometry_info);` and reads `geometry_info` alone, so the helper's own `flags` draws the warning (`ci_linux_warnings` clang and gcc, `-DNDEBUG` scan); every other use of `flags` in `XMagickCommand` is a store, or a read after the same case's own store | owner |
 | 2026-11-14 | AMEND | CT | Step 3, event-loop form: with a targets struct that serves every block of one event loop, a case that writes only one member, or none and only reads members, moves in this form too (every member it names bound and used as `(*v)`), instead of Recipe E step 7's value form, which would carry the reads as by-value parameters past four. The argument is the struct's own: a member holds the local's address, so each access touches the same object at the same point whatever the number of members written | `display-image.c`'s `XDisplayImage`: the ConfigureNotify case writes `status` alone and reads `event`, `display_image` and `vid_info`; the event switch's cases are to share `DisplayEventTargets` so that the switch can later move whole (campaign A, W23 round eleven, lane d; Claude Code, Opus 5.5) | owner |
+| 2026-11-14 | AMEND | LC | Step 6: a caller that already shares a Recipe N step 8 input struct and a Recipe CT step 3 loop-wide `const` targets struct between the helpers of its loop passes both to the helper (`if (Helper(&name,&targets) != MagickFalse) continue;`) in place of step 4's own struct and pointers: members bound once, targets members written `(*v)`, `&v` as `v`, `&name` as `name`, step 2's temporaries declared in the helper. *Careful* gives the argument (N step 8's fill condition for the reads, CT step 3's addresses for the writes) | `display-image.c`'s `XDisplayImage` (campaign A, W23 round twelve lane d, wide build): the command-widget test at the head of its event loop leaves the iteration through three `continue;`, writes `nexus` and `display_image` (members of `DisplayEventTargets`) and reads `event`, the command buffer and the context members; a probe of the step with the stasis test's Recipe E step: bumps 9 to 7, cc 95 to 87, the file with the other seven finding functions emptied 4.51 to 4.56, no finding on a new function | owner |
