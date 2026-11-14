@@ -24764,6 +24764,26 @@ static XWindows *XAllocateDisplayWindows(Display *display,
   return(windows);
 }
 
+static void XInitializeWindowIds(XWindows *windows,
+  XWindowInfo **magick_windows,unsigned int *number_windows)
+{
+  int
+    i;
+
+  (*number_windows)=0;
+  magick_windows[(*number_windows)++]=(&windows->icon);
+  magick_windows[(*number_windows)++]=(&windows->backdrop);
+  magick_windows[(*number_windows)++]=(&windows->image);
+  magick_windows[(*number_windows)++]=(&windows->info);
+  magick_windows[(*number_windows)++]=(&windows->command);
+  magick_windows[(*number_windows)++]=(&windows->widget);
+  magick_windows[(*number_windows)++]=(&windows->popup);
+  magick_windows[(*number_windows)++]=(&windows->magnify);
+  magick_windows[(*number_windows)++]=(&windows->pan);
+  for (i=0; i < (int) (*number_windows); i++)
+    magick_windows[i]->id=(Window) NULL;
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -24785,9 +24805,6 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
 
   RectangleInfo
     geometry_info;
-
-  int
-    i;
 
   static char
     working_directory[MagickPathExtent];
@@ -24878,18 +24895,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
       /*
         Initialize window id's.
       */
-      number_windows=0;
-      magick_windows[number_windows++]=(&windows->icon);
-      magick_windows[number_windows++]=(&windows->backdrop);
-      magick_windows[number_windows++]=(&windows->image);
-      magick_windows[number_windows++]=(&windows->info);
-      magick_windows[number_windows++]=(&windows->command);
-      magick_windows[number_windows++]=(&windows->widget);
-      magick_windows[number_windows++]=(&windows->popup);
-      magick_windows[number_windows++]=(&windows->magnify);
-      magick_windows[number_windows++]=(&windows->pan);
-      for (i=0; i < (int) number_windows; i++)
-        magick_windows[i]->id=(Window) NULL;
+      XInitializeWindowIds(windows,magick_windows,&number_windows);
       vid_info.x=0;
       vid_info.y=0;
     }
