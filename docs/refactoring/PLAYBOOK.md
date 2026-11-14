@@ -4237,6 +4237,23 @@ time (E, O or Z on its body) leaves every label in the caller, and the cc with i
    helper binds each member once (`T *const v = targets->v;`), writes `(*v)` as Z step 4
    says, and passes `&(*v)` on to the earlier step's helper. Each variable meets Recipe
    O step 2.
+   A run kept apart from `default`, and the caller's shared structs (2026-11-14). (a) The
+   groups that move with the `default` group need not stand beside it when groups that
+   stay in the caller stand between: a run of groups adjacent to one another, in their
+   source order, may move with the `default` group, as step 6 already allows for its own
+   form. Each step moves one such run; the kept groups stay where they were, and none of
+   them is part of a chain (step 1). (b) When the caller already declares an input struct
+   that Recipe N step 8 fills once for the sibling helpers of the loop holding the
+   `switch`, and a `const` targets struct of Recipe CT step 3's loop-wide form, the
+   helpers of the chain take both, `const Name *name` and `const T *targets`, under the
+   names of the caller's two locals, in place of step 8's own struct and fill: no
+   typedef, local or fill is added. In the moved groups each `&name` and `&targets` is
+   written `name` and `targets` (the pointer the helper received, as CT step 5 passes
+   them on), each member a group reads is bound once at the top of the helper,
+   `T *const v = name->v;` or `T *const v = targets->v;`, and a targets member is written
+   `(*v)` at every use, `&v` as `v`, the controlling expression included
+   (`switch ((*event).type)`). The caller's `default:` group and each helper's are the
+   call `Helper(&name,&targets);` or `Helper(name,targets);` and `break;`.
 
 **Before:**
 
@@ -4396,6 +4413,19 @@ static void ApplyUnaryComplexOperator(const ComplexUnaryOperands *unary,
   pass the same `tile` and the same addresses (`&(*v)` is `v`) down to the helper whose
   `switch` holds the group, so each written variable is the caller's own, written at
   the points it was.
+- Under step 8's run kept apart from `default` (a), a value of a kept label still selects its own group; a value of a
+  moved label matches no label of the caller's `switch`, wherever the kept groups stand,
+  so it reaches `default`, whose call selects the same group in the new `switch`. C
+  selects a group by its label, not by its position (C11 6.8.4.2p4), and no group that
+  stays runs into another (step 1 refuses fall-through), so taking a run out from between
+  kept groups changes which statements run for no value of `e`. Under (b) the input
+  struct is the one N step 8 already fills before the loop, and nothing on a path from
+  that fill to a call writes a member's variable (N step 8's condition, which the
+  sibling helpers already rely on); the targets struct holds the addresses of the
+  caller's locals, so each `(*v)` is the caller's own object, read and written at the
+  point the group read and wrote it (CT step 3). A helper that passes `name` and
+  `targets` on passes the addresses it received, which are the caller's `&name` and
+  `&targets`.
 - Under step 8's `targets` form the argument is Recipe Z step 7's: only the addresses
   travel, fixed at the declaration and bound once to `*const` locals, so each `(*v)` is
   the caller's own variable, written at the points it was; they are the addresses of
@@ -16523,3 +16553,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | AMEND | E | Step 4: a temporary the block only writes, never reads, that nothing after the block reads and that the caller keeps because other blocks use the same name, passes as a pointer `T *v` (stores written `*v`, the call passing `&v`) on the terms of the pointer paragraph before it, since declaring it in the new function leaves it set but never used (`-Wunused-but-set-variable`, an error in the CI jobs; no recipe deletes the store). The argument: the stores are the same stores of the same values, into a variable that nothing reads afterwards, so the caller's variable and a local of the new function cannot be told apart by any path | `display-image.c`'s `XMagickCommand` (campaign A, W23 round eleven lane c, wide build): the OilPaintCommand case writes `flags=ParseGeometry(radius,&geometry_info);` and reads `geometry_info` alone, so the helper's own `flags` draws the warning (`ci_linux_warnings` clang and gcc, `-DNDEBUG` scan); every other use of `flags` in `XMagickCommand` is a store, or a read after the same case's own store | owner |
 | 2026-11-14 | AMEND | CT | Step 3, event-loop form: with a targets struct that serves every block of one event loop, a case that writes only one member, or none and only reads members, moves in this form too (every member it names bound and used as `(*v)`), instead of Recipe E step 7's value form, which would carry the reads as by-value parameters past four. The argument is the struct's own: a member holds the local's address, so each access touches the same object at the same point whatever the number of members written | `display-image.c`'s `XDisplayImage`: the ConfigureNotify case writes `status` alone and reads `event`, `display_image` and `vid_info`; the event switch's cases are to share `DisplayEventTargets` so that the switch can later move whole (campaign A, W23 round eleven, lane d; Claude Code, Opus 5.5) | owner |
 | 2026-11-14 | AMEND | LC | Step 6: a caller that already shares a Recipe N step 8 input struct and a Recipe CT step 3 loop-wide `const` targets struct between the helpers of its loop passes both to the helper (`if (Helper(&name,&targets) != MagickFalse) continue;`) in place of step 4's own struct and pointers: members bound once, targets members written `(*v)`, `&v` as `v`, `&name` as `name`, step 2's temporaries declared in the helper. *Careful* gives the argument (N step 8's fill condition for the reads, CT step 3's addresses for the writes) | `display-image.c`'s `XDisplayImage` (campaign A, W23 round twelve lane d, wide build): the command-widget test at the head of its event loop leaves the iteration through three `continue;`, writes `nexus` and `display_image` (members of `DisplayEventTargets`) and reads `event`, the command buffer and the context members; a probe of the step with the stasis test's Recipe E step: bumps 9 to 7, cc 95 to 87, the file with the other seven finding functions emptied 4.51 to 4.56, no finding on a new function | owner |
+| 2026-11-14 | AMEND | SD | Step 8, a run kept apart and shared structs: (a) a run of adjacent groups, in source order, may move with the `default` group when groups that stay stand between the run and `default` (step 6 already allowed it for its own form; C selects by label, not position, and no kept group falls through); (b) a caller that already shares a Recipe N step 8 input struct and a Recipe CT step 3 loop-wide `const` targets struct between the helpers of its loop passes both to the chain under the caller's local names (`&name` written `name` in the moved groups, members bound once, targets members as `(*v)`, the controlling expression included), with no struct, fill or local of its own. *Careful* gives the argument | `display-image.c`'s `XDisplayImage` (campaign A, W23 round twelve lane d, wide build): its 17-group event `switch` must keep `KeyPress` and `KeyRelease` in the caller (`XLookupString` takes `sizeof(command)` of the caller's array), which stand between the groups before them and `default`; the cases already share `DisplayEventContext` and `DisplayEventTargets`. A probe of the four-link chain after the crossing cases' Recipe P step: `XDisplayImage` cc 85 to 64, the file with the other seven finding functions emptied 4.56 to 4.76, no finding on a new function | owner |
