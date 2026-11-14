@@ -14370,6 +14370,31 @@ static void XApplyViewCommands(const XMagickCommandContext *context,
   }
 }
 
+static void XApplyResizeCommands(const XMagickCommandContext *context,
+  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
+{
+  switch (command)
+  {
+    case HalfSizeCommand:
+      XApplyHalfSizeCommand(context);
+      break;
+    case OriginalSizeCommand:
+      XApplyOriginalSizeCommand(context);
+      break;
+    case DoubleSizeCommand:
+      XApplyDoubleSizeCommand(context);
+      break;
+    case ResizeCommand:
+      XApplyResizeCommand(context);
+      break;
+    default:
+    {
+      XApplyViewCommands(context,command,&(*flags),&(*nexus));
+      break;
+    }
+  }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -14455,21 +14480,9 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
     case PasteCommand:
       XApplyPasteCommand(&context);
       break;
-    case HalfSizeCommand:
-      XApplyHalfSizeCommand(&context);
-      break;
-    case OriginalSizeCommand:
-      XApplyOriginalSizeCommand(&context);
-      break;
-    case DoubleSizeCommand:
-      XApplyDoubleSizeCommand(&context);
-      break;
-    case ResizeCommand:
-      XApplyResizeCommand(&context);
-      break;
     default:
     {
-      XApplyViewCommands(&context,command,&flags,&nexus);
+      XApplyResizeCommands(&context,command,&flags,&nexus);
       break;
     }
   }
