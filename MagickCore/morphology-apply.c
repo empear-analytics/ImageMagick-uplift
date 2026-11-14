@@ -2678,6 +2678,30 @@ static KernelInfo *AcquireBlurKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireBlurOrNamedKernel(KernelInfo *kernel,
+  const KernelInfoType type,const BuiltInKernelInputs *inputs)
+{
+  const GeometryInfo
+    *args = inputs->args;
+
+  switch(type) {
+    case BlurKernel:
+      return(AcquireBlurKernel(kernel,args));
+    case CometKernel:
+      return(AcquireCometKernel(kernel,args));
+    case BinomialKernel:
+      return(AcquireBinomialKernel(kernel,args));
+
+    /*
+      Convolution Kernels - Well Known Named Constant Kernels
+    */
+    case LaplacianKernel:
+      return(AcquireLaplacianKernel(kernel,type,args));
+    default:
+      return(AcquireEdgeDetectionKernel(kernel,type,inputs));
+  }
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -2763,23 +2787,11 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
     case DoGKernel:
     case LoGKernel:
       return(AcquireGaussianKernel(kernel,type,args));
-    case BlurKernel:
-      return(AcquireBlurKernel(kernel,args));
-    case CometKernel:
-      return(AcquireCometKernel(kernel,args));
-    case BinomialKernel:
-      return(AcquireBinomialKernel(kernel,args));
-
-    /*
-      Convolution Kernels - Well Known Named Constant Kernels
-    */
-    case LaplacianKernel:
-      return(AcquireLaplacianKernel(kernel,type,args));
     default:
       inputs.args=args;
       inputs.nan=nan;
       inputs.exception=exception;
-      return(AcquireEdgeDetectionKernel(kernel,type,&inputs));
+      return(AcquireBlurOrNamedKernel(kernel,type,&inputs));
   }
 }
 
