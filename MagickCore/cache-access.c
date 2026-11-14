@@ -942,17 +942,26 @@ MagickExport MagickBooleanType GetOneVirtualPixelInfo(const Image *image,
 %    o cache: the pixel cache.
 %
 */
+static inline CacheInfo *GetTracedCacheInfo(const Cache cache)
+{
+  CacheInfo
+    *magick_restrict cache_info;
+
+  cache_info=(CacheInfo *) cache;
+  assert(cache_info->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
+      cache_info->filename);
+  return(cache_info);
+}
+
 MagickPrivate ColorspaceType GetPixelCacheColorspace(const Cache cache)
 {
   CacheInfo
     *magick_restrict cache_info;
 
   assert(cache != (Cache) NULL);
-  cache_info=(CacheInfo *) cache;
-  assert(cache_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      cache_info->filename);
+  cache_info=GetTracedCacheInfo(cache);
   return(cache_info->colorspace);
 }
 
