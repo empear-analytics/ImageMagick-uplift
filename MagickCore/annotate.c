@@ -2735,6 +2735,18 @@ static MagickBooleanType OpenFreetypeFace(const FreetypeTarget *target,
   return(ConfigureFreetypeFace(target,targets,exception));
 }
 
+typedef struct _GlyphInfo
+{
+  FT_UInt
+    id;
+
+  FT_Vector
+    origin;
+
+  FT_Glyph
+    image;
+} GlyphInfo;
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2750,18 +2762,6 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
 #if !defined(FT_OPEN_PATHNAME)
 #define FT_OPEN_PATHNAME  ft_open_pathname
 #endif
-
-  typedef struct _GlyphInfo
-  {
-    FT_UInt
-      id;
-
-    FT_Vector
-      origin;
-
-    FT_Glyph
-      image;
-  } GlyphInfo;
 
   char
     *p;
