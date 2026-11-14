@@ -20712,6 +20712,12 @@ typedef struct _XTileInput
 
   char
     *filename;
+
+  const ModeType
+    *TileCommands;
+
+  int
+    id;
 } XTileInput;
 
 static void XTileUpdateImage(const XTileInput *input)
@@ -20971,6 +20977,71 @@ static void XTileDeleteImage(const XTileInput *input)
   XTileUpdateImage(input);
 }
 
+static Image *XTileCommand(const XTileInput *input)
+{
+  Display
+    *const display = input->display;
+
+  XWindows
+    *const windows = input->windows;
+
+  const ModeType
+    *const TileCommands = input->TileCommands;
+
+  const int
+    id = input->id;
+
+  Image
+    *tile_image;
+
+  /*
+    Perform command for the selected tile.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  tile_image=NewImageList();
+  switch (TileCommands[id])
+  {
+    case TileLoadCommand:
+    {
+      tile_image=XTileLoadImage(input);
+      break;
+    }
+    case TileNextCommand:
+    {
+      /*
+        Display next image.
+      */
+      XClientMessage(display,windows->image.id,windows->im_protocols,
+        windows->im_next_image,CurrentTime);
+      break;
+    }
+    case TileFormerCommand:
+    {
+      /*
+        Display former image.
+      */
+      XClientMessage(display,windows->image.id,windows->im_protocols,
+        windows->im_former_image,CurrentTime);
+      break;
+    }
+    case TileDeleteCommand:
+    {
+      XTileDeleteImage(input);
+      break;
+    }
+    case TileUpdateCommand:
+    {
+      XTileUpdateImage(input);
+      break;
+    }
+    default:
+      break;
+  }
+  XSetCursorState(display,windows,MagickFalse);
+  return(tile_image);
+}
+
 static Image *XTileImage(Display *display,XResourceInfo *resource_info,
   XWindows *windows,Image *image,XEvent *event,ExceptionInfo *exception)
 {
@@ -20998,9 +21069,6 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
   char
     command[MagickPathExtent],
     filename[MagickPathExtent];
-
-  Image
-    *tile_image;
 
   int
     id,
@@ -21035,12 +21103,6 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
          ((size_t) (q-p+1) < sizeof(filename)))
     q++;
   (void) CopyMagickString(filename,p,(size_t) (q-p+1));
-  /*
-    Perform command for the selected tile.
-  */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  tile_image=NewImageList();
   input.display=display;
   input.resource_info=resource_info;
   input.windows=windows;
@@ -21051,46 +21113,9 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
   input.height=height;
   input.width=width;
   input.filename=filename;
-  switch (TileCommands[id])
-  {
-    case TileLoadCommand:
-    {
-      tile_image=XTileLoadImage(&input);
-      break;
-    }
-    case TileNextCommand:
-    {
-      /*
-        Display next image.
-      */
-      XClientMessage(display,windows->image.id,windows->im_protocols,
-        windows->im_next_image,CurrentTime);
-      break;
-    }
-    case TileFormerCommand:
-    {
-      /*
-        Display former image.
-      */
-      XClientMessage(display,windows->image.id,windows->im_protocols,
-        windows->im_former_image,CurrentTime);
-      break;
-    }
-    case TileDeleteCommand:
-    {
-      XTileDeleteImage(&input);
-      break;
-    }
-    case TileUpdateCommand:
-    {
-      XTileUpdateImage(&input);
-      break;
-    }
-    default:
-      break;
-  }
-  XSetCursorState(display,windows,MagickFalse);
-  return(tile_image);
+  input.TileCommands=TileCommands;
+  input.id=id;
+  return(XTileCommand(&input));
 }
 
 static void XClampImageOffset(XWindows *windows)
