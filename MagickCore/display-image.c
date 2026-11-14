@@ -11145,6 +11145,51 @@ static void XApplySaturationCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyBrightnessCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  char
+    modulate_factors[MagickPathExtent];
+
+  static char
+    brightness_percent[MagickPathExtent] = "110";
+
+  /*
+    Query user for percent brightness change.
+  */
+  (void) XDialogWidget(display,windows,"Apply",
+    "Enter percent change in color brightness (0-200):",brightness_percent);
+  if (*brightness_percent == '\0')
+    return;
+  /*
+    Vary the color brightness.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) CopyMagickString(modulate_factors,brightness_percent,
+    MagickPathExtent);
+  (void) ModulateImage(*image,modulate_factors,exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyResizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11731,8 +11776,7 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   ExceptionInfo *exception)
 {
   char
-    filename[MagickPathExtent],
-    modulate_factors[MagickPathExtent];
+    filename[MagickPathExtent];
 
   GeometryInfo
     geometry_info;
@@ -11875,32 +11919,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplySaturationCommand(&context);
       break;
     case BrightnessCommand:
-    {
-      static char
-        brightness_percent[MagickPathExtent] = "110";
-
-      /*
-        Query user for percent brightness change.
-      */
-      (void) XDialogWidget(display,windows,"Apply",
-        "Enter percent change in color brightness (0-200):",brightness_percent);
-      if (*brightness_percent == '\0')
-        break;
-      /*
-        Vary the color brightness.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      (void) CopyMagickString(modulate_factors,brightness_percent,
-        MagickPathExtent);
-      (void) ModulateImage(*image,modulate_factors,exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyBrightnessCommand(&context);
       break;
-    }
     case GammaCommand:
     {
       static char
