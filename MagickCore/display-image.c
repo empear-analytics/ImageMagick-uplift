@@ -26416,12 +26416,6 @@ typedef struct _DisplayContextInput
   ExceptionInfo
     *exception;
 
-  XPixelInfo
-    *pixel;
-
-  XStandardColormap
-    *map_info;
-
   XWindowInfo
     **magick_windows;
 
@@ -26431,78 +26425,96 @@ typedef struct _DisplayContextInput
   size_t
     *state;
 
-  Window
-    root_window;
-
   char
     *command;
 
-  XVisualInfo
-    *visual_info;
-
   Image
     **image;
-
-  XVisualInfo
-    *icon_visual;
-
-  XStandardColormap
-    *icon_map;
-
-  XPixelInfo
-    *icon_pixel;
-
-  XFontStruct
-    *font_info;
 
   char
     **argv;
 
   int
     argc;
-
-  XClassHint
-    *class_hints;
-
-  XWMHints
-    *manager_hints;
-
-  XResourceInfo
-    *icon_resources;
 } DisplayContextInput;
 
 static void XFillDisplayEventContext(const DisplayContextInput *input,
   DisplayEventContext *event_context)
 {
+  Window
+    root_window;
+
+  XClassHint
+    *class_hints;
+
+  XFontStruct
+    *font_info;
+
+  XPixelInfo
+    *icon_pixel,
+    *pixel;
+
+  XResourceInfo
+    *icon_resources;
+
+  XStandardColormap
+    *icon_map,
+    *map_info;
+
+  XVisualInfo
+    *icon_visual,
+    *visual_info;
+
+  XWMHints
+    *manager_hints;
+
+  /*
+    Initialize font info.
+  */
+  XLoadDisplayFont(input->display,input->resource_info,input->windows);
+  /*
+    Initialize Standard Colormap.
+  */
+  map_info=input->windows->map_info;
+  icon_map=input->windows->icon_map;
+  visual_info=input->windows->visual_info;
+  icon_visual=input->windows->icon_visual;
+  pixel=input->windows->pixel_info;
+  icon_pixel=input->windows->icon_pixel;
+  font_info=input->windows->font_info;
+  icon_resources=input->windows->icon_resources;
+  class_hints=input->windows->class_hints;
+  manager_hints=input->windows->manager_hints;
+  root_window=XRootWindow(input->display,visual_info->screen);
   (*event_context).display=input->display;
   (*event_context).resource_info=input->resource_info;
   (*event_context).windows=input->windows;
   (*event_context).exception=input->exception;
-  (*event_context).pixel=input->pixel;
-  (*event_context).map_info=input->map_info;
+  (*event_context).pixel=pixel;
+  (*event_context).map_info=map_info;
   (*event_context).magick_windows=input->magick_windows;
   (*event_context).number_windows=input->number_windows;
   (*event_context).state=input->state;
-  (*event_context).root_window=input->root_window;
+  (*event_context).root_window=root_window;
   (*event_context).CommandMenu=CommandMenu;
   (*event_context).command=input->command;
-  (*event_context).visual_info=input->visual_info;
+  (*event_context).visual_info=visual_info;
   (*event_context).VirtualMenu=VirtualMenu;
   (*event_context).VirtualCommands=VirtualCommands;
   (*event_context).ShortCutsMenu=ShortCutsMenu;
   (*event_context).ShortCutsCommands=ShortCutsCommands;
   (*event_context).image=input->image;
-  (*event_context).icon_visual=input->icon_visual;
-  (*event_context).icon_map=input->icon_map;
-  (*event_context).icon_pixel=input->icon_pixel;
+  (*event_context).icon_visual=icon_visual;
+  (*event_context).icon_map=icon_map;
+  (*event_context).icon_pixel=icon_pixel;
   (*event_context).Menus=Menus;
   (*event_context).Commands=Commands;
-  (*event_context).font_info=input->font_info;
+  (*event_context).font_info=font_info;
   (*event_context).argv=input->argv;
   (*event_context).argc=input->argc;
-  (*event_context).class_hints=input->class_hints;
-  (*event_context).manager_hints=input->manager_hints;
-  (*event_context).icon_resources=input->icon_resources;
+  (*event_context).class_hints=class_hints;
+  (*event_context).manager_hints=manager_hints;
+  (*event_context).icon_resources=icon_resources;
 }
 
 typedef struct _DisplayWindowsInput
@@ -26598,18 +26610,6 @@ typedef struct _DisplaySetUpInput
 
   size_t
     *state;
-
-  XPixelInfo
-    *pixel;
-
-  XStandardColormap
-    *map_info;
-
-  XVisualInfo
-    *visual_info;
-
-  XFontStruct
-    *font_info;
 } DisplaySetUpInput;
 
 static void XSetUpDisplay(const DisplaySetUpInput *input,
@@ -26640,22 +26640,22 @@ static void XSetUpDisplay(const DisplaySetUpInput *input,
     *const warning_handler = targets->warning_handler;
 
   XFontStruct
-    *const font_info = input->font_info;
+    *const font_info = event_context->font_info;
 
   XGCValues
     *const context_values = targets->context_values;
 
   XPixelInfo
-    *const pixel = input->pixel;
+    *const pixel = event_context->pixel;
 
   XResourceInfo
     *const resource_info = input->resource_info;
 
   XStandardColormap
-    *const map_info = input->map_info;
+    *const map_info = event_context->map_info;
 
   XVisualInfo
-    *const visual_info = input->visual_info;
+    *const visual_info = event_context->visual_info;
 
   MagickStatusType
     context_mask;
@@ -26742,41 +26742,14 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   WarningHandler
     warning_handler;
 
-  Window
-    root_window;
-
-  XClassHint
-    *class_hints;
-
   XEvent
     event;
-
-  XFontStruct
-    *font_info;
 
   XGCValues
     context_values;
 
-  XPixelInfo
-    *icon_pixel,
-    *pixel;
-
-  XResourceInfo
-    *icon_resources;
-
-  XStandardColormap
-    *icon_map,
-    *map_info;
-
-  XVisualInfo
-    *icon_visual,
-    *visual_info;
-
   XWindows
     *windows;
-
-  XWMHints
-    *manager_hints;
 
   DisplayEventContext
     event_context;
@@ -26795,36 +26768,16 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
 
     XOpenDisplayWindows(&input,&event_targets);
   }
-  /*
-    Initialize font info.
-  */
-  XLoadDisplayFont(display,resource_info,windows);
-  /*
-    Initialize Standard Colormap.
-  */
-  map_info=windows->map_info;
-  icon_map=windows->icon_map;
-  visual_info=windows->visual_info;
-  icon_visual=windows->icon_visual;
-  pixel=windows->pixel_info;
-  icon_pixel=windows->icon_pixel;
-  font_info=windows->font_info;
-  icon_resources=windows->icon_resources;
-  class_hints=windows->class_hints;
-  manager_hints=windows->manager_hints;
-  root_window=XRootWindow(display,visual_info->screen);
   {
     const DisplayContextInput input = { display, resource_info, windows,
-      exception, pixel, map_info, magick_windows, number_windows, state,
-      root_window, command, visual_info, image, icon_visual, icon_map,
-      icon_pixel, font_info, argv, argc, class_hints, manager_hints,
-      icon_resources };
+      exception, magick_windows, number_windows, state, command, image, argv,
+      argc };
 
     XFillDisplayEventContext(&input,&event_context);
   }
   {
-    const DisplaySetUpInput input = { display, resource_info, exception, state,
-      pixel, map_info, visual_info, font_info };
+    const DisplaySetUpInput input = { display, resource_info, exception,
+      state };
 
     XSetUpDisplay(&input,&event_context,&event_targets);
   }
