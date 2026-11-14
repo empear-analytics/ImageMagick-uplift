@@ -1160,6 +1160,21 @@ is worth it.
    split. A macro is text: the kept part names none of these, so no expansion there changes,
    and in the new file the moved functions are its only users, each expansion giving the tokens
    it gave before; `refactor_guard.py --combined` counts every literal once, as before.
+   A struct that both parts name is defined again, verbatim, in the new file (2026-11-14,
+   `split_source.py --copy-struct TAG`): a definition `struct TAG` / `{` ... `};` standing
+   once in the original, with no preprocessor line inside, that a header completes into a
+   type name (`threshold.c`'s `struct _ThresholdMap`, which `threshold.h` declares as
+   `typedef struct _ThresholdMap ThresholdMap;`) and that the moved functions use as the
+   kept ones do (`OrderedDitherImage` and `GetThresholdMap`). The original keeps its
+   definition and the new file's *Typedef declarations* block holds a token-for-token copy.
+   Each translation unit then contains the one definition, so each file is a complete C
+   program as before; the two definitions are compatible types (the same tag, the same
+   members in the same order, C11 6.2.7), so a pointer that one file's function returns
+   and the other's takes names one type, and the layout follows from the members, which
+   are the same tokens. Nothing public changes (the struct is private to the original; no
+   header gains a member) and no other kind of shared type is taken by this step (an
+   enumeration, a typedef'd struct, a function-pointer typedef); the tool still refuses
+   those, and refuses this one without the option.
    The new file's include block
    is the original's, with one exception (2026-11-11): a run of conditional lines at
    its end, after the last unconditional `#include`, that holds every `#define` of the
@@ -1189,6 +1204,12 @@ is worth it.
   expands to the same tokens in the one file that uses it, and the kept file used none.
   `refactor_guard.py --combined` therefore counts every literal once, as before; say in
   the message which tables and macros moved.
+- A struct copied under step 2 (`--copy-struct`) is a second place to edit: a later change to
+  one definition without the other would give two incompatible types in two files, and a
+  call through the public functions would then be undefined. The commit message names the
+  struct; the object comparison below (`tools/split_branch_check.py`, every moved function
+  and every kept one IDENTICAL-MODULO-LAYOUT in the builds) is what shows that no offset or
+  size moved.
 - An include left out under step 2's second exception is neither moved nor edited either:
   the original keeps the line, and the header's objects stay defined once, in the original's
   object. The family names none of them (the tool checks, with the header's macros), so every
@@ -20546,3 +20567,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | AMEND | LP | Step 7 (*chain form*): a step-2 predicate whose one label group holds four or more labels and is a *Complex Method* splits at a label boundary into two chained predicates: the later run (two labels or more) moves to a second predicate directly above the first, whose tail `return(MagickFalse);` becomes `return(<Second>(x));`. *Careful* gives the argument (the chain returns `MagickTrue` exactly for the original labels). Checked by `tools/label_set_check.py --split` | `display-image.c`'s `IsImageWindowArrowKey` (campaign A, W23 round thirteen lane c, wide build): eight labels, cc 10; a probe of the vertical/horizontal split 5.36 to 5.52 with no finding on either predicate (Claude Code, Sonnet 5.5) | owner |
 | 2026-11-14 | AMEND | BC | *Unreached functions: Recipe BC* (new paragraph of *Two levels of evidence*, BC's evidence line, the guard-level list): BC may be applied to a function no case reaches, `Verified: guard`, with BC's steps read, `refactor_guard.py` and `--calls` (+2), `tools/loop_tail_check.py` printing OK (the helper's body is the old block with each exit rewritten as BC step 3 gives, the call passes the parameter names in order, the rest of the file the same token stream) and `tools/obj_modulo.sh` IDENTICAL or MODULO-IDENTICAL | `display-image.c`'s `XLoadDirectoryImages` (campaign A, W23 round thirteen lane c, wide build): its progress block is the second bump of a Bumpy Road, the function and its callers run in no case, and no guard-level recipe takes a block that breaks; a probe with the backdrop block's Recipe N step 5.52 to 5.56 (Claude Code, Sonnet 5.5) | owner |
 | 2026-11-14 | AMEND | N | Step 8, the shared-struct form (a struct the caller already fills for another `static` function serving a later block): the block may also read up to three variables that are not members, which it only reads, each a by-value parameter of its exact type after `name` (Recipe E step 3), at most four parameters in all; the members' condition stands. The step gives the argument (each parameter holds the value its variable has at the call, never written by the block) | `feature-texture.c`'s `GetImageFeatures` (campaign A, W23 round thirteen lane d): the closing release of the six buffers (`sum`, `Q`, `density_y`, `density_xy`, `density_x`, `cooccurrence`) reads the six members of the `FeatureBuffers buffers` filled for `IsFeatureMemoryMissing` and `number_grays` for the two `DestroyFeatureMatrix` calls; a struct of its own would repeat the typedef and a six-line fill. A probe 8.70 to 8.72, `GetImageFeatures` 134 to 129 lines, no finding on the new function. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
+| 2026-11-14 | AMEND | S | Step 2 (*Careful*): a struct both parts name, one definition `struct TAG` / `{` ... `};` with no preprocessor line that a header completes into a type name, is defined again, verbatim, in the new file's *Typedef declarations* block (`split_source.py --copy-struct TAG`, committed with six tests in `41a035502`), the original keeping its definition. The step gives the argument (each translation unit holds the one definition; the two are compatible types by C11 6.2.7; layout follows from the same members) and the *Careful* bullet names the drift risk; the object comparison is the check. Enumerations, typedef'd structs and function-pointer typedefs stay refused | `threshold.c` (campaign A, W25 round fourteen lane a): `struct _ThresholdMap` is named by `OrderedDitherImage` and its helpers (the nine-root family of 63 functions) and by `GetThresholdMap`, `DestroyThresholdMap` and their statics (the roots that stay); `split_source.py` refused every split ("type ThresholdMap defined outside the region and used in it") and no other closed root set lifts Lines of Code from the kept file: the one with the maps out leaves 9.09 and the one with the nine roots out scores 10.0 for the kept file, 9.09 for the new one (the original's own score). Added by Claude Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
