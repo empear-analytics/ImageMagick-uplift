@@ -12900,6 +12900,12 @@ a label.
    the step. (A build that warns on enumerators missing from a `switch` with a
    `default:` (`-Wswitch-enum`) is not the oracle build; the step is refused where the
    project's own flags include it.)
+4. *No default* (2026-11-14, lane c). In a `switch` with no `default:` label, a group
+   whose statements are `break;` alone (comments aside), with every label in front of
+   it, may be deleted the same way: a value that matches no label leaves the `switch`
+   at its end, where that `break;` went. The group before it must not fall into it (it
+   ends in `break;`, `return` or a `goto`, or there is none), and no `#` line stands
+   inside it. Step 3's check applies.
 
 **Before:**
 
@@ -19955,3 +19961,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | AMEND | V | Step 9: the cleanup exit may be `S goto L;` with `S` assignments of constants to caller variables (`status=MagickFalse; goto cleanup;`), the caller writing `{ S goto L; }`, as VC step 6 does in a loop; Lane: c | `property.c`'s `InterpretImageProperties` (scratch image and text allocation) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | PK | Peel Keyed Arms That Share One Body out of a First-Letter Switch into a Key Table: arms in many groups of a name `switch` that compare the name with keys (or call a predicate joining key comparisons) and run one leaving body become one `static const` key table, a `LocaleCompare` membership lookup, and one `if` before the `switch` holding the body; Lane: c | `property.c`'s `SetImageProperty` (fifteen read-only keys in nine groups) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | KA | Peel Keyed Returning Arms out of a First-Letter Switch into a Table of Handlers: arms in several groups of a name `switch` that compare the name with a key and return become handlers of one signature (an existing function when an arm is one call of it), a `static const` key table, a lookup returning the handler, and one call before the `switch`; Lane: c | `property.c`'s `SetImageProperty` (eight setter keys) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | DL | Step 4: in a `switch` with no `default:`, a group that is `break;` alone, with its labels, may be deleted (a value matching no label leaves the `switch` where the `break;` went); `obj_identical.sh` IDENTICAL; Lane: c | `property.c`'s `SetImageProperty` (fourteen letter groups emptied by Recipes PK and KA) | mandate (2026-10-24) |
