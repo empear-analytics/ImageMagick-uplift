@@ -10388,15 +10388,15 @@ static DisplayCommand XTrimImageWindowEdge(const ImageWindowKeyInput *input,
   return(NullCommand);
 }
 
+static const char
+  Digits[] = "01234567890";
+
 static DisplayCommand XImageWindowCommand(Display *display,
   XResourceInfo *resource_info,XWindows *windows,const MagickStatusType state,
   KeySym key_symbol,Image **image,ExceptionInfo *exception)
 {
   static char
     delta[MagickPathExtent+1] = "";
-
-  static const char
-    Digits[] = "01234567890";
 
   static KeySym
     last_symbol = XK_0;
