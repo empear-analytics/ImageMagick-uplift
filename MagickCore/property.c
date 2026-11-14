@@ -3306,9 +3306,6 @@ static const char *CloneMagickPropertyValue(ImageInfo *image_info,
   return((char *) NULL);
 }
 
-static const char *GetMagickPropertyLetter(ImageInfo *image_info,
-  Image *image,const char letter,ExceptionInfo *exception)
-{
 #define WarnNoImageReturn(format,arg) \
   if (image == (Image *) NULL ) { \
     (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning, \
@@ -3322,6 +3319,9 @@ static const char *GetMagickPropertyLetter(ImageInfo *image_info,
     return((const char *) NULL); \
   }
 
+static const char *GetMagickPropertyLetter(ImageInfo *image_info,
+  Image *image,const char letter,ExceptionInfo *exception)
+{
   char
     value[MagickPathExtent];  /* formatted string to store as an artifact */
 
