@@ -334,12 +334,9 @@ static MagickBooleanType ExpandFilenameTail(
   return(MagickTrue);
 }
 
-static MagickBooleanType ExpandFilenameSpecifier(
+static MagickBooleanType FormatFilenameSpecifier(
   const FilenameExpansion *expansion,const FilenameTargets *targets)
 {
-  const char
-    *const start = expansion->start;
-
   char
     *const filename = expansion->filename;
 
@@ -358,38 +355,54 @@ static MagickBooleanType ExpandFilenameSpecifier(
   char
     pattern[MagickPathExtent];
 
+  char
+    format_specifier[MagickPathExtent];
+
+  size_t
+    length = (size_t) ((*cursor)-specifier_start),
+    pattern_length;
+
+  ssize_t
+    count;
+
+  (void) snprintf(format_specifier,sizeof(format_specifier),
+    "%%%.*s%c",(int) length,specifier_start,*(*cursor));
+  count=FormatLocaleString(pattern,sizeof(pattern),format_specifier,
+    value);
+  pattern_length=strlen(pattern);
+  if ((count <= 0) || ((size_t) count != pattern_length))
+    return(MagickFalse);
+  if (((*p)-filename+(ssize_t) pattern_length) >= MagickPathExtent)
+    return(MagickFalse);
+  (void) CopyMagickString((*p),pattern,(size_t) (MagickPathExtent-
+    ((*p)-filename)));
+  (*p)+=pattern_length;
+  (*cursor)++;
+  return(MagickTrue);
+}
+
+static MagickBooleanType ExpandFilenameSpecifier(
+  const FilenameExpansion *expansion,const FilenameTargets *targets)
+{
+  const char
+    *const start = expansion->start;
+
+  const char
+    *const specifier_start = expansion->specifier_start;
+
+  char
+    **const p = targets->p;
+
+  const char
+    **const cursor = targets->cursor;
+
   if (IsIntegerSpecifierAt((*cursor)) != MagickFalse)
     {
       const char
         *specifier_end = (*cursor)+1;
 
       if (IsValidFormatSpecifier(specifier_start,specifier_end) != MagickFalse)
-        {
-          char
-            format_specifier[MagickPathExtent];
-
-          size_t
-            length = (size_t) ((*cursor)-specifier_start),
-            pattern_length;
-
-          ssize_t
-            count;
-
-          (void) snprintf(format_specifier,sizeof(format_specifier),
-            "%%%.*s%c",(int) length,specifier_start,*(*cursor));
-          count=FormatLocaleString(pattern,sizeof(pattern),format_specifier,
-            value);
-          pattern_length=strlen(pattern);
-          if ((count <= 0) || ((size_t) count != pattern_length))
-            return(MagickFalse);
-          if (((*p)-filename+(ssize_t) pattern_length) >= MagickPathExtent)
-            return(MagickFalse);
-          (void) CopyMagickString((*p),pattern,(size_t) (MagickPathExtent-
-            ((*p)-filename)));
-          (*p)+=pattern_length;
-          (*cursor)++;
-          return(MagickTrue);
-        }
+        return(FormatFilenameSpecifier(expansion,targets));
       else
         {
           /*
