@@ -4870,6 +4870,37 @@ static MagickBooleanType AppendUnprefixedValue(
   return(WarnUnknownProperty(exception,pattern,offset));
 }
 
+static MagickBooleanType AppendBracedValue(
+  const InterpretSources *sources,const InterpretText *text,
+  const BracedPattern *braced)
+{
+  char
+    *const pattern = braced->pattern;
+
+  ExceptionInfo
+    *const exception = sources->exception;
+
+  Image
+    *const property_image = sources->property_image;
+
+  /*
+    Special Lookup Prefixes %[prefix:...].
+  */
+  if (LocaleNCompare("fx:",pattern,3) == 0)
+    return(AppendFxValue(text,property_image,pattern,exception));
+  if (LocaleNCompare("hex:",pattern,4) == 0)
+    return(AppendHexValue(text,property_image,pattern,exception));
+  if (LocaleNCompare("pixel:",pattern,6) == 0)
+    return(AppendPixelValue(text,property_image,pattern,exception));
+  if (LocaleNCompare("option:",pattern,7) == 0)
+    return(AppendOptionOrArtifact(sources,text,braced,OptionGlobSide));
+  if (LocaleNCompare("artifact:",pattern,9) == 0)
+    return(AppendOptionOrArtifact(sources,text,braced,ArtifactGlobSide));
+  if (LocaleNCompare("property:",pattern,9) == 0)
+    return(AppendPrefixedProperty(sources,text,braced));
+  return(AppendUnprefixedValue(sources,text,braced));
+}
+
 static MagickBooleanType InterpretBracedEscape(
   const InterpretSources *sources,const InterpretText *text,const char **p)
 {
@@ -4885,9 +4916,6 @@ static MagickBooleanType InterpretBracedEscape(
 
   ExceptionInfo
     *const exception = sources->exception;
-
-  Image
-    *const property_image = sources->property_image;
 
   /*
     Braced Percent Escape %[...].
@@ -4913,22 +4941,7 @@ static MagickBooleanType InterpretBracedEscape(
     }
   braced.pattern=pattern;
   braced.offset=offset;
-  /*
-    Special Lookup Prefixes %[prefix:...].
-  */
-  if (LocaleNCompare("fx:",pattern,3) == 0)
-    return(AppendFxValue(text,property_image,pattern,exception));
-  if (LocaleNCompare("hex:",pattern,4) == 0)
-    return(AppendHexValue(text,property_image,pattern,exception));
-  if (LocaleNCompare("pixel:",pattern,6) == 0)
-    return(AppendPixelValue(text,property_image,pattern,exception));
-  if (LocaleNCompare("option:",pattern,7) == 0)
-    return(AppendOptionOrArtifact(sources,text,&braced,OptionGlobSide));
-  if (LocaleNCompare("artifact:",pattern,9) == 0)
-    return(AppendOptionOrArtifact(sources,text,&braced,ArtifactGlobSide));
-  if (LocaleNCompare("property:",pattern,9) == 0)
-    return(AppendPrefixedProperty(sources,text,&braced));
-  return(AppendUnprefixedValue(sources,text,&braced));
+  return(AppendBracedValue(sources,text,&braced));
 }
 
 static MagickBooleanType ReadInterpretTextFile(const char *p,
