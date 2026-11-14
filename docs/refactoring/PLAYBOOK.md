@@ -16365,6 +16365,147 @@ Lane: c
 
 ---
 
+## Recipe KH - Replace a Keyword Switch by a Table of Arm Handlers
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead* and a
+*Complex Method* of several hundred on a loop whose body selects on a parsed keyword
+with a first-letter `switch`, each group a run of `if (LocaleCompare("K",keyword) == 0)
+{ ...; break; }` arms ending in `status=MagickFalse; break;`, the arms reading and writing
+a dozen loop locals and using a file macro that names `status` and hides a `break`:
+`draw.c`'s `RenderMVGContent` (69 MVG keywords, `ThrowPointExpectedException`).
+
+**Not covered by:** Recipe CK, whose groups leave through `return(c);` and hold no
+`break` that leaves the group (here every arm ends with one, and so does the macro);
+Recipe KM, whose arms share one shape and set one member; Recipe KD, whose arms are one
+`return F(args);`; Recipes SD and SR, which split the `switch` but keep the arms in it,
+rewriting written variables as `(*v)`, which would edit the macro's text; Recipe SF,
+which keeps every arm in one function.
+
+**How:**
+
+1. The `switch (*keyword)` is outside every OpenMP region, with no `#` line in it; each
+   group holds both cases of one letter and only arms whose key starts with that letter,
+   then `status=MagickFalse; break;`; a `;` group is `break;` alone; `default` is
+   `status=MagickFalse; break;`. Keys are distinct. An arm holds no `goto` and no
+   `continue` that leaves it; a `return` in it is `return(c);` of one constant `c`.
+2. State: the caller's `const` state struct of Recipe CS step 3, grown by the members the
+   arms need (the keyword array's value among them). Temporaries of the arms (Recipe CK
+   step 2) are declared in each handler and leave the caller.
+3. Handlers: each arm whose body is not `primitive_type=P; break;` moves to `static
+   MagickBooleanType ParseX(const State *state)` above the caller: copies in (Recipe CK
+   step 4) of the locals it names, the temporaries, then the arm's text; when anything
+   but its last `break;` leaves the arm (an inner `break;`, the macro), the text is
+   wrapped in `do { ... } while (0);`, otherwise the last `break;` is dropped; then the
+   copies out and `return(r);` (`r` not `c`). An arm that calls a helper taking the
+   state (an earlier Recipe CS step) passes instead `&arm_state`, a `const` struct the
+   handler declares last, whose members are the addresses of the handler's own copies
+   and temporaries and `state`'s members for the rest.
+4. A nested chain of the same shape on a token (`push` and `pop`, whose arms compare the
+   next token, `if (LocaleCompare("class",token) == 0)`, after `if (GetNextToken(...) <
+   1) break;`) gets its own table: its handler runs the token read, copies `q` out, and
+   on a match calls the sub-handler; a miss sets `status` false, as the chain's tail
+   did. A sub-arm that is `break;` alone is a table row without handler.
+5. Table: `typedef struct { const char *keyword; PrimitiveType primitive;
+   ParseMethod parse; }` and one `static const` array per chain, a row
+   `{ "K", P, ParseX }` per arm in source order (`P` for a `primitive_type=P;` arm and no
+   handler, `UndefinedPrimitive` otherwise); `GetMVGKeywordInfo` walks a table with
+   `LocaleCompare(row.keyword,name) == 0`, the arms' argument order.
+6. The `switch` becomes `if (ParseKeyword(&render_state) == c) return(c);`; the lookup
+   sets `primitive_type` from the row, calls the handler, or, on a miss, sets `status`
+   false unless the keyword starts with `;`.
+7. Check by reading: (a) `LocaleCompare` folds case through the C locale only, so a
+   keyword equal to a key starts with one of the two letters of that key's group, as
+   Recipe KM step 2 says: the lookup reaches the arm the `switch` reached, and a keyword
+   equal to no key took the group's or `default`'s `status=MagickFalse;`, or the `;`
+   group's nothing; (b) Recipe CK step 6 for every handler; (c) a `break` that left the
+   `switch` now leaves the `do`, runs the copies out and returns `r`, after which the
+   caller's statement after the `switch` runs, as before; (d) a handler's nested
+   helper reads and writes the handler's copies through `arm_state`, never a stale
+   caller variable.
+8. Run `tools/refactor_guard.py --calls`, the CI and C++ warning checks, and the oracle on
+   the caller's cases.
+
+**Before:**
+
+```c
+    switch (*keyword)
+    {
+      case ';':
+        break;
+      case 'a':
+      case 'A':
+      {
+        if (LocaleCompare("affine",keyword) == 0)
+          {
+            (void) GetNextToken(q,&q,extent,token);
+            affine.sx=GetDrawValue(token,&next_token);
+            if (token == next_token)
+              ThrowPointExpectedException(token,exception);
+            ...
+            break;
+          }
+        if (LocaleCompare("alpha",keyword) == 0)
+          {
+            primitive_type=AlphaPrimitive;
+            break;
+          }
+        ...
+        status=MagickFalse;
+        break;
+      }
+```
+
+**After:**
+
+```c
+static MagickBooleanType ParseMVGAffine(const MVGRenderState *state)
+{
+  ...
+  do
+  {
+    (void) GetNextToken(q,&q,extent,token);
+    affine.sx=GetDrawValue(token,&next_token);
+    ...
+    break;
+  } while (0);
+  (*state->affine)=affine;
+  (*state->q)=q;
+  (*state->status)=status;
+  return(MagickTrue);
+}
+  ...
+static const MVGKeywordInfo
+  MVGKeywords[] =
+  {
+    { "affine", UndefinedPrimitive, ParseMVGAffine },
+    { "alpha", AlphaPrimitive, (ParseMVGKeywordMethod) NULL },
+    ...
+  };
+  ...
+    if (ParseMVGKeyword(&render_state) == MagickFalse)
+      return(MagickFalse);
+```
+
+**Careful:**
+
+- The `do { } while (0);` is a block a `break` can leave, nothing more; an arm with a
+  `continue` that leaves it is refused (step 1), since it would end the `do`.
+- The lookup scans up to the whole table (69 rows) where the `switch` scanned one
+  group; every comparison is side-effect free.
+- An error the macro throws with `GetMagickModule()` now names the handler (owner,
+  2026-11-12).
+
+**Evidence level:** oracle, with `refactor_guard.py --calls`, `ci_warnings.sh`,
+`cxx_warnings.sh`, and step 7 checked by reading.
+
+**Provenance:** 2026-11-14, from `draw.c`'s `RenderMVGContent` (campaign B, M127 lane c
+round 8): the keyword switch held 74 bumps and depth 6; with the primitive tail moved
+by Recipe CS first, the table takes draw.c from 2.99 to 3.19. Added by Claude Code
+(Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: c
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -18078,3 +18219,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | AMEND | MT | Step 1: the copies may be blocks that Recipe VC moves (in-loop, leaving through `S goto L;`); a differing pair of `void` call statements is written as a `?:` of the two calls; Lane: c | `InterpretImageProperties`' option and artifact glob loops (two helpers would be *Code Duplication*) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | CS | Extract a Loop-Body Segment Through a State of the Caller's Addresses: a segment of a loop body moves to a `void` helper taking one `const` struct of the caller's addresses, copying locals in and out (Recipe CK's form); a local aliased through another struct is bound by address and written `(*v)`; a segment whose loop exits all have the status false is wrapped in `do { } while (0);` and the caller's status test follows; Lane: c | `draw.c`'s `RenderMVGContent` (the primitive tail: segments writing up to eight loop locals, `number_points` and `primitive_info` aliased through `mvg_info`) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | CS | Step 1: in form A the segment may be a run of statements nested inside the loop body (a `switch` group, an `if` block, an inner loop's body) when nothing in it leaves it; Lane: c | `RenderMVGContent`'s `clip-path` and `stroke-dasharray` arms, whose nested blocks hold the depth 4 their keyword handlers would keep | mandate (2026-10-24) |
+| 2026-11-14 | NEW | KH | Replace a Keyword Switch by a Table of Arm Handlers: each `LocaleCompare` arm of a first-letter keyword `switch` moves to a handler taking the caller's state struct (copies in and out, `do { } while (0);` around an arm with inner exits), a nested token chain gets its own table, and the `switch` becomes a table lookup that keeps the misses' `status=MagickFalse;`; Lane: c | `draw.c`'s `RenderMVGContent` (69 keywords, 74 bumps, depth 6; 2.99 to 3.19 after the Recipe CS steps) | mandate (2026-10-24) |
