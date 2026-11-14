@@ -4985,6 +4985,21 @@ static SegmentInfo RotateBlurAxes(const GeometryInfo geometry_info,
   return(blur);
 }
 
+static void GetBlurAngleRange(const GeometryInfo geometry_info,
+  const MagickStatusType flags,double *angle_start,double *angle_range)
+{
+  *angle_start=0.0;
+  *angle_range=0.0;
+  if ((flags & YValue) != 0 )
+    {
+      /*
+        Lets set a angle range and calculate in the loop.
+      */
+      *angle_start=DegreesToRadians(geometry_info.xi);
+      *angle_range=DegreesToRadians(geometry_info.psi)-*angle_start;
+    }
+}
+
 typedef struct _BlurCanvasInputs
 {
   double
@@ -5442,16 +5457,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       blur.y2=height;
       if ((flags & XValue) != 0 )
         blur=RotateBlurAxes(geometry_info,width,height);
-      angle_start=0.0;
-      angle_range=0.0;
-      if ((flags & YValue) != 0 )
-        {
-          /*
-            Lets set a angle range and calculate in the loop.
-          */
-          angle_start=DegreesToRadians(geometry_info.xi);
-          angle_range=DegreesToRadians(geometry_info.psi)-angle_start;
-        }
+      GetBlurAngleRange(geometry_info,flags,&angle_start,&angle_range);
       {
         const BlurCanvasInputs
           inputs = { angle_range, angle_start, height, width, canvas_image,
