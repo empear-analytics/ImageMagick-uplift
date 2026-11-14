@@ -1992,6 +1992,89 @@ static void ComputeVarianceDirections(
   }
 }
 
+static void ComputeTextureDirections(
+  const TextureFeatureState *inputs,FeatureStatistics sum_squares,
+  FeatureStatistics variance,MagickBooleanType status)
+{
+  const Image
+    *const image = inputs->image;
+
+  ChannelFeatures
+    *const channel_features = inputs->channel_features;
+
+  FeatureStatistics
+    **const cooccurrence = inputs->cooccurrence,
+    *const density_x = inputs->density_x,
+    *const density_xy = inputs->density_xy,
+    *const density_y = inputs->density_y,
+    **const Q = inputs->Q,
+    *const sum = inputs->sum;
+
+  const unsigned int
+    number_grays = inputs->number_grays;
+
+  FeatureStatistics
+    correlation = inputs->correlation,
+    entropy_x = inputs->entropy_x,
+    entropy_xy = inputs->entropy_xy,
+    entropy_xy1 = inputs->entropy_xy1,
+    entropy_xy2 = inputs->entropy_xy2,
+    entropy_y = inputs->entropy_y,
+    mean = inputs->mean;
+
+  ssize_t
+    i;
+
+  /*
+    Compute texture features.
+  */
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,number_grays,1)
+#endif
+  for (i=0; i < 4; i++)
+  {
+    const TextureDirection
+      texture = { image, channel_features, cooccurrence, density_x,
+        density_xy, density_y, Q, sum, number_grays, i };
+
+    const TextureSlots
+      slots = { &correlation.direction[i], &entropy_x.direction[i],
+        &entropy_xy.direction[i], &entropy_xy1.direction[i],
+        &entropy_xy2.direction[i], &entropy_y.direction[i],
+        &mean.direction[i], &sum_squares.direction[i],
+        &variance.direction[i] };
+
+    ComputeTextureFeatures(&texture,&slots);
+  }
+  /*
+    Compute more texture features.
+  */
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,number_grays,1)
+#endif
+  for (i=0; i < 4; i++)
+  {
+    const TextureDirection
+      texture = { image, channel_features, cooccurrence, density_x,
+        density_xy, density_y, Q, sum, number_grays, i };
+
+    ComputeSumFeatures(&texture);
+  }
+  /*
+    Compute more texture features.
+  */
+  {
+    const TextureFeatureState
+      features = { image, channel_features, cooccurrence, density_x,
+        density_xy, density_y, Q, sum, number_grays, correlation, entropy_x,
+        entropy_xy, entropy_xy1, entropy_xy2, entropy_y, mean };
+
+    ComputeVarianceDirections(&features,sum_squares,variance,status);
+  }
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -2007,6 +2090,9 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
 
   FeatureMatrixInputs
     matrix;
+
+  TextureFeatureState
+    inputs;
 
   FeatureStatistics
     **cooccurrence,
@@ -2134,54 +2220,23 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     Normalize spatial dependence matrix.
   */
   NormalizeFeatureCooccurrence(image,distance,cooccurrence,number_grays);
-  /*
-    Compute texture features.
-  */
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(image,image,number_grays,1)
-#endif
-  for (i=0; i < 4; i++)
-  {
-    const TextureDirection
-      texture = { image, channel_features, cooccurrence, density_x,
-        density_xy, density_y, Q, sum, number_grays, i };
-
-    const TextureSlots
-      slots = { &correlation.direction[i], &entropy_x.direction[i],
-        &entropy_xy.direction[i], &entropy_xy1.direction[i],
-        &entropy_xy2.direction[i], &entropy_y.direction[i],
-        &mean.direction[i], &sum_squares.direction[i],
-        &variance.direction[i] };
-
-    ComputeTextureFeatures(&texture,&slots);
-  }
-  /*
-    Compute more texture features.
-  */
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(image,image,number_grays,1)
-#endif
-  for (i=0; i < 4; i++)
-  {
-    const TextureDirection
-      texture = { image, channel_features, cooccurrence, density_x,
-        density_xy, density_y, Q, sum, number_grays, i };
-
-    ComputeSumFeatures(&texture);
-  }
-  /*
-    Compute more texture features.
-  */
-  {
-    const TextureFeatureState
-      features = { image, channel_features, cooccurrence, density_x,
-        density_xy, density_y, Q, sum, number_grays, correlation, entropy_x,
-        entropy_xy, entropy_xy1, entropy_xy2, entropy_y, mean };
-
-    ComputeVarianceDirections(&features,sum_squares,variance,status);
-  }
+  inputs.image=image;
+  inputs.channel_features=channel_features;
+  inputs.cooccurrence=cooccurrence;
+  inputs.density_x=density_x;
+  inputs.density_xy=density_xy;
+  inputs.density_y=density_y;
+  inputs.Q=Q;
+  inputs.sum=sum;
+  inputs.number_grays=number_grays;
+  inputs.correlation=correlation;
+  inputs.entropy_x=entropy_x;
+  inputs.entropy_xy=entropy_xy;
+  inputs.entropy_xy1=entropy_xy1;
+  inputs.entropy_xy2=entropy_xy2;
+  inputs.entropy_y=entropy_y;
+  inputs.mean=mean;
+  ComputeTextureDirections(&inputs,sum_squares,variance,status);
   /*
     Relinquish resources.
   */
