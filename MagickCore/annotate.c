@@ -769,6 +769,15 @@ static void DrawTextLineThrough(const TextDecorationInfo *decoration,
   }
 }
 
+static void DestroyAnnotateText(DrawInfo *annotate_info,DrawInfo *annotate,
+  char **textlist,char *text)
+{
+  annotate_info=DestroyDrawInfo(annotate_info);
+  annotate=DestroyDrawInfo(annotate);
+  textlist=(char **) RelinquishMagickMemory(textlist);
+  text=DestroyString(text);
+}
+
 MagickExport MagickBooleanType AnnotateImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -841,10 +850,7 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
     }
   if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
     {
-      annotate_info=DestroyDrawInfo(annotate_info);
-      annotate=DestroyDrawInfo(annotate);
-      textlist=(char **) RelinquishMagickMemory(textlist);
-      text=DestroyString(text);
+      DestroyAnnotateText(annotate_info,annotate,textlist,text);
       return(MagickFalse);
     }
   if (IsGrayColorspace(image->colorspace) != MagickFalse)
@@ -918,10 +924,7 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
   /*
     Relinquish resources.
   */
-  annotate_info=DestroyDrawInfo(annotate_info);
-  annotate=DestroyDrawInfo(annotate);
-  textlist=(char **) RelinquishMagickMemory(textlist);
-  text=DestroyString(text);
+  DestroyAnnotateText(annotate_info,annotate,textlist,text);
   return(status);
 }
 
