@@ -22846,6 +22846,89 @@ static void XMakePopupWindow(const DisplayEventContext *context)
       "Window id: 0x%lx (pop up)",windows->popup.id);
 }
 
+static void XMakeMagnifyWindow(const DisplayEventContext *context,
+  const Image *display_image)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  XPixelInfo
+    *const pixel = context->pixel;
+
+  XStandardColormap
+    *const map_info = context->map_info;
+
+  const Window
+    root_window = context->root_window;
+
+  XVisualInfo
+    *const visual_info = context->visual_info;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  char
+    **const argv = context->argv;
+
+  const int
+    argc = context->argc;
+
+  XClassHint
+    *const class_hints = context->class_hints;
+
+  XWMHints
+    *const manager_hints = context->manager_hints;
+
+  char
+    resource_name[MagickPathExtent];
+
+  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
+    resource_info,&windows->magnify);
+  if (resource_info->use_shared_memory == MagickFalse)
+    windows->magnify.shared_memory=MagickFalse;
+  (void) FormatLocaleString(resource_name,MagickPathExtent,"%s.magnify",
+    resource_info->client_name);
+  windows->magnify.geometry=XGetResourceClass(resource_info->resource_database,
+    resource_name,"geometry",(char *) NULL);
+  (void) FormatLocaleString(windows->magnify.name,MagickPathExtent,
+    "Magnify %uX",resource_info->magnify);
+  if (windows->magnify.cursor != (Cursor) NULL)
+    (void) XFreeCursor(display,windows->magnify.cursor);
+  windows->magnify.cursor=XMakeCursor(display,windows->image.id,
+    map_info->colormap,resource_info->background_color,
+    resource_info->foreground_color);
+  if (windows->magnify.cursor == (Cursor) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateCursor",
+      display_image->filename);
+  windows->magnify.width=MagnifySize;
+  windows->magnify.height=MagnifySize;
+  windows->magnify.flags|=PPosition;
+  windows->magnify.min_width=MagnifySize;
+  windows->magnify.min_height=MagnifySize;
+  windows->magnify.width_inc=MagnifySize;
+  windows->magnify.height_inc=MagnifySize;
+  windows->magnify.data=resource_info->magnify;
+  windows->magnify.attributes.cursor=windows->magnify.cursor;
+  windows->magnify.attributes.event_mask=ButtonPressMask | ButtonReleaseMask |
+    ExposureMask | KeyPressMask | KeyReleaseMask | OwnerGrabButtonMask |
+    StructureNotifyMask;
+  manager_hints->flags=InputHint | StateHint | WindowGroupHint;
+  manager_hints->input=MagickTrue;
+  manager_hints->initial_state=NormalState;
+  manager_hints->window_group=windows->image.id;
+  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
+    &windows->magnify);
+  if (resource_info->debug != MagickFalse)
+    (void) LogMagickEvent(X11Event,GetMagickModule(),
+      "Window id: 0x%lx (magnify)",windows->magnify.id);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -23179,45 +23262,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   /*
     Initialize Magnify window and cursor.
   */
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->magnify);
-  if (resource_info->use_shared_memory == MagickFalse)
-    windows->magnify.shared_memory=MagickFalse;
-  (void) FormatLocaleString(resource_name,MagickPathExtent,"%s.magnify",
-    resource_info->client_name);
-  windows->magnify.geometry=XGetResourceClass(resource_info->resource_database,
-    resource_name,"geometry",(char *) NULL);
-  (void) FormatLocaleString(windows->magnify.name,MagickPathExtent,
-    "Magnify %uX",resource_info->magnify);
-  if (windows->magnify.cursor != (Cursor) NULL)
-    (void) XFreeCursor(display,windows->magnify.cursor);
-  windows->magnify.cursor=XMakeCursor(display,windows->image.id,
-    map_info->colormap,resource_info->background_color,
-    resource_info->foreground_color);
-  if (windows->magnify.cursor == (Cursor) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateCursor",
-      display_image->filename);
-  windows->magnify.width=MagnifySize;
-  windows->magnify.height=MagnifySize;
-  windows->magnify.flags|=PPosition;
-  windows->magnify.min_width=MagnifySize;
-  windows->magnify.min_height=MagnifySize;
-  windows->magnify.width_inc=MagnifySize;
-  windows->magnify.height_inc=MagnifySize;
-  windows->magnify.data=resource_info->magnify;
-  windows->magnify.attributes.cursor=windows->magnify.cursor;
-  windows->magnify.attributes.event_mask=ButtonPressMask | ButtonReleaseMask |
-    ExposureMask | KeyPressMask | KeyReleaseMask | OwnerGrabButtonMask |
-    StructureNotifyMask;
-  manager_hints->flags=InputHint | StateHint | WindowGroupHint;
-  manager_hints->input=MagickTrue;
-  manager_hints->initial_state=NormalState;
-  manager_hints->window_group=windows->image.id;
-  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-    &windows->magnify);
-  if (resource_info->debug != MagickFalse)
-    (void) LogMagickEvent(X11Event,GetMagickModule(),
-      "Window id: 0x%lx (magnify)",windows->magnify.id);
+  XMakeMagnifyWindow(&event_context,display_image);
   (void) XSetTransientForHint(display,windows->magnify.id,windows->image.id);
   /*
     Initialize panning window.
