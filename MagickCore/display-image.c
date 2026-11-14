@@ -10964,6 +10964,68 @@ static void XApplySpreadCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyShadeCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  Image
+    *shade_image;
+
+  int
+    status;
+
+  static char
+    geometry[MagickPathExtent] = "30x30";
+
+  /*
+    Query user for the shade geometry.
+  */
+  status=XDialogWidget(display,windows,"Shade",
+    "Enter the azimuth and elevation of the light source:",geometry);
+  if (*geometry == '\0')
+    return;
+  /*
+    Shade image pixels.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flags=ParseGeometry(geometry,&geometry_info);
+  if ((flags & SigmaValue) == 0)
+    geometry_info.sigma=1.0;
+  shade_image=ShadeImage(*image,status != 0 ? MagickTrue : MagickFalse,
+    geometry_info.rho,geometry_info.sigma,exception);
+  if (shade_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=shade_image;
+    }
+  CatchException(exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyRollCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12113,46 +12175,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplySpreadCommand(&context,&flags);
       break;
     case ShadeCommand:
-    {
-      Image
-        *shade_image;
-
-      int
-        status;
-
-      static char
-        geometry[MagickPathExtent] = "30x30";
-
-      /*
-        Query user for the shade geometry.
-      */
-      status=XDialogWidget(display,windows,"Shade",
-        "Enter the azimuth and elevation of the light source:",geometry);
-      if (*geometry == '\0')
-        break;
-      /*
-        Shade image pixels.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      flags=ParseGeometry(geometry,&geometry_info);
-      if ((flags & SigmaValue) == 0)
-        geometry_info.sigma=1.0;
-      shade_image=ShadeImage(*image,status != 0 ? MagickTrue : MagickFalse,
-        geometry_info.rho,geometry_info.sigma,exception);
-      if (shade_image != (Image *) NULL)
-        {
-          *image=DestroyImage(*image);
-          *image=shade_image;
-        }
-      CatchException(exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyShadeCommand(&context);
       break;
-    }
     case RaiseCommand:
     {
       static char
