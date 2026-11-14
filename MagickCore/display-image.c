@@ -10421,6 +10421,9 @@ typedef struct _XMagickCommandContext
 
   ExceptionInfo
     *exception;
+
+  char
+    *color;
 } XMagickCommandContext;
 
 static Image *XApplyOpenCommand(const XMagickCommandContext *context)
@@ -14041,6 +14044,40 @@ static void XApplyMiscellanyCommands(const XMagickCommandContext *context,
   }
 }
 
+static void XApplyImageEditCommands(const XMagickCommandContext *context,
+  const DisplayCommand command,Image **nexus)
+{
+  char
+    *const color = context->color;
+
+  switch (command)
+  {
+    case CompositeCommand:
+      XApplyCompositeCommand(context);
+      break;
+    case AddBorderCommand:
+      XApplyAddBorderCommand(context,color);
+      break;
+    case AddFrameCommand:
+      XApplyAddFrameCommand(context,color);
+      break;
+    case CommentCommand:
+      XApplyCommentCommand(context);
+      break;
+    case LaunchCommand:
+      (*nexus)=XApplyLaunchCommand(context,(*nexus));
+      break;
+    case RegionOfInterestCommand:
+      XApplyRegionOfInterestCommand(context);
+      break;
+    default:
+    {
+      XApplyMiscellanyCommands(context,command,&(*nexus));
+      break;
+    }
+  }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -14083,6 +14120,7 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   context.image=image;
   context.image_info=image_info;
   context.exception=exception;
+  context.color=color;
   switch (command)
   {
     case OpenCommand:
@@ -14289,27 +14327,9 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
     case MatteCommand:
       XApplyMatteCommand(&context);
       break;
-    case CompositeCommand:
-      XApplyCompositeCommand(&context);
-      break;
-    case AddBorderCommand:
-      XApplyAddBorderCommand(&context,color);
-      break;
-    case AddFrameCommand:
-      XApplyAddFrameCommand(&context,color);
-      break;
-    case CommentCommand:
-      XApplyCommentCommand(&context);
-      break;
-    case LaunchCommand:
-      nexus=XApplyLaunchCommand(&context,nexus);
-      break;
-    case RegionOfInterestCommand:
-      XApplyRegionOfInterestCommand(&context);
-      break;
     default:
     {
-      XApplyMiscellanyCommands(&context,command,&nexus);
+      XApplyImageEditCommands(&context,command,&nexus);
       break;
     }
   }
