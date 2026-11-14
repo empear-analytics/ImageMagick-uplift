@@ -5369,9 +5369,6 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     }
     case BlurCompositeOp:
     {
-      BlurCanvasInputs
-        inputs;
-
       double
         angle_range,
         angle_start,
@@ -5447,17 +5444,13 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
           angle_start=DegreesToRadians(geometry_info.xi);
           angle_range=DegreesToRadians(geometry_info.psi)-angle_start;
         }
-      inputs.angle_range=angle_range;
-      inputs.angle_start=angle_start;
-      inputs.height=height;
-      inputs.width=width;
-      inputs.canvas_image=canvas_image;
-      inputs.image=image;
-      inputs.source_image=source_image;
-      inputs.x_offset=x_offset;
-      inputs.y_offset=y_offset;
-      inputs.exception=exception;
-      BlurCompositeCanvas(&inputs,blur);
+      {
+        const BlurCanvasInputs
+          inputs = { angle_range, angle_start, height, width, canvas_image,
+            image, source_image, x_offset, y_offset, exception };
+
+        BlurCompositeCanvas(&inputs,blur);
+      }
       source_image=DestroyImage(source_image);
       source_image=canvas_image;
       break;
