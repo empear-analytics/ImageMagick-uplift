@@ -195,6 +195,23 @@ static inline void AppendTokenChar(const NextTokenInput *input,
     token[(*i)++]=(*p);
 }
 
+static MagickBooleanType ScanQuotedEscape(const NextTokenTargets *targets,
+  const char escape)
+{
+  const char
+    *magick_restrict *const p = targets->p;
+
+  if (IsEscapedQuote((*p),escape) != MagickFalse)
+    (*p)++;
+  else
+    if (*(*p) == escape)
+      {
+        (*p)++;
+        return(MagickFalse);
+      }
+  return(MagickTrue);
+}
+
 static void ScanQuotedToken(const NextTokenInput *input,
   const NextTokenTargets *targets)
 {
@@ -210,14 +227,8 @@ static void ScanQuotedToken(const NextTokenInput *input,
   escape=GetClosingQuote((*p));
   for ((*p)++; *(*p) != '\0'; (*p)++)
   {
-    if (IsEscapedQuote((*p),escape) != MagickFalse)
-      (*p)++;
-    else
-      if (*(*p) == escape)
-        {
-          (*p)++;
-          break;
-        }
+    if (ScanQuotedEscape(targets,escape) == MagickFalse)
+      break;
     AppendTokenChar(input,(*p),i);
     if (IsTokenExtentReached(input,targets) != MagickFalse)
       break;
