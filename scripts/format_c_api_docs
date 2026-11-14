@@ -73,6 +73,7 @@ if ( ! GetOptions(
 	 'image.c',
 	 'image-mask.c',
 	 'image-fill.c',
+	 'image-clone.c',
 	 'image-settings.c',
 	 'image-append.c',
 	 'image-filename.c',
