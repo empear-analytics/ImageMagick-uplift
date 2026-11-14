@@ -95,6 +95,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/blob.h \
   MagickCore/blob-private.h \
   MagickCore/cache.c \
+  MagickCore/cache-access.c \
   MagickCore/cache.h \
   MagickCore/cache-private.h \
   MagickCore/cache-view.c \
