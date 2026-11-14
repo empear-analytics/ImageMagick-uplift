@@ -897,6 +897,18 @@ static size_t GetHuffmanWidth(const ImageInfo *image_info,
   return(width);
 }
 
+static void OutputHuffmanEndOfPage(const ImageInfo *image_info,Image *image,
+  unsigned char *byte,unsigned char *bit)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < 6; i++)
+  {
+    OutputHuffmanEndOfLine(image_info,image,byte,bit);
+  }
+}
+
 MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
   Image *image,Image *inject_image,ExceptionInfo *exception)
 {
@@ -908,9 +920,6 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
 
   Image
     *huffman_image;
-
-  ssize_t
-    i;
 
   const Quantum
     *p;
@@ -1024,10 +1033,7 @@ MagickExport MagickBooleanType HuffmanEncodeImage(const ImageInfo *image_info,
   /*
     End of page.
   */
-  for (i=0; i < 6; i++)
-  {
-    OutputHuffmanEndOfLine(image_info,image,&byte,&bit);
-  }
+  OutputHuffmanEndOfPage(image_info,image,&byte,&bit);
   /*
     Flush bits.
   */
