@@ -14233,6 +14233,37 @@ static void XApplyColorMapCommands(const XMagickCommandContext *context,
   }
 }
 
+static void XApplyContrastCommands(const XMagickCommandContext *context,
+  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
+{
+  switch (command)
+  {
+    case SpiffCommand:
+      XApplySpiffCommand(context);
+      break;
+    case DullCommand:
+      XApplyDullCommand(context);
+      break;
+    case ContrastStretchCommand:
+      XApplyContrastStretchCommand(context);
+      break;
+    case SigmoidalContrastCommand:
+      XApplySigmoidalContrastCommand(context);
+      break;
+    case NormalizeCommand:
+      XApplyNormalizeCommand(context);
+      break;
+    case EqualizeCommand:
+      XApplyEqualizeCommand(context);
+      break;
+    default:
+    {
+      XApplyColorMapCommands(context,command,&(*flags),&(*nexus));
+      break;
+    }
+  }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -14381,27 +14412,9 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
     case GammaCommand:
       XApplyGammaCommand(&context);
       break;
-    case SpiffCommand:
-      XApplySpiffCommand(&context);
-      break;
-    case DullCommand:
-      XApplyDullCommand(&context);
-      break;
-    case ContrastStretchCommand:
-      XApplyContrastStretchCommand(&context);
-      break;
-    case SigmoidalContrastCommand:
-      XApplySigmoidalContrastCommand(&context);
-      break;
-    case NormalizeCommand:
-      XApplyNormalizeCommand(&context);
-      break;
-    case EqualizeCommand:
-      XApplyEqualizeCommand(&context);
-      break;
     default:
     {
-      XApplyColorMapCommands(&context,command,&flags,&nexus);
+      XApplyContrastCommands(&context,command,&flags,&nexus);
       break;
     }
   }
