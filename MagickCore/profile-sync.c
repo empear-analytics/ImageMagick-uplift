@@ -933,6 +933,13 @@ static void SyncExifDirectory(const ExifWalkInfo *walk,
   }
 }
 
+static inline MagickBooleanType IsInvalidExifOffset(const ssize_t offset,
+  const size_t length)
+{
+  return(((offset < 0) || ((size_t) offset >= length)) ? MagickTrue :
+    MagickFalse);
+}
+
 static void SyncExifProfile(const Image *image,unsigned char *exif,
   size_t length)
 {
@@ -969,7 +976,7 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
     This the offset to the first IFD.
   */
   offset=(ssize_t) ReadProfileLong(endian,exif+4);
-  if ((offset < 0) || ((size_t) offset >= length))
+  if (IsInvalidExifOffset(offset,length) != MagickFalse)
     return;
   directory=exif+offset;
   exif_directory=(unsigned char *) NULL;
