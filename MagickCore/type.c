@@ -469,7 +469,7 @@ static inline size_t GetDefaultFontWeight(const size_t weight)
   return(font_weight);
 }
 
-MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
+static const TypeInfo *GetSubstituteTypeInfo(const char *family,
   const StyleType style,const StretchType stretch,const size_t weight,
   ExceptionInfo *exception)
 {
@@ -482,9 +482,6 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
 
   const TypeInfo
     *type_info;
-
-  size_t
-    font_weight;
 
   ssize_t
     i;
@@ -500,6 +497,28 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
       { "terminal", "courier" },
       { "wingdings", "symbol" }
     };
+
+  type_info=(const TypeInfo *) NULL;
+  for (i=0; i < (ssize_t) (sizeof(fontmap)/sizeof(fontmap[0])); i++)
+  {
+    if (IsFamilyMismatch(fontmap[i].name,family) != MagickFalse)
+      continue;
+    type_info=GetTypeInfoByFamily(fontmap[i].substitute,style,stretch,weight,
+      exception);
+    break;
+  }
+  return(type_info);
+}
+
+MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
+  const StyleType style,const StretchType stretch,const size_t weight,
+  ExceptionInfo *exception)
+{
+  const TypeInfo
+    *type_info;
+
+  size_t
+    font_weight;
 
   /*
     Check for an exact type match.
@@ -520,14 +539,7 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
   /*
     Check for table-based substitution match.
   */
-  for (i=0; i < (ssize_t) (sizeof(fontmap)/sizeof(fontmap[0])); i++)
-  {
-    if (IsFamilyMismatch(fontmap[i].name,family) != MagickFalse)
-      continue;
-    type_info=GetTypeInfoByFamily(fontmap[i].substitute,style,stretch,weight,
-      exception);
-    break;
-  }
+  type_info=GetSubstituteTypeInfo(family,style,stretch,weight,exception);
   if (type_info != (const TypeInfo *) NULL)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),TypeWarning,
