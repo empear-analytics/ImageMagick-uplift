@@ -240,6 +240,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/montage-info.c \
   MagickCore/montage.h \
   MagickCore/morphology.c \
+  MagickCore/morphology-apply.c \
   MagickCore/morphology.h \
   MagickCore/morphology-private.h \
   MagickCore/mutex.h \
