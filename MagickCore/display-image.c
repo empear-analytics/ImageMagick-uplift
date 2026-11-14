@@ -24459,6 +24459,14 @@ static void XUpdateWindowStasis(XWindows *windows,const time_t timestamp)
     }
 }
 
+static inline MagickBooleanType IsSelectiveColormapCrossing(Display *display,
+  const XStandardColormap *map_info,const XVisualInfo *visual_info,
+  const int mode)
+{
+  return(((map_info->colormap != XDefaultColormap(display,visual_info->screen)) &&
+    (mode != NotifyUngrab)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -24906,8 +24914,8 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
         /*
           Selectively install colormap.
         */
-        if ((map_info->colormap != XDefaultColormap(display,visual_info->screen)) &&
-            (event.xcrossing.mode != NotifyUngrab))
+        if (IsSelectiveColormapCrossing(display,map_info,visual_info,
+              event.xcrossing.mode) != MagickFalse)
           XInstallColormap(display,map_info->colormap);
         break;
       }
@@ -24947,8 +24955,8 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
         /*
           Selectively uninstall colormap.
         */
-        if ((map_info->colormap != XDefaultColormap(display,visual_info->screen)) &&
-            (event.xcrossing.mode != NotifyUngrab))
+        if (IsSelectiveColormapCrossing(display,map_info,visual_info,
+              event.xcrossing.mode) != MagickFalse)
           XUninstallColormap(display,map_info->colormap);
         break;
       }
