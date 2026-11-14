@@ -3061,6 +3061,9 @@ typedef struct _MVGRenderState
     *extent,
     *number_points;
 
+  SplayTreeInfo
+    **macros;
+
   ssize_t
     *i,
     *j,
@@ -3739,6 +3742,50 @@ static void TransformMVGPrimitive(const MVGRenderState *state)
   (*state->i)=i;
 }
 
+static void DrawMVGPrimitive(const MVGRenderState *state)
+{
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  Image
+    *image = state->image;
+
+  MagickStatusType
+    status = (*state->status);
+
+  PrimitiveInfo
+    *primitive_info = (*state->primitive_info);
+
+  SplayTreeInfo
+    *macros = (*state->macros);
+
+  ssize_t
+    n = (*state->n);
+
+  if (graphic_context[n]->render != MagickFalse)
+    {
+      if (IsClipMaskChanged(graphic_context,n) != MagickFalse)
+        {
+          const char
+            *clip_path;
+
+          clip_path=(const char *) GetValueFromSplayTree(macros,
+            graphic_context[n]->clip_mask);
+          if (clip_path != (const char *) NULL)
+            (void) SetImageArtifact(image,graphic_context[n]->clip_mask,
+              clip_path);
+          status&=(MagickStatusType) DrawClipPath(image,graphic_context[n],
+            graphic_context[n]->clip_mask,exception);
+        }
+      status&=(MagickStatusType) DrawPrimitive(image,graphic_context[n],
+        primitive_info,exception);
+    }
+  (*state->status)=status;
+}
+
 static MagickBooleanType RenderMVGContent(Image *image,
   const DrawInfo *draw_info,const size_t depth,ExceptionInfo *exception)
 {
@@ -3815,7 +3862,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
   const MVGRenderState
     render_state = { &token, &p, &q, &coordinates, &cursor, &graphic_context,
       draw_info, exception, image, &status, &mvg_info, &primitive_info,
-      &primitive_type, &extent, &number_points, &i, &j, &n, &x };
+      &primitive_type, &extent, &number_points, &macros, &i, &j, &n, &x };
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -5398,24 +5445,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
       Transform points.
     */
     TransformMVGPrimitive(&render_state);
-    if (graphic_context[n]->render != MagickFalse)
-      {
-        if (IsClipMaskChanged(graphic_context,n) != MagickFalse)
-          {
-            const char
-              *clip_path;
-
-            clip_path=(const char *) GetValueFromSplayTree(macros,
-              graphic_context[n]->clip_mask);
-            if (clip_path != (const char *) NULL)
-              (void) SetImageArtifact(image,graphic_context[n]->clip_mask,
-                clip_path);
-            status&=(MagickStatusType) DrawClipPath(image,graphic_context[n],
-              graphic_context[n]->clip_mask,exception);
-          }
-        status&=(MagickStatusType) DrawPrimitive(image,graphic_context[n],
-          primitive_info,exception);
-      }
+    DrawMVGPrimitive(&render_state);
     proceed=SetImageProgress(image,RenderImageTag,q-primitive,(MagickSizeType)
       primitive_extent);
     if (proceed == MagickFalse)
