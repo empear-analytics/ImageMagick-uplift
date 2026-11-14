@@ -3538,6 +3538,65 @@ static void GetProfilesProperty(const Image *image,char *value)
     }
 }
 
+static MagickBooleanType IsTopHullPoint(const PointInfo *point,
+  const PointInfo *extreme)
+{
+  if (point->y < extreme->y)
+    return(MagickTrue);
+  if (point->y != extreme->y)
+    return(MagickFalse);
+  return((MagickBooleanType) (point->x < extreme->x));
+}
+
+static MagickBooleanType IsRightHullPoint(const PointInfo *point,
+  const PointInfo *extreme)
+{
+  if (point->x > extreme->x)
+    return(MagickTrue);
+  if (point->x != extreme->x)
+    return(MagickFalse);
+  return((MagickBooleanType) (point->y < extreme->y));
+}
+
+static MagickBooleanType IsBottomHullPoint(const PointInfo *point,
+  const PointInfo *extreme)
+{
+  if (point->y > extreme->y)
+    return(MagickTrue);
+  if (point->y != extreme->y)
+    return(MagickFalse);
+  return((MagickBooleanType) (point->x > extreme->x));
+}
+
+static MagickBooleanType IsLeftHullPoint(const PointInfo *point,
+  const PointInfo *extreme)
+{
+  if (point->x < extreme->x)
+    return(MagickTrue);
+  if (point->x != extreme->x)
+    return(MagickFalse);
+  return((MagickBooleanType) (point->y > extreme->y));
+}
+
+typedef MagickBooleanType
+  (*HullPointMethod)(const PointInfo *,const PointInfo *);
+
+static PointInfo GetHullExtremePoint(const PointInfo *convex_hull,
+  const size_t number_points,const HullPointMethod method)
+{
+  PointInfo
+    extreme;
+
+  ssize_t
+    n;
+
+  extreme=convex_hull[0];
+  for (n=0; n < (ssize_t) number_points; n++)
+    if (method(convex_hull+n,&extreme) != MagickFalse)
+      extreme=convex_hull[n];
+  return(extreme);
+}
+
 static const char *GetConvexHullExtremePoints(Image *image,char *value,
   const char *string,ExceptionInfo *exception)
 {
@@ -3548,9 +3607,6 @@ static const char *GetConvexHullExtremePoints(Image *image,char *value,
     extreme,
     *convex_hull;
 
-  ssize_t
-    n;
-
   size_t
     number_points;
 
@@ -3558,67 +3614,23 @@ static const char *GetConvexHullExtremePoints(Image *image,char *value,
   if (convex_hull == (PointInfo *) NULL)
     return(string);
   points=AcquireString("");
-  extreme=convex_hull[0];  /* top */
-  for (n=0; n < (ssize_t) number_points; n++)
-  {
-    if (convex_hull[n].y < extreme.y)
-      {
-        extreme=convex_hull[n];
-        continue;
-      }
-    if (convex_hull[n].y != extreme.y)
-      continue;
-    if (convex_hull[n].x < extreme.x)
-      extreme=convex_hull[n];
-  }
+  extreme=GetHullExtremePoint(convex_hull,number_points,  /* top */
+    IsTopHullPoint);
   (void) FormatLocaleString(value,MagickPathExtent,"%g,%g ",
     extreme.x,extreme.y);
   (void) ConcatenateString(&points,value);
-  extreme=convex_hull[0]; /* right */
-  for (n=0; n < (ssize_t) number_points; n++)
-  {
-    if (convex_hull[n].x > extreme.x)
-      {
-        extreme=convex_hull[n];
-        continue;
-      }
-    if (convex_hull[n].x != extreme.x)
-      continue;
-    if (convex_hull[n].y < extreme.y)
-      extreme=convex_hull[n];
-  }
+  extreme=GetHullExtremePoint(convex_hull,number_points,  /* right */
+    IsRightHullPoint);
   (void) FormatLocaleString(value,MagickPathExtent,"%g,%g ",
     extreme.x,extreme.y);
   (void) ConcatenateString(&points,value);
-  extreme=convex_hull[0];  /* bottom */
-  for (n=0; n < (ssize_t) number_points; n++)
-  {
-    if (convex_hull[n].y > extreme.y)
-      {
-        extreme=convex_hull[n];
-        continue;
-      }
-    if (convex_hull[n].y != extreme.y)
-      continue;
-    if (convex_hull[n].x > extreme.x)
-      extreme=convex_hull[n];
-  }
+  extreme=GetHullExtremePoint(convex_hull,number_points,  /* bottom */
+    IsBottomHullPoint);
   (void) FormatLocaleString(value,MagickPathExtent,"%g,%g ",
     extreme.x,extreme.y);
   (void) ConcatenateString(&points,value);
-  extreme=convex_hull[0];  /* left */
-  for (n=0; n < (ssize_t) number_points; n++)
-  {
-    if (convex_hull[n].x < extreme.x)
-      {
-        extreme=convex_hull[n];
-        continue;
-      }
-    if (convex_hull[n].x != extreme.x)
-      continue;
-    if (convex_hull[n].y > extreme.y)
-      extreme=convex_hull[n];
-  }
+  extreme=GetHullExtremePoint(convex_hull,number_points,  /* left */
+    IsLeftHullPoint);
   (void) FormatLocaleString(value,MagickPathExtent,"%g,%g ",
     extreme.x,extreme.y);
   (void) ConcatenateString(&points,value);
