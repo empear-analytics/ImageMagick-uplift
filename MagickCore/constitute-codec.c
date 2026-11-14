@@ -105,6 +105,18 @@ typedef struct _InterpretedPropertyTarget
     *exception;
 } InterpretedPropertyTarget;
 
+typedef struct _EncodeTarget
+{
+  ImageInfo
+    *write_info;
+
+  Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+} EncodeTarget;
+
 typedef struct _ConstituteInfo
 {
   const char
@@ -1107,9 +1119,17 @@ static void FindFallbackEncoder(const EncodeFallbackInfo *info,
 }
 
 static MagickBooleanType EncodeImageWithInfo(const MagickInfo *magick_info,
-  EncodeImageHandler *encoder,ImageInfo *write_info,Image *image,
-  ExceptionInfo *exception)
+  EncodeImageHandler *encoder,const EncodeTarget *target)
 {
+  ImageInfo
+    *const write_info = target->write_info;
+
+  Image
+    *const image = target->image;
+
+  ExceptionInfo
+    *const exception = target->exception;
+
   MagickBooleanType
     status;
 
@@ -1197,11 +1217,13 @@ static void EncodeImageWithFallback(const EncodeFallbackInfo *info,
       FindFallbackEncoder(info,&magick_info,&encoder);
       if (encoder != (EncodeImageHandler *) NULL)
         {
+          const EncodeTarget
+            target = { write_info, image, exception };
+
           /*
             Call appropriate image writer based on image type.
           */
-          (*status)=EncodeImageWithInfo(magick_info,encoder,write_info,
-            image,exception);
+          (*status)=EncodeImageWithInfo(magick_info,encoder,&target);
         }
     }
 }
@@ -1308,11 +1330,13 @@ MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
   encoder=GetImageEncoder(magick_info);
   if (encoder != (EncodeImageHandler *) NULL)
     {
+      const EncodeTarget
+        target = { write_info, image, exception };
+
       /*
         Call appropriate image writer based on image type.
       */
-      status=EncodeImageWithInfo(magick_info,encoder,write_info,image,
-        exception);
+      status=EncodeImageWithInfo(magick_info,encoder,&target);
     }
   else
     {
