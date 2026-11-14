@@ -81,11 +81,9 @@ for f in "$@"; do
   cand=$(diag "$ROOT" "$f")
   if [ -f "$BASE_SRC/$f" ]; then base=$(diag "$BASE_SRC" "$f"); else base=""; fi
   new=$(diff <(printf '%s\n' "$base" | sed '/^$/d') <(printf '%s\n' "$cand" | sed '/^$/d') | sed -n 's/^> //p')
-  # magick_unreferenced(x) expands to (x) under MSVC only, so clang++ still
-  # reports the parameter; the Windows jobs do not.
-  for p in $(grep -o "magick_unreferenced([a-z_A-Z0-9]*)" "$ROOT/$f" | sed 's/.*(\(.*\))/\1/' | sort -u); do
-    new=$(printf '%s\n' "$new" | grep -v "unused parameter '$p'")
-  done
+  # An unused parameter is an error in the Linux jobs (-Wall -Wextra -Werror) even
+  # when the body says magick_unreferenced(x), which expands to nothing there: the
+  # signature needs magick_unused(x), as upstream writes it.
   if [ -n "$new" ]; then
     status=1
     echo "== $f: new diagnostics (lines from: clang++ the file to see them)"
