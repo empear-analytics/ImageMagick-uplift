@@ -151,17 +151,23 @@ def function_pointer_typedef(L, e):
     if not re.fullmatch(r"typedef[^;{}]*\(\*\w+\)\([^;{}]*\);", text): return None
     return s, re.findall(r"\(\*(\w+)\)", text)
 
+BRACKET_DEPTH = {"(": 1, "{": 1, "[": 1, ")": -1, "}": -1, "]": -1}
+
+def literal_end(text, i):
+    """The index of the quote that closes the string or character literal opening at TEXT[i] (the end of TEXT when
+    it never closes); a backslash skips the character after it."""
+    quote = text[i]; i += 1
+    while i < len(text) and text[i] != quote: i += 2 if text[i] == "\\" else 1
+    return i
+
 def split_top_level(text):
     """TEXT cut at every comma outside braces, parentheses, brackets and string or character literals."""
     pieces = []; depth = 0; start = 0; i = 0
     while i < len(text):
         ch = text[i]
-        if ch in "\"'":
-            i += 1
-            while i < len(text) and text[i] != ch: i += 2 if text[i] == "\\" else 1
-        elif ch in "({[": depth += 1
-        elif ch in ")}]": depth -= 1
-        elif ch == "," and depth == 0: pieces.append(text[start:i]); start = i + 1
+        if ch in "\"'": i = literal_end(text, i)
+        else: depth += BRACKET_DEPTH.get(ch, 0)
+        if ch == "," and depth == 0: pieces.append(text[start:i]); start = i + 1
         i += 1
     pieces.append(text[start:])
     return pieces
