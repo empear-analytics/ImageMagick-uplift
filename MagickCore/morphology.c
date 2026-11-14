@@ -607,6 +607,17 @@ static void ShowKernelValues(const KernelInfo *k)
   }
 }
 
+static void ShowKernelSum(const KernelInfo *k)
+{
+  if ( fabs(k->positive_range+k->negative_range) < MagickEpsilon )
+    (void) FormatLocaleFile(stderr, " (Zero-Summing)\n");
+  else if ( fabs(k->positive_range+k->negative_range-1.0) < MagickEpsilon )
+    (void) FormatLocaleFile(stderr, " (Normalized)\n");
+  else
+    (void) FormatLocaleFile(stderr, " (Sum %.*lg)\n",
+        GetMagickPrecision(), k->positive_range+k->negative_range);
+}
+
 MagickPrivate void ShowKernelInfo(const KernelInfo *kernel)
 {
   const KernelInfo
@@ -633,13 +644,7 @@ MagickPrivate void ShowKernelInfo(const KernelInfo *kernel)
     (void) FormatLocaleFile(stderr, "Forming a output range from %.*lg to %.*lg",
           GetMagickPrecision(), k->negative_range,
           GetMagickPrecision(), k->positive_range);
-    if ( fabs(k->positive_range+k->negative_range) < MagickEpsilon )
-      (void) FormatLocaleFile(stderr, " (Zero-Summing)\n");
-    else if ( fabs(k->positive_range+k->negative_range-1.0) < MagickEpsilon )
-      (void) FormatLocaleFile(stderr, " (Normalized)\n");
-    else
-      (void) FormatLocaleFile(stderr, " (Sum %.*lg)\n",
-          GetMagickPrecision(), k->positive_range+k->negative_range);
+    ShowKernelSum(k);
     ShowKernelValues(k);
   }
 }
