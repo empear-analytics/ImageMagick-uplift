@@ -167,6 +167,21 @@ typedef struct _NextTokenTargets
     *i;
 } NextTokenTargets;
 
+static inline MagickBooleanType IsTokenExtentReached(
+  const NextTokenInput *input,const NextTokenTargets *targets)
+{
+  const char
+    *const start = input->start;
+
+  const size_t
+    extent = input->extent;
+
+  const char
+    *magick_restrict *const p = targets->p;
+
+  return(((size_t) ((*p)-start) >= (extent-1)) ? MagickTrue : MagickFalse);
+}
+
 static inline void AppendTokenChar(const NextTokenInput *input,
   const char *magick_restrict p,ssize_t *i)
 {
@@ -180,15 +195,39 @@ static inline void AppendTokenChar(const NextTokenInput *input,
     token[(*i)++]=(*p);
 }
 
-static void ScanQuotedToken(const NextTokenInput *input,
+static inline void AppendTokenCharAndAdvance(const NextTokenInput *input,
   const NextTokenTargets *targets)
 {
   const char
-    *const start = input->start;
+    *magick_restrict *const p = targets->p;
 
-  const size_t
-    extent = input->extent;
+  ssize_t
+    *const i = targets->i;
 
+  AppendTokenChar(input,(*p),i);
+  (*p)++;
+}
+
+static MagickBooleanType ScanQuotedEscape(const NextTokenTargets *targets,
+  const char escape)
+{
+  const char
+    *magick_restrict *const p = targets->p;
+
+  if (IsEscapedQuote((*p),escape) != MagickFalse)
+    (*p)++;
+  else
+    if (*(*p) == escape)
+      {
+        (*p)++;
+        return(MagickFalse);
+      }
+  return(MagickTrue);
+}
+
+static void ScanQuotedToken(const NextTokenInput *input,
+  const NextTokenTargets *targets)
+{
   const char
     *magick_restrict *const p = targets->p;
 
@@ -201,16 +240,10 @@ static void ScanQuotedToken(const NextTokenInput *input,
   escape=GetClosingQuote((*p));
   for ((*p)++; *(*p) != '\0'; (*p)++)
   {
-    if (IsEscapedQuote((*p),escape) != MagickFalse)
-      (*p)++;
-    else
-      if (*(*p) == escape)
-        {
-          (*p)++;
-          break;
-        }
+    if (ScanQuotedEscape(targets,escape) == MagickFalse)
+      break;
     AppendTokenChar(input,(*p),i);
-    if ((size_t) ((*p)-start) >= (extent-1))
+    if (IsTokenExtentReached(input,targets) != MagickFalse)
       break;
   }
 }
@@ -221,32 +254,35 @@ static void ScanSlashToken(const NextTokenInput *input,
   const char
     *magick_restrict *const p = targets->p;
 
+  AppendTokenCharAndAdvance(input,targets);
+  if ((*(*p) == '>') || (*(*p) == '/'))
+    {
+      AppendTokenCharAndAdvance(input,targets);
+    }
+}
+
+static void ScanNumberDigits(const NextTokenInput *input,
+  const NextTokenTargets *targets,const char *magick_restrict q)
+{
+  const char
+    *magick_restrict *const p = targets->p;
+
   ssize_t
     *const i = targets->i;
 
-  AppendTokenChar(input,(*p),i);
-  (*p)++;
-  if ((*(*p) == '>') || (*(*p) == '/'))
-    {
-      AppendTokenChar(input,(*p),i);
-      (*p)++;
-    }
+  for ( ; ((*p) < q) && (*(*p) != ','); (*p)++)
+  {
+    AppendTokenChar(input,(*p),i);
+    if (IsTokenExtentReached(input,targets) != MagickFalse)
+      break;
+  }
 }
 
 static MagickBooleanType ScanNumberToken(const NextTokenInput *input,
   const NextTokenTargets *targets)
 {
   const char
-    *const start = input->start;
-
-  const size_t
-    extent = input->extent;
-
-  const char
     *magick_restrict *const p = targets->p;
-
-  ssize_t
-    *const i = targets->i;
 
   char
     *magick_restrict q;
@@ -258,62 +294,68 @@ static MagickBooleanType ScanNumberToken(const NextTokenInput *input,
   (void) value;
   if (((*p) != q) && (*(*p) != ','))
     {
-      for ( ; ((*p) < q) && (*(*p) != ','); (*p)++)
-      {
-        AppendTokenChar(input,(*p),i);
-        if ((size_t) ((*p)-start) >= (extent-1))
-          break;
-      }
+      ScanNumberDigits(input,targets,q);
       if (*(*p) == '%')
         {
-          AppendTokenChar(input,(*p),i);
-          (*p)++;
+          AppendTokenCharAndAdvance(input,targets);
         }
       return(MagickFalse);
     }
   return(MagickTrue);
 }
 
-static MagickBooleanType ScanParenthesizedToken(const NextTokenInput *input,
+static void ScanParenthesizedContents(const NextTokenInput *input,
   const NextTokenTargets *targets)
 {
-  const char
-    *const start = input->start;
-
-  const size_t
-    extent = input->extent;
-
   const char
     *magick_restrict *const p = targets->p;
 
   ssize_t
     *const i = targets->i;
 
+  for ((*p)++; *(*p) != '\0'; (*p)++)
+  {
+    AppendTokenChar(input,(*p),i);
+    if ((*(*p) == ')') && (*((*p)-1) != '\\'))
+      break;
+    if (IsTokenExtentReached(input,targets) != MagickFalse)
+      break;
+  }
+}
+
+static MagickBooleanType ScanParenthesizedToken(const NextTokenInput *input,
+  const NextTokenTargets *targets)
+{
+  const char
+    *magick_restrict *const p = targets->p;
+
   if (*(*p) == '(')
     {
-      for ((*p)++; *(*p) != '\0'; (*p)++)
-      {
-        AppendTokenChar(input,(*p),i);
-        if ((*(*p) == ')') && (*((*p)-1) != '\\'))
-          break;
-        if ((size_t) ((*p)-start) >= (extent-1))
-          break;
-      }
+      ScanParenthesizedContents(input,targets);
       if (*(*p) == '\0')
         return(MagickFalse);
     }
   return(MagickTrue);
 }
 
+static MagickBooleanType IsWordTokenContinued(const NextTokenTargets *targets)
+{
+  const char
+    *magick_restrict *const p = targets->p;
+
+  ssize_t
+    *const i = targets->i;
+
+  if (IsTokenDelimiter((*p)) != MagickFalse)
+    return(MagickFalse);
+  if (((*i) > 0) && (*(*p) == '<'))
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static void ScanWordToken(const NextTokenInput *input,
   const NextTokenTargets *targets)
 {
-  const char
-    *const start = input->start;
-
-  const size_t
-    extent = input->extent;
-
   const char
     *magick_restrict *const p = targets->p;
 
@@ -322,16 +364,14 @@ static void ScanWordToken(const NextTokenInput *input,
 
   for ( ; *(*p) != '\0'; (*p)++)
   {
-    if (IsTokenDelimiter((*p)) != MagickFalse)
-      break;
-    if (((*i) > 0) && (*(*p) == '<'))
+    if (IsWordTokenContinued(targets) == MagickFalse)
       break;
     AppendTokenChar(input,(*p),i);
     if (*(*p) == '>')
       break;
     if (ScanParenthesizedToken(input,targets) == MagickFalse)
       break;
-    if ((size_t) ((*p)-start) >= (extent-1))
+    if (IsTokenExtentReached(input,targets) != MagickFalse)
       break;
   }
 }
@@ -342,15 +382,11 @@ static void ScanDefaultToken(const NextTokenInput *input,
   const char
     *magick_restrict *const p = targets->p;
 
-  ssize_t
-    *const i = targets->i;
-
   if (ScanNumberToken(input,targets) == MagickFalse)
     return;
   if (IsSingleCharToken((*p)) != MagickFalse)
     {
-      AppendTokenChar(input,(*p),i);
-      (*p)++;
+      AppendTokenCharAndAdvance(input,targets);
       return;
     }
   ScanWordToken(input,targets);
@@ -387,6 +423,13 @@ static void ScanNextToken(const NextTokenInput *input,
   }
 }
 
+static inline const char *SkipTrailingTokenSpace(const char *magick_restrict p)
+{
+  while (isspace((int) ((unsigned char) *p)) != 0)
+    p++;
+  return(p);
+}
+
 MagickExport magick_hot_spot size_t GetNextToken(
   const char *magick_restrict start,const char **magick_restrict end,
   const size_t extent,char *magick_restrict token)
@@ -413,8 +456,7 @@ MagickExport magick_hot_spot size_t GetNextToken(
   token[i]='\0';
   if (LocaleNCompare(token,"url(#",5) == 0)
     StripURLReference(token);
-  while (isspace((int) ((unsigned char) *p)) != 0)
-    p++;
+  p=SkipTrailingTokenSpace(p);
   if (end != (const char **) NULL)
     *end=(const char *) p;
   return((size_t) (p-start+1));
