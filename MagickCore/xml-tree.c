@@ -2447,6 +2447,15 @@ typedef struct _EndTagTargets
     *ignore_depth;
 } EndTagTargets;
 
+static void EndCloseTag(char **p,size_t *ignore_depth,const int c)
+{
+  if (*ignore_depth > 0)
+    (*ignore_depth)--;
+  **p=(char) c;
+  if (isspace((int) ((unsigned char) **p)) != 0)
+    *p+=(ptrdiff_t) strspn(*p,XMLWhitespace);
+}
+
 static MagickBooleanType ParseEndTag(XMLTreeRoot *root,const int terminal,
   ExceptionInfo *exception,const EndTagTargets *targets)
 {
@@ -2480,11 +2489,7 @@ static MagickBooleanType ParseEndTag(XMLTreeRoot *root,const int terminal,
     {
       return(MagickFalse);
     }
-  if (*ignore_depth > 0)
-    (*ignore_depth)--;
-  **p=(char) c;
-  if (isspace((int) ((unsigned char) **p)) != 0)
-    *p+=(ptrdiff_t) strspn(*p,XMLWhitespace);
+  EndCloseTag(p,ignore_depth,c);
   return(MagickTrue);
 }
 
