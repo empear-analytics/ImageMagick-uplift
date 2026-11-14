@@ -71,6 +71,7 @@ if ( ! GetOptions(
 	 'exception-throw.c',
 	 'fx.c',
 	 'image.c',
+	 'image-mask.c',
 	 'image-settings.c',
 	 'image-append.c',
 	 'image-filename.c',
