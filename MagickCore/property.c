@@ -806,11 +806,34 @@ static MagickBooleanType Skip8BIMUnmatchedResource(const Match8BIM *match,
   return(MagickFalse);
 }
 
+static void Set8BIMResource(const AttributeInfo8BIM *attribute_info,
+  const unsigned char **info,size_t *length,MagickBooleanType *status)
+{
+  char
+    *attribute;
+
+  const ssize_t
+    count = attribute_info->count;
+
+  attribute=(char *) NULL;
+  if (~((size_t) count) >= (MagickPathExtent-1))
+    attribute=(char *) AcquireQuantumMemory((size_t) count+MagickPathExtent,
+      sizeof(*attribute));
+  if (attribute != (char *) NULL)
+    {
+      (void) memcpy(attribute,(char *) (*info),(size_t) count);
+      attribute[count]='\0';
+      Skip8BIMResourceData(info,length,count);
+      Set8BIMAttribute(attribute_info,attribute);
+      attribute=DestroyString(attribute);
+      (*status)=MagickTrue;
+    }
+}
+
 static void Get8BIMProperty(const Image *image,const char *key,
   ExceptionInfo *exception)
 {
   char
-    *attribute,
     format[MagickPathExtent],
     *macroman_resource = (char *) NULL,
     name[MagickPathExtent],
@@ -860,6 +883,9 @@ static void Get8BIMProperty(const Image *image,const char *key,
   info=GetStringInfoDatum(profile);
   while ((length > 0) && (status == MagickFalse))
   {
+    AttributeInfo8BIM
+      attribute_info;
+
     Match8BIM
       match;
 
@@ -894,28 +920,13 @@ static void Get8BIMProperty(const Image *image,const char *key,
     /*
       We have the resource of interest.
     */
-    attribute=(char *) NULL;
-    if (~((size_t) count) >= (MagickPathExtent-1))
-      attribute=(char *) AcquireQuantumMemory((size_t) count+MagickPathExtent,
-        sizeof(*attribute));
-    if (attribute != (char *) NULL)
-      {
-        AttributeInfo8BIM
-          attribute_info;
-
-        (void) memcpy(attribute,(char *) info,(size_t) count);
-        attribute[count]='\0';
-        Skip8BIMResourceData(&info,&length,count);
-        attribute_info.image=image;
-        attribute_info.key=key;
-        attribute_info.format=format;
-        attribute_info.count=count;
-        attribute_info.id=id;
-        attribute_info.exception=exception;
-        Set8BIMAttribute(&attribute_info,attribute);
-        attribute=DestroyString(attribute);
-        status=MagickTrue;
-      }
+    attribute_info.image=image;
+    attribute_info.key=key;
+    attribute_info.format=format;
+    attribute_info.count=count;
+    attribute_info.id=id;
+    attribute_info.exception=exception;
+    Set8BIMResource(&attribute_info,&info,&length,&status);
   }
   Release8BIMResourceNames(&resource,&macroman_resource);
 }
