@@ -713,6 +713,15 @@ static inline MagickBooleanType Is8BIMResourceName(const char *name)
   return(((*name != '\0') && (*name != '#')) ? MagickTrue : MagickFalse);
 }
 
+static void Release8BIMResourceNames(char **resource,
+  char **macroman_resource)
+{
+  if ((*macroman_resource) != (char *) NULL)
+    (*macroman_resource)=DestroyString((*macroman_resource));
+  if ((*resource) != (char *) NULL)
+    (*resource)=DestroyString((*resource));
+}
+
 static void Get8BIMProperty(const Image *image,const char *key,
   ExceptionInfo *exception)
 {
@@ -780,10 +789,7 @@ static void Get8BIMProperty(const Image *image,const char *key,
       continue;
     if (id > (ssize_t) stop)
       continue;
-    if (macroman_resource != (char *) NULL)
-      macroman_resource=DestroyString(macroman_resource);
-    if (resource != (char *) NULL)
-      resource=DestroyString(resource);
+    Release8BIMResourceNames(&resource,&macroman_resource);
     count=(ssize_t) ReadPropertyByte(&info,&length);
     Read8BIMResourceName(&resource,&info,&length,count);
     if ((count & 0x01) == 0)
@@ -844,10 +850,7 @@ static void Get8BIMProperty(const Image *image,const char *key,
         status=MagickTrue;
       }
   }
-  if (macroman_resource != (char *) NULL)
-    macroman_resource=DestroyString(macroman_resource);
-  if (resource != (char *) NULL)
-    resource=DestroyString(resource);
+  Release8BIMResourceNames(&resource,&macroman_resource);
 }
 
 static inline signed int ReadPropertySignedLong(const EndianType endian,
