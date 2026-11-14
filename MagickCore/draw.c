@@ -3063,7 +3063,8 @@ typedef struct _MVGRenderState
 
   size_t
     *extent,
-    *number_points;
+    *number_points,
+    *number_stops;
 
   SplayTreeInfo
     **macros;
@@ -3073,6 +3074,9 @@ typedef struct _MVGRenderState
     *j,
     *n,
     *x;
+
+  StopInfo
+    **stops;
 } MVGRenderState;
 
 static void ParseMVGPrimitivePoints(const MVGRenderState *state)
@@ -3815,6 +3819,45 @@ static void ApplyMVGAffine(const MVGRenderState *state)
     }
 }
 
+static void FinishMVGGradient(const MVGRenderState *state)
+{
+  const char
+    *q = (*state->q);
+
+  const DrawInfo
+    *draw_info = state->draw_info;
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  Image
+    *image = state->image;
+
+  size_t
+    number_stops = (*state->number_stops);
+
+  StopInfo
+    *stops = (*state->stops);
+
+  if (*q == '\0')
+    {
+      if (number_stops > 1)
+        {
+          GradientType
+            type;
+
+          type=LinearGradient;
+          if (draw_info->gradient.type == RadialGradient)
+            type=RadialGradient;
+          (void) GradientImage(image,type,PadSpread,stops,number_stops,
+            exception);
+        }
+     if (number_stops > 0)
+       stops=(StopInfo *) RelinquishMagickMemory(stops);
+    }
+  (*state->stops)=stops;
+}
+
 static MagickBooleanType RenderMVGContent(Image *image,
   const DrawInfo *draw_info,const size_t depth,ExceptionInfo *exception)
 {
@@ -3891,8 +3934,8 @@ static MagickBooleanType RenderMVGContent(Image *image,
   const MVGRenderState
     render_state = { &affine, &current, &token, &p, &q, &coordinates, &cursor,
       &graphic_context, draw_info, exception, image, &status, &mvg_info,
-      &primitive_info, &primitive_type, &extent, &number_points, &macros, &i,
-      &j, &n, &x };
+      &primitive_info, &primitive_type, &extent, &number_points, &number_stops,
+      &macros, &i, &j, &n, &x, &stops };
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -5420,22 +5463,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     ApplyMVGAffine(&render_state);
     if (primitive_type == UndefinedPrimitive)
       {
-        if (*q == '\0')
-          {
-            if (number_stops > 1)
-              {
-                GradientType
-                  type;
-
-                type=LinearGradient;
-                if (draw_info->gradient.type == RadialGradient)
-                  type=RadialGradient;
-                (void) GradientImage(image,type,PadSpread,stops,number_stops,
-                  exception);
-              }
-           if (number_stops > 0)
-             stops=(StopInfo *) RelinquishMagickMemory(stops);
-          }
+        FinishMVGGradient(&render_state);
         if ((draw_info->debug != MagickFalse) && (q > p))
           (void) LogMagickEvent(DrawEvent,GetMagickModule(),"  %.*s",(int)
             (q-p-1),p);
