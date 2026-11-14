@@ -144,6 +144,19 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void FillPixelRow(const Image *image,const PixelInfo *color,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    SetPixelViaPixelInfo(image,color,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport Image *NewMagickImage(const ImageInfo *image_info,
   const size_t width,const size_t height,const PixelInfo *background,
   ExceptionInfo *exception)
@@ -183,9 +196,6 @@ MagickExport Image *NewMagickImage(const ImageInfo *image_info,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     q=QueueCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -194,11 +204,7 @@ MagickExport Image *NewMagickImage(const ImageInfo *image_info,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      SetPixelViaPixelInfo(image,background,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    FillPixelRow(image,background,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
   }
