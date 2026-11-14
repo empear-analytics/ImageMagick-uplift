@@ -19552,6 +19552,137 @@ Lane: c
 
 ---
 
+## Recipe KB - Peel Keyed Arms Writing a Result out of a First-Letter Switch into a Table of Handlers
+
+**Use when:** CodeScene reports *Complex Method* or *Large Method* on a function that
+selects on a name with a first-letter `switch` whose arms compare the name with a key,
+write the function's result into a local (`string`) or a buffer (`value`), and leave
+through `break;` to a common tail that returns the result: `property.c`'s
+`GetMagickProperty` (48 arms, cc 88, 506 lines), whose arms also leave through
+`WarnNoImageReturn`, a macro hiding `return((const char *) NULL);`.
+
+**Not covered by:** Recipe KA, whose arms end in a `return` of their own result; Recipe
+KH, whose arms sit in a loop and report through a status; Recipe KM, whose arms share one
+shape; Recipe SD, which keeps every arm in a `switch` (a new *Complex Method*).
+
+**How:**
+
+1. Arms. Each is `if (LocaleCompare("K",n) == 0)` (or two such tests joined by `||`, two
+   keys) followed by a braced body `S` ending in its only `break;`, outside every OpenMP
+   region and `#if` branch; `n` is a parameter nothing writes. `S` writes no caller local
+   but the result local `r` (set to a constant `r0` and nothing else before the
+   `switch`), and the buffer `v` only through `v` (cleared to `""` before the `switch`);
+   it reads parameters, `r`, `v` and constants. A `return(x)` inside `S` (written or
+   hidden in a function-local macro) returns a value `x` that the tail would also
+   produce from `r0` and the cleared `v` (check by reading the tail: here
+   `CloneMagickPropertyValue(...,value)` returns `NULL` for an empty `value`, with no
+   side effect, so `return((const char *) NULL);` is that value).
+2. Hoisting. Recipe KM step 2 for every key, with this difference: when the `switch`
+   labels only one case of each letter, the lookup also requires the name's first
+   character to equal the key's (step 5), so a name that differs only in the case of
+   its first letter still reaches no arm.
+3. Handlers. Directly above the function, a `typedef struct` of the parameters the arms
+   read (`image_info`, `image`, `property`, `value`, `exception`: Recipe N's input
+   struct), and for each arm `static T Name(const Request *request)`: the declaration
+   `T r = r0;` when `S` names `r`, then `S` with its final `break;` replaced by
+   `return(r);` (or `return(r0);` when `S` does not name `r`), every member written
+   `request->m` (Recipe N step 4), text otherwise unchanged and dedented;
+   `magick_unreferenced(request);` when it names none.
+4. Guards. When `S` opens (after its declarations) with one of the function-local guard
+   macros, the same arguments in every arm (`WarnNoImageReturn("\"%%[%s]\"",n);`,
+   `WarnNoImageInfoReturn(...)`), that statement leaves `S`: the row records which
+   macro (an enumeration, one value for "none"), and `static T Invoke...(const Row
+   *row,const Request *request)` binds the members the macros name, runs the row's
+   macro under `if (row->requirement == ...)`, then returns `row->handler(request)`.
+   An arm whose macro stands elsewhere, or that has two, stays in the `switch`. A
+   statement that ends many handlers identically (`(void) FormatLocaleString(value,
+   ...,x); return(r0);`) goes in one shared helper returning `r0` (Recipe D), so that
+   the handlers carry no *Code Duplication*.
+5. Table, lookup and call: Recipe KA step 4 with rows `{ "K", requirement, Handler }`,
+   the lookup returning the row and testing `(*n == *key) && (LocaleCompare(key,n) ==
+   0)` under step 2's difference; two keys of one arm share its handler. Before the
+   `switch`, after `r` and `v` are set, fill the request (Recipe N step 6), then
+   `row=Get...(n); if (row != NULL) r=Invoke...(row,&request);`. The `switch` keeps
+   every arm the table did not take; for a name the table matched each is a false
+   comparison (step 2). Groups left as `break;` go by Recipe DL.
+6. Check by script that every moved arm is one handler whose body is the arm's text, and
+   every key one row; by reading steps 1 and 2; `refactor_guard.py --calls`, the CI and
+   C++ warning checks, the oracle on the function's cases.
+
+**Before:**
+
+```c
+  switch (*property)
+  {
+    case 'b':
+    {
+      if (LocaleCompare("basename",property) == 0)
+        {
+          WarnNoImageReturn("\"%%[%s]\"",property);
+          string=GetPathComponentProperty(image,BasePath,value,string);
+          break;
+        }
+```
+
+**After:**
+
+```c
+static const char *MagickPropertyBasename(const MagickPropertyRequest *request)
+{
+  const char
+    *string = (char *) NULL;
+
+  string=GetPathComponentProperty(request->image,BasePath,request->value,string);
+  return(string);
+}
+...
+    { "basename", ImagePropertyRequirement, MagickPropertyBasename },
+...
+static const char *InvokeMagickPropertyHandler(
+  const MagickPropertyHandlerInfo *info,const MagickPropertyRequest *request)
+{
+  ...
+  if (info->requirement == ImagePropertyRequirement)
+    {
+      WarnNoImageReturn("\"%%[%s]\"",property);
+    }
+  ...
+  return(info->handler(request));
+}
+...
+  info=GetMagickPropertyHandlerInfo(property);
+  if (info != (const MagickPropertyHandlerInfo *) NULL)
+    string=InvokeMagickPropertyHandler(info,&request);
+  switch (*property)
+```
+
+**Careful:**
+
+- Why the behaviour is the same. For a name equal to a key, the original reached the
+  arm after false comparisons only and ran `S` on `r0` and an empty `v`, then the tail;
+  the handler runs `S` on the same values (its `r` starts at `r0`, `v` is the caller's
+  buffer) and hands `r` to the tail, whose `switch` meets only false comparisons. A
+  `return(x)` in `S` now ends the handler with `x` as `r`, and the tail turns `x` and
+  the untouched `v` into the value the function returned (step 1). Any other name gets
+  no handler and runs the `switch` as before, minus arms that would not have fired.
+- The first-character test reproduces a `switch` that labels only the lower case: an
+  upper-case first letter selected no group before and selects no row now.
+- Step 4 runs the guard before the handler's declarations' initialisers, where it ran
+  after them: those initialisers only copy pointers (no call, no dereference; check by
+  reading), so nothing observable moves.
+- A warning thrown by a guard now names `Invoke...` in `GetMagickModule()` (owner,
+  2026-11-12).
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` and steps 1 and 2 checked by
+reading.
+
+**Provenance:** 2026-11-14, from `property.c`'s `GetMagickProperty` (campaign B, M127 lane
+c round 10): stubbed alone, the function is worth 3.69 to 4.39 for the file. Added by
+Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: c
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -19962,3 +20093,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | PK | Peel Keyed Arms That Share One Body out of a First-Letter Switch into a Key Table: arms in many groups of a name `switch` that compare the name with keys (or call a predicate joining key comparisons) and run one leaving body become one `static const` key table, a `LocaleCompare` membership lookup, and one `if` before the `switch` holding the body; Lane: c | `property.c`'s `SetImageProperty` (fifteen read-only keys in nine groups) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | KA | Peel Keyed Returning Arms out of a First-Letter Switch into a Table of Handlers: arms in several groups of a name `switch` that compare the name with a key and return become handlers of one signature (an existing function when an arm is one call of it), a `static const` key table, a lookup returning the handler, and one call before the `switch`; Lane: c | `property.c`'s `SetImageProperty` (eight setter keys) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | DL | Step 4: in a `switch` with no `default:`, a group that is `break;` alone, with its labels, may be deleted (a value matching no label leaves the `switch` where the `break;` went); `obj_identical.sh` IDENTICAL; Lane: c | `property.c`'s `SetImageProperty` (fourteen letter groups emptied by Recipes PK and KA) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | KB | Peel Keyed Arms Writing a Result out of a First-Letter Switch into a Table of Handlers: arms of a name `switch` that write a result local or buffer and `break;` to a common tail become handlers taking an input struct and returning the result, a key table whose rows also name the guard macro the arm opened with (run by one dispatcher), and one lookup before the `switch`; Lane: c | `property.c`'s `GetMagickProperty` (45 handlers for 47 keys; 3.69 to 3.99) | mandate (2026-10-24) |
