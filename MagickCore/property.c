@@ -5193,6 +5193,19 @@ static MagickBooleanType SetImageDelayProperty(Image *image,
   return(MagickTrue);
 }
 
+static MagickBooleanType SetImageColorspaceProperty(Image *image,
+  const char *value,ExceptionInfo *exception)
+{
+  ssize_t
+    colorspace;
+
+  colorspace=ParseCommandOption(MagickColorspaceOptions,MagickFalse,
+    value);
+  if (colorspace < 0)
+    return(MagickFalse); /* FUTURE: value exception?? */
+  return(SetImageColorspace(image,(ColorspaceType) colorspace,exception));
+}
+
 typedef void
   (*SetImageMemberMethod)(Image *,const ssize_t);
 
@@ -5376,14 +5389,7 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
         }
       if (LocaleCompare("colorspace",property) == 0)
         {
-          ssize_t
-            colorspace;
-
-          colorspace=ParseCommandOption(MagickColorspaceOptions,MagickFalse,
-            value);
-          if (colorspace < 0)
-            return(MagickFalse); /* FUTURE: value exception?? */
-          return(SetImageColorspace(image,(ColorspaceType) colorspace,exception));
+          return(SetImageColorspaceProperty(image,value,exception));
         }
       break; /* not an attribute, add as a property */
     }
