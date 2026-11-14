@@ -5540,6 +5540,37 @@ MagickExport void ResetImagePropertyIterator(const Image *image)
   ResetSplayTreeIterator((SplayTreeInfo *) image->properties);
 }
 
+static const char
+  *const ReadOnlyProperties[] =
+  {
+    "channels",
+    "delay_units",
+    "height",
+    "kurtosis",
+    "magick",
+    "max",
+    "mean",
+    "min",
+    "opaque",
+    "size",
+    "skewness",
+    "scenes",
+    "standard-deviation",
+    "version",
+    "width"
+  };
+
+static MagickBooleanType IsReadOnlyProperty(const char *property)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(ReadOnlyProperties)/sizeof(*ReadOnlyProperties)); i++)
+    if (LocaleCompare(ReadOnlyProperties[i],property) == 0)
+      return(MagickTrue);
+  return(MagickFalse);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -5573,24 +5604,6 @@ MagickExport void ResetImagePropertyIterator(const Image *image)
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static inline MagickBooleanType IsReadOnlyMProperty(const char *property)
-{
-  return(((LocaleCompare("magick",property) == 0) ||
-    (LocaleCompare("max",property) == 0) ||
-    (LocaleCompare("mean",property) == 0) ||
-    (LocaleCompare("min",property) == 0) ||
-    (LocaleCompare("min",property) == 0)) ? MagickTrue : MagickFalse);
-}
-
-static inline MagickBooleanType IsReadOnlySProperty(const char *property)
-{
-  return(((LocaleCompare("size",property) == 0) ||
-    (LocaleCompare("skewness",property) == 0) ||
-    (LocaleCompare("scenes",property) == 0) ||
-    (LocaleCompare("standard-deviation",property) == 0)) ? MagickTrue :
-    MagickFalse);
-}
-
 static void LowerImageDelay(Image *image,const GeometryInfo geometry_info)
 {
   if (image->delay > (size_t) floor(geometry_info.rho+0.5))
@@ -5797,6 +5810,12 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
   if (SetEnumeratedProperty(image,property,value,&status) != MagickFalse)
     return(status);
   status=MagickTrue;
+  if (IsReadOnlyProperty(property) != MagickFalse)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+        "SetReadOnlyProperty","`%s'",property);
+      return(MagickFalse);
+    }
   switch (*property)
   {
 #if 0  /* Percent escape's sets values with this prefix: for later use
@@ -5827,12 +5846,6 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
     case 'C':
     case 'c':
     {
-      if (LocaleCompare("channels",property) == 0)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-            "SetReadOnlyProperty","`%s'",property);
-          return(MagickFalse);
-        }
       if (LocaleCompare("colorspace",property) == 0)
         {
           return(SetImageColorspaceProperty(image,value,exception));
@@ -5845,12 +5858,6 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
       if (LocaleCompare("delay",property) == 0)
         {
           return(SetImageDelayProperty(image,value));
-        }
-      if (LocaleCompare("delay_units",property) == 0)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-            "SetReadOnlyProperty","`%s'",property);
-          return(MagickFalse);
         }
       if (LocaleCompare("density",property) == 0)
         {
@@ -5901,12 +5908,6 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
     case 'H':
     case 'h':
     {
-      if (LocaleCompare("height",property) == 0)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-            "SetReadOnlyProperty","`%s'",property);
-          return(MagickFalse);
-        }
       break; /* not an attribute, add as a property */
     }
     case 'I':
@@ -5925,12 +5926,6 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
     }
     case 'K':
     case 'k':
-      if (LocaleCompare("kurtosis",property) == 0)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-            "SetReadOnlyProperty","`%s'",property);
-          return(MagickFalse);
-        }
       break; /* not an attribute, add as a property */
     case 'L':
     case 'l':
@@ -5944,21 +5939,9 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
     }
     case 'M':
     case 'm':
-      if (IsReadOnlyMProperty(property) != MagickFalse)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-             "SetReadOnlyProperty","`%s'",property);
-          return(MagickFalse);
-        }
       break; /* not an attribute, add as a property */
     case 'O':
     case 'o':
-      if (LocaleCompare("opaque",property) == 0)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-            "SetReadOnlyProperty","`%s'",property);
-          return(MagickFalse);
-        }
       break; /* not an attribute, add as a property */
     case 'P':
     case 'p':
@@ -5991,12 +5974,6 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
     }
     case 'S':
     case 's':
-      if (IsReadOnlySProperty(property) != MagickFalse)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-            "SetReadOnlyProperty","`%s'",property);
-          return(MagickFalse);
-        }
       break; /* not an attribute, add as a property */
     case 'T':
     case 't':
@@ -6021,23 +5998,11 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
     case 'V':
     case 'v':
     {
-      if (LocaleCompare("version",property) == 0)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-            "SetReadOnlyProperty","`%s'",property);
-          return(MagickFalse);
-        }
       break; /* not an attribute, add as a property */
     }
     case 'W':
     case 'w':
     {
-      if (LocaleCompare("width",property) == 0)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-            "SetReadOnlyProperty","`%s'",property);
-          return(MagickFalse);
-        }
       break; /* not an attribute, add as a property */
     }
 #if 0  /* Percent escape's sets values with this prefix: for later use
