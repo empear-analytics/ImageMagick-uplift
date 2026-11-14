@@ -91,10 +91,39 @@ fi
 for side in before after
 do
   mkdir "$tmp/$side.fn"
-  objdump -d --no-show-raw-insn "$tmp/$side.o" | awk -v dir="$tmp/$side.fn" '
-    /^[0-9a-f]+ <[^>]+>:$/ { name=$2; gsub(/[<>:]/,"",name); out=dir "/" name; next }
-    out != "" && /^ *[0-9a-f]+:\t/ {
-      sub(/^ *[0-9a-f]+:\t/,"");
+  # The function at an address: the object's own symbol table, so that a
+  # function Mach-O's disassembly labels with a section marker (`ltmp0`, the
+  # first function of __text) keeps its name. Mach-O prefixes C names with `_`;
+  # it is dropped, so that names compare with CALLER and HELPER as written.
+  macho=$(objdump -h "$tmp/$side.o" | grep -c 'file format mach-o' || true)
+  nm -n "$tmp/$side.o" | awk -v macho="$macho" '$2 ~ /^[tT]$/ && $3 !~ /^(ltmp|L|l_)/ {
+      n=$3; if (macho) sub(/^_/,"",n); print $1, n }' > "$tmp/$side.names"
+  # Instruction lines are `   1c:\tmov ...` (x86-64 ELF) or `   1c:      \tmov ...`
+  # (arm64 Mach-O): the address, a colon, then any blank run. Relocation lines
+  # (-r) name the symbol an instruction refers to (the callee of a `bl`/`call`,
+  # whose encoded target is a placeholder until linking): their offset is
+  # dropped and a local label (a string literal's `l_.str.12`, a constant
+  # pool's `lCPI4_0`, an ELF section such as `.rodata`) is compared as `<anon>`, since its
+  # number is only its order.
+  objdump -d -r --no-show-raw-insn "$tmp/$side.o" | awk -v dir="$tmp/$side.fn" \
+      -v names="$tmp/$side.names" -v macho="$macho" '
+    BEGIN { while ((getline l < names) > 0) { split(l, a, " "); nm[a[1]]=a[2] } }
+    /^[0-9a-f]+ <[^>]+>:$/ {
+      name=$2; gsub(/[<>:]/,"",name)
+      if ($1 in nm) name=nm[$1]
+      else if (macho) sub(/^_/,"",name)
+      out=dir "/" name; printf "" > out; next }
+    out != "" && /^[ \t]*[0-9a-f]+:[ \t]+(R_|ARM64_RELOC_|X86_64_RELOC_)/ {
+      sub(/^[ \t]*[0-9a-f]+:[ \t]+/,"")
+      gsub(/[ \t]+/," ")
+      n=split($0, r, " "); sym=r[n]
+      sub(/[-+]0x[0-9a-f]+$/,"",sym)
+      # Mach-O: C names start with `_`; `l...`/`L...` (l_.str.3, lCPI4_0,
+      # ltmp1) are assembler-local labels. ELF: section-relative (.rodata+0x..).
+      if (macho ? sym ~ /^[lL]/ : sym ~ /^\./) sym="<anon>"
+      print "  reloc " r[1] " " sym > out; next }
+    out != "" && /^ *[0-9a-f]+:[ \t]+/ {
+      sub(/^ *[0-9a-f]+:[ \t]+/,"");
       gsub(/[0-9a-f]+ <[^>+]+\+0x[0-9a-f]+>/,"<local>");
       gsub(/[0-9a-f]+ <([^>]+)>/,"<&>");
       gsub(/<[0-9a-f]+ /,"<");
@@ -105,6 +134,16 @@ do
       # the annotation names the target, which is what is compared.
       if ($0 ~ /# <<[^>+]+>>$/) gsub(/-?0x[0-9a-f]+\(%rip\)/,"(%rip)");
       print > out }'
+  # A disassembly this script cannot read is not a pass: every function must
+  # have instructions, and there must be functions.
+  nfn=$(ls "$tmp/$side.fn" | wc -l | tr -d ' ')
+  [ "$nfn" -gt 0 ] ||
+    { echo "ERROR: no functions extracted from the $side object"; exit 2; }
+  for fnf in "$tmp/$side.fn"/*
+  do
+    [ -s "$fnf" ] ||
+      { echo "ERROR: no instructions extracted for $(basename "$fnf") ($side)"; exit 2; }
+  done
   ls "$tmp/$side.fn" | sort > "$tmp/$side.syms"
   # Alignment padding after a function's last instruction (the nop family and
   # int3 the assembler emits so that the next function starts on its boundary)
@@ -163,6 +202,10 @@ do
     { echo "  $f differs"; diff "$tmp/before.fn/$f" "$tmp/after.fn/$f" | head -6; rc=1; }
 done
 echo "functions compared instruction for instruction: $compared"
+# The objects differ (else IDENTICAL above): with no function compared, nothing
+# was shown equal, and that is never a pass.
+[ "$compared" -gt 0 ] ||
+  { echo "ERROR: objects differ and no function was compared"; exit 2; }
 if [ $rc -eq 0 ]
 then
   echo "MODULO-IDENTICAL $file (all but $caller and $helper)"
