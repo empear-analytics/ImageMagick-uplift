@@ -3101,6 +3101,21 @@ static MagickBooleanType ConvertXMLTreeToUTF8(const char *xml,
   return(MagickTrue);
 }
 
+static MagickBooleanType ParseXMLTreeContent(XMLTreeRoot *root,
+  const size_t ignore_depth,char **p)
+{
+  char
+    *tag;
+
+  if (((*p) == (char *) NULL) || (*(*p) == '\0'))
+    return(MagickFalse);
+  *(*p)++='\0';
+  tag=(*p);
+  if (ParseTagCharacterContent(root,tag,ignore_depth,p) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType ParseXMLTreeTags(XMLTreeRoot *root,char *p,
   const int terminal,ExceptionInfo *exception)
 {
@@ -3153,12 +3168,8 @@ static MagickBooleanType ParseXMLTreeTags(XMLTreeRoot *root,char *p,
         if (ParseMarkup(root,terminal,exception,&markup) == MagickFalse)
           return(MagickFalse);
       }
-     if ((p == (char *) NULL) || (*p == '\0'))
-       break;
-     *p++='\0';
-     tag=p;
-     if (ParseTagCharacterContent(root,tag,ignore_depth,&p) == MagickFalse)
-       break;
+    if (ParseXMLTreeContent(root,ignore_depth,&p) == MagickFalse)
+      break;
   }
   return(MagickTrue);
 }
