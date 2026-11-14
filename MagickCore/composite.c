@@ -4985,6 +4985,21 @@ static SegmentInfo RotateBlurAxes(const GeometryInfo geometry_info,
   return(blur);
 }
 
+static SegmentInfo GetBlurAxes(const GeometryInfo geometry_info,
+  const MagickStatusType flags,const double width,const double height)
+{
+  SegmentInfo
+    blur;
+
+  blur.x1=width;
+  blur.x2=0.0;
+  blur.y1=0.0;
+  blur.y2=height;
+  if ((flags & XValue) != 0 )
+    blur=RotateBlurAxes(geometry_info,width,height);
+  return(blur);
+}
+
 static void GetBlurAngleRange(const GeometryInfo geometry_info,
   const MagickStatusType flags,double *angle_start,double *angle_range)
 {
@@ -5511,12 +5526,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       /*
         Default the unrotated ellipse width and height axis vectors.
       */
-      blur.x1=width;
-      blur.x2=0.0;
-      blur.y1=0.0;
-      blur.y2=height;
-      if ((flags & XValue) != 0 )
-        blur=RotateBlurAxes(geometry_info,width,height);
+      blur=GetBlurAxes(geometry_info,flags,width,height);
       GetBlurAngleRange(geometry_info,flags,&angle_start,&angle_range);
       {
         const BlurCanvasInputs
