@@ -17537,6 +17537,114 @@ Lane: a
 
 ---
 
+## Recipe MX - Merge Axis Twins Through a Side Selector and a Struct of Two Parts
+
+**Use when:** CodeScene reports *Code Duplication* on a chain of `static` functions and
+its mirror for the other axis, the two chains the same once columns are read as rows,
+`x` as `y` and the two images of one chain as the two of the other: `image-append.c`'s
+horizontal smush (`SmushXGap`, `SmushXRow`, `FindLeftGapEdge`, `FindRightGapEdge`,
+`IsLeftGapEdge`, `IsRightGapEdge` over a `SmushXRows` struct) and its vertical mirror
+(`SmushYGap`, `SmushYRow`, `FindTopGapEdge`, `FindBottomGapEdge`, `IsTopGapEdge`,
+`IsBottomGapEdge` over `SmushYRows`).
+
+**Not covered by:** Recipe MT, whose copies read the same variables or one struct type
+and differ in runs a conditional can hold; here the two chains use two struct types with
+different member names and pass coordinates in swapped argument positions, and the
+merge needs one struct type for both. Recipe D, SV, SC and TW, which take one value;
+Recipe CF, whose copies differ only in the callee.
+
+**How:**
+
+1. Copies. Two chains of `static` functions outside every OpenMP region, each called
+   only within its chain or from one entry function per chain, every function of one
+   chain the mirror of one function of the other: the same token sequence once (a) the
+   members `columns` and `rows` of the chain's images, (b) each pair of coordinates
+   passed to one call (`x,geometry.y+y` against `geometry.x+x,y`), and (c) the names of
+   the variables and struct members, are set aside. Each chain's struct holds, for each
+   of two roles (the earlier image of the list and the current one), an image, a cache
+   view and a geometry, and the exception.
+2. Write `typedef enum { HorizontalName, VerticalName } NameSide;`, a struct `NamePart`
+   (`image`, `view`, `geometry`, of the members' types) and one struct `NameRows` (`side`,
+   one `NamePart` per role, named for the role, and `exception`), replacing both chain
+   structs.
+3. Write `static inline` selectors for each pair of (a) as `return((side == HorizontalName)
+   ? image->columns : image->rows);` (and the swapped one), and one function for each
+   call of (b) taking the rows struct and the part: `if (rows->side == HorizontalName)
+   return(call(horizontal arguments)); return(call(vertical arguments));`, every argument
+   verbatim with the part's members for the chain's.
+4. Write one function per mirror pair: one copy's text with each (a) read replaced by its
+   selector, each (b) call by its function, each chain member by the part's member; the
+   loop variables keep the horizontal copy's names (the scan coordinate `x`, the line
+   `y`). Where one copy sets up the two parts with the same statements, they move to one
+   `static void` setter per part, called in the copy's order.
+5. The entry pair keeps its two names and parameters, each body one call of the merged
+   entry with its own side constant (in a `const` input struct when the merged entry
+   would take five or more parameters). Statements stay in each copy's order (views
+   acquired, released and set up in the order both copies used).
+6. All functions of both chains move in one commit. When the chains run per pixel, time
+   an operation that runs them on both binaries (Recipe CF step 7's 3%).
+7. Check by reading, pair by pair, that substituting the horizontal side gives the
+   horizontal copy and the vertical side the vertical copy, argument for argument, with
+   the same operand types; `refactor_guard.py --calls` with `--renamed Old=New` for each
+   merged function moves only the deduplicated callees and the new functions.
+
+**Before:**
+
+```c
+  for (x=(ssize_t) rows->left_image->columns-1; x > 0; x--)
+  {
+    p=GetCacheViewVirtualPixels(rows->left_view,x,rows->left_geometry.y+y,1,1,
+      rows->exception);
+  ...
+  for (y=(ssize_t) rows->top_image->rows-1; y > 0; y--)
+  {
+    p=GetCacheViewVirtualPixels(rows->top_view,rows->top_geometry.x+x,y,1,1,
+      rows->exception);
+```
+
+**After:**
+
+```c
+static const Quantum *GetSmushPixel(const SmushRows *rows,
+  const SmushPart *part,const ssize_t x,const ssize_t y)
+{
+  if (rows->side == HorizontalSmush)
+    return(GetCacheViewVirtualPixels(part->view,x,part->geometry.y+y,1,1,
+      rows->exception));
+  return(GetCacheViewVirtualPixels(part->view,part->geometry.x+y,x,1,1,
+    rows->exception));
+}
+...
+  for (x=(ssize_t) GetSmushExtent(rows->side,rows->previous.image)-1; x > 0;
+       x--)
+  {
+    p=GetSmushPixel(rows,&rows->previous,x,y);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. Each merged function, for one side, executes the
+  statements of that side's copy in the same order with the same values: the selectors
+  return the member the copy read (same type, `size_t`), the pixel function makes the
+  very call the copy made with the same arguments in the same positions, and each part
+  member holds what the copy's struct member or local held, filled from the same
+  expressions. The side is a constant passed by each entry, never computed.
+- Struct members filled in another order than the copy's are plain stores to a local
+  without side effects; calls (`SetGeometry`, `GravityAdjustGeometry`,
+  `AcquireVirtualCacheView`, `DestroyCacheView`) keep each copy's order.
+- Avoid `near` and `far` as names: the Windows headers define them as macros.
+
+**Evidence level:** oracle (cases that reach each side's entry), with step 7's reading
+and the `--calls` check, and the timing of step 6.
+
+**Provenance:** 2026-11-14, from `image-append.c` (campaign B, M127 lane a round 6): the
+smush chains, the file's last finding (*Code Duplication*, 8 functions) after Recipe SA;
+a probe 8.81 to 10.0. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-10-24.
+Lane: a
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -17921,3 +18029,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | NC | Share a NULL-Tested Copy Through a Helper Taking the Destination: copies `if (S != (T) NULL) (void) F(&D,S);` become calls of one `static void` helper taking `&D` and `S`; Lane: a | `image-clone.c`'s eleven `CloneString` copies in `CloneImageInfo`, `CloneImageInfoRenderStrings` and `CloneMontageStrings` (probe 9.09 to 9.68, *Overall Code Complexity* gone) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | SK | Name the Constant a Keyed Switch's Groups Differ In: a `static` function whose `switch` groups are one statement differing in one enumeration constant becomes that statement with a call of a new `switch` returning the constants; a sibling with the same key-to-constant map shares it; Lane: a | `image-mask.c`'s `AddImageMaskChannel` and `RemoveRegionMaskChannel` (*Code Duplication*, probe 8.81 to 9.38) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | SA | Pass the Sum a Callee Only Reads Whole: two `const` parameters of one integer type that a `static` function reads only as `(a+b)` become one parameter, each call passing `ea+eb` of side-effect-free operands; Lane: a | `image-append.c`'s `IsRightGapEdge` and `IsBottomGapEdge` (*Excess Number of Function Arguments*; probe 8.54 to 8.81) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | MX | Merge Axis Twins Through a Side Selector and a Struct of Two Parts: a chain of `static` functions and its other-axis mirror (columns for rows, swapped coordinate pairs, two struct types) become one chain over one struct with a side constant, `static inline` selectors and one function per swapped call; the two entries stay as one-call wrappers; Lane: a | `image-append.c`'s horizontal and vertical smush chains (*Code Duplication*, 8 functions; probe 8.81 to 10.0) | mandate (2026-10-24) |
