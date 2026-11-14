@@ -9350,7 +9350,14 @@ way clones the first.
    holds and the pair is converted to one target, an assignment's left side or a
    parameter, as each copy's run was (`j=0` and `j=(ssize_t) MaxMap`). A pair whose runs
    are statements' whole expressions (`j++`, `j--`) has its value discarded, and needs
-   only scalar types.
+   only scalar types. A pair of null pointer casts to two different pointer types
+   (`(CacheInfo *) NULL` and `(Cache) NULL`, `Cache` being `void *`), each the right
+   operand of `==` or `!=` whose left operand is the same pointer in both copies, may
+   differ too (2026-11-14): the conditional of the two has type `void *` (C11 6.5.15p6)
+   and is a null pointer either way, and comparing a pointer with a null pointer of any
+   object or `void` pointer type is true exactly when the pointer is null (6.5.9p5-6),
+   so the comparison gives what each copy's gave; `tools/cxx_warnings.sh` checks the
+   C++ build, where the composite pointer type is `void *` as well.
 4. Write one `static inline` function directly above the first caller: its parameters are
    the variables a copy reads (Recipe E step 3) and `const NameSide side`, at most four in
    all; when that would make five or more, the selector and the read values that differ
@@ -19935,3 +19942,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | AMEND | WS | Step 7: one block (no copies) moves the same way; further written locals read after it may join the struct as written members, one more may go by pointer (MB's copy in and out), and a flag the block sets on every path is the return value; Lane: b | `compress.c`'s `HuffmanDecodeImage` (the `InputBit` code-reading `do` loop; probe 8.59 to 9.32) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | NS | Step 1: `k1` and `k2` may be constant macros of an installed header (`TransparentAlpha`, `OpaqueAlpha`, `QuantumRange`), or one and `0`, when the site converts the result at once to the macros' cast type, which the function returns; Lane: b | `quantum-import.c`'s `Import1BitGrayAlphaQuantum` and `Import1BitIndexAlphaQuantum` (six selections each; probe 7.65 to 8.15) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | NS | Step 1: `k1` and `k2` may be two locals or parameters of one type assigned on every path to the site (no call, assignment or increment), passed after `c`'s parameters; Lane: b | `compress.c`'s `HuffmanDecodeImage` (`(color != MagickFalse) ? mw_hash : mb_hash`; chain probe 9.44 to 10.0) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | MT | Step 3: a pair of null pointer casts to two pointer types (`(CacheInfo *) NULL` and `(Cache) NULL`), each the right operand of `==`/`!=` against the same pointer, may be a differing pair: the conditional is a `void *` null pointer and the comparison is true exactly when the pointer is null (C11 6.5.9); Lane: a | `cache.c`'s `ClipPixelCacheNexus` and `MaskPixelCacheNexus` (*Code Duplication*; with two Recipe E per-pixel helpers, both leave Code Duplication and Complex Method) | mandate (2026-10-24) |

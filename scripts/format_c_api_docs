@@ -35,6 +35,7 @@ if ( ! GetOptions(
 	 'attribute-depth-measure.c',
 	 'blob.c',
 	 'cache.c',
+	 'cache-access.c',
 	 'cache-view.c',
 	 'color.c',
 	 'color-tuple.c',
