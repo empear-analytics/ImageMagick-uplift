@@ -2303,6 +2303,19 @@ static void SetQueriedColorspace(PixelInfo *color,const ssize_t type,
     }
 }
 
+static MagickStatusType ParseQueriedColorGeometry(const char *name,
+  const ssize_t i,GeometryInfo *geometry_info)
+{
+  MagickStatusType
+    flags;
+
+  if (i >= (ssize_t) strlen(name))
+    flags=ParseCSSColor(name,geometry_info);
+  else
+    flags=ParseCSSColor(name+i+1,geometry_info);
+  return(flags);
+}
+
 static MagickBooleanType QueryColorFunction(const char *name,
   const char *q,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2348,10 +2361,7 @@ static MagickBooleanType QueryColorFunction(const char *name,
       return(MagickFalse);
     }
   SetQueriedColorspace(color,type,icc_color);
-  if (i >= (ssize_t) strlen(name))
-    flags=ParseCSSColor(name,&geometry_info);
-  else
-    flags=ParseCSSColor(name+i+1,&geometry_info);
+  flags=ParseQueriedColorGeometry(name,i,&geometry_info);
   if (flags == 0)
     return(QueryColorFromCSSName(name,i,color,exception));
   SetColorFromGeometry(color,geometry_info,flags,scale);
