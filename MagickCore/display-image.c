@@ -11290,6 +11290,66 @@ static void XApplyDullCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyContrastStretchCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  double
+    black_point,
+    white_point;
+
+  static char
+    levels[MagickPathExtent] = "1%";
+
+  /*
+    Query user for gamma value.
+  */
+  (void) XDialogWidget(display,windows,"Contrast Stretch",
+    "Enter black and white points:",levels);
+  if (*levels == '\0')
+    return;
+  /*
+    Contrast stretch image.
+  */
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flags=ParseGeometry(levels,&geometry_info);
+  black_point=geometry_info.rho;
+  white_point=(flags & SigmaValue) != 0 ? geometry_info.sigma : black_point;
+  if ((flags & PercentValue) != 0)
+    {
+      black_point*=(double) (*image)->columns*(*image)->rows/100.0;
+      white_point*=(double) (*image)->columns*(*image)->rows/100.0;
+    }
+  white_point=(double) (*image)->columns*(*image)->rows-white_point;
+  (void) ContrastStretchImage(*image,black_point,white_point,
+    exception);
+  XSetCursorState(display,windows,MagickFalse);
+  if (windows->image.orphan != MagickFalse)
+    return;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyResizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12031,44 +12091,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyDullCommand(&context);
       break;
     case ContrastStretchCommand:
-    {
-      double
-        black_point,
-        white_point;
-
-      static char
-        levels[MagickPathExtent] = "1%";
-
-      /*
-        Query user for gamma value.
-      */
-      (void) XDialogWidget(display,windows,"Contrast Stretch",
-        "Enter black and white points:",levels);
-      if (*levels == '\0')
-        break;
-      /*
-        Contrast stretch image.
-      */
-      XSetCursorState(display,windows,MagickTrue);
-      XCheckRefreshWindows(display,windows);
-      flags=ParseGeometry(levels,&geometry_info);
-      black_point=geometry_info.rho;
-      white_point=(flags & SigmaValue) != 0 ? geometry_info.sigma : black_point;
-      if ((flags & PercentValue) != 0)
-        {
-          black_point*=(double) (*image)->columns*(*image)->rows/100.0;
-          white_point*=(double) (*image)->columns*(*image)->rows/100.0;
-        }
-      white_point=(double) (*image)->columns*(*image)->rows-white_point;
-      (void) ContrastStretchImage(*image,black_point,white_point,
-        exception);
-      XSetCursorState(display,windows,MagickFalse);
-      if (windows->image.orphan != MagickFalse)
-        break;
-      XConfigureImageColormap(display,resource_info,windows,*image,exception);
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyContrastStretchCommand(&context);
       break;
-    }
     case SigmoidalContrastCommand:
     {
       GeometryInfo
