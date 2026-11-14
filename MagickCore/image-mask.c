@@ -223,6 +223,18 @@ typedef struct _ImageMaskRow
     *exception;
 } ImageMaskRow;
 
+static inline MagickRealType GetMaskRowIntensity(const Image *mask,
+  const Quantum *magick_restrict p,const ssize_t x,const ssize_t y)
+{
+  MagickRealType
+    intensity;
+
+  intensity=0.0;
+  if ((x < (ssize_t) mask->columns) && (y < (ssize_t) mask->rows))
+    intensity=GetPixelIntensity(mask,p);
+  return(intensity);
+}
+
 static void SetImageMaskRow(const ImageMaskRow *row,const ssize_t y,
   MagickBooleanType *status)
 {
@@ -265,9 +277,7 @@ static void SetImageMaskRow(const ImageMaskRow *row,const ssize_t y,
     MagickRealType
       intensity;
 
-    intensity=0.0;
-    if ((x < (ssize_t) mask->columns) && (y < (ssize_t) mask->rows))
-      intensity=GetPixelIntensity(mask,p);
+    intensity=GetMaskRowIntensity(mask,p,x,y);
     SetMaskPixel(image,type,ClampToQuantum(intensity),q);
     p+=(ptrdiff_t) GetPixelChannels(mask);
     q+=(ptrdiff_t) GetPixelChannels(image);
