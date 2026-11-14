@@ -3934,6 +3934,17 @@ static const char *FormatMagickPropertyPrecision(char *value,
   return((const char *) NULL);
 }
 
+static void LogMagickPropertyRequest(const ImageInfo *image_info,
+  const Image *image)
+{
+  if ((image != (Image *) NULL) && (IsEventLogging() != MagickFalse))
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  else
+    if ((image_info != (ImageInfo *) NULL) &&
+        (IsEventLogging() != MagickFalse))
+      (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no-images");
+}
+
 typedef struct _MagickPropertyRequest
 {
   ImageInfo
@@ -4542,12 +4553,7 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
   assert(image != (Image *) NULL || image_info != (ImageInfo *) NULL );
   if (property[1] == '\0')  /* single letter property request */
     return(GetMagickPropertyLetter(image_info,image,*property,exception));
-  if ((image != (Image *) NULL) && (IsEventLogging() != MagickFalse))
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  else
-    if ((image_info != (ImageInfo *) NULL) &&
-        (IsEventLogging() != MagickFalse))
-      (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s","no-images");
+  LogMagickPropertyRequest(image_info,image);
   *value='\0';           /* formated string */
   string=(char *) NULL;  /* constant string reference */
   request.image_info=image_info;
