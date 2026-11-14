@@ -3967,6 +3967,9 @@ typedef struct _MagickPropertyHandlerInfo
   const char
     *key;
 
+  size_t
+    length;
+
   MagickPropertyRequirement
     requirement;
 
@@ -4052,16 +4055,23 @@ static const char *MagickPropertyCompression(const MagickPropertyRequest *reques
   return(string);
 }
 
-static const char *MagickPropertyConvexHull(const MagickPropertyRequest *request)
+static const char *GetPointListRequestProperty(
+  const MagickPropertyRequest *request,const PointListSide side)
 {
   const char
     *string = (char *) NULL;
 
   const PointListInputs
-    inputs = { request->image, request->value, string, request->property, request->exception };
+    inputs = { request->image, request->value, string, request->property,
+      request->exception };
 
-  string=GetPointListProperty(&inputs,ConvexHullPointList);
+  string=GetPointListProperty(&inputs,side);
   return(string);
+}
+
+static const char *MagickPropertyConvexHull(const MagickPropertyRequest *request)
+{
+  return(GetPointListRequestProperty(request,ConvexHullPointList));
 }
 
 static const char *MagickPropertyConvexHullExtremePoints(const MagickPropertyRequest *request)
@@ -4374,57 +4384,104 @@ static const char *MagickPropertyWidth(const MagickPropertyRequest *request)
   return((const char *) NULL);
 }
 
+static const char *MagickPropertyMinimumBoundingBox(
+  const MagickPropertyRequest *request)
+{
+  return(GetPointListRequestProperty(request,MinimumBoundingBoxPointList));
+}
+
+static const char *MagickPropertyPapersize(const MagickPropertyRequest *request)
+{
+  FormatPaperSizeProperty(request->property,request->value);
+  return((const char *) NULL);
+}
+
+static const char *MagickPropertyScene(const MagickPropertyRequest *request)
+{
+  Image
+    *const image = request->image;
+
+  const char
+    *const property = request->property;
+
+  ExceptionInfo
+    *const exception = request->exception;
+
+  if (request->image_info->number_scenes != 0)
+    (void) FormatLocaleString(request->value,MagickPathExtent,"%.17g",(double)
+      request->image_info->scene);
+  else {
+    WarnNoImageReturn("\"%%[%s]\"",property);
+    (void) FormatLocaleString(request->value,MagickPathExtent,"%.17g",(double)
+      image->scene);
+  }
+  return((const char *) NULL);
+}
+
 static const MagickPropertyHandlerInfo
   MagickPropertyHandlers[] =
   {
-    { "basename", ImagePropertyRequirement, MagickPropertyBasename },
-    { "bit-depth", ImagePropertyRequirement, MagickPropertyBitDepth },
-    { "bounding-box", ImagePropertyRequirement, MagickPropertyBoundingBox },
-    { "channels", ImagePropertyRequirement, MagickPropertyChannels },
-    { "colors", ImagePropertyRequirement, MagickPropertyColors },
-    { "colorspace", ImagePropertyRequirement, MagickPropertyColorspace },
-    { "compose", ImagePropertyRequirement, MagickPropertyCompose },
-    { "compression", ImagePropertyRequirement, MagickPropertyCompression },
-    { "convex-hull", ImagePropertyRequirement, MagickPropertyConvexHull },
-    { "convex-hull:extreme-points", ImagePropertyRequirement, MagickPropertyConvexHullExtremePoints },
-    { "copyright", NoPropertyRequirement, MagickPropertyCopyright },
-    { "depth", ImagePropertyRequirement, MagickPropertyDepth },
-    { "directory", ImagePropertyRequirement, MagickPropertyDirectory },
-    { "entropy", ImagePropertyRequirement, MagickPropertyEntropy },
-    { "extension", ImagePropertyRequirement, MagickPropertyExtension },
-    { "gamma", ImagePropertyRequirement, MagickPropertyGamma },
-    { "height", ImagePropertyRequirement, MagickPropertyHeight },
-    { "input", ImagePropertyRequirement, MagickPropertyInput },
-    { "interlace", ImagePropertyRequirement, MagickPropertyInterlace },
-    { "kurtosis", ImagePropertyRequirement, MagickPropertyKurtosis },
-    { "magick", ImagePropertyRequirement, MagickPropertyMagick },
-    { "maxima", ImagePropertyRequirement, MagickPropertyMaxima },
-    { "max", ImagePropertyRequirement, MagickPropertyMaxima },
-    { "mean", ImagePropertyRequirement, MagickPropertyMean },
-    { "median", ImagePropertyRequirement, MagickPropertyMedian },
-    { "mime:type", NoPropertyRequirement, MagickPropertyMimeType },
-    { "minima", ImagePropertyRequirement, MagickPropertyMinima },
-    { "min", ImagePropertyRequirement, MagickPropertyMinima },
-    { "opaque", ImagePropertyRequirement, MagickPropertyOpaque },
-    { "orientation", ImagePropertyRequirement, MagickPropertyOrientation },
-    { "output", ImageInfoPropertyRequirement, MagickPropertyOutput },
-    { "page", ImagePropertyRequirement, MagickPropertyPage },
-    { "printsize.x", ImagePropertyRequirement, MagickPropertyPrintsizeX },
-    { "printsize.y", ImagePropertyRequirement, MagickPropertyPrintsizeY },
-    { "profiles", ImagePropertyRequirement, MagickPropertyProfiles },
-    { "quality", ImagePropertyRequirement, MagickPropertyQuality },
-    { "resolution.x", ImagePropertyRequirement, MagickPropertyResolutionX },
-    { "resolution.y", ImagePropertyRequirement, MagickPropertyResolutionY },
-    { "scenes", ImagePropertyRequirement, MagickPropertyScenes },
-    { "size", ImagePropertyRequirement, MagickPropertySize },
-    { "skewness", ImagePropertyRequirement, MagickPropertySkewness },
-    { "standard-deviation", ImagePropertyRequirement, MagickPropertyStandardDeviation },
-    { "type", ImagePropertyRequirement, MagickPropertyType },
-    { "unique", ImageInfoPropertyRequirement, MagickPropertyUnique },
-    { "units", ImagePropertyRequirement, MagickPropertyUnits },
-    { "version", NoPropertyRequirement, MagickPropertyVersion },
-    { "width", ImagePropertyRequirement, MagickPropertyWidth }
+    { "basename", 0, ImagePropertyRequirement, MagickPropertyBasename },
+    { "bit-depth", 0, ImagePropertyRequirement, MagickPropertyBitDepth },
+    { "bounding-box", 0, ImagePropertyRequirement, MagickPropertyBoundingBox },
+    { "channels", 0, ImagePropertyRequirement, MagickPropertyChannels },
+    { "colors", 0, ImagePropertyRequirement, MagickPropertyColors },
+    { "colorspace", 0, ImagePropertyRequirement, MagickPropertyColorspace },
+    { "compose", 0, ImagePropertyRequirement, MagickPropertyCompose },
+    { "compression", 0, ImagePropertyRequirement, MagickPropertyCompression },
+    { "convex-hull", 0, ImagePropertyRequirement, MagickPropertyConvexHull },
+    { "convex-hull:extreme-points", 0, ImagePropertyRequirement, MagickPropertyConvexHullExtremePoints },
+    { "copyright", 0, NoPropertyRequirement, MagickPropertyCopyright },
+    { "depth", 0, ImagePropertyRequirement, MagickPropertyDepth },
+    { "directory", 0, ImagePropertyRequirement, MagickPropertyDirectory },
+    { "entropy", 0, ImagePropertyRequirement, MagickPropertyEntropy },
+    { "extension", 0, ImagePropertyRequirement, MagickPropertyExtension },
+    { "gamma", 0, ImagePropertyRequirement, MagickPropertyGamma },
+    { "height", 0, ImagePropertyRequirement, MagickPropertyHeight },
+    { "input", 0, ImagePropertyRequirement, MagickPropertyInput },
+    { "interlace", 0, ImagePropertyRequirement, MagickPropertyInterlace },
+    { "kurtosis", 0, ImagePropertyRequirement, MagickPropertyKurtosis },
+    { "magick", 0, ImagePropertyRequirement, MagickPropertyMagick },
+    { "maxima", 0, ImagePropertyRequirement, MagickPropertyMaxima },
+    { "max", 0, ImagePropertyRequirement, MagickPropertyMaxima },
+    { "mean", 0, ImagePropertyRequirement, MagickPropertyMean },
+    { "median", 0, ImagePropertyRequirement, MagickPropertyMedian },
+    { "mime:type", 0, NoPropertyRequirement, MagickPropertyMimeType },
+    { "minima", 0, ImagePropertyRequirement, MagickPropertyMinima },
+    { "min", 0, ImagePropertyRequirement, MagickPropertyMinima },
+    { "minimum-bounding-box", 20, ImagePropertyRequirement,
+      MagickPropertyMinimumBoundingBox },
+    { "opaque", 0, ImagePropertyRequirement, MagickPropertyOpaque },
+    { "orientation", 0, ImagePropertyRequirement, MagickPropertyOrientation },
+    { "output", 0, ImageInfoPropertyRequirement, MagickPropertyOutput },
+    { "page", 0, ImagePropertyRequirement, MagickPropertyPage },
+    { "papersize:", 10, ImagePropertyRequirement, MagickPropertyPapersize },
+    { "printsize.x", 0, ImagePropertyRequirement, MagickPropertyPrintsizeX },
+    { "printsize.y", 0, ImagePropertyRequirement, MagickPropertyPrintsizeY },
+    { "profiles", 0, ImagePropertyRequirement, MagickPropertyProfiles },
+    { "quality", 0, ImagePropertyRequirement, MagickPropertyQuality },
+    { "resolution.x", 0, ImagePropertyRequirement, MagickPropertyResolutionX },
+    { "resolution.y", 0, ImagePropertyRequirement, MagickPropertyResolutionY },
+    { "scene", 0, ImageInfoPropertyRequirement, MagickPropertyScene },
+    { "scenes", 0, ImagePropertyRequirement, MagickPropertyScenes },
+    { "size", 0, ImagePropertyRequirement, MagickPropertySize },
+    { "skewness", 0, ImagePropertyRequirement, MagickPropertySkewness },
+    { "standard-deviation", 0, ImagePropertyRequirement, MagickPropertyStandardDeviation },
+    { "type", 0, ImagePropertyRequirement, MagickPropertyType },
+    { "unique", 0, ImageInfoPropertyRequirement, MagickPropertyUnique },
+    { "units", 0, ImagePropertyRequirement, MagickPropertyUnits },
+    { "version", 0, NoPropertyRequirement, MagickPropertyVersion },
+    { "width", 0, ImagePropertyRequirement, MagickPropertyWidth }
   };
+
+static MagickBooleanType IsMagickPropertyKey(
+  const MagickPropertyHandlerInfo *info,const char *property)
+{
+  if (info->length != 0)
+    return(LocaleNCompare(info->key,property,info->length) == 0 ? MagickTrue :
+      MagickFalse);
+  return(LocaleCompare(info->key,property) == 0 ? MagickTrue : MagickFalse);
+}
 
 static const MagickPropertyHandlerInfo *GetMagickPropertyHandlerInfo(
   const char *property)
@@ -4434,7 +4491,7 @@ static const MagickPropertyHandlerInfo *GetMagickPropertyHandlerInfo(
 
   for (i=0; i < (sizeof(MagickPropertyHandlers)/sizeof(*MagickPropertyHandlers)); i++)
     if ((*property == *MagickPropertyHandlers[i].key) &&
-        (LocaleCompare(MagickPropertyHandlers[i].key,property) == 0))
+        (IsMagickPropertyKey(MagickPropertyHandlers+i,property) != MagickFalse))
       return(MagickPropertyHandlers+i);
   return((const MagickPropertyHandlerInfo *) NULL);
 }
@@ -4505,25 +4562,10 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
   {
     case 'm':
     {
-      if (LocaleNCompare("minimum-bounding-box",property,20) == 0)
-        {
-          const PointListInputs
-            inputs = { image, value, string, property, exception };
-
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          string=GetPointListProperty(&inputs,MinimumBoundingBoxPointList);
-          break;
-        }
       break;
     }
     case 'p':
     {
-      if (LocaleNCompare("papersize:",property,10) == 0)
-        {
-          WarnNoImageReturn("\"%%[%s]\"",property);
-          FormatPaperSizeProperty(property,value);
-          break;
-        }
 #if defined(MAGICKCORE_LCMS_DELEGATE)
       if (LocaleCompare("profile:icc",property) == 0 ||
           LocaleCompare("profile:icm",property) == 0)
@@ -4560,19 +4602,6 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
     }
     case 's':
     {
-      if (LocaleCompare("scene",property) == 0)
-        {
-          WarnNoImageInfoReturn("\"%%[%s]\"",property);
-          if (image_info->number_scenes != 0)
-            (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-              image_info->scene);
-          else {
-            WarnNoImageReturn("\"%%[%s]\"",property);
-            (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-              image->scene);
-          }
-          break;
-        }
       break;
     }
   }
