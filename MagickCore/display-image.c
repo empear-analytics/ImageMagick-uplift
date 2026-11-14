@@ -24949,13 +24949,87 @@ static MagickStatusType XMakeDisplayXImages(const DisplayEventContext *context,
   return(status);
 }
 
+static void XMakeDisplayWindows(const DisplayEventContext *context,
+  Image *display_image)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  XVisualInfo
+    *const visual_info = context->visual_info;
+
+  char
+    geometry[MagickPathExtent];
+
+  RectangleInfo
+    geometry_info;
+
+  XNameImageWindow(context,display_image);
+  if (resource_info->immutable)
+    windows->image.immutable=MagickTrue;
+  windows->image.use_pixmap=resource_info->use_pixmap;
+  windows->image.geometry=resource_info->image_geometry;
+  (void) FormatLocaleString(geometry,MagickPathExtent,"%ux%u+0+0>!",
+    XDisplayWidth(display,visual_info->screen),
+    XDisplayHeight(display,visual_info->screen));
+  geometry_info.width=display_image->columns;
+  geometry_info.height=display_image->rows;
+  geometry_info.x=0;
+  geometry_info.y=0;
+  (void) ParseMetaGeometry(geometry,&geometry_info.x,&geometry_info.y,
+    &geometry_info.width,&geometry_info.height);
+  windows->image.width=(unsigned int) geometry_info.width;
+  windows->image.height=(unsigned int) geometry_info.height;
+  windows->image.attributes.event_mask=ButtonMotionMask | ButtonPressMask |
+    ButtonReleaseMask | EnterWindowMask | ExposureMask | KeyPressMask |
+    KeyReleaseMask | LeaveWindowMask | OwnerGrabButtonMask |
+    PropertyChangeMask | StructureNotifyMask | SubstructureNotifyMask;
+  XInitializeBackdropWindow(context);
+  XMakeImageWindow(context);
+  /*
+    Initialize Info widget.
+  */
+  XMakeInfoWindow(context);
+  /*
+    Initialize Command widget.
+  */
+  XMakeCommandWindow(context);
+  /*
+    Initialize Widget window.
+  */
+  XMakeWidgetWindow(context);
+  /*
+    Initialize popup window.
+  */
+  XMakePopupWindow(context);
+  /*
+    Initialize Magnify window and cursor.
+  */
+  XMakeMagnifyWindow(context,display_image);
+  (void) XSetTransientForHint(display,windows->magnify.id,windows->image.id);
+  /*
+    Initialize panning window.
+  */
+  XMakePanWindow(context);
+  if (windows->info.mapped != MagickFalse)
+    (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+  if ((windows->image.mapped == MagickFalse) ||
+      (windows->backdrop.id != (Window) NULL))
+    (void) XMapWindow(display,windows->image.id);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
   char
     command[MagickPathExtent],
-    *directory,
-    geometry[MagickPathExtent];
+    *directory;
 
   Image
     *display_image,
@@ -24967,9 +25041,6 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   MagickStatusType
     context_mask,
     status;
-
-  RectangleInfo
-    geometry_info;
 
   static char
     working_directory[MagickPathExtent];
@@ -25202,58 +25273,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   /*
     Initialize Image window.
   */
-  XNameImageWindow(&event_context,display_image);
-  if (resource_info->immutable)
-    windows->image.immutable=MagickTrue;
-  windows->image.use_pixmap=resource_info->use_pixmap;
-  windows->image.geometry=resource_info->image_geometry;
-  (void) FormatLocaleString(geometry,MagickPathExtent,"%ux%u+0+0>!",
-    XDisplayWidth(display,visual_info->screen),
-    XDisplayHeight(display,visual_info->screen));
-  geometry_info.width=display_image->columns;
-  geometry_info.height=display_image->rows;
-  geometry_info.x=0;
-  geometry_info.y=0;
-  (void) ParseMetaGeometry(geometry,&geometry_info.x,&geometry_info.y,
-    &geometry_info.width,&geometry_info.height);
-  windows->image.width=(unsigned int) geometry_info.width;
-  windows->image.height=(unsigned int) geometry_info.height;
-  windows->image.attributes.event_mask=ButtonMotionMask | ButtonPressMask |
-    ButtonReleaseMask | EnterWindowMask | ExposureMask | KeyPressMask |
-    KeyReleaseMask | LeaveWindowMask | OwnerGrabButtonMask |
-    PropertyChangeMask | StructureNotifyMask | SubstructureNotifyMask;
-  XInitializeBackdropWindow(&event_context);
-  XMakeImageWindow(&event_context);
-  /*
-    Initialize Info widget.
-  */
-  XMakeInfoWindow(&event_context);
-  /*
-    Initialize Command widget.
-  */
-  XMakeCommandWindow(&event_context);
-  /*
-    Initialize Widget window.
-  */
-  XMakeWidgetWindow(&event_context);
-  /*
-    Initialize popup window.
-  */
-  XMakePopupWindow(&event_context);
-  /*
-    Initialize Magnify window and cursor.
-  */
-  XMakeMagnifyWindow(&event_context,display_image);
-  (void) XSetTransientForHint(display,windows->magnify.id,windows->image.id);
-  /*
-    Initialize panning window.
-  */
-  XMakePanWindow(&event_context);
-  if (windows->info.mapped != MagickFalse)
-    (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
-  if ((windows->image.mapped == MagickFalse) ||
-      (windows->backdrop.id != (Window) NULL))
-    (void) XMapWindow(display,windows->image.id);
+  XMakeDisplayWindows(&event_context,display_image);
   /*
     Set our progress monitor and warning handlers.
   */
