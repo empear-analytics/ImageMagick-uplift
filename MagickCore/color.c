@@ -1048,6 +1048,14 @@ static const ColorInfo *GetFirstColorInfo(const ElementInfo *p,
   return(color);
 }
 
+static void CopyColorName(const char *name,char *colorname)
+{
+  *colorname='\0';
+  if (name != (const char *) NULL)
+    (void) CopyMagickString(colorname,name,MagickPathExtent);
+  StripColorNameWhitespace(colorname);
+}
+
 MagickExport const ColorInfo *GetColorCompliance(const char *name,
   const ComplianceType compliance,ExceptionInfo *exception)
 {
@@ -1066,10 +1074,7 @@ MagickExport const ColorInfo *GetColorCompliance(const char *name,
   /*
     Strip names of whitespace.
   */
-  *colorname='\0';
-  if (name != (const char *) NULL)
-    (void) CopyMagickString(colorname,name,MagickPathExtent);
-  StripColorNameWhitespace(colorname);
+  CopyColorName(name,colorname);
   /*
     Search for color tag.
   */
