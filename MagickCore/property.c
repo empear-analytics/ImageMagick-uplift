@@ -3725,6 +3725,87 @@ static const char *MagickPropertyLetterHash(const MagickPropertyRequest *request
   return(string);
 }
 
+static const char *FormatMagickPropertyListLength(
+  const MagickPropertyRequest *request,const MagickBooleanType test,
+  const char *format,const char *fallback)
+{
+  const char
+    *string = (char *) NULL;
+
+  if (test != MagickFalse)
+    (void) FormatLocaleString(request->value,MagickPathExtent,format,(double)
+      GetImageListLength(request->image));
+  else
+    string=fallback;
+  return(string);
+}
+
+static const char *MagickPropertyLetterLowerN(
+  const MagickPropertyRequest *request)
+{
+  /* "0": no images or scenes */
+  return(FormatMagickPropertyListLength(request,(MagickBooleanType)
+    (request->image != (Image *) NULL),"%.17g","0"));
+}
+
+static const char *MagickPropertyLetterLowerS(
+  const MagickPropertyRequest *request)
+{
+  Image
+    *const image = request->image;
+
+  char
+    *const value = request->value;
+
+#if 0  /* this seems non-sensical -- simplifying */
+      if (image_info->number_scenes != 0)
+        (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
+          image_info->scene);
+      else if (image != (Image *) NULL)
+        (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
+          image->scene);
+      else
+          string="0";
+#else
+  (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
+    image->scene);
+#endif
+  return((const char *) NULL);
+}
+
+static const char *MagickPropertyLetterUpperN(
+  const MagickPropertyRequest *request)
+{
+  return(FormatMagickPropertyListLength(request,(MagickBooleanType)
+    ((request->image != (Image *) NULL) &&
+    (request->image->next == (Image *) NULL)),"%.17g\n",""));
+}
+
+static const char *MagickPropertyLetterUpperS(
+  const MagickPropertyRequest *request)
+{
+  ImageInfo
+    *const image_info = request->image_info;
+
+  char
+    *const value = request->value;
+
+#if 0 /* What is this number? -- it makes no sense - simplifying */
+      if (image_info->number_scenes == 0)
+         string="2147483647";
+      else if ( image != (Image *) NULL )
+        (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
+                image_info->scene+image_info->number_scenes);
+      else
+        string="0";
+#else
+  (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
+    (image_info->number_scenes == 0 ? 2147483647 :
+     image_info->number_scenes));
+#endif
+  return((const char *) NULL);
+}
+
 static const MagickPropertyLetterInfo
   MagickPropertyLetters[] =
   {
@@ -3739,10 +3820,12 @@ static const MagickPropertyLetterInfo
     { 'k', ImagePropertyRequirement, MagickPropertyLetterLowerK },
     { 'l', ImagePropertyRequirement, MagickPropertyLetterLowerL },
     { 'm', ImagePropertyRequirement, MagickPropertyMagick },
+    { 'n', NoPropertyRequirement, MagickPropertyLetterLowerN },
     { 'o', ImageInfoPropertyRequirement, MagickPropertyLetterLowerO },
     { 'p', ImagePropertyRequirement, MagickPropertyLetterLowerP },
     { 'q', ImagePropertyRequirement, MagickPropertyLetterLowerQ },
     { 'r', ImagePropertyRequirement, MagickPropertyLetterLowerR },
+    { 's', ImagePropertyRequirement, MagickPropertyLetterLowerS },
     { 't', ImagePropertyRequirement, MagickPropertyLetterLowerT },
     { 'u', ImageInfoPropertyRequirement, MagickPropertyUnique },
     { 'w', ImagePropertyRequirement, MagickPropertyLetterLowerW },
@@ -3756,9 +3839,11 @@ static const MagickPropertyLetterInfo
     { 'G', ImagePropertyRequirement, MagickPropertyLetterUpperG },
     { 'H', ImagePropertyRequirement, MagickPropertyLetterUpperH },
     { 'M', ImagePropertyRequirement, MagickPropertyLetterUpperM },
+    { 'N', NoPropertyRequirement, MagickPropertyLetterUpperN },
     { 'O', ImagePropertyRequirement, MagickPropertyLetterUpperO },
     { 'P', ImagePropertyRequirement, MagickPropertyLetterUpperP },
     { 'Q', ImagePropertyRequirement, MagickPropertyLetterUpperQ },
+    { 'S', ImageInfoPropertyRequirement, MagickPropertyLetterUpperS },
     { 'T', ImagePropertyRequirement, MagickPropertyLetterUpperT },
     { 'U', ImagePropertyRequirement, MagickPropertyUnits },
     { 'W', ImagePropertyRequirement, MagickPropertyLetterUpperW },
@@ -3817,66 +3902,6 @@ static const char *GetMagickPropertyLetter(ImageInfo *image_info,
         }
       string=info->handler(&request);
     }
-  /*
-    Get properties that are directly defined by images.
-  */
-  switch (letter)
-  {
-    case 'n': /* Number of images in the list.  */
-    {
-      if ( image != (Image *) NULL )
-        (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-          GetImageListLength(image));
-      else
-        string="0";    /* no images or scenes */
-      break;
-    }
-    case 's': /* Image scene number */
-    {
-#if 0  /* this seems non-sensical -- simplifying */
-      if (image_info->number_scenes != 0)
-        (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-          image_info->scene);
-      else if (image != (Image *) NULL)
-        (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-          image->scene);
-      else
-          string="0";
-#else
-      WarnNoImageReturn("\"%%%c\"",letter);
-      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-        image->scene);
-#endif
-      break;
-    }
-    case 'N': /* Number of images in the list.  */
-    {
-      if ((image != (Image *) NULL) && (image->next == (Image *) NULL))
-        (void) FormatLocaleString(value,MagickPathExtent,"%.17g\n",(double)
-          GetImageListLength(image));
-      else
-        string="";
-      break;
-    }
-    case 'S': /* Number of scenes in image list.  */
-    {
-      WarnNoImageInfoReturn("\"%%%c\"",letter);
-#if 0 /* What is this number? -- it makes no sense - simplifying */
-      if (image_info->number_scenes == 0)
-         string="2147483647";
-      else if ( image != (Image *) NULL )
-        (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-                image_info->scene+image_info->number_scenes);
-      else
-        string="0";
-#else
-      (void) FormatLocaleString(value,MagickPathExtent,"%.17g",(double)
-        (image_info->number_scenes == 0 ? 2147483647 :
-         image_info->number_scenes));
-#endif
-      break;
-    }
-  }
   if (string != (char *) NULL)
     return(string);
   return(CloneMagickPropertyValue(image_info,image,value));
