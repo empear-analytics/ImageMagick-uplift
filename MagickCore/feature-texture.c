@@ -1927,6 +1927,71 @@ static MagickBooleanType FormFeatureGrays(const FeatureGraysForm *form,
   return(MagickFalse);
 }
 
+static void ComputeVarianceDirections(
+  const TextureFeatureState *features,FeatureStatistics sum_squares,
+  FeatureStatistics variance,MagickBooleanType status)
+{
+  const Image
+    *const image = features->image;
+
+  ChannelFeatures
+    *const channel_features = features->channel_features;
+
+  FeatureStatistics
+    **const cooccurrence = features->cooccurrence,
+    *const density_x = features->density_x,
+    *const density_xy = features->density_xy,
+    *const density_y = features->density_y,
+    **const Q = features->Q,
+    *const sum = features->sum;
+
+  const unsigned int
+    number_grays = features->number_grays;
+
+  FeatureStatistics
+    correlation = features->correlation,
+    entropy_x = features->entropy_x,
+    entropy_xy = features->entropy_xy,
+    entropy_xy1 = features->entropy_xy1,
+    entropy_xy2 = features->entropy_xy2,
+    entropy_y = features->entropy_y,
+    mean = features->mean;
+
+  ssize_t
+    i;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,number_grays,1)
+#endif
+  for (i=0; i < 4; i++)
+  {
+    const TextureDirection
+      texture = { image, channel_features, cooccurrence, density_x,
+        density_xy, density_y, Q, sum, number_grays, i };
+
+    const TextureSlots
+      slots = { &correlation.direction[i], &entropy_x.direction[i],
+        &entropy_xy.direction[i], &entropy_xy1.direction[i],
+        &entropy_xy2.direction[i], &entropy_y.direction[i],
+        &mean.direction[i], &sum_squares.direction[i],
+        &variance.direction[i] };
+
+    ComputeVarianceFeatures(&texture,&slots);
+  }
+  /*
+    Compute more texture features.
+  */
+  {
+    const TextureFeatureState
+      state = { image, channel_features, cooccurrence, density_x, density_xy,
+        density_y, Q, sum, number_grays, correlation, entropy_x, entropy_xy,
+        entropy_xy1, entropy_xy2, entropy_y, mean };
+
+    ComputeDifferenceAndContrastFeatures(&state,status);
+  }
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1942,6 +2007,9 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
 
   FeatureMatrixInputs
     matrix;
+
+  TextureFeatureState
+    features;
 
   FeatureStatistics
     **cooccurrence,
@@ -2109,36 +2177,23 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   /*
     Compute more texture features.
   */
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(image,image,number_grays,1)
-#endif
-  for (i=0; i < 4; i++)
-  {
-    const TextureDirection
-      texture = { image, channel_features, cooccurrence, density_x,
-        density_xy, density_y, Q, sum, number_grays, i };
-
-    const TextureSlots
-      slots = { &correlation.direction[i], &entropy_x.direction[i],
-        &entropy_xy.direction[i], &entropy_xy1.direction[i],
-        &entropy_xy2.direction[i], &entropy_y.direction[i],
-        &mean.direction[i], &sum_squares.direction[i],
-        &variance.direction[i] };
-
-    ComputeVarianceFeatures(&texture,&slots);
-  }
-  /*
-    Compute more texture features.
-  */
-  {
-    const TextureFeatureState
-      state = { image, channel_features, cooccurrence, density_x, density_xy,
-        density_y, Q, sum, number_grays, correlation, entropy_x, entropy_xy,
-        entropy_xy1, entropy_xy2, entropy_y, mean };
-
-    ComputeDifferenceAndContrastFeatures(&state,status);
-  }
+  features.image=image;
+  features.channel_features=channel_features;
+  features.cooccurrence=cooccurrence;
+  features.density_x=density_x;
+  features.density_xy=density_xy;
+  features.density_y=density_y;
+  features.Q=Q;
+  features.sum=sum;
+  features.number_grays=number_grays;
+  features.correlation=correlation;
+  features.entropy_x=entropy_x;
+  features.entropy_xy=entropy_xy;
+  features.entropy_xy1=entropy_xy1;
+  features.entropy_xy2=entropy_xy2;
+  features.entropy_y=entropy_y;
+  features.mean=mean;
+  ComputeVarianceDirections(&features,sum_squares,variance,status);
   /*
     Relinquish resources.
   */
