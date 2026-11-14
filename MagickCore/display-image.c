@@ -22083,6 +22083,22 @@ static void XLoadBackdropImage(const DirectoryLoadInput *load_input,
   XSetCursorState(display,windows,MagickTrue);
 }
 
+static MagickBooleanType IsDirectoryLoadCancelled(Image *images,const int i,
+  const int number_files)
+{
+  if (images->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      proceed=SetImageProgress(images,LoadImageTag,(MagickOffsetType) i,
+        (MagickSizeType) number_files);
+      if (proceed == MagickFalse)
+        return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 static Image *XLoadDirectoryImages(const DirectoryLoadInput *load_input,
   Image *images)
 {
@@ -22135,16 +22151,8 @@ static Image *XLoadDirectoryImages(const DirectoryLoadInput *load_input,
     if (backdrop)
       XLoadBackdropImage(load_input,next_image);
     AppendImageToList(&images,next_image);
-    if (images->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-        proceed=SetImageProgress(images,LoadImageTag,(MagickOffsetType) i,
-          (MagickSizeType) number_files);
-        if (proceed == MagickFalse)
-          break;
-      }
+    if (IsDirectoryLoadCancelled(images,i,number_files) != MagickFalse)
+      break;
   }
   return(images);
 }
