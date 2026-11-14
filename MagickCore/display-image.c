@@ -24677,6 +24677,49 @@ static void XWithdrawDynamicWindows(Display *display,XWindows *windows)
     }
 }
 
+static void XFreeDisplayResources(const DisplayEventContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XPixelInfo
+    *const icon_pixel = context->icon_pixel,
+    *const pixel = context->pixel;
+
+  XStandardColormap
+    *const icon_map = context->icon_map,
+    *const map_info = context->map_info;
+
+  XVisualInfo
+    *const icon_visual = context->icon_visual,
+    *const visual_info = context->visual_info;
+
+  size_t
+    *const state = context->state;
+
+  if (*state & ExitState)
+    {
+      /*
+        Free Standard Colormap.
+      */
+      (void) XFreeStandardColormap(display,icon_visual,icon_map,icon_pixel);
+      if (resource_info->map_type == (char *) NULL)
+        (void) XFreeStandardColormap(display,visual_info,map_info,pixel);
+      /*
+        Free X resources.
+      */
+      if (resource_info->copy_image != (Image *) NULL)
+        {
+          resource_info->copy_image=DestroyImage(resource_info->copy_image);
+          resource_info->copy_image=NewImageList();
+        }
+      DestroyXResources();
+    }
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -25157,24 +25200,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   XCheckRefreshWindows(display,windows);
   if (((*state & FormerImageState) != 0) || ((*state & NextImageState) != 0))
     *state&=(unsigned int) (~ExitState);
-  if (*state & ExitState)
-    {
-      /*
-        Free Standard Colormap.
-      */
-      (void) XFreeStandardColormap(display,icon_visual,icon_map,icon_pixel);
-      if (resource_info->map_type == (char *) NULL)
-        (void) XFreeStandardColormap(display,visual_info,map_info,pixel);
-      /*
-        Free X resources.
-      */
-      if (resource_info->copy_image != (Image *) NULL)
-        {
-          resource_info->copy_image=DestroyImage(resource_info->copy_image);
-          resource_info->copy_image=NewImageList();
-        }
-      DestroyXResources();
-    }
+  XFreeDisplayResources(&event_context);
   (void) XSync(display,MagickFalse);
   /*
     Restore our progress monitor and warning handlers.
