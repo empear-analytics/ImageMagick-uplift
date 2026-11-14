@@ -17353,6 +17353,112 @@ Lane: a
 
 ---
 
+## Recipe SK - Name the Constant a Keyed Switch's Groups Differ In
+
+**Use when:** CodeScene reports *Code Duplication* (or *Complex Method*, or *Overall Code
+Complexity*) on `static` functions whose body is one `switch` on a parameter in which
+every group is one and the same statement that differs only in one enumeration constant,
+as `image-mask.c`'s `AddImageMaskChannel` and `RemoveRegionMaskChannel`: each group of
+the `PixelMask` switch sets `image->channels` from `ReadMaskChannel`, `WriteMaskChannel`
+or `CompositeMaskChannel`, one function with `|`, the other with `& ~`.
+
+**Not covered by:** Recipe KS, KC and KR, whose groups assign or return a literal (here
+each group is a computed statement around the constant); Recipe SC, which extracts
+sibling blocks into one helper passing their constants and leaves the selection in the
+caller; Recipe NS, which names a two-way `?:`; Recipe D, which merges identical blocks.
+
+**How:**
+
+1. The function is `static`, outside every OpenMP region; its body is one `switch (k)`
+   on a parameter `k`, without fall-through, each group `case L: S_i break;` (braces
+   allowed) and a `default:` group of the same shape, where the statements `S_i` are
+   token for token the same once one enumeration constant `C_i` of one enumeration type
+   `E` is set aside. No `#if` line stands inside the `switch`.
+2. Directly above the first function of the file that will call it, write `static E
+   GetName(const K k)` (`K` the parameter's type) holding the same `switch`, each group
+   `case L: return(C_i);` and `default: return(C_default);`.
+3. Replace the `switch` by `S` with `C_i` replaced by `GetName(k)`, wrapped and indented
+   as the group's statement was.
+4. Another function of the file whose `switch` on the same type has the same labels
+   mapping to the same constants (the same key-to-constant map) may call the same
+   `GetName`; it goes in the same commit when the duplication finding links the two.
+5. Check by script that each group's statement equals the new statement with that
+   group's constant in place of the call, and that the labels and constants of the
+   new `switch` are the original's. Run `tools/ci_warnings.sh` and
+   `tools/cxx_warnings.sh` (`OK`) and the oracle for each changed function.
+
+**Before:**
+
+```c
+static void AddImageMaskChannel(Image *image,const PixelMask type)
+{
+  switch (type)
+  {
+    case ReadPixelMask:
+    {
+      image->channels=(ChannelType) (image->channels | ReadMaskChannel);
+      break;
+    }
+    ...
+    default:
+    {
+      image->channels=(ChannelType) (image->channels | CompositeMaskChannel);
+      break;
+    }
+  }
+}
+```
+
+**After:**
+
+```c
+static ChannelType GetMaskChannel(const PixelMask type)
+{
+  switch (type)
+  {
+    case ReadPixelMask: return(ReadMaskChannel);
+    case WritePixelMask: return(WriteMaskChannel);
+    default: return(CompositeMaskChannel);
+  }
+}
+
+static void AddImageMaskChannel(Image *image,const PixelMask type)
+{
+  image->channels=(ChannelType) (image->channels | GetMaskChannel(type));
+}
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The new `switch` sends each value of `k` to the group
+  it went to before and returns that group's constant; the statement then computes with
+  that constant where the group computed with it. Without fall-through (step 1) each
+  value reached exactly one group.
+- Type: the constant was an `int` enumeration constant, the call returns it as `E`. Both
+  hold the same value, and an `E` promotes in `|`, `&` and `~` to `int` or `unsigned
+  int`, of the same width: the bits that reach the statement's own casts are the same.
+  Check the enumeration has no negative enumerator and no enumerator above `INT_MAX`
+  in the C build; otherwise refuse. (Under C++, as with `ChannelType`'s
+  `MAGICKCORE_64BIT_CHANNEL_MASK_SUPPORT` underlying type, an enumerator already has
+  the type `E`, so the call yields the very type the constant had.)
+- A `switch` with fall-through (a group sharing the next group's statement) is not this
+  shape: `RemoveImageMaskChannel`'s `WritePixelMask` group also clears the composite
+  bit, so it keeps its `switch`.
+- `k` is a parameter that the statement does not write, so reading it in the call reads
+  what the `switch` read.
+
+**Evidence level:** oracle (the cases that reach each changed function), with step 5's
+script, `tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`.
+
+**Provenance:** 2026-11-14, from `image-mask.c` (campaign B, M127 lane a round 6):
+`AddImageMaskChannel`, `RemoveRegionMaskChannel` and `RemoveImageMaskChannel` in *Code
+Duplication*; a probe naming the constant for the first two: 8.81 to 9.38, the
+duplication finding gone. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-10-24.
+Lane: a
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -17735,3 +17841,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | PT | Peel a Leaving Label Set out of a Selection into a Membership Table: PL's peel with TB's table predicate in one step, for a file of six functions where PL's label-run predicate and the seventh function each dip; Lane: b | `quantum-type.c`'s `SetQuantumImageType` (PL alone 8.92, PT alone 9.09, with PL on the index labels 10.0 from 9.58) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | SM | Extract a Block Reading Its Inputs Through the Members of a Struct It Passes On: a block that passes `&s` (a `const` struct local) to a callee and reads caller variables holding members of `s` moves into a function taking `const Name *s`, binding those variables from their member paths; at most four parameters; Lane: a | `type.c`'s `LoadTypeCache` and `policy.c`'s `LoadPolicyCache`: the include element's retry loop and throw read `exception` and `token`, which are `scan.target->exception` and `scan.token`; probes 8.13 to 8.22 and 7.89 to 7.97 | mandate (2026-10-24) |
 | 2026-11-14 | NEW | NC | Share a NULL-Tested Copy Through a Helper Taking the Destination: copies `if (S != (T) NULL) (void) F(&D,S);` become calls of one `static void` helper taking `&D` and `S`; Lane: a | `image-clone.c`'s eleven `CloneString` copies in `CloneImageInfo`, `CloneImageInfoRenderStrings` and `CloneMontageStrings` (probe 9.09 to 9.68, *Overall Code Complexity* gone) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | SK | Name the Constant a Keyed Switch's Groups Differ In: a `static` function whose `switch` groups are one statement differing in one enumeration constant becomes that statement with a call of a new `switch` returning the constants; a sibling with the same key-to-constant map shares it; Lane: a | `image-mask.c`'s `AddImageMaskChannel` and `RemoveRegionMaskChannel` (*Code Duplication*, probe 8.81 to 9.38) | mandate (2026-10-24) |
