@@ -1211,6 +1211,15 @@ static MagickBooleanType TransformProfileImage(Image *image,
   image_view=DestroyCacheView(image_view);
   return(status);
 }
+
+static void CloseLCMSProfiles(const LCMSInfo *source_info,
+  const LCMSInfo *target_info)
+{
+  if ((*source_info).profile != (cmsHPROFILE) NULL)
+    (void) cmsCloseProfile((*source_info).profile);
+  if ((*target_info).profile != (cmsHPROFILE) NULL)
+    (void) cmsCloseProfile((*target_info).profile);
+}
 #endif
 
 #define ThrowProfileException(severity,tag,context) \
@@ -1570,10 +1579,7 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
                 target_info.pixels=DestroyPixelTLS(target_info.pixels);
                 source_info.pixels=DestroyPixelTLS(source_info.pixels);
                 transform=DestroyTransformTLS(transform);
-                if (source_info.profile != (cmsHPROFILE) NULL)
-                  (void) cmsCloseProfile(source_info.profile);
-                if (target_info.profile != (cmsHPROFILE) NULL)
-                  (void) cmsCloseProfile(target_info.profile);
+                CloseLCMSProfiles(&source_info,&target_info);
                 return(MagickFalse);
               }
             if (target_info.colorspace == CMYKColorspace)
