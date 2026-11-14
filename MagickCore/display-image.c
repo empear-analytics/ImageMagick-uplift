@@ -3258,6 +3258,46 @@ static MagickBooleanType XAnnotateRenderLines(const AnnotateContext *context,
   return(MagickTrue);
 }
 
+static MagickBooleanType XAnnotateLoadFont(const AnnotateContext *context,
+  const AnnotateTargets *targets,XFontStruct **font_info)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  const unsigned int
+    font_id = *context->font_targets->font_id;
+
+  int
+    *const x = targets->x,
+    *const y = targets->y;
+
+  /*
+    Set font info and check boundary conditions.
+  */
+  (*font_info)=XLoadQueryFont(display,resource_info->font_name[font_id]);
+  if ((*font_info) == (XFontStruct *) NULL)
+    {
+      XNoticeWidget(display,windows,"Unable to load font:",
+        resource_info->font_name[font_id]);
+      (*font_info)=windows->font_info;
+    }
+  if (((*x)+(*font_info)->max_bounds.width) >= (int) windows->image.width)
+    (*x)=(int) windows->image.width-(*font_info)->max_bounds.width;
+  if ((*y) < (int) ((*font_info)->ascent+(*font_info)->descent))
+    (*y)=(int) (*font_info)->ascent+(*font_info)->descent;
+  if (((int) (*font_info)->max_bounds.width > (int) windows->image.width) ||
+      (((*font_info)->ascent+(*font_info)->descent) >=
+       (int) windows->image.height))
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType XAnnotateEditImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -3361,19 +3401,7 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
   /*
     Set font info and check boundary conditions.
   */
-  font_info=XLoadQueryFont(display,resource_info->font_name[font_id]);
-  if (font_info == (XFontStruct *) NULL)
-    {
-      XNoticeWidget(display,windows,"Unable to load font:",
-        resource_info->font_name[font_id]);
-      font_info=windows->font_info;
-    }
-  if ((x+font_info->max_bounds.width) >= (int) windows->image.width)
-    x=(int) windows->image.width-font_info->max_bounds.width;
-  if (y < (int) (font_info->ascent+font_info->descent))
-    y=(int) font_info->ascent+font_info->descent;
-  if (((int) font_info->max_bounds.width > (int) windows->image.width) ||
-      ((font_info->ascent+font_info->descent) >= (int) windows->image.height))
+  if (XAnnotateLoadFont(&context,&targets,&font_info) == MagickFalse)
     return(MagickFalse);
   /*
     Initialize annotate structure.
