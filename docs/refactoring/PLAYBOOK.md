@@ -17539,6 +17539,90 @@ Lane: b
 
 ---
 
+## Recipe FM - Fold Twin Functions Differing in the Member They Read into One Taking the Value
+
+**Use when:** a file sits at CodeScene's *Number of Functions in a Single Module*
+threshold, so that the helper the next step needs would trip it, and two `static`
+functions of the file are the same text but for the member of one struct parameter they
+read, once, as a value: `annotate.c`'s `IsColumnOutside(image,x_offset)` and
+`IsRowOutside(image,y_offset)`, which test an offset against `image->columns` and
+`image->rows`. One function taking that value replaces both and frees a place.
+
+**Not covered by:** Recipe TM, which keeps both twins (each with its own opening block) and
+shares only their tails; Recipe FG, FW and FC, which fold one function into a twin that
+already exists; Recipe DV, which drops a parameter the callee can read from another
+(here the opposite: the callee stops reading the member); Recipe TI and MT, which add a
+selector.
+
+**How:**
+
+1. `F(s,a)` and `G(s,b)` are `static`, in one file, and neither's address is taken
+   (`grep`). Their bodies are the same token sequence once their other parameters are
+   renamed alike, except that `F` reads `s->m` where `G` reads `s->n` (check by script).
+   `s` is used nowhere else in either body, and `m` and `n` have one type `T`.
+2. Write one function `H(a,v)`, with `F`'s other parameters and a parameter `const T v`
+   in place of `s`, whose body is `F`'s with `v` for `s->m`. Put it where `F` stood and
+   delete `F` and `G`.
+3. Replace each call `F(e,x)` by `H(x,e->m)` and each `G(e,y)` by `H(y,e->n)`, where `e`,
+   `x` and `y` have no side effect (identifiers or member reads), so that evaluating the
+   member at the call instead of inside the function reads the same value: nothing runs
+   between the two points.
+4. Build: a call left behind does not compile. Run `refactor_guard.py --calls` with
+   `--renamed F=H --renamed G=H`.
+
+**Before:**
+
+```c
+static inline MagickBooleanType IsColumnOutside(const Image *image,
+  const ssize_t x_offset)
+{
+  return(((x_offset < 0) || (x_offset >= (ssize_t) image->columns)) ?
+    MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsRowOutside(const Image *image,
+  const ssize_t y_offset)
+{
+  return(((y_offset < 0) || (y_offset >= (ssize_t) image->rows)) ?
+    MagickTrue : MagickFalse);
+}
+...
+  if (IsRowOutside(image,y_offset) != MagickFalse)
+```
+
+**After:**
+
+```c
+static inline MagickBooleanType IsOffsetOutside(const ssize_t offset,
+  const size_t extent)
+{
+  return(((offset < 0) || (offset >= (ssize_t) extent)) ?
+    MagickTrue : MagickFalse);
+}
+...
+  if (IsOffsetOutside(y_offset,image->rows) != MagickFalse)
+```
+
+**Careful:**
+
+- The member is read once in the body and once at the call: the same object, with
+  nothing between, so the same value; `v` has the member's exact type (`size_t` for
+  `columns` and `rows`), so every cast and comparison on it is the one the body made.
+- The operators, the casts and their order are those of the twins; only the member read
+  moves out.
+- The step removes a function: flat or a small gain; it is kept for the place it frees
+  (rule 2), and the commit names the step that uses that place.
+
+**Evidence level:** oracle (the cases that reach the callers).
+
+**Provenance:** 2026-11-14, from `annotate.c`'s `IsColumnOutside` and `IsRowOutside`
+(campaign B, M127 lane b round 10): the file had 113 functions, the 114th trips *Number
+of Functions*, and `AnnotateImage`'s shared cleanup needs a helper (probe of both steps:
+5.79 to 5.81). Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: b
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -17923,3 +18007,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | NEW | FW | Fold a Pointer-Advancing Writer into Its Index-Returning Twin: `p=F(p,...);` becomes `p+=G(p,0,...);` when `G` writes at `b[j++]` the bytes `F` writes at `*x++`, and `F` is deleted, freeing a place under the function-count threshold; Lane: b | `xml-tree.c`'s `WriteUTF8Sequence`/`WriteUTF8Bytes` (110 functions; the 112th costs 0.17) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | CE | Chain a Continuing Block into an Else Before the Loop's Tail: `if (c) { S continue; } T` at the end of a loop body becomes `if (c) { S } else T`, repeated upward into an `else if` chain; CodeScene counts each `continue` as a branch; Lane: b | `locale.c`'s `LoadLocaleCache` (cc 18 to 16, 8.85 to 8.90 in a probe) | mandate (2026-10-24) |
 | 2026-11-14 | NEW | FC | Fold a Function into the Twin That Calls Out Its Block: `G`, whose block `B` is the body of `F`'s callee `H` (taking and returning the written local `r` by value), loses its calls to `F` and is deleted; `F` and `H` move whole above the first caller, out of a delegate `#if` when they name nothing it declares, freeing a place under the function-count threshold; Lane: b | `annotate.c`'s `GetPostscriptResolution`/`GetFreetypeTextResolution` (113 functions; the 114th costs 0.18; fold probe 5.69 flat) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | FM | Fold Twin Functions Differing in the Member They Read into One Taking the Value: `F(s,a)` and `G(s,b)`, the same text but for reading `s->m` and `s->n` once each, become one `H(a,v)` taking the member's value; calls pass `e->m` or `e->n`; both twins are deleted, freeing a place under the function-count threshold; Lane: b | `annotate.c`'s `IsColumnOutside`/`IsRowOutside` (113 functions; fold flat, with the helper it frees 5.79 to 5.81 in a probe) | mandate (2026-10-24) |
