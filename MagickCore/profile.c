@@ -241,6 +241,14 @@ MagickExport MagickBooleanType CloneImageProfiles(Image *image,
   return(MagickTrue);
 }
 
+static void TraceImageProfiles(const Image *image)
+{
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -267,10 +275,7 @@ MagickExport MagickBooleanType CloneImageProfiles(Image *image,
 */
 MagickExport MagickBooleanType DeleteImageProfile(Image *image,const char *name)
 {
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceImageProfiles(image);
   if (image->profiles == (SplayTreeInfo *) NULL)
     return(MagickFalse);
   WriteTo8BimProfile(image,name,(StringInfo *) NULL);
@@ -335,10 +340,7 @@ MagickExport const StringInfo *GetImageProfile(const Image *image,
   const StringInfo
     *profile;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceImageProfiles(image);
   if (image->profiles == (SplayTreeInfo *) NULL)
     return((StringInfo *) NULL);
   profile=(const StringInfo *) GetValueFromSplayTree((SplayTreeInfo *)
@@ -370,10 +372,7 @@ MagickExport const StringInfo *GetImageProfile(const Image *image,
 */
 MagickExport char *GetNextImageProfile(const Image *image)
 {
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceImageProfiles(image);
   if (image->profiles == (SplayTreeInfo *) NULL)
     return((char *) NULL);
   return((char *) GetNextKeyInSplayTree((SplayTreeInfo *) image->profiles));
@@ -1212,6 +1211,22 @@ static MagickBooleanType TransformProfileImage(Image *image,
   image_view=DestroyCacheView(image_view);
   return(status);
 }
+
+static void SetCMYKTargetColorspace(Image *image,const LCMSInfo *target_info,
+  ExceptionInfo *exception)
+{
+  if ((*target_info).colorspace == CMYKColorspace)
+    (void) SetImageColorspace(image,(*target_info).colorspace,exception);
+}
+
+static void CloseLCMSProfiles(const LCMSInfo *source_info,
+  const LCMSInfo *target_info)
+{
+  if ((*source_info).profile != (cmsHPROFILE) NULL)
+    (void) cmsCloseProfile((*source_info).profile);
+  if ((*target_info).profile != (cmsHPROFILE) NULL)
+    (void) cmsCloseProfile((*target_info).profile);
+}
 #endif
 
 #define ThrowProfileException(severity,tag,context) \
@@ -1252,8 +1267,10 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
     return(MagickFalse);
   SetStringInfoDatum(profile,(unsigned char *) datum);
   if ((LocaleCompare(name,"icc") != 0) && (LocaleCompare(name,"icm") != 0))
-    status=SetImageProfilePrivate(image,profile,exception);
-  else
+    {
+      status=SetImageProfilePrivate(image,profile,exception);
+      return(status);
+    }
     {
       const StringInfo
         *icc_profile;
@@ -1569,14 +1586,10 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
                 target_info.pixels=DestroyPixelTLS(target_info.pixels);
                 source_info.pixels=DestroyPixelTLS(source_info.pixels);
                 transform=DestroyTransformTLS(transform);
-                if (source_info.profile != (cmsHPROFILE) NULL)
-                  (void) cmsCloseProfile(source_info.profile);
-                if (target_info.profile != (cmsHPROFILE) NULL)
-                  (void) cmsCloseProfile(target_info.profile);
+                CloseLCMSProfiles(&source_info,&target_info);
                 return(MagickFalse);
               }
-            if (target_info.colorspace == CMYKColorspace)
-              (void) SetImageColorspace(image,target_info.colorspace,exception);
+            SetCMYKTargetColorspace(image,&target_info,exception);
             transform_in.highres=highres;
             transform_in.source_info=source_info;
             transform_in.target_info=target_info;
@@ -1635,10 +1648,7 @@ MagickExport StringInfo *RemoveImageProfile(Image *image,const char *name)
   StringInfo
     *profile;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceImageProfiles(image);
   if (image->profiles == (SplayTreeInfo *) NULL)
     return((StringInfo *) NULL);
   WriteTo8BimProfile(image,name,(StringInfo *) NULL);
@@ -1673,10 +1683,7 @@ MagickExport StringInfo *RemoveImageProfile(Image *image,const char *name)
 */
 MagickExport void ResetImageProfileIterator(const Image *image)
 {
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceImageProfiles(image);
   if (image->profiles == (SplayTreeInfo *) NULL)
     return;
   ResetSplayTreeIterator((SplayTreeInfo *) image->profiles);

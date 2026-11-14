@@ -380,6 +380,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/type-list.c \
   MagickCore/type.h \
   MagickCore/utility.c \
+  MagickCore/utility-unique.c \
   MagickCore/utility.h \
   MagickCore/utility-private.h \
   MagickCore/version.c \

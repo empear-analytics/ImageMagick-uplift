@@ -1289,6 +1289,68 @@ static void LoadPolicyIncludeElement(const PolicyIncludeScan *scan,
       ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
 }
 
+typedef struct _PolicyElementInput
+{
+  LinkedListInfo
+    *cache;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    *keyword,
+    *token;
+
+  const char
+    *filename;
+
+  size_t
+    extent;
+} PolicyElementInput;
+
+static void ParsePolicyElement(const PolicyElementInput *element,
+  PolicyInfo **policy_info,MagickStatusType *status,const char **q)
+{
+  LinkedListInfo
+    *const cache = element->cache;
+
+  ExceptionInfo
+    *const exception = element->exception;
+
+  char
+    *const keyword = element->keyword,
+    *const token = element->token;
+
+  const char
+    *const filename = element->filename;
+
+  const size_t
+    extent = element->extent;
+
+  if (LocaleCompare(keyword,"<policy") == 0)
+    {
+      /*
+        Policy element.
+      */
+      (*policy_info)=AcquirePolicyElement(filename);
+      return;
+    }
+  if ((*policy_info) == (PolicyInfo *) NULL)
+    return;
+  if (IsPolicyEnd(keyword) != MagickFalse)
+    {
+      (*status)=AppendPolicyElement(cache,(*policy_info),exception);
+      (*policy_info)=(PolicyInfo *) NULL;
+      return;
+    }
+  (void) GetNextToken(*q,(const char **) NULL,extent,token);
+  if (*token != '=')
+    return;
+  (void) GetNextToken(*q,q,extent,token);
+  (void) GetNextToken(*q,q,extent,token);
+  SetPolicyInfoAttribute((*policy_info),keyword,token);
+}
+
 static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
   const char *policy,const char *filename,const size_t depth)
 {
@@ -1327,6 +1389,9 @@ static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
   extent=strlen(token)+MagickPathExtent;
   for (q=policy; *q != '\0'; )
   {
+    PolicyElementInput
+      element;
+
     /*
       Interpret XML.
     */
@@ -1347,28 +1412,13 @@ static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
         LoadPolicyIncludeElement(&scan,&q,&status);
         continue;
       }
-    if (LocaleCompare(keyword,"<policy") == 0)
-      {
-        /*
-          Policy element.
-        */
-        policy_info=AcquirePolicyElement(filename);
-        continue;
-      }
-    if (policy_info == (PolicyInfo *) NULL)
-      continue;
-    if (IsPolicyEnd(keyword) != MagickFalse)
-      {
-        status=AppendPolicyElement(cache,policy_info,exception);
-        policy_info=(PolicyInfo *) NULL;
-        continue;
-      }
-    (void) GetNextToken(q,(const char **) NULL,extent,token);
-    if (*token != '=')
-      continue;
-    (void) GetNextToken(q,&q,extent,token);
-    (void) GetNextToken(q,&q,extent,token);
-    SetPolicyInfoAttribute(policy_info,keyword,token);
+    element.cache=cache;
+    element.exception=exception;
+    element.keyword=keyword;
+    element.token=token;
+    element.filename=filename;
+    element.extent=extent;
+    ParsePolicyElement(&element,&policy_info,&status,&q);
   }
   token=(char *) RelinquishMagickMemory(token);
   return((MagickBooleanType) (status != 0));

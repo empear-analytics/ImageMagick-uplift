@@ -196,6 +196,7 @@ $call Make threshold-auto.c
 $call Make type.c
 $call Make type-list.c
 $call Make utility.c
+$call Make utility-unique.c
 $call Make version.c
 $call Make vision.c
 $call Make vision-components.c

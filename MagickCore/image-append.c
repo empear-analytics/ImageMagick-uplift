@@ -699,42 +699,75 @@ MagickExport Image *GetImageMask(const Image *image,const PixelMask type,
 %
 */
 
-static inline MagickBooleanType IsLeftGapEdge(const Image *left_image,
-  const Quantum *p,const ssize_t x,const size_t gap)
+typedef enum
 {
-  return(((p == (const Quantum *) NULL) ||
-    (GetPixelAlpha(left_image,p) != TransparentAlpha) ||
-    (((ssize_t) left_image->columns-x-1) >= (ssize_t) gap)) ? MagickTrue :
-    MagickFalse);
-}
+  HorizontalSmush,
+  VerticalSmush
+} SmushSide;
 
-static inline MagickBooleanType IsRightGapEdge(const Image *right_image,
-  const Quantum *p,const ssize_t x,const ssize_t i,const size_t gap)
-{
-  return(((p == (const Quantum *) NULL) ||
-    (GetPixelAlpha(right_image,p) != TransparentAlpha) ||
-    ((x+i) >= (ssize_t) gap)) ? MagickTrue : MagickFalse);
-}
-
-typedef struct _SmushXRows
+typedef struct _SmushPart
 {
   const Image
-    *left_image,
-    *right_image;
+    *image;
 
   CacheView
-    *left_view,
-    *right_view;
+    *view;
 
   RectangleInfo
-    left_geometry,
-    right_geometry;
+    geometry;
+} SmushPart;
+
+typedef struct _SmushRows
+{
+  SmushSide
+    side;
+
+  SmushPart
+    previous,
+    current;
 
   ExceptionInfo
     *exception;
-} SmushXRows;
+} SmushRows;
 
-static ssize_t FindLeftGapEdge(const SmushXRows *rows,const ssize_t y,
+static inline size_t GetSmushExtent(const SmushSide side,const Image *image)
+{
+  return((side == HorizontalSmush) ? image->columns : image->rows);
+}
+
+static inline size_t GetSmushLines(const SmushSide side,const Image *image)
+{
+  return((side == HorizontalSmush) ? image->rows : image->columns);
+}
+
+static inline MagickBooleanType IsPreviousGapEdge(const SmushRows *rows,
+  const Quantum *p,const ssize_t x,const size_t gap)
+{
+  return(((p == (const Quantum *) NULL) ||
+    (GetPixelAlpha(rows->previous.image,p) != TransparentAlpha) ||
+    (((ssize_t) GetSmushExtent(rows->side,rows->previous.image)-x-1) >=
+    (ssize_t) gap)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsCurrentGapEdge(const Image *current_image,
+  const Quantum *p,const ssize_t extent,const size_t gap)
+{
+  return(((p == (const Quantum *) NULL) ||
+    (GetPixelAlpha(current_image,p) != TransparentAlpha) ||
+    (extent >= (ssize_t) gap)) ? MagickTrue : MagickFalse);
+}
+
+static const Quantum *GetSmushPixel(const SmushRows *rows,
+  const SmushPart *part,const ssize_t x,const ssize_t y)
+{
+  if (rows->side == HorizontalSmush)
+    return(GetCacheViewVirtualPixels(part->view,x,part->geometry.y+y,1,1,
+      rows->exception));
+  return(GetCacheViewVirtualPixels(part->view,part->geometry.x+y,x,1,1,
+    rows->exception));
+}
+
+static ssize_t FindPreviousGapEdge(const SmushRows *rows,const ssize_t y,
   const size_t gap)
 {
   const Quantum
@@ -743,17 +776,17 @@ static ssize_t FindLeftGapEdge(const SmushXRows *rows,const ssize_t y,
   ssize_t
     x;
 
-  for (x=(ssize_t) rows->left_image->columns-1; x > 0; x--)
+  for (x=(ssize_t) GetSmushExtent(rows->side,rows->previous.image)-1; x > 0;
+       x--)
   {
-    p=GetCacheViewVirtualPixels(rows->left_view,x,rows->left_geometry.y+y,1,1,
-      rows->exception);
-    if (IsLeftGapEdge(rows->left_image,p,x,gap) != MagickFalse)
+    p=GetSmushPixel(rows,&rows->previous,x,y);
+    if (IsPreviousGapEdge(rows,p,x,gap) != MagickFalse)
       break;
   }
   return(x);
 }
 
-static ssize_t FindRightGapEdge(const SmushXRows *rows,const ssize_t y,
+static ssize_t FindCurrentGapEdge(const SmushRows *rows,const ssize_t y,
   const ssize_t i,const size_t gap)
 {
   const Quantum
@@ -762,49 +795,67 @@ static ssize_t FindRightGapEdge(const SmushXRows *rows,const ssize_t y,
   ssize_t
     x;
 
-  for (x=0; x < (ssize_t) rows->right_image->columns; x++)
+  for (x=0; x < (ssize_t) GetSmushExtent(rows->side,rows->current.image); x++)
   {
-    p=GetCacheViewVirtualPixels(rows->right_view,x,rows->right_geometry.y+y,1,1,
-      rows->exception);
-    if (IsRightGapEdge(rows->right_image,p,x,i,gap) != MagickFalse)
+    p=GetSmushPixel(rows,&rows->current,x,y);
+    if (IsCurrentGapEdge(rows->current.image,p,x+i,gap) != MagickFalse)
       break;
   }
   return(x);
 }
 
-static size_t SmushXRow(const SmushXRows *rows,const ssize_t y,size_t gap)
+static size_t SmushRow(const SmushRows *rows,const ssize_t y,size_t gap)
 {
   ssize_t
     i,
     x;
 
-  x=FindLeftGapEdge(rows,y,gap);
-  i=(ssize_t) rows->left_image->columns-x-1;
-  x=FindRightGapEdge(rows,y,i,gap);
+  x=FindPreviousGapEdge(rows,y,gap);
+  i=(ssize_t) GetSmushExtent(rows->side,rows->previous.image)-x-1;
+  x=FindCurrentGapEdge(rows,y,i,gap);
   if ((x+i) < (ssize_t) gap)
     gap=(size_t) (x+i);
   return(gap);
 }
 
-static ssize_t SmushXGap(const Image *smush_image,const Image *images,
-  const ssize_t offset,ExceptionInfo *exception)
+typedef struct _SmushGapInput
 {
-  CacheView
-    *left_view,
-    *right_view;
-
   const Image
-    *left_image,
-    *right_image;
+    *smush_image,
+    *images;
 
-  RectangleInfo
-    left_geometry,
-    right_geometry;
+  SmushSide
+    side;
+
+  ssize_t
+    offset;
+} SmushGapInput;
+
+static void SetSmushPart(const Image *smush_image,const Image *image,
+  SmushPart *part)
+{
+  part->image=image;
+  SetGeometry(smush_image,&part->geometry);
+  GravityAdjustGeometry(image->columns,image->rows,image->gravity,
+    &part->geometry);
+}
+
+static ssize_t SmushGap(const SmushGapInput *input,ExceptionInfo *exception)
+{
+  const Image
+    *smush_image = input->smush_image,
+    *images = input->images;
+
+  const SmushSide
+    side = input->side;
+
+  const ssize_t
+    offset = input->offset;
 
   size_t
     gap;
 
-  SmushXRows
+  SmushRows
     rows;
 
   ssize_t
@@ -812,175 +863,38 @@ static ssize_t SmushXGap(const Image *smush_image,const Image *images,
 
   if (images->previous == (Image *) NULL)
     return(0);
-  right_image=images;
-  SetGeometry(smush_image,&right_geometry);
-  GravityAdjustGeometry(right_image->columns,right_image->rows,
-    right_image->gravity,&right_geometry);
-  left_image=images->previous;
-  SetGeometry(smush_image,&left_geometry);
-  GravityAdjustGeometry(left_image->columns,left_image->rows,
-    left_image->gravity,&left_geometry);
-  gap=right_image->columns;
-  left_view=AcquireVirtualCacheView(left_image,exception);
-  right_view=AcquireVirtualCacheView(right_image,exception);
-  rows.left_image=left_image;
-  rows.right_image=right_image;
-  rows.left_view=left_view;
-  rows.right_view=right_view;
-  rows.left_geometry=left_geometry;
-  rows.right_geometry=right_geometry;
+  rows.side=side;
+  SetSmushPart(smush_image,images,&rows.current);
+  SetSmushPart(smush_image,images->previous,&rows.previous);
+  gap=GetSmushExtent(side,rows.current.image);
+  rows.previous.view=AcquireVirtualCacheView(rows.previous.image,exception);
+  rows.current.view=AcquireVirtualCacheView(rows.current.image,exception);
   rows.exception=exception;
-  for (y=0; y < (ssize_t) smush_image->rows; y++)
+  for (y=0; y < (ssize_t) GetSmushLines(side,smush_image); y++)
   {
-    gap=SmushXRow(&rows,y,gap);
+    gap=SmushRow(&rows,y,gap);
   }
-  right_view=DestroyCacheView(right_view);
-  left_view=DestroyCacheView(left_view);
-  if (y < (ssize_t) smush_image->rows)
+  rows.current.view=DestroyCacheView(rows.current.view);
+  rows.previous.view=DestroyCacheView(rows.previous.view);
+  if (y < (ssize_t) GetSmushLines(side,smush_image))
     return(offset);
   return((ssize_t) gap-offset);
 }
 
-static inline MagickBooleanType IsTopGapEdge(const Image *top_image,
-  const Quantum *p,const ssize_t y,const size_t gap)
+static ssize_t SmushXGap(const Image *smush_image,const Image *images,
+  const ssize_t offset,ExceptionInfo *exception)
 {
-  return(((p == (const Quantum *) NULL) ||
-    (GetPixelAlpha(top_image,p) != TransparentAlpha) ||
-    (((ssize_t) top_image->rows-y-1) >= (ssize_t) gap)) ? MagickTrue :
-    MagickFalse);
-}
+  const SmushGapInput input = { smush_image, images, HorizontalSmush, offset };
 
-static inline MagickBooleanType IsBottomGapEdge(const Image *bottom_image,
-  const Quantum *p,const ssize_t y,const ssize_t i,const size_t gap)
-{
-  return(((p == (const Quantum *) NULL) ||
-    (GetPixelAlpha(bottom_image,p) != TransparentAlpha) ||
-    ((y+i) >= (ssize_t) gap)) ? MagickTrue : MagickFalse);
-}
-
-typedef struct _SmushYRows
-{
-  const Image
-    *bottom_image,
-    *top_image;
-
-  CacheView
-    *bottom_view,
-    *top_view;
-
-  RectangleInfo
-    bottom_geometry,
-    top_geometry;
-
-  ExceptionInfo
-    *exception;
-} SmushYRows;
-
-static ssize_t FindTopGapEdge(const SmushYRows *rows,const ssize_t x,
-  const size_t gap)
-{
-  const Quantum
-    *p;
-
-  ssize_t
-    y;
-
-  for (y=(ssize_t) rows->top_image->rows-1; y > 0; y--)
-  {
-    p=GetCacheViewVirtualPixels(rows->top_view,rows->top_geometry.x+x,y,1,1,
-      rows->exception);
-    if (IsTopGapEdge(rows->top_image,p,y,gap) != MagickFalse)
-      break;
-  }
-  return(y);
-}
-
-static ssize_t FindBottomGapEdge(const SmushYRows *rows,const ssize_t x,
-  const ssize_t i,const size_t gap)
-{
-  const Quantum
-    *p;
-
-  ssize_t
-    y;
-
-  for (y=0; y < (ssize_t) rows->bottom_image->rows; y++)
-  {
-    p=GetCacheViewVirtualPixels(rows->bottom_view,rows->bottom_geometry.x+x,y,1,
-      1,rows->exception);
-    if (IsBottomGapEdge(rows->bottom_image,p,y,i,gap) != MagickFalse)
-      break;
-  }
-  return(y);
-}
-
-static size_t SmushYRow(const SmushYRows *rows,const ssize_t x,size_t gap)
-{
-  ssize_t
-    i,
-    y;
-
-  y=FindTopGapEdge(rows,x,gap);
-  i=(ssize_t) rows->top_image->rows-y-1;
-  y=FindBottomGapEdge(rows,x,i,gap);
-  if ((y+i) < (ssize_t) gap)
-    gap=(size_t) (y+i);
-  return(gap);
+  return(SmushGap(&input,exception));
 }
 
 static ssize_t SmushYGap(const Image *smush_image,const Image *images,
   const ssize_t offset,ExceptionInfo *exception)
 {
-  CacheView
-    *bottom_view,
-    *top_view;
+  const SmushGapInput input = { smush_image, images, VerticalSmush, offset };
 
-  const Image
-    *bottom_image,
-    *top_image;
-
-  RectangleInfo
-    bottom_geometry,
-    top_geometry;
-
-  size_t
-    gap;
-
-  SmushYRows
-    rows;
-
-  ssize_t
-    x;
-
-  if (images->previous == (Image *) NULL)
-    return(0);
-  bottom_image=images;
-  SetGeometry(smush_image,&bottom_geometry);
-  GravityAdjustGeometry(bottom_image->columns,bottom_image->rows,
-    bottom_image->gravity,&bottom_geometry);
-  top_image=images->previous;
-  SetGeometry(smush_image,&top_geometry);
-  GravityAdjustGeometry(top_image->columns,top_image->rows,top_image->gravity,
-    &top_geometry);
-  gap=bottom_image->rows;
-  top_view=AcquireVirtualCacheView(top_image,exception);
-  bottom_view=AcquireVirtualCacheView(bottom_image,exception);
-  rows.bottom_image=bottom_image;
-  rows.top_image=top_image;
-  rows.bottom_view=bottom_view;
-  rows.top_view=top_view;
-  rows.bottom_geometry=bottom_geometry;
-  rows.top_geometry=top_geometry;
-  rows.exception=exception;
-  for (x=0; x < (ssize_t) smush_image->columns; x++)
-  {
-    gap=SmushYRow(&rows,x,gap);
-  }
-  bottom_view=DestroyCacheView(bottom_view);
-  top_view=DestroyCacheView(top_view);
-  if (x < (ssize_t) smush_image->columns)
-    return(offset);
-  return((ssize_t) gap-offset);
+  return(SmushGap(&input,exception));
 }
 
 static void AddSmushStackExtent(const Image *next,const ssize_t offset,
