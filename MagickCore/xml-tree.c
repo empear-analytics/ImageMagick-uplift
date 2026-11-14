@@ -1040,6 +1040,18 @@ static void DecodeCharacterReference(char **xml)
   (void) memmove(*xml,strchr(*xml,';')+1,strlen(strchr(*xml,';')));
 }
 
+static ssize_t FindEntityIndex(char **entities,const char *xml)
+{
+  ssize_t
+    i;
+
+  i=0;
+  while ((entities[i] != (char *) NULL) &&
+         (strncmp(xml+1,entities[i],strlen(entities[i])) != 0))
+    i+=2;
+  return(i);
+}
+
 static void DecodeEntityReference(char **entities,char *q,char **p,
   char **xml)
 {
@@ -1057,10 +1069,7 @@ static void DecodeEntityReference(char **entities,char *q,char **p,
   /*
     Find entity in the list.
   */
-  i=0;
-  while ((entities[i] != (char *) NULL) &&
-         (strncmp(*xml+1,entities[i],strlen(entities[i])) != 0))
-    i+=2;
+  i=FindEntityIndex(entities,*xml);
   if (entities[i++] == (char *) NULL)
     (*xml)++;
   else
