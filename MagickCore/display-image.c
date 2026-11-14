@@ -2979,6 +2979,53 @@ static void XAnnotateTextPress(const AnnotateContext *context,
     }
 }
 
+static MagickBooleanType XAnnotateTextKeyEvent(
+  const AnnotateContext *context,const AnnotateTargets *targets)
+{
+  char
+    command[MagickPathExtent];
+
+  KeySym
+    key_symbol;
+
+  XEvent
+    *const event = targets->event;
+
+  size_t
+    *const state = targets->state;
+
+  switch ((*event).type)
+  {
+    case KeyPress:
+    {
+      if ((*event).xkey.window != context->windows->image.id)
+        break;
+      if (XAnnotateTextKey(context,targets) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+    case KeyRelease:
+    {
+      /*
+        Respond to a user key release.
+      */
+      (void) XLookupString((XKeyEvent *) &(*event).xkey,command,(int)
+        sizeof(command),&key_symbol,(XComposeStatus *) NULL);
+      (*state)&=(size_t) (~ModifierState);
+      break;
+    }
+    case SelectionNotify:
+    {
+      if (XAnnotateTextPaste(context,targets) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+    default:
+      break;
+  }
+  return(MagickTrue);
+}
+
 typedef struct _AnnotateRenderInput
 {
   Image
@@ -3083,9 +3130,6 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
   int
     x,
     y;
-
-  KeySym
-    key_symbol;
 
   size_t
     state;
@@ -3276,32 +3320,12 @@ static MagickBooleanType XAnnotateEditImage(Display *display,
           }
         break;
       }
-      case KeyPress:
-      {
-        if (event.xkey.window != windows->image.id)
-          break;
-        if (XAnnotateTextKey(&context,&targets) == MagickFalse)
-          return(MagickFalse);
-        break;
-      }
-      case KeyRelease:
-      {
-        /*
-          Respond to a user key release.
-        */
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        state&=(size_t) (~ModifierState);
-        break;
-      }
-      case SelectionNotify:
-      {
-        if (XAnnotateTextPaste(&context,&targets) == MagickFalse)
-          return(MagickFalse);
-        break;
-      }
       default:
+      {
+        if (XAnnotateTextKeyEvent(&context,&targets) == MagickFalse)
+          return(MagickFalse);
         break;
+      }
     }
   } while ((state & ExitState) == 0);
   (void) XFreeCursor(display,cursor);
