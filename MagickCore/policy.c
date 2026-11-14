@@ -361,6 +361,13 @@ static MagickBooleanType GetWildcardPolicy(const char *name,
   return(MagickFalse);
 }
 
+static inline MagickBooleanType IsPolicyInDomain(const PolicyInfo *policy,
+  const PolicyDomain domain)
+{
+  return((MagickBooleanType) ((domain == UndefinedPolicyDomain) ||
+    (policy->domain == domain)));
+}
+
 static PolicyInfo *GetPolicyInfo(const char *name,ExceptionInfo *exception)
 {
   char
@@ -402,7 +409,7 @@ static PolicyInfo *GetPolicyInfo(const char *name,ExceptionInfo *exception)
   while (p != (ElementInfo *) NULL)
   {
     policy=(PolicyInfo *) p->value;
-    if ((domain == UndefinedPolicyDomain) || (policy->domain == domain))
+    if (IsPolicyInDomain(policy,domain) != MagickFalse)
       if (LocaleCompare(policyname,policy->name) == 0)
         break;
     p=p->next;
