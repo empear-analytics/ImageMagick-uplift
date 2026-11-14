@@ -4709,21 +4709,31 @@ static MagickBooleanType AppendGlobbedValues(const InterpretSources *sources,
   return(MagickTrue);
 }
 
+static MagickBooleanType AppendGlobbedProperties(const InterpretText *text,
+  Image *property_image,const char *pattern,ExceptionInfo *exception)
+{
+  const char
+    *key,
+    *string;
+
+  ResetImagePropertyIterator(property_image);
+  while ((key=GetNextImageProperty(property_image)) != (const char *) NULL)
+    if (GlobExpression(key,pattern,MagickTrue) != MagickFalse)
+      {
+        string=GetImageProperty(property_image,key,exception);
+        if ((string != (const char *) NULL) &&
+            (AppendInterpretKeyValue(text,key,string) == MagickFalse))
+          return(MagickFalse);
+      }
+  return(MagickTrue);
+}
+
 MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   const char *embed_text,ExceptionInfo *exception)
 {
 #define ExtendInterpretText(string_length) \
 { \
   if (ExtendInterpretBuffer(&text,(string_length)) == MagickFalse) \
-    { \
-      status=MagickFalse; \
-      goto cleanup; \
-    } \
-}
-
-#define AppendKeyValue2Text(key,value)\
-{ \
-  if (AppendInterpretKeyValue(&text,(key),(value)) == MagickFalse) \
     { \
       status=MagickFalse; \
       goto cleanup; \
@@ -4869,7 +4879,6 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
         pattern[2*MagickPathExtent] = "\0";
 
       const char
-        *key,
         *string;
 
       ssize_t
@@ -4985,14 +4994,12 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
           */
           if (IsGlob(pattern+9) != MagickFalse)
             {
-              ResetImagePropertyIterator(property_image);
-              while ((key=GetNextImageProperty(property_image)) != (const char *) NULL)
-                if (GlobExpression(key,pattern,MagickTrue) != MagickFalse)
-                  {
-                    string=GetImageProperty(property_image,key,exception);
-                    if (string != (const char *) NULL)
-                      AppendKeyValue2Text(key,string);
-                  }
+              if (AppendGlobbedProperties(&text,property_image,pattern,
+                  exception) == MagickFalse)
+                {
+                  status=MagickFalse;
+                  goto cleanup;
+                }
               continue;
             }
           string=GetImageProperty(property_image,pattern+9,exception);
@@ -5014,14 +5021,12 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
         }
       if (IsGlob(pattern) != MagickFalse)
         {
-          ResetImagePropertyIterator(property_image);
-          while ((key=GetNextImageProperty(property_image)) != (const char *) NULL)
-            if (GlobExpression(key,pattern,MagickTrue) != MagickFalse)
-              {
-                string=GetImageProperty(property_image,key,exception);
-                if (string != (const char *) NULL)
-                  AppendKeyValue2Text(key,string);
-              }
+          if (AppendGlobbedProperties(&text,property_image,pattern,exception) ==
+              MagickFalse)
+            {
+              status=MagickFalse;
+              goto cleanup;
+            }
           continue;
         }
       /*
