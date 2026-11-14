@@ -10740,6 +10740,31 @@ static void XApplyOriginalSizeCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyDoubleSizeCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  /*
+    Double the image size.
+  */
+  windows->image.window_changes.width=windows->image.ximage->width << 1;
+  windows->image.window_changes.height=windows->image.ximage->height << 1;
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyResizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11427,15 +11452,8 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
       XApplyOriginalSizeCommand(&context);
       break;
     case DoubleSizeCommand:
-    {
-      /*
-        Double the image size.
-      */
-      windows->image.window_changes.width=windows->image.ximage->width << 1;
-      windows->image.window_changes.height=windows->image.ximage->height << 1;
-      (void) XConfigureImage(display,resource_info,windows,*image,exception);
+      XApplyDoubleSizeCommand(&context);
       break;
-    }
     case ResizeCommand:
       XApplyResizeCommand(&context);
       break;
