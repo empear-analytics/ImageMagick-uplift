@@ -1747,75 +1747,34 @@ static MagickBooleanType CopyLogFormatLiteral(const char **p,char **q)
   return(MagickFalse);
 }
 
-static char *TranslateEvent(const LogEventLocation *location,
-  const char *domain,const char *event)
+static LogInfo *GetDefaultLogInfo(void)
 {
-  const char
-    *module = location->module,
-    *function = location->function;
-
-  const size_t
-    line = location->line;
-
-  char
-    *text;
-
-  double
-    elapsed_time,
-    user_time;
-
   ExceptionInfo
     *exception;
 
   LogInfo
     *log_info;
 
+  exception=AcquireExceptionInfo();
+  log_info=GetLogInfo("*",exception);
+  exception=DestroyExceptionInfo(exception);
+  return(log_info);
+}
+
+static char *TranslateLogFormat(const char *format,char *text,size_t extent,
+  LogEventText *event_text,const char *domain)
+{
   char
     *q;
 
   const char
     *p;
 
-  size_t
-    extent;
-
-  time_t
-    seconds;
-
-  LogEventText
-    event_text;
-
-  exception=AcquireExceptionInfo();
-  log_info=GetLogInfo("*",exception);
-  exception=DestroyExceptionInfo(exception);
-  text=AcquireString(event);
-  if (log_info == (LogInfo *) NULL)
-    return(text);
-  seconds=GetMagickTime();
-  elapsed_time=GetElapsedTime(&log_info->timer);
-  user_time=GetUserTime(&log_info->timer);
-  if (log_info->format == (char *) NULL)
-    return(text);
-  extent=strlen(event)+MagickPathExtent;
-  if (LocaleCompare(log_info->format,"xml") == 0)
-    {
-      event_text.text=text;
-      event_text.extent=extent;
-      event_text.elapsed_time=elapsed_time;
-      event_text.user_time=user_time;
-      event_text.seconds=seconds;
-      event_text.event=event;
-      event_text.function=function;
-      event_text.module=module;
-      event_text.line=line;
-      FormatLogEventXML(&event_text,domain);
-      return(text);
-    }
   /*
     Translate event in "human readable" format.
   */
   q=text;
-  for (p=log_info->format; *p != '\0'; p++)
+  for (p=format; *p != '\0'; p++)
   {
     *q='\0';
     if (GrowLogEventText(&text,&q,&extent) == MagickFalse)
@@ -1845,19 +1804,68 @@ static char *TranslateEvent(const LogEventLocation *location,
     p++;
     if (*p == '\0')
       break;
-    event_text.text=text;
-    event_text.extent=extent;
-    event_text.elapsed_time=elapsed_time;
-    event_text.user_time=user_time;
-    event_text.seconds=seconds;
-    event_text.event=event;
-    event_text.function=function;
-    event_text.module=module;
-    event_text.line=line;
-    TranslateLogSpecifier(&event_text,domain,p,&q);
+    (*event_text).text=text;
+    (*event_text).extent=extent;
+    TranslateLogSpecifier(event_text,domain,p,&q);
   }
   *q='\0';
   return(text);
+}
+
+static char *TranslateEvent(const LogEventLocation *location,
+  const char *domain,const char *event)
+{
+  const char
+    *module = location->module,
+    *function = location->function;
+
+  const size_t
+    line = location->line;
+
+  char
+    *text;
+
+  double
+    elapsed_time,
+    user_time;
+
+  LogInfo
+    *log_info;
+
+  size_t
+    extent;
+
+  time_t
+    seconds;
+
+  LogEventText
+    event_text;
+
+  log_info=GetDefaultLogInfo();
+  text=AcquireString(event);
+  if (log_info == (LogInfo *) NULL)
+    return(text);
+  seconds=GetMagickTime();
+  elapsed_time=GetElapsedTime(&log_info->timer);
+  user_time=GetUserTime(&log_info->timer);
+  if (log_info->format == (char *) NULL)
+    return(text);
+  extent=strlen(event)+MagickPathExtent;
+  event_text.text=text;
+  event_text.extent=extent;
+  event_text.elapsed_time=elapsed_time;
+  event_text.user_time=user_time;
+  event_text.seconds=seconds;
+  event_text.event=event;
+  event_text.function=function;
+  event_text.module=module;
+  event_text.line=line;
+  if (LocaleCompare(log_info->format,"xml") == 0)
+    {
+      FormatLogEventXML(&event_text,domain);
+      return(text);
+    }
+  return(TranslateLogFormat(log_info->format,text,extent,&event_text,domain));
 }
 
 static void RotateLogFiles(LogInfo *log_info)

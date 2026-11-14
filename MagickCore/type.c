@@ -469,7 +469,7 @@ static inline size_t GetDefaultFontWeight(const size_t weight)
   return(font_weight);
 }
 
-MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
+static const TypeInfo *GetSubstituteTypeInfo(const char *family,
   const StyleType style,const StretchType stretch,const size_t weight,
   ExceptionInfo *exception)
 {
@@ -482,9 +482,6 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
 
   const TypeInfo
     *type_info;
-
-  size_t
-    font_weight;
 
   ssize_t
     i;
@@ -500,6 +497,28 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
       { "terminal", "courier" },
       { "wingdings", "symbol" }
     };
+
+  type_info=(const TypeInfo *) NULL;
+  for (i=0; i < (ssize_t) (sizeof(fontmap)/sizeof(fontmap[0])); i++)
+  {
+    if (IsFamilyMismatch(fontmap[i].name,family) != MagickFalse)
+      continue;
+    type_info=GetTypeInfoByFamily(fontmap[i].substitute,style,stretch,weight,
+      exception);
+    break;
+  }
+  return(type_info);
+}
+
+MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
+  const StyleType style,const StretchType stretch,const size_t weight,
+  ExceptionInfo *exception)
+{
+  const TypeInfo
+    *type_info;
+
+  size_t
+    font_weight;
 
   /*
     Check for an exact type match.
@@ -520,14 +539,7 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
   /*
     Check for table-based substitution match.
   */
-  for (i=0; i < (ssize_t) (sizeof(fontmap)/sizeof(fontmap[0])); i++)
-  {
-    if (IsFamilyMismatch(fontmap[i].name,family) != MagickFalse)
-      continue;
-    type_info=GetTypeInfoByFamily(fontmap[i].substitute,style,stretch,weight,
-      exception);
-    break;
-  }
+  type_info=GetSubstituteTypeInfo(family,style,stretch,weight,exception);
   if (type_info != (const TypeInfo *) NULL)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),TypeWarning,
@@ -921,27 +933,45 @@ static void SetFontConfigTypeInfo(TypeInfo *type_info,FcPattern *font,
   type_info->glyphs=ConstantString((const char *) file);
 }
 
-MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
-  ExceptionInfo *exception)
+static void AddFontConfigFonts(SplayTreeInfo *cache,
+  const FcFontSet *font_set)
 {
-  FcBool
-    result;
-
   FcChar8
     *family,
     *file;
-
-  FcConfig
-    *font_config;
-
-  FcFontSet
-    *font_set;
 
   ssize_t
     i;
 
   TypeInfo
     *type_info;
+
+  for (i=0; i < (ssize_t) font_set->nfont; i++)
+  {
+    if (GetFontConfigFile(font_set->fonts[i],&family,&file) == MagickFalse)
+      continue;
+    type_info=(TypeInfo *) AcquireMagickMemory(sizeof(*type_info));
+    if (type_info == (TypeInfo *) NULL)
+      continue;
+    (void) memset(type_info,0,sizeof(*type_info));
+    type_info->path=ConstantString("System Fonts");
+    type_info->signature=MagickCoreSignature;
+    SetFontConfigTypeInfo(type_info,font_set->fonts[i],family,file);
+    (void) AddValueToSplayTree(cache,type_info->name,type_info);
+  }
+}
+
+MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
+  ExceptionInfo *exception)
+{
+  FcBool
+    result;
+
+  FcConfig
+    *font_config;
+
+  FcFontSet
+    *font_set;
 
   /*
     Load system fonts.
@@ -960,19 +990,7 @@ MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
       FcConfigDestroy(font_config);
       return(MagickFalse);
     }
-  for (i=0; i < (ssize_t) font_set->nfont; i++)
-  {
-    if (GetFontConfigFile(font_set->fonts[i],&family,&file) == MagickFalse)
-      continue;
-    type_info=(TypeInfo *) AcquireMagickMemory(sizeof(*type_info));
-    if (type_info == (TypeInfo *) NULL)
-      continue;
-    (void) memset(type_info,0,sizeof(*type_info));
-    type_info->path=ConstantString("System Fonts");
-    type_info->signature=MagickCoreSignature;
-    SetFontConfigTypeInfo(type_info,font_set->fonts[i],family,file);
-    (void) AddValueToSplayTree(type_cache,type_info->name,type_info);
-  }
+  AddFontConfigFonts(type_cache,font_set);
   FcFontSetDestroy(font_set);
   FcConfigDestroy(font_config);
   return(MagickTrue);
@@ -1339,6 +1357,75 @@ static void LoadTypeIncludeElement(const TypeIncludeScan *scan,
       ConfigureError,"IncludeNodeNestedTooDeeply","`%s'",token);
 }
 
+typedef struct _TypeElementInput
+{
+  SplayTreeInfo
+    *cache;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    *keyword,
+    *token;
+
+  const char
+    *filename;
+
+  char
+    *font_path;
+
+  size_t
+    extent;
+} TypeElementInput;
+
+static void ParseTypeElement(const TypeElementInput *element,
+  TypeInfo **type_info,MagickStatusType *status,const char **q)
+{
+  SplayTreeInfo
+    *const cache = element->cache;
+
+  ExceptionInfo
+    *const exception = element->exception;
+
+  char
+    *const keyword = element->keyword,
+    *const token = element->token;
+
+  const char
+    *const filename = element->filename;
+
+  char
+    *const font_path = element->font_path;
+
+  const size_t
+    extent = element->extent;
+
+  if (LocaleCompare(keyword,"<type") == 0)
+    {
+      /*
+        Type element.
+      */
+      (*type_info)=AcquireTypeNode(filename);
+      return;
+    }
+  if ((*type_info) == (TypeInfo *) NULL)
+    return;
+  if (IsElementEnd(keyword) != MagickFalse)
+    {
+      (*status)=AddTypeNode(cache,(*type_info),exception);
+      (*type_info)=(TypeInfo *) NULL;
+      return;
+    }
+  (void) GetNextToken(*q,(const char **) NULL,extent,token);
+  if (*token != '=')
+    return;
+  (void) GetNextToken(*q,q,extent,token);
+  (void) GetNextToken(*q,q,extent,token);
+  (*type_info)=SetTypeInfoAttribute((*type_info),keyword,token,filename,
+    font_path);
+}
+
 static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -1388,6 +1475,9 @@ static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
 #endif
   for (q=(char *) xml; *q != '\0'; )
   {
+    TypeElementInput
+      element;
+
     /*
       Interpret XML.
     */
@@ -1408,29 +1498,14 @@ static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
         LoadTypeIncludeElement(&scan,&q,&status);
         continue;
       }
-    if (LocaleCompare(keyword,"<type") == 0)
-      {
-        /*
-          Type element.
-        */
-        type_info=AcquireTypeNode(filename);
-        continue;
-      }
-    if (type_info == (TypeInfo *) NULL)
-      continue;
-    if (IsElementEnd(keyword) != MagickFalse)
-      {
-        status=AddTypeNode(cache,type_info,exception);
-        type_info=(TypeInfo *) NULL;
-        continue;
-      }
-    (void) GetNextToken(q,(const char **) NULL,extent,token);
-    if (*token != '=')
-      continue;
-    (void) GetNextToken(q,&q,extent,token);
-    (void) GetNextToken(q,&q,extent,token);
-    type_info=SetTypeInfoAttribute(type_info,keyword,token,filename,
-      font_path);
+    element.cache=cache;
+    element.exception=exception;
+    element.keyword=keyword;
+    element.token=token;
+    element.filename=filename;
+    element.font_path=font_path;
+    element.extent=extent;
+    ParseTypeElement(&element,&type_info,&status,&q);
   }
   token=(char *) RelinquishMagickMemory(token);
   return((MagickBooleanType) (status != 0));

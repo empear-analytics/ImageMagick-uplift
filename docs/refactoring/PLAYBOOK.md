@@ -12818,6 +12818,12 @@ moves a run of skip tests as one predicate.
    `return(MagickTrue);`. Each test's text is copied character for character.
 3. The tests in the loop become `if (Is<Name>(<inputs>) == MagickFalse) continue;`.
 4. The tests that followed the run stay where they were.
+5. *Function form (2026-11-14).* The run may instead open a function's body (after its
+   declarations): `if (<test>) return;` statements of a `void` function, or `if
+   (<test>) return(c);` with one and the same constant `c`, under steps 1 and 2's
+   conditions. The run becomes `if (Is<Name>(<inputs>) == MagickFalse) return;` (or
+   `return(c);`), as `utility.c`'s `ExpandFilename` (`if (path == (char *) NULL)
+   return; if (*path != '~') return;`). Lane: a
 
 **Before:**
 
@@ -16239,6 +16245,469 @@ Lane: c
 
 ---
 
+## Recipe NC - Share a NULL-Tested Copy Through a Helper Taking the Destination
+
+**Use when:** CodeScene reports *Overall Code Complexity* (the mean cyclomatic
+complexity of the file's functions) on a file whose functions copy members one by one
+and guard each pointer copy with its own test, `if (s->m != (char *) NULL) (void)
+F(&d->m,s->m);`, as `image-clone.c`'s `CloneImageInfo`, `CloneImageInfoRenderStrings`
+and `CloneMontageStrings` do with `CloneString` (eleven copies, eleven `if`s).
+
+**Not covered by:** Recipe OS, whose copies look an option up by name and store a
+converted value, not a member tested for `NULL` and passed with a destination's
+address; Recipe MA, whose lvalue's address is never taken and whose copies lie in one
+function; Recipe D and SV, which need reported duplication or one differing value
+(here two differing member designators, one of them under `&`).
+
+**How:**
+
+1. Copies. Statements of the form `if (S != (T) NULL) (void) F(&D,S);` outside every
+   OpenMP region, where `S` is a chain of member selections through a pointer parameter
+   or local (no call, no subscript, no side effect), `D` is a chain of member selections
+   through a pointer the function guarantees non-`NULL` at that point, and `F` is one
+   function whose first parameter is `P *` and whose second takes `S`'s type. Copies that
+   share a helper have the same text once `S` and `D` are set aside.
+2. Write, directly above the first function of the file that will call it, `static void
+   Name(P *destination,const T source)` whose body is the copy with `S` replaced by
+   `source` and `&D` by `destination`, nothing else changed.
+3. Each copy becomes `Name(&D,S);` where it stood.
+4. All copies of one file may go in one commit when *Overall Code Complexity* is the
+   finding they lower (rule 1's set); the message lists the functions and copies.
+5. Check by script that substituting each call's arguments into the helper's text gives
+   the copy it replaced, token for token. Run `tools/ci_warnings.sh` and
+   `tools/cxx_warnings.sh` (`OK`) and the oracle for each changed function.
+
+**Before:**
+
+```c
+  if (image_info->size != (char *) NULL)
+    (void) CloneString(&clone_info->size,image_info->size);
+  if (image_info->extract != (char *) NULL)
+    (void) CloneString(&clone_info->extract,image_info->extract);
+```
+
+**After:**
+
+```c
+static void CloneStringIfSet(char **destination,const char *source)
+{
+  if (source != (char *) NULL)
+    (void) CloneString(destination,source);
+}
+...
+  CloneStringIfSet(&clone_info->size,image_info->size);
+  CloneStringIfSet(&clone_info->extract,image_info->extract);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The copy read `S` for the test and again as the
+  argument, with nothing written in between; the call reads it once, as an argument,
+  and the helper tests and passes that value, so the same value is tested and passed.
+  `&D` is the same address the copy passed; it is now computed also when `S` is `NULL`,
+  which reads nothing (an address of a member through a valid pointer), so step 1
+  requires that pointer to be valid wherever the call stands. When `S` is `NULL`
+  neither form calls `F`.
+- The test's cast `(T) NULL` and the discarded result `(void)` stay in the helper as
+  written; `const` on the parameter only qualifies the helper's own copy of the pointer
+  value (`const char *` here, as `CloneString`'s own parameter), and `S` converts to it
+  without change.
+- `S` must have no side effect: the copy evaluated it twice, the call once.
+
+**Evidence level:** oracle (the cases that reach each changed function), with
+`tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`.
+
+**Provenance:** 2026-11-14, from `image-clone.c` (campaign B, M127 lane a round 6):
+*Overall Code Complexity* and two public five-argument functions held the file at
+9.09; a probe sharing the eleven `CloneString` copies cleared the mean (9.68). Added by
+Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: a
+
+---
+
+## Recipe SK - Name the Constant a Keyed Switch's Groups Differ In
+
+**Use when:** CodeScene reports *Code Duplication* (or *Complex Method*, or *Overall Code
+Complexity*) on `static` functions whose body is one `switch` on a parameter in which
+every group is one and the same statement that differs only in one enumeration constant,
+as `image-mask.c`'s `AddImageMaskChannel` and `RemoveRegionMaskChannel`: each group of
+the `PixelMask` switch sets `image->channels` from `ReadMaskChannel`, `WriteMaskChannel`
+or `CompositeMaskChannel`, one function with `|`, the other with `& ~`.
+
+**Not covered by:** Recipe KS, KC and KR, whose groups assign or return a literal (here
+each group is a computed statement around the constant); Recipe SC, which extracts
+sibling blocks into one helper passing their constants and leaves the selection in the
+caller; Recipe NS, which names a two-way `?:`; Recipe D, which merges identical blocks.
+
+**How:**
+
+1. The function is `static`, outside every OpenMP region; its body is one `switch (k)`
+   on a parameter `k`, without fall-through, each group `case L: S_i break;` (braces
+   allowed) and a `default:` group of the same shape, where the statements `S_i` are
+   token for token the same once one enumeration constant `C_i` of one enumeration type
+   `E` is set aside. No `#if` line stands inside the `switch`.
+2. Directly above the first function of the file that will call it, write `static E
+   GetName(const K k)` (`K` the parameter's type) holding the same `switch`, each group
+   `case L: return(C_i);` and `default: return(C_default);`.
+3. Replace the `switch` by `S` with `C_i` replaced by `GetName(k)`, wrapped and indented
+   as the group's statement was.
+4. Another function of the file whose `switch` on the same type has the same labels
+   mapping to the same constants (the same key-to-constant map) may call the same
+   `GetName`; it goes in the same commit when the duplication finding links the two.
+5. Check by script that each group's statement equals the new statement with that
+   group's constant in place of the call, and that the labels and constants of the
+   new `switch` are the original's. Run `tools/ci_warnings.sh` and
+   `tools/cxx_warnings.sh` (`OK`) and the oracle for each changed function.
+
+**Before:**
+
+```c
+static void AddImageMaskChannel(Image *image,const PixelMask type)
+{
+  switch (type)
+  {
+    case ReadPixelMask:
+    {
+      image->channels=(ChannelType) (image->channels | ReadMaskChannel);
+      break;
+    }
+    ...
+    default:
+    {
+      image->channels=(ChannelType) (image->channels | CompositeMaskChannel);
+      break;
+    }
+  }
+}
+```
+
+**After:**
+
+```c
+static ChannelType GetMaskChannel(const PixelMask type)
+{
+  switch (type)
+  {
+    case ReadPixelMask: return(ReadMaskChannel);
+    case WritePixelMask: return(WriteMaskChannel);
+    default: return(CompositeMaskChannel);
+  }
+}
+
+static void AddImageMaskChannel(Image *image,const PixelMask type)
+{
+  image->channels=(ChannelType) (image->channels | GetMaskChannel(type));
+}
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The new `switch` sends each value of `k` to the group
+  it went to before and returns that group's constant; the statement then computes with
+  that constant where the group computed with it. Without fall-through (step 1) each
+  value reached exactly one group.
+- Type: the constant was an `int` enumeration constant, the call returns it as `E`. Both
+  hold the same value, and an `E` promotes in `|`, `&` and `~` to `int` or `unsigned
+  int`, of the same width: the bits that reach the statement's own casts are the same.
+  Check the enumeration has no negative enumerator and no enumerator above `INT_MAX`
+  in the C build; otherwise refuse. (Under C++, as with `ChannelType`'s
+  `MAGICKCORE_64BIT_CHANNEL_MASK_SUPPORT` underlying type, an enumerator already has
+  the type `E`, so the call yields the very type the constant had.)
+- A `switch` with fall-through (a group sharing the next group's statement) is not this
+  shape: `RemoveImageMaskChannel`'s `WritePixelMask` group also clears the composite
+  bit, so it keeps its `switch`.
+- `k` is a parameter that the statement does not write, so reading it in the call reads
+  what the `switch` read.
+
+**Evidence level:** oracle (the cases that reach each changed function), with step 5's
+script, `tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`.
+
+**Provenance:** 2026-11-14, from `image-mask.c` (campaign B, M127 lane a round 6):
+`AddImageMaskChannel`, `RemoveRegionMaskChannel` and `RemoveImageMaskChannel` in *Code
+Duplication*; a probe naming the constant for the first two: 8.81 to 9.38, the
+duplication finding gone. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-10-24.
+Lane: a
+
+---
+
+## Recipe SA - Pass the Sum a Callee Only Reads Whole
+
+**Use when:** CodeScene reports *Excess Number of Function Arguments* on a `static`
+function that reads two of its parameters only as one sum, `(a+b)`, as `image-append.c`'s
+`IsRightGapEdge(right_image,p,x,i,gap)` and `IsBottomGapEdge`, which use `x` and `i`
+only in `((x+i) >= (ssize_t) gap)`.
+
+**Not covered by:** Recipe M, whose call sites pass one identifier to two parameters;
+Recipe DV, which drops a parameter the callee can read from another; Recipe B, which
+bundles the parameters into a struct and keeps the sum in the callee.
+
+**How:**
+
+1. The function is `static`, outside every OpenMP region, and its parameters `a` and
+   `b` have one integer type `T`, are `const` (or never assigned) and appear in its body
+   only inside one parenthesised sum `(a+b)` (each occurrence of either is part of such
+   a sum). Its address is not taken.
+2. Every call passes, for `a` and `b`, expressions `ea` and `eb` of type `T` with no side
+   effect (variables or member reads, as `x` and `i`).
+3. Replace the two parameters by one, `const T name`, at the position of `a`, and every
+   `(a+b)` in the body by `name` (keeping the outer parentheses the expression needs).
+4. At every call, pass `ea+eb` in that position and drop the `eb` argument.
+5. Run `tools/ci_warnings.sh` and `tools/cxx_warnings.sh` (`OK`) and the oracle for each
+   function that calls it.
+
+**Before:**
+
+```c
+static inline MagickBooleanType IsRightGapEdge(const Image *right_image,
+  const Quantum *p,const ssize_t x,const ssize_t i,const size_t gap)
+{
+  return(((p == (const Quantum *) NULL) ||
+    (GetPixelAlpha(right_image,p) != TransparentAlpha) ||
+    ((x+i) >= (ssize_t) gap)) ? MagickTrue : MagickFalse);
+}
+...
+    if (IsRightGapEdge(rows->right_image,p,x,i,gap) != MagickFalse)
+```
+
+**After:**
+
+```c
+static inline MagickBooleanType IsRightGapEdge(const Image *right_image,
+  const Quantum *p,const ssize_t extent,const size_t gap)
+{
+  return(((p == (const Quantum *) NULL) ||
+    (GetPixelAlpha(right_image,p) != TransparentAlpha) ||
+    (extent >= (ssize_t) gap)) ? MagickTrue : MagickFalse);
+}
+...
+    if (IsRightGapEdge(rows->right_image,p,x+i,gap) != MagickFalse)
+```
+
+**Careful:**
+
+- Why the behaviour is the same. Both operands have type `T`, so `ea+eb` at the call is
+  computed in `T` exactly as `a+b` was in the callee from the same values (the parameters
+  held copies of `ea` and `eb`), and passing it to a `T` parameter converts nothing. The
+  callee then reads that value where it computed the sum. Neither operand has a side
+  effect, so computing the sum before the call, rather than possibly never (behind a
+  short-circuit operator, as here), changes nothing observable: signed overflow is
+  ruled out where the callee could have computed the sum, and with indices of one image
+  row or column the sum stays far inside `T`'s range wherever it is computed.
+- A parameter used anywhere else in the body, alone or in another expression, refuses the
+  step.
+
+**Evidence level:** oracle (the cases that reach each caller), with
+`tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`; `obj_identical.sh`
+may differ (the compiler places the addition elsewhere).
+
+**Provenance:** 2026-11-14, from `image-append.c` (campaign B, M127 lane a round 6):
+`IsRightGapEdge` and `IsBottomGapEdge`, the file's *Excess Number of Function
+Arguments*; a probe 8.54 to 8.81, the finding gone. Added by Claude Code (Claude Opus
+5.5) under the mandate of 2026-10-24.
+Lane: a
+
+---
+
+## Recipe MX - Merge Axis Twins Through a Side Selector and a Struct of Two Parts
+
+**Use when:** CodeScene reports *Code Duplication* on a chain of `static` functions and
+its mirror for the other axis, the two chains the same once columns are read as rows,
+`x` as `y` and the two images of one chain as the two of the other: `image-append.c`'s
+horizontal smush (`SmushXGap`, `SmushXRow`, `FindLeftGapEdge`, `FindRightGapEdge`,
+`IsLeftGapEdge`, `IsRightGapEdge` over a `SmushXRows` struct) and its vertical mirror
+(`SmushYGap`, `SmushYRow`, `FindTopGapEdge`, `FindBottomGapEdge`, `IsTopGapEdge`,
+`IsBottomGapEdge` over `SmushYRows`).
+
+**Not covered by:** Recipe MT, whose copies read the same variables or one struct type
+and differ in runs a conditional can hold; here the two chains use two struct types with
+different member names and pass coordinates in swapped argument positions, and the
+merge needs one struct type for both. Recipe D, SV, SC and TW, which take one value;
+Recipe CF, whose copies differ only in the callee.
+
+**How:**
+
+1. Copies. Two chains of `static` functions outside every OpenMP region, each called
+   only within its chain or from one entry function per chain, every function of one
+   chain the mirror of one function of the other: the same token sequence once (a) the
+   members `columns` and `rows` of the chain's images, (b) each pair of coordinates
+   passed to one call (`x,geometry.y+y` against `geometry.x+x,y`), and (c) the names of
+   the variables and struct members, are set aside. Each chain's struct holds, for each
+   of two roles (the earlier image of the list and the current one), an image, a cache
+   view and a geometry, and the exception.
+2. Write `typedef enum { HorizontalName, VerticalName } NameSide;`, a struct `NamePart`
+   (`image`, `view`, `geometry`, of the members' types) and one struct `NameRows` (`side`,
+   one `NamePart` per role, named for the role, and `exception`), replacing both chain
+   structs.
+3. Write `static inline` selectors for each pair of (a) as `return((side == HorizontalName)
+   ? image->columns : image->rows);` (and the swapped one), and one function for each
+   call of (b) taking the rows struct and the part: `if (rows->side == HorizontalName)
+   return(call(horizontal arguments)); return(call(vertical arguments));`, every argument
+   verbatim with the part's members for the chain's.
+4. Write one function per mirror pair: one copy's text with each (a) read replaced by its
+   selector, each (b) call by its function, each chain member by the part's member; the
+   loop variables keep the horizontal copy's names (the scan coordinate `x`, the line
+   `y`). Where one copy sets up the two parts with the same statements, they move to one
+   `static void` setter per part, called in the copy's order.
+5. The entry pair keeps its two names and parameters, each body one call of the merged
+   entry with its own side constant (in a `const` input struct when the merged entry
+   would take five or more parameters). Statements stay in each copy's order (views
+   acquired, released and set up in the order both copies used).
+6. All functions of both chains move in one commit. When the chains run per pixel, time
+   an operation that runs them on both binaries (Recipe CF step 7's 3%).
+7. Check by reading, pair by pair, that substituting the horizontal side gives the
+   horizontal copy and the vertical side the vertical copy, argument for argument, with
+   the same operand types; `refactor_guard.py --calls` with `--renamed Old=New` for each
+   merged function moves only the deduplicated callees and the new functions.
+
+**Before:**
+
+```c
+  for (x=(ssize_t) rows->left_image->columns-1; x > 0; x--)
+  {
+    p=GetCacheViewVirtualPixels(rows->left_view,x,rows->left_geometry.y+y,1,1,
+      rows->exception);
+  ...
+  for (y=(ssize_t) rows->top_image->rows-1; y > 0; y--)
+  {
+    p=GetCacheViewVirtualPixels(rows->top_view,rows->top_geometry.x+x,y,1,1,
+      rows->exception);
+```
+
+**After:**
+
+```c
+static const Quantum *GetSmushPixel(const SmushRows *rows,
+  const SmushPart *part,const ssize_t x,const ssize_t y)
+{
+  if (rows->side == HorizontalSmush)
+    return(GetCacheViewVirtualPixels(part->view,x,part->geometry.y+y,1,1,
+      rows->exception));
+  return(GetCacheViewVirtualPixels(part->view,part->geometry.x+y,x,1,1,
+    rows->exception));
+}
+...
+  for (x=(ssize_t) GetSmushExtent(rows->side,rows->previous.image)-1; x > 0;
+       x--)
+  {
+    p=GetSmushPixel(rows,&rows->previous,x,y);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. Each merged function, for one side, executes the
+  statements of that side's copy in the same order with the same values: the selectors
+  return the member the copy read (same type, `size_t`), the pixel function makes the
+  very call the copy made with the same arguments in the same positions, and each part
+  member holds what the copy's struct member or local held, filled from the same
+  expressions. The side is a constant passed by each entry, never computed.
+- Struct members filled in another order than the copy's are plain stores to a local
+  without side effects; calls (`SetGeometry`, `GravityAdjustGeometry`,
+  `AcquireVirtualCacheView`, `DestroyCacheView`) keep each copy's order.
+- Avoid `near` and `far` as names: the Windows headers define them as macros.
+
+**Evidence level:** oracle (cases that reach each side's entry), with step 7's reading
+and the `--calls` check, and the timing of step 6.
+
+**Provenance:** 2026-11-14, from `image-append.c` (campaign B, M127 lane a round 6): the
+smush chains, the file's last finding (*Code Duplication*, 8 functions) after Recipe SA;
+a probe 8.81 to 10.0. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-10-24.
+Lane: a
+
+---
+
+## Recipe HF - Hoist a Struct Fill That Both Paths Repeat
+
+**Use when:** CodeScene reports *Large Method* (or *Code Duplication* inside one
+function) on a function that fills one struct local member by member in two places, one
+in an early-returning branch and one later (in a loop, say), the second repeating most
+of the first's assignments from values nothing changes in between, as `log.c`'s
+`TranslateEvent`: nine `event_text.<m>=<m>;` lines before `FormatLogEventXML` in the
+`xml` branch, which returns, and the same nine before every `TranslateLogSpecifier` in
+the format loop, where only `text` and `extent` change from one iteration to the next.
+
+**Not covered by:** Recipe RF, whose earlier fill already runs on every path to the
+later one; here the earlier fill sits in a branch the later one never follows. Recipe
+FI, which turns one fill into an initialiser; Recipe D, whose copies become calls.
+
+**How:**
+
+1. Two fills `F1` (in the branch `if (C) { F1 ... return ...; }`) and `F2` (after the
+   branch) of one struct local `s`, each a run of `s.m=e;` with `e` an identifier or a
+   member access, `F2` assigning a subset `K` of `F1`'s members from the same
+   expressions as `F1` plus the rest (`R`) from the same expressions too.
+2. Nothing from the statement before the branch to `F2`'s every execution writes a
+   variable that an expression of `K` reads, or writes `s` (check by reading every
+   statement and callee on those paths, loop back edges included: `&s` may only go to
+   `const` pointer parameters). The test `C` neither reads `s` nor has an effect on
+   anything the fill reads (a call such as `LocaleCompare` on other data).
+3. Move `F1` unchanged to directly before the branch; the branch keeps the rest.
+4. Delete from `F2` the assignments of the members of `K` whose expressions read
+   nothing written between the moved `F1` and `F2`; those of members whose expressions
+   do change (`text`, `extent`) stay in `F2`, in order.
+5. Run the oracle for the function; `obj_identical.sh` may differ (the stores move).
+
+**Before:**
+
+```c
+  extent=strlen(event)+MagickPathExtent;
+  if (LocaleCompare(log_info->format,"xml") == 0)
+    {
+      event_text.text=text;
+      ...
+      event_text.line=line;
+      FormatLogEventXML(&event_text,domain);
+      return(text);
+    }
+  ...
+    event_text.text=text;
+    event_text.extent=extent;
+    event_text.elapsed_time=elapsed_time;
+    ...
+    event_text.line=line;
+    TranslateLogSpecifier(&event_text,domain,p,&q);
+```
+
+**After:**
+
+```c
+  extent=strlen(event)+MagickPathExtent;
+  event_text.text=text;
+  ...
+  event_text.line=line;
+  if (LocaleCompare(log_info->format,"xml") == 0)
+    {
+      FormatLogEventXML(&event_text,domain);
+      return(text);
+    }
+  ...
+    event_text.text=text;
+    event_text.extent=extent;
+    TranslateLogSpecifier(&event_text,domain,p,&q);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. Stores to a local struct have no effect until it is
+  read. On the branch path the moved fill stores the same values (nothing between its
+  new and old place writes what it reads, step 2) before the same call reads them. On
+  the other path the members of `K` hold, at each `F2`, the values `F2` would have
+  stored, since nothing writes them or what their expressions read (step 2); the
+  members whose sources change are still stored where `F2` stored them.
+- A member a callee writes through a non-`const` `&s` refuses the deletion.
+
+**Evidence level:** oracle (cases that reach the function), with step 2 checked by
+reading.
+
+**Provenance:** 2026-11-14, from `log.c`'s `TranslateEvent` (campaign B, M127 lane a
+round 6): *Large Method* (78 lines) and *Complex Method*; this step and an E step on
+the log-info lookup took it out of *Large Method* (probe 7.93 to 8.03). Added by Claude
+Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Lane: a
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -17950,3 +18419,9 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | AMEND | MC | Step 6: a use that is the whole body of `if (c)` becomes `if ((c) && (F(...) == MagickFalse)) return(MagickFalse);` in the moving commit (Recipe CN's form); Lane: c | `InterpretImageProperties`' glob loops, whose nested `if` would leave each helper at depth 4 | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | VC | Step 7: a moved group `{ if (G(...) == MagickFalse) return(MagickFalse); return(MagickTrue); }`, or those two statements ending a block, become `return(G(...));` when `G` returns only `MagickTrue` or `MagickFalse`; a `const` input struct declared at the block's top becomes the struct parameter; Lane: c | `InterpretImageProperties`' braced-escape block after its prefix arms moved (probe 3.27 to 3.48) | mandate (2026-10-24) |
 | 2026-11-14 | AMEND | MT | Step 1: the copies may be blocks that Recipe VC moves (in-loop, leaving through `S goto L;`); a differing pair of `void` call statements is written as a `?:` of the two calls; Lane: c | `InterpretImageProperties`' option and artifact glob loops (two helpers would be *Code Duplication*) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | NC | Share a NULL-Tested Copy Through a Helper Taking the Destination: copies `if (S != (T) NULL) (void) F(&D,S);` become calls of one `static void` helper taking `&D` and `S`; Lane: a | `image-clone.c`'s eleven `CloneString` copies in `CloneImageInfo`, `CloneImageInfoRenderStrings` and `CloneMontageStrings` (probe 9.09 to 9.68, *Overall Code Complexity* gone) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | SK | Name the Constant a Keyed Switch's Groups Differ In: a `static` function whose `switch` groups are one statement differing in one enumeration constant becomes that statement with a call of a new `switch` returning the constants; a sibling with the same key-to-constant map shares it; Lane: a | `image-mask.c`'s `AddImageMaskChannel` and `RemoveRegionMaskChannel` (*Code Duplication*, probe 8.81 to 9.38) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | SA | Pass the Sum a Callee Only Reads Whole: two `const` parameters of one integer type that a `static` function reads only as `(a+b)` become one parameter, each call passing `ea+eb` of side-effect-free operands; Lane: a | `image-append.c`'s `IsRightGapEdge` and `IsBottomGapEdge` (*Excess Number of Function Arguments*; probe 8.54 to 8.81) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | MX | Merge Axis Twins Through a Side Selector and a Struct of Two Parts: a chain of `static` functions and its other-axis mirror (columns for rows, swapped coordinate pairs, two struct types) become one chain over one struct with a side constant, `static inline` selectors and one function per swapped call; the two entries stay as one-call wrappers; Lane: a | `image-append.c`'s horizontal and vertical smush chains (*Code Duplication*, 8 functions; probe 8.81 to 10.0) | mandate (2026-10-24) |
+| 2026-11-14 | NEW | HF | Hoist a Struct Fill That Both Paths Repeat: a member-by-member fill in an early-returning branch moves before the branch, and the later fill keeps only the members whose sources change in between; Lane: a | `log.c`'s `TranslateEvent` (nine `event_text` stores in the `xml` branch and in the format loop; with E, out of *Large Method*, probe 7.93 to 8.03) | mandate (2026-10-24) |
+| 2026-11-14 | AMEND | LF | Step 5, function form: a function body's leading run of `if (<test>) return;` (or `return(c);` of one constant) becomes one predicate call with the same exit; Lane: a | `utility.c`'s `ExpandFilename` (`path == NULL` and `*path != '~'` guards; cc 9, *Complex Method*) | mandate (2026-10-24) |
