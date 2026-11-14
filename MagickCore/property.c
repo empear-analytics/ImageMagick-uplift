@@ -759,6 +759,53 @@ static MagickBooleanType Skip8BIMResourceHeader(const Range8BIM *range,
   return(MagickFalse);
 }
 
+typedef struct _Match8BIM
+{
+  const char
+    *name;
+
+  char
+    *resource,
+    *macroman_resource;
+
+  ssize_t
+    count;
+} Match8BIM;
+
+static MagickBooleanType Skip8BIMUnmatchedResource(const Match8BIM *match,
+  const unsigned char **info,size_t *length,ssize_t *sub_number)
+{
+  const char
+    *const name = match->name;
+
+  char
+    *const resource = match->resource,
+    *const macroman_resource = match->macroman_resource;
+
+  const ssize_t
+    count = match->count;
+
+  if ((Is8BIMResourceName(name) != MagickFalse) &&
+      (IsUnrequestedResource(resource,macroman_resource,name) != MagickFalse))
+    {
+      /*
+        No name match, scroll forward and try next.
+      */
+      Skip8BIMResourceData(info,length,count);
+      return(MagickTrue);
+    }
+  if ((*name == '#') && ((*sub_number) != 1))
+    {
+      /*
+        No numbered match, scroll forward and try next.
+      */
+      (*sub_number)--;
+      Skip8BIMResourceData(info,length,count);
+      return(MagickTrue);
+    }
+  return(MagickFalse);
+}
+
 static void Get8BIMProperty(const Image *image,const char *key,
   ExceptionInfo *exception)
 {
@@ -813,6 +860,9 @@ static void Get8BIMProperty(const Image *image,const char *key,
   info=GetStringInfoDatum(profile);
   while ((length > 0) && (status == MagickFalse))
   {
+    Match8BIM
+      match;
+
     Range8BIM
       range;
 
@@ -834,24 +884,13 @@ static void Get8BIMProperty(const Image *image,const char *key,
     if (resource != (char *) NULL)
       macroman_resource=(char *) ConvertMacRomanToUTF8((unsigned char *)
         resource);
-    if ((Is8BIMResourceName(name) != MagickFalse) &&
-        (IsUnrequestedResource(resource,macroman_resource,name) != MagickFalse))
-      {
-        /*
-          No name match, scroll forward and try next.
-        */
-        Skip8BIMResourceData(&info,&length,count);
-        continue;
-      }
-    if ((*name == '#') && (sub_number != 1))
-      {
-        /*
-          No numbered match, scroll forward and try next.
-        */
-        sub_number--;
-        Skip8BIMResourceData(&info,&length,count);
-        continue;
-      }
+    match.name=name;
+    match.resource=resource;
+    match.macroman_resource=macroman_resource;
+    match.count=count;
+    if (Skip8BIMUnmatchedResource(&match,&info,&length,&sub_number) !=
+        MagickFalse)
+      continue;
     /*
       We have the resource of interest.
     */
