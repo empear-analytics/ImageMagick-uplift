@@ -882,6 +882,16 @@ static char *AcquireLocaleName(void)
   return(locale);
 }
 
+static void InstantiateLocaleCache(ExceptionInfo *exception)
+{
+  char
+    *locale;
+
+  locale=AcquireLocaleName();
+  locale_cache=AcquireLocaleSplayTree(LocaleFilename,locale,exception);
+  locale=DestroyString(locale);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 +   I s L o c a l e T r e e I n s t a n t i a t e d                           %
@@ -907,14 +917,7 @@ static MagickBooleanType IsLocaleTreeInstantiated(ExceptionInfo *exception)
         ActivateSemaphoreInfo(&locale_semaphore);
       LockSemaphoreInfo(locale_semaphore);
       if (locale_cache == (SplayTreeInfo *) NULL)
-        {
-          char
-            *locale;
-
-          locale=AcquireLocaleName();
-          locale_cache=AcquireLocaleSplayTree(LocaleFilename,locale,exception);
-          locale=DestroyString(locale);
-        }
+        InstantiateLocaleCache(exception);
       UnlockSemaphoreInfo(locale_semaphore);
     }
   return(locale_cache != (SplayTreeInfo *) NULL ? MagickTrue : MagickFalse);
