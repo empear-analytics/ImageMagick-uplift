@@ -5765,14 +5765,123 @@ static MagickBooleanType SetEnumeratedProperty(Image *image,
   return(MagickFalse);
 }
 
+typedef MagickBooleanType
+  (*ImagePropertyHandler)(Image *,const char *,ExceptionInfo *);
+
+typedef struct _ImagePropertyHandlerInfo
+{
+  const char
+    *key;
+
+  ImagePropertyHandler
+    handler;
+} ImagePropertyHandlerInfo;
+
+static MagickBooleanType SetImageDelayHandler(Image *image,const char *value,
+  ExceptionInfo *exception)
+{
+  magick_unreferenced(exception);
+  return(SetImageDelayProperty(image,value));
+}
+
+static MagickBooleanType SetImageDensityHandler(Image *image,const char *value,
+  ExceptionInfo *exception)
+{
+  MagickStatusType
+    flags;
+
+  magick_unreferenced(exception);
+  return(SetImageDensityProperty(image,value,&flags));
+}
+
+static MagickBooleanType SetImageDepthHandler(Image *image,const char *value,
+  ExceptionInfo *exception)
+{
+  magick_unreferenced(exception);
+  image->depth=StringToUnsignedLong(value);
+  return(MagickTrue);
+}
+
+static MagickBooleanType SetImageGammaHandler(Image *image,const char *value,
+  ExceptionInfo *exception)
+{
+  magick_unreferenced(exception);
+  image->gamma=StringToDouble(value,(char **) NULL);
+  return(MagickTrue);
+}
+
+static MagickBooleanType SetImageLoopHandler(Image *image,const char *value,
+  ExceptionInfo *exception)
+{
+  magick_unreferenced(exception);
+  image->iterations=StringToUnsignedLong(value);
+  return(MagickTrue);
+}
+
+static MagickBooleanType SetImageGeometryMember(const char *value,
+  RectangleInfo *member,MagickStatusType *flags)
+{
+  char
+    *geometry;
+
+  geometry=GetPageGeometry(value);
+  (*flags)=ParseAbsoluteGeometry(geometry,member);
+  geometry=DestroyString(geometry);
+  return(MagickTrue);
+}
+
+static MagickBooleanType SetImagePageHandler(Image *image,const char *value,
+  ExceptionInfo *exception)
+{
+  MagickStatusType
+    flags;
+
+  magick_unreferenced(exception);
+  return(SetImageGeometryMember(value,&image->page,&flags));
+}
+
+static MagickBooleanType SetImageTileOffsetHandler(Image *image,const char *value,
+  ExceptionInfo *exception)
+{
+  MagickStatusType
+    flags;
+
+  magick_unreferenced(exception);
+  return(SetImageGeometryMember(value,&image->tile_offset,&flags));
+}
+
+static const ImagePropertyHandlerInfo
+  ImagePropertyHandlers[] =
+  {
+    { "colorspace", SetImageColorspaceProperty },
+    { "delay", SetImageDelayHandler },
+    { "density", SetImageDensityHandler },
+    { "depth", SetImageDepthHandler },
+    { "gamma", SetImageGammaHandler },
+    { "loop", SetImageLoopHandler },
+    { "page", SetImagePageHandler },
+    { "tile-offset", SetImageTileOffsetHandler }
+  };
+
+static ImagePropertyHandler GetImagePropertyHandler(const char *property)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(ImagePropertyHandlers)/sizeof(*ImagePropertyHandlers)); i++)
+    if (LocaleCompare(ImagePropertyHandlers[i].key,property) == 0)
+      return(ImagePropertyHandlers[i].handler);
+  return((ImagePropertyHandler) NULL);
+}
+
 MagickExport MagickBooleanType SetImageProperty(Image *image,
   const char *property,const char *value,ExceptionInfo *exception)
 {
+  ImagePropertyHandler
+    handler;
+
   MagickBooleanType
     status;
-
-  MagickStatusType
-    flags;
 
   size_t
     property_length;
@@ -5816,6 +5925,9 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
         "SetReadOnlyProperty","`%s'",property);
       return(MagickFalse);
     }
+  handler=GetImagePropertyHandler(property);
+  if (handler != (ImagePropertyHandler) NULL)
+    return(handler(image,value,exception));
   switch (*property)
   {
 #if 0  /* Percent escape's sets values with this prefix: for later use
@@ -5846,28 +5958,11 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
     case 'C':
     case 'c':
     {
-      if (LocaleCompare("colorspace",property) == 0)
-        {
-          return(SetImageColorspaceProperty(image,value,exception));
-        }
       break; /* not an attribute, add as a property */
     }
     case 'D':
     case 'd':
     {
-      if (LocaleCompare("delay",property) == 0)
-        {
-          return(SetImageDelayProperty(image,value));
-        }
-      if (LocaleCompare("density",property) == 0)
-        {
-          return(SetImageDensityProperty(image,value,&flags));
-        }
-      if (LocaleCompare("depth",property) == 0)
-        {
-          image->depth=StringToUnsignedLong(value);
-          return(MagickTrue);
-        }
       break; /* not an attribute, add as a property */
     }
 #if 0  /* Percent escape's sets values with this prefix: for later use
@@ -5898,11 +5993,6 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
     case 'G':
     case 'g':
     {
-      if (LocaleCompare("gamma",property) == 0)
-        {
-          image->gamma=StringToDouble(value,(char **) NULL);
-          return(MagickTrue);
-        }
       break; /* not an attribute, add as a property */
     }
     case 'H':
@@ -5930,11 +6020,6 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
     case 'L':
     case 'l':
     {
-      if (LocaleCompare("loop",property) == 0)
-        {
-          image->iterations=StringToUnsignedLong(value);
-          return(MagickTrue);
-        }
       break; /* not an attribute, add as a property */
     }
     case 'M':
@@ -5946,16 +6031,6 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
     case 'P':
     case 'p':
     {
-      if (LocaleCompare("page",property) == 0)
-        {
-          char
-            *geometry;
-
-          geometry=GetPageGeometry(value);
-          flags=ParseAbsoluteGeometry(geometry,&image->page);
-          geometry=DestroyString(geometry);
-          return(MagickTrue);
-        }
 #if 0  /* Percent escape's sets values with this prefix: for later use
           Throwing an exception causes this setting to fail */
       if (LocaleNCompare("pixel:",property,6) == 0)
@@ -5978,16 +6053,6 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
     case 'T':
     case 't':
     {
-      if (LocaleCompare("tile-offset",property) == 0)
-        {
-          char
-            *geometry;
-
-          geometry=GetPageGeometry(value);
-          flags=ParseAbsoluteGeometry(geometry,&image->tile_offset);
-          geometry=DestroyString(geometry);
-          return(MagickTrue);
-        }
       break; /* not an attribute, add as a property */
     }
     case 'U':
