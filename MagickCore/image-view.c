@@ -188,6 +188,19 @@ MagickExport ImageView *DestroyImageView(ImageView *image_view)
 %    o context: the user defined context.
 %
 */
+static MagickBooleanType SetImageViewDirectClass(Image *destination_image,
+  ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  status=SetImageStorageClass(destination_image,DirectClass,
+    exception);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType DuplexTransferImageViewIterator(
   ImageView *source,ImageView *duplex,ImageView *destination,
   DuplexTransferImageViewMethod transfer,void *context)
@@ -216,9 +229,8 @@ MagickExport MagickBooleanType DuplexTransferImageViewIterator(
     return(MagickFalse);
   source_image=source->image;
   destination_image=destination->image;
-  status=SetImageStorageClass(destination_image,DirectClass,
-    destination->exception);
-  if (status == MagickFalse)
+  if (SetImageViewDirectClass(destination_image,destination->exception) ==
+      MagickFalse)
     return(MagickFalse);
   status=MagickTrue;
   progress=0;
