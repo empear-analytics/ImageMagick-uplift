@@ -864,6 +864,15 @@ static inline MagickBooleanType IsUTF16Surrogate(const int c)
   return(((c >= 0xd800) && (c <= 0xdfff)) ? MagickTrue : MagickFalse);
 }
 
+static int GetUTF16Encoding(const char *content)
+{
+  int
+    encoding;
+
+  encoding=(*content == '\xFE') ? 1 : (*content == '\xFF') ? 0 : -1;
+  return(encoding);
+}
+
 static char *ConvertUTF16ToUTF8(const char *content,size_t *length)
 {
   char
@@ -883,7 +892,7 @@ static char *ConvertUTF16ToUTF8(const char *content,size_t *length)
   utf8=(char *) AcquireQuantumMemory(*length+1,sizeof(*utf8));
   if (utf8 == (char *) NULL)
     return((char *) NULL);
-  encoding=(*content == '\xFE') ? 1 : (*content == '\xFF') ? 0 : -1;
+  encoding=GetUTF16Encoding(content);
   if (encoding == -1)
     {
       /*
