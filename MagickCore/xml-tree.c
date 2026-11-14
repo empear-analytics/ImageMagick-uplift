@@ -2544,6 +2544,16 @@ typedef struct _StartTagTargets
     *ignore_depth;
 } StartTagTargets;
 
+static MagickBooleanType ThrowMissingTagEnd(const ssize_t l,
+  char **attributes,ExceptionInfo *exception)
+{
+  if (l != 0)
+    (void) DestroyXMLTreeAttributes(attributes);
+  (void) ThrowMagickException(exception,GetMagickModule(),
+    OptionWarning,"ParseError","missing >");
+  return(MagickFalse);
+}
+
 static MagickBooleanType EndStartTag(const StartTagInfo *start_tag,
   const StartTagTargets *targets)
 {
@@ -2581,13 +2591,7 @@ static MagickBooleanType EndStartTag(const StartTagInfo *start_tag,
       */
       *(*p)++='\0';
       if (IsTagNotClosed(*p,terminal) != MagickFalse)
-        {
-          if (l != 0)
-            (void) DestroyXMLTreeAttributes(attributes);
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            OptionWarning,"ParseError","missing >");
-          return(MagickFalse);
-        }
+        return(ThrowMissingTagEnd(l,attributes,exception));
       if ((*ignore_depth != 0) || (IsSkipTag(tag) != MagickFalse))
         (void) DestroyXMLTreeAttributes(attributes);
       else
@@ -2607,13 +2611,7 @@ static MagickBooleanType EndStartTag(const StartTagInfo *start_tag,
           **p=(char) c;
         }
       else
-        {
-          if (l != 0)
-            (void) DestroyXMLTreeAttributes(attributes);
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            OptionWarning,"ParseError","missing >");
-          return(MagickFalse);
-        }
+        return(ThrowMissingTagEnd(l,attributes,exception));
     }
   return(MagickTrue);
 }
