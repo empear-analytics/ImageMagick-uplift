@@ -10391,6 +10391,27 @@ static DisplayCommand XTrimImageWindowEdge(const ImageWindowKeyInput *input,
 static const char
   Digits[] = "01234567890";
 
+static void XEnterWindowDigit(XResourceInfo *resource_info,
+  const KeySym key_symbol,char *delta,KeySym *last_symbol)
+{
+  size_t
+    length;
+
+  if ((((*last_symbol) < XK_0) || ((*last_symbol) > XK_9)))
+    {
+      *delta='\0';
+      resource_info->quantum=1;
+    }
+  (*last_symbol)=key_symbol;
+  length=strlen(delta);
+  if (length < MagickPathExtent)
+    {
+      delta[length]=Digits[key_symbol-XK_0];
+      delta[length+1]='\0';
+    }
+  resource_info->quantum=StringToLong(delta);
+}
+
 static DisplayCommand XImageWindowCommand(Display *display,
   XResourceInfo *resource_info,XWindows *windows,const MagickStatusType state,
   KeySym key_symbol,Image **image,ExceptionInfo *exception)
@@ -10406,22 +10427,7 @@ static DisplayCommand XImageWindowCommand(Display *display,
 
   if ((key_symbol >= XK_0) && (key_symbol <= XK_9))
     {
-      size_t
-        length;
-
-      if (((last_symbol < XK_0) || (last_symbol > XK_9)))
-        {
-          *delta='\0';
-          resource_info->quantum=1;
-        }
-      last_symbol=key_symbol;
-      length=strlen(delta);
-      if (length < MagickPathExtent)
-        {
-          delta[length]=Digits[key_symbol-XK_0];
-          delta[length+1]='\0';
-        }
-      resource_info->quantum=StringToLong(delta);
+      XEnterWindowDigit(resource_info,key_symbol,delta,&last_symbol);
       return(NullCommand);
     }
   last_symbol=key_symbol;
