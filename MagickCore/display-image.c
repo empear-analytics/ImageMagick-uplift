@@ -20423,6 +20423,9 @@ typedef struct _DisplayEventContext
 
   XWMHints
     *manager_hints;
+
+  XResourceInfo
+    *icon_resources;
 } DisplayEventContext;
 
 static void XConfigureImageWindow(const DisplayEventContext *context,
@@ -22293,6 +22296,81 @@ static void XHandleKeyPress(const DisplayEventContext *context,
   (*timer)=XGetDisplayTimer((*display_image));
 }
 
+static void XRecordMappedWindow(const DisplayEventContext *context,
+  const DisplayEventTargets *targets)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  XVisualInfo
+    *const icon_visual = context->icon_visual;
+
+  XStandardColormap
+    *const icon_map = context->icon_map;
+
+  XPixelInfo
+    *const icon_pixel = context->icon_pixel;
+
+  XResourceInfo
+    *const icon_resources = context->icon_resources;
+
+  Image
+    **const display_image = targets->display_image;
+
+  XEvent
+    *const event = targets->event;
+
+  if ((*event).xmap.window == windows->info.id)
+    {
+      windows->info.mapped=MagickTrue;
+      return;
+    }
+  if ((*event).xmap.window == windows->icon.id)
+    {
+      MagickBooleanType
+        taint;
+
+      /*
+        Create an icon image.
+      */
+      taint=(*display_image)->taint;
+      XMakeStandardColormap(display,icon_visual,icon_resources,
+        (*display_image),icon_map,icon_pixel,exception);
+      (void) XMakeImage(display,icon_resources,&windows->icon,
+        (*display_image),windows->icon.width,windows->icon.height,
+        exception);
+      (*display_image)->taint=taint;
+      (void) XSetWindowBackgroundPixmap(display,windows->icon.id,
+        windows->icon.pixmap);
+      (void) XClearWindow(display,windows->icon.id);
+      (void) XWithdrawWindow(display,windows->info.id,
+        windows->info.screen);
+      windows->icon.mapped=MagickTrue;
+      return;
+    }
+  if ((*event).xmap.window == windows->command.id)
+    {
+      windows->command.mapped=MagickTrue;
+      return;
+    }
+  if ((*event).xmap.window == windows->popup.id)
+    {
+      windows->popup.mapped=MagickTrue;
+      return;
+    }
+  if ((*event).xmap.window == windows->widget.id)
+    {
+      windows->widget.mapped=MagickTrue;
+      return;
+    }
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -22494,6 +22572,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   event_context.argc=argc;
   event_context.class_hints=class_hints;
   event_context.manager_hints=manager_hints;
+  event_context.icon_resources=icon_resources;
   nexus=NewImageList();
   XLogDisplayImage(resource_info,display_image);
   XMakeStandardColormap(display,visual_info,resource_info,display_image,
@@ -23011,49 +23090,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
             windows->pan.mapped=MagickTrue;
             break;
           }
-        if (event.xmap.window == windows->info.id)
-          {
-            windows->info.mapped=MagickTrue;
-            break;
-          }
-        if (event.xmap.window == windows->icon.id)
-          {
-            MagickBooleanType
-              taint;
-
-            /*
-              Create an icon image.
-            */
-            taint=display_image->taint;
-            XMakeStandardColormap(display,icon_visual,icon_resources,
-              display_image,icon_map,icon_pixel,exception);
-            (void) XMakeImage(display,icon_resources,&windows->icon,
-              display_image,windows->icon.width,windows->icon.height,
-              exception);
-            display_image->taint=taint;
-            (void) XSetWindowBackgroundPixmap(display,windows->icon.id,
-              windows->icon.pixmap);
-            (void) XClearWindow(display,windows->icon.id);
-            (void) XWithdrawWindow(display,windows->info.id,
-              windows->info.screen);
-            windows->icon.mapped=MagickTrue;
-            break;
-          }
-        if (event.xmap.window == windows->command.id)
-          {
-            windows->command.mapped=MagickTrue;
-            break;
-          }
-        if (event.xmap.window == windows->popup.id)
-          {
-            windows->popup.mapped=MagickTrue;
-            break;
-          }
-        if (event.xmap.window == windows->widget.id)
-          {
-            windows->widget.mapped=MagickTrue;
-            break;
-          }
+        XRecordMappedWindow(&event_context,&event_targets);
         break;
       }
       case MappingNotify:
