@@ -14348,6 +14348,28 @@ static void XApplyCropFlipCommands(const XMagickCommandContext *context,
   }
 }
 
+static void XApplyViewCommands(const XMagickCommandContext *context,
+  const DisplayCommand command,MagickStatusType *flags,Image **nexus)
+{
+  switch (command)
+  {
+    case ApplyCommand:
+      XApplyApplyCommand(context);
+      break;
+    case RefreshCommand:
+      XApplyRefreshCommand(context);
+      break;
+    case RestoreCommand:
+      XApplyRestoreCommand(context);
+      break;
+    default:
+    {
+      XApplyCropFlipCommands(context,command,&(*flags),&(*nexus));
+      break;
+    }
+  }
+}
+
 static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const DisplayCommand command,Image **image,
   ExceptionInfo *exception)
@@ -14445,18 +14467,9 @@ static Image *XMagickCommand(Display *display,XResourceInfo *resource_info,
     case ResizeCommand:
       XApplyResizeCommand(&context);
       break;
-    case ApplyCommand:
-      XApplyApplyCommand(&context);
-      break;
-    case RefreshCommand:
-      XApplyRefreshCommand(&context);
-      break;
-    case RestoreCommand:
-      XApplyRestoreCommand(&context);
-      break;
     default:
     {
-      XApplyCropFlipCommands(&context,command,&flags,&nexus);
+      XApplyViewCommands(&context,command,&flags,&nexus);
       break;
     }
   }
