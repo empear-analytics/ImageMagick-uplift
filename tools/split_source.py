@@ -65,15 +65,20 @@ def letter_spans(art):
     mask = "".join("x" if "".join(column).strip() else " " for column in zip(*art))
     return [m.span() for m in re.finditer(r"x+", mask)]
 
+def file_glyphs(f):
+    """(letter, rows) for each letter of F's file name that the banner at the head of F draws; [] when the banner
+    draws another number of letters."""
+    art = banner_art(f)
+    word = re.sub(r"[^A-Z]", "", f.split("/")[-1][:-2].upper())
+    segs = letter_spans(art)
+    if not art or len(segs) != len(word): return []
+    return [(ch, tuple(r[a:b] for r in art)) for ch, (a, b) in zip(word, segs)]
+
 def harvest_glyphs():
     """The 5-row banner letters, as the MagickCore file headers draw them."""
     g = collections.defaultdict(collections.Counter)
     for f in glob.glob("MagickCore/*.c"):
-        art = banner_art(f)
-        word = re.sub(r"[^A-Z]", "", f.split("/")[-1][:-2].upper())
-        segs = letter_spans(art)
-        if art and len(segs) == len(word):
-            for ch, (a, b) in zip(word, segs): g[ch][tuple(r[a:b] for r in art)] += 1
+        for ch, rows in file_glyphs(f): g[ch][rows] += 1
     return {ch: list(c.most_common(1)[0][0]) for ch, c in g.items()}
 
 def conditional_start(L, end):
@@ -120,15 +125,22 @@ def object_header_names(path):
     objects = set(re.findall(r"(?m)^(?!typedef|static|extern|return|#)(?:const\s+)?\w[\w \t\*]*?[ \t\*](\w+)\s*(?:\[[^\]]*\])?\s*=(?!=)", text))
     return objects | set(re.findall(r"(?m)^\s*#\s*define\s+(\w+)", text)) if objects else set()
 
-def macro_block_start(L, c):
-    """First line of the #define, or the #if ... #endif holding one, that ends at L[c - 1]."""
-    if L[c - 1].strip().startswith("#endif"):
-        u = conditional_start(L, c - 1)
-        block = "\n".join(L[u:c]) if u is not None else ""
-        return u if "#define" in block and "#include" not in block else None
+def conditional_macro_start(L, c):
+    """First line of the #if ... #endif that ends at L[c - 1] when it holds a #define and no #include, else None."""
+    u = conditional_start(L, c - 1)
+    block = "\n".join(L[u:c]) if u is not None else ""
+    return u if "#define" in block and "#include" not in block else None
+
+def define_start(L, c):
+    """First line of the #define (its backslash-continued lines included) that ends at L[c - 1], else None."""
     u = c - 1
     while u > 0 and L[u - 1].rstrip().endswith("\\"): u -= 1
     return u if L[u].lstrip().startswith("#define") else None
+
+def macro_block_start(L, c):
+    """First line of the #define, or the #if ... #endif holding one, that ends at L[c - 1]."""
+    if L[c - 1].strip().startswith("#endif"): return conditional_macro_start(L, c)
+    return define_start(L, c)
 
 def typedef_names(L, starts):
     """The names closing each `typedef struct [_X]` that begins at one of the lines STARTS."""
@@ -154,28 +166,30 @@ def function_pointer_typedef(L, e):
     if not re.fullmatch(r"typedef[^;{}]*\(\*\w+\)\([^;{}]*\);", text): return None
     return s, re.findall(r"\(\*(\w+)\)", text)
 
+BRACKET_DEPTH = {"(": 1, "{": 1, "[": 1, ")": -1, "}": -1, "]": -1}
+
+def literal_end(text, i):
+    """The index of the quote that closes the string or character literal opening at TEXT[i] (the end of TEXT when
+    it never closes); a backslash skips the character after it."""
+    quote = text[i]; i += 1
+    while i < len(text) and text[i] != quote: i += 2 if text[i] == "\\" else 1
+    return i
+
 def split_top_level(text):
     """TEXT cut at every comma outside braces, parentheses, brackets and string or character literals."""
     pieces = []; depth = 0; start = 0; i = 0
     while i < len(text):
         ch = text[i]
-        if ch in "\"'":
-            i += 1
-            while i < len(text) and text[i] != ch: i += 2 if text[i] == "\\" else 1
-        elif ch in "({[": depth += 1
-        elif ch in ")}]": depth -= 1
-        elif ch == "," and depth == 0: pieces.append(text[start:i]); start = i + 1
+        if ch in "\"'": i = literal_end(text, i)
+        else: depth += BRACKET_DEPTH.get(ch, 0)
+        if ch == "," and depth == 0: pieces.append(text[start:i]); start = i + 1
         i += 1
     pieces.append(text[start:])
     return pieces
 
-def static_table(L, n):
-    """(last line, names) of a file-scope `static` declaration of constant tables, variables or arrays declared from
-    L[n]: every declarator is a plain name with optional array dimensions (no function declarator), else None."""
-    if not re.match(r"^static\b[^(]*$", L[n]): return None
-    e = next((k for k in range(n, len(L)) if re.match(r"^[^{]*;\s*$|^\s*\};\s*$", L[k])), None)
-    if e is None: return None
-    full = " ".join(x.strip() for x in L[n:e + 1]).rstrip().rstrip(";")
+def plain_declarator_names(full):
+    """The names declared by the comma-separated declarators of FULL when each is a plain name with optional array
+    dimensions (no function declarator), else None."""
     names = []
     for piece in split_top_level(full):
         decl = piece.split("=")[0].strip()
@@ -183,7 +197,16 @@ def static_table(L, n):
         named = re.findall(r"(\w+)\s*(?:\[[^\]]*\])*$", decl)
         if not named: return None
         names.append(named[0])
-    return e, names
+    return names
+
+def static_table(L, n):
+    """(last line, names) of a file-scope `static` declaration of constant tables, variables or arrays declared from
+    L[n]: every declarator is a plain name with optional array dimensions (no function declarator), else None."""
+    if not re.match(r"^static\b[^(]*$", L[n]): return None
+    e = next((k for k in range(n, len(L)) if re.match(r"^[^{]*;\s*$|^\s*\};\s*$", L[k])), None)
+    if e is None: return None
+    names = plain_declarator_names(" ".join(x.strip() for x in L[n:e + 1]).rstrip().rstrip(";"))
+    return (e, names) if names is not None else None
 
 def family_only_define(lines, name):
     """The one-line `#define NAME ...` of LINES when no other line of LINES names NAME, else None."""
@@ -191,10 +214,8 @@ def family_only_define(lines, name):
     one_line = [l for l in named if re.match(r"^#define\s+%s\b.*[^\\\s]\s*$" % name, l)]
     return named[0] if named == one_line[:1] else None
 
-def family_only_multiline_defines(lines, region):
-    """(name, first line, last line) of every multi-line `#define` (backslash continuation) of LINES that REGION names
-    and that no other line of LINES names, outside the define blocks that move with it: a macro named by another
-    moving define moves with it (XGammaPixel names XRedGamma), a macro named by anything else stays, refusing."""
+def multiline_define_blocks(lines):
+    """{name: (first line, last line)} of every multi-line `#define` (backslash continuation) of LINES."""
     blocks = {}
     for k, line in enumerate(lines):
         m = re.match(r"^#define\s+(\w+)", line)
@@ -202,13 +223,19 @@ def family_only_multiline_defines(lines, region):
             e = k
             while lines[e].rstrip().endswith("\\") and e + 1 < len(lines): e += 1
             blocks[m.group(1)] = (k, e)
-    cand = {n for n in blocks if re.search(r"\b%s\b" % n, region)}
+    return blocks
+
+def grow_by_named_defines(lines, blocks, cand):
+    """Add to CAND every multi-line define of BLOCKS that the text of a define already in CAND names, until none is."""
     grown = True
-    while grown:   # a multi-line define named by a candidate's text is a candidate too
+    while grown:
         grown = False
         text = "\n".join("\n".join(lines[blocks[n][0]:blocks[n][1] + 1]) for n in cand)
         for n in blocks:
             if n not in cand and re.search(r"\b%s\b" % n, text): cand.add(n); grown = True
+
+def drop_defines_named_outside(lines, blocks, cand):
+    """Remove from CAND every define that a line outside the blocks of CAND names, until none is."""
     changed = True
     while changed:
         changed = False
@@ -216,6 +243,15 @@ def family_only_multiline_defines(lines, region):
         residue = "\n".join(l for i, l in enumerate(lines) if i not in drop)
         for n in sorted(cand):
             if re.search(r"\b%s\b" % n, residue): cand.discard(n); changed = True
+
+def family_only_multiline_defines(lines, region):
+    """(name, first line, last line) of every multi-line `#define` (backslash continuation) of LINES that REGION names
+    and that no other line of LINES names, outside the define blocks that move with it: a macro named by another
+    moving define moves with it (XGammaPixel names XRedGamma), a macro named by anything else stays, refusing."""
+    blocks = multiline_define_blocks(lines)
+    cand = {n for n in blocks if re.search(r"\b%s\b" % n, region)}
+    grow_by_named_defines(lines, blocks, cand)   # a multi-line define named by a candidate's text is a candidate too
+    drop_defines_named_outside(lines, blocks, cand)
     return sorted(((n,) + blocks[n] for n in cand), key=lambda row: row[1])
 
 def drop_empty_banner(lines, banner):
@@ -322,8 +358,22 @@ def relocate_declarations(lines, statics, macros):
 
 def note_banner(lines, n, titles):
     """Remember the title of the one-title `/* Title. */` banner standing directly above LINES[n], if any."""
-    if n >= 3 and lines[n - 3] == "/*" and lines[n - 1] == "*/" and lines[n - 2].startswith("  "):
-        titles.append(lines[n - 2].strip())
+    if n < 3: return
+    above = lines[n - 3:n]
+    if above == ["/*", above[1], "*/"] and above[1].startswith("  "): titles.append(above[1].strip())
+
+def is_function_head_next(lines, j):
+    """Whether a function definition opens within twelve lines from LINES[j]: a line `{` on its own comes before
+    any line ending in `;`."""
+    for k in range(j, min(j + 12, len(lines))):
+        if lines[k] == "{": return True
+        if lines[k].rstrip().endswith(";"): return False
+    return False
+
+def has_nothing_under(lines, j):
+    """Whether LINES[j], the first line that is not blank under a banner, ends the banner's section: the end of
+    LINES, another banner, or a function definition."""
+    return j >= len(lines) or lines[j].startswith("/*") or is_function_head_next(lines, j)
 
 def drop_banner_if_empty(lines, title):
     """Remove the first `/* title */` banner of LINES that has nothing under it: the next line that is not blank
@@ -332,12 +382,7 @@ def drop_banner_if_empty(lines, title):
         if lines[b:b + 3] != ["/*", "  " + title, "*/"]: continue
         j = b + 3
         while j < len(lines) and not lines[j].strip(): j += 1
-        empty = j >= len(lines) or lines[j].startswith("/*")
-        if not empty:
-            for k in range(j, min(j + 12, len(lines))):
-                if lines[k] == "{": empty = True; break
-                if lines[k].rstrip().endswith(";"): break
-        if empty:
+        if has_nothing_under(lines, j):
             del lines[b:j]
             return
 
