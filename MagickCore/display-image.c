@@ -24883,6 +24883,20 @@ static void XCloseDisplayWindows(const DisplayEventContext *context)
   (void) XSync(display,MagickFalse);
 }
 
+static void XChangeToHomeDirectory(XResourceInfo *resource_info,
+  ExceptionInfo *exception)
+{
+  int
+    status;
+
+  if (*resource_info->home_directory == '\0')
+    (void) CopyMagickString(resource_info->home_directory,".",MagickPathExtent);
+  status=chdir(resource_info->home_directory);
+  if (status == -1)
+    (void) ThrowMagickException(exception,GetMagickModule(),FileOpenError,
+      "UnableToOpenFile","%s",resource_info->home_directory);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -25307,17 +25321,7 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   */
   directory=getcwd(working_directory,MagickPathExtent);
   (void) directory;
-  {
-    int
-      status;
-
-    if (*resource_info->home_directory == '\0')
-      (void) CopyMagickString(resource_info->home_directory,".",MagickPathExtent);
-    status=chdir(resource_info->home_directory);
-    if (status == -1)
-      (void) ThrowMagickException(exception,GetMagickModule(),FileOpenError,
-        "UnableToOpenFile","%s",resource_info->home_directory);
-  }
+  XChangeToHomeDirectory(resource_info,exception);
   *image=display_image;
   return(nexus);
 }
