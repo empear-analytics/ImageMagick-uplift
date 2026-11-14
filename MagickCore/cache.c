@@ -2374,6 +2374,19 @@ static MagickBooleanType CloneCacheSource(CacheInfo *cache_info,
   return(status);
 }
 
+static MagickBooleanType FinishPixelCacheOpen(CacheInfo *cache_info,
+  CacheInfo *source_info,const MapMode mode,const MagickBooleanType status)
+{
+  if (status == 0)
+    {
+      if (IsCacheSourcePending(*source_info,mode) != MagickFalse)
+        RelinquishPixelCachePixels(source_info);
+      cache_info->type=UndefinedCache;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType CreateMemoryPixelCache(CacheInfo *cache_info,
   const PixelCacheOpenInfo *open_info,CacheInfo source_info,
   MagickBooleanType status)
@@ -2423,14 +2436,7 @@ static MagickBooleanType CreateMemoryPixelCache(CacheInfo *cache_info,
         message);
     }
   cache_info->storage_class=image->storage_class;
-  if (status == 0)
-    {
-      if (IsCacheSourcePending(source_info,mode) != MagickFalse)
-        RelinquishPixelCachePixels(&source_info);
-      cache_info->type=UndefinedCache;
-      return(MagickFalse);
-    }
-  return(MagickTrue);
+  return(FinishPixelCacheOpen(cache_info,&source_info,mode,status));
 }
 
 static MagickBooleanType CreateMappedPixelCache(CacheInfo *cache_info,
