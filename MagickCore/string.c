@@ -1151,6 +1151,17 @@ static char **DestroyTextList(char **textlist,const ssize_t count)
   return((char **) NULL);
 }
 
+static const char *FindTextLineEnd(const char *p)
+{
+  const char
+    *q;
+
+  for (q=p; *q != '\0'; q++)
+    if ((*q == '\r') || (*q == '\n'))
+      break;
+  return(q);
+}
+
 static char **AsciiTextList(const char *text,size_t *lines)
 {
   char
@@ -1174,9 +1185,7 @@ static char **AsciiTextList(const char *text,size_t *lines)
   p=text;
   for (i=0; i < (ssize_t) *lines; i++)
   {
-    for (q=p; *q != '\0'; q++)
-      if ((*q == '\r') || (*q == '\n'))
-        break;
+    q=FindTextLineEnd(p);
     textlist[i]=(char *) AcquireQuantumMemory((size_t) (q-p)+1,
       sizeof(**textlist));
     if (textlist[i] == (char *) NULL)
