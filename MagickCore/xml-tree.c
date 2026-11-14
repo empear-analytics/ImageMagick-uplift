@@ -3627,6 +3627,16 @@ static void AppendRootInstruction(const TagBufferInfo *tag_buffer,
       "\n<?%s%s%s?>",q,*p != '\0' ? " " : "",p);
 }
 
+static ssize_t CountInstructionFields(const XMLTreeRoot *root,
+  const ssize_t i)
+{
+  ssize_t
+    k;
+
+  for (k=2; root->processing_instructions[i][k-1]; k++) ;
+  return(k);
+}
+
 static MagickBooleanType AppendRootInstructions(const XMLTreeRoot *root,
   const char skip,const TagBufferInfo *tag_buffer)
 {
@@ -3649,7 +3659,7 @@ static MagickBooleanType AppendRootInstructions(const XMLTreeRoot *root,
     /*
       Pre-root or post-root processing instructions.
     */
-    for (k=2; root->processing_instructions[i][k-1]; k++) ;
+    k=CountInstructionFields(root,i);
     p=root->processing_instructions[i][1];
     for (j=1; p != (char *) NULL; j++)
     {
