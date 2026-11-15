@@ -20523,6 +20523,187 @@ owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
+## Recipe RI - Extract a Parallel Row Loop Filling Its Row Struct Once
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead* on a
+function whose tail is a parallel row loop whose body fills a body-declared row struct
+member by member before passing it to a row function, where most members are filled from
+values that no row changes: `composite.c`'s `CompositeImage`, whose loop body assigned
+twenty-seven members of a `CompositeRowInputs`, five of them by `IsListedOperator` scans of
+`static const` operator tables (the row flags Recipe RH introduced), for every row.
+
+**Not covered by:** Recipe N step 1 and Recipe Z step 1, which move the tail with its
+loop whole and unchanged, so the new function keeps the per-row fill, reads every filled
+variable through a new input struct that repeats the row struct member for member, and
+stays a *Large Method*; Recipe PC, whose head takes its read-only inputs in a `const`
+struct built in the body, so the head reads the same twenty variables (Recipe N step 2's
+limit of four parameters again needs a struct of all of them); Recipes FI, FB, FU and
+HF, which rewrite or hoist a fill within one block and never across a `#pragma omp`
+region's boundary; Recipe RH, which moves a label test the other way, into the per-row
+fill; Recipe RL, which shares one loop between several functions' tails.
+
+**How:**
+
+1. The tail. A block of the function that lies outside every OpenMP region and runs,
+   from its first statement, as Recipe N step 1 requires of a block holding a whole
+   parallel loop: the statements that set the region's shared variables (`status=
+   MagickTrue; progress=0;`), the cache-view acquisitions, the `#if
+   defined(MAGICKCORE_OPENMP_SUPPORT)` line, the pragma and the `#endif`, the `for`
+   loop the pragma governs, and the view releases. Every variable the region writes or a
+   clause names (`status`, `progress`, `y`, the views) is written nowhere after the
+   block, except `status`, which the block's last statement leaves for the caller's
+   `return(status);`.
+2. The fill. Inside the loop body, a struct local `row` of a typedef `S` of the file,
+   declared in the body (so private to the iteration), is filled by plain member
+   assignments `row.m=e;`, one per member of `S` (check against the typedef that every
+   member is assigned once), all in one run directly before the run's only reader, a
+   call `F(&row,...)`, and nothing else in the body names `row`. A member is *per-row*
+   when its `e` reads the loop counter or a variable the body declares (`row.y=y;`,
+   `row.pixels=pixels;`); every other member is *invariant*: its `e` reads only
+   variables that nothing in the region writes, and calls, if any, only functions that
+   read nothing but their arguments and `static const` data and write nothing, checked
+   by reading them (`IsListedOperator`).
+3. The caller's fill. Declare `S rows;` at the top of the caller. Where the block stood,
+   write the invariant assignments in their original order with `rows.` for `row.`, each
+   `e` unchanged, after any statement of the block that computes a value they read and
+   writes nothing the region shares (`midpoint=...;`, which stays in the caller), then
+   `status=Name(&rows);`. Declarations the caller no longer uses leave it (`progress`).
+4. The loop function. Directly above the caller, `static MagickBooleanType Name(const S
+   *rows)`: it binds, as `const` locals of their own names and types, the members the
+   loop's own statements read (`image`, `source_image`, `exception`), declares the
+   block's temporaries (`source_view`, `image_view`, `status`, `progress`, `y`), and
+   holds the block's statements unchanged from `status=MagickTrue;` to the last view
+   release, then `return(status);`. The pragma, its clauses and the `#if`/`#endif` lines
+   are unchanged; each name a clause holds is a local of the function.
+5. The row head. The loop body, from its first statement to the call `F(&row,...)` and
+   the sync that follows it, becomes Recipe PC's head: `static MagickBooleanType
+   NameHead(const H *head,MagickBooleanType *status)`, where `H` is a typedef declared
+   directly above it whose members are `const S *rows`, the views and `y`, filled in the
+   body as `const H head = { rows, source_view, image_view, y };`. The head binds what it
+   reads (Recipe N step 4, members of `*rows` read as `rows->m` or bound), each
+   `continue` becomes `return(MagickFalse);` and each `status` is `(*status)` (Recipe PC
+   steps 2 and 3); the run of step 2 becomes `row=(*rows);` followed by the per-row
+   assignments in their original order. The body keeps `if (NameHead(&head,&status) ==
+   MagickFalse) continue;` and the progress tail unchanged.
+6. The write set, read by hand and quoted in the commit (the owner's OpenMP ruling of
+   2026-11-15): the region writes `status` (shared, plain stores of `MagickFalse` as
+   before, now through the head's pointer), `progress` (shared, the same `omp atomic`),
+   `y` (the loop counter) and the body's and head's locals (private); `*rows` is read and
+   never written inside the region. No pragma line, clause or `critical` name changes.
+7. Time a case that reaches the region, base against candidate, several runs each, at
+   one thread and at four, and quote the medians: the per-row work is now one struct copy
+   and two stores where it was the whole fill and the invariant calls, plus one call of
+   the head; a slowdown beyond noise means the step is not taken.
+
+**Before:**
+
+```c
+  status=MagickTrue;
+  progress=0;
+  midpoint=((MagickRealType) QuantumRange+1.0)/2;
+  source_view=AcquireVirtualCacheView(source_image,exception);
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(source_image,image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    ...
+    if (SkipOverRow(&source,&status) == MagickFalse)
+      continue;
+    ...
+    row.image=image;
+    row.source_image=source_image;
+    row.compose=compose;
+    row.union_coverage=IsListedOperator(UnionCoverageOperators,
+      sizeof(UnionCoverageOperators)/sizeof(*UnionCoverageOperators),compose);
+    ...
+    row.y=y;
+    row.exception=exception;
+    row.pixels=pixels;
+    ...
+    row.geometry_info=geometry_info;
+    CompositeImageRow(&row,p,q);
+    SyncCompositeRow(image_view,exception,&status);
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      ...
+  }
+  source_view=DestroyCacheView(source_view);
+  image_view=DestroyCacheView(image_view);
+```
+
+**After:**
+
+```c
+  midpoint=((MagickRealType) QuantumRange+1.0)/2;
+  rows.image=image;
+  rows.source_image=source_image;
+  rows.compose=compose;
+  rows.union_coverage=IsListedOperator(UnionCoverageOperators,
+    sizeof(UnionCoverageOperators)/sizeof(*UnionCoverageOperators),compose);
+  ...
+  rows.geometry_info=geometry_info;
+  status=CompositeImageRows(&rows);
+```
+
+with `CompositeImageRows` holding the acquisitions, the unchanged pragma and loop, whose
+body is
+
+```c
+    const CompositeRowHead
+      head = { rows, source_view, image_view, y };
+
+    if (CompositeImageRowHead(&head,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      ...
+```
+
+and `CompositeImageRowHead` ending in `row=(*rows); row.y=y; row.pixels=pixels;
+CompositeImageRow(&row,p,q); SyncCompositeRow(image_view,exception,status);`.
+
+**Careful:**
+
+- Why the values are the same. Each invariant `e` reads variables that nothing in the
+  region writes, and nothing between the old position of the block and the new fill
+  writes them either (the fill stands where the block began), so `e` has the same value
+  before the loop as in every row; its calls read only their arguments and constant
+  tables, so evaluating them once gives what each row's evaluation gave. `row=(*rows);`
+  then copies those values into the private `row`, and the per-row assignments that
+  follow set the others as before, so `F` receives a struct with the same value in
+  every member. The copy also copies the per-row members of `rows`, which nothing set:
+  a struct object is never a trap representation (C11 6.2.6.1p6) and both are
+  overwritten before any read.
+- Calls that ran once per row now run once, also when the image has no rows or every
+  row is skipped. That is why step 2 admits only calls with no side effect: a call that
+  allocates, logs, throws or reads mutable state is not invariant.
+- Order of effects. The block's statements keep their order inside the loop function;
+  the fill moved before `status=MagickTrue; progress=0;` and the acquisitions, which it
+  neither reads nor affects, and the acquisitions still precede the loop.
+- OpenMP. `rows` lives in the caller's frame for the whole call, so every thread reads
+  a live object; nobody writes it after the fill, so the shared reads race with nothing.
+  Every write of the region keeps the protection it had (step 6). The oracle runs one
+  thread: `tools/omp_compare.sh` at one and four threads on cases that reach the region
+  is the check for the parallel build.
+- The head's exits are the body's `continue` statements, each preceded by the same
+  writes (`(*status)=MagickFalse` where the body set `status`), as Recipe PC argues.
+
+**Evidence level:** oracle (the cases that reach the loop; quote line coverage of the
+skip, fetch-failure and progress paths, which may run in no case, in which case write
+`Verified: guard` and say which), plus `tools/omp_compare.sh` at one and four threads on
+cases that reach the region, the step 6 reading and the step 7 timing in the message.
+
+**Provenance:** 2026-11-15, from `composite.c`'s `CompositeImage` (campaign A, W29 round
+eighteen lane a): the row flags of Recipe RH, held since W19c as an owner question
+because they sat inside the parallel body, and the twenty other invariant members of
+the row fill. Moved whole under Recipe N step 1, the loop function was a *Large Method*;
+without the head it was a *Complex Method* (cc 9); with both, the file rose from 4.24 to
+4.33 in a probe with no new finding. Added by Claude Code (Claude Opus 5.5) under the
+owner's OK of 2026-11-10 to evolve the recipes and the OpenMP ruling of 2026-11-15.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -20960,3 +21141,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-15 | AMEND | N | Step 8, the function-body siblings form (a later block holding an earlier sibling's call takes its `const Name *name`): a statement of the later block before the call may write a member's variable when every path through the write returns before the call (the later block binds that member read-then-written), and a variable the later block only reads that is not a member goes by value as a parameter after `name` (Recipe E step 3), at most four parameters | `feature-texture.c`'s `GetImageFeatures` (campaign A, W26 round fifteen lane c): its tail (the buffers check, the row allocation, the matrix fill and their exits, the normalisation, the call of the direction passes' function, the release) holds the call of the function that takes `FeatureAnalysis`; its exits write `channel_features`, a member, and return, and it reads `distance`, `exception` and `grays`, which the direction passes do not. A probe of the chain: every function under 70 lines, 8.72 to 9.38. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
 | 2026-11-15 | AMEND | Y | Step 7: another block of the file whose text equals, under Recipe D's renaming (checked by script; `diff` of the line ranges for verbatim copies), the block a Recipe Y function was cut from calls that function instead of a second copy, in the same caller or another, with its own struct fill, written variable, temporaries and exit, steps 1 to 6 checked for the copy; one commit per caller. *Careful* gives the argument (Recipe V step 6, W step 7, LB step 6 and I step 7 make it for their forms) | `accelerate.c`'s `ComputeDespeckleImage` (campaign A, W27 round sixteen lane a): four verbatim copies of the hull-pass launch pair, each leaving through `goto cleanup;`; a second function of the same text would be a duplicate, and Recipe D may not leave the caller. Probe (stub procedure, other 18 Complex/Large functions emptied): 7.58 to 7.62 for the first copy, 7.75 with all four | owner |
 | 2026-11-15 | AMEND | WP | Step 8, *a wrapper no code calls*: a wrapper that meets steps 1 and 2 and that nothing calls (`git grep` finds only its definition and its declaration in a header listed under `MAGICKCORE_NOINST_HDRS`; `MagickPrivate`, hidden visibility; `casemap.py` 0 cases for wrapper and worker) may be converted at guard level when `obj_modulo.sh <file> <Wrapper> <Worker>` prints `IDENTICAL` or `MODULO-IDENTICAL`, `refactor_guard.py` drops only the wrapper's removed literals (`WARN`, every value present), `--calls` moves only the wrapper's removed calls and the prologue, and step 7's compile checks pass. A *Careful* bullet gives the argument (the transformation's argument rests on steps 1 and 2, read; nothing executes the wrapper or its `static` worker, and every other function compiles to the same instructions) | `accelerate.c`'s `AccelerateContrastStretchImage` (campaign A, W28 round seventeen lane a): no caller in the tree, a clone of `AccelerateGrayscaleImage`; a probe with it converted lists no *Code Duplication*, 3.24 to 3.49. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
+| 2026-11-15 | NEW | RI | Extract a Parallel Row Loop Filling Its Row Struct Once: a tail holding a parallel row loop whose body fills a private row struct member by member moves into `static MagickBooleanType Name(const S *rows)`; the invariant members (values nothing in the region writes, calls without side effects) are filled once by the caller in their order, the body copies `row=(*rows);` and sets the per-row members, and the body up to the row call and sync becomes a Recipe PC head; write set read by hand, omp_compare at one and four threads, timing | `composite.c`'s `CompositeImage` (W29 lane a): probe 4.24 to 4.33, no new finding | owner |
