@@ -5590,6 +5590,120 @@ static MagickBooleanType IsSourceInsideCanvas(const Image *image,
   return(MagickTrue);
 }
 
+typedef struct _CompositeRowHead
+{
+  const CompositeRowInputs
+    *rows;
+
+  CacheView
+    *source_view,
+    *image_view;
+
+  ssize_t
+    y;
+} CompositeRowHead;
+
+static MagickBooleanType CompositeImageRowHead(const CompositeRowHead *head,
+  MagickBooleanType *status)
+{
+  const CompositeRowInputs
+    *const rows = head->rows;
+
+  CacheView
+    *const image_view = head->image_view;
+
+  const ssize_t
+    y = head->y;
+
+  Image
+    *const image = rows->image;
+
+  ExceptionInfo
+    *const exception = rows->exception;
+
+  const Quantum
+    *magick_restrict p,
+    *pixels;
+
+  Quantum
+    *magick_restrict q;
+
+  CompositeRowInputs
+    row;
+
+  const OverSourceRow
+    source = { head->source_view, rows->source_image, rows->clip_to_self,
+      rows->x_offset, rows->y_offset, y, exception };
+
+  if (SkipOverRow(&source,status) == MagickFalse)
+    return(MagickFalse);
+  if (FetchOverSourceRow(&source,&pixels,&p,status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  row=(*rows);
+  row.y=y;
+  row.pixels=pixels;
+  CompositeImageRow(&row,p,q);
+  SyncCompositeRow(image_view,exception,status);
+  return(MagickTrue);
+}
+
+static MagickBooleanType CompositeImageRows(const CompositeRowInputs *rows)
+{
+  Image
+    *const image = rows->image,
+    *const source_image = rows->source_image;
+
+  ExceptionInfo
+    *const exception = rows->exception;
+
+  CacheView
+    *source_view,
+    *image_view;
+
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  ssize_t
+    y;
+
+  status=MagickTrue;
+  progress=0;
+  source_view=AcquireVirtualCacheView(source_image,exception);
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(source_image,image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const CompositeRowHead
+      head = { rows, source_view, image_view, y };
+
+    if (CompositeImageRowHead(&head,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetCompositeProgress(image,CompositeImageTag,progress,&status);
+      }
+  }
+  source_view=DestroyCacheView(source_view);
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -5603,6 +5717,9 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
 
   ColorspaceType
     colorspace = HCLColorspace;
+
+  CompositeRowInputs
+    rows;
 
   CompositeSetup
     setup;
@@ -5627,9 +5744,6 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     clamp,
     compose_sync,
     status;
-
-  MagickOffsetType
-    progress;
 
   MagickRealType
     amount,
@@ -5886,86 +6000,38 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
   /*
     Composite image.
   */
-  status=MagickTrue;
-  progress=0;
   midpoint=((MagickRealType) QuantumRange+1.0)/2;
-  source_view=AcquireVirtualCacheView(source_image,exception);
-  image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(source_image,image,image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p,
-      *pixels;
-
-    Quantum
-      *magick_restrict q;
-
-    CompositeRowInputs
-      row;
-
-    const OverSourceRow
-      source = { source_view, source_image, clip_to_self, x_offset, y_offset,
-        y, exception };
-
-    if (SkipOverRow(&source,&status) == MagickFalse)
-      continue;
-    if (FetchOverSourceRow(&source,&pixels,&p,&status) == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    row.image=image;
-    row.source_image=source_image;
-    row.compose=compose;
-    row.union_coverage=IsListedOperator(UnionCoverageOperators,
-      sizeof(UnionCoverageOperators)/sizeof(*UnionCoverageOperators),compose);
-    row.canvas_alpha=IsListedOperator(CanvasAlphaOperators,
-      sizeof(CanvasAlphaOperators)/sizeof(*CanvasAlphaOperators),compose);
-    row.source_alpha=IsListedOperator(SourceAlphaOperators,
-      sizeof(SourceAlphaOperators)/sizeof(*SourceAlphaOperators),compose);
-    row.pixel_info_inputs=IsListedOperator(PixelInfoInputOperators,
-      sizeof(PixelInfoInputOperators)/sizeof(*PixelInfoInputOperators),compose);
-    row.intensity_inputs=IsListedOperator(IntensityInputOperators,
-      sizeof(IntensityInputOperators)/sizeof(*IntensityInputOperators),compose);
-    row.clip_to_self=clip_to_self;
-    row.x_offset=x_offset;
-    row.y_offset=y_offset;
-    row.y=y;
-    row.exception=exception;
-    row.pixels=pixels;
-    row.amount=amount;
-    row.canvas_dissolve=canvas_dissolve;
-    row.midpoint=midpoint;
-    row.percent_luma=percent_luma;
-    row.percent_chroma=percent_chroma;
-    row.source_dissolve=source_dissolve;
-    row.threshold=threshold;
-    row.clamp=clamp;
-    row.compose_sync=compose_sync;
-    row.colorspace=colorspace;
-    row.white_luminance=white_luminance;
-    row.illuminant=illuminant;
-    row.geometry_info=geometry_info;
-    CompositeImageRow(&row,p,q);
-    SyncCompositeRow(image_view,exception,&status);
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetCompositeProgress(image,CompositeImageTag,progress,&status);
-      }
-  }
-  source_view=DestroyCacheView(source_view);
-  image_view=DestroyCacheView(image_view);
+  rows.image=image;
+  rows.source_image=source_image;
+  rows.compose=compose;
+  rows.union_coverage=IsListedOperator(UnionCoverageOperators,
+    sizeof(UnionCoverageOperators)/sizeof(*UnionCoverageOperators),compose);
+  rows.canvas_alpha=IsListedOperator(CanvasAlphaOperators,
+    sizeof(CanvasAlphaOperators)/sizeof(*CanvasAlphaOperators),compose);
+  rows.source_alpha=IsListedOperator(SourceAlphaOperators,
+    sizeof(SourceAlphaOperators)/sizeof(*SourceAlphaOperators),compose);
+  rows.pixel_info_inputs=IsListedOperator(PixelInfoInputOperators,
+    sizeof(PixelInfoInputOperators)/sizeof(*PixelInfoInputOperators),compose);
+  rows.intensity_inputs=IsListedOperator(IntensityInputOperators,
+    sizeof(IntensityInputOperators)/sizeof(*IntensityInputOperators),compose);
+  rows.clip_to_self=clip_to_self;
+  rows.x_offset=x_offset;
+  rows.y_offset=y_offset;
+  rows.exception=exception;
+  rows.amount=amount;
+  rows.canvas_dissolve=canvas_dissolve;
+  rows.midpoint=midpoint;
+  rows.percent_luma=percent_luma;
+  rows.percent_chroma=percent_chroma;
+  rows.source_dissolve=source_dissolve;
+  rows.threshold=threshold;
+  rows.clamp=clamp;
+  rows.compose_sync=compose_sync;
+  rows.colorspace=colorspace;
+  rows.white_luminance=white_luminance;
+  rows.illuminant=illuminant;
+  rows.geometry_info=geometry_info;
+  status=CompositeImageRows(&rows);
   if (canvas_image != (Image * ) NULL)
     canvas_image=DestroyImage(canvas_image);
   else
