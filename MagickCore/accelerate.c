@@ -2639,6 +2639,20 @@ cleanup:
   return(outputReady);
 }
 
+static MagickBooleanType HasGrayscaleInputChannels(const Image *image)
+{
+  if (image->number_channels < 3)
+    return(MagickFalse);
+
+  if (GetPixelRedTraits(image) == UndefinedPixelTrait)
+    return(MagickFalse);
+  if (GetPixelGreenTraits(image) == UndefinedPixelTrait)
+    return(MagickFalse);
+  if (GetPixelBlueTraits(image) == UndefinedPixelTrait)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickPrivate MagickBooleanType AccelerateGrayscaleImage(Image* image,
   const PixelIntensityMethod method,ExceptionInfo *exception)
 {
@@ -2657,14 +2671,7 @@ MagickPrivate MagickBooleanType AccelerateGrayscaleImage(Image* image,
       (checkPixelIntensity(image,method) == MagickFalse))
     return(MagickFalse);
 
-  if (image->number_channels < 3)
-    return(MagickFalse);
-
-  if (GetPixelRedTraits(image) == UndefinedPixelTrait)
-    return(MagickFalse);
-  if (GetPixelGreenTraits(image) == UndefinedPixelTrait)
-    return(MagickFalse);
-  if (GetPixelBlueTraits(image) == UndefinedPixelTrait)
+  if (HasGrayscaleInputChannels(image) == MagickFalse)
     return(MagickFalse);
 
   clEnv=getOpenCLEnvironment(exception);
