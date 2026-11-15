@@ -20697,9 +20697,10 @@ cases that reach the region, the step 6 reading and the step 7 timing in the mes
 **Provenance:** 2026-11-15, from `composite.c`'s `CompositeImage` (campaign A, W29 round
 eighteen lane a): the row flags of Recipe RH, held since W19c as an owner question
 because they sat inside the parallel body, and the twenty other invariant members of
-the row fill. Moved whole under Recipe N step 1, the loop function was a *Large Method*;
-without the head it was a *Complex Method* (cc 9); with both, the file rose from 4.24 to
-4.33 in a probe with no new finding. Added by Claude Code (Claude Opus 5.5) under the
+the row fill. Moved whole under Recipe N step 1, the loop function would keep the
+twenty-seven-line fill and a binding per member (that form was not probed); with the fill
+hoisted but without the head it was a *Complex Method* (cc 9, probed); with both, the
+file rose from 4.24 to 4.33 in a probe with no new finding. Added by Claude Code (Claude Opus 5.5) under the
 owner's OK of 2026-11-10 to evolve the recipes and the OpenMP ruling of 2026-11-15.
 
 ---
@@ -20718,7 +20719,7 @@ the same pragma and clauses, the same fetch, sync, progress and release, differi
 **Not covered by:** Recipe E, N and Z step 1, which move the loop whole: the new function
 is the existing function's twin, and CodeScene reports *Code Duplication* (W15: 3.46 to
 3.21); Recipe MT, whose copies hold no `#pragma` line and may differ by a statement in one
-copy only only outside a parallel region; Recipe CF, whose callees must have one type
+copy only outside a parallel region; Recipe CF, whose callees must have one type
 (the two row calls take different parameters) and which passes a function pointer;
 Recipe RL, which builds a shared loop for several functions' tails; Recipe D, whose
 copies differ in variables or one value.
