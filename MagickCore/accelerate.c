@@ -4393,14 +4393,10 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
 
 cleanup:
 
-  if (imageBuffer != (cl_mem) NULL)
-    ReleaseOpenCLMemObject(imageBuffer);
-  if (filteredImageBuffer != (cl_mem) NULL)
-    ReleaseOpenCLMemObject(filteredImageBuffer);
-  if (tempImageBuffer != (cl_mem) NULL)
-    ReleaseOpenCLMemObject(tempImageBuffer);
-  if (cubicCoefficientsBuffer != (cl_mem) NULL)
-    ReleaseOpenCLMemObject(cubicCoefficientsBuffer);
+  ReleaseOpenCLBuffer(imageBuffer);
+  ReleaseOpenCLBuffer(filteredImageBuffer);
+  ReleaseOpenCLBuffer(tempImageBuffer);
+  ReleaseOpenCLBuffer(cubicCoefficientsBuffer);
   if (queue != (cl_command_queue) NULL)
     ReleaseOpenCLCommandQueue(device,queue);
   if (device != (MagickCLDevice) NULL)
