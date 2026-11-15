@@ -4396,10 +4396,7 @@ cleanup:
   ReleaseOpenCLBuffer(filteredImageBuffer);
   ReleaseOpenCLBuffer(tempImageBuffer);
   ReleaseOpenCLBuffer(cubicCoefficientsBuffer);
-  if (queue != (cl_command_queue) NULL)
-    ReleaseOpenCLCommandQueue(device,queue);
-  if (device != (MagickCLDevice) NULL)
-    ReleaseOpenCLDevice(device);
+  ReleaseAccelerateQueue(device,queue);
   if ((outputReady == MagickFalse) && (filteredImage != (Image *) NULL))
     filteredImage=DestroyImage(filteredImage);
 
