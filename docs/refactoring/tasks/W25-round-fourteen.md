@@ -38,3 +38,33 @@ Gate on the merged tree: whole catalogue 15,955 cases, 0 diverged; wide catalogu
 `-DNDEBUG` scan names nothing in `feature-texture.c`. Sweep (`codehealth_sweep.py --only
 MagickCore/`, Linux cs-mcp): MagickCore mean 9.13 over 198 files; campaign A 98 files, mean 9.35
 (9.34 before), 49 at 10.0; `feature-texture.c` 8.72 -> 9.38.
+
+## Round sixteen (2026-11-15): accelerate.c chain, three lanes (branch campaign/W27, NOT in PR #118)
+
+Three Opus lanes (a: ContrastStretch, Equalize, Despeckle; b: MotionBlur, LocalContrast, Modulate,
+Grayscale; c: unsharp-mask workers, resize filters, checkAccelerateCondition, leftovers), 56
+commits, merged without a source conflict (the playbook rows merged automatically). Gate on the
+merged tree: whole catalogue 15,955 cases and wide catalogue 14,200 cases, 0 diverged;
+`ci_linux_warnings.sh --campaign-a` OK on 98 files; the `-DNDEBUG` scan names nothing new;
+`playbook_lint` 0 problems (150 recipes, 429 change rows).
+
+`accelerate.c` real score 3.71 -> **3.24** on the merged tree. Complex Method 19 -> 13 functions,
+Large Method 15 -> 14. Two findings appeared: Number of Functions in a Single Module (113
+functions) and Code Duplication in six functions (the lanes' helper twins `CreateHistogramBuffer`,
+`CreateEqualizeMapBuffer`, `AcquireLocalContrastResources`, `AcquireModulateResources` and the
+wrappers `AccelerateContrastStretchImage`, `AccelerateGrayscaleImage`). Lane c alone fell 3.71 ->
+3.58 (`36d6893ce`, committed `--no-verify`, disclosed). The branch is therefore kept apart from
+draft PR #118 until the owner decides how to go on: unifying the twins (Recipe D) and then either
+a split of the workers into a second file (Recipe S, which would also clear Number of Functions)
+or more decomposition of the 13 remaining Complex functions. The stubbed ceiling (all 19 emptied)
+is now 9.09, down from 9.68.
+
+Reviewer notes: lane a `f0e2ba33b` writes `refactor_guard PASS` where the literal check printed WARN
+(three copies of two launches: every literal x6, benign); lane a's Recipe Y step 7 amendment
+(`be5bee9fd`) does not require equal variable types in the other copies; lane c `b23ac4538` is
+`Verified: guard` while `targets_fill_check.py` prints FAIL (one-caller assumption), and two
+trace-block moves sit after an early return test (2026-11-13 ruling reads "opening block");
+lane c's tools commits `70243b078`, `ae4a138dd` extend `targets_fill_check.py` and `reuse_check.py`
+with tests; lane b rests the `&imageBuffer` argument to `clSetKernelArg` on the OpenCL spec; the
+stub script `~/sp_w23a/stub.py` lives outside the repository. A reviewer's `/tmp` wipe made one
+command run in the Windows checkout on main (`git reset --hard HEAD`; no tracked change existed).
