@@ -20306,6 +20306,146 @@ recipes.
 
 ---
 
+## Recipe SZ - Sink a Run of Zeroing Writes to Their First Reader
+
+**Use when:** CodeScene reports *Large Method* (or *Bumpy Road Ahead* or *Complex
+Method*) and the block that an extraction would move first reads objects that a run of
+zeroing writes higher up the same function set (`(void) memset(&v,0,sizeof(v));`),
+separated from the block by statements that never touch those objects (allocations,
+their failure exits, other passes). Moved alone, the block would carry each zeroed
+local as an input and the caller would keep its declaration and its write; with the run
+sunk to directly above the block, the run and the block are adjacent siblings that one
+extraction takes together, and each zeroed local becomes a temporary the new function
+declares (Recipe E step 4: written before it is read on every path, read by nothing
+after). `GetImageFeatures`'s nine statistics (`correlation`, `mean`, `sum_squares`,
+`entropy_x` ... `variance`) and the zeroing of its `density_x`, `density_xy`,
+`density_y` and `sum` buffers stand before the row allocation, the matrix fill and the
+normalisation, two exits apart from the direction passes, their only reader.
+
+**Not covered by:** Recipe E step 4 and Recipe N step 2, which declare a temporary in
+the new function only when the *block* writes it before reading it; here the write
+stands outside the block, statements away. Recipes FI, FB, FU and HF, which rewrite or
+rewrite or hoist a struct *fill* (assignments of values to members); a zeroing call is
+not a fill. Recipes HT and HE, which hoist an exit test above a selection; neither moves
+a write down past other statements. Recipe IX, which inlines a constant local.
+
+**How:**
+
+1. The run is one or more consecutive expression statements of one compound statement,
+   each of them either `(void) memset(&v,0,sizeof(v));` for a plain automatic local `v`
+   of the function (not `static`, not `volatile`, not an array parameter), or `(void)
+   memset(p,0,n);` where `p` is a pointer local that holds a heap block the function
+   itself allocated, or a call of a `static void` function of the file whose body is
+   nothing but such `memset(p,0,n)` calls on its pointer parameters (checked by reading
+   it: `ZeroFeatureDensities`). Every operand of `n` and every argument is a local or
+   parameter, read and not written, with no call, increment or assignment in it.
+2. The target `T` is a later statement of the same compound statement, the first one
+   after the run that reads any object the run writes. The statements between the run
+   and `T` (the *crossed* statements, exits included) satisfy, checked by reading each
+   one and every callee it reaches: (a) none names a zeroed local `v` in any form (no
+   `v`, no `&v`, no `sizeof(v)`); (b) none writes a pointer `p` of the run or an operand
+   of an `n`; (c) none reads or writes a byte of a zeroed heap block: `p`, or a struct
+   holding `p` (a `FeatureBuffers` filled from it), reaches a crossed statement only as
+   an argument of a release (`RelinquishMagickMemory`, or a `static` function whose
+   body only releases, checked by reading it) on a path that then leaves the function,
+   and every other callee receives no pointer to the block or to `p`; (d) no crossed
+   statement is or holds a `#pragma`, a preprocessor line, a label or a `goto`.
+3. Cut the run and paste it, its statements unchanged and in the same order, directly
+   above `T`, at `T`'s indentation. `T` stands in the same compound statement as the
+   run stood, so the run is entered once on every path that reaches `T`, and neither
+   enters nor leaves a loop.
+4. Nothing else changes: no declaration moves (a later extraction moves them), no
+   comment moves with the run unless it stood inside it.
+5. Rule 2: the step alone leaves the function's length and the file's score where they
+   were. Take it only as the first step of a probed plan whose extraction of the run
+   and `T` follows, and say so in the message, naming the plan.
+
+**Before:**
+
+```c
+  (void) memset(&correlation,0,sizeof(correlation));
+  ZeroFeatureDensities(density_x,density_xy,density_y,number_grays);
+  (void) memset(&mean,0,sizeof(mean));
+  (void) memset(sum,0,number_grays*sizeof(*sum));
+  ...
+  (void) memset(&variance,0,sizeof(variance));
+  i=AcquireFeatureRows(cooccurrence,Q,number_grays);
+  if (i < (ssize_t) number_grays)
+    {
+      ...
+      RelinquishAcquiredFeatureBuffers(&buffers);
+      ...
+      return(channel_features);
+    }
+  ...
+  NormalizeFeatureCooccurrence(image,distance,cooccurrence,number_grays);
+  {
+    const TextureFeatureState
+      inputs = { image, channel_features, cooccurrence, density_x,
+        ...
+```
+
+**After:**
+
+```c
+  i=AcquireFeatureRows(cooccurrence,Q,number_grays);
+  if (i < (ssize_t) number_grays)
+    {
+      ...
+    }
+  ...
+  NormalizeFeatureCooccurrence(image,distance,cooccurrence,number_grays);
+  (void) memset(&correlation,0,sizeof(correlation));
+  ZeroFeatureDensities(density_x,density_xy,density_y,number_grays);
+  (void) memset(&mean,0,sizeof(mean));
+  (void) memset(sum,0,number_grays*sizeof(*sum));
+  ...
+  (void) memset(&variance,0,sizeof(variance));
+  {
+    const TextureFeatureState
+      inputs = { image, channel_features, cooccurrence, density_x,
+        ...
+```
+
+**Careful:**
+
+- Why the behaviour is the same. A zeroing write has no effect but the bytes it
+  stores: `memset` cannot fail, returns its first argument (discarded) and reads
+  nothing. On every path that reaches `T`, the crossed statements neither read nor
+  write a zeroed object (step 2 (a) and (c)), nor change where it is or how many bytes
+  the run covers (step 2 (b)), so each object holds the same bytes when `T` begins
+  whether the run ran before or after them, and `T` and everything after it read the
+  same values. On a path that leaves between the run and `T`, the zeroed bytes were
+  never read before: a local's lifetime ends at the `return`, and a heap block is
+  released unread or left unreached (the bytes of a block no pointer reaches are
+  observable by nothing). The writes among themselves keep their order, and they touch
+  distinct objects (distinct locals; distinct allocations).
+- A crossed callee is read, not trusted: a callee that receives a struct holding `p`
+  might read through it. Only a release qualifies (`free` reads no content).
+- The run may not cross a parallel region (step 2 (d)): the argument above is about one
+  thread's order of accesses. A callee holding a region is fine when it receives no
+  pointer to a zeroed object.
+- The oracle runs every path that reaches `T`; the exits that the run no longer
+  precedes are the allocation failures, which no case runs, and step 2 (c)'s reading
+  is their evidence. Quote it in the message.
+- Not a deletion: every write still happens, on every path that reads it, once.
+
+**Evidence level:** oracle (the cases that reach `T`; line coverage must show the run
+and `T` executed), with step 2's reading quoted in the commit message;
+`refactor_guard.py` and `--calls` see no change.
+
+**Provenance:** 2026-11-15, from `feature-texture.c`'s `GetImageFeatures` (campaign A, W26
+round fifteen lane c): a probe of round fourteen extracted the direction passes and the
+tail, but the tail carried the nine statistics' declarations and zeroing and stayed a
+*Large Method* (71 lines), the file 9.01. With the twelve zeroing statements sunk to the
+direction passes, one extraction takes them with their declarations, the tail shares
+that extraction's input struct, and a probe of the chain (sink, Recipe N, Recipe FB,
+Recipe N step 8) left every function under 70 lines and the file at 9.38, the score
+with `GetImageFeatures` stubbed. Added by Claude Code (Claude Opus 5.5) under the
+owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -20738,3 +20878,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | AMEND | N | Step 8, the shared-struct form (a struct the caller already fills for another `static` function serving a later block): the block may also read up to three variables that are not members, which it only reads, each a by-value parameter of its exact type after `name` (Recipe E step 3), at most four parameters in all; the members' condition stands. The step gives the argument (each parameter holds the value its variable has at the call, never written by the block) | `feature-texture.c`'s `GetImageFeatures` (campaign A, W23 round thirteen lane d): the closing release of the six buffers (`sum`, `Q`, `density_y`, `density_xy`, `density_x`, `cooccurrence`) reads the six members of the `FeatureBuffers buffers` filled for `IsFeatureMemoryMissing` and `number_grays` for the two `DestroyFeatureMatrix` calls; a struct of its own would repeat the typedef and a six-line fill. A probe 8.70 to 8.72, `GetImageFeatures` 134 to 129 lines, no finding on the new function. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
 | 2026-11-14 | AMEND | S | Step 2 (*Careful*): a struct both parts name, one definition `struct TAG` / `{` ... `};` with no preprocessor line that a header completes into a type name, is defined again, verbatim, in the new file's *Typedef declarations* block (`split_source.py --copy-struct TAG`, committed with six tests in `41a035502`), the original keeping its definition. The step gives the argument (each translation unit holds the one definition; the two are compatible types by C11 6.2.7; layout follows from the same members) and the *Careful* bullet names the drift risk; the object comparison is the check. Enumerations, typedef'd structs and function-pointer typedefs stay refused | `threshold.c` (campaign A, W25 round fourteen lane a): `struct _ThresholdMap` is named by `OrderedDitherImage` and its helpers (the nine-root family of 63 functions) and by `GetThresholdMap`, `DestroyThresholdMap` and their statics (the roots that stay); `split_source.py` refused every split ("type ThresholdMap defined outside the region and used in it") and no other closed root set lifts Lines of Code from the kept file: the one with the maps out leaves 9.09 and the one with the nine roots out scores 10.0 for the kept file, 9.09 for the new one (the original's own score). Added by Claude Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
 | 2026-11-14 | NEW | DG | a `switch` of returning groups, a `break;`-only label group `N` and the `default:` group `D` (whose other labels may stand in an `#if 0` branch with `default:` alone in its `#else`) keeps its returning groups and `default: break;`; after it, `if (<Name>(e) != MagickFalse)` runs `D`'s body without its `break;`. The predicate returns `MagickFalse` for the kept groups' and `N`'s labels and `MagickTrue` for `D`'s label lines, moved verbatim with the `#if 0` lines. *Careful* gives the argument (one more read of `e`, no write; the never-compiled configuration checks the same label set). Not an LP amendment: LP has eight steps already | `morphology-apply.c`'s `AcquireKernelBuiltIn` (campaign A, W25 lane c): the twenty `#if 0` labels of the default group keep any function holding the group a *Complex Method*; LP needs `default: break;` and no `#` line, PL and PT need groups that leave. Measured 7.39 to 7.41, the predicate a label run (cc 40) | owner |
+| 2026-11-15 | NEW | SZ | a run of zeroing writes (`memset(&v,0,sizeof(v))` of plain locals, `memset(p,0,n)` of heap blocks the function allocated, or a `static void` helper made of such calls) moves, unchanged and in order, to directly above the first later statement of the same compound statement that reads a zeroed object, when the crossed statements name no zeroed local, write no pointer or size operand, and reach a zeroed block only through a release on a path that leaves; flat alone, taken only as the first step of a probed extraction | `feature-texture.c`'s `GetImageFeatures` (campaign A, W26 round fifteen lane c): the nine statistics and four buffers zeroed before the row allocation, the matrix fill and the normalisation, read first by the direction passes; a probe of the chain sink, N, FB, N step 8: every function under 70 lines, 8.72 to 9.38. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
