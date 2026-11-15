@@ -4619,16 +4619,11 @@ static Image* ComputeRotationalBlurImage(const Image *image,MagickCLEnv clEnv,
 
 cleanup:
 
-  if (imageBuffer != (cl_mem) NULL)
-    ReleaseOpenCLMemObject(imageBuffer);
-  if (filteredImageBuffer != (cl_mem) NULL)
-    ReleaseOpenCLMemObject(filteredImageBuffer);
-  if (sinThetaBuffer != (cl_mem) NULL)
-    ReleaseOpenCLMemObject(sinThetaBuffer);
-  if (cosThetaBuffer != (cl_mem) NULL)
-    ReleaseOpenCLMemObject(cosThetaBuffer);
-  if (rotationalBlurKernel != (cl_kernel) NULL)
-    ReleaseOpenCLKernel(rotationalBlurKernel);
+  ReleaseOpenCLBuffer(imageBuffer);
+  ReleaseOpenCLBuffer(filteredImageBuffer);
+  ReleaseOpenCLBuffer(sinThetaBuffer);
+  ReleaseOpenCLBuffer(cosThetaBuffer);
+  ReleaseKernel(rotationalBlurKernel);
   if (queue != (cl_command_queue) NULL)
     ReleaseOpenCLCommandQueue(device,queue);
   if (device != (MagickCLDevice) NULL)
