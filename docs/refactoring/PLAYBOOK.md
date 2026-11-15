@@ -20704,6 +20704,148 @@ owner's OK of 2026-11-10 to evolve the recipes and the OpenMP ruling of 2026-11-
 
 ---
 
+## Recipe FL - Fold a Twin Parallel Row Loop into Its Sibling Function Through a Flag
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead* on a
+function holding a parallel row loop (a `case` body, say) that is the same text as the
+whole loop of a `static` function of the file except for the row call, which in the twin
+takes a private row struct filled per row from values no row changes: `composite.c`'s
+Intensity group of `CompositeImage` and `CompositeCopyImage` (W14), the same acquisitions,
+the same pragma and clauses, the same fetch, sync, progress and release, differing in
+`SetIntensityAlphaRow(&row,p,q)` after a three-member fill against
+`CopyCompositeRow(source_image,image,p,q)`.
+
+**Not covered by:** Recipe E, N and Z step 1, which move the loop whole: the new function
+is the existing function's twin, and CodeScene reports *Code Duplication* (W15: 3.46 to
+3.21); Recipe MT, whose copies hold no `#pragma` line and may differ by a statement in one
+copy only only outside a parallel region; Recipe CF, whose callees must have one type
+(the two row calls take different parameters) and which passes a function pointer;
+Recipe RL, which builds a shared loop for several functions' tails; Recipe D, whose
+copies differ in variables or one value.
+
+**How:**
+
+1. The twins. A block `B` of a function `G` and the body of a `static` function `F` of
+   the same file. `F`'s body, from its first statement after its declarations to its
+   `return(status);`, and `B` (ending in its own `return(status);`) are the same token
+   sequence once each one's variables are renamed to one name per role (Recipe TW step
+   1), the `#if`, pragma and `#endif` lines included and identical, except at one
+   statement, the row call: `F` calls `R1(...)`, `B` calls `R2(&row,...)` after a run of
+   member assignments `row.m=e;` that fills every member of the body-declared struct
+   `row`, whose `e` read only variables nothing in the region writes (the invariance
+   test of Recipe RI step 2). `G` reads none of `B`'s temporaries after it, and every
+   variable `B` reads that `F` does not read as a parameter is a local of `G` the region
+   does not write. Check it with `diff` of the two line ranges, each dedented to a
+   function body's indentation (the command and its whole output quoted in the commit):
+   the only hunks are `row`'s declaration, its fill and the two calls. When the twins
+   need a renaming, the step is refused unless a committed tool compares them.
+2. The flag. `F` takes its inputs through a `const` struct parameter (`const
+   CompositeSetup *setup`), or gets one under Recipe B before this step. Add to that
+   struct's typedef, after its last member, a `MagickBooleanType` member named for what
+   `B` does (`intensity`) and one member for each variable the fill reads that `F` does
+   not have (`clamp`), of its type and name. Every place that fills the struct for `F`'s
+   existing callers sets the flag to `MagickFalse` and each new member from the variable
+   of its name, directly after the struct's existing fills (`grep` the struct's name).
+3. The row function. Directly above `F`, write `static void NameRow(const S *row,const
+   MagickBooleanType flag,...)`, where `S` is `row`'s type and the remaining parameters
+   are the row call's own arguments that both calls share (`p`, `q`): its body is `if
+   (flag == MagickFalse) R1(...); else R2(row,...);`, each call's arguments those of its
+   twin, with `R1`'s arguments that `S`'s members hold read as `row->m`. At most four
+   parameters.
+4. In `F`, declare `const S row = { ... };` among its declarations, with `F`'s
+   parameters and the new members (`setup->clamp`) in the order of `S`'s members, the
+   values the fill assigned; replace `F`'s row call by `NameRow(&row,setup->flag,...);`.
+5. In `G`, replace `B` by setting the flag `setup.flag=MagickTrue;` (the struct `G`
+   already fills for `F`) and `return(F(...));`, the call `G` makes for `F`'s own group.
+   Declarations `B` alone used leave `G`.
+6. The write set, read by hand and quoted in the commit (the owner's OpenMP ruling of
+   2026-11-15): the region of `F` writes what it wrote before (`status`, shared, the
+   same plain stores; `y`; the body's locals, private); the new `row` is declared outside
+   the region and only read inside it, through a pointer to `const`; the flag is read.
+   `B`'s region wrote its own `row` per iteration; that write is gone, the values read
+   are the same. The pragma lines of `F` are unchanged and `B`'s were identical.
+7. Time both groups (`F`'s callers' path and `B`'s) base against candidate at one and
+   four threads, several runs each; the per-row cost is one call and one test.
+   `tools/omp_compare.sh` at one and four threads on cases of both groups.
+
+**Before:**
+
+```c
+    case IntensityCompositeOp:
+    {
+      if (IsSourceInsideCanvas(image,source_image,x_offset,y_offset) ==
+          MagickFalse)
+        break;
+      status=MagickTrue;
+      source_view=AcquireVirtualCacheView(source_image,exception);
+      ...
+      for (y=0; y < (ssize_t) source_image->rows; y++)
+      {
+        ...
+        row.image=image;
+        row.source_image=source_image;
+        row.clamp=clamp;
+        SetIntensityAlphaRow(&row,p,q);
+        SyncCompositeRow(image_view,exception,&status);
+        ...
+      }
+      ...
+      source_image=DestroyImage(source_image);
+      return(status);
+    }
+```
+
+with `CompositeCopyImage` holding the same loop around `CopyCompositeRow(source_image,
+image,p,q);`.
+
+**After:**
+
+```c
+    case IntensityCompositeOp:
+    {
+      if (IsSourceInsideCanvas(image,source_image,x_offset,y_offset) ==
+          MagickFalse)
+        break;
+      setup.intensity=MagickTrue;
+      return(CompositeCopyImage(image,source_image,&setup,exception));
+    }
+```
+
+and in `CompositeCopyImage`, `const IntensityRowInputs row = { image, source_image,
+setup->clamp };` and `CompositeCopyRow(&row,setup->intensity,p,q);`.
+
+**Careful:**
+
+- Why the behaviour is the same. On `F`'s existing paths the flag is `MagickFalse`, so
+  `NameRow` calls `R1` with the same arguments; nothing else in `F` changed. On `B`'s
+  path, `G` now runs `F`'s statements, which are `B`'s under the renaming (step 1), with
+  the same values: `F`'s parameters receive the variables `B` read, and `row`, filled
+  once before the region from values no row changes, holds what each iteration's fill
+  stored, so `R2` reads the same members. `G` returns `F`'s `status` as `B` returned its
+  own, and released the same objects in the same order (the release of the source
+  image is part of both).
+- The new struct members are filled before any read: step 2 fills them wherever the
+  struct is filled, and `G` sets the flag after the shared fills.
+- OpenMP. A per-iteration private fill became one shared read-only object: reads of an
+  object nobody writes during the region do not race. The oracle runs one thread;
+  `tools/omp_compare.sh` at one and four threads is the check for the parallel build.
+- Step 1's identity includes the pragma: if the clauses differ (`magick_number_threads`
+  arguments, `shared` lists), the twins are not twins and the step is refused.
+
+**Evidence level:** oracle (cases of both groups; quote line coverage of the moved
+loop's failure and progress paths and write `Verified: guard` when some run in no
+case), plus `tools/omp_compare.sh` at one and four threads, the step 6 reading and the
+step 7 timing in the message, and the step 1 script's result.
+
+**Provenance:** 2026-11-15, from `composite.c`'s `CompositeImage` and `CompositeCopyImage`
+(campaign A, W29 round eighteen lane a): the Intensity group, held since W15 because its
+extraction cloned `CompositeCopyImage` and MT and CF refused the pair; a probe of the fold
+took the file from 4.33 to 4.45 with no new finding and `CompositeImage` out of *Bumpy
+Road Ahead*. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10
+to evolve the recipes and the OpenMP ruling of 2026-11-15.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -21142,3 +21284,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-15 | AMEND | Y | Step 7: another block of the file whose text equals, under Recipe D's renaming (checked by script; `diff` of the line ranges for verbatim copies), the block a Recipe Y function was cut from calls that function instead of a second copy, in the same caller or another, with its own struct fill, written variable, temporaries and exit, steps 1 to 6 checked for the copy; one commit per caller. *Careful* gives the argument (Recipe V step 6, W step 7, LB step 6 and I step 7 make it for their forms) | `accelerate.c`'s `ComputeDespeckleImage` (campaign A, W27 round sixteen lane a): four verbatim copies of the hull-pass launch pair, each leaving through `goto cleanup;`; a second function of the same text would be a duplicate, and Recipe D may not leave the caller. Probe (stub procedure, other 18 Complex/Large functions emptied): 7.58 to 7.62 for the first copy, 7.75 with all four | owner |
 | 2026-11-15 | AMEND | WP | Step 8, *a wrapper no code calls*: a wrapper that meets steps 1 and 2 and that nothing calls (`git grep` finds only its definition and its declaration in a header listed under `MAGICKCORE_NOINST_HDRS`; `MagickPrivate`, hidden visibility; `casemap.py` 0 cases for wrapper and worker) may be converted at guard level when `obj_modulo.sh <file> <Wrapper> <Worker>` prints `IDENTICAL` or `MODULO-IDENTICAL`, `refactor_guard.py` drops only the wrapper's removed literals (`WARN`, every value present), `--calls` moves only the wrapper's removed calls and the prologue, and step 7's compile checks pass. A *Careful* bullet gives the argument (the transformation's argument rests on steps 1 and 2, read; nothing executes the wrapper or its `static` worker, and every other function compiles to the same instructions) | `accelerate.c`'s `AccelerateContrastStretchImage` (campaign A, W28 round seventeen lane a): no caller in the tree, a clone of `AccelerateGrayscaleImage`; a probe with it converted lists no *Code Duplication*, 3.24 to 3.49. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
 | 2026-11-15 | NEW | RI | Extract a Parallel Row Loop Filling Its Row Struct Once: a tail holding a parallel row loop whose body fills a private row struct member by member moves into `static MagickBooleanType Name(const S *rows)`; the invariant members (values nothing in the region writes, calls without side effects) are filled once by the caller in their order, the body copies `row=(*rows);` and sets the per-row members, and the body up to the row call and sync becomes a Recipe PC head; write set read by hand, omp_compare at one and four threads, timing | `composite.c`'s `CompositeImage` (W29 lane a): probe 4.24 to 4.33, no new finding | owner |
+| 2026-11-15 | NEW | FL | Fold a Twin Parallel Row Loop into Its Sibling Function Through a Flag: a block holding a parallel row loop that is, token for token and pragma included, the whole body of a `static` function of the file except for the row call (its own call after an invariant fill of a private row struct) becomes a flag in that function's `const` input struct and a call of it; a `static void` row function selects the call by the flag, and the row struct is filled once before the region; write set read by hand, omp_compare at one and four threads, timing | `composite.c`'s Intensity group and `CompositeCopyImage` (W29 lane a): probe 4.33 to 4.45, no new finding | owner |
