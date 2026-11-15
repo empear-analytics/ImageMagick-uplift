@@ -784,6 +784,14 @@ static MagickBooleanType AcquireAccelerateImageBuffer(MagickCLEnv clEnv,
   return(MagickTrue);
 }
 
+static void TraceAccelerateImage(const Image *image)
+{
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+}
+
 static MagickBooleanType ComputeContrastImage(Image *image,MagickCLEnv clEnv,
   const MagickBooleanType sharpen,ExceptionInfo *exception)
 {
@@ -819,10 +827,7 @@ static MagickBooleanType ComputeContrastImage(Image *image,MagickCLEnv clEnv,
   if (clEnv == (MagickCLEnv) NULL)
     return(MagickFalse);
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceAccelerateImage(image);
 
   queue=NULL;
   contrastKernel=NULL;
