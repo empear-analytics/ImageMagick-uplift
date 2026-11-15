@@ -3862,6 +3862,57 @@ static MagickRealType GetCompositeChannelColor(
   return(pixel);
 }
 
+static void CompositeChannelColorVividLightToXor(const CompositeRowInputs *row,
+  const CompositePixelInputs *authentic,const CompositeChannelInputs *tile,
+  MagickRealType *pixel)
+{
+  const CompositeOperator
+    compose = row->compose;
+
+  const MagickRealType
+    Da = authentic->Da,
+    Sa = authentic->Sa;
+
+  const MagickRealType
+    Dca = tile->Dca,
+    Sc = tile->Sc,
+    Sca = tile->Sca;
+
+  const double
+    gamma = tile->gamma;
+
+  MagickRealType
+    blend = 0.0;
+
+  switch (compose)
+  {
+    case VividLightCompositeOp:
+    {
+      if ((fabs((double) Sa) < MagickEpsilon) ||
+          (fabs((double) Da) < MagickEpsilon))
+        {
+          (*pixel)=(double) QuantumRange*gamma*(Sa*Da+Sca*(1.0-Da)+Dca*
+            (1.0-Sa));
+          break;
+        }
+      blend=GetVividLightBlend(Sa,Sca,Da,Dca);
+      (*pixel)=(double) QuantumRange*gamma*(Sa*Da*RoundToUnity(blend)+Sca*
+        (1.0-Da)+Dca*(1.0-Sa));
+      break;
+    }
+    case XorCompositeOp:
+    {
+      (*pixel)=(double) QuantumRange*(Sca*(1.0-Da)+Dca*(1.0-Sa));
+      break;
+    }
+    default:
+    {
+      (*pixel)=Sc;
+      break;
+    }
+  }
+}
+
 static void CompositeChannelColor(const CompositeRowInputs *row,
   const CompositePixelInputs *authentic,const CompositeChannelInputs *tile,
   MagickRealType *pixel)
@@ -4658,28 +4709,9 @@ static void CompositeChannelColor(const CompositeRowInputs *row,
         (1.0-Da)+Dca*(1.0-Sa));
       break;
     }
-    case VividLightCompositeOp:
-    {
-      if ((fabs((double) Sa) < MagickEpsilon) ||
-          (fabs((double) Da) < MagickEpsilon))
-        {
-          (*pixel)=(double) QuantumRange*gamma*(Sa*Da+Sca*(1.0-Da)+Dca*
-            (1.0-Sa));
-          break;
-        }
-      blend=GetVividLightBlend(Sa,Sca,Da,Dca);
-      (*pixel)=(double) QuantumRange*gamma*(Sa*Da*RoundToUnity(blend)+Sca*
-        (1.0-Da)+Dca*(1.0-Sa));
-      break;
-    }
-    case XorCompositeOp:
-    {
-      (*pixel)=(double) QuantumRange*(Sca*(1.0-Da)+Dca*(1.0-Sa));
-      break;
-    }
     default:
     {
-      (*pixel)=Sc;
+      CompositeChannelColorVividLightToXor(row,authentic,tile,pixel);
       break;
     }
   }
