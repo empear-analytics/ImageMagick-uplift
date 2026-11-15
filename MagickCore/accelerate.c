@@ -1448,6 +1448,70 @@ static void ReleaseTempImageBuffers(MagickCLEnv clEnv,cl_mem *tempImageBuffer)
   }
 }
 
+typedef struct _HullPassLaunch
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  cl_kernel
+    hullPass1,
+    hullPass2;
+
+  size_t
+    *global_work_size;
+} HullPassLaunch;
+
+static MagickBooleanType EnqueueHullPasses(const HullPassLaunch *launch,
+  ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = launch->clEnv;
+
+  const MagickCLDevice
+    device = launch->device;
+
+  const cl_command_queue
+    queue = launch->queue;
+
+  const cl_kernel
+    hullPass1 = launch->hullPass1,
+    hullPass2 = launch->hullPass2;
+
+  size_t
+    *const global_work_size = launch->global_work_size;
+
+  cl_event
+    event;
+
+  cl_int
+    clStatus;
+
+  /* launch the kernel */
+  clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, hullPass1, 2, NULL, global_work_size, NULL, 0, NULL, &event);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
+    return(MagickFalse);
+  }
+  RecordProfileData(device,hullPass1,event);
+
+  /* launch the kernel */
+  clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, hullPass2, 2, NULL, global_work_size, NULL, 0, NULL, &event);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
+    return(MagickFalse);
+  }
+  RecordProfileData(device,hullPass2,event);
+  return(MagickTrue);
+}
+
 static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
   ExceptionInfo*exception)
 {
@@ -1655,23 +1719,14 @@ static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
       (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
       goto cleanup;
     }
-    /* launch the kernel */
-	clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, hullPass1, 2, NULL, global_work_size, NULL, 0, NULL, &event);
-    if (clStatus != CL_SUCCESS)
     {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
-      goto cleanup;
-    }
-    RecordProfileData(device,hullPass1,event);
+      const HullPassLaunch
+        launch = { clEnv, device, queue, hullPass1, hullPass2,
+          global_work_size };
 
-    /* launch the kernel */
-	clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, hullPass2, 2, NULL, global_work_size, NULL, 0, NULL, &event);
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
-      goto cleanup;
+      if (EnqueueHullPasses(&launch,exception) == MagickFalse)
+        goto cleanup;
     }
-    RecordProfileData(device,hullPass2,event);
 
     if (k == 0)
       clStatus =clEnv->library->clSetKernelArg(hullPass1,0,sizeof(cl_mem),(void *)(tempImageBuffer));
