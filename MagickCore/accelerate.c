@@ -4857,6 +4857,10 @@ static Image *ComputeUnsharpMaskImage(const Image *image,MagickCLEnv clEnv,
     length,
     lsize[2];
 
+  const AccelerateBufferTargets
+    targets = { &device, &queue, &filteredImage, &imageBuffer,
+      &filteredImageBuffer };
+
   queue=NULL;
   filteredImage=NULL;
   imageBuffer=NULL;
@@ -4867,22 +4871,7 @@ static Image *ComputeUnsharpMaskImage(const Image *image,MagickCLEnv clEnv,
   unsharpMaskBlurColumnKernel=NULL;
   outputReady=MagickFalse;
 
-  device=RequestOpenCLDevice(clEnv);
-  if (device == (MagickCLDevice) NULL)
-    goto cleanup;
-  queue=AcquireOpenCLCommandQueue(device);
-  if (queue == (cl_command_queue) NULL)
-    goto cleanup;
-  filteredImage=cloneImage(image,exception);
-  if (filteredImage == (Image *) NULL)
-    goto cleanup;
-  if (filteredImage->number_channels != image->number_channels)
-    goto cleanup;
-  imageBuffer=GetAuthenticOpenCLBuffer(image,device,exception);
-  if (imageBuffer == (cl_mem) NULL)
-    goto cleanup;
-  filteredImageBuffer=GetAuthenticOpenCLBuffer(filteredImage,device,exception);
-  if (filteredImageBuffer == (cl_mem) NULL)
+  if (AcquireAccelerateBuffers(clEnv,image,exception,&targets) == MagickFalse)
     goto cleanup;
 
   imageKernelBuffer=createKernelInfo(device,radius,sigma,&kernelWidth,
