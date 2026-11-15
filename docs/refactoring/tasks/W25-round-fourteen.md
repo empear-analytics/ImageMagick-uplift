@@ -68,3 +68,32 @@ lane c's tools commits `70243b078`, `ae4a138dd` extend `targets_fill_check.py` a
 with tests; lane b rests the `&imageBuffer` argument to `clSetKernelArg` on the OpenCL spec; the
 stub script `~/sp_w23a/stub.py` lives outside the repository. A reviewer's `/tmp` wipe made one
 command run in the Windows checkout on main (`git reset --hard HEAD`; no tracked change existed).
+
+## Round seventeen (2026-11-15): accelerate.c 3.24 -> 3.62 (campaign/W28-a, one Opus lane)
+
+Three refactor commits and one amendment: Recipe WP step 8 (`2a841c873`: a wrapper no code calls may
+be converted at guard level; `c879d0764` converts `AccelerateContrastStretchImage`, which cleared the
+whole Code Duplication finding at once, so no Recipe D unification was needed), Recipe Y on
+`ComputeFunctionImage` (`d5eba3cb4`), Recipe E on `ComputeDespeckleImage` (`24592cc73`). Gate on the
+tip: whole catalogue 15,955 and wide 14,200 cases, 0 diverged; `ci_linux_warnings.sh --campaign-a` OK
+on 98 files; `playbook_lint` 0 problems. Real score 3.24 -> 3.49 -> 3.62 -> 3.62; the 3.71 of before
+round sixteen is not yet regained. Remaining findings: Number of Functions (113), Overall Code
+Complexity, Complex Method 13, Large Method 13, 18 argument findings.
+
+**Blockers for the owner.** (1) *Recipe S split is refused by `split_source.py` for every family*: all
+14 MagickPrivate roots share the prologue statics (`getAccelerateEnvironment`, `getOpenCLEnvironment`,
+`checkAccelerateCondition`/`RGBA`/`Kind`, `checkHistogramCondition`, `checkPixelIntensity`,
+`get32BitChannelValue`, `GetInputBufferFlags` and their predicates); a legal split would copy them or
+widen their linkage, both forbidden. A probe that only removes 13 functions makes Lines of Code in a
+Single File appear instead, for about +0.09. (2) *The remaining rise needs a chain of six functions at
+once*: emptying `ComputeLocalContrastImage`, `ComputeUnsharpMaskImageSingle`, `resizeHorizontalFilter`,
+`resizeVerticalFilter`, `ComputeUnsharpMaskImage`, `ComputeRotationalBlurImage` scores 3.89 stubbed;
+every subset of up to five stays at 3.62 or below, and a function leaving Complex while still Large
+lowers the score (Recipe D reuse in `ComputeLocalContrastImage`: 3.62 -> 3.50, reverted). The Large
+Method threshold is 70 lines, flagged at 70.
+
+Reviewer notes: WP step 8 is a guard-level path whose label `Decided by: owner` rests on the standing
+2026-11-10 OK; the playbook's *Two levels of evidence* paragraph and AGENTS.md's guard-verified list
+were not updated, so the owner should confirm or add it. `c879d0764`'s `--calls` list omits one
+printed line (`GetMagickModule -1`); `d5eba3cb4` moves a throw that now names `SetFunctionKernelArgs`
+(2026-11-13 ruling) without saying so.
