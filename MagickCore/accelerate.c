@@ -2519,6 +2519,9 @@ static MagickBooleanType ComputeFunctionImage(Image *image,MagickCLEnv clEnv,
   MagickBooleanType
     outputReady;
 
+  AccelerateImageBufferTargets
+    targets;
+
   MagickCLDevice
     device;
 
@@ -2537,14 +2540,10 @@ static MagickBooleanType ComputeFunctionImage(Image *image,MagickCLEnv clEnv,
   parametersBuffer=NULL;
   outputReady=MagickFalse;
 
-  device=RequestOpenCLDevice(clEnv);
-  if (device == (MagickCLDevice) NULL)
-    goto cleanup;
-  queue=AcquireOpenCLCommandQueue(device);
-  if (queue == (cl_command_queue) NULL)
-    goto cleanup;
-  imageBuffer=GetAuthenticOpenCLBuffer(image,device,exception);
-  if (imageBuffer == (cl_mem) NULL)
+  targets.device=(&device);
+  targets.queue=(&queue);
+  targets.imageBuffer=(&imageBuffer);
+  if (AcquireAccelerateImageBuffer(clEnv,image,exception,&targets) == MagickFalse)
     goto cleanup;
 
   parametersBufferPtr=(float *) AcquireQuantumMemory(number_parameters,
