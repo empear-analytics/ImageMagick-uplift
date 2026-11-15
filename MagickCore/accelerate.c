@@ -4129,8 +4129,7 @@ RestoreMSCWarning
 
 cleanup:
 
-  if (verticalKernel != (cl_kernel) NULL)
-    ReleaseOpenCLKernel(verticalKernel);
+  ReleaseKernel(verticalKernel);
 
   return(outputReady);
 }
