@@ -881,6 +881,64 @@ static MagickBooleanType ForwardFourierTransformChannel(
 static MagickBooleanType FourierTransformChannels(
   const FourierSectionInput *,const Image *,const MagickBooleanType);
 
+typedef struct _ForwardFourierPair
+{
+  const Image
+    *image;
+
+  MagickBooleanType
+    modulus;
+
+  Image
+    *magnitude_image,
+    *phase_image;
+
+  ExceptionInfo
+    *exception;
+} ForwardFourierPair;
+
+static Image *ForwardFourierTransformPair(const ForwardFourierPair *pair,
+  Image *fourier_image)
+{
+  const Image
+    *const image = pair->image;
+
+  const MagickBooleanType
+    modulus = pair->modulus;
+
+  Image
+    *const magnitude_image = pair->magnitude_image,
+    *const phase_image = pair->phase_image;
+
+  ExceptionInfo
+    *const exception = pair->exception;
+
+  const ForwardChannelSource
+    source = { image, modulus };
+
+  FourierSectionInput
+    section;
+
+  MagickBooleanType
+    is_gray,
+    status;
+
+  phase_image->storage_class=DirectClass;
+  phase_image->depth=32UL;
+  AppendImageToList(&fourier_image,magnitude_image);
+  AppendImageToList(&fourier_image,phase_image);
+  is_gray=IsImageGray(image);
+  section.forward_source=(&source);
+  section.inverse_source=(const InverseChannelSource *) NULL;
+  section.fourier_image=fourier_image;
+  section.exception=exception;
+  status=FourierTransformChannels(&section,image,is_gray);
+  if (status == MagickFalse)
+    fourier_image=DestroyImageList(fourier_image);
+  fftw_cleanup();
+  return(fourier_image);
+}
+
 static size_t PadFourierWidth(const Image *image,size_t width)
 {
   if (IsFourierPaddingNeeded(image) != MagickFalse)
@@ -931,29 +989,11 @@ MagickExport Image *ForwardFourierTransformImage(const Image *image,
           magnitude_image=DestroyImage(magnitude_image);
         else
           {
-            const ForwardChannelSource
-              source = { image, modulus };
+            const ForwardFourierPair
+              pair = { image, modulus, magnitude_image, phase_image,
+                exception };
 
-            FourierSectionInput
-              section;
-
-            MagickBooleanType
-              is_gray,
-              status;
-
-            phase_image->storage_class=DirectClass;
-            phase_image->depth=32UL;
-            AppendImageToList(&fourier_image,magnitude_image);
-            AppendImageToList(&fourier_image,phase_image);
-            is_gray=IsImageGray(image);
-            section.forward_source=(&source);
-            section.inverse_source=(const InverseChannelSource *) NULL;
-            section.fourier_image=fourier_image;
-            section.exception=exception;
-            status=FourierTransformChannels(&section,image,is_gray);
-            if (status == MagickFalse)
-              fourier_image=DestroyImageList(fourier_image);
-            fftw_cleanup();
+            fourier_image=ForwardFourierTransformPair(&pair,fourier_image);
           }
       }
   }
