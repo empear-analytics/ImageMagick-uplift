@@ -792,6 +792,11 @@ static void TraceAccelerateImage(const Image *image)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
 }
 
+static inline int ContrastSign(const MagickBooleanType sharpen)
+{
+  return(sharpen != MagickFalse ? 1 : -1);
+}
+
 static MagickBooleanType ComputeContrastImage(Image *image,MagickCLEnv clEnv,
   const MagickBooleanType sharpen,ExceptionInfo *exception)
 {
@@ -849,7 +854,7 @@ static MagickBooleanType ComputeContrastImage(Image *image,MagickCLEnv clEnv,
   }
 
   number_channels=(cl_uint) image->number_channels;
-  sign=sharpen != MagickFalse ? 1 : -1;
+  sign=ContrastSign(sharpen);
 
   i=0;
   status =SetOpenCLKernelArg(contrastKernel,i++,sizeof(cl_mem),(void *)&imageBuffer);
