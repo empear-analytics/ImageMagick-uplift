@@ -1,0 +1,17 @@
+# ForwardFourierTransformImage and InverseFourierTransformImage (fourier.c): -fft/+fft and -ift/+ift over gray, colour, CMYK and alpha images, so that every section of both parallel sections regions calls its channel transform; the last line is the CLI's missing-phase error (no transform runs)
+rose: -fft -format "%# %wx%h %[channels]\n" info:
+rose: +fft -format "%# %wx%h %[channels]\n" info:
+rose: -fft -ift -format "%# %wx%h\n" info:
+rose: +fft +ift -format "%# %wx%h\n" info:
+rose: -colorspace gray -fft -format "%# %[channels]\n" info:
+rose: -colorspace gray -fft -ift -format "%#\n" info:
+rose: -colorspace CMYK -fft -format "%# %[channels]\n" info:
+rose: -colorspace CMYK -fft -ift -format "%# %[channels]\n" info:
+rose: -colorspace CMYK +fft +ift -verbose info:
+rose: -alpha set -channel A -evaluate set 60% +channel -fft -format "%# %[channels]\n" info:
+rose: -alpha set -channel A -evaluate set 60% +channel -fft -ift -format "%# %[channels]\n" info:
+rose: -colorspace CMYK -alpha set -channel A -fx "i/w" +channel +fft +ift -verbose info:
+logo: -resize 64x48! -fft -ift -verbose info:
+-size 64x64 gradient:red-blue -fft -ift -format "%#\n" info:
+-size 50x30 xc:gray50 -fft -ift -format "%#\n" info:
+rose: -fft -delete 1 -ift -format "%#\n" info:
