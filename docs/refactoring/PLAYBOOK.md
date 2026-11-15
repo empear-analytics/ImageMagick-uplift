@@ -18429,6 +18429,135 @@ Lane: c
 
 ---
 
+## Recipe TS - Share One Body Across Twin Sections of a Parallel Sections Region
+
+**Use when:** CodeScene reports *Complex Method* or *Large Method* on a function that holds
+an `#pragma omp parallel sections` region whose sections are the same block four times over
+except for one test and one channel constant, as `fourier.c`'s `InverseFourierTransformImage`
+and `ForwardFourierTransformImage` do: each section declares `thread_status`, sets it to
+`MagickTrue`, calls `InverseFourierTransformChannel` under `if (<test>)` for its channel,
+and writes `status=thread_status;` when the call failed.
+
+**Not covered by:** Recipe PS, which moves a block of a `parallel for` body once, so each
+section would be its own near-identical helper (Code Duplication); Recipe SC, whose copies
+differ in constants only and which refuses a block inside an OpenMP region; Recipe SV and
+Recipe TW, whose copies differ in one value and which have no `status` through a pointer;
+Recipe D, which needs a reported *Code Duplication*; Recipe E, whose OpenMP rule refuses a
+block that writes `status`.
+
+**How:**
+
+1. The function holds one `parallel sections` region, guarded as the file guards it
+   (`#if defined(MAGICKCORE_OPENMP_SUPPORT)`), outside every other OpenMP region; no pragma
+   is added, removed, moved or edited, and each pragma keeps the braces it governs. At least
+   two sections have a structured block of this text, checked by script (whitespace ignored,
+   no variable renamed): `{ MagickBooleanType thread_status; thread_status=MagickTrue;
+   if (T) thread_status=F(&source,C,fourier_image,exception); if (thread_status ==
+   MagickFalse) status=thread_status; }`. `T` is an expression with no side effect that
+   reads only variables nothing in the region writes (`is_gray`, a member of a pointer to
+   `const`), `C` is an enumeration constant, and `F`, its other arguments and the names are
+   the same in every copy. A section of another shape stays as it is. `status` is declared
+   outside the region and named in no data-sharing clause, so it is shared.
+2. The write-set rule, as the playbook's *OpenMP regions* gives it: a block inside a region
+   may move only when it writes no variable declared outside it. Each copy breaks it in one
+   place, `status=thread_status;`, the plain store of `MagickFalse` that the sections already
+   make concurrently (every writer stores the same value, and nothing reads `status` before
+   the region's closing barrier). Recipe PS step 2 admits that write when the variable is
+   shared and written only by plain assignment outside `critical` and `atomic`, and this
+   step does the same: nothing else of the copy writes a variable outside it (`thread_status`
+   is the copy's own).
+3. The variables `F` reads besides `C` (`source`, `fourier_image`, `exception`) go in one
+   `typedef struct` of exactly those types and names, declared above the new function and
+   inside the conditional that holds `F`. The caller declares it `const` with the values as its
+   initialiser among the declarations of the block that holds the region when no member's
+   variable is written between that declaration and the region (a call that fills
+   `fourier_image` before it), and otherwise declares it plain and assigns each member
+   directly before the region, outside it. No section writes a member's variable or the struct.
+4. Write the new function directly above the caller, inside the same conditional as `F`:
+   `static void Name(const Input *input,const MagickBooleanType run,const <C's type>
+   channel,MagickBooleanType *status)`. It binds each member as a `const` local of its name
+   (Recipe N step 4), declares `thread_status`, and holds the copy's text with `if (T)` read
+   `if (run != MagickFalse)`, `C` read `channel`, `&source` read `source` (the member holds the
+   caller's address), and `status` read `(*status)`. Nothing else changes.
+5. Each such section's block becomes `Name(&input,T,C,&status);`, the braces and the pragma
+   unchanged, `T` and `C` as the copy wrote them. `T` yields `0` or `1` (a comparison), which
+   `run != MagickFalse` tests as `T` did, evaluated by the same thread at the same point
+   (the copy evaluated it first, after setting `thread_status`, which `T` does not read).
+6. One function's sections go in one commit; a second function with its own twin sections
+   takes its own helper in its own commit and the file's score decides it (two helpers over
+   different callees are reported as Code Duplication).
+7. Evidence: the oracle (which builds without OpenMP and so runs the sections one after the
+   other), `refactor_guard.py --calls`, and, because the oracle cannot see a race, private
+   OpenMP builds of the base and the candidate compared on the cases that reach the region
+   at `OMP_NUM_THREADS=1` and `=4`, output and exit status byte for byte.
+
+**Before:**
+
+```c
+          {
+            MagickBooleanType
+              thread_status;
+
+            thread_status=MagickTrue;
+            if (is_gray == MagickFalse)
+              thread_status=InverseFourierTransformChannel(&source,
+                GreenPixelChannel,fourier_image,exception);
+            if (thread_status == MagickFalse)
+              status=thread_status;
+          }
+```
+
+**After:**
+
+```c
+          {
+            InverseFourierSection(&section,
+              is_gray == MagickFalse,
+              GreenPixelChannel,&status);
+          }
+...
+static void InverseFourierSection(const InverseSectionInput *input,
+  const MagickBooleanType run,const PixelChannel channel,
+  MagickBooleanType *status)
+{
+  ...
+  thread_status=MagickTrue;
+  if (run != MagickFalse)
+    thread_status=InverseFourierTransformChannel(source,
+      channel,fourier_image,exception);
+  if (thread_status == MagickFalse)
+    (*status)=thread_status;
+}
+```
+
+**Careful:**
+
+- Which thread runs what does not change: each section still runs once, by one thread of the
+  team, and the helper runs on that thread. The region's variables keep their sharing: the
+  helper's `status` is the caller's `status` (shared, written by plain stores of one value,
+  as before) and the input struct is read only.
+- `T` is evaluated before the call instead of after `thread_status=MagickTrue;`. It has no
+  side effect and reads nothing a section writes, so it has the value it had.
+- The race stays the race it was: several sections may store `MagickFalse` into `status` at
+  once, and the function acts on it only after the region's barrier. The recipe does not
+  repair it; it must not add a `critical` or an atomic.
+- The oracle's build has no OpenMP, so it proves the sequential order only; the differential
+  runs of step 7 compare what two threads or four make of the same inputs. They show no
+  difference; they cannot prove a race absent, which is why the step is as mechanical as
+  PS: same stores, same objects, same points.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function and
+its `-Wunused` neighbours), the write-set rule of step 2 read by hand, and the differential
+runs of step 7.
+
+**Provenance:** 2026-11-13, from `fourier.c`'s `InverseFourierTransformImage` (campaign A,
+W21 lane b): four of its five sections are this block, the owner's ruling of 2026-11-12 lets the
+`omp` sites of `fourier.c` be taken one at a time; with the helper the function leaves
+*Complex Method* (cc 16), the file 7.59 to 7.66. Added by Claude Code (Claude Sonnet 5.5)
+under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -20960,3 +21089,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-15 | AMEND | N | Step 8, the function-body siblings form (a later block holding an earlier sibling's call takes its `const Name *name`): a statement of the later block before the call may write a member's variable when every path through the write returns before the call (the later block binds that member read-then-written), and a variable the later block only reads that is not a member goes by value as a parameter after `name` (Recipe E step 3), at most four parameters | `feature-texture.c`'s `GetImageFeatures` (campaign A, W26 round fifteen lane c): its tail (the buffers check, the row allocation, the matrix fill and their exits, the normalisation, the call of the direction passes' function, the release) holds the call of the function that takes `FeatureAnalysis`; its exits write `channel_features`, a member, and return, and it reads `distance`, `exception` and `grays`, which the direction passes do not. A probe of the chain: every function under 70 lines, 8.72 to 9.38. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
 | 2026-11-15 | AMEND | Y | Step 7: another block of the file whose text equals, under Recipe D's renaming (checked by script; `diff` of the line ranges for verbatim copies), the block a Recipe Y function was cut from calls that function instead of a second copy, in the same caller or another, with its own struct fill, written variable, temporaries and exit, steps 1 to 6 checked for the copy; one commit per caller. *Careful* gives the argument (Recipe V step 6, W step 7, LB step 6 and I step 7 make it for their forms) | `accelerate.c`'s `ComputeDespeckleImage` (campaign A, W27 round sixteen lane a): four verbatim copies of the hull-pass launch pair, each leaving through `goto cleanup;`; a second function of the same text would be a duplicate, and Recipe D may not leave the caller. Probe (stub procedure, other 18 Complex/Large functions emptied): 7.58 to 7.62 for the first copy, 7.75 with all four | owner |
 | 2026-11-15 | AMEND | WP | Step 8, *a wrapper no code calls*: a wrapper that meets steps 1 and 2 and that nothing calls (`git grep` finds only its definition and its declaration in a header listed under `MAGICKCORE_NOINST_HDRS`; `MagickPrivate`, hidden visibility; `casemap.py` 0 cases for wrapper and worker) may be converted at guard level when `obj_modulo.sh <file> <Wrapper> <Worker>` prints `IDENTICAL` or `MODULO-IDENTICAL`, `refactor_guard.py` drops only the wrapper's removed literals (`WARN`, every value present), `--calls` moves only the wrapper's removed calls and the prologue, and step 7's compile checks pass. A *Careful* bullet gives the argument (the transformation's argument rests on steps 1 and 2, read; nothing executes the wrapper or its `static` worker, and every other function compiles to the same instructions) | `accelerate.c`'s `AccelerateContrastStretchImage` (campaign A, W28 round seventeen lane a): no caller in the tree, a clone of `AccelerateGrayscaleImage`; a probe with it converted lists no *Code Duplication*, 3.24 to 3.49. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
+| 2026-11-13 | NEW | TS | Share One Body Across Twin Sections of a Parallel Sections Region: sections that are one block but for a test and a channel constant call one `static void` helper taking an input struct, the test's value, the constant and a pointer to the shared `status`; the pragmas stay. *Careful* gives the argument (same thread, same stores to the same shared `status`, the test has no side effect) | `fourier.c`'s `InverseFourierTransformImage` (campaign A, W21 lane b): four of five sections; 7.59 to 7.66, the function leaves *Complex Method*; the same helper for `ForwardFourierTransformImage` too switches on *Code Duplication* (7.29), so one function takes it | owner |
