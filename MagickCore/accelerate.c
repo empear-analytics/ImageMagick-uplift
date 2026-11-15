@@ -1093,6 +1093,9 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
     *hostPtr,
     *inputPixels;
 
+  if (clEnv == (MagickCLEnv) NULL)
+    return(MagickFalse);
+
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
@@ -1469,28 +1472,9 @@ MagickPrivate MagickBooleanType AccelerateContrastStretchImage(
   Image *image,const double black_point,const double white_point,
   ExceptionInfo *exception)
 {
-  MagickBooleanType
-    status;
-
-  MagickCLEnv
-    clEnv;
-
-  assert(image != NULL);
-  assert(exception != (ExceptionInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-
-  if ((checkAccelerateConditionRGBA(image) == MagickFalse) ||
-      (checkHistogramCondition(image,image->intensity) == MagickFalse))
-    return(MagickFalse);
-
-  clEnv=getOpenCLEnvironment(exception);
-  if (clEnv == (MagickCLEnv) NULL)
-    return(MagickFalse);
-
-  status=ComputeContrastStretchImage(image,clEnv,black_point,white_point,
-    exception);
-  return(status);
+  return(ComputeContrastStretchImage(image,getAccelerateEnvironment(image,
+    HistogramAccelerateCheck,__func__,exception),black_point,white_point,
+    exception));
 }
 
 /*
