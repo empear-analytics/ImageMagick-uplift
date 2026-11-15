@@ -20847,6 +20847,168 @@ to evolve the recipes and the OpenMP ruling of 2026-11-15.
 
 ---
 
+## Recipe MR - Merge Reduction Row Loops Through a Metric Selector
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Complex Method*, *Large Method* or
+*Code Duplication* in several `static` functions of one file whose bodies hold the same
+parallel reduction over rows: views acquired, `#pragma omp parallel for` with the same
+clauses, per-row private partials filled by a per-pixel accumulate call, a named `omp
+critical` merging the partials into shared totals, views destroyed. The copies differ only
+in the accumulate function called, in a counter some of them add to the partials, in the
+merge operator (`+=` or a running maximum), in the critical section's name, and in
+statements before and after the loop. `compare-similarity.c`'s `GetAESimilarity`,
+`GetFUZZSimilarity`, `GetMAESimilarity`, `GetMSESimilarity`, `GetPASimilarity` and
+`GetPDCSimilarity`.
+
+**Not covered by:** Recipe RL, whose copies differ in the row work only and share no
+critical section, and whose row function is reached through a pointer (here the per-pixel
+call must stay inlined: one indirect call per pixel is a hot-path cost); Recipe MT and
+Recipe TI, which take no `#pragma` line; Recipe CB, which moves a critical block's body but
+keeps each function's loop, so the skeletons still clone; Recipe N and Z step 1, which
+move one loop whole, so that the second moved the same way clones the first. This recipe
+edits the region: the copies' named critical sections become one name (the owner's ruling
+of 2026-11-15 in AGENTS.md).
+
+**How:**
+
+1. Copies. Two or more `static` functions of one file, each holding one parallel row
+   loop of the shape above, with every variable the region writes or a clause names a
+   local of the function. Check by reading, and say in the message, that the loop texts
+   are the same once each copy's accumulate call, its counter increment (`channel_area++`
+   after the call, or inside the accumulate function), its merge statements and its
+   critical name are set aside; the statements before the views are acquired and after
+   they are destroyed stay with each function (step 6).
+2. Types. Directly after the file's other typedefs: a `const` input struct `NameInfo` (the
+   two images, the selector of the enumeration the file already uses for the copies, here
+   `MetricType`, and the scalars the accumulate calls read, such as `fuzz`), a partials
+   struct `NameSums` (the counter `area` and the array `similarity[MaxPixelChannels+1]`,
+   both zero-initialised per row as the copies' locals were), a row struct (images, row
+   pointers, `columns`, the scalars) and a prototype of the driver (step 5) when a caller
+   precedes it.
+3. Per-pixel dispatch. A `static magick_attribute((__always_inline__)) inline` function
+   taking the selector, the scalars, the pixels and the partials, holding one `switch` on
+   the selector with one group per copy: the copy's accumulate call with its arguments
+   rewritten to the struct's members, and the copy's counter increment after it when the
+   copy had one there. The last group also takes `default:`. A column-loop function, also
+   forced inline, holds the copies' common `for (x=...)` loop with the dispatch call in
+   place of the accumulate call; a non-inline row function `switch`es on the selector and
+   calls the column-loop function with each group's enumeration constant written as a
+   literal, so that each group's loop is compiled with its selector known and the
+   per-pixel `switch` folds away (check with `nm` that neither forced-inline function has
+   a symbol of its own).
+4. Merge. A `static void` merge function (Recipe CB's form) holding the copies' merge
+   loop over the channels; where the copies' merge operator differs, the operator moves
+   to a forced-inline value function (`if (metric != PeakAbsoluteErrorMetric) { *total+=
+   value; return; } if (value > *total) *total=value;`), each branch one copy's text
+   verbatim.
+5. Driver. One `static MagickBooleanType` function (not inline) taking `const NameInfo
+   *info`, the shared totals, a pointer receiving the counter and the exception, at most
+   four parameters: the copies' loop text with the row work written as the row function's
+   call, the critical block written `{ area+=sums.area; Merge(info,&sums,similarity); }`
+   under ONE name, `MagickCore_<Driver>`, and the pragma's `shared(...)` list naming the
+   driver's locals (`area`, `similarity`, `status`). After the views are destroyed it
+   stores the counter through its pointer and returns `status`.
+6. Each copy keeps its name, parameters and comment and becomes: its `const NameInfo`
+   declared with its own enumeration constant (and its scalars, computed in the
+   initialiser in the order the copy computed them), the statements it ran before the
+   views were acquired, the driver's call, and the statements it ran after the views were
+   destroyed (a normalisation; an existing helper that is the same text, Recipe D, is
+   called instead), on the same values. One copy (or one pair of copies of one shape) per
+   commit; later commits add their group to the dispatch and merge functions.
+7. OpenMP (the owner's ruling of 2026-11-15 and the agents' conditions in AGENTS.md):
+   quote in the message the by-hand reading of what the region writes and how each write
+   stays protected (the partials and the row struct are declared in the loop body, so
+   private; `area` and `similarity` written only inside the critical block; `status`
+   written only by the failed-fetch branch, as before; `y` the loop variable); say which
+   regions now share the one lock and why no region calls another (the merge holds no
+   lock, no call that enters a critical section, and no nested parallel region); run
+   `tools/omp_compare.sh` at one and four threads on cases that reach each folded copy;
+   and compare instructions (callgrind, one thread) of the reached metric against the
+   base: an increase above noise in the region stops the step.
+8. Check by reading that every argument fills its parameter, that the dispatch group of
+   each copy calls that copy's accumulate function with the copy's arguments, and that
+   the merge of each copy is its own operator.
+
+**Before:**
+
+```c
+static MagickBooleanType GetMAESimilarity(const Image *image,
+  const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
+{
+  ...
+  (void) memset(similarity,0,(MaxPixelChannels+1)*sizeof(*similarity));
+  SetImageCompareBounds(image,reconstruct_image,&columns,&rows);
+  ...
+  #pragma omp parallel for schedule(static) shared(area,similarity,status) \
+    magick_number_threads(image,image,rows,1)
+  for (y=0; y < (ssize_t) rows; y++)
+  {
+    ...
+      AccumulateMAEPixel(&pixels,channel_similarity);
+      channel_area++;
+    ...
+    #pragma omp critical (MagickCore_GetMAESimilarity)
+    {
+      area+=channel_area;
+      ...
+    }
+  }
+  ...
+  NormalizeChannelSimilarity(image,reconstruct_image,area,similarity);
+  return(status);
+}
+```
+
+**After:**
+
+```c
+static MagickBooleanType GetMAESimilarity(const Image *image,
+  const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
+{
+  const PixelMetricInfo
+    info = { image, reconstruct_image, MeanAbsoluteErrorMetric,
+      0.0 };
+  ...
+  (void) memset(similarity,0,(MaxPixelChannels+1)*sizeof(*similarity));
+  status=GetPixelMetricSimilarity(&info,similarity,&area,exception);
+  NormalizeChannelSimilarity(image,reconstruct_image,area,similarity);
+  return(status);
+}
+```
+
+**Careful:**
+
+- Behaviour. Each copy's per-pixel arithmetic is its accumulate function, unchanged and
+  called with the same arguments in the same order; the counter is incremented where the
+  copy incremented it; the merge applies the copy's own operator to the same values in
+  the same order of channels. Rows are still merged one at a time under a lock, in
+  whatever order the threads reach it, as before: a sum over rows depends on that order
+  exactly as the copy's did, and the one-thread run is bit-identical.
+- Unifying critical names makes the folded regions exclude one another. Mutual exclusion
+  only grows: no interleaving the new lock allows was forbidden before, so it adds no
+  race; it can add waiting only when two different metrics run at once in one process.
+  No region calls another or nests a parallel region, so the shared lock cannot deadlock.
+- A copy that had no counter now adds `0.0` partials to a driver-local `area` that its
+  wrapper never reads: no value it returns changes.
+- The selector reaches the hot loop as a constant only through the forced inlining of
+  step 3; without it the `switch` runs per pixel. Measure (step 7).
+- The oracle runs single-threaded and cannot see a race or a lock: `omp_compare.sh` and
+  the by-hand reading are the evidence for the region.
+
+**Evidence level:** oracle (cases reaching each folded copy), `tools/omp_compare.sh` at one
+and four threads, `refactor_guard.py --calls`, the step 7 reading and timing quoted in
+the message.
+
+**Provenance:** 2026-11-15, from `compare-similarity.c` (campaign A, W29 round eighteen
+lane b), the owner's ruling of 2026-11-15 allowing edits to OpenMP regions: six
+`Get*Similarity` functions share one row loop with a named critical merge each; a probe
+of the whole fold took the file from 2.97 to 3.01 (Bumpy Road 12 to 6 functions,
+Complex Method 23 to 17, Large Method 17 to 11). The W21 note that the MAE+MSE fold
+probes flat stands: the gain comes with the fourth and fifth copies. Added by Claude Code
+(Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -21286,3 +21448,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-15 | AMEND | WP | Step 8, *a wrapper no code calls*: a wrapper that meets steps 1 and 2 and that nothing calls (`git grep` finds only its definition and its declaration in a header listed under `MAGICKCORE_NOINST_HDRS`; `MagickPrivate`, hidden visibility; `casemap.py` 0 cases for wrapper and worker) may be converted at guard level when `obj_modulo.sh <file> <Wrapper> <Worker>` prints `IDENTICAL` or `MODULO-IDENTICAL`, `refactor_guard.py` drops only the wrapper's removed literals (`WARN`, every value present), `--calls` moves only the wrapper's removed calls and the prologue, and step 7's compile checks pass. A *Careful* bullet gives the argument (the transformation's argument rests on steps 1 and 2, read; nothing executes the wrapper or its `static` worker, and every other function compiles to the same instructions) | `accelerate.c`'s `AccelerateContrastStretchImage` (campaign A, W28 round seventeen lane a): no caller in the tree, a clone of `AccelerateGrayscaleImage`; a probe with it converted lists no *Code Duplication*, 3.24 to 3.49. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
 | 2026-11-15 | NEW | RI | Extract a Parallel Row Loop Filling Its Row Struct Once: a tail holding a parallel row loop whose body fills a private row struct member by member moves into `static MagickBooleanType Name(const S *rows)`; the invariant members (values nothing in the region writes, calls without side effects) are filled once by the caller in their order, the body copies `row=(*rows);` and sets the per-row members, and the body up to the row call and sync becomes a Recipe PC head; write set read by hand, omp_compare at one and four threads, timing | `composite.c`'s `CompositeImage` (W29 lane a): probe 4.24 to 4.33, no new finding | owner |
 | 2026-11-15 | NEW | FL | Fold a Twin Parallel Row Loop into Its Sibling Function Through a Flag: a block holding a parallel row loop that is, token for token and pragma included, the whole body of a `static` function of the file except for the row call (its own call after an invariant fill of a private row struct) becomes a flag in that function's `const` input struct and a call of it; a `static void` row function selects the call by the flag, and the row struct is filled once before the region; write set read by hand, omp_compare at one and four threads, timing | `composite.c`'s Intensity group and `CompositeCopyImage` (W29 lane a): probe 4.33 to 4.45, no new finding | owner |
+| 2026-11-15 | NEW | MR | Merge Reduction Row Loops Through a Metric Selector: `static` functions holding the same parallel row reduction (per-row partials from a per-pixel accumulate call, a named `omp critical` merge) fold into one driver taking a `const` input struct with an enumeration selector; a non-inline row function switches once per row into a forced-inline column loop and per-pixel dispatch so each group is compiled with its selector constant; the merge's differing operator goes to a forced-inline value function; the critical names become one; each copy keeps its name, its pre- and post-loop statements and calls the driver; OpenMP reading, `omp_compare.sh` at one and four threads and instruction counts quoted | `compare-similarity.c` (campaign A, W29 lane b): six `Get*Similarity` functions, probe 2.97 to 3.01 (Bumpy Road 12 to 6, Complex Method 23 to 17, Large Method 17 to 11 functions); `omp_compare` 52 runs, 0 diverged on the whole fold | owner |
