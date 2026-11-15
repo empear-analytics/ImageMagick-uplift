@@ -147,6 +147,26 @@ static MagickBooleanType HasRGBOrRGBAPixelOrder(const Image *image)
   return(MagickTrue);
 }
 
+static MagickBooleanType HasSupportedPixelOrder(const Image *image)
+{
+  /* check if pixel order is R */
+  if (GetPixelChannelOffset(image,RedPixelChannel) != 0)
+    return(MagickFalse);
+
+  if (image->number_channels == 1)
+    return(MagickTrue);
+
+  /* check if pixel order is RA */
+  if ((image->number_channels == 2) &&
+      (GetPixelChannelOffset(image,AlphaPixelChannel) == 1))
+    return(MagickTrue);
+
+  if (image->number_channels == 2)
+    return(MagickFalse);
+
+  return(HasRGBOrRGBAPixelOrder(image));
+}
+
 static MagickBooleanType checkAccelerateCondition(const Image* image)
 {
   /* only direct class images are supported */
@@ -173,22 +193,7 @@ static MagickBooleanType checkAccelerateCondition(const Image* image)
       (image->channel_mask > 0x7ffffff))
     return(MagickFalse);
 
-  /* check if pixel order is R */
-  if (GetPixelChannelOffset(image,RedPixelChannel) != 0)
-    return(MagickFalse);
-
-  if (image->number_channels == 1)
-    return(MagickTrue);
-
-  /* check if pixel order is RA */
-  if ((image->number_channels == 2) &&
-      (GetPixelChannelOffset(image,AlphaPixelChannel) == 1))
-    return(MagickTrue);
-
-  if (image->number_channels == 2)
-    return(MagickFalse);
-
-  return(HasRGBOrRGBAPixelOrder(image));
+  return(HasSupportedPixelOrder(image));
 }
 
 static MagickBooleanType HasUndefinedRGBATraits(const Image *image)
