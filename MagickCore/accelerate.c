@@ -4140,6 +4140,100 @@ static MagickBooleanType SetMotionBlurKernelArgs(
   return(MagickTrue);
 }
 
+typedef struct _MotionBlurLaunchInputs
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  cl_kernel
+    motionBlurKernel;
+
+  cl_mem
+    filteredImageBuffer;
+
+  const Image
+    *image;
+
+  void
+    *filteredPixels;
+
+  CacheView
+    *filteredImage_view;
+} MotionBlurLaunchInputs;
+
+static MagickBooleanType LaunchMotionBlurKernel(
+  const MotionBlurLaunchInputs *inputs,MagickBooleanType *outputReady,
+  ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = inputs->clEnv;
+
+  const cl_command_queue
+    queue = inputs->queue;
+
+  const Image
+    *const image = inputs->image;
+
+  cl_event
+    event;
+
+  cl_int
+    clStatus;
+
+  size_t
+    global_work_size[2],
+    length,
+    local_work_size[2];
+
+  /*
+    Launch the kernel.
+  */
+  local_work_size[0] = 16;
+  local_work_size[1] = 16;
+  global_work_size[0] = (size_t)padGlobalWorkgroupSizeToLocalWorkgroupSize(
+                                (unsigned int) image->columns,(unsigned int) local_work_size[0]);
+  global_work_size[1] = (size_t)padGlobalWorkgroupSizeToLocalWorkgroupSize(
+                                (unsigned int) image->rows,(unsigned int) local_work_size[1]);
+  clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, inputs->motionBlurKernel, 2, NULL,
+	  global_work_size, local_work_size, 0, NULL, &event);
+
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) ThrowMagickException(exception, GetMagickModule(), ModuleFatalError,
+      "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
+    return(MagickFalse);
+  }
+  RecordProfileData(inputs->device,inputs->motionBlurKernel,event);
+
+  if (ALIGNED(inputs->filteredPixels,CLPixelPacket))
+  {
+    length = image->columns * image->rows;
+    clEnv->library->clEnqueueMapBuffer(queue, inputs->filteredImageBuffer, CL_TRUE,
+      CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(CLPixelPacket), 0, NULL,
+      NULL, &clStatus);
+  }
+  else
+  {
+    length = image->columns * image->rows;
+    clStatus = clEnv->library->clEnqueueReadBuffer(queue, inputs->filteredImageBuffer, CL_TRUE, 0,
+      length * sizeof(CLPixelPacket), inputs->filteredPixels, 0, NULL, NULL);
+  }
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) ThrowMagickException(exception, GetMagickModule(), ModuleFatalError,
+      "Reading output image from CL buffer failed.", ".");
+    return(MagickFalse);
+  }
+  *outputReady=SyncCacheViewAuthenticPixels(inputs->filteredImage_view,exception);
+  return(MagickTrue);
+}
+
 static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
   const double *kernel,const size_t width,const OffsetInfo *offset,
   ExceptionInfo *exception)
@@ -4157,9 +4251,6 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
 
   cl_kernel
     motionBlurKernel;
-
-  cl_event
-    event;
 
   cl_mem
     filteredImageBuffer,
@@ -4186,9 +4277,7 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
     device;
 
   size_t
-    global_work_size[2],
-    length,
-    local_work_size[2];
+    length;
 
   unsigned int
     i;
@@ -4349,46 +4438,14 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
       goto cleanup;
   }
 
-  /*
-    Launch the kernel.
-  */
-  local_work_size[0] = 16;
-  local_work_size[1] = 16;
-  global_work_size[0] = (size_t)padGlobalWorkgroupSizeToLocalWorkgroupSize(
-                                (unsigned int) image->columns,(unsigned int) local_work_size[0]);
-  global_work_size[1] = (size_t)padGlobalWorkgroupSizeToLocalWorkgroupSize(
-                                (unsigned int) image->rows,(unsigned int) local_work_size[1]);
-  clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, motionBlurKernel, 2, NULL,
-	  global_work_size, local_work_size, 0, NULL, &event);
+  {
+    const MotionBlurLaunchInputs inputs = { clEnv, device, queue,
+      motionBlurKernel, filteredImageBuffer, image, filteredPixels,
+      filteredImage_view };
 
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) ThrowMagickException(exception, GetMagickModule(), ModuleFatalError,
-      "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
-    goto cleanup;
+    if (LaunchMotionBlurKernel(&inputs,&outputReady,exception) == MagickFalse)
+      goto cleanup;
   }
-  RecordProfileData(device,motionBlurKernel,event);
-
-  if (ALIGNED(filteredPixels,CLPixelPacket))
-  {
-    length = image->columns * image->rows;
-    clEnv->library->clEnqueueMapBuffer(queue, filteredImageBuffer, CL_TRUE,
-      CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(CLPixelPacket), 0, NULL,
-      NULL, &clStatus);
-  }
-  else
-  {
-    length = image->columns * image->rows;
-    clStatus = clEnv->library->clEnqueueReadBuffer(queue, filteredImageBuffer, CL_TRUE, 0,
-      length * sizeof(CLPixelPacket), filteredPixels, 0, NULL, NULL);
-  }
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) ThrowMagickException(exception, GetMagickModule(), ModuleFatalError,
-      "Reading output image from CL buffer failed.", ".");
-    goto cleanup;
-  }
-  outputReady=SyncCacheViewAuthenticPixels(filteredImage_view,exception);
 
 cleanup:
 
