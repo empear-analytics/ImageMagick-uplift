@@ -130,6 +130,23 @@ static MagickBooleanType IsUnsupportedVirtualPixelMethod(const Image *image)
     MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType HasRGBOrRGBAPixelOrder(const Image *image)
+{
+  /* check if pixel order is RGB */
+  if ((GetPixelChannelOffset(image,GreenPixelChannel) != 1) ||
+      (GetPixelChannelOffset(image,BluePixelChannel) != 2))
+    return(MagickFalse);
+
+  if (image->number_channels == 3)
+    return(MagickTrue);
+
+  /* check if pixel order is RGBA */
+  if (GetPixelChannelOffset(image,AlphaPixelChannel) != 3)
+    return(MagickFalse);
+
+  return(MagickTrue);
+}
+
 static MagickBooleanType checkAccelerateCondition(const Image* image)
 {
   /* only direct class images are supported */
@@ -171,19 +188,7 @@ static MagickBooleanType checkAccelerateCondition(const Image* image)
   if (image->number_channels == 2)
     return(MagickFalse);
 
-  /* check if pixel order is RGB */
-  if ((GetPixelChannelOffset(image,GreenPixelChannel) != 1) ||
-      (GetPixelChannelOffset(image,BluePixelChannel) != 2))
-    return(MagickFalse);
-
-  if (image->number_channels == 3)
-    return(MagickTrue);
-
-  /* check if pixel order is RGBA */
-  if (GetPixelChannelOffset(image,AlphaPixelChannel) != 3)
-    return(MagickFalse);
-
-  return(MagickTrue);
+  return(HasRGBOrRGBAPixelOrder(image));
 }
 
 static MagickBooleanType HasUndefinedRGBATraits(const Image *image)
