@@ -2040,6 +2040,56 @@ static void EqualizeColormap(Image *image,PixelPacket *equalize_map,
   }
 }
 
+typedef struct _EqualizeMapInput
+{
+  Image
+    *image;
+
+  cl_float4
+    *map,
+    white,
+    black;
+
+  PixelPacket
+    *equalize_map;
+} EqualizeMapInput;
+
+static void SetEqualizeMapEntry(const EqualizeMapInput *input,const cl_uint i)
+{
+  Image
+    *const image = input->image;
+
+  cl_float4
+    *const map = input->map;
+
+  const cl_float4
+    white = input->white,
+    black = input->black;
+
+  PixelPacket
+    *const equalize_map = input->equalize_map;
+
+  if ((image->channel_mask & SyncChannels) != 0)
+  {
+    if (white.x != black.x)
+      equalize_map[i].red=(unsigned int) ScaleMapToQuantum(
+        (MagickRealType) ((MaxMap*(map[i].x-black.x))/(white.x-black.x)));
+    return;
+  }
+  if (EqualizesRedChannel(image,white,black) != MagickFalse)
+    equalize_map[i].red=(unsigned int) ScaleMapToQuantum(
+      (MagickRealType) ((MaxMap*(map[i].x-black.x))/(white.x-black.x)));
+  if (EqualizesGreenChannel(image,white,black) != MagickFalse)
+    equalize_map[i].green=(unsigned int) ScaleMapToQuantum(
+      (MagickRealType) ((MaxMap*(map[i].y-black.y))/(white.y-black.y)));
+  if (EqualizesBlueChannel(image,white,black) != MagickFalse)
+    equalize_map[i].blue=(unsigned int) ScaleMapToQuantum(
+      (MagickRealType) ((MaxMap*(map[i].z-black.z))/(white.z-black.z)));
+  if (EqualizesAlphaChannel(image,white,black) != MagickFalse)
+    equalize_map[i].alpha=(unsigned int) ScaleMapToQuantum(
+      (MagickRealType) ((MaxMap*(map[i].w-black.w))/(white.w-black.w)));
+}
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -2083,6 +2133,9 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
 
   HistogramBufferInfo
     histogram_info;
+
+  EqualizeMapInput
+    map_input;
 
   MagickBooleanType
     outputReady,
@@ -2223,28 +2276,13 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   black=map[0];
   white=map[(int) MaxMap];
   (void) memset(equalize_map,0,(MaxMap+1)*sizeof(*equalize_map));
+  map_input.image=image;
+  map_input.map=map;
+  map_input.white=white;
+  map_input.black=black;
+  map_input.equalize_map=equalize_map;
   for (i=0; i <= (ssize_t) MaxMap; i++)
-  {
-    if ((image->channel_mask & SyncChannels) != 0)
-    {
-      if (white.x != black.x)
-        equalize_map[i].red=(unsigned int) ScaleMapToQuantum(
-          (MagickRealType) ((MaxMap*(map[i].x-black.x))/(white.x-black.x)));
-      continue;
-    }
-    if (EqualizesRedChannel(image,white,black) != MagickFalse)
-      equalize_map[i].red=(unsigned int) ScaleMapToQuantum(
-        (MagickRealType) ((MaxMap*(map[i].x-black.x))/(white.x-black.x)));
-    if (EqualizesGreenChannel(image,white,black) != MagickFalse)
-      equalize_map[i].green=(unsigned int) ScaleMapToQuantum(
-        (MagickRealType) ((MaxMap*(map[i].y-black.y))/(white.y-black.y)));
-    if (EqualizesBlueChannel(image,white,black) != MagickFalse)
-      equalize_map[i].blue=(unsigned int) ScaleMapToQuantum(
-        (MagickRealType) ((MaxMap*(map[i].z-black.z))/(white.z-black.z)));
-    if (EqualizesAlphaChannel(image,white,black) != MagickFalse)
-      equalize_map[i].alpha=(unsigned int) ScaleMapToQuantum(
-        (MagickRealType) ((MaxMap*(map[i].w-black.w))/(white.w-black.w)));
-  }
+    SetEqualizeMapEntry(&map_input,i);
 
   if (image->storage_class == PseudoClass)
   {
