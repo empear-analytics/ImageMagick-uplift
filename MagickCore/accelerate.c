@@ -485,6 +485,15 @@ static void ReleaseKernel(cl_kernel kernel)
     ReleaseOpenCLKernel(kernel);
 }
 
+static void ReleaseAccelerateQueue(MagickCLDevice device,
+  cl_command_queue queue)
+{
+  if (queue != (cl_command_queue) NULL)
+    ReleaseOpenCLCommandQueue(device,queue);
+  if (device != (MagickCLDevice) NULL)
+    ReleaseOpenCLDevice(device);
+}
+
 static Image *ComputeBlurImage(const Image* image,MagickCLEnv clEnv,
   const double radius,const double sigma,ExceptionInfo *exception)
 {
@@ -654,10 +663,7 @@ cleanup:
   ReleaseOpenCLBuffer(imageKernelBuffer);
   ReleaseKernel(blurRowKernel);
   ReleaseKernel(blurColumnKernel);
-  if (queue != (cl_command_queue) NULL)
-    ReleaseOpenCLCommandQueue(device,queue);
-  if (device != (MagickCLDevice) NULL)
-    ReleaseOpenCLDevice(device);
+  ReleaseAccelerateQueue(device,queue);
   if ((outputReady == MagickFalse) && (filteredImage != (Image *) NULL))
     filteredImage=DestroyImage(filteredImage);
 
