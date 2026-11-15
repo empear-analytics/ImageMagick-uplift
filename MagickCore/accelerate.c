@@ -3852,6 +3852,19 @@ MagickPrivate Image *AccelerateMotionBlurImage(const Image *image,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 */
 
+static size_t GetGammaAccumulatorSize(const cl_uint number_channels,
+  const unsigned int chunkSize)
+{
+  size_t
+    gammaAccumulatorLocalMemorySize;
+
+  if ((number_channels == 4) || (number_channels == 2))
+    gammaAccumulatorLocalMemorySize=chunkSize*sizeof(float);
+  else
+    gammaAccumulatorLocalMemorySize=sizeof(float);
+  return(gammaAccumulatorLocalMemorySize);
+}
+
 static MagickBooleanType resizeHorizontalFilter(MagickCLDevice device,
   cl_command_queue queue,const Image *image,Image *filteredImage,
   cl_mem imageBuffer,cl_uint number_channels,cl_uint columns,cl_uint rows,
@@ -3949,10 +3962,8 @@ RestoreMSCWarning
     totalLocalMemorySize+=weightAccumulatorLocalMemorySize;
 
     /* local memory size for the gamma accumulator */
-    if ((number_channels == 4) || (number_channels == 2))
-      gammaAccumulatorLocalMemorySize=chunkSize*sizeof(float);
-    else
-      gammaAccumulatorLocalMemorySize=sizeof(float);
+    gammaAccumulatorLocalMemorySize=GetGammaAccumulatorSize(number_channels,
+      chunkSize);
     totalLocalMemorySize+=gammaAccumulatorLocalMemorySize;
 
     if (totalLocalMemorySize <= device->local_memory_size)
