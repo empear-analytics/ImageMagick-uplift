@@ -25,11 +25,15 @@ Recipe I gives:
     exits. Each removed exit (`goto L;`, `return ...;`, or step 1's `break;` of the
     enclosing `switch`) must reappear unchanged among the added lines outside HELPER
     (the caller's one exit after the call, step 7 or 8; several removed exits of the
-    same text are matched by that one line), and HELPER must hold as many
-    `return(MagickFalse);` as the block had exits;
+    same text are matched by that one line; when `git diff` pairs that line with the
+    block's last exit and shows it as unchanged context, the line that directly
+    follows the call's `if (HELPER(...) == MagickFalse)` in the working tree counts
+    as both, removed and added), and HELPER must hold as many `return(MagickFalse);`
+    as the block had exits;
   - nothing else is added: every added line outside HELPER's body belongs to the
-    typedef, HELPER's signature, the declaration of LOCAL, its fill, the call, or is
-    the exit matched above.
+    typedef, HELPER's signature, the declaration of LOCAL, its fill (the `const`
+    initialiser may be wrapped over several lines), the call, or is the exit matched
+    above.
 
 It prints OK or FAIL with the line that broke the rule. It cannot check types, nor the
 precedence of `*m` against `->` and `[]` (a wrong one does not compile for the pointer
@@ -121,8 +125,31 @@ def canonical(line, names):
     return line
 
 
-def diff_lines(path):
-    diff = subprocess.run(["git", "diff", "-U0", "HEAD", "--", path],
+def kept_exits(path, helper, new_lines):
+    """The exit directly after each `if (HELPER(...) == MagickFalse)` that the diff adds.
+
+    `git diff` may pair the caller's new exit with the block's last exit of the same text
+    and show it as unchanged context; that line is then both a removed exit and the
+    caller's added one. Only a call whose first line is an added line (its number in
+    NEW_LINES) counts, so an unchanged caller elsewhere in the file lends no exit."""
+    with open(path) as f:
+        text = f.read()
+    call = (r"\bif \(" + re.escape(helper) + r"\([^;{}]*?\)\s*==\s*MagickFalse\)\n"
+            r"\s*(goto \w+;|return\b[^\n]*;|break;)\n")
+    return [m.group(1) for m in re.finditer(call, text)
+            if text.count("\n", 0, m.start()) + 1 in new_lines]
+
+
+def add_kept_exits(step, removed, added, new_lines):
+    """Count each kept exit (kept_exits) that git diff did not list as added."""
+    for exit_line in kept_exits(step.path, step.helper, new_lines):
+        if exit_line not in added:  # shown as context: the block's and the caller's
+            removed.append(exit_line)
+            added.append(exit_line)
+
+
+def diff_lines(step):
+    diff = subprocess.run(["git", "diff", "-U0", "HEAD", "--", step.path],
                           capture_output=True, text=True, check=True).stdout
     removed, added = [], []
     for line in diff.splitlines():
@@ -131,15 +158,25 @@ def diff_lines(path):
             continue
         if line[:1] in "-+":
             (removed if line[0] == "-" else added).append(text)
+    add_kept_exits(step, removed, added, added_line_numbers(diff))
     return removed, added
 
 
-def check_rewrite(path, body, ptr, names):
+def added_line_numbers(diff):
+    """The working-tree line numbers of the lines a `git diff -U0` adds."""
+    numbers = set()
+    for m in re.finditer(r"^@@ -\S+ \+(\d+)(?:,(\d+))? @@", diff, re.M):
+        first, count = int(m.group(1)), int(m.group(2) or 1)
+        numbers.update(range(first, first + count))
+    return numbers
+
+
+def check_rewrite(step, body, ptr, names):
     """Compare as multisets: each removed line moves once, nothing is added twice.
 
     A declarator list may lose or gain its last name (`*head,` becomes `*head;`), so
     a trailing `,` or `;` of a line does not count."""
-    removed, added = diff_lines(path)
+    removed, added = diff_lines(step)
     body_lines = [b.strip() for b in body.splitlines()]
     body_lines = [b for b in body_lines if b not in TRIVIAL]
     outside = Counter(added)
@@ -199,8 +236,8 @@ def check_outside(text, step, outside):
                             text, re.M):
         allowed |= {l.strip() for l in call.group(0).splitlines()}  # a wrapped call
     init = re.search(r"^\s*(" + re.escape(step.local) + r"\s*=\s*\{[^}]*\};)", text, re.M)
-    if init:
-        allowed.add(init.group(1).strip())  # the const form, checked by check_fill
+    if init:  # the const form, checked by check_fill; it may be wrapped
+        allowed |= set(map(str.strip, init.group(1).splitlines()))
     problems = []
     for line, n in outside.items():
         if n <= 0 or line in allowed:
@@ -224,7 +261,7 @@ def main(argv):
     ptr, bad = check_bindings(params, body, step.type_name, names)
     problems += bad
     if ptr:
-        moved, outside = check_rewrite(step.path, body, ptr, names)
+        moved, outside = check_rewrite(step, body, ptr, names)
         problems += moved + check_outside(text, step, outside)
     for line in problems:
         print("FAIL:", line)
