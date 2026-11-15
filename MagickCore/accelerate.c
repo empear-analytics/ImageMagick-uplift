@@ -2491,6 +2491,79 @@ MagickPrivate MagickBooleanType AccelerateEqualizeImage(Image *image,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 */
 
+typedef struct _FunctionKernelInputs
+{
+  MagickCLDevice
+    device;
+
+  size_t
+    number_parameters;
+
+  const double
+    *parameters;
+} FunctionKernelInputs;
+
+typedef struct _FunctionKernelTargets
+{
+  cl_mem
+    *parametersBuffer;
+
+  cl_kernel
+    *functionKernel;
+} FunctionKernelTargets;
+
+static MagickBooleanType AcquireFunctionKernel(
+  const FunctionKernelInputs *inputs,ExceptionInfo *exception,
+  const FunctionKernelTargets *targets)
+{
+  const MagickCLDevice
+    device = inputs->device;
+
+  const size_t
+    number_parameters = inputs->number_parameters;
+
+  const double
+    *const parameters = inputs->parameters;
+
+  cl_mem
+    *const parametersBuffer = targets->parametersBuffer;
+
+  cl_kernel
+    *const functionKernel = targets->functionKernel;
+
+  float
+    *parametersBufferPtr;
+
+  size_t
+    i;
+
+  parametersBufferPtr=(float *) AcquireQuantumMemory(number_parameters,
+    sizeof(float));
+  if (parametersBufferPtr == (float *) NULL)
+    return(MagickFalse);
+  for (i=0; i<number_parameters; i++)
+    parametersBufferPtr[i]=(float) parameters[i];
+  *parametersBuffer=CreateOpenCLBuffer(device,CL_MEM_READ_ONLY |
+    CL_MEM_COPY_HOST_PTR,number_parameters*sizeof(*parametersBufferPtr),
+    parametersBufferPtr);
+  parametersBufferPtr=(float *) RelinquishMagickMemory(parametersBufferPtr);
+  if (*parametersBuffer == (cl_mem) NULL)
+  {
+    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
+      ResourceLimitWarning,"CreateOpenCLBuffer failed.",".");
+    return(MagickFalse);
+  }
+
+  *functionKernel=AcquireOpenCLKernel(device,"ComputeFunction");
+  if (*functionKernel == (cl_kernel) NULL)
+  {
+    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
+      ResourceLimitWarning,"AcquireOpenCLKernel failed.",".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeFunctionImage(Image *image,MagickCLEnv clEnv,
   const MagickFunction function,const size_t number_parameters,
   const double *parameters,ExceptionInfo *exception)
@@ -2513,8 +2586,11 @@ static MagickBooleanType ComputeFunctionImage(Image *image,MagickCLEnv clEnv,
     number_params,
     number_channels;
 
-  float
-    *parametersBufferPtr;
+  FunctionKernelInputs
+    inputs;
+
+  FunctionKernelTargets
+    kernel_targets;
 
   MagickBooleanType
     outputReady;
@@ -2543,30 +2619,13 @@ static MagickBooleanType ComputeFunctionImage(Image *image,MagickCLEnv clEnv,
   if (AcquireAccelerateImageBuffer(clEnv,image,exception,&targets) == MagickFalse)
     goto cleanup;
 
-  parametersBufferPtr=(float *) AcquireQuantumMemory(number_parameters,
-    sizeof(float));
-  if (parametersBufferPtr == (float *) NULL)
+  inputs.device=device;
+  inputs.number_parameters=number_parameters;
+  inputs.parameters=parameters;
+  kernel_targets.parametersBuffer=(&parametersBuffer);
+  kernel_targets.functionKernel=(&functionKernel);
+  if (AcquireFunctionKernel(&inputs,exception,&kernel_targets) == MagickFalse)
     goto cleanup;
-  for (i=0; i<number_parameters; i++)
-    parametersBufferPtr[i]=(float) parameters[i];
-  parametersBuffer=CreateOpenCLBuffer(device,CL_MEM_READ_ONLY |
-    CL_MEM_COPY_HOST_PTR,number_parameters*sizeof(*parametersBufferPtr),
-    parametersBufferPtr);
-  parametersBufferPtr=(float *) RelinquishMagickMemory(parametersBufferPtr);
-  if (parametersBuffer == (cl_mem) NULL)
-  {
-    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
-      ResourceLimitWarning,"CreateOpenCLBuffer failed.",".");
-    goto cleanup;
-  }
-
-  functionKernel=AcquireOpenCLKernel(device,"ComputeFunction");
-  if (functionKernel == (cl_kernel) NULL)
-  {
-    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
-      ResourceLimitWarning,"AcquireOpenCLKernel failed.",".");
-    goto cleanup;
-  }
 
   number_channels=(cl_uint) image->number_channels;
   number_params=(cl_uint) number_parameters;
