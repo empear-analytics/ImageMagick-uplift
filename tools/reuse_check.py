@@ -425,7 +425,7 @@ def main(argv):
     note = note_proto
     if returned:
         target = returned.group(1)
-        bound = [p for a, p, ptr in binds if a == target and not ptr]
+        bound = [p for a, p, _ in binds if a == target]
         own_decl = [i for i in range(1, len(body_lines))
                     if body_lines[i] == f"{target};"
                     and re.fullmatch(r"[\w\s]+", body_lines[i - 1])]
