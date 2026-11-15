@@ -908,6 +908,20 @@ static void StretchColormap(Image *image,PixelPacket *stretch_map,
   }
 }
 
+static void StretchImageClass(Image *image,PixelPacket *stretch_map,
+  const cl_float4 black,const cl_float4 white)
+{
+  if (IsStretchDirectClass(image) != MagickFalse)
+    image->storage_class=DirectClass;
+  if (image->storage_class == PseudoClass)
+  {
+    /*
+       Stretch colormap.
+       */
+    StretchColormap(image,stretch_map,black,white);
+  }
+}
+
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
   MagickCLEnv clEnv,const double black_point,const double white_point,
   ExceptionInfo *exception)
@@ -1206,15 +1220,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   /*
     Stretch the image.
   */
-  if (IsStretchDirectClass(image) != MagickFalse)
-    image->storage_class=DirectClass;
-  if (image->storage_class == PseudoClass)
-  {
-    /*
-       Stretch colormap.
-       */
-    StretchColormap(image,stretch_map,black,white);
-  }
+  StretchImageClass(image,stretch_map,black,white);
 
   /*
     Stretch image.
