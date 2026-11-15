@@ -4566,8 +4566,7 @@ cleanup:
   ReleaseOpenCLBuffer(tempImageBuffer);
   ReleaseOpenCLBuffer(cubicCoefficientsBuffer);
   ReleaseAccelerateQueue(device,queue);
-  if ((outputReady == MagickFalse) && (filteredImage != (Image *) NULL))
-    filteredImage=DestroyImage(filteredImage);
+  filteredImage=DestroyUnfinishedImage(outputReady,filteredImage);
 
   return(filteredImage);
 }
