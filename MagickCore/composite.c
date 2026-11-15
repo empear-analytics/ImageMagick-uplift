@@ -3974,6 +3974,75 @@ static void CompositeChannelColorStereoToThreshold(const CompositeRowInputs *row
   }
 }
 
+static void CompositeChannelColorSoftBurnToStamp(const CompositeRowInputs *row,
+  const CompositePixelInputs *authentic,const CompositeChannelInputs *tile,
+  MagickRealType *pixel)
+{
+  const CompositeOperator
+    compose = row->compose;
+
+  const MagickRealType
+    Da = authentic->Da,
+    Sa = authentic->Sa;
+
+  const MagickRealType
+    Dca = tile->Dca,
+    Sca = tile->Sca;
+
+  const double
+    gamma = tile->gamma;
+
+  MagickRealType
+    blend = 0.0;
+
+  switch (compose)
+  {
+    case SoftBurnCompositeOp:
+    {
+      blend=GetSoftBurnBlend(Sca,Dca);
+      (*pixel)=(double) QuantumRange*gamma*RoundToUnity(blend);
+      break;
+    }
+    case SoftDodgeCompositeOp:
+    {
+      blend=GetSoftDodgeBlend(Sca,Dca);
+      (*pixel)=(double) QuantumRange*gamma*RoundToUnity(blend);
+      break;
+    }
+    case SoftLightCompositeOp:
+    {
+      if (RoundToUnity(Sca) <= 0.5)
+        {
+          (*pixel)=(double) QuantumRange*gamma*(RoundToUnity(Dca)*Sa+Da*
+           (RoundToUnity(Dca)-(1.0-2.0*RoundToUnity(Sca))*
+           RoundToUnity(Dca)*(1.0-RoundToUnity(Dca)))+RoundToUnity(Sca)*
+           (1.0-Da)+RoundToUnity(Dca)*(1.0-Sa));
+          break;
+        }
+      if (RoundToUnity(Dca) > 0.25)
+        blend=sqrt(RoundToUnity(Dca));
+      else
+        blend=((16.0*RoundToUnity(Dca)-12.0)*RoundToUnity(Dca)+4.0)*
+          RoundToUnity(Dca);
+      (*pixel)=(double) QuantumRange*gamma*(RoundToUnity(Dca)*Sa+Da*
+        (RoundToUnity(Dca)+(2.0*RoundToUnity(Sca)-1.0)*
+        (RoundToUnity(blend)-RoundToUnity(Dca)))+RoundToUnity(Sca)*
+        (1.0-Da)+RoundToUnity(Dca)*(1.0-Sa));
+      break;
+    }
+    case StampCompositeOp:
+    {
+      (*pixel)=(double) QuantumRange*RoundToUnity(Sca+Dca-1.0);
+      break;
+    }
+    default:
+    {
+      CompositeChannelColorStereoToThreshold(row,authentic,tile,pixel);
+      break;
+    }
+  }
+}
+
 static void CompositeChannelColor(const CompositeRowInputs *row,
   const CompositePixelInputs *authentic,const CompositeChannelInputs *tile,
   MagickRealType *pixel)
@@ -4712,47 +4781,9 @@ static void CompositeChannelColor(const CompositeRowInputs *row,
         Dca*(1.0-Sa));
       break;
     }
-    case SoftBurnCompositeOp:
-    {
-      blend=GetSoftBurnBlend(Sca,Dca);
-      (*pixel)=(double) QuantumRange*gamma*RoundToUnity(blend);
-      break;
-    }
-    case SoftDodgeCompositeOp:
-    {
-      blend=GetSoftDodgeBlend(Sca,Dca);
-      (*pixel)=(double) QuantumRange*gamma*RoundToUnity(blend);
-      break;
-    }
-    case SoftLightCompositeOp:
-    {
-      if (RoundToUnity(Sca) <= 0.5)
-        {
-          (*pixel)=(double) QuantumRange*gamma*(RoundToUnity(Dca)*Sa+Da*
-           (RoundToUnity(Dca)-(1.0-2.0*RoundToUnity(Sca))*
-           RoundToUnity(Dca)*(1.0-RoundToUnity(Dca)))+RoundToUnity(Sca)*
-           (1.0-Da)+RoundToUnity(Dca)*(1.0-Sa));
-          break;
-        }
-      if (RoundToUnity(Dca) > 0.25)
-        blend=sqrt(RoundToUnity(Dca));
-      else
-        blend=((16.0*RoundToUnity(Dca)-12.0)*RoundToUnity(Dca)+4.0)*
-          RoundToUnity(Dca);
-      (*pixel)=(double) QuantumRange*gamma*(RoundToUnity(Dca)*Sa+Da*
-        (RoundToUnity(Dca)+(2.0*RoundToUnity(Sca)-1.0)*
-        (RoundToUnity(blend)-RoundToUnity(Dca)))+RoundToUnity(Sca)*
-        (1.0-Da)+RoundToUnity(Dca)*(1.0-Sa));
-      break;
-    }
-    case StampCompositeOp:
-    {
-      (*pixel)=(double) QuantumRange*RoundToUnity(Sca+Dca-1.0);
-      break;
-    }
     default:
     {
-      CompositeChannelColorStereoToThreshold(row,authentic,tile,pixel);
+      CompositeChannelColorSoftBurnToStamp(row,authentic,tile,pixel);
       break;
     }
   }
