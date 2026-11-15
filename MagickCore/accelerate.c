@@ -4229,10 +4229,8 @@ RestoreMSCWarning
     totalLocalMemorySize+=weightAccumulatorLocalMemorySize;
 
     /* local memory size for the gamma accumulator */
-    if ((number_channels == 4) || (number_channels == 2))
-      gammaAccumulatorLocalMemorySize=chunkSize*sizeof(float);
-    else
-      gammaAccumulatorLocalMemorySize=sizeof(float);
+    gammaAccumulatorLocalMemorySize=GetGammaAccumulatorSize(number_channels,
+      chunkSize);
     totalLocalMemorySize+=gammaAccumulatorLocalMemorySize;
 
     if (totalLocalMemorySize <= device->local_memory_size)
