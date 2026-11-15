@@ -3212,6 +3212,19 @@ static void ReleaseLocalContrastBuffers(const LocalContrastBufferInputs *inputs)
     clEnv->library->clReleaseMemObject(imageKernelBuffer);
 }
 
+static void ReleaseLocalContrastKernels(cl_kernel blurRowKernel,
+  cl_kernel blurColumnKernel,cl_command_queue queue,MagickCLDevice device)
+{
+  if (blurRowKernel!=NULL)
+    ReleaseOpenCLKernel(blurRowKernel);
+  if (blurColumnKernel!=NULL)
+    ReleaseOpenCLKernel(blurColumnKernel);
+  if (queue != NULL)
+    ReleaseOpenCLCommandQueue(device, queue);
+  if (device != NULL)
+    ReleaseOpenCLDevice(device);
+}
+
 static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
   const double radius,const double strength,ExceptionInfo *exception)
 {
@@ -3378,14 +3391,7 @@ cleanup:
 
     ReleaseLocalContrastBuffers(&inputs);
   }
-  if (blurRowKernel!=NULL)
-    ReleaseOpenCLKernel(blurRowKernel);
-  if (blurColumnKernel!=NULL)
-    ReleaseOpenCLKernel(blurColumnKernel);
-  if (queue != NULL)
-    ReleaseOpenCLCommandQueue(device, queue);
-  if (device != NULL)
-    ReleaseOpenCLDevice(device);
+  ReleaseLocalContrastKernels(blurRowKernel,blurColumnKernel,queue,device);
   if ((outputReady == MagickFalse) && (filteredImage != NULL))
   {
     DestroyImage(filteredImage);
