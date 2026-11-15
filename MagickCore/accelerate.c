@@ -563,6 +563,14 @@ static MagickBooleanType AcquireAccelerateBuffers(MagickCLEnv clEnv,
   return(MagickTrue);
 }
 
+static Image *DestroyUnfinishedImage(const MagickBooleanType outputReady,
+  Image *filteredImage)
+{
+  if ((outputReady == MagickFalse) && (filteredImage != (Image *) NULL))
+    filteredImage=DestroyImage(filteredImage);
+  return(filteredImage);
+}
+
 static void
   TraceAccelerateImage(const Image *);
 
@@ -722,8 +730,7 @@ cleanup:
   ReleaseKernel(blurRowKernel);
   ReleaseKernel(blurColumnKernel);
   ReleaseAccelerateQueue(device,queue);
-  if ((outputReady == MagickFalse) && (filteredImage != (Image *) NULL))
-    filteredImage=DestroyImage(filteredImage);
+  filteredImage=DestroyUnfinishedImage(outputReady,filteredImage);
 
   return(filteredImage);
 }
