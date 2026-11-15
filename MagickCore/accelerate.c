@@ -3335,6 +3335,93 @@ static MagickBooleanType LaunchLocalContrastRowStage(
   return(MagickTrue);
 }
 
+typedef struct _LocalContrastStageInputs
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  const Image
+    *image;
+
+  cl_mem
+    imageBuffer,
+    filteredImageBuffer;
+
+  double
+    radius,
+    strength;
+} LocalContrastStageInputs;
+
+typedef struct _LocalContrastStageTargets
+{
+  cl_mem
+    *tempImageBuffer;
+
+  cl_kernel
+    *blurRowKernel,
+    *blurColumnKernel;
+} LocalContrastStageTargets;
+
+static MagickBooleanType RunLocalContrastKernels(
+  const LocalContrastStageInputs *stage,ExceptionInfo *exception,
+  const LocalContrastStageTargets *kernels)
+{
+  cl_mem
+    *const tempImageBuffer = kernels->tempImageBuffer;
+
+  cl_kernel
+    *const blurRowKernel = kernels->blurRowKernel,
+    *const blurColumnKernel = kernels->blurColumnKernel;
+
+  cl_int
+    iRadius;
+
+  unsigned int
+    imageColumns,
+    imageRows,
+    passes;
+
+  {
+    {
+      const LocalContrastKernelInputs inputs = { stage->clEnv, stage->device, stage->image };
+      const LocalContrastKernelTargets targets = { tempImageBuffer,
+        blurRowKernel, blurColumnKernel };
+
+      if (AcquireLocalContrastKernels(&inputs,exception,&targets) ==
+          MagickFalse)
+        return(MagickFalse);
+    }
+
+    {
+      const LocalContrastRowInputs inputs = { stage->clEnv, stage->device, stage->queue,
+        *blurRowKernel, stage->imageBuffer, stage->filteredImageBuffer, *tempImageBuffer,
+        stage->image, stage->radius };
+      const LocalContrastRowTargets targets = { &imageColumns, &imageRows,
+        &iRadius, &passes };
+
+      if (LaunchLocalContrastRowStage(&inputs,exception,&targets) ==
+          MagickFalse)
+        return(MagickFalse);
+    }
+
+    {
+      const LocalContrastColumnInputs inputs = { stage->clEnv, stage->device, stage->queue,
+        *blurColumnKernel, stage->imageBuffer, stage->filteredImageBuffer, *tempImageBuffer,
+        iRadius, stage->strength, imageColumns, imageRows, passes, stage->image };
+
+      if (LaunchLocalContrastBlurColumn(&inputs,exception) == MagickFalse)
+        return(MagickFalse);
+    }
+  }
+  return(MagickTrue);
+}
+
 static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
   const double radius,const double strength,ExceptionInfo *exception)
 {
@@ -3346,8 +3433,7 @@ static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
     queue;
 
   cl_int
-    clStatus,
-    iRadius;
+    clStatus;
 
   cl_kernel
     blurRowKernel,
@@ -3373,11 +3459,6 @@ static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
 
   void
     *filteredPixels;
-
-  unsigned int
-    imageColumns,
-    imageRows,
-    passes;
 
   if (clEnv == (MagickCLEnv) NULL)
     return((Image *) NULL);
@@ -3413,36 +3494,13 @@ static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
   }
 
   {
-    {
-      const LocalContrastKernelInputs inputs = { clEnv, device, image };
-      const LocalContrastKernelTargets targets = { &tempImageBuffer,
-        &blurRowKernel, &blurColumnKernel };
+    const LocalContrastStageInputs inputs = { clEnv, device, queue, image,
+      imageBuffer, filteredImageBuffer, radius, strength };
+    const LocalContrastStageTargets targets = { &tempImageBuffer,
+      &blurRowKernel, &blurColumnKernel };
 
-      if (AcquireLocalContrastKernels(&inputs,exception,&targets) ==
-          MagickFalse)
-        goto cleanup;
-    }
-
-    {
-      const LocalContrastRowInputs inputs = { clEnv, device, queue,
-        blurRowKernel, imageBuffer, filteredImageBuffer, tempImageBuffer,
-        image, radius };
-      const LocalContrastRowTargets targets = { &imageColumns, &imageRows,
-        &iRadius, &passes };
-
-      if (LaunchLocalContrastRowStage(&inputs,exception,&targets) ==
-          MagickFalse)
-        goto cleanup;
-    }
-
-    {
-      const LocalContrastColumnInputs inputs = { clEnv, device, queue,
-        blurColumnKernel, imageBuffer, filteredImageBuffer, tempImageBuffer,
-        iRadius, strength, imageColumns, imageRows, passes, image };
-
-      if (LaunchLocalContrastBlurColumn(&inputs,exception) == MagickFalse)
-        goto cleanup;
-    }
+    if (RunLocalContrastKernels(&inputs,exception,&targets) == MagickFalse)
+      goto cleanup;
   }
 
   /* get result */
