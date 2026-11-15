@@ -19387,6 +19387,19 @@ returns; Recipe G, which keeps every test in the wrapper.
    `refactor_guard.py --calls`, and the oracle on the wrapper and on its worker (the wide build
    for a wide file), with line coverage showing a case on the failed fetch and a case in the
    worker.
+8. *A wrapper no code calls* (2026-11-15). A wrapper that meets steps 1 and 2 and that no
+   case can reach because nothing calls it may be converted at guard level, `Verified: guard`,
+   when all of these hold, each run before the commit and quoted in its message: `git grep -n
+   <Wrapper>` finds its definition and its declaration in a header that is not installed (one
+   listed under `MAGICKCORE_NOINST_HDRS` in `MagickCore/Makefile.am`) and nothing else that is
+   code; the wrapper is `MagickPrivate` (hidden visibility, so no program linked against the
+   library can name it); `casemap.py` shows 0 cases for the wrapper and for its worker; `WIDE=1
+   sh tools/obj_modulo.sh <file> <Wrapper> <Worker>` (without `WIDE=1` for a narrow-build file)
+   prints `IDENTICAL` or `MODULO-IDENTICAL`; `refactor_guard.py` drops only the literals of the
+   wrapper's removed asserts, log and returns, every value still present (`WARN`), and
+   `--calls` moves only the wrapper's removed calls (each down by one) and the prologue
+   (up by one); and step 7's compile checks pass. Steps 1 and 2 are checked by reading and
+   quoted in the message.
 
 **Before:**
 
@@ -19456,13 +19469,20 @@ MagickPrivate Image* AccelerateBlurImage(const Image *image,
 - The test of step 3 calls the same functions on the same image in the same order with the
   same short-circuit. Selectors and trace names are constants at each call.
 - Not a hot path: the prologue runs once per image operation.
+- A wrapper no code calls (step 8). The argument above rests on steps 1 and 2, which are read,
+  not on the oracle: the oracle only confirms it for wrappers some case runs. For a wrapper
+  nothing calls, no execution of the library or of any program linked against it runs the
+  wrapper or its worker (the worker is `static` and called only by the wrapper, step 2), so no
+  output can change through them; `obj_modulo.sh` shows that every other function compiles to
+  the same instructions, so the edit reached nothing else. The conversion still preserves the
+  wrapper's behaviour by the argument above, should a caller be added later.
 - A wrapper converted for a latent clone (step 6) carries no finding when it is converted:
   the transformation, and so the argument above, is the same as for a flagged wrapper (the
   argument never rests on the finding, only on steps 1 and 2). Only the reason to take the step
   is a probe of a later step, which changes no code.
 
 **Evidence level:** oracle (wide build for a wide file), with step 7's checks, and steps 1 and
-2 by reading.
+2 by reading; for a wrapper no code calls, guard level with step 8's checks.
 
 **Provenance:** 2026-11-13, from `accelerate.c`'s `Accelerate*Image` wrappers (campaign A, W22,
 lane d). Ten wrappers carried *Code Duplication*: a shared helper with an `if`-return in each
@@ -19470,6 +19490,12 @@ wrapper, the original prologue with a single return, and two statements with a `
 flagged (3.27 to 3.35); bodies of one statement clear the finding (a probe of four wrappers,
 3.27 to 3.71). Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to
 evolve the recipes.
+Step 8 (2026-11-15, campaign A W28 round seventeen lane a, Claude Code, Claude Opus 5.5, under
+the owner's OK of 2026-11-10 to evolve the recipes): `accelerate.c`'s
+`AccelerateContrastStretchImage`, which nothing in the tree calls (its one declaration is in
+`accelerate-private.h`, a `MAGICKCORE_NOINST_HDRS` header) and whose clone of
+`AccelerateGrayscaleImage` holds the file's *Code Duplication* finding (six functions); a probe
+with the wrapper converted lists no *Code Duplication* at all, 3.24 to 3.49.
 
 ---
 
@@ -20933,3 +20959,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-15 | NEW | SZ | a run of zeroing writes (`memset(&v,0,sizeof(v))` of plain locals, `memset(p,0,n)` of heap blocks the function allocated, or a `static void` helper made of such calls) moves, unchanged and in order, to directly above the first later statement of the same compound statement that reads a zeroed object, when the crossed statements name no zeroed local, write no pointer or size operand, and reach a zeroed block only through a release on a path that leaves; flat alone, taken only as the first step of a probed extraction | `feature-texture.c`'s `GetImageFeatures` (campaign A, W26 round fifteen lane c): the nine statistics and four buffers zeroed before the row allocation, the matrix fill and the normalisation, read first by the direction passes; a probe of the chain sink, N, FB, N step 8: every function under 70 lines, 8.72 to 9.38. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
 | 2026-11-15 | AMEND | N | Step 8, the function-body siblings form (a later block holding an earlier sibling's call takes its `const Name *name`): a statement of the later block before the call may write a member's variable when every path through the write returns before the call (the later block binds that member read-then-written), and a variable the later block only reads that is not a member goes by value as a parameter after `name` (Recipe E step 3), at most four parameters | `feature-texture.c`'s `GetImageFeatures` (campaign A, W26 round fifteen lane c): its tail (the buffers check, the row allocation, the matrix fill and their exits, the normalisation, the call of the direction passes' function, the release) holds the call of the function that takes `FeatureAnalysis`; its exits write `channel_features`, a member, and return, and it reads `distance`, `exception` and `grays`, which the direction passes do not. A probe of the chain: every function under 70 lines, 8.72 to 9.38. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
 | 2026-11-15 | AMEND | Y | Step 7: another block of the file whose text equals, under Recipe D's renaming (checked by script; `diff` of the line ranges for verbatim copies), the block a Recipe Y function was cut from calls that function instead of a second copy, in the same caller or another, with its own struct fill, written variable, temporaries and exit, steps 1 to 6 checked for the copy; one commit per caller. *Careful* gives the argument (Recipe V step 6, W step 7, LB step 6 and I step 7 make it for their forms) | `accelerate.c`'s `ComputeDespeckleImage` (campaign A, W27 round sixteen lane a): four verbatim copies of the hull-pass launch pair, each leaving through `goto cleanup;`; a second function of the same text would be a duplicate, and Recipe D may not leave the caller. Probe (stub procedure, other 18 Complex/Large functions emptied): 7.58 to 7.62 for the first copy, 7.75 with all four | owner |
+| 2026-11-15 | AMEND | WP | Step 8, *a wrapper no code calls*: a wrapper that meets steps 1 and 2 and that nothing calls (`git grep` finds only its definition and its declaration in a header listed under `MAGICKCORE_NOINST_HDRS`; `MagickPrivate`, hidden visibility; `casemap.py` 0 cases for wrapper and worker) may be converted at guard level when `obj_modulo.sh <file> <Wrapper> <Worker>` prints `IDENTICAL` or `MODULO-IDENTICAL`, `refactor_guard.py` drops only the wrapper's removed literals (`WARN`, every value present), `--calls` moves only the wrapper's removed calls and the prologue, and step 7's compile checks pass. A *Careful* bullet gives the argument (the transformation's argument rests on steps 1 and 2, read; nothing executes the wrapper or its `static` worker, and every other function compiles to the same instructions) | `accelerate.c`'s `AccelerateContrastStretchImage` (campaign A, W28 round seventeen lane a): no caller in the tree, a clone of `AccelerateGrayscaleImage`; a probe with it converted lists no *Code Duplication*, 3.24 to 3.49. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
