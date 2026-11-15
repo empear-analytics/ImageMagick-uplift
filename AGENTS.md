@@ -73,6 +73,16 @@ Never, in any commit:
   symbol. ImageMagick is a library; its ABI belongs to everyone who links it.
 - **Edit an OpenMP pragma**, or move code into, out of, or across a `#pragma omp` region
   (see the playbook). The oracle runs single-threaded and cannot see a data race.
+  Ruling of 2026-11-15 (owner: "you can touch openmp files. If the test cases still pass,
+  it's fine!"): files with OpenMP regions may be edited, including pragma lines and moves into,
+  out of or across a `#pragma omp` region, one commit per step, when (1) the whole catalogue, narrow
+  and wide, stays at 0 diverged, and (2) `tools/omp_compare.sh` (an OpenMP-enabled build of base
+  and candidate at one and at four threads) shows no difference on cases that reach the region.
+  The agents' conditions on top of the owner's, to keep the oracle's single-threaded blind spot
+  honest: every variable the moved or edited region writes keeps the protection it had
+  (private, `reduction`, `atomic` or the same `critical`), the commit message quotes that by-hand
+  reading, a changed `critical` name says which regions now share one lock, and a step that
+  slows the region by more than measurement noise is not taken.
 - Touch code in a preprocessor branch this build does not compile (X11, OpenCL, Windows,
   a delegate library that is not installed). Nothing can check it.
   The one exception (owner, 2026-11-01): a branch no configuration compiles, `#if 0`, may
