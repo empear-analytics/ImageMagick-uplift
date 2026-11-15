@@ -1613,6 +1613,14 @@ static MagickBooleanType EnqueueHullPasses(const HullPassLaunch *launch,
   return(MagickTrue);
 }
 
+static void DestroyAccelerateViews(CacheView *image_view,
+  CacheView *filteredImage_view)
+{
+  image_view=DestroyCacheView(image_view);
+  if (filteredImage_view != NULL)
+    filteredImage_view=DestroyCacheView(filteredImage_view);
+}
+
 static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
   ExceptionInfo*exception)
 {
@@ -1909,9 +1917,7 @@ static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
 
 cleanup:
 
-  image_view=DestroyCacheView(image_view);
-  if (filteredImage_view != NULL)
-    filteredImage_view=DestroyCacheView(filteredImage_view);
+  DestroyAccelerateViews(image_view,filteredImage_view);
 
   if (queue != NULL)
     ReleaseOpenCLCommandQueue(device,queue);
