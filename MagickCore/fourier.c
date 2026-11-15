@@ -144,6 +144,21 @@ typedef struct _ForwardChannelSource
     modulus;
 } ForwardChannelSource;
 
+typedef struct _FourierSectionInput
+{
+  const ForwardChannelSource
+    *forward_source;
+
+  const InverseChannelSource
+    *inverse_source;
+
+  Image
+    *fourier_image;
+
+  ExceptionInfo
+    *exception;
+} FourierSectionInput;
+
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -863,6 +878,9 @@ static MagickBooleanType ForwardFourierTransformChannel(
   return(status);
 }
 
+static MagickBooleanType FourierTransformChannels(
+  const FourierSectionInput *,const Image *,const MagickBooleanType);
+
 static size_t PadFourierWidth(const Image *image,size_t width)
 {
   if (IsFourierPaddingNeeded(image) != MagickFalse)
@@ -916,6 +934,9 @@ MagickExport Image *ForwardFourierTransformImage(const Image *image,
             const ForwardChannelSource
               source = { image, modulus };
 
+            FourierSectionInput
+              section;
+
             MagickBooleanType
               is_gray,
               status;
@@ -924,85 +945,12 @@ MagickExport Image *ForwardFourierTransformImage(const Image *image,
             phase_image->depth=32UL;
             AppendImageToList(&fourier_image,magnitude_image);
             AppendImageToList(&fourier_image,phase_image);
-            status=MagickTrue;
             is_gray=IsImageGray(image);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-            #pragma omp parallel sections
-#endif
-            {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-              #pragma omp section
-#endif
-              {
-                MagickBooleanType
-                  thread_status;
-
-                if (is_gray != MagickFalse)
-                  thread_status=ForwardFourierTransformChannel(&source,
-                    GrayPixelChannel,fourier_image,exception);
-                else
-                  thread_status=ForwardFourierTransformChannel(&source,
-                    RedPixelChannel,fourier_image,exception);
-                if (thread_status == MagickFalse)
-                  status=thread_status;
-              }
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-              #pragma omp section
-#endif
-              {
-                MagickBooleanType
-                  thread_status;
-
-                thread_status=MagickTrue;
-                if (is_gray == MagickFalse)
-                  thread_status=ForwardFourierTransformChannel(&source,
-                    GreenPixelChannel,fourier_image,exception);
-                if (thread_status == MagickFalse)
-                  status=thread_status;
-              }
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-              #pragma omp section
-#endif
-              {
-                MagickBooleanType
-                  thread_status;
-
-                thread_status=MagickTrue;
-                if (is_gray == MagickFalse)
-                  thread_status=ForwardFourierTransformChannel(&source,
-                    BluePixelChannel,fourier_image,exception);
-                if (thread_status == MagickFalse)
-                  status=thread_status;
-              }
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-              #pragma omp section
-#endif
-              {
-                MagickBooleanType
-                  thread_status;
-
-                thread_status=MagickTrue;
-                if (image->colorspace == CMYKColorspace)
-                  thread_status=ForwardFourierTransformChannel(&source,
-                    BlackPixelChannel,fourier_image,exception);
-                if (thread_status == MagickFalse)
-                  status=thread_status;
-              }
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-              #pragma omp section
-#endif
-              {
-                MagickBooleanType
-                  thread_status;
-
-                thread_status=MagickTrue;
-                if (image->alpha_trait != UndefinedPixelTrait)
-                  thread_status=ForwardFourierTransformChannel(&source,
-                    AlphaPixelChannel,fourier_image,exception);
-                if (thread_status == MagickFalse)
-                  status=thread_status;
-              }
-            }
+            section.forward_source=(&source);
+            section.inverse_source=(const InverseChannelSource *) NULL;
+            section.fourier_image=fourier_image;
+            section.exception=exception;
+            status=FourierTransformChannels(&section,image,is_gray);
             if (status == MagickFalse)
               fourier_image=DestroyImageList(fourier_image);
             fftw_cleanup();
@@ -1515,55 +1463,34 @@ static MagickBooleanType InverseFourierTransformChannel(
   return(status);
 }
 
-typedef struct _InverseSectionInput
+static MagickBooleanType FourierSectionChannel(
+  const FourierSectionInput *input,const PixelChannel channel)
 {
-  const InverseChannelSource
-    *source;
+  if (input->inverse_source != (const InverseChannelSource *) NULL)
+    return(InverseFourierTransformChannel(input->inverse_source,channel,
+      input->fourier_image,input->exception));
+  return(ForwardFourierTransformChannel(input->forward_source,channel,
+    input->fourier_image,input->exception));
+}
 
-  Image
-    *fourier_image;
-
-  ExceptionInfo
-    *exception;
-} InverseSectionInput;
-
-static void InverseFourierSection(const InverseSectionInput *input,
+static void FourierSection(const FourierSectionInput *input,
   const MagickBooleanType run,const PixelChannel channel,
   MagickBooleanType *status)
 {
-  const InverseChannelSource
-    *const source = input->source;
-
-  Image
-    *const fourier_image = input->fourier_image;
-
-  ExceptionInfo
-    *const exception = input->exception;
-
   MagickBooleanType
     thread_status;
 
   thread_status=MagickTrue;
   if (run != MagickFalse)
-    thread_status=InverseFourierTransformChannel(source,
-      channel,fourier_image,exception);
+    thread_status=FourierSectionChannel(input,channel);
   if (thread_status == MagickFalse)
     (*status)=thread_status;
 }
 
-static MagickBooleanType InverseFourierChannels(
-  const InverseSectionInput *section,const Image *magnitude_image,
+static MagickBooleanType FourierTransformChannels(
+  const FourierSectionInput *section,const Image *image,
   const MagickBooleanType is_gray)
 {
-  const InverseChannelSource
-    *const source = section->source;
-
-  Image
-    *const fourier_image = section->fourier_image;
-
-  ExceptionInfo
-    *const exception = section->exception;
-
   MagickBooleanType
     status;
 
@@ -1580,11 +1507,9 @@ static MagickBooleanType InverseFourierChannels(
         thread_status;
 
       if (is_gray != MagickFalse)
-        thread_status=InverseFourierTransformChannel(source,
-          GrayPixelChannel,fourier_image,exception);
+        thread_status=FourierSectionChannel(section,GrayPixelChannel);
       else
-        thread_status=InverseFourierTransformChannel(source,
-          RedPixelChannel,fourier_image,exception);
+        thread_status=FourierSectionChannel(section,RedPixelChannel);
       if (thread_status == MagickFalse)
         status=thread_status;
     }
@@ -1592,7 +1517,7 @@ static MagickBooleanType InverseFourierChannels(
     #pragma omp section
 #endif
     {
-      InverseFourierSection(section,
+      FourierSection(section,
         is_gray == MagickFalse,
         GreenPixelChannel,&status);
     }
@@ -1600,7 +1525,7 @@ static MagickBooleanType InverseFourierChannels(
     #pragma omp section
 #endif
     {
-      InverseFourierSection(section,
+      FourierSection(section,
         is_gray == MagickFalse,
         BluePixelChannel,&status);
     }
@@ -1608,16 +1533,16 @@ static MagickBooleanType InverseFourierChannels(
     #pragma omp section
 #endif
     {
-      InverseFourierSection(section,
-        magnitude_image->colorspace == CMYKColorspace,
+      FourierSection(section,
+        image->colorspace == CMYKColorspace,
         BlackPixelChannel,&status);
     }
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
     #pragma omp section
 #endif
     {
-      InverseFourierSection(section,
-        magnitude_image->alpha_trait != UndefinedPixelTrait,
+      FourierSection(section,
+        image->alpha_trait != UndefinedPixelTrait,
         AlphaPixelChannel,&status);
     }
   }
@@ -1667,8 +1592,9 @@ MagickExport Image *InverseFourierTransformImage(const Image *magnitude_image,
         const InverseChannelSource
           source = { magnitude_image, phase_image, modulus };
 
-        const InverseSectionInput
-          section = { &source, fourier_image, exception };
+        const FourierSectionInput
+          section = { (const ForwardChannelSource *) NULL, &source,
+            fourier_image, exception };
 
         MagickBooleanType
           is_gray,
@@ -1677,7 +1603,7 @@ MagickExport Image *InverseFourierTransformImage(const Image *magnitude_image,
         is_gray=IsImageGray(magnitude_image);
         if (is_gray != MagickFalse)
           is_gray=IsImageGray(phase_image);
-        status=InverseFourierChannels(&section,magnitude_image,is_gray);
+        status=FourierTransformChannels(&section,magnitude_image,is_gray);
         if (status == MagickFalse)
           fourier_image=DestroyImage(fourier_image);
       }
