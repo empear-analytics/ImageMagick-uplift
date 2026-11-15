@@ -3515,6 +3515,17 @@ static MagickBooleanType RunLocalContrastImage(
   return(MagickTrue);
 }
 
+static Image *DiscardLocalContrastOutput(MagickBooleanType outputReady,
+  Image *filteredImage)
+{
+  if ((outputReady == MagickFalse) && (filteredImage != NULL))
+  {
+    DestroyImage(filteredImage);
+    filteredImage = NULL;
+  }
+  return(filteredImage);
+}
+
 static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
   const double radius,const double strength,ExceptionInfo *exception)
 {
@@ -3604,11 +3615,7 @@ cleanup:
     ReleaseLocalContrastBuffers(&inputs);
   }
   ReleaseLocalContrastKernels(blurRowKernel,blurColumnKernel,queue,device);
-  if ((outputReady == MagickFalse) && (filteredImage != NULL))
-  {
-    DestroyImage(filteredImage);
-    filteredImage = NULL;
-  }
+  filteredImage=DiscardLocalContrastOutput(outputReady,filteredImage);
 
   return(filteredImage);
 }
