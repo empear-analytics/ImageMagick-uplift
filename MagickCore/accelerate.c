@@ -3946,6 +3946,97 @@ MagickPrivate MagickBooleanType AccelerateModulateImage(Image *image,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 */
 
+typedef struct _MotionBlurFilterInputs
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  const double
+    *kernel;
+
+  size_t
+    width;
+} MotionBlurFilterInputs;
+
+typedef struct _MotionBlurFilterTargets
+{
+  cl_mem
+    *imageKernelBuffer;
+
+  cl_command_queue
+    *queue;
+} MotionBlurFilterTargets;
+
+static MagickBooleanType CreateMotionBlurFilterBuffer(
+  const MotionBlurFilterInputs *inputs,ExceptionInfo *exception,
+  const MotionBlurFilterTargets *targets)
+{
+  const MagickCLEnv
+    clEnv = inputs->clEnv;
+
+  const MagickCLDevice
+    device = inputs->device;
+
+  const double
+    *const kernel = inputs->kernel;
+
+  const size_t
+    width = inputs->width;
+
+  cl_mem
+    *const imageKernelBuffer = targets->imageKernelBuffer;
+
+  cl_command_queue
+    *const queue = targets->queue;
+
+  cl_int
+    clStatus;
+
+  float
+    *kernelBufferPtr;
+
+  unsigned int
+    i;
+
+  *imageKernelBuffer = clEnv->library->clCreateBuffer(device->context,
+    CL_MEM_READ_ONLY|CL_MEM_ALLOC_HOST_PTR, width * sizeof(float), NULL,
+    &clStatus);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) ThrowMagickException(exception, GetMagickModule(),
+      ResourceLimitError, "clEnv->library->clCreateBuffer failed.",".");
+    return(MagickFalse);
+  }
+
+  *queue=AcquireOpenCLCommandQueue(device);
+  if (*queue == (cl_command_queue) NULL)
+    return(MagickFalse);
+  kernelBufferPtr = (float*)clEnv->library->clEnqueueMapBuffer(*queue, *imageKernelBuffer,
+    CL_TRUE, CL_MAP_WRITE, 0, width * sizeof(float), 0, NULL, NULL, &clStatus);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) ThrowMagickException(exception, GetMagickModule(),
+      ResourceLimitError, "clEnv->library->clEnqueueMapBuffer failed.",".");
+    return(MagickFalse);
+  }
+  for (i = 0; i < width; i++)
+  {
+    kernelBufferPtr[i] = (float) kernel[i];
+  }
+  clStatus = clEnv->library->clEnqueueUnmapMemObject(*queue, *imageKernelBuffer, kernelBufferPtr,
+    0, NULL, NULL);
+ if (clStatus != CL_SUCCESS)
+  {
+    (void) ThrowMagickException(exception, GetMagickModule(), ModuleFatalError,
+      "clEnv->library->clEnqueueUnmapMemObject failed.", ".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
   const double *kernel,const size_t width,const OffsetInfo *offset,
   ExceptionInfo *exception)
@@ -3981,9 +4072,6 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
 
   const void
     *inputPixels;
-
-  float
-    *kernelBufferPtr;
 
   Image
     *filteredImage;
@@ -4115,38 +4203,13 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
   }
 
 
-  imageKernelBuffer = clEnv->library->clCreateBuffer(device->context,
-    CL_MEM_READ_ONLY|CL_MEM_ALLOC_HOST_PTR, width * sizeof(float), NULL,
-    &clStatus);
-  if (clStatus != CL_SUCCESS)
   {
-    (void) ThrowMagickException(exception, GetMagickModule(),
-      ResourceLimitError, "clEnv->library->clCreateBuffer failed.",".");
-    goto cleanup;
-  }
+    const MotionBlurFilterInputs inputs = { clEnv, device, kernel, width };
+    const MotionBlurFilterTargets targets = { &imageKernelBuffer, &queue };
 
-  queue=AcquireOpenCLCommandQueue(device);
-  if (queue == (cl_command_queue) NULL)
-    goto cleanup;
-  kernelBufferPtr = (float*)clEnv->library->clEnqueueMapBuffer(queue, imageKernelBuffer,
-    CL_TRUE, CL_MAP_WRITE, 0, width * sizeof(float), 0, NULL, NULL, &clStatus);
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) ThrowMagickException(exception, GetMagickModule(),
-      ResourceLimitError, "clEnv->library->clEnqueueMapBuffer failed.",".");
-    goto cleanup;
-  }
-  for (i = 0; i < width; i++)
-  {
-    kernelBufferPtr[i] = (float) kernel[i];
-  }
-  clStatus = clEnv->library->clEnqueueUnmapMemObject(queue, imageKernelBuffer, kernelBufferPtr,
-    0, NULL, NULL);
- if (clStatus != CL_SUCCESS)
-  {
-    (void) ThrowMagickException(exception, GetMagickModule(), ModuleFatalError,
-      "clEnv->library->clEnqueueUnmapMemObject failed.", ".");
-    goto cleanup;
+    if (CreateMotionBlurFilterBuffer(&inputs,exception,&targets) ==
+        MagickFalse)
+      goto cleanup;
   }
 
   offsetBuffer = clEnv->library->clCreateBuffer(device->context,
