@@ -2799,7 +2799,20 @@ typedef struct _CompositeSetup
   ssize_t
     x_offset,
     y_offset;
+
+  MagickBooleanType
+    clamp,
+    intensity;
 } CompositeSetup;
+
+static void CompositeCopyRow(const IntensityRowInputs *row,
+  const MagickBooleanType intensity,const Quantum *p,Quantum *q)
+{
+  if (intensity == MagickFalse)
+    CopyCompositeRow(row->source_image,row->image,p,q);
+  else
+    SetIntensityAlphaRow(row,p,q);
+}
 
 static MagickBooleanType CompositeCopyImage(Image *image,Image *source_image,
   const CompositeSetup *setup,ExceptionInfo *exception)
@@ -2807,6 +2820,9 @@ static MagickBooleanType CompositeCopyImage(Image *image,Image *source_image,
   const ssize_t
     x_offset = setup->x_offset,
     y_offset = setup->y_offset;
+
+  const IntensityRowInputs
+    row = { image, source_image, setup->clamp };
 
   CacheView
     *image_view,
@@ -2844,7 +2860,7 @@ static MagickBooleanType CompositeCopyImage(Image *image,Image *source_image,
         status=MagickFalse;
         continue;
       }
-    CopyCompositeRow(source_image,image,p,q);
+    CompositeCopyRow(&row,setup->intensity,p,q);
     SyncCompositeRow(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
@@ -3823,7 +3839,81 @@ typedef struct _CompositeChannelInputs
     gamma;
 } CompositeChannelInputs;
 
-static void CompositeChannelColor(const CompositeRowInputs *row,
+static MagickRealType GetCompositeChannelColor(
+  const CompositeChannelInputs *tile,const MagickRealType red,
+  const MagickRealType green,const MagickRealType blue)
+{
+  const PixelChannel
+    channel = tile->channel;
+
+  const MagickRealType
+    Dc = tile->Dc;
+
+  MagickRealType
+    pixel;
+
+  switch (channel)
+  {
+    case RedPixelChannel: pixel=red; break;
+    case GreenPixelChannel: pixel=green; break;
+    case BluePixelChannel: pixel=blue; break;
+    default: pixel=Dc; break;
+  }
+  return(pixel);
+}
+
+static void CompositeChannelColorVividLightToXor(const CompositeRowInputs *row,
+  const CompositePixelInputs *authentic,const CompositeChannelInputs *tile,
+  MagickRealType *pixel)
+{
+  const CompositeOperator
+    compose = row->compose;
+
+  const MagickRealType
+    Da = authentic->Da,
+    Sa = authentic->Sa;
+
+  const MagickRealType
+    Dca = tile->Dca,
+    Sc = tile->Sc,
+    Sca = tile->Sca;
+
+  const double
+    gamma = tile->gamma;
+
+  MagickRealType
+    blend = 0.0;
+
+  switch (compose)
+  {
+    case VividLightCompositeOp:
+    {
+      if ((fabs((double) Sa) < MagickEpsilon) ||
+          (fabs((double) Da) < MagickEpsilon))
+        {
+          (*pixel)=(double) QuantumRange*gamma*(Sa*Da+Sca*(1.0-Da)+Dca*
+            (1.0-Sa));
+          break;
+        }
+      blend=GetVividLightBlend(Sa,Sca,Da,Dca);
+      (*pixel)=(double) QuantumRange*gamma*(Sa*Da*RoundToUnity(blend)+Sca*
+        (1.0-Da)+Dca*(1.0-Sa));
+      break;
+    }
+    case XorCompositeOp:
+    {
+      (*pixel)=(double) QuantumRange*(Sca*(1.0-Da)+Dca*(1.0-Sa));
+      break;
+    }
+    default:
+    {
+      (*pixel)=Sc;
+      break;
+    }
+  }
+}
+
+static void CompositeChannelColorStereoToThreshold(const CompositeRowInputs *row,
   const CompositePixelInputs *authentic,const CompositeChannelInputs *tile,
   MagickRealType *pixel)
 {
@@ -3835,12 +3925,259 @@ static void CompositeChannelColor(const CompositeRowInputs *row,
 
   const MagickRealType
     amount = row->amount,
+    threshold = row->threshold;
+
+  const Quantum
+    *const p = authentic->p;
+
+  const MagickRealType
+    Da = authentic->Da,
+    Sa = authentic->Sa;
+
+  const PixelChannel
+    channel = tile->channel;
+
+  const MagickRealType
+    Dca = tile->Dca,
+    Sca = tile->Sca;
+
+  MagickRealType
+    blend = 0.0,
+    D = 0.0,
+    S = 0.0;
+
+  switch (compose)
+  {
+    case StereoCompositeOp:
+    {
+      if (channel == RedPixelChannel)
+        (*pixel)=(MagickRealType) GetPixelRed(source_image,p);
+      break;
+    }
+    case ThresholdCompositeOp:
+    {
+      S=(Sa > 0.0) ? (Sca/Sa) : 0.0;
+      D=(Da > 0.0) ? (Dca/Da) : 0.0;
+      if (fabs(2.0*(S-D)) < threshold)
+        blend=D;
+      else
+        blend=D+(S-D)*amount;
+      (*pixel)=(double) QuantumRange*(Sa*Da*RoundToUnity(blend)+Sca*
+        (1.0-Da)+Dca*(1.0-Sa));
+      break;
+    }
+    default:
+    {
+      CompositeChannelColorVividLightToXor(row,authentic,tile,pixel);
+      break;
+    }
+  }
+}
+
+static void CompositeChannelColorSoftBurnToStamp(const CompositeRowInputs *row,
+  const CompositePixelInputs *authentic,const CompositeChannelInputs *tile,
+  MagickRealType *pixel)
+{
+  const CompositeOperator
+    compose = row->compose;
+
+  const MagickRealType
+    Da = authentic->Da,
+    Sa = authentic->Sa;
+
+  const MagickRealType
+    Dca = tile->Dca,
+    Sca = tile->Sca;
+
+  const double
+    gamma = tile->gamma;
+
+  MagickRealType
+    blend = 0.0;
+
+  switch (compose)
+  {
+    case SoftBurnCompositeOp:
+    {
+      blend=GetSoftBurnBlend(Sca,Dca);
+      (*pixel)=(double) QuantumRange*gamma*RoundToUnity(blend);
+      break;
+    }
+    case SoftDodgeCompositeOp:
+    {
+      blend=GetSoftDodgeBlend(Sca,Dca);
+      (*pixel)=(double) QuantumRange*gamma*RoundToUnity(blend);
+      break;
+    }
+    case SoftLightCompositeOp:
+    {
+      if (RoundToUnity(Sca) <= 0.5)
+        {
+          (*pixel)=(double) QuantumRange*gamma*(RoundToUnity(Dca)*Sa+Da*
+           (RoundToUnity(Dca)-(1.0-2.0*RoundToUnity(Sca))*
+           RoundToUnity(Dca)*(1.0-RoundToUnity(Dca)))+RoundToUnity(Sca)*
+           (1.0-Da)+RoundToUnity(Dca)*(1.0-Sa));
+          break;
+        }
+      if (RoundToUnity(Dca) > 0.25)
+        blend=sqrt(RoundToUnity(Dca));
+      else
+        blend=((16.0*RoundToUnity(Dca)-12.0)*RoundToUnity(Dca)+4.0)*
+          RoundToUnity(Dca);
+      (*pixel)=(double) QuantumRange*gamma*(RoundToUnity(Dca)*Sa+Da*
+        (RoundToUnity(Dca)+(2.0*RoundToUnity(Sca)-1.0)*
+        (RoundToUnity(blend)-RoundToUnity(Dca)))+RoundToUnity(Sca)*
+        (1.0-Da)+RoundToUnity(Dca)*(1.0-Sa));
+      break;
+    }
+    case StampCompositeOp:
+    {
+      (*pixel)=(double) QuantumRange*RoundToUnity(Sca+Dca-1.0);
+      break;
+    }
+    default:
+    {
+      CompositeChannelColorStereoToThreshold(row,authentic,tile,pixel);
+      break;
+    }
+  }
+}
+
+static void CompositeChannelColorScreen(const CompositeRowInputs *row,
+  const CompositePixelInputs *authentic,const CompositeChannelInputs *tile,
+  MagickRealType *pixel)
+{
+  const CompositeOperator
+    compose = row->compose;
+
+  const MagickBooleanType
+    compose_sync = row->compose_sync;
+
+  const MagickRealType
+    Da = authentic->Da,
+    Sa = authentic->Sa;
+
+  const MagickRealType
+    Dc = tile->Dc,
+    Dca = tile->Dca,
+    Sc = tile->Sc,
+    Sca = tile->Sca;
+
+  MagickRealType
+    blend = 0.0,
+    D = 0.0,
+    S = 0.0;
+
+  switch (compose)
+  {
+    case ScreenCompositeOp:
+    {
+      if (compose_sync == MagickFalse)
+        {
+          (*pixel)=(double) QuantumRange*RoundToUnity(Sc+Dc-Sc*Dc);
+          break;
+        }
+      S=(Sa > 0.0) ? RoundToUnity(Sca/Sa) : 0.0;
+      D=(Da > 0.0) ? RoundToUnity(Dca/Da) : 0.0;
+      blend=RoundToUnity(S+D-S*D);
+      (*pixel)=(double) QuantumRange*RoundToUnity(Sa*Da*blend+Sca*(1.0-Da)+
+        Dca*(1.0-Sa));
+      break;
+    }
+    default:
+    {
+      CompositeChannelColorSoftBurnToStamp(row,authentic,tile,pixel);
+      break;
+    }
+  }
+}
+
+static void CompositeChannelColorSaturate(const CompositeRowInputs *row,
+  const CompositePixelInputs *authentic,const CompositeChannelInputs *tile,
+  MagickRealType *pixel)
+{
+  const CompositeOperator
+    compose = row->compose;
+
+  const ColorspaceType
+    colorspace = row->colorspace;
+
+  const double
+    white_luminance = row->white_luminance;
+
+  const IlluminantType
+    illuminant = row->illuminant;
+
+  const MagickRealType
+    Da = authentic->Da,
+    Sa = authentic->Sa;
+
+  const PixelInfo
+    *const canvas_pixel = authentic->canvas_pixel,
+    *const source_pixel = authentic->source_pixel;
+
+  const MagickRealType
+    Dc = tile->Dc,
+    Sc = tile->Sc;
+
+  MagickRealType
+    blue = 0.0,
+    chroma = 0.0,
+    green = 0.0,
+    hue = 0.0,
+    luma = 0.0,
+    red = 0.0,
+    sans = 0.0;
+
+  switch (compose)
+  {
+    case SaturateCompositeOp:
+    {
+      if (fabs((double) QuantumRange*Sa-(double) TransparentAlpha) < MagickEpsilon)
+        {
+          (*pixel)=Dc;
+          break;
+        }
+      if (fabs((double) QuantumRange*Da-(double) TransparentAlpha) < MagickEpsilon)
+        {
+          (*pixel)=Sc;
+          break;
+        }
+      ConvertRGBToGeneric(colorspace,(double) (*canvas_pixel).red,
+        (double) (*canvas_pixel).green,(double) (*canvas_pixel).blue,
+        white_luminance,illuminant,&hue,&chroma,&luma);
+      ConvertRGBToGeneric(colorspace,(double) (*source_pixel).red,
+        (double) (*source_pixel).green,(double) (*source_pixel).blue,
+        white_luminance,illuminant,&sans,&chroma,&sans);
+      ConvertGenericToRGB(colorspace,hue,chroma,luma,
+        white_luminance,illuminant,&red,&green,&blue);
+      (*pixel)=GetCompositeChannelColor(tile,red,green,blue);
+      break;
+    }
+    default:
+    {
+      CompositeChannelColorScreen(row,authentic,tile,pixel);
+      break;
+    }
+  }
+}
+
+static void CompositeChannelColor(const CompositeRowInputs *row,
+  const CompositePixelInputs *authentic,const CompositeChannelInputs *tile,
+  MagickRealType *pixel)
+{
+  Image
+    *const source_image = row->source_image;
+
+  const CompositeOperator
+    compose = row->compose;
+
+  const MagickRealType
     canvas_dissolve = row->canvas_dissolve,
     midpoint = row->midpoint,
     percent_luma = row->percent_luma,
     percent_chroma = row->percent_chroma,
-    source_dissolve = row->source_dissolve,
-    threshold = row->threshold;
+    source_dissolve = row->source_dissolve;
 
   const MagickBooleanType
     compose_sync = row->compose_sync;
@@ -3993,13 +4330,7 @@ static void CompositeChannelColor(const CompositeRowInputs *row,
         white_luminance,illuminant,&hue,&chroma,&sans);
       ConvertGenericToRGB(colorspace,hue,chroma,luma,
         white_luminance,illuminant,&red,&green,&blue);
-      switch (channel)
-      {
-        case RedPixelChannel: (*pixel)=red; break;
-        case GreenPixelChannel: (*pixel)=green; break;
-        case BluePixelChannel: (*pixel)=blue; break;
-        default: (*pixel)=Dc; break;
-      }
+      (*pixel)=GetCompositeChannelColor(tile,red,green,blue);
       break;
     }
     case CopyAlphaCompositeOp:
@@ -4200,13 +4531,7 @@ static void CompositeChannelColor(const CompositeRowInputs *row,
         white_luminance,illuminant,&hue,&sans,&sans);
       ConvertGenericToRGB(colorspace,hue,chroma,luma,
         white_luminance,illuminant,&red,&green,&blue);
-      switch (channel)
-      {
-        case RedPixelChannel: (*pixel)=red; break;
-        case GreenPixelChannel: (*pixel)=green; break;
-        case BluePixelChannel: (*pixel)=blue; break;
-        default: (*pixel)=Dc; break;
-      }
+      (*pixel)=GetCompositeChannelColor(tile,red,green,blue);
       break;
     }
     case InCompositeOp:
@@ -4297,13 +4622,7 @@ static void CompositeChannelColor(const CompositeRowInputs *row,
         white_luminance,illuminant,&sans,&sans,&luma);
       ConvertGenericToRGB(colorspace,hue,chroma,luma,
         white_luminance,illuminant,&red,&green,&blue);
-      switch (channel)
-      {
-        case RedPixelChannel: (*pixel)=red; break;
-        case GreenPixelChannel: (*pixel)=green; break;
-        case BluePixelChannel: (*pixel)=blue; break;
-        default: (*pixel)=Dc; break;
-      }
+      (*pixel)=GetCompositeChannelColor(tile,red,green,blue);
       break;
     }
     case MathematicsCompositeOp:
@@ -4381,13 +4700,7 @@ static void CompositeChannelColor(const CompositeRowInputs *row,
       chroma*=0.01*percent_chroma;
       ConvertGenericToRGB(colorspace,hue,chroma,luma,
         white_luminance,illuminant,&red,&green,&blue);
-      switch (channel)
-      {
-        case RedPixelChannel: (*pixel)=red; break;
-        case GreenPixelChannel: (*pixel)=green; break;
-        case BluePixelChannel: (*pixel)=blue; break;
-        default: (*pixel)=Dc; break;
-      }
+      (*pixel)=GetCompositeChannelColor(tile,red,green,blue);
       break;
     }
     case ModulusAddCompositeOp:
@@ -4547,136 +4860,12 @@ static void CompositeChannelColor(const CompositeRowInputs *row,
         ((*canvas_pixel).green-(*source_pixel).green)+
         ((*canvas_pixel).blue-(*source_pixel).blue)*
         ((*canvas_pixel).blue-(*source_pixel).blue)/3.0);
-      switch (channel)
-      {
-        case RedPixelChannel: (*pixel)=gray; break;
-        case GreenPixelChannel: (*pixel)=gray; break;
-        case BluePixelChannel: (*pixel)=gray; break;
-        default: (*pixel)=Dc; break;
-      }
-      break;
-    }
-    case SaturateCompositeOp:
-    {
-      if (fabs((double) QuantumRange*Sa-(double) TransparentAlpha) < MagickEpsilon)
-        {
-          (*pixel)=Dc;
-          break;
-        }
-      if (fabs((double) QuantumRange*Da-(double) TransparentAlpha) < MagickEpsilon)
-        {
-          (*pixel)=Sc;
-          break;
-        }
-      ConvertRGBToGeneric(colorspace,(double) (*canvas_pixel).red,
-        (double) (*canvas_pixel).green,(double) (*canvas_pixel).blue,
-        white_luminance,illuminant,&hue,&chroma,&luma);
-      ConvertRGBToGeneric(colorspace,(double) (*source_pixel).red,
-        (double) (*source_pixel).green,(double) (*source_pixel).blue,
-        white_luminance,illuminant,&sans,&chroma,&sans);
-      ConvertGenericToRGB(colorspace,hue,chroma,luma,
-        white_luminance,illuminant,&red,&green,&blue);
-      switch (channel)
-      {
-        case RedPixelChannel: (*pixel)=red; break;
-        case GreenPixelChannel: (*pixel)=green; break;
-        case BluePixelChannel: (*pixel)=blue; break;
-        default: (*pixel)=Dc; break;
-      }
-      break;
-    }
-    case ScreenCompositeOp:
-    {
-      if (compose_sync == MagickFalse)
-        {
-          (*pixel)=(double) QuantumRange*RoundToUnity(Sc+Dc-Sc*Dc);
-          break;
-        }
-      S=(Sa > 0.0) ? RoundToUnity(Sca/Sa) : 0.0;
-      D=(Da > 0.0) ? RoundToUnity(Dca/Da) : 0.0;
-      blend=RoundToUnity(S+D-S*D);
-      (*pixel)=(double) QuantumRange*RoundToUnity(Sa*Da*blend+Sca*(1.0-Da)+
-        Dca*(1.0-Sa));
-      break;
-    }
-    case SoftBurnCompositeOp:
-    {
-      blend=GetSoftBurnBlend(Sca,Dca);
-      (*pixel)=(double) QuantumRange*gamma*RoundToUnity(blend);
-      break;
-    }
-    case SoftDodgeCompositeOp:
-    {
-      blend=GetSoftDodgeBlend(Sca,Dca);
-      (*pixel)=(double) QuantumRange*gamma*RoundToUnity(blend);
-      break;
-    }
-    case SoftLightCompositeOp:
-    {
-      if (RoundToUnity(Sca) <= 0.5)
-        {
-          (*pixel)=(double) QuantumRange*gamma*(RoundToUnity(Dca)*Sa+Da*
-           (RoundToUnity(Dca)-(1.0-2.0*RoundToUnity(Sca))*
-           RoundToUnity(Dca)*(1.0-RoundToUnity(Dca)))+RoundToUnity(Sca)*
-           (1.0-Da)+RoundToUnity(Dca)*(1.0-Sa));
-          break;
-        }
-      if (RoundToUnity(Dca) > 0.25)
-        blend=sqrt(RoundToUnity(Dca));
-      else
-        blend=((16.0*RoundToUnity(Dca)-12.0)*RoundToUnity(Dca)+4.0)*
-          RoundToUnity(Dca);
-      (*pixel)=(double) QuantumRange*gamma*(RoundToUnity(Dca)*Sa+Da*
-        (RoundToUnity(Dca)+(2.0*RoundToUnity(Sca)-1.0)*
-        (RoundToUnity(blend)-RoundToUnity(Dca)))+RoundToUnity(Sca)*
-        (1.0-Da)+RoundToUnity(Dca)*(1.0-Sa));
-      break;
-    }
-    case StampCompositeOp:
-    {
-      (*pixel)=(double) QuantumRange*RoundToUnity(Sca+Dca-1.0);
-      break;
-    }
-    case StereoCompositeOp:
-    {
-      if (channel == RedPixelChannel)
-        (*pixel)=(MagickRealType) GetPixelRed(source_image,p);
-      break;
-    }
-    case ThresholdCompositeOp:
-    {
-      S=(Sa > 0.0) ? (Sca/Sa) : 0.0;
-      D=(Da > 0.0) ? (Dca/Da) : 0.0;
-      if (fabs(2.0*(S-D)) < threshold)
-        blend=D;
-      else
-        blend=D+(S-D)*amount;
-      (*pixel)=(double) QuantumRange*(Sa*Da*RoundToUnity(blend)+Sca*
-        (1.0-Da)+Dca*(1.0-Sa));
-      break;
-    }
-    case VividLightCompositeOp:
-    {
-      if ((fabs((double) Sa) < MagickEpsilon) ||
-          (fabs((double) Da) < MagickEpsilon))
-        {
-          (*pixel)=(double) QuantumRange*gamma*(Sa*Da+Sca*(1.0-Da)+Dca*
-            (1.0-Sa));
-          break;
-        }
-      blend=GetVividLightBlend(Sa,Sca,Da,Dca);
-      (*pixel)=(double) QuantumRange*gamma*(Sa*Da*RoundToUnity(blend)+Sca*
-        (1.0-Da)+Dca*(1.0-Sa));
-      break;
-    }
-    case XorCompositeOp:
-    {
-      (*pixel)=(double) QuantumRange*(Sca*(1.0-Da)+Dca*(1.0-Sa));
+      (*pixel)=GetCompositeChannelColor(tile,gray,gray,gray);
       break;
     }
     default:
     {
-      (*pixel)=Sc;
+      CompositeChannelColorSaturate(row,authentic,tile,pixel);
       break;
     }
   }
@@ -5590,6 +5779,120 @@ static MagickBooleanType IsSourceInsideCanvas(const Image *image,
   return(MagickTrue);
 }
 
+typedef struct _CompositeRowHead
+{
+  const CompositeRowInputs
+    *rows;
+
+  CacheView
+    *source_view,
+    *image_view;
+
+  ssize_t
+    y;
+} CompositeRowHead;
+
+static MagickBooleanType CompositeImageRowHead(const CompositeRowHead *head,
+  MagickBooleanType *status)
+{
+  const CompositeRowInputs
+    *const rows = head->rows;
+
+  CacheView
+    *const image_view = head->image_view;
+
+  const ssize_t
+    y = head->y;
+
+  Image
+    *const image = rows->image;
+
+  ExceptionInfo
+    *const exception = rows->exception;
+
+  const Quantum
+    *magick_restrict p,
+    *pixels;
+
+  Quantum
+    *magick_restrict q;
+
+  CompositeRowInputs
+    row;
+
+  const OverSourceRow
+    source = { head->source_view, rows->source_image, rows->clip_to_self,
+      rows->x_offset, rows->y_offset, y, exception };
+
+  if (SkipOverRow(&source,status) == MagickFalse)
+    return(MagickFalse);
+  if (FetchOverSourceRow(&source,&pixels,&p,status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  row=(*rows);
+  row.y=y;
+  row.pixels=pixels;
+  CompositeImageRow(&row,p,q);
+  SyncCompositeRow(image_view,exception,status);
+  return(MagickTrue);
+}
+
+static MagickBooleanType CompositeImageRows(const CompositeRowInputs *rows)
+{
+  Image
+    *const image = rows->image,
+    *const source_image = rows->source_image;
+
+  ExceptionInfo
+    *const exception = rows->exception;
+
+  CacheView
+    *source_view,
+    *image_view;
+
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  ssize_t
+    y;
+
+  status=MagickTrue;
+  progress=0;
+  source_view=AcquireVirtualCacheView(source_image,exception);
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(source_image,image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const CompositeRowHead
+      head = { rows, source_view, image_view, y };
+
+    if (CompositeImageRowHead(&head,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetCompositeProgress(image,CompositeImageTag,progress,&status);
+      }
+  }
+  source_view=DestroyCacheView(source_view);
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -5597,12 +5900,11 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
 {
 #define CompositeImageTag  "Composite/Image"
 
-  CacheView
-    *source_view,
-    *image_view;
-
   ColorspaceType
     colorspace = HCLColorspace;
+
+  CompositeRowInputs
+    rows;
 
   CompositeSetup
     setup;
@@ -5628,9 +5930,6 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     compose_sync,
     status;
 
-  MagickOffsetType
-    progress;
-
   MagickRealType
     amount,
     canvas_dissolve,
@@ -5642,9 +5941,6 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
 
   MagickStatusType
     flags;
-
-  ssize_t
-    y;
 
   const ComposeArtifactTargets
     targets = { &white_luminance, &illuminant, &colorspace, &clamp,
@@ -5682,6 +5978,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
   threshold=0.05f;
   setup.x_offset=x_offset;
   setup.y_offset=y_offset;
+  setup.clamp=clamp;
+  setup.intensity=MagickFalse;
   switch (compose)
   {
     case CopyCompositeOp:
@@ -5698,50 +5996,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       if (IsSourceInsideCanvas(image,source_image,x_offset,y_offset) ==
           MagickFalse)
         break;
-      status=MagickTrue;
-      source_view=AcquireVirtualCacheView(source_image,exception);
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(source_image,image,source_image->rows,4)
-#endif
-      for (y=0; y < (ssize_t) source_image->rows; y++)
-      {
-        const Quantum
-          *p;
-
-        Quantum
-          *q;
-
-        IntensityRowInputs
-          row;
-
-        if (status == MagickFalse)
-          continue;
-        p=GetCacheViewVirtualPixels(source_view,0,y,source_image->columns,1,
-          exception);
-        q=GetCacheViewAuthenticPixels(image_view,x_offset,y+y_offset,
-          source_image->columns,1,exception);
-        if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-          {
-            status=MagickFalse;
-            continue;
-          }
-        row.image=image;
-        row.source_image=source_image;
-        row.clamp=clamp;
-        SetIntensityAlphaRow(&row,p,q);
-        SyncCompositeRow(image_view,exception,&status);
-        if (image->progress_monitor != (MagickProgressMonitor) NULL)
-          {
-            SetCompositeProgress(image,CompositeImageTag,(MagickOffsetType) y,
-              &status);
-          }
-      }
-      source_view=DestroyCacheView(source_view);
-      image_view=DestroyCacheView(image_view);
-      source_image=DestroyImage(source_image);
-      return(status);
+      setup.intensity=MagickTrue;
+      return(CompositeCopyImage(image,source_image,&setup,exception));
     }
     case CopyAlphaCompositeOp:
     case ChangeMaskCompositeOp:
@@ -5886,86 +6142,38 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
   /*
     Composite image.
   */
-  status=MagickTrue;
-  progress=0;
   midpoint=((MagickRealType) QuantumRange+1.0)/2;
-  source_view=AcquireVirtualCacheView(source_image,exception);
-  image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(progress,status) \
-    magick_number_threads(source_image,image,image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p,
-      *pixels;
-
-    Quantum
-      *magick_restrict q;
-
-    CompositeRowInputs
-      row;
-
-    const OverSourceRow
-      source = { source_view, source_image, clip_to_self, x_offset, y_offset,
-        y, exception };
-
-    if (SkipOverRow(&source,&status) == MagickFalse)
-      continue;
-    if (FetchOverSourceRow(&source,&pixels,&p,&status) == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    row.image=image;
-    row.source_image=source_image;
-    row.compose=compose;
-    row.union_coverage=IsListedOperator(UnionCoverageOperators,
-      sizeof(UnionCoverageOperators)/sizeof(*UnionCoverageOperators),compose);
-    row.canvas_alpha=IsListedOperator(CanvasAlphaOperators,
-      sizeof(CanvasAlphaOperators)/sizeof(*CanvasAlphaOperators),compose);
-    row.source_alpha=IsListedOperator(SourceAlphaOperators,
-      sizeof(SourceAlphaOperators)/sizeof(*SourceAlphaOperators),compose);
-    row.pixel_info_inputs=IsListedOperator(PixelInfoInputOperators,
-      sizeof(PixelInfoInputOperators)/sizeof(*PixelInfoInputOperators),compose);
-    row.intensity_inputs=IsListedOperator(IntensityInputOperators,
-      sizeof(IntensityInputOperators)/sizeof(*IntensityInputOperators),compose);
-    row.clip_to_self=clip_to_self;
-    row.x_offset=x_offset;
-    row.y_offset=y_offset;
-    row.y=y;
-    row.exception=exception;
-    row.pixels=pixels;
-    row.amount=amount;
-    row.canvas_dissolve=canvas_dissolve;
-    row.midpoint=midpoint;
-    row.percent_luma=percent_luma;
-    row.percent_chroma=percent_chroma;
-    row.source_dissolve=source_dissolve;
-    row.threshold=threshold;
-    row.clamp=clamp;
-    row.compose_sync=compose_sync;
-    row.colorspace=colorspace;
-    row.white_luminance=white_luminance;
-    row.illuminant=illuminant;
-    row.geometry_info=geometry_info;
-    CompositeImageRow(&row,p,q);
-    SyncCompositeRow(image_view,exception,&status);
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        SetCompositeProgress(image,CompositeImageTag,progress,&status);
-      }
-  }
-  source_view=DestroyCacheView(source_view);
-  image_view=DestroyCacheView(image_view);
+  rows.image=image;
+  rows.source_image=source_image;
+  rows.compose=compose;
+  rows.union_coverage=IsListedOperator(UnionCoverageOperators,
+    sizeof(UnionCoverageOperators)/sizeof(*UnionCoverageOperators),compose);
+  rows.canvas_alpha=IsListedOperator(CanvasAlphaOperators,
+    sizeof(CanvasAlphaOperators)/sizeof(*CanvasAlphaOperators),compose);
+  rows.source_alpha=IsListedOperator(SourceAlphaOperators,
+    sizeof(SourceAlphaOperators)/sizeof(*SourceAlphaOperators),compose);
+  rows.pixel_info_inputs=IsListedOperator(PixelInfoInputOperators,
+    sizeof(PixelInfoInputOperators)/sizeof(*PixelInfoInputOperators),compose);
+  rows.intensity_inputs=IsListedOperator(IntensityInputOperators,
+    sizeof(IntensityInputOperators)/sizeof(*IntensityInputOperators),compose);
+  rows.clip_to_self=clip_to_self;
+  rows.x_offset=x_offset;
+  rows.y_offset=y_offset;
+  rows.exception=exception;
+  rows.amount=amount;
+  rows.canvas_dissolve=canvas_dissolve;
+  rows.midpoint=midpoint;
+  rows.percent_luma=percent_luma;
+  rows.percent_chroma=percent_chroma;
+  rows.source_dissolve=source_dissolve;
+  rows.threshold=threshold;
+  rows.clamp=clamp;
+  rows.compose_sync=compose_sync;
+  rows.colorspace=colorspace;
+  rows.white_luminance=white_luminance;
+  rows.illuminant=illuminant;
+  rows.geometry_info=geometry_info;
+  status=CompositeImageRows(&rows);
   if (canvas_image != (Image * ) NULL)
     canvas_image=DestroyImage(canvas_image);
   else
