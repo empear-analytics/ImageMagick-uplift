@@ -83,6 +83,10 @@ Never, in any commit:
   (private, `reduction`, `atomic` or the same `critical`), the commit message quotes that by-hand
   reading, a changed `critical` name says which regions now share one lock, and a step that
   slows the region by more than measurement noise is not taken.
+  `GetMagickNumberThreads` runs a region on one thread below about 262144 pixels (four times that
+  for `CompositeCopyImage`), so an `omp_compare` run counts only with cases big enough to start
+  several threads: `tools/omp_cases/large-images.txt` has such cases for `composite.c`,
+  `compare-similarity.c` and `fourier.c`; add one for any other region before relying on it.
 - Touch code in a preprocessor branch this build does not compile (X11, OpenCL, Windows,
   a delegate library that is not installed). Nothing can check it.
   The one exception (owner, 2026-11-01): a branch no configuration compiles, `#if 0`, may
