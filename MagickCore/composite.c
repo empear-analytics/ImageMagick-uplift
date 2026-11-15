@@ -4043,6 +4043,55 @@ static void CompositeChannelColorSoftBurnToStamp(const CompositeRowInputs *row,
   }
 }
 
+static void CompositeChannelColorScreen(const CompositeRowInputs *row,
+  const CompositePixelInputs *authentic,const CompositeChannelInputs *tile,
+  MagickRealType *pixel)
+{
+  const CompositeOperator
+    compose = row->compose;
+
+  const MagickBooleanType
+    compose_sync = row->compose_sync;
+
+  const MagickRealType
+    Da = authentic->Da,
+    Sa = authentic->Sa;
+
+  const MagickRealType
+    Dc = tile->Dc,
+    Dca = tile->Dca,
+    Sc = tile->Sc,
+    Sca = tile->Sca;
+
+  MagickRealType
+    blend = 0.0,
+    D = 0.0,
+    S = 0.0;
+
+  switch (compose)
+  {
+    case ScreenCompositeOp:
+    {
+      if (compose_sync == MagickFalse)
+        {
+          (*pixel)=(double) QuantumRange*RoundToUnity(Sc+Dc-Sc*Dc);
+          break;
+        }
+      S=(Sa > 0.0) ? RoundToUnity(Sca/Sa) : 0.0;
+      D=(Da > 0.0) ? RoundToUnity(Dca/Da) : 0.0;
+      blend=RoundToUnity(S+D-S*D);
+      (*pixel)=(double) QuantumRange*RoundToUnity(Sa*Da*blend+Sca*(1.0-Da)+
+        Dca*(1.0-Sa));
+      break;
+    }
+    default:
+    {
+      CompositeChannelColorSoftBurnToStamp(row,authentic,tile,pixel);
+      break;
+    }
+  }
+}
+
 static void CompositeChannelColor(const CompositeRowInputs *row,
   const CompositePixelInputs *authentic,const CompositeChannelInputs *tile,
   MagickRealType *pixel)
@@ -4767,23 +4816,9 @@ static void CompositeChannelColor(const CompositeRowInputs *row,
       (*pixel)=GetCompositeChannelColor(tile,red,green,blue);
       break;
     }
-    case ScreenCompositeOp:
-    {
-      if (compose_sync == MagickFalse)
-        {
-          (*pixel)=(double) QuantumRange*RoundToUnity(Sc+Dc-Sc*Dc);
-          break;
-        }
-      S=(Sa > 0.0) ? RoundToUnity(Sca/Sa) : 0.0;
-      D=(Da > 0.0) ? RoundToUnity(Dca/Da) : 0.0;
-      blend=RoundToUnity(S+D-S*D);
-      (*pixel)=(double) QuantumRange*RoundToUnity(Sa*Da*blend+Sca*(1.0-Da)+
-        Dca*(1.0-Sa));
-      break;
-    }
     default:
     {
-      CompositeChannelColorSoftBurnToStamp(row,authentic,tile,pixel);
+      CompositeChannelColorScreen(row,authentic,tile,pixel);
       break;
     }
   }
