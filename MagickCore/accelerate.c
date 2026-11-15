@@ -2492,12 +2492,9 @@ static MagickBooleanType ComputeFunctionImage(Image *image,MagickCLEnv clEnv,
 
 cleanup:
 
-  if (imageBuffer != (cl_mem) NULL)
-    ReleaseOpenCLMemObject(imageBuffer);
-  if (parametersBuffer != (cl_mem) NULL)
-    ReleaseOpenCLMemObject(parametersBuffer);
-  if (functionKernel != (cl_kernel) NULL)
-    ReleaseOpenCLKernel(functionKernel);
+  ReleaseOpenCLBuffer(imageBuffer);
+  ReleaseOpenCLBuffer(parametersBuffer);
+  ReleaseKernel(functionKernel);
   if (queue != (cl_command_queue) NULL)
     ReleaseOpenCLCommandQueue(device,queue);
   if (device != (MagickCLDevice) NULL)
