@@ -2826,6 +2826,9 @@ static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
     imageRows,
     passes;
 
+  if (clEnv == (MagickCLEnv) NULL)
+    return((Image *) NULL);
+
   queue=NULL;
   image_view=NULL;
   filteredImage=NULL;
@@ -3075,25 +3078,9 @@ cleanup:
 MagickPrivate Image *AccelerateLocalContrastImage(const Image *image,
   const double radius,const double strength,ExceptionInfo *exception)
 {
-  Image
-    *filteredImage;
-
-  MagickCLEnv
-    clEnv;
-
-  assert(image != NULL);
-  assert(exception != (ExceptionInfo *) NULL);
-
-  if (checkAccelerateConditionRGBA(image) == MagickFalse)
-    return((Image *) NULL);
-
-  clEnv=getOpenCLEnvironment(exception);
-  if (clEnv == (MagickCLEnv) NULL)
-    return((Image *) NULL);
-
-  filteredImage=ComputeLocalContrastImage(image,clEnv,radius,strength,
-    exception);
-  return(filteredImage);
+  return(ComputeLocalContrastImage(image,getAccelerateEnvironment(image,
+    RGBAAccelerateCheck,(const char *) NULL,exception),radius,strength,
+    exception));
 }
 
 /*
