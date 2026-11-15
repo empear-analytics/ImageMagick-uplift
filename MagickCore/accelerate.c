@@ -773,10 +773,7 @@ cleanup:
 
   ReleaseOpenCLBuffer(imageBuffer);
   ReleaseKernel(contrastKernel);
-  if (queue != (cl_command_queue) NULL)
-    ReleaseOpenCLCommandQueue(device,queue);
-  if (device != (MagickCLDevice) NULL)
-    ReleaseOpenCLDevice(device);
+  ReleaseAccelerateQueue(device,queue);
 
   return(outputReady);
 }
