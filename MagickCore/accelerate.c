@@ -2710,16 +2710,10 @@ static MagickBooleanType AcquireFunctionKernel(
   return(MagickTrue);
 }
 
-static MagickBooleanType ComputeFunctionImage(Image *image,MagickCLEnv clEnv,
-  const MagickFunction function,const size_t number_parameters,
-  const double *parameters,ExceptionInfo *exception)
+typedef struct _FunctionKernelArgs
 {
-  cl_command_queue
-    queue;
-
-  cl_int
-    channel_mask=get32BitChannelValue(image->channel_mask),
-    status;
+  Image
+    *image;
 
   cl_kernel
     functionKernel;
@@ -2728,9 +2722,89 @@ static MagickBooleanType ComputeFunctionImage(Image *image,MagickCLEnv clEnv,
     imageBuffer,
     parametersBuffer;
 
+  cl_int
+    channel_mask;
+
+  MagickFunction
+    function;
+
+  size_t
+    number_parameters;
+
+  MagickCLDevice
+    device;
+} FunctionKernelArgs;
+
+static MagickBooleanType SetFunctionKernelArgs(const FunctionKernelArgs *args,
+  ExceptionInfo *exception)
+{
+  Image
+    *const image = args->image;
+
+  const cl_kernel
+    functionKernel = args->functionKernel;
+
+  const cl_mem
+    imageBuffer = args->imageBuffer,
+    parametersBuffer = args->parametersBuffer;
+
+  const cl_int
+    channel_mask = args->channel_mask;
+
+  const MagickFunction
+    function = args->function;
+
+  const size_t
+    number_parameters = args->number_parameters;
+
+  const MagickCLDevice
+    device = args->device;
+
+  cl_int
+    status;
+
   cl_uint
     number_params,
     number_channels;
+
+  size_t
+    i;
+
+  number_channels=(cl_uint) image->number_channels;
+  number_params=(cl_uint) number_parameters;
+
+  i=0;
+  status =SetOpenCLKernelArg(functionKernel,i++,sizeof(cl_mem),(void *)&imageBuffer);
+  status|=SetOpenCLKernelArg(functionKernel,i++,sizeof(cl_uint),(void *)&number_channels);
+  status|=SetOpenCLKernelArg(functionKernel,i++,sizeof(cl_int),&channel_mask);
+  status|=SetOpenCLKernelArg(functionKernel,i++,sizeof(MagickFunction),(void *)&function);
+  status|=SetOpenCLKernelArg(functionKernel,i++,sizeof(cl_uint),(void *)&number_params);
+  status|=SetOpenCLKernelArg(functionKernel,i++,sizeof(cl_mem),(void *)&parametersBuffer);
+  if (status != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
+      ResourceLimitWarning,"SetOpenCLKernelArg failed.",".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType ComputeFunctionImage(Image *image,MagickCLEnv clEnv,
+  const MagickFunction function,const size_t number_parameters,
+  const double *parameters,ExceptionInfo *exception)
+{
+  cl_command_queue
+    queue;
+
+  cl_int
+    channel_mask=get32BitChannelValue(image->channel_mask);
+
+  cl_kernel
+    functionKernel;
+
+  cl_mem
+    imageBuffer,
+    parametersBuffer;
 
   FunctionKernelInputs
     inputs;
@@ -2748,8 +2822,7 @@ static MagickBooleanType ComputeFunctionImage(Image *image,MagickCLEnv clEnv,
     device;
 
   size_t
-    gsize[2],
-    i;
+    gsize[2];
 
   TraceAccelerateImage(image);
   
@@ -2773,21 +2846,12 @@ static MagickBooleanType ComputeFunctionImage(Image *image,MagickCLEnv clEnv,
   if (AcquireFunctionKernel(&inputs,exception,&kernel_targets) == MagickFalse)
     goto cleanup;
 
-  number_channels=(cl_uint) image->number_channels;
-  number_params=(cl_uint) number_parameters;
-
-  i=0;
-  status =SetOpenCLKernelArg(functionKernel,i++,sizeof(cl_mem),(void *)&imageBuffer);
-  status|=SetOpenCLKernelArg(functionKernel,i++,sizeof(cl_uint),(void *)&number_channels);
-  status|=SetOpenCLKernelArg(functionKernel,i++,sizeof(cl_int),&channel_mask);
-  status|=SetOpenCLKernelArg(functionKernel,i++,sizeof(MagickFunction),(void *)&function);
-  status|=SetOpenCLKernelArg(functionKernel,i++,sizeof(cl_uint),(void *)&number_params);
-  status|=SetOpenCLKernelArg(functionKernel,i++,sizeof(cl_mem),(void *)&parametersBuffer);
-  if (status != CL_SUCCESS)
   {
-    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
-      ResourceLimitWarning,"SetOpenCLKernelArg failed.",".");
-    goto cleanup;
+    const FunctionKernelArgs args = { image, functionKernel, imageBuffer,
+      parametersBuffer, channel_mask, function, number_parameters, device };
+
+    if (SetFunctionKernelArgs(&args,exception) == MagickFalse)
+      goto cleanup;
   }
 
   gsize[0]=image->columns;
