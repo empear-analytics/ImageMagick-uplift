@@ -649,15 +649,11 @@ static Image *ComputeBlurImage(const Image* image,MagickCLEnv clEnv,
 cleanup:
 
   ReleaseOpenCLBuffer(imageBuffer);
-  if (filteredImageBuffer != (cl_mem) NULL)
-    ReleaseOpenCLMemObject(filteredImageBuffer);
-  if (tempImageBuffer != (cl_mem) NULL)
-    ReleaseOpenCLMemObject(tempImageBuffer);
-  if (imageKernelBuffer != (cl_mem) NULL)
-    ReleaseOpenCLMemObject(imageKernelBuffer);
+  ReleaseOpenCLBuffer(filteredImageBuffer);
+  ReleaseOpenCLBuffer(tempImageBuffer);
+  ReleaseOpenCLBuffer(imageKernelBuffer);
   ReleaseKernel(blurRowKernel);
-  if (blurColumnKernel != (cl_kernel) NULL)
-    ReleaseOpenCLKernel(blurColumnKernel);
+  ReleaseKernel(blurColumnKernel);
   if (queue != (cl_command_queue) NULL)
     ReleaseOpenCLCommandQueue(device,queue);
   if (device != (MagickCLDevice) NULL)
