@@ -109,6 +109,11 @@ Never, in any commit:
   recipe (guard level: `tools/obj_identical.sh` IDENTICAL, no code token changed), keeping
   what each says about the API, where CodeScene counts their near-identical text as Code
   Duplication.
+  Ruling of 2026-11-15 (owner, "that sounds like ok side effects if the tests pass"): Recipe SZ
+  (sink a run of zeroing writes to their first reader) is allowed: a `memset` of a plain local
+  or of a heap block the function allocated, or a `static void` helper made of such calls, may
+  move past statements that do not name it, as the recipe's conditions require, when the whole
+  catalogue, narrow and wide, stays at 0 diverged.
 - Modify a `static const` data table.
 - Fix a bug you noticed. Report it.
 

@@ -2101,6 +2101,166 @@ static void DestroyFeatureBuffers(const FeatureBuffers *buffers,
   DestroyFeatureMatrix(cooccurrence,number_grays);
 }
 
+typedef struct _FeatureAnalysis
+{
+  const Image
+    *image;
+
+  ChannelFeatures
+    *channel_features;
+
+  FeatureStatistics
+    **cooccurrence,
+    *density_x,
+    *density_xy,
+    *density_y,
+    **Q,
+    *sum;
+
+  unsigned int
+    number_grays;
+} FeatureAnalysis;
+
+static void ComputeFeatureStatistics(const FeatureAnalysis *analysis,
+  MagickBooleanType status)
+{
+  const Image
+    *const image = analysis->image;
+
+  ChannelFeatures
+    *const channel_features = analysis->channel_features;
+
+  FeatureStatistics
+    **const cooccurrence = analysis->cooccurrence,
+    *const density_x = analysis->density_x,
+    *const density_xy = analysis->density_xy,
+    *const density_y = analysis->density_y,
+    **const Q = analysis->Q,
+    *const sum = analysis->sum;
+
+  const unsigned int
+    number_grays = analysis->number_grays;
+
+  FeatureStatistics
+    correlation,
+    entropy_x,
+    entropy_xy,
+    entropy_xy1,
+    entropy_xy2,
+    entropy_y,
+    mean,
+    sum_squares,
+    variance;
+
+  (void) memset(&correlation,0,sizeof(correlation));
+  ZeroFeatureDensities(density_x,density_xy,density_y,number_grays);
+  (void) memset(&mean,0,sizeof(mean));
+  (void) memset(sum,0,number_grays*sizeof(*sum));
+  (void) memset(&sum_squares,0,sizeof(sum_squares));
+  (void) memset(density_xy,0,2*number_grays*sizeof(*density_xy));
+  (void) memset(&entropy_x,0,sizeof(entropy_x));
+  (void) memset(&entropy_xy,0,sizeof(entropy_xy));
+  (void) memset(&entropy_xy1,0,sizeof(entropy_xy1));
+  (void) memset(&entropy_xy2,0,sizeof(entropy_xy2));
+  (void) memset(&entropy_y,0,sizeof(entropy_y));
+  (void) memset(&variance,0,sizeof(variance));
+  {
+    const TextureFeatureState
+      inputs = { image, channel_features, cooccurrence, density_x,
+        density_xy, density_y, Q, sum, number_grays, correlation, entropy_x,
+        entropy_xy, entropy_xy1, entropy_xy2, entropy_y, mean };
+
+    ComputeTextureDirections(&inputs,sum_squares,variance,status);
+  }
+}
+
+static ChannelFeatures *AnalyzeFeatureCooccurrence(
+  const FeatureAnalysis *analysis,const size_t distance,
+  ExceptionInfo *exception,PixelPacket *grays)
+{
+  const Image
+    *const image = analysis->image;
+
+  ChannelFeatures
+    *channel_features = analysis->channel_features;
+
+  FeatureBuffers
+    buffers;
+
+  FeatureMatrixInputs
+    matrix;
+
+  FeatureStatistics
+    **const cooccurrence = analysis->cooccurrence,
+    *const density_x = analysis->density_x,
+    *const density_xy = analysis->density_xy,
+    *const density_y = analysis->density_y,
+    **const Q = analysis->Q,
+    *const sum = analysis->sum;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    i;
+
+  const unsigned int
+    number_grays = analysis->number_grays;
+
+  buffers.cooccurrence=cooccurrence;
+  buffers.density_x=density_x;
+  buffers.density_xy=density_xy;
+  buffers.density_y=density_y;
+  buffers.Q=Q;
+  buffers.sum=sum;
+  if (IsFeatureMemoryMissing(&buffers) != MagickFalse)
+    {
+      RelinquishFeatureBuffers(&buffers);
+      channel_features=RelinquishFeatureGrays(grays,channel_features);
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+      return(channel_features);
+    }
+  i=AcquireFeatureRows(cooccurrence,Q,number_grays);
+  if (i < (ssize_t) number_grays)
+    {
+      RelinquishFeatureRows(cooccurrence,Q,i);
+      RelinquishAcquiredFeatureBuffers(&buffers);
+      channel_features=RelinquishFeatureGrays(grays,channel_features);
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+      return(channel_features);
+    }
+  /*
+    Initialize spatial dependence matrix.
+  */
+  matrix.image=image;
+  matrix.distance=distance;
+  matrix.grays=grays;
+  matrix.cooccurrence=cooccurrence;
+  matrix.exception=exception;
+  status=FillFeatureCooccurrence(&matrix);
+  if (status == MagickFalse)
+    {
+      DestroyFeatureMatrix(cooccurrence,number_grays);
+      channel_features=(ChannelFeatures *) RelinquishMagickMemory(
+        channel_features);
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+      return(channel_features);
+    }
+  /*
+    Normalize spatial dependence matrix.
+  */
+  NormalizeFeatureCooccurrence(image,distance,cooccurrence,number_grays);
+  ComputeFeatureStatistics(analysis,status);
+  /*
+    Relinquish resources.
+  */
+  DestroyFeatureBuffers(&buffers,number_grays);
+  return(channel_features);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -2108,41 +2268,23 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     *channel_features,
     *returned;
 
-  FeatureBuffers
-    buffers;
+  FeatureAnalysis
+    analysis;
 
   FeatureGraysForm
     form;
 
-  FeatureMatrixInputs
-    matrix;
-
   FeatureStatistics
     **cooccurrence,
-    correlation,
     *density_x,
     *density_xy,
     *density_y,
-    entropy_x,
-    entropy_xy,
-    entropy_xy1,
-    entropy_xy2,
-    entropy_y,
-    mean,
     **Q,
-    *sum,
-    sum_squares,
-    variance;
+    *sum;
 
   PixelPacket
     gray,
     *grays;
-
-  MagickBooleanType
-    status;
-
-  ssize_t
-    i;
 
   size_t
     length;
@@ -2185,75 +2327,14 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   */
   number_grays=GetFeatureGrayLevels(image,gray);
   AcquireFeatureBuffers(number_grays,&targets);
-  buffers.cooccurrence=cooccurrence;
-  buffers.density_x=density_x;
-  buffers.density_xy=density_xy;
-  buffers.density_y=density_y;
-  buffers.Q=Q;
-  buffers.sum=sum;
-  if (IsFeatureMemoryMissing(&buffers) != MagickFalse)
-    {
-      RelinquishFeatureBuffers(&buffers);
-      channel_features=RelinquishFeatureGrays(grays,channel_features);
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
-      return(channel_features);
-    }
-  (void) memset(&correlation,0,sizeof(correlation));
-  ZeroFeatureDensities(density_x,density_xy,density_y,number_grays);
-  (void) memset(&mean,0,sizeof(mean));
-  (void) memset(sum,0,number_grays*sizeof(*sum));
-  (void) memset(&sum_squares,0,sizeof(sum_squares));
-  (void) memset(density_xy,0,2*number_grays*sizeof(*density_xy));
-  (void) memset(&entropy_x,0,sizeof(entropy_x));
-  (void) memset(&entropy_xy,0,sizeof(entropy_xy));
-  (void) memset(&entropy_xy1,0,sizeof(entropy_xy1));
-  (void) memset(&entropy_xy2,0,sizeof(entropy_xy2));
-  (void) memset(&entropy_y,0,sizeof(entropy_y));
-  (void) memset(&variance,0,sizeof(variance));
-  i=AcquireFeatureRows(cooccurrence,Q,number_grays);
-  if (i < (ssize_t) number_grays)
-    {
-      RelinquishFeatureRows(cooccurrence,Q,i);
-      RelinquishAcquiredFeatureBuffers(&buffers);
-      channel_features=RelinquishFeatureGrays(grays,channel_features);
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
-      return(channel_features);
-    }
-  /*
-    Initialize spatial dependence matrix.
-  */
-  matrix.image=image;
-  matrix.distance=distance;
-  matrix.grays=grays;
-  matrix.cooccurrence=cooccurrence;
-  matrix.exception=exception;
-  status=FillFeatureCooccurrence(&matrix);
-  if (status == MagickFalse)
-    {
-      DestroyFeatureMatrix(cooccurrence,number_grays);
-      channel_features=(ChannelFeatures *) RelinquishMagickMemory(
-        channel_features);
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
-      return(channel_features);
-    }
-  /*
-    Normalize spatial dependence matrix.
-  */
-  NormalizeFeatureCooccurrence(image,distance,cooccurrence,number_grays);
-  {
-    const TextureFeatureState
-      inputs = { image, channel_features, cooccurrence, density_x,
-        density_xy, density_y, Q, sum, number_grays, correlation, entropy_x,
-        entropy_xy, entropy_xy1, entropy_xy2, entropy_y, mean };
-
-    ComputeTextureDirections(&inputs,sum_squares,variance,status);
-  }
-  /*
-    Relinquish resources.
-  */
-  DestroyFeatureBuffers(&buffers,number_grays);
-  return(channel_features);
+  analysis.image=image;
+  analysis.channel_features=channel_features;
+  analysis.cooccurrence=cooccurrence;
+  analysis.density_x=density_x;
+  analysis.density_xy=density_xy;
+  analysis.density_y=density_y;
+  analysis.Q=Q;
+  analysis.sum=sum;
+  analysis.number_grays=number_grays;
+  return(AnalyzeFeatureCooccurrence(&analysis,distance,exception,grays));
 }

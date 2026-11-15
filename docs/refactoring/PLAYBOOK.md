@@ -1160,6 +1160,21 @@ is worth it.
    split. A macro is text: the kept part names none of these, so no expansion there changes,
    and in the new file the moved functions are its only users, each expansion giving the tokens
    it gave before; `refactor_guard.py --combined` counts every literal once, as before.
+   A struct that both parts name is defined again, verbatim, in the new file (2026-11-14,
+   `split_source.py --copy-struct TAG`): a definition `struct TAG` / `{` ... `};` standing
+   once in the original, with no preprocessor line inside, that a header completes into a
+   type name (`threshold.c`'s `struct _ThresholdMap`, which `threshold.h` declares as
+   `typedef struct _ThresholdMap ThresholdMap;`) and that the moved functions use as the
+   kept ones do (`OrderedDitherImage` and `GetThresholdMap`). The original keeps its
+   definition and the new file's *Typedef declarations* block holds a token-for-token copy.
+   Each translation unit then contains the one definition, so each file is a complete C
+   program as before; the two definitions are compatible types (the same tag, the same
+   members in the same order, C11 6.2.7), so a pointer that one file's function returns
+   and the other's takes names one type, and the layout follows from the members, which
+   are the same tokens. Nothing public changes (the struct is private to the original; no
+   header gains a member) and no other kind of shared type is taken by this step (an
+   enumeration, a typedef'd struct, a function-pointer typedef); the tool still refuses
+   those, and refuses this one without the option.
    The new file's include block
    is the original's, with one exception (2026-11-11): a run of conditional lines at
    its end, after the last unconditional `#include`, that holds every `#define` of the
@@ -1189,6 +1204,12 @@ is worth it.
   expands to the same tokens in the one file that uses it, and the kept file used none.
   `refactor_guard.py --combined` therefore counts every literal once, as before; say in
   the message which tables and macros moved.
+- A struct copied under step 2 (`--copy-struct`) is a second place to edit: a later change to
+  one definition without the other would give two incompatible types in two files, and a
+  call through the public functions would then be undefined. The commit message names the
+  struct; the object comparison below (`tools/split_branch_check.py`, every moved function
+  and every kept one IDENTICAL-MODULO-LAYOUT in the builds) is what shows that no offset or
+  size moved.
 - An include left out under step 2's second exception is neither moved nor edited either:
   the original keeps the line, and the header's objects stay defined once, in the original's
   object. The family names none of them (the tool checks, with the header's macros), so every
@@ -2210,6 +2231,18 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    members it reads as step 4 does, and each variable it writes that is not a member
    (step 2's read-then-written variable, which nothing after it reads) goes by value as
    a parameter, at most four parameters in all.
+   Two relaxations of this function-body form (2026-11-15). A statement of the later
+   block before the call may write a member's variable when every path through that write
+   leaves the later block through a `return` before it reaches the call (an allocation
+   failure's exit that releases `channel_features` and returns it): no path that reaches
+   the call has written the variable since the fill, so the earlier sibling's function
+   reads the values it read before; the later block binds that member as step 2's
+   read-then-written local, without `const`, and its writes land there. And a variable
+   the later block only reads that is not a member (no assignment, increment, or `&v`
+   passed on) goes by value as a parameter of its exact type after `name`, Recipe E step
+   3's input, as the shared-struct form below admits (2026-11-14), within the same limit
+   of four parameters: the parameter holds the variable's value at the call, which nothing
+   in the block changes.
    The same holds in a parallel loop body when the earlier sibling is a nested loop's
    whole body moved under Recipe PS step 7, its struct declared `const` with its
    initialiser among the body's declarations (PS step 6), and the later block is the
@@ -3360,6 +3393,15 @@ a finding.
 6. Where the block stood, write `if (Helper(&name,&v) == MagickFalse) goto L;` (or
    `return(c);`, or Recipe V step 7's `{ S return(v); }` and its other forms, the exit's
    text unchanged), and check every member and argument by reading.
+7. Another block of the file whose text equals, under Recipe D's renaming (checked by
+   script; `diff` of the two line ranges when the copies are verbatim), the block a
+   function of this recipe was cut from, calls that function instead of a second copy
+   (2026-11-15): another copy in the same caller, or one in another function. Steps 1
+   to 6 hold for the copy as written, with its own variables: its own struct local
+   filled as step 5 says (or in Recipe FB's form), its own written variable `v`, its own
+   temporaries (step 2) checked by reading every use in its own caller, and its own exit
+   (`goto L;` to its own label, or its own `return(c);`), unchanged. One commit per
+   caller; the copies of one caller go in one commit.
 
 **Before:**
 
@@ -3437,6 +3479,19 @@ static MagickBooleanType SetPlasmaMiddlePixel(const PlasmaMidpoint *midpoint,
   in the caller before the call, so the cleanup may write one (`resize_filter`) after
   the helper returns; the block itself writes no member (step 3). With one exit,
   `refactor_guard.py --calls` moves only `+2`.
+- Under step 7 the function was cut from the first copy's text, and the other copy is
+  that text with its own variables in place of the first copy's. The call runs the same
+  statements on the values its own struct carries, filled directly before the call from
+  variables the copy does not write; its temporaries are the function's own, written
+  before they are read, and its own caller writes them again before any later read
+  (checked for that caller, as step 2 asks); its one written variable lands through the
+  pointer before the function returns; and on a failure path the caller jumps or
+  returns from the point where the copy did, with its own exit's text. This is the
+  argument Recipe V step 6 makes for another copy of a `return(c);` block, Recipe W
+  step 7 for W's, Recipe LB step 6 for a `break;` block and Recipe I step 7 for I's: a
+  second function of the same text would be a duplicate, and Recipe D, which moves
+  copies whole, may not leave the caller. `refactor_guard.py --calls` shows each call
+  of the block fall by one per copy replaced, and the function's name rise by one.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
 nothing else moved), and steps 1, 2 and 6 checked by reading.
@@ -3447,6 +3502,13 @@ temporaries `x`, `y`, `u`, `v` and `q`, and reads the context, the segment, both
 midpoints and the plasma amplitude: Recipe V gives the helper six parameters. A probe:
 bumps 5 to 4, 3.12 to 3.19. Its bottom and top pixels have the same shape. Added by
 Claude Code (Claude Opus 5.5) during task W08, under the mandate of 2026-10-24.
+Step 7 (2026-11-15, campaign A W27 round sixteen lane a, Claude Code, Claude Opus 5.5,
+under the owner's OK of 2026-11-10 to evolve the recipes): `accelerate.c`'s
+`ComputeDespeckleImage`, whose hull-pass loop holds four verbatim copies of the
+launch pair (enqueue `hullPass1`, test, record; enqueue `hullPass2`, test, record),
+each leaving through `goto cleanup;`. A probe (`~/sp_w23a/stub.py`, the other 18
+Complex/Large functions emptied, no padding): the first copy alone 7.58 to 7.62
+(cc 65 to 63), all four 7.75 (cc 57, 306 to 278 lines), the new function finding-free.
 
 ---
 
@@ -19313,12 +19375,31 @@ returns; Recipe G, which keeps every test in the wrapper.
    change.
 6. One wrapper per commit; the first also adds steps 3 and 4. Stop at the commit after which
    the file has no *Code Duplication* finding: converting a wrapper that no longer carries the
-   finding is a flat step that removes nothing (rule 2).
+   finding is a flat step that removes nothing (rule 2). *Latent clones*: a wrapper that meets
+   steps 1 and 2 but carries no finding may still be converted, one per commit, when a probe of
+   a planned later step of the file (that step applied to a scratch copy with the wrapper left
+   as it is) lists the wrapper under *Code Duplication*, and the same probe with the wrapper
+   converted lists no wrapper there. The message names the planned step and quotes both probes'
+   scores and the flagged functions; the conversion is a flat step inside that plan (rule 2). A
+   wrapper that no probe flags stays as it is.
 7. Check: `clang -DNDEBUG -Wunused-parameter -Wunused-variable` on the file (every parameter of
    step 4 stays used without asserts), `ci_warnings.sh` and `ci_linux_warnings.sh`,
    `refactor_guard.py --calls`, and the oracle on the wrapper and on its worker (the wide build
    for a wide file), with line coverage showing a case on the failed fetch and a case in the
    worker.
+8. *A wrapper no code calls* (2026-11-15). A wrapper that meets steps 1 and 2 and that no
+   case can reach because nothing calls it may be converted at guard level, `Verified: guard`,
+   when all of these hold, each run before the commit and quoted in its message: `git grep -n
+   <Wrapper>` finds its definition and its declaration in a header that is not installed (one
+   listed under `MAGICKCORE_NOINST_HDRS` in `MagickCore/Makefile.am`) and nothing else that is
+   code; the wrapper is `MagickPrivate` (hidden visibility, so no program linked against the
+   library can name it); `casemap.py` shows 0 cases for the wrapper and for its worker; `WIDE=1
+   sh tools/obj_modulo.sh <file> <Wrapper> <Worker>` (without `WIDE=1` for a narrow-build file)
+   prints `IDENTICAL` or `MODULO-IDENTICAL`; `refactor_guard.py` drops only the literals of the
+   wrapper's removed asserts, log and returns, every value still present (`WARN`), and
+   `--calls` moves only the wrapper's removed calls (each down by one) and the prologue
+   (up by one); and step 7's compile checks pass. Steps 1 and 2 are checked by reading and
+   quoted in the message.
 
 **Before:**
 
@@ -19388,9 +19469,20 @@ MagickPrivate Image* AccelerateBlurImage(const Image *image,
 - The test of step 3 calls the same functions on the same image in the same order with the
   same short-circuit. Selectors and trace names are constants at each call.
 - Not a hot path: the prologue runs once per image operation.
+- A wrapper no code calls (step 8). The argument above rests on steps 1 and 2, which are read,
+  not on the oracle: the oracle only confirms it for wrappers some case runs. For a wrapper
+  nothing calls, no execution of the library or of any program linked against it runs the
+  wrapper or its worker (the worker is `static` and called only by the wrapper, step 2), so no
+  output can change through them; `obj_modulo.sh` shows that every other function compiles to
+  the same instructions, so the edit reached nothing else. The conversion still preserves the
+  wrapper's behaviour by the argument above, should a caller be added later.
+- A wrapper converted for a latent clone (step 6) carries no finding when it is converted:
+  the transformation, and so the argument above, is the same as for a flagged wrapper (the
+  argument never rests on the finding, only on steps 1 and 2). Only the reason to take the step
+  is a probe of a later step, which changes no code.
 
 **Evidence level:** oracle (wide build for a wide file), with step 7's checks, and steps 1 and
-2 by reading.
+2 by reading; for a wrapper no code calls, guard level with step 8's checks.
 
 **Provenance:** 2026-11-13, from `accelerate.c`'s `Accelerate*Image` wrappers (campaign A, W22,
 lane d). Ten wrappers carried *Code Duplication*: a shared helper with an `if`-return in each
@@ -19398,6 +19490,12 @@ wrapper, the original prologue with a single return, and two statements with a `
 flagged (3.27 to 3.35); bodies of one statement clear the finding (a probe of four wrappers,
 3.27 to 3.71). Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to
 evolve the recipes.
+Step 8 (2026-11-15, campaign A W28 round seventeen lane a, Claude Code, Claude Opus 5.5, under
+the owner's OK of 2026-11-10 to evolve the recipes): `accelerate.c`'s
+`AccelerateContrastStretchImage`, which nothing in the tree calls (its one declaration is in
+`accelerate-private.h`, a `MAGICKCORE_NOINST_HDRS` header) and whose clone of
+`AccelerateGrayscaleImage` holds the file's *Code Duplication* finding (six functions); a probe
+with the wrapper converted lists no *Code Duplication* at all, 3.24 to 3.49.
 
 ---
 
@@ -20116,6 +20214,315 @@ Lane: b
 
 ---
 
+## Recipe DG - Guard a Default Group's Body by a Predicate of Its Labels
+
+**Use when:** CodeScene reports *Complex Method* (and *Large Method*) on a function whose
+`switch` selects, besides groups that return, one group `N` of many labels whose body is
+`break;` alone and the `default:` group `D`, which does the work; the labels written with
+`default:` in `D` cannot leave the function because they stand in a never-compiled `#if 0`
+branch whose `#else` holds `default:` alone, as `morphology-apply.c`'s
+`AcquireKernelBuiltIn` writes them: Undefined and UserDefined throw and return, sixteen
+kernels `break;` (no base kernel is needed), and the twenty kernels of the `#if 0` branch,
+or `default:` in the build, allocate the base kernel. The labels are 38 of the function's
+cc 41, and every function that holds the `#if 0` labels counts them.
+
+**Not covered by:** Recipe LP, whose `switch` has `default: break;` beside the label set
+(steps 1 and 6) and holds no preprocessor line; Recipe PL and Recipe PT, whose peeled
+groups leave the function; Recipes SD, SR and ST, which move groups with their labels, so
+the new function keeps the `#if 0` labels and the body and is a *Complex Method* that is no
+label run; Recipe DL, which deletes labels that fall into `default:`, which no recipe may do
+to the text of an `#if 0` branch (the branch is the author's compile-time check, AGENTS.md).
+
+**How:**
+
+1. The `switch (e)` lies outside every OpenMP region; `e` is a parameter or a local of an
+   enumeration type that no statement of the `switch` writes, with no call, assignment or
+   increment. Its groups are: kept groups, each ending every path with a `return`; one
+   group `N` whose body is `break;` alone; and the group `D` that carries `default:`, whose
+   body is statements, which may leave the function by `return`, followed by its one
+   `break;`, with no other `break` of this `switch` and no `continue`, `goto`, `case`
+   label or `#pragma` line. No group falls into another.
+2. `D`'s other labels may stand in an `#if 0` branch whose `#else` holds `default:` alone
+   (the branch no configuration compiles, *Preprocessor branches*); no other `#` line
+   stands in the `switch`.
+3. Write `static MagickBooleanType <Name>(const T x)` directly above the function (`T` the
+   declared type of `e`), named for what `D`'s values have in common. Its body is `switch
+   (x) { <the label lines of every kept group and of N, in their order, their comments
+   with them> return(MagickFalse); <D's label lines verbatim, with the #if 0, #else and
+   #endif lines and their comments> return(MagickTrue); } return(MagickFalse);`. A comment
+   on `N`'s `break;` line moves to the line of the first `return(MagickFalse);`.
+4. In the caller, delete `N` (its labels and `break;`) and write `D` as `default:` and
+   `break;` alone (the `#if 0` lines, `D`'s other labels and its comment lines leave the
+   caller: step 3 holds them). The kept groups stay as they were.
+5. Directly after the `switch`'s closing brace write `if (<Name>(e) != MagickFalse)`
+   followed by `D`'s body without its last `break;`, braced, two columns deeper than the
+   `if`, nothing else changed (a comment line moves with its statement).
+6. Check by reading the diff that the predicate's labels are exactly the original
+   `switch`'s labels, each once, the `#if 0` text unchanged, and that the caller's new
+   body is the old one with only steps 4 and 5's changes. Run `refactor_guard.py` and
+   `--calls` (+2 for the predicate, nothing else moved) and the oracle on the function.
+
+**Before:**
+
+```c
+  kernel=(KernelInfo *) NULL;
+  switch(type) {
+    case UndefinedKernel:    /* These should not call this function */
+    case UserDefinedKernel:
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+        "InvalidOption","`%s'","Should not call this function");
+      return((KernelInfo *) NULL);
+    case LaplacianKernel:   /* Named Discrete Convolution Kernels */
+    ...
+    case ThinSEKernel:
+      break;               /* A pre-generated kernel is not needed */
+#if 0
+    /* set to 1 to do a compile-time check that we haven't missed anything */
+    case UnityKernel:
+    ...
+    case EuclideanKernel:
+#else
+    default:
+#endif
+      /* Generate the base Kernel Structure */
+      kernel=(KernelInfo *) AcquireMagickMemory(sizeof(*kernel));
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      ...
+      break;
+  }
+```
+
+**After:**
+
+```c
+static MagickBooleanType IsBaseKernelNeeded(const KernelInfoType type)
+{
+  switch(type) {
+    case UndefinedKernel:    /* These should not call this function */
+    case UserDefinedKernel:
+    case LaplacianKernel:   /* Named Discrete Convolution Kernels */
+    ...
+    case ThinSEKernel:
+      return(MagickFalse); /* A pre-generated kernel is not needed */
+#if 0
+    /* set to 1 to do a compile-time check that we haven't missed anything */
+    case UnityKernel:
+    ...
+    case EuclideanKernel:
+#else
+    default:
+#endif
+      return(MagickTrue);
+  }
+  return(MagickFalse);
+}
+...
+  kernel=(KernelInfo *) NULL;
+  switch(type) {
+    case UndefinedKernel:    /* These should not call this function */
+    case UserDefinedKernel:
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+        "InvalidOption","`%s'","Should not call this function");
+      return((KernelInfo *) NULL);
+    default:
+      break;
+  }
+  if (IsBaseKernelNeeded(type) != MagickFalse)
+    {
+      /* Generate the base Kernel Structure */
+      kernel=(KernelInfo *) AcquireMagickMemory(sizeof(*kernel));
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      ...
+    }
+```
+
+**Careful:**
+
+- Why the behaviour is the same, value by value. In the build the `#if 0` branch is not
+  compiled, so the original `switch` selects the kept groups and `N` by their labels and
+  `D` by `default:`. A value of a kept group runs that group as before; it returns on
+  every path (step 1), so the new `if` is never reached, as the statements after the
+  `switch` were not. A value of `N` ran `break;` alone and went on after the `switch`;
+  now it reaches `default: break;`, which also does nothing, and the `if` calls the
+  predicate on `e`, which has no side effect and which nothing in the `switch` wrote
+  (step 1), so the predicate sees the value the `switch` selected on and returns
+  `MagickFalse` for `N`'s labels: nothing runs, and control goes on where it went. Any
+  other value reached `D`; now it reaches `default: break;`, the predicate returns
+  `MagickTrue` (its `default:`), and `D`'s statements run in their order on the same
+  state: a `return` among them leaves the function as it did, and the end of the body
+  goes on after the `if`, where `D`'s `break;` went. The predicate only reads its
+  argument; its parameter has `e`'s own type, so passing converts nothing.
+- The never-compiled configuration. With `#if 0` changed to `#if 1` by hand, the
+  original `switch` had no `default:` and `-Wswitch` named every enumerator it missed; the
+  predicate's `switch` holds every label of the original (step 3), so the same check
+  names the same enumerators, and a value no label names gets `MagickFalse`, as it ran no
+  group before. The `#if 0` text moves verbatim (the 2026-11-01 ruling), next to the same
+  `default:` it stood beside.
+- The kept groups' labels stand in both functions; the caller returns for them before
+  the predicate is called, so the predicate's answer for them is never used. Both
+  `switch` statements of the build have `default:`, so `-Wswitch` warns about neither.
+- The predicate is a label run (allowed as a *Complex Method* by the owner's ruling of
+  2026-11-07). The cost is a call and a second read of `e` outside any pixel loop; check
+  the function's callers by reading, and time it as Recipe CF step 7 says otherwise.
+
+**Evidence level:** oracle (the cases that reach the function), with step 6's reading
+and `refactor_guard.py --calls`.
+
+**Provenance:** 2026-11-14, from `morphology-apply.c`'s `AcquireKernelBuiltIn` (campaign
+A, W25 lane c): its first `switch`'s twenty `#if 0` labels kept it a *Complex Method*
+(cc 41) and a *Large Method* (73 lines) after rounds eleven to thirteen had moved its
+second `switch`. Measured on the step (cs-mcp 1.5.16): 7.39 to 7.41,
+`AcquireKernelBuiltIn` leaving both findings, the predicate a label run (cc 40, the
+kept groups' two labels included) and the file's only *Complex Method*. Without the
+kept groups' labels the predicate measured cc 38 and 7.45, but the `#if 1`
+configuration would then warn about two enumerators the caller handles.
+Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the
+recipes.
+
+---
+
+## Recipe SZ - Sink a Run of Zeroing Writes to Their First Reader
+
+**Use when:** CodeScene reports *Large Method* (or *Bumpy Road Ahead* or *Complex
+Method*) and the block that an extraction would move first reads objects that a run of
+zeroing writes higher up the same function set (`(void) memset(&v,0,sizeof(v));`),
+separated from the block by statements that never touch those objects (allocations,
+their failure exits, other passes). Moved alone, the block would carry each zeroed
+local as an input and the caller would keep its declaration and its write; with the run
+sunk to directly above the block, the run and the block are adjacent siblings that one
+extraction takes together, and each zeroed local becomes a temporary the new function
+declares (Recipe E step 4: written before it is read on every path, read by nothing
+after). `GetImageFeatures`'s nine statistics (`correlation`, `mean`, `sum_squares`,
+`entropy_x` ... `variance`) and the zeroing of its `density_x`, `density_xy`,
+`density_y` and `sum` buffers stand before the row allocation, the matrix fill and the
+normalisation, two exits apart from the direction passes, their only reader.
+
+**Not covered by:** Recipe E step 4 and Recipe N step 2, which declare a temporary in
+the new function only when the *block* writes it before reading it; here the write
+stands outside the block, statements away. Recipes FI, FB, FU and HF, which rewrite or
+rewrite or hoist a struct *fill* (assignments of values to members); a zeroing call is
+not a fill. Recipes HT and HE, which hoist an exit test above a selection; neither moves
+a write down past other statements. Recipe IX, which inlines a constant local.
+
+**How:**
+
+1. The run is one or more consecutive expression statements of one compound statement,
+   each of them either `(void) memset(&v,0,sizeof(v));` for a plain automatic local `v`
+   of the function (not `static`, not `volatile`, not an array parameter), or `(void)
+   memset(p,0,n);` where `p` is a pointer local that holds a heap block the function
+   itself allocated, or a call of a `static void` function of the file whose body is
+   nothing but such `memset(p,0,n)` calls on its pointer parameters (checked by reading
+   it: `ZeroFeatureDensities`). Every operand of `n` and every argument is a local or
+   parameter, read and not written, with no call, increment or assignment in it.
+2. The target `T` is a later statement of the same compound statement, the first one
+   after the run that reads any object the run writes. The statements between the run
+   and `T` (the *crossed* statements, exits included) satisfy, checked by reading each
+   one and every callee it reaches: (a) none names a zeroed local `v` in any form (no
+   `v`, no `&v`, no `sizeof(v)`); (b) none writes a pointer `p` of the run or an operand
+   of an `n`; (c) none reads or writes a byte of a zeroed heap block: `p`, or a struct
+   holding `p` (a `FeatureBuffers` filled from it), reaches a crossed statement only as
+   an argument of a release (`RelinquishMagickMemory`, or a `static` function whose
+   body only releases, checked by reading it) on a path that then leaves the function,
+   and every other callee receives no pointer to the block or to `p`; (d) no crossed
+   statement is or holds a `#pragma`, a preprocessor line, a label or a `goto`.
+3. Cut the run and paste it, its statements unchanged and in the same order, directly
+   above `T`, at `T`'s indentation. `T` stands in the same compound statement as the
+   run stood, so the run is entered once on every path that reaches `T`, and neither
+   enters nor leaves a loop.
+4. Nothing else changes: no declaration moves (a later extraction moves them), no
+   comment moves with the run unless it stood inside it.
+5. Rule 2: the step alone leaves the function's length and the file's score where they
+   were. Take it only as the first step of a probed plan whose extraction of the run
+   and `T` follows, and say so in the message, naming the plan.
+
+**Before:**
+
+```c
+  (void) memset(&correlation,0,sizeof(correlation));
+  ZeroFeatureDensities(density_x,density_xy,density_y,number_grays);
+  (void) memset(&mean,0,sizeof(mean));
+  (void) memset(sum,0,number_grays*sizeof(*sum));
+  ...
+  (void) memset(&variance,0,sizeof(variance));
+  i=AcquireFeatureRows(cooccurrence,Q,number_grays);
+  if (i < (ssize_t) number_grays)
+    {
+      ...
+      RelinquishAcquiredFeatureBuffers(&buffers);
+      ...
+      return(channel_features);
+    }
+  ...
+  NormalizeFeatureCooccurrence(image,distance,cooccurrence,number_grays);
+  {
+    const TextureFeatureState
+      inputs = { image, channel_features, cooccurrence, density_x,
+        ...
+```
+
+**After:**
+
+```c
+  i=AcquireFeatureRows(cooccurrence,Q,number_grays);
+  if (i < (ssize_t) number_grays)
+    {
+      ...
+    }
+  ...
+  NormalizeFeatureCooccurrence(image,distance,cooccurrence,number_grays);
+  (void) memset(&correlation,0,sizeof(correlation));
+  ZeroFeatureDensities(density_x,density_xy,density_y,number_grays);
+  (void) memset(&mean,0,sizeof(mean));
+  (void) memset(sum,0,number_grays*sizeof(*sum));
+  ...
+  (void) memset(&variance,0,sizeof(variance));
+  {
+    const TextureFeatureState
+      inputs = { image, channel_features, cooccurrence, density_x,
+        ...
+```
+
+**Careful:**
+
+- Why the behaviour is the same. A zeroing write has no effect but the bytes it
+  stores: `memset` cannot fail, returns its first argument (discarded) and reads
+  nothing. On every path that reaches `T`, the crossed statements neither read nor
+  write a zeroed object (step 2 (a) and (c)), nor change where it is or how many bytes
+  the run covers (step 2 (b)), so each object holds the same bytes when `T` begins
+  whether the run ran before or after them, and `T` and everything after it read the
+  same values. On a path that leaves between the run and `T`, the zeroed bytes were
+  never read before: a local's lifetime ends at the `return`, and a heap block is
+  released unread or left unreached (the bytes of a block no pointer reaches are
+  observable by nothing). The writes among themselves keep their order, and they touch
+  distinct objects (distinct locals; distinct allocations).
+- A crossed callee is read, not trusted: a callee that receives a struct holding `p`
+  might read through it. Only a release qualifies (`free` reads no content).
+- The run may not cross a parallel region (step 2 (d)): the argument above is about one
+  thread's order of accesses. A callee holding a region is fine when it receives no
+  pointer to a zeroed object.
+- The oracle runs every path that reaches `T`; the exits that the run no longer
+  precedes are the allocation failures, which no case runs, and step 2 (c)'s reading
+  is their evidence. Quote it in the message.
+- Not a deletion: every write still happens, on every path that reads it, once.
+
+**Evidence level:** oracle (the cases that reach `T`; line coverage must show the run
+and `T` executed), with step 2's reading quoted in the commit message;
+`refactor_guard.py` and `--calls` see no change.
+
+**Provenance:** 2026-11-15, from `feature-texture.c`'s `GetImageFeatures` (campaign A, W26
+round fifteen lane c): a probe of round fourteen extracted the direction passes and the
+tail, but the tail carried the nine statistics' declarations and zeroing and stayed a
+*Large Method* (71 lines), the file 9.01. With the twelve zeroing statements sunk to the
+direction passes, one extraction takes them with their declarations, the tail shares
+that extraction's input struct, and a probe of the chain (sink, Recipe N, Recipe FB,
+Recipe N step 8) left every function under 70 lines and the file at 9.38, the score
+with `GetImageFeatures` stubbed. Added by Claude Code (Claude Opus 5.5) under the
+owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -20546,3 +20953,10 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-14 | AMEND | LP | Step 7 (*chain form*): a step-2 predicate whose one label group holds four or more labels and is a *Complex Method* splits at a label boundary into two chained predicates: the later run (two labels or more) moves to a second predicate directly above the first, whose tail `return(MagickFalse);` becomes `return(<Second>(x));`. *Careful* gives the argument (the chain returns `MagickTrue` exactly for the original labels). Checked by `tools/label_set_check.py --split` | `display-image.c`'s `IsImageWindowArrowKey` (campaign A, W23 round thirteen lane c, wide build): eight labels, cc 10; a probe of the vertical/horizontal split 5.36 to 5.52 with no finding on either predicate (Claude Code, Sonnet 5.5) | owner |
 | 2026-11-14 | AMEND | BC | *Unreached functions: Recipe BC* (new paragraph of *Two levels of evidence*, BC's evidence line, the guard-level list): BC may be applied to a function no case reaches, `Verified: guard`, with BC's steps read, `refactor_guard.py` and `--calls` (+2), `tools/loop_tail_check.py` printing OK (the helper's body is the old block with each exit rewritten as BC step 3 gives, the call passes the parameter names in order, the rest of the file the same token stream) and `tools/obj_modulo.sh` IDENTICAL or MODULO-IDENTICAL | `display-image.c`'s `XLoadDirectoryImages` (campaign A, W23 round thirteen lane c, wide build): its progress block is the second bump of a Bumpy Road, the function and its callers run in no case, and no guard-level recipe takes a block that breaks; a probe with the backdrop block's Recipe N step 5.52 to 5.56 (Claude Code, Sonnet 5.5) | owner |
 | 2026-11-14 | AMEND | N | Step 8, the shared-struct form (a struct the caller already fills for another `static` function serving a later block): the block may also read up to three variables that are not members, which it only reads, each a by-value parameter of its exact type after `name` (Recipe E step 3), at most four parameters in all; the members' condition stands. The step gives the argument (each parameter holds the value its variable has at the call, never written by the block) | `feature-texture.c`'s `GetImageFeatures` (campaign A, W23 round thirteen lane d): the closing release of the six buffers (`sum`, `Q`, `density_y`, `density_xy`, `density_x`, `cooccurrence`) reads the six members of the `FeatureBuffers buffers` filled for `IsFeatureMemoryMissing` and `number_grays` for the two `DestroyFeatureMatrix` calls; a struct of its own would repeat the typedef and a six-line fill. A probe 8.70 to 8.72, `GetImageFeatures` 134 to 129 lines, no finding on the new function. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
+| 2026-11-14 | AMEND | S | Step 2 (*Careful*): a struct both parts name, one definition `struct TAG` / `{` ... `};` with no preprocessor line that a header completes into a type name, is defined again, verbatim, in the new file's *Typedef declarations* block (`split_source.py --copy-struct TAG`, committed with six tests in `41a035502`), the original keeping its definition. The step gives the argument (each translation unit holds the one definition; the two are compatible types by C11 6.2.7; layout follows from the same members) and the *Careful* bullet names the drift risk; the object comparison is the check. Enumerations, typedef'd structs and function-pointer typedefs stay refused | `threshold.c` (campaign A, W25 round fourteen lane a): `struct _ThresholdMap` is named by `OrderedDitherImage` and its helpers (the nine-root family of 63 functions) and by `GetThresholdMap`, `DestroyThresholdMap` and their statics (the roots that stay); `split_source.py` refused every split ("type ThresholdMap defined outside the region and used in it") and no other closed root set lifts Lines of Code from the kept file: the one with the maps out leaves 9.09 and the one with the nine roots out scores 10.0 for the kept file, 9.09 for the new one (the original's own score). Added by Claude Code (Claude Sonnet 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
+| 2026-11-14 | NEW | DG | a `switch` of returning groups, a `break;`-only label group `N` and the `default:` group `D` (whose other labels may stand in an `#if 0` branch with `default:` alone in its `#else`) keeps its returning groups and `default: break;`; after it, `if (<Name>(e) != MagickFalse)` runs `D`'s body without its `break;`. The predicate returns `MagickFalse` for the kept groups' and `N`'s labels and `MagickTrue` for `D`'s label lines, moved verbatim with the `#if 0` lines. *Careful* gives the argument (one more read of `e`, no write; the never-compiled configuration checks the same label set). Not an LP amendment: LP has eight steps already | `morphology-apply.c`'s `AcquireKernelBuiltIn` (campaign A, W25 lane c): the twenty `#if 0` labels of the default group keep any function holding the group a *Complex Method*; LP needs `default: break;` and no `#` line, PL and PT need groups that leave. Measured 7.39 to 7.41, the predicate a label run (cc 40) | owner |
+| 2026-11-15 | AMEND | WP | Step 6 (*latent clones*): a wrapper that meets steps 1 and 2 but carries no *Code Duplication* finding may be converted, one per commit, when a probe of a planned later step of the file (applied to a scratch copy, the wrapper unconverted) lists it under *Code Duplication* and the same probe with the wrapper converted lists no wrapper there; the message quotes both probes, the step is flat inside that plan (rule 2), and a wrapper no probe flags stays. A *Careful* bullet gives the argument (the transformation and its argument are those of a flagged wrapper; only the reason to take it changes) | `accelerate.c` (campaign A, W26 lane b, wide build): the planned shared OpenCL host helpers (release buffer, kernel, queue and device; acquire device and queue, kernel; test `CL_SUCCESS`) shrink `ComputeContrastImage` and `ComputeGrayscaleImage` into a pair and the file gains *Code Duplication* with `AccelerateLocalContrastImage`, `AccelerateWaveletDenoiseImage` and `AccelerateMotionBlurImage` (3.71 to 3.44, probe); with the two step-1 wrappers among them converted the probe scores 3.71 with no *Code Duplication*. Step 6 refused the conversion because the base file has no such finding. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
+| 2026-11-15 | NEW | SZ | a run of zeroing writes (`memset(&v,0,sizeof(v))` of plain locals, `memset(p,0,n)` of heap blocks the function allocated, or a `static void` helper made of such calls) moves, unchanged and in order, to directly above the first later statement of the same compound statement that reads a zeroed object, when the crossed statements name no zeroed local, write no pointer or size operand, and reach a zeroed block only through a release on a path that leaves; flat alone, taken only as the first step of a probed extraction | `feature-texture.c`'s `GetImageFeatures` (campaign A, W26 round fifteen lane c): the nine statistics and four buffers zeroed before the row allocation, the matrix fill and the normalisation, read first by the direction passes; a probe of the chain sink, N, FB, N step 8: every function under 70 lines, 8.72 to 9.38. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
+| 2026-11-15 | AMEND | N | Step 8, the function-body siblings form (a later block holding an earlier sibling's call takes its `const Name *name`): a statement of the later block before the call may write a member's variable when every path through the write returns before the call (the later block binds that member read-then-written), and a variable the later block only reads that is not a member goes by value as a parameter after `name` (Recipe E step 3), at most four parameters | `feature-texture.c`'s `GetImageFeatures` (campaign A, W26 round fifteen lane c): its tail (the buffers check, the row allocation, the matrix fill and their exits, the normalisation, the call of the direction passes' function, the release) holds the call of the function that takes `FeatureAnalysis`; its exits write `channel_features`, a member, and return, and it reads `distance`, `exception` and `grays`, which the direction passes do not. A probe of the chain: every function under 70 lines, 8.72 to 9.38. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
+| 2026-11-15 | AMEND | Y | Step 7: another block of the file whose text equals, under Recipe D's renaming (checked by script; `diff` of the line ranges for verbatim copies), the block a Recipe Y function was cut from calls that function instead of a second copy, in the same caller or another, with its own struct fill, written variable, temporaries and exit, steps 1 to 6 checked for the copy; one commit per caller. *Careful* gives the argument (Recipe V step 6, W step 7, LB step 6 and I step 7 make it for their forms) | `accelerate.c`'s `ComputeDespeckleImage` (campaign A, W27 round sixteen lane a): four verbatim copies of the hull-pass launch pair, each leaving through `goto cleanup;`; a second function of the same text would be a duplicate, and Recipe D may not leave the caller. Probe (stub procedure, other 18 Complex/Large functions emptied): 7.58 to 7.62 for the first copy, 7.75 with all four | owner |
+| 2026-11-15 | AMEND | WP | Step 8, *a wrapper no code calls*: a wrapper that meets steps 1 and 2 and that nothing calls (`git grep` finds only its definition and its declaration in a header listed under `MAGICKCORE_NOINST_HDRS`; `MagickPrivate`, hidden visibility; `casemap.py` 0 cases for wrapper and worker) may be converted at guard level when `obj_modulo.sh <file> <Wrapper> <Worker>` prints `IDENTICAL` or `MODULO-IDENTICAL`, `refactor_guard.py` drops only the wrapper's removed literals (`WARN`, every value present), `--calls` moves only the wrapper's removed calls and the prologue, and step 7's compile checks pass. A *Careful* bullet gives the argument (the transformation's argument rests on steps 1 and 2, read; nothing executes the wrapper or its `static` worker, and every other function compiles to the same instructions) | `accelerate.c`'s `AccelerateContrastStretchImage` (campaign A, W28 round seventeen lane a): no caller in the tree, a clone of `AccelerateGrayscaleImage`; a probe with it converted lists no *Code Duplication*, 3.24 to 3.49. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |

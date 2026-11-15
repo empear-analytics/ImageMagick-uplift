@@ -409,9 +409,26 @@ static Image *BlendMagnitudeImage(const Image *dx_image,const Image *dy_image,
   return(magnitude_image);
 }
 
-static inline MagickBooleanType IsBlendRowsMissing(const Quantum *p,
-  const Quantum *q,const Quantum *r,const Quantum *s,const Quantum *t)
+typedef struct _BlendRowPointers
 {
+  const Quantum
+    *p,
+    *q,
+    *r,
+    *s,
+    *t;
+} BlendRowPointers;
+
+static inline MagickBooleanType IsBlendRowsMissing(
+  const BlendRowPointers *rows)
+{
+  const Quantum
+    *p = rows->p,
+    *q = rows->q,
+    *r = rows->r,
+    *s = rows->s,
+    *t = rows->t;
+
   return(((p == (const Quantum *) NULL) || (q == (const Quantum *) NULL) ||
     (r == (const Quantum *) NULL) || (s == (const Quantum *) NULL) ||
     (t == (Quantum *) NULL)) ? MagickTrue : MagickFalse);
@@ -486,6 +503,9 @@ typedef struct _MaxMagnitudeLine
 static void SelectMaxMagnitudeLine(const MaxMagnitudeLine *line,
   const ssize_t y,MagickBooleanType *status)
 {
+  BlendRowPointers
+    rows;
+
   const Quantum
     *magick_restrict p,
     *magick_restrict q,
@@ -510,7 +530,12 @@ static void SelectMaxMagnitudeLine(const MaxMagnitudeLine *line,
     line->exception);
   t=GetCacheViewAuthenticPixels(line->magnitude_view,0,y,
     line->alpha_image->columns,1,line->exception);
-  if (IsBlendRowsMissing(p,q,r,s,t) != MagickFalse)
+  rows.p=p;
+  rows.q=q;
+  rows.r=r;
+  rows.s=s;
+  rows.t=t;
+  if (IsBlendRowsMissing(&rows) != MagickFalse)
     {
       (*status)=MagickFalse;
       return;
