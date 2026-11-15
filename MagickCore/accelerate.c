@@ -4234,6 +4234,59 @@ static MagickBooleanType LaunchMotionBlurKernel(
   return(MagickTrue);
 }
 
+typedef struct _MotionBlurReleaseInputs
+{
+  MagickCLEnv
+    clEnv;
+
+  cl_mem
+    filteredImageBuffer,
+    imageBuffer,
+    imageKernelBuffer;
+
+  cl_kernel
+    motionBlurKernel;
+
+  cl_command_queue
+    queue;
+
+  MagickCLDevice
+    device;
+} MotionBlurReleaseInputs;
+
+static void ReleaseMotionBlurResources(const MotionBlurReleaseInputs *inputs)
+{
+  const MagickCLEnv
+    clEnv = inputs->clEnv;
+
+  const cl_mem
+    filteredImageBuffer = inputs->filteredImageBuffer,
+    imageBuffer = inputs->imageBuffer,
+    imageKernelBuffer = inputs->imageKernelBuffer;
+
+  const cl_kernel
+    motionBlurKernel = inputs->motionBlurKernel;
+
+  const cl_command_queue
+    queue = inputs->queue;
+
+  const MagickCLDevice
+    device = inputs->device;
+
+  if (filteredImageBuffer!=NULL)
+    clEnv->library->clReleaseMemObject(filteredImageBuffer);
+  if (imageBuffer!=NULL)
+    clEnv->library->clReleaseMemObject(imageBuffer);
+  if (imageKernelBuffer!=NULL)
+    clEnv->library->clReleaseMemObject(imageKernelBuffer);
+  if (motionBlurKernel!=NULL)
+    ReleaseOpenCLKernel(motionBlurKernel);
+  if (queue != NULL)
+    ReleaseOpenCLCommandQueue(device,queue);
+  if (device != NULL)
+    ReleaseOpenCLDevice(device);
+}
+
 static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
   const double *kernel,const size_t width,const OffsetInfo *offset,
   ExceptionInfo *exception)
@@ -4453,18 +4506,12 @@ cleanup:
   if (filteredImage_view != NULL)
     filteredImage_view=DestroyCacheView(filteredImage_view);
 
-  if (filteredImageBuffer!=NULL)
-    clEnv->library->clReleaseMemObject(filteredImageBuffer);
-  if (imageBuffer!=NULL)
-    clEnv->library->clReleaseMemObject(imageBuffer);
-  if (imageKernelBuffer!=NULL)
-    clEnv->library->clReleaseMemObject(imageKernelBuffer);
-  if (motionBlurKernel!=NULL)
-    ReleaseOpenCLKernel(motionBlurKernel);
-  if (queue != NULL)
-    ReleaseOpenCLCommandQueue(device,queue);
-  if (device != NULL)
-    ReleaseOpenCLDevice(device);
+  {
+    const MotionBlurReleaseInputs inputs = { clEnv, filteredImageBuffer,
+      imageBuffer, imageKernelBuffer, motionBlurKernel, queue, device };
+
+    ReleaseMotionBlurResources(&inputs);
+  }
   if (outputReady == MagickFalse && filteredImage != NULL)
     filteredImage=DestroyImage(filteredImage);
 
