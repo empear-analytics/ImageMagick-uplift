@@ -2799,7 +2799,20 @@ typedef struct _CompositeSetup
   ssize_t
     x_offset,
     y_offset;
+
+  MagickBooleanType
+    clamp,
+    intensity;
 } CompositeSetup;
+
+static void CompositeCopyRow(const IntensityRowInputs *row,
+  const MagickBooleanType intensity,const Quantum *p,Quantum *q)
+{
+  if (intensity == MagickFalse)
+    CopyCompositeRow(row->source_image,row->image,p,q);
+  else
+    SetIntensityAlphaRow(row,p,q);
+}
 
 static MagickBooleanType CompositeCopyImage(Image *image,Image *source_image,
   const CompositeSetup *setup,ExceptionInfo *exception)
@@ -2807,6 +2820,9 @@ static MagickBooleanType CompositeCopyImage(Image *image,Image *source_image,
   const ssize_t
     x_offset = setup->x_offset,
     y_offset = setup->y_offset;
+
+  const IntensityRowInputs
+    row = { image, source_image, setup->clamp };
 
   CacheView
     *image_view,
@@ -2844,7 +2860,7 @@ static MagickBooleanType CompositeCopyImage(Image *image,Image *source_image,
         status=MagickFalse;
         continue;
       }
-    CopyCompositeRow(source_image,image,p,q);
+    CompositeCopyRow(&row,setup->intensity,p,q);
     SyncCompositeRow(image_view,exception,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
@@ -5711,10 +5727,6 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
 {
 #define CompositeImageTag  "Composite/Image"
 
-  CacheView
-    *source_view,
-    *image_view;
-
   ColorspaceType
     colorspace = HCLColorspace;
 
@@ -5757,9 +5769,6 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
   MagickStatusType
     flags;
 
-  ssize_t
-    y;
-
   const ComposeArtifactTargets
     targets = { &white_luminance, &illuminant, &colorspace, &clamp,
       &compose_sync };
@@ -5796,6 +5805,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
   threshold=0.05f;
   setup.x_offset=x_offset;
   setup.y_offset=y_offset;
+  setup.clamp=clamp;
+  setup.intensity=MagickFalse;
   switch (compose)
   {
     case CopyCompositeOp:
@@ -5812,50 +5823,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       if (IsSourceInsideCanvas(image,source_image,x_offset,y_offset) ==
           MagickFalse)
         break;
-      status=MagickTrue;
-      source_view=AcquireVirtualCacheView(source_image,exception);
-      image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-      #pragma omp parallel for schedule(static) shared(status) \
-        magick_number_threads(source_image,image,source_image->rows,4)
-#endif
-      for (y=0; y < (ssize_t) source_image->rows; y++)
-      {
-        const Quantum
-          *p;
-
-        Quantum
-          *q;
-
-        IntensityRowInputs
-          row;
-
-        if (status == MagickFalse)
-          continue;
-        p=GetCacheViewVirtualPixels(source_view,0,y,source_image->columns,1,
-          exception);
-        q=GetCacheViewAuthenticPixels(image_view,x_offset,y+y_offset,
-          source_image->columns,1,exception);
-        if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-          {
-            status=MagickFalse;
-            continue;
-          }
-        row.image=image;
-        row.source_image=source_image;
-        row.clamp=clamp;
-        SetIntensityAlphaRow(&row,p,q);
-        SyncCompositeRow(image_view,exception,&status);
-        if (image->progress_monitor != (MagickProgressMonitor) NULL)
-          {
-            SetCompositeProgress(image,CompositeImageTag,(MagickOffsetType) y,
-              &status);
-          }
-      }
-      source_view=DestroyCacheView(source_view);
-      image_view=DestroyCacheView(image_view);
-      source_image=DestroyImage(source_image);
-      return(status);
+      setup.intensity=MagickTrue;
+      return(CompositeCopyImage(image,source_image,&setup,exception));
     }
     case CopyAlphaCompositeOp:
     case ChangeMaskCompositeOp:
