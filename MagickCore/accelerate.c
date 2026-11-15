@@ -3225,6 +3225,116 @@ static void ReleaseLocalContrastKernels(cl_kernel blurRowKernel,
     ReleaseOpenCLDevice(device);
 }
 
+typedef struct _LocalContrastRowInputs
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  cl_kernel
+    blurRowKernel;
+
+  cl_mem
+    imageBuffer,
+    filteredImageBuffer,
+    tempImageBuffer;
+
+  const Image
+    *image;
+
+  double
+    radius;
+} LocalContrastRowInputs;
+
+typedef struct _LocalContrastRowTargets
+{
+  unsigned int
+    *imageColumns,
+    *imageRows;
+
+  cl_int
+    *iRadius;
+
+  unsigned int
+    *passes;
+} LocalContrastRowTargets;
+
+static MagickBooleanType LaunchLocalContrastRowStage(
+  const LocalContrastRowInputs *inputs,ExceptionInfo *exception,
+  const LocalContrastRowTargets *targets)
+{
+  const MagickCLEnv
+    clEnv = inputs->clEnv;
+
+  const MagickCLDevice
+    device = inputs->device;
+
+  const cl_command_queue
+    queue = inputs->queue;
+
+  const cl_kernel
+    blurRowKernel = inputs->blurRowKernel;
+
+  const Image
+    *const image = inputs->image;
+
+  unsigned int
+    *const imageColumns = targets->imageColumns,
+    *const imageRows = targets->imageRows;
+
+  cl_int
+    *const iRadius = targets->iRadius;
+
+  unsigned int
+    *const passes = targets->passes;
+
+  cl_int
+    clStatus;
+
+  cl_uint
+    i;
+
+    {
+      *imageColumns = (unsigned int) image->columns;
+      *imageRows = (unsigned int) image->rows;
+      /* Normalized radius, 100% gives blur radius of 20% of the largest dimension */
+      *iRadius = (cl_int) ((image->rows > image->columns ? image->rows : image->columns) * 0.002f * fabs(inputs->radius)); 
+
+      *passes = (unsigned int) ((((1.0f * *imageRows) * *imageColumns * *iRadius) + 3999999999) / 4000000000.0f);
+      *passes = (*passes < 1) ? 1: *passes;
+
+      /* set the kernel arguments */
+      i=0;
+      clStatus=clEnv->library->clSetKernelArg(blurRowKernel,i++,sizeof(cl_mem),(void *)&inputs->imageBuffer);
+      clStatus|=clEnv->library->clSetKernelArg(blurRowKernel,i++,sizeof(cl_mem),(void *)&inputs->filteredImageBuffer);
+      clStatus|=clEnv->library->clSetKernelArg(blurRowKernel,i++,sizeof(cl_mem),(void *)&inputs->tempImageBuffer);
+      clStatus|=clEnv->library->clSetKernelArg(blurRowKernel,i++,sizeof(cl_int),(void *)iRadius);
+      clStatus|=clEnv->library->clSetKernelArg(blurRowKernel,i++,sizeof(unsigned int),(void *)imageColumns);
+      clStatus|=clEnv->library->clSetKernelArg(blurRowKernel,i++,sizeof(unsigned int),(void *)imageRows);
+
+      if (clStatus != CL_SUCCESS)
+      {
+        (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
+        return(MagickFalse);
+      }
+    }
+
+    /* launch the kernel */
+    {
+      const LocalContrastLaunchInfo
+        info = { clEnv, device, queue, blurRowKernel, image, *passes };
+
+      if (LaunchLocalContrastBlurRow(&info,exception) == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
   const double radius,const double strength,ExceptionInfo *exception)
 {
@@ -3248,9 +3358,6 @@ static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
     imageBuffer,
     imageKernelBuffer,
     tempImageBuffer;
-
-  cl_uint
-    i;
 
   Image
     *filteredImage;
@@ -3317,36 +3424,14 @@ static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
     }
 
     {
-      imageColumns = (unsigned int) image->columns;
-      imageRows = (unsigned int) image->rows;
-      /* Normalized radius, 100% gives blur radius of 20% of the largest dimension */
-      iRadius = (cl_int) ((image->rows > image->columns ? image->rows : image->columns) * 0.002f * fabs(radius)); 
+      const LocalContrastRowInputs inputs = { clEnv, device, queue,
+        blurRowKernel, imageBuffer, filteredImageBuffer, tempImageBuffer,
+        image, radius };
+      const LocalContrastRowTargets targets = { &imageColumns, &imageRows,
+        &iRadius, &passes };
 
-      passes = (unsigned int) ((((1.0f * imageRows) * imageColumns * iRadius) + 3999999999) / 4000000000.0f);
-      passes = (passes < 1) ? 1: passes;
-
-      /* set the kernel arguments */
-      i=0;
-      clStatus=clEnv->library->clSetKernelArg(blurRowKernel,i++,sizeof(cl_mem),(void *)&imageBuffer);
-      clStatus|=clEnv->library->clSetKernelArg(blurRowKernel,i++,sizeof(cl_mem),(void *)&filteredImageBuffer);
-      clStatus|=clEnv->library->clSetKernelArg(blurRowKernel,i++,sizeof(cl_mem),(void *)&tempImageBuffer);
-      clStatus|=clEnv->library->clSetKernelArg(blurRowKernel,i++,sizeof(cl_int),(void *)&iRadius);
-      clStatus|=clEnv->library->clSetKernelArg(blurRowKernel,i++,sizeof(unsigned int),(void *)&imageColumns);
-      clStatus|=clEnv->library->clSetKernelArg(blurRowKernel,i++,sizeof(unsigned int),(void *)&imageRows);
-
-      if (clStatus != CL_SUCCESS)
-      {
-        (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
-        goto cleanup;
-      }
-    }
-
-    /* launch the kernel */
-    {
-      const LocalContrastLaunchInfo
-        info = { clEnv, device, queue, blurRowKernel, image, passes };
-
-      if (LaunchLocalContrastBlurRow(&info,exception) == MagickFalse)
+      if (LaunchLocalContrastRowStage(&inputs,exception,&targets) ==
+          MagickFalse)
         goto cleanup;
     }
 
