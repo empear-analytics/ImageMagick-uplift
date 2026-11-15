@@ -2151,6 +2151,65 @@ static MagickBooleanType CreateHistogramBuffer(
   return(MagickTrue);
 }
 
+typedef struct _EqualizeMapSource
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  PixelPacket
+    *equalize_map;
+} EqualizeMapSource;
+
+static MagickBooleanType CreateEqualizeMapBuffer(
+  const EqualizeMapSource *source,cl_mem *equalizeMapBuffer,
+  ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = source->clEnv;
+
+  const MagickCLDevice
+    device = source->device;
+
+  PixelPacket
+    *const equalize_map = source->equalize_map;
+
+  cl_int
+    clStatus;
+
+  cl_mem_flags
+    mem_flags;
+
+  size_t
+    length;
+
+  void
+    *hostPtr;
+
+  /* Create and initialize OpenCL buffers. */
+  if (ALIGNED(equalize_map, PixelPacket))
+  {
+    mem_flags = CL_MEM_READ_ONLY|CL_MEM_USE_HOST_PTR;
+    hostPtr = equalize_map;
+  }
+  else
+  {
+    mem_flags = CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR;
+    hostPtr = equalize_map;
+  }
+  /* create a CL buffer for equalize_map  */
+  length = (MaxMap+1);
+  *equalizeMapBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(PixelPacket), hostPtr, &clStatus);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -2213,7 +2272,6 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
     length;
 
   void
-    *hostPtr,
     *inputPixels;
 
   if (clEnv == (MagickCLEnv) NULL)
@@ -2370,24 +2428,12 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   }
 #endif
 
-  /* Create and initialize OpenCL buffers. */
-  if (ALIGNED(equalize_map, PixelPacket))
   {
-    mem_flags = CL_MEM_READ_ONLY|CL_MEM_USE_HOST_PTR;
-    hostPtr = equalize_map;
-  }
-  else
-  {
-    mem_flags = CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR;
-    hostPtr = equalize_map;
-  }
-  /* create a CL buffer for equalize_map  */
-  length = (MaxMap+1);
-  equalizeMapBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(PixelPacket), hostPtr, &clStatus);
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
-    goto cleanup;
+    const EqualizeMapSource
+      source = { clEnv, device, equalize_map };
+
+    if (CreateEqualizeMapBuffer(&source,&equalizeMapBuffer,exception) == MagickFalse)
+      goto cleanup;
   }
 
   /* get the OpenCL kernel */
