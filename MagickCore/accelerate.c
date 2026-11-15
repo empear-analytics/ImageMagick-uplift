@@ -510,6 +510,59 @@ static void ReleaseAccelerateQueue(MagickCLDevice device,
     ReleaseOpenCLDevice(device);
 }
 
+typedef struct _AccelerateBufferTargets
+{
+  MagickCLDevice
+    *device;
+
+  cl_command_queue
+    *queue;
+
+  Image
+    **filteredImage;
+
+  cl_mem
+    *imageBuffer,
+    *filteredImageBuffer;
+} AccelerateBufferTargets;
+
+static MagickBooleanType AcquireAccelerateBuffers(MagickCLEnv clEnv,
+  const Image *image,ExceptionInfo *exception,
+  const AccelerateBufferTargets *targets)
+{
+  MagickCLDevice
+    *const device = targets->device;
+
+  cl_command_queue
+    *const queue = targets->queue;
+
+  Image
+    **const filteredImage = targets->filteredImage;
+
+  cl_mem
+    *const imageBuffer = targets->imageBuffer,
+    *const filteredImageBuffer = targets->filteredImageBuffer;
+
+  *device=RequestOpenCLDevice(clEnv);
+  if (*device == (MagickCLDevice) NULL)
+    return(MagickFalse);
+  *queue=AcquireOpenCLCommandQueue(*device);
+  if (*queue == (cl_command_queue) NULL)
+    return(MagickFalse);
+  *filteredImage=cloneImage(image,exception);
+  if (*filteredImage == (Image *) NULL)
+    return(MagickFalse);
+  if ((*filteredImage)->number_channels != image->number_channels)
+    return(MagickFalse);
+  *imageBuffer=GetAuthenticOpenCLBuffer(image,*device,exception);
+  if (*imageBuffer == (cl_mem) NULL)
+    return(MagickFalse);
+  *filteredImageBuffer=GetAuthenticOpenCLBuffer(*filteredImage,*device,exception);
+  if (*filteredImageBuffer == (cl_mem) NULL)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static Image *ComputeBlurImage(const Image* image,MagickCLEnv clEnv,
   const double radius,const double sigma,ExceptionInfo *exception)
 {
@@ -552,6 +605,10 @@ static Image *ComputeBlurImage(const Image* image,MagickCLEnv clEnv,
     length,
     lsize[2];
 
+  const AccelerateBufferTargets
+    targets = { &device, &queue, &filteredImage, &imageBuffer,
+      &filteredImageBuffer };
+
   if (clEnv == (MagickCLEnv) NULL)
     return((Image *) NULL);
 
@@ -570,22 +627,7 @@ static Image *ComputeBlurImage(const Image* image,MagickCLEnv clEnv,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
 
-  device=RequestOpenCLDevice(clEnv);
-  if (device == (MagickCLDevice) NULL)
-    goto cleanup;
-  queue=AcquireOpenCLCommandQueue(device);
-  if (queue == (cl_command_queue) NULL)
-    goto cleanup;
-  filteredImage=cloneImage(image,exception);
-  if (filteredImage == (Image *) NULL)
-    goto cleanup;
-  if (filteredImage->number_channels != image->number_channels)
-    goto cleanup;
-  imageBuffer=GetAuthenticOpenCLBuffer(image,device,exception);
-  if (imageBuffer == (cl_mem) NULL)
-    goto cleanup;
-  filteredImageBuffer=GetAuthenticOpenCLBuffer(filteredImage,device,exception);
-  if (filteredImageBuffer == (cl_mem) NULL)
+  if (AcquireAccelerateBuffers(clEnv,image,exception,&targets) == MagickFalse)
     goto cleanup;
 
   imageKernelBuffer=createKernelInfo(device,radius,sigma,&kernelWidth,
