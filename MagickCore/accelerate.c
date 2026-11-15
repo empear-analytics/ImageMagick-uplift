@@ -908,6 +908,20 @@ static void StretchColormap(Image *image,PixelPacket *stretch_map,
   }
 }
 
+static void StretchImageClass(Image *image,PixelPacket *stretch_map,
+  const cl_float4 black,const cl_float4 white)
+{
+  if (IsStretchDirectClass(image) != MagickFalse)
+    image->storage_class=DirectClass;
+  if (image->storage_class == PseudoClass)
+  {
+    /*
+       Stretch colormap.
+       */
+    StretchColormap(image,stretch_map,black,white);
+  }
+}
+
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
   MagickCLEnv clEnv,const double black_point,const double white_point,
   ExceptionInfo *exception)
@@ -1206,15 +1220,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   /*
     Stretch the image.
   */
-  if (IsStretchDirectClass(image) != MagickFalse)
-    image->storage_class=DirectClass;
-  if (image->storage_class == PseudoClass)
-  {
-    /*
-       Stretch colormap.
-       */
-    StretchColormap(image,stretch_map,black,white);
-  }
+  StretchImageClass(image,stretch_map,black,white);
 
   /*
     Stretch image.
@@ -1448,6 +1454,70 @@ static void ReleaseTempImageBuffers(MagickCLEnv clEnv,cl_mem *tempImageBuffer)
   }
 }
 
+typedef struct _HullPassLaunch
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  cl_kernel
+    hullPass1,
+    hullPass2;
+
+  size_t
+    *global_work_size;
+} HullPassLaunch;
+
+static MagickBooleanType EnqueueHullPasses(const HullPassLaunch *launch,
+  ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = launch->clEnv;
+
+  const MagickCLDevice
+    device = launch->device;
+
+  const cl_command_queue
+    queue = launch->queue;
+
+  const cl_kernel
+    hullPass1 = launch->hullPass1,
+    hullPass2 = launch->hullPass2;
+
+  size_t
+    *const global_work_size = launch->global_work_size;
+
+  cl_event
+    event;
+
+  cl_int
+    clStatus;
+
+  /* launch the kernel */
+  clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, hullPass1, 2, NULL, global_work_size, NULL, 0, NULL, &event);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
+    return(MagickFalse);
+  }
+  RecordProfileData(device,hullPass1,event);
+
+  /* launch the kernel */
+  clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, hullPass2, 2, NULL, global_work_size, NULL, 0, NULL, &event);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
+    return(MagickFalse);
+  }
+  RecordProfileData(device,hullPass2,event);
+  return(MagickTrue);
+}
+
 static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
   ExceptionInfo*exception)
 {
@@ -1468,9 +1538,6 @@ static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
   cl_kernel
     hullPass1,
     hullPass2;
-
-  cl_event
-    event;
 
   cl_mem_flags
     mem_flags;
@@ -1540,14 +1607,7 @@ static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
     goto cleanup;
   }
 
-  if (ALIGNED(inputPixels,CLPixelPacket))
-  {
-    mem_flags = CL_MEM_READ_ONLY|CL_MEM_USE_HOST_PTR;
-  }
-  else
-  {
-    mem_flags = CL_MEM_READ_ONLY|CL_MEM_COPY_HOST_PTR;
-  }
+  mem_flags=GetInputBufferFlags(inputPixels);
   /* create a CL buffer from image pixel buffer */
   length = image->columns * image->rows;
   imageBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(CLPixelPacket), (void*)inputPixels, &clStatus);
@@ -1655,23 +1715,14 @@ static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
       (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
       goto cleanup;
     }
-    /* launch the kernel */
-	clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, hullPass1, 2, NULL, global_work_size, NULL, 0, NULL, &event);
-    if (clStatus != CL_SUCCESS)
     {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
-      goto cleanup;
-    }
-    RecordProfileData(device,hullPass1,event);
+      const HullPassLaunch
+        launch = { clEnv, device, queue, hullPass1, hullPass2,
+          global_work_size };
 
-    /* launch the kernel */
-	clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, hullPass2, 2, NULL, global_work_size, NULL, 0, NULL, &event);
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
-      goto cleanup;
+      if (EnqueueHullPasses(&launch,exception) == MagickFalse)
+        goto cleanup;
     }
-    RecordProfileData(device,hullPass2,event);
 
     if (k == 0)
       clStatus =clEnv->library->clSetKernelArg(hullPass1,0,sizeof(cl_mem),(void *)(tempImageBuffer));
@@ -1687,23 +1738,14 @@ static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
       (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
       goto cleanup;
     }
-    /* launch the kernel */
-	clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, hullPass1, 2, NULL, global_work_size, NULL, 0, NULL, &event);
-    if (clStatus != CL_SUCCESS)
     {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
-      goto cleanup;
-    }
-    RecordProfileData(device,hullPass1,event);
+      const HullPassLaunch
+        launch = { clEnv, device, queue, hullPass1, hullPass2,
+          global_work_size };
 
-    /* launch the kernel */
-	clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, hullPass2, 2, NULL, global_work_size, NULL, 0, NULL, &event);
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
-      goto cleanup;
+      if (EnqueueHullPasses(&launch,exception) == MagickFalse)
+        goto cleanup;
     }
-    RecordProfileData(device,hullPass2,event);
 
     offset.s[0] = -X[k];
     offset.s[1] = -Y[k];
@@ -1717,23 +1759,14 @@ static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
       (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
       goto cleanup;
     }
-    /* launch the kernel */
-	clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, hullPass1, 2, NULL, global_work_size, NULL, 0, NULL, &event);
-    if (clStatus != CL_SUCCESS)
     {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
-      goto cleanup;
-    }
-    RecordProfileData(device,hullPass1,event);
+      const HullPassLaunch
+        launch = { clEnv, device, queue, hullPass1, hullPass2,
+          global_work_size };
 
-    /* launch the kernel */
-	clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, hullPass2, 2, NULL, global_work_size, NULL, 0, NULL, &event);
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
-      goto cleanup;
+      if (EnqueueHullPasses(&launch,exception) == MagickFalse)
+        goto cleanup;
     }
-    RecordProfileData(device,hullPass2,event);
 
     offset.s[0] = X[k];
     offset.s[1] = Y[k];
@@ -1751,23 +1784,14 @@ static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
       (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
       goto cleanup;
     }
-    /* launch the kernel */
-	clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, hullPass1, 2, NULL, global_work_size, NULL, 0, NULL, &event);
-    if (clStatus != CL_SUCCESS)
     {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
-      goto cleanup;
-    }
-    RecordProfileData(device,hullPass1,event);
+      const HullPassLaunch
+        launch = { clEnv, device, queue, hullPass1, hullPass2,
+          global_work_size };
 
-    /* launch the kernel */
-	clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, hullPass2, 2, NULL, global_work_size, NULL, 0, NULL, &event);
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
-      goto cleanup;
+      if (EnqueueHullPasses(&launch,exception) == MagickFalse)
+        goto cleanup;
     }
-    RecordProfileData(device,hullPass2,event);
   }
 
   if (ALIGNED(filteredPixels,CLPixelPacket))
@@ -2022,6 +2046,176 @@ static void EqualizeColormap(Image *image,PixelPacket *equalize_map,
   }
 }
 
+typedef struct _EqualizeMapInput
+{
+  Image
+    *image;
+
+  cl_float4
+    *map,
+    white,
+    black;
+
+  PixelPacket
+    *equalize_map;
+} EqualizeMapInput;
+
+static void SetEqualizeMapEntry(const EqualizeMapInput *input,const cl_uint i)
+{
+  Image
+    *const image = input->image;
+
+  cl_float4
+    *const map = input->map;
+
+  const cl_float4
+    white = input->white,
+    black = input->black;
+
+  PixelPacket
+    *const equalize_map = input->equalize_map;
+
+  if ((image->channel_mask & SyncChannels) != 0)
+  {
+    if (white.x != black.x)
+      equalize_map[i].red=(unsigned int) ScaleMapToQuantum(
+        (MagickRealType) ((MaxMap*(map[i].x-black.x))/(white.x-black.x)));
+    return;
+  }
+  if (EqualizesRedChannel(image,white,black) != MagickFalse)
+    equalize_map[i].red=(unsigned int) ScaleMapToQuantum(
+      (MagickRealType) ((MaxMap*(map[i].x-black.x))/(white.x-black.x)));
+  if (EqualizesGreenChannel(image,white,black) != MagickFalse)
+    equalize_map[i].green=(unsigned int) ScaleMapToQuantum(
+      (MagickRealType) ((MaxMap*(map[i].y-black.y))/(white.y-black.y)));
+  if (EqualizesBlueChannel(image,white,black) != MagickFalse)
+    equalize_map[i].blue=(unsigned int) ScaleMapToQuantum(
+      (MagickRealType) ((MaxMap*(map[i].z-black.z))/(white.z-black.z)));
+  if (EqualizesAlphaChannel(image,white,black) != MagickFalse)
+    equalize_map[i].alpha=(unsigned int) ScaleMapToQuantum(
+      (MagickRealType) ((MaxMap*(map[i].w-black.w))/(white.w-black.w)));
+}
+
+typedef struct _HistogramBufferSource
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_uint4
+    *histogram;
+} HistogramBufferSource;
+
+static MagickBooleanType CreateHistogramBuffer(
+  const HistogramBufferSource *source,cl_mem *histogramBuffer,
+  ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = source->clEnv;
+
+  const MagickCLDevice
+    device = source->device;
+
+  cl_uint4
+    *const histogram = source->histogram;
+
+  cl_int
+    clStatus;
+
+  cl_mem_flags
+    mem_flags;
+
+  size_t
+    length;
+
+  void
+    *hostPtr;
+
+  /* If the host pointer is aligned to the size of cl_uint,
+     then use the host buffer directly from the GPU; otherwise,
+     create a buffer on the GPU and copy the data over */
+  if (ALIGNED(histogram,cl_uint4))
+  {
+    mem_flags = CL_MEM_READ_WRITE|CL_MEM_USE_HOST_PTR;
+    hostPtr = histogram;
+  }
+  else
+  {
+    mem_flags = CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR;
+    hostPtr = histogram;
+  }
+  /* create a CL buffer for histogram  */
+  length = (MaxMap+1);
+  *histogramBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(cl_uint4), hostPtr, &clStatus);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+typedef struct _EqualizeMapSource
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  PixelPacket
+    *equalize_map;
+} EqualizeMapSource;
+
+static MagickBooleanType CreateEqualizeMapBuffer(
+  const EqualizeMapSource *source,cl_mem *equalizeMapBuffer,
+  ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = source->clEnv;
+
+  const MagickCLDevice
+    device = source->device;
+
+  PixelPacket
+    *const equalize_map = source->equalize_map;
+
+  cl_int
+    clStatus;
+
+  cl_mem_flags
+    mem_flags;
+
+  size_t
+    length;
+
+  void
+    *hostPtr;
+
+  /* Create and initialize OpenCL buffers. */
+  if (ALIGNED(equalize_map, PixelPacket))
+  {
+    mem_flags = CL_MEM_READ_ONLY|CL_MEM_USE_HOST_PTR;
+    hostPtr = equalize_map;
+  }
+  else
+  {
+    mem_flags = CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR;
+    hostPtr = equalize_map;
+  }
+  /* create a CL buffer for equalize_map  */
+  length = (MaxMap+1);
+  *equalizeMapBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(PixelPacket), hostPtr, &clStatus);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -2066,6 +2260,9 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   HistogramBufferInfo
     histogram_info;
 
+  EqualizeMapInput
+    map_input;
+
   MagickBooleanType
     outputReady,
     status;
@@ -2081,7 +2278,6 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
     length;
 
   void
-    *hostPtr,
     *inputPixels;
 
   if (clEnv == (MagickCLEnv) NULL)
@@ -2149,26 +2345,12 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
     goto cleanup;
   }
 
-  /* If the host pointer is aligned to the size of cl_uint,
-     then use the host buffer directly from the GPU; otherwise,
-     create a buffer on the GPU and copy the data over */
-  if (ALIGNED(histogram,cl_uint4))
   {
-    mem_flags = CL_MEM_READ_WRITE|CL_MEM_USE_HOST_PTR;
-    hostPtr = histogram;
-  }
-  else
-  {
-    mem_flags = CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR;
-    hostPtr = histogram;
-  }
-  /* create a CL buffer for histogram  */
-  length = (MaxMap+1);
-  histogramBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(cl_uint4), hostPtr, &clStatus);
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
-    goto cleanup;
+    const HistogramBufferSource
+      source = { clEnv, device, histogram };
+
+    if (CreateHistogramBuffer(&source,&histogramBuffer,exception) == MagickFalse)
+      goto cleanup;
   }
 
   status = LaunchHistogramKernel(clEnv, device, queue, imageBuffer, histogramBuffer, image, image->channel_mask, exception);
@@ -2205,28 +2387,13 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   black=map[0];
   white=map[(int) MaxMap];
   (void) memset(equalize_map,0,(MaxMap+1)*sizeof(*equalize_map));
+  map_input.image=image;
+  map_input.map=map;
+  map_input.white=white;
+  map_input.black=black;
+  map_input.equalize_map=equalize_map;
   for (i=0; i <= (ssize_t) MaxMap; i++)
-  {
-    if ((image->channel_mask & SyncChannels) != 0)
-    {
-      if (white.x != black.x)
-        equalize_map[i].red=(unsigned int) ScaleMapToQuantum(
-          (MagickRealType) ((MaxMap*(map[i].x-black.x))/(white.x-black.x)));
-      continue;
-    }
-    if (EqualizesRedChannel(image,white,black) != MagickFalse)
-      equalize_map[i].red=(unsigned int) ScaleMapToQuantum(
-        (MagickRealType) ((MaxMap*(map[i].x-black.x))/(white.x-black.x)));
-    if (EqualizesGreenChannel(image,white,black) != MagickFalse)
-      equalize_map[i].green=(unsigned int) ScaleMapToQuantum(
-        (MagickRealType) ((MaxMap*(map[i].y-black.y))/(white.y-black.y)));
-    if (EqualizesBlueChannel(image,white,black) != MagickFalse)
-      equalize_map[i].blue=(unsigned int) ScaleMapToQuantum(
-        (MagickRealType) ((MaxMap*(map[i].z-black.z))/(white.z-black.z)));
-    if (EqualizesAlphaChannel(image,white,black) != MagickFalse)
-      equalize_map[i].alpha=(unsigned int) ScaleMapToQuantum(
-        (MagickRealType) ((MaxMap*(map[i].w-black.w))/(white.w-black.w)));
-  }
+    SetEqualizeMapEntry(&map_input,i);
 
   if (image->storage_class == PseudoClass)
   {
@@ -2267,24 +2434,12 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   }
 #endif
 
-  /* Create and initialize OpenCL buffers. */
-  if (ALIGNED(equalize_map, PixelPacket))
   {
-    mem_flags = CL_MEM_READ_ONLY|CL_MEM_USE_HOST_PTR;
-    hostPtr = equalize_map;
-  }
-  else
-  {
-    mem_flags = CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR;
-    hostPtr = equalize_map;
-  }
-  /* create a CL buffer for equalize_map  */
-  length = (MaxMap+1);
-  equalizeMapBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(PixelPacket), hostPtr, &clStatus);
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
-    goto cleanup;
+    const EqualizeMapSource
+      source = { clEnv, device, equalize_map };
+
+    if (CreateEqualizeMapBuffer(&source,&equalizeMapBuffer,exception) == MagickFalse)
+      goto cleanup;
   }
 
   /* get the OpenCL kernel */
