@@ -4562,13 +4562,7 @@ static void CompositeChannelColor(const CompositeRowInputs *row,
         ((*canvas_pixel).green-(*source_pixel).green)+
         ((*canvas_pixel).blue-(*source_pixel).blue)*
         ((*canvas_pixel).blue-(*source_pixel).blue)/3.0);
-      switch (channel)
-      {
-        case RedPixelChannel: (*pixel)=gray; break;
-        case GreenPixelChannel: (*pixel)=gray; break;
-        case BluePixelChannel: (*pixel)=gray; break;
-        default: (*pixel)=Dc; break;
-      }
+      (*pixel)=GetCompositeChannelColor(tile,gray,gray,gray);
       break;
     }
     case SaturateCompositeOp:
