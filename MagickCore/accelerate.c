@@ -3872,6 +3872,28 @@ static size_t GetGammaAccumulatorSize(const cl_uint number_channels,
   return(gammaAccumulatorLocalMemorySize);
 }
 
+static float GetResizeScaledSupport(const ResizeFilter *resizeFilter,
+  const float xFactor)
+{
+  float
+    scale,
+    support;
+
+  scale=(float) MAGICK_MAX(1.0/xFactor+MagickEpsilon,1.0);
+  support=scale*(float) GetResizeFilterSupport(resizeFilter);
+  if (support < 0.5)
+  {
+    /*
+    Support too small even for nearest neighbour: Reduce to point
+    sampling.
+    */
+    support=(float) 0.5;
+    scale=1.0;
+  }
+  scale=(float) MagickSafeReciprocal(scale);
+  return(support);
+}
+
 static MagickBooleanType resizeHorizontalFilter(MagickCLDevice device,
   cl_command_queue queue,const Image *image,Image *filteredImage,
   cl_mem imageBuffer,cl_uint number_channels,cl_uint columns,cl_uint rows,
@@ -3896,7 +3918,6 @@ static MagickBooleanType resizeHorizontalFilter(MagickCLDevice device,
     resizeFilterSupport,
     resizeFilterWindowSupport,
     resizeFilterBlur,
-    scale,
     support;
 
   int
@@ -3926,18 +3947,7 @@ static MagickBooleanType resizeHorizontalFilter(MagickCLDevice device,
   /*
   Apply filter to resize vertically from image to resize image.
   */
-  scale=(float) MAGICK_MAX(1.0/xFactor+MagickEpsilon,1.0);
-  support=scale*(float) GetResizeFilterSupport(resizeFilter);
-  if (support < 0.5)
-  {
-    /*
-    Support too small even for nearest neighbour: Reduce to point
-    sampling.
-    */
-    support=(float) 0.5;
-    scale=1.0;
-  }
-  scale=(float) MagickSafeReciprocal(scale);
+  support=GetResizeScaledSupport(resizeFilter,xFactor);
 
   if (resizedColumns < workgroupSize)
   {
