@@ -2090,6 +2090,67 @@ static void SetEqualizeMapEntry(const EqualizeMapInput *input,const cl_uint i)
       (MagickRealType) ((MaxMap*(map[i].w-black.w))/(white.w-black.w)));
 }
 
+typedef struct _HistogramBufferSource
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_uint4
+    *histogram;
+} HistogramBufferSource;
+
+static MagickBooleanType CreateHistogramBuffer(
+  const HistogramBufferSource *source,cl_mem *histogramBuffer,
+  ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = source->clEnv;
+
+  const MagickCLDevice
+    device = source->device;
+
+  cl_uint4
+    *const histogram = source->histogram;
+
+  cl_int
+    clStatus;
+
+  cl_mem_flags
+    mem_flags;
+
+  size_t
+    length;
+
+  void
+    *hostPtr;
+
+  /* If the host pointer is aligned to the size of cl_uint,
+     then use the host buffer directly from the GPU; otherwise,
+     create a buffer on the GPU and copy the data over */
+  if (ALIGNED(histogram,cl_uint4))
+  {
+    mem_flags = CL_MEM_READ_WRITE|CL_MEM_USE_HOST_PTR;
+    hostPtr = histogram;
+  }
+  else
+  {
+    mem_flags = CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR;
+    hostPtr = histogram;
+  }
+  /* create a CL buffer for histogram  */
+  length = (MaxMap+1);
+  *histogramBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(cl_uint4), hostPtr, &clStatus);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -2220,26 +2281,12 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
     goto cleanup;
   }
 
-  /* If the host pointer is aligned to the size of cl_uint,
-     then use the host buffer directly from the GPU; otherwise,
-     create a buffer on the GPU and copy the data over */
-  if (ALIGNED(histogram,cl_uint4))
   {
-    mem_flags = CL_MEM_READ_WRITE|CL_MEM_USE_HOST_PTR;
-    hostPtr = histogram;
-  }
-  else
-  {
-    mem_flags = CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR;
-    hostPtr = histogram;
-  }
-  /* create a CL buffer for histogram  */
-  length = (MaxMap+1);
-  histogramBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(cl_uint4), hostPtr, &clStatus);
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
-    goto cleanup;
+    const HistogramBufferSource
+      source = { clEnv, device, histogram };
+
+    if (CreateHistogramBuffer(&source,&histogramBuffer,exception) == MagickFalse)
+      goto cleanup;
   }
 
   status = LaunchHistogramKernel(clEnv, device, queue, imageBuffer, histogramBuffer, image, image->channel_mask, exception);
