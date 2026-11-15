@@ -3069,6 +3069,116 @@ static MagickBooleanType AcquireLocalContrastKernels(
   return(MagickTrue);
 }
 
+typedef struct _LocalContrastColumnInputs
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  cl_kernel
+    blurColumnKernel;
+
+  cl_mem
+    imageBuffer,
+    filteredImageBuffer,
+    tempImageBuffer;
+
+  cl_int
+    iRadius;
+
+  double
+    strength;
+
+  unsigned int
+    imageColumns,
+    imageRows,
+    passes;
+
+  const Image
+    *image;
+} LocalContrastColumnInputs;
+
+static MagickBooleanType LaunchLocalContrastBlurColumn(
+  const LocalContrastColumnInputs *inputs,ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = inputs->clEnv;
+
+  const MagickCLDevice
+    device = inputs->device;
+
+  const cl_command_queue
+    queue = inputs->queue;
+
+  const cl_kernel
+    blurColumnKernel = inputs->blurColumnKernel;
+
+  const unsigned int
+    passes = inputs->passes;
+
+  const Image
+    *const image = inputs->image;
+
+  cl_event
+    event;
+
+  cl_int
+    clStatus;
+
+  cl_uint
+    i;
+
+    {
+      cl_float FStrength = (cl_float) inputs->strength;
+      i=0;
+      clStatus=clEnv->library->clSetKernelArg(blurColumnKernel,i++,sizeof(cl_mem),(void *)&inputs->imageBuffer);
+      clStatus|=clEnv->library->clSetKernelArg(blurColumnKernel,i++,sizeof(cl_mem),(void *)&inputs->filteredImageBuffer);
+      clStatus|=clEnv->library->clSetKernelArg(blurColumnKernel,i++,sizeof(cl_mem),(void *)&inputs->tempImageBuffer);
+      clStatus|=clEnv->library->clSetKernelArg(blurColumnKernel,i++,sizeof(unsigned int),(void *)&inputs->iRadius);
+      clStatus|=clEnv->library->clSetKernelArg(blurColumnKernel,i++,sizeof(cl_float),(void *)&FStrength);
+      clStatus|=clEnv->library->clSetKernelArg(blurColumnKernel,i++,sizeof(unsigned int),(void *)&inputs->imageColumns);
+      clStatus|=clEnv->library->clSetKernelArg(blurColumnKernel,i++,sizeof(unsigned int),(void *)&inputs->imageRows);
+
+      if (clStatus != CL_SUCCESS)
+      {
+        (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
+        return(MagickFalse);
+      }
+    }
+
+    /* launch the kernel */
+    {
+      int x;
+      for (x = 0; x < (int) passes; ++x) {
+        size_t gsize[2];
+        size_t wsize[2];
+        size_t goffset[2];
+
+        gsize[0] = ((image->columns + 3) / 4) * 4;
+        gsize[1] = ((((image->rows + 63) / 64) + (passes + 1)) / passes) * 64;
+        wsize[0] = 4;
+        wsize[1] = 64;
+        goffset[0] = 0;
+        goffset[1] = x * gsize[1];
+
+        clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, blurColumnKernel, 2, goffset, gsize, wsize, 0, NULL, &event);
+        if (clStatus != CL_SUCCESS)
+        {
+          (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
+          return(MagickFalse);
+        }
+        clEnv->library->clFlush(queue);
+        RecordProfileData(device,blurColumnKernel,event);
+      }
+    }
+  return(MagickTrue);
+}
+
 static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
   const double radius,const double strength,ExceptionInfo *exception)
 {
@@ -3086,9 +3196,6 @@ static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
   cl_kernel
     blurRowKernel,
     blurColumnKernel;
-
-  cl_event
-    event;
 
   cl_mem
     filteredImageBuffer,
@@ -3198,47 +3305,12 @@ static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
     }
 
     {
-      cl_float FStrength = (cl_float) strength;
-      i=0;
-      clStatus=clEnv->library->clSetKernelArg(blurColumnKernel,i++,sizeof(cl_mem),(void *)&imageBuffer);
-      clStatus|=clEnv->library->clSetKernelArg(blurColumnKernel,i++,sizeof(cl_mem),(void *)&filteredImageBuffer);
-      clStatus|=clEnv->library->clSetKernelArg(blurColumnKernel,i++,sizeof(cl_mem),(void *)&tempImageBuffer);
-      clStatus|=clEnv->library->clSetKernelArg(blurColumnKernel,i++,sizeof(unsigned int),(void *)&iRadius);
-      clStatus|=clEnv->library->clSetKernelArg(blurColumnKernel,i++,sizeof(cl_float),(void *)&FStrength);
-      clStatus|=clEnv->library->clSetKernelArg(blurColumnKernel,i++,sizeof(unsigned int),(void *)&imageColumns);
-      clStatus|=clEnv->library->clSetKernelArg(blurColumnKernel,i++,sizeof(unsigned int),(void *)&imageRows);
+      const LocalContrastColumnInputs inputs = { clEnv, device, queue,
+        blurColumnKernel, imageBuffer, filteredImageBuffer, tempImageBuffer,
+        iRadius, strength, imageColumns, imageRows, passes, image };
 
-      if (clStatus != CL_SUCCESS)
-      {
-        (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
+      if (LaunchLocalContrastBlurColumn(&inputs,exception) == MagickFalse)
         goto cleanup;
-      }
-    }
-
-    /* launch the kernel */
-    {
-      int x;
-      for (x = 0; x < (int) passes; ++x) {
-        size_t gsize[2];
-        size_t wsize[2];
-        size_t goffset[2];
-
-        gsize[0] = ((image->columns + 3) / 4) * 4;
-        gsize[1] = ((((image->rows + 63) / 64) + (passes + 1)) / passes) * 64;
-        wsize[0] = 4;
-        wsize[1] = 64;
-        goffset[0] = 0;
-        goffset[1] = x * gsize[1];
-
-        clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, blurColumnKernel, 2, goffset, gsize, wsize, 0, NULL, &event);
-        if (clStatus != CL_SUCCESS)
-        {
-          (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
-          goto cleanup;
-        }
-        clEnv->library->clFlush(queue);
-        RecordProfileData(device,blurColumnKernel,event);
-      }
     }
   }
 
