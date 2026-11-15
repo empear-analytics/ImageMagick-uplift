@@ -4092,6 +4092,76 @@ static void CompositeChannelColorScreen(const CompositeRowInputs *row,
   }
 }
 
+static void CompositeChannelColorSaturate(const CompositeRowInputs *row,
+  const CompositePixelInputs *authentic,const CompositeChannelInputs *tile,
+  MagickRealType *pixel)
+{
+  const CompositeOperator
+    compose = row->compose;
+
+  const ColorspaceType
+    colorspace = row->colorspace;
+
+  const double
+    white_luminance = row->white_luminance;
+
+  const IlluminantType
+    illuminant = row->illuminant;
+
+  const MagickRealType
+    Da = authentic->Da,
+    Sa = authentic->Sa;
+
+  const PixelInfo
+    *const canvas_pixel = authentic->canvas_pixel,
+    *const source_pixel = authentic->source_pixel;
+
+  const MagickRealType
+    Dc = tile->Dc,
+    Sc = tile->Sc;
+
+  MagickRealType
+    blue = 0.0,
+    chroma = 0.0,
+    green = 0.0,
+    hue = 0.0,
+    luma = 0.0,
+    red = 0.0,
+    sans = 0.0;
+
+  switch (compose)
+  {
+    case SaturateCompositeOp:
+    {
+      if (fabs((double) QuantumRange*Sa-(double) TransparentAlpha) < MagickEpsilon)
+        {
+          (*pixel)=Dc;
+          break;
+        }
+      if (fabs((double) QuantumRange*Da-(double) TransparentAlpha) < MagickEpsilon)
+        {
+          (*pixel)=Sc;
+          break;
+        }
+      ConvertRGBToGeneric(colorspace,(double) (*canvas_pixel).red,
+        (double) (*canvas_pixel).green,(double) (*canvas_pixel).blue,
+        white_luminance,illuminant,&hue,&chroma,&luma);
+      ConvertRGBToGeneric(colorspace,(double) (*source_pixel).red,
+        (double) (*source_pixel).green,(double) (*source_pixel).blue,
+        white_luminance,illuminant,&sans,&chroma,&sans);
+      ConvertGenericToRGB(colorspace,hue,chroma,luma,
+        white_luminance,illuminant,&red,&green,&blue);
+      (*pixel)=GetCompositeChannelColor(tile,red,green,blue);
+      break;
+    }
+    default:
+    {
+      CompositeChannelColorScreen(row,authentic,tile,pixel);
+      break;
+    }
+  }
+}
+
 static void CompositeChannelColor(const CompositeRowInputs *row,
   const CompositePixelInputs *authentic,const CompositeChannelInputs *tile,
   MagickRealType *pixel)
@@ -4793,32 +4863,9 @@ static void CompositeChannelColor(const CompositeRowInputs *row,
       (*pixel)=GetCompositeChannelColor(tile,gray,gray,gray);
       break;
     }
-    case SaturateCompositeOp:
-    {
-      if (fabs((double) QuantumRange*Sa-(double) TransparentAlpha) < MagickEpsilon)
-        {
-          (*pixel)=Dc;
-          break;
-        }
-      if (fabs((double) QuantumRange*Da-(double) TransparentAlpha) < MagickEpsilon)
-        {
-          (*pixel)=Sc;
-          break;
-        }
-      ConvertRGBToGeneric(colorspace,(double) (*canvas_pixel).red,
-        (double) (*canvas_pixel).green,(double) (*canvas_pixel).blue,
-        white_luminance,illuminant,&hue,&chroma,&luma);
-      ConvertRGBToGeneric(colorspace,(double) (*source_pixel).red,
-        (double) (*source_pixel).green,(double) (*source_pixel).blue,
-        white_luminance,illuminant,&sans,&chroma,&sans);
-      ConvertGenericToRGB(colorspace,hue,chroma,luma,
-        white_luminance,illuminant,&red,&green,&blue);
-      (*pixel)=GetCompositeChannelColor(tile,red,green,blue);
-      break;
-    }
     default:
     {
-      CompositeChannelColorScreen(row,authentic,tile,pixel);
+      CompositeChannelColorSaturate(row,authentic,tile,pixel);
       break;
     }
   }
