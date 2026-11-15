@@ -2887,6 +2887,110 @@ static MagickBooleanType AcquireLocalContrastResources(MagickCLEnv clEnv,
   return(MagickTrue);
 }
 
+typedef struct _LocalContrastOutputInputs
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  const Image
+    *image;
+} LocalContrastOutputInputs;
+
+typedef struct _LocalContrastOutputTargets
+{
+  Image
+    **filteredImage;
+
+  CacheView
+    **filteredImage_view;
+
+  void
+    **filteredPixels;
+
+  cl_mem
+    *filteredImageBuffer;
+} LocalContrastOutputTargets;
+
+static MagickBooleanType CreateLocalContrastOutput(
+  const LocalContrastOutputInputs *inputs,ExceptionInfo *exception,
+  const LocalContrastOutputTargets *targets)
+{
+  const MagickCLEnv
+    clEnv = inputs->clEnv;
+
+  const MagickCLDevice
+    device = inputs->device;
+
+  const Image
+    *const image = inputs->image;
+
+  Image
+    **const filteredImage = targets->filteredImage;
+
+  CacheView
+    **const filteredImage_view = targets->filteredImage_view;
+
+  void
+    **const filteredPixels = targets->filteredPixels;
+
+  cl_mem
+    *const filteredImageBuffer = targets->filteredImageBuffer;
+
+  cl_int
+    clStatus;
+
+  cl_mem_flags
+    mem_flags;
+
+  size_t
+    length;
+
+  void
+    *hostPtr;
+
+  /* create output */
+  {
+    *filteredImage = CloneImage(image,0,0,MagickTrue,exception);
+    assert(*filteredImage != NULL);
+    if (SetImageStorageClass(*filteredImage,DirectClass,exception) != MagickTrue)
+    {
+      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "CloneImage failed.", ".");
+      return(MagickFalse);
+    }
+    *filteredImage_view=AcquireAuthenticCacheView(*filteredImage,exception);
+    *filteredPixels=GetCacheViewAuthenticPixels(*filteredImage_view,0,0,(*filteredImage)->columns,(*filteredImage)->rows,exception);
+    if (*filteredPixels == (void *) NULL)
+    {
+      (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),CacheWarning, "UnableToReadPixelCache.","`%s'",(*filteredImage)->filename);
+      return(MagickFalse);
+    }
+
+    if (ALIGNED(*filteredPixels,CLPixelPacket))
+    {
+      mem_flags = CL_MEM_WRITE_ONLY|CL_MEM_USE_HOST_PTR;
+      hostPtr = *filteredPixels;
+    }
+    else
+    {
+      mem_flags = CL_MEM_WRITE_ONLY;
+      hostPtr = NULL;
+    }
+
+    /* create a CL buffer from image pixel buffer */
+    length = image->columns * image->rows;
+    *filteredImageBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(CLPixelPacket), hostPtr, &clStatus);
+    if (clStatus != CL_SUCCESS)
+    {
+      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+      return(MagickFalse);
+    }
+  }
+  return(MagickTrue);
+}
+
 static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
   const double radius,const double strength,ExceptionInfo *exception)
 {
@@ -2914,9 +3018,6 @@ static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
     imageKernelBuffer,
     tempImageBuffer;
 
-  cl_mem_flags
-    mem_flags;
-
   cl_uint
     i;
 
@@ -2933,8 +3034,7 @@ static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
     length;
 
   void
-    *filteredPixels,
-    *hostPtr;
+    *filteredPixels;
 
   unsigned int
     imageColumns,
@@ -2965,42 +3065,13 @@ static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
       goto cleanup;
   }
 
-  /* create output */
   {
-    filteredImage = CloneImage(image,0,0,MagickTrue,exception);
-    assert(filteredImage != NULL);
-    if (SetImageStorageClass(filteredImage,DirectClass,exception) != MagickTrue)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "CloneImage failed.", ".");
-      goto cleanup;
-    }
-    filteredImage_view=AcquireAuthenticCacheView(filteredImage,exception);
-    filteredPixels=GetCacheViewAuthenticPixels(filteredImage_view,0,0,filteredImage->columns,filteredImage->rows,exception);
-    if (filteredPixels == (void *) NULL)
-    {
-      (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),CacheWarning, "UnableToReadPixelCache.","`%s'",filteredImage->filename);
-      goto cleanup;
-    }
+    const LocalContrastOutputInputs inputs = { clEnv, device, image };
+    const LocalContrastOutputTargets targets = { &filteredImage,
+      &filteredImage_view, &filteredPixels, &filteredImageBuffer };
 
-    if (ALIGNED(filteredPixels,CLPixelPacket))
-    {
-      mem_flags = CL_MEM_WRITE_ONLY|CL_MEM_USE_HOST_PTR;
-      hostPtr = filteredPixels;
-    }
-    else
-    {
-      mem_flags = CL_MEM_WRITE_ONLY;
-      hostPtr = NULL;
-    }
-
-    /* create a CL buffer from image pixel buffer */
-    length = image->columns * image->rows;
-    filteredImageBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(CLPixelPacket), hostPtr, &clStatus);
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+    if (CreateLocalContrastOutput(&inputs,exception,&targets) == MagickFalse)
       goto cleanup;
-    }
   }
 
   {
