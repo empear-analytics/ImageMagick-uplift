@@ -4772,8 +4772,7 @@ cleanup:
   ReleaseOpenCLBuffer(cosThetaBuffer);
   ReleaseKernel(rotationalBlurKernel);
   ReleaseAccelerateQueue(device,queue);
-  if ((outputReady == MagickFalse) && (filteredImage != (Image *) NULL))
-    filteredImage=DestroyImage(filteredImage);
+  filteredImage=DestroyUnfinishedImage(outputReady,filteredImage);
 
   return(filteredImage);
 }
