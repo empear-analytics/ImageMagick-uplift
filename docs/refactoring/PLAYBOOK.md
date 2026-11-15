@@ -3393,6 +3393,15 @@ a finding.
 6. Where the block stood, write `if (Helper(&name,&v) == MagickFalse) goto L;` (or
    `return(c);`, or Recipe V step 7's `{ S return(v); }` and its other forms, the exit's
    text unchanged), and check every member and argument by reading.
+7. Another block of the file whose text equals, under Recipe D's renaming (checked by
+   script; `diff` of the two line ranges when the copies are verbatim), the block a
+   function of this recipe was cut from, calls that function instead of a second copy
+   (2026-11-15): another copy in the same caller, or one in another function. Steps 1
+   to 6 hold for the copy as written, with its own variables: its own struct local
+   filled as step 5 says (or in Recipe FB's form), its own written variable `v`, its own
+   temporaries (step 2) checked by reading every use in its own caller, and its own exit
+   (`goto L;` to its own label, or its own `return(c);`), unchanged. One commit per
+   caller; the copies of one caller go in one commit.
 
 **Before:**
 
@@ -3470,6 +3479,19 @@ static MagickBooleanType SetPlasmaMiddlePixel(const PlasmaMidpoint *midpoint,
   in the caller before the call, so the cleanup may write one (`resize_filter`) after
   the helper returns; the block itself writes no member (step 3). With one exit,
   `refactor_guard.py --calls` moves only `+2`.
+- Under step 7 the function was cut from the first copy's text, and the other copy is
+  that text with its own variables in place of the first copy's. The call runs the same
+  statements on the values its own struct carries, filled directly before the call from
+  variables the copy does not write; its temporaries are the function's own, written
+  before they are read, and its own caller writes them again before any later read
+  (checked for that caller, as step 2 asks); its one written variable lands through the
+  pointer before the function returns; and on a failure path the caller jumps or
+  returns from the point where the copy did, with its own exit's text. This is the
+  argument Recipe V step 6 makes for another copy of a `return(c);` block, Recipe W
+  step 7 for W's, Recipe LB step 6 for a `break;` block and Recipe I step 7 for I's: a
+  second function of the same text would be a duplicate, and Recipe D, which moves
+  copies whole, may not leave the caller. `refactor_guard.py --calls` shows each call
+  of the block fall by one per copy replaced, and the function's name rise by one.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
 nothing else moved), and steps 1, 2 and 6 checked by reading.
@@ -3480,6 +3502,13 @@ temporaries `x`, `y`, `u`, `v` and `q`, and reads the context, the segment, both
 midpoints and the plasma amplitude: Recipe V gives the helper six parameters. A probe:
 bumps 5 to 4, 3.12 to 3.19. Its bottom and top pixels have the same shape. Added by
 Claude Code (Claude Opus 5.5) during task W08, under the mandate of 2026-10-24.
+Step 7 (2026-11-15, campaign A W27 round sixteen lane a, Claude Code, Claude Opus 5.5,
+under the owner's OK of 2026-11-10 to evolve the recipes): `accelerate.c`'s
+`ComputeDespeckleImage`, whose hull-pass loop holds four verbatim copies of the
+launch pair (enqueue `hullPass1`, test, record; enqueue `hullPass2`, test, record),
+each leaving through `goto cleanup;`. A probe (`~/sp_w23a/stub.py`, the other 18
+Complex/Large functions emptied, no padding): the first copy alone 7.58 to 7.62
+(cc 65 to 63), all four 7.75 (cc 57, 306 to 278 lines), the new function finding-free.
 
 ---
 
@@ -20903,3 +20932,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-15 | AMEND | WP | Step 6 (*latent clones*): a wrapper that meets steps 1 and 2 but carries no *Code Duplication* finding may be converted, one per commit, when a probe of a planned later step of the file (applied to a scratch copy, the wrapper unconverted) lists it under *Code Duplication* and the same probe with the wrapper converted lists no wrapper there; the message quotes both probes, the step is flat inside that plan (rule 2), and a wrapper no probe flags stays. A *Careful* bullet gives the argument (the transformation and its argument are those of a flagged wrapper; only the reason to take it changes) | `accelerate.c` (campaign A, W26 lane b, wide build): the planned shared OpenCL host helpers (release buffer, kernel, queue and device; acquire device and queue, kernel; test `CL_SUCCESS`) shrink `ComputeContrastImage` and `ComputeGrayscaleImage` into a pair and the file gains *Code Duplication* with `AccelerateLocalContrastImage`, `AccelerateWaveletDenoiseImage` and `AccelerateMotionBlurImage` (3.71 to 3.44, probe); with the two step-1 wrappers among them converted the probe scores 3.71 with no *Code Duplication*. Step 6 refused the conversion because the base file has no such finding. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
 | 2026-11-15 | NEW | SZ | a run of zeroing writes (`memset(&v,0,sizeof(v))` of plain locals, `memset(p,0,n)` of heap blocks the function allocated, or a `static void` helper made of such calls) moves, unchanged and in order, to directly above the first later statement of the same compound statement that reads a zeroed object, when the crossed statements name no zeroed local, write no pointer or size operand, and reach a zeroed block only through a release on a path that leaves; flat alone, taken only as the first step of a probed extraction | `feature-texture.c`'s `GetImageFeatures` (campaign A, W26 round fifteen lane c): the nine statistics and four buffers zeroed before the row allocation, the matrix fill and the normalisation, read first by the direction passes; a probe of the chain sink, N, FB, N step 8: every function under 70 lines, 8.72 to 9.38. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
 | 2026-11-15 | AMEND | N | Step 8, the function-body siblings form (a later block holding an earlier sibling's call takes its `const Name *name`): a statement of the later block before the call may write a member's variable when every path through the write returns before the call (the later block binds that member read-then-written), and a variable the later block only reads that is not a member goes by value as a parameter after `name` (Recipe E step 3), at most four parameters | `feature-texture.c`'s `GetImageFeatures` (campaign A, W26 round fifteen lane c): its tail (the buffers check, the row allocation, the matrix fill and their exits, the normalisation, the call of the direction passes' function, the release) holds the call of the function that takes `FeatureAnalysis`; its exits write `channel_features`, a member, and return, and it reads `distance`, `exception` and `grays`, which the direction passes do not. A probe of the chain: every function under 70 lines, 8.72 to 9.38. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
+| 2026-11-15 | AMEND | Y | Step 7: another block of the file whose text equals, under Recipe D's renaming (checked by script; `diff` of the line ranges for verbatim copies), the block a Recipe Y function was cut from calls that function instead of a second copy, in the same caller or another, with its own struct fill, written variable, temporaries and exit, steps 1 to 6 checked for the copy; one commit per caller. *Careful* gives the argument (Recipe V step 6, W step 7, LB step 6 and I step 7 make it for their forms) | `accelerate.c`'s `ComputeDespeckleImage` (campaign A, W27 round sixteen lane a): four verbatim copies of the hull-pass launch pair, each leaving through `goto cleanup;`; a second function of the same text would be a duplicate, and Recipe D may not leave the caller. Probe (stub procedure, other 18 Complex/Large functions emptied): 7.58 to 7.62 for the first copy, 7.75 with all four | owner |
