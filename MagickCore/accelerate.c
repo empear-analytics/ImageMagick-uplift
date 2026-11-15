@@ -3401,6 +3401,51 @@ static MagickBooleanType ReadModulateOutput(
   return(MagickTrue);
 }
 
+typedef struct _ModulateReleaseInputs
+{
+  MagickCLEnv
+    clEnv;
+
+  cl_mem
+    imageBuffer;
+
+  cl_kernel
+    modulateKernel;
+
+  cl_command_queue
+    queue;
+
+  MagickCLDevice
+    device;
+} ModulateReleaseInputs;
+
+static void ReleaseModulateResources(const ModulateReleaseInputs *inputs)
+{
+  const MagickCLEnv
+    clEnv = inputs->clEnv;
+
+  const cl_mem
+    imageBuffer = inputs->imageBuffer;
+
+  const cl_kernel
+    modulateKernel = inputs->modulateKernel;
+
+  const cl_command_queue
+    queue = inputs->queue;
+
+  const MagickCLDevice
+    device = inputs->device;
+
+  if (imageBuffer!=NULL)
+    clEnv->library->clReleaseMemObject(imageBuffer);
+  if (modulateKernel!=NULL)
+    ReleaseOpenCLKernel(modulateKernel);
+  if (queue != NULL)
+    ReleaseOpenCLCommandQueue(device,queue);
+  if (device != NULL)
+    ReleaseOpenCLDevice(device);
+}
+
 static MagickBooleanType ComputeModulateImage(Image *image,MagickCLEnv clEnv,
   const double percent_brightness,const double percent_hue,
   const double percent_saturation,const ColorspaceType colorspace,
@@ -3471,14 +3516,12 @@ cleanup:
 
   image_view=DestroyCacheView(image_view);
 
-  if (imageBuffer!=NULL)
-    clEnv->library->clReleaseMemObject(imageBuffer);
-  if (modulateKernel!=NULL)
-    ReleaseOpenCLKernel(modulateKernel);
-  if (queue != NULL)
-    ReleaseOpenCLCommandQueue(device,queue);
-  if (device != NULL)
-    ReleaseOpenCLDevice(device);
+  {
+    const ModulateReleaseInputs inputs = { clEnv, imageBuffer, modulateKernel,
+      queue, device };
+
+    ReleaseModulateResources(&inputs);
+  }
 
   return outputReady;
 
