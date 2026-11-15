@@ -747,6 +747,43 @@ MagickPrivate Image* AccelerateBlurImage(const Image *image,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 */
 
+typedef struct _AccelerateImageBufferTargets
+{
+  MagickCLDevice
+    *device;
+
+  cl_command_queue
+    *queue;
+
+  cl_mem
+    *imageBuffer;
+} AccelerateImageBufferTargets;
+
+static MagickBooleanType AcquireAccelerateImageBuffer(MagickCLEnv clEnv,
+  const Image *image,ExceptionInfo *exception,
+  const AccelerateImageBufferTargets *targets)
+{
+  MagickCLDevice
+    *const device = targets->device;
+
+  cl_command_queue
+    *const queue = targets->queue;
+
+  cl_mem
+    *const imageBuffer = targets->imageBuffer;
+
+  *device=RequestOpenCLDevice(clEnv);
+  if (*device == (MagickCLDevice) NULL)
+    return(MagickFalse);
+  *queue=AcquireOpenCLCommandQueue(*device);
+  if (*queue == (cl_command_queue) NULL)
+    return(MagickFalse);
+  *imageBuffer=GetAuthenticOpenCLBuffer(image,*device,exception);
+  if (*imageBuffer == (cl_mem) NULL)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeContrastImage(Image *image,MagickCLEnv clEnv,
   const MagickBooleanType sharpen,ExceptionInfo *exception)
 {
@@ -769,6 +806,9 @@ static MagickBooleanType ComputeContrastImage(Image *image,MagickCLEnv clEnv,
   MagickBooleanType
     outputReady;
 
+  AccelerateImageBufferTargets
+    targets;
+
   MagickCLDevice
     device;
 
@@ -789,14 +829,10 @@ static MagickBooleanType ComputeContrastImage(Image *image,MagickCLEnv clEnv,
   imageBuffer=NULL;
   outputReady=MagickFalse;
 
-  device=RequestOpenCLDevice(clEnv);
-  if (device == (MagickCLDevice) NULL)
-    goto cleanup;
-  queue=AcquireOpenCLCommandQueue(device);
-  if (queue == (cl_command_queue) NULL)
-    goto cleanup;
-  imageBuffer=GetAuthenticOpenCLBuffer(image,device,exception);
-  if (imageBuffer == (cl_mem) NULL)
+  targets.device=(&device);
+  targets.queue=(&queue);
+  targets.imageBuffer=(&imageBuffer);
+  if (AcquireAccelerateImageBuffer(clEnv,image,exception,&targets) == MagickFalse)
     goto cleanup;
 
   contrastKernel=AcquireOpenCLKernel(device,"Contrast");
