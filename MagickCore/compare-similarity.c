@@ -100,6 +100,47 @@ typedef struct _ComparePixels
     *q;
 } ComparePixels;
 
+typedef struct _PixelMetricInfo
+{
+  const Image
+    *image,
+    *reconstruct_image;
+
+  MetricType
+    metric;
+
+  double
+    fuzz;
+} PixelMetricInfo;
+
+typedef struct _PixelMetricSums
+{
+  double
+    area,
+    similarity[MaxPixelChannels+1];
+} PixelMetricSums;
+
+typedef struct _PixelMetricRow
+{
+  const Image
+    *image,
+    *reconstruct_image;
+
+  const Quantum
+    *p,
+    *q;
+
+  size_t
+    columns;
+
+  double
+    fuzz;
+} PixelMetricRow;
+
+static MagickBooleanType
+  GetPixelMetricSimilarity(const PixelMetricInfo *,double *,double *,
+    ExceptionInfo *);
+
 static void AccumulateAEPixel(const ComparePixels *pixels,const double fuzz,
   double *channel_similarity)
 {
@@ -823,97 +864,21 @@ static void NormalizeChannelSimilarity(const Image *image,
 static MagickBooleanType GetMAESimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
-  CacheView
-    *image_view,
-    *reconstruct_view;
+  const PixelMetricInfo
+    info = { image, reconstruct_image, MeanAbsoluteErrorMetric,
+      0.0 };
 
   double
-    area = 0.0;
+    area;
 
   MagickBooleanType
-    status = MagickTrue;
-
-  size_t
-    columns,
-    rows;
-
-  ssize_t
-    y;
+    status;
 
   /*
     Compute the mean absolute error similarity.
   */
   (void) memset(similarity,0,(MaxPixelChannels+1)*sizeof(*similarity));
-  SetImageCompareBounds(image,reconstruct_image,&columns,&rows);
-  image_view=AcquireVirtualCacheView(image,exception);
-  reconstruct_view=AcquireVirtualCacheView(reconstruct_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(area,similarity,status) \
-    magick_number_threads(image,image,rows,1)
-#endif
-  for (y=0; y < (ssize_t) rows; y++)
-  {
-    const Quantum
-      *magick_restrict p,
-      *magick_restrict q;
-
-    double
-      channel_area = 0.0,
-      channel_similarity[MaxPixelChannels+1] = { 0.0 };
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,columns,1,exception);
-    q=GetCacheViewVirtualPixels(reconstruct_view,0,y,columns,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (const Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) columns; x++)
-    {
-      const ComparePixels pixels = { image, reconstruct_image, p, q };
-
-      if ((GetPixelReadMask(image,p) <= (QuantumRange/2)) ||
-          (GetPixelReadMask(reconstruct_image,q) <= (QuantumRange/2)))
-        {
-          p+=(ptrdiff_t) GetPixelChannels(image);
-          q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
-          continue;
-        }
-      AccumulateMAEPixel(&pixels,channel_similarity);
-      channel_area++;
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
-    }
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-    #pragma omp critical (MagickCore_GetMAESimilarity)
-#endif
-    {
-      ssize_t
-        j;
-
-      area+=channel_area;
-      for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,j);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
-          channel);
-        if (((traits & UpdatePixelTrait) == 0) ||
-            ((reconstruct_traits & UpdatePixelTrait) == 0))
-          continue;
-        similarity[j]+=channel_similarity[j];
-      }
-      similarity[CompositePixelChannel]+=
-        channel_similarity[CompositePixelChannel];
-    }
-  }
-  reconstruct_view=DestroyCacheView(reconstruct_view);
-  image_view=DestroyCacheView(image_view);
+  status=GetPixelMetricSimilarity(&info,similarity,&area,exception);
   NormalizeChannelSimilarity(image,reconstruct_image,area,similarity);
   return(status);
 }
@@ -1137,96 +1102,20 @@ static void AccumulateMSEPixel(const ComparePixels *pixels,
 static MagickBooleanType GetMSESimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
-  CacheView
-    *image_view,
-    *reconstruct_view;
+  const PixelMetricInfo
+    info = { image, reconstruct_image, MeanSquaredErrorMetric,
+      0.0 };
 
   double
-    area = 0.0;
+    area;
 
   MagickBooleanType
-    status = MagickTrue;
-
-  size_t
-    columns,
-    rows;
-
-  ssize_t
-    y;
+    status;
 
   /*
     Compute the mean sequared error similarity.
   */
-  SetImageCompareBounds(image,reconstruct_image,&columns,&rows);
-  image_view=AcquireVirtualCacheView(image,exception);
-  reconstruct_view=AcquireVirtualCacheView(reconstruct_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(area,similarity,status) \
-    magick_number_threads(image,image,rows,1)
-#endif
-  for (y=0; y < (ssize_t) rows; y++)
-  {
-    const Quantum
-      *magick_restrict p,
-      *magick_restrict q;
-
-    double
-      channel_area = 0.0,
-      channel_similarity[MaxPixelChannels+1] = { 0.0 };
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,columns,1,exception);
-    q=GetCacheViewVirtualPixels(reconstruct_view,0,y,columns,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (const Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) columns; x++)
-    {
-      const ComparePixels pixels = { image, reconstruct_image, p, q };
-
-      if ((GetPixelReadMask(image,p) <= (QuantumRange/2)) ||
-          (GetPixelReadMask(reconstruct_image,q) <= (QuantumRange/2)))
-        {
-          p+=(ptrdiff_t) GetPixelChannels(image);
-          q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
-          continue;
-        }
-      AccumulateMSEPixel(&pixels,channel_similarity);
-      channel_area++;
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
-    }
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-    #pragma omp critical (MagickCore_GetMSESimilarity)
-#endif
-    {
-      ssize_t
-        j;
-
-      area+=channel_area;
-      for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,j);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
-          channel);
-        if (((traits & UpdatePixelTrait) == 0) ||
-            ((reconstruct_traits & UpdatePixelTrait) == 0))
-          continue;
-        similarity[j]+=channel_similarity[j];
-      }
-      similarity[CompositePixelChannel]+=
-        channel_similarity[CompositePixelChannel];
-    }
-  }
-  reconstruct_view=DestroyCacheView(reconstruct_view);
-  image_view=DestroyCacheView(image_view);
+  status=GetPixelMetricSimilarity(&info,similarity,&area,exception);
   NormalizeChannelSimilarity(image,reconstruct_image,area,similarity);
   return(status);
 }
@@ -1569,6 +1458,168 @@ static void AccumulatePDCPixel(const ComparePixels *pixels,const double fuzz,
   }
   if (count != 0)
     channel_similarity[CompositePixelChannel]++;
+}
+
+static magick_attribute((__always_inline__)) inline void
+  AccumulateMetricPixel(const MetricType metric,
+  const ComparePixels *pixels,PixelMetricSums *sums)
+{
+  switch (metric)
+  {
+    case MeanAbsoluteErrorMetric:
+    {
+      AccumulateMAEPixel(pixels,sums->similarity);
+      sums->area++;
+      break;
+    }
+    case MeanSquaredErrorMetric:
+    default:
+    {
+      AccumulateMSEPixel(pixels,sums->similarity);
+      sums->area++;
+      break;
+    }
+  }
+}
+
+static magick_attribute((__always_inline__)) inline void
+  AccumulateMetricColumns(const MetricType metric,const PixelMetricRow *row,
+  PixelMetricSums *sums)
+{
+  const Image
+    *image = row->image,
+    *reconstruct_image = row->reconstruct_image;
+
+  const Quantum
+    *magick_restrict p = row->p,
+    *magick_restrict q = row->q;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) row->columns; x++)
+  {
+    const ComparePixels pixels = { image, reconstruct_image, p, q };
+
+    if ((GetPixelReadMask(image,p) <= (QuantumRange/2)) ||
+        (GetPixelReadMask(reconstruct_image,q) <= (QuantumRange/2)))
+      {
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
+        continue;
+      }
+    AccumulateMetricPixel(metric,&pixels,sums);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
+  }
+}
+
+static void AccumulateMetricRow(const MetricType metric,
+  const PixelMetricRow *row,PixelMetricSums *sums)
+{
+  switch (metric)
+  {
+    case MeanAbsoluteErrorMetric:
+    {
+      AccumulateMetricColumns(MeanAbsoluteErrorMetric,row,sums);
+      break;
+    }
+    case MeanSquaredErrorMetric:
+    default:
+    {
+      AccumulateMetricColumns(MeanSquaredErrorMetric,row,sums);
+      break;
+    }
+  }
+}
+
+static void MergeMetricRow(const PixelMetricInfo *info,
+  const PixelMetricSums *sums,double *similarity)
+{
+  const Image
+    *image = info->image,
+    *reconstruct_image = info->reconstruct_image;
+
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,j);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
+      channel);
+    if (((traits & UpdatePixelTrait) == 0) ||
+        ((reconstruct_traits & UpdatePixelTrait) == 0))
+      continue;
+    similarity[j]+=sums->similarity[j];
+  }
+  similarity[CompositePixelChannel]+=
+    sums->similarity[CompositePixelChannel];
+}
+
+static MagickBooleanType GetPixelMetricSimilarity(const PixelMetricInfo *info,
+  double *similarity,double *pixel_area,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view,
+    *reconstruct_view;
+
+  const Image
+    *image = info->image,
+    *reconstruct_image = info->reconstruct_image;
+
+  double
+    area = 0.0;
+
+  MagickBooleanType
+    status = MagickTrue;
+
+  size_t
+    columns,
+    rows;
+
+  ssize_t
+    y;
+
+  SetImageCompareBounds(image,reconstruct_image,&columns,&rows);
+  image_view=AcquireVirtualCacheView(image,exception);
+  reconstruct_view=AcquireVirtualCacheView(reconstruct_image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(area,similarity,status) \
+    magick_number_threads(image,image,rows,1)
+#endif
+  for (y=0; y < (ssize_t) rows; y++)
+  {
+    PixelMetricRow
+      row = { image, reconstruct_image, (const Quantum *) NULL,
+        (const Quantum *) NULL, columns, info->fuzz };
+
+    PixelMetricSums
+      sums = { 0.0, { 0.0 } };
+
+    if (status == MagickFalse)
+      continue;
+    row.p=GetCacheViewVirtualPixels(image_view,0,y,columns,1,exception);
+    row.q=GetCacheViewVirtualPixels(reconstruct_view,0,y,columns,1,exception);
+    if ((row.p == (const Quantum *) NULL) || (row.q == (const Quantum *) NULL))
+      {
+        status=MagickFalse;
+        continue;
+      }
+    AccumulateMetricRow(info->metric,&row,&sums);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+    #pragma omp critical (MagickCore_GetPixelMetricSimilarity)
+#endif
+    {
+      area+=sums.area;
+      MergeMetricRow(info,&sums,similarity);
+    }
+  }
+  reconstruct_view=DestroyCacheView(reconstruct_view);
+  image_view=DestroyCacheView(image_view);
+  *pixel_area=area;
+  return(status);
 }
 
 static MagickBooleanType GetPDCSimilarity(const Image *image,
