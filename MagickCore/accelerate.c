@@ -3179,6 +3179,39 @@ static MagickBooleanType LaunchLocalContrastBlurColumn(
   return(MagickTrue);
 }
 
+typedef struct _LocalContrastBufferInputs
+{
+  MagickCLEnv
+    clEnv;
+
+  cl_mem
+    imageBuffer,
+    filteredImageBuffer,
+    tempImageBuffer,
+    imageKernelBuffer;
+} LocalContrastBufferInputs;
+
+static void ReleaseLocalContrastBuffers(const LocalContrastBufferInputs *inputs)
+{
+  const MagickCLEnv
+    clEnv = inputs->clEnv;
+
+  const cl_mem
+    imageBuffer = inputs->imageBuffer,
+    filteredImageBuffer = inputs->filteredImageBuffer,
+    tempImageBuffer = inputs->tempImageBuffer,
+    imageKernelBuffer = inputs->imageKernelBuffer;
+
+  if (imageBuffer!=NULL)
+    clEnv->library->clReleaseMemObject(imageBuffer);
+  if (filteredImageBuffer!=NULL)
+    clEnv->library->clReleaseMemObject(filteredImageBuffer);
+  if (tempImageBuffer!=NULL)
+    clEnv->library->clReleaseMemObject(tempImageBuffer);
+  if (imageKernelBuffer!=NULL)
+    clEnv->library->clReleaseMemObject(imageKernelBuffer);
+}
+
 static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
   const double radius,const double strength,ExceptionInfo *exception)
 {
@@ -3339,14 +3372,12 @@ cleanup:
   if (filteredImage_view != NULL)
     filteredImage_view=DestroyCacheView(filteredImage_view);
 
-  if (imageBuffer!=NULL)
-    clEnv->library->clReleaseMemObject(imageBuffer);
-  if (filteredImageBuffer!=NULL)
-    clEnv->library->clReleaseMemObject(filteredImageBuffer);
-  if (tempImageBuffer!=NULL)
-    clEnv->library->clReleaseMemObject(tempImageBuffer);
-  if (imageKernelBuffer!=NULL)
-    clEnv->library->clReleaseMemObject(imageKernelBuffer);
+  {
+    const LocalContrastBufferInputs inputs = { clEnv, imageBuffer,
+      filteredImageBuffer, tempImageBuffer, imageKernelBuffer };
+
+    ReleaseLocalContrastBuffers(&inputs);
+  }
   if (blurRowKernel!=NULL)
     ReleaseOpenCLKernel(blurRowKernel);
   if (blurColumnKernel!=NULL)
