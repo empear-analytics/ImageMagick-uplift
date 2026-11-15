@@ -3839,6 +3839,29 @@ typedef struct _CompositeChannelInputs
     gamma;
 } CompositeChannelInputs;
 
+static MagickRealType GetCompositeChannelColor(
+  const CompositeChannelInputs *tile,const MagickRealType red,
+  const MagickRealType green,const MagickRealType blue)
+{
+  const PixelChannel
+    channel = tile->channel;
+
+  const MagickRealType
+    Dc = tile->Dc;
+
+  MagickRealType
+    pixel;
+
+  switch (channel)
+  {
+    case RedPixelChannel: pixel=red; break;
+    case GreenPixelChannel: pixel=green; break;
+    case BluePixelChannel: pixel=blue; break;
+    default: pixel=Dc; break;
+  }
+  return(pixel);
+}
+
 static void CompositeChannelColor(const CompositeRowInputs *row,
   const CompositePixelInputs *authentic,const CompositeChannelInputs *tile,
   MagickRealType *pixel)
@@ -4009,13 +4032,7 @@ static void CompositeChannelColor(const CompositeRowInputs *row,
         white_luminance,illuminant,&hue,&chroma,&sans);
       ConvertGenericToRGB(colorspace,hue,chroma,luma,
         white_luminance,illuminant,&red,&green,&blue);
-      switch (channel)
-      {
-        case RedPixelChannel: (*pixel)=red; break;
-        case GreenPixelChannel: (*pixel)=green; break;
-        case BluePixelChannel: (*pixel)=blue; break;
-        default: (*pixel)=Dc; break;
-      }
+      (*pixel)=GetCompositeChannelColor(tile,red,green,blue);
       break;
     }
     case CopyAlphaCompositeOp:
@@ -4216,13 +4233,7 @@ static void CompositeChannelColor(const CompositeRowInputs *row,
         white_luminance,illuminant,&hue,&sans,&sans);
       ConvertGenericToRGB(colorspace,hue,chroma,luma,
         white_luminance,illuminant,&red,&green,&blue);
-      switch (channel)
-      {
-        case RedPixelChannel: (*pixel)=red; break;
-        case GreenPixelChannel: (*pixel)=green; break;
-        case BluePixelChannel: (*pixel)=blue; break;
-        default: (*pixel)=Dc; break;
-      }
+      (*pixel)=GetCompositeChannelColor(tile,red,green,blue);
       break;
     }
     case InCompositeOp:
@@ -4313,13 +4324,7 @@ static void CompositeChannelColor(const CompositeRowInputs *row,
         white_luminance,illuminant,&sans,&sans,&luma);
       ConvertGenericToRGB(colorspace,hue,chroma,luma,
         white_luminance,illuminant,&red,&green,&blue);
-      switch (channel)
-      {
-        case RedPixelChannel: (*pixel)=red; break;
-        case GreenPixelChannel: (*pixel)=green; break;
-        case BluePixelChannel: (*pixel)=blue; break;
-        default: (*pixel)=Dc; break;
-      }
+      (*pixel)=GetCompositeChannelColor(tile,red,green,blue);
       break;
     }
     case MathematicsCompositeOp:
@@ -4397,13 +4402,7 @@ static void CompositeChannelColor(const CompositeRowInputs *row,
       chroma*=0.01*percent_chroma;
       ConvertGenericToRGB(colorspace,hue,chroma,luma,
         white_luminance,illuminant,&red,&green,&blue);
-      switch (channel)
-      {
-        case RedPixelChannel: (*pixel)=red; break;
-        case GreenPixelChannel: (*pixel)=green; break;
-        case BluePixelChannel: (*pixel)=blue; break;
-        default: (*pixel)=Dc; break;
-      }
+      (*pixel)=GetCompositeChannelColor(tile,red,green,blue);
       break;
     }
     case ModulusAddCompositeOp:
@@ -4592,13 +4591,7 @@ static void CompositeChannelColor(const CompositeRowInputs *row,
         white_luminance,illuminant,&sans,&chroma,&sans);
       ConvertGenericToRGB(colorspace,hue,chroma,luma,
         white_luminance,illuminant,&red,&green,&blue);
-      switch (channel)
-      {
-        case RedPixelChannel: (*pixel)=red; break;
-        case GreenPixelChannel: (*pixel)=green; break;
-        case BluePixelChannel: (*pixel)=blue; break;
-        default: (*pixel)=Dc; break;
-      }
+      (*pixel)=GetCompositeChannelColor(tile,red,green,blue);
       break;
     }
     case ScreenCompositeOp:
