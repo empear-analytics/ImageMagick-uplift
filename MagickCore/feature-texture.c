@@ -2174,36 +2174,29 @@ static void ComputeFeatureStatistics(const FeatureAnalysis *analysis,
   }
 }
 
-MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
-  const size_t distance,ExceptionInfo *exception)
+static ChannelFeatures *AnalyzeFeatureCooccurrence(
+  const FeatureAnalysis *analysis,const size_t distance,
+  ExceptionInfo *exception,PixelPacket *grays)
 {
-  ChannelFeatures
-    *channel_features,
-    *returned;
+  const Image
+    *const image = analysis->image;
 
-  FeatureAnalysis
-    analysis;
+  ChannelFeatures
+    *channel_features = analysis->channel_features;
 
   FeatureBuffers
     buffers;
-
-  FeatureGraysForm
-    form;
 
   FeatureMatrixInputs
     matrix;
 
   FeatureStatistics
-    **cooccurrence,
-    *density_x,
-    *density_xy,
-    *density_y,
-    **Q,
-    *sum;
-
-  PixelPacket
-    gray,
-    *grays;
+    **const cooccurrence = analysis->cooccurrence,
+    *const density_x = analysis->density_x,
+    *const density_xy = analysis->density_xy,
+    *const density_y = analysis->density_y,
+    **const Q = analysis->Q,
+    *const sum = analysis->sum;
 
   MagickBooleanType
     status;
@@ -2211,47 +2204,9 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   ssize_t
     i;
 
-  size_t
-    length;
+  const unsigned int
+    number_grays = analysis->number_grays;
 
-  unsigned int
-    number_grays;
-
-  const FeatureBufferTargets
-    targets = { &cooccurrence, &density_x, &density_xy, &density_y, &Q, &sum };
-
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (IsFeatureDistanceBeyondImage(image,distance) != MagickFalse)
-    return((ChannelFeatures *) NULL);
-  length=MaxPixelChannels+1UL;
-  channel_features=(ChannelFeatures *) AcquireQuantumMemory(length,
-    sizeof(*channel_features));
-  if (channel_features == (ChannelFeatures *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
-      return(channel_features);
-    }
-  (void) memset(channel_features,0,length*
-    sizeof(*channel_features));
-  /*
-    Form grays.
-  */
-  form.image=image;
-  form.channel_features=channel_features;
-  form.exception=exception;
-  form.grays=(&grays);
-  form.gray=(&gray);
-  if (FormFeatureGrays(&form,&returned) != MagickFalse)
-    return(returned);
-  /*
-    Allocate spatial dependence matrix.
-  */
-  number_grays=GetFeatureGrayLevels(image,gray);
-  AcquireFeatureBuffers(number_grays,&targets);
   buffers.cooccurrence=cooccurrence;
   buffers.density_x=density_x;
   buffers.density_xy=density_xy;
@@ -2298,6 +2253,80 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     Normalize spatial dependence matrix.
   */
   NormalizeFeatureCooccurrence(image,distance,cooccurrence,number_grays);
+  ComputeFeatureStatistics(analysis,status);
+  /*
+    Relinquish resources.
+  */
+  DestroyFeatureBuffers(&buffers,number_grays);
+  return(channel_features);
+}
+
+MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
+  const size_t distance,ExceptionInfo *exception)
+{
+  ChannelFeatures
+    *channel_features,
+    *returned;
+
+  FeatureAnalysis
+    analysis;
+
+  FeatureGraysForm
+    form;
+
+  FeatureStatistics
+    **cooccurrence,
+    *density_x,
+    *density_xy,
+    *density_y,
+    **Q,
+    *sum;
+
+  PixelPacket
+    gray,
+    *grays;
+
+  size_t
+    length;
+
+  unsigned int
+    number_grays;
+
+  const FeatureBufferTargets
+    targets = { &cooccurrence, &density_x, &density_xy, &density_y, &Q, &sum };
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if (IsFeatureDistanceBeyondImage(image,distance) != MagickFalse)
+    return((ChannelFeatures *) NULL);
+  length=MaxPixelChannels+1UL;
+  channel_features=(ChannelFeatures *) AcquireQuantumMemory(length,
+    sizeof(*channel_features));
+  if (channel_features == (ChannelFeatures *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+      return(channel_features);
+    }
+  (void) memset(channel_features,0,length*
+    sizeof(*channel_features));
+  /*
+    Form grays.
+  */
+  form.image=image;
+  form.channel_features=channel_features;
+  form.exception=exception;
+  form.grays=(&grays);
+  form.gray=(&gray);
+  if (FormFeatureGrays(&form,&returned) != MagickFalse)
+    return(returned);
+  /*
+    Allocate spatial dependence matrix.
+  */
+  number_grays=GetFeatureGrayLevels(image,gray);
+  AcquireFeatureBuffers(number_grays,&targets);
   analysis.image=image;
   analysis.channel_features=channel_features;
   analysis.cooccurrence=cooccurrence;
@@ -2307,10 +2336,5 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   analysis.Q=Q;
   analysis.sum=sum;
   analysis.number_grays=number_grays;
-  ComputeFeatureStatistics(&analysis,status);
-  /*
-    Relinquish resources.
-  */
-  DestroyFeatureBuffers(&buffers,number_grays);
-  return(channel_features);
+  return(AnalyzeFeatureCooccurrence(&analysis,distance,exception,grays));
 }
