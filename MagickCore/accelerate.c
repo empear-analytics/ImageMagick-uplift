@@ -3218,6 +3218,114 @@ static MagickBooleanType AcquireModulateResources(MagickCLEnv clEnv,
   return(MagickTrue);
 }
 
+typedef struct _ModulateKernelInputs
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  cl_mem
+    imageBuffer;
+
+  Image
+    *image;
+
+  double
+    percent_brightness,
+    percent_hue,
+    percent_saturation;
+
+  ColorspaceType
+    colorspace;
+} ModulateKernelInputs;
+
+static MagickBooleanType LaunchModulateKernel(
+  const ModulateKernelInputs *inputs,cl_kernel *modulateKernel,
+  ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = inputs->clEnv;
+
+  const MagickCLDevice
+    device = inputs->device;
+
+  const cl_command_queue
+    queue = inputs->queue;
+
+  const cl_mem
+    imageBuffer = inputs->imageBuffer;
+
+  Image
+    *const image = inputs->image;
+
+  const double
+    percent_brightness = inputs->percent_brightness,
+    percent_hue = inputs->percent_hue,
+    percent_saturation = inputs->percent_saturation;
+
+  const ColorspaceType
+    colorspace = inputs->colorspace;
+
+  cl_event
+    event;
+
+  cl_float
+    bright,
+    hue,
+    saturation;
+
+  cl_int
+    color,
+    clStatus;
+
+  cl_uint
+    i;
+
+  *modulateKernel = AcquireOpenCLKernel(device, "Modulate");
+  if (*modulateKernel == NULL)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "AcquireOpenCLKernel failed.", ".");
+    return(MagickFalse);
+  }
+
+  bright=(cl_float) percent_brightness;
+  hue=(cl_float) percent_hue;
+  saturation=(cl_float) percent_saturation;
+  color=(cl_int) colorspace;
+
+  i=0;
+  clStatus=clEnv->library->clSetKernelArg(*modulateKernel,i++,sizeof(cl_mem),(void *)&imageBuffer);
+  clStatus|=clEnv->library->clSetKernelArg(*modulateKernel,i++,sizeof(cl_float),&bright);
+  clStatus|=clEnv->library->clSetKernelArg(*modulateKernel,i++,sizeof(cl_float),&hue);
+  clStatus|=clEnv->library->clSetKernelArg(*modulateKernel,i++,sizeof(cl_float),&saturation);
+  clStatus|=clEnv->library->clSetKernelArg(*modulateKernel,i++,sizeof(cl_float),&color);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
+    return(MagickFalse);
+  }
+
+  {
+    size_t global_work_size[2];
+    global_work_size[0] = image->columns;
+    global_work_size[1] = image->rows;
+    /* launch the kernel */
+	clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, *modulateKernel, 2, NULL, global_work_size, NULL, 0, NULL, &event);
+    if (clStatus != CL_SUCCESS)
+    {
+      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
+      return(MagickFalse);
+    }
+    RecordProfileData(device,*modulateKernel,event);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeModulateImage(Image *image,MagickCLEnv clEnv,
   const double percent_brightness,const double percent_hue,
   const double percent_saturation,const ColorspaceType colorspace,
@@ -3226,29 +3334,17 @@ static MagickBooleanType ComputeModulateImage(Image *image,MagickCLEnv clEnv,
   CacheView
     *image_view;
 
-  cl_float
-    bright,
-    hue,
-    saturation;
-
   cl_command_queue
     queue;
 
   cl_int
-    color,
     clStatus;
 
   cl_kernel
     modulateKernel;
 
-  cl_event
-    event;
-
   cl_mem
     imageBuffer;
-
-  cl_uint
-    i;
 
   MagickBooleanType
     outputReady;
@@ -3286,42 +3382,12 @@ static MagickBooleanType ComputeModulateImage(Image *image,MagickCLEnv clEnv,
       goto cleanup;
   }
 
-  modulateKernel = AcquireOpenCLKernel(device, "Modulate");
-  if (modulateKernel == NULL)
   {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "AcquireOpenCLKernel failed.", ".");
-    goto cleanup;
-  }
+    const ModulateKernelInputs inputs = { clEnv, device, queue, imageBuffer,
+      image, percent_brightness, percent_hue, percent_saturation, colorspace };
 
-  bright=(cl_float) percent_brightness;
-  hue=(cl_float) percent_hue;
-  saturation=(cl_float) percent_saturation;
-  color=(cl_int) colorspace;
-
-  i=0;
-  clStatus=clEnv->library->clSetKernelArg(modulateKernel,i++,sizeof(cl_mem),(void *)&imageBuffer);
-  clStatus|=clEnv->library->clSetKernelArg(modulateKernel,i++,sizeof(cl_float),&bright);
-  clStatus|=clEnv->library->clSetKernelArg(modulateKernel,i++,sizeof(cl_float),&hue);
-  clStatus|=clEnv->library->clSetKernelArg(modulateKernel,i++,sizeof(cl_float),&saturation);
-  clStatus|=clEnv->library->clSetKernelArg(modulateKernel,i++,sizeof(cl_float),&color);
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
-    goto cleanup;
-  }
-
-  {
-    size_t global_work_size[2];
-    global_work_size[0] = image->columns;
-    global_work_size[1] = image->rows;
-    /* launch the kernel */
-	clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, modulateKernel, 2, NULL, global_work_size, NULL, 0, NULL, &event);
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
+    if (LaunchModulateKernel(&inputs,&modulateKernel,exception) == MagickFalse)
       goto cleanup;
-    }
-    RecordProfileData(device,modulateKernel,event);
   }
 
   if (ALIGNED(inputPixels,CLPixelPacket))
