@@ -1157,94 +1157,18 @@ static void AccumulatePAPixel(const ComparePixels *pixels,
 static MagickBooleanType GetPASimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
-  CacheView
-    *image_view,
-    *reconstruct_view;
+  const PixelMetricInfo
+    info = { image, reconstruct_image, PeakAbsoluteErrorMetric,
+      0.0 };
 
-  MagickBooleanType
-    status = MagickTrue;
-
-  size_t
-    columns,
-    rows;
-
-  ssize_t
-    y;
+  double
+    area;
 
   /*
     Compute the peak absolute similarity.
   */
   (void) memset(similarity,0,(MaxPixelChannels+1)*sizeof(*similarity));
-  SetImageCompareBounds(image,reconstruct_image,&columns,&rows);
-  image_view=AcquireVirtualCacheView(image,exception);
-  reconstruct_view=AcquireVirtualCacheView(reconstruct_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(similarity,status) \
-    magick_number_threads(image,image,rows,1)
-#endif
-  for (y=0; y < (ssize_t) rows; y++)
-  {
-    const Quantum
-      *magick_restrict p,
-      *magick_restrict q;
-
-    double
-      channel_similarity[MaxPixelChannels+1] = { 0.0 };
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,columns,1,exception);
-    q=GetCacheViewVirtualPixels(reconstruct_view,0,y,columns,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (const Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) columns; x++)
-    {
-      const ComparePixels pixels = { image, reconstruct_image, p, q };
-
-      if ((GetPixelReadMask(image,p) <= (QuantumRange/2)) ||
-          (GetPixelReadMask(reconstruct_image,q) <= (QuantumRange/2)))
-        {
-          p+=(ptrdiff_t) GetPixelChannels(image);
-          q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
-          continue;
-        }
-      AccumulatePAPixel(&pixels,channel_similarity);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
-    }
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-    #pragma omp critical (MagickCore_GetPASimilarity)
-#endif
-    {
-      ssize_t
-        j;
-
-      for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,j);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
-          channel);
-        if (((traits & UpdatePixelTrait) == 0) ||
-            ((reconstruct_traits & UpdatePixelTrait) == 0))
-          continue;
-        if (channel_similarity[j] > similarity[j])
-          similarity[j]=channel_similarity[j];
-      }
-      if (channel_similarity[CompositePixelChannel] > similarity[CompositePixelChannel])
-        similarity[CompositePixelChannel]=
-          channel_similarity[CompositePixelChannel];
-    }
-  }
-  reconstruct_view=DestroyCacheView(reconstruct_view);
-  image_view=DestroyCacheView(image_view);
-  return(status);
+  return(GetPixelMetricSimilarity(&info,similarity,&area,exception));
 }
 
 static void AccumulatePDCPixel(const ComparePixels *pixels,const double fuzz,
@@ -1327,6 +1251,11 @@ static magick_attribute((__always_inline__)) inline void
       sums->area++;
       break;
     }
+    case PeakAbsoluteErrorMetric:
+    {
+      AccumulatePAPixel(pixels,sums->similarity);
+      break;
+    }
     case PixelDifferenceCountErrorMetric:
     default:
     {
@@ -1393,6 +1322,11 @@ static void AccumulateMetricRow(const MetricType metric,
       AccumulateMetricColumns(MeanSquaredErrorMetric,row,sums);
       break;
     }
+    case PeakAbsoluteErrorMetric:
+    {
+      AccumulateMetricColumns(PeakAbsoluteErrorMetric,row,sums);
+      break;
+    }
     case PixelDifferenceCountErrorMetric:
     default:
     {
@@ -1400,6 +1334,18 @@ static void AccumulateMetricRow(const MetricType metric,
       break;
     }
   }
+}
+
+static inline void MergeMetricValue(const MetricType metric,
+  const double value,double *total)
+{
+  if (metric != PeakAbsoluteErrorMetric)
+    {
+      *total+=value;
+      return;
+    }
+  if (value > *total)
+    *total=value;
 }
 
 static void MergeMetricRow(const PixelMetricInfo *info,
@@ -1421,10 +1367,10 @@ static void MergeMetricRow(const PixelMetricInfo *info,
     if (((traits & UpdatePixelTrait) == 0) ||
         ((reconstruct_traits & UpdatePixelTrait) == 0))
       continue;
-    similarity[j]+=sums->similarity[j];
+    MergeMetricValue(info->metric,sums->similarity[j],similarity+j);
   }
-  similarity[CompositePixelChannel]+=
-    sums->similarity[CompositePixelChannel];
+  MergeMetricValue(info->metric,sums->similarity[CompositePixelChannel],
+    similarity+CompositePixelChannel);
 }
 
 static MagickBooleanType GetPixelMetricSimilarity(const PixelMetricInfo *info,
