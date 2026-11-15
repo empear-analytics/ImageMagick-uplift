@@ -4287,6 +4287,75 @@ static void ReleaseMotionBlurResources(const MotionBlurReleaseInputs *inputs)
     ReleaseOpenCLDevice(device);
 }
 
+typedef struct _MotionBlurOffsetInputs
+{
+  MagickCLEnv
+    clEnv;
+
+  cl_command_queue
+    queue;
+
+  cl_mem
+    offsetBuffer;
+
+  const OffsetInfo
+    *offset;
+
+  size_t
+    width;
+} MotionBlurOffsetInputs;
+
+static MagickBooleanType FillMotionBlurOffsets(
+  const MotionBlurOffsetInputs *inputs,ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = inputs->clEnv;
+
+  const cl_command_queue
+    queue = inputs->queue;
+
+  const cl_mem
+    offsetBuffer = inputs->offsetBuffer;
+
+  const OffsetInfo
+    *const offset = inputs->offset;
+
+  const size_t
+    width = inputs->width;
+
+  cl_int
+    clStatus;
+
+  int
+    *offsetBufferPtr;
+
+  unsigned int
+    i;
+
+  offsetBufferPtr = (int*)clEnv->library->clEnqueueMapBuffer(queue, offsetBuffer, CL_TRUE,
+    CL_MAP_WRITE, 0, width * sizeof(cl_int2), 0, NULL, NULL, &clStatus);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) ThrowMagickException(exception, GetMagickModule(),
+      ResourceLimitError, "clEnv->library->clEnqueueMapBuffer failed.",".");
+    return(MagickFalse);
+  }
+  for (i = 0; i < width; i++)
+  {
+    offsetBufferPtr[2*i] = (int)offset[i].x;
+    offsetBufferPtr[2*i+1] = (int)offset[i].y;
+  }
+  clStatus = clEnv->library->clEnqueueUnmapMemObject(queue, offsetBuffer, offsetBufferPtr, 0,
+    NULL, NULL);
+ if (clStatus != CL_SUCCESS)
+  {
+    (void) ThrowMagickException(exception, GetMagickModule(), ModuleFatalError,
+      "clEnv->library->clEnqueueUnmapMemObject failed.", ".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
   const double *kernel,const size_t width,const OffsetInfo *offset,
   ExceptionInfo *exception)
@@ -4320,9 +4389,6 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
   Image
     *filteredImage;
 
-  int
-    *offsetBufferPtr;
-
   MagickBooleanType
     outputReady;
 
@@ -4331,9 +4397,6 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
 
   size_t
     length;
-
-  unsigned int
-    i;
 
   void
     *filteredPixels,
@@ -4458,26 +4521,12 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
     goto cleanup;
   }
 
-  offsetBufferPtr = (int*)clEnv->library->clEnqueueMapBuffer(queue, offsetBuffer, CL_TRUE,
-    CL_MAP_WRITE, 0, width * sizeof(cl_int2), 0, NULL, NULL, &clStatus);
-  if (clStatus != CL_SUCCESS)
   {
-    (void) ThrowMagickException(exception, GetMagickModule(),
-      ResourceLimitError, "clEnv->library->clEnqueueMapBuffer failed.",".");
-    goto cleanup;
-  }
-  for (i = 0; i < width; i++)
-  {
-    offsetBufferPtr[2*i] = (int)offset[i].x;
-    offsetBufferPtr[2*i+1] = (int)offset[i].y;
-  }
-  clStatus = clEnv->library->clEnqueueUnmapMemObject(queue, offsetBuffer, offsetBufferPtr, 0,
-    NULL, NULL);
- if (clStatus != CL_SUCCESS)
-  {
-    (void) ThrowMagickException(exception, GetMagickModule(), ModuleFatalError,
-      "clEnv->library->clEnqueueUnmapMemObject failed.", ".");
-    goto cleanup;
+    const MotionBlurOffsetInputs inputs = { clEnv, queue, offsetBuffer,
+      offset, width };
+
+    if (FillMotionBlurOffsets(&inputs,exception) == MagickFalse)
+      goto cleanup;
   }
 
 
