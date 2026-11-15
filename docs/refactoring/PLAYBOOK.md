@@ -21284,6 +21284,138 @@ Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the r
 
 ---
 
+## Recipe KV - Replace a Split Call Switch by a Table of Function Pointers of Two Signatures
+
+**Use when:** CodeScene reports *Complex Method* or *Large Method* on a function whose
+complexity is a `switch` over an enumeration whose groups each make one call to a
+different function, the functions of two signatures that differ only in one extra
+argument (`F(R,G,B,X,Y,Z)` and `G(R,G,B,illuminant,X,Y,Z)`), and that an earlier Recipe SD
+chain has split at its default into `static void` helpers of the same shape, so that each
+further SD level adds a look-alike helper that CodeScene counts as *Code Duplication*.
+`colorspace-convert.c`'s `ConvertRGBToGeneric` (26 labels over three switches, two
+signatures, an identity default; two more SD levels probed 7.88 and 8.28 against the
+file's 9.08).
+
+**Not covered by:** Recipe KF, whose groups all call functions of one signature with the
+same arguments and whose `switch` is not split; Recipe SD, which keeps every label as a
+branch and adds a helper per level; Recipes KT, KS and KR, whose groups assign or return
+constants; Recipe KD, whose run is a `LocaleCompare` ladder.
+
+**How:**
+
+1. The `switch` and its SD helpers lie outside every OpenMP region. Their controlling
+   expression is the same parameter `e` of the function, which no group writes. Every
+   label is a constant, and the labels of the function's `switch` and of all its helpers'
+   switches are distinct (the chain passes a value on only through `default:`). Each
+   *table group* is labels and one statement `F(args);` followed by `break;`, where `args`
+   is the same text in every group of one signature, free of side effects, and the
+   arguments of the second signature are those of the first with one parameter `p` of
+   the function inserted at one position. Each `F` is a function of exactly one of the two
+   signatures: `static` or `static inline` (a private header's converters) or a function
+   of this file or its headers whose prototype has that signature.
+2. Groups that are not table groups (two statements, a third signature) stay in the
+   function's `switch`, unchanged and in their order. The innermost helper's `default:`
+   group is the fallback: its statements stay as written.
+3. Directly above the function write a `typedef struct` of the key and one pointer per
+   signature, and a `static const` array of it with one element per label of the table
+   groups, `{ L, F, NULL }` or `{ L, NULL, G }`, in the source order of the labels along
+   the chain (the function's groups first, then each helper's in turn). A group of two
+   labels gives two elements naming the same function.
+4. Below the table write a lookup `static const T *Get<Name>(const E key)` that scans the
+   array and returns the first element whose key equals `key`, or `NULL` (Recipe KF step
+   3).
+5. The function's `switch` keeps the kept groups and gets the `default:` group `m=Get<Name>(e);
+   if (m == NULL) { <fallback statements>; break; } if (m->f != NULL) m->f(args); else
+   m->g(args with p); break;`, with `m` a `const T *` declared at the top of the function.
+   The SD helpers, their input struct and its fill are removed: every label they held
+   is an element of the table (step 6 checks it), and nothing else reads the struct.
+6. Check by reading, against the parent's text, that each label of the three kinds of
+   group is in exactly one place (a kept group, an element, or none: the fallback), that
+   each element names the function its group called, and that each element's non-`NULL`
+   pointer is the one of its group's signature. `refactor_guard.py --calls` lists each
+   called name as gone, by design: each must appear in the table, which the reading
+   checks.
+7. A per-pixel caller: time the conversions the table serves (first, middle and last
+   elements, both signatures) against the baseline binary, several runs alternating, the
+   median quoted; a slowdown beyond 3% means the step is not taken (AGENTS.md).
+8. Run `tools/ci_warnings.sh <file>`, `tools/ci_linux_warnings.sh <file>`, a C++ compile
+   of the file, and the oracle for the function with line coverage showing a case runs
+   every group's call.
+
+**Before:**
+
+```c
+  switch (colorspace)
+  {
+    case Adobe98Colorspace:
+    {
+      ConvertRGBToAdobe98(R,G,B,X,Y,Z);
+      break;
+    }
+    ...
+    case LabColorspace:
+    {
+      ConvertRGBToLab(R,G,B,illuminant,X,Y,Z);
+      break;
+    }
+    ...
+    default:
+    {
+      ConvertRGBToOklabThroughYCbCr(&input);
+      break;
+    }
+  }
+```
+
+**After:**
+
+```c
+    default:
+    {
+      method=GetRGBToGenericMethod(colorspace);
+      if (method == (const RGBToGenericMethod *) NULL)
+        {
+          *X=QuantumScale*R;
+          *Y=QuantumScale*G;
+          *Z=QuantumScale*B;
+          break;
+        }
+      if (method->convert != NULL)
+        method->convert(R,G,B,X,Y,Z);
+      else
+        method->convert_illuminant(R,G,B,illuminant,X,Y,Z);
+      break;
+    }
+```
+
+**Careful:**
+
+- Behaviour: the labels are distinct along the chain, so a value reaches exactly one group
+  before and after: a kept label its kept group (it is not in the table), a table label the
+  element of its group (the lookup returns the first, and only, match), and any other value
+  the fallback, as it reached the innermost `default:` before. The element calls the same
+  function with the same arguments, the extra parameter where the group passed it.
+- Exactly one pointer of each element is non-`NULL`, and the call tests the first; a
+  function of the wrong signature does not compile into the other member.
+- Floating point: a callee called through a pointer is compiled out of line, where before it
+  could be inlined into the switch. Without fast-math, C's evaluation of each expression in
+  the callee does not depend on inlining; the oracle compares the bytes.
+- Cost: the lookup scans the table on every call and the call is indirect. On a per-pixel
+  path that must be timed (step 7).
+- The removed helpers held only groups that are now elements and the passing of the value
+  on; nothing of their text is lost but the binding of the struct's members, which the
+  table makes unnecessary.
+
+**Evidence level:** oracle (the cases that reach the function, with line coverage showing
+every group's call runs), plus the step 6 reading and the step 7 timing.
+
+**Provenance:** 2026-11-16, from `colorspace-convert.c`'s `ConvertRGBToGeneric`
+(campaign A, W30 lane c): the file 9.08 to 9.68 in a probe, the function cc 20 to below
+the threshold and 113 lines to 43. Added by Claude Code (Claude Opus 5.5) under the
+owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -21726,3 +21858,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-15 | NEW | MR | Merge Reduction Row Loops Through a Metric Selector: `static` functions holding the same parallel row reduction (per-row partials from a per-pixel accumulate call, a named `omp critical` merge) fold into one driver taking a `const` input struct with an enumeration selector; a non-inline row function switches once per row into a forced-inline column loop and per-pixel dispatch so each group is compiled with its selector constant; the merge's differing operator goes to a forced-inline value function; the critical names become one; each copy keeps its name, its pre- and post-loop statements and calls the driver; OpenMP reading, `omp_compare.sh` at one and four threads and instruction counts quoted | `compare-similarity.c` (campaign A, W29 lane b): six `Get*Similarity` functions, probe 2.97 to 3.01 (Bumpy Road 12 to 6, Complex Method 23 to 17, Large Method 17 to 11 functions); `omp_compare` 52 runs, 0 diverged on the whole fold | owner |
 | 2026-11-13 | NEW | TS | Share One Body Across Twin Sections of a Parallel Sections Region: sections that are one block but for a test and a channel constant call one `static void` helper taking an input struct, the test's value, the constant and a pointer to the shared `status`; the pragmas stay. *Careful* gives the argument (same thread, same stores to the same shared `status`, the test has no side effect) | `fourier.c`'s `InverseFourierTransformImage` (campaign A, W21 lane b): four of five sections; 7.59 to 7.66, the function leaves *Complex Method*; the same helper for `ForwardFourierTransformImage` too switches on *Code Duplication* (7.29), so one function takes it | owner |
 | 2026-11-15 | NEW | RG | Move a Parallel Sections Region into a Helper Returning the Status: a function's whole `omp parallel sections` region, whose only outer write is plain stores of `MagickFalse` into a shared `status` set to `MagickTrue` before it, moves verbatim (pragma lines included) into a `static MagickBooleanType` helper whose own `status` it returns; step 7 lets a second function's twin region over a twin callee share the helper through a dispatcher on which source pointer of the input struct is set. *Careful* gives the argument (same team and nesting, `status` still shared, the same stores, one callee per section as before) | `fourier.c`'s `InverseFourierTransformImage` and `ForwardFourierTransformImage` (campaign A, W29 lane c, after the owner's OpenMP ruling of 2026-11-15): probe 7.66 to 8.08 (Inverse), 8.67 with step 7 (Forward); a second TS helper had cost 7.28 (Code Duplication) | owner |
+| 2026-11-16 | NEW | KV | Replace a Split Call Switch by a Table of Function Pointers of Two Signatures: a `switch` whose groups each make one call to a function of one of two signatures differing in one extra parameter, already split by a Recipe SD chain into look-alike helpers, becomes a `static const` table of `{ key, f, g }` (one pointer `NULL`) and a lookup; groups of another shape stay in the `switch`, whose `default:` does the lookup and keeps the innermost fallback; the SD helpers and their input struct go. *Careful* gives the argument (distinct labels along the chain, the same callee and arguments, the fallback for every other value); per-pixel callers timed against the baseline | `colorspace-convert.c`'s `ConvertRGBToGeneric` (campaign A, W30 lane c): two further SD levels probed 7.88 and 8.28 (*Code Duplication* among the helpers, *Overall Code Complexity*) against 9.08; the table probe 9.68 with no new finding | owner |
