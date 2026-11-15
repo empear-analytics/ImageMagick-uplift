@@ -2804,6 +2804,89 @@ static MagickBooleanType LaunchLocalContrastBlurRow(
   return(MagickTrue);
 }
 
+typedef struct _LocalContrastResourceTargets
+{
+  MagickCLDevice
+    *device;
+
+  cl_command_queue
+    *queue;
+
+  CacheView
+    **image_view;
+
+  cl_mem
+    *imageBuffer;
+} LocalContrastResourceTargets;
+
+static MagickBooleanType AcquireLocalContrastResources(MagickCLEnv clEnv,
+  const Image *image,ExceptionInfo *exception,
+  const LocalContrastResourceTargets *targets)
+{
+  MagickCLDevice
+    *const device = targets->device;
+
+  cl_command_queue
+    *const queue = targets->queue;
+
+  CacheView
+    **const image_view = targets->image_view;
+
+  cl_mem
+    *const imageBuffer = targets->imageBuffer;
+
+  cl_int
+    clStatus;
+
+  cl_mem_flags
+    mem_flags;
+
+  const void
+    *inputPixels;
+
+  size_t
+    length;
+
+  *device=RequestOpenCLDevice(clEnv);
+  if (*device == (MagickCLDevice) NULL)
+    return(MagickFalse);
+  *queue=AcquireOpenCLCommandQueue(*device);
+  if (*queue == (cl_command_queue) NULL)
+    return(MagickFalse);
+
+  /* Create and initialize OpenCL buffers. */
+  {
+    *image_view=AcquireAuthenticCacheView(image,exception);
+    inputPixels=GetCacheViewAuthenticPixels(*image_view,0,0,image->columns,image->rows,exception);
+    if (inputPixels == (const void *) NULL)
+    {
+      (void) OpenCLThrowMagickException(*device,exception,GetMagickModule(),CacheWarning,"UnableToReadPixelCache.","`%s'",image->filename);
+      return(MagickFalse);
+    }
+
+    /* If the host pointer is aligned to the size of CLPixelPacket,
+     then use the host buffer directly from the GPU; otherwise,
+     create a buffer on the GPU and copy the data over */
+    if (ALIGNED(inputPixels,CLPixelPacket))
+    {
+      mem_flags = CL_MEM_READ_ONLY|CL_MEM_USE_HOST_PTR;
+    }
+    else
+    {
+      mem_flags = CL_MEM_READ_ONLY|CL_MEM_COPY_HOST_PTR;
+    }
+    /* create a CL buffer from image pixel buffer */
+    length = image->columns * image->rows;
+    *imageBuffer = clEnv->library->clCreateBuffer((*device)->context, mem_flags, length * sizeof(CLPixelPacket), (void*)inputPixels, &clStatus);
+    if (clStatus != CL_SUCCESS)
+    {
+      (void) OpenCLThrowMagickException(*device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+      return(MagickFalse);
+    }
+  }
+  return(MagickTrue);
+}
+
 static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
   const double radius,const double strength,ExceptionInfo *exception)
 {
@@ -2836,9 +2919,6 @@ static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
 
   cl_uint
     i;
-
-  const void
-    *inputPixels;
 
   Image
     *filteredImage;
@@ -2876,42 +2956,13 @@ static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
   blurColumnKernel=NULL;
   outputReady=MagickFalse;
 
-  device=RequestOpenCLDevice(clEnv);
-  if (device == (MagickCLDevice) NULL)
-    goto cleanup;
-  queue=AcquireOpenCLCommandQueue(device);
-  if (queue == (cl_command_queue) NULL)
-    goto cleanup;
-
-  /* Create and initialize OpenCL buffers. */
   {
-    image_view=AcquireAuthenticCacheView(image,exception);
-    inputPixels=GetCacheViewAuthenticPixels(image_view,0,0,image->columns,image->rows,exception);
-    if (inputPixels == (const void *) NULL)
-    {
-      (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),CacheWarning,"UnableToReadPixelCache.","`%s'",image->filename);
-      goto cleanup;
-    }
+    const LocalContrastResourceTargets targets = { &device, &queue,
+      &image_view, &imageBuffer };
 
-    /* If the host pointer is aligned to the size of CLPixelPacket,
-     then use the host buffer directly from the GPU; otherwise,
-     create a buffer on the GPU and copy the data over */
-    if (ALIGNED(inputPixels,CLPixelPacket))
-    {
-      mem_flags = CL_MEM_READ_ONLY|CL_MEM_USE_HOST_PTR;
-    }
-    else
-    {
-      mem_flags = CL_MEM_READ_ONLY|CL_MEM_COPY_HOST_PTR;
-    }
-    /* create a CL buffer from image pixel buffer */
-    length = image->columns * image->rows;
-    imageBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(CLPixelPacket), (void*)inputPixels, &clStatus);
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+    if (AcquireLocalContrastResources(clEnv,image,exception,&targets) ==
+        MagickFalse)
       goto cleanup;
-    }
   }
 
   /* create output */
