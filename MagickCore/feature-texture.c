@@ -2199,18 +2199,6 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
         ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
       return(channel_features);
     }
-  (void) memset(&correlation,0,sizeof(correlation));
-  ZeroFeatureDensities(density_x,density_xy,density_y,number_grays);
-  (void) memset(&mean,0,sizeof(mean));
-  (void) memset(sum,0,number_grays*sizeof(*sum));
-  (void) memset(&sum_squares,0,sizeof(sum_squares));
-  (void) memset(density_xy,0,2*number_grays*sizeof(*density_xy));
-  (void) memset(&entropy_x,0,sizeof(entropy_x));
-  (void) memset(&entropy_xy,0,sizeof(entropy_xy));
-  (void) memset(&entropy_xy1,0,sizeof(entropy_xy1));
-  (void) memset(&entropy_xy2,0,sizeof(entropy_xy2));
-  (void) memset(&entropy_y,0,sizeof(entropy_y));
-  (void) memset(&variance,0,sizeof(variance));
   i=AcquireFeatureRows(cooccurrence,Q,number_grays);
   if (i < (ssize_t) number_grays)
     {
@@ -2243,6 +2231,18 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     Normalize spatial dependence matrix.
   */
   NormalizeFeatureCooccurrence(image,distance,cooccurrence,number_grays);
+  (void) memset(&correlation,0,sizeof(correlation));
+  ZeroFeatureDensities(density_x,density_xy,density_y,number_grays);
+  (void) memset(&mean,0,sizeof(mean));
+  (void) memset(sum,0,number_grays*sizeof(*sum));
+  (void) memset(&sum_squares,0,sizeof(sum_squares));
+  (void) memset(density_xy,0,2*number_grays*sizeof(*density_xy));
+  (void) memset(&entropy_x,0,sizeof(entropy_x));
+  (void) memset(&entropy_xy,0,sizeof(entropy_xy));
+  (void) memset(&entropy_xy1,0,sizeof(entropy_xy1));
+  (void) memset(&entropy_xy2,0,sizeof(entropy_xy2));
+  (void) memset(&entropy_y,0,sizeof(entropy_y));
+  (void) memset(&variance,0,sizeof(variance));
   {
     const TextureFeatureState
       inputs = { image, channel_features, cooccurrence, density_x,
