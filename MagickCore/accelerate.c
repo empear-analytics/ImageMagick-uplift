@@ -3326,6 +3326,81 @@ static MagickBooleanType LaunchModulateKernel(
   return(MagickTrue);
 }
 
+typedef struct _ModulateOutputInputs
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  cl_mem
+    imageBuffer;
+
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  void
+    *inputPixels;
+} ModulateOutputInputs;
+
+static MagickBooleanType ReadModulateOutput(
+  const ModulateOutputInputs *inputs,MagickBooleanType *outputReady,
+  ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = inputs->clEnv;
+
+  const MagickCLDevice
+    device = inputs->device;
+
+  const cl_command_queue
+    queue = inputs->queue;
+
+  const cl_mem
+    imageBuffer = inputs->imageBuffer;
+
+  Image
+    *const image = inputs->image;
+
+  CacheView
+    *const image_view = inputs->image_view;
+
+  void
+    *const inputPixels = inputs->inputPixels;
+
+  cl_int
+    clStatus;
+
+  size_t
+    length;
+
+  if (ALIGNED(inputPixels,CLPixelPacket))
+  {
+    length = image->columns * image->rows;
+    clEnv->library->clEnqueueMapBuffer(queue, imageBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(CLPixelPacket), 0, NULL, NULL, &clStatus);
+  }
+  else
+  {
+    length = image->columns * image->rows;
+    clStatus = clEnv->library->clEnqueueReadBuffer(queue, imageBuffer, CL_TRUE, 0, length * sizeof(CLPixelPacket), inputPixels, 0, NULL, NULL);
+  }
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
+    return(MagickFalse);
+  }
+
+  *outputReady=SyncCacheViewAuthenticPixels(image_view,exception);
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeModulateImage(Image *image,MagickCLEnv clEnv,
   const double percent_brightness,const double percent_hue,
   const double percent_saturation,const ColorspaceType colorspace,
@@ -3336,9 +3411,6 @@ static MagickBooleanType ComputeModulateImage(Image *image,MagickCLEnv clEnv,
 
   cl_command_queue
     queue;
-
-  cl_int
-    clStatus;
 
   cl_kernel
     modulateKernel;
@@ -3351,9 +3423,6 @@ static MagickBooleanType ComputeModulateImage(Image *image,MagickCLEnv clEnv,
 
   MagickCLDevice
     device;
-
-  size_t
-    length;
 
   void
     *inputPixels;
@@ -3390,23 +3459,13 @@ static MagickBooleanType ComputeModulateImage(Image *image,MagickCLEnv clEnv,
       goto cleanup;
   }
 
-  if (ALIGNED(inputPixels,CLPixelPacket))
   {
-    length = image->columns * image->rows;
-    clEnv->library->clEnqueueMapBuffer(queue, imageBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(CLPixelPacket), 0, NULL, NULL, &clStatus);
-  }
-  else
-  {
-    length = image->columns * image->rows;
-    clStatus = clEnv->library->clEnqueueReadBuffer(queue, imageBuffer, CL_TRUE, 0, length * sizeof(CLPixelPacket), inputPixels, 0, NULL, NULL);
-  }
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
-    goto cleanup;
-  }
+    const ModulateOutputInputs inputs = { clEnv, device, queue, imageBuffer,
+      image, image_view, inputPixels };
 
-  outputReady=SyncCacheViewAuthenticPixels(image_view,exception);
+    if (ReadModulateOutput(&inputs,&outputReady,exception) == MagickFalse)
+      goto cleanup;
+  }
 
 cleanup:
 
