@@ -3422,6 +3422,99 @@ static MagickBooleanType RunLocalContrastKernels(
   return(MagickTrue);
 }
 
+typedef struct _LocalContrastRunInputs
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  const Image
+    *image;
+
+  cl_mem
+    imageBuffer,
+    filteredImageBuffer;
+
+  double
+    radius,
+    strength;
+
+  void
+    *filteredPixels;
+
+  CacheView
+    *filteredImage_view;
+} LocalContrastRunInputs;
+
+typedef struct _LocalContrastRunTargets
+{
+  cl_mem
+    *tempImageBuffer;
+
+  cl_kernel
+    *blurRowKernel,
+    *blurColumnKernel;
+
+  MagickBooleanType
+    *outputReady;
+} LocalContrastRunTargets;
+
+static MagickBooleanType RunLocalContrastImage(
+  const LocalContrastRunInputs *run,ExceptionInfo *exception,
+  const LocalContrastRunTargets *results)
+{
+  cl_mem
+    *const tempImageBuffer = results->tempImageBuffer;
+
+  cl_kernel
+    *const blurRowKernel = results->blurRowKernel,
+    *const blurColumnKernel = results->blurColumnKernel;
+
+  MagickBooleanType
+    *const outputReady = results->outputReady;
+
+  cl_int
+    clStatus;
+
+  size_t
+    length;
+
+  {
+    const LocalContrastStageInputs inputs = { run->clEnv, run->device, run->queue, run->image,
+      run->imageBuffer, run->filteredImageBuffer, run->radius, run->strength };
+    const LocalContrastStageTargets targets = { tempImageBuffer,
+      blurRowKernel, blurColumnKernel };
+
+    if (RunLocalContrastKernels(&inputs,exception,&targets) == MagickFalse)
+      return(MagickFalse);
+  }
+
+  /* get result */
+  if (ALIGNED(run->filteredPixels,CLPixelPacket))
+  {
+    length = run->image->columns * run->image->rows;
+    run->clEnv->library->clEnqueueMapBuffer(run->queue, run->filteredImageBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(CLPixelPacket), 0, NULL, NULL, &clStatus);
+  }
+  else
+  {
+    length = run->image->columns * run->image->rows;
+    clStatus = run->clEnv->library->clEnqueueReadBuffer(run->queue, run->filteredImageBuffer, CL_TRUE, 0, length * sizeof(CLPixelPacket), run->filteredPixels, 0, NULL, NULL);
+  }
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(run->device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
+    return(MagickFalse);
+  }
+
+  *outputReady=SyncCacheViewAuthenticPixels(run->filteredImage_view,exception);
+  return(MagickTrue);
+}
+
 static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
   const double radius,const double strength,ExceptionInfo *exception)
 {
@@ -3431,9 +3524,6 @@ static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
 
   cl_command_queue
     queue;
-
-  cl_int
-    clStatus;
 
   cl_kernel
     blurRowKernel,
@@ -3453,9 +3543,6 @@ static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
 
   MagickCLDevice
     device;
-
-  size_t
-    length;
 
   void
     *filteredPixels;
@@ -3494,33 +3581,15 @@ static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
   }
 
   {
-    const LocalContrastStageInputs inputs = { clEnv, device, queue, image,
-      imageBuffer, filteredImageBuffer, radius, strength };
-    const LocalContrastStageTargets targets = { &tempImageBuffer,
-      &blurRowKernel, &blurColumnKernel };
+    const LocalContrastRunInputs inputs = { clEnv, device, queue, image,
+      imageBuffer, filteredImageBuffer, radius, strength, filteredPixels,
+      filteredImage_view };
+    const LocalContrastRunTargets targets = { &tempImageBuffer,
+      &blurRowKernel, &blurColumnKernel, &outputReady };
 
-    if (RunLocalContrastKernels(&inputs,exception,&targets) == MagickFalse)
+    if (RunLocalContrastImage(&inputs,exception,&targets) == MagickFalse)
       goto cleanup;
   }
-
-  /* get result */
-  if (ALIGNED(filteredPixels,CLPixelPacket))
-  {
-    length = image->columns * image->rows;
-    clEnv->library->clEnqueueMapBuffer(queue, filteredImageBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(CLPixelPacket), 0, NULL, NULL, &clStatus);
-  }
-  else
-  {
-    length = image->columns * image->rows;
-    clStatus = clEnv->library->clEnqueueReadBuffer(queue, filteredImageBuffer, CL_TRUE, 0, length * sizeof(CLPixelPacket), filteredPixels, 0, NULL, NULL);
-  }
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
-    goto cleanup;
-  }
-
-  outputReady=SyncCacheViewAuthenticPixels(filteredImage_view,exception);
 
 cleanup:
 
