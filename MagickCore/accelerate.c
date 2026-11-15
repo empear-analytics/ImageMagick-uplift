@@ -765,10 +765,8 @@ static MagickBooleanType ComputeContrastImage(Image *image,MagickCLEnv clEnv,
 
 cleanup:
 
-  if (imageBuffer != (cl_mem) NULL)
-    ReleaseOpenCLMemObject(imageBuffer);
-  if (contrastKernel != (cl_kernel) NULL)
-    ReleaseOpenCLKernel(contrastKernel);
+  ReleaseOpenCLBuffer(imageBuffer);
+  ReleaseKernel(contrastKernel);
   if (queue != (cl_command_queue) NULL)
     ReleaseOpenCLCommandQueue(device,queue);
   if (device != (MagickCLDevice) NULL)
