@@ -1601,14 +1601,7 @@ static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
     goto cleanup;
   }
 
-  if (ALIGNED(inputPixels,CLPixelPacket))
-  {
-    mem_flags = CL_MEM_READ_ONLY|CL_MEM_USE_HOST_PTR;
-  }
-  else
-  {
-    mem_flags = CL_MEM_READ_ONLY|CL_MEM_COPY_HOST_PTR;
-  }
+  mem_flags=GetInputBufferFlags(inputPixels);
   /* create a CL buffer from image pixel buffer */
   length = image->columns * image->rows;
   imageBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(CLPixelPacket), (void*)inputPixels, &clStatus);
