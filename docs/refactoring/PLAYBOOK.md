@@ -20652,6 +20652,152 @@ owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
+## Recipe RG - Move a Parallel Sections Region into a Helper Returning the Status
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead* on a
+function whose bulk is one `#pragma omp parallel sections` region that writes nothing
+outside it but the shared `status`, set to `MagickTrue` just before the region and tested
+right after it, as `fourier.c`'s `InverseFourierTransformImage` and
+`ForwardFourierTransformImage` are once Recipe TS has shrunk their sections: the region is
+five sections, each calling a channel transform and storing `MagickFalse` into `status` when
+it fails. Step 7 covers a second function whose region is the same text over a twin callee.
+
+**Not covered by:** Recipe TS, which shares one section's body and leaves the region (and
+its pragma lines) in the function; Recipe T and AS, which move a block of a `parallel for`
+body, not a whole region; Recipe N and Z step 1, which move a function's tail (here the
+region is followed by the caller's own use of `status`); Recipe E, whose OpenMP rule
+refuses moving code across a `#pragma omp` line; Recipe D, which needs a reported *Code
+Duplication* between the two regions (none is reported: the twin callees differ).
+
+**How:**
+
+1. The owner's ruling of 2026-11-15 (AGENTS.md, *Never*, OpenMP) applies: the step is one
+   commit, the whole catalogue (narrow and wide) stays at 0 diverged, and
+   `tools/omp_compare.sh` shows no difference at one and four threads on cases that reach
+   the region (a case list in `tools/omp_cases/` that runs every section's call).
+2. The region is one statement: the guarded `#pragma omp parallel sections` line and the
+   compound statement it governs, with no data-sharing clause. Read by hand which variables
+   it writes: each section's own locals (private to the thread running the section) and
+   one variable declared outside it, `status`, written only by plain stores of
+   `MagickFalse` (directly or through a Recipe TS helper's `(*status)`), shared because no
+   clause names it. Before the region (with only statements that neither read nor write
+   `status` between) the function writes `status=MagickTrue;`. Nothing else the region
+   reads is written inside it.
+3. Write directly below the last helper the region calls (inside the same conditional as
+   the callees) `static MagickBooleanType Name(<the region's inputs>)`: one `const`
+   pointer to the input struct the caller already holds (Recipe TS step 3) and, by value,
+   each other variable the region reads (as `const` parameters of their names and types).
+   Bind each struct member the region names as a `const` local of its name (Recipe N
+   step 4). Declare `MagickBooleanType status;`, write `status=MagickTrue;`, then the
+   region's text dedented, with `&x` read `x` where `x` is now the pointer the helper
+   holds, then `return(status);`.
+4. In the caller, delete `status=MagickTrue;` and replace the region by
+   `status=Name(<arguments>);` at the region's place; the test of `status` that follows
+   stays. Keep `status`'s declaration (it is still read).
+5. The pragma lines move verbatim, with their `#if defined(MAGICKCORE_OPENMP_SUPPORT)`
+   guards; no clause is added, and the sharing of every variable is what it was: `status`
+   is the helper's local declared outside the region, so shared (as the caller's was);
+   the sections' locals stay private; the parameters are read-only inputs, which the
+   region shared and did not write.
+6. Evidence: oracle on the function's cases, `refactor_guard.py --calls` (`+2` for the
+   helper's definition and call), the reading of step 2 quoted in the message,
+   `omp_compare.sh` at one and four threads, and a repeated timing of a case reaching the
+   region, base against candidate (the helper adds one call per region, not per pixel).
+7. Twin regions. A second function holding a region whose text is the first one's with
+   only the callee different (a twin channel transform taking a pointer to another
+   source type, the other parameters the same) and the tested image variable named
+   differently takes the same helper in its own later commit: the input struct gets one
+   pointer per source type (the first function sets the other to `NULL` in its
+   initialiser), a `static MagickBooleanType` dispatcher `NameChannel(input,channel)`
+   calls the callee of whichever source pointer is not `NULL`, the Recipe TS helper and
+   the first section call the dispatcher, the tested image becomes a `const Image *`
+   parameter, and the second function's region and its `status=MagickTrue;` become
+   `status=Name(...);`. A prototype of `Name` goes in the conditional above the second
+   function when that function comes first in the file. The dispatcher's test is a
+   pointer comparison made once per section, not per pixel.
+
+**Before:**
+
+```c
+        status=MagickTrue;
+        is_gray=IsImageGray(magnitude_image);
+        if (is_gray != MagickFalse)
+          is_gray=IsImageGray(phase_image);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp parallel sections
+#endif
+        {
+          ...
+          {
+            InverseFourierSection(&section,
+              is_gray == MagickFalse,
+              GreenPixelChannel,&status);
+          }
+          ...
+        }
+        if (status == MagickFalse)
+          fourier_image=DestroyImage(fourier_image);
+```
+
+**After:**
+
+```c
+        is_gray=IsImageGray(magnitude_image);
+        if (is_gray != MagickFalse)
+          is_gray=IsImageGray(phase_image);
+        status=InverseFourierChannels(&section,magnitude_image,is_gray);
+        if (status == MagickFalse)
+          fourier_image=DestroyImage(fourier_image);
+...
+static MagickBooleanType InverseFourierChannels(
+  const InverseSectionInput *section,const Image *magnitude_image,
+  const MagickBooleanType is_gray)
+{
+  ...
+  status=MagickTrue;
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel sections
+#endif
+  {
+    ...
+  }
+  return(status);
+}
+```
+
+**Careful:**
+
+- Same team, same work: the region is entered once per call of the function as before, by
+  the thread that called it; each section runs once on one thread of the team. Moving the
+  region into a callee does not change the team (OpenMP forms it at the pragma, wherever
+  the pragma stands) or the nesting (the caller was not inside a region at that point).
+- `status` keeps its sharing: a variable declared outside a `parallel` construct with no
+  clause is shared, whether it is the caller's local or the helper's. The race the
+  sections already have (plain stores of one value, no read before the closing barrier)
+  stays the race it was; the recipe must not add an `atomic` or `critical`.
+- The value returned is what the caller would have tested: `MagickTrue` unless a section
+  stored `MagickFalse`, read after the region's implied barrier.
+- Step 7's dispatcher calls exactly one of the two callees with the same arguments the
+  section passed; which one is fixed by the caller's initialiser (exactly one source
+  pointer is set), so each section calls the callee it called before. No function pointer
+  is used.
+- The oracle builds without OpenMP and runs the sections in order; omp_compare is the check
+  that sees the threads. It cannot prove a race absent, which is why the step is held to
+  moving text verbatim.
+
+**Evidence level:** oracle plus `refactor_guard.py --calls`, the step 2 reading quoted, and
+`tools/omp_compare.sh` at `OMP_NUM_THREADS=1` and `=4` on cases that run every section.
+
+**Provenance:** 2026-11-15, from `fourier.c`'s `InverseFourierTransformImage` and
+`ForwardFourierTransformImage` (campaign A, W29 lane c), after the owner's ruling of
+2026-11-15 allowed moves into, out of and across `#pragma omp` regions. Probe on the
+candidate: Inverse's region alone 7.66 to 8.08 (the function leaves *Large Method*); with
+step 7 for Forward 8.67 (Forward leaves *Complex Method* and *Large Method*), where a
+second Recipe TS helper for Forward had switched on *Code Duplication* (7.28). Added by
+Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -21090,3 +21236,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-15 | AMEND | Y | Step 7: another block of the file whose text equals, under Recipe D's renaming (checked by script; `diff` of the line ranges for verbatim copies), the block a Recipe Y function was cut from calls that function instead of a second copy, in the same caller or another, with its own struct fill, written variable, temporaries and exit, steps 1 to 6 checked for the copy; one commit per caller. *Careful* gives the argument (Recipe V step 6, W step 7, LB step 6 and I step 7 make it for their forms) | `accelerate.c`'s `ComputeDespeckleImage` (campaign A, W27 round sixteen lane a): four verbatim copies of the hull-pass launch pair, each leaving through `goto cleanup;`; a second function of the same text would be a duplicate, and Recipe D may not leave the caller. Probe (stub procedure, other 18 Complex/Large functions emptied): 7.58 to 7.62 for the first copy, 7.75 with all four | owner |
 | 2026-11-15 | AMEND | WP | Step 8, *a wrapper no code calls*: a wrapper that meets steps 1 and 2 and that nothing calls (`git grep` finds only its definition and its declaration in a header listed under `MAGICKCORE_NOINST_HDRS`; `MagickPrivate`, hidden visibility; `casemap.py` 0 cases for wrapper and worker) may be converted at guard level when `obj_modulo.sh <file> <Wrapper> <Worker>` prints `IDENTICAL` or `MODULO-IDENTICAL`, `refactor_guard.py` drops only the wrapper's removed literals (`WARN`, every value present), `--calls` moves only the wrapper's removed calls and the prologue, and step 7's compile checks pass. A *Careful* bullet gives the argument (the transformation's argument rests on steps 1 and 2, read; nothing executes the wrapper or its `static` worker, and every other function compiles to the same instructions) | `accelerate.c`'s `AccelerateContrastStretchImage` (campaign A, W28 round seventeen lane a): no caller in the tree, a clone of `AccelerateGrayscaleImage`; a probe with it converted lists no *Code Duplication*, 3.24 to 3.49. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
 | 2026-11-13 | NEW | TS | Share One Body Across Twin Sections of a Parallel Sections Region: sections that are one block but for a test and a channel constant call one `static void` helper taking an input struct, the test's value, the constant and a pointer to the shared `status`; the pragmas stay. *Careful* gives the argument (same thread, same stores to the same shared `status`, the test has no side effect) | `fourier.c`'s `InverseFourierTransformImage` (campaign A, W21 lane b): four of five sections; 7.59 to 7.66, the function leaves *Complex Method*; the same helper for `ForwardFourierTransformImage` too switches on *Code Duplication* (7.29), so one function takes it | owner |
+| 2026-11-15 | NEW | RG | Move a Parallel Sections Region into a Helper Returning the Status: a function's whole `omp parallel sections` region, whose only outer write is plain stores of `MagickFalse` into a shared `status` set to `MagickTrue` before it, moves verbatim (pragma lines included) into a `static MagickBooleanType` helper whose own `status` it returns; step 7 lets a second function's twin region over a twin callee share the helper through a dispatcher on which source pointer of the input struct is set. *Careful* gives the argument (same team and nesting, `status` still shared, the same stores, one callee per section as before) | `fourier.c`'s `InverseFourierTransformImage` and `ForwardFourierTransformImage` (campaign A, W29 lane c, after the owner's OpenMP ruling of 2026-11-15): probe 7.66 to 8.08 (Inverse), 8.67 with step 7 (Forward); a second TS helper had cost 7.28 (Code Duplication) | owner |
