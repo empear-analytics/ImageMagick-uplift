@@ -4970,18 +4970,11 @@ static Image *ComputeUnsharpMaskImageSingle(const Image *image,
 
 cleanup:
 
-  if (imageBuffer != (cl_mem) NULL)
-    ReleaseOpenCLMemObject(imageBuffer);
-  if (filteredImageBuffer != (cl_mem) NULL)
-    ReleaseOpenCLMemObject(filteredImageBuffer);
-  if (imageKernelBuffer != (cl_mem) NULL)
-    ReleaseOpenCLMemObject(imageKernelBuffer);
-  if (unsharpMaskKernel != (cl_kernel) NULL)
-    ReleaseOpenCLKernel(unsharpMaskKernel);
-  if (queue != (cl_command_queue) NULL)
-    ReleaseOpenCLCommandQueue(device,queue);
-  if (device != (MagickCLDevice) NULL)
-    ReleaseOpenCLDevice(device);
+  ReleaseOpenCLBuffer(imageBuffer);
+  ReleaseOpenCLBuffer(filteredImageBuffer);
+  ReleaseOpenCLBuffer(imageKernelBuffer);
+  ReleaseKernel(unsharpMaskKernel);
+  ReleaseAccelerateQueue(device,queue);
   if ((outputReady == MagickFalse) && (filteredImage != (Image *) NULL))
     filteredImage=DestroyImage(filteredImage);
 
