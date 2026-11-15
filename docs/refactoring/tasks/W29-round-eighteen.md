@@ -49,3 +49,36 @@ says never to move or edit a pragma and does not point at the AGENTS.md ruling. 
 with `--no-verify` after a garbled gcc figure. Upstream bug, not fixed: `ForwardFourierTransformChannel` tests
 `if (magnitude_info == NULL) magnitude_info=RelinquishVirtualMemory(...)` where `!=` was meant (leak when only the
 phase allocation fails). `fx.c` and `accelerate.c` were not part of this round.
+
+## Round nineteen (2026-11-16 night): mid-range files probed, one rise
+
+Three Opus lanes probed morphology-apply.c and distort.c (a), widget.c and xwindow-image.c (b), quantize.c,
+animate-window.c and the 9.x group (c). Only lane c made a refactor commit: **`colorspace-convert.c` 9.08 -> 9.68**
+by a new Recipe KV (`4e93f10f4`, replace a split call switch by a table of function pointers of two signatures;
+`5a0822556` on `ConvertRGBToGeneric`: oracle 607 cases 0 diverged, timing ratios 0.965 to 1.011, `--calls` FAIL by
+design since the calls became table entries, read by hand). Gate on the tip (lane c's own runs): whole catalogue
+15,955 and wide 14,200 cases, 0 diverged; `ci_linux_warnings.sh --campaign-a` OK on 98 files.
+
+Why the other files did not move (stub probes with `~/sp_w23a/stub.py`, no padding):
+- **morphology-apply.c 7.41**: `IsBaseKernelNeeded` (cc 40) keeps 20 labels in a never-compiled `#if 0` block that must
+  stay verbatim (stubbed alone 8.28); `MorphologyApply` has 7 MagickPrivate arguments; Number of Functions (173) in a
+  split product; Overall Code Complexity needs a chain of about 54 flat extractions (+0.47).
+- **distort.c 7.90**: `poly_basis_dx` (cc 17, per pixel; index-table form measured 5% to 20% slower in W16, order split
+  clones `PolyBasisFn*`); `DistortImage` and `SparseColorImage` are MagickExport; Number of Functions (126, shared
+  statics block Recipe S); Overall Code Complexity needs about 29 flat Recipe E/N extractions (+0.50, a full lane;
+  Recipe DT would need a *Use when* amendment to cover it).
+- **widget.c 7.78 and xwindow-image.c 8.28**: Number of Functions (368 and 246; no legal split, re-carving split
+  products is not allowed) and MagickPrivate argument counts (all six, resp. 13 functions); even with every count cut to
+  4 (illegal) they reach only 8.03 and 8.54; folding functions makes Overall Code Complexity appear.
+- **quantize.c 8.81, animate-window.c 8.81**: Number of Functions and public arguments; `split_source.py` refuses every
+  public root of quantize.c (shared statics, `MaxTreeDepth` macro); animate-window.c is a split product.
+- **threshold-image.c 9.09, enhance-tone.c 9.09, effect-filter.c 9.09, layer-frames.c 9.38,
+  colorspace-transform-image.c 9.38**: Lines of Code in split products, plus public arguments. **colorspace-convert.c
+  9.68**: three argument findings on MagickExport/MagickPrivate functions.
+
+Owner decisions that would unlock more: (1) a ruling that a split product may be carved again (the W21 round two rule
+holds nine files at Lines of Code or Number of Functions); (2) public and MagickPrivate argument counts (the largest
+group of remaining findings: 40 or so functions across the files above), which a changed signature would clear but the
+rules forbid; (3) a long flat chain for `distort.c` (29 steps, +0.50) and `morphology-apply.c` (54 steps, +0.47).
+Reviewer note on Recipe KV: its text cites "the AGENTS.md 3% rule" which AGENTS.md does not contain (other recipes cite
+it the same way); the row says `Decided by: owner` where the legend would say `mandate`.
