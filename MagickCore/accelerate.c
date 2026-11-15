@@ -123,6 +123,13 @@ static MagickBooleanType HasImageMaskChannel(const Image *image)
     MagickFalse);
 }
 
+static MagickBooleanType IsUnsupportedVirtualPixelMethod(const Image *image)
+{
+  return(((GetImageVirtualPixelMethod(image) != UndefinedVirtualPixelMethod) &&
+      (GetImageVirtualPixelMethod(image) != EdgeVirtualPixelMethod)) ?
+    MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType checkAccelerateCondition(const Image* image)
 {
   /* only direct class images are supported */
@@ -134,8 +141,7 @@ static MagickBooleanType checkAccelerateCondition(const Image* image)
     return(MagickFalse);
 
   /* check if the virtual pixel method is compatible with the OpenCL implementation */
-  if ((GetImageVirtualPixelMethod(image) != UndefinedVirtualPixelMethod) &&
-      (GetImageVirtualPixelMethod(image) != EdgeVirtualPixelMethod))
+  if (IsUnsupportedVirtualPixelMethod(image) != MagickFalse)
     return(MagickFalse);
 
   /* check if the image has mask */
