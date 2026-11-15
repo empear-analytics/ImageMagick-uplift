@@ -1,0 +1,31 @@
+# CompositeImage (composite.c): the general row loop, the Copy and Intensity loops and the per-channel colour switch, over -compose operators, offsets, clipping and alpha
+rose: \( granite: -resize 60x40! \) -geometry +10+5 -compose Multiply -composite -format %# info:
+rose: \( granite: -resize 60x40! \) -geometry -7-3 -compose Screen -composite -format %# info:
+rose: -alpha set \( granite: -resize 50x30! -alpha set -channel A -evaluate set 60% +channel \) -geometry +4+9 -compose Atop -composite -format %# info:
+rose: \( logo: -resize 40x30! \) -geometry +2+2 -compose Dissolve -define compose:args=30,70 -composite -format %# info:
+rose: \( logo: -resize 40x30! \) -geometry +2+2 -compose Blend -define compose:args=40 -composite -format %# info:
+rose: \( granite: -resize 70x46! \) -compose Mathematics -define compose:args=0.5,0.3,-0.2,0.1 -composite -format %# info:
+rose: \( granite: -resize 70x46! \) -compose Modulate -define compose:args=80,120 -composite -format %# info:
+rose: \( granite: -resize 70x46! \) -compose Threshold -define compose:args=0.4,0.1 -composite -format %# info:
+rose: \( granite: -resize 30x20! \) -geometry +20+10 -compose Copy -composite -format %# info:
+rose: -alpha set \( granite: -resize 30x20! \) -geometry +20+10 -compose Intensity -composite -format %# info:
+rose: \( granite: -resize 30x20! \) -geometry +20+10 -compose In -define compose:clip-to-self=true -composite -format %# info:
+rose: \( granite: -resize 30x20! \) -geometry +20+10 -compose Src -define compose:clip-to-self=false -composite -format %# info:
+rose: \( granite: -resize 70x46! \) -compose HardLight -composite -format %# info:
+rose: \( granite: -resize 70x46! \) -compose SoftLight -composite -format %# info:
+rose: \( granite: -resize 70x46! \) -compose ColorBurn -composite -format %# info:
+rose: \( granite: -resize 70x46! \) -compose Hue -composite -format %# info:
+rose: \( granite: -resize 70x46! \) -compose Luminize -define compose:colorspace=HSL -composite -format %# info:
+rose: \( granite: -resize 70x46! \) -compose VividLight -composite -format %# info:
+rose: \( granite: -resize 70x46! \) -compose PegtopLight -composite -format %# info:
+rose: \( granite: -resize 70x46! \) -compose Difference -composite -format %# info:
+rose: \( granite: -resize 70x46! \) -compose DarkenIntensity -composite -format %# info:
+rose: \( granite: -resize 70x46! \) -compose ModulusAdd -composite -format %# info:
+rose: \( granite: -resize 70x46! \) -compose Stereo -composite -format %# info:
+rose: \( granite: -resize 70x46! \) -compose RMSE -composite -format %# info:
+rose: \( granite: -resize 70x46! \) -compose Freeze -composite -format %# info:
+rose: \( granite: -resize 70x46! \) -compose Displace -define compose:args=5x5 -composite -format %# info:
+rose: \( granite: -resize 70x46! \) -compose Blur -define compose:args=3 -composite -format %# info:
+rose: -colorspace CMYK \( granite: -resize 70x46! -colorspace CMYK \) -compose Overlay -composite -format %# info:
+-size 300x200 gradient:#ff0000-#0000ff \( -size 300x200 gradient:#ffff00-#000000 -rotate 90 -resize 300x200! \) -compose Multiply -composite -format %# info:
+-size 300x200 gradient:#ff0000-#0000ff \( -size 120x80 radial-gradient:#ffffff-#008000 \) -geometry +50+40 -compose LinearLight -composite -format %# info:
