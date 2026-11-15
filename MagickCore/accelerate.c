@@ -4665,10 +4665,7 @@ static Image* ComputeRotationalBlurImage(const Image *image,MagickCLEnv clEnv,
     targets = { &device, &queue, &filteredImage, &imageBuffer,
       &filteredImageBuffer };
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceAccelerateImage(image);
 
   queue=NULL;
   filteredImage=NULL;
