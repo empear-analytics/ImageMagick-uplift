@@ -2991,6 +2991,84 @@ static MagickBooleanType CreateLocalContrastOutput(
   return(MagickTrue);
 }
 
+typedef struct _LocalContrastKernelInputs
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  const Image
+    *image;
+} LocalContrastKernelInputs;
+
+typedef struct _LocalContrastKernelTargets
+{
+  cl_mem
+    *tempImageBuffer;
+
+  cl_kernel
+    *blurRowKernel,
+    *blurColumnKernel;
+} LocalContrastKernelTargets;
+
+static MagickBooleanType AcquireLocalContrastKernels(
+  const LocalContrastKernelInputs *inputs,ExceptionInfo *exception,
+  const LocalContrastKernelTargets *targets)
+{
+  const MagickCLEnv
+    clEnv = inputs->clEnv;
+
+  const MagickCLDevice
+    device = inputs->device;
+
+  const Image
+    *const image = inputs->image;
+
+  cl_mem
+    *const tempImageBuffer = targets->tempImageBuffer;
+
+  cl_kernel
+    *const blurRowKernel = targets->blurRowKernel,
+    *const blurColumnKernel = targets->blurColumnKernel;
+
+  cl_int
+    clStatus;
+
+  size_t
+    length;
+
+    /* create temp buffer */
+    {
+      length = image->columns * image->rows;
+      *tempImageBuffer = clEnv->library->clCreateBuffer(device->context, CL_MEM_READ_WRITE, length * sizeof(float), NULL, &clStatus);
+      if (clStatus != CL_SUCCESS)
+      {
+        (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+        return(MagickFalse);
+      }
+    }
+
+    /* get the opencl kernel */
+    {
+      *blurRowKernel = AcquireOpenCLKernel(device,"LocalContrastBlurRow");
+      if (*blurRowKernel == NULL)
+      {
+        (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "AcquireOpenCLKernel failed.", ".");
+        return(MagickFalse);
+      };
+
+      *blurColumnKernel = AcquireOpenCLKernel(device,"LocalContrastBlurApplyColumn");
+      if (*blurColumnKernel == NULL)
+      {
+        (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "AcquireOpenCLKernel failed.", ".");
+        return(MagickFalse);
+      };
+    }
+  return(MagickTrue);
+}
+
 static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
   const double radius,const double strength,ExceptionInfo *exception)
 {
@@ -3075,32 +3153,14 @@ static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
   }
 
   {
-    /* create temp buffer */
     {
-      length = image->columns * image->rows;
-      tempImageBuffer = clEnv->library->clCreateBuffer(device->context, CL_MEM_READ_WRITE, length * sizeof(float), NULL, &clStatus);
-      if (clStatus != CL_SUCCESS)
-      {
-        (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
-        goto cleanup;
-      }
-    }
+      const LocalContrastKernelInputs inputs = { clEnv, device, image };
+      const LocalContrastKernelTargets targets = { &tempImageBuffer,
+        &blurRowKernel, &blurColumnKernel };
 
-    /* get the opencl kernel */
-    {
-      blurRowKernel = AcquireOpenCLKernel(device,"LocalContrastBlurRow");
-      if (blurRowKernel == NULL)
-      {
-        (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "AcquireOpenCLKernel failed.", ".");
+      if (AcquireLocalContrastKernels(&inputs,exception,&targets) ==
+          MagickFalse)
         goto cleanup;
-      };
-
-      blurColumnKernel = AcquireOpenCLKernel(device,"LocalContrastBlurApplyColumn");
-      if (blurColumnKernel == NULL)
-      {
-        (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "AcquireOpenCLKernel failed.", ".");
-        goto cleanup;
-      };
     }
 
     {
