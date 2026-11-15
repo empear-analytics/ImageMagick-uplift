@@ -2101,12 +2101,88 @@ static void DestroyFeatureBuffers(const FeatureBuffers *buffers,
   DestroyFeatureMatrix(cooccurrence,number_grays);
 }
 
+typedef struct _FeatureAnalysis
+{
+  const Image
+    *image;
+
+  ChannelFeatures
+    *channel_features;
+
+  FeatureStatistics
+    **cooccurrence,
+    *density_x,
+    *density_xy,
+    *density_y,
+    **Q,
+    *sum;
+
+  unsigned int
+    number_grays;
+} FeatureAnalysis;
+
+static void ComputeFeatureStatistics(const FeatureAnalysis *analysis,
+  MagickBooleanType status)
+{
+  const Image
+    *const image = analysis->image;
+
+  ChannelFeatures
+    *const channel_features = analysis->channel_features;
+
+  FeatureStatistics
+    **const cooccurrence = analysis->cooccurrence,
+    *const density_x = analysis->density_x,
+    *const density_xy = analysis->density_xy,
+    *const density_y = analysis->density_y,
+    **const Q = analysis->Q,
+    *const sum = analysis->sum;
+
+  const unsigned int
+    number_grays = analysis->number_grays;
+
+  FeatureStatistics
+    correlation,
+    entropy_x,
+    entropy_xy,
+    entropy_xy1,
+    entropy_xy2,
+    entropy_y,
+    mean,
+    sum_squares,
+    variance;
+
+  (void) memset(&correlation,0,sizeof(correlation));
+  ZeroFeatureDensities(density_x,density_xy,density_y,number_grays);
+  (void) memset(&mean,0,sizeof(mean));
+  (void) memset(sum,0,number_grays*sizeof(*sum));
+  (void) memset(&sum_squares,0,sizeof(sum_squares));
+  (void) memset(density_xy,0,2*number_grays*sizeof(*density_xy));
+  (void) memset(&entropy_x,0,sizeof(entropy_x));
+  (void) memset(&entropy_xy,0,sizeof(entropy_xy));
+  (void) memset(&entropy_xy1,0,sizeof(entropy_xy1));
+  (void) memset(&entropy_xy2,0,sizeof(entropy_xy2));
+  (void) memset(&entropy_y,0,sizeof(entropy_y));
+  (void) memset(&variance,0,sizeof(variance));
+  {
+    const TextureFeatureState
+      inputs = { image, channel_features, cooccurrence, density_x,
+        density_xy, density_y, Q, sum, number_grays, correlation, entropy_x,
+        entropy_xy, entropy_xy1, entropy_xy2, entropy_y, mean };
+
+    ComputeTextureDirections(&inputs,sum_squares,variance,status);
+  }
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
   ChannelFeatures
     *channel_features,
     *returned;
+
+  FeatureAnalysis
+    analysis;
 
   FeatureBuffers
     buffers;
@@ -2119,20 +2195,11 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
 
   FeatureStatistics
     **cooccurrence,
-    correlation,
     *density_x,
     *density_xy,
     *density_y,
-    entropy_x,
-    entropy_xy,
-    entropy_xy1,
-    entropy_xy2,
-    entropy_y,
-    mean,
     **Q,
-    *sum,
-    sum_squares,
-    variance;
+    *sum;
 
   PixelPacket
     gray,
@@ -2231,26 +2298,16 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     Normalize spatial dependence matrix.
   */
   NormalizeFeatureCooccurrence(image,distance,cooccurrence,number_grays);
-  (void) memset(&correlation,0,sizeof(correlation));
-  ZeroFeatureDensities(density_x,density_xy,density_y,number_grays);
-  (void) memset(&mean,0,sizeof(mean));
-  (void) memset(sum,0,number_grays*sizeof(*sum));
-  (void) memset(&sum_squares,0,sizeof(sum_squares));
-  (void) memset(density_xy,0,2*number_grays*sizeof(*density_xy));
-  (void) memset(&entropy_x,0,sizeof(entropy_x));
-  (void) memset(&entropy_xy,0,sizeof(entropy_xy));
-  (void) memset(&entropy_xy1,0,sizeof(entropy_xy1));
-  (void) memset(&entropy_xy2,0,sizeof(entropy_xy2));
-  (void) memset(&entropy_y,0,sizeof(entropy_y));
-  (void) memset(&variance,0,sizeof(variance));
-  {
-    const TextureFeatureState
-      inputs = { image, channel_features, cooccurrence, density_x,
-        density_xy, density_y, Q, sum, number_grays, correlation, entropy_x,
-        entropy_xy, entropy_xy1, entropy_xy2, entropy_y, mean };
-
-    ComputeTextureDirections(&inputs,sum_squares,variance,status);
-  }
+  analysis.image=image;
+  analysis.channel_features=channel_features;
+  analysis.cooccurrence=cooccurrence;
+  analysis.density_x=density_x;
+  analysis.density_xy=density_xy;
+  analysis.density_y=density_y;
+  analysis.Q=Q;
+  analysis.sum=sum;
+  analysis.number_grays=number_grays;
+  ComputeFeatureStatistics(&analysis,status);
   /*
     Relinquish resources.
   */
