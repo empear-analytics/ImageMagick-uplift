@@ -3130,6 +3130,94 @@ MagickPrivate Image *AccelerateLocalContrastImage(const Image *image,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 */
 
+typedef struct _ModulateResourceTargets
+{
+  MagickCLDevice
+    *device;
+
+  cl_command_queue
+    *queue;
+
+  CacheView
+    **image_view;
+
+  void
+    **inputPixels;
+
+  cl_mem
+    *imageBuffer;
+} ModulateResourceTargets;
+
+static MagickBooleanType AcquireModulateResources(MagickCLEnv clEnv,
+  Image *image,ExceptionInfo *exception,
+  const ModulateResourceTargets *targets)
+{
+  MagickCLDevice
+    *const device = targets->device;
+
+  cl_command_queue
+    *const queue = targets->queue;
+
+  CacheView
+    **const image_view = targets->image_view;
+
+  void
+    **const inputPixels = targets->inputPixels;
+
+  cl_mem
+    *const imageBuffer = targets->imageBuffer;
+
+  cl_int
+    clStatus;
+
+  cl_mem_flags
+    mem_flags;
+
+  size_t
+    length;
+
+  *device=RequestOpenCLDevice(clEnv);
+  if (*device == (MagickCLDevice) NULL)
+    return(MagickFalse);
+  *queue=AcquireOpenCLCommandQueue(*device);
+  if (*queue == (cl_command_queue) NULL)
+    return(MagickFalse);
+
+  /* Create and initialize OpenCL buffers.
+   inputPixels = AcquirePixelCachePixels(image, &length, exception);
+   assume this  will get a writable image
+   */
+  *image_view=AcquireAuthenticCacheView(image,exception);
+  *inputPixels=GetCacheViewAuthenticPixels(*image_view,0,0,image->columns,image->rows,exception);
+  if (*inputPixels == (void *) NULL)
+  {
+    (void) OpenCLThrowMagickException(*device,exception,GetMagickModule(),CacheWarning,"UnableToReadPixelCache.","`%s'",image->filename);
+    return(MagickFalse);
+  }
+
+  /* If the host pointer is aligned to the size of CLPixelPacket,
+   then use the host buffer directly from the GPU; otherwise,
+   create a buffer on the GPU and copy the data over
+   */
+  if (ALIGNED(*inputPixels,CLPixelPacket))
+  {
+    mem_flags = CL_MEM_READ_WRITE|CL_MEM_USE_HOST_PTR;
+  }
+  else
+  {
+    mem_flags = CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR;
+  }
+  /* create a CL buffer from image pixel buffer */
+  length = image->columns * image->rows;
+  *imageBuffer = clEnv->library->clCreateBuffer((*device)->context, mem_flags, length * sizeof(CLPixelPacket), (void*)*inputPixels, &clStatus);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(*device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeModulateImage(Image *image,MagickCLEnv clEnv,
   const double percent_brightness,const double percent_hue,
   const double percent_saturation,const ColorspaceType colorspace,
@@ -3162,9 +3250,6 @@ static MagickBooleanType ComputeModulateImage(Image *image,MagickCLEnv clEnv,
   cl_uint
     i;
 
-  cl_mem_flags
-    mem_flags;
-
   MagickBooleanType
     outputReady;
 
@@ -3192,44 +3277,13 @@ static MagickBooleanType ComputeModulateImage(Image *image,MagickCLEnv clEnv,
   /*
    * initialize opencl env
    */
-  device=RequestOpenCLDevice(clEnv);
-  if (device == (MagickCLDevice) NULL)
-    goto cleanup;
-  queue=AcquireOpenCLCommandQueue(device);
-  if (queue == (cl_command_queue) NULL)
-    goto cleanup;
+  {
+    const ModulateResourceTargets targets = { &device, &queue, &image_view,
+      &inputPixels, &imageBuffer };
 
-  /* Create and initialize OpenCL buffers.
-   inputPixels = AcquirePixelCachePixels(image, &length, exception);
-   assume this  will get a writable image
-   */
-  image_view=AcquireAuthenticCacheView(image,exception);
-  inputPixels=GetCacheViewAuthenticPixels(image_view,0,0,image->columns,image->rows,exception);
-  if (inputPixels == (void *) NULL)
-  {
-    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),CacheWarning,"UnableToReadPixelCache.","`%s'",image->filename);
-    goto cleanup;
-  }
-
-  /* If the host pointer is aligned to the size of CLPixelPacket,
-   then use the host buffer directly from the GPU; otherwise,
-   create a buffer on the GPU and copy the data over
-   */
-  if (ALIGNED(inputPixels,CLPixelPacket))
-  {
-    mem_flags = CL_MEM_READ_WRITE|CL_MEM_USE_HOST_PTR;
-  }
-  else
-  {
-    mem_flags = CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR;
-  }
-  /* create a CL buffer from image pixel buffer */
-  length = image->columns * image->rows;
-  imageBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(CLPixelPacket), (void*)inputPixels, &clStatus);
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
-    goto cleanup;
+    if (AcquireModulateResources(clEnv,image,exception,&targets) ==
+        MagickFalse)
+      goto cleanup;
   }
 
   modulateKernel = AcquireOpenCLKernel(device, "Modulate");
