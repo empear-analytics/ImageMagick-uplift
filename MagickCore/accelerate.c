@@ -563,6 +563,9 @@ static MagickBooleanType AcquireAccelerateBuffers(MagickCLEnv clEnv,
   return(MagickTrue);
 }
 
+static void
+  TraceAccelerateImage(const Image *);
+
 static Image *ComputeBlurImage(const Image* image,MagickCLEnv clEnv,
   const double radius,const double sigma,ExceptionInfo *exception)
 {
@@ -622,10 +625,7 @@ static Image *ComputeBlurImage(const Image* image,MagickCLEnv clEnv,
   blurColumnKernel=NULL;
   outputReady=MagickFalse;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceAccelerateImage(image);
 
   if (AcquireAccelerateBuffers(clEnv,image,exception,&targets) == MagickFalse)
     goto cleanup;
