@@ -2552,6 +2552,48 @@ static void ReleaseGrayscaleResources(cl_mem imageBuffer,
     ReleaseOpenCLDevice(device);
 }
 
+typedef struct _GrayscaleResourceTargets
+{
+  cl_command_queue
+    *queue;
+
+  cl_mem
+    *imageBuffer;
+
+  cl_kernel
+    *grayscaleKernel;
+} GrayscaleResourceTargets;
+
+static MagickBooleanType AcquireGrayscaleResources(MagickCLDevice device,
+  Image *image,ExceptionInfo *exception,
+  const GrayscaleResourceTargets *targets)
+{
+  cl_command_queue
+    *const queue = targets->queue;
+
+  cl_mem
+    *const imageBuffer = targets->imageBuffer;
+
+  cl_kernel
+    *const grayscaleKernel = targets->grayscaleKernel;
+
+  *queue=AcquireOpenCLCommandQueue(device);
+  if (*queue == (cl_command_queue) NULL)
+    return(MagickFalse);
+  *imageBuffer=GetAuthenticOpenCLBuffer(image,device,exception);
+  if (*imageBuffer == (cl_mem) NULL)
+    return(MagickFalse);
+
+  *grayscaleKernel=AcquireOpenCLKernel(device,"Grayscale");
+  if (*grayscaleKernel == (cl_kernel) NULL)
+  {
+    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
+      ResourceLimitWarning,"AcquireOpenCLKernel failed.",".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeGrayscaleImage(Image *image,MagickCLEnv clEnv,
   const PixelIntensityMethod method,ExceptionInfo *exception)
 {
@@ -2571,6 +2613,9 @@ static MagickBooleanType ComputeGrayscaleImage(Image *image,MagickCLEnv clEnv,
     number_channels,
     colorspace,
     intensityMethod;
+
+  GrayscaleResourceTargets
+    targets;
 
   MagickBooleanType
     outputReady;
@@ -2595,20 +2640,12 @@ static MagickBooleanType ComputeGrayscaleImage(Image *image,MagickCLEnv clEnv,
   device=RequestOpenCLDevice(clEnv);
   if (device == (MagickCLDevice) NULL)
     goto cleanup;
-  queue=AcquireOpenCLCommandQueue(device);
-  if (queue == (cl_command_queue) NULL)
+  targets.queue=(&queue);
+  targets.imageBuffer=(&imageBuffer);
+  targets.grayscaleKernel=(&grayscaleKernel);
+  if (AcquireGrayscaleResources(device,image,exception,&targets) ==
+      MagickFalse)
     goto cleanup;
-  imageBuffer=GetAuthenticOpenCLBuffer(image,device,exception);
-  if (imageBuffer == (cl_mem) NULL)
-    goto cleanup;
-
-  grayscaleKernel=AcquireOpenCLKernel(device,"Grayscale");
-  if (grayscaleKernel == (cl_kernel) NULL)
-  {
-    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
-      ResourceLimitWarning,"AcquireOpenCLKernel failed.",".");
-    goto cleanup;
-  }
 
   number_channels=(cl_uint) image->number_channels;
   intensityMethod=(cl_uint) method;
