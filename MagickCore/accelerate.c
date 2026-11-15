@@ -4982,8 +4982,7 @@ cleanup:
   ReleaseKernel(blurRowKernel);
   ReleaseKernel(unsharpMaskBlurColumnKernel);
   ReleaseAccelerateQueue(device,queue);
-  if ((outputReady == MagickFalse) && (filteredImage != (Image *) NULL))
-    filteredImage=DestroyImage(filteredImage);
+  filteredImage=DestroyUnfinishedImage(outputReady,filteredImage);
 
   return(filteredImage);
 }
