@@ -4037,6 +4037,109 @@ static MagickBooleanType CreateMotionBlurFilterBuffer(
   return(MagickTrue);
 }
 
+typedef struct _MotionBlurKernelInputs
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_mem
+    imageBuffer,
+    filteredImageBuffer,
+    imageKernelBuffer,
+    offsetBuffer;
+
+  size_t
+    width;
+
+  cl_int
+    channel_mask;
+
+  const Image
+    *image;
+} MotionBlurKernelInputs;
+
+static MagickBooleanType SetMotionBlurKernelArgs(
+  const MotionBlurKernelInputs *inputs,cl_kernel *motionBlurKernel,
+  ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = inputs->clEnv;
+
+  const MagickCLDevice
+    device = inputs->device;
+
+  const Image
+    *const image = inputs->image;
+
+  cl_float4
+    biasPixel;
+
+  cl_int
+    clStatus;
+
+  PixelInfo
+    bias;
+
+  unsigned int
+    i,
+    imageHeight,
+    imageWidth,
+    matte;
+
+  /*
+    Get the OpenCL kernel
+  */
+  *motionBlurKernel = AcquireOpenCLKernel(device,"MotionBlur");
+  if (*motionBlurKernel == NULL)
+  {
+    (void) ThrowMagickException(exception, GetMagickModule(), ModuleFatalError,
+      "AcquireOpenCLKernel failed.", ".");
+    return(MagickFalse);
+  }
+
+  /*
+    Set the kernel arguments.
+  */
+  i = 0;
+  clStatus=clEnv->library->clSetKernelArg(*motionBlurKernel,i++,sizeof(cl_mem),
+    (void *)&inputs->imageBuffer);
+  clStatus|=clEnv->library->clSetKernelArg(*motionBlurKernel,i++,sizeof(cl_mem),
+    (void *)&inputs->filteredImageBuffer);
+  imageWidth = (unsigned int) image->columns;
+  imageHeight = (unsigned int) image->rows;
+  clStatus|=clEnv->library->clSetKernelArg(*motionBlurKernel,i++,sizeof(unsigned int),
+    &imageWidth);
+  clStatus|=clEnv->library->clSetKernelArg(*motionBlurKernel,i++,sizeof(unsigned int),
+    &imageHeight);
+  clStatus|=clEnv->library->clSetKernelArg(*motionBlurKernel,i++,sizeof(cl_mem),
+    (void *)&inputs->imageKernelBuffer);
+  clStatus|=clEnv->library->clSetKernelArg(*motionBlurKernel,i++,sizeof(unsigned int),
+    &inputs->width);
+  clStatus|=clEnv->library->clSetKernelArg(*motionBlurKernel,i++,sizeof(cl_mem),
+    (void *)&inputs->offsetBuffer);
+
+  GetPixelInfo(image,&bias);
+  biasPixel.s[0] = (cl_float) bias.red;
+  biasPixel.s[1] = (cl_float) bias.green;
+  biasPixel.s[2] = (cl_float) bias.blue;
+  biasPixel.s[3] = (cl_float) bias.alpha;
+  clStatus|=clEnv->library->clSetKernelArg(*motionBlurKernel,i++,sizeof(cl_float4), &biasPixel);
+
+  clStatus|=clEnv->library->clSetKernelArg(*motionBlurKernel,i++,sizeof(cl_int),&inputs->channel_mask);
+  matte = (image->alpha_trait > CopyPixelTrait)?1:0;
+  clStatus|=clEnv->library->clSetKernelArg(*motionBlurKernel,i++,sizeof(unsigned int), &matte);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) ThrowMagickException(exception, GetMagickModule(), ModuleFatalError,
+      "clEnv->library->clSetKernelArg failed.", ".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
   const double *kernel,const size_t width,const OffsetInfo *offset,
   ExceptionInfo *exception)
@@ -4047,9 +4150,6 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
 
   cl_command_queue
     queue;
-
-  cl_float4
-    biasPixel;
 
   cl_int
     channel_mask=get32BitChannelValue(image->channel_mask),
@@ -4085,19 +4185,13 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
   MagickCLDevice
     device;
 
-  PixelInfo
-    bias;
-
   size_t
     global_work_size[2],
     length,
     local_work_size[2];
 
   unsigned int
-    i,
-    imageHeight,
-    imageWidth,
-    matte;
+    i;
 
   void
     *filteredPixels,
@@ -4245,53 +4339,14 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
   }
 
 
-  /*
-    Get the OpenCL kernel
-  */
-  motionBlurKernel = AcquireOpenCLKernel(device,"MotionBlur");
-  if (motionBlurKernel == NULL)
   {
-    (void) ThrowMagickException(exception, GetMagickModule(), ModuleFatalError,
-      "AcquireOpenCLKernel failed.", ".");
-    goto cleanup;
-  }
+    const MotionBlurKernelInputs inputs = { clEnv, device, imageBuffer,
+      filteredImageBuffer, imageKernelBuffer, offsetBuffer, width,
+      channel_mask, image };
 
-  /*
-    Set the kernel arguments.
-  */
-  i = 0;
-  clStatus=clEnv->library->clSetKernelArg(motionBlurKernel,i++,sizeof(cl_mem),
-    (void *)&imageBuffer);
-  clStatus|=clEnv->library->clSetKernelArg(motionBlurKernel,i++,sizeof(cl_mem),
-    (void *)&filteredImageBuffer);
-  imageWidth = (unsigned int) image->columns;
-  imageHeight = (unsigned int) image->rows;
-  clStatus|=clEnv->library->clSetKernelArg(motionBlurKernel,i++,sizeof(unsigned int),
-    &imageWidth);
-  clStatus|=clEnv->library->clSetKernelArg(motionBlurKernel,i++,sizeof(unsigned int),
-    &imageHeight);
-  clStatus|=clEnv->library->clSetKernelArg(motionBlurKernel,i++,sizeof(cl_mem),
-    (void *)&imageKernelBuffer);
-  clStatus|=clEnv->library->clSetKernelArg(motionBlurKernel,i++,sizeof(unsigned int),
-    &width);
-  clStatus|=clEnv->library->clSetKernelArg(motionBlurKernel,i++,sizeof(cl_mem),
-    (void *)&offsetBuffer);
-
-  GetPixelInfo(image,&bias);
-  biasPixel.s[0] = (cl_float) bias.red;
-  biasPixel.s[1] = (cl_float) bias.green;
-  biasPixel.s[2] = (cl_float) bias.blue;
-  biasPixel.s[3] = (cl_float) bias.alpha;
-  clStatus|=clEnv->library->clSetKernelArg(motionBlurKernel,i++,sizeof(cl_float4), &biasPixel);
-
-  clStatus|=clEnv->library->clSetKernelArg(motionBlurKernel,i++,sizeof(cl_int),&channel_mask);
-  matte = (image->alpha_trait > CopyPixelTrait)?1:0;
-  clStatus|=clEnv->library->clSetKernelArg(motionBlurKernel,i++,sizeof(unsigned int), &matte);
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) ThrowMagickException(exception, GetMagickModule(), ModuleFatalError,
-      "clEnv->library->clSetKernelArg failed.", ".");
-    goto cleanup;
+    if (SetMotionBlurKernelArgs(&inputs,&motionBlurKernel,exception) ==
+        MagickFalse)
+      goto cleanup;
   }
 
   /*
