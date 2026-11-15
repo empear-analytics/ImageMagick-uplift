@@ -3913,7 +3913,7 @@ static void CompositeChannelColorVividLightToXor(const CompositeRowInputs *row,
   }
 }
 
-static void CompositeChannelColor(const CompositeRowInputs *row,
+static void CompositeChannelColorStereoToThreshold(const CompositeRowInputs *row,
   const CompositePixelInputs *authentic,const CompositeChannelInputs *tile,
   MagickRealType *pixel)
 {
@@ -3925,12 +3925,71 @@ static void CompositeChannelColor(const CompositeRowInputs *row,
 
   const MagickRealType
     amount = row->amount,
+    threshold = row->threshold;
+
+  const Quantum
+    *const p = authentic->p;
+
+  const MagickRealType
+    Da = authentic->Da,
+    Sa = authentic->Sa;
+
+  const PixelChannel
+    channel = tile->channel;
+
+  const MagickRealType
+    Dca = tile->Dca,
+    Sca = tile->Sca;
+
+  MagickRealType
+    blend = 0.0,
+    D = 0.0,
+    S = 0.0;
+
+  switch (compose)
+  {
+    case StereoCompositeOp:
+    {
+      if (channel == RedPixelChannel)
+        (*pixel)=(MagickRealType) GetPixelRed(source_image,p);
+      break;
+    }
+    case ThresholdCompositeOp:
+    {
+      S=(Sa > 0.0) ? (Sca/Sa) : 0.0;
+      D=(Da > 0.0) ? (Dca/Da) : 0.0;
+      if (fabs(2.0*(S-D)) < threshold)
+        blend=D;
+      else
+        blend=D+(S-D)*amount;
+      (*pixel)=(double) QuantumRange*(Sa*Da*RoundToUnity(blend)+Sca*
+        (1.0-Da)+Dca*(1.0-Sa));
+      break;
+    }
+    default:
+    {
+      CompositeChannelColorVividLightToXor(row,authentic,tile,pixel);
+      break;
+    }
+  }
+}
+
+static void CompositeChannelColor(const CompositeRowInputs *row,
+  const CompositePixelInputs *authentic,const CompositeChannelInputs *tile,
+  MagickRealType *pixel)
+{
+  Image
+    *const source_image = row->source_image;
+
+  const CompositeOperator
+    compose = row->compose;
+
+  const MagickRealType
     canvas_dissolve = row->canvas_dissolve,
     midpoint = row->midpoint,
     percent_luma = row->percent_luma,
     percent_chroma = row->percent_chroma,
-    source_dissolve = row->source_dissolve,
-    threshold = row->threshold;
+    source_dissolve = row->source_dissolve;
 
   const MagickBooleanType
     compose_sync = row->compose_sync;
@@ -4691,27 +4750,9 @@ static void CompositeChannelColor(const CompositeRowInputs *row,
       (*pixel)=(double) QuantumRange*RoundToUnity(Sca+Dca-1.0);
       break;
     }
-    case StereoCompositeOp:
-    {
-      if (channel == RedPixelChannel)
-        (*pixel)=(MagickRealType) GetPixelRed(source_image,p);
-      break;
-    }
-    case ThresholdCompositeOp:
-    {
-      S=(Sa > 0.0) ? (Sca/Sa) : 0.0;
-      D=(Da > 0.0) ? (Dca/Da) : 0.0;
-      if (fabs(2.0*(S-D)) < threshold)
-        blend=D;
-      else
-        blend=D+(S-D)*amount;
-      (*pixel)=(double) QuantumRange*(Sa*Da*RoundToUnity(blend)+Sca*
-        (1.0-Da)+Dca*(1.0-Sa));
-      break;
-    }
     default:
     {
-      CompositeChannelColorVividLightToXor(row,authentic,tile,pixel);
+      CompositeChannelColorStereoToThreshold(row,authentic,tile,pixel);
       break;
     }
   }
