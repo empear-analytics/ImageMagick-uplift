@@ -175,7 +175,12 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/effect-blur.c \
   MagickCore/effect-blur-adaptive.c \
   MagickCore/effect-blur-adaptive-filters.c \
+  MagickCore/effect-emboss.c \
+  MagickCore/effect-blur-bilateral.c \
+  MagickCore/effect-blur-selective.c \
+  MagickCore/effect-adaptive.c \
   MagickCore/effect.h \
+  MagickCore/effect-blur-adaptive-filters-private.h \
   MagickCore/effect-private.h \
   MagickCore/enhance.c \
   MagickCore/enhance-color.c \
@@ -407,10 +412,18 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/visual-effects.c \
   MagickCore/visual-effects-pixel.c \
   MagickCore/visual-effects-pixel-methods.c \
+  MagickCore/visual-effects-polaroid.c \
+  MagickCore/visual-effects-color-matrix.c \
+  MagickCore/visual-effects-morph.c \
+  MagickCore/visual-effects-sepia.c \
+  MagickCore/visual-effects-colorize.c \
+  MagickCore/visual-effects-blueshift.c \
+  MagickCore/visual-effects-noise.c \
   MagickCore/visual-effects-wavelet.c \
   MagickCore/visual-effects-plasma.c \
   MagickCore/visual-effects-stegano.c \
   MagickCore/visual-effects.h \
+  MagickCore/visual-effects-pixel-methods-private.h \
   MagickCore/vision.c \
   MagickCore/vision-components.c \
   MagickCore/vision.h \
@@ -564,6 +577,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/display-private.h \
   MagickCore/distribute-cache-private.h \
   MagickCore/draw-private.h \
+  MagickCore/effect-blur-adaptive-filters-private.h \
   MagickCore/effect-private.h \
   MagickCore/enhance-private.h \
   MagickCore/enhance-color-private.h \
@@ -615,6 +629,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/type-private.h \
   MagickCore/utility-private.h \
   MagickCore/version-private.h \
+  MagickCore/visual-effects-pixel-methods-private.h \
   MagickCore/widget-private.h \
   MagickCore/xml-tree-private.h \
   MagickCore/xwindow-private.h
