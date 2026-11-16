@@ -206,9 +206,22 @@ static void EqualizeColormap(Image *image,const double *black,
   }
 }
 
-static void EqualizeImageRow(const Image *image,const double *black,
-  const double *white,const double *equalize_map,Quantum *q)
+typedef struct _EqualizeRowMaps
 {
+  const double
+    *black,
+    *white,
+    *equalize_map;
+} EqualizeRowMaps;
+
+static void EqualizeImageRow(const Image *image,const EqualizeRowMaps *maps,
+  Quantum *q)
+{
+  const double
+    *black = maps->black,
+    *white = maps->white,
+    *equalize_map = maps->equalize_map;
+
   ssize_t
     x;
 
@@ -516,9 +529,12 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
     const ToneLine
       line = { image,image_view,exception };
 
+    const EqualizeRowMaps
+      maps = { black, white, equalize_map };
+
     if (GetToneRow(&line,y,&q,&status) == MagickFalse)
       continue;
-    EqualizeImageRow(image,black,white,equalize_map,q);
+    EqualizeImageRow(image,&maps,q);
     SyncToneRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
