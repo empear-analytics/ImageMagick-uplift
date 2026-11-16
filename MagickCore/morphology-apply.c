@@ -6284,6 +6284,13 @@ static void EndKernelReportLine(const MorphologyMethodLoop *loop)
     (void) FormatLocaleFile(stderr, "\n");
 }
 
+static KernelInfo *NextReflectedKernel(KernelInfo *rflt_kernel)
+{
+  if ( rflt_kernel != (KernelInfo *) NULL )
+    rflt_kernel = rflt_kernel->next;
+  return(rflt_kernel);
+}
+
 static MagickBooleanType ApplyMorphologyMethodLoop(
   const MorphologyMethodLoop *loop,const MorphologyApplyTargets *targets)
 {
@@ -6358,8 +6365,7 @@ static MagickBooleanType ApplyMorphologyMethodLoop(
 
       /* loop to the next kernel in a multi-kernel list */
       norm_kernel = norm_kernel->next;
-      if ( rflt_kernel != (KernelInfo *) NULL )
-        rflt_kernel = rflt_kernel->next;
+      rflt_kernel=NextReflectedKernel(rflt_kernel);
       kernel_number++;
     } /* End Loop 2: Loop over each kernel */
 
