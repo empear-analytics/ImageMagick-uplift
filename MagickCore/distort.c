@@ -1044,6 +1044,20 @@ static void AddPerspectiveTerms(double **matrix,double *vectors[1],
   }
 }
 
+static void SetPerspectiveGroundSign(double *coeff,const double *arguments,
+  const size_t cp_x,const size_t cp_y)
+{
+  /*
+    Calculate 9'th coefficient! The ground-sky determination.
+    What is sign of the 'ground' in r() denominator affine function?
+    Just use any valid image coordinate (first control point) in
+    destination for determination of what part of view is 'ground'.
+  */
+  coeff[8] = coeff[6]*arguments[cp_x]
+                  + coeff[7]*arguments[cp_y] + 1.0;
+  coeff[8] = (coeff[8] < 0.0) ? -1.0 : +1.0;
+}
+
 static double *PerspectiveCoefficients(double *coeff,
   const DistortMethod *method,const CoefficientContext *context)
 {
@@ -1126,15 +1140,7 @@ static double *PerspectiveCoefficients(double *coeff,
         CommandOptionToMnemonic(MagickDistortOptions, *method) );
     return((double *) NULL);
   }
-  /*
-    Calculate 9'th coefficient! The ground-sky determination.
-    What is sign of the 'ground' in r() denominator affine function?
-    Just use any valid image coordinate (first control point) in
-    destination for determination of what part of view is 'ground'.
-  */
-  coeff[8] = coeff[6]*arguments[cp_x]
-                  + coeff[7]*arguments[cp_y] + 1.0;
-  coeff[8] = (coeff[8] < 0.0) ? -1.0 : +1.0;
+  SetPerspectiveGroundSign(coeff,arguments,cp_x,cp_y);
 
   return(coeff);
 }
