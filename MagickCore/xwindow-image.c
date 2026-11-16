@@ -92,6 +92,7 @@
 #include "MagickCore/xwindow.h"
 #include "MagickCore/xwindow-private.h"
 #include "MagickCore/version.h"
+#include "MagickCore/xwindow-image-private.h"
 #if defined(__BEOS__)
 #include <OS.h>
 #endif
@@ -145,16 +146,6 @@ typedef struct _MakeImageContext
 /*
   Define declarations.
 */
-#define XBlueGamma(color) ClampToQuantum(blue_gamma == 1.0 ? (double) \
-  (color) : ((pow((QuantumScale*(double) (color)),1.0* \
-  MagickSafeReciprocal((double) blue_gamma))*(double) QuantumRange)))
-#define XGammaPacket(map,color)  (size_t) (map->base_pixel+ \
-  ((ScaleQuantumToShort(XRedGamma((color)->red))*map->red_max/65535L)* \
-    map->red_mult)+ \
-  ((ScaleQuantumToShort(XGreenGamma((color)->green))*map->green_max/65535L)* \
-    map->green_mult)+ \
-  ((ScaleQuantumToShort(XBlueGamma((color)->blue))*map->blue_max/65535L)* \
-    map->blue_mult))
 #define XGammaPixel(image,map,color)  (size_t) (map->base_pixel+ \
   ((ScaleQuantumToShort(XRedGamma(GetPixelRed(image,color)))*map->red_max/65535L)* \
     map->red_mult)+ \
@@ -162,20 +153,6 @@ typedef struct _MakeImageContext
     map->green_mult)+ \
   ((ScaleQuantumToShort(XBlueGamma(GetPixelBlue(image,color)))*map->blue_max/65535L)* \
     map->blue_mult))
-#define XGreenGamma(color) ClampToQuantum(green_gamma == 1.0 ? (double) \
-  (color) : ((pow((QuantumScale*(double) (color)),1.0* \
-  MagickSafeReciprocal((double) green_gamma))*(double) QuantumRange)))
-#define XRedGamma(color) ClampToQuantum(red_gamma == 1.0 ? (double) \
-  (color) : ((pow((QuantumScale*(double) (color)),1.0* \
-  MagickSafeReciprocal((double) red_gamma))*(double) QuantumRange)))
-#define XStandardPixel(map,color)  (size_t) (map->base_pixel+ \
-  (((color)->red*map->red_max/65535L)*map->red_mult)+ \
-  (((color)->green*map->green_max/65535L)*map->green_mult)+ \
-  (((color)->blue*map->blue_max/65535L)*map->blue_mult))
-#define HighlightModulate  ScaleCharToQuantum(125)
-#define ShadowModulate  ScaleCharToQuantum(135)
-#define DepthModulate  ScaleCharToQuantum(185)
-#define TroughModulate  ScaleCharToQuantum(110)
 
 /*
   Constant declarations.
@@ -187,6 +164,21 @@ static double
   blue_gamma = 1.0,
   green_gamma = 1.0,
   red_gamma = 1.0;
+
+MagickPrivate double *XBlueGammaReference(void)
+{
+  return(&blue_gamma);
+}
+
+MagickPrivate double *XGreenGammaReference(void)
+{
+  return(&green_gamma);
+}
+
+MagickPrivate double *XRedGammaReference(void)
+{
+  return(&red_gamma);
+}
 
 /*
   Forward declarations.
@@ -2164,349 +2156,6 @@ MagickPrivate void XGetMapInfo(const XVisualInfo *visual_info,
   map_info->base_pixel=0;
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   X G e t P i x e l I n f o                                                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  XGetPixelInfo() initializes the PixelInfo structure.
-%
-%  The format of the XGetPixelInfo method is:
-%
-%      void XGetPixelInfo(Display *display,const XVisualInfo *visual_info,
-%        const XStandardColormap *map_info,const XResourceInfo *resource_info,
-%        Image *image,XPixelInfo *pixel)
-%        pixel)
-%
-%  A description of each parameter follows:
-%
-%    o display: Specifies a connection to an X server; returned from
-%      XOpenDisplay.
-%
-%    o visual_info: Specifies a pointer to a X11 XVisualInfo structure;
-%      returned from XGetVisualInfo.
-%
-%    o map_info: If map_type is specified, this structure is initialized
-%      with info from the Standard Colormap.
-%
-%    o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
-%
-%    o image: the image.
-%
-%    o pixel: Specifies a pointer to a XPixelInfo structure.
-%
-*/
-static void XSetDisplayGamma(const XResourceInfo *resource_info,
-  const Image *image)
-{
-  if ((resource_info->gamma_correct != MagickFalse) &&
-      (image->gamma != 0.0))
-    {
-      GeometryInfo
-        geometry_info;
-
-      MagickStatusType
-        flags;
-
-      /*
-        Initialize map relative to display and image gamma.
-      */
-      flags=ParseGeometry(resource_info->display_gamma,&geometry_info);
-      if ((flags & RhoValue) != 0)
-        red_gamma=geometry_info.rho;
-      green_gamma=red_gamma;
-      if ((flags & SigmaValue) != 0)
-        green_gamma=geometry_info.sigma;
-      blue_gamma=red_gamma;
-      if ((flags & XiValue) != 0)
-        blue_gamma=geometry_info.xi;
-      red_gamma*=image->gamma;
-      green_gamma*=image->gamma;
-      blue_gamma*=image->gamma;
-    }
-}
-
-static void XInitializePseudoPixels(const XStandardColormap *map_info,
-  const Image *image,XPixelInfo *pixel)
-{
-  ssize_t
-    i;
-
-  if (image->storage_class == PseudoClass)
-    {
-      /*
-        Initialize pixel array for images of type PseudoClass.
-      */
-      for (i=0; i < (ssize_t) image->colors; i++)
-        pixel->pixels[i]=XGammaPacket(map_info,image->colormap+i);
-      for (i=0; i < MaxNumberPens; i++)
-        pixel->pixels[image->colors+(size_t) i]=pixel->pen_colors[i].pixel;
-      pixel->colors+=MaxNumberPens;
-    }
-}
-
-static void XGetModulatedColors(const XStandardColormap *map_info,
-  XPixelInfo *pixel)
-{
-  /*
-    Set highlight color.
-  */
-  pixel->highlight_color.red=(unsigned short) (((double)
-    pixel->matte_color.red*ScaleQuantumToShort(HighlightModulate))/65535L+
-    (ScaleQuantumToShort((Quantum) (QuantumRange-HighlightModulate))));
-  pixel->highlight_color.green=(unsigned short) (((double)
-    pixel->matte_color.green*ScaleQuantumToShort(HighlightModulate))/65535L+
-    (ScaleQuantumToShort((Quantum) (QuantumRange-HighlightModulate))));
-  pixel->highlight_color.blue=(unsigned short) (((double)
-    pixel->matte_color.blue*ScaleQuantumToShort(HighlightModulate))/65535L+
-    (ScaleQuantumToShort((Quantum) (QuantumRange-HighlightModulate))));
-  pixel->highlight_color.pixel=XStandardPixel(map_info,&pixel->highlight_color);
-  pixel->highlight_color.flags=(char) (DoRed | DoGreen | DoBlue);
-  /*
-    Set shadow color.
-  */
-  pixel->shadow_color.red=(unsigned short) (((double)
-    pixel->matte_color.red*ScaleQuantumToShort(ShadowModulate))/65535L);
-  pixel->shadow_color.green=(unsigned short) (((double)
-    pixel->matte_color.green*ScaleQuantumToShort(ShadowModulate))/65535L);
-  pixel->shadow_color.blue=(unsigned short) (((double)
-    pixel->matte_color.blue*ScaleQuantumToShort(ShadowModulate))/65535L);
-  pixel->shadow_color.pixel=XStandardPixel(map_info,&pixel->shadow_color);
-  pixel->shadow_color.flags=(char) (DoRed | DoGreen | DoBlue);
-  /*
-    Set depth color.
-  */
-  pixel->depth_color.red=(unsigned short) (((double)
-    pixel->matte_color.red*ScaleQuantumToShort(DepthModulate))/65535L);
-  pixel->depth_color.green=(unsigned short) (((double)
-    pixel->matte_color.green*ScaleQuantumToShort(DepthModulate))/65535L);
-  pixel->depth_color.blue=(unsigned short) (((double)
-    pixel->matte_color.blue*ScaleQuantumToShort(DepthModulate))/65535L);
-  pixel->depth_color.pixel=XStandardPixel(map_info,&pixel->depth_color);
-  pixel->depth_color.flags=(char) (DoRed | DoGreen | DoBlue);
-  /*
-    Set trough color.
-  */
-  pixel->trough_color.red=(unsigned short) (((double)
-    pixel->matte_color.red*ScaleQuantumToShort(TroughModulate))/65535L);
-  pixel->trough_color.green=(unsigned short) (((double)
-    pixel->matte_color.green*ScaleQuantumToShort(TroughModulate))/65535L);
-  pixel->trough_color.blue=(unsigned short) (((double)
-    pixel->matte_color.blue*ScaleQuantumToShort(TroughModulate))/65535L);
-  pixel->trough_color.pixel=XStandardPixel(map_info,&pixel->trough_color);
-  pixel->trough_color.flags=(char) (DoRed | DoGreen | DoBlue);
-}
-
-typedef struct _XPixelColorContext
-{
-  Display
-    *display;
-
-  Colormap
-    colormap;
-
-  const XStandardColormap
-    *map_info;
-
-  const XResourceInfo
-    *resource_info;
-
-  const char
-    **PenColors;
-} XPixelColorContext;
-
-static void XGetInterfaceColors(const XPixelColorContext *context,
-  XPixelInfo *pixel)
-{
-  Display
-    *const display = context->display;
-
-  const Colormap
-    colormap = context->colormap;
-
-  const XStandardColormap
-    *const map_info = context->map_info;
-
-  const XResourceInfo
-    *const resource_info = context->resource_info;
-
-  Status
-    status;
-
-  (void) XParseColor(display,colormap,(char *) ForegroundColor,
-    &pixel->foreground_color);
-  status=XParseColor(display,colormap,resource_info->foreground_color,
-    &pixel->foreground_color);
-  if (status == False)
-    ThrowXWindowException(XServerError,"ColorIsNotKnownToServer",
-      resource_info->foreground_color);
-  pixel->foreground_color.pixel=
-    XStandardPixel(map_info,&pixel->foreground_color);
-  pixel->foreground_color.flags=(char) (DoRed | DoGreen | DoBlue);
-  /*
-    Set background color.
-  */
-  (void) XParseColor(display,colormap,"#d6d6d6d6d6d6",&pixel->background_color);
-  status=XParseColor(display,colormap,resource_info->background_color,
-    &pixel->background_color);
-  if (status == False)
-    ThrowXWindowException(XServerError,"ColorIsNotKnownToServer",
-      resource_info->background_color);
-  pixel->background_color.pixel=
-    XStandardPixel(map_info,&pixel->background_color);
-  pixel->background_color.flags=(char) (DoRed | DoGreen | DoBlue);
-  /*
-    Set border color.
-  */
-  (void) XParseColor(display,colormap,(char *) BorderColor,
-    &pixel->border_color);
-  status=XParseColor(display,colormap,resource_info->border_color,
-    &pixel->border_color);
-  if (status == False)
-    ThrowXWindowException(XServerError,"ColorIsNotKnownToServer",
-      resource_info->border_color);
-  pixel->border_color.pixel=XStandardPixel(map_info,&pixel->border_color);
-  pixel->border_color.flags=(char) (DoRed | DoGreen | DoBlue);
-  /*
-    Set matte color.
-  */
-  pixel->matte_color=pixel->background_color;
-  if (resource_info->matte_color != (char *) NULL)
-    {
-      /*
-        Matte color is specified as a X resource or command line argument.
-      */
-      status=XParseColor(display,colormap,resource_info->matte_color,
-        &pixel->matte_color);
-      if (status == False)
-        ThrowXWindowException(XServerError,"ColorIsNotKnownToServer",
-          resource_info->matte_color);
-      pixel->matte_color.pixel=XStandardPixel(map_info,&pixel->matte_color);
-      pixel->matte_color.flags=(char) (DoRed | DoGreen | DoBlue);
-    }
-}
-
-static void XGetPenColors(const XPixelColorContext *context,
-  XPixelInfo *pixel)
-{
-  Display
-    *const display = context->display;
-
-  const Colormap
-    colormap = context->colormap;
-
-  const XStandardColormap
-    *const map_info = context->map_info;
-
-  const XResourceInfo
-    *const resource_info = context->resource_info;
-
-  const char
-    **const PenColors = context->PenColors;
-
-  ssize_t
-    i;
-
-  Status
-    status;
-
-  /*
-    Set pen color.
-  */
-  for (i=0; i < MaxNumberPens; i++)
-  {
-    (void) XParseColor(display,colormap,(char *) PenColors[i],
-      &pixel->pen_colors[i]);
-    status=XParseColor(display,colormap,resource_info->pen_colors[i],
-      &pixel->pen_colors[i]);
-    if (status == False)
-      ThrowXWindowException(XServerError,"ColorIsNotKnownToServer",
-        resource_info->pen_colors[i]);
-    pixel->pen_colors[i].pixel=XStandardPixel(map_info,&pixel->pen_colors[i]);
-    pixel->pen_colors[i].flags=(char) (DoRed | DoGreen | DoBlue);
-  }
-}
-
-MagickPrivate void XGetPixelInfo(Display *display,
-  const XVisualInfo *visual_info,const XStandardColormap *map_info,
-  const XResourceInfo *resource_info,Image *image,XPixelInfo *pixel)
-{
-  static const char
-    *PenColors[MaxNumberPens]=
-    {
-      "#000000000000",  /* black */
-      "#00000000ffff",  /* blue */
-      "#0000ffffffff",  /* cyan */
-      "#0000ffff0000",  /* green */
-      "#bdbdbdbdbdbd",  /* gray */
-      "#ffff00000000",  /* red */
-      "#ffff0000ffff",  /* magenta */
-      "#ffffffff0000",  /* yellow */
-      "#ffffffffffff",  /* white */
-      "#bdbdbdbdbdbd",  /* gray */
-      "#bdbdbdbdbdbd"   /* gray */
-    };
-
-  Colormap
-    colormap;
-
-  unsigned int
-    packets;
-
-  XPixelColorContext
-    context;
-
-  /*
-    Initialize pixel info.
-  */
-  assert(display != (Display *) NULL);
-  assert(visual_info != (XVisualInfo *) NULL);
-  assert(map_info != (XStandardColormap *) NULL);
-  assert(resource_info != (XResourceInfo *) NULL);
-  assert(pixel != (XPixelInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  pixel->colors=0;
-  if (image != (Image *) NULL)
-    if (image->storage_class == PseudoClass)
-      pixel->colors=(ssize_t) image->colors;
-  packets=(unsigned int)
-    MagickMax((int) pixel->colors,visual_info->colormap_size)+MaxNumberPens;
-  if (pixel->pixels != (unsigned long *) NULL)
-    pixel->pixels=(unsigned long *) RelinquishMagickMemory(pixel->pixels);
-  pixel->pixels=(unsigned long *) AcquireQuantumMemory(packets,
-    sizeof(*pixel->pixels));
-  if (pixel->pixels == (unsigned long *) NULL)
-    ThrowXWindowFatalException(ResourceLimitFatalError,"UnableToGetPixelInfo",
-      image->filename);
-  /*
-    Set foreground color.
-  */
-  colormap=map_info->colormap;
-  context.display=display;
-  context.colormap=colormap;
-  context.map_info=map_info;
-  context.resource_info=resource_info;
-  context.PenColors=PenColors;
-  XGetInterfaceColors(&context,pixel);
-  XGetModulatedColors(map_info,pixel);
-  XGetPenColors(&context,pixel);
-  pixel->box_color=pixel->background_color;
-  pixel->pen_color=pixel->foreground_color;
-  pixel->box_index=0;
-  pixel->pen_index=1;
-  if (image != (Image *) NULL)
-    {
-      XSetDisplayGamma(resource_info,image);
-      XInitializePseudoPixels(map_info,image,pixel);
-    }
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
