@@ -164,6 +164,14 @@ static ssize_t FillFloodplaneSpan(const FloodfillScan *scan,
   return(x);
 }
 
+static void SetFloodfillOpaqueAlpha(Image *image,const DrawInfo *draw_info,
+  ExceptionInfo *exception)
+{
+  if (((image->alpha_trait & BlendPixelTrait) == 0) &&
+      (draw_info->fill.alpha_trait != UndefinedPixelTrait))
+    (void) SetImageAlpha(image,OpaqueAlpha,exception);
+}
+
 static MagickBooleanType PrepareFloodfillImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -171,9 +179,7 @@ static MagickBooleanType PrepareFloodfillImage(Image *image,
     return(MagickFalse);
   if (IsGrayColorspace(image->colorspace) != MagickFalse)
     (void) SetImageColorspace(image,sRGBColorspace,exception);
-  if (((image->alpha_trait & BlendPixelTrait) == 0) &&
-      (draw_info->fill.alpha_trait != UndefinedPixelTrait))
-    (void) SetImageAlpha(image,OpaqueAlpha,exception);
+  SetFloodfillOpaqueAlpha(image,draw_info,exception);
   return(MagickTrue);
 }
 
