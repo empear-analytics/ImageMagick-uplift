@@ -6969,6 +6969,13 @@ static double NormalizeKernelAngle(double angle)
   return(angle);
 }
 
+static double TurnBlurKernelAngle(double angle)
+{
+  if (IsNearThreeQuarterTurnAngle(angle) != MagickFalse)
+    angle -= 180;
+  return(angle);
+}
+
 static void RotateKernelInfo(KernelInfo *kernel, double angle)
 {
   /* angle the lower kernels first */
@@ -6995,8 +7002,7 @@ static void RotateKernelInfo(KernelInfo *kernel, double angle)
     case BlurKernel:
       if (IsNearHalfTurnAngle(angle) != MagickFalse)
         return;
-      if (IsNearThreeQuarterTurnAngle(angle) != MagickFalse)
-        angle -= 180;
+      angle=TurnBlurKernelAngle(angle);
       break;
 
     default:
