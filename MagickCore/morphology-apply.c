@@ -659,6 +659,14 @@ static const char *SkipKernelNameSeparators(const char *p)
   return(p);
 }
 
+static void ExpandSingleKernelByFlags(KernelInfo *kernel,
+  const MagickStatusType flags)
+{
+  if ( kernel->next == (KernelInfo *) NULL ) {
+    ExpandKernelByFlags(kernel,flags);
+  }
+}
+
 static KernelInfo *ParseKernelName(const char *kernel_string,
   ExceptionInfo *exception)
 {
@@ -715,9 +723,7 @@ static KernelInfo *ParseKernelName(const char *kernel_string,
     return(kernel);
 
   /* global expand to rotated kernel list - only for single kernels */
-  if ( kernel->next == (KernelInfo *) NULL ) {
-    ExpandKernelByFlags(kernel,flags);
-  }
+  ExpandSingleKernelByFlags(kernel,flags);
 
   return(kernel);
 }
