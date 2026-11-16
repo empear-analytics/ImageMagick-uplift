@@ -250,6 +250,13 @@ static ssize_t CountKernelArrayValues(const char *p,const char *end)
   return(i);
 }
 
+static const char *SkipKernelArrayQuotes(const char *p)
+{
+  while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == '\''))
+    p++;
+  return(p);
+}
+
 /* This was separated so that it could be used as a separate
 ** array input handling function, such as for -color-matrix
 */
@@ -265,8 +272,7 @@ static const char *SetOddSquareKernelSize(KernelInfo *kernel,
   /* ELSE - Old old specification, forming odd-square kernel */
   /* count up number of values given */
   p=(const char *) kernel_string;
-  while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == '\''))
-    p++;  /* ignore "'" chars for convolve filter usage - Cristy */
+  p=SkipKernelArrayQuotes(p);  /* ignore "'" chars for convolve filter usage - Cristy */
   i=CountKernelArrayValues(p,end);
   /* set the size of the kernel - old sized square */
   kernel->width = kernel->height=CastDoubleToSizeT(sqrt((double) i+1.0));
