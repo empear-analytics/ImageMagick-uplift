@@ -67,6 +67,7 @@ if ( ! GetOptions(
 	 'effect-blur.c',
 	 'effect-blur-adaptive.c',
 	 'effect-blur-adaptive-filters.c',
+	 'effect-blur-bilateral.c',
 	 'effect-blur-selective.c',
 	 'effect-adaptive.c',
 	 'enhance.c',

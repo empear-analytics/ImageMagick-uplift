@@ -175,6 +175,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/effect-blur.c \
   MagickCore/effect-blur-adaptive.c \
   MagickCore/effect-blur-adaptive-filters.c \
+  MagickCore/effect-blur-bilateral.c \
   MagickCore/effect-blur-selective.c \
   MagickCore/effect-adaptive.c \
   MagickCore/effect.h \
