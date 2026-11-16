@@ -382,9 +382,11 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/transform.h \
   MagickCore/threshold.c \
   MagickCore/threshold-image.c \
+  MagickCore/threshold-level.c \
   MagickCore/threshold-adaptive.c \
   MagickCore/threshold-auto.c \
   MagickCore/threshold.h \
+  MagickCore/threshold-private.h \
   MagickCore/type.c \
   MagickCore/type-list.c \
   MagickCore/type.h \
@@ -596,6 +598,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/string-private.h \
   MagickCore/thread_.h \
   MagickCore/thread-private.h \
+  MagickCore/threshold-private.h \
   MagickCore/timer-private.h \
   MagickCore/token-private.h \
   MagickCore/transform-private.h \

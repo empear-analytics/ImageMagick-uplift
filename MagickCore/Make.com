@@ -199,6 +199,7 @@ $call Make transform-region.c
 $call Make transform-tiles.c
 $call Make threshold.c
 $call Make threshold-image.c
+$call Make threshold-level.c
 $call Make threshold-adaptive.c
 $call Make threshold-auto.c
 $call Make type.c
