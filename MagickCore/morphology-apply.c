@@ -728,6 +728,20 @@ static KernelInfo *ParseKernelName(const char *kernel_string,
   return(kernel);
 }
 
+static KernelInfo *ParseKernelToken(const char *p,const char *token,
+  ExceptionInfo *exception)
+{
+  KernelInfo
+    *new_kernel;
+
+  /* tokens starting with alpha is a Named kernel */
+  if (isalpha((int) ((unsigned char) *token)) != 0)
+    new_kernel=ParseKernelName(p,exception);
+  else /* otherwise a user defined kernel array */
+    new_kernel=ParseKernelArray(p);
+  return(new_kernel);
+}
+
 static MagickBooleanType AppendKernelToken(const char *p,const char *token,
   KernelInfo **kernel,ExceptionInfo *exception)
 {
@@ -737,11 +751,7 @@ static MagickBooleanType AppendKernelToken(const char *p,const char *token,
   /* ignore extra or multiple ';' kernel separators */
   if (*token != ';')
     {
-      /* tokens starting with alpha is a Named kernel */
-      if (isalpha((int) ((unsigned char) *token)) != 0)
-        new_kernel=ParseKernelName(p,exception);
-      else /* otherwise a user defined kernel array */
-        new_kernel=ParseKernelArray(p);
+      new_kernel=ParseKernelToken(p,token,exception);
 
       /* Error handling -- this is not proper error handling! */
       if (new_kernel == (KernelInfo *) NULL)
