@@ -6352,6 +6352,15 @@ typedef struct _MorphologyApplyRelease
     *reflected_kernel;
 } MorphologyApplyRelease;
 
+static void ReleaseCurrentImage(const Image *image,Image *curr_image,
+  const Image *rslt_image)
+{
+  if ( curr_image == rslt_image || curr_image == image )
+    curr_image = (Image *) NULL;
+  if ( curr_image != (Image *) NULL )
+    curr_image = DestroyImage(curr_image);
+}
+
 static void ReleaseMorphologyApply(const MorphologyApplyRelease *release)
 {
   const Image
@@ -6366,10 +6375,7 @@ static void ReleaseMorphologyApply(const MorphologyApplyRelease *release)
   KernelInfo
     *reflected_kernel = release->reflected_kernel;
 
-  if ( curr_image == rslt_image || curr_image == image )
-    curr_image = (Image *) NULL;
-  if ( curr_image != (Image *) NULL )
-    curr_image = DestroyImage(curr_image);
+  ReleaseCurrentImage(image,curr_image,rslt_image);
   if ( work_image != (Image *) NULL )
     work_image = DestroyImage(work_image);
   if ( save_image != (Image *) NULL )
