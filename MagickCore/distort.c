@@ -1569,6 +1569,20 @@ static void SetPolarCenter(double *coeff,const Image *image,
   }
 }
 
+static void SetPolarAngles(double *coeff,const double *arguments,
+  const size_t number_arguments)
+{
+  /* Angle from,to - about polar center 0 is downward */
+  coeff[4] = -MagickPI;
+  if ( number_arguments >= 5 )
+    coeff[4] = DegreesToRadians(arguments[4]);
+  coeff[5] = coeff[4];
+  if ( number_arguments >= 6 )
+    coeff[5] = DegreesToRadians(arguments[5]);
+  if ( fabs(coeff[4]-coeff[5]) < MagickEpsilon )
+    coeff[5] += Magick2PI; /* same angle is a full circle */
+}
+
 static void SetPolarCoefficients(double *coeff,const Image *image,
   const double *arguments,const size_t number_arguments)
 {
@@ -1580,15 +1594,7 @@ static void SetPolarCoefficients(double *coeff,const Image *image,
   /* Rmin  - usually 0 */
   coeff[1] = number_arguments >= 2 ? arguments[1] : 0.0;
   SetPolarCenter(coeff,image,arguments,number_arguments);
-  /* Angle from,to - about polar center 0 is downward */
-  coeff[4] = -MagickPI;
-  if ( number_arguments >= 5 )
-    coeff[4] = DegreesToRadians(arguments[4]);
-  coeff[5] = coeff[4];
-  if ( number_arguments >= 6 )
-    coeff[5] = DegreesToRadians(arguments[5]);
-  if ( fabs(coeff[4]-coeff[5]) < MagickEpsilon )
-    coeff[5] += Magick2PI; /* same angle is a full circle */
+  SetPolarAngles(coeff,arguments,number_arguments);
 }
 
 static void SetPolarRatios(double *coeff,const Image *image,
