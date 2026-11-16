@@ -4437,20 +4437,25 @@ static void SetMorphologyKernelOffset(const MorphologyMethod method,
   }
 }
 
+static void ResetMorphologyChanges(size_t *changes)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) GetOpenMPMaximumThreads(); j++)
+    changes[j]=0;
+}
+
 static size_t *AcquireMorphologyChanges(void)
 {
   size_t
     *changes;
 
-  ssize_t
-    j;
-
   changes=(size_t *) AcquireQuantumMemory(GetOpenMPMaximumThreads(),
     sizeof(*changes));
   if (changes == (size_t *) NULL)
     ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
-  for (j=0; j < (ssize_t) GetOpenMPMaximumThreads(); j++)
-    changes[j]=0;
+  ResetMorphologyChanges(changes);
   return(changes);
 }
 
