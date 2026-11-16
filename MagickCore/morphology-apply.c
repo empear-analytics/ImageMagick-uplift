@@ -5998,6 +5998,20 @@ static void ReportDirectMorphology(const MagickBooleanType verbose,
       1.0,0.0,1.0, (double) changed);
 }
 
+static void PreserveVoronoiAlpha(const MorphologyMethod method,
+  const Image *image,Image **rslt_image,ExceptionInfo *exception)
+{
+  if ( method == VoronoiMorphology ) {
+    /* Preserve the alpha channel of input image - but turned it off */
+    (void) SetImageAlphaChannel((*rslt_image), DeactivateAlphaChannel,
+      exception);
+    (void) CompositeImage((*rslt_image),image,CopyAlphaCompositeOp,
+      MagickTrue,0,0,exception);
+    (void) SetImageAlphaChannel((*rslt_image), DeactivateAlphaChannel,
+      exception);
+  }
+}
+
 static MagickBooleanType ApplyDirectMorphology(
   const MorphologyDirectApply *direct,Image **rslt_image)
 {
@@ -6032,15 +6046,7 @@ static MagickBooleanType ApplyDirectMorphology(
   if ( changed < 0 )
     return(MagickFalse);
 
-  if ( method == VoronoiMorphology ) {
-    /* Preserve the alpha channel of input image - but turned it off */
-    (void) SetImageAlphaChannel((*rslt_image), DeactivateAlphaChannel,
-      exception);
-    (void) CompositeImage((*rslt_image),image,CopyAlphaCompositeOp,
-      MagickTrue,0,0,exception);
-    (void) SetImageAlphaChannel((*rslt_image), DeactivateAlphaChannel,
-      exception);
-  }
+  PreserveVoronoiAlpha(method,image,rslt_image,exception);
   return(MagickTrue);
 }
 
