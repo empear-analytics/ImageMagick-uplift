@@ -1308,6 +1308,15 @@ static KernelInfo *AcquireUnityKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static void SetCometKernelWidth(KernelInfo *kernel,const GeometryInfo *args,
+  const double sigma)
+{
+  if ( args->rho < 1.0 )
+    kernel->width = (GetOptimalKernelWidth1D(args->rho,sigma)-1)/2+1;
+  else
+    kernel->width = CastDoubleToSizeT(args->rho);
+}
+
 static KernelInfo *AcquireCometKernel(KernelInfo *kernel,
   const GeometryInfo *args)
 {
@@ -1322,10 +1331,7 @@ static KernelInfo *AcquireCometKernel(KernelInfo *kernel,
     sigma = fabs(args->sigma),
     A;
 
-  if ( args->rho < 1.0 )
-    kernel->width = (GetOptimalKernelWidth1D(args->rho,sigma)-1)/2+1;
-  else
-    kernel->width = CastDoubleToSizeT(args->rho);
+  SetCometKernelWidth(kernel,args,sigma);
   kernel->x = kernel->y = 0;
   kernel->height = 1;
   kernel->negative_range = kernel->positive_range = 0.0;
