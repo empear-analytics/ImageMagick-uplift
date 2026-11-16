@@ -3041,25 +3041,11 @@ static void MapBarrelDistortion(const DistortMapping *mapping,PointInfo *d,
   }
 }
 
-static MagickBooleanType PrintAffineFX(double *coeff,const char *image_gen,
-  const char *lookup,ExceptionInfo *exception)
+static void PrintAffineProjection(const double *inverse)
 {
-  double
-    *inverse;
-
   ssize_t
     i;
 
-  inverse=(double *) AcquireQuantumMemory(6,sizeof(*inverse));
-  if (inverse == (double *) NULL)
-    {
-      coeff=(double *) RelinquishMagickMemory(coeff);
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","%s","DistortImages");
-      return(MagickFalse);
-    }
-  InvertAffineCoefficients(coeff, inverse);
-  CoefficientsToAffineArgs(inverse);
   (void) FormatLocaleFile(stderr, "Affine projection:\n");
   (void) FormatLocaleFile(stderr,
     "  -distort AffineProjection \\\n    '");
@@ -3075,6 +3061,25 @@ static MagickBooleanType PrintAffineFX(double *coeff,const char *image_gen,
     inverse[1]*inverse[1]),GetMagickPrecision(),
     RadiansToDegrees(atan2(inverse[1],inverse[0])),
     GetMagickPrecision(),inverse[4],GetMagickPrecision(),inverse[5]);
+}
+
+static MagickBooleanType PrintAffineFX(double *coeff,const char *image_gen,
+  const char *lookup,ExceptionInfo *exception)
+{
+  double
+    *inverse;
+
+  inverse=(double *) AcquireQuantumMemory(6,sizeof(*inverse));
+  if (inverse == (double *) NULL)
+    {
+      coeff=(double *) RelinquishMagickMemory(coeff);
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","%s","DistortImages");
+      return(MagickFalse);
+    }
+  InvertAffineCoefficients(coeff, inverse);
+  CoefficientsToAffineArgs(inverse);
+  PrintAffineProjection(inverse);
   inverse=(double *) RelinquishMagickMemory(inverse);
   (void) FormatLocaleFile(stderr,"Affine distort, FX equivalent:\n");
   (void) FormatLocaleFile(stderr, "%s", image_gen);
