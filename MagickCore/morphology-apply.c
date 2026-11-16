@@ -2108,6 +2108,15 @@ static KernelInfo *AcquireCyclicSkeletonKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static void SetTypesAndMirrorKernels(KernelInfo *kernel,
+  const KernelInfoType type)
+{
+  kernel->type = type;
+  kernel->next->type = type;
+  kernel->next->next->type = type;
+  ExpandMirrorKernelInfo(kernel);
+}
+
 static KernelInfo *AcquireSkeletonKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -2128,10 +2137,7 @@ static KernelInfo *AcquireSkeletonKernel(KernelInfo *kernel,
         return(DestroyKernelInfo(kernel));
       if (kernel->next->next == (KernelInfo *) NULL)
         return(DestroyKernelInfo(kernel));
-      kernel->type = type;
-      kernel->next->type = type;
-      kernel->next->next->type = type;
-      ExpandMirrorKernelInfo(kernel); /* 12 kernels total */
+      SetTypesAndMirrorKernels(kernel,type); /* 12 kernels total */
       break;
    }
   return(kernel);
