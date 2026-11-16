@@ -4068,6 +4068,21 @@ typedef struct _DistortBestFitInput
     *coeff;
 } DistortBestFitInput;
 
+static void SetBestFitGeometry(RectangleInfo *geometry,
+  const MagickBooleanType fix_bounds,const PointInfo min,const PointInfo max)
+{
+  /* Set the output image geometry to calculated 'bestfit'.
+     Yes this tends to 'over do' the file image size, ON PURPOSE!
+     Do not do this for DePolar which needs to be exact for virtual tiling.
+  */
+  if ( fix_bounds ) {
+    (*geometry).x = CastDoubleToSsizeT(floor(min.x-0.5));
+    (*geometry).y = CastDoubleToSsizeT(floor(min.y-0.5));
+    (*geometry).width=CastDoubleToSizeT(ceil(max.x-(*geometry).x+0.5));
+    (*geometry).height=CastDoubleToSizeT(ceil(max.y-(*geometry).y+0.5));
+  }
+}
+
 static void SetDistortBestFit(const DistortBestFitInput *fit,
   RectangleInfo *geometry,MagickBooleanType *bestfit)
 {
@@ -4127,16 +4142,7 @@ static void SetDistortBestFit(const DistortBestFitInput *fit,
       }
     }
 
-    /* Set the output image geometry to calculated 'bestfit'.
-       Yes this tends to 'over do' the file image size, ON PURPOSE!
-       Do not do this for DePolar which needs to be exact for virtual tiling.
-    */
-    if ( fix_bounds ) {
-      (*geometry).x = CastDoubleToSsizeT(floor(min.x-0.5));
-      (*geometry).y = CastDoubleToSsizeT(floor(min.y-0.5));
-      (*geometry).width=CastDoubleToSizeT(ceil(max.x-(*geometry).x+0.5));
-      (*geometry).height=CastDoubleToSizeT(ceil(max.y-(*geometry).y+0.5));
-    }
+    SetBestFitGeometry(geometry,fix_bounds,min,max);
 
   }  /* end bestfit destination image calculations */
 }
