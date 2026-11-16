@@ -1293,6 +1293,35 @@ is worth it.
    macro is identical in the original and in each product under both branches. An
    exception or log call in a moved helper then names the header as its module file
    (`GetMagickModule()`'s `__FILE__`), as one moved to a new `.c` file names that file.
+   A helper that holds an OpenMP pragma, or a function-level `static` local, qualifies as
+   well (owner, 2026-11-16, AGENTS.md, answers to the round-twenty-four questions:
+   `quantize.c`'s `AssignImageColors`, whose row loop holds a `#pragma omp parallel for`),
+   when its other terms above hold and three checks pass. (a) The parallel region moves
+   whole, pragma line and `#if defined(MAGICKCORE_OPENMP_SUPPORT)` pair included, every
+   token unchanged, so every variable the region writes keeps the protection it had
+   (private, `reduction`, `atomic`, the same `critical`); the message quotes that by-hand
+   reading of the write set. (b) `tools/omp_compare.sh` at one and at four threads shows no
+   difference on cases that reach the region and really start several threads: images
+   above `GetMagickNumberThreads`' threshold (about 262144 pixels) and, for a pragma whose
+   `magick_number_threads` takes a `key == ~0UL` argument, no `-seed` (a seed fixes the
+   random key and the region runs one thread); the message shows that the wall time at four
+   threads drops, as proof that threads ran. (c) Every path that runs the helper is timed
+   against the baseline binary as Recipe TH step 8 says. A `static` local becomes one object
+   per file that includes the header: a `static const` one (a table each file holds a copy
+   of) qualifies; a writable one is refused (the two files would no longer share its state),
+   a lane restriction on top of the ruling. A block-scope `const` object without `static`
+   (`Riemersma`'s `const RiemersmaTurns turns = {...}`) is an automatic object, not a
+   `static` local, and needs none of this.
+   A later split may put the helpers it shares into a second private header instead of the
+   first (a reading of the core-header and shared-header rulings of 2026-11-16, for the
+   owner's confirmation): `MagickCore/<stem>-<family>-private.h`, which includes the first
+   header and the library headers its helpers need, and which only the files that use the
+   family include (`quantize-assign-private.h`, the assignment and dither family that
+   `quantize.c` and `quantize-remap.c` use and `quantize-kmeans.c` does not). It is written,
+   registered and scored as the first header is: every item in it on the terms above, used
+   by at least two of the files that include it (directly or through another of its
+   helpers), its score at least the original's before the split. The first header then
+   keeps its score, and a file that does not use the family does not see it.
 3. The public function keeps its declaration in the header it already has.
 4. List the new file wherever the original is listed: `tools/register_source.py` does it
    for `MagickCore/Makefile.am`, `Makefile.in` (by hand, mirroring what automake
@@ -22250,3 +22279,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | AMEND | S | Step 2: a file-scope variable that both parts name is shared through one accessor, `MagickPrivate T *NameReference(void)` returning its address, defined in the file that keeps the variable's one definition and storage and declared in the private header; the other file and the header's macros write each use `(*NameReference())`; *Careful*: why every read and write reaches the same object, and the timing of each per-pixel path whose text changes. The accessor form and the address-returning shape (needed because the moved `XSetDisplayGamma` writes the variables) are the lane's wording | `xwindow-image.c`'s `red_gamma`, `green_gamma` and `blue_gamma` (campaign A, W35 lane b): written by the `XGetPixelInfo` family, read by the kept packers per pixel and by the colormap family per colormap entry, they refused every carve of those families (round 23's question 2). The owner's ruling of 2026-11-16 allows one accessor per variable | owner |
 | 2026-11-16 | AMEND | S | Step 2: a file-scope `static const` object of arithmetic type that both parts name is shared through a read-only accessor (`MagickPrivate const T *NameReference(void)`), and a helper moving into the private header names a shared variable only through its accessor; *Careful*: a `const` read through the accessor is no longer folded to an immediate, which changes instructions, not values. The coordinator's reading of ruling 2 (the accessor stays the only new external name per variable); the wording is the lane's | `widget.c`'s `BorderOffset` and `DoubleClick` (campaign A, W35 lane b2): named by the `XDialogWidget` family (`PressDialogReply`, `RedrawDialogWidget`) and by the kept widgets, they refused the dialog carve (`split_source.py`: file-scope variable defined outside the region) | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | RL | Step 8, loop-function form: the copies may be two whole static functions, each one parallel row loop after `const` bindings of one struct pointer, with `status` and `progress` by value (one extra parameter allowed when its caller passes the same value as a struct member); the row work becomes a row function `(const Struct *,const int id,const Quantum **p,Quantum *q)`, the first copy the driver taking the row function; checked by script and by a by-hand write-set reading, the whole catalogue narrow and wide, `omp_compare.sh` at 1 and 4 threads on large cases, and timing | `statistic.c`'s `EvaluateMedianImages` and `EvaluateOtherImages`, the Code Duplication that the probed Polynomial split exposes in the kept file | mandate (2026-10-24) |
+| 2026-11-16 | AMEND | S | Step 2: a helper holding an OpenMP pragma or a function-level `static` local may move into the private header when (a) its region moves whole and the message quotes the by-hand write-set reading, (b) `omp_compare.sh` at 1 and 4 threads shows no difference on cases that start several threads (large images, no `-seed` where the pragma's key argument would stop the threads), the wall time at 4 threads shown to drop, and (c) every path is timed as Recipe TH step 8 says; a writable `static` local is refused (the lane's restriction), a `static const` one qualifies, and a block-scope `const` object without `static` is not a `static` local | `quantize.c`'s remap split (campaign A, W36 lane a): `AssignImageColors` holds the `#pragma omp parallel for` of its no-dither row loop; round twenty-four's question 1, after the revert `167d2c858`. The ruling is the owner's, the three checks and the wording the lane's | owner |
+| 2026-11-16 | AMEND | S | Step 2: a later split may put the helpers it shares into a second private header, `<stem>-<family>-private.h`, that includes the first and that only the files using the family include; it is written, registered and scored as the first header, every item used by at least two of its including files | `quantize.c`'s remap split: one header of 2,600 lines scored 9.38 (Lines of Code) and put the assign and dither family in `quantize-kmeans.c`'s view; a second header leaves `quantize-private.h` at 10.0. A reading of the core-header and shared-header rulings of 2026-11-16, for the owner's confirmation | mandate (2026-10-24) |
