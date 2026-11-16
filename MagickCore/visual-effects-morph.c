@@ -471,6 +471,17 @@ static MagickBooleanType MorphSequenceFrames(const Image *next,
   return(MagickTrue);
 }
 
+static MagickBooleanType FinishMorphImageSequence(const Image *next,
+  Image **morph_images)
+{
+  if (GetNextImageInList(next) != (Image *) NULL)
+    {
+      (*morph_images)=DestroyImageList((*morph_images));
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType MorphImageSequence(const Image *image,
   const size_t number_frames,Image **morph_images,ExceptionInfo *exception)
 {
@@ -519,12 +530,7 @@ static MagickBooleanType MorphImageSequence(const Image *image,
     status=ReportMorphProgress(image,scene,status);
     scene++;
   }
-  if (GetNextImageInList(next) != (Image *) NULL)
-    {
-      (*morph_images)=DestroyImageList((*morph_images));
-      return(MagickFalse);
-    }
-  return(MagickTrue);
+  return(FinishMorphImageSequence(next,morph_images));
 }
 
 MagickExport Image *MorphImages(const Image *image,const size_t number_frames,

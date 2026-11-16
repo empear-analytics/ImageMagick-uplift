@@ -391,6 +391,17 @@ static MagickBooleanType AcquireAdaptiveBlurKernel(double **kernel,
   return(MagickTrue);
 }
 
+static MagickBooleanType FinishAdaptiveBlurKernels(double **kernel,
+  const size_t width,const ssize_t w)
+{
+  if (w < (ssize_t) width)
+    {
+      RelinquishAdaptiveKernels(kernel,w);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType AcquireAdaptiveBlurKernels(double **kernel,
   const size_t width,const double sigma)
 {
@@ -402,9 +413,15 @@ static MagickBooleanType AcquireAdaptiveBlurKernels(double **kernel,
     if (AcquireAdaptiveBlurKernel(kernel,width,w,sigma) == MagickFalse)
       break;
   }
-  if (w < (ssize_t) width)
+  return(FinishAdaptiveBlurKernels(kernel,width,w));
+}
+
+static MagickBooleanType FillAdaptiveBlurKernelSet(double ***kernel,
+  const size_t width,const double sigma)
+{
+  if (AcquireAdaptiveBlurKernels(*kernel,width,sigma) == MagickFalse)
     {
-      RelinquishAdaptiveKernels(kernel,w);
+      *kernel=(double **) RelinquishAlignedMemory(*kernel);
       return(MagickFalse);
     }
   return(MagickTrue);
@@ -418,12 +435,7 @@ static MagickBooleanType AcquireAdaptiveBlurKernelSet(double ***kernel,
   if (*kernel == (double **) NULL)
     return(MagickFalse);
   (void) memset(*kernel,0,(size_t) width*sizeof(**kernel));
-  if (AcquireAdaptiveBlurKernels(*kernel,width,sigma) == MagickFalse)
-    {
-      *kernel=(double **) RelinquishAlignedMemory(*kernel);
-      return(MagickFalse);
-    }
-  return(MagickTrue);
+  return(FillAdaptiveBlurKernelSet(kernel,width,sigma));
 }
 
 typedef struct _AdaptiveBlurRow
@@ -509,6 +521,15 @@ typedef struct _AdaptiveEdge
     sigma;
 } AdaptiveEdge;
 
+static void ReplaceAdaptiveEdgeImage(Image **edge_image,Image *gaussian_image)
+{
+  if (gaussian_image != (Image *) NULL)
+    {
+      *edge_image=DestroyImage(*edge_image);
+      *edge_image=gaussian_image;
+    }
+}
+
 static MagickBooleanType PrepareAdaptiveEdge(const AdaptiveEdge *edge,
   Image **edge_image,ExceptionInfo *exception)
 {
@@ -520,11 +541,7 @@ static MagickBooleanType PrepareAdaptiveEdge(const AdaptiveEdge *edge,
     return(MagickFalse);
   (void) AutoLevelImage(*edge_image,exception);
   gaussian_image=BlurImage(*edge_image,edge->radius,edge->sigma,exception);
-  if (gaussian_image != (Image *) NULL)
-    {
-      *edge_image=DestroyImage(*edge_image);
-      *edge_image=gaussian_image;
-    }
+  ReplaceAdaptiveEdgeImage(edge_image,gaussian_image);
   (void) AutoLevelImage(*edge_image,exception);
   return(MagickTrue);
 }
