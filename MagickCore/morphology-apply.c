@@ -6234,6 +6234,20 @@ typedef struct _MorphologyApplyTargets
     *count;
 } MorphologyApplyTargets;
 
+static void FinishCompoundStages(const MorphologyMethodLoop *loop,
+  Image **curr_image,Image **save_image)
+{
+  MorphologyCompoundFinish
+    finish;
+
+  finish.method=loop->method;
+  finish.verbose=loop->verbose;
+  finish.curr_image=(*curr_image);
+  finish.image=loop->image;
+  finish.exception=loop->exception;
+  (*save_image)=FinishCompoundMorphology(&finish,(*save_image));
+}
+
 static MagickBooleanType ApplyMorphologyMethodLoop(
   const MorphologyMethodLoop *loop,const MorphologyApplyTargets *targets)
 {
@@ -6280,9 +6294,6 @@ static MagickBooleanType ApplyMorphologyMethodLoop(
           loop->stage_limit, loop->kernel_limit, loop->v_info,
           loop->exception };
 
-      MorphologyCompoundFinish
-        finish;
-
       MorphologyKernelResult
         kernel_result;
 
@@ -6297,12 +6308,7 @@ static MagickBooleanType ApplyMorphologyMethodLoop(
       ** purely mathematical way, and only to the selected channels.
       ** Turn off SVG composition 'alpha blending'.
       */
-      finish.method=loop->method;
-      finish.verbose=loop->verbose;
-      finish.curr_image=(*curr_image);
-      finish.image=loop->image;
-      finish.exception=loop->exception;
-      (*save_image)=FinishCompoundMorphology(&finish,(*save_image));
+      FinishCompoundStages(loop,curr_image,save_image);
 
       /* multi-kernel handling:  re-iterate, or compose results */
       kernel_result.kernel=loop->kernel;
