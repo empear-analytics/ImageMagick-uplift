@@ -788,6 +788,20 @@ typedef struct _FloodfillSegments
     y_offset;
 } FloodfillSegments;
 
+static MagickBooleanType PushFloodfillSeedBelow(
+  const FloodfillSegments *segments,const FloodfillStack *stack)
+{
+  {
+    const FloodfillSegment
+      segment = { segments->y_offset+1, segments->x_offset,
+        segments->x_offset, -1 };
+
+    if (PushFloodfillSegment(stack,&segment) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType PushFloodfillSeeds(const FloodfillSegments *segments,
   const FloodfillStack *stack)
 {
@@ -799,15 +813,7 @@ static MagickBooleanType PushFloodfillSeeds(const FloodfillSegments *segments,
     if (PushFloodfillSegment(stack,&segment) == MagickFalse)
       return(MagickFalse);
   }
-  {
-    const FloodfillSegment
-      segment = { segments->y_offset+1, segments->x_offset,
-        segments->x_offset, -1 };
-
-    if (PushFloodfillSegment(stack,&segment) == MagickFalse)
-      return(MagickFalse);
-  }
-  return(MagickTrue);
+  return(PushFloodfillSeedBelow(segments,stack));
 }
 
 static MagickBooleanType FillFloodplaneSegments(
