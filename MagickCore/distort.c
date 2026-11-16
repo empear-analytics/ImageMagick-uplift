@@ -1381,6 +1381,18 @@ static void SetPolynomialVectors(double **vectors,double *coeff,
     vectors[i] = &(coeff[2+i*nterms]);
 }
 
+static size_t SetPolynomialOrder(double *coeff,const double *arguments)
+{
+  size_t
+    nterms;
+
+  /* first two coefficients hold polynomial order information */
+  coeff[0] = arguments[0];
+  coeff[1] = (double) poly_number_terms(arguments[0]);
+  nterms = CastDoubleToSizeT(coeff[1]);
+  return(nterms);
+}
+
 static double *PolynomialCoefficients(double *coeff,
   const DistortMethod *method,const CoefficientContext *context)
 {
@@ -1436,10 +1448,7 @@ static double *PolynomialCoefficients(double *coeff,
   MagickBooleanType
     status;
 
-  /* first two coefficients hold polynomial order information */
-  coeff[0] = arguments[0];
-  coeff[1] = (double) poly_number_terms(arguments[0]);
-  nterms = CastDoubleToSizeT(coeff[1]);
+  nterms=SetPolynomialOrder(coeff,arguments);
 
   /* create matrix, a fake vectors matrix, and least sqs terms */
   matrix=AcquireMagickMatrix(nterms,nterms);
