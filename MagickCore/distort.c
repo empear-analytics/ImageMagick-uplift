@@ -143,6 +143,17 @@ static double PolyBasisDxQuartic(ssize_t n, double x, double y)
   }
   return( 0.0 ); /* should never happen */
 }
+static double PolyBasisDxCubic(ssize_t n, double x, double y)
+{
+  switch(n) {
+    case 10:  return( x*x*x );
+    case 11:  return( x*x*y );
+    case 12:  return( x*y*y );
+    case 13:  return( y*y*y );
+    default:  break;
+  }
+  return(PolyBasisDxQuartic(n,x,y));
+}
 static double poly_basis_dx(ssize_t n, double x, double y)
 {
   /* polynomial term for x derivative */
@@ -155,13 +166,9 @@ static double poly_basis_dx(ssize_t n, double x, double y)
     case  6:  return( x*x );
     case  7:  return( x*y );
     case  8:  return( y*y );
-    case 10:  return( x*x*x );
-    case 11:  return( x*x*y );
-    case 12:  return( x*y*y );
-    case 13:  return( y*y*y );
     default:  break;
   }
-  return(PolyBasisDxQuartic(n,x,y));
+  return(PolyBasisDxCubic(n,x,y));
 }
 static double poly_basis_dy(ssize_t n, double x, double y)
 {
