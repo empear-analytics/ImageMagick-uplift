@@ -4312,8 +4312,8 @@ static void XPackColormapped2BitLSB(const XImageRowSource *source,
   }
 }
 
-static void XPackColormapped4BitLSB(const XImageRowSource *source,
-  unsigned char *q)
+static inline void XPackColormapped4Bit(const XImageRowSource *source,
+  const XPackBitOrder side,unsigned char *q)
 {
   Image
     *const canvas = source->canvas;
@@ -4342,7 +4342,7 @@ static void XPackColormapped4BitLSB(const XImageRowSource *source,
   for (y=0; y < (int) canvas->rows; y++)
   {
     const XPackColormappedRow
-      row = { XPackLSBFirst, canvas, pixels };
+      row = { side, canvas, pixels };
 
     p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
       canvas->columns,1,exception);
@@ -4884,7 +4884,7 @@ static void XPackColormappedLSB(const XImage *ximage,
     }
     case 4:
     {
-      XPackColormapped4BitLSB(&row_source,q);
+      XPackColormapped4Bit(&row_source,XPackLSBFirst,q);
       break;
     }
     case 6:
@@ -5575,47 +5575,6 @@ static void XPackColormapped2BitMSB(const XImageRowSource *source,
   }
 }
 
-static void XPackColormapped4BitMSB(const XImageRowSource *source,
-  unsigned char *q)
-{
-  Image
-    *const canvas = source->canvas;
-
-  CacheView
-    *const canvas_view = source->canvas_view;
-
-  ExceptionInfo
-    *const exception = source->exception;
-
-  const unsigned int
-    scanline_pad = source->scanline_pad;
-
-  unsigned long
-    *const pixels = source->pixels;
-
-  const Quantum
-    *p;
-
-  int
-    y;
-
-  /*
-    Convert to 4 bit color-mapped X canvas.
-  */
-  for (y=0; y < (int) canvas->rows; y++)
-  {
-    const XPackColormappedRow
-      row = { XPackMSBFirst, canvas, pixels };
-
-    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-      canvas->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    q=XPackColormapped4BitRow(&row,p,q);
-    q+=(ptrdiff_t) scanline_pad;
-  }
-}
-
 static void XPackColormapped8BitMSB(const XImageRowSource *source,
   unsigned char *q)
 {
@@ -6037,7 +5996,7 @@ static void XPackColormappedMSB(const XImage *ximage,
     }
     case 4:
     {
-      XPackColormapped4BitMSB(&row_source,q);
+      XPackColormapped4Bit(&row_source,XPackMSBFirst,q);
       break;
     }
     case 6:
