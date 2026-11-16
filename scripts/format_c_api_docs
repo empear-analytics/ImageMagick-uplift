@@ -112,6 +112,7 @@ if ( ! GetOptions(
 	 'registry.c',
    'resource.c',
 	 'segment.c',
+	 'segment-threshold.c',
 	 'shear.c',
 	 'shear-rotate.c',
 	 'shear-deskew.c',

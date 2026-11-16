@@ -349,7 +349,9 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/resource_.h \
   MagickCore/resource-private.h \
   MagickCore/segment.c \
+  MagickCore/segment-threshold.c \
   MagickCore/segment.h \
+  MagickCore/segment-private.h \
   MagickCore/semaphore.c \
   MagickCore/semaphore.h \
   MagickCore/semaphore-private.h \
@@ -634,6 +636,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/resize-private.h \
   MagickCore/resource-private.h \
   MagickCore/resource-private.h \
+  MagickCore/segment-private.h \
   MagickCore/semaphore-private.h \
   MagickCore/semaphore-private.h \
   MagickCore/signature-private.h \

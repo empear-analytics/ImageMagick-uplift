@@ -181,6 +181,7 @@ $call Make resize-image.c
 $call Make magnify.c
 $call Make resource.c
 $call Make segment.c
+$call Make segment-threshold.c
 $call Make semaphore.c
 $call Make shear.c
 $call Make shear-rotate.c
