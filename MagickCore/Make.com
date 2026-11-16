@@ -84,6 +84,7 @@ $call Make effect-preview.c
 $call Make effect-blur.c
 $call Make effect-blur-adaptive.c
 $call Make effect-blur-adaptive-filters.c
+$call Make effect-emboss.c
 $call Make effect-blur-bilateral.c
 $call Make effect-blur-selective.c
 $call Make effect-adaptive.c
