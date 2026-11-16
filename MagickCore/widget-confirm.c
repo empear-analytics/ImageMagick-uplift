@@ -341,6 +341,21 @@ typedef struct _ConfirmContext
     *reason;
 } ConfirmContext;
 
+static void SetConfirmYesButton(XFontStruct *font_info,
+  const char *description,const XWidgetInfo *cancel_info,
+  XWidgetInfo *yes_info)
+{
+  (*yes_info)=(*cancel_info);
+  (*yes_info).text=(char *) YesButtonText;
+  if (LocaleCompare(description,"Do you want to save it") == 0)
+    (*yes_info).text=(char *) "Save";
+  (*yes_info).width=(unsigned int) QuantumMargin+
+    WidgetTextWidth(font_info,(*yes_info).text);
+  if ((*yes_info).width < (*cancel_info).width)
+    (*yes_info).width=(*cancel_info).width;
+  (*yes_info).x=QuantumMargin;
+}
+
 static void UpdateConfirmButtons(const ConfirmContext *context,
   const ConfirmTargets *targets)
 {
@@ -385,15 +400,7 @@ static void UpdateConfirmButtons(const ConfirmContext *context,
         WidgetTextWidth(font_info,(*dismiss_info).text);
       (*dismiss_info).x=(int)
         ((windows->widget.width >> 1)-((*dismiss_info).width >> 1));
-      (*yes_info)=(*cancel_info);
-      (*yes_info).text=(char *) YesButtonText;
-      if (LocaleCompare(description,"Do you want to save it") == 0)
-        (*yes_info).text=(char *) "Save";
-      (*yes_info).width=(unsigned int) QuantumMargin+
-        WidgetTextWidth(font_info,(*yes_info).text);
-      if ((*yes_info).width < (*cancel_info).width)
-        (*yes_info).width=(*cancel_info).width;
-      (*yes_info).x=QuantumMargin;
+      SetConfirmYesButton(font_info,description,cancel_info,yes_info);
       (*state)&=(unsigned int) (~UpdateConfigurationState);
     }
 }
@@ -539,16 +546,13 @@ static void HandleConfirmEvent(Display *display,XWindows *windows,
   }
 }
 
-static void MapConfirmWidget(Display *display,XWindows *windows)
+static void SetConfirmWidgetName(Display *display,XWindows *windows)
 {
   Status
     status;
 
   XTextProperty
     window_name;
-
-  XWindowChanges
-    window_changes;
 
   (void) CopyMagickString(windows->widget.name,"Confirm",MagickPathExtent);
   status=XStringListToTextProperty(&windows->widget.name,1,&window_name);
@@ -558,6 +562,14 @@ static void MapConfirmWidget(Display *display,XWindows *windows)
       XSetWMIconName(display,windows->widget.id,&window_name);
       (void) XFree((void *) window_name.value);
     }
+}
+
+static void MapConfirmWidget(Display *display,XWindows *windows)
+{
+  XWindowChanges
+    window_changes;
+
+  SetConfirmWidgetName(display,windows);
   window_changes.width=(int) windows->widget.width;
   window_changes.height=(int) windows->widget.height;
   window_changes.x=windows->widget.x;
@@ -611,6 +623,24 @@ static void PositionConfirmWidget(XWindows *windows,
   XConstrainWindowPosition(display,&windows->widget);
 }
 
+static unsigned int GetConfirmTextWidth(XFontStruct *font_info,
+  const char *description)
+{
+  unsigned int
+    width;
+
+  width=WidgetTextWidth(font_info,CancelButtonText);
+  if (WidgetTextWidth(font_info,DismissButtonText) > width)
+    width=WidgetTextWidth(font_info,DismissButtonText);
+  if (WidgetTextWidth(font_info,YesButtonText) > width)
+    width=WidgetTextWidth(font_info,YesButtonText);
+  width<<=1;
+  if (description != (char *) NULL)
+    if (WidgetTextWidth(font_info,(char *) description) > width)
+      width=WidgetTextWidth(font_info,(char *) description);
+  return(width);
+}
+
 MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -654,15 +684,7 @@ MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",reason);
   XCheckRefreshWindows(display,windows);
   font_info=windows->widget.font_info;
-  width=WidgetTextWidth(font_info,CancelButtonText);
-  if (WidgetTextWidth(font_info,DismissButtonText) > width)
-    width=WidgetTextWidth(font_info,DismissButtonText);
-  if (WidgetTextWidth(font_info,YesButtonText) > width)
-    width=WidgetTextWidth(font_info,YesButtonText);
-  width<<=1;
-  if (description != (char *) NULL)
-    if (WidgetTextWidth(font_info,(char *) description) > width)
-      width=WidgetTextWidth(font_info,(char *) description);
+  width=GetConfirmTextWidth(font_info,description);
   height=(unsigned int) (font_info->ascent+font_info->descent);
   layout.display=display;
   layout.font_info=font_info;

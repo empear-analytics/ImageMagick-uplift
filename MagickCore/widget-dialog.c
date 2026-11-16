@@ -163,6 +163,20 @@ typedef struct _DialogPress
     *font_info;
 } DialogPress;
 
+static void MoveDialogTextCursor(XFontStruct *font_info,
+  const XEvent event,XWidgetInfo *reply_info)
+{
+  int
+    i,
+    x;
+
+  x=event.xbutton.x-(*reply_info).x-(int) (QuantumMargin >> 2);
+  for (i=1; i <= Extent((*reply_info).marker); i++)
+    if (XTextWidth(font_info,(*reply_info).marker,i) > x)
+      break;
+  (*reply_info).cursor=(*reply_info).marker+i-1;
+}
+
 static void PressDialogReply(const DialogPress *press,char *primary_selection,
   XWidgetInfo *reply_info)
 {
@@ -178,21 +192,13 @@ static void PressDialogReply(const DialogPress *press,char *primary_selection,
   XFontStruct
     *const font_info = press->font_info;
 
-  int
-    i,
-    x;
-
   static Time
     click_time;
 
   /*
     Move text cursor to position of button press.
   */
-  x=event.xbutton.x-(*reply_info).x-(int) (QuantumMargin >> 2);
-  for (i=1; i <= Extent((*reply_info).marker); i++)
-    if (XTextWidth(font_info,(*reply_info).marker,i) > x)
-      break;
-  (*reply_info).cursor=(*reply_info).marker+i-1;
+  MoveDialogTextCursor(font_info,event,reply_info);
   if (event.xbutton.time > (click_time+(unsigned long) (*DoubleClickReference())))
     (*reply_info).highlight=MagickFalse;
   else
@@ -601,6 +607,21 @@ static void SelectDialogReply(const DialogContext *context,
   (void) XFree((void *) data);
 }
 
+static void SetDialogOptionText(const char *action,
+  XWidgetInfo *special_info)
+{
+  if (LocaleCompare(action,"Background") == 0)
+    (*special_info).text=(char *) "Backdrop";
+  if (LocaleCompare(action,"New") == 0)
+    (*special_info).text=(char *) "Gradation";
+  if (LocaleCompare(action,"Resize") == 0)
+    (*special_info).text=(char *) "Constrain ratio";
+  if (LocaleCompare(action,"Save") == 0)
+    (*special_info).text=(char *) "Non-progressive";
+  if (LocaleCompare(action,"Shade") == 0)
+    (*special_info).text=(char *) "Color shading";
+}
+
 static void InitializeDialogOptions(const DialogContext *context,
   const DialogTargets *targets)
 {
@@ -634,16 +655,7 @@ static void InitializeDialogOptions(const DialogContext *context,
   (*special_info).x=(*reply_info).x;
   (*special_info).y=(*action_info).y+(int) (*action_info).height-(int)
     (*special_info).height;
-  if (LocaleCompare(action,"Background") == 0)
-    (*special_info).text=(char *) "Backdrop";
-  if (LocaleCompare(action,"New") == 0)
-    (*special_info).text=(char *) "Gradation";
-  if (LocaleCompare(action,"Resize") == 0)
-    (*special_info).text=(char *) "Constrain ratio";
-  if (LocaleCompare(action,"Save") == 0)
-    (*special_info).text=(char *) "Non-progressive";
-  if (LocaleCompare(action,"Shade") == 0)
-    (*special_info).text=(char *) "Color shading";
+  SetDialogOptionText(action,special_info);
   /*
     Initialize text information.
   */
@@ -757,6 +769,29 @@ static void RedrawDialogWidget(const DialogContext *context,
     }
 }
 
+static void SendDialogSelection(const XSelectionRequestEvent *request,
+  char *primary_selection)
+{
+  XSelectionEvent
+    notify;
+
+  (void) XChangeProperty(request->display,request->requestor,
+    request->property,request->target,8,PropModeReplace,
+    (unsigned char *) primary_selection,Extent(primary_selection));
+  notify.type=SelectionNotify;
+  notify.display=request->display;
+  notify.requestor=request->requestor;
+  notify.selection=request->selection;
+  notify.target=request->target;
+  notify.time=request->time;
+  if (request->property == None)
+    notify.property=request->target;
+  else
+    notify.property=request->property;
+  (void) XSendEvent(request->display,request->requestor,False,0,
+    (XEvent *) &notify);
+}
+
 static void HandleDialogSelectionEvent(const DialogContext *context,
   XEvent event,const DialogTargets *targets)
 {
@@ -787,9 +822,6 @@ static void HandleDialogSelectionEvent(const DialogContext *context,
     }
     case SelectionRequest:
     {
-      XSelectionEvent
-        notify;
-
       XSelectionRequestEvent
         *request;
 
@@ -799,21 +831,7 @@ static void HandleDialogSelectionEvent(const DialogContext *context,
         Set primary selection.
       */
       request=(&(event.xselectionrequest));
-      (void) XChangeProperty(request->display,request->requestor,
-        request->property,request->target,8,PropModeReplace,
-        (unsigned char *) primary_selection,Extent(primary_selection));
-      notify.type=SelectionNotify;
-      notify.display=request->display;
-      notify.requestor=request->requestor;
-      notify.selection=request->selection;
-      notify.target=request->target;
-      notify.time=request->time;
-      if (request->property == None)
-        notify.property=request->target;
-      else
-        notify.property=request->property;
-      (void) XSendEvent(request->display,request->requestor,False,0,
-        (XEvent *) &notify);
+      SendDialogSelection(request,primary_selection);
     }
     default:
       break;
@@ -927,6 +945,15 @@ typedef struct _DialogLayout
     *reply;
 } DialogLayout;
 
+static void SetDialogWidgetHeight(XWindows *windows,
+  XFontStruct *font_info,const unsigned int height)
+{
+  windows->widget.height=(unsigned int) (7*(int) height+(QuantumMargin << 1));
+  windows->widget.min_height=windows->widget.height;
+  if (windows->widget.height < windows->widget.min_height)
+    windows->widget.height=windows->widget.min_height;
+}
+
 static void PositionDialogWidget(XWindows *windows,
   const DialogLayout *layout)
 {
@@ -958,23 +985,17 @@ static void PositionDialogWidget(XWindows *windows,
     ((int) width+28*XTextWidth(font_info,"#",1)+4*QuantumMargin);
   if (windows->widget.width < windows->widget.min_width)
     windows->widget.width=windows->widget.min_width;
-  windows->widget.height=(unsigned int) (7*(int) height+(QuantumMargin << 1));
-  windows->widget.min_height=windows->widget.height;
-  if (windows->widget.height < windows->widget.min_height)
-    windows->widget.height=windows->widget.min_height;
+  SetDialogWidgetHeight(windows,font_info,height);
   XConstrainWindowPosition(display,&windows->widget);
 }
 
-static void MapDialogWidget(Display *display,XWindows *windows)
+static void SetDialogWidgetName(Display *display,XWindows *windows)
 {
   Status
     status;
 
   XTextProperty
     window_name;
-
-  XWindowChanges
-    window_changes;
 
   (void) CopyMagickString(windows->widget.name,"Dialog",MagickPathExtent);
   status=XStringListToTextProperty(&windows->widget.name,1,&window_name);
@@ -984,6 +1005,14 @@ static void MapDialogWidget(Display *display,XWindows *windows)
       XSetWMIconName(display,windows->widget.id,&window_name);
       (void) XFree((void *) window_name.value);
     }
+}
+
+static void MapDialogWidget(Display *display,XWindows *windows)
+{
+  XWindowChanges
+    window_changes;
+
+  SetDialogWidgetName(display,windows);
   window_changes.width=(int) windows->widget.width;
   window_changes.height=(int) windows->widget.height;
   window_changes.x=windows->widget.x;
