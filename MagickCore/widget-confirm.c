@@ -341,6 +341,21 @@ typedef struct _ConfirmContext
     *reason;
 } ConfirmContext;
 
+static void SetConfirmYesButton(XFontStruct *font_info,
+  const char *description,const XWidgetInfo *cancel_info,
+  XWidgetInfo *yes_info)
+{
+  (*yes_info)=(*cancel_info);
+  (*yes_info).text=(char *) YesButtonText;
+  if (LocaleCompare(description,"Do you want to save it") == 0)
+    (*yes_info).text=(char *) "Save";
+  (*yes_info).width=(unsigned int) QuantumMargin+
+    WidgetTextWidth(font_info,(*yes_info).text);
+  if ((*yes_info).width < (*cancel_info).width)
+    (*yes_info).width=(*cancel_info).width;
+  (*yes_info).x=QuantumMargin;
+}
+
 static void UpdateConfirmButtons(const ConfirmContext *context,
   const ConfirmTargets *targets)
 {
@@ -385,15 +400,7 @@ static void UpdateConfirmButtons(const ConfirmContext *context,
         WidgetTextWidth(font_info,(*dismiss_info).text);
       (*dismiss_info).x=(int)
         ((windows->widget.width >> 1)-((*dismiss_info).width >> 1));
-      (*yes_info)=(*cancel_info);
-      (*yes_info).text=(char *) YesButtonText;
-      if (LocaleCompare(description,"Do you want to save it") == 0)
-        (*yes_info).text=(char *) "Save";
-      (*yes_info).width=(unsigned int) QuantumMargin+
-        WidgetTextWidth(font_info,(*yes_info).text);
-      if ((*yes_info).width < (*cancel_info).width)
-        (*yes_info).width=(*cancel_info).width;
-      (*yes_info).x=QuantumMargin;
+      SetConfirmYesButton(font_info,description,cancel_info,yes_info);
       (*state)&=(unsigned int) (~UpdateConfigurationState);
     }
 }
