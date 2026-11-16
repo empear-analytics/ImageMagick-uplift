@@ -28,7 +28,7 @@ Base `9985bdf74` (campaign/W34 after round 23, plus the AGENTS.md record of the 
 - Recipe S step 2: core header of any size and the header-score condition (lane a, `69b0e32b2`, with mandate readings for prototype blocks, a non-inline `SetImageColormap`, a qsort comparator, an `#if/#else` macro block checked under both branches); a twice-defined identical macro as one header definition (lane c, `c9aba830b`); the accessor sentence (lane b, `62914e106`) and its extension to `static const` objects with read-only accessors (`da9caa8ca`, mandate).
 - Recipe RL step 8, loop-function form (lane a, `0ea3d1496`, mandate, under the 2026-11-15 OpenMP ruling's checks).
 - `split_source.py` reads `static magick_attribute((...)) inline` definitions (`e60b3ab55`).
-- Known plateaus rows rewritten for `widget.c`, `quantize.c`, `xwindow-image.c`, `animate-window.c`, `display-image.c`.
+- Known plateaus rows rewritten for `widget.c` and `quantize.c` (the other files' plateaus are recorded in this report only; the table has no rows for them).
 
 ## What holds the rest
 
