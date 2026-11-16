@@ -6846,13 +6846,8 @@ static double RotateSquareKernelBy90Degrees(KernelInfo *kernel,double angle)
   return(angle);
 }
 
-static double ReflectKernel(KernelInfo *kernel,double angle)
+static void ReverseKernelValues(KernelInfo *kernel)
 {
-  /* For a 180 degree rotation - also know as a reflection
-   * This is actually a very very common operation!
-   * Basically all that is needed is a reversal of the kernel data!
-   * And a reflection of the origin
-   */
   MagickRealType
     t;
 
@@ -6867,6 +6862,16 @@ static double ReflectKernel(KernelInfo *kernel,double angle)
   j=(ssize_t) (kernel->width*kernel->height-1);
   for (i=0;  i < j;  i++, j--)
     t=k[i],  k[i]=k[j],  k[j]=t;
+}
+
+static double ReflectKernel(KernelInfo *kernel,double angle)
+{
+  /* For a 180 degree rotation - also know as a reflection
+   * This is actually a very very common operation!
+   * Basically all that is needed is a reversal of the kernel data!
+   * And a reflection of the origin
+   */
+  ReverseKernelValues(kernel);
 
   kernel->x = (ssize_t) kernel->width  - kernel->x - 1;
   kernel->y = (ssize_t) kernel->height - kernel->y - 1;
