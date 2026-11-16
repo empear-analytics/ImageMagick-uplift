@@ -5851,6 +5851,18 @@ typedef struct _MorphologyStageTargets
     *method_changed;
 } MorphologyStageTargets;
 
+static MorphologyMethod SaveEdgeDilateImage(const MorphologyStages *stages,
+  Image **save_image,Image **curr_image)
+{
+  MorphologyMethod
+    primitive;
+
+  (*save_image) = (*curr_image);      /* save the image difference */
+  (*curr_image) = (Image *) stages->image;
+  primitive = ErodeMorphology;
+  return(primitive);
+}
+
 static MagickBooleanType ApplyMorphologyStages(
   const MorphologyStages *stages,const MorphologyStageTargets *targets)
 {
@@ -5896,11 +5908,8 @@ static MagickBooleanType ApplyMorphologyStages(
     switch( stages->method ) {
       case EdgeMorphology:        /* dilate and erode difference */
         primitive = DilateMorphology;
-        if ( stage_loop == 2 ) {
-          (*save_image) = (*curr_image);      /* save the image difference */
-          (*curr_image) = (Image *) stages->image;
-          primitive = ErodeMorphology;
-        }
+        if ( stage_loop == 2 )
+          primitive=SaveEdgeDilateImage(stages,save_image,curr_image);
         break;
       default:
         SelectCloseIntensityPrimitive(&selection,this_kernel,&primitive);
