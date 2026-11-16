@@ -316,6 +316,14 @@ static MagickBooleanType SkipFloodplaneRun(const FloodfillRow *row,
   return(MagickTrue);
 }
 
+static MagickBooleanType SyncFloodplaneLeft(const FloodfillRow *row)
+{
+  if (SyncCacheViewAuthenticPixels(row->floodplane_view,row->exception) ==
+      MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType FillFloodplaneLeft(const FloodfillRow *row,
   const ssize_t x1,ssize_t *x)
 {
@@ -347,10 +355,7 @@ static MagickBooleanType FillFloodplaneLeft(const FloodfillRow *row,
     p-=(ptrdiff_t)GetPixelChannels(row->image);
     q-=GetPixelChannels(row->floodplane_image);
   }
-  if (SyncCacheViewAuthenticPixels(row->floodplane_view,row->exception) ==
-      MagickFalse)
-    return(MagickFalse);
-  return(MagickTrue);
+  return(SyncFloodplaneLeft(row));
 }
 
 typedef struct _FloodfillTileView
