@@ -18,6 +18,7 @@
 #ifndef MAGICKCORE_EFFECT_BLUR_ADAPTIVE_FILTERS_PRIVATE_H
 #define MAGICKCORE_EFFECT_BLUR_ADAPTIVE_FILTERS_PRIVATE_H
 
+#include "MagickCore/effect-common-private.h"
 #include "MagickCore/image.h"
 #include "MagickCore/monitor.h"
 
@@ -36,13 +37,6 @@ static inline void SetBlurProgress(const Image *image,const char *tag,
   proceed=SetImageProgress(image,tag,progress,image->rows);
   if (proceed == MagickFalse)
     (*status)=MagickFalse;
-}
-
-static inline Image *ReleaseFailedImage(Image *image,const MagickBooleanType status)
-{
-  if (status == MagickFalse)
-    image=DestroyImage(image);
-  return(image);
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)

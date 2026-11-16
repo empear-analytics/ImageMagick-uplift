@@ -18,19 +18,13 @@
 #ifndef MAGICKCORE_EFFECT_PRIVATE_H
 #define MAGICKCORE_EFFECT_PRIVATE_H
 
+#include "MagickCore/effect-common-private.h"
 #include "MagickCore/image.h"
 #include "MagickCore/monitor.h"
 
 #if defined(__cplusplus) || defined(c_plusplus)
 extern "C" {
 #endif
-
-static inline Image *ReleaseFailedImage(Image *image,const MagickBooleanType status)
-{
-  if (status == MagickFalse)
-    image=DestroyImage(image);
-  return(image);
-}
 
 static inline void ReportRowProgress(const Image *image,const char *tag,
   const MagickOffsetType progress,MagickBooleanType *status)

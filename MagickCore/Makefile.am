@@ -182,6 +182,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/effect.h \
   MagickCore/effect-blur-adaptive-filters-private.h \
   MagickCore/effect-private.h \
+  MagickCore/effect-common-private.h \
   MagickCore/enhance.c \
   MagickCore/enhance-color.c \
   MagickCore/enhance-balance.c \
@@ -315,12 +316,14 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/profile.h \
   MagickCore/profile-private.h \
   MagickCore/quantize.c \
+  MagickCore/quantize-remap.c \
   MagickCore/quantize-kmeans.c \
   MagickCore/quantize-error.c \
   MagickCore/quantize-info.c \
   MagickCore/quantize-posterize.c \
   MagickCore/quantize.h \
   MagickCore/quantize-private.h \
+  MagickCore/quantize-assign-private.h \
   MagickCore/quantum.c \
   MagickCore/quantum-type.c \
   MagickCore/quantum.h \
@@ -347,7 +350,9 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/resource_.h \
   MagickCore/resource-private.h \
   MagickCore/segment.c \
+  MagickCore/segment-threshold.c \
   MagickCore/segment.h \
+  MagickCore/segment-private.h \
   MagickCore/semaphore.c \
   MagickCore/semaphore.h \
   MagickCore/semaphore-private.h \
@@ -595,6 +600,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/draw-private.h \
   MagickCore/effect-blur-adaptive-filters-private.h \
   MagickCore/effect-private.h \
+  MagickCore/effect-common-private.h \
   MagickCore/enhance-private.h \
   MagickCore/enhance-color-private.h \
   MagickCore/exception-private.h \
@@ -625,6 +631,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/policy-private.h \
   MagickCore/profile-private.h \
   MagickCore/quantize-private.h \
+  MagickCore/quantize-assign-private.h \
   MagickCore/quantum-private.h \
   MagickCore/random-private.h \
   MagickCore/registry-private.h \
@@ -632,6 +639,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/resize-private.h \
   MagickCore/resource-private.h \
   MagickCore/resource-private.h \
+  MagickCore/segment-private.h \
   MagickCore/semaphore-private.h \
   MagickCore/semaphore-private.h \
   MagickCore/signature-private.h \
