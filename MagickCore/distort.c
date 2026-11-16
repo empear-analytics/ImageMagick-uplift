@@ -3915,6 +3915,21 @@ typedef struct _DistortBestFitTile
     *coeff;
 } DistortBestFitTile;
 
+static void SetCylinder2PlaneBestFit(double *coeff,RectangleInfo *geometry,
+  MagickBooleanType *fix_bounds)
+{
+  /* direct calculation so center of distortion is either a pixel
+   * center, or pixel edge. This allows for reversibility of the
+   * distortion */
+  (*geometry).x = (*geometry).y = 0;
+  (*geometry).width = CastDoubleToSizeT(ceil( 2.0*coeff[1]*tan(coeff[0]/2.0) ));
+  (*geometry).height = CastDoubleToSizeT(ceil( 2.0*coeff[3]/cos(coeff[0]/2.0) ));
+  /* correct center of distortion relative to new size */
+  coeff[4] = (double) (*geometry).width/2.0;
+  coeff[5] = (double) (*geometry).height/2.0;
+  (*fix_bounds) = MagickFalse;
+}
+
 static void SetDistortCylinderBestFit(const DistortBestFitTile *tile,
   RectangleInfo *geometry,MagickBooleanType *fix_bounds,
   MagickBooleanType *bestfit)
@@ -3929,16 +3944,7 @@ static void SetDistortCylinderBestFit(const DistortBestFitTile *tile,
     {
       case Cylinder2PlaneDistortion:
       {
-        /* direct calculation so center of distortion is either a pixel
-         * center, or pixel edge. This allows for reversibility of the
-         * distortion */
-        (*geometry).x = (*geometry).y = 0;
-        (*geometry).width = CastDoubleToSizeT(ceil( 2.0*coeff[1]*tan(coeff[0]/2.0) ));
-        (*geometry).height = CastDoubleToSizeT(ceil( 2.0*coeff[3]/cos(coeff[0]/2.0) ));
-        /* correct center of distortion relative to new size */
-        coeff[4] = (double) (*geometry).width/2.0;
-        coeff[5] = (double) (*geometry).height/2.0;
-        (*fix_bounds) = MagickFalse;
+        SetCylinder2PlaneBestFit(coeff,geometry,fix_bounds);
         break;
       }
       case Plane2CylinderDistortion:
