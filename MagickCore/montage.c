@@ -1657,9 +1657,54 @@ static Image *ComposeMontagePages(const MontagePages *pages)
   return(FinishMontagePages(pages,montage));
 }
 
-MagickExport Image *MontageImageList(const ImageInfo *image_info,
-  const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
+typedef struct _MontageTiling
 {
+  const ImageInfo
+    *image_info;
+
+  const MontageInfo
+    *montage_info;
+
+  const Image
+    *images;
+
+  ExceptionInfo
+    *exception;
+
+  Image
+    **primary_list,
+    **image_list,
+    *image;
+
+  size_t
+    number_images,
+    tiles_per_row,
+    tiles_per_column;
+
+  MagickBooleanType
+    concatenate;
+
+  RectangleInfo
+    extract_info;
+} MontageTiling;
+
+static Image *ComposeMontage(const MontageTiling *tiling)
+{
+  const MontageInfo
+    *const montage_info = tiling->montage_info;
+
+  ExceptionInfo
+    *const exception = tiling->exception;
+
+  Image
+    **const image_list = tiling->image_list;
+
+  const size_t
+    number_images = tiling->number_images;
+
+  RectangleInfo
+    extract_info = tiling->extract_info;
+
   char
     *title;
 
@@ -1670,15 +1715,79 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     frame_info;
 
   Image
-    *image,
-    **image_list,
-    **primary_list,
     *montage,
     *texture,
     *tile_image;
 
   ImageInfo
     *clone_info;
+
+  size_t
+    border_width,
+    number_lines,
+    title_offset;
+
+  ssize_t
+    bevel_width;
+
+  TypeMetric
+    metrics;
+
+  border_width=montage_info->border_width;
+  bevel_width=0;
+  (void) memset(&frame_info,0,sizeof(frame_info));
+  if (montage_info->frame != (char *) NULL)
+    {
+      frame_info=ParseMontageFrame(montage_info,frame_info,extract_info);
+      bevel_width=(ssize_t) MagickMax(frame_info.inner_bevel,
+        frame_info.outer_bevel);
+      border_width=(size_t) MagickMax((ssize_t) frame_info.width,
+        (ssize_t) frame_info.height);
+    }
+  extract_info=GetLargestTileExtent(extract_info,image_list,number_images);
+  /*
+    Initialize draw attributes.
+  */
+  clone_info=CloneImageInfo(tiling->image_info);
+  clone_info->background_color=montage_info->background_color;
+  clone_info->border_color=montage_info->border_color;
+  draw_info=AcquireMontageDrawInfo(clone_info,montage_info);
+  (void) GetTypeMetrics(image_list[0],draw_info,&metrics,exception);
+  texture=ReadMontageTexture(clone_info,montage_info,exception);
+  /*
+    Determine the number of lines in an next label.
+  */
+  title=InterpretImageProperties(clone_info,image_list[0],montage_info->title,
+    exception);
+  title_offset=GetMontageTitleOffset(montage_info,metrics,title,extract_info);
+  number_lines=GetMaximumLabelLines(image_list,number_images,exception);
+  /*
+    Allocate next structure.
+  */
+  tile_image=AcquireImage((ImageInfo *) NULL,exception);
+  montage=AcquireImage(clone_info,exception);
+  montage->background_color=montage_info->background_color;
+  montage->scene=0;
+  {
+    const MontagePages
+      pages = { tiling->image_info, montage_info, tiling->images, exception,
+        tiling->primary_list, image_list, tiling->image, montage, texture,
+        tile_image, number_images, tiling->tiles_per_row,
+        tiling->tiles_per_column, title_offset, border_width, number_lines,
+        tiling->concatenate, extract_info, metrics, bevel_width, frame_info,
+        clone_info, draw_info, title };
+
+    return(ComposeMontagePages(&pages));
+  }
+}
+
+MagickExport Image *MontageImageList(const ImageInfo *image_info,
+  const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
+{
+  Image
+    *image,
+    **image_list,
+    **primary_list;
 
   MagickBooleanType
     concatenate;
@@ -1692,6 +1801,9 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   MontageThumbnailInfo
     thumbnail_info;
 
+  MontageTiling
+    tiling;
+
   const MontageThumbnailTargets
     thumbnail_targets = { (&image), (&progress_monitor), (&flags) };
 
@@ -1699,18 +1811,9 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     extract_info;
 
   size_t
-    border_width,
     number_images,
-    number_lines,
     tiles_per_column,
-    tiles_per_row,
-    title_offset;
-
-  ssize_t
-    bevel_width;
-
-  TypeMetric
-    metrics;
+    tiles_per_row;
 
   /*
     Create image tiles.
@@ -1751,49 +1854,17 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   extract_info.y=(ssize_t) montage_info->border_width;
   GetMontageTileGeometry(montage_info->geometry,&extract_info,&flags,
     &concatenate);
-  border_width=montage_info->border_width;
-  bevel_width=0;
-  (void) memset(&frame_info,0,sizeof(frame_info));
-  if (montage_info->frame != (char *) NULL)
-    {
-      frame_info=ParseMontageFrame(montage_info,frame_info,extract_info);
-      bevel_width=(ssize_t) MagickMax(frame_info.inner_bevel,
-        frame_info.outer_bevel);
-      border_width=(size_t) MagickMax((ssize_t) frame_info.width,
-        (ssize_t) frame_info.height);
-    }
-  extract_info=GetLargestTileExtent(extract_info,image_list,number_images);
-  /*
-    Initialize draw attributes.
-  */
-  clone_info=CloneImageInfo(image_info);
-  clone_info->background_color=montage_info->background_color;
-  clone_info->border_color=montage_info->border_color;
-  draw_info=AcquireMontageDrawInfo(clone_info,montage_info);
-  (void) GetTypeMetrics(image_list[0],draw_info,&metrics,exception);
-  texture=ReadMontageTexture(clone_info,montage_info,exception);
-  /*
-    Determine the number of lines in an next label.
-  */
-  title=InterpretImageProperties(clone_info,image_list[0],montage_info->title,
-    exception);
-  title_offset=GetMontageTitleOffset(montage_info,metrics,title,extract_info);
-  number_lines=GetMaximumLabelLines(image_list,number_images,exception);
-  /*
-    Allocate next structure.
-  */
-  tile_image=AcquireImage((ImageInfo *) NULL,exception);
-  montage=AcquireImage(clone_info,exception);
-  montage->background_color=montage_info->background_color;
-  montage->scene=0;
-  {
-    const MontagePages
-      pages = { image_info, montage_info, images, exception, primary_list,
-        image_list, image, montage, texture, tile_image, number_images,
-        tiles_per_row, tiles_per_column, title_offset, border_width,
-        number_lines, concatenate, extract_info, metrics, bevel_width,
-        frame_info, clone_info, draw_info, title };
-
-    return(ComposeMontagePages(&pages));
-  }
+  tiling.image_info=image_info;
+  tiling.montage_info=montage_info;
+  tiling.images=images;
+  tiling.exception=exception;
+  tiling.primary_list=primary_list;
+  tiling.image_list=image_list;
+  tiling.image=image;
+  tiling.number_images=number_images;
+  tiling.tiles_per_row=tiles_per_row;
+  tiling.tiles_per_column=tiles_per_column;
+  tiling.concatenate=concatenate;
+  tiling.extract_info=extract_info;
+  return(ComposeMontage(&tiling));
 }
