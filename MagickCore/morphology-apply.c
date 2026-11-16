@@ -6361,6 +6361,17 @@ static void ReleaseCurrentImage(const Image *image,Image *curr_image,
     curr_image = DestroyImage(curr_image);
 }
 
+static void ReleaseMorphologyWork(Image *work_image,Image *save_image,
+  KernelInfo *reflected_kernel)
+{
+  if ( work_image != (Image *) NULL )
+    work_image = DestroyImage(work_image);
+  if ( save_image != (Image *) NULL )
+    save_image = DestroyImage(save_image);
+  if ( reflected_kernel != (KernelInfo *) NULL )
+    reflected_kernel = DestroyKernelInfo(reflected_kernel);
+}
+
 static void ReleaseMorphologyApply(const MorphologyApplyRelease *release)
 {
   const Image
@@ -6376,12 +6387,7 @@ static void ReleaseMorphologyApply(const MorphologyApplyRelease *release)
     *reflected_kernel = release->reflected_kernel;
 
   ReleaseCurrentImage(image,curr_image,rslt_image);
-  if ( work_image != (Image *) NULL )
-    work_image = DestroyImage(work_image);
-  if ( save_image != (Image *) NULL )
-    save_image = DestroyImage(save_image);
-  if ( reflected_kernel != (KernelInfo *) NULL )
-    reflected_kernel = DestroyKernelInfo(reflected_kernel);
+  ReleaseMorphologyWork(work_image,save_image,reflected_kernel);
 }
 
 typedef struct _MorphologyIteratedLimits
