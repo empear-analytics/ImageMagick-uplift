@@ -398,6 +398,13 @@ static MagickBooleanType AcquireShadeImages(const Image *image,
   return(MagickTrue);
 }
 
+static void SyncSharpenRow(MagickBooleanType *status,CacheView *view,
+  ExceptionInfo *exception)
+{
+  if (SyncCacheViewAuthenticPixels(view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static MagickBooleanType ShadeHeadRow(MagickBooleanType *status,
   const ShadeRow *row)
 {
@@ -504,8 +511,7 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
 
     if (ShadeHeadRow(&status,&row) == MagickFalse)
       continue;
-    if (SyncCacheViewAuthenticPixels(shade_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncSharpenRow(&status,shade_view,exception);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
