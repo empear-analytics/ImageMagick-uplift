@@ -76,3 +76,10 @@ compare -metric RMSE -fuzz 10% -size 1200x1200 gradient:"#ff0000-#ff000000" grad
 " info:
 -size 1024x1024 plasma:fractal -colorspace gray +fft +ift -format "%# %wx%h %[channels]
 " info:
+# statistic.c EvaluateImages (three 800x800 images; the median and the other-operator row loops)
+-seed 3 -size 800x800 plasma: plasma: plasma: -evaluate-sequence Median -format %# info:
+-seed 3 -size 800x800 plasma: plasma: plasma: -evaluate-sequence Mean -format %# info:
+-seed 3 -size 800x800 plasma: plasma: plasma: -evaluate-sequence Add -format %# info:
+-seed 3 -size 800x800 plasma: plasma: plasma: -evaluate-sequence Max -format %# info:
+-seed 3 -size 800x800 plasma: plasma: plasma: -evaluate-sequence RootMeanSquare -format %# info:
+-seed 3 -size 800x800 plasma: plasma: plasma: -evaluate-sequence Multiply -format %# info:
