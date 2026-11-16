@@ -9600,6 +9600,35 @@ copies differ in variables or a value, not in the function called.
 7. Check by reading that every member the region reads through `rows` is only read, that
    every object `arguments` points to is a local or parameter of the caller that nothing
    writes until the call returns, and that every caller passes its own tag.
+8. Loop-function form (2026-11-16, under the owner's OpenMP ruling of 2026-11-15). The
+   copies may instead be two whole `static` functions, each nothing but one parallel row
+   loop (Recipe N step 1's conditions) after `const` bindings of the members of one
+   `const` struct pointer of the file (`statistic.c`'s `EvaluateMedianImages` and
+   `EvaluateOtherImages`, taking `const EvaluateImagesLoop *loop`), plus `status` and
+   `progress` by value, returning `status`; a copy may take one more parameter that its
+   only caller passes the same value as a member of that struct (`random_info`, assigned
+   to `loop.random_info` directly before), and is then read from the struct. Each copy's
+   row work is the run of statements between the row fetch's `continue;` and the row
+   finish, the same place in both, reading only bindings, the iteration's `id`, `p` and
+   `q`, and its own locals. Write a `typedef void (*NameRowMethod)(const Struct *,const
+   int,const Quantum **,Quantum *magick_restrict);`, then one `static void` row
+   function per copy taking `(const Struct *loop,const int id,const Quantum **p,Quantum
+   *magick_restrict q)` whose body is the copy's bindings that the run reads, the run's
+   locals, and the run verbatim; then one driver, the first copy's text with the run
+   written `method(loop,id,p,q);`, a `const NameRowMethod method` parameter after the
+   struct, and the bindings and locals only the run read removed (a binding read only
+   inside an `#if defined(MAGICKCORE_OPENMP_SUPPORT)` block is read through the struct
+   there instead, so that no build warns it unused). Each call of a copy becomes a call of
+   the driver with its row function. Check by script that each row function's statements
+   and the driver's text, with the call written back as the run, give each copy's
+   token sequence after the bindings; by hand, that the region writes exactly what it
+   wrote (the loop variable, the iteration's locals, the shared `status` and `progress`
+   through the same calls and the same `omp atomic`, the per-thread buffer `[id]` and the
+   row through `q`), now some of them inside the row function's frame, which is the
+   iteration's, and quote that reading in the message. The whole catalogue, narrow and
+   wide, stays at 0 diverged, `tools/omp_compare.sh` shows no difference at one and four
+   threads on cases big enough to start several threads, and the step is timed (one
+   indirect call per row).
 
 **Before:**
 
@@ -22154,3 +22183,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | AMEND | TH | Step 2: a line outside every differing run that only a failure path reaches (the `break;` after a `NULL` pixel fetch), the same in both copies by the fold check, need not run in the harness; the message names it. Step 8: a ratio above 1.03 is measured again with 21 runs beside an A/A run of the base against itself, the step stopping if the 21-run ratio stays above 1.03; every measurement quoted | The row drivers of `xwindow-image.c` hold such a `break;` (the harness cannot make the pixel cache fail); a 9-to-11-run timing under the load of three lanes swung 0.93 to 1.06 on one step, where 21 runs gave 0.96 and 1.00 and an A/A run 1.00 | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | S | Step 2: the private header may hold a shared core of any size, every helper, typedef and macro on step 2's terms; no size limit, but the header is scored like a split product and must score at least the original's score before the split (the message gives the header's score beside the two files') | `quantize.c` (8.81): every split shares its colour tree (36 helpers, ten typedefs, the cache macros); round twenty-three's questions 1 and 6 | owner |
 | 2026-11-16 | AMEND | S | Step 2: with a core header, the original's forward declarations of the moving helpers go to the header's *Method prototypes* block (groups split as `split_source.py` splits them); a helper whose definition line has no `static` moves unchanged (internal linkage from the `static` prototype) when every including file calls it; a helper whose address another moving helper passes to `qsort` qualifies when its name stands in the header alone; a macro defined in the branches of one file-level `#if`/`#else` moves with the conditional whole when a build taking the other branch compiles both products and the `-E -dM` dump of every moved macro is identical in the original and the products under both branches; a moved helper's exception names the header as its module file | `quantize.c`'s prototypes block, `SetImageColormap` (static only through its prototype), `QuantizeErrorCompare` (`qsort` comparator of `SetRapidReductionThreshold`) and `CacheShift` (`#if !defined(__APPLE__) && !defined(TARGET_OS_IPHONE)`), all needed by the colour-tree core | mandate (2026-10-24) |
+| 2026-11-16 | AMEND | RL | Step 8, loop-function form: the copies may be two whole static functions, each one parallel row loop after `const` bindings of one struct pointer, with `status` and `progress` by value (one extra parameter allowed when its caller passes the same value as a struct member); the row work becomes a row function `(const Struct *,const int id,const Quantum **p,Quantum *q)`, the first copy the driver taking the row function; checked by script and by a by-hand write-set reading, the whole catalogue narrow and wide, `omp_compare.sh` at 1 and 4 threads on large cases, and timing | `statistic.c`'s `EvaluateMedianImages` and `EvaluateOtherImages`, the Code Duplication that the probed Polynomial split exposes in the kept file | mandate (2026-10-24) |
