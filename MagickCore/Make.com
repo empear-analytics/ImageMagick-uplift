@@ -161,6 +161,7 @@ $call Make PreRvIcccm.c
 $call Make profile.c
 $call Make profile-sync.c
 $call Make quantize.c
+$call Make quantize-remap.c
 $call Make quantize-kmeans.c
 $call Make quantize-error.c
 $call Make quantize-info.c

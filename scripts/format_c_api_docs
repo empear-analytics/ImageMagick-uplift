@@ -104,6 +104,7 @@ if ( ! GetOptions(
 	 'profile.c',
 	 'profile-sync.c',
 	 'quantize.c',
+	 'quantize-remap.c',
 	 'quantize-kmeans.c',
 	 'quantize-error.c',
 	 'quantize-info.c',
