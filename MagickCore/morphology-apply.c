@@ -233,15 +233,42 @@ static inline MagickBooleanType AcquireKernelValues(KernelInfo *kernel)
   return(kernel->values == (MagickRealType *) NULL ? MagickFalse : MagickTrue);
 }
 
+static ssize_t CountKernelArrayValues(const char *p,const char *end)
+{
+  char
+    token[MagickPathExtent];
+
+  ssize_t
+    i;
+
+  for (i=0; p < end; i++)
+  {
+    (void) GetNextToken(p,&p,MagickPathExtent,token);
+    if (*token == ',')
+      (void) GetNextToken(p,&p,MagickPathExtent,token);
+  }
+  return(i);
+}
+
+static const char *SkipKernelArrayQuotes(const char *p)
+{
+  while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == '\''))
+    p++;
+  return(p);
+}
+
+static void SetOddSquareSize(KernelInfo *kernel,const ssize_t i)
+{
+  kernel->width = kernel->height=CastDoubleToSizeT(sqrt((double) i+1.0));
+  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+}
+
 /* This was separated so that it could be used as a separate
 ** array input handling function, such as for -color-matrix
 */
 static const char *SetOddSquareKernelSize(KernelInfo *kernel,
   const char *kernel_string,const char *end)
 {
-  char
-    token[MagickPathExtent];
-
   const char
     *p;
 
@@ -251,17 +278,10 @@ static const char *SetOddSquareKernelSize(KernelInfo *kernel,
   /* ELSE - Old old specification, forming odd-square kernel */
   /* count up number of values given */
   p=(const char *) kernel_string;
-  while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == '\''))
-    p++;  /* ignore "'" chars for convolve filter usage - Cristy */
-  for (i=0; p < end; i++)
-  {
-    (void) GetNextToken(p,&p,MagickPathExtent,token);
-    if (*token == ',')
-      (void) GetNextToken(p,&p,MagickPathExtent,token);
-  }
+  p=SkipKernelArrayQuotes(p);  /* ignore "'" chars for convolve filter usage - Cristy */
+  i=CountKernelArrayValues(p,end);
   /* set the size of the kernel - old sized square */
-  kernel->width = kernel->height=CastDoubleToSizeT(sqrt((double) i+1.0));
-  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+  SetOddSquareSize(kernel,i);
   p=(const char *) kernel_string;
   while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == '\''))
     p++;  /* ignore "'" chars for convolve filter usage - Cristy */
@@ -307,6 +327,15 @@ static GeometryInfo SetKernelArraySize(KernelInfo *kernel,
   return(args);
 }
 
+static void SetKernelArrayOrigin(KernelInfo *kernel,
+  const MagickStatusType *flags,const GeometryInfo args)
+{
+  kernel->x = ((*flags & XValue)!=0) ? (ssize_t)args.xi
+                                    : (ssize_t) (kernel->width-1)/2;
+  kernel->y = ((*flags & YValue)!=0) ? (ssize_t)args.psi
+                                    : (ssize_t) (kernel->height-1)/2;
+}
+
 static MagickBooleanType ParseKernelGeometry(const char *kernel_string,
   const char *p,KernelInfo *kernel,MagickStatusType *flags)
 {
@@ -332,10 +361,7 @@ static MagickBooleanType ParseKernelGeometry(const char *kernel_string,
   /* Offset Handling and Checks */
   if ( args.xi  < 0.0 || args.psi < 0.0 )
     return(MagickFalse);
-  kernel->x = ((*flags & XValue)!=0) ? (ssize_t)args.xi
-                                    : (ssize_t) (kernel->width-1)/2;
-  kernel->y = ((*flags & YValue)!=0) ? (ssize_t)args.psi
-                                    : (ssize_t) (kernel->height-1)/2;
+  SetKernelArrayOrigin(kernel,flags,args);
   if ( kernel->x >= (ssize_t) kernel->width ||
        kernel->y >= (ssize_t) kernel->height )
     return(MagickFalse);
@@ -447,6 +473,23 @@ static MagickBooleanType IsKernelArrayComplete(KernelInfo *kernel,
   return(MagickTrue);
 }
 
+static void ResetUserDefinedKernel(KernelInfo *kernel)
+{
+  (void) memset(kernel,0,sizeof(*kernel));
+  kernel->minimum = kernel->maximum = kernel->angle = 0.0;
+  kernel->negative_range = kernel->positive_range = 0.0;
+  kernel->type = UserDefinedKernel;
+  kernel->next = (KernelInfo *) NULL;
+  kernel->signature=MagickCoreSignature;
+}
+
+static void ResetKernelArrayRanges(KernelInfo *kernel)
+{
+  kernel->minimum=MagickMaximumValue;
+  kernel->maximum=(-MagickMaximumValue);
+  kernel->negative_range = kernel->positive_range = 0.0;
+}
+
 static KernelInfo *ParseKernelArray(const char *kernel_string)
 {
   KernelInfo
@@ -474,12 +517,7 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
   kernel=(KernelInfo *) AcquireMagickMemory(sizeof(*kernel));
   if (kernel == (KernelInfo *) NULL)
     return(kernel);
-  (void) memset(kernel,0,sizeof(*kernel));
-  kernel->minimum = kernel->maximum = kernel->angle = 0.0;
-  kernel->negative_range = kernel->positive_range = 0.0;
-  kernel->type = UserDefinedKernel;
-  kernel->next = (KernelInfo *) NULL;
-  kernel->signature=MagickCoreSignature;
+  ResetUserDefinedKernel(kernel);
   if (kernel_string == (const char *) NULL)
     return(kernel);
 
@@ -501,9 +539,7 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
   /* Read in the kernel values from rest of input string argument */
   if (AcquireKernelValues(kernel) == MagickFalse)
     return(DestroyKernelInfo(kernel));
-  kernel->minimum=MagickMaximumValue;
-  kernel->maximum=(-MagickMaximumValue);
-  kernel->negative_range = kernel->positive_range = 0.0;
+  ResetKernelArrayRanges(kernel);
   for (i=0; IsKernelArrayReading(kernel,i,p,end) != MagickFalse; i++)
   {
     p=ReadKernelArrayToken(p,token);
@@ -626,6 +662,21 @@ static MagickBooleanType IsKernelNameSeparator(const char *p)
     MagickTrue : MagickFalse);
 }
 
+static const char *SkipKernelNameSeparators(const char *p)
+{
+  while (IsKernelNameSeparator(p) != MagickFalse)
+    p++;
+  return(p);
+}
+
+static void ExpandSingleKernelByFlags(KernelInfo *kernel,
+  const MagickStatusType flags)
+{
+  if ( kernel->next == (KernelInfo *) NULL ) {
+    ExpandKernelByFlags(kernel,flags);
+  }
+}
+
 static KernelInfo *ParseKernelName(const char *kernel_string,
   ExceptionInfo *exception)
 {
@@ -657,8 +708,7 @@ static KernelInfo *ParseKernelName(const char *kernel_string,
   if ( type < 0 || type == UserDefinedKernel )
     return((KernelInfo *) NULL);  /* not a valid named kernel */
 
-  while (IsKernelNameSeparator(p) != MagickFalse)
-    p++;
+  p=SkipKernelNameSeparators(p);
 
   end=FindKernelEnd(p); /* end of this kernel definition */
 
@@ -683,11 +733,31 @@ static KernelInfo *ParseKernelName(const char *kernel_string,
     return(kernel);
 
   /* global expand to rotated kernel list - only for single kernels */
-  if ( kernel->next == (KernelInfo *) NULL ) {
-    ExpandKernelByFlags(kernel,flags);
-  }
+  ExpandSingleKernelByFlags(kernel,flags);
 
   return(kernel);
+}
+
+static KernelInfo *ParseKernelToken(const char *p,const char *token,
+  ExceptionInfo *exception)
+{
+  KernelInfo
+    *new_kernel;
+
+  /* tokens starting with alpha is a Named kernel */
+  if (isalpha((int) ((unsigned char) *token)) != 0)
+    new_kernel=ParseKernelName(p,exception);
+  else /* otherwise a user defined kernel array */
+    new_kernel=ParseKernelArray(p);
+  return(new_kernel);
+}
+
+static void AppendKernelToList(KernelInfo **kernel,KernelInfo *new_kernel)
+{
+  if (*kernel == (KernelInfo *) NULL)
+    *kernel=new_kernel;
+  else
+    LastKernelInfo(*kernel)->next=new_kernel;
 }
 
 static MagickBooleanType AppendKernelToken(const char *p,const char *token,
@@ -699,11 +769,7 @@ static MagickBooleanType AppendKernelToken(const char *p,const char *token,
   /* ignore extra or multiple ';' kernel separators */
   if (*token != ';')
     {
-      /* tokens starting with alpha is a Named kernel */
-      if (isalpha((int) ((unsigned char) *token)) != 0)
-        new_kernel=ParseKernelName(p,exception);
-      else /* otherwise a user defined kernel array */
-        new_kernel=ParseKernelArray(p);
+      new_kernel=ParseKernelToken(p,token,exception);
 
       /* Error handling -- this is not proper error handling! */
       if (new_kernel == (KernelInfo *) NULL)
@@ -714,10 +780,7 @@ static MagickBooleanType AppendKernelToken(const char *p,const char *token,
         }
 
       /* initialise or append the kernel list */
-      if (*kernel == (KernelInfo *) NULL)
-        *kernel=new_kernel;
-      else
-        LastKernelInfo(*kernel)->next=new_kernel;
+      AppendKernelToList(kernel,new_kernel);
     }
   return(MagickTrue);
 }
@@ -748,6 +811,12 @@ static MagickBooleanType ReadKernelCache(const char *kernel_string,
       *p=(const char *) *kernel_cache;
     }
   return(MagickTrue);
+}
+
+static void ReleaseKernelCache(char *kernel_cache)
+{
+  if (kernel_cache != (char *) NULL)
+    kernel_cache=DestroyString(kernel_cache);
 }
 
 MagickExport KernelInfo *AcquireKernelInfo(const char *kernel_string,
@@ -786,8 +855,7 @@ MagickExport KernelInfo *AcquireKernelInfo(const char *kernel_string,
       break;
     p++;
   }
-  if (kernel_cache != (char *) NULL)
-    kernel_cache=DestroyString(kernel_cache);
+  ReleaseKernelCache(kernel_cache);
   return(kernel);
 }
 
@@ -1201,8 +1269,8 @@ static inline MagickBooleanType IsKernelOriginOutside(const GeometryInfo *args,
     MagickTrue : MagickFalse);
 }
 
-static KernelInfo *AcquireDiamondKernel(KernelInfo *kernel,
-  const GeometryInfo *args,const double nan)
+static void SetDiamondKernelValues(KernelInfo *kernel,const GeometryInfo *args,
+  const double nan)
 {
   ssize_t
     i;
@@ -1211,6 +1279,17 @@ static KernelInfo *AcquireDiamondKernel(KernelInfo *kernel,
     u,
     v;
 
+  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      if ( (labs((long) u)+labs((long) v)) <= (long) kernel->x)
+        kernel->positive_range += kernel->values[i] = args->sigma;
+      else
+        kernel->values[i] = nan;
+}
+
+static KernelInfo *AcquireDiamondKernel(KernelInfo *kernel,
+  const GeometryInfo *args,const double nan)
+{
   if (args->rho < 1.0)
     kernel->width = kernel->height = 3;  /* default radius = 1 */
   else
@@ -1221,12 +1300,7 @@ static KernelInfo *AcquireDiamondKernel(KernelInfo *kernel,
     return(DestroyKernelInfo(kernel));
 
   /* set all kernel values within diamond area to scale given */
-  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-      if ( (labs((long) u)+labs((long) v)) <= (long) kernel->x)
-        kernel->positive_range += kernel->values[i] = args->sigma;
-      else
-        kernel->values[i] = nan;
+  SetDiamondKernelValues(kernel,args,nan);
   kernel->minimum = kernel->maximum = args->sigma;   /* a flat shape */
   return(kernel);
 }
@@ -1244,6 +1318,23 @@ static KernelInfo *AcquireUnityKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static void SetCometKernelWidth(KernelInfo *kernel,const GeometryInfo *args,
+  const double sigma)
+{
+  if ( args->rho < 1.0 )
+    kernel->width = (GetOptimalKernelWidth1D(args->rho,sigma)-1)/2+1;
+  else
+    kernel->width = CastDoubleToSizeT(args->rho);
+}
+
+static void SetCometUnityKernel(KernelInfo *kernel)
+{
+  (void) memset(kernel->values,0, (size_t)
+    kernel->width*kernel->height*sizeof(*kernel->values));
+  kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
+  kernel->positive_range = 1.0;
+}
+
 static KernelInfo *AcquireCometKernel(KernelInfo *kernel,
   const GeometryInfo *args)
 {
@@ -1258,10 +1349,7 @@ static KernelInfo *AcquireCometKernel(KernelInfo *kernel,
     sigma = fabs(args->sigma),
     A;
 
-  if ( args->rho < 1.0 )
-    kernel->width = (GetOptimalKernelWidth1D(args->rho,sigma)-1)/2+1;
-  else
-    kernel->width = CastDoubleToSizeT(args->rho);
+  SetCometKernelWidth(kernel,args,sigma);
   kernel->x = kernel->y = 0;
   kernel->height = 1;
   kernel->negative_range = kernel->positive_range = 0.0;
@@ -1305,11 +1393,7 @@ static KernelInfo *AcquireCometKernel(KernelInfo *kernel,
 #endif
     }
   else /* special case - generate a unity kernel */
-    { (void) memset(kernel->values,0, (size_t)
-        kernel->width*kernel->height*sizeof(*kernel->values));
-      kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
-      kernel->positive_range = 1.0;
-    }
+    SetCometUnityKernel(kernel);
 
   kernel->minimum = 0.0;
   kernel->maximum = kernel->values[0];
@@ -1320,8 +1404,7 @@ static KernelInfo *AcquireCometKernel(KernelInfo *kernel,
   return(kernel);
 }
 
-static KernelInfo *AcquireBinomialKernel(KernelInfo *kernel,
-  const GeometryInfo *args)
+static void SetBinomialKernelValues(KernelInfo *kernel,const size_t order_f)
 {
   ssize_t
     i;
@@ -1330,6 +1413,20 @@ static KernelInfo *AcquireBinomialKernel(KernelInfo *kernel,
     u,
     v;
 
+  for ( i=0, v=0; v < (ssize_t)kernel->height; v++)
+    {
+      size_t
+        alpha = order_f / ( fact((size_t) v) * fact(kernel->height-(size_t) v-1) );
+
+      for ( u=0; u < (ssize_t)kernel->width; u++, i++)
+        kernel->positive_range += kernel->values[i] = (double)
+          (alpha * order_f / ( fact((size_t) u) * fact(kernel->height-(size_t) u-1) ));
+    }
+}
+
+static KernelInfo *AcquireBinomialKernel(KernelInfo *kernel,
+  const GeometryInfo *args)
+{
   const size_t
     max_order = (sizeof(size_t) > 4) ? 20 : 12;
 
@@ -1352,15 +1449,7 @@ static KernelInfo *AcquireBinomialKernel(KernelInfo *kernel,
     return(DestroyKernelInfo(kernel));
 
   /* set all kernel values within diamond area to scale given */
-  for ( i=0, v=0; v < (ssize_t)kernel->height; v++)
-    {
-      size_t
-        alpha = order_f / ( fact((size_t) v) * fact(kernel->height-(size_t) v-1) );
-
-      for ( u=0; u < (ssize_t)kernel->width; u++, i++)
-        kernel->positive_range += kernel->values[i] = (double)
-          (alpha * order_f / ( fact((size_t) u) * fact(kernel->height-(size_t) u-1) ));
-    }
+  SetBinomialKernelValues(kernel,order_f);
   kernel->minimum = 1.0;
   kernel->maximum = kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width];
   kernel->negative_range = 0.0;
@@ -1399,6 +1488,18 @@ static const KeyedKernelArray
     { 0, "3: -1,-1,-1  -1,8,-1  -1,-1,-1" }
   };
 
+static size_t FindLaplacianKernelArray(const int key)
+{
+  size_t
+    i;
+
+  for (i=0; i < ((sizeof(LaplacianKernelArrays)/
+       sizeof(*LaplacianKernelArrays))-1); i++)
+    if (LaplacianKernelArrays[i].key == key)
+      break;
+  return(i);
+}
+
 static KernelInfo *AcquireLaplacianKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args)
 {
@@ -1408,10 +1509,7 @@ static KernelInfo *AcquireLaplacianKernel(KernelInfo *kernel,
   size_t
     i;
 
-  for (i=0; i < ((sizeof(LaplacianKernelArrays)/
-       sizeof(*LaplacianKernelArrays))-1); i++)
-    if (LaplacianKernelArrays[i].key == key)
-      break;
+  i=FindLaplacianKernelArray(key);
   kernel=ParseKernelArray(LaplacianKernelArrays[i].definition);
   if (kernel == (KernelInfo *) NULL)
     return(kernel);
@@ -1590,8 +1688,7 @@ static double SetSquareKernelGeometry(KernelInfo *kernel,
   return(scale);
 }
 
-static KernelInfo *AcquireRectangleKernel(KernelInfo *kernel,
-  const KernelInfoType type,const GeometryInfo *args)
+static void SetFlatKernelValues(KernelInfo *kernel,const double scale)
 {
   ssize_t
     i;
@@ -1599,6 +1696,16 @@ static KernelInfo *AcquireRectangleKernel(KernelInfo *kernel,
   ssize_t
     u;
 
+  u=(ssize_t) (kernel->width*kernel->height);
+  for ( i=0; i < u; i++)
+      kernel->values[i] = scale;
+  kernel->minimum = kernel->maximum = scale;   /* a flat shape */
+  kernel->positive_range = scale*u;
+}
+
+static KernelInfo *AcquireRectangleKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args)
+{
   double
     scale;
   if ( type == SquareKernel )
@@ -1619,11 +1726,7 @@ static KernelInfo *AcquireRectangleKernel(KernelInfo *kernel,
     return(DestroyKernelInfo(kernel));
 
   /* set all kernel values to scale given */
-  u=(ssize_t) (kernel->width*kernel->height);
-  for ( i=0; i < u; i++)
-      kernel->values[i] = scale;
-  kernel->minimum = kernel->maximum = scale;   /* a flat shape */
-  kernel->positive_range = scale*u;
+  SetFlatKernelValues(kernel,scale);
   return(kernel);
 }
 
@@ -1767,26 +1870,32 @@ static KernelInfo *AcquireEdgesKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireDiagonalsKernelPair(const KernelInfoType type)
+{
+  KernelInfo
+    *kernel,
+    *new_kernel;
+
+  kernel=ParseKernelArray("3: 0,0,0  0,-,1  1,1,-");
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+  kernel->type = type;
+  new_kernel=ParseKernelArray("3: 0,0,1  0,-,1  0,1,-");
+  if (new_kernel == (KernelInfo *) NULL)
+    return(DestroyKernelInfo(kernel));
+  new_kernel->type = type;
+  LastKernelInfo(kernel)->next = new_kernel;
+  ExpandMirrorKernelInfo(kernel);
+  return(kernel);
+}
+
 static KernelInfo *AcquireDiagonalsKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args)
 {
   switch ( (int) args->rho ) {
     case 0:
     default:
-      { KernelInfo
-          *new_kernel;
-        kernel=ParseKernelArray("3: 0,0,0  0,-,1  1,1,-");
-        if (kernel == (KernelInfo *) NULL)
-          return(kernel);
-        kernel->type = type;
-        new_kernel=ParseKernelArray("3: 0,0,1  0,-,1  0,1,-");
-        if (new_kernel == (KernelInfo *) NULL)
-          return(DestroyKernelInfo(kernel));
-        new_kernel->type = type;
-        LastKernelInfo(kernel)->next = new_kernel;
-        ExpandMirrorKernelInfo(kernel);
-        return(kernel);
-      }
+      return(AcquireDiagonalsKernelPair(type));
     case 1:
       kernel=ParseKernelArray("3: 0,0,0  0,-,1  1,1,-");
       break;
@@ -1794,6 +1903,16 @@ static KernelInfo *AcquireDiagonalsKernel(KernelInfo *kernel,
       kernel=ParseKernelArray("3: 0,0,1  0,-,1  0,1,-");
       break;
   }
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+  kernel->type = type;
+  RotateKernelInfo(kernel, args->sigma);
+  return(kernel);
+}
+
+static KernelInfo *SetTypeAndRotateKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args)
+{
   if (kernel == (KernelInfo *) NULL)
     return(kernel);
   kernel->type = type;
@@ -1827,11 +1946,7 @@ static KernelInfo *AcquireLineEndsKernel(KernelInfo *kernel,
       kernel=ParseKernelArray("3: 0,0,0  0,1,-  0,0,-");
       break;
   }
-  if (kernel == (KernelInfo *) NULL)
-    return(kernel);
-  kernel->type = type;
-  RotateKernelInfo(kernel, args->sigma);
-  return(kernel);
+  return(SetTypeAndRotateKernel(kernel,type,args));
 }
 
 static const KeyedKernelArray
@@ -1993,6 +2108,15 @@ static KernelInfo *AcquireCyclicSkeletonKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static void SetTypesAndMirrorKernels(KernelInfo *kernel,
+  const KernelInfoType type)
+{
+  kernel->type = type;
+  kernel->next->type = type;
+  kernel->next->next->type = type;
+  ExpandMirrorKernelInfo(kernel);
+}
+
 static KernelInfo *AcquireSkeletonKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -2013,10 +2137,7 @@ static KernelInfo *AcquireSkeletonKernel(KernelInfo *kernel,
         return(DestroyKernelInfo(kernel));
       if (kernel->next->next == (KernelInfo *) NULL)
         return(DestroyKernelInfo(kernel));
-      kernel->type = type;
-      kernel->next->type = type;
-      kernel->next->next->type = type;
-      ExpandMirrorKernelInfo(kernel); /* 12 kernels total */
+      SetTypesAndMirrorKernels(kernel,type); /* 12 kernels total */
       break;
    }
   return(kernel);
@@ -2196,6 +2317,25 @@ static MagickBooleanType IsGaussianSigmaWidest(const KernelInfoType type,
     MagickFalse);
 }
 
+static void SetGaussianFamilyValues(KernelInfo *kernel,
+  const KernelInfoType type,const double sigma,const double sigma2)
+{
+  if ( type == GaussianKernel || type == DoGKernel )
+    { /* Calculate a Gaussian,  OR positive half of a DoG */
+      SetGaussianKernelValues(kernel,sigma);
+    }
+
+  if ( type == DoGKernel )
+    { /* Subtract a Negative Gaussian for "Difference of Gaussian" */
+      SubtractGaussianKernelValues(kernel,sigma2);
+    }
+
+  if ( type == LoGKernel )
+    { /* Calculate a Laplacian of a Gaussian - Or Mexican Hat */
+      SetLoGOrUnityKernelValues(kernel,sigma);
+    }
+}
+
 static KernelInfo *AcquireGaussianKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args)
 {
@@ -2221,20 +2361,7 @@ static KernelInfo *AcquireGaussianKernel(KernelInfo *kernel,
    * Error Function 'erf()' (integral of a gaussian)
    */
 
-  if ( type == GaussianKernel || type == DoGKernel )
-    { /* Calculate a Gaussian,  OR positive half of a DoG */
-      SetGaussianKernelValues(kernel,sigma);
-    }
-
-  if ( type == DoGKernel )
-    { /* Subtract a Negative Gaussian for "Difference of Gaussian" */
-      SubtractGaussianKernelValues(kernel,sigma2);
-    }
-
-  if ( type == LoGKernel )
-    { /* Calculate a Laplacian of a Gaussian - Or Mexican Hat */
-      SetLoGOrUnityKernelValues(kernel,sigma);
-    }
+  SetGaussianFamilyValues(kernel,type,sigma,sigma2);
 
   /* Note the above kernels may have been 'clipped' by a user defined
   ** radius, producing a smaller (darker) kernel.  Also for very small
@@ -2300,12 +2427,9 @@ typedef enum
   CrossKernelShape
 } PlusKernelSide;
 
-static inline KernelInfo *AcquirePlusOrCrossKernel(KernelInfo *kernel,
+static void SetPlusOrCrossKernelValues(KernelInfo *kernel,
   const GeometryInfo *args,const double nan,const PlusKernelSide side)
 {
-  const KernelRadius
-    radius = { 1.0, 5 };  /* default radius 2 */
-
   ssize_t
     i;
 
@@ -2313,16 +2437,25 @@ static inline KernelInfo *AcquirePlusOrCrossKernel(KernelInfo *kernel,
     u,
     v;
 
+  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      kernel->values[i] = ((side == PlusKernelShape) ? (u == 0 || v == 0) :
+        (u == v || u == -v)) ? args->sigma : nan;
+}
+
+static inline KernelInfo *AcquirePlusOrCrossKernel(KernelInfo *kernel,
+  const GeometryInfo *args,const double nan,const PlusKernelSide side)
+{
+  const KernelRadius
+    radius = { 1.0, 5 };  /* default radius 2 */
+
   SetKernelRadius(kernel,args,&radius);
 
   if (AcquireKernelValues(kernel) == MagickFalse)
     return(DestroyKernelInfo(kernel));
 
   /* set all kernel values along axises to given scale */
-  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-      kernel->values[i] = ((side == PlusKernelShape) ? (u == 0 || v == 0) :
-        (u == v || u == -v)) ? args->sigma : nan;
+  SetPlusOrCrossKernelValues(kernel,args,nan,side);
   kernel->minimum = kernel->maximum = args->sigma;   /* a flat shape */
   kernel->positive_range = args->sigma*(kernel->width*2.0 - 1.0);
   return(kernel);
@@ -2334,12 +2467,9 @@ typedef enum
   EuclideanKernelDistance
 } DistanceKernelSide;
 
-static inline KernelInfo *AcquireManhattanOrEuclideanKernel(KernelInfo *kernel,
+static void SetManhattanOrEuclideanValues(KernelInfo *kernel,
   const GeometryInfo *args,const DistanceKernelSide side)
 {
-  const KernelRadius
-    radius = { 1.0, 3 };  /* default radius = 1 */
-
   ssize_t
     i;
 
@@ -2347,17 +2477,26 @@ static inline KernelInfo *AcquireManhattanOrEuclideanKernel(KernelInfo *kernel,
     u,
     v;
 
-  SetKernelRadius(kernel,args,&radius);
-
-  if (AcquireKernelValues(kernel) == MagickFalse)
-    return(DestroyKernelInfo(kernel));
-
   for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
     for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
       kernel->positive_range += ( kernel->values[i] =
         ((side == ManhattanKernelDistance) ?
         args->sigma*(labs((long) u)+labs((long) v)) :
         args->sigma*sqrt((double) (u*u+v*v))) );
+}
+
+static inline KernelInfo *AcquireManhattanOrEuclideanKernel(KernelInfo *kernel,
+  const GeometryInfo *args,const DistanceKernelSide side)
+{
+  const KernelRadius
+    radius = { 1.0, 3 };  /* default radius = 1 */
+
+  SetKernelRadius(kernel,args,&radius);
+
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  SetManhattanOrEuclideanValues(kernel,args,side);
   kernel->maximum = kernel->values[0];
   return(kernel);
 }
@@ -2590,6 +2729,15 @@ static void AddRankedBlurGaussian(KernelInfo *kernel,const ssize_t v,
   }
 }
 
+static void SetBlurKernelWidth(KernelInfo *kernel,const GeometryInfo *args,
+  const double sigma)
+{
+  if ( args->rho >= 1.0 )
+    kernel->width = CastDoubleToSizeT(args->rho)*2+1;
+  else
+    kernel->width = GetOptimalKernelWidth1D(args->rho,sigma);
+}
+
 static KernelInfo *AcquireBlurKernel(KernelInfo *kernel,
   const GeometryInfo *args)
 {
@@ -2600,10 +2748,7 @@ static KernelInfo *AcquireBlurKernel(KernelInfo *kernel,
     sigma = fabs(args->sigma),
     alpha, beta;
 
-  if ( args->rho >= 1.0 )
-    kernel->width = CastDoubleToSizeT(args->rho)*2+1;
-  else
-    kernel->width = GetOptimalKernelWidth1D(args->rho,sigma);
+  SetBlurKernelWidth(kernel,args,sigma);
   kernel->height = 1;
   kernel->x = (ssize_t) (kernel->width-1)/2;
   kernel->y = 0;
@@ -2735,28 +2880,46 @@ static KernelInfo *AcquireKernelOfType(KernelInfo *kernel,
   }
 }
 
+static const KernelInfoType
+  KernelsBuiltWithoutBase[] =
+  {
+    UndefinedKernel,    /* These should not call this function */
+    UserDefinedKernel,
+    LaplacianKernel,   /* Named Discrete Convolution Kernels */
+    SobelKernel,       /* these are defined using other kernels */
+    RobertsKernel,
+    PrewittKernel,
+    CompassKernel,
+    KirschKernel,
+    FreiChenKernel,
+    EdgesKernel,       /* Hit and Miss kernels */
+    CornersKernel,
+    DiagonalsKernel,
+    LineEndsKernel,
+    LineJunctionsKernel,
+    RidgesKernel,
+    ConvexHullKernel,
+    SkeletonKernel,
+    ThinSEKernel
+  };
+
+static MagickBooleanType IsKernelBuiltWithoutBase(const KernelInfoType type)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(KernelsBuiltWithoutBase)/
+       sizeof(*KernelsBuiltWithoutBase)); i++)
+    if (KernelsBuiltWithoutBase[i] == type)
+      return(MagickTrue);
+  return(MagickFalse);
+}
+
 static MagickBooleanType IsBaseKernelNeeded(const KernelInfoType type)
 {
+  if (IsKernelBuiltWithoutBase(type) != MagickFalse)
+    return(MagickFalse); /* A pre-generated kernel is not needed */
   switch(type) {
-    case UndefinedKernel:    /* These should not call this function */
-    case UserDefinedKernel:
-    case LaplacianKernel:   /* Named Discrete Convolution Kernels */
-    case SobelKernel:       /* these are defined using other kernels */
-    case RobertsKernel:
-    case PrewittKernel:
-    case CompassKernel:
-    case KirschKernel:
-    case FreiChenKernel:
-    case EdgesKernel:       /* Hit and Miss kernels */
-    case CornersKernel:
-    case DiagonalsKernel:
-    case LineEndsKernel:
-    case LineJunctionsKernel:
-    case RidgesKernel:
-    case ConvexHullKernel:
-    case SkeletonKernel:
-    case ThinSEKernel:
-      return(MagickFalse); /* A pre-generated kernel is not needed */
 #if 0
     /* set to 1 to do a compile-time check that we haven't missed anything */
     case UnityKernel:
@@ -2829,6 +2992,15 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   builtin.exception=exception;
   return(AcquireKernelOfType(kernel,type,&builtin));
 }
+static void CopyKernelValues(KernelInfo *new_kernel,const KernelInfo *kernel)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) (kernel->width*kernel->height); i++)
+    new_kernel->values[i]=kernel->values[i];
+}
+
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2856,9 +3028,6 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
 */
 MagickExport KernelInfo *CloneKernelInfo(const KernelInfo *kernel)
 {
-  ssize_t
-    i;
-
   KernelInfo
     *new_kernel;
 
@@ -2871,8 +3040,7 @@ MagickExport KernelInfo *CloneKernelInfo(const KernelInfo *kernel)
   /* replace the values with a copy of the values */
   if (AcquireKernelValues(new_kernel) == MagickFalse)
     return(DestroyKernelInfo(new_kernel));
-  for (i=0; i < (ssize_t) (kernel->width*kernel->height); i++)
-    new_kernel->values[i]=kernel->values[i];
+  CopyKernelValues(new_kernel,kernel);
 
   /* Also clone the next kernel in the kernel list */
   if ( kernel->next != (KernelInfo *) NULL ) {
@@ -2882,6 +3050,18 @@ MagickExport KernelInfo *CloneKernelInfo(const KernelInfo *kernel)
   }
 
   return(new_kernel);
+}
+
+static void AppendFloppedKernel(KernelInfo *last)
+{
+  KernelInfo
+    *clone;
+
+  clone = CloneKernelInfo(last);
+  if (clone == (KernelInfo *) NULL)
+    return;
+  RotateKernelInfo(clone, 180);  /* flop */
+  LastKernelInfo(last)->next = clone;
 }
 
 static void ExpandMirrorKernelInfo(KernelInfo *kernel)
@@ -2906,11 +3086,7 @@ static void ExpandMirrorKernelInfo(KernelInfo *kernel)
   LastKernelInfo(last)->next = clone;
   last = clone;
 
-  clone = CloneKernelInfo(last);
-  if (clone == (KernelInfo *) NULL)
-    return;
-  RotateKernelInfo(clone, 180);  /* flop */
-  LastKernelInfo(last)->next = clone;
+  AppendFloppedKernel(last);
 
   return;
 }
@@ -2982,6 +3158,12 @@ static MagickBooleanType SameKernelInfo(const KernelInfo *kernel1,
   return MagickTrue;
 }
 
+static void ReleaseRepeatedKernel(KernelInfo *clone_info)
+{
+  if (clone_info != (KernelInfo *) NULL)
+    clone_info=DestroyKernelInfo(clone_info);
+}
+
 static void ExpandRotateKernelInfo(KernelInfo *kernel,const double angle)
 {
   KernelInfo
@@ -3002,10 +3184,20 @@ RestoreMSCWarning
     LastKernelInfo(last)->next=clone_info;
     last=clone_info;
   }
-  if (clone_info != (KernelInfo *) NULL)
-    clone_info=DestroyKernelInfo(clone_info);  /* kernel repeated - junk */
+  ReleaseRepeatedKernel(clone_info);  /* kernel repeated - junk */
   return;
 }
+static void AddKernelMetaValue(KernelInfo *kernel,const size_t i)
+{
+  if ( fabs(kernel->values[i]) < MagickEpsilon )
+    kernel->values[i] = 0.0;
+  ( kernel->values[i] < 0)
+      ?  ( kernel->negative_range += kernel->values[i] )
+      :  ( kernel->positive_range += kernel->values[i] );
+  Minimize(kernel->minimum, kernel->values[i]);
+  Maximize(kernel->maximum, kernel->values[i]);
+}
+
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3051,15 +3243,7 @@ static void CalcKernelMetaData(KernelInfo *kernel)
   kernel->minimum = kernel->maximum = 0.0;
   kernel->negative_range = kernel->positive_range = 0.0;
   for (i=0; i < (kernel->width*kernel->height); i++)
-    {
-      if ( fabs(kernel->values[i]) < MagickEpsilon )
-        kernel->values[i] = 0.0;
-      ( kernel->values[i] < 0)
-          ?  ( kernel->negative_range += kernel->values[i] )
-          :  ( kernel->positive_range += kernel->values[i] );
-      Minimize(kernel->minimum, kernel->values[i]);
-      Maximize(kernel->maximum, kernel->values[i]);
-    }
+    AddKernelMetaValue(kernel,i);
 
   return;
 }
@@ -4283,20 +4467,25 @@ static void SetMorphologyKernelOffset(const MorphologyMethod method,
   }
 }
 
+static void ResetMorphologyChanges(size_t *changes)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) GetOpenMPMaximumThreads(); j++)
+    changes[j]=0;
+}
+
 static size_t *AcquireMorphologyChanges(void)
 {
   size_t
     *changes;
 
-  ssize_t
-    j;
-
   changes=(size_t *) AcquireQuantumMemory(GetOpenMPMaximumThreads(),
     sizeof(*changes));
   if (changes == (size_t *) NULL)
     ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
-  for (j=0; j < (ssize_t) GetOpenMPMaximumThreads(); j++)
-    changes[j]=0;
+  ResetMorphologyChanges(changes);
   return(changes);
 }
 
@@ -4339,6 +4528,16 @@ typedef struct _MorphologyPrimitiveSetup
     *exception;
 } MorphologyPrimitiveSetup;
 
+static size_t SumMorphologyChanges(size_t changed,const size_t *changes)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) GetOpenMPMaximumThreads(); j++)
+    changed+=changes[j];
+  return(changed);
+}
+
 static ssize_t MorphologyRows(const MorphologyPrimitiveSetup *setup)
 {
   const MorphologyMethod
@@ -4380,7 +4579,6 @@ static ssize_t MorphologyRows(const MorphologyPrimitiveSetup *setup)
     *exception = setup->exception;
 
   ssize_t
-    j,
     y;
 
   /*
@@ -4412,8 +4610,7 @@ static ssize_t MorphologyRows(const MorphologyPrimitiveSetup *setup)
   }
   morphology_view=DestroyCacheView(morphology_view);
   image_view=DestroyCacheView(image_view);
-  for (j=0; j < (ssize_t) GetOpenMPMaximumThreads(); j++)
-    changed+=changes[j];
+  changed=SumMorphologyChanges(changed,changes);
   changes=(size_t *) RelinquishMagickMemory(changes);
   return(status ? (ssize_t) (changed/GetImageChannels(image)) : -1);
 }
@@ -5568,6 +5765,17 @@ typedef struct _MorphologyIterationTargets
     **curr_image;
 } MorphologyIterationTargets;
 
+static void SwapMorphologyImages(const MorphologyStages *stages,
+  Image **work_image,Image **curr_image)
+{
+  { Image *tmp = (*work_image);   /* swap images for iteration */
+    (*work_image) = (*curr_image);
+    (*curr_image) = tmp;
+  }
+  if ( (*work_image) == stages->image )
+    (*work_image) = (Image *) NULL; /* replace input 'image' */
+}
+
 static MagickBooleanType IterateMorphologyKernel(
   const MorphologyStages *stages,const MorphologyMethod primitive,
   KernelInfo *this_kernel,const MorphologyIterationTargets *targets)
@@ -5627,12 +5835,7 @@ static MagickBooleanType IterateMorphologyKernel(
     (*method_changed) = (size_t) ((ssize_t) (*method_changed)+(*changed));
 
     /* prepare next loop */
-    { Image *tmp = (*work_image);   /* swap images for iteration */
-      (*work_image) = (*curr_image);
-      (*curr_image) = tmp;
-    }
-    if ( (*work_image) == stages->image )
-      (*work_image) = (Image *) NULL; /* replace input 'image' */
+    SwapMorphologyImages(stages,work_image,curr_image);
 
   } /* End Loop 4: Iterate the kernel with primitive */
   return(MagickTrue);
@@ -5677,6 +5880,18 @@ typedef struct _MorphologyStageTargets
     *count,
     *method_changed;
 } MorphologyStageTargets;
+
+static MorphologyMethod SaveEdgeDilateImage(const MorphologyStages *stages,
+  Image **save_image,Image **curr_image)
+{
+  MorphologyMethod
+    primitive;
+
+  (*save_image) = (*curr_image);      /* save the image difference */
+  (*curr_image) = (Image *) stages->image;
+  primitive = ErodeMorphology;
+  return(primitive);
+}
 
 static MagickBooleanType ApplyMorphologyStages(
   const MorphologyStages *stages,const MorphologyStageTargets *targets)
@@ -5723,11 +5938,8 @@ static MagickBooleanType ApplyMorphologyStages(
     switch( stages->method ) {
       case EdgeMorphology:        /* dilate and erode difference */
         primitive = DilateMorphology;
-        if ( stage_loop == 2 ) {
-          (*save_image) = (*curr_image);      /* save the image difference */
-          (*curr_image) = (Image *) stages->image;
-          primitive = ErodeMorphology;
-        }
+        if ( stage_loop == 2 )
+          primitive=SaveEdgeDilateImage(stages,save_image,curr_image);
         break;
       default:
         SelectCloseIntensityPrimitive(&selection,this_kernel,&primitive);
@@ -5806,6 +6018,30 @@ typedef struct _MorphologyDirectApply
     *exception;
 } MorphologyDirectApply;
 
+static void ReportDirectMorphology(const MagickBooleanType verbose,
+  const MorphologyMethod method,const ssize_t changed)
+{
+  if (verbose != MagickFalse)
+    (void) (void) FormatLocaleFile(stderr,
+      "%s:%.17g.%.17g #%.17g => Changed %.17g\n",
+      CommandOptionToMnemonic(MagickMorphologyOptions, method),
+      1.0,0.0,1.0, (double) changed);
+}
+
+static void PreserveVoronoiAlpha(const MorphologyMethod method,
+  const Image *image,Image **rslt_image,ExceptionInfo *exception)
+{
+  if ( method == VoronoiMorphology ) {
+    /* Preserve the alpha channel of input image - but turned it off */
+    (void) SetImageAlphaChannel((*rslt_image), DeactivateAlphaChannel,
+      exception);
+    (void) CompositeImage((*rslt_image),image,CopyAlphaCompositeOp,
+      MagickTrue,0,0,exception);
+    (void) SetImageAlphaChannel((*rslt_image), DeactivateAlphaChannel,
+      exception);
+  }
+}
+
 static MagickBooleanType ApplyDirectMorphology(
   const MorphologyDirectApply *direct,Image **rslt_image)
 {
@@ -5835,24 +6071,12 @@ static MagickBooleanType ApplyDirectMorphology(
 
   changed=MorphologyPrimitiveDirect((*rslt_image),method,kernel,exception);
 
-  if (verbose != MagickFalse)
-    (void) (void) FormatLocaleFile(stderr,
-      "%s:%.17g.%.17g #%.17g => Changed %.17g\n",
-      CommandOptionToMnemonic(MagickMorphologyOptions, method),
-      1.0,0.0,1.0, (double) changed);
+  ReportDirectMorphology(verbose,method,changed);
 
   if ( changed < 0 )
     return(MagickFalse);
 
-  if ( method == VoronoiMorphology ) {
-    /* Preserve the alpha channel of input image - but turned it off */
-    (void) SetImageAlphaChannel((*rslt_image), DeactivateAlphaChannel,
-      exception);
-    (void) CompositeImage((*rslt_image),image,CopyAlphaCompositeOp,
-      MagickTrue,0,0,exception);
-    (void) SetImageAlphaChannel((*rslt_image), DeactivateAlphaChannel,
-      exception);
-  }
+  PreserveVoronoiAlpha(method,image,rslt_image,exception);
   return(MagickTrue);
 }
 
@@ -5936,6 +6160,14 @@ typedef struct _MorphologyKernelResult
     *exception;
 } MorphologyKernelResult;
 
+static void SaveResultForCompose(const MagickBooleanType verbose,
+  const Image *image,Image **rslt_image,Image **curr_image)
+{
+  ReportSaveForCompose(verbose);
+  (*rslt_image) = (*curr_image);
+  (*curr_image) = (Image *) image;  /* continue with original image */
+}
+
 static void CollectKernelResult(const MorphologyKernelResult *result,
   Image **rslt_image,Image **curr_image)
 {
@@ -5967,10 +6199,7 @@ static void CollectKernelResult(const MorphologyKernelResult *result,
       (*rslt_image) = (*curr_image); /* return result, and re-iterate */
     }
   else if ( (*rslt_image) == (Image *) NULL)
-    { ReportSaveForCompose(verbose);
-      (*rslt_image) = (*curr_image);
-      (*curr_image) = (Image *) image;  /* continue with original image */
-    }
+    SaveResultForCompose(verbose,image,rslt_image,curr_image);
   else
     { /* Add the new 'current' result to the composition
       **
@@ -6035,6 +6264,33 @@ typedef struct _MorphologyApplyTargets
     *count;
 } MorphologyApplyTargets;
 
+static void FinishCompoundStages(const MorphologyMethodLoop *loop,
+  Image **curr_image,Image **save_image)
+{
+  MorphologyCompoundFinish
+    finish;
+
+  finish.method=loop->method;
+  finish.verbose=loop->verbose;
+  finish.curr_image=(*curr_image);
+  finish.image=loop->image;
+  finish.exception=loop->exception;
+  (*save_image)=FinishCompoundMorphology(&finish,(*save_image));
+}
+
+static void EndKernelReportLine(const MorphologyMethodLoop *loop)
+{
+  if (loop->verbose != MagickFalse)
+    (void) FormatLocaleFile(stderr, "\n");
+}
+
+static KernelInfo *NextReflectedKernel(KernelInfo *rflt_kernel)
+{
+  if ( rflt_kernel != (KernelInfo *) NULL )
+    rflt_kernel = rflt_kernel->next;
+  return(rflt_kernel);
+}
+
 static MagickBooleanType ApplyMorphologyMethodLoop(
   const MorphologyMethodLoop *loop,const MorphologyApplyTargets *targets)
 {
@@ -6081,9 +6337,6 @@ static MagickBooleanType ApplyMorphologyMethodLoop(
           loop->stage_limit, loop->kernel_limit, loop->v_info,
           loop->exception };
 
-      MorphologyCompoundFinish
-        finish;
-
       MorphologyKernelResult
         kernel_result;
 
@@ -6098,12 +6351,7 @@ static MagickBooleanType ApplyMorphologyMethodLoop(
       ** purely mathematical way, and only to the selected channels.
       ** Turn off SVG composition 'alpha blending'.
       */
-      finish.method=loop->method;
-      finish.verbose=loop->verbose;
-      finish.curr_image=(*curr_image);
-      finish.image=loop->image;
-      finish.exception=loop->exception;
-      (*save_image)=FinishCompoundMorphology(&finish,(*save_image));
+      FinishCompoundStages(loop,curr_image,save_image);
 
       /* multi-kernel handling:  re-iterate, or compose results */
       kernel_result.kernel=loop->kernel;
@@ -6113,13 +6361,11 @@ static MagickBooleanType ApplyMorphologyMethodLoop(
       kernel_result.image=loop->image;
       kernel_result.exception=loop->exception;
       CollectKernelResult(&kernel_result,rslt_image,curr_image);
-      if (loop->verbose != MagickFalse)
-        (void) FormatLocaleFile(stderr, "\n");
+      EndKernelReportLine(loop);
 
       /* loop to the next kernel in a multi-kernel list */
       norm_kernel = norm_kernel->next;
-      if ( rflt_kernel != (KernelInfo *) NULL )
-        rflt_kernel = rflt_kernel->next;
+      rflt_kernel=NextReflectedKernel(rflt_kernel);
       kernel_number++;
     } /* End Loop 2: Loop over each kernel */
 
@@ -6142,6 +6388,26 @@ typedef struct _MorphologyApplyRelease
     *reflected_kernel;
 } MorphologyApplyRelease;
 
+static void ReleaseCurrentImage(const Image *image,Image *curr_image,
+  const Image *rslt_image)
+{
+  if ( curr_image == rslt_image || curr_image == image )
+    curr_image = (Image *) NULL;
+  if ( curr_image != (Image *) NULL )
+    curr_image = DestroyImage(curr_image);
+}
+
+static void ReleaseMorphologyWork(Image *work_image,Image *save_image,
+  KernelInfo *reflected_kernel)
+{
+  if ( work_image != (Image *) NULL )
+    work_image = DestroyImage(work_image);
+  if ( save_image != (Image *) NULL )
+    save_image = DestroyImage(save_image);
+  if ( reflected_kernel != (KernelInfo *) NULL )
+    reflected_kernel = DestroyKernelInfo(reflected_kernel);
+}
+
 static void ReleaseMorphologyApply(const MorphologyApplyRelease *release)
 {
   const Image
@@ -6156,16 +6422,8 @@ static void ReleaseMorphologyApply(const MorphologyApplyRelease *release)
   KernelInfo
     *reflected_kernel = release->reflected_kernel;
 
-  if ( curr_image == rslt_image || curr_image == image )
-    curr_image = (Image *) NULL;
-  if ( curr_image != (Image *) NULL )
-    curr_image = DestroyImage(curr_image);
-  if ( work_image != (Image *) NULL )
-    work_image = DestroyImage(work_image);
-  if ( save_image != (Image *) NULL )
-    save_image = DestroyImage(save_image);
-  if ( reflected_kernel != (KernelInfo *) NULL )
-    reflected_kernel = DestroyKernelInfo(reflected_kernel);
+  ReleaseCurrentImage(image,curr_image,rslt_image);
+  ReleaseMorphologyWork(work_image,save_image,reflected_kernel);
 }
 
 typedef struct _MorphologyIteratedLimits
@@ -6318,6 +6576,18 @@ typedef struct _MorphologyStagesTargets
     **reflected_kernel;
 } MorphologyStagesTargets;
 
+static MagickBooleanType ApplySpecialMorphology(
+  const MorphologyApplyStages *stages,Image **rslt_image)
+{
+  const MorphologyDirectApply
+    direct = { stages->image, stages->method, stages->kernel,
+      stages->verbose, stages->exception };
+
+  if (ApplyDirectMorphology(&direct,rslt_image) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType ApplyMorphologyMethodPrimitives(
   const MorphologyApplyStages *stages,CompositeOperator rslt_compose,
   const MorphologyStagesTargets *stage_targets)
@@ -6335,15 +6605,7 @@ static MagickBooleanType ApplyMorphologyMethodPrimitives(
   ** For example, single run only, or post-processing requirements
   */
   if ( stages->special != MagickFalse )
-    {
-      const MorphologyDirectApply
-        direct = { stages->image, stages->method, stages->kernel,
-          stages->verbose, stages->exception };
-
-      if (ApplyDirectMorphology(&direct,rslt_image) == MagickFalse)
-        return(MagickFalse);
-      return(MagickTrue);
-    }
+    return(ApplySpecialMorphology(stages,rslt_image));
 
   /* Handle user (caller) specified multi-kernel composition method */
   rslt_compose=ResolveMultiKernelCompose(stages->compose,rslt_compose);
@@ -6488,6 +6750,34 @@ exit_cleanup:
   return(rslt_image);
 }
 
+static void RotateKernelOriginBy45Degrees(KernelInfo *kernel)
+{
+  if ( kernel->x != 1 || kernel->y != 1 ) {
+    ssize_t x,y;
+    x = (ssize_t) kernel->x-1;
+    y = (ssize_t) kernel->y-1;
+         if ( x == y  ) x = 0;
+    else if ( x == 0  ) x = -y;
+    else if ( x == -y ) y = 0;
+    else if ( y == 0  ) y = x;
+    kernel->x = (ssize_t) x+1;
+    kernel->y = (ssize_t) y+1;
+  }
+}
+
+static void RotateKernelRingBy45Degrees(KernelInfo *kernel)
+{
+  double t  = kernel->values[0];
+  kernel->values[0] = kernel->values[3];
+  kernel->values[3] = kernel->values[6];
+  kernel->values[6] = kernel->values[7];
+  kernel->values[7] = kernel->values[8];
+  kernel->values[8] = kernel->values[5];
+  kernel->values[5] = kernel->values[2];
+  kernel->values[2] = kernel->values[1];
+  kernel->values[1] = t;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -6521,29 +6811,23 @@ exit_cleanup:
 static double RotateKernelBy45Degrees(KernelInfo *kernel,double angle)
 {
   /* Rotate a 3x3 square by 45 degree angle */
-  double t  = kernel->values[0];
-  kernel->values[0] = kernel->values[3];
-  kernel->values[3] = kernel->values[6];
-  kernel->values[6] = kernel->values[7];
-  kernel->values[7] = kernel->values[8];
-  kernel->values[8] = kernel->values[5];
-  kernel->values[5] = kernel->values[2];
-  kernel->values[2] = kernel->values[1];
-  kernel->values[1] = t;
+  RotateKernelRingBy45Degrees(kernel);
   /* rotate non-centered origin */
-  if ( kernel->x != 1 || kernel->y != 1 ) {
-    ssize_t x,y;
-    x = (ssize_t) kernel->x-1;
-    y = (ssize_t) kernel->y-1;
-         if ( x == y  ) x = 0;
-    else if ( x == 0  ) x = -y;
-    else if ( x == -y ) y = 0;
-    else if ( y == 0  ) y = x;
-    kernel->x = (ssize_t) x+1;
-    kernel->y = (ssize_t) y+1;
-  }
+  RotateKernelOriginBy45Degrees(kernel);
   angle = fmod(angle+315.0, 360.0);  /* angle reduced 45 degrees */
   kernel->angle = fmod(kernel->angle+45.0, 360.0);
+  return(angle);
+}
+
+static double TurnTransposedKernelAngle(KernelInfo *kernel,double angle)
+{
+  if ( kernel->width == 1 ) {
+    angle = fmod(angle+270.0, 360.0);     /* angle reduced 90 degrees */
+    kernel->angle = fmod(kernel->angle+90.0, 360.0);
+  } else {
+    angle = fmod(angle+90.0, 360.0);   /* angle increased 90 degrees */
+    kernel->angle = fmod(kernel->angle+270.0, 360.0);
+  }
   return(angle);
 }
 
@@ -6560,54 +6844,51 @@ static double TransposeKernel(KernelInfo *kernel,double angle)
   t = kernel->x;
   kernel->x = kernel->y;
   kernel->y = t;
-  if ( kernel->width == 1 ) {
-    angle = fmod(angle+270.0, 360.0);     /* angle reduced 90 degrees */
-    kernel->angle = fmod(kernel->angle+90.0, 360.0);
-  } else {
-    angle = fmod(angle+90.0, 360.0);   /* angle increased 90 degrees */
-    kernel->angle = fmod(kernel->angle+270.0, 360.0);
-  }
+  angle=TurnTransposedKernelAngle(kernel,angle);
   return(angle);
+}
+
+static void RotateSquareKernelValues(KernelInfo *kernel)
+{
+  ssize_t
+    i,j,x,y;
+
+  MagickRealType
+    *k,t;
+
+  k=kernel->values;
+  for( i=0, x=(ssize_t) kernel->width-1;  i<=x;   i++, x--)
+    for( j=0, y=(ssize_t) kernel->height-1;  j<y;   j++, y--)
+      { t                    = k[i+j*(ssize_t) kernel->width];
+        k[i+j*(ssize_t) kernel->width] = k[j+x*(ssize_t) kernel->width];
+        k[j+x*(ssize_t) kernel->width] = k[x+y*(ssize_t) kernel->width];
+        k[x+y*(ssize_t) kernel->width] = k[y+i*(ssize_t) kernel->width];
+        k[y+i*(ssize_t) kernel->width] = t;
+      }
+}
+
+static void RotateSquareKernelOrigin(KernelInfo *kernel)
+{
+  ssize_t x,y;
+  x = (ssize_t) (kernel->x*2-(ssize_t) kernel->width+1);
+  y = (ssize_t) (kernel->y*2-(ssize_t) kernel->height+1);
+  kernel->x = (ssize_t) ( -y +(ssize_t) kernel->width-1)/2;
+  kernel->y = (ssize_t) ( +x +(ssize_t) kernel->height-1)/2;
 }
 
 static double RotateSquareKernelBy90Degrees(KernelInfo *kernel,double angle)
 {
   /* Rotate a square array of values by 90 degrees */
-  { ssize_t
-      i,j,x,y;
-
-    MagickRealType
-      *k,t;
-
-    k=kernel->values;
-    for( i=0, x=(ssize_t) kernel->width-1;  i<=x;   i++, x--)
-      for( j=0, y=(ssize_t) kernel->height-1;  j<y;   j++, y--)
-        { t                    = k[i+j*(ssize_t) kernel->width];
-          k[i+j*(ssize_t) kernel->width] = k[j+x*(ssize_t) kernel->width];
-          k[j+x*(ssize_t) kernel->width] = k[x+y*(ssize_t) kernel->width];
-          k[x+y*(ssize_t) kernel->width] = k[y+i*(ssize_t) kernel->width];
-          k[y+i*(ssize_t) kernel->width] = t;
-        }
-  }
+  RotateSquareKernelValues(kernel);
   /* rotate the origin - relative to center of array */
-  { ssize_t x,y;
-    x = (ssize_t) (kernel->x*2-(ssize_t) kernel->width+1);
-    y = (ssize_t) (kernel->y*2-(ssize_t) kernel->height+1);
-    kernel->x = (ssize_t) ( -y +(ssize_t) kernel->width-1)/2;
-    kernel->y = (ssize_t) ( +x +(ssize_t) kernel->height-1)/2;
-  }
+  RotateSquareKernelOrigin(kernel);
   angle = fmod(angle+270.0, 360.0);     /* angle reduced 90 degrees */
   kernel->angle = fmod(kernel->angle+90.0, 360.0);
   return(angle);
 }
 
-static double ReflectKernel(KernelInfo *kernel,double angle)
+static void ReverseKernelValues(KernelInfo *kernel)
 {
-  /* For a 180 degree rotation - also know as a reflection
-   * This is actually a very very common operation!
-   * Basically all that is needed is a reversal of the kernel data!
-   * And a reflection of the origin
-   */
   MagickRealType
     t;
 
@@ -6622,6 +6903,16 @@ static double ReflectKernel(KernelInfo *kernel,double angle)
   j=(ssize_t) (kernel->width*kernel->height-1);
   for (i=0;  i < j;  i++, j--)
     t=k[i],  k[i]=k[j],  k[j]=t;
+}
+
+static double ReflectKernel(KernelInfo *kernel,double angle)
+{
+  /* For a 180 degree rotation - also know as a reflection
+   * This is actually a very very common operation!
+   * Basically all that is needed is a reversal of the kernel data!
+   * And a reflection of the origin
+   */
+  ReverseKernelValues(kernel);
 
   kernel->x = (ssize_t) kernel->width  - kernel->x - 1;
   kernel->y = (ssize_t) kernel->height - kernel->y - 1;
@@ -6719,6 +7010,13 @@ static double NormalizeKernelAngle(double angle)
   return(angle);
 }
 
+static double TurnBlurKernelAngle(double angle)
+{
+  if (IsNearThreeQuarterTurnAngle(angle) != MagickFalse)
+    angle -= 180;
+  return(angle);
+}
+
 static void RotateKernelInfo(KernelInfo *kernel, double angle)
 {
   /* angle the lower kernels first */
@@ -6745,8 +7043,7 @@ static void RotateKernelInfo(KernelInfo *kernel, double angle)
     case BlurKernel:
       if (IsNearHalfTurnAngle(angle) != MagickFalse)
         return;
-      if (IsNearThreeQuarterTurnAngle(angle) != MagickFalse)
-        angle -= 180;
+      angle=TurnBlurKernelAngle(angle);
       break;
 
     default:
