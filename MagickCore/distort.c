@@ -2488,20 +2488,27 @@ static void PrintPolynomialFX(const double *coeff,const char *image_gen,
   (void) FormatLocaleFile(stderr,";\n       %s' \\\n", lookup);
 }
 
+static void ParseDistortViewport(const char *artifact,
+  RectangleInfo *geometry,MagickBooleanType *viewport_given,
+  ExceptionInfo *exception)
+{
+  if ( artifact != (const char *) NULL ) {
+    MagickStatusType flags=ParseAbsoluteGeometry(artifact,geometry);
+    if (flags==NoValue)
+      (void) ThrowMagickException(exception,GetMagickModule(),
+           OptionWarning,"InvalidSetting","'%s' '%s'",
+           "distort:viewport",artifact);
+    else
+      *viewport_given = MagickTrue;
+  }
+}
+
 static void GetDistortViewport(const Image *image,RectangleInfo *geometry,
   MagickBooleanType *viewport_given,ExceptionInfo *exception)
 {
   { const char *artifact=GetImageArtifact(image,"distort:viewport");
     *viewport_given = MagickFalse;
-    if ( artifact != (const char *) NULL ) {
-      MagickStatusType flags=ParseAbsoluteGeometry(artifact,geometry);
-      if (flags==NoValue)
-        (void) ThrowMagickException(exception,GetMagickModule(),
-             OptionWarning,"InvalidSetting","'%s' '%s'",
-             "distort:viewport",artifact);
-      else
-        *viewport_given = MagickTrue;
-    }
+    ParseDistortViewport(artifact,geometry,viewport_given,exception);
   }
 }
 
