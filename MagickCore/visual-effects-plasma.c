@@ -415,6 +415,14 @@ static MagickBooleanType FinishPlasmaSegment(const PlasmaMidpoint *midpoint,
   return(MagickFalse);
 }
 
+static MagickBooleanType FinishPlasmaColumnPixels(
+  const PlasmaMidpoint *midpoint,MagickStatusType status)
+{
+  if (SetPlasmaRowPixels(midpoint,&status) == MagickFalse)
+    return(MagickTrue);
+  return(FinishPlasmaSegment(midpoint,status));
+}
+
 static MagickBooleanType SetPlasmaColumnPixels(const PlasmaMidpoint *midpoint,
   MagickStatusType status)
 {
@@ -441,9 +449,7 @@ static MagickBooleanType SetPlasmaColumnPixels(const PlasmaMidpoint *midpoint,
               &status) == MagickFalse))
         return(MagickFalse);
     }
-  if (SetPlasmaRowPixels(midpoint,&status) == MagickFalse)
-    return(MagickTrue);
-  return(FinishPlasmaSegment(midpoint,status));
+  return(FinishPlasmaColumnPixels(midpoint,status));
 }
 
 static MagickBooleanType AveragePlasmaSegment(const PlasmaContext *context,
