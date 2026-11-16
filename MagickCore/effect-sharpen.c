@@ -677,8 +677,7 @@ static MagickBooleanType UnsharpHeadRow(const UnsharpHead *head,const ssize_t y,
       return(MagickFalse);
     }
   UnsharpRow(&unsharp,p,q);
-  if (SyncCacheViewAuthenticPixels(unsharp_view,exception) == MagickFalse)
-    (*status)=MagickFalse;
+  SyncSharpenRow(status,unsharp_view,exception);
   return(MagickTrue);
 }
 
