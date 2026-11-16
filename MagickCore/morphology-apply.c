@@ -803,6 +803,12 @@ static MagickBooleanType ReadKernelCache(const char *kernel_string,
   return(MagickTrue);
 }
 
+static void ReleaseKernelCache(char *kernel_cache)
+{
+  if (kernel_cache != (char *) NULL)
+    kernel_cache=DestroyString(kernel_cache);
+}
+
 MagickExport KernelInfo *AcquireKernelInfo(const char *kernel_string,
   ExceptionInfo *exception)
 {
@@ -839,8 +845,7 @@ MagickExport KernelInfo *AcquireKernelInfo(const char *kernel_string,
       break;
     p++;
   }
-  if (kernel_cache != (char *) NULL)
-    kernel_cache=DestroyString(kernel_cache);
+  ReleaseKernelCache(kernel_cache);
   return(kernel);
 }
 
