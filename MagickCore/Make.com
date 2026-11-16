@@ -207,6 +207,7 @@ $call Make token-next.c
 $call Make token-glob.c
 $call Make transform.c
 $call Make transform-region.c
+$call Make transform-crop.c
 $call Make transform-tiles.c
 $call Make threshold.c
 $call Make threshold-image.c

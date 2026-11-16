@@ -119,6 +119,7 @@ if ( ! GetOptions(
 	 'stream-read.c',
 	 'transform.c',
 	 'transform-region.c',
+	 'transform-crop.c',
 	 'transform-tiles.c',
 	 'resize.c',
 	 'resize-rescale.c',

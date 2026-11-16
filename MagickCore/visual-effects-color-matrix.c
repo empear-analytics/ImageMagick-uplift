@@ -150,22 +150,31 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static ssize_t LoadColorMatrixRow(const KernelInfo *color_matrix,
+  double ColorMatrix[][6],const ssize_t v,ssize_t i)
+{
+  ssize_t
+    u;
+
+  for (u=0; u < (ssize_t) color_matrix->width; u++)
+  {
+    if ((v < 6) && (u < 6))
+      ColorMatrix[v][u]=color_matrix->values[i];
+    i++;
+  }
+  return(i);
+}
+
 static void LoadColorMatrix(const KernelInfo *color_matrix,
   double ColorMatrix[][6])
 {
   ssize_t
     i,
-    u,
     v;
 
   i=0;
   for (v=0; v < (ssize_t) color_matrix->height; v++)
-    for (u=0; u < (ssize_t) color_matrix->width; u++)
-    {
-      if ((v < 6) && (u < 6))
-        ColorMatrix[v][u]=color_matrix->values[i];
-      i++;
-    }
+    i=LoadColorMatrixRow(color_matrix,ColorMatrix,v,i);
 }
 
 static double GetColorMatrixSum(const Image *image,
@@ -248,6 +257,33 @@ typedef struct _ColorMatrixRow
     *exception;
 } ColorMatrixRow;
 
+static PixelInfo ApplyColorMatrixPixel(const ColorMatrixRow *color_row,
+  double ColorMatrix[][6],const Quantum *magick_restrict p,PixelInfo pixel)
+{
+  const Image
+    *const image = color_row->image;
+
+  const KernelInfo
+    *const color_matrix = color_row->color_matrix;
+
+  ssize_t
+    h;
+
+  size_t
+    height;
+
+  height=color_matrix->height > 6 ? 6UL : color_matrix->height;
+  for (h=0; h < (ssize_t) height; h++)
+  {
+    double
+      sum;
+
+    sum=GetColorMatrixSum(image,p,ColorMatrix[h]);
+    pixel=SetColorMatrixChannel(pixel,h,sum);
+  }
+  return(pixel);
+}
+
 static void ApplyColorMatrixRow(const ColorMatrixRow *color_row,
   double ColorMatrix[][6],const Quantum *magick_restrict p,
   Quantum *magick_restrict q)
@@ -258,9 +294,6 @@ static void ApplyColorMatrixRow(const ColorMatrixRow *color_row,
   Image
     *const color_image = color_row->color_image;
 
-  const KernelInfo
-    *const color_matrix = color_row->color_matrix;
-
   PixelInfo
     pixel;
 
@@ -270,22 +303,8 @@ static void ApplyColorMatrixRow(const ColorMatrixRow *color_row,
   GetPixelInfo(image,&pixel);
   for (x=0; x < (ssize_t) image->columns; x++)
   {
-    ssize_t
-      h;
-
-    size_t
-      height;
-
     GetPixelInfoPixel(image,p,&pixel);
-    height=color_matrix->height > 6 ? 6UL : color_matrix->height;
-    for (h=0; h < (ssize_t) height; h++)
-    {
-      double
-        sum;
-
-      sum=GetColorMatrixSum(image,p,ColorMatrix[h]);
-      pixel=SetColorMatrixChannel(pixel,h,sum);
-    }
+    pixel=ApplyColorMatrixPixel(color_row,ColorMatrix,p,pixel);
     SetPixelViaPixelInfo(color_image,&pixel,q);
     p+=(ptrdiff_t) GetPixelChannels(image);
     q+=(ptrdiff_t) GetPixelChannels(color_image);
@@ -329,6 +348,12 @@ static MagickBooleanType ColorMatrixImageRow(
   if (SyncCacheViewAuthenticPixels(color_view,exception) == MagickFalse)
     (*status)=MagickFalse;
   return(MagickTrue);
+}
+
+static void LogColorMatrixIfDebug(const Image *image,double ColorMatrix[][6])
+{
+  if (image->debug != MagickFalse)
+    LogColorMatrix(ColorMatrix);
 }
 
 MagickExport Image *ColorMatrixImage(const Image *image,
@@ -378,8 +403,7 @@ MagickExport Image *ColorMatrixImage(const Image *image,
   */
   if (CloneEffectImage(image,&color_image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (image->debug != MagickFalse)
-    LogColorMatrix(ColorMatrix);
+  LogColorMatrixIfDebug(image,ColorMatrix);
   /*
     Apply the ColorMatrix to image.
   */
