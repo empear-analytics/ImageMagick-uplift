@@ -5735,6 +5735,17 @@ typedef struct _MorphologyIterationTargets
     **curr_image;
 } MorphologyIterationTargets;
 
+static void SwapMorphologyImages(const MorphologyStages *stages,
+  Image **work_image,Image **curr_image)
+{
+  { Image *tmp = (*work_image);   /* swap images for iteration */
+    (*work_image) = (*curr_image);
+    (*curr_image) = tmp;
+  }
+  if ( (*work_image) == stages->image )
+    (*work_image) = (Image *) NULL; /* replace input 'image' */
+}
+
 static MagickBooleanType IterateMorphologyKernel(
   const MorphologyStages *stages,const MorphologyMethod primitive,
   KernelInfo *this_kernel,const MorphologyIterationTargets *targets)
@@ -5794,12 +5805,7 @@ static MagickBooleanType IterateMorphologyKernel(
     (*method_changed) = (size_t) ((ssize_t) (*method_changed)+(*changed));
 
     /* prepare next loop */
-    { Image *tmp = (*work_image);   /* swap images for iteration */
-      (*work_image) = (*curr_image);
-      (*curr_image) = tmp;
-    }
-    if ( (*work_image) == stages->image )
-      (*work_image) = (Image *) NULL; /* replace input 'image' */
+    SwapMorphologyImages(stages,work_image,curr_image);
 
   } /* End Loop 4: Iterate the kernel with primitive */
   return(MagickTrue);
