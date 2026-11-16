@@ -219,6 +219,7 @@ $call Make vision.c
 $call Make vision-components.c
 $call Make vms.c
 $call Make widget.c
+$call Make widget-confirm.c
 $call Make widget-dialog.c
 $call Make xml-tree.c
 $call Make xml-tree-file.c

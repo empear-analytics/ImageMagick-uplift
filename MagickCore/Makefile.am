@@ -428,6 +428,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/vision-components.c \
   MagickCore/vision.h \
   MagickCore/widget.c \
+  MagickCore/widget-confirm.c \
   MagickCore/widget-dialog.c \
   MagickCore/widget.h \
   MagickCore/widget-core-private.h \

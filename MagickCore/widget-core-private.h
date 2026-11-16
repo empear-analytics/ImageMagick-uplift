@@ -1262,6 +1262,30 @@ static inline size_t LeaveWidgetWindow(XWindows *windows,const XEvent event,
   return(state);
 }
 
+static inline size_t ClientWidgetMessage(Display *display,XWindows *windows,
+  const XEvent event,size_t state)
+{
+  /*
+    If client window delete message, exit.
+  */
+  if (event.xclient.message_type != windows->wm_protocols)
+    return(state);
+  if (*event.xclient.data.l == (int) windows->wm_take_focus)
+    {
+      (void) XSetInputFocus(display,event.xclient.window,RevertToParent,
+        (Time) event.xclient.data.l[1]);
+      return(state);
+    }
+  if (*event.xclient.data.l != (int) windows->wm_delete_window)
+    return(state);
+  if (event.xclient.window == windows->widget.id)
+    {
+      state|=ExitState;
+      return(state);
+    }
+  return(state);
+}
+
 #endif
 
 #if defined(__cplusplus) || defined(c_plusplus)
