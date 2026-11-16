@@ -3980,9 +3980,36 @@ static unsigned char *XPackColormapped2BitRowLSB(const Image *canvas,
   return(q);
 }
 
-static unsigned char *XPackColormapped4BitRowLSB(const Image *canvas,
-  const unsigned long *pixels,const Quantum *p,unsigned char *q)
+typedef enum
 {
+  XPackLSBFirst,
+  XPackMSBFirst
+} XPackBitOrder;
+
+typedef struct _XPackColormappedRow
+{
+  XPackBitOrder
+    side;
+
+  const Image
+    *canvas;
+
+  const unsigned long
+    *pixels;
+} XPackColormappedRow;
+
+static inline unsigned char *XPackColormapped4BitRow(
+  const XPackColormappedRow *row,const Quantum *p,unsigned char *q)
+{
+  const XPackBitOrder
+    side = row->side;
+
+  const Image
+    *const canvas = row->canvas;
+
+  const unsigned long
+    *const pixels = row->pixels;
+
   unsigned int
     nibble;
 
@@ -4000,13 +4027,15 @@ static unsigned char *XPackColormapped4BitRowLSB(const Image *canvas,
     {
       case 0:
       {
-        *q=(unsigned char) pixel;
+        *q=((side == XPackLSBFirst) ? (unsigned char) pixel :
+          (unsigned char) (pixel << 4));
         nibble++;
         break;
       }
       case 1:
       {
-        *q|=(unsigned char) (pixel << 4);
+        *q|=((side == XPackLSBFirst) ? (unsigned char) (pixel << 4) :
+          (unsigned char) pixel);
         q++;
         nibble=0;
         break;
@@ -4139,38 +4168,58 @@ static unsigned char *XPackContinuous4BitRowLSB(const Image *canvas,
   return(q);
 }
 
-static unsigned char *XPackGammaBGRARowLSB(const Image *canvas,const Quantum *p,
-  unsigned char *q)
+static magick_attribute((__always_inline__)) inline unsigned char
+  *XPackGammaRedHighRow(const Image *canvas,
+  const XPackBitOrder side,const Quantum *p,unsigned char *q)
 {
   int
     x;
 
   for (x=(int) canvas->columns-1; x >= 0; x--)
   {
-    *q++=ScaleQuantumToChar(XBlueGamma(
-      GetPixelBlue(canvas,p)));
-    *q++=ScaleQuantumToChar(XGreenGamma(
-      GetPixelGreen(canvas,p)));
-    *q++=ScaleQuantumToChar(XRedGamma(
-      GetPixelRed(canvas,p)));
-    *q++=0;
+    *q++=((side == XPackLSBFirst) ?
+      ScaleQuantumToChar(XBlueGamma(
+        GetPixelBlue(canvas,p))) :
+      0);
+    *q++=((side == XPackLSBFirst) ?
+      ScaleQuantumToChar(XGreenGamma(
+        GetPixelGreen(canvas,p))) :
+      ScaleQuantumToChar(XRedGamma(
+        GetPixelRed(canvas,p))));
+    *q++=((side == XPackLSBFirst) ?
+      ScaleQuantumToChar(XRedGamma(
+        GetPixelRed(canvas,p))) :
+      ScaleQuantumToChar(XGreenGamma(
+        GetPixelGreen(canvas,p))));
+    *q++=((side == XPackLSBFirst) ?
+      0 :
+      ScaleQuantumToChar(XBlueGamma(
+        GetPixelBlue(canvas,p))));
     p+=(ptrdiff_t) GetPixelChannels(canvas);
   }
   return(q);
 }
 
-static unsigned char *XPackBGRARowLSB(const Image *canvas,const Quantum *p,
-  unsigned char *q)
+static inline unsigned char *XPackRedHighRow(const Image *canvas,
+  const XPackBitOrder side,const Quantum *p,unsigned char *q)
 {
   int
     x;
 
   for (x=(int) canvas->columns-1; x >= 0; x--)
   {
-    *q++=ScaleQuantumToChar((Quantum) GetPixelBlue(canvas,p));
-    *q++=ScaleQuantumToChar((Quantum) GetPixelGreen(canvas,p));
-    *q++=ScaleQuantumToChar((Quantum) GetPixelRed(canvas,p));
-    *q++=0;
+    *q++=((side == XPackLSBFirst) ?
+      ScaleQuantumToChar((Quantum) GetPixelBlue(canvas,p)) :
+      0);
+    *q++=((side == XPackLSBFirst) ?
+      ScaleQuantumToChar((Quantum) GetPixelGreen(canvas,p)) :
+      ScaleQuantumToChar((Quantum) GetPixelRed(canvas,p)));
+    *q++=((side == XPackLSBFirst) ?
+      ScaleQuantumToChar((Quantum) GetPixelRed(canvas,p)) :
+      ScaleQuantumToChar((Quantum) GetPixelGreen(canvas,p)));
+    *q++=((side == XPackLSBFirst) ?
+      0 :
+      ScaleQuantumToChar((Quantum) GetPixelBlue(canvas,p)));
     p+=(ptrdiff_t) GetPixelChannels(canvas);
   }
   return(q);
@@ -4283,8 +4332,8 @@ static void XPackColormapped2BitLSB(const XImageRowSource *source,
   }
 }
 
-static void XPackColormapped4BitLSB(const XImageRowSource *source,
-  unsigned char *q)
+static inline void XPackColormapped4Bit(const XImageRowSource *source,
+  const XPackBitOrder side,unsigned char *q)
 {
   Image
     *const canvas = source->canvas;
@@ -4312,11 +4361,14 @@ static void XPackColormapped4BitLSB(const XImageRowSource *source,
   */
   for (y=0; y < (int) canvas->rows; y++)
   {
+    const XPackColormappedRow
+      row = { side, canvas, pixels };
+
     p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
       canvas->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    q=XPackColormapped4BitRowLSB(canvas,pixels,p,q);
+    q=XPackColormapped4BitRow(&row,p,q);
     q+=(ptrdiff_t) scanline_pad;
   }
 }
@@ -4558,8 +4610,8 @@ static void XPackContinuous8BitLSB(const XImageRowSource *source,
   }
 }
 
-static void XPackRedHigh32BitLSB(const XImageRowSource *source,
-  unsigned char *q)
+static magick_attribute((__always_inline__)) inline void XPackRedHigh32Bit(
+  const XImageRowSource *source,const XPackBitOrder side,unsigned char *q)
 {
   Image
     *const canvas = source->canvas;
@@ -4590,10 +4642,10 @@ static void XPackRedHigh32BitLSB(const XImageRowSource *source,
         /*
           Gamma correct canvas.
         */
-        q=XPackGammaBGRARowLSB(canvas,p,q);
+        q=XPackGammaRedHighRow(canvas,side,p,q);
         continue;
       }
-    q=XPackBGRARowLSB(canvas,p,q);
+    q=XPackRedHighRow(canvas,side,p,q);
   }
 }
 
@@ -4852,7 +4904,7 @@ static void XPackColormappedLSB(const XImage *ximage,
     }
     case 4:
     {
-      XPackColormapped4BitLSB(&row_source,q);
+      XPackColormapped4Bit(&row_source,XPackLSBFirst,q);
       break;
     }
     case 6:
@@ -4894,7 +4946,7 @@ static void XPackContinuousLSB(const XImage *ximage,
     default:
     {
       if (IsRedHigh32BitMap(ximage,map_info) != MagickFalse)
-        XPackRedHigh32BitLSB(&row_source,q);
+        XPackRedHigh32Bit(&row_source,XPackLSBFirst,q);
       else
         if (IsBlueHigh32BitMap(ximage,map_info) != MagickFalse)
           XPackBlueHigh32BitLSB(&row_source,q);
@@ -5182,43 +5234,6 @@ static inline MagickBooleanType IsImmutableAlphaImage(const XWindowInfo *window,
     (image->alpha_trait != UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
 }
 
-static unsigned char *XPackGammaARGBRowMSB(const Image *canvas,const Quantum *p,
-  unsigned char *q)
-{
-  int
-    x;
-
-  for (x=(int) canvas->columns-1; x >= 0; x--)
-  {
-    *q++=0;
-    *q++=ScaleQuantumToChar(XRedGamma(
-      GetPixelRed(canvas,p)));
-    *q++=ScaleQuantumToChar(XGreenGamma(
-      GetPixelGreen(canvas,p)));
-    *q++=ScaleQuantumToChar(XBlueGamma(
-      GetPixelBlue(canvas,p)));
-    p+=(ptrdiff_t) GetPixelChannels(canvas);
-  }
-  return(q);
-}
-
-static unsigned char *XPackARGBRowMSB(const Image *canvas,const Quantum *p,
-  unsigned char *q)
-{
-  int
-    x;
-
-  for (x=(int) canvas->columns-1; x >= 0; x--)
-  {
-    *q++=0;
-    *q++=ScaleQuantumToChar((Quantum) GetPixelRed(canvas,p));
-    *q++=ScaleQuantumToChar((Quantum) GetPixelGreen(canvas,p));
-    *q++=ScaleQuantumToChar((Quantum) GetPixelBlue(canvas,p));
-    p+=(ptrdiff_t) GetPixelChannels(canvas);
-  }
-  return(q);
-}
-
 static unsigned char *XPackGammaABGRRowMSB(const Image *canvas,const Quantum *p,
   unsigned char *q)
 {
@@ -5294,44 +5309,6 @@ static unsigned char *XPackColormapped2BitRowMSB(const Image *canvas,
         break;
       }
       case 3:
-      {
-        *q|=(unsigned char) pixel;
-        q++;
-        nibble=0;
-        break;
-      }
-    }
-    p+=(ptrdiff_t) GetPixelChannels(canvas);
-  }
-  return(q);
-}
-
-static unsigned char *XPackColormapped4BitRowMSB(const Image *canvas,
-  const unsigned long *pixels,const Quantum *p,unsigned char *q)
-{
-  int
-    x;
-
-  unsigned int
-    nibble;
-
-  unsigned long
-    pixel;
-
-  nibble=0;
-  for (x=0; x < (int) canvas->columns; x++)
-  {
-    pixel=pixels[(ssize_t)
-      GetPixelIndex(canvas,p)] & 0xf;
-    switch (nibble)
-    {
-      case 0:
-      {
-        *q=(unsigned char) (pixel << 4);
-        nibble++;
-        break;
-      }
-      case 1:
       {
         *q|=(unsigned char) pixel;
         q++;
@@ -5581,44 +5558,6 @@ static void XPackColormapped2BitMSB(const XImageRowSource *source,
   }
 }
 
-static void XPackColormapped4BitMSB(const XImageRowSource *source,
-  unsigned char *q)
-{
-  Image
-    *const canvas = source->canvas;
-
-  CacheView
-    *const canvas_view = source->canvas_view;
-
-  ExceptionInfo
-    *const exception = source->exception;
-
-  const unsigned int
-    scanline_pad = source->scanline_pad;
-
-  unsigned long
-    *const pixels = source->pixels;
-
-  const Quantum
-    *p;
-
-  int
-    y;
-
-  /*
-    Convert to 4 bit color-mapped X canvas.
-  */
-  for (y=0; y < (int) canvas->rows; y++)
-  {
-    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-      canvas->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    q=XPackColormapped4BitRowMSB(canvas,pixels,p,q);
-    q+=(ptrdiff_t) scanline_pad;
-  }
-}
-
 static void XPackColormapped8BitMSB(const XImageRowSource *source,
   unsigned char *q)
 {
@@ -5837,45 +5776,6 @@ static void XPackContinuous8BitMSB(const XImageRowSource *source,
   }
 }
 
-static void XPackRedHigh32BitMSB(const XImageRowSource *source,
-  unsigned char *q)
-{
-  Image
-    *const canvas = source->canvas;
-
-  CacheView
-    *const canvas_view = source->canvas_view;
-
-  ExceptionInfo
-    *const exception = source->exception;
-
-  const Quantum
-    *p;
-
-  int
-    y;
-
-  /*
-    Convert to 32 bit continuous-tone X canvas.
-  */
-  for (y=0; y < (int) canvas->rows; y++)
-  {
-    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-      canvas->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    if (IsGammaCorrected() != MagickFalse)
-      {
-        /*
-          Gamma correct canvas.
-        */
-        q=XPackGammaARGBRowMSB(canvas,p,q);
-        continue;
-      }
-    q=XPackARGBRowMSB(canvas,p,q);
-  }
-}
-
 static void XPackBlueHigh32BitMSB(const XImageRowSource *source,
   unsigned char *q)
 {
@@ -6040,7 +5940,7 @@ static void XPackColormappedMSB(const XImage *ximage,
     }
     case 4:
     {
-      XPackColormapped4BitMSB(&row_source,q);
+      XPackColormapped4Bit(&row_source,XPackMSBFirst,q);
       break;
     }
     case 6:
@@ -6082,7 +5982,7 @@ static void XPackContinuousMSB(const XImage *ximage,
     default:
     {
       if (IsRedHigh32BitMap(ximage,map_info) != MagickFalse)
-        XPackRedHigh32BitMSB(&row_source,q);
+        XPackRedHigh32Bit(&row_source,XPackMSBFirst,q);
       else
         if (IsBlueHigh32BitMap(ximage,map_info) != MagickFalse)
           XPackBlueHigh32BitMSB(&row_source,q);
