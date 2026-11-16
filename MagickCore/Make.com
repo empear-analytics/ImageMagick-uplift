@@ -117,6 +117,7 @@ $call Make image-filename.c
 $call Make image-view.c
 $call Make layer.c
 $call Make layer-frames.c
+$call Make layer-optimize.c
 $call Make layer-dispose.c
 $call Make layer-composite.c
 $call Make layer-merge.c

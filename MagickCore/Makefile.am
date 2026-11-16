@@ -228,6 +228,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/image-view.h \
   MagickCore/layer.c \
   MagickCore/layer-frames.c \
+  MagickCore/layer-optimize.c \
   MagickCore/layer-dispose.c \
   MagickCore/layer-composite.c \
   MagickCore/layer-merge.c \
