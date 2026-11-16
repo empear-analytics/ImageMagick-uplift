@@ -1259,8 +1259,8 @@ static inline MagickBooleanType IsKernelOriginOutside(const GeometryInfo *args,
     MagickTrue : MagickFalse);
 }
 
-static KernelInfo *AcquireDiamondKernel(KernelInfo *kernel,
-  const GeometryInfo *args,const double nan)
+static void SetDiamondKernelValues(KernelInfo *kernel,const GeometryInfo *args,
+  const double nan)
 {
   ssize_t
     i;
@@ -1269,6 +1269,17 @@ static KernelInfo *AcquireDiamondKernel(KernelInfo *kernel,
     u,
     v;
 
+  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      if ( (labs((long) u)+labs((long) v)) <= (long) kernel->x)
+        kernel->positive_range += kernel->values[i] = args->sigma;
+      else
+        kernel->values[i] = nan;
+}
+
+static KernelInfo *AcquireDiamondKernel(KernelInfo *kernel,
+  const GeometryInfo *args,const double nan)
+{
   if (args->rho < 1.0)
     kernel->width = kernel->height = 3;  /* default radius = 1 */
   else
@@ -1279,12 +1290,7 @@ static KernelInfo *AcquireDiamondKernel(KernelInfo *kernel,
     return(DestroyKernelInfo(kernel));
 
   /* set all kernel values within diamond area to scale given */
-  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-      if ( (labs((long) u)+labs((long) v)) <= (long) kernel->x)
-        kernel->positive_range += kernel->values[i] = args->sigma;
-      else
-        kernel->values[i] = nan;
+  SetDiamondKernelValues(kernel,args,nan);
   kernel->minimum = kernel->maximum = args->sigma;   /* a flat shape */
   return(kernel);
 }
