@@ -310,7 +310,6 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/profile.h \
   MagickCore/profile-private.h \
   MagickCore/quantize.c \
-  MagickCore/quantize-remap.c \
   MagickCore/quantize-kmeans.c \
   MagickCore/quantize-error.c \
   MagickCore/quantize-info.c \
