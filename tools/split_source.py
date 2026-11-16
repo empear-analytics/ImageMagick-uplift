@@ -424,7 +424,13 @@ path, new, title, roots = args[0], args[1], args[2], args[3:]
 src = open(path).read(); L = src.split("\n")
 defs = []; i = 0
 while i < len(L):
-    m = re.match(r"^((?:inline\s+)?static\s+(?:inline\s+)?|MagickExport\s+|MagickPrivate\s+)?[A-Za-z_][\w \*]*?\b([A-Za-z_]\w*)\s*\(", L[i])
+    # `static magick_attribute((__always_inline__)) inline T` names no function: the attribute is skipped, and a
+    # definition whose name then stands on the next line (`  *XPackGammaRedHighRow(`) is read with that line
+    head = L[i]
+    if re.match(r"static\s+magick_attribute\(\([\w ,]*\)\)\s", head):
+        head = re.sub(r"magick_attribute\(\([\w ,]*\)\)\s+", "", head, count=1)
+        if "(" not in head and i + 1 < len(L) and L[i + 1].startswith(" "): head += " " + L[i + 1].strip()
+    m = re.match(r"^((?:inline\s+)?static\s+(?:inline\s+)?|MagickExport\s+|MagickPrivate\s+)?[A-Za-z_][\w \*]*?\b([A-Za-z_]\w*)\s*\(", head)
     if m and not L[i].rstrip().endswith(";") and not L[i].startswith((" ", "#", "%", "/*")):
         j = i
         while j < len(L) and L[j] != "{" and not L[j].rstrip().endswith(";"): j += 1

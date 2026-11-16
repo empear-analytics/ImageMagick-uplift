@@ -1236,7 +1236,33 @@ is worth it.
    line that names `NAME` is such a define (a progress tag defined in each function body
    that names it, as `threshold-image.c`'s `ThresholdImageTag` in six), each file keeps
    the definitions that stand in its own text and nothing moves (`split_source.py` accepts
-   it). Copying a helper, type or macro into both files, and widening a helper to
+   it). A file-scope variable that both parts name (one declarator of arithmetic
+   type, not `const`; the `const` form follows, as `xwindow-image.c`'s `red_gamma`,
+   which the `XGetPixelInfo` family
+   writes and the kept packers read per pixel) is shared through one accessor (owner,
+   2026-11-16, answers to the round-twenty-three questions, AGENTS.md): the variable keeps
+   its one definition, storage and initialiser in one of the two files, and that file
+   defines, directly after the variable's declaration group, one function
+   `MagickPrivate T *NameReference(void)` whose body is `return(&name);` (its name in the
+   file's `X` style with `Reference` appended: `XRedGammaReference` for `red_gamma`),
+   declared `extern MagickPrivate T *NameReference(void);` in the private header. In the other file,
+   and in a macro of the header, each use of the variable is written `(*NameReference())`
+   and nothing else on the line changes; the defining file's own uses stay as they were.
+   The accessor is the only new external name per variable; it is not installed and not
+   `MagickExport`, and `MagickPrivate` (hidden visibility) keeps it out of the library's
+   dynamic symbol table (this is the ruling's one new external name; the refusal below of
+   widening a helper to `MagickPrivate` stands). The new file's uses are rewritten in the
+   split's commit, before `split_source.py` runs, which then finds the variable named by
+   the kept part only. A file-scope `static const` object of arithmetic type that both
+   parts name (`widget.c`'s `BorderOffset` and `DoubleClick`, one `static const int`
+   group) is shared the same way, its accessor `MagickPrivate const T
+   *NameReference(void)` (the variable's own name with `Reference` appended,
+   `BorderOffsetReference`), so a use through it can only read; the declaration keeps
+   its `const`, initialiser and storage. A helper that moves into the header may name a
+   shared variable only through its accessor, `(*NameReference())`, as the other file
+   does (the accessor is declared in the same header, before the helpers); this is still
+   one accessor per variable, its only new external name.
+   Copying a helper, type or macro into both files, and widening a helper to
    `MagickPrivate` (a symbol in the library's internal ABI), stay refused. A later split of
    either product (a chain of splits, owner, 2026-11-16) includes the same header and may
    move further helpers into it in its own commit.
@@ -1324,6 +1350,26 @@ is worth it.
   expanded to before, from whichever definition precedes it (C11 6.10.3p2 allows the
   identical redefinitions, as the original already did), and `refactor_guard.py
   --combined` counts its literal as often as before.
+- A variable shared through an accessor under step 2 is still one object: `(*NameReference())`
+  is an lvalue that designates it (C11 6.5.3.2), so a read through it reads the value a
+  direct read would and a write (`=`, `*=`) stores where it stored before, in the same
+  order, and the accessor has no side effect and reads nothing. Its storage, initialiser
+  and linkage do not change (it stays `static`; only its address leaves the file, through
+  a function no installed header declares). A macro of the header that names the variable
+  through the accessor expands, in each file, to the tokens it expanded to before with
+  `name` replaced by `(*NameReference())`, so a use in the defining file that reached the
+  variable through the macro now calls the accessor: the compiler may inline it (it is
+  defined in that file and hidden) or call it, which changes instructions, not values.
+  Every per-pixel path whose text changes is timed against the baseline binary as Recipe
+  TH step 8 says (a ratio above 1.03 re-measured with 21 runs beside an A/A
+  run), and the message names the paths timed; a per-image use needs no timing. The
+  accessor changes nothing about threads: it hands out the address the code used before;
+  check by reading that no `#pragma omp` region names the variable or a macro naming it,
+  and refuse the step if one does (the oracle runs single-threaded). A `const` object read
+  through its accessor gives the value its initialiser gave, as the direct read did; the
+  compiler of the other file can no longer fold it to an immediate, so the instructions of
+  each use change (a call and a load) and its value does not; such a use is timed only when
+  it runs per pixel.
 - An include left out under step 2's second exception is neither moved nor edited either:
   the original keeps the line, and the header's objects stay defined once, in the original's
   object. The family names none of them (the tool checks, with the header's macros), so every
@@ -22172,3 +22218,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | AMEND | S | Step 2: a macro that the original defines more than once, every `#define NAME` the same line byte for byte and no `#undef`, that both parts name outside the self-defined form (a part names it before or without a define of its own) moves into the private header as one definition, every definition leaving the original; *Careful* gives the argument (the same tokens at every use; the header's definition precedes every use) | `effect-blur-adaptive-filters.c`'s `MagickSigma` (campaign A, W35 lane c): defined twice, identically, inside the adaptive family and used by the Emboss, Motion, Selective and Sharpen kernels, so neither the move of a one-definition macro nor the self-defined form took it; round twenty-three's question 3. The ruling is the owner's, the wording the lane's | owner |
 | 2026-11-16 | AMEND | S | Step 2: the private header may hold a shared core of any size, every helper, typedef and macro on step 2's terms; no size limit, but the header is scored like a split product and must score at least the original's score before the split (the message gives the header's score beside the two files') | `quantize.c` (8.81): every split shares its colour tree (36 helpers, ten typedefs, the cache macros); round twenty-three's questions 1 and 6 | owner |
 | 2026-11-16 | AMEND | S | Step 2: with a core header, the original's forward declarations of the moving helpers go to the header's *Method prototypes* block (groups split as `split_source.py` splits them); a helper whose definition line has no `static` moves unchanged (internal linkage from the `static` prototype) when every including file calls it; a helper whose address another moving helper passes to `qsort` qualifies when its name stands in the header alone; a macro defined in the branches of one file-level `#if`/`#else` moves with the conditional whole when a build taking the other branch compiles both products and the `-E -dM` dump of every moved macro is identical in the original and the products under both branches; a moved helper's exception names the header as its module file | `quantize.c`'s prototypes block, `SetImageColormap` (static only through its prototype), `QuantizeErrorCompare` (`qsort` comparator of `SetRapidReductionThreshold`) and `CacheShift` (`#if !defined(__APPLE__) && !defined(TARGET_OS_IPHONE)`), all needed by the colour-tree core | mandate (2026-10-24) |
+| 2026-11-16 | AMEND | S | Step 2: a file-scope variable that both parts name is shared through one accessor, `MagickPrivate T *NameReference(void)` returning its address, defined in the file that keeps the variable's one definition and storage and declared in the private header; the other file and the header's macros write each use `(*NameReference())`; *Careful*: why every read and write reaches the same object, and the timing of each per-pixel path whose text changes. The accessor form and the address-returning shape (needed because the moved `XSetDisplayGamma` writes the variables) are the lane's wording | `xwindow-image.c`'s `red_gamma`, `green_gamma` and `blue_gamma` (campaign A, W35 lane b): written by the `XGetPixelInfo` family, read by the kept packers per pixel and by the colormap family per colormap entry, they refused every carve of those families (round 23's question 2). The owner's ruling of 2026-11-16 allows one accessor per variable | owner |
+| 2026-11-16 | AMEND | S | Step 2: a file-scope `static const` object of arithmetic type that both parts name is shared through a read-only accessor (`MagickPrivate const T *NameReference(void)`), and a helper moving into the private header names a shared variable only through its accessor; *Careful*: a `const` read through the accessor is no longer folded to an immediate, which changes instructions, not values. The coordinator's reading of ruling 2 (the accessor stays the only new external name per variable); the wording is the lane's | `widget.c`'s `BorderOffset` and `DoubleClick` (campaign A, W35 lane b2): named by the `XDialogWidget` family (`PressDialogReply`, `RedrawDialogWidget`) and by the kept widgets, they refused the dialog carve (`split_source.py`: file-scope variable defined outside the region) | mandate (2026-10-24) |
