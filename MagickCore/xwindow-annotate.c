@@ -604,6 +604,16 @@ static void XDrawArcElement(Display *display,const Pixmap draw_pixmap,
   }
 }
 
+static void XSetDrawStipple(Display *display,const GC draw_context,
+  const XDrawInfo *draw_info)
+{
+  if (draw_info->stipple !=  (Pixmap) NULL)
+    {
+      (void) XSetFillStyle(display,draw_context,FillOpaqueStippled);
+      (void) XSetStipple(display,draw_context,draw_info->stipple);
+    }
+}
+
 static void XDrawElementToPixmap(Display *display,const Pixmap draw_pixmap,
   const GC draw_context,const XDrawInfo *draw_info)
 {
@@ -617,11 +627,7 @@ static void XDrawElementToPixmap(Display *display,const Pixmap draw_pixmap,
   */
   (void) XSetBackground(display,draw_context,0);
   (void) XSetForeground(display,draw_context,(size_t) (~0));
-  if (draw_info->stipple !=  (Pixmap) NULL)
-    {
-      (void) XSetFillStyle(display,draw_context,FillOpaqueStippled);
-      (void) XSetStipple(display,draw_context,draw_info->stipple);
-    }
+  XSetDrawStipple(display,draw_context,draw_info);
   switch (draw_info->element)
   {
     default:
