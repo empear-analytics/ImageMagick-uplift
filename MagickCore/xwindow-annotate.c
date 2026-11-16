@@ -983,6 +983,19 @@ static MagickBooleanType XComposeDrawImage(const XDrawSource *source,
   return(MagickTrue);
 }
 
+static GC XCreateDrawContext(Display *display,const Window root_window,
+  const XDrawInfo *draw_info)
+{
+  XGCValues
+    context_values;
+
+  context_values.background=(size_t) (~0);
+  context_values.foreground=0;
+  context_values.line_width=(int) draw_info->line_width;
+  return(XCreateGC(display,root_window,(size_t)
+    (GCBackground | GCForeground | GCLineWidth),&context_values));
+}
+
 MagickPrivate MagickBooleanType XDrawImage(Display *display,
   const XPixelInfo *pixel,XDrawInfo *draw_info,Image *image,
   ExceptionInfo *exception)
@@ -1001,9 +1014,6 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
 
   XDrawSource
     source;
-
-  XGCValues
-    context_values;
 
   XImage
     *draw_ximage;
@@ -1029,11 +1039,7 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
   /*
     Initialize graphics info.
   */
-  context_values.background=(size_t) (~0);
-  context_values.foreground=0;
-  context_values.line_width=(int) draw_info->line_width;
-  draw_context=XCreateGC(display,root_window,(size_t)
-    (GCBackground | GCForeground | GCLineWidth),&context_values);
+  draw_context=XCreateDrawContext(display,root_window,draw_info);
   if (draw_context == (GC) NULL)
     return(MagickFalse);
   XDrawElementToPixmap(display,draw_pixmap,draw_context,draw_info);
