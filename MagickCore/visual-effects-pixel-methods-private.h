@@ -19,6 +19,7 @@
 #define MAGICKCORE_VISUAL_EFFECTS_PIXEL_METHODS_PRIVATE_H
 
 #include "MagickCore/cache-view.h"
+#include "MagickCore/effect-common-private.h"
 #include "MagickCore/image.h"
 #include "MagickCore/monitor.h"
 
@@ -98,13 +99,6 @@ static inline MagickBooleanType CloneEffectImage(const Image *image,
       return(MagickFalse);
     }
   return(MagickTrue);
-}
-
-static inline Image *ReleaseFailedImage(Image *image,const MagickBooleanType status)
-{
-  if (status == MagickFalse)
-    image=DestroyImage(image);
-  return(image);
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)
