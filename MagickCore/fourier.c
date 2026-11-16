@@ -279,6 +279,16 @@ static void SwapForwardQuadrantRows(const ForwardQuadrant *quadrant,
         source_pixels[y*(ssize_t) center+x+1L];
 }
 
+static void SwapForwardQuadrantFirstRow(const size_t width,
+  double *source_pixels,double *forward_pixels)
+{
+  ssize_t
+    x;
+
+  for (x=0L; x < (ssize_t) (width/2L); x++)
+    forward_pixels[(ssize_t) width/2L-x-1L]=source_pixels[x+1L];
+}
+
 static MagickBooleanType ForwardQuadrantSwap(const size_t width,
   const size_t height,double *source_pixels,double *forward_pixels)
 {
@@ -316,8 +326,7 @@ static MagickBooleanType ForwardQuadrantSwap(const size_t width,
   quadrant.center=center;
   quadrant.source_pixels=source_pixels;
   SwapForwardQuadrantRows(&quadrant,forward_pixels);
-  for (x=0L; x < (ssize_t) (width/2L); x++)
-    forward_pixels[(ssize_t) width/2L-x-1L]=source_pixels[x+1L];
+  SwapForwardQuadrantFirstRow(width,source_pixels,forward_pixels);
   return(MagickTrue);
 }
 
@@ -508,6 +517,16 @@ static void SetForwardFourierPhase(const ForwardFourierPhase *pass,
   phase_view=DestroyCacheView(phase_view);
 }
 
+static MagickBooleanType SwapForwardPhaseQuadrants(
+  const FourierInfo *fourier_info,const ForwardFourierPlanes *planes,
+  double *phase_pixels,MagickBooleanType status)
+{
+  if (status != MagickFalse)
+    status=ForwardQuadrantSwap(fourier_info->width,fourier_info->height,
+      planes->phase_pixels,phase_pixels);
+  return(status);
+}
+
 static MagickBooleanType ForwardFourier(const FourierInfo *fourier_info,
   Image *image,const ForwardFourierPlanes *planes,ExceptionInfo *exception)
 {
@@ -566,9 +585,7 @@ static MagickBooleanType ForwardFourier(const FourierInfo *fourier_info,
     fourier_info->height*sizeof(*phase_pixels));
   status=ForwardQuadrantSwap(fourier_info->width,fourier_info->height,
     planes->magnitude_pixels,magnitude_pixels);
-  if (status != MagickFalse)
-    status=ForwardQuadrantSwap(fourier_info->width,fourier_info->height,
-      planes->phase_pixels,phase_pixels);
+  status=SwapForwardPhaseQuadrants(fourier_info,planes,phase_pixels,status);
   CorrectPhaseLHS(fourier_info->width,fourier_info->height,phase_pixels);
   ScaleForwardFourierPhase(fourier_info,phase_pixels);
   pass.fourier_info=fourier_info;
@@ -1226,6 +1243,16 @@ static void ReadInverseFourierPhase(FourierInfo *fourier_info,
   CorrectPhaseLHS(fourier_info->width,fourier_info->height,phase_pixels);
 }
 
+static MagickBooleanType SwapInversePhaseQuadrants(
+  const FourierInfo *fourier_info,double *phase_pixels,double *inverse_pixels,
+  MagickBooleanType status)
+{
+  if (status != MagickFalse)
+    status=InverseQuadrantSwap(fourier_info->width,fourier_info->height,
+      phase_pixels,inverse_pixels);
+  return(status);
+}
+
 static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
   const InverseImagePair *images,fftw_complex *fourier_pixels,
   ExceptionInfo *exception)
@@ -1267,9 +1294,8 @@ static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
   (void) memcpy(magnitude_pixels,inverse_pixels,fourier_info->height*
     fourier_info->center*sizeof(*magnitude_pixels));
   ReadInverseFourierPhase(fourier_info,images,phase_pixels,exception);
-  if (status != MagickFalse)
-    status=InverseQuadrantSwap(fourier_info->width,fourier_info->height,
-      phase_pixels,inverse_pixels);
+  status=SwapInversePhaseQuadrants(fourier_info,phase_pixels,inverse_pixels,
+    status);
   (void) memcpy(phase_pixels,inverse_pixels,fourier_info->height*
     fourier_info->center*sizeof(*phase_pixels));
   inverse_info=RelinquishVirtualMemory(inverse_info);

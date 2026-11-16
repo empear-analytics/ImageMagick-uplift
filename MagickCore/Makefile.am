@@ -453,6 +453,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/xwindow-text.c \
   MagickCore/xwindow-visual.c \
   MagickCore/xwindow-import.c \
+  MagickCore/xwindow-search.c \
   MagickCore/xwindow.h
 
 if WIN32_NATIVE_BUILD
