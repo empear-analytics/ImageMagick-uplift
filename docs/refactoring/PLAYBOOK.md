@@ -1231,6 +1231,33 @@ is worth it.
    `MagickPrivate` (a symbol in the library's internal ABI), stay refused. A later split of
    either product (a chain of splits, owner, 2026-11-16) includes the same header and may
    move further helpers into it in its own commit.
+   The header may hold a shared core of any size (owner, 2026-11-16, AGENTS.md, answers to
+   the round-twenty-three questions), every helper, typedef and macro in it on the terms
+   above (`quantize.c`'s colour tree: the classification, reduction and colormap helpers,
+   their typedefs and the file's *Define declarations* block); there is no size limit, but
+   the header is scored like a split product: it must score at least what the original
+   scored before the split, the message gives its `tools/ch.py` score beside the two `.c`
+   files', and a split whose header scores lower is refused. The original's forward
+   declarations of the moving helpers go to a *Method prototypes* block of the header,
+   before its first helper, a group that also declares a kept static being split as
+   `split_source.py` splits one (each moved declarator under a copy of the group's `static
+   T` line, the last ending in `;`). A helper whose definition line carries no `static`
+   (its internal linkage coming from that prototype, as `quantize.c`'s `SetImageColormap`)
+   moves with its lines unchanged and so is not made `inline`; the `static` prototype in
+   the header keeps its linkage internal (C11 6.2.2p4-5), and it qualifies only when every
+   file including the header calls it (an uncalled non-inline static draws
+   `-Wunused-function`). A helper whose address another moving helper passes on (a `qsort`
+   comparator, as `quantize.c`'s `QuantizeErrorCompare` in `SetRapidReductionThreshold`)
+   qualifies when its name stands in the header alone: each file's definition serves that
+   file's calls, and no address is stored or compared across files. A macro whose
+   definitions stand in the branches of one file-level
+   `#if`/`#else`/`#endif` (`quantize.c`'s `CacheShift`, 2 or 3 under `#if
+   !defined(__APPLE__) && !defined(TARGET_OS_IPHONE)`) moves with its conditional whole,
+   directive lines verbatim, when a build that takes the other branch (the cand flags with
+   `-DTARGET_OS_IPHONE` added) compiles both products and the `-E -dM` dump of every moved
+   macro is identical in the original and in each product under both branches. An
+   exception or log call in a moved helper then names the header as its module file
+   (`GetMagickModule()`'s `__FILE__`), as one moved to a new `.c` file names that file.
 3. The public function keeps its declaration in the header it already has.
 4. List the new file wherever the original is listed: `tools/register_source.py` does it
    for `MagickCore/Makefile.am`, `Makefile.in` (by hand, mirroring what automake
@@ -22125,3 +22152,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | NEW | TH | Merge Twin Functions Through a Constant Selector, Checked by a Harness: Recipe TI's merge (one `static inline` function, a `NameSide` selector, each differing run `((side == NameA) ? runA : runB)`, the copies leave) for twins of which one or both run in no oracle case, with a committed harness standing in for the oracle: its `cover` mode must show every line of both copies run before the edit and of the merged function after it, its `check` must print IDENTICAL, `tools/twin_fold_check.py` must fold the merged function back to each copy, `nm` must show it inlined, and each path is timed (9 alternating runs, ratio above 1.03 stops the step; within it, reported as no slowdown). Selector enum and struct reused by later merges; at most three parameters may take the selector as a parameter | `xwindow-image.c`'s `XPack*` LSB/MSB packers (campaign A, W34 lane b): the MSB-first side runs only for an MSB-first X server, which the oracle lacks. The owner's ruling of 2026-11-16 allows the timed merge chain; the wording is the lane's. Round twenty-two wrote it as a TI amendment with `Decided by: owner`; its reviewer asked for a new recipe (a different evidence level) and an honest decider | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | TH | Step 4: a differing run that is the selector's own constant (a copy passing `XPackLSBFirst` on to an earlier merged function) is written `side`, not `((side == NameA) ? NameA : NameB)`; `tools/twin_fold_check.py` (6e06e005d) writes the copy's constant back for the selector before comparing | The row drivers `XPackColormapped4BitLSB` and `...MSB` of `xwindow-image.c` differ, after the first merge, only in that constant; the conditional form would compare a constant with itself | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | TH | Step 2: a line outside every differing run that only a failure path reaches (the `break;` after a `NULL` pixel fetch), the same in both copies by the fold check, need not run in the harness; the message names it. Step 8: a ratio above 1.03 is measured again with 21 runs beside an A/A run of the base against itself, the step stopping if the 21-run ratio stays above 1.03; every measurement quoted | The row drivers of `xwindow-image.c` hold such a `break;` (the harness cannot make the pixel cache fail); a 9-to-11-run timing under the load of three lanes swung 0.93 to 1.06 on one step, where 21 runs gave 0.96 and 1.00 and an A/A run 1.00 | mandate (2026-10-24) |
+| 2026-11-16 | AMEND | S | Step 2: the private header may hold a shared core of any size, every helper, typedef and macro on step 2's terms; no size limit, but the header is scored like a split product and must score at least the original's score before the split (the message gives the header's score beside the two files') | `quantize.c` (8.81): every split shares its colour tree (36 helpers, ten typedefs, the cache macros); round twenty-three's questions 1 and 6 | owner |
+| 2026-11-16 | AMEND | S | Step 2: with a core header, the original's forward declarations of the moving helpers go to the header's *Method prototypes* block (groups split as `split_source.py` splits them); a helper whose definition line has no `static` moves unchanged (internal linkage from the `static` prototype) when every including file calls it; a helper whose address another moving helper passes to `qsort` qualifies when its name stands in the header alone; a macro defined in the branches of one file-level `#if`/`#else` moves with the conditional whole when a build taking the other branch compiles both products and the `-E -dM` dump of every moved macro is identical in the original and the products under both branches; a moved helper's exception names the header as its module file | `quantize.c`'s prototypes block, `SetImageColormap` (static only through its prototype), `QuantizeErrorCompare` (`qsort` comparator of `SetRapidReductionThreshold`) and `CacheShift` (`#if !defined(__APPLE__) && !defined(TARGET_OS_IPHONE)`), all needed by the colour-tree core | mandate (2026-10-24) |
