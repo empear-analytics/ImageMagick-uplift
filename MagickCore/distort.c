@@ -3171,6 +3171,16 @@ static void PrintBilinearForwardYTerm(const double *coeff)
       -coeff[4],coeff[0]);
 }
 
+static void PrintBilinearForwardLookup(const double *coeff,
+  const char *lookup)
+{
+  if ( coeff[9] != 0 )
+    (void) FormatLocaleFile(stderr,"       (rt < 0 ) ? red : %s'\n",
+      lookup);
+  else
+    (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
+}
+
 static void PrintBilinearForwardFX(const double *coeff,const char *image_gen,
   const char *lookup)
 {
@@ -3197,11 +3207,7 @@ static void PrintBilinearForwardFX(const double *coeff,const char *image_gen,
   (void) FormatLocaleFile(stderr,
     "       xx=(ii %+lf*yy)/(%lf %+lf*yy);\n",-coeff[1],coeff[0],
     coeff[2]);
-  if ( coeff[9] != 0 )
-    (void) FormatLocaleFile(stderr,"       (rt < 0 ) ? red : %s'\n",
-      lookup);
-  else
-    (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
+  PrintBilinearForwardLookup(coeff,lookup);
 }
 
 static void PrintBilinearReverseFX(const double *coeff,const char *image_gen,
