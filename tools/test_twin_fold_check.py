@@ -4,9 +4,10 @@
 A correct merge of two twins (declared in different orders) must MATCH both copies; a
 merge whose conditional arms are swapped, one with a token changed outside the
 conditionals, and one that drops a statement must each MISMATCH; a missing function must
-fail. Fixtures are written to a temporary directory, so the test needs no git history.
+fail. A copy that names a role differently MISMATCHes until --rename maps the name. Fixtures are written to a temporary directory, so the test needs no git history.
 """
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -125,7 +126,8 @@ static inline void Drive(const Source *source,const PackOrder side,
 '''
 
 
-def run(tmp, merged, name='PackRow', base=BASE, copies=('PackRowLSB', 'PackRowMSB')):
+def run(tmp, merged, name='PackRow', base=BASE, copies=('PackRowLSB', 'PackRowMSB'),
+        extra=()):
     b, c = os.path.join(tmp, 'base.c'), os.path.join(tmp, 'cand.c')
     with open(b, 'w') as f:
         f.write(base)
@@ -133,8 +135,28 @@ def run(tmp, merged, name='PackRow', base=BASE, copies=('PackRowLSB', 'PackRowMS
         f.write(merged)
     r = subprocess.run([sys.executable, os.path.join(HERE, 'twin_fold_check.py'), b, c,
                         '--merged', name, '--copy', copies[0] + '=PackLSB',
-                        '--copy', copies[1] + '=PackMSB'], capture_output=True, text=True)
+                        '--copy', copies[1] + '=PackMSB'] + list(extra),
+                       capture_output=True, text=True)
     return r.returncode, r.stdout
+
+
+def test_rename(tmp):
+    """--rename: a copy that names a role differently matches only once renamed."""
+    fail = 0
+    at = BASE.index('static unsigned char *PackRowMSB(')
+    renamed = BASE[:at] + re.sub(r'\bcanvas\b', 'image', BASE[at:])
+    for label, extra, want, matches in (
+            ('role renamed in one copy, no --rename', (), 1, 1),
+            ('role renamed in one copy, --rename',
+             ('--rename', 'PackRowMSB:image=canvas'), 0, 2),
+            ('wrong --rename', ('--rename', 'PackRowMSB:image=pixels'), 1, 1)):
+        st, out = run(tmp, MERGED, base=renamed, extra=extra)
+        ok = st == want and out.count('MATCH ') - out.count('MISMATCH ') == matches
+        print('%s %s (exit %d)' % ('ok  ' if ok else 'FAIL', label, st))
+        if not ok:
+            print(out)
+            fail = 1
+    return fail
 
 
 def main():
@@ -168,6 +190,7 @@ def main():
             if not ok:
                 print(out)
                 fail = 1
+        fail |= test_rename(tmp)
     return fail
 
 

@@ -9,6 +9,7 @@ members, must give copy X's token sequence. This is that script.
 
     python3 tools/twin_fold_check.py BASE CAND --merged NewName \\
         --copy OldLSB=XPackLSBFirst --copy OldMSB=XPackMSBFirst [--selector side]
+        [--rename OldLSB:old_name=role_name ...]
 
 BASE and CAND are C files; either may be REV:path (read with `git show`). The copies are
 read from BASE, the merged function from CAND. For each copy the script
@@ -26,6 +27,11 @@ read from BASE, the merged function from CAND. For each copy the script
   3. compares the result with the copy's body token by token, comments dropped and the
      run of leading plain declarations (`int x;`, `unsigned int nibble;`: no `=`, no
      call) compared as a set, since the copies may declare them in another order.
+
+Recipe MT step 1 aligns copies after renaming each copy's variables to one name per role;
+`--rename COPY:OLD=NEW` (repeatable) renames identifier OLD to NEW in COPY's tokens before
+the comparison (`--rename XTransferDrawPixels:draw_view=image_view`), so a merged function
+that names a role differently from a copy can be compared with it.
 
 It prints `MATCH <copy>` or `MISMATCH <copy>` with the first differing tokens, and exits
 1 when any copy mismatches or a function is missing. tools/test_twin_fold_check.py is its
@@ -179,6 +185,21 @@ def fold(toks, selector, const):
     return out
 
 
+def parse_renames(specs):
+    """{copy: {old: new}} from the --rename COPY:OLD=NEW arguments."""
+    renames = {}
+    for spec in specs:
+        copy_name, pair = spec.split(':', 1)
+        old, new = pair.split('=', 1)
+        renames.setdefault(copy_name, {})[old] = new
+    return renames
+
+
+def renamed(toks, names):
+    """The tokens with every identifier in NAMES replaced by its new name."""
+    return [names.get(t, t) for t in toks]
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('base')
@@ -186,7 +207,9 @@ def main(argv=None):
     ap.add_argument('--merged', required=True)
     ap.add_argument('--copy', action='append', required=True, metavar='NAME=CONST')
     ap.add_argument('--selector', default='side')
+    ap.add_argument('--rename', action='append', default=[], metavar='COPY:OLD=NEW')
     args = ap.parse_args(argv)
+    renames = parse_renames(args.rename)
     base, cand = read(args.base), read(args.cand)
     merged = body(cand, args.merged)
     if merged is None:
@@ -200,6 +223,7 @@ def main(argv=None):
             print('MISSING copy %s in %s' % (name, args.base))
             status = 1
             continue
+        copy = renamed(copy, renames.get(name, {}))
         folded = [const if t == args.selector else t
                   for t in fold(strip_bindings(merged, copy), args.selector, const)]
         got_decls, got = normalise(folded)
