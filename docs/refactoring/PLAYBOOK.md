@@ -1334,6 +1334,21 @@ is worth it.
    by at least two of the files that include it (directly or through another of its
    helpers), its score at least the original's before the split. The first header then
    keeps its score, and a file that does not use the family does not see it.
+   A chain of splits through such headers may drop the original between its steps (owner,
+   2026-11-16, answers to the round-twenty-five questions: `morphology-apply.c`'s chain
+   through a header of 20 or more statics, "if the test cases pass"). Before the first
+   step, the whole chain is run on a stub probe (copies of the files, every header move and
+   split and any later step of the chain applied, scored with `tools/ch.py`, the sources
+   untouched), and the chain is taken only when the probe's last state raises the original
+   above its score before the chain and leaves every product and header at or above that
+   score. A step that the gate refuses only because the original drops is committed with
+   `--no-verify`, `tools/check_trailers.py` run on its message by hand, and the message
+   names the drop, the probe's end scores and the step that ends the drop; a lane that
+   cannot reach the probed end resets the branch to the chain's start. Every step keeps
+   the checks of a split: narrow and wide catalogues at 0 diverged, a parallel region that
+   moves to another file checked as (b) above (`omp_compare` at one and four threads on
+   cases that start several threads), and the moved hot paths timed against the baseline
+   binary as Recipe TH step 8 says.
 3. The public function keeps its declaration in the header it already has.
 4. List the new file wherever the original is listed: `tools/register_source.py` does it
    for `MagickCore/Makefile.am`, `Makefile.in` (by hand, mirroring what automake
@@ -22389,3 +22404,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | AMEND | S | Step 2: a later split may put the helpers it shares into a second private header, `<stem>-<family>-private.h`, that includes the first and that only the files using the family include; it is written, registered and scored as the first header, every item used by at least two of its including files | `quantize.c`'s remap split: one header of 2,600 lines scored 9.38 (Lines of Code) and put the assign and dither family in `quantize-kmeans.c`'s view; a second header leaves `quantize-private.h` at 10.0. A reading of the core-header and shared-header rulings of 2026-11-16, for the owner's confirmation | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | S | Step 2: a file-scope `static const` declaration of arithmetic type that a moving helper names moves into the private header verbatim, declared only there; each including file has its own internal-linkage copy with the same initialiser, and nothing writes it; the read-only accessor stays the form when no moving helper names it; an `#if`/`#else` macro block moves under the `CacheShift` sentence's terms | `segment.c` (campaign A, W36 lane a): its shared scale-space core names `SafeMargin`, `TreeLength`, `Red`, `Green` and `Blue`, one `static const int` declaration; round twenty-four's question 7. The ruling is the owner's, the wording the lane's | owner |
 | 2026-11-16 | NEW | CH | Share an Identical Header Helper Through a Common Private Header: a `static inline` helper defined byte-identically in several private headers moves to one new private header that each of them includes; proof: every including `.c` file compiles to a byte-identical object (`-g0`, `__FILE__`/`__LINE__` pinned) against HEAD's and the new headers; a helper whose definitions differ in anything, its name included, is not taken | `ReleaseFailedImage` in `effect-private.h`, `effect-blur-adaptive-filters-private.h` and `visual-effects-pixel-methods-private.h` (campaign A, W36 lane a); round twenty-four's question 4. The ruling is the owner's; the recipe, its object proof and the exclusion of renamed twins (`SetBlurProgress`/`ReportRowProgress`) are the lane's | mandate (2026-10-24) |
+| 2026-11-16 | AMEND | S | Step 2: a chain of splits through private headers may drop the original between its steps, when a stub probe of the whole chain first shows its last state raising the original above its score before the chain and every product and header at or above that score; the dropping step goes `--no-verify` with the drop, the probe and the step that ends it in its message; the lane resets the branch if it cannot reach the probed end; each step keeps a split's checks (both catalogues, `omp_compare` for a region that moves, timing) | `morphology-apply.c` (8.26): round twenty-five's probe of a rotation header and the `MorphologyApply` split dropped the kept file to 8.01, the second split of the `AcquireKernelBuiltIn` side ends it at 10.0 (products 8.54 and 8.26, headers 9.68); round twenty-five's question 5. The ruling is the owner's, the wording and the products-and-headers condition the lane's | owner |
