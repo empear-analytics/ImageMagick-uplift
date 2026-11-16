@@ -1,0 +1,17 @@
+# MorphologyApply's parallel regions (MorphologyPrimitive's two passes, the per-row and per-column loops under `#pragma omp parallel for ... magick_number_threads(...)`, and their `omp atomic` progress tails; MorphologyPrimitiveDirect's progress tail): 1000x1000 and 1200x800 images, above GetMagickNumberThreads' one-thread threshold of about 262144 pixels, over convolution, erode/dilate, intensity, hit-and-miss, iterated thinning, compound methods, the direct distance pass and an alpha image
+-size 1000x1000 gradient:"#ff0000-#0000ff" -morphology Convolve Gaussian:0x2 -format "%# %[fx:mean]\n" info:
+-size 1000x1000 gradient:"#ff0000-#0000ff" -morphology Correlate Sobel -format "%#\n" info:
+-size 1000x1000 gradient:"#ff0000-#0000ff" -morphology Erode Disk:3 -format "%#\n" info:
+-size 1000x1000 gradient:"#ff0000-#0000ff" -morphology Dilate Octagon:2 -format "%#\n" info:
+-size 1000x1000 gradient:"#ff0000-#0000ff" -morphology Close:2 Octagon:2 -format "%#\n" info:
+-size 1000x1000 gradient:"#ff0000-#0000ff" -morphology Smooth Square:1 -format "%#\n" info:
+-size 1000x1000 gradient:"#ff0000-#0000ff" -morphology TopHat Diamond -format "%#\n" info:
+-size 1000x1000 gradient:"#ff0000-#0000ff" -morphology EdgeIn Square -format "%#\n" info:
+-size 1000x1000 gradient:"#ff0000-#0000ff" -morphology ErodeIntensity Square:2 -format "%#\n" info:
+-size 1000x1000 gradient:"#ff0000-#0000ff" -morphology DilateIntensity Disk:2 -format "%#\n" info:
+-size 1000x1000 gradient:"#ff0000-#0000ff" -threshold 50% -morphology HitAndMiss Peaks:1.5 -format "%#\n" info:
+-size 800x800 gradient:"#ff0000-#0000ff" -threshold 50% -morphology Thinning:3 Skeleton -format "%#\n" info:
+-size 1000x1000 gradient:"#ff0000-#0000ff" -threshold 50% -morphology Distance Euclidean:4 -format "%#\n" info:
+-size 1000x1000 gradient:"#ff0000-#0000ff" -threshold 50% -morphology Distance Chebyshev -format "%#\n" info:
+-size 1200x800 gradient:"#ff0000-#0000ff" -alpha set -channel A -fx "i/w" +channel -morphology Convolve Blur:0x3 -format "%#\n" info:
+-size 1000x1000 gradient:"#ff0000-#0000ff" -morphology Convolve "Blur:0x2;Blur:0x2,90" -format "%#\n" info:
