@@ -416,6 +416,17 @@ static MagickBooleanType AcquireAdaptiveBlurKernels(double **kernel,
   return(FinishAdaptiveBlurKernels(kernel,width,w));
 }
 
+static MagickBooleanType FillAdaptiveBlurKernelSet(double ***kernel,
+  const size_t width,const double sigma)
+{
+  if (AcquireAdaptiveBlurKernels(*kernel,width,sigma) == MagickFalse)
+    {
+      *kernel=(double **) RelinquishAlignedMemory(*kernel);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType AcquireAdaptiveBlurKernelSet(double ***kernel,
   const size_t width,const double sigma)
 {
@@ -424,12 +435,7 @@ static MagickBooleanType AcquireAdaptiveBlurKernelSet(double ***kernel,
   if (*kernel == (double **) NULL)
     return(MagickFalse);
   (void) memset(*kernel,0,(size_t) width*sizeof(**kernel));
-  if (AcquireAdaptiveBlurKernels(*kernel,width,sigma) == MagickFalse)
-    {
-      *kernel=(double **) RelinquishAlignedMemory(*kernel);
-      return(MagickFalse);
-    }
-  return(MagickTrue);
+  return(FillAdaptiveBlurKernelSet(kernel,width,sigma));
 }
 
 typedef struct _AdaptiveBlurRow
