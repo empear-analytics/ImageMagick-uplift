@@ -128,6 +128,7 @@ Never, in any commit:
   or of a heap block the function allocated, or a `static void` helper made of such calls, may
   move past statements that do not name it, as the recipe's conditions require, when the whole
   catalogue, narrow and wide, stays at 0 diverged.
+- (Owner, 2026-11-16, answering "which rule may I relax to push the campaign A scores toward 10?") **A file that a Recipe S split produced may be carved again** (Number of Functions, Lines of Code), each new file under the same conditions as the first split (the playbook's Recipe S and its Texture-family rules, the gate that a split product scores at least what its original did, a build in every configuration that compiles the file, no public or MagickPrivate name changed, one function or family per commit). **Long flat chains** (about 30 to 55 one-helper steps whose score does not move until the last) may be committed in a dedicated lane, each intermediate commit that the CodeScene gate refuses taken with `--no-verify` and disclosed, **provided the chain's end score was first measured on a stub probe** and the lane resets the branch if it cannot finish. Public and MagickPrivate signatures stay as they were (the owner did not relax that rule).
 - Modify a `static const` data table.
 - Fix a bug you noticed. Report it.
 
