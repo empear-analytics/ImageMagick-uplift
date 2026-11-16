@@ -2355,6 +2355,16 @@ static void PrintCylinder2PlaneFX(const double *coeff,const char *image_gen,
   (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
 }
 
+static void PrintBarrelCenter(const double *coeff,const double xc,
+  const double yc)
+{
+  if ( fabs(coeff[8]-xc-0.5) < 0.1 && fabs(coeff[9]-yc-0.5) < 0.1 )
+    (void) FormatLocaleFile(stderr,"  -fx 'xc=(w-1)/2;  yc=(h-1)/2;\n");
+  else
+    (void) FormatLocaleFile(stderr,"  -fx 'xc=%lf;  yc=%lf;\n",coeff[8]-
+      0.5,coeff[9]-0.5);
+}
+
 static void PrintBarrelFX(const Image *image,const double *coeff,
   const DistortMethod method,const char *image_gen)
 {
@@ -2372,11 +2382,7 @@ static void PrintBarrelFX(const Image *image,const double *coeff,
   (void) FormatLocaleFile(stderr, "Barrel%s Distort, FX Equivalent:\n",
     method == BarrelDistortion ? "" : "Inv");
   (void) FormatLocaleFile(stderr, "%s", image_gen);
-  if ( fabs(coeff[8]-xc-0.5) < 0.1 && fabs(coeff[9]-yc-0.5) < 0.1 )
-    (void) FormatLocaleFile(stderr,"  -fx 'xc=(w-1)/2;  yc=(h-1)/2;\n");
-  else
-    (void) FormatLocaleFile(stderr,"  -fx 'xc=%lf;  yc=%lf;\n",coeff[8]-
-      0.5,coeff[9]-0.5);
+  PrintBarrelCenter(coeff,xc,yc);
   (void) FormatLocaleFile(stderr,
     "       ii=i-xc;  jj=j-yc;  rr=hypot(ii,jj);\n");
   (void) FormatLocaleFile(stderr,
