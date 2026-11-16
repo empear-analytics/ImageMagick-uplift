@@ -4523,6 +4523,16 @@ typedef struct _DistortLayoutTargets
     *output_scaling;
 } DistortLayoutTargets;
 
+static void SetDefaultDistortGeometry(RectangleInfo *geometry,
+  const Image *image)
+{
+  /* default output image bounds, when no 'bestfit' is requested */
+  (*geometry).width=image->columns;
+  (*geometry).height=image->rows;
+  (*geometry).x=0;
+  (*geometry).y=0;
+}
+
 static MagickBooleanType LayoutDistortImage(const DistortLayoutInput *layout,
   double *coeff,const DistortLayoutTargets *targets)
 {
@@ -4562,11 +4572,7 @@ static MagickBooleanType LayoutDistortImage(const DistortLayoutInput *layout,
     Usually the four corners of the source image is enough.
   */
 
-  /* default output image bounds, when no 'bestfit' is requested */
-  (*geometry).width=image->columns;
-  (*geometry).height=image->rows;
-  (*geometry).x=0;
-  (*geometry).y=0;
+  SetDefaultDistortGeometry(geometry,image);
 
   if ( method == ArcDistortion ) {
     (*bestfit) = MagickTrue;  /* always calculate a 'best fit' viewport */
