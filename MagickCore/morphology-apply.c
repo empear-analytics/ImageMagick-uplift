@@ -6826,17 +6826,21 @@ static void RotateSquareKernelValues(KernelInfo *kernel)
       }
 }
 
+static void RotateSquareKernelOrigin(KernelInfo *kernel)
+{
+  ssize_t x,y;
+  x = (ssize_t) (kernel->x*2-(ssize_t) kernel->width+1);
+  y = (ssize_t) (kernel->y*2-(ssize_t) kernel->height+1);
+  kernel->x = (ssize_t) ( -y +(ssize_t) kernel->width-1)/2;
+  kernel->y = (ssize_t) ( +x +(ssize_t) kernel->height-1)/2;
+}
+
 static double RotateSquareKernelBy90Degrees(KernelInfo *kernel,double angle)
 {
   /* Rotate a square array of values by 90 degrees */
   RotateSquareKernelValues(kernel);
   /* rotate the origin - relative to center of array */
-  { ssize_t x,y;
-    x = (ssize_t) (kernel->x*2-(ssize_t) kernel->width+1);
-    y = (ssize_t) (kernel->y*2-(ssize_t) kernel->height+1);
-    kernel->x = (ssize_t) ( -y +(ssize_t) kernel->width-1)/2;
-    kernel->y = (ssize_t) ( +x +(ssize_t) kernel->height-1)/2;
-  }
+  RotateSquareKernelOrigin(kernel);
   angle = fmod(angle+270.0, 360.0);     /* angle reduced 90 degrees */
   kernel->angle = fmod(kernel->angle+90.0, 360.0);
   return(angle);
