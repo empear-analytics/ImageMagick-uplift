@@ -412,6 +412,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/visual-effects.c \
   MagickCore/visual-effects-pixel.c \
   MagickCore/visual-effects-pixel-methods.c \
+  MagickCore/visual-effects-blueshift.c \
   MagickCore/visual-effects-noise.c \
   MagickCore/visual-effects-wavelet.c \
   MagickCore/visual-effects-plasma.c \
