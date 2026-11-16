@@ -412,10 +412,12 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/visual-effects.c \
   MagickCore/visual-effects-pixel.c \
   MagickCore/visual-effects-pixel-methods.c \
+  MagickCore/visual-effects-noise.c \
   MagickCore/visual-effects-wavelet.c \
   MagickCore/visual-effects-plasma.c \
   MagickCore/visual-effects-stegano.c \
   MagickCore/visual-effects.h \
+  MagickCore/visual-effects-pixel-methods-private.h \
   MagickCore/vision.c \
   MagickCore/vision-components.c \
   MagickCore/vision.h \
@@ -621,6 +623,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/type-private.h \
   MagickCore/utility-private.h \
   MagickCore/version-private.h \
+  MagickCore/visual-effects-pixel-methods-private.h \
   MagickCore/widget-private.h \
   MagickCore/xml-tree-private.h \
   MagickCore/xwindow-private.h
