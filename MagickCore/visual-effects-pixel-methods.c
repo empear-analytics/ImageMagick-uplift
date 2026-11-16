@@ -956,10 +956,26 @@ static PixelInfo ParseTintColorVector(const Image *image,const char *blend)
   return(color_vector);
 }
 
-static void TintPixel(const Image *image,const Image *tint_image,
-  const PixelInfo *color_vector,const Quantum *magick_restrict p,
-  Quantum *magick_restrict q)
+typedef struct _TintPixelInfo
 {
+  const Image
+    *image,
+    *tint_image;
+
+  const PixelInfo
+    *color_vector;
+} TintPixelInfo;
+
+static void TintPixel(const TintPixelInfo *pixel_info,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  const Image
+    *const image = pixel_info->image,
+    *const tint_image = pixel_info->tint_image;
+
+  const PixelInfo
+    *const color_vector = pixel_info->color_vector;
+
   PixelInfo
     pixel;
 
@@ -1030,12 +1046,15 @@ static void TintImageRow(const TintRow *tint_row,
   const PixelInfo
     color_vector = tint_row->color_vector;
 
+  const TintPixelInfo
+    pixel_info = { image, tint_image, (&color_vector) };
+
   ssize_t
     x;
 
   for (x=0; x < (ssize_t) image->columns; x++)
   {
-    TintPixel(image,tint_image,&color_vector,p,q);
+    TintPixel(&pixel_info,p,q);
     p+=(ptrdiff_t) GetPixelChannels(image);
     q+=(ptrdiff_t) GetPixelChannels(tint_image);
   }
