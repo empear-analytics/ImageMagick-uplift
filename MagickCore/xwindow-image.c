@@ -4200,18 +4200,26 @@ static magick_attribute((__always_inline__)) inline unsigned char
   return(q);
 }
 
-static unsigned char *XPackBGRARowLSB(const Image *canvas,const Quantum *p,
-  unsigned char *q)
+static inline unsigned char *XPackRedHighRow(const Image *canvas,
+  const XPackBitOrder side,const Quantum *p,unsigned char *q)
 {
   int
     x;
 
   for (x=(int) canvas->columns-1; x >= 0; x--)
   {
-    *q++=ScaleQuantumToChar((Quantum) GetPixelBlue(canvas,p));
-    *q++=ScaleQuantumToChar((Quantum) GetPixelGreen(canvas,p));
-    *q++=ScaleQuantumToChar((Quantum) GetPixelRed(canvas,p));
-    *q++=0;
+    *q++=((side == XPackLSBFirst) ?
+      ScaleQuantumToChar((Quantum) GetPixelBlue(canvas,p)) :
+      0);
+    *q++=((side == XPackLSBFirst) ?
+      ScaleQuantumToChar((Quantum) GetPixelGreen(canvas,p)) :
+      ScaleQuantumToChar((Quantum) GetPixelRed(canvas,p)));
+    *q++=((side == XPackLSBFirst) ?
+      ScaleQuantumToChar((Quantum) GetPixelRed(canvas,p)) :
+      ScaleQuantumToChar((Quantum) GetPixelGreen(canvas,p)));
+    *q++=((side == XPackLSBFirst) ?
+      0 :
+      ScaleQuantumToChar((Quantum) GetPixelBlue(canvas,p)));
     p+=(ptrdiff_t) GetPixelChannels(canvas);
   }
   return(q);
@@ -4637,7 +4645,7 @@ static void XPackRedHigh32BitLSB(const XImageRowSource *source,
         q=XPackGammaRedHighRow(canvas,XPackLSBFirst,p,q);
         continue;
       }
-    q=XPackBGRARowLSB(canvas,p,q);
+    q=XPackRedHighRow(canvas,XPackLSBFirst,p,q);
   }
 }
 
@@ -5226,23 +5234,6 @@ static inline MagickBooleanType IsImmutableAlphaImage(const XWindowInfo *window,
     (image->alpha_trait != UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
 }
 
-static unsigned char *XPackARGBRowMSB(const Image *canvas,const Quantum *p,
-  unsigned char *q)
-{
-  int
-    x;
-
-  for (x=(int) canvas->columns-1; x >= 0; x--)
-  {
-    *q++=0;
-    *q++=ScaleQuantumToChar((Quantum) GetPixelRed(canvas,p));
-    *q++=ScaleQuantumToChar((Quantum) GetPixelGreen(canvas,p));
-    *q++=ScaleQuantumToChar((Quantum) GetPixelBlue(canvas,p));
-    p+=(ptrdiff_t) GetPixelChannels(canvas);
-  }
-  return(q);
-}
-
 static unsigned char *XPackGammaABGRRowMSB(const Image *canvas,const Quantum *p,
   unsigned char *q)
 {
@@ -5820,7 +5811,7 @@ static void XPackRedHigh32BitMSB(const XImageRowSource *source,
         q=XPackGammaRedHighRow(canvas,XPackMSBFirst,p,q);
         continue;
       }
-    q=XPackARGBRowMSB(canvas,p,q);
+    q=XPackRedHighRow(canvas,XPackMSBFirst,p,q);
   }
 }
 
