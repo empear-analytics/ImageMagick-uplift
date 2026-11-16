@@ -1378,6 +1378,21 @@ is worth it.
    by at least two of the files that include it (directly or through another of its
    helpers), its score at least the original's before the split. The first header then
    keeps its score, and a file that does not use the family does not see it.
+   A chain of splits through such headers may drop the original between its steps (owner,
+   2026-11-16, answers to the round-twenty-five questions: `morphology-apply.c`'s chain
+   through a header of 20 or more statics, "if the test cases pass"). Before the first
+   step, the whole chain is run on a stub probe (copies of the files, every header move and
+   split and any later step of the chain applied, scored with `tools/ch.py`, the sources
+   untouched), and the chain is taken only when the probe's last state raises the original
+   above its score before the chain and leaves every product and header at or above that
+   score. A step that the gate refuses only because the original drops is committed with
+   `--no-verify`, `tools/check_trailers.py` run on its message by hand, and the message
+   names the drop, the probe's end scores and the step that ends the drop; a lane that
+   cannot reach the probed end resets the branch to the chain's start. Every step keeps
+   the checks of a split: narrow and wide catalogues at 0 diverged, a parallel region that
+   moves to another file checked as (b) above (`omp_compare` at one and four threads on
+   cases that start several threads), and the moved hot paths timed against the baseline
+   binary as Recipe TH step 8 says.
 3. The public function keeps its declaration in the header it already has.
 4. List the new file wherever the original is listed: `tools/register_source.py` does it
    for `MagickCore/Makefile.am`, `Makefile.in` (by hand, mirroring what automake
@@ -22446,3 +22461,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | AMEND | S | Step 2's second exception: a quoted include of a header that defines objects, named by the family and by no line of the kept part, moves to the new file (the original's line removed), so each object stays defined once; refused when both parts name something the header defines; `split_source.py` 3e573eec5 | `opencl.c`'s environment split (campaign A, W37 lane a): only `HasOpenCLDevices` names `accelerateKernels` | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | S | Step 2: a file-scope variable of external linkage that only the moved functions name (and no other file) moves with them, its declaration group and comment verbatim after the new file's *Forward declarations*; by hand, checked by a sorted-line comparison and `nm` | `opencl.c`'s `cache_directory` and `cache_directory_lock` (campaign A, W37 lane a); the declaration form of 82c165e07 asks that both parts name the variable | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | S | *Preprocessor branches*: an `#if` without `#else` directly above the family's first moved function whose `#endif` stands inside the moved run moves whole, directives verbatim; `split_source.py` 3423ec185 | `opencl.c`'s `#if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT` around the benchmark-profile readers (campaign A, W37 lane a) | mandate (2026-10-24) |
+| 2026-11-16 | AMEND | S | Step 2: a chain of splits through private headers may drop the original between its steps, when a stub probe of the whole chain first shows its last state raising the original above its score before the chain and every product and header at or above that score; the dropping step goes `--no-verify` with the drop, the probe and the step that ends it in its message; the lane resets the branch if it cannot reach the probed end; each step keeps a split's checks (both catalogues, `omp_compare` for a region that moves, timing) | `morphology-apply.c` (8.26): round twenty-five's probe of a rotation header and the `MorphologyApply` split dropped the kept file to 8.01, the second split of the `AcquireKernelBuiltIn` side ends it at 10.0 (products 8.54 and 8.26, headers 9.68); round twenty-five's question 5. The ruling is the owner's, the wording and the products-and-headers condition the lane's | owner |
