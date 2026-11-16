@@ -218,145 +218,72 @@ MagickExport void ConvertHSLToRGB(const double hue,const double saturation,
 %      generic color space.
 %
 */
-typedef struct _RGBToGenericInput
+typedef struct _RGBToGenericMethod
 {
   ColorspaceType
     colorspace;
 
-  double
-    R,
-    G,
-    B;
+  void
+    (*convert)(const double,const double,const double,double *,double *,
+      double *);
 
-  double
-    *X,
-    *Y,
-    *Z;
-} RGBToGenericInput;
+  void
+    (*convert_illuminant)(const double,const double,const double,
+      const IlluminantType,double *,double *,double *);
+} RGBToGenericMethod;
 
-static void ConvertRGBToYDbDrThroughYUV(const RGBToGenericInput *input)
-{
-  const ColorspaceType
-    colorspace = input->colorspace;
-
-  const double
-    R = input->R,
-    G = input->G,
-    B = input->B;
-
-  double
-    *const X = input->X,
-    *const Y = input->Y,
-    *const Z = input->Z;
-
-  switch (colorspace)
+static const RGBToGenericMethod
+  RGBToGenericMethods[] =
   {
-    case YDbDrColorspace:
-    {
-      ConvertRGBToYDbDr(R,G,B,X,Y,Z);
-      break;
-    }
-    case YIQColorspace:
-    {
-      ConvertRGBToYIQ(R,G,B,X,Y,Z);
-      break;
-    }
-    case YPbPrColorspace:
-    {
-      ConvertRGBToYPbPr(R,G,B,X,Y,Z);
-      break;
-    }
-    case YUVColorspace:
-    {
-      ConvertRGBToYUV(R,G,B,X,Y,Z);
-      break;
-    }
-    default:
-    {
-      *X=QuantumScale*R;
-      *Y=QuantumScale*G;
-      *Z=QuantumScale*B;
-      break;
-    }
-  }
-}
+    { Adobe98Colorspace, ConvertRGBToAdobe98, NULL },
+    { CMYColorspace, ConvertRGBToCMY, NULL },
+    { DisplayP3Colorspace, ConvertRGBToDisplayP3, NULL },
+    { HCLColorspace, ConvertRGBToHCL, NULL },
+    { HCLpColorspace, ConvertRGBToHCLp, NULL },
+    { HSBColorspace, ConvertRGBToHSB, NULL },
+    { HSIColorspace, ConvertRGBToHSI, NULL },
+    { HSLColorspace, ConvertRGBToHSL, NULL },
+    { HSVColorspace, ConvertRGBToHSV, NULL },
+    { HWBColorspace, ConvertRGBToHWB, NULL },
+    { LabColorspace, NULL, ConvertRGBToLab },
+    { LCHColorspace, NULL, ConvertRGBToLCHab },
+    { LCHabColorspace, NULL, ConvertRGBToLCHab },
+    { LCHuvColorspace, NULL, ConvertRGBToLCHuv },
+    { LMSColorspace, ConvertRGBToLMS, NULL },
+    { LuvColorspace, NULL, ConvertRGBToLuv },
+    { OklabColorspace, ConvertRGBToOklab, NULL },
+    { OklchColorspace, ConvertRGBToOklch, NULL },
+    { ProPhotoColorspace, ConvertRGBToProPhoto, NULL },
+    { xyYColorspace, ConvertRGBToxyY, NULL },
+    { XYZColorspace, ConvertRGBToXYZ, NULL },
+    { YCbCrColorspace, ConvertRGBToYCbCr, NULL },
+    { YDbDrColorspace, ConvertRGBToYDbDr, NULL },
+    { YIQColorspace, ConvertRGBToYIQ, NULL },
+    { YPbPrColorspace, ConvertRGBToYPbPr, NULL },
+    { YUVColorspace, ConvertRGBToYUV, NULL }
+  };
 
-static void ConvertRGBToOklabThroughYCbCr(const RGBToGenericInput *input)
+static const RGBToGenericMethod *GetRGBToGenericMethod(
+  const ColorspaceType colorspace)
 {
-  const ColorspaceType
-    colorspace = input->colorspace;
+  size_t
+    i;
 
-  const double
-    R = input->R,
-    G = input->G,
-    B = input->B;
-
-  double
-    *const X = input->X,
-    *const Y = input->Y,
-    *const Z = input->Z;
-
-  switch (colorspace)
-  {
-    case OklabColorspace:
-    {
-      ConvertRGBToOklab(R,G,B,X,Y,Z);
-      break;
-    }
-    case OklchColorspace:
-    {
-      ConvertRGBToOklch(R,G,B,X,Y,Z);
-      break;
-    }
-    case ProPhotoColorspace:
-    {
-      ConvertRGBToProPhoto(R,G,B,X,Y,Z);
-      break;
-    }
-    case xyYColorspace:
-    {
-      ConvertRGBToxyY(R,G,B,X,Y,Z);
-      break;
-    }
-    case XYZColorspace:
-    {
-      ConvertRGBToXYZ(R,G,B,X,Y,Z);
-      break;
-    }
-    case YCbCrColorspace:
-    {
-      ConvertRGBToYCbCr(R,G,B,X,Y,Z);
-      break;
-    }
-    default:
-    {
-      ConvertRGBToYDbDrThroughYUV(input);
-      break;
-    }
-  }
+  for (i=0; i < (sizeof(RGBToGenericMethods)/sizeof(*RGBToGenericMethods)); i++)
+    if (RGBToGenericMethods[i].colorspace == colorspace)
+      return(RGBToGenericMethods+i);
+  return((const RGBToGenericMethod *) NULL);
 }
 
 MagickPrivate void ConvertRGBToGeneric(const ColorspaceType colorspace,
   const double R,const double G,const double B,const double white_luminance,
   const IlluminantType illuminant,double *X,double *Y,double *Z)
 {
-  RGBToGenericInput
-    input;
+  const RGBToGenericMethod
+    *method;
 
-  input.colorspace=colorspace;
-  input.R=R;
-  input.G=G;
-  input.B=B;
-  input.X=X;
-  input.Y=Y;
-  input.Z=Z;
   switch (colorspace)
   {
-    case Adobe98Colorspace:
-    {
-      ConvertRGBToAdobe98(R,G,B,X,Y,Z);
-      break;
-    }
     case CAT02LMSColorspace:
     {
       double
@@ -368,85 +295,25 @@ MagickPrivate void ConvertRGBToGeneric(const ColorspaceType colorspace,
       ConvertCAT02LMSToXYZ(L,M,S,X,Y,Z);
       break;
     }
-    case CMYColorspace:
-    {
-      ConvertRGBToCMY(R,G,B,X,Y,Z);
-      break;
-    }
-    case DisplayP3Colorspace:
-    {
-      ConvertRGBToDisplayP3(R,G,B,X,Y,Z);
-      break;
-    }
-    case HCLColorspace:
-    {
-      ConvertRGBToHCL(R,G,B,X,Y,Z);
-      break;
-    }
-    case HCLpColorspace:
-    {
-      ConvertRGBToHCLp(R,G,B,X,Y,Z);
-      break;
-    }
-    case HSBColorspace:
-    {
-      ConvertRGBToHSB(R,G,B,X,Y,Z);
-      break;
-    }
-    case HSIColorspace:
-    {
-      ConvertRGBToHSI(R,G,B,X,Y,Z);
-      break;
-    }
-    case HSLColorspace:
-    {
-      ConvertRGBToHSL(R,G,B,X,Y,Z);
-      break;
-    }
-    case HSVColorspace:
-    {
-      ConvertRGBToHSV(R,G,B,X,Y,Z);
-      break;
-    }
-    case HWBColorspace:
-    {
-      ConvertRGBToHWB(R,G,B,X,Y,Z);
-      break;
-    }
     case JzazbzColorspace:
     {
       ConvertRGBToJzazbz(R,G,B,white_luminance,X,Y,Z);
       break;
     }
-    case LabColorspace:
-    {
-      ConvertRGBToLab(R,G,B,illuminant,X,Y,Z);
-      break;
-    }
-    case LCHColorspace:
-    case LCHabColorspace:
-    {
-      ConvertRGBToLCHab(R,G,B,illuminant,X,Y,Z);
-      break;
-    }
-    case LCHuvColorspace:
-    {
-      ConvertRGBToLCHuv(R,G,B,illuminant,X,Y,Z);
-      break;
-    }
-    case LMSColorspace:
-    {
-      ConvertRGBToLMS(R,G,B,X,Y,Z);
-      break;
-    }
-    case LuvColorspace:
-    {
-      ConvertRGBToLuv(R,G,B,illuminant,X,Y,Z);
-      break;
-    }
     default:
     {
-      ConvertRGBToOklabThroughYCbCr(&input);
+      method=GetRGBToGenericMethod(colorspace);
+      if (method == (const RGBToGenericMethod *) NULL)
+        {
+          *X=QuantumScale*R;
+          *Y=QuantumScale*G;
+          *Z=QuantumScale*B;
+          break;
+        }
+      if (method->convert != NULL)
+        method->convert(R,G,B,X,Y,Z);
+      else
+        method->convert_illuminant(R,G,B,illuminant,X,Y,Z);
       break;
     }
   }

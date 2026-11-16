@@ -83,7 +83,12 @@ with OpenMP disabled, so it cannot see a data race or a change in what is shared
 threads. Therefore:
 
 - **Never add, remove, move, or edit a `#pragma omp` line or its clauses**, and never
-  move code into, out of, or across the region it governs.
+  move code into, out of, or across the region it governs. **Exception (owner,
+  2026-11-15):** AGENTS.md's ruling allows both, one commit per step, when the whole
+  catalogue (narrow and wide) stays at 0 diverged and `tools/omp_compare.sh` shows no
+  difference at one and four threads on cases big enough to start several threads; read
+  there for the extra conditions (write-set quoted, `critical` names, no slowdown). The
+  rules below still apply to a step that stays inside that ruling's reach.
 - A block **inside** a parallel loop body may be extracted (Recipe E) into a `static`
   function called from the same place, **provided the block writes no variable declared
   outside the loop body** - not directly, and not by passing its address. Reading outer
@@ -176,7 +181,7 @@ start new runs (`mutate.py`, Mull builds, `night3.sh`) to gate a step.
 be refactored, as an earlier campaign refactored a program with no tests at all, but only with the
 recipes whose guard fingerprint is exact: **E, G and P** (and B, N and I with the
 checks of *Unreached functions: B and N* and *Unreached functions: Recipe I* below, SD with
-*Unreached functions: Recipe SD* and BC with *Unreached functions: Recipe BC*). The proof is the build
+*Unreached functions: Recipe SD* and BC with *Unreached functions: Recipe BC*, and WP's step 8 for a wrapper no code calls). The proof is the build
 and `refactor_guard.py` reporting `OK` with `--calls`; a `WARN` stops the commit.
 For E and P, which add a function, `OK` means the exact fingerprint the guard names as
 expected: the literal check `OK`, and `--calls` moving nothing but `+2` for each new
@@ -18429,6 +18434,135 @@ Lane: c
 
 ---
 
+## Recipe TS - Share One Body Across Twin Sections of a Parallel Sections Region
+
+**Use when:** CodeScene reports *Complex Method* or *Large Method* on a function that holds
+an `#pragma omp parallel sections` region whose sections are the same block four times over
+except for one test and one channel constant, as `fourier.c`'s `InverseFourierTransformImage`
+and `ForwardFourierTransformImage` do: each section declares `thread_status`, sets it to
+`MagickTrue`, calls `InverseFourierTransformChannel` under `if (<test>)` for its channel,
+and writes `status=thread_status;` when the call failed.
+
+**Not covered by:** Recipe PS, which moves a block of a `parallel for` body once, so each
+section would be its own near-identical helper (Code Duplication); Recipe SC, whose copies
+differ in constants only and which refuses a block inside an OpenMP region; Recipe SV and
+Recipe TW, whose copies differ in one value and which have no `status` through a pointer;
+Recipe D, which needs a reported *Code Duplication*; Recipe E, whose OpenMP rule refuses a
+block that writes `status`.
+
+**How:**
+
+1. The function holds one `parallel sections` region, guarded as the file guards it
+   (`#if defined(MAGICKCORE_OPENMP_SUPPORT)`), outside every other OpenMP region; no pragma
+   is added, removed, moved or edited, and each pragma keeps the braces it governs. At least
+   two sections have a structured block of this text, checked by script (whitespace ignored,
+   no variable renamed): `{ MagickBooleanType thread_status; thread_status=MagickTrue;
+   if (T) thread_status=F(&source,C,fourier_image,exception); if (thread_status ==
+   MagickFalse) status=thread_status; }`. `T` is an expression with no side effect that
+   reads only variables nothing in the region writes (`is_gray`, a member of a pointer to
+   `const`), `C` is an enumeration constant, and `F`, its other arguments and the names are
+   the same in every copy. A section of another shape stays as it is. `status` is declared
+   outside the region and named in no data-sharing clause, so it is shared.
+2. The write-set rule, as the playbook's *OpenMP regions* gives it: a block inside a region
+   may move only when it writes no variable declared outside it. Each copy breaks it in one
+   place, `status=thread_status;`, the plain store of `MagickFalse` that the sections already
+   make concurrently (every writer stores the same value, and nothing reads `status` before
+   the region's closing barrier). Recipe PS step 2 admits that write when the variable is
+   shared and written only by plain assignment outside `critical` and `atomic`, and this
+   step does the same: nothing else of the copy writes a variable outside it (`thread_status`
+   is the copy's own).
+3. The variables `F` reads besides `C` (`source`, `fourier_image`, `exception`) go in one
+   `typedef struct` of exactly those types and names, declared above the new function and
+   inside the conditional that holds `F`. The caller declares it `const` with the values as its
+   initialiser among the declarations of the block that holds the region when no member's
+   variable is written between that declaration and the region (a call that fills
+   `fourier_image` before it), and otherwise declares it plain and assigns each member
+   directly before the region, outside it. No section writes a member's variable or the struct.
+4. Write the new function directly above the caller, inside the same conditional as `F`:
+   `static void Name(const Input *input,const MagickBooleanType run,const <C's type>
+   channel,MagickBooleanType *status)`. It binds each member as a `const` local of its name
+   (Recipe N step 4), declares `thread_status`, and holds the copy's text with `if (T)` read
+   `if (run != MagickFalse)`, `C` read `channel`, `&source` read `source` (the member holds the
+   caller's address), and `status` read `(*status)`. Nothing else changes.
+5. Each such section's block becomes `Name(&input,T,C,&status);`, the braces and the pragma
+   unchanged, `T` and `C` as the copy wrote them. `T` yields `0` or `1` (a comparison), which
+   `run != MagickFalse` tests as `T` did, evaluated by the same thread at the same point
+   (the copy evaluated it first, after setting `thread_status`, which `T` does not read).
+6. One function's sections go in one commit; a second function with its own twin sections
+   takes its own helper in its own commit and the file's score decides it (two helpers over
+   different callees are reported as Code Duplication).
+7. Evidence: the oracle (which builds without OpenMP and so runs the sections one after the
+   other), `refactor_guard.py --calls`, and, because the oracle cannot see a race, private
+   OpenMP builds of the base and the candidate compared on the cases that reach the region
+   at `OMP_NUM_THREADS=1` and `=4`, output and exit status byte for byte.
+
+**Before:**
+
+```c
+          {
+            MagickBooleanType
+              thread_status;
+
+            thread_status=MagickTrue;
+            if (is_gray == MagickFalse)
+              thread_status=InverseFourierTransformChannel(&source,
+                GreenPixelChannel,fourier_image,exception);
+            if (thread_status == MagickFalse)
+              status=thread_status;
+          }
+```
+
+**After:**
+
+```c
+          {
+            InverseFourierSection(&section,
+              is_gray == MagickFalse,
+              GreenPixelChannel,&status);
+          }
+...
+static void InverseFourierSection(const InverseSectionInput *input,
+  const MagickBooleanType run,const PixelChannel channel,
+  MagickBooleanType *status)
+{
+  ...
+  thread_status=MagickTrue;
+  if (run != MagickFalse)
+    thread_status=InverseFourierTransformChannel(source,
+      channel,fourier_image,exception);
+  if (thread_status == MagickFalse)
+    (*status)=thread_status;
+}
+```
+
+**Careful:**
+
+- Which thread runs what does not change: each section still runs once, by one thread of the
+  team, and the helper runs on that thread. The region's variables keep their sharing: the
+  helper's `status` is the caller's `status` (shared, written by plain stores of one value,
+  as before) and the input struct is read only.
+- `T` is evaluated before the call instead of after `thread_status=MagickTrue;`. It has no
+  side effect and reads nothing a section writes, so it has the value it had.
+- The race stays the race it was: several sections may store `MagickFalse` into `status` at
+  once, and the function acts on it only after the region's barrier. The recipe does not
+  repair it; it must not add a `critical` or an atomic.
+- The oracle's build has no OpenMP, so it proves the sequential order only; the differential
+  runs of step 7 compare what two threads or four make of the same inputs. They show no
+  difference; they cannot prove a race absent, which is why the step is as mechanical as
+  PS: same stores, same objects, same points.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function and
+its `-Wunused` neighbours), the write-set rule of step 2 read by hand, and the differential
+runs of step 7.
+
+**Provenance:** 2026-11-13, from `fourier.c`'s `InverseFourierTransformImage` (campaign A,
+W21 lane b): four of its five sections are this block, the owner's ruling of 2026-11-12 lets the
+`omp` sites of `fourier.c` be taken one at a time; with the helper the function leaves
+*Complex Method* (cc 16), the file 7.59 to 7.66. Added by Claude Code (Claude Sonnet 5.5)
+under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -20523,6 +20657,772 @@ owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
+## Recipe RI - Extract a Parallel Row Loop Filling Its Row Struct Once
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead* on a
+function whose tail is a parallel row loop whose body fills a body-declared row struct
+member by member before passing it to a row function, where most members are filled from
+values that no row changes: `composite.c`'s `CompositeImage`, whose loop body assigned
+twenty-seven members of a `CompositeRowInputs`, five of them by `IsListedOperator` scans of
+`static const` operator tables (the row flags Recipe RH introduced), for every row.
+
+**Not covered by:** Recipe N step 1 and Recipe Z step 1, which move the tail with its
+loop whole and unchanged, so the new function keeps the per-row fill, reads every filled
+variable through a new input struct that repeats the row struct member for member, and
+stays a *Large Method*; Recipe PC, whose head takes its read-only inputs in a `const`
+struct built in the body, so the head reads the same twenty variables (Recipe N step 2's
+limit of four parameters again needs a struct of all of them); Recipes FI, FB, FU and
+HF, which rewrite or hoist a fill within one block and never across a `#pragma omp`
+region's boundary; Recipe RH, which moves a label test the other way, into the per-row
+fill; Recipe RL, which shares one loop between several functions' tails.
+
+**How:**
+
+1. The tail. A block of the function that lies outside every OpenMP region and runs,
+   from its first statement, as Recipe N step 1 requires of a block holding a whole
+   parallel loop: the statements that set the region's shared variables (`status=
+   MagickTrue; progress=0;`), the cache-view acquisitions, the `#if
+   defined(MAGICKCORE_OPENMP_SUPPORT)` line, the pragma and the `#endif`, the `for`
+   loop the pragma governs, and the view releases. Every variable the region writes or a
+   clause names (`status`, `progress`, `y`, the views) is written nowhere after the
+   block, except `status`, which the block's last statement leaves for the caller's
+   `return(status);`.
+2. The fill. Inside the loop body, a struct local `row` of a typedef `S` of the file,
+   declared in the body (so private to the iteration), is filled by plain member
+   assignments `row.m=e;`, one per member of `S` (check against the typedef that every
+   member is assigned once), all in one run directly before the run's only reader, a
+   call `F(&row,...)`, and nothing else in the body names `row`. A member is *per-row*
+   when its `e` reads the loop counter or a variable the body declares (`row.y=y;`,
+   `row.pixels=pixels;`); every other member is *invariant*: its `e` reads only
+   variables that nothing in the region writes, and calls, if any, only functions that
+   read nothing but their arguments and `static const` data and write nothing, checked
+   by reading them (`IsListedOperator`).
+3. The caller's fill. Declare `S rows;` at the top of the caller. Where the block stood,
+   write the invariant assignments in their original order with `rows.` for `row.`, each
+   `e` unchanged, after any statement of the block that computes a value they read and
+   writes nothing the region shares (`midpoint=...;`, which stays in the caller), then
+   `status=Name(&rows);`. Declarations the caller no longer uses leave it (`progress`).
+4. The loop function. Directly above the caller, `static MagickBooleanType Name(const S
+   *rows)`: it binds, as `const` locals of their own names and types, the members the
+   loop's own statements read (`image`, `source_image`, `exception`), declares the
+   block's temporaries (`source_view`, `image_view`, `status`, `progress`, `y`), and
+   holds the block's statements unchanged from `status=MagickTrue;` to the last view
+   release, then `return(status);`. The pragma, its clauses and the `#if`/`#endif` lines
+   are unchanged; each name a clause holds is a local of the function.
+5. The row head. The loop body, from its first statement to the call `F(&row,...)` and
+   the sync that follows it, becomes Recipe PC's head: `static MagickBooleanType
+   NameHead(const H *head,MagickBooleanType *status)`, where `H` is a typedef declared
+   directly above it whose members are `const S *rows`, the views and `y`, filled in the
+   body as `const H head = { rows, source_view, image_view, y };`. The head binds what it
+   reads (Recipe N step 4, members of `*rows` read as `rows->m` or bound), each
+   `continue` becomes `return(MagickFalse);` and each `status` is `(*status)` (Recipe PC
+   steps 2 and 3); the run of step 2 becomes `row=(*rows);` followed by the per-row
+   assignments in their original order. The body keeps `if (NameHead(&head,&status) ==
+   MagickFalse) continue;` and the progress tail unchanged.
+6. The write set, read by hand and quoted in the commit (the owner's OpenMP ruling of
+   2026-11-15): the region writes `status` (shared, plain stores of `MagickFalse` as
+   before, now through the head's pointer), `progress` (shared, the same `omp atomic`),
+   `y` (the loop counter) and the body's and head's locals (private); `*rows` is read and
+   never written inside the region. No pragma line, clause or `critical` name changes.
+7. Time a case that reaches the region, base against candidate, several runs each, at
+   one thread and at four, and quote the medians: the per-row work is now one struct copy
+   and two stores where it was the whole fill and the invariant calls, plus one call of
+   the head; a slowdown beyond noise means the step is not taken.
+
+**Before:**
+
+```c
+  status=MagickTrue;
+  progress=0;
+  midpoint=((MagickRealType) QuantumRange+1.0)/2;
+  source_view=AcquireVirtualCacheView(source_image,exception);
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(source_image,image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    ...
+    if (SkipOverRow(&source,&status) == MagickFalse)
+      continue;
+    ...
+    row.image=image;
+    row.source_image=source_image;
+    row.compose=compose;
+    row.union_coverage=IsListedOperator(UnionCoverageOperators,
+      sizeof(UnionCoverageOperators)/sizeof(*UnionCoverageOperators),compose);
+    ...
+    row.y=y;
+    row.exception=exception;
+    row.pixels=pixels;
+    ...
+    row.geometry_info=geometry_info;
+    CompositeImageRow(&row,p,q);
+    SyncCompositeRow(image_view,exception,&status);
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      ...
+  }
+  source_view=DestroyCacheView(source_view);
+  image_view=DestroyCacheView(image_view);
+```
+
+**After:**
+
+```c
+  midpoint=((MagickRealType) QuantumRange+1.0)/2;
+  rows.image=image;
+  rows.source_image=source_image;
+  rows.compose=compose;
+  rows.union_coverage=IsListedOperator(UnionCoverageOperators,
+    sizeof(UnionCoverageOperators)/sizeof(*UnionCoverageOperators),compose);
+  ...
+  rows.geometry_info=geometry_info;
+  status=CompositeImageRows(&rows);
+```
+
+with `CompositeImageRows` holding the acquisitions, the unchanged pragma and loop, whose
+body is
+
+```c
+    const CompositeRowHead
+      head = { rows, source_view, image_view, y };
+
+    if (CompositeImageRowHead(&head,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      ...
+```
+
+and `CompositeImageRowHead` ending in `row=(*rows); row.y=y; row.pixels=pixels;
+CompositeImageRow(&row,p,q); SyncCompositeRow(image_view,exception,status);`.
+
+**Careful:**
+
+- Why the values are the same. Each invariant `e` reads variables that nothing in the
+  region writes, and nothing between the old position of the block and the new fill
+  writes them either (the fill stands where the block began), so `e` has the same value
+  before the loop as in every row; its calls read only their arguments and constant
+  tables, so evaluating them once gives what each row's evaluation gave. `row=(*rows);`
+  then copies those values into the private `row`, and the per-row assignments that
+  follow set the others as before, so `F` receives a struct with the same value in
+  every member. The copy also copies the per-row members of `rows`, which nothing set:
+  a struct object is never a trap representation (C11 6.2.6.1p6) and both are
+  overwritten before any read.
+- Calls that ran once per row now run once, also when the image has no rows or every
+  row is skipped. That is why step 2 admits only calls with no side effect: a call that
+  allocates, logs, throws or reads mutable state is not invariant.
+- Order of effects. The block's statements keep their order inside the loop function;
+  the fill moved before `status=MagickTrue; progress=0;` and the acquisitions, which it
+  neither reads nor affects, and the acquisitions still precede the loop.
+- OpenMP. `rows` lives in the caller's frame for the whole call, so every thread reads
+  a live object; nobody writes it after the fill, so the shared reads race with nothing.
+  Every write of the region keeps the protection it had (step 6). The oracle runs one
+  thread: `tools/omp_compare.sh` at one and four threads on cases that reach the region
+  is the check for the parallel build.
+- The head's exits are the body's `continue` statements, each preceded by the same
+  writes (`(*status)=MagickFalse` where the body set `status`), as Recipe PC argues.
+
+**Evidence level:** oracle (the cases that reach the loop; quote line coverage of the
+skip, fetch-failure and progress paths, which may run in no case, in which case write
+`Verified: guard` and say which), plus `tools/omp_compare.sh` at one and four threads on
+cases that reach the region, the step 6 reading and the step 7 timing in the message.
+
+**Provenance:** 2026-11-15, from `composite.c`'s `CompositeImage` (campaign A, W29 round
+eighteen lane a): the row flags of Recipe RH, held since W19c as an owner question
+because they sat inside the parallel body, and the twenty other invariant members of
+the row fill. Moved whole under Recipe N step 1, the loop function would keep the
+twenty-seven-line fill and a binding per member (that form was not probed); with the fill
+hoisted but without the head it was a *Complex Method* (cc 9, probed); with both, the
+file rose from 4.24 to 4.33 in a probe with no new finding. Added by Claude Code (Claude Opus 5.5) under the
+owner's OK of 2026-11-10 to evolve the recipes and the OpenMP ruling of 2026-11-15.
+
+---
+
+## Recipe FL - Fold a Twin Parallel Row Loop into Its Sibling Function Through a Flag
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead* on a
+function holding a parallel row loop (a `case` body, say) that is the same text as the
+whole loop of a `static` function of the file except for the row call, which in the twin
+takes a private row struct filled per row from values no row changes: `composite.c`'s
+Intensity group of `CompositeImage` and `CompositeCopyImage` (W14), the same acquisitions,
+the same pragma and clauses, the same fetch, sync, progress and release, differing in
+`SetIntensityAlphaRow(&row,p,q)` after a three-member fill against
+`CopyCompositeRow(source_image,image,p,q)`.
+
+**Not covered by:** Recipe E, N and Z step 1, which move the loop whole: the new function
+is the existing function's twin, and CodeScene reports *Code Duplication* (W15: 3.46 to
+3.21); Recipe MT, whose copies hold no `#pragma` line and may differ by a statement in one
+copy only outside a parallel region; Recipe CF, whose callees must have one type
+(the two row calls take different parameters) and which passes a function pointer;
+Recipe RL, which builds a shared loop for several functions' tails; Recipe D, whose
+copies differ in variables or one value.
+
+**How:**
+
+1. The twins. A block `B` of a function `G` and the body of a `static` function `F` of
+   the same file. `F`'s body, from its first statement after its declarations to its
+   `return(status);`, and `B` (ending in its own `return(status);`) are the same token
+   sequence once each one's variables are renamed to one name per role (Recipe TW step
+   1), the `#if`, pragma and `#endif` lines included and identical, except at one
+   statement, the row call: `F` calls `R1(...)`, `B` calls `R2(&row,...)` after a run of
+   member assignments `row.m=e;` that fills every member of the body-declared struct
+   `row`, whose `e` read only variables nothing in the region writes (the invariance
+   test of Recipe RI step 2). `G` reads none of `B`'s temporaries after it, and every
+   variable `B` reads that `F` does not read as a parameter is a local of `G` the region
+   does not write. Check it with `diff` of the two line ranges, each dedented to a
+   function body's indentation (the command and its whole output quoted in the commit):
+   the only hunks are `row`'s declaration, its fill and the two calls. When the twins
+   need a renaming, the step is refused unless a committed tool compares them.
+2. The flag. `F` takes its inputs through a `const` struct parameter (`const
+   CompositeSetup *setup`), or gets one under Recipe B before this step. Add to that
+   struct's typedef, after its last member, a `MagickBooleanType` member named for what
+   `B` does (`intensity`) and one member for each variable the fill reads that `F` does
+   not have (`clamp`), of its type and name. Every place that fills the struct for `F`'s
+   existing callers sets the flag to `MagickFalse` and each new member from the variable
+   of its name, directly after the struct's existing fills (`grep` the struct's name).
+3. The row function. Directly above `F`, write `static void NameRow(const S *row,const
+   MagickBooleanType flag,...)`, where `S` is `row`'s type and the remaining parameters
+   are the row call's own arguments that both calls share (`p`, `q`): its body is `if
+   (flag == MagickFalse) R1(...); else R2(row,...);`, each call's arguments those of its
+   twin, with `R1`'s arguments that `S`'s members hold read as `row->m`. At most four
+   parameters.
+4. In `F`, declare `const S row = { ... };` among its declarations, with `F`'s
+   parameters and the new members (`setup->clamp`) in the order of `S`'s members, the
+   values the fill assigned; replace `F`'s row call by `NameRow(&row,setup->flag,...);`.
+5. In `G`, replace `B` by setting the flag `setup.flag=MagickTrue;` (the struct `G`
+   already fills for `F`) and `return(F(...));`, the call `G` makes for `F`'s own group.
+   Declarations `B` alone used leave `G`.
+6. The write set, read by hand and quoted in the commit (the owner's OpenMP ruling of
+   2026-11-15): the region of `F` writes what it wrote before (`status`, shared, the
+   same plain stores; `y`; the body's locals, private); the new `row` is declared outside
+   the region and only read inside it, through a pointer to `const`; the flag is read.
+   `B`'s region wrote its own `row` per iteration; that write is gone, the values read
+   are the same. The pragma lines of `F` are unchanged and `B`'s were identical.
+7. Time both groups (`F`'s callers' path and `B`'s) base against candidate at one and
+   four threads, several runs each; the per-row cost is one call and one test.
+   `tools/omp_compare.sh` at one and four threads on cases of both groups.
+
+**Before:**
+
+```c
+    case IntensityCompositeOp:
+    {
+      if (IsSourceInsideCanvas(image,source_image,x_offset,y_offset) ==
+          MagickFalse)
+        break;
+      status=MagickTrue;
+      source_view=AcquireVirtualCacheView(source_image,exception);
+      ...
+      for (y=0; y < (ssize_t) source_image->rows; y++)
+      {
+        ...
+        row.image=image;
+        row.source_image=source_image;
+        row.clamp=clamp;
+        SetIntensityAlphaRow(&row,p,q);
+        SyncCompositeRow(image_view,exception,&status);
+        ...
+      }
+      ...
+      source_image=DestroyImage(source_image);
+      return(status);
+    }
+```
+
+with `CompositeCopyImage` holding the same loop around `CopyCompositeRow(source_image,
+image,p,q);`.
+
+**After:**
+
+```c
+    case IntensityCompositeOp:
+    {
+      if (IsSourceInsideCanvas(image,source_image,x_offset,y_offset) ==
+          MagickFalse)
+        break;
+      setup.intensity=MagickTrue;
+      return(CompositeCopyImage(image,source_image,&setup,exception));
+    }
+```
+
+and in `CompositeCopyImage`, `const IntensityRowInputs row = { image, source_image,
+setup->clamp };` and `CompositeCopyRow(&row,setup->intensity,p,q);`.
+
+**Careful:**
+
+- Why the behaviour is the same. On `F`'s existing paths the flag is `MagickFalse`, so
+  `NameRow` calls `R1` with the same arguments; nothing else in `F` changed. On `B`'s
+  path, `G` now runs `F`'s statements, which are `B`'s under the renaming (step 1), with
+  the same values: `F`'s parameters receive the variables `B` read, and `row`, filled
+  once before the region from values no row changes, holds what each iteration's fill
+  stored, so `R2` reads the same members. `G` returns `F`'s `status` as `B` returned its
+  own, and released the same objects in the same order (the release of the source
+  image is part of both).
+- The new struct members are filled before any read: step 2 fills them wherever the
+  struct is filled, and `G` sets the flag after the shared fills.
+- OpenMP. A per-iteration private fill became one shared read-only object: reads of an
+  object nobody writes during the region do not race. The oracle runs one thread;
+  `tools/omp_compare.sh` at one and four threads is the check for the parallel build.
+- Step 1's identity includes the pragma: if the clauses differ (`magick_number_threads`
+  arguments, `shared` lists), the twins are not twins and the step is refused.
+
+**Evidence level:** oracle (cases of both groups; quote line coverage of the moved
+loop's failure and progress paths and write `Verified: guard` when some run in no
+case), plus `tools/omp_compare.sh` at one and four threads, the step 6 reading and the
+step 7 timing in the message, and the step 1 script's result.
+
+**Provenance:** 2026-11-15, from `composite.c`'s `CompositeImage` and `CompositeCopyImage`
+(campaign A, W29 round eighteen lane a): the Intensity group, held since W15 because its
+extraction cloned `CompositeCopyImage` and MT and CF refused the pair; a probe of the fold
+took the file from 4.33 to 4.45 with no new finding and `CompositeImage` out of *Bumpy
+Road Ahead*. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10
+to evolve the recipes and the OpenMP ruling of 2026-11-15.
+
+---
+
+## Recipe MR - Merge Reduction Row Loops Through a Metric Selector
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Complex Method*, *Large Method* or
+*Code Duplication* in several `static` functions of one file whose bodies hold the same
+parallel reduction over rows: views acquired, `#pragma omp parallel for` with the same
+clauses, per-row private partials filled by a per-pixel accumulate call, a named `omp
+critical` merging the partials into shared totals, views destroyed. The copies differ only
+in the accumulate function called, in a counter some of them add to the partials, in the
+merge operator (`+=` or a running maximum), in the critical section's name, and in
+statements before and after the loop. `compare-similarity.c`'s `GetAESimilarity`,
+`GetFUZZSimilarity`, `GetMAESimilarity`, `GetMSESimilarity`, `GetPASimilarity` and
+`GetPDCSimilarity`.
+
+**Not covered by:** Recipe RL, whose copies differ in the row work only and share no
+critical section, and whose row function is reached through a pointer (here the per-pixel
+call must stay inlined: one indirect call per pixel is a hot-path cost); Recipe MT and
+Recipe TI, which take no `#pragma` line; Recipe CB, which moves a critical block's body but
+keeps each function's loop, so the skeletons still clone; Recipe N and Z step 1, which
+move one loop whole, so that the second moved the same way clones the first. This recipe
+edits the region: the copies' named critical sections become one name (the owner's ruling
+of 2026-11-15 in AGENTS.md).
+
+**How:**
+
+1. Copies. Two or more `static` functions of one file, each holding one parallel row
+   loop of the shape above, with every variable the region writes or a clause names a
+   local of the function. Check by reading, and say in the message, that the loop texts
+   are the same once each copy's accumulate call, its counter increment (`channel_area++`
+   after the call, or inside the accumulate function), its merge statements and its
+   critical name are set aside; the statements before the views are acquired and after
+   they are destroyed stay with each function (step 6).
+2. Types. Directly after the file's other typedefs: a `const` input struct `NameInfo` (the
+   two images, the selector of the enumeration the file already uses for the copies, here
+   `MetricType`, and the scalars the accumulate calls read, such as `fuzz`), a partials
+   struct `NameSums` (the counter `area` and the array `similarity[MaxPixelChannels+1]`,
+   both zero-initialised per row as the copies' locals were), a row struct (images, row
+   pointers, `columns`, the scalars) and a prototype of the driver (step 5) when a caller
+   precedes it.
+3. Per-pixel dispatch. A `static magick_attribute((__always_inline__)) inline` function
+   taking the selector, the scalars, the pixels and the partials, holding one `switch` on
+   the selector with one group per copy: the copy's accumulate call with its arguments
+   rewritten to the struct's members, and the copy's counter increment after it when the
+   copy had one there. The last group also takes `default:`. A column-loop function, also
+   forced inline, holds the copies' common `for (x=...)` loop with the dispatch call in
+   place of the accumulate call; a non-inline row function `switch`es on the selector and
+   calls the column-loop function with each group's enumeration constant written as a
+   literal, so that each group's loop is compiled with its selector known and the
+   per-pixel `switch` folds away (check with `nm` that neither forced-inline function has
+   a symbol of its own).
+4. Merge. A `static void` merge function (Recipe CB's form) holding the copies' merge
+   loop over the channels; where the copies' merge operator differs, the operator moves
+   to a forced-inline value function (`if (metric != PeakAbsoluteErrorMetric) { *total+=
+   value; return; } if (value > *total) *total=value;`), each branch one copy's text
+   verbatim.
+5. Driver. One `static MagickBooleanType` function (not inline) taking `const NameInfo
+   *info`, the shared totals, a pointer receiving the counter and the exception, at most
+   four parameters: the copies' loop text with the row work written as the row function's
+   call, the critical block written `{ area+=sums.area; Merge(info,&sums,similarity); }`
+   under ONE name, `MagickCore_<Driver>`, and the pragma's `shared(...)` list naming the
+   driver's locals (`area`, `similarity`, `status`). After the views are destroyed it
+   stores the counter through its pointer and returns `status`.
+6. Each copy keeps its name, parameters and comment and becomes: its `const NameInfo`
+   declared with its own enumeration constant (and its scalars, computed in the
+   initialiser in the order the copy computed them), the statements it ran before the
+   views were acquired, the driver's call, and the statements it ran after the views were
+   destroyed (a normalisation; an existing helper that is the same text, Recipe D, is
+   called instead), on the same values. One copy (or one pair of copies of one shape) per
+   commit; later commits add their group to the dispatch and merge functions.
+7. OpenMP (the owner's ruling of 2026-11-15 and the agents' conditions in AGENTS.md):
+   quote in the message the by-hand reading of what the region writes and how each write
+   stays protected (the partials and the row struct are declared in the loop body, so
+   private; `area` and `similarity` written only inside the critical block; `status`
+   written only by the failed-fetch branch, as before; `y` the loop variable); say which
+   regions now share the one lock and why no region calls another (the merge holds no
+   lock, no call that enters a critical section, and no nested parallel region); run
+   `tools/omp_compare.sh` at one and four threads on cases that reach each folded copy;
+   and compare instructions (callgrind, one thread) of the reached metric against the
+   base: an increase above noise in the region stops the step.
+8. Check by reading that every argument fills its parameter, that the dispatch group of
+   each copy calls that copy's accumulate function with the copy's arguments, and that
+   the merge of each copy is its own operator.
+
+**Before:**
+
+```c
+static MagickBooleanType GetMAESimilarity(const Image *image,
+  const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
+{
+  ...
+  (void) memset(similarity,0,(MaxPixelChannels+1)*sizeof(*similarity));
+  SetImageCompareBounds(image,reconstruct_image,&columns,&rows);
+  ...
+  #pragma omp parallel for schedule(static) shared(area,similarity,status) \
+    magick_number_threads(image,image,rows,1)
+  for (y=0; y < (ssize_t) rows; y++)
+  {
+    ...
+      AccumulateMAEPixel(&pixels,channel_similarity);
+      channel_area++;
+    ...
+    #pragma omp critical (MagickCore_GetMAESimilarity)
+    {
+      area+=channel_area;
+      ...
+    }
+  }
+  ...
+  NormalizeChannelSimilarity(image,reconstruct_image,area,similarity);
+  return(status);
+}
+```
+
+**After:**
+
+```c
+static MagickBooleanType GetMAESimilarity(const Image *image,
+  const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
+{
+  const PixelMetricInfo
+    info = { image, reconstruct_image, MeanAbsoluteErrorMetric,
+      0.0 };
+  ...
+  (void) memset(similarity,0,(MaxPixelChannels+1)*sizeof(*similarity));
+  status=GetPixelMetricSimilarity(&info,similarity,&area,exception);
+  NormalizeChannelSimilarity(image,reconstruct_image,area,similarity);
+  return(status);
+}
+```
+
+**Careful:**
+
+- Behaviour. Each copy's per-pixel arithmetic is its accumulate function, unchanged and
+  called with the same arguments in the same order; the counter is incremented where the
+  copy incremented it; the merge applies the copy's own operator to the same values in
+  the same order of channels. Rows are still merged one at a time under a lock, in
+  whatever order the threads reach it, as before: a sum over rows depends on that order
+  exactly as the copy's did, and the one-thread run is bit-identical.
+- Unifying critical names makes the folded regions exclude one another. Mutual exclusion
+  only grows: no interleaving the new lock allows was forbidden before, so it adds no
+  race; it can add waiting only when two different metrics run at once in one process.
+  No region calls another or nests a parallel region, so the shared lock cannot deadlock.
+- A copy that had no counter now adds `0.0` partials to a driver-local `area` that its
+  wrapper never reads: no value it returns changes.
+- The selector reaches the hot loop as a constant only through the forced inlining of
+  step 3; without it the `switch` runs per pixel. Measure (step 7).
+- The oracle runs single-threaded and cannot see a race or a lock: `omp_compare.sh` and
+  the by-hand reading are the evidence for the region.
+
+**Evidence level:** oracle (cases reaching each folded copy), `tools/omp_compare.sh` at one
+and four threads, `refactor_guard.py --calls`, the step 7 reading and timing quoted in
+the message.
+
+**Provenance:** 2026-11-15, from `compare-similarity.c` (campaign A, W29 round eighteen
+lane b), the owner's ruling of 2026-11-15 allowing edits to OpenMP regions: six
+`Get*Similarity` functions share one row loop with a named critical merge each; a probe
+of the whole fold took the file from 2.97 to 3.01 (Bumpy Road 12 to 6 functions,
+Complex Method 23 to 17, Large Method 17 to 11). The W21 note that the MAE+MSE fold
+probes flat stands: the gain comes with the fourth and fifth copies. Added by Claude Code
+(Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
+## Recipe RG - Move a Parallel Sections Region into a Helper Returning the Status
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead* on a
+function whose bulk is one `#pragma omp parallel sections` region that writes nothing
+outside it but the shared `status`, set to `MagickTrue` just before the region and tested
+right after it, as `fourier.c`'s `InverseFourierTransformImage` and
+`ForwardFourierTransformImage` are once Recipe TS has shrunk their sections: the region is
+five sections, each calling a channel transform and storing `MagickFalse` into `status` when
+it fails. Step 7 covers a second function whose region is the same text over a twin callee.
+
+**Not covered by:** Recipe TS, which shares one section's body and leaves the region (and
+its pragma lines) in the function; Recipe T and AS, which move a block of a `parallel for`
+body, not a whole region; Recipe N and Z step 1, which move a function's tail (here the
+region is followed by the caller's own use of `status`); Recipe E, whose OpenMP rule
+refuses moving code across a `#pragma omp` line; Recipe D, which needs a reported *Code
+Duplication* between the two regions (none is reported: the twin callees differ).
+
+**How:**
+
+1. The owner's ruling of 2026-11-15 (AGENTS.md, *Never*, OpenMP) applies: the step is one
+   commit, the whole catalogue (narrow and wide) stays at 0 diverged, and
+   `tools/omp_compare.sh` shows no difference at one and four threads on cases that reach
+   the region (a case list in `tools/omp_cases/` that runs every section's call).
+2. The region is one statement: the guarded `#pragma omp parallel sections` line and the
+   compound statement it governs, with no data-sharing clause. Read by hand which variables
+   it writes: each section's own locals (private to the thread running the section) and
+   one variable declared outside it, `status`, written only by plain stores of
+   `MagickFalse` (directly or through a Recipe TS helper's `(*status)`), shared because no
+   clause names it. Before the region (with only statements that neither read nor write
+   `status` between) the function writes `status=MagickTrue;`. Nothing else the region
+   reads is written inside it.
+3. Write directly below the last helper the region calls (inside the same conditional as
+   the callees) `static MagickBooleanType Name(<the region's inputs>)`: one `const`
+   pointer to the input struct the caller already holds (Recipe TS step 3) and, by value,
+   each other variable the region reads (as `const` parameters of their names and types).
+   Bind each struct member the region names as a `const` local of its name (Recipe N
+   step 4). Declare `MagickBooleanType status;`, write `status=MagickTrue;`, then the
+   region's text dedented, with `&x` read `x` where `x` is now the pointer the helper
+   holds, then `return(status);`.
+4. In the caller, delete `status=MagickTrue;` and replace the region by
+   `status=Name(<arguments>);` at the region's place; the test of `status` that follows
+   stays. Keep `status`'s declaration (it is still read).
+5. The pragma lines move verbatim, with their `#if defined(MAGICKCORE_OPENMP_SUPPORT)`
+   guards; no clause is added, and the sharing of every variable is what it was: `status`
+   is the helper's local declared outside the region, so shared (as the caller's was);
+   the sections' locals stay private; the parameters are read-only inputs, which the
+   region shared and did not write.
+6. Evidence: oracle on the function's cases, `refactor_guard.py --calls` (`+2` for the
+   helper's definition and call), the reading of step 2 quoted in the message,
+   `omp_compare.sh` at one and four threads, and a repeated timing of a case reaching the
+   region, base against candidate (the helper adds one call per region, not per pixel).
+7. Twin regions. A second function holding a region whose text is the first one's with
+   only the callee different (a twin channel transform taking a pointer to another
+   source type, the other parameters the same) and the tested image variable named
+   differently takes the same helper in its own later commit: the input struct gets one
+   pointer per source type (the first function sets the other to `NULL` in its
+   initialiser), a `static MagickBooleanType` dispatcher `NameChannel(input,channel)`
+   calls the callee of whichever source pointer is not `NULL`, the Recipe TS helper and
+   the first section call the dispatcher, the tested image becomes a `const Image *`
+   parameter, and the second function's region and its `status=MagickTrue;` become
+   `status=Name(...);`. A prototype of `Name` goes in the conditional above the second
+   function when that function comes first in the file. The dispatcher's test is a
+   pointer comparison made once per section, not per pixel.
+
+**Before:**
+
+```c
+        status=MagickTrue;
+        is_gray=IsImageGray(magnitude_image);
+        if (is_gray != MagickFalse)
+          is_gray=IsImageGray(phase_image);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp parallel sections
+#endif
+        {
+          ...
+          {
+            InverseFourierSection(&section,
+              is_gray == MagickFalse,
+              GreenPixelChannel,&status);
+          }
+          ...
+        }
+        if (status == MagickFalse)
+          fourier_image=DestroyImage(fourier_image);
+```
+
+**After:**
+
+```c
+        is_gray=IsImageGray(magnitude_image);
+        if (is_gray != MagickFalse)
+          is_gray=IsImageGray(phase_image);
+        status=InverseFourierChannels(&section,magnitude_image,is_gray);
+        if (status == MagickFalse)
+          fourier_image=DestroyImage(fourier_image);
+...
+static MagickBooleanType InverseFourierChannels(
+  const InverseSectionInput *section,const Image *magnitude_image,
+  const MagickBooleanType is_gray)
+{
+  ...
+  status=MagickTrue;
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel sections
+#endif
+  {
+    ...
+  }
+  return(status);
+}
+```
+
+**Careful:**
+
+- Same team, same work: the region is entered once per call of the function as before, by
+  the thread that called it; each section runs once on one thread of the team. Moving the
+  region into a callee does not change the team (OpenMP forms it at the pragma, wherever
+  the pragma stands) or the nesting (the caller was not inside a region at that point).
+- `status` keeps its sharing: a variable declared outside a `parallel` construct with no
+  clause is shared, whether it is the caller's local or the helper's. The race the
+  sections already have (plain stores of one value, no read before the closing barrier)
+  stays the race it was; the recipe must not add an `atomic` or `critical`.
+- The value returned is what the caller would have tested: `MagickTrue` unless a section
+  stored `MagickFalse`, read after the region's implied barrier.
+- Step 7's dispatcher calls exactly one of the two callees with the same arguments the
+  section passed; which one is fixed by the caller's initialiser (exactly one source
+  pointer is set), so each section calls the callee it called before. No function pointer
+  is used.
+- The oracle builds without OpenMP and runs the sections in order; omp_compare is the check
+  that sees the threads. It cannot prove a race absent, which is why the step is held to
+  moving text verbatim.
+
+**Evidence level:** oracle plus `refactor_guard.py --calls`, the step 2 reading quoted, and
+`tools/omp_compare.sh` at `OMP_NUM_THREADS=1` and `=4` on cases that run every section.
+
+**Provenance:** 2026-11-15, from `fourier.c`'s `InverseFourierTransformImage` and
+`ForwardFourierTransformImage` (campaign A, W29 lane c), after the owner's ruling of
+2026-11-15 allowed moves into, out of and across `#pragma omp` regions. Probe on the
+candidate: Inverse's region alone 7.66 to 8.08 (the function leaves *Large Method*); with
+step 7 for Forward 8.67 (Forward leaves *Complex Method* and *Large Method*), where a
+second Recipe TS helper for Forward had switched on *Code Duplication* (7.28). Added by
+Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
+## Recipe KV - Replace a Split Call Switch by a Table of Function Pointers of Two Signatures
+
+**Use when:** CodeScene reports *Complex Method* or *Large Method* on a function whose
+complexity is a `switch` over an enumeration whose groups each make one call to a
+different function, the functions of two signatures that differ only in one extra
+argument (`F(R,G,B,X,Y,Z)` and `G(R,G,B,illuminant,X,Y,Z)`), and that an earlier Recipe SD
+chain has split at its default into `static void` helpers of the same shape, so that each
+further SD level adds a look-alike helper that CodeScene counts as *Code Duplication*.
+`colorspace-convert.c`'s `ConvertRGBToGeneric` (26 labels over three switches, two
+signatures, an identity default; two more SD levels probed 7.88 and 8.28 against the
+file's 9.08).
+
+**Not covered by:** Recipe KF, whose groups all call functions of one signature with the
+same arguments and whose `switch` is not split; Recipe SD, which keeps every label as a
+branch and adds a helper per level; Recipes KT, KS and KR, whose groups assign or return
+constants; Recipe KD, whose run is a `LocaleCompare` ladder.
+
+**How:**
+
+1. The `switch` and its SD helpers lie outside every OpenMP region. Their controlling
+   expression is the same parameter `e` of the function, which no group writes. Every
+   label is a constant, and the labels of the function's `switch` and of all its helpers'
+   switches are distinct (the chain passes a value on only through `default:`). Each
+   *table group* is labels and one statement `F(args);` followed by `break;`, where `args`
+   is the same text in every group of one signature, free of side effects, and the
+   arguments of the second signature are those of the first with one parameter `p` of
+   the function inserted at one position. Each `F` is a function of exactly one of the two
+   signatures: `static` or `static inline` (a private header's converters) or a function
+   of this file or its headers whose prototype has that signature.
+2. Groups that are not table groups (two statements, a third signature) stay in the
+   function's `switch`, unchanged and in their order. The innermost helper's `default:`
+   group is the fallback: its statements stay as written.
+3. Directly above the function write a `typedef struct` of the key and one pointer per
+   signature, and a `static const` array of it with one element per label of the table
+   groups, `{ L, F, NULL }` or `{ L, NULL, G }`, in the source order of the labels along
+   the chain (the function's groups first, then each helper's in turn). A group of two
+   labels gives two elements naming the same function.
+4. Below the table write a lookup `static const T *Get<Name>(const E key)` that scans the
+   array and returns the first element whose key equals `key`, or `NULL` (Recipe KF step
+   3).
+5. The function's `switch` keeps the kept groups and gets the `default:` group `m=Get<Name>(e);
+   if (m == NULL) { <fallback statements>; break; } if (m->f != NULL) m->f(args); else
+   m->g(args with p); break;`, with `m` a `const T *` declared at the top of the function.
+   The SD helpers, their input struct and its fill are removed: every label they held
+   is an element of the table (step 6 checks it), and nothing else reads the struct.
+6. Check by reading, against the parent's text, that each label of the three kinds of
+   group is in exactly one place (a kept group, an element, or none: the fallback), that
+   each element names the function its group called, and that each element's non-`NULL`
+   pointer is the one of its group's signature. `refactor_guard.py --calls` lists each
+   called name as gone, by design: each must appear in the table, which the reading
+   checks.
+7. A per-pixel caller: time the conversions the table serves (first, middle and last
+   elements, both signatures) against the baseline binary, several runs alternating, the
+   median quoted; a slowdown beyond 3% means the step is not taken (this recipe's own
+   threshold; AGENTS.md says only that a step slowing a hot path beyond measurement noise
+   is not taken).
+8. Run `tools/ci_warnings.sh <file>`, `tools/ci_linux_warnings.sh <file>`, a C++ compile
+   of the file, and the oracle for the function with line coverage showing a case runs
+   every group's call.
+
+**Before:**
+
+```c
+  switch (colorspace)
+  {
+    case Adobe98Colorspace:
+    {
+      ConvertRGBToAdobe98(R,G,B,X,Y,Z);
+      break;
+    }
+    ...
+    case LabColorspace:
+    {
+      ConvertRGBToLab(R,G,B,illuminant,X,Y,Z);
+      break;
+    }
+    ...
+    default:
+    {
+      ConvertRGBToOklabThroughYCbCr(&input);
+      break;
+    }
+  }
+```
+
+**After:**
+
+```c
+    default:
+    {
+      method=GetRGBToGenericMethod(colorspace);
+      if (method == (const RGBToGenericMethod *) NULL)
+        {
+          *X=QuantumScale*R;
+          *Y=QuantumScale*G;
+          *Z=QuantumScale*B;
+          break;
+        }
+      if (method->convert != NULL)
+        method->convert(R,G,B,X,Y,Z);
+      else
+        method->convert_illuminant(R,G,B,illuminant,X,Y,Z);
+      break;
+    }
+```
+
+**Careful:**
+
+- Behaviour: the labels are distinct along the chain, so a value reaches exactly one group
+  before and after: a kept label its kept group (it is not in the table), a table label the
+  element of its group (the lookup returns the first, and only, match), and any other value
+  the fallback, as it reached the innermost `default:` before. The element calls the same
+  function with the same arguments, the extra parameter where the group passed it.
+- Exactly one pointer of each element is non-`NULL`, and the call tests the first; a
+  function of the wrong signature does not compile into the other member.
+- Floating point: a callee called through a pointer is compiled out of line, where before it
+  could be inlined into the switch. Without fast-math, C's evaluation of each expression in
+  the callee does not depend on inlining; the oracle compares the bytes.
+- Cost: the lookup scans the table on every call and the call is indirect. On a per-pixel
+  path that must be timed (step 7).
+- The removed helpers held only groups that are now elements and the passing of the value
+  on; nothing of their text is lost but the binding of the struct's members, which the
+  table makes unnecessary.
+
+**Evidence level:** oracle (the cases that reach the function, with line coverage showing
+every group's call runs), plus the step 6 reading and the step 7 timing.
+
+**Provenance:** 2026-11-16, from `colorspace-convert.c`'s `ConvertRGBToGeneric`
+(campaign A, W30 lane c): the file 9.08 to 9.68 in a probe, the function cc 20 to below
+the threshold and 113 lines to 43. Added by Claude Code (Claude Opus 5.5) under the
+owner's OK of 2026-11-10 to evolve the recipes.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -20960,3 +21860,11 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-15 | AMEND | N | Step 8, the function-body siblings form (a later block holding an earlier sibling's call takes its `const Name *name`): a statement of the later block before the call may write a member's variable when every path through the write returns before the call (the later block binds that member read-then-written), and a variable the later block only reads that is not a member goes by value as a parameter after `name` (Recipe E step 3), at most four parameters | `feature-texture.c`'s `GetImageFeatures` (campaign A, W26 round fifteen lane c): its tail (the buffers check, the row allocation, the matrix fill and their exits, the normalisation, the call of the direction passes' function, the release) holds the call of the function that takes `FeatureAnalysis`; its exits write `channel_features`, a member, and return, and it reads `distance`, `exception` and `grays`, which the direction passes do not. A probe of the chain: every function under 70 lines, 8.72 to 9.38. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
 | 2026-11-15 | AMEND | Y | Step 7: another block of the file whose text equals, under Recipe D's renaming (checked by script; `diff` of the line ranges for verbatim copies), the block a Recipe Y function was cut from calls that function instead of a second copy, in the same caller or another, with its own struct fill, written variable, temporaries and exit, steps 1 to 6 checked for the copy; one commit per caller. *Careful* gives the argument (Recipe V step 6, W step 7, LB step 6 and I step 7 make it for their forms) | `accelerate.c`'s `ComputeDespeckleImage` (campaign A, W27 round sixteen lane a): four verbatim copies of the hull-pass launch pair, each leaving through `goto cleanup;`; a second function of the same text would be a duplicate, and Recipe D may not leave the caller. Probe (stub procedure, other 18 Complex/Large functions emptied): 7.58 to 7.62 for the first copy, 7.75 with all four | owner |
 | 2026-11-15 | AMEND | WP | Step 8, *a wrapper no code calls*: a wrapper that meets steps 1 and 2 and that nothing calls (`git grep` finds only its definition and its declaration in a header listed under `MAGICKCORE_NOINST_HDRS`; `MagickPrivate`, hidden visibility; `casemap.py` 0 cases for wrapper and worker) may be converted at guard level when `obj_modulo.sh <file> <Wrapper> <Worker>` prints `IDENTICAL` or `MODULO-IDENTICAL`, `refactor_guard.py` drops only the wrapper's removed literals (`WARN`, every value present), `--calls` moves only the wrapper's removed calls and the prologue, and step 7's compile checks pass. A *Careful* bullet gives the argument (the transformation's argument rests on steps 1 and 2, read; nothing executes the wrapper or its `static` worker, and every other function compiles to the same instructions) | `accelerate.c`'s `AccelerateContrastStretchImage` (campaign A, W28 round seventeen lane a): no caller in the tree, a clone of `AccelerateGrayscaleImage`; a probe with it converted lists no *Code Duplication*, 3.24 to 3.49. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes | owner |
+| 2026-11-15 | NEW | RI | Extract a Parallel Row Loop Filling Its Row Struct Once: a tail holding a parallel row loop whose body fills a private row struct member by member moves into `static MagickBooleanType Name(const S *rows)`; the invariant members (values nothing in the region writes, calls without side effects) are filled once by the caller in their order, the body copies `row=(*rows);` and sets the per-row members, and the body up to the row call and sync becomes a Recipe PC head; write set read by hand, omp_compare at one and four threads, timing | `composite.c`'s `CompositeImage` (W29 lane a): probe 4.24 to 4.33, no new finding | owner |
+| 2026-11-15 | NEW | FL | Fold a Twin Parallel Row Loop into Its Sibling Function Through a Flag: a block holding a parallel row loop that is, token for token and pragma included, the whole body of a `static` function of the file except for the row call (its own call after an invariant fill of a private row struct) becomes a flag in that function's `const` input struct and a call of it; a `static void` row function selects the call by the flag, and the row struct is filled once before the region; write set read by hand, omp_compare at one and four threads, timing | `composite.c`'s Intensity group and `CompositeCopyImage` (W29 lane a): probe 4.33 to 4.45, no new finding | owner |
+| 2026-11-15 | NEW | MR | Merge Reduction Row Loops Through a Metric Selector: `static` functions holding the same parallel row reduction (per-row partials from a per-pixel accumulate call, a named `omp critical` merge) fold into one driver taking a `const` input struct with an enumeration selector; a non-inline row function switches once per row into a forced-inline column loop and per-pixel dispatch so each group is compiled with its selector constant; the merge's differing operator goes to a forced-inline value function; the critical names become one; each copy keeps its name, its pre- and post-loop statements and calls the driver; OpenMP reading, `omp_compare.sh` at one and four threads and instruction counts quoted | `compare-similarity.c` (campaign A, W29 lane b): six `Get*Similarity` functions, probe 2.97 to 3.01 (Bumpy Road 12 to 6, Complex Method 23 to 17, Large Method 17 to 11 functions); `omp_compare` 52 runs, 0 diverged on the whole fold | owner |
+| 2026-11-13 | NEW | TS | Share One Body Across Twin Sections of a Parallel Sections Region: sections that are one block but for a test and a channel constant call one `static void` helper taking an input struct, the test's value, the constant and a pointer to the shared `status`; the pragmas stay. *Careful* gives the argument (same thread, same stores to the same shared `status`, the test has no side effect) | `fourier.c`'s `InverseFourierTransformImage` (campaign A, W21 lane b): four of five sections; 7.59 to 7.66, the function leaves *Complex Method*; the same helper for `ForwardFourierTransformImage` too switches on *Code Duplication* (7.29), so one function takes it | owner |
+| 2026-11-15 | NEW | RG | Move a Parallel Sections Region into a Helper Returning the Status: a function's whole `omp parallel sections` region, whose only outer write is plain stores of `MagickFalse` into a shared `status` set to `MagickTrue` before it, moves verbatim (pragma lines included) into a `static MagickBooleanType` helper whose own `status` it returns; step 7 lets a second function's twin region over a twin callee share the helper through a dispatcher on which source pointer of the input struct is set. *Careful* gives the argument (same team and nesting, `status` still shared, the same stores, one callee per section as before) | `fourier.c`'s `InverseFourierTransformImage` and `ForwardFourierTransformImage` (campaign A, W29 lane c, after the owner's OpenMP ruling of 2026-11-15): probe 7.66 to 8.08 (Inverse), 8.67 with step 7 (Forward); a second TS helper had cost 7.28 (Code Duplication) | owner |
+| 2026-11-16 | WORDING | KV | Step 7: the 3% slowdown limit is this recipe's own; AGENTS.md says only that a step slowing a hot path beyond measurement noise is not taken | The round-nineteen reviewer found the cited "AGENTS.md 3% rule" does not exist | owner |
+| 2026-11-16 | WORDING | rule | *OpenMP regions* points to AGENTS.md's ruling of 2026-11-15 as an exception to its first bullet; *Two levels of evidence* names WP step 8 among the guard-verified forms | The section still said never to edit a pragma after the owner's ruling; the guard-verified list omitted WP step 8, which AGENTS.md's list also does not yet name | owner |
+| 2026-11-16 | NEW | KV | Replace a Split Call Switch by a Table of Function Pointers of Two Signatures: a `switch` whose groups each make one call to a function of one of two signatures differing in one extra parameter, already split by a Recipe SD chain into look-alike helpers, becomes a `static const` table of `{ key, f, g }` (one pointer `NULL`) and a lookup; groups of another shape stay in the `switch`, whose `default:` does the lookup and keeps the innermost fallback; the SD helpers and their input struct go. *Careful* gives the argument (distinct labels along the chain, the same callee and arguments, the fallback for every other value); per-pixel callers timed against the baseline | `colorspace-convert.c`'s `ConvertRGBToGeneric` (campaign A, W30 lane c): two further SD levels probed 7.88 and 8.28 (*Code Duplication* among the helpers, *Overall Code Complexity*) against 9.08; the table probe 9.68 with no new finding | owner |

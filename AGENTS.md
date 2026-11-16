@@ -73,6 +73,20 @@ Never, in any commit:
   symbol. ImageMagick is a library; its ABI belongs to everyone who links it.
 - **Edit an OpenMP pragma**, or move code into, out of, or across a `#pragma omp` region
   (see the playbook). The oracle runs single-threaded and cannot see a data race.
+  Ruling of 2026-11-15 (owner: "you can touch openmp files. If the test cases still pass,
+  it's fine!"): files with OpenMP regions may be edited, including pragma lines and moves into,
+  out of or across a `#pragma omp` region, one commit per step, when (1) the whole catalogue, narrow
+  and wide, stays at 0 diverged, and (2) `tools/omp_compare.sh` (an OpenMP-enabled build of base
+  and candidate at one and at four threads) shows no difference on cases that reach the region.
+  The agents' conditions on top of the owner's, to keep the oracle's single-threaded blind spot
+  honest: every variable the moved or edited region writes keeps the protection it had
+  (private, `reduction`, `atomic` or the same `critical`), the commit message quotes that by-hand
+  reading, a changed `critical` name says which regions now share one lock, and a step that
+  slows the region by more than measurement noise is not taken.
+  `GetMagickNumberThreads` runs a region on one thread below about 262144 pixels (four times that
+  for `CompositeCopyImage`), so an `omp_compare` run counts only with cases big enough to start
+  several threads: `tools/omp_cases/large-images.txt` has such cases for `composite.c`,
+  `compare-similarity.c` and `fourier.c`; add one for any other region before relying on it.
 - Touch code in a preprocessor branch this build does not compile (X11, OpenCL, Windows,
   a delegate library that is not installed). Nothing can check it.
   The one exception (owner, 2026-11-01): a branch no configuration compiles, `#if 0`, may
@@ -143,7 +157,9 @@ python3 tools/oracle/casemap.py <Function>     # which cases execute it
   `tools/obj_modulo.sh`; owner, 2026-11-10); and Recipe SD with its *Unreached functions:
   Recipe SD* checks (`tools/switch_split_check.py`, `tools/obj_modulo.sh`,
   `refactor_guard.py --calls`; **the agent's addition of 2026-11-13 under the owner's OK of
-  2026-11-10 to evolve the recipes, for the owner's confirmation**).
+  2026-11-10 to evolve the recipes, for the owner's confirmation**); and Recipe WP's step 8
+  for a wrapper no code calls (`tools/obj_modulo.sh`, `refactor_guard.py --calls`; **the
+  agents' addition of 2026-11-15 under the same OK, for the owner's confirmation**).
 
 The rules are in the playbook, *Two levels of evidence*; the reasoning and the measured
 results are in [`docs/refactoring/VERIFICATION.md`](docs/refactoring/VERIFICATION.md).
