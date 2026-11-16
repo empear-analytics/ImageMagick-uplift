@@ -2103,6 +2103,17 @@ static double *GenerateAffineFamilyCoefficients(double *coeff,
   return(GenerateMappedCoefficients(coeff,method,context));
 }
 
+static void ZeroCoefficients(double *coeff,
+  const size_t number_coefficients)
+{
+  size_t
+    i;
+
+  /* zero out coefficients array */
+  for (i=0; i < number_coefficients; i++)
+    coeff[i] = 0.0;
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -2117,9 +2128,6 @@ static double *GenerateCoefficients(const Image *image,
 
   double
     *coeff;
-
-  size_t
-    i;
 
   size_t
     number_coefficients, /* number of coefficients to return (array size) */
@@ -2182,9 +2190,7 @@ static double *GenerateCoefficients(const Image *image,
       return((double *) NULL);
     }
 
-  /* zero out coefficients array */
-  for (i=0; i < number_coefficients; i++)
-    coeff[i] = 0.0;
+  ZeroCoefficients(coeff,number_coefficients);
 
   return(GenerateAffineFamilyCoefficients(coeff,method,&context));
 }
