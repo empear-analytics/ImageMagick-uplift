@@ -331,6 +331,27 @@ static void XResetWindowInfo(Display *display,XWindowInfo *window)
     window->icon_name=AcquireString("");
 }
 
+static void XInitializeWindowAttributes(const XPixelInfo *pixel,
+  const XStandardColormap *map_info,XWindowInfo *window)
+{
+  window->mask=(int) (CWBackingStore | CWBackPixel | CWBackPixmap |
+    CWBitGravity | CWBorderPixel | CWColormap | CWCursor | CWDontPropagate |
+    CWEventMask | CWOverrideRedirect | CWSaveUnder | CWWinGravity);
+  window->attributes.background_pixel=pixel->background_color.pixel;
+  window->attributes.background_pixmap=(Pixmap) NULL;
+  window->attributes.bit_gravity=ForgetGravity;
+  window->attributes.backing_store=WhenMapped;
+  window->attributes.save_under=MagickTrue;
+  window->attributes.border_pixel=pixel->border_color.pixel;
+  window->attributes.colormap=map_info->colormap;
+  window->attributes.cursor=window->cursor;
+  window->attributes.do_not_propagate_mask=NoEventMask;
+  window->attributes.event_mask=NoEventMask;
+  window->attributes.override_redirect=MagickFalse;
+  window->attributes.win_gravity=NorthWestGravity;
+  window->orphan=MagickFalse;
+}
+
 MagickPrivate void XGetWindowInfo(Display *display,XVisualInfo *visual_info,
   XStandardColormap *map_info,XPixelInfo *pixel,XFontStruct *font_info,
   XResourceInfo *resource_info,XWindowInfo *window)
@@ -382,21 +403,6 @@ MagickPrivate void XGetWindowInfo(Display *display,XVisualInfo *visual_info,
   window->pixel_info=pixel;
   window->font_info=font_info;
   XInitializeWindowGeometry(display,pixel,resource_info,window);
-  window->mask=(int) (CWBackingStore | CWBackPixel | CWBackPixmap |
-    CWBitGravity | CWBorderPixel | CWColormap | CWCursor | CWDontPropagate |
-    CWEventMask | CWOverrideRedirect | CWSaveUnder | CWWinGravity);
-  window->attributes.background_pixel=pixel->background_color.pixel;
-  window->attributes.background_pixmap=(Pixmap) NULL;
-  window->attributes.bit_gravity=ForgetGravity;
-  window->attributes.backing_store=WhenMapped;
-  window->attributes.save_under=MagickTrue;
-  window->attributes.border_pixel=pixel->border_color.pixel;
-  window->attributes.colormap=map_info->colormap;
-  window->attributes.cursor=window->cursor;
-  window->attributes.do_not_propagate_mask=NoEventMask;
-  window->attributes.event_mask=NoEventMask;
-  window->attributes.override_redirect=MagickFalse;
-  window->attributes.win_gravity=NorthWestGravity;
-  window->orphan=MagickFalse;
+  XInitializeWindowAttributes(pixel,map_info,window);
 }
 #endif
