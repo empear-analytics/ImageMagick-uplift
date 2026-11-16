@@ -284,8 +284,24 @@ static double EvaluateLog(const Quantum pixel,const double value,
   return(result);
 }
 
-static double EvaluateLeftShift(const Quantum pixel,const double value)
+typedef enum
 {
+  EvaluateLeftShiftSide,
+  EvaluateRightShiftSide
+} EvaluateShiftSide;
+
+typedef struct _EvaluateShift
+{
+  EvaluateShiftSide
+    side;
+} EvaluateShift;
+
+static inline double EvaluateShiftPixel(const EvaluateShift *shift,
+  const Quantum pixel,const double value)
+{
+  const EvaluateShiftSide
+    side = shift->side;
+
   double
     result;
 
@@ -294,7 +310,7 @@ static double EvaluateLeftShift(const Quantum pixel,const double value)
 
   result=(double) pixel;
   for (i=0; i < (ssize_t) value; i++)
-    result*=2.0;
+    ((side == EvaluateLeftShiftSide) ? (result*=2.0) : (result/=2.0));
   return(result);
 }
 
@@ -372,20 +388,6 @@ static void ApplyThresholdEvaluateOperator(const Quantum pixel,
   }
 }
 
-static double EvaluateRightShift(const Quantum pixel,const double value)
-{
-  double
-    result;
-
-  ssize_t
-    i;
-
-  result=(double) pixel;
-  for (i=0; i < (ssize_t) value; i++)
-    result/=2.0;
-  return(result);
-}
-
 static void ApplyBitwiseEvaluateOperator(const Quantum pixel,
   const MagickEvaluateOperator op,const double value,double *result)
 {
@@ -398,7 +400,10 @@ static void ApplyBitwiseEvaluateOperator(const Quantum pixel,
     }
     case LeftShiftEvaluateOperator:
     {
-      (*result)=EvaluateLeftShift(pixel,value);
+      const EvaluateShift
+        shift = { EvaluateLeftShiftSide };
+
+      (*result)=EvaluateShiftPixel(&shift,pixel,value);
       break;
     }
     case OrEvaluateOperator:
@@ -408,7 +413,10 @@ static void ApplyBitwiseEvaluateOperator(const Quantum pixel,
     }
     case RightShiftEvaluateOperator:
     {
-      (*result)=EvaluateRightShift(pixel,value);
+      const EvaluateShift
+        shift = { EvaluateRightShiftSide };
+
+      (*result)=EvaluateShiftPixel(&shift,pixel,value);
       break;
     }
     case XorEvaluateOperator:
