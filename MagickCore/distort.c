@@ -1601,8 +1601,8 @@ static void SetPolarAngles(double *coeff,const double *arguments,
     coeff[5] += Magick2PI; /* same angle is a full circle */
 }
 
-static void SetPolarCoefficients(double *coeff,const Image *image,
-  const double *arguments,const size_t number_arguments)
+static void SetPolarRadii(double *coeff,const double *arguments,
+  const size_t number_arguments)
 {
   /* Rmax -  if 0 calculate appropriate value */
   if ( number_arguments >= 1 )
@@ -1610,6 +1610,12 @@ static void SetPolarCoefficients(double *coeff,const Image *image,
   else
     coeff[0] = 0.0;
   /* Rmin  - usually 0 */
+}
+
+static void SetPolarCoefficients(double *coeff,const Image *image,
+  const double *arguments,const size_t number_arguments)
+{
+  SetPolarRadii(coeff,arguments,number_arguments);
   coeff[1] = number_arguments >= 2 ? arguments[1] : 0.0;
   SetPolarCenter(coeff,image,arguments,number_arguments);
   SetPolarAngles(coeff,arguments,number_arguments);
