@@ -601,6 +601,21 @@ static void SelectDialogReply(const DialogContext *context,
   (void) XFree((void *) data);
 }
 
+static void SetDialogOptionText(const char *action,
+  XWidgetInfo *special_info)
+{
+  if (LocaleCompare(action,"Background") == 0)
+    (*special_info).text=(char *) "Backdrop";
+  if (LocaleCompare(action,"New") == 0)
+    (*special_info).text=(char *) "Gradation";
+  if (LocaleCompare(action,"Resize") == 0)
+    (*special_info).text=(char *) "Constrain ratio";
+  if (LocaleCompare(action,"Save") == 0)
+    (*special_info).text=(char *) "Non-progressive";
+  if (LocaleCompare(action,"Shade") == 0)
+    (*special_info).text=(char *) "Color shading";
+}
+
 static void InitializeDialogOptions(const DialogContext *context,
   const DialogTargets *targets)
 {
@@ -634,16 +649,7 @@ static void InitializeDialogOptions(const DialogContext *context,
   (*special_info).x=(*reply_info).x;
   (*special_info).y=(*action_info).y+(int) (*action_info).height-(int)
     (*special_info).height;
-  if (LocaleCompare(action,"Background") == 0)
-    (*special_info).text=(char *) "Backdrop";
-  if (LocaleCompare(action,"New") == 0)
-    (*special_info).text=(char *) "Gradation";
-  if (LocaleCompare(action,"Resize") == 0)
-    (*special_info).text=(char *) "Constrain ratio";
-  if (LocaleCompare(action,"Save") == 0)
-    (*special_info).text=(char *) "Non-progressive";
-  if (LocaleCompare(action,"Shade") == 0)
-    (*special_info).text=(char *) "Color shading";
+  SetDialogOptionText(action,special_info);
   /*
     Initialize text information.
   */
