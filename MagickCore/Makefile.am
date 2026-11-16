@@ -181,6 +181,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/enhance-color.c \
   MagickCore/enhance-clahe.c \
   MagickCore/enhance-tone.c \
+  MagickCore/enhance-equalize.c \
   MagickCore/enhance-level.c \
   MagickCore/enhance-level-colors.c \
   MagickCore/enhance.h \
