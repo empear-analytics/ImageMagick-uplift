@@ -3551,6 +3551,17 @@ static void PerspectiveBestFitBounds(const double *coeff,const Image *image,
   (*caller_max)=max;
 }
 
+static void ScaleArcCoefficients(double *coeff,const Image *image)
+{
+  /*
+    Convert the angle_to_width and radius_to_height
+    to appropriate scaling factors, to allow faster processing
+    in the mapping function.
+  */
+  coeff[1] = (double) (Magick2PI*image->columns/coeff[1]);
+  coeff[3] = (double)image->rows/coeff[3];
+}
+
 static void ArcBestFitBounds(double *coeff,const Image *image,
   PointInfo *caller_min,PointInfo *caller_max)
 {
@@ -3587,13 +3598,7 @@ static void ArcBestFitBounds(double *coeff,const Image *image,
     d.y = coeff[2]*sa;
     ExpandBounds(d);
   }
-  /*
-    Convert the angle_to_width and radius_to_height
-    to appropriate scaling factors, to allow faster processing
-    in the mapping function.
-  */
-  coeff[1] = (double) (Magick2PI*image->columns/coeff[1]);
-  coeff[3] = (double)image->rows/coeff[3];
+  ScaleArcCoefficients(coeff,image);
   (*caller_min)=min;
   (*caller_max)=max;
 }
