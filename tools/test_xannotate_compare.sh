@@ -30,12 +30,12 @@ def plant(name, key, new, last=False):
     open('%s/planted-%s.c' % (tmp, name), 'w', encoding='utf-8',
          errors='surrogateescape').write(t)
 
-key = 'pixel->pen_color.red),q);'
+key = 'pixel->pen_color.red'
 assert s.index(key) != s.rindex(key)
-plant('annotate-pen', key, 'pixel->pen_color.green),q);')
-plant('draw-pen', key, 'pixel->pen_color.green),q);', last=True)
-plant('annotate-box-alpha', '(annotate_info->stencil == OpaqueStencil))',
-      '(annotate_info->stencil == TransparentStencil))')
+plant('annotate-pen', key, 'pixel->pen_color.green')
+plant('draw-pen', key, 'pixel->pen_color.green', last=True)
+plant('annotate-box-alpha', 'annotate_info->stencil == OpaqueStencil',
+      'annotate_info->stencil == TransparentStencil')
 plant('draw-background-alpha', 'OpaqueStencil ? TransparentAlpha : OpaqueAlpha),q);',
       'OpaqueStencil ? OpaqueAlpha : TransparentAlpha),q);')
 EOF
