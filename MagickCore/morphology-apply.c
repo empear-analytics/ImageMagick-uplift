@@ -6540,6 +6540,18 @@ typedef struct _MorphologyStagesTargets
     **reflected_kernel;
 } MorphologyStagesTargets;
 
+static MagickBooleanType ApplySpecialMorphology(
+  const MorphologyApplyStages *stages,Image **rslt_image)
+{
+  const MorphologyDirectApply
+    direct = { stages->image, stages->method, stages->kernel,
+      stages->verbose, stages->exception };
+
+  if (ApplyDirectMorphology(&direct,rslt_image) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType ApplyMorphologyMethodPrimitives(
   const MorphologyApplyStages *stages,CompositeOperator rslt_compose,
   const MorphologyStagesTargets *stage_targets)
@@ -6557,15 +6569,7 @@ static MagickBooleanType ApplyMorphologyMethodPrimitives(
   ** For example, single run only, or post-processing requirements
   */
   if ( stages->special != MagickFalse )
-    {
-      const MorphologyDirectApply
-        direct = { stages->image, stages->method, stages->kernel,
-          stages->verbose, stages->exception };
-
-      if (ApplyDirectMorphology(&direct,rslt_image) == MagickFalse)
-        return(MagickFalse);
-      return(MagickTrue);
-    }
+    return(ApplySpecialMorphology(stages,rslt_image));
 
   /* Handle user (caller) specified multi-kernel composition method */
   rslt_compose=ResolveMultiKernelCompose(stages->compose,rslt_compose);
