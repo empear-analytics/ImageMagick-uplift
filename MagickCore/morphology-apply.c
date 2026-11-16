@@ -1478,6 +1478,18 @@ static const KeyedKernelArray
     { 0, "3: -1,-1,-1  -1,8,-1  -1,-1,-1" }
   };
 
+static size_t FindLaplacianKernelArray(const int key)
+{
+  size_t
+    i;
+
+  for (i=0; i < ((sizeof(LaplacianKernelArrays)/
+       sizeof(*LaplacianKernelArrays))-1); i++)
+    if (LaplacianKernelArrays[i].key == key)
+      break;
+  return(i);
+}
+
 static KernelInfo *AcquireLaplacianKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args)
 {
@@ -1487,10 +1499,7 @@ static KernelInfo *AcquireLaplacianKernel(KernelInfo *kernel,
   size_t
     i;
 
-  for (i=0; i < ((sizeof(LaplacianKernelArrays)/
-       sizeof(*LaplacianKernelArrays))-1); i++)
-    if (LaplacianKernelArrays[i].key == key)
-      break;
+  i=FindLaplacianKernelArray(key);
   kernel=ParseKernelArray(LaplacianKernelArrays[i].definition);
   if (kernel == (KernelInfo *) NULL)
     return(kernel);
