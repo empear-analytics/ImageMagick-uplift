@@ -157,7 +157,9 @@ python3 tools/oracle/casemap.py <Function>     # which cases execute it
   `tools/obj_modulo.sh`; owner, 2026-11-10); and Recipe SD with its *Unreached functions:
   Recipe SD* checks (`tools/switch_split_check.py`, `tools/obj_modulo.sh`,
   `refactor_guard.py --calls`; **the agent's addition of 2026-11-13 under the owner's OK of
-  2026-11-10 to evolve the recipes, for the owner's confirmation**).
+  2026-11-10 to evolve the recipes, for the owner's confirmation**); and Recipe WP's step 8
+  for a wrapper no code calls (`tools/obj_modulo.sh`, `refactor_guard.py --calls`; **the
+  agents' addition of 2026-11-15 under the same OK, for the owner's confirmation**).
 
 The rules are in the playbook, *Two levels of evidence*; the reasoning and the measured
 results are in [`docs/refactoring/VERIFICATION.md`](docs/refactoring/VERIFICATION.md).

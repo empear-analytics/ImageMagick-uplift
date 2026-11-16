@@ -83,7 +83,12 @@ with OpenMP disabled, so it cannot see a data race or a change in what is shared
 threads. Therefore:
 
 - **Never add, remove, move, or edit a `#pragma omp` line or its clauses**, and never
-  move code into, out of, or across the region it governs.
+  move code into, out of, or across the region it governs. **Exception (owner,
+  2026-11-15):** AGENTS.md's ruling allows both, one commit per step, when the whole
+  catalogue (narrow and wide) stays at 0 diverged and `tools/omp_compare.sh` shows no
+  difference at one and four threads on cases big enough to start several threads; read
+  there for the extra conditions (write-set quoted, `critical` names, no slowdown). The
+  rules below still apply to a step that stays inside that ruling's reach.
 - A block **inside** a parallel loop body may be extracted (Recipe E) into a `static`
   function called from the same place, **provided the block writes no variable declared
   outside the loop body** - not directly, and not by passing its address. Reading outer
@@ -176,7 +181,7 @@ start new runs (`mutate.py`, Mull builds, `night3.sh`) to gate a step.
 be refactored, as an earlier campaign refactored a program with no tests at all, but only with the
 recipes whose guard fingerprint is exact: **E, G and P** (and B, N and I with the
 checks of *Unreached functions: B and N* and *Unreached functions: Recipe I* below, SD with
-*Unreached functions: Recipe SD* and BC with *Unreached functions: Recipe BC*). The proof is the build
+*Unreached functions: Recipe SD* and BC with *Unreached functions: Recipe BC*, and WP's step 8 for a wrapper no code calls). The proof is the build
 and `refactor_guard.py` reporting `OK` with `--calls`; a `WARN` stops the commit.
 For E and P, which add a function, `OK` means the exact fingerprint the guard names as
 expected: the literal check `OK`, and `--calls` moving nothing but `+2` for each new
@@ -21337,7 +21342,9 @@ constants; Recipe KD, whose run is a `LocaleCompare` ladder.
    checks.
 7. A per-pixel caller: time the conversions the table serves (first, middle and last
    elements, both signatures) against the baseline binary, several runs alternating, the
-   median quoted; a slowdown beyond 3% means the step is not taken (AGENTS.md).
+   median quoted; a slowdown beyond 3% means the step is not taken (this recipe's own
+   threshold; AGENTS.md says only that a step slowing a hot path beyond measurement noise
+   is not taken).
 8. Run `tools/ci_warnings.sh <file>`, `tools/ci_linux_warnings.sh <file>`, a C++ compile
    of the file, and the oracle for the function with line coverage showing a case runs
    every group's call.
@@ -21858,4 +21865,6 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-15 | NEW | MR | Merge Reduction Row Loops Through a Metric Selector: `static` functions holding the same parallel row reduction (per-row partials from a per-pixel accumulate call, a named `omp critical` merge) fold into one driver taking a `const` input struct with an enumeration selector; a non-inline row function switches once per row into a forced-inline column loop and per-pixel dispatch so each group is compiled with its selector constant; the merge's differing operator goes to a forced-inline value function; the critical names become one; each copy keeps its name, its pre- and post-loop statements and calls the driver; OpenMP reading, `omp_compare.sh` at one and four threads and instruction counts quoted | `compare-similarity.c` (campaign A, W29 lane b): six `Get*Similarity` functions, probe 2.97 to 3.01 (Bumpy Road 12 to 6, Complex Method 23 to 17, Large Method 17 to 11 functions); `omp_compare` 52 runs, 0 diverged on the whole fold | owner |
 | 2026-11-13 | NEW | TS | Share One Body Across Twin Sections of a Parallel Sections Region: sections that are one block but for a test and a channel constant call one `static void` helper taking an input struct, the test's value, the constant and a pointer to the shared `status`; the pragmas stay. *Careful* gives the argument (same thread, same stores to the same shared `status`, the test has no side effect) | `fourier.c`'s `InverseFourierTransformImage` (campaign A, W21 lane b): four of five sections; 7.59 to 7.66, the function leaves *Complex Method*; the same helper for `ForwardFourierTransformImage` too switches on *Code Duplication* (7.29), so one function takes it | owner |
 | 2026-11-15 | NEW | RG | Move a Parallel Sections Region into a Helper Returning the Status: a function's whole `omp parallel sections` region, whose only outer write is plain stores of `MagickFalse` into a shared `status` set to `MagickTrue` before it, moves verbatim (pragma lines included) into a `static MagickBooleanType` helper whose own `status` it returns; step 7 lets a second function's twin region over a twin callee share the helper through a dispatcher on which source pointer of the input struct is set. *Careful* gives the argument (same team and nesting, `status` still shared, the same stores, one callee per section as before) | `fourier.c`'s `InverseFourierTransformImage` and `ForwardFourierTransformImage` (campaign A, W29 lane c, after the owner's OpenMP ruling of 2026-11-15): probe 7.66 to 8.08 (Inverse), 8.67 with step 7 (Forward); a second TS helper had cost 7.28 (Code Duplication) | owner |
+| 2026-11-16 | WORDING | KV | Step 7: the 3% slowdown limit is this recipe's own; AGENTS.md says only that a step slowing a hot path beyond measurement noise is not taken | The round-nineteen reviewer found the cited "AGENTS.md 3% rule" does not exist | owner |
+| 2026-11-16 | WORDING | rule | *OpenMP regions* points to AGENTS.md's ruling of 2026-11-15 as an exception to its first bullet; *Two levels of evidence* names WP step 8 among the guard-verified forms | The section still said never to edit a pragma after the owner's ruling; the guard-verified list omitted WP step 8, which AGENTS.md's list also does not yet name | owner |
 | 2026-11-16 | NEW | KV | Replace a Split Call Switch by a Table of Function Pointers of Two Signatures: a `switch` whose groups each make one call to a function of one of two signatures differing in one extra parameter, already split by a Recipe SD chain into look-alike helpers, becomes a `static const` table of `{ key, f, g }` (one pointer `NULL`) and a lookup; groups of another shape stay in the `switch`, whose `default:` does the lookup and keeps the innermost fallback; the SD helpers and their input struct go. *Careful* gives the argument (distinct labels along the chain, the same callee and arguments, the fallback for every other value); per-pixel callers timed against the baseline | `colorspace-convert.c`'s `ConvertRGBToGeneric` (campaign A, W30 lane c): two further SD levels probed 7.88 and 8.28 (*Code Duplication* among the helpers, *Overall Code Complexity*) against 9.08; the table probe 9.68 with no new finding | owner |
