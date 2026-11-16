@@ -72,6 +72,7 @@ $call Make deprecate.c
 $call Make display.c
 $call Make display-image.c
 $call Make distort.c
+$call Make distort-sparse.c
 $call Make distort-affine.c
 $call Make distort-resize.c
 $call Make distribute-cache.c
