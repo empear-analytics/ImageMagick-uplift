@@ -1142,6 +1142,16 @@ static inline MagickBooleanType IsNonGrayColormapEntry(const Image *image,
     MagickFalse);
 }
 
+static void NegateColormapEntry(Image *image,const ssize_t i)
+{
+  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+    image->colormap[i].red=(double) QuantumRange-image->colormap[i].red;
+  if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+    image->colormap[i].green=(double) QuantumRange-image->colormap[i].green;
+  if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+    image->colormap[i].blue=(double) QuantumRange-image->colormap[i].blue;
+}
+
 static void NegateColormap(Image *image,const MagickBooleanType grayscale)
 {
   ssize_t
@@ -1155,12 +1165,7 @@ static void NegateColormap(Image *image,const MagickBooleanType grayscale)
     if (grayscale != MagickFalse)
       if (IsNonGrayColormapEntry(image,i) != MagickFalse)
         continue;
-    if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-      image->colormap[i].red=(double) QuantumRange-image->colormap[i].red;
-    if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-      image->colormap[i].green=(double) QuantumRange-image->colormap[i].green;
-    if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-      image->colormap[i].blue=(double) QuantumRange-image->colormap[i].blue;
+    NegateColormapEntry(image,i);
   }
 }
 
