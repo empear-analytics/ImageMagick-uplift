@@ -2396,12 +2396,9 @@ typedef enum
   CrossKernelShape
 } PlusKernelSide;
 
-static inline KernelInfo *AcquirePlusOrCrossKernel(KernelInfo *kernel,
+static void SetPlusOrCrossKernelValues(KernelInfo *kernel,
   const GeometryInfo *args,const double nan,const PlusKernelSide side)
 {
-  const KernelRadius
-    radius = { 1.0, 5 };  /* default radius 2 */
-
   ssize_t
     i;
 
@@ -2409,16 +2406,25 @@ static inline KernelInfo *AcquirePlusOrCrossKernel(KernelInfo *kernel,
     u,
     v;
 
+  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      kernel->values[i] = ((side == PlusKernelShape) ? (u == 0 || v == 0) :
+        (u == v || u == -v)) ? args->sigma : nan;
+}
+
+static inline KernelInfo *AcquirePlusOrCrossKernel(KernelInfo *kernel,
+  const GeometryInfo *args,const double nan,const PlusKernelSide side)
+{
+  const KernelRadius
+    radius = { 1.0, 5 };  /* default radius 2 */
+
   SetKernelRadius(kernel,args,&radius);
 
   if (AcquireKernelValues(kernel) == MagickFalse)
     return(DestroyKernelInfo(kernel));
 
   /* set all kernel values along axises to given scale */
-  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-      kernel->values[i] = ((side == PlusKernelShape) ? (u == 0 || v == 0) :
-        (u == v || u == -v)) ? args->sigma : nan;
+  SetPlusOrCrossKernelValues(kernel,args,nan,side);
   kernel->minimum = kernel->maximum = args->sigma;   /* a flat shape */
   kernel->positive_range = args->sigma*(kernel->width*2.0 - 1.0);
   return(kernel);
