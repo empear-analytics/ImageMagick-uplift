@@ -1234,6 +1234,16 @@ static void ReadInverseFourierPhase(FourierInfo *fourier_info,
   CorrectPhaseLHS(fourier_info->width,fourier_info->height,phase_pixels);
 }
 
+static MagickBooleanType SwapInversePhaseQuadrants(
+  const FourierInfo *fourier_info,double *phase_pixels,double *inverse_pixels,
+  MagickBooleanType status)
+{
+  if (status != MagickFalse)
+    status=InverseQuadrantSwap(fourier_info->width,fourier_info->height,
+      phase_pixels,inverse_pixels);
+  return(status);
+}
+
 static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
   const InverseImagePair *images,fftw_complex *fourier_pixels,
   ExceptionInfo *exception)
@@ -1275,9 +1285,8 @@ static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
   (void) memcpy(magnitude_pixels,inverse_pixels,fourier_info->height*
     fourier_info->center*sizeof(*magnitude_pixels));
   ReadInverseFourierPhase(fourier_info,images,phase_pixels,exception);
-  if (status != MagickFalse)
-    status=InverseQuadrantSwap(fourier_info->width,fourier_info->height,
-      phase_pixels,inverse_pixels);
+  status=SwapInversePhaseQuadrants(fourier_info,phase_pixels,inverse_pixels,
+    status);
   (void) memcpy(phase_pixels,inverse_pixels,fourier_info->height*
     fourier_info->center*sizeof(*phase_pixels));
   inverse_info=RelinquishVirtualMemory(inverse_info);
