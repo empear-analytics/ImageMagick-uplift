@@ -382,6 +382,19 @@ class SplitSource(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("holds a preprocessor line", r.stderr)
 
+    def test_always_inline_attribute_names_the_function(self):
+        body = ("\nstatic magick_attribute((__always_inline__)) inline int\n  FamilyInline(int x)\n{\n  return(x+2);\n}\n"
+                "\nstatic magick_attribute((__always_inline__)) inline int FamilyInline2(int x)\n{\n  return(x+3);\n}\n"
+                "\nMagickExport int FamilyRoot(int x)\n{\n  return(FamilyInline(x)+FamilyInline2(x));\n}\n" + KEPT)
+        r = self.split(body, extra_h="#define magick_attribute(x) __attribute__(x)\n")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        new = open(os.path.join(self.out, "synth-family.c")).read()
+        self.assertIn("FamilyInline(int x)", new)
+        self.assertIn("FamilyInline2(int x)", new)
+        self.assertNotIn("FamilyInline", open(os.path.join(self.out, "synth.c")).read())
+        self.assertTrue(self.compiles("synth-family.c")[0])
+        self.assertTrue(self.compiles("synth.c")[0])
+
     def test_shared_static_still_refused(self):
         r = self.split("#if defined(DELEGATE)\n" + FAMILY + KEPT.replace("x*2", "FamilyHelper(x)") + "#endif\n")
         self.assertNotEqual(r.returncode, 0)
