@@ -131,6 +131,18 @@ static MagickBooleanType IsPolyBasisDxZero(const ssize_t n)
   }
   return(MagickFalse);
 }
+static double PolyBasisDxQuartic(ssize_t n, double x, double y)
+{
+  switch(n) {
+    case 15:  return( x*x*x*x );
+    case 16:  return( x*x*x*y );
+    case 17:  return( x*x*y*y );
+    case 18:  return( x*y*y*y );
+    case 19:  return( y*y*y*y );
+    default:  break;
+  }
+  return( 0.0 ); /* should never happen */
+}
 static double poly_basis_dx(ssize_t n, double x, double y)
 {
   /* polynomial term for x derivative */
@@ -147,13 +159,9 @@ static double poly_basis_dx(ssize_t n, double x, double y)
     case 11:  return( x*x*y );
     case 12:  return( x*y*y );
     case 13:  return( y*y*y );
-    case 15:  return( x*x*x*x );
-    case 16:  return( x*x*x*y );
-    case 17:  return( x*x*y*y );
-    case 18:  return( x*y*y*y );
-    case 19:  return( y*y*y*y );
+    default:  break;
   }
-  return( 0.0 ); /* should never happen */
+  return(PolyBasisDxQuartic(n,x,y));
 }
 static double poly_basis_dy(ssize_t n, double x, double y)
 {
