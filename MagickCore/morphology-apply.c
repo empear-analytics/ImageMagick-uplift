@@ -3152,6 +3152,17 @@ RestoreMSCWarning
     clone_info=DestroyKernelInfo(clone_info);  /* kernel repeated - junk */
   return;
 }
+static void AddKernelMetaValue(KernelInfo *kernel,const size_t i)
+{
+  if ( fabs(kernel->values[i]) < MagickEpsilon )
+    kernel->values[i] = 0.0;
+  ( kernel->values[i] < 0)
+      ?  ( kernel->negative_range += kernel->values[i] )
+      :  ( kernel->positive_range += kernel->values[i] );
+  Minimize(kernel->minimum, kernel->values[i]);
+  Maximize(kernel->maximum, kernel->values[i]);
+}
+
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3197,15 +3208,7 @@ static void CalcKernelMetaData(KernelInfo *kernel)
   kernel->minimum = kernel->maximum = 0.0;
   kernel->negative_range = kernel->positive_range = 0.0;
   for (i=0; i < (kernel->width*kernel->height); i++)
-    {
-      if ( fabs(kernel->values[i]) < MagickEpsilon )
-        kernel->values[i] = 0.0;
-      ( kernel->values[i] < 0)
-          ?  ( kernel->negative_range += kernel->values[i] )
-          :  ( kernel->positive_range += kernel->values[i] );
-      Minimize(kernel->minimum, kernel->values[i]);
-      Maximize(kernel->maximum, kernel->values[i]);
-    }
+    AddKernelMetaValue(kernel,i);
 
   return;
 }
