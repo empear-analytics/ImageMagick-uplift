@@ -257,6 +257,12 @@ static const char *SkipKernelArrayQuotes(const char *p)
   return(p);
 }
 
+static void SetOddSquareSize(KernelInfo *kernel,const ssize_t i)
+{
+  kernel->width = kernel->height=CastDoubleToSizeT(sqrt((double) i+1.0));
+  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+}
+
 /* This was separated so that it could be used as a separate
 ** array input handling function, such as for -color-matrix
 */
@@ -275,8 +281,7 @@ static const char *SetOddSquareKernelSize(KernelInfo *kernel,
   p=SkipKernelArrayQuotes(p);  /* ignore "'" chars for convolve filter usage - Cristy */
   i=CountKernelArrayValues(p,end);
   /* set the size of the kernel - old sized square */
-  kernel->width = kernel->height=CastDoubleToSizeT(sqrt((double) i+1.0));
-  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+  SetOddSquareSize(kernel,i);
   p=(const char *) kernel_string;
   while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == '\''))
     p++;  /* ignore "'" chars for convolve filter usage - Cristy */
