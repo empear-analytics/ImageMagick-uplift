@@ -429,17 +429,8 @@ static void SetAffineSingleCoefficients(double *coeff,const double *arguments,
   }
 }
 
-static void SetPolarSpecialRadius(const Image *image,double *coeff)
+static void SetPolarFurthestRadius(const Image *image,double *coeff)
 {
-  /* Use closest edge  if radius == 0 */
-  if ( fabs(coeff[0]) < MagickEpsilon ) {
-    coeff[0]=MagickMin(fabs(coeff[2]-image->page.x),
-                       fabs(coeff[3]-image->page.y));
-    coeff[0]=MagickMin(coeff[0],
-                 fabs(coeff[2]-image->page.x-image->columns));
-    coeff[0]=MagickMin(coeff[0],
-                 fabs(coeff[3]-image->page.y-image->rows));
-  }
   /* furthest diagonal if radius == -1 */
   if ( fabs(-1.0-coeff[0]) < MagickEpsilon ) {
     double rx,ry;
@@ -454,6 +445,20 @@ static void SetPolarSpecialRadius(const Image *image,double *coeff)
     coeff[0] = MagickMax(coeff[0],rx*rx+ry*ry);
     coeff[0] = sqrt(coeff[0]);
   }
+}
+
+static void SetPolarSpecialRadius(const Image *image,double *coeff)
+{
+  /* Use closest edge  if radius == 0 */
+  if ( fabs(coeff[0]) < MagickEpsilon ) {
+    coeff[0]=MagickMin(fabs(coeff[2]-image->page.x),
+                       fabs(coeff[3]-image->page.y));
+    coeff[0]=MagickMin(coeff[0],
+                 fabs(coeff[2]-image->page.x-image->columns));
+    coeff[0]=MagickMin(coeff[0],
+                 fabs(coeff[3]-image->page.y-image->rows));
+  }
+  SetPolarFurthestRadius(image,coeff);
 }
 
 static void SetArcOuterRadius(double *coeff,const size_t number_arguments,
