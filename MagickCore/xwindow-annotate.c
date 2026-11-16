@@ -147,36 +147,55 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static void SetAnnotateBoxPixel(const Image *annotate_image,
-  const XPixelInfo *pixel,const XAnnotateInfo *annotate_info,Quantum *q)
+typedef enum
 {
+  AnnotateBoxColor,
+  AnnotatePenColor
+} AnnotatePixelSide;
+
+typedef struct _AnnotatePixelPaint
+{
+  AnnotatePixelSide
+    side;
+
+  const Image
+    *annotate_image;
+
+  const XPixelInfo
+    *pixel;
+
+  const XAnnotateInfo
+    *annotate_info;
+} AnnotatePixelPaint;
+
+static magick_attribute((__always_inline__)) inline void SetAnnotatePixel(
+  const AnnotatePixelPaint *paint,Quantum *q)
+{
+  const AnnotatePixelSide
+    side = paint->side;
+
+  const Image
+    *const annotate_image = paint->annotate_image;
+
+  const XPixelInfo
+    *const pixel = paint->pixel;
+
+  const XAnnotateInfo
+    *const annotate_info = paint->annotate_info;
+
   /*
     Set this pixel to the background color.
   */
-  SetPixelRed(annotate_image,ScaleShortToQuantum(
-    pixel->box_color.red),q);
-  SetPixelGreen(annotate_image,ScaleShortToQuantum(
-    pixel->box_color.green),q);
-  SetPixelBlue(annotate_image,ScaleShortToQuantum(
-    pixel->box_color.blue),q);
-  if ((annotate_info->stencil == ForegroundStencil) ||
-      (annotate_info->stencil == OpaqueStencil))
-    SetPixelAlpha(annotate_image,TransparentAlpha,q);
-}
-
-static void SetAnnotatePenPixel(const Image *annotate_image,
-  const XPixelInfo *pixel,const XAnnotateInfo *annotate_info,Quantum *q)
-{
-  /*
-    Set this pixel to the pen color.
-  */
-  SetPixelRed(annotate_image,ScaleShortToQuantum(
-    pixel->pen_color.red),q);
-  SetPixelGreen(annotate_image,ScaleShortToQuantum(
-    pixel->pen_color.green),q);
-  SetPixelBlue(annotate_image,ScaleShortToQuantum(
-    pixel->pen_color.blue),q);
-  if (annotate_info->stencil == BackgroundStencil)
+  SetPixelRed(annotate_image,ScaleShortToQuantum(((side == AnnotateBoxColor) ?
+    pixel->box_color.red : pixel->pen_color.red)),q);
+  SetPixelGreen(annotate_image,ScaleShortToQuantum(((side == AnnotateBoxColor) ?
+    pixel->box_color.green : pixel->pen_color.green)),q);
+  SetPixelBlue(annotate_image,ScaleShortToQuantum(((side == AnnotateBoxColor) ?
+    pixel->box_color.blue : pixel->pen_color.blue)),q);
+  if (((side == AnnotateBoxColor) ?
+      (annotate_info->stencil == ForegroundStencil) ||
+      (annotate_info->stencil == OpaqueStencil) :
+      annotate_info->stencil == BackgroundStencil))
     SetPixelAlpha(annotate_image,TransparentAlpha,q);
 }
 
@@ -218,11 +237,15 @@ static void XSetAnnotateRow(const AnnotatePixels *annotate_pixels,
 
   for (x=0; x < (int) annotate_image->columns; x++)
   {
+    const AnnotatePixelPaint
+      box = { AnnotateBoxColor, annotate_image, pixel, annotate_info },
+      pen = { AnnotatePenColor, annotate_image, pixel, annotate_info };
+
     SetPixelAlpha(annotate_image,OpaqueAlpha,q);
     if (XGetPixel(annotate_ximage,x,y) == 0)
-      SetAnnotateBoxPixel(annotate_image,pixel,annotate_info,q);
+      SetAnnotatePixel(&box,q);
     else
-      SetAnnotatePenPixel(annotate_image,pixel,annotate_info,q);
+      SetAnnotatePixel(&pen,q);
     q+=(ptrdiff_t) GetPixelChannels(annotate_image);
   }
 }
