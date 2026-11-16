@@ -201,6 +201,27 @@ class SplitSource(unittest.TestCase):
             self.assertNotEqual(r.returncode, 0, use)
             self.assertIn("refused", r.stderr + r.stdout)
 
+    def test_a_tag_each_part_defines_before_use_stays_in_both(self):
+        tag = '#define SynthTag  "Synth/Image"\n'
+        fam = FAMILY.replace("{\n  return(FamilyHelper(x));", "{\n" + tag + "  return(FamilyHelper(x)+sizeof(SynthTag));")
+        kept = KEPT.replace("{\n  return(x*2);", "{\n" + tag + "  return(x*2+(int) sizeof(SynthTag));")
+        r = self.split(fam + kept)
+        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        new = open(os.path.join(self.out, "synth-family.c")).read()
+        old = open(os.path.join(self.out, "synth.c")).read()
+        self.assertEqual(new.count(tag.strip()), 1)
+        self.assertEqual(old.count(tag.strip()), 1)
+        self.assertNotIn("Define declarations", new)
+        self.assert_both_compile()
+        # planted defects: the family names the tag before its own define; the two defines differ; an #undef
+        early = fam.replace("static int FamilyHelper(int x)\n{\n", "static int FamilyHelper(int x)\n{\n  (void) SynthTag;\n")
+        other = fam.replace(tag, tag.replace("Synth/Image", "Synth/Other"))
+        undef = kept.replace("  return(x*2", "#undef SynthTag\n  return(x*2")
+        for body in (early + kept, other + kept, fam + undef):
+            r = self.split(body)
+            self.assertNotEqual(r.returncode, 0)
+            self.assertIn("refused: macro SynthTag", r.stderr + r.stdout)
+
     def test_variables_that_only_the_family_names_move_with_it(self):
         # one declaration of two mutable static arrays between the moved functions, and a mutable static scalar at the top
         top = "static int\n  FamilyCount = 0;\n\n"
