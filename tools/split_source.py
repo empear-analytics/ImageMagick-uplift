@@ -36,7 +36,9 @@ in FILE's include block that holds every macro the block defines (a delegate's h
 is left out of NEW's copy when the family names none of those macros. A quoted `#include` of a header of the same directory that defines objects (a file-scope initialised
 variable, as accelerate-kernels-private.h's `accelerateKernels`) is left out of NEW's copy of the include
 block, since both files would define the variable, when no line of the family names a variable or macro
-that header defines; the split is refused when one does. A file-level
+that header defines. When the family names one and no line of the kept part names any, the include line
+moves to NEW instead, the original no longer including it (2026-11-16); the split is refused when both
+parts name them. A file-level
 `#if defined(...)` ... `#else` ... `#endif` block that holds whole functions of the family
 (a delegate's code and its stub of the same public function) moves whole, its directives
 included, when its `#endif` follows the family's last function; a function defined in both
@@ -792,7 +794,18 @@ for k, line in enumerate(list(include_lines)):
     names_in = object_header_names(os.path.join(os.path.dirname(path), mi.group(1))) if mi else set()
     if not names_in: continue
     named = sorted(n for n in names_in if re.search(r"\b%s\b" % n, region_code))
-    if named: sys.exit("refused: the family names %s, defined by %s, which defines objects and cannot be included by both files" % (named, mi.group(1)))
+    if named:
+        # a header whose objects and macros only the family names moves to NEW: the original's include line leaves
+        # (2026-11-16), so the objects are still defined once, in NEW's object; the kept part may name none of them
+        kept_code = re.sub(r'"(?:\\.|[^"\\])*"', '""', re.sub(r"/\*.*?\*/", "", "\n".join(
+            l for l in rest_lines if l != line), flags=re.S))
+        kept_named = sorted(n for n in names_in if re.search(r"\b%s\b" % n, kept_code))
+        if kept_named or rest_lines.count(line) != 1:
+            sys.exit("refused: both parts name %s, defined by %s, which defines objects and cannot be included by both files"
+                     % (sorted(set(named) | set(kept_named)), mi.group(1)))
+        rest_lines.remove(line)
+        print("include block: %s defines objects only the family names (%s) and moves to the new file" % (mi.group(1), named))
+        continue
     include_lines[k] = None
     print("include block: %s defines objects and stays in the original only" % mi.group(1))
 include_lines = [l for l in include_lines if l is not None]
