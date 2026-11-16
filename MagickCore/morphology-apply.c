@@ -652,6 +652,13 @@ static MagickBooleanType IsKernelNameSeparator(const char *p)
     MagickTrue : MagickFalse);
 }
 
+static const char *SkipKernelNameSeparators(const char *p)
+{
+  while (IsKernelNameSeparator(p) != MagickFalse)
+    p++;
+  return(p);
+}
+
 static KernelInfo *ParseKernelName(const char *kernel_string,
   ExceptionInfo *exception)
 {
@@ -683,8 +690,7 @@ static KernelInfo *ParseKernelName(const char *kernel_string,
   if ( type < 0 || type == UserDefinedKernel )
     return((KernelInfo *) NULL);  /* not a valid named kernel */
 
-  while (IsKernelNameSeparator(p) != MagickFalse)
-    p++;
+  p=SkipKernelNameSeparators(p);
 
   end=FindKernelEnd(p); /* end of this kernel definition */
 
