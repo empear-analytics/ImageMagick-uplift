@@ -3654,6 +3654,15 @@ typedef struct _DistortScaleTargets
     *geometry;
 } DistortScaleTargets;
 
+static void ScaleDistortRectangle(RectangleInfo *geometry,
+  const double *output_scaling)
+{
+  (*geometry).width=CastDoubleToSizeT((*output_scaling)*(*geometry).width+0.5);
+  (*geometry).height=CastDoubleToSizeT((*output_scaling)*(*geometry).height+0.5);
+  (*geometry).x=(ssize_t) ((*output_scaling)*(*geometry).x+0.5);
+  (*geometry).y=(ssize_t) ((*output_scaling)*(*geometry).y+0.5);
+}
+
 static MagickBooleanType ScaleDistortGeometry(const Image *image,
   const DistortScaleTargets *targets)
 {
@@ -3668,10 +3677,7 @@ static MagickBooleanType ScaleDistortGeometry(const Image *image,
     (*output_scaling) = 1.0;
     if (artifact != (const char *) NULL) {
       (*output_scaling) = fabs(StringToDouble(artifact,(char **) NULL));
-      (*geometry).width=CastDoubleToSizeT((*output_scaling)*(*geometry).width+0.5);
-      (*geometry).height=CastDoubleToSizeT((*output_scaling)*(*geometry).height+0.5);
-      (*geometry).x=(ssize_t) ((*output_scaling)*(*geometry).x+0.5);
-      (*geometry).y=(ssize_t) ((*output_scaling)*(*geometry).y+0.5);
+      ScaleDistortRectangle(geometry,output_scaling);
       if ( (*output_scaling) < 0.1 ) {
         return(MagickFalse);
       }
