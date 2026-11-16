@@ -40,7 +40,10 @@ that header defines; the split is refused when one does. A file-level
 `#if defined(...)` ... `#else` ... `#endif` block that holds whole functions of the family
 (a delegate's code and its stub of the same public function) moves whole, its directives
 included, when its `#endif` follows the family's last function; a function defined in both
-branches calls what either definition calls (owner, 2026-11-11).
+branches calls what either definition calls (owner, 2026-11-11). An `#if` with no `#else` standing
+directly above a run's first function (blank lines aside) moves whole the same way when its `#endif`
+stands inside the run, after the run's first function: `opencl.c`'s `#if
+!MAGICKCORE_ZERO_CONFIGURATION_SUPPORT` around its benchmark-profile readers (2026-11-16).
 
 When the family stands inside a file-level conditional that the rest of FILE keeps (a delegate's
 `#if defined(MAGICKCORE_X11_DELEGATE)` that wraps the whole file), NEW carries that conditional too:
@@ -527,6 +530,12 @@ for run in runs:
         if c >= 3 and L[c - 1].strip() == "#endif" and L[c - 2].strip() == 'extern "C" {' \
                 and re.match(r"#\s*if defined\(__cplusplus\)", L[c - 3].strip()):
             a = c - 3; externs += 1; continue
+        # an #if with no #else directly above the run's first function, whose #endif closes inside the run, moves
+        # whole with it (the mirror of the #endif taken after the run's last function, below; 2026-11-16)
+        cr = next((r for r in recs if r["if"] == c - 1), None) \
+            if c >= 1 and re.match(r"#\s*(if|ifdef|ifndef)\b", L[c - 1].strip()) else None
+        if cr and cr["end"] is not None and first[1] < cr["end"] <= last[2] and not cr["else"]:
+            a = c - 1; continue
         u = macro_block_start(L, c)
         if u is None: break
         a = u

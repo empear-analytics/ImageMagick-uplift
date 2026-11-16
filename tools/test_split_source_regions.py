@@ -6,7 +6,8 @@
 Each case writes a small original under a temporary directory, runs the splitter on it with `--out`, and checks what
 came out or what it refused. The accepted case holds what the tool takes since 2026-11-12 (a family inside a file-level
 `#if`, a two-line forward declaration between moved functions, an `extern "C"` pair around a callback, a table and an
-enumeration at the top of the file that only the family uses); every planted defect must still be refused.
+enumeration at the top of the file that only the family uses) and, since 2026-11-16, an `#if` without `#else` directly
+above the run's first function that closes inside the run; every planted defect must still be refused.
 """
 import os, subprocess, sys, tempfile
 
@@ -154,6 +155,16 @@ def main():
     split_c = good.replace("#if defined(__cplusplus) || defined(c_plusplus)\n}\n#endif\n", "", 1)
     rc, msg, _ = run(split_c)
     results.append(check("refused: an extern \"C\" block that never closes", rc != 0))
+    callee = "static void Callee(int *p)\n{\n  (*p)+=(int) FamilyText[0];\n}\n"
+    above = good.replace(callee, "#if !defined(ZERO)\n" + callee + "#endif\n", 1)
+    rc, msg, files = run(above)
+    new, kept = files.get("animate-window.c", ""), files.get("animate.c", "")
+    results.append(check("accepted: an #if directly above the first moved function, closed inside the run",
+                         rc == 0 and "#if !defined(ZERO)\n" + callee + "#endif\n" in new and "ZERO" not in kept))
+    above_else = good.replace(callee, "#if !defined(ZERO)\n" + callee + "#else\nstatic int Other(void)\n{\n"
+                              "  return(1);\n}\n#endif\n", 1)
+    rc, msg, _ = run(above_else)
+    results.append(check("refused: an #if above the first moved function with an #else", rc != 0))
     print("%d of %d checks passed" % (sum(results), len(results)))
     sys.exit(0 if all(results) else 1)
 
