@@ -1441,6 +1441,85 @@ static void LogMontageImages(const Image *images)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
 }
 
+typedef struct _MontagePages
+{
+  const MontageInfo
+    *montage_info;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
+    tiles_per_row,
+    tiles_per_column,
+    title_offset,
+    border_width,
+    number_lines;
+
+  MagickBooleanType
+    concatenate;
+
+  RectangleInfo
+    extract_info;
+
+  TypeMetric
+    metrics;
+} MontagePages;
+
+static size_t LayoutMontagePage(const MontagePages *pages,Image *montage,
+  Image **image_list,const size_t number_images)
+{
+  const MontageInfo
+    *const montage_info = pages->montage_info;
+
+  ExceptionInfo
+    *const exception = pages->exception;
+
+  const size_t
+    tiles_per_row = pages->tiles_per_row,
+    tiles_per_column = pages->tiles_per_column,
+    title_offset = pages->title_offset,
+    border_width = pages->border_width,
+    number_lines = pages->number_lines;
+
+  const MagickBooleanType
+    concatenate = pages->concatenate;
+
+  const RectangleInfo
+    extract_info = pages->extract_info;
+
+  const TypeMetric
+    metrics = pages->metrics;
+
+  RectangleInfo
+    bounds;
+
+  size_t
+    tiles_per_page;
+
+  ssize_t
+    x_offset,
+    y_offset;
+
+  /*
+    Determine bounding box.
+  */
+  tiles_per_page=tiles_per_row*tiles_per_column;
+  GetMontageOffsets(montage_info,number_images,&x_offset,&y_offset);
+  tiles_per_page=tiles_per_row*tiles_per_column;
+  y_offset+=(ssize_t) title_offset;
+  {
+    const MontageBoundsInfo
+      bounds_info = { tiles_per_page, number_images, tiles_per_row,
+        border_width, number_lines, concatenate, image_list, montage_info,
+        extract_info, metrics };
+
+    GetMontageBounds(x_offset,y_offset,&bounds_info,&bounds);
+  }
+  InitializeMontageCanvas(montage_info,&bounds,montage,exception);
+  return(tiles_per_page);
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -1476,6 +1555,9 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   MagickStatusType
     flags;
 
+  MontagePages
+    pages;
+
   MontageThumbnailInfo
     thumbnail_info;
 
@@ -1489,7 +1571,6 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     i;
 
   RectangleInfo
-    bounds,
     extract_info;
 
   size_t
@@ -1505,9 +1586,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     total_tiles;
 
   ssize_t
-    bevel_width,
-    x_offset,
-    y_offset;
+    bevel_width;
 
   TypeMetric
     metrics;
@@ -1592,24 +1671,19 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   images_per_page=(number_images-1)/(tiles_per_row*tiles_per_column)+1;
   tiles=0;
   total_tiles=(size_t) number_images;
+  pages.montage_info=montage_info;
+  pages.exception=exception;
+  pages.tiles_per_row=tiles_per_row;
+  pages.tiles_per_column=tiles_per_column;
+  pages.title_offset=title_offset;
+  pages.border_width=border_width;
+  pages.number_lines=number_lines;
+  pages.concatenate=concatenate;
+  pages.extract_info=extract_info;
+  pages.metrics=metrics;
   for (i=0; i < (ssize_t) images_per_page; i++)
   {
-    /*
-      Determine bounding box.
-    */
-    tiles_per_page=tiles_per_row*tiles_per_column;
-    GetMontageOffsets(montage_info,number_images,&x_offset,&y_offset);
-    tiles_per_page=tiles_per_row*tiles_per_column;
-    y_offset+=(ssize_t) title_offset;
-    {
-      const MontageBoundsInfo
-        bounds_info = { tiles_per_page, number_images, tiles_per_row,
-          border_width, number_lines, concatenate, image_list, montage_info,
-          extract_info, metrics };
-
-      GetMontageBounds(x_offset,y_offset,&bounds_info,&bounds);
-    }
-    InitializeMontageCanvas(montage_info,&bounds,montage,exception);
+    tiles_per_page=LayoutMontagePage(&pages,montage,image_list,number_images);
     /*
       Set montage geometry.
     */
