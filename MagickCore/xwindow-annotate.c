@@ -1019,6 +1019,17 @@ static GC XCreateDrawContext(Display *display,const Window root_window,
     (GCBackground | GCForeground | GCLineWidth),&context_values));
 }
 
+static Pixmap XCreateDrawPixmap(Display *display,const Window root_window,
+  const XDrawInfo *draw_info)
+{
+  unsigned int
+    depth;
+
+  depth=(unsigned int) XDefaultDepth(display,XDefaultScreen(display));
+  return(XCreatePixmap(display,root_window,draw_info->width,
+    draw_info->height,depth));
+}
+
 MagickPrivate MagickBooleanType XDrawImage(Display *display,
   const XPixelInfo *pixel,XDrawInfo *draw_info,Image *image,
   ExceptionInfo *exception)
@@ -1028,9 +1039,6 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
 
   Pixmap
     draw_pixmap;
-
-  unsigned int
-    depth;
 
   Window
     root_window;
@@ -1054,9 +1062,7 @@ MagickPrivate MagickBooleanType XDrawImage(Display *display,
     Initialize drawd pixmap.
   */
   root_window=XRootWindow(display,XDefaultScreen(display));
-  depth=(unsigned int) XDefaultDepth(display,XDefaultScreen(display));
-  draw_pixmap=XCreatePixmap(display,root_window,draw_info->width,
-    draw_info->height,depth);
+  draw_pixmap=XCreateDrawPixmap(display,root_window,draw_info);
   if (draw_pixmap == (Pixmap) NULL)
     return(MagickFalse);
   /*
