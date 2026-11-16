@@ -6714,6 +6714,21 @@ exit_cleanup:
   return(rslt_image);
 }
 
+static void RotateKernelOriginBy45Degrees(KernelInfo *kernel)
+{
+  if ( kernel->x != 1 || kernel->y != 1 ) {
+    ssize_t x,y;
+    x = (ssize_t) kernel->x-1;
+    y = (ssize_t) kernel->y-1;
+         if ( x == y  ) x = 0;
+    else if ( x == 0  ) x = -y;
+    else if ( x == -y ) y = 0;
+    else if ( y == 0  ) y = x;
+    kernel->x = (ssize_t) x+1;
+    kernel->y = (ssize_t) y+1;
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -6757,17 +6772,7 @@ static double RotateKernelBy45Degrees(KernelInfo *kernel,double angle)
   kernel->values[2] = kernel->values[1];
   kernel->values[1] = t;
   /* rotate non-centered origin */
-  if ( kernel->x != 1 || kernel->y != 1 ) {
-    ssize_t x,y;
-    x = (ssize_t) kernel->x-1;
-    y = (ssize_t) kernel->y-1;
-         if ( x == y  ) x = 0;
-    else if ( x == 0  ) x = -y;
-    else if ( x == -y ) y = 0;
-    else if ( y == 0  ) y = x;
-    kernel->x = (ssize_t) x+1;
-    kernel->y = (ssize_t) y+1;
-  }
+  RotateKernelOriginBy45Degrees(kernel);
   angle = fmod(angle+315.0, 360.0);  /* angle reduced 45 degrees */
   kernel->angle = fmod(kernel->angle+45.0, 360.0);
   return(angle);
