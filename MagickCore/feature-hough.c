@@ -171,6 +171,15 @@ static void ScaleHoughDrawing(Image *image,DrawInfo *draw_info)
   image->rows=CastDoubleToSizeT(draw_info->affine.sy*image->rows);
 }
 
+static void LoadHoughPrimitive(Image *image,DrawInfo *draw_info,
+  ExceptionInfo *exception)
+{
+  if (GetBlobStreamData(image) == (unsigned char *) NULL)
+    draw_info->primitive=FileToString(image->filename,~0UL,exception);
+  else
+    CopyBlobToPrimitive(image,draw_info);
+}
+
 static Image *RenderHoughLines(const ImageInfo *image_info,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -211,10 +220,7 @@ static Image *RenderHoughLines(const ImageInfo *image_info,const size_t columns,
   /*
     Render drawing.
   */
-  if (GetBlobStreamData(image) == (unsigned char *) NULL)
-    draw_info->primitive=FileToString(image->filename,~0UL,exception);
-  else
-    CopyBlobToPrimitive(image,draw_info);
+  LoadHoughPrimitive(image,draw_info,exception);
   (void) DrawImage(image,draw_info,exception);
   draw_info=DestroyDrawInfo(draw_info);
   if (CloseBlob(image) == MagickFalse)
