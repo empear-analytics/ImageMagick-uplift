@@ -143,6 +143,7 @@ $call Make montage-info.c
 $call Make morphology.c
 $call Make morphology-apply.c
 $call Make opencl.c
+$call Make opencl-environment.c
 $call Make opencl-enqueue.c
 $call Make opencl-device.c
 $call Make option.c

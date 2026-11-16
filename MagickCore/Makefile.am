@@ -285,6 +285,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/nt-base-private.h \
   MagickCore/nt-feature.h \
   MagickCore/opencl.c \
+  MagickCore/opencl-environment.c \
   MagickCore/opencl-enqueue.c \
   MagickCore/opencl-device.c \
   MagickCore/opencl.h \

@@ -420,6 +420,12 @@ typedef struct _MagickCLEnv
 extern MagickLibrary
   *openCL_library;
 
+extern MagickCLEnv
+  default_CLEnv;
+
+extern SemaphoreInfo
+  *openCL_lock;
+
 extern MagickPrivate cl_command_queue
   AcquireOpenCLCommandQueue(MagickCLDevice);
 
