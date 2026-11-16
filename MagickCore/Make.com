@@ -88,6 +88,7 @@ $call Make enhance.c
 $call Make enhance-color.c
 $call Make enhance-clahe.c
 $call Make enhance-tone.c
+$call Make enhance-level.c
 $call Make enhance-level-colors.c
 $call Make exception.c
 $call Make exception-throw.c

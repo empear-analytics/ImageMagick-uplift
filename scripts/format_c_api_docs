@@ -71,6 +71,7 @@ if ( ! GetOptions(
 	 'enhance-color.c',
 	 'enhance-clahe.c',
 	 'enhance-tone.c',
+	 'enhance-level.c',
 	 'enhance-level-colors.c',
 	 'exception.c',
 	 'exception-throw.c',

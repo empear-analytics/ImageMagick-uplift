@@ -181,8 +181,10 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/enhance-color.c \
   MagickCore/enhance-clahe.c \
   MagickCore/enhance-tone.c \
+  MagickCore/enhance-level.c \
   MagickCore/enhance-level-colors.c \
   MagickCore/enhance.h \
+  MagickCore/enhance-private.h \
   MagickCore/exception.c \
   MagickCore/exception-throw.c \
   MagickCore/exception.h \
@@ -558,6 +560,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/distribute-cache-private.h \
   MagickCore/draw-private.h \
   MagickCore/effect-private.h \
+  MagickCore/enhance-private.h \
   MagickCore/exception-private.h \
   MagickCore/fx-private.h \
   MagickCore/gem-private.h \
