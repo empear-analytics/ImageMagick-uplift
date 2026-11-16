@@ -508,6 +508,16 @@ static void SetForwardFourierPhase(const ForwardFourierPhase *pass,
   phase_view=DestroyCacheView(phase_view);
 }
 
+static MagickBooleanType SwapForwardPhaseQuadrants(
+  const FourierInfo *fourier_info,const ForwardFourierPlanes *planes,
+  double *phase_pixels,MagickBooleanType status)
+{
+  if (status != MagickFalse)
+    status=ForwardQuadrantSwap(fourier_info->width,fourier_info->height,
+      planes->phase_pixels,phase_pixels);
+  return(status);
+}
+
 static MagickBooleanType ForwardFourier(const FourierInfo *fourier_info,
   Image *image,const ForwardFourierPlanes *planes,ExceptionInfo *exception)
 {
@@ -566,9 +576,7 @@ static MagickBooleanType ForwardFourier(const FourierInfo *fourier_info,
     fourier_info->height*sizeof(*phase_pixels));
   status=ForwardQuadrantSwap(fourier_info->width,fourier_info->height,
     planes->magnitude_pixels,magnitude_pixels);
-  if (status != MagickFalse)
-    status=ForwardQuadrantSwap(fourier_info->width,fourier_info->height,
-      planes->phase_pixels,phase_pixels);
+  status=SwapForwardPhaseQuadrants(fourier_info,planes,phase_pixels,status);
   CorrectPhaseLHS(fourier_info->width,fourier_info->height,phase_pixels);
   ScaleForwardFourierPhase(fourier_info,phase_pixels);
   pass.fourier_info=fourier_info;
