@@ -1717,6 +1717,23 @@ static void SetBarrelYCoefficients(double *coeff,const double *arguments,
   }
 }
 
+static void SetBarrelXCoefficients(double *coeff,const double *arguments,
+  const size_t number_arguments,const double rscale)
+{
+  /* A,B,C,D coefficients */
+  coeff[0] = arguments[0];
+  coeff[1] = arguments[1];
+  coeff[2] = arguments[2];
+  if ((number_arguments == 3) || (number_arguments == 5) )
+    coeff[3] = 1.0 - coeff[0] - coeff[1] - coeff[2];
+  else
+    coeff[3] = arguments[3];
+  /* de-normalize the coefficients */
+  coeff[0] *= pow(rscale,3.0);
+  coeff[1] *= rscale*rscale;
+  coeff[2] *= rscale;
+}
+
 static double *BarrelCoefficients(double *coeff,const DistortMethod *method,
   const CoefficientContext *context)
 {
@@ -1762,18 +1779,7 @@ static double *BarrelCoefficients(double *coeff,const DistortMethod *method,
         CommandOptionToMnemonic(MagickDistortOptions, *method) );
       return((double *) NULL);
     }
-  /* A,B,C,D coefficients */
-  coeff[0] = arguments[0];
-  coeff[1] = arguments[1];
-  coeff[2] = arguments[2];
-  if ((number_arguments == 3) || (number_arguments == 5) )
-    coeff[3] = 1.0 - coeff[0] - coeff[1] - coeff[2];
-  else
-    coeff[3] = arguments[3];
-  /* de-normalize the coefficients */
-  coeff[0] *= pow(rscale,3.0);
-  coeff[1] *= rscale*rscale;
-  coeff[2] *= rscale;
+  SetBarrelXCoefficients(coeff,arguments,number_arguments,rscale);
   SetBarrelYCoefficients(coeff,arguments,number_arguments,rscale);
   SetBarrelCenter(coeff,image,arguments,number_arguments);
   return(coeff);
