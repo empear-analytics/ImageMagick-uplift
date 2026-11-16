@@ -1352,6 +1352,17 @@ static double *BilinearCoefficients(double *coeff,const DistortMethod *method,
   return(coeff);
 }
 
+static void SetPolynomialVectors(double **vectors,double *coeff,
+  const size_t number_values,const size_t nterms)
+{
+  size_t
+    i;
+
+  /* fake a number_values x3 vectors matrix from coefficients array */
+  for (i=0; i < number_values; i++)
+    vectors[i] = &(coeff[2+i*nterms]);
+}
+
 static double *PolynomialCoefficients(double *coeff,
   const DistortMethod *method,const CoefficientContext *context)
 {
@@ -1428,9 +1439,7 @@ static double *PolynomialCoefficients(double *coeff,
             "%s", "DistortCoefficients");
     return((double *) NULL);
   }
-  /* fake a number_values x3 vectors matrix from coefficients array */
-  for (i=0; i < number_values; i++)
-    vectors[i] = &(coeff[2+i*nterms]);
+  SetPolynomialVectors(vectors,coeff,number_values,nterms);
   /* Add given control point pairs for least squares solving */
   for (i=1; i < number_arguments; i+=cp_size) { /* NB: start = 1 not 0 */
     for (j=0; j < (ssize_t) nterms; j++)
