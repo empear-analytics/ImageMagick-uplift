@@ -315,7 +315,8 @@ static void XInitializeWindowOnce(Display *display,
   window->segment_info=(void *) NULL;
 }
 
-static void XResetWindowInfo(Display *display,XWindowInfo *window)
+static void XFreeWindowCursorsAndStipples(Display *display,
+  const XWindowInfo *window)
 {
   if (window->cursor != (Cursor) NULL)
     (void) XFreeCursor(display,window->cursor);
@@ -325,6 +326,11 @@ static void XResetWindowInfo(Display *display,XWindowInfo *window)
     (void) XFreePixmap(display,window->highlight_stipple);
   if (window->shadow_stipple != (Pixmap) NULL)
     (void) XFreePixmap(display,window->shadow_stipple);
+}
+
+static void XResetWindowInfo(Display *display,XWindowInfo *window)
+{
+  XFreeWindowCursorsAndStipples(display,window);
   if (window->name == (char *) NULL)
     window->name=AcquireString("");
   if (window->icon_name == (char *) NULL)
