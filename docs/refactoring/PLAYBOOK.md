@@ -1236,8 +1236,9 @@ is worth it.
    line that names `NAME` is such a define (a progress tag defined in each function body
    that names it, as `threshold-image.c`'s `ThresholdImageTag` in six), each file keeps
    the definitions that stand in its own text and nothing moves (`split_source.py` accepts
-   it). A file-scope variable that both parts name (not `const`, one declarator of
-   arithmetic type, as `xwindow-image.c`'s `red_gamma`, which the `XGetPixelInfo` family
+   it). A file-scope variable that both parts name (one declarator of arithmetic
+   type, not `const`; the `const` form follows, as `xwindow-image.c`'s `red_gamma`,
+   which the `XGetPixelInfo` family
    writes and the kept packers read per pixel) is shared through one accessor (owner,
    2026-11-16, answers to the round-twenty-three questions, AGENTS.md): the variable keeps
    its one definition, storage and initialiser in one of the two files, and that file
@@ -1252,7 +1253,15 @@ is worth it.
    dynamic symbol table (this is the ruling's one new external name; the refusal below of
    widening a helper to `MagickPrivate` stands). The new file's uses are rewritten in the
    split's commit, before `split_source.py` runs, which then finds the variable named by
-   the kept part only.
+   the kept part only. A file-scope `static const` object of arithmetic type that both
+   parts name (`widget.c`'s `BorderOffset` and `DoubleClick`, one `static const int`
+   group) is shared the same way, its accessor `MagickPrivate const T
+   *NameReference(void)` (the variable's own name with `Reference` appended,
+   `BorderOffsetReference`), so a use through it can only read; the declaration keeps
+   its `const`, initialiser and storage. A helper that moves into the header may name a
+   shared variable only through its accessor, `(*NameReference())`, as the other file
+   does (the accessor is declared in the same header, before the helpers); this is still
+   one accessor per variable, its only new external name.
    Copying a helper, type or macro into both files, and widening a helper to
    `MagickPrivate` (a symbol in the library's internal ABI), stay refused. A later split of
    either product (a chain of splits, owner, 2026-11-16) includes the same header and may
@@ -1329,7 +1338,11 @@ is worth it.
   run), and the message names the paths timed; a per-image use needs no timing. The
   accessor changes nothing about threads: it hands out the address the code used before;
   check by reading that no `#pragma omp` region names the variable or a macro naming it,
-  and refuse the step if one does (the oracle runs single-threaded).
+  and refuse the step if one does (the oracle runs single-threaded). A `const` object read
+  through its accessor gives the value its initialiser gave, as the direct read did; the
+  compiler of the other file can no longer fold it to an immediate, so the instructions of
+  each use change (a call and a load) and its value does not; such a use is timed only when
+  it runs per pixel.
 - An include left out under step 2's second exception is neither moved nor edited either:
   the original keeps the line, and the header's objects stay defined once, in the original's
   object. The family names none of them (the tool checks, with the header's macros), so every
@@ -22177,3 +22190,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | AMEND | TH | Step 2: a line outside every differing run that only a failure path reaches (the `break;` after a `NULL` pixel fetch), the same in both copies by the fold check, need not run in the harness; the message names it. Step 8: a ratio above 1.03 is measured again with 21 runs beside an A/A run of the base against itself, the step stopping if the 21-run ratio stays above 1.03; every measurement quoted | The row drivers of `xwindow-image.c` hold such a `break;` (the harness cannot make the pixel cache fail); a 9-to-11-run timing under the load of three lanes swung 0.93 to 1.06 on one step, where 21 runs gave 0.96 and 1.00 and an A/A run 1.00 | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | S | Step 2: a macro that the original defines more than once, every `#define NAME` the same line byte for byte and no `#undef`, that both parts name outside the self-defined form (a part names it before or without a define of its own) moves into the private header as one definition, every definition leaving the original; *Careful* gives the argument (the same tokens at every use; the header's definition precedes every use) | `effect-blur-adaptive-filters.c`'s `MagickSigma` (campaign A, W35 lane c): defined twice, identically, inside the adaptive family and used by the Emboss, Motion, Selective and Sharpen kernels, so neither the move of a one-definition macro nor the self-defined form took it; round twenty-three's question 3. The ruling is the owner's, the wording the lane's | owner |
 | 2026-11-16 | AMEND | S | Step 2: a file-scope variable that both parts name is shared through one accessor, `MagickPrivate T *NameReference(void)` returning its address, defined in the file that keeps the variable's one definition and storage and declared in the private header; the other file and the header's macros write each use `(*NameReference())`; *Careful*: why every read and write reaches the same object, and the timing of each per-pixel path whose text changes. The accessor form and the address-returning shape (needed because the moved `XSetDisplayGamma` writes the variables) are the lane's wording | `xwindow-image.c`'s `red_gamma`, `green_gamma` and `blue_gamma` (campaign A, W35 lane b): written by the `XGetPixelInfo` family, read by the kept packers per pixel and by the colormap family per colormap entry, they refused every carve of those families (round 23's question 2). The owner's ruling of 2026-11-16 allows one accessor per variable | owner |
+| 2026-11-16 | AMEND | S | Step 2: a file-scope `static const` object of arithmetic type that both parts name is shared through a read-only accessor (`MagickPrivate const T *NameReference(void)`), and a helper moving into the private header names a shared variable only through its accessor; *Careful*: a `const` read through the accessor is no longer folded to an immediate, which changes instructions, not values. The coordinator's reading of ruling 2 (the accessor stays the only new external name per variable); the wording is the lane's | `widget.c`'s `BorderOffset` and `DoubleClick` (campaign A, W35 lane b2): named by the `XDialogWidget` family (`PressDialogReply`, `RedrawDialogWidget`) and by the kept widgets, they refused the dialog carve (`split_source.py`: file-scope variable defined outside the region) | mandate (2026-10-24) |
