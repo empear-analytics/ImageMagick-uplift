@@ -3980,9 +3980,36 @@ static unsigned char *XPackColormapped2BitRowLSB(const Image *canvas,
   return(q);
 }
 
-static unsigned char *XPackColormapped4BitRowLSB(const Image *canvas,
-  const unsigned long *pixels,const Quantum *p,unsigned char *q)
+typedef enum
 {
+  XPackLSBFirst,
+  XPackMSBFirst
+} XPackBitOrder;
+
+typedef struct _XPackColormappedRow
+{
+  XPackBitOrder
+    side;
+
+  const Image
+    *canvas;
+
+  const unsigned long
+    *pixels;
+} XPackColormappedRow;
+
+static inline unsigned char *XPackColormapped4BitRow(
+  const XPackColormappedRow *row,const Quantum *p,unsigned char *q)
+{
+  const XPackBitOrder
+    side = row->side;
+
+  const Image
+    *const canvas = row->canvas;
+
+  const unsigned long
+    *const pixels = row->pixels;
+
   unsigned int
     nibble;
 
@@ -4000,13 +4027,15 @@ static unsigned char *XPackColormapped4BitRowLSB(const Image *canvas,
     {
       case 0:
       {
-        *q=(unsigned char) pixel;
+        *q=((side == XPackLSBFirst) ? (unsigned char) pixel :
+          (unsigned char) (pixel << 4));
         nibble++;
         break;
       }
       case 1:
       {
-        *q|=(unsigned char) (pixel << 4);
+        *q|=((side == XPackLSBFirst) ? (unsigned char) (pixel << 4) :
+          (unsigned char) pixel);
         q++;
         nibble=0;
         break;
@@ -4312,11 +4341,14 @@ static void XPackColormapped4BitLSB(const XImageRowSource *source,
   */
   for (y=0; y < (int) canvas->rows; y++)
   {
+    const XPackColormappedRow
+      row = { XPackLSBFirst, canvas, pixels };
+
     p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
       canvas->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    q=XPackColormapped4BitRowLSB(canvas,pixels,p,q);
+    q=XPackColormapped4BitRow(&row,p,q);
     q+=(ptrdiff_t) scanline_pad;
   }
 }
@@ -5306,44 +5338,6 @@ static unsigned char *XPackColormapped2BitRowMSB(const Image *canvas,
   return(q);
 }
 
-static unsigned char *XPackColormapped4BitRowMSB(const Image *canvas,
-  const unsigned long *pixels,const Quantum *p,unsigned char *q)
-{
-  int
-    x;
-
-  unsigned int
-    nibble;
-
-  unsigned long
-    pixel;
-
-  nibble=0;
-  for (x=0; x < (int) canvas->columns; x++)
-  {
-    pixel=pixels[(ssize_t)
-      GetPixelIndex(canvas,p)] & 0xf;
-    switch (nibble)
-    {
-      case 0:
-      {
-        *q=(unsigned char) (pixel << 4);
-        nibble++;
-        break;
-      }
-      case 1:
-      {
-        *q|=(unsigned char) pixel;
-        q++;
-        nibble=0;
-        break;
-      }
-    }
-    p+=(ptrdiff_t) GetPixelChannels(canvas);
-  }
-  return(q);
-}
-
 static unsigned char *XPackColormapped8BitRowMSB(const Image *canvas,
   const unsigned long *pixels,const Quantum *p,unsigned char *q)
 {
@@ -5610,11 +5604,14 @@ static void XPackColormapped4BitMSB(const XImageRowSource *source,
   */
   for (y=0; y < (int) canvas->rows; y++)
   {
+    const XPackColormappedRow
+      row = { XPackMSBFirst, canvas, pixels };
+
     p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
       canvas->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    q=XPackColormapped4BitRowMSB(canvas,pixels,p,q);
+    q=XPackColormapped4BitRow(&row,p,q);
     q+=(ptrdiff_t) scanline_pad;
   }
 }
