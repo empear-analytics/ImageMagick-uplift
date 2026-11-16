@@ -1057,6 +1057,26 @@ static inline MagickBooleanType RiemersmaDither(const RiemersmaCurve *curve,
   return(MagickTrue);
 }
 
+static inline void RiemersmaNorthUnitCurve(const RiemersmaCurve *curve,
+  MagickBooleanType *status,ExceptionInfo *exception)
+{
+  *status=RiemersmaDither(curve,SouthGravity,exception);
+  if (*status != MagickFalse)
+    *status=RiemersmaDither(curve,EastGravity,exception);
+  if (*status != MagickFalse)
+    *status=RiemersmaDither(curve,NorthGravity,exception);
+}
+
+static inline void RiemersmaSouthUnitCurve(const RiemersmaCurve *curve,
+  MagickBooleanType *status,ExceptionInfo *exception)
+{
+  *status=RiemersmaDither(curve,NorthGravity,exception);
+  if (*status != MagickFalse)
+    *status=RiemersmaDither(curve,WestGravity,exception);
+  if (*status != MagickFalse)
+    *status=RiemersmaDither(curve,SouthGravity,exception);
+}
+
 static inline void RiemersmaVerticalUnitCurve(const RiemersmaCurve *curve,
   const unsigned int direction,MagickBooleanType *status,
   ExceptionInfo *exception)
@@ -1065,20 +1085,12 @@ static inline void RiemersmaVerticalUnitCurve(const RiemersmaCurve *curve,
   {
     case NorthGravity:
     {
-      *status=RiemersmaDither(curve,SouthGravity,exception);
-      if (*status != MagickFalse)
-        *status=RiemersmaDither(curve,EastGravity,exception);
-      if (*status != MagickFalse)
-        *status=RiemersmaDither(curve,NorthGravity,exception);
+      RiemersmaNorthUnitCurve(curve,status,exception);
       break;
     }
     case SouthGravity:
     {
-      *status=RiemersmaDither(curve,NorthGravity,exception);
-      if (*status != MagickFalse)
-        *status=RiemersmaDither(curve,WestGravity,exception);
-      if (*status != MagickFalse)
-        *status=RiemersmaDither(curve,SouthGravity,exception);
+      RiemersmaSouthUnitCurve(curve,status,exception);
       break;
     }
     default:
