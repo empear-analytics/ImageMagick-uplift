@@ -2970,6 +2970,15 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   builtin.exception=exception;
   return(AcquireKernelOfType(kernel,type,&builtin));
 }
+static void CopyKernelValues(KernelInfo *new_kernel,const KernelInfo *kernel)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) (kernel->width*kernel->height); i++)
+    new_kernel->values[i]=kernel->values[i];
+}
+
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2997,9 +3006,6 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
 */
 MagickExport KernelInfo *CloneKernelInfo(const KernelInfo *kernel)
 {
-  ssize_t
-    i;
-
   KernelInfo
     *new_kernel;
 
@@ -3012,8 +3018,7 @@ MagickExport KernelInfo *CloneKernelInfo(const KernelInfo *kernel)
   /* replace the values with a copy of the values */
   if (AcquireKernelValues(new_kernel) == MagickFalse)
     return(DestroyKernelInfo(new_kernel));
-  for (i=0; i < (ssize_t) (kernel->width*kernel->height); i++)
-    new_kernel->values[i]=kernel->values[i];
+  CopyKernelValues(new_kernel,kernel);
 
   /* Also clone the next kernel in the kernel list */
   if ( kernel->next != (KernelInfo *) NULL ) {
