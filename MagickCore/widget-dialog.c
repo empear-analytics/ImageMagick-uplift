@@ -163,6 +163,20 @@ typedef struct _DialogPress
     *font_info;
 } DialogPress;
 
+static void MoveDialogTextCursor(XFontStruct *font_info,
+  const XEvent event,XWidgetInfo *reply_info)
+{
+  int
+    i,
+    x;
+
+  x=event.xbutton.x-(*reply_info).x-(int) (QuantumMargin >> 2);
+  for (i=1; i <= Extent((*reply_info).marker); i++)
+    if (XTextWidth(font_info,(*reply_info).marker,i) > x)
+      break;
+  (*reply_info).cursor=(*reply_info).marker+i-1;
+}
+
 static void PressDialogReply(const DialogPress *press,char *primary_selection,
   XWidgetInfo *reply_info)
 {
@@ -178,21 +192,13 @@ static void PressDialogReply(const DialogPress *press,char *primary_selection,
   XFontStruct
     *const font_info = press->font_info;
 
-  int
-    i,
-    x;
-
   static Time
     click_time;
 
   /*
     Move text cursor to position of button press.
   */
-  x=event.xbutton.x-(*reply_info).x-(int) (QuantumMargin >> 2);
-  for (i=1; i <= Extent((*reply_info).marker); i++)
-    if (XTextWidth(font_info,(*reply_info).marker,i) > x)
-      break;
-  (*reply_info).cursor=(*reply_info).marker+i-1;
+  MoveDialogTextCursor(font_info,event,reply_info);
   if (event.xbutton.time > (click_time+(unsigned long) (*DoubleClickReference())))
     (*reply_info).highlight=MagickFalse;
   else
