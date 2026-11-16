@@ -3,6 +3,7 @@
 # The committed file against itself must print IDENTICAL; a copy with one colormap
 # lookup changed in the first (LSB-first) and, separately, in the last (MSB-first)
 # packer must print DIFFERENT, as must a copy whose MSB-first bitmap foreground bit moves.
+# cover must pass a function every configuration runs and fail one the harness never calls.
 set -uo pipefail
 root=$(git rev-parse --show-toplevel)
 cd "$root"
@@ -35,4 +36,14 @@ EOF
 expect DIFFERENT "$tmp/planted-first.c"
 expect DIFFERENT "$tmp/planted-last.c"
 expect DIFFERENT "$tmp/planted-bit.c"
+# cover: a packer every configuration runs reports no line left; XLogXImage, which the
+# harness never calls, and a name the file lacks make it fail.
+cover() {  # cover WANT_STATUS FUNCTION
+  local out st
+  out=$(XPACK_CAND="$tmp/orig.c" bash tools/xpack_compare.sh cover HEAD "$2" 2>&1); st=$?
+  if [ "$st" = "$1" ]; then echo "ok   cover $2 exit $st"; else echo "FAIL cover $2 exit $st, expected $1: $out"; fail=1; fi
+}
+cover 0 XPackCanvasMSB
+cover 1 XLogXImage
+cover 1 NoSuchFunctionInTheFile
 exit $fail
