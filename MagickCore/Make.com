@@ -230,6 +230,8 @@ $call Make xml-tree.c
 $call Make xml-tree-file.c
 $call Make xwindow.c
 $call Make xwindow-image.c
+$call Make xwindow-pixel.c
+$call Make xwindow-text.c
 $call Make xwindow-visual.c
 $call Make xwindow-import.c
 $ set default [-.filters]
