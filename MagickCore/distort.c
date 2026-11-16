@@ -1462,6 +1462,13 @@ static double *PolynomialCoefficients(double *coeff,
   return(coeff);
 }
 
+static void NormalizeArcAngle(double *coeff)
+{
+  coeff[0] /= Magick2PI;  /* normalize radians */
+  coeff[0] -= MagickRound(coeff[0]);
+  coeff[0] *= Magick2PI;  /* de-normalize back to radians */
+}
+
 static void SetArcCoefficients(double *coeff,const Image *image,
   const double *arguments,const size_t number_arguments)
 {
@@ -1472,9 +1479,7 @@ static void SetArcCoefficients(double *coeff,const Image *image,
     coeff[1] = MagickPI2;   /* zero arguments - center is at top */
   if ( number_arguments >= 2 )
     coeff[0] += DegreesToRadians(arguments[1]);
-  coeff[0] /= Magick2PI;  /* normalize radians */
-  coeff[0] -= MagickRound(coeff[0]);
-  coeff[0] *= Magick2PI;  /* de-normalize back to radians */
+  NormalizeArcAngle(coeff);
   coeff[3] = (double)image->rows-1;
   coeff[2] = (double)image->columns/coeff[1] + coeff[3]/2.0;
   if ( number_arguments >= 3 )
