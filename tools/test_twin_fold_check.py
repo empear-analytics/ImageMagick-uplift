@@ -95,15 +95,45 @@ static inline unsigned char *PackRow(const PackRowInput *row,const Quantum *p,
 '''
 
 
-def run(tmp, merged, name='PackRow'):
+DRIVERS = r'''
+static void DriveLSB(const Source *source,unsigned char *q)
+{
+  const Row
+    row = { PackLSB, source->canvas };
+
+  q=PackRow(&row,q);
+}
+
+static void DriveMSB(const Source *source,unsigned char *q)
+{
+  const Row
+    row = { PackMSB, source->canvas };
+
+  q=PackRow(&row,q);
+}
+'''
+
+DRIVER = r'''
+static inline void Drive(const Source *source,const PackOrder side,
+  unsigned char *q)
+{
+  const Row
+    row = { side, source->canvas };
+
+  q=PackRow(&row,q);
+}
+'''
+
+
+def run(tmp, merged, name='PackRow', base=BASE, copies=('PackRowLSB', 'PackRowMSB')):
     b, c = os.path.join(tmp, 'base.c'), os.path.join(tmp, 'cand.c')
     with open(b, 'w') as f:
-        f.write(BASE)
+        f.write(base)
     with open(c, 'w') as f:
         f.write(merged)
     r = subprocess.run([sys.executable, os.path.join(HERE, 'twin_fold_check.py'), b, c,
-                        '--merged', name, '--copy', 'PackRowLSB=PackLSB',
-                        '--copy', 'PackRowMSB=PackMSB'], capture_output=True, text=True)
+                        '--merged', name, '--copy', copies[0] + '=PackLSB',
+                        '--copy', copies[1] + '=PackMSB'], capture_output=True, text=True)
     return r.returncode, r.stdout
 
 
@@ -122,6 +152,17 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         for label, text, name, want, matches in cases:
             st, out = run(tmp, text, name)
+            ok = st == want and out.count('MATCH ') - out.count('MISMATCH ') == matches
+            print('%s %s (exit %d)' % ('ok  ' if ok else 'FAIL', label, st))
+            if not ok:
+                print(out)
+                fail = 1
+        # selector as a parameter: the constant run is written as the selector
+        for label, text, want, matches in (
+                ('selector parameter', DRIVER, 0, 2),
+                ('constant kept in place of the selector',
+                 DRIVER.replace('{ side,', '{ PackLSB,'), 1, 1)):
+            st, out = run(tmp, text, 'Drive', DRIVERS, ('DriveLSB', 'DriveMSB'))
             ok = st == want and out.count('MATCH ') - out.count('MISMATCH ') == matches
             print('%s %s (exit %d)' % ('ok  ' if ok else 'FAIL', label, st))
             if not ok:

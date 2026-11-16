@@ -15,9 +15,14 @@ read from BASE, the merged function from CAND. For each copy the script
 
   1. takes the merged function's body and drops its leading bindings, the declarations
      `const T [*const] name = s->member;` whose initialiser is a member of a struct pointer
-     (one per member the body reads), and the selector's binding with them;
+     (one per member the body reads), and the selector's binding with them; a binding
+     the copy declares the same way stays and is compared;
   2. folds every `( ( SEL == K ) ? A : B )` to A when K is the copy's constant, to B
-     otherwise (nested conditionals and parentheses inside A and B are balanced);
+     otherwise (nested conditionals and parentheses inside A and B are balanced), and
+     then writes the copy's constant for every remaining SEL token: the selector is a
+     `const` that holds that constant in the copy's call (a run that was the constant
+     itself, `{ XPackLSBFirst, canvas, pixels }`, is written `{ side, canvas, pixels }`
+     when the selector is a parameter);
   3. compares the result with the copy's body token by token, comments dropped and the
      run of leading plain declarations (`int x;`, `unsigned int nibble;`: no `=`, no
      call) compared as a set, since the copies may declare them in another order.
@@ -110,13 +115,19 @@ def is_plain_decl(stmt):
             all(re.match(r'[A-Za-z_]\w*$|[*,;]$', t) for t in stmt) and len(stmt) >= 3)
 
 
-def strip_bindings(toks):
+def strip_bindings(toks, copy):
+    """Drop the merged body's leading member bindings that the copy does not have
+    (a binding the copy also declares, `Image *const canvas = source->canvas;` in both,
+    stays and is compared)."""
     stmts, _ = statements(toks)
-    i = n = 0
+    have = [' '.join(s) for s in statements(copy)[0]]
+    out = []
+    i = 0
     while i < len(stmts) and is_binding(stmts[i]):
-        n += len(stmts[i])
+        if ' '.join(stmts[i]) in have:
+            out.extend(stmts[i])
         i += 1
-    return toks[n:]
+    return out + toks[sum(len(s) for s in stmts[:i]):]
 
 
 def normalise(toks):
@@ -181,7 +192,6 @@ def main(argv=None):
     if merged is None:
         print('MISSING merged function %s in %s' % (args.merged, args.cand))
         return 1
-    merged = strip_bindings(merged)
     status = 0
     for spec in args.copy:
         name, const = spec.split('=', 1)
@@ -190,7 +200,9 @@ def main(argv=None):
             print('MISSING copy %s in %s' % (name, args.base))
             status = 1
             continue
-        got_decls, got = normalise(fold(merged, args.selector, const))
+        folded = [const if t == args.selector else t
+                  for t in fold(strip_bindings(merged, copy), args.selector, const)]
+        got_decls, got = normalise(folded)
         want_decls, want = normalise(copy)
         if got_decls == want_decls and got == want:
             print('MATCH %s (%d tokens, %d leading declarations)' %
