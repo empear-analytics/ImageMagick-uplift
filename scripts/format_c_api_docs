@@ -62,6 +62,7 @@ if ( ! GetOptions(
 	 'effect.c',
 	 'effect-filter.c',
 	 'effect-despeckle.c',
+	 'effect-sharpen.c',
 	 'effect-preview.c',
 	 'effect-blur.c',
 	 'effect-blur-adaptive.c',

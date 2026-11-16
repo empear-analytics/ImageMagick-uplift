@@ -170,6 +170,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/effect.c \
   MagickCore/effect-filter.c \
   MagickCore/effect-despeckle.c \
+  MagickCore/effect-sharpen.c \
   MagickCore/effect-preview.c \
   MagickCore/effect-blur.c \
   MagickCore/effect-blur-adaptive.c \
