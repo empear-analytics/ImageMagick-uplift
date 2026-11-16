@@ -4493,6 +4493,16 @@ typedef struct _MorphologyPrimitiveSetup
     *exception;
 } MorphologyPrimitiveSetup;
 
+static size_t SumMorphologyChanges(size_t changed,const size_t *changes)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) GetOpenMPMaximumThreads(); j++)
+    changed+=changes[j];
+  return(changed);
+}
+
 static ssize_t MorphologyRows(const MorphologyPrimitiveSetup *setup)
 {
   const MorphologyMethod
@@ -4534,7 +4544,6 @@ static ssize_t MorphologyRows(const MorphologyPrimitiveSetup *setup)
     *exception = setup->exception;
 
   ssize_t
-    j,
     y;
 
   /*
@@ -4566,8 +4575,7 @@ static ssize_t MorphologyRows(const MorphologyPrimitiveSetup *setup)
   }
   morphology_view=DestroyCacheView(morphology_view);
   image_view=DestroyCacheView(image_view);
-  for (j=0; j < (ssize_t) GetOpenMPMaximumThreads(); j++)
-    changed+=changes[j];
+  changed=SumMorphologyChanges(changed,changes);
   changes=(size_t *) RelinquishMagickMemory(changes);
   return(status ? (ssize_t) (changed/GetImageChannels(image)) : -1);
 }
