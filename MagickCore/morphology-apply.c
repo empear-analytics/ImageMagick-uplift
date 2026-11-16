@@ -6248,6 +6248,12 @@ static void FinishCompoundStages(const MorphologyMethodLoop *loop,
   (*save_image)=FinishCompoundMorphology(&finish,(*save_image));
 }
 
+static void EndKernelReportLine(const MorphologyMethodLoop *loop)
+{
+  if (loop->verbose != MagickFalse)
+    (void) FormatLocaleFile(stderr, "\n");
+}
+
 static MagickBooleanType ApplyMorphologyMethodLoop(
   const MorphologyMethodLoop *loop,const MorphologyApplyTargets *targets)
 {
@@ -6318,8 +6324,7 @@ static MagickBooleanType ApplyMorphologyMethodLoop(
       kernel_result.image=loop->image;
       kernel_result.exception=loop->exception;
       CollectKernelResult(&kernel_result,rslt_image,curr_image);
-      if (loop->verbose != MagickFalse)
-        (void) FormatLocaleFile(stderr, "\n");
+      EndKernelReportLine(loop);
 
       /* loop to the next kernel in a multi-kernel list */
       norm_kernel = norm_kernel->next;
