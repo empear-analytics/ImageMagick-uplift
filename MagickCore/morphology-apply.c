@@ -322,6 +322,15 @@ static GeometryInfo SetKernelArraySize(KernelInfo *kernel,
   return(args);
 }
 
+static void SetKernelArrayOrigin(KernelInfo *kernel,
+  const MagickStatusType *flags,const GeometryInfo args)
+{
+  kernel->x = ((*flags & XValue)!=0) ? (ssize_t)args.xi
+                                    : (ssize_t) (kernel->width-1)/2;
+  kernel->y = ((*flags & YValue)!=0) ? (ssize_t)args.psi
+                                    : (ssize_t) (kernel->height-1)/2;
+}
+
 static MagickBooleanType ParseKernelGeometry(const char *kernel_string,
   const char *p,KernelInfo *kernel,MagickStatusType *flags)
 {
@@ -347,10 +356,7 @@ static MagickBooleanType ParseKernelGeometry(const char *kernel_string,
   /* Offset Handling and Checks */
   if ( args.xi  < 0.0 || args.psi < 0.0 )
     return(MagickFalse);
-  kernel->x = ((*flags & XValue)!=0) ? (ssize_t)args.xi
-                                    : (ssize_t) (kernel->width-1)/2;
-  kernel->y = ((*flags & YValue)!=0) ? (ssize_t)args.psi
-                                    : (ssize_t) (kernel->height-1)/2;
+  SetKernelArrayOrigin(kernel,flags,args);
   if ( kernel->x >= (ssize_t) kernel->width ||
        kernel->y >= (ssize_t) kernel->height )
     return(MagickFalse);
