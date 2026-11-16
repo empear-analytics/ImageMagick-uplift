@@ -1555,6 +1555,20 @@ static double *ArcCoefficients(double *coeff,const DistortMethod *method,
   return(coeff);
 }
 
+static void SetPolarCenter(double *coeff,const Image *image,
+  const double *arguments,const size_t number_arguments)
+{
+  /* Center X,Y */
+  if ( number_arguments >= 4 ) {
+    coeff[2] = arguments[2];
+    coeff[3] = arguments[3];
+  }
+  else { /* center of actual image */
+    coeff[2] = (double)(image->columns)/2.0+image->page.x;
+    coeff[3] = (double)(image->rows)/2.0+image->page.y;
+  }
+}
+
 static void SetPolarCoefficients(double *coeff,const Image *image,
   const double *arguments,const size_t number_arguments)
 {
@@ -1565,15 +1579,7 @@ static void SetPolarCoefficients(double *coeff,const Image *image,
     coeff[0] = 0.0;
   /* Rmin  - usually 0 */
   coeff[1] = number_arguments >= 2 ? arguments[1] : 0.0;
-  /* Center X,Y */
-  if ( number_arguments >= 4 ) {
-    coeff[2] = arguments[2];
-    coeff[3] = arguments[3];
-  }
-  else { /* center of actual image */
-    coeff[2] = (double)(image->columns)/2.0+image->page.x;
-    coeff[3] = (double)(image->rows)/2.0+image->page.y;
-  }
+  SetPolarCenter(coeff,image,arguments,number_arguments);
   /* Angle from,to - about polar center 0 is downward */
   coeff[4] = -MagickPI;
   if ( number_arguments >= 5 )
