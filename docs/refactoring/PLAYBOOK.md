@@ -21453,6 +21453,166 @@ owner's OK of 2026-11-10 to evolve the recipes.
 
 ---
 
+## Recipe TH - Merge Twin Functions Through a Constant Selector, Checked by a Harness
+
+**Use when:** two `static` functions of one file are the same text except for a few
+whole-expression runs, each is called from exactly one place, they run per pixel or per
+row (or drive a row loop that calls such a function), and one copy, or both, runs in no
+oracle case because only an environment the oracle cannot provide selects it: the
+`XPack*LSB` and `XPack*MSB` row packers of `xwindow-image.c`, of which the MSB-first side
+runs only for an X server whose byte order is MSB-first (the oracle's server is
+LSB-first). The finding is *Number of Functions in a Single Module* (each merge removes a
+function), or the *Code Duplication* the twins would show in a product of a later Recipe S
+carve (`xwindow-image.c`'s 146-function cut scored 7.10 and 6.89 in round twenty-two with
+*Code Duplication* in 57 functions, most of them such twins).
+
+**Not covered by:** Recipe TI, whose evidence level is the oracle on each copy, and which
+therefore refuses a copy no case reaches (the different evidence level is why this is a
+new recipe, *Growing the catalogue* (d)). Recipe MT, which keeps each copy's function as a
+caller of the new one, so no function leaves the file. Recipe FT, for twins with no
+differing run. Recipe CF, whose copies differ only in the function called. Recipe D, which
+merges blocks of one function, not whole functions, and only when they differ in values.
+
+**How:**
+
+1. Copies. Two `static` functions of one file whose bodies align under Recipe MT step 1
+   (one name per role; every differing run a whole expression; the leading plain
+   declarations may stand in another order). Check by `grep` that each is called from
+   exactly one place and that neither's address is taken, and quote the casemap count
+   (`WIDE=1 tools/oracle/casemap.py <copy>` for a wide file) of each copy and of each
+   copy's caller.
+2. Harness. The file has a committed harness that builds it at a base revision and from
+   the working tree against one library, calls the copies' callers on synthetic inputs
+   without the environment the oracle lacks, and compares every byte they write, with a
+   planted-defect test (for `xwindow-image.c`: `tools/xpack_compare.sh` and
+   `tools/test_xpack_compare.sh`). Before the edit, its `cover` mode must report every
+   line of both copies run (`tools/xpack_compare.sh cover HEAD <copyA> <copyB>`: `0 not
+   run`); a line no configuration runs stops the step until a `tools:` commit adds a
+   configuration that runs it.
+3. Selector. The two sides take one `typedef enum { NameA, NameB } NameSide;`, written
+   directly above the first merged function of the file; every later merge of the same two
+   sides reuses it (`XPackBitOrder`, `XPackLSBFirst`, `XPackMSBFirst`).
+4. Merged function. Write it as Recipe TI steps 2 to 4 do: a struct of `NameSide side` and
+   the parameters the merged function does not keep (at most three stay parameters), the
+   members bound as `const` locals at the top of the body, the first copy's text after
+   them with each differing run written `((side == NameA) ? runA : runB)`, both runs
+   verbatim, as a `static inline` function in the first copy's place. When the copies take
+   at most three parameters, `const NameSide side` may instead be one more parameter and
+   no struct is written. A struct of the same members in the same order that an earlier
+   merge wrote is reused rather than written again.
+5. Callers. In each copy's caller, the call of the copy becomes a call of the merged
+   function: with TI step 5's `const Name name = { NameX, ... };` at the top of the block
+   that holds the call, or with the constant `NameX` as the selector argument. The copies
+   leave the file.
+6. Inlining. Each call must compile with its constant folded: list the object's local
+   symbols (`nm` on the file's object, wide build for a wide file); when the merged
+   function appears, declare it `static magick_attribute((__always_inline__)) inline` (TI
+   step 6) and check again.
+7. Checks. `tools/twin_fold_check.py <rev>:<file> <file> --merged <New> --copy
+   <copyA>=NameA --copy <copyB>=NameB` prints `MATCH` for both copies;
+   `tools/xpack_compare.sh check` prints `IDENTICAL` over all its configuration runs;
+   `cover HEAD <New>` reports `0 not run`; where casemap names cases for a copy's caller,
+   `tools/oracle/oracle.py run --function <caller>` (`WIDE=1` for a wide file) runs them
+   at 0 diverged; read each initialiser of step 5 against the parameter it replaced.
+8. Timing. `tools/xpack_compare.sh time <rev> <config> 9` on one configuration of each
+   copy's path (9 alternating runs of base and candidate, both medians and their ratio
+   quoted). A ratio above 1.03 on either path stops the step (AGENTS.md: no slowdown
+   beyond noise); ratios within that band are reported as "no slowdown", never as a
+   speedup.
+
+**Before:**
+
+```c
+static unsigned char *XPackColormapped4BitRowLSB(const Image *canvas,
+  const unsigned long *pixels,const Quantum *p,unsigned char *q)
+{
+  ...
+      case 0:
+      {
+        *q=(unsigned char) pixel;
+  ...
+}
+...
+static unsigned char *XPackColormapped4BitRowMSB(const Image *canvas,
+  const unsigned long *pixels,const Quantum *p,unsigned char *q)
+{
+  ...
+      case 0:
+      {
+        *q=(unsigned char) (pixel << 4);
+  ...
+}
+...
+    q=XPackColormapped4BitRowMSB(canvas,pixels,p,q);
+```
+
+**After:**
+
+```c
+typedef enum
+{
+  XPackLSBFirst,
+  XPackMSBFirst
+} XPackBitOrder;
+...
+static inline unsigned char *XPackColormapped4BitRow(
+  const XPackColormappedRow *row,const Quantum *p,unsigned char *q)
+{
+  const XPackBitOrder
+    side = row->side;
+  ...
+      case 0:
+      {
+        *q=((side == XPackLSBFirst) ? (unsigned char) pixel :
+          (unsigned char) (pixel << 4));
+  ...
+}
+...
+  for (y=0; y < (int) canvas->rows; y++)
+  {
+    const XPackColormappedRow
+      row = { XPackMSBFirst, canvas, pixels };
+    ...
+    q=XPackColormapped4BitRow(&row,p,q);
+```
+
+**Careful:**
+
+- Values. Each call runs its copy's statements in its order on the same values: TI's
+  argument (the members hold what the call passed; each conditional evaluates its copy's
+  run alone, C11 6.5.15). Step 7's fold check is that argument done by script.
+- Why a harness may stand in for the oracle. A packer's output is a function of what it
+  reads: the image's pixels, the colormap and pixel table, the standard colormap, the
+  XImage's fields and the file-scope gamma; the X server only chooses which copy runs.
+  The harness sets those inputs itself, runs both byte orders, and hashes every byte of
+  the XImage and matte buffers (guard bytes included), so a changed byte in any
+  configuration prints `DIFFERENT` (its planted-defect test changes one lookup in the
+  first and in the last packer and one bit of the MSB-first bitmap, and each is caught).
+  The `cover` mode is what makes the comparison reach the code: a run that never executes
+  a line cannot compare it. What the harness cannot see is an input it does not build
+  (another visual class, another pad); step 2 asks that every line run, not every input.
+- Speed. The selector is a constant only after the merged function is inlined into each
+  caller (step 6); out of line, a per-row function would test it on every pixel. Step 8
+  measures the path, and the 1.03 bound is this recipe's reading of AGENTS.md's "noise".
+- A merge chain is flat until the carve that uses it: *Number of Functions* stays a finding
+  at this size, so a step is kept for the function it removes and the duplication it
+  ends, under the owner's ruling for the timed chain (2026-11-16); the gate may refuse a
+  step that lowers the score, and such a step is committed `--no-verify` only with the
+  disclosure the ruling asks for.
+
+**Evidence level:** guard (`Verified: guard`), with the harness's `check` and `cover`
+(step 7), `twin_fold_check.py`, `nm` (step 6) and the timing (step 8); plus the oracle on
+the cases that reach either copy's caller, where casemap names any.
+
+**Provenance:** 2026-11-16, from `xwindow-image.c`'s `XPackColormapped4BitRowLSB` and
+`XPackColormapped4BitRowMSB` (campaign A, W33 and W34 lane b). Round twenty-two wrote this
+form as an amendment of Recipe TI step 8; its reviewer asked for a new recipe because the
+evidence level differs. The owner's ruling of 2026-11-16 allows the timed merge chain of
+the `XPack*` twins; this text is the lane's. Added by Claude Code (Claude Opus 5.5) under
+the mandate of 2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -21899,3 +22059,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | WORDING | rule | *OpenMP regions* points to AGENTS.md's ruling of 2026-11-15 as an exception to its first bullet; *Two levels of evidence* names WP step 8 among the guard-verified forms | The section still said never to edit a pragma after the owner's ruling; the guard-verified list omitted WP step 8, which AGENTS.md's list also does not yet name | owner |
 | 2026-11-16 | NEW | KV | Replace a Split Call Switch by a Table of Function Pointers of Two Signatures: a `switch` whose groups each make one call to a function of one of two signatures differing in one extra parameter, already split by a Recipe SD chain into look-alike helpers, becomes a `static const` table of `{ key, f, g }` (one pointer `NULL`) and a lookup; groups of another shape stay in the `switch`, whose `default:` does the lookup and keeps the innermost fallback; the SD helpers and their input struct go. *Careful* gives the argument (distinct labels along the chain, the same callee and arguments, the fallback for every other value); per-pixel callers timed against the baseline | `colorspace-convert.c`'s `ConvertRGBToGeneric` (campaign A, W30 lane c): two further SD levels probed 7.88 and 8.28 (*Code Duplication* among the helpers, *Overall Code Complexity*) against 9.08; the table probe 9.68 with no new finding | owner |
 | 2026-11-16 | AMEND | S | Step 2: a small `static` helper both parts call is shared, one per split, by moving its definition unchanged but for `inline` into a new non-installed `MagickCore/<stem>-private.h` (`MAGICKCORE_NOINST_HDRS` and `MAGICKCORE_BASE_SRCS`, mirrored in `Makefile.in`) that the original includes at the end of its include block, so the new file's copy includes it too; the helper calls no other static, names no file-scope object, type or macro of the original, holds no `static` local or pragma and has no address taken; copying and `MagickPrivate` widening stay refused; a family needing two helpers, or a helper with a type or macro, at once is still refused. *Careful* gives the argument (internal linkage in each file, one source text, no shared state, `inline` a hint) | Owner question (1) of the W32 round-twenty-one report: `threshold-image.c`, `enhance-tone.c` and `effect-filter.c` were refused by `split_source.py` for statics every root calls (`SetThresholdProgress`, `SetToneProgress`, `ReleaseFailedImage`) | owner |
+| 2026-11-16 | NEW | TH | Merge Twin Functions Through a Constant Selector, Checked by a Harness: Recipe TI's merge (one `static inline` function, a `NameSide` selector, each differing run `((side == NameA) ? runA : runB)`, the copies leave) for twins of which one or both run in no oracle case, with a committed harness standing in for the oracle: its `cover` mode must show every line of both copies run before the edit and of the merged function after it, its `check` must print IDENTICAL, `tools/twin_fold_check.py` must fold the merged function back to each copy, `nm` must show it inlined, and each path is timed (9 alternating runs, ratio above 1.03 stops the step; within it, reported as no slowdown). Selector enum and struct reused by later merges; at most three parameters may take the selector as a parameter | `xwindow-image.c`'s `XPack*` LSB/MSB packers (campaign A, W34 lane b): the MSB-first side runs only for an MSB-first X server, which the oracle lacks. The owner's ruling of 2026-11-16 allows the timed merge chain; the wording is the lane's. Round twenty-two wrote it as a TI amendment with `Decided by: owner`; its reviewer asked for a new recipe (a different evidence level) and an honest decider | mandate (2026-10-24) |
