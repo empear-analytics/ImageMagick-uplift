@@ -1669,8 +1669,7 @@ static double SetSquareKernelGeometry(KernelInfo *kernel,
   return(scale);
 }
 
-static KernelInfo *AcquireRectangleKernel(KernelInfo *kernel,
-  const KernelInfoType type,const GeometryInfo *args)
+static void SetFlatKernelValues(KernelInfo *kernel,const double scale)
 {
   ssize_t
     i;
@@ -1678,6 +1677,16 @@ static KernelInfo *AcquireRectangleKernel(KernelInfo *kernel,
   ssize_t
     u;
 
+  u=(ssize_t) (kernel->width*kernel->height);
+  for ( i=0; i < u; i++)
+      kernel->values[i] = scale;
+  kernel->minimum = kernel->maximum = scale;   /* a flat shape */
+  kernel->positive_range = scale*u;
+}
+
+static KernelInfo *AcquireRectangleKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args)
+{
   double
     scale;
   if ( type == SquareKernel )
@@ -1698,11 +1707,7 @@ static KernelInfo *AcquireRectangleKernel(KernelInfo *kernel,
     return(DestroyKernelInfo(kernel));
 
   /* set all kernel values to scale given */
-  u=(ssize_t) (kernel->width*kernel->height);
-  for ( i=0; i < u; i++)
-      kernel->values[i] = scale;
-  kernel->minimum = kernel->maximum = scale;   /* a flat shape */
-  kernel->positive_range = scale*u;
+  SetFlatKernelValues(kernel,scale);
   return(kernel);
 }
 
