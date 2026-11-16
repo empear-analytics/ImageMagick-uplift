@@ -151,7 +151,13 @@ directives included, when its `#endif` follows the family's last function and no
 is edited. Every side must be compiled by an available build and pass `split_branch_check.py`
 there; the commit names each side's build and quotes its counts. `tools/split_source.py`
 reads a function defined in both branches as one member of the family, calling what either
-definition calls.
+definition calls. An `#if`
+with no `#else` that stands directly above the family's first moved function (blank lines and
+its comment aside) and whose `#endif` stands inside the moved run moves whole the same way, its
+two directive lines verbatim (2026-11-16, under the mandate; `opencl.c`'s `#if
+!MAGICKCORE_ZERO_CONFIGURATION_SUPPORT` around the benchmark-profile readers, which only the
+environment family calls): every function between the directives moves, so the branch holds in
+the new file what it held, and a build that defines the macro drops the same functions there.
 
 This stands until `tools/oracle/build.sh` can build the X11, OpenCL and Windows code in
 one command ([`VERIFICATION.md`](VERIFICATION.md), step 5). Then that code becomes
@@ -1198,7 +1204,13 @@ is worth it.
    `accelerate-kernels-private.h`'s `const char *accelerateKernels =`) is left out of the
    copy as well, when no line of the family, comments and strings aside, names an object
    or a macro that header defines. Both files including it would define the object twice
-   (a link error); the split is refused when the family names one.
+   (a link error). When the family names one and no line of the kept part names anything that
+   header defines (`opencl.c`'s environment split: only the moving `HasOpenCLDevices` names
+   `accelerateKernels`), the include line moves to the new file instead (2026-11-16, under the
+   mandate): the original's line is removed and the new file's copy of the include block keeps
+   it, so each object is still defined once, now in the new file's object, with the same
+   initialiser and linkage, and no other file includes the header (the step checks by grep).
+   The split is refused when both parts name something the header defines.
    A small `static` helper that both parts call is shared rather than refusing the split
    (owner, 2026-11-16, "You can do all three"; several helpers, typedefs and macros, the
    owner's answers to the round-twenty-two questions of the same day). Before the split, its
@@ -1262,6 +1274,38 @@ is worth it.
    shared variable only through its accessor, `(*NameReference())`, as the other file
    does (the accessor is declared in the same header, before the helpers); this is still
    one accessor per variable, its only new external name.
+   A file-scope variable of the original with external linkage (defined without `static` and
+   declared in no header, as `opencl.c`'s `MagickLibrary *openCL_library;`) that both parts
+   name is declared rather than shared through an accessor (owner, 2026-11-16, AGENTS.md,
+   answers to the round-twenty-five questions: a split may declare an existing external
+   global in the private header, its linkage unchanged). The original's existing
+   non-installed private header (`opencl-private.h`), or the split's `<stem>-private.h` when
+   it has none, gains one declaration `extern T` / `  declarator;`, the definition's type
+   specifiers and declarator unchanged, with no initialiser, qualifier, storage class or
+   visibility macro added, after the definition of every type it names and inside the
+   conditional that compiles those types; the original includes that header. The definition,
+   its initialiser and its storage stay in the original. The name has external linkage
+   before and after (C11 6.2.2p4-5), so in the new file it designates the object the original
+   defines, and every read and write reaches the storage it reached; in the original the
+   declaration only precedes a compatible definition (C11 6.7p4), so its object code does
+   not change (`tools/split_branch_check.py`), and the objects show one definition (`nm`:
+   `B` or `D` in the original's object, `U` in the new file's). A header that other files
+   also include gives them a declaration they do not use; the step checks (grep over
+   `MagickCore/`, `MagickWand/`, `coders/`) that no other file defines or declares the name
+   differently. The variable must be named by both parts (the original's functions and the
+   moved ones), so that the declaration has a user in each file.
+   A file-scope variable of external linkage that only the moved functions name (no line of the
+   kept part, and no other file of the tree, names it: `opencl.c`'s `char *cache_directory;`
+   and `SemaphoreInfo *cache_directory_lock;`, which only the cache-directory helpers of the
+   environment family read and write) moves with them instead (2026-11-16, under the mandate):
+   its declaration group and the comment directly above it leave the original, verbatim, for
+   the new file, after its *Forward declarations* block, where the original had it after its
+   own. The definition, initialiser and external linkage do not change; only the object that
+   holds its storage does, and since no other file names it, every read and write reaches the
+   one object as before (`nm`: the symbol defined in the new file's object, absent from the
+   original's). `split_source.py` does not take this form; the commit moves the lines by hand
+   and shows, by a sorted-line comparison, that they stand once in the new file exactly as
+   they stood.
    Copying a helper, type or macro into both files, and widening a helper to
    `MagickPrivate` (a symbol in the library's internal ABI), stay refused. A later split of
    either product (a chain of splits, owner, 2026-11-16) includes the same header and may
@@ -22398,3 +22442,7 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | AMEND | S | Step 2: a file-scope `static const` declaration of arithmetic type that a moving helper names moves into the private header verbatim, declared only there; each including file has its own internal-linkage copy with the same initialiser, and nothing writes it; the read-only accessor stays the form when no moving helper names it; an `#if`/`#else` macro block moves under the `CacheShift` sentence's terms | `segment.c` (campaign A, W36 lane a): its shared scale-space core names `SafeMargin`, `TreeLength`, `Red`, `Green` and `Blue`, one `static const int` declaration; round twenty-four's question 7. The ruling is the owner's, the wording the lane's | owner |
 | 2026-11-16 | NEW | CH | Share an Identical Header Helper Through a Common Private Header: a `static inline` helper defined byte-identically in several private headers moves to one new private header that each of them includes; proof: every including `.c` file compiles to a byte-identical object (`-g0`, `__FILE__`/`__LINE__` pinned) against HEAD's and the new headers; a helper whose definitions differ in anything, its name included, is not taken | `ReleaseFailedImage` in `effect-private.h`, `effect-blur-adaptive-filters-private.h` and `visual-effects-pixel-methods-private.h` (campaign A, W36 lane a); round twenty-four's question 4. The ruling is the owner's; the recipe, its object proof and the exclusion of renamed twins (`SetBlurProgress`/`ReportRowProgress`) are the lane's | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | TH | *Use when*: also the per-pixel twins of `xwindow-annotate.c`'s annotate and draw transfer (`SetAnnotateBoxPixel`/`SetAnnotatePenPixel`), with the harness beside the oracle (step 7's oracle run on the copies' caller required); step 2 names that file's harness, `tools/xannotate_compare.sh` (`check`, `cover`, `time`) and its planted-defect test `tools/test_xannotate_compare.sh` (839a24a20) | The owner's ruling of 2026-11-16 on round twenty-five's question 3 (a timing harness for the annotate and draw paths so their per-pixel twins can take Recipe TH); the wide oracle reaches both copies (29 cases, scripted X sessions) but not every stencil, which the harness runs. The ruling is the owner's, the wording and the harness the lane's | owner |
+| 2026-11-16 | AMEND | S | Step 2: a file-scope variable of external linkage (no `static`, in no header) that both parts name is declared `extern T` / `  declarator;` in the original's existing non-installed private header (or the split's `<stem>-private.h`), after the types it names and inside their conditional, the definition and storage staying in the original; proof: split_branch_check IDENTICAL-MODULO-LAYOUT for both files, `nm` one definition, grep shows no other definition or declaration of the name | `opencl.c`'s `openCL_library`, which the `EnqueueOpenCLKernel`/`CopyMagickCLCacheInfo` split (campaign A, W37 lane a) needs; round twenty-five's question 4. The ruling is the owner's; the wording and the checks are the lane's | owner |
+| 2026-11-16 | AMEND | S | Step 2's second exception: a quoted include of a header that defines objects, named by the family and by no line of the kept part, moves to the new file (the original's line removed), so each object stays defined once; refused when both parts name something the header defines; `split_source.py` 3e573eec5 | `opencl.c`'s environment split (campaign A, W37 lane a): only `HasOpenCLDevices` names `accelerateKernels` | mandate (2026-10-24) |
+| 2026-11-16 | AMEND | S | Step 2: a file-scope variable of external linkage that only the moved functions name (and no other file) moves with them, its declaration group and comment verbatim after the new file's *Forward declarations*; by hand, checked by a sorted-line comparison and `nm` | `opencl.c`'s `cache_directory` and `cache_directory_lock` (campaign A, W37 lane a); the declaration form of 82c165e07 asks that both parts name the variable | mandate (2026-10-24) |
+| 2026-11-16 | AMEND | S | *Preprocessor branches*: an `#if` without `#else` directly above the family's first moved function whose `#endif` stands inside the moved run moves whole, directives verbatim; `split_source.py` 3423ec185 | `opencl.c`'s `#if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT` around the benchmark-profile readers (campaign A, W37 lane a) | mandate (2026-10-24) |

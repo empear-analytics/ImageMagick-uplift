@@ -36,11 +36,16 @@ in FILE's include block that holds every macro the block defines (a delegate's h
 is left out of NEW's copy when the family names none of those macros. A quoted `#include` of a header of the same directory that defines objects (a file-scope initialised
 variable, as accelerate-kernels-private.h's `accelerateKernels`) is left out of NEW's copy of the include
 block, since both files would define the variable, when no line of the family names a variable or macro
-that header defines; the split is refused when one does. A file-level
+that header defines. When the family names one and no line of the kept part names any, the include line
+moves to NEW instead, the original no longer including it (2026-11-16); the split is refused when both
+parts name them. A file-level
 `#if defined(...)` ... `#else` ... `#endif` block that holds whole functions of the family
 (a delegate's code and its stub of the same public function) moves whole, its directives
 included, when its `#endif` follows the family's last function; a function defined in both
-branches calls what either definition calls (owner, 2026-11-11).
+branches calls what either definition calls (owner, 2026-11-11). An `#if` with no `#else` standing
+directly above a run's first function (blank lines aside) moves whole the same way when its `#endif`
+stands inside the run, after the run's first function: `opencl.c`'s `#if
+!MAGICKCORE_ZERO_CONFIGURATION_SUPPORT` around its benchmark-profile readers (2026-11-16).
 
 When the family stands inside a file-level conditional that the rest of FILE keeps (a delegate's
 `#if defined(MAGICKCORE_X11_DELEGATE)` that wraps the whole file), NEW carries that conditional too:
@@ -527,6 +532,12 @@ for run in runs:
         if c >= 3 and L[c - 1].strip() == "#endif" and L[c - 2].strip() == 'extern "C" {' \
                 and re.match(r"#\s*if defined\(__cplusplus\)", L[c - 3].strip()):
             a = c - 3; externs += 1; continue
+        # an #if with no #else directly above the run's first function, whose #endif closes inside the run, moves
+        # whole with it (the mirror of the #endif taken after the run's last function, below; 2026-11-16)
+        cr = next((r for r in recs if r["if"] == c - 1), None) \
+            if c >= 1 and re.match(r"#\s*(if|ifdef|ifndef)\b", L[c - 1].strip()) else None
+        if cr and cr["end"] is not None and first[1] < cr["end"] <= last[2] and not cr["else"]:
+            a = c - 1; continue
         u = macro_block_start(L, c)
         if u is None: break
         a = u
@@ -783,7 +794,18 @@ for k, line in enumerate(list(include_lines)):
     names_in = object_header_names(os.path.join(os.path.dirname(path), mi.group(1))) if mi else set()
     if not names_in: continue
     named = sorted(n for n in names_in if re.search(r"\b%s\b" % n, region_code))
-    if named: sys.exit("refused: the family names %s, defined by %s, which defines objects and cannot be included by both files" % (named, mi.group(1)))
+    if named:
+        # a header whose objects and macros only the family names moves to NEW: the original's include line leaves
+        # (2026-11-16), so the objects are still defined once, in NEW's object; the kept part may name none of them
+        kept_code = re.sub(r'"(?:\\.|[^"\\])*"', '""', re.sub(r"/\*.*?\*/", "", "\n".join(
+            l for l in rest_lines if l != line), flags=re.S))
+        kept_named = sorted(n for n in names_in if re.search(r"\b%s\b" % n, kept_code))
+        if kept_named or rest_lines.count(line) != 1:
+            sys.exit("refused: both parts name %s, defined by %s, which defines objects and cannot be included by both files"
+                     % (sorted(set(named) | set(kept_named)), mi.group(1)))
+        rest_lines.remove(line)
+        print("include block: %s defines objects only the family names (%s) and moves to the new file" % (mi.group(1), named))
+        continue
     include_lines[k] = None
     print("include block: %s defines objects and stays in the original only" % mi.group(1))
 include_lines = [l for l in include_lines if l is not None]

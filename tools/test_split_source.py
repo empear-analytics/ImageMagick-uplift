@@ -309,9 +309,20 @@ class SplitSource(unittest.TestCase):
         self.assertNotIn("objs.h", new)
         self.assertIn('#include "synth.h"', new)
 
-    def test_header_that_defines_objects_refused_when_the_family_names_one(self):
+    def test_header_that_defines_objects_moves_when_only_the_family_names_one(self):
+        # 2026-11-16: the include line leaves the original for the new file, so the objects stay defined once
         fam = FAMILY.replace("return(FamilyHelper(x));", "return(FamilyHelper(x)+kObjTable[0]);")
         r = self.split('#include "objs.h"\n' + fam + KEPT, objects_h=True)
+        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        self.assertIn("moves to the new file", r.stdout)
+        old = open(os.path.join(self.out, "synth.c")).read()
+        new = open(os.path.join(self.out, "synth-family.c")).read()
+        self.assertNotIn("objs.h", old)
+        self.assertIn('#include "objs.h"', new)
+
+    def test_header_that_defines_objects_refused_when_both_parts_name_one(self):
+        fam = FAMILY.replace("return(FamilyHelper(x));", "return(FamilyHelper(x)+kObjTable[0]);")
+        r = self.split('#include "objs.h"\n' + fam + KEPT.replace("x*2", "(int) kObjTable[0]"), objects_h=True)
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("kObjTable", r.stderr)
 
