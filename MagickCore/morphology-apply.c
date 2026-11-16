@@ -2735,31 +2735,38 @@ static KernelInfo *AcquireKernelOfType(KernelInfo *kernel,
   }
 }
 
+static const KernelInfoType
+  KernelsBuiltWithoutBase[] =
+  {
+    UndefinedKernel,    /* These should not call this function */
+    UserDefinedKernel,
+    LaplacianKernel,   /* Named Discrete Convolution Kernels */
+    SobelKernel,       /* these are defined using other kernels */
+    RobertsKernel,
+    PrewittKernel,
+    CompassKernel,
+    KirschKernel,
+    FreiChenKernel,
+    EdgesKernel,       /* Hit and Miss kernels */
+    CornersKernel,
+    DiagonalsKernel,
+    LineEndsKernel,
+    LineJunctionsKernel,
+    RidgesKernel,
+    ConvexHullKernel,
+    SkeletonKernel,
+    ThinSEKernel
+  };
+
 static MagickBooleanType IsKernelBuiltWithoutBase(const KernelInfoType type)
 {
-  switch(type) {
-    case UndefinedKernel:    /* These should not call this function */
-    case UserDefinedKernel:
-    case LaplacianKernel:   /* Named Discrete Convolution Kernels */
-    case SobelKernel:       /* these are defined using other kernels */
-    case RobertsKernel:
-    case PrewittKernel:
-    case CompassKernel:
-    case KirschKernel:
-    case FreiChenKernel:
-    case EdgesKernel:       /* Hit and Miss kernels */
-    case CornersKernel:
-    case DiagonalsKernel:
-    case LineEndsKernel:
-    case LineJunctionsKernel:
-    case RidgesKernel:
-    case ConvexHullKernel:
-    case SkeletonKernel:
-    case ThinSEKernel:
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(KernelsBuiltWithoutBase)/
+       sizeof(*KernelsBuiltWithoutBase)); i++)
+    if (KernelsBuiltWithoutBase[i] == type)
       return(MagickTrue);
-    default:
-      break;
-  }
   return(MagickFalse);
 }
 
