@@ -257,6 +257,33 @@ typedef struct _ColorMatrixRow
     *exception;
 } ColorMatrixRow;
 
+static PixelInfo ApplyColorMatrixPixel(const ColorMatrixRow *color_row,
+  double ColorMatrix[][6],const Quantum *magick_restrict p,PixelInfo pixel)
+{
+  const Image
+    *const image = color_row->image;
+
+  const KernelInfo
+    *const color_matrix = color_row->color_matrix;
+
+  ssize_t
+    h;
+
+  size_t
+    height;
+
+  height=color_matrix->height > 6 ? 6UL : color_matrix->height;
+  for (h=0; h < (ssize_t) height; h++)
+  {
+    double
+      sum;
+
+    sum=GetColorMatrixSum(image,p,ColorMatrix[h]);
+    pixel=SetColorMatrixChannel(pixel,h,sum);
+  }
+  return(pixel);
+}
+
 static void ApplyColorMatrixRow(const ColorMatrixRow *color_row,
   double ColorMatrix[][6],const Quantum *magick_restrict p,
   Quantum *magick_restrict q)
@@ -267,9 +294,6 @@ static void ApplyColorMatrixRow(const ColorMatrixRow *color_row,
   Image
     *const color_image = color_row->color_image;
 
-  const KernelInfo
-    *const color_matrix = color_row->color_matrix;
-
   PixelInfo
     pixel;
 
@@ -279,22 +303,8 @@ static void ApplyColorMatrixRow(const ColorMatrixRow *color_row,
   GetPixelInfo(image,&pixel);
   for (x=0; x < (ssize_t) image->columns; x++)
   {
-    ssize_t
-      h;
-
-    size_t
-      height;
-
     GetPixelInfoPixel(image,p,&pixel);
-    height=color_matrix->height > 6 ? 6UL : color_matrix->height;
-    for (h=0; h < (ssize_t) height; h++)
-    {
-      double
-        sum;
-
-      sum=GetColorMatrixSum(image,p,ColorMatrix[h]);
-      pixel=SetColorMatrixChannel(pixel,h,sum);
-    }
+    pixel=ApplyColorMatrixPixel(color_row,ColorMatrix,p,pixel);
     SetPixelViaPixelInfo(color_image,&pixel,q);
     p+=(ptrdiff_t) GetPixelChannels(image);
     q+=(ptrdiff_t) GetPixelChannels(color_image);
