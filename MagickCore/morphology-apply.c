@@ -2735,7 +2735,7 @@ static KernelInfo *AcquireKernelOfType(KernelInfo *kernel,
   }
 }
 
-static MagickBooleanType IsBaseKernelNeeded(const KernelInfoType type)
+static MagickBooleanType IsKernelBuiltWithoutBase(const KernelInfoType type)
 {
   switch(type) {
     case UndefinedKernel:    /* These should not call this function */
@@ -2756,7 +2756,18 @@ static MagickBooleanType IsBaseKernelNeeded(const KernelInfoType type)
     case ConvexHullKernel:
     case SkeletonKernel:
     case ThinSEKernel:
-      return(MagickFalse); /* A pre-generated kernel is not needed */
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
+static MagickBooleanType IsBaseKernelNeeded(const KernelInfoType type)
+{
+  if (IsKernelBuiltWithoutBase(type) != MagickFalse)
+    return(MagickFalse); /* A pre-generated kernel is not needed */
+  switch(type) {
 #if 0
     /* set to 1 to do a compile-time check that we haven't missed anything */
     case UnityKernel:
