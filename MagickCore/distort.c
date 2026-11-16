@@ -3094,6 +3094,22 @@ static MagickBooleanType PrintPerspectiveFX(double *coeff,
   return(MagickTrue);
 }
 
+static void PrintBilinearForwardYTerm(const double *coeff)
+{
+  /* Handle Special degenerate (non-quadratic) or trapezoidal case */
+  if (coeff[9] != 0)
+    {
+      (void) FormatLocaleFile(stderr,
+        "       rt=bb*bb %+lf*(%lf*ii%+lf*jj);\n",-2*coeff[9],coeff[4],
+        -coeff[0]);
+    (void) FormatLocaleFile(stderr,
+      "       yy=( -bb + sqrt(rt) ) / %lf;\n",coeff[9]);
+    }
+  else
+    (void) FormatLocaleFile(stderr,"       yy=(%lf*ii%+lf*jj)/bb;\n",
+      -coeff[4],coeff[0]);
+}
+
 static void PrintBilinearForwardFX(const double *coeff,const char *image_gen,
   const char *lookup)
 {
@@ -3116,18 +3132,7 @@ static void PrintBilinearForwardFX(const double *coeff,const char *image_gen,
     coeff[7]);
   (void) FormatLocaleFile(stderr,"       bb=%lf*ii %+lf*jj %+lf;\n",
     coeff[6], -coeff[2], coeff[8]);
-  /* Handle Special degenerate (non-quadratic) or trapezoidal case */
-  if (coeff[9] != 0)
-    {
-      (void) FormatLocaleFile(stderr,
-        "       rt=bb*bb %+lf*(%lf*ii%+lf*jj);\n",-2*coeff[9],coeff[4],
-        -coeff[0]);
-    (void) FormatLocaleFile(stderr,
-      "       yy=( -bb + sqrt(rt) ) / %lf;\n",coeff[9]);
-    }
-  else
-    (void) FormatLocaleFile(stderr,"       yy=(%lf*ii%+lf*jj)/bb;\n",
-      -coeff[4],coeff[0]);
+  PrintBilinearForwardYTerm(coeff);
   (void) FormatLocaleFile(stderr,
     "       xx=(ii %+lf*yy)/(%lf %+lf*yy);\n",-coeff[1],coeff[0],
     coeff[2]);
