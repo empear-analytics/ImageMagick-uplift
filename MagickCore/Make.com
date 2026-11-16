@@ -188,6 +188,7 @@ $call Make signature.c
 $call Make splay-tree.c
 $call Make static.c
 $call Make statistic.c
+$call Make statistic-polynomial.c
 $call Make statistic-measure.c
 $call Make statistic-function.c
 $call Make statistic-moments.c

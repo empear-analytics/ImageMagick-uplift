@@ -363,11 +363,13 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/static.c \
   MagickCore/static.h \
   MagickCore/statistic.c \
+  MagickCore/statistic-polynomial.c \
   MagickCore/statistic-measure.c \
   MagickCore/statistic-function.c \
   MagickCore/statistic-moments.c \
   MagickCore/statistic-image.c \
   MagickCore/statistic.h \
+  MagickCore/statistic-evaluate-private.h \
   MagickCore/statistic-private.h \
   MagickCore/stream.c \
   MagickCore/stream-read.c \
@@ -629,6 +631,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/semaphore-private.h \
   MagickCore/semaphore-private.h \
   MagickCore/signature-private.h \
+  MagickCore/statistic-evaluate-private.h \
   MagickCore/statistic-private.h \
   MagickCore/stream-private.h \
   MagickCore/string-private.h \
