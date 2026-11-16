@@ -2286,6 +2286,25 @@ static MagickBooleanType IsGaussianSigmaWidest(const KernelInfoType type,
     MagickFalse);
 }
 
+static void SetGaussianFamilyValues(KernelInfo *kernel,
+  const KernelInfoType type,const double sigma,const double sigma2)
+{
+  if ( type == GaussianKernel || type == DoGKernel )
+    { /* Calculate a Gaussian,  OR positive half of a DoG */
+      SetGaussianKernelValues(kernel,sigma);
+    }
+
+  if ( type == DoGKernel )
+    { /* Subtract a Negative Gaussian for "Difference of Gaussian" */
+      SubtractGaussianKernelValues(kernel,sigma2);
+    }
+
+  if ( type == LoGKernel )
+    { /* Calculate a Laplacian of a Gaussian - Or Mexican Hat */
+      SetLoGOrUnityKernelValues(kernel,sigma);
+    }
+}
+
 static KernelInfo *AcquireGaussianKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args)
 {
@@ -2311,20 +2330,7 @@ static KernelInfo *AcquireGaussianKernel(KernelInfo *kernel,
    * Error Function 'erf()' (integral of a gaussian)
    */
 
-  if ( type == GaussianKernel || type == DoGKernel )
-    { /* Calculate a Gaussian,  OR positive half of a DoG */
-      SetGaussianKernelValues(kernel,sigma);
-    }
-
-  if ( type == DoGKernel )
-    { /* Subtract a Negative Gaussian for "Difference of Gaussian" */
-      SubtractGaussianKernelValues(kernel,sigma2);
-    }
-
-  if ( type == LoGKernel )
-    { /* Calculate a Laplacian of a Gaussian - Or Mexican Hat */
-      SetLoGOrUnityKernelValues(kernel,sigma);
-    }
+  SetGaussianFamilyValues(kernel,type,sigma,sigma2);
 
   /* Note the above kernels may have been 'clipped' by a user defined
   ** radius, producing a smaller (darker) kernel.  Also for very small
