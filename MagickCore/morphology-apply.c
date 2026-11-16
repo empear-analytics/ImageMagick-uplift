@@ -5988,6 +5988,16 @@ typedef struct _MorphologyDirectApply
     *exception;
 } MorphologyDirectApply;
 
+static void ReportDirectMorphology(const MagickBooleanType verbose,
+  const MorphologyMethod method,const ssize_t changed)
+{
+  if (verbose != MagickFalse)
+    (void) (void) FormatLocaleFile(stderr,
+      "%s:%.17g.%.17g #%.17g => Changed %.17g\n",
+      CommandOptionToMnemonic(MagickMorphologyOptions, method),
+      1.0,0.0,1.0, (double) changed);
+}
+
 static MagickBooleanType ApplyDirectMorphology(
   const MorphologyDirectApply *direct,Image **rslt_image)
 {
@@ -6017,11 +6027,7 @@ static MagickBooleanType ApplyDirectMorphology(
 
   changed=MorphologyPrimitiveDirect((*rslt_image),method,kernel,exception);
 
-  if (verbose != MagickFalse)
-    (void) (void) FormatLocaleFile(stderr,
-      "%s:%.17g.%.17g #%.17g => Changed %.17g\n",
-      CommandOptionToMnemonic(MagickMorphologyOptions, method),
-      1.0,0.0,1.0, (double) changed);
+  ReportDirectMorphology(verbose,method,changed);
 
   if ( changed < 0 )
     return(MagickFalse);
