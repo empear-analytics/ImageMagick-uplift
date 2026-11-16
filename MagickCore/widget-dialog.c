@@ -757,6 +757,29 @@ static void RedrawDialogWidget(const DialogContext *context,
     }
 }
 
+static void SendDialogSelection(const XSelectionRequestEvent *request,
+  char *primary_selection)
+{
+  XSelectionEvent
+    notify;
+
+  (void) XChangeProperty(request->display,request->requestor,
+    request->property,request->target,8,PropModeReplace,
+    (unsigned char *) primary_selection,Extent(primary_selection));
+  notify.type=SelectionNotify;
+  notify.display=request->display;
+  notify.requestor=request->requestor;
+  notify.selection=request->selection;
+  notify.target=request->target;
+  notify.time=request->time;
+  if (request->property == None)
+    notify.property=request->target;
+  else
+    notify.property=request->property;
+  (void) XSendEvent(request->display,request->requestor,False,0,
+    (XEvent *) &notify);
+}
+
 static void HandleDialogSelectionEvent(const DialogContext *context,
   XEvent event,const DialogTargets *targets)
 {
@@ -787,9 +810,6 @@ static void HandleDialogSelectionEvent(const DialogContext *context,
     }
     case SelectionRequest:
     {
-      XSelectionEvent
-        notify;
-
       XSelectionRequestEvent
         *request;
 
@@ -799,21 +819,7 @@ static void HandleDialogSelectionEvent(const DialogContext *context,
         Set primary selection.
       */
       request=(&(event.xselectionrequest));
-      (void) XChangeProperty(request->display,request->requestor,
-        request->property,request->target,8,PropModeReplace,
-        (unsigned char *) primary_selection,Extent(primary_selection));
-      notify.type=SelectionNotify;
-      notify.display=request->display;
-      notify.requestor=request->requestor;
-      notify.selection=request->selection;
-      notify.target=request->target;
-      notify.time=request->time;
-      if (request->property == None)
-        notify.property=request->target;
-      else
-        notify.property=request->property;
-      (void) XSendEvent(request->display,request->requestor,False,0,
-        (XEvent *) &notify);
+      SendDialogSelection(request,primary_selection);
     }
     default:
       break;
