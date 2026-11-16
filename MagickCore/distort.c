@@ -567,6 +567,17 @@ typedef struct _CoefficientContext
     cp_values;
 } CoefficientContext;
 
+static void SetAffineVectors(double **vectors,double *coeff,
+  const size_t number_values)
+{
+  size_t
+    i;
+
+  /* fake a number_values x3 vectors matrix from coefficients array */
+  for (i=0; i < number_values; i++)
+    vectors[i] = &(coeff[i*3]);
+}
+
 static void AddAffineTerms(double *coeff,double **matrix,double **vectors,
   const CoefficientContext *context)
 {
@@ -587,9 +598,7 @@ static void AddAffineTerms(double *coeff,double **matrix,double **vectors,
   size_t
     i;
 
-  /* fake a number_values x3 vectors matrix from coefficients array */
-  for (i=0; i < number_values; i++)
-    vectors[i] = &(coeff[i*3]);
+  SetAffineVectors(vectors,coeff,number_values);
   /* Add given control point pairs for least squares solving */
   for (i=0; i < number_arguments; i+=cp_size) {
     terms[0] = arguments[i+cp_x];  /* x */
