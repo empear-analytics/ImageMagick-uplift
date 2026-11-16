@@ -483,6 +483,13 @@ static void ResetUserDefinedKernel(KernelInfo *kernel)
   kernel->signature=MagickCoreSignature;
 }
 
+static void ResetKernelArrayRanges(KernelInfo *kernel)
+{
+  kernel->minimum=MagickMaximumValue;
+  kernel->maximum=(-MagickMaximumValue);
+  kernel->negative_range = kernel->positive_range = 0.0;
+}
+
 static KernelInfo *ParseKernelArray(const char *kernel_string)
 {
   KernelInfo
@@ -532,9 +539,7 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
   /* Read in the kernel values from rest of input string argument */
   if (AcquireKernelValues(kernel) == MagickFalse)
     return(DestroyKernelInfo(kernel));
-  kernel->minimum=MagickMaximumValue;
-  kernel->maximum=(-MagickMaximumValue);
-  kernel->negative_range = kernel->positive_range = 0.0;
+  ResetKernelArrayRanges(kernel);
   for (i=0; IsKernelArrayReading(kernel,i,p,end) != MagickFalse; i++)
   {
     p=ReadKernelArrayToken(p,token);
