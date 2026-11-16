@@ -6765,6 +6765,19 @@ static void RotateKernelOriginBy45Degrees(KernelInfo *kernel)
   }
 }
 
+static void RotateKernelRingBy45Degrees(KernelInfo *kernel)
+{
+  double t  = kernel->values[0];
+  kernel->values[0] = kernel->values[3];
+  kernel->values[3] = kernel->values[6];
+  kernel->values[6] = kernel->values[7];
+  kernel->values[7] = kernel->values[8];
+  kernel->values[8] = kernel->values[5];
+  kernel->values[5] = kernel->values[2];
+  kernel->values[2] = kernel->values[1];
+  kernel->values[1] = t;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -6798,15 +6811,7 @@ static void RotateKernelOriginBy45Degrees(KernelInfo *kernel)
 static double RotateKernelBy45Degrees(KernelInfo *kernel,double angle)
 {
   /* Rotate a 3x3 square by 45 degree angle */
-  double t  = kernel->values[0];
-  kernel->values[0] = kernel->values[3];
-  kernel->values[3] = kernel->values[6];
-  kernel->values[6] = kernel->values[7];
-  kernel->values[7] = kernel->values[8];
-  kernel->values[8] = kernel->values[5];
-  kernel->values[5] = kernel->values[2];
-  kernel->values[2] = kernel->values[1];
-  kernel->values[1] = t;
+  RotateKernelRingBy45Degrees(kernel);
   /* rotate non-centered origin */
   RotateKernelOriginBy45Degrees(kernel);
   angle = fmod(angle+315.0, 360.0);  /* angle reduced 45 degrees */
