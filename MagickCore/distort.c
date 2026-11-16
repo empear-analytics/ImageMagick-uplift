@@ -3984,6 +3984,23 @@ typedef struct _DistortBestFitTargets
     *bestfit;
 } DistortBestFitTargets;
 
+static void SetDePolarBestFit(double *coeff,RectangleInfo *geometry,
+  MagickBooleanType *fix_bounds)
+{
+  /* direct calculation as it needs to tile correctly
+   * for reversibility in a DePolar-Polar cycle */
+  (*fix_bounds) = MagickFalse;
+  (*geometry).x = (*geometry).y = 0;
+  (*geometry).height = CastDoubleToSizeT(ceil(coeff[0]-coeff[1]));
+  (*geometry).width = CastDoubleToSizeT(ceil((coeff[0]-coeff[1])*
+    (coeff[5]-coeff[4])*0.5));
+  /* correct scaling factors relative to new size */
+  coeff[6]=(coeff[5]-coeff[4]) * MagickSafeReciprocal(
+    (double) (*geometry).width); /* changed width */
+  coeff[7]=(coeff[0]-coeff[1]) * MagickSafeReciprocal(
+    (double) (*geometry).height); /* should be about 1.0 */
+}
+
 static void SetDistortPolarBestFit(const DistortBestFitTile *tile,
   const DistortBestFitTargets *targets)
 {
@@ -4025,18 +4042,7 @@ static void SetDistortPolarBestFit(const DistortBestFitTile *tile,
       }
       case DePolarDistortion:
       {
-        /* direct calculation as it needs to tile correctly
-         * for reversibility in a DePolar-Polar cycle */
-        (*fix_bounds) = MagickFalse;
-        (*geometry).x = (*geometry).y = 0;
-        (*geometry).height = CastDoubleToSizeT(ceil(coeff[0]-coeff[1]));
-        (*geometry).width = CastDoubleToSizeT(ceil((coeff[0]-coeff[1])*
-          (coeff[5]-coeff[4])*0.5));
-        /* correct scaling factors relative to new size */
-        coeff[6]=(coeff[5]-coeff[4]) * MagickSafeReciprocal(
-          (double) (*geometry).width); /* changed width */
-        coeff[7]=(coeff[0]-coeff[1]) * MagickSafeReciprocal(
-          (double) (*geometry).height); /* should be about 1.0 */
+        SetDePolarBestFit(coeff,geometry,fix_bounds);
         break;
       }
       default:
