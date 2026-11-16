@@ -3128,6 +3128,12 @@ static MagickBooleanType SameKernelInfo(const KernelInfo *kernel1,
   return MagickTrue;
 }
 
+static void ReleaseRepeatedKernel(KernelInfo *clone_info)
+{
+  if (clone_info != (KernelInfo *) NULL)
+    clone_info=DestroyKernelInfo(clone_info);
+}
+
 static void ExpandRotateKernelInfo(KernelInfo *kernel,const double angle)
 {
   KernelInfo
@@ -3148,8 +3154,7 @@ RestoreMSCWarning
     LastKernelInfo(last)->next=clone_info;
     last=clone_info;
   }
-  if (clone_info != (KernelInfo *) NULL)
-    clone_info=DestroyKernelInfo(clone_info);  /* kernel repeated - junk */
+  ReleaseRepeatedKernel(clone_info);  /* kernel repeated - junk */
   return;
 }
 static void AddKernelMetaValue(KernelInfo *kernel,const size_t i)
