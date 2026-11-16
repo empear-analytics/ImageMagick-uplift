@@ -391,6 +391,17 @@ static MagickBooleanType AcquireAdaptiveBlurKernel(double **kernel,
   return(MagickTrue);
 }
 
+static MagickBooleanType FinishAdaptiveBlurKernels(double **kernel,
+  const size_t width,const ssize_t w)
+{
+  if (w < (ssize_t) width)
+    {
+      RelinquishAdaptiveKernels(kernel,w);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType AcquireAdaptiveBlurKernels(double **kernel,
   const size_t width,const double sigma)
 {
@@ -402,12 +413,7 @@ static MagickBooleanType AcquireAdaptiveBlurKernels(double **kernel,
     if (AcquireAdaptiveBlurKernel(kernel,width,w,sigma) == MagickFalse)
       break;
   }
-  if (w < (ssize_t) width)
-    {
-      RelinquishAdaptiveKernels(kernel,w);
-      return(MagickFalse);
-    }
-  return(MagickTrue);
+  return(FinishAdaptiveBlurKernels(kernel,width,w));
 }
 
 static MagickBooleanType AcquireAdaptiveBlurKernelSet(double ***kernel,
