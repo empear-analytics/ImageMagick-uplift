@@ -1443,18 +1443,28 @@ static void LogMontageImages(const Image *images)
 
 typedef struct _MontagePages
 {
+  const ImageInfo
+    *image_info;
+
   const MontageInfo
     *montage_info;
+
+  const Image
+    *images;
 
   ExceptionInfo
     *exception;
 
   Image
     **primary_list,
+    **image_list,
+    *image,
+    *montage,
     *texture,
     *tile_image;
 
   size_t
+    number_images,
     tiles_per_row,
     tiles_per_column,
     title_offset,
@@ -1469,6 +1479,12 @@ typedef struct _MontagePages
 
   TypeMetric
     metrics;
+
+  ssize_t
+    bevel_width;
+
+  FrameInfo
+    frame_info;
 
   ImageInfo
     *clone_info;
@@ -1559,6 +1575,88 @@ static Image *FinishMontagePages(const MontagePages *pages,Image *montage)
   return(GetFirstImageInList(montage));
 }
 
+static Image *ComposeMontagePages(const MontagePages *pages)
+{
+  ExceptionInfo
+    *const exception = pages->exception;
+
+  Image
+    *image = pages->image,
+    **image_list = pages->image_list,
+    *montage = pages->montage;
+
+  MagickOffsetType
+    tiles;
+
+  MagickProgressMonitor
+    progress_monitor;
+
+  ssize_t
+    i;
+
+  size_t
+    extent,
+    images_per_page,
+    number_images = pages->number_images,
+    tiles_per_page,
+    total_tiles;
+
+  const MontageTileTargets
+    tile_targets = { (&image), (&progress_monitor), (&tiles) };
+
+  const MontagePageTargets
+    page_targets = { (&montage), (&image_list), (&number_images) };
+
+  images_per_page=(number_images-1)/(pages->tiles_per_row*
+    pages->tiles_per_column)+1;
+  tiles=0;
+  total_tiles=(size_t) number_images;
+  for (i=0; i < (ssize_t) images_per_page; i++)
+  {
+    tiles_per_page=LayoutMontagePage(pages,montage,image_list,number_images);
+    /*
+      Set montage geometry.
+    */
+    extent=GetMontageDirectoryExtent(image_list,tiles_per_page,number_images);
+    if (AcquireMontageStrings(montage,extent) == MagickFalse)
+      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
+    {
+      const MontagePageInfo
+        page_info = { montage, tiles_per_page, number_images, image_list,
+          extent, exception, pages->texture, pages->montage_info,
+          pages->image_info, pages->draw_info, pages->extract_info,
+          pages->title, pages->title_offset, pages->border_width,
+          pages->metrics, pages->number_lines };
+
+      SetMontagePage(&page_info);
+    }
+    /*
+      Copy tile to the composite.
+    */
+    {
+      const MontageTileCopy
+        copy = { pages->montage_info, number_images, pages->extract_info,
+          pages->title_offset, tiles_per_page, image_list, exception,
+          pages->concatenate, pages->border_width, pages->tile_image,
+          pages->bevel_width, pages->frame_info, pages->metrics, montage,
+          pages->draw_info, pages->tiles_per_row, pages->number_lines,
+          pages->images, total_tiles };
+
+      if (CopyMontageTiles(&copy,&tile_targets) == MagickFalse)
+        ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
+    }
+    {
+      const MontageNextPage
+        next = { i, images_per_page, pages->clone_info, exception,
+          pages->montage_info, tiles_per_page };
+
+      if (AdvanceMontagePage(&next,&page_targets) == MagickFalse)
+        return((Image *) NULL);
+    }
+  }
+  return(FinishMontagePages(pages,montage));
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -1585,9 +1683,6 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   MagickBooleanType
     concatenate;
 
-  MagickOffsetType
-    tiles;
-
   MagickProgressMonitor
     progress_monitor;
 
@@ -1603,35 +1698,22 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageThumbnailTargets
     thumbnail_targets = { (&image), (&progress_monitor), (&flags) };
 
-  const MontageTileTargets
-    tile_targets = { (&image), (&progress_monitor), (&tiles) };
-
-  ssize_t
-    i;
-
   RectangleInfo
     extract_info;
 
   size_t
     border_width,
-    extent,
-    images_per_page,
     number_images,
     number_lines,
     tiles_per_column,
-    tiles_per_page,
     tiles_per_row,
-    title_offset,
-    total_tiles;
+    title_offset;
 
   ssize_t
     bevel_width;
 
   TypeMetric
     metrics;
-
-  const MontagePageTargets
-    page_targets = { (&montage), (&image_list), (&number_images) };
 
   /*
     Create image tiles.
@@ -1707,14 +1789,17 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   montage=AcquireImage(clone_info,exception);
   montage->background_color=montage_info->background_color;
   montage->scene=0;
-  images_per_page=(number_images-1)/(tiles_per_row*tiles_per_column)+1;
-  tiles=0;
-  total_tiles=(size_t) number_images;
+  pages.image_info=image_info;
   pages.montage_info=montage_info;
+  pages.images=images;
   pages.exception=exception;
   pages.primary_list=primary_list;
+  pages.image_list=image_list;
+  pages.image=image;
+  pages.montage=montage;
   pages.texture=texture;
   pages.tile_image=tile_image;
+  pages.number_images=number_images;
   pages.tiles_per_row=tiles_per_row;
   pages.tiles_per_column=tiles_per_column;
   pages.title_offset=title_offset;
@@ -1723,48 +1808,10 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   pages.concatenate=concatenate;
   pages.extract_info=extract_info;
   pages.metrics=metrics;
+  pages.bevel_width=bevel_width;
+  pages.frame_info=frame_info;
   pages.clone_info=clone_info;
   pages.draw_info=draw_info;
   pages.title=title;
-  for (i=0; i < (ssize_t) images_per_page; i++)
-  {
-    tiles_per_page=LayoutMontagePage(&pages,montage,image_list,number_images);
-    /*
-      Set montage geometry.
-    */
-    extent=GetMontageDirectoryExtent(image_list,tiles_per_page,number_images);
-    if (AcquireMontageStrings(montage,extent) == MagickFalse)
-      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-    {
-      const MontagePageInfo
-        page_info = { montage, tiles_per_page, number_images, image_list,
-          extent, exception, texture, montage_info, image_info, draw_info,
-          extract_info, title, title_offset, border_width, metrics,
-          number_lines };
-
-      SetMontagePage(&page_info);
-    }
-    /*
-      Copy tile to the composite.
-    */
-    {
-      const MontageTileCopy
-        copy = { montage_info, number_images, extract_info, title_offset,
-          tiles_per_page, image_list, exception, concatenate, border_width,
-          tile_image, bevel_width, frame_info, metrics, montage, draw_info,
-          tiles_per_row, number_lines, images, total_tiles };
-
-      if (CopyMontageTiles(&copy,&tile_targets) == MagickFalse)
-        ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-    }
-    {
-      const MontageNextPage
-        next = { i, images_per_page, clone_info, exception, montage_info,
-          tiles_per_page };
-
-      if (AdvanceMontagePage(&next,&page_targets) == MagickFalse)
-        return((Image *) NULL);
-    }
-  }
-  return(FinishMontagePages(&pages,montage));
+  return(ComposeMontagePages(&pages));
 }
