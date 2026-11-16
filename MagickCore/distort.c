@@ -429,17 +429,8 @@ static void SetAffineSingleCoefficients(double *coeff,const double *arguments,
   }
 }
 
-static void SetPolarSpecialRadius(const Image *image,double *coeff)
+static void SetPolarFurthestRadius(const Image *image,double *coeff)
 {
-  /* Use closest edge  if radius == 0 */
-  if ( fabs(coeff[0]) < MagickEpsilon ) {
-    coeff[0]=MagickMin(fabs(coeff[2]-image->page.x),
-                       fabs(coeff[3]-image->page.y));
-    coeff[0]=MagickMin(coeff[0],
-                 fabs(coeff[2]-image->page.x-image->columns));
-    coeff[0]=MagickMin(coeff[0],
-                 fabs(coeff[3]-image->page.y-image->rows));
-  }
   /* furthest diagonal if radius == -1 */
   if ( fabs(-1.0-coeff[0]) < MagickEpsilon ) {
     double rx,ry;
@@ -454,6 +445,20 @@ static void SetPolarSpecialRadius(const Image *image,double *coeff)
     coeff[0] = MagickMax(coeff[0],rx*rx+ry*ry);
     coeff[0] = sqrt(coeff[0]);
   }
+}
+
+static void SetPolarSpecialRadius(const Image *image,double *coeff)
+{
+  /* Use closest edge  if radius == 0 */
+  if ( fabs(coeff[0]) < MagickEpsilon ) {
+    coeff[0]=MagickMin(fabs(coeff[2]-image->page.x),
+                       fabs(coeff[3]-image->page.y));
+    coeff[0]=MagickMin(coeff[0],
+                 fabs(coeff[2]-image->page.x-image->columns));
+    coeff[0]=MagickMin(coeff[0],
+                 fabs(coeff[3]-image->page.y-image->rows));
+  }
+  SetPolarFurthestRadius(image,coeff);
 }
 
 static void SetArcOuterRadius(double *coeff,const size_t number_arguments,
@@ -562,6 +567,17 @@ typedef struct _CoefficientContext
     cp_values;
 } CoefficientContext;
 
+static void SetAffineVectors(double **vectors,double *coeff,
+  const size_t number_values)
+{
+  size_t
+    i;
+
+  /* fake a number_values x3 vectors matrix from coefficients array */
+  for (i=0; i < number_values; i++)
+    vectors[i] = &(coeff[i*3]);
+}
+
 static void AddAffineTerms(double *coeff,double **matrix,double **vectors,
   const CoefficientContext *context)
 {
@@ -582,9 +598,7 @@ static void AddAffineTerms(double *coeff,double **matrix,double **vectors,
   size_t
     i;
 
-  /* fake a number_values x3 vectors matrix from coefficients array */
-  for (i=0; i < number_values; i++)
-    vectors[i] = &(coeff[i*3]);
+  SetAffineVectors(vectors,coeff,number_values);
   /* Add given control point pairs for least squares solving */
   for (i=0; i < number_arguments; i+=cp_size) {
     terms[0] = arguments[i+cp_x];  /* x */
@@ -709,6 +723,24 @@ static void AddRigidAffineTerms(double **matrix,double *vectors[1],
   }
 }
 
+static void ConvertRigidAffineCoefficients(double *coeff)
+{
+  double
+    inverse[6];
+
+  /*
+    Convert (S, R, Tx, Ty) to an affine projection.
+  */
+  inverse[0]=coeff[0];
+  inverse[1]=coeff[1];
+  inverse[2]=(-coeff[1]);
+  inverse[3]=coeff[0];
+  inverse[4]=coeff[2];
+  inverse[5]=coeff[3];
+  AffineArgsToCoefficients(inverse);
+  InvertAffineCoefficients(inverse,coeff);
+}
+
 static double *RigidAffineCoefficients(double *coeff,DistortMethod *method,
   const CoefficientContext *context)
 {
@@ -723,7 +755,6 @@ static double *RigidAffineCoefficients(double *coeff,DistortMethod *method,
     cp_size = context->cp_size;
 
   double
-    inverse[6],
     **matrix,
     *vectors[1];
 
@@ -773,19 +804,22 @@ static double *RigidAffineCoefficients(double *coeff,DistortMethod *method,
         CommandOptionToMnemonic(MagickDistortOptions,*method));
       return((double *) NULL);
     }
-  /*
-    Convert (S, R, Tx, Ty) to an affine projection.
-  */
-  inverse[0]=coeff[0];
-  inverse[1]=coeff[1];
-  inverse[2]=(-coeff[1]);
-  inverse[3]=coeff[0];
-  inverse[4]=coeff[2];
-  inverse[5]=coeff[3];
-  AffineArgsToCoefficients(inverse);
-  InvertAffineCoefficients(inverse,coeff);
+  ConvertRigidAffineCoefficients(coeff);
   *method=AffineDistortion;
   return(coeff);
+}
+
+static void SetAffineProjectionCoefficients(double *coeff,
+  const double *arguments)
+{
+  size_t
+    i;
+
+  double inverse[8];
+  for(i=0; i<6UL; i++ )
+    inverse[i] = arguments[i];
+  AffineArgsToCoefficients(inverse); /* map into coefficients */
+  InvertAffineCoefficients(inverse, coeff); /* invert */
 }
 
 static double *AffineProjectionCoefficients(double *coeff,
@@ -800,9 +834,6 @@ static double *AffineProjectionCoefficients(double *coeff,
   const size_t
     number_arguments = context->number_arguments;
 
-  size_t
-    i;
-
   /*
     Arguments: Affine Matrix (forward mapping)
     Arguments  sx, rx, ry, sy, tx, ty
@@ -816,7 +847,6 @@ static double *AffineProjectionCoefficients(double *coeff,
        + Will only work with a 2 number_values for Image Distortion
        + Can not be used for generating a sparse gradient (interpolation)
   */
-  double inverse[8];
   if (number_arguments != 6) {
     coeff = (double *) RelinquishMagickMemory(coeff);
     (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
@@ -825,10 +855,7 @@ static double *AffineProjectionCoefficients(double *coeff,
     return((double *) NULL);
   }
   /* FUTURE: trap test for sx*sy-rx*ry == 0 (determinant = 0, no inverse) */
-  for(i=0; i<6UL; i++ )
-    inverse[i] = arguments[i];
-  AffineArgsToCoefficients(inverse); /* map into coefficients */
-  InvertAffineCoefficients(inverse, coeff); /* invert */
+  SetAffineProjectionCoefficients(coeff,arguments);
   *method = AffineDistortion;
 
   return(coeff);
@@ -1039,6 +1066,20 @@ static void AddPerspectiveTerms(double **matrix,double *vectors[1],
   }
 }
 
+static void SetPerspectiveGroundSign(double *coeff,const double *arguments,
+  const size_t cp_x,const size_t cp_y)
+{
+  /*
+    Calculate 9'th coefficient! The ground-sky determination.
+    What is sign of the 'ground' in r() denominator affine function?
+    Just use any valid image coordinate (first control point) in
+    destination for determination of what part of view is 'ground'.
+  */
+  coeff[8] = coeff[6]*arguments[cp_x]
+                  + coeff[7]*arguments[cp_y] + 1.0;
+  coeff[8] = (coeff[8] < 0.0) ? -1.0 : +1.0;
+}
+
 static double *PerspectiveCoefficients(double *coeff,
   const DistortMethod *method,const CoefficientContext *context)
 {
@@ -1121,15 +1162,7 @@ static double *PerspectiveCoefficients(double *coeff,
         CommandOptionToMnemonic(MagickDistortOptions, *method) );
     return((double *) NULL);
   }
-  /*
-    Calculate 9'th coefficient! The ground-sky determination.
-    What is sign of the 'ground' in r() denominator affine function?
-    Just use any valid image coordinate (first control point) in
-    destination for determination of what part of view is 'ground'.
-  */
-  coeff[8] = coeff[6]*arguments[cp_x]
-                  + coeff[7]*arguments[cp_y] + 1.0;
-  coeff[8] = (coeff[8] < 0.0) ? -1.0 : +1.0;
+  SetPerspectiveGroundSign(coeff,arguments,cp_x,cp_y);
 
   return(coeff);
 }
@@ -1173,6 +1206,17 @@ static double *PerspectiveProjectionCoefficients(double *coeff,
   return(coeff);
 }
 
+static void SetBilinearVectors(double **vectors,double *coeff,
+  const size_t number_values)
+{
+  size_t
+    i;
+
+  /* fake a number_values x4 vectors matrix from coefficients array */
+  for (i=0; i < number_values; i++)
+    vectors[i] = &(coeff[i*4]);
+}
+
 static MagickBooleanType SolveBilinearCoefficients(double *coeff,
   double **matrix,double **vectors,const CoefficientContext *context)
 {
@@ -1196,9 +1240,7 @@ static MagickBooleanType SolveBilinearCoefficients(double *coeff,
   MagickBooleanType
     status;
 
-  /* fake a number_values x4 vectors matrix from coefficients array */
-  for (i=0; i < number_values; i++)
-    vectors[i] = &(coeff[i*4]);
+  SetBilinearVectors(vectors,coeff,number_values);
   /* Add given control point pairs for least squares solving */
   for (i=0; i < number_arguments; i+=cp_size) {
     terms[0] = arguments[i+cp_x];   /*  x  */
@@ -1328,6 +1370,29 @@ static double *BilinearCoefficients(double *coeff,const DistortMethod *method,
   return(coeff);
 }
 
+static void SetPolynomialVectors(double **vectors,double *coeff,
+  const size_t number_values,const size_t nterms)
+{
+  size_t
+    i;
+
+  /* fake a number_values x3 vectors matrix from coefficients array */
+  for (i=0; i < number_values; i++)
+    vectors[i] = &(coeff[2+i*nterms]);
+}
+
+static size_t SetPolynomialOrder(double *coeff,const double *arguments)
+{
+  size_t
+    nterms;
+
+  /* first two coefficients hold polynomial order information */
+  coeff[0] = arguments[0];
+  coeff[1] = (double) poly_number_terms(arguments[0]);
+  nterms = CastDoubleToSizeT(coeff[1]);
+  return(nterms);
+}
+
 static double *PolynomialCoefficients(double *coeff,
   const DistortMethod *method,const CoefficientContext *context)
 {
@@ -1383,10 +1448,7 @@ static double *PolynomialCoefficients(double *coeff,
   MagickBooleanType
     status;
 
-  /* first two coefficients hold polynomial order information */
-  coeff[0] = arguments[0];
-  coeff[1] = (double) poly_number_terms(arguments[0]);
-  nterms = CastDoubleToSizeT(coeff[1]);
+  nterms=SetPolynomialOrder(coeff,arguments);
 
   /* create matrix, a fake vectors matrix, and least sqs terms */
   matrix=AcquireMagickMatrix(nterms,nterms);
@@ -1404,9 +1466,7 @@ static double *PolynomialCoefficients(double *coeff,
             "%s", "DistortCoefficients");
     return((double *) NULL);
   }
-  /* fake a number_values x3 vectors matrix from coefficients array */
-  for (i=0; i < number_values; i++)
-    vectors[i] = &(coeff[2+i*nterms]);
+  SetPolynomialVectors(vectors,coeff,number_values,nterms);
   /* Add given control point pairs for least squares solving */
   for (i=1; i < number_arguments; i+=cp_size) { /* NB: start = 1 not 0 */
     for (j=0; j < (ssize_t) nterms; j++)
@@ -1429,6 +1489,13 @@ static double *PolynomialCoefficients(double *coeff,
   return(coeff);
 }
 
+static void NormalizeArcAngle(double *coeff)
+{
+  coeff[0] /= Magick2PI;  /* normalize radians */
+  coeff[0] -= MagickRound(coeff[0]);
+  coeff[0] *= Magick2PI;  /* de-normalize back to radians */
+}
+
 static void SetArcCoefficients(double *coeff,const Image *image,
   const double *arguments,const size_t number_arguments)
 {
@@ -1439,9 +1506,7 @@ static void SetArcCoefficients(double *coeff,const Image *image,
     coeff[1] = MagickPI2;   /* zero arguments - center is at top */
   if ( number_arguments >= 2 )
     coeff[0] += DegreesToRadians(arguments[1]);
-  coeff[0] /= Magick2PI;  /* normalize radians */
-  coeff[0] -= MagickRound(coeff[0]);
-  coeff[0] *= Magick2PI;  /* de-normalize back to radians */
+  NormalizeArcAngle(coeff);
   coeff[3] = (double)image->rows-1;
   coeff[2] = (double)image->columns/coeff[1] + coeff[3]/2.0;
   if ( number_arguments >= 3 )
@@ -1517,16 +1582,9 @@ static double *ArcCoefficients(double *coeff,const DistortMethod *method,
   return(coeff);
 }
 
-static void SetPolarCoefficients(double *coeff,const Image *image,
+static void SetPolarCenter(double *coeff,const Image *image,
   const double *arguments,const size_t number_arguments)
 {
-  /* Rmax -  if 0 calculate appropriate value */
-  if ( number_arguments >= 1 )
-    coeff[0] = arguments[0];
-  else
-    coeff[0] = 0.0;
-  /* Rmin  - usually 0 */
-  coeff[1] = number_arguments >= 2 ? arguments[1] : 0.0;
   /* Center X,Y */
   if ( number_arguments >= 4 ) {
     coeff[2] = arguments[2];
@@ -1536,6 +1594,11 @@ static void SetPolarCoefficients(double *coeff,const Image *image,
     coeff[2] = (double)(image->columns)/2.0+image->page.x;
     coeff[3] = (double)(image->rows)/2.0+image->page.y;
   }
+}
+
+static void SetPolarAngles(double *coeff,const double *arguments,
+  const size_t number_arguments)
+{
   /* Angle from,to - about polar center 0 is downward */
   coeff[4] = -MagickPI;
   if ( number_arguments >= 5 )
@@ -1545,6 +1608,40 @@ static void SetPolarCoefficients(double *coeff,const Image *image,
     coeff[5] = DegreesToRadians(arguments[5]);
   if ( fabs(coeff[4]-coeff[5]) < MagickEpsilon )
     coeff[5] += Magick2PI; /* same angle is a full circle */
+}
+
+static void SetPolarRadii(double *coeff,const double *arguments,
+  const size_t number_arguments)
+{
+  /* Rmax -  if 0 calculate appropriate value */
+  if ( number_arguments >= 1 )
+    coeff[0] = arguments[0];
+  else
+    coeff[0] = 0.0;
+  /* Rmin  - usually 0 */
+}
+
+static void SetPolarCoefficients(double *coeff,const Image *image,
+  const double *arguments,const size_t number_arguments)
+{
+  SetPolarRadii(coeff,arguments,number_arguments);
+  coeff[1] = number_arguments >= 2 ? arguments[1] : 0.0;
+  SetPolarCenter(coeff,image,arguments,number_arguments);
+  SetPolarAngles(coeff,arguments,number_arguments);
+}
+
+static void SetPolarRatios(double *coeff,const Image *image,
+  const DistortMethod *method)
+{
+  /* conversion ratios */
+  if ( *method == PolarDistortion ) {
+    coeff[6]=(double) image->columns/(coeff[5]-coeff[4]);
+    coeff[7]=(double) image->rows/(coeff[0]-coeff[1]);
+  }
+  else { /* *method == DePolarDistortion */
+    coeff[6]=(coeff[5]-coeff[4])/image->columns;
+    coeff[7]=(coeff[0]-coeff[1])/image->rows;
+  }
 }
 
 static double *PolarCoefficients(double *coeff,const DistortMethod *method,
@@ -1591,16 +1688,27 @@ static double *PolarCoefficients(double *coeff,const DistortMethod *method,
     coeff=(double *) RelinquishMagickMemory(coeff);
     return((double *) NULL);
   }
-  /* conversion ratios */
-  if ( *method == PolarDistortion ) {
-    coeff[6]=(double) image->columns/(coeff[5]-coeff[4]);
-    coeff[7]=(double) image->rows/(coeff[0]-coeff[1]);
-  }
-  else { /* *method == DePolarDistortion */
-    coeff[6]=(coeff[5]-coeff[4])/image->columns;
-    coeff[7]=(coeff[0]-coeff[1])/image->rows;
-  }
+  SetPolarRatios(coeff,image,method);
   return(coeff);
+}
+
+static void SetCylinderCoefficients(double *coeff,const Image *image,
+  const double *arguments,const DistortMethod *method)
+{
+  coeff[0] = DegreesToRadians(arguments[0]);
+  if ( *method == Cylinder2PlaneDistortion )
+    /* image is curved around cylinder, so FOV angle (in radians)
+     * scales directly to image X coordinate, according to its radius.
+     */
+    coeff[1] = (double) image->columns/coeff[0];
+  else
+    /* radius is distance away from an image with this angular FOV */
+    coeff[1] = (double) image->columns / ( 2 * tan(coeff[0]/2) );
+
+  coeff[2] = (double)(image->columns)/2.0+image->page.x;
+  coeff[3] = (double)(image->rows)/2.0+image->page.y;
+  coeff[4] = coeff[2];
+  coeff[5] = coeff[3]; /* assuming image size is the same */
 }
 
 static double *CylinderCoefficients(double *coeff,const DistortMethod *method,
@@ -1654,20 +1762,7 @@ static double *CylinderCoefficients(double *coeff,const DistortMethod *method,
         CommandOptionToMnemonic(MagickDistortOptions,*method));
     return((double *) NULL);
   }
-  coeff[0] = DegreesToRadians(arguments[0]);
-  if ( *method == Cylinder2PlaneDistortion )
-    /* image is curved around cylinder, so FOV angle (in radians)
-     * scales directly to image X coordinate, according to its radius.
-     */
-    coeff[1] = (double) image->columns/coeff[0];
-  else
-    /* radius is distance away from an image with this angular FOV */
-    coeff[1] = (double) image->columns / ( 2 * tan(coeff[0]/2) );
-
-  coeff[2] = (double)(image->columns)/2.0+image->page.x;
-  coeff[3] = (double)(image->rows)/2.0+image->page.y;
-  coeff[4] = coeff[2];
-  coeff[5] = coeff[3]; /* assuming image size is the same */
+  SetCylinderCoefficients(coeff,image,arguments,method);
   return(coeff);
 }
 
@@ -1692,6 +1787,41 @@ static void SetBarrelCenter(double *coeff,const Image *image,
     coeff[8] = (double)image->columns/2.0 + image->page.x;
     coeff[9] = (double)image->rows/2.0    + image->page.y;
   }
+}
+
+static void SetBarrelYCoefficients(double *coeff,const double *arguments,
+  const size_t number_arguments,const double rscale)
+{
+  /* Y coefficients: as given OR same as X coefficients */
+  if ( number_arguments >= 8 ) {
+    coeff[4] = arguments[4] * pow(rscale,3.0);
+    coeff[5] = arguments[5] * rscale*rscale;
+    coeff[6] = arguments[6] * rscale;
+    coeff[7] = arguments[7];
+  }
+  else {
+    coeff[4] = coeff[0];
+    coeff[5] = coeff[1];
+    coeff[6] = coeff[2];
+    coeff[7] = coeff[3];
+  }
+}
+
+static void SetBarrelXCoefficients(double *coeff,const double *arguments,
+  const size_t number_arguments,const double rscale)
+{
+  /* A,B,C,D coefficients */
+  coeff[0] = arguments[0];
+  coeff[1] = arguments[1];
+  coeff[2] = arguments[2];
+  if ((number_arguments == 3) || (number_arguments == 5) )
+    coeff[3] = 1.0 - coeff[0] - coeff[1] - coeff[2];
+  else
+    coeff[3] = arguments[3];
+  /* de-normalize the coefficients */
+  coeff[0] *= pow(rscale,3.0);
+  coeff[1] *= rscale*rscale;
+  coeff[2] *= rscale;
 }
 
 static double *BarrelCoefficients(double *coeff,const DistortMethod *method,
@@ -1739,31 +1869,8 @@ static double *BarrelCoefficients(double *coeff,const DistortMethod *method,
         CommandOptionToMnemonic(MagickDistortOptions, *method) );
       return((double *) NULL);
     }
-  /* A,B,C,D coefficients */
-  coeff[0] = arguments[0];
-  coeff[1] = arguments[1];
-  coeff[2] = arguments[2];
-  if ((number_arguments == 3) || (number_arguments == 5) )
-    coeff[3] = 1.0 - coeff[0] - coeff[1] - coeff[2];
-  else
-    coeff[3] = arguments[3];
-  /* de-normalize the coefficients */
-  coeff[0] *= pow(rscale,3.0);
-  coeff[1] *= rscale*rscale;
-  coeff[2] *= rscale;
-  /* Y coefficients: as given OR same as X coefficients */
-  if ( number_arguments >= 8 ) {
-    coeff[4] = arguments[4] * pow(rscale,3.0);
-    coeff[5] = arguments[5] * rscale*rscale;
-    coeff[6] = arguments[6] * rscale;
-    coeff[7] = arguments[7];
-  }
-  else {
-    coeff[4] = coeff[0];
-    coeff[5] = coeff[1];
-    coeff[6] = coeff[2];
-    coeff[7] = coeff[3];
-  }
+  SetBarrelXCoefficients(coeff,arguments,number_arguments,rscale);
+  SetBarrelYCoefficients(coeff,arguments,number_arguments,rscale);
   SetBarrelCenter(coeff,image,arguments,number_arguments);
   return(coeff);
 }
@@ -2046,6 +2153,17 @@ static double *GenerateAffineFamilyCoefficients(double *coeff,
   return(GenerateMappedCoefficients(coeff,method,context));
 }
 
+static void ZeroCoefficients(double *coeff,
+  const size_t number_coefficients)
+{
+  size_t
+    i;
+
+  /* zero out coefficients array */
+  for (i=0; i < number_coefficients; i++)
+    coeff[i] = 0.0;
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -2060,9 +2178,6 @@ static double *GenerateCoefficients(const Image *image,
 
   double
     *coeff;
-
-  size_t
-    i;
 
   size_t
     number_coefficients, /* number of coefficients to return (array size) */
@@ -2125,9 +2240,7 @@ static double *GenerateCoefficients(const Image *image,
       return((double *) NULL);
     }
 
-  /* zero out coefficients array */
-  for (i=0; i < number_coefficients; i++)
-    coeff[i] = 0.0;
+  ZeroCoefficients(coeff,number_coefficients);
 
   return(GenerateAffineFamilyCoefficients(coeff,method,&context));
 }
@@ -2292,6 +2405,16 @@ static void PrintCylinder2PlaneFX(const double *coeff,const char *image_gen,
   (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
 }
 
+static void PrintBarrelCenter(const double *coeff,const double xc,
+  const double yc)
+{
+  if ( fabs(coeff[8]-xc-0.5) < 0.1 && fabs(coeff[9]-yc-0.5) < 0.1 )
+    (void) FormatLocaleFile(stderr,"  -fx 'xc=(w-1)/2;  yc=(h-1)/2;\n");
+  else
+    (void) FormatLocaleFile(stderr,"  -fx 'xc=%lf;  yc=%lf;\n",coeff[8]-
+      0.5,coeff[9]-0.5);
+}
+
 static void PrintBarrelFX(const Image *image,const double *coeff,
   const DistortMethod method,const char *image_gen)
 {
@@ -2309,11 +2432,7 @@ static void PrintBarrelFX(const Image *image,const double *coeff,
   (void) FormatLocaleFile(stderr, "Barrel%s Distort, FX Equivalent:\n",
     method == BarrelDistortion ? "" : "Inv");
   (void) FormatLocaleFile(stderr, "%s", image_gen);
-  if ( fabs(coeff[8]-xc-0.5) < 0.1 && fabs(coeff[9]-yc-0.5) < 0.1 )
-    (void) FormatLocaleFile(stderr,"  -fx 'xc=(w-1)/2;  yc=(h-1)/2;\n");
-  else
-    (void) FormatLocaleFile(stderr,"  -fx 'xc=%lf;  yc=%lf;\n",coeff[8]-
-      0.5,coeff[9]-0.5);
+  PrintBarrelCenter(coeff,xc,yc);
   (void) FormatLocaleFile(stderr,
     "       ii=i-xc;  jj=j-yc;  rr=hypot(ii,jj);\n");
   (void) FormatLocaleFile(stderr,
@@ -2369,20 +2488,27 @@ static void PrintPolynomialFX(const double *coeff,const char *image_gen,
   (void) FormatLocaleFile(stderr,";\n       %s' \\\n", lookup);
 }
 
+static void ParseDistortViewport(const char *artifact,
+  RectangleInfo *geometry,MagickBooleanType *viewport_given,
+  ExceptionInfo *exception)
+{
+  if ( artifact != (const char *) NULL ) {
+    MagickStatusType flags=ParseAbsoluteGeometry(artifact,geometry);
+    if (flags==NoValue)
+      (void) ThrowMagickException(exception,GetMagickModule(),
+           OptionWarning,"InvalidSetting","'%s' '%s'",
+           "distort:viewport",artifact);
+    else
+      *viewport_given = MagickTrue;
+  }
+}
+
 static void GetDistortViewport(const Image *image,RectangleInfo *geometry,
   MagickBooleanType *viewport_given,ExceptionInfo *exception)
 {
   { const char *artifact=GetImageArtifact(image,"distort:viewport");
     *viewport_given = MagickFalse;
-    if ( artifact != (const char *) NULL ) {
-      MagickStatusType flags=ParseAbsoluteGeometry(artifact,geometry);
-      if (flags==NoValue)
-        (void) ThrowMagickException(exception,GetMagickModule(),
-             OptionWarning,"InvalidSetting","'%s' '%s'",
-             "distort:viewport",artifact);
-      else
-        *viewport_given = MagickTrue;
-    }
+    ParseDistortViewport(artifact,geometry,viewport_given,exception);
   }
 }
 
@@ -2931,25 +3057,11 @@ static void MapBarrelDistortion(const DistortMapping *mapping,PointInfo *d,
   }
 }
 
-static MagickBooleanType PrintAffineFX(double *coeff,const char *image_gen,
-  const char *lookup,ExceptionInfo *exception)
+static void PrintAffineProjection(const double *inverse)
 {
-  double
-    *inverse;
-
   ssize_t
     i;
 
-  inverse=(double *) AcquireQuantumMemory(6,sizeof(*inverse));
-  if (inverse == (double *) NULL)
-    {
-      coeff=(double *) RelinquishMagickMemory(coeff);
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","%s","DistortImages");
-      return(MagickFalse);
-    }
-  InvertAffineCoefficients(coeff, inverse);
-  CoefficientsToAffineArgs(inverse);
   (void) FormatLocaleFile(stderr, "Affine projection:\n");
   (void) FormatLocaleFile(stderr,
     "  -distort AffineProjection \\\n    '");
@@ -2965,6 +3077,25 @@ static MagickBooleanType PrintAffineFX(double *coeff,const char *image_gen,
     inverse[1]*inverse[1]),GetMagickPrecision(),
     RadiansToDegrees(atan2(inverse[1],inverse[0])),
     GetMagickPrecision(),inverse[4],GetMagickPrecision(),inverse[5]);
+}
+
+static MagickBooleanType PrintAffineFX(double *coeff,const char *image_gen,
+  const char *lookup,ExceptionInfo *exception)
+{
+  double
+    *inverse;
+
+  inverse=(double *) AcquireQuantumMemory(6,sizeof(*inverse));
+  if (inverse == (double *) NULL)
+    {
+      coeff=(double *) RelinquishMagickMemory(coeff);
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","%s","DistortImages");
+      return(MagickFalse);
+    }
+  InvertAffineCoefficients(coeff, inverse);
+  CoefficientsToAffineArgs(inverse);
+  PrintAffineProjection(inverse);
   inverse=(double *) RelinquishMagickMemory(inverse);
   (void) FormatLocaleFile(stderr,"Affine distort, FX equivalent:\n");
   (void) FormatLocaleFile(stderr, "%s", image_gen);
@@ -3031,6 +3162,32 @@ static MagickBooleanType PrintPerspectiveFX(double *coeff,
   return(MagickTrue);
 }
 
+static void PrintBilinearForwardYTerm(const double *coeff)
+{
+  /* Handle Special degenerate (non-quadratic) or trapezoidal case */
+  if (coeff[9] != 0)
+    {
+      (void) FormatLocaleFile(stderr,
+        "       rt=bb*bb %+lf*(%lf*ii%+lf*jj);\n",-2*coeff[9],coeff[4],
+        -coeff[0]);
+    (void) FormatLocaleFile(stderr,
+      "       yy=( -bb + sqrt(rt) ) / %lf;\n",coeff[9]);
+    }
+  else
+    (void) FormatLocaleFile(stderr,"       yy=(%lf*ii%+lf*jj)/bb;\n",
+      -coeff[4],coeff[0]);
+}
+
+static void PrintBilinearForwardLookup(const double *coeff,
+  const char *lookup)
+{
+  if ( coeff[9] != 0 )
+    (void) FormatLocaleFile(stderr,"       (rt < 0 ) ? red : %s'\n",
+      lookup);
+  else
+    (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
+}
+
 static void PrintBilinearForwardFX(const double *coeff,const char *image_gen,
   const char *lookup)
 {
@@ -3053,26 +3210,11 @@ static void PrintBilinearForwardFX(const double *coeff,const char *image_gen,
     coeff[7]);
   (void) FormatLocaleFile(stderr,"       bb=%lf*ii %+lf*jj %+lf;\n",
     coeff[6], -coeff[2], coeff[8]);
-  /* Handle Special degenerate (non-quadratic) or trapezoidal case */
-  if (coeff[9] != 0)
-    {
-      (void) FormatLocaleFile(stderr,
-        "       rt=bb*bb %+lf*(%lf*ii%+lf*jj);\n",-2*coeff[9],coeff[4],
-        -coeff[0]);
-    (void) FormatLocaleFile(stderr,
-      "       yy=( -bb + sqrt(rt) ) / %lf;\n",coeff[9]);
-    }
-  else
-    (void) FormatLocaleFile(stderr,"       yy=(%lf*ii%+lf*jj)/bb;\n",
-      -coeff[4],coeff[0]);
+  PrintBilinearForwardYTerm(coeff);
   (void) FormatLocaleFile(stderr,
     "       xx=(ii %+lf*yy)/(%lf %+lf*yy);\n",-coeff[1],coeff[0],
     coeff[2]);
-  if ( coeff[9] != 0 )
-    (void) FormatLocaleFile(stderr,"       (rt < 0 ) ? red : %s'\n",
-      lookup);
-  else
-    (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
+  PrintBilinearForwardLookup(coeff,lookup);
 }
 
 static void PrintBilinearReverseFX(const double *coeff,const char *image_gen,
@@ -3483,6 +3625,17 @@ static void PerspectiveBestFitBounds(const double *coeff,const Image *image,
   (*caller_max)=max;
 }
 
+static void ScaleArcCoefficients(double *coeff,const Image *image)
+{
+  /*
+    Convert the angle_to_width and radius_to_height
+    to appropriate scaling factors, to allow faster processing
+    in the mapping function.
+  */
+  coeff[1] = (double) (Magick2PI*image->columns/coeff[1]);
+  coeff[3] = (double)image->rows/coeff[3];
+}
+
 static void ArcBestFitBounds(double *coeff,const Image *image,
   PointInfo *caller_min,PointInfo *caller_max)
 {
@@ -3519,13 +3672,7 @@ static void ArcBestFitBounds(double *coeff,const Image *image,
     d.y = coeff[2]*sa;
     ExpandBounds(d);
   }
-  /*
-    Convert the angle_to_width and radius_to_height
-    to appropriate scaling factors, to allow faster processing
-    in the mapping function.
-  */
-  coeff[1] = (double) (Magick2PI*image->columns/coeff[1]);
-  coeff[3] = (double)image->rows/coeff[3];
+  ScaleArcCoefficients(coeff,image);
   (*caller_min)=min;
   (*caller_max)=max;
 }
@@ -3558,6 +3705,15 @@ typedef struct _DistortScaleTargets
     *geometry;
 } DistortScaleTargets;
 
+static void ScaleDistortRectangle(RectangleInfo *geometry,
+  const double *output_scaling)
+{
+  (*geometry).width=CastDoubleToSizeT((*output_scaling)*(*geometry).width+0.5);
+  (*geometry).height=CastDoubleToSizeT((*output_scaling)*(*geometry).height+0.5);
+  (*geometry).x=(ssize_t) ((*output_scaling)*(*geometry).x+0.5);
+  (*geometry).y=(ssize_t) ((*output_scaling)*(*geometry).y+0.5);
+}
+
 static MagickBooleanType ScaleDistortGeometry(const Image *image,
   const DistortScaleTargets *targets)
 {
@@ -3572,10 +3728,7 @@ static MagickBooleanType ScaleDistortGeometry(const Image *image,
     (*output_scaling) = 1.0;
     if (artifact != (const char *) NULL) {
       (*output_scaling) = fabs(StringToDouble(artifact,(char **) NULL));
-      (*geometry).width=CastDoubleToSizeT((*output_scaling)*(*geometry).width+0.5);
-      (*geometry).height=CastDoubleToSizeT((*output_scaling)*(*geometry).height+0.5);
-      (*geometry).x=(ssize_t) ((*output_scaling)*(*geometry).x+0.5);
-      (*geometry).y=(ssize_t) ((*output_scaling)*(*geometry).y+0.5);
+      ScaleDistortRectangle(geometry,output_scaling);
       if ( (*output_scaling) < 0.1 ) {
         return(MagickFalse);
       }
@@ -3847,6 +4000,21 @@ typedef struct _DistortBestFitTile
     *coeff;
 } DistortBestFitTile;
 
+static void SetCylinder2PlaneBestFit(double *coeff,RectangleInfo *geometry,
+  MagickBooleanType *fix_bounds)
+{
+  /* direct calculation so center of distortion is either a pixel
+   * center, or pixel edge. This allows for reversibility of the
+   * distortion */
+  (*geometry).x = (*geometry).y = 0;
+  (*geometry).width = CastDoubleToSizeT(ceil( 2.0*coeff[1]*tan(coeff[0]/2.0) ));
+  (*geometry).height = CastDoubleToSizeT(ceil( 2.0*coeff[3]/cos(coeff[0]/2.0) ));
+  /* correct center of distortion relative to new size */
+  coeff[4] = (double) (*geometry).width/2.0;
+  coeff[5] = (double) (*geometry).height/2.0;
+  (*fix_bounds) = MagickFalse;
+}
+
 static void SetDistortCylinderBestFit(const DistortBestFitTile *tile,
   RectangleInfo *geometry,MagickBooleanType *fix_bounds,
   MagickBooleanType *bestfit)
@@ -3861,16 +4029,7 @@ static void SetDistortCylinderBestFit(const DistortBestFitTile *tile,
     {
       case Cylinder2PlaneDistortion:
       {
-        /* direct calculation so center of distortion is either a pixel
-         * center, or pixel edge. This allows for reversibility of the
-         * distortion */
-        (*geometry).x = (*geometry).y = 0;
-        (*geometry).width = CastDoubleToSizeT(ceil( 2.0*coeff[1]*tan(coeff[0]/2.0) ));
-        (*geometry).height = CastDoubleToSizeT(ceil( 2.0*coeff[3]/cos(coeff[0]/2.0) ));
-        /* correct center of distortion relative to new size */
-        coeff[4] = (double) (*geometry).width/2.0;
-        coeff[5] = (double) (*geometry).height/2.0;
-        (*fix_bounds) = MagickFalse;
+        SetCylinder2PlaneBestFit(coeff,geometry,fix_bounds);
         break;
       }
       case Plane2CylinderDistortion:
@@ -3909,6 +4068,23 @@ typedef struct _DistortBestFitTargets
   MagickBooleanType
     *bestfit;
 } DistortBestFitTargets;
+
+static void SetDePolarBestFit(double *coeff,RectangleInfo *geometry,
+  MagickBooleanType *fix_bounds)
+{
+  /* direct calculation as it needs to tile correctly
+   * for reversibility in a DePolar-Polar cycle */
+  (*fix_bounds) = MagickFalse;
+  (*geometry).x = (*geometry).y = 0;
+  (*geometry).height = CastDoubleToSizeT(ceil(coeff[0]-coeff[1]));
+  (*geometry).width = CastDoubleToSizeT(ceil((coeff[0]-coeff[1])*
+    (coeff[5]-coeff[4])*0.5));
+  /* correct scaling factors relative to new size */
+  coeff[6]=(coeff[5]-coeff[4]) * MagickSafeReciprocal(
+    (double) (*geometry).width); /* changed width */
+  coeff[7]=(coeff[0]-coeff[1]) * MagickSafeReciprocal(
+    (double) (*geometry).height); /* should be about 1.0 */
+}
 
 static void SetDistortPolarBestFit(const DistortBestFitTile *tile,
   const DistortBestFitTargets *targets)
@@ -3951,18 +4127,7 @@ static void SetDistortPolarBestFit(const DistortBestFitTile *tile,
       }
       case DePolarDistortion:
       {
-        /* direct calculation as it needs to tile correctly
-         * for reversibility in a DePolar-Polar cycle */
-        (*fix_bounds) = MagickFalse;
-        (*geometry).x = (*geometry).y = 0;
-        (*geometry).height = CastDoubleToSizeT(ceil(coeff[0]-coeff[1]));
-        (*geometry).width = CastDoubleToSizeT(ceil((coeff[0]-coeff[1])*
-          (coeff[5]-coeff[4])*0.5));
-        /* correct scaling factors relative to new size */
-        coeff[6]=(coeff[5]-coeff[4]) * MagickSafeReciprocal(
-          (double) (*geometry).width); /* changed width */
-        coeff[7]=(coeff[0]-coeff[1]) * MagickSafeReciprocal(
-          (double) (*geometry).height); /* should be about 1.0 */
+        SetDePolarBestFit(coeff,geometry,fix_bounds);
         break;
       }
       default:
@@ -3987,6 +4152,21 @@ typedef struct _DistortBestFitInput
   double
     *coeff;
 } DistortBestFitInput;
+
+static void SetBestFitGeometry(RectangleInfo *geometry,
+  const MagickBooleanType fix_bounds,const PointInfo min,const PointInfo max)
+{
+  /* Set the output image geometry to calculated 'bestfit'.
+     Yes this tends to 'over do' the file image size, ON PURPOSE!
+     Do not do this for DePolar which needs to be exact for virtual tiling.
+  */
+  if ( fix_bounds ) {
+    (*geometry).x = CastDoubleToSsizeT(floor(min.x-0.5));
+    (*geometry).y = CastDoubleToSsizeT(floor(min.y-0.5));
+    (*geometry).width=CastDoubleToSizeT(ceil(max.x-(*geometry).x+0.5));
+    (*geometry).height=CastDoubleToSizeT(ceil(max.y-(*geometry).y+0.5));
+  }
+}
 
 static void SetDistortBestFit(const DistortBestFitInput *fit,
   RectangleInfo *geometry,MagickBooleanType *bestfit)
@@ -4047,16 +4227,7 @@ static void SetDistortBestFit(const DistortBestFitInput *fit,
       }
     }
 
-    /* Set the output image geometry to calculated 'bestfit'.
-       Yes this tends to 'over do' the file image size, ON PURPOSE!
-       Do not do this for DePolar which needs to be exact for virtual tiling.
-    */
-    if ( fix_bounds ) {
-      (*geometry).x = CastDoubleToSsizeT(floor(min.x-0.5));
-      (*geometry).y = CastDoubleToSsizeT(floor(min.y-0.5));
-      (*geometry).width=CastDoubleToSizeT(ceil(max.x-(*geometry).x+0.5));
-      (*geometry).height=CastDoubleToSizeT(ceil(max.y-(*geometry).y+0.5));
-    }
+    SetBestFitGeometry(geometry,fix_bounds,min,max);
 
   }  /* end bestfit destination image calculations */
 }
@@ -4432,6 +4603,16 @@ typedef struct _DistortLayoutTargets
     *output_scaling;
 } DistortLayoutTargets;
 
+static void SetDefaultDistortGeometry(RectangleInfo *geometry,
+  const Image *image)
+{
+  /* default output image bounds, when no 'bestfit' is requested */
+  (*geometry).width=image->columns;
+  (*geometry).height=image->rows;
+  (*geometry).x=0;
+  (*geometry).y=0;
+}
+
 static MagickBooleanType LayoutDistortImage(const DistortLayoutInput *layout,
   double *coeff,const DistortLayoutTargets *targets)
 {
@@ -4471,11 +4652,7 @@ static MagickBooleanType LayoutDistortImage(const DistortLayoutInput *layout,
     Usually the four corners of the source image is enough.
   */
 
-  /* default output image bounds, when no 'bestfit' is requested */
-  (*geometry).width=image->columns;
-  (*geometry).height=image->rows;
-  (*geometry).x=0;
-  (*geometry).y=0;
+  SetDefaultDistortGeometry(geometry,image);
 
   if ( method == ArcDistortion ) {
     (*bestfit) = MagickTrue;  /* always calculate a 'best fit' viewport */
@@ -4546,6 +4723,18 @@ typedef struct _DistortCreateInput
     *exception;
 } DistortCreateInput;
 
+static void SetDistortImageAttributes(Image **distort_image,
+  const RectangleInfo geometry,ExceptionInfo *exception)
+{
+  if ((IsPixelInfoGray(&(*distort_image)->background_color) == MagickFalse) &&
+      (IsGrayColorspace((*distort_image)->colorspace) != MagickFalse))
+    (void) SetImageColorspace((*distort_image),sRGBColorspace,exception);
+  if ((*distort_image)->background_color.alpha_trait != UndefinedPixelTrait)
+    (*distort_image)->alpha_trait=BlendPixelTrait;
+  (*distort_image)->page.x=geometry.x;
+  (*distort_image)->page.y=geometry.y;
+}
+
 static MagickBooleanType CreateDistortImage(const DistortCreateInput *create,
   double *coeff,Image **distort_image)
 {
@@ -4594,13 +4783,7 @@ static MagickBooleanType CreateDistortImage(const DistortCreateInput *create,
       (*distort_image)=DestroyImage((*distort_image));
       return(MagickFalse);
     }
-  if ((IsPixelInfoGray(&(*distort_image)->background_color) == MagickFalse) &&
-      (IsGrayColorspace((*distort_image)->colorspace) != MagickFalse))
-    (void) SetImageColorspace((*distort_image),sRGBColorspace,exception);
-  if ((*distort_image)->background_color.alpha_trait != UndefinedPixelTrait)
-    (*distort_image)->alpha_trait=BlendPixelTrait;
-  (*distort_image)->page.x=geometry.x;
-  (*distort_image)->page.y=geometry.y;
+  SetDistortImageAttributes(distort_image,geometry,exception);
   ConformPixelInfo((*distort_image),&(*distort_image)->matte_color,&invalid,
     exception);
 
@@ -4630,6 +4813,18 @@ static MagickBooleanType CreateDistortImage(const DistortCreateInput *create,
       (*distort_image)=DestroyImage((*distort_image));
   }
   return(MagickTrue);
+}
+
+static void ResetArcPage(Image *distort_image,const DistortMethod method,
+  const MagickBooleanType bestfit,const MagickBooleanType viewport_given)
+{
+  /* Arc does not return an offset unless 'bestfit' is in effect
+     And the user has not provided an overriding 'viewport'.
+   */
+  if (IsArcPageReset(method,bestfit,viewport_given) != MagickFalse) {
+    distort_image->page.x = 0;
+    distort_image->page.y = 0;
+  }
 }
 
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
@@ -4706,13 +4901,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   if (CreateDistortImage(&create,coeff,&distort_image) == MagickFalse)
     return((Image *) NULL);
 
-  /* Arc does not return an offset unless 'bestfit' is in effect
-     And the user has not provided an overriding 'viewport'.
-   */
-  if (IsArcPageReset(method,bestfit,viewport_given) != MagickFalse) {
-    distort_image->page.x = 0;
-    distort_image->page.y = 0;
-  }
+  ResetArcPage(distort_image,method,bestfit,viewport_given);
   coeff=(double *) RelinquishMagickMemory(coeff);
   return(distort_image);
 }

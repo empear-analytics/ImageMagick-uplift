@@ -169,11 +169,14 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/draw-private.h \
   MagickCore/effect.c \
   MagickCore/effect-filter.c \
+  MagickCore/effect-despeckle.c \
+  MagickCore/effect-sharpen.c \
   MagickCore/effect-preview.c \
   MagickCore/effect-blur.c \
   MagickCore/effect-blur-adaptive.c \
   MagickCore/effect-blur-adaptive-filters.c \
   MagickCore/effect.h \
+  MagickCore/effect-private.h \
   MagickCore/enhance.c \
   MagickCore/enhance-color.c \
   MagickCore/enhance-clahe.c \
@@ -552,6 +555,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/display-private.h \
   MagickCore/distribute-cache-private.h \
   MagickCore/draw-private.h \
+  MagickCore/effect-private.h \
   MagickCore/exception-private.h \
   MagickCore/fx-private.h \
   MagickCore/gem-private.h \

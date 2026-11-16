@@ -78,6 +78,8 @@ $call Make distribute-cache.c
 $call Make draw.c
 $call Make effect.c
 $call Make effect-filter.c
+$call Make effect-despeckle.c
+$call Make effect-sharpen.c
 $call Make effect-preview.c
 $call Make effect-blur.c
 $call Make effect-blur-adaptive.c
