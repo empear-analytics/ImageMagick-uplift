@@ -1449,6 +1449,11 @@ typedef struct _MontagePages
   ExceptionInfo
     *exception;
 
+  Image
+    **primary_list,
+    *texture,
+    *tile_image;
+
   size_t
     tiles_per_row,
     tiles_per_column,
@@ -1464,6 +1469,15 @@ typedef struct _MontagePages
 
   TypeMetric
     metrics;
+
+  ImageInfo
+    *clone_info;
+
+  DrawInfo
+    *draw_info;
+
+  char
+    *title;
 } MontagePages;
 
 static size_t LayoutMontagePage(const MontagePages *pages,Image *montage,
@@ -1518,6 +1532,31 @@ static size_t LayoutMontagePage(const MontagePages *pages,Image *montage,
   }
   InitializeMontageCanvas(montage_info,&bounds,montage,exception);
   return(tiles_per_page);
+}
+
+static Image *FinishMontagePages(const MontagePages *pages,Image *montage)
+{
+  Image
+    **primary_list = pages->primary_list,
+    *texture = pages->texture,
+    *tile_image = pages->tile_image;
+
+  ImageInfo
+    *clone_info = pages->clone_info;
+
+  DrawInfo
+    *draw_info = pages->draw_info;
+
+  char
+    *title = pages->title;
+
+  tile_image=DestroyImage(tile_image);
+  texture=DestroyMontageTexture(texture);
+  title=DestroyString(title);
+  primary_list=(Image **) RelinquishMagickMemory(primary_list);
+  draw_info=DestroyDrawInfo(draw_info);
+  clone_info=DestroyImageInfo(clone_info);
+  return(GetFirstImageInList(montage));
 }
 
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
@@ -1673,6 +1712,9 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   total_tiles=(size_t) number_images;
   pages.montage_info=montage_info;
   pages.exception=exception;
+  pages.primary_list=primary_list;
+  pages.texture=texture;
+  pages.tile_image=tile_image;
   pages.tiles_per_row=tiles_per_row;
   pages.tiles_per_column=tiles_per_column;
   pages.title_offset=title_offset;
@@ -1681,6 +1723,9 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   pages.concatenate=concatenate;
   pages.extract_info=extract_info;
   pages.metrics=metrics;
+  pages.clone_info=clone_info;
+  pages.draw_info=draw_info;
+  pages.title=title;
   for (i=0; i < (ssize_t) images_per_page; i++)
   {
     tiles_per_page=LayoutMontagePage(&pages,montage,image_list,number_images);
@@ -1721,11 +1766,5 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
         return((Image *) NULL);
     }
   }
-  tile_image=DestroyImage(tile_image);
-  texture=DestroyMontageTexture(texture);
-  title=DestroyString(title);
-  primary_list=(Image **) RelinquishMagickMemory(primary_list);
-  draw_info=DestroyDrawInfo(draw_info);
-  clone_info=DestroyImageInfo(clone_info);
-  return(GetFirstImageInList(montage));
+  return(FinishMontagePages(&pages,montage));
 }
