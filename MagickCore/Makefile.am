@@ -228,9 +228,11 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/image-view.h \
   MagickCore/layer.c \
   MagickCore/layer-frames.c \
+  MagickCore/layer-dispose.c \
   MagickCore/layer-composite.c \
   MagickCore/layer-merge.c \
   MagickCore/layer.h \
+  MagickCore/layer-frames-private.h \
   MagickCore/linked-list.c \
   MagickCore/linked-list.h \
   MagickCore/list.c \
@@ -576,6 +578,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/gem-private.h \
   MagickCore/geometry-private.h \
   MagickCore/image-private.h \
+  MagickCore/layer-frames-private.h \
   MagickCore/linked-list-private.h \
   MagickCore/locale-private.h \
   MagickCore/log-private.h \
