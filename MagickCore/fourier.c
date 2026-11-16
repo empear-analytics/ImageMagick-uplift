@@ -279,6 +279,16 @@ static void SwapForwardQuadrantRows(const ForwardQuadrant *quadrant,
         source_pixels[y*(ssize_t) center+x+1L];
 }
 
+static void SwapForwardQuadrantFirstRow(const size_t width,
+  double *source_pixels,double *forward_pixels)
+{
+  ssize_t
+    x;
+
+  for (x=0L; x < (ssize_t) (width/2L); x++)
+    forward_pixels[(ssize_t) width/2L-x-1L]=source_pixels[x+1L];
+}
+
 static MagickBooleanType ForwardQuadrantSwap(const size_t width,
   const size_t height,double *source_pixels,double *forward_pixels)
 {
@@ -316,8 +326,7 @@ static MagickBooleanType ForwardQuadrantSwap(const size_t width,
   quadrant.center=center;
   quadrant.source_pixels=source_pixels;
   SwapForwardQuadrantRows(&quadrant,forward_pixels);
-  for (x=0L; x < (ssize_t) (width/2L); x++)
-    forward_pixels[(ssize_t) width/2L-x-1L]=source_pixels[x+1L];
+  SwapForwardQuadrantFirstRow(width,source_pixels,forward_pixels);
   return(MagickTrue);
 }
 
