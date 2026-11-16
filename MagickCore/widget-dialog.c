@@ -939,6 +939,15 @@ typedef struct _DialogLayout
     *reply;
 } DialogLayout;
 
+static void SetDialogWidgetHeight(XWindows *windows,
+  XFontStruct *font_info,const unsigned int height)
+{
+  windows->widget.height=(unsigned int) (7*(int) height+(QuantumMargin << 1));
+  windows->widget.min_height=windows->widget.height;
+  if (windows->widget.height < windows->widget.min_height)
+    windows->widget.height=windows->widget.min_height;
+}
+
 static void PositionDialogWidget(XWindows *windows,
   const DialogLayout *layout)
 {
@@ -970,10 +979,7 @@ static void PositionDialogWidget(XWindows *windows,
     ((int) width+28*XTextWidth(font_info,"#",1)+4*QuantumMargin);
   if (windows->widget.width < windows->widget.min_width)
     windows->widget.width=windows->widget.min_width;
-  windows->widget.height=(unsigned int) (7*(int) height+(QuantumMargin << 1));
-  windows->widget.min_height=windows->widget.height;
-  if (windows->widget.height < windows->widget.min_height)
-    windows->widget.height=windows->widget.min_height;
+  SetDialogWidgetHeight(windows,font_info,height);
   XConstrainWindowPosition(display,&windows->widget);
 }
 
