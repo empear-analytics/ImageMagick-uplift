@@ -1394,8 +1394,7 @@ static KernelInfo *AcquireCometKernel(KernelInfo *kernel,
   return(kernel);
 }
 
-static KernelInfo *AcquireBinomialKernel(KernelInfo *kernel,
-  const GeometryInfo *args)
+static void SetBinomialKernelValues(KernelInfo *kernel,const size_t order_f)
 {
   ssize_t
     i;
@@ -1404,6 +1403,20 @@ static KernelInfo *AcquireBinomialKernel(KernelInfo *kernel,
     u,
     v;
 
+  for ( i=0, v=0; v < (ssize_t)kernel->height; v++)
+    {
+      size_t
+        alpha = order_f / ( fact((size_t) v) * fact(kernel->height-(size_t) v-1) );
+
+      for ( u=0; u < (ssize_t)kernel->width; u++, i++)
+        kernel->positive_range += kernel->values[i] = (double)
+          (alpha * order_f / ( fact((size_t) u) * fact(kernel->height-(size_t) u-1) ));
+    }
+}
+
+static KernelInfo *AcquireBinomialKernel(KernelInfo *kernel,
+  const GeometryInfo *args)
+{
   const size_t
     max_order = (sizeof(size_t) > 4) ? 20 : 12;
 
@@ -1426,15 +1439,7 @@ static KernelInfo *AcquireBinomialKernel(KernelInfo *kernel,
     return(DestroyKernelInfo(kernel));
 
   /* set all kernel values within diamond area to scale given */
-  for ( i=0, v=0; v < (ssize_t)kernel->height; v++)
-    {
-      size_t
-        alpha = order_f / ( fact((size_t) v) * fact(kernel->height-(size_t) v-1) );
-
-      for ( u=0; u < (ssize_t)kernel->width; u++, i++)
-        kernel->positive_range += kernel->values[i] = (double)
-          (alpha * order_f / ( fact((size_t) u) * fact(kernel->height-(size_t) u-1) ));
-    }
+  SetBinomialKernelValues(kernel,order_f);
   kernel->minimum = 1.0;
   kernel->maximum = kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width];
   kernel->negative_range = 0.0;
