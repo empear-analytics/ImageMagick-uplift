@@ -86,6 +86,7 @@ $call Make effect-blur-adaptive.c
 $call Make effect-blur-adaptive-filters.c
 $call Make enhance.c
 $call Make enhance-color.c
+$call Make enhance-balance.c
 $call Make enhance-clahe.c
 $call Make enhance-tone.c
 $call Make enhance-equalize.c
