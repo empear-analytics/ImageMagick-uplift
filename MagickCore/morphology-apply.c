@@ -6130,6 +6130,14 @@ typedef struct _MorphologyKernelResult
     *exception;
 } MorphologyKernelResult;
 
+static void SaveResultForCompose(const MagickBooleanType verbose,
+  const Image *image,Image **rslt_image,Image **curr_image)
+{
+  ReportSaveForCompose(verbose);
+  (*rslt_image) = (*curr_image);
+  (*curr_image) = (Image *) image;  /* continue with original image */
+}
+
 static void CollectKernelResult(const MorphologyKernelResult *result,
   Image **rslt_image,Image **curr_image)
 {
@@ -6161,10 +6169,7 @@ static void CollectKernelResult(const MorphologyKernelResult *result,
       (*rslt_image) = (*curr_image); /* return result, and re-iterate */
     }
   else if ( (*rslt_image) == (Image *) NULL)
-    { ReportSaveForCompose(verbose);
-      (*rslt_image) = (*curr_image);
-      (*curr_image) = (Image *) image;  /* continue with original image */
-    }
+    SaveResultForCompose(verbose,image,rslt_image,curr_image);
   else
     { /* Add the new 'current' result to the composition
       **
