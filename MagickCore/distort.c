@@ -1608,6 +1608,25 @@ static double *PolarCoefficients(double *coeff,const DistortMethod *method,
   return(coeff);
 }
 
+static void SetCylinderCoefficients(double *coeff,const Image *image,
+  const double *arguments,const DistortMethod *method)
+{
+  coeff[0] = DegreesToRadians(arguments[0]);
+  if ( *method == Cylinder2PlaneDistortion )
+    /* image is curved around cylinder, so FOV angle (in radians)
+     * scales directly to image X coordinate, according to its radius.
+     */
+    coeff[1] = (double) image->columns/coeff[0];
+  else
+    /* radius is distance away from an image with this angular FOV */
+    coeff[1] = (double) image->columns / ( 2 * tan(coeff[0]/2) );
+
+  coeff[2] = (double)(image->columns)/2.0+image->page.x;
+  coeff[3] = (double)(image->rows)/2.0+image->page.y;
+  coeff[4] = coeff[2];
+  coeff[5] = coeff[3]; /* assuming image size is the same */
+}
+
 static double *CylinderCoefficients(double *coeff,const DistortMethod *method,
   const CoefficientContext *context)
 {
@@ -1659,20 +1678,7 @@ static double *CylinderCoefficients(double *coeff,const DistortMethod *method,
         CommandOptionToMnemonic(MagickDistortOptions,*method));
     return((double *) NULL);
   }
-  coeff[0] = DegreesToRadians(arguments[0]);
-  if ( *method == Cylinder2PlaneDistortion )
-    /* image is curved around cylinder, so FOV angle (in radians)
-     * scales directly to image X coordinate, according to its radius.
-     */
-    coeff[1] = (double) image->columns/coeff[0];
-  else
-    /* radius is distance away from an image with this angular FOV */
-    coeff[1] = (double) image->columns / ( 2 * tan(coeff[0]/2) );
-
-  coeff[2] = (double)(image->columns)/2.0+image->page.x;
-  coeff[3] = (double)(image->rows)/2.0+image->page.y;
-  coeff[4] = coeff[2];
-  coeff[5] = coeff[3]; /* assuming image size is the same */
+  SetCylinderCoefficients(coeff,image,arguments,method);
   return(coeff);
 }
 
