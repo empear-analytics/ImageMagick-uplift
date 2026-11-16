@@ -401,6 +401,15 @@ static MagickBooleanType SetPlasmaRowPixels(const PlasmaMidpoint *midpoint,
   return(MagickTrue);
 }
 
+static MagickBooleanType FinishSmallPlasmaSegment(
+  const SegmentInfo *segment,MagickStatusType status)
+{
+  if ((fabs(segment->x2-segment->x1) < 3.0) &&
+      (fabs(segment->y2-segment->y1) < 3.0))
+    return(status == 0 ? MagickFalse : MagickTrue);
+  return(MagickFalse);
+}
+
 static MagickBooleanType FinishPlasmaSegment(const PlasmaMidpoint *midpoint,
   MagickStatusType status)
 {
@@ -409,10 +418,7 @@ static MagickBooleanType FinishPlasmaSegment(const PlasmaMidpoint *midpoint,
 
   if (SetPlasmaMiddlePixel(midpoint,&status) == MagickFalse)
     return(MagickTrue);
-  if ((fabs(segment->x2-segment->x1) < 3.0) &&
-      (fabs(segment->y2-segment->y1) < 3.0))
-    return(status == 0 ? MagickFalse : MagickTrue);
-  return(MagickFalse);
+  return(FinishSmallPlasmaSegment(segment,status));
 }
 
 static MagickBooleanType FinishPlasmaColumnPixels(
