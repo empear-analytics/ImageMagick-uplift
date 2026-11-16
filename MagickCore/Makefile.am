@@ -423,6 +423,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/xml-tree-private.h \
   MagickCore/xwindow.c \
   MagickCore/xwindow-image.c \
+  MagickCore/xwindow-text.c \
   MagickCore/xwindow-visual.c \
   MagickCore/xwindow-import.c \
   MagickCore/xwindow.h
