@@ -155,7 +155,7 @@ typedef struct _UnsharpPixels
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static inline double GetSurfaceShade(const PrimaryInfo *normal,
+static inline double GetSlopedSurfaceShade(const PrimaryInfo *normal,
   const PrimaryInfo *light)
 {
   double
@@ -163,21 +163,29 @@ static inline double GetSurfaceShade(const PrimaryInfo *normal,
     normal_distance,
     shade;
 
+  shade=0.0;
+  distance=normal->x*light->x+normal->y*light->y+normal->z*light->z;
+  if (distance > MagickEpsilon)
+    {
+      normal_distance=normal->x*normal->x+normal->y*normal->y+
+        normal->z*normal->z;
+      if (normal_distance > (MagickEpsilon*MagickEpsilon))
+        shade=distance/sqrt((double) normal_distance);
+    }
+  return(shade);
+}
+
+static inline double GetSurfaceShade(const PrimaryInfo *normal,
+  const PrimaryInfo *light)
+{
+  double
+    shade;
+
   if ((fabs(normal->x) <= MagickEpsilon) &&
       (fabs(normal->y) <= MagickEpsilon))
     shade=light->z;
   else
-    {
-      shade=0.0;
-      distance=normal->x*light->x+normal->y*light->y+normal->z*light->z;
-      if (distance > MagickEpsilon)
-        {
-          normal_distance=normal->x*normal->x+normal->y*normal->y+
-            normal->z*normal->z;
-          if (normal_distance > (MagickEpsilon*MagickEpsilon))
-            shade=distance/sqrt((double) normal_distance);
-        }
-    }
+    shade=GetSlopedSurfaceShade(normal,light);
   return(shade);
 }
 
