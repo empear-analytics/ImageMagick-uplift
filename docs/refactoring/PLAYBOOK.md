@@ -21830,6 +21830,100 @@ the mandate of 2026-10-24.
 
 ---
 
+## Recipe CH - Share an Identical Header Helper Through a Common Private Header
+
+**Use when:** two or more non-installed private headers of `MagickCore/` (each written by a
+Recipe S split, or by an earlier one) define the same `static inline` helper, every
+definition byte-identical, name and parameters included: `ReleaseFailedImage`, defined in
+`effect-private.h`, `effect-blur-adaptive-filters-private.h` and
+`visual-effects-pixel-methods-private.h`. The finding is the *Code Duplication* a later
+split or carve would expose, and the second place to edit that Recipe S forbids creating;
+no file's score needs to move (the step must not lower one).
+
+**Not covered by:** Recipe S step 2, which shares a helper between the two products of one
+split through that split's header, and which does not relate two headers. Recipe D, which
+merges blocks inside one file. Recipe FT and TI, which merge twin functions of one file
+whose texts differ. A helper whose definitions differ in anything, its name included
+(`effect-blur-adaptive-filters-private.h`'s `SetBlurProgress` and `effect-private.h`'s
+`ReportRowProgress`, the same body under two names), is not this recipe: merging it would
+rename calls, a different change with a different argument.
+
+**How:**
+
+1. Find the copies. `grep -n "^static inline .*Name("` over `MagickCore/*-private.h`; take
+   every header that defines `Name`; extract each definition (signature line to the closing
+   brace at column 0) and check with `diff` or `cmp` that all are byte-identical.
+2. New header. Create `MagickCore/<theme>-private.h` (not installed: `MAGICKCORE_NOINST_HDRS`
+   and `MAGICKCORE_BASE_SRCS` of `MagickCore/Makefile.am`, mirrored in `Makefile.in`, as the
+   other private headers are), with the short licence of the private headers, its own
+   include guard, the `#include` lines the helper's body needs and an `extern "C"` pair,
+   holding the one definition, verbatim. It must compile on its own after
+   `MagickCore/studio.h`.
+3. Each old header loses its definition (with one blank line next to it) and includes the new
+   header in its include block, in name order. Nothing else in it changes; no `.c` file
+   changes.
+4. Every item of the new header must be used by at least two files (directly or through the
+   headers that include it); say which.
+5. Proof: every `.c` file that includes one of the edited headers (`grep -l`) compiles, with
+   the candidate build's flags at `-g0`, `__FILE__` and `__LINE__` pinned, to an object
+   file byte-identical to the one HEAD's headers give (a script that compiles each file
+   against a `git archive HEAD MagickCore` copy and against the working tree, and `cmp`s
+   the two objects); every file must print `IDENTICAL`.
+6. Run `tools/ci_linux_warnings.sh --campaign-a`, `tools/cxx_warnings.sh` on the including
+   files, `refactor_guard.py --combined` over the edited and new headers (the helper's
+   literals counted once less per removed copy: a `WARN`, stated), and score every edited
+   header and the new one with `tools/ch.py`: none may fall, and the new one is 10.0.
+7. One helper per commit (`refactor(<new header>): share Name`), `Recipe: CH`, `Verified:
+   guard` with the object proof of step 5 quoted.
+
+**Before:** (`effect-private.h`, and the same definition in two other headers):
+
+```c
+#include "MagickCore/image.h"
+#include "MagickCore/monitor.h"
+...
+static inline Image *ReleaseFailedImage(Image *image,const MagickBooleanType status)
+{
+  if (status == MagickFalse)
+    image=DestroyImage(image);
+  return(image);
+}
+```
+
+**After:** (`effect-private.h`; the definition stands once, in the new header):
+
+```c
+#include "MagickCore/effect-common-private.h"
+#include "MagickCore/image.h"
+#include "MagickCore/monitor.h"
+```
+
+**Careful:**
+
+- A `static inline` function defined in a header is one internal-linkage definition per
+  translation unit, before and after: a file that included one of the old headers now
+  includes the new one through it, and gets the same definition text, so it compiles the
+  same function; only the place of the text in the translation unit moves (into the new
+  header, before the old header's own declarations). Step 5 proves that the object code of
+  every including file is unchanged byte for byte, so no behaviour, timing or thread
+  question arises.
+- A file that includes two of the old headers (none does for `ReleaseFailedImage`, `grep`)
+  defined the helper twice before, which C forbids; the new header's guard makes it once.
+- The new header is a second place in the include graph, not a second copy: an edit to the
+  helper is made once.
+
+**Evidence level:** guard, with object identity of every including file (step 5); the
+oracle is not needed when every object is `IDENTICAL`, and the branch's whole-catalogue run
+covers the step.
+
+**Provenance:** 2026-11-16, `ReleaseFailedImage` in three private headers (round twenty-four's
+question 4); owner ruling of 2026-11-16 (AGENTS.md, answers to the round-twenty-four
+questions: identical helpers in several private headers may be shared through one common
+private header that the others include). Added by Claude Code (Opus 5.5), campaign A, W36
+lane a.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -22294,3 +22388,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | AMEND | S | Step 2: a helper holding an OpenMP pragma or a function-level `static` local may move into the private header when (a) its region moves whole and the message quotes the by-hand write-set reading, (b) `omp_compare.sh` at 1 and 4 threads shows no difference on cases that start several threads (large images, no `-seed` where the pragma's key argument would stop the threads), the wall time at 4 threads shown to drop, and (c) every path is timed as Recipe TH step 8 says; a writable `static` local is refused (the lane's restriction), a `static const` one qualifies, and a block-scope `const` object without `static` is not a `static` local | `quantize.c`'s remap split (campaign A, W36 lane a): `AssignImageColors` holds the `#pragma omp parallel for` of its no-dither row loop; round twenty-four's question 1, after the revert `167d2c858`. The ruling is the owner's, the three checks and the wording the lane's | owner |
 | 2026-11-16 | AMEND | S | Step 2: a later split may put the helpers it shares into a second private header, `<stem>-<family>-private.h`, that includes the first and that only the files using the family include; it is written, registered and scored as the first header, every item used by at least two of its including files | `quantize.c`'s remap split: one header of 2,600 lines scored 9.38 (Lines of Code) and put the assign and dither family in `quantize-kmeans.c`'s view; a second header leaves `quantize-private.h` at 10.0. A reading of the core-header and shared-header rulings of 2026-11-16, for the owner's confirmation | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | S | Step 2: a file-scope `static const` declaration of arithmetic type that a moving helper names moves into the private header verbatim, declared only there; each including file has its own internal-linkage copy with the same initialiser, and nothing writes it; the read-only accessor stays the form when no moving helper names it; an `#if`/`#else` macro block moves under the `CacheShift` sentence's terms | `segment.c` (campaign A, W36 lane a): its shared scale-space core names `SafeMargin`, `TreeLength`, `Red`, `Green` and `Blue`, one `static const int` declaration; round twenty-four's question 7. The ruling is the owner's, the wording the lane's | owner |
+| 2026-11-16 | NEW | CH | Share an Identical Header Helper Through a Common Private Header: a `static inline` helper defined byte-identically in several private headers moves to one new private header that each of them includes; proof: every including `.c` file compiles to a byte-identical object (`-g0`, `__FILE__`/`__LINE__` pinned) against HEAD's and the new headers; a helper whose definitions differ in anything, its name included, is not taken | `ReleaseFailedImage` in `effect-private.h`, `effect-blur-adaptive-filters-private.h` and `visual-effects-pixel-methods-private.h` (campaign A, W36 lane a); round twenty-four's question 4. The ruling is the owner's; the recipe, its object proof and the exclusion of renamed twins (`SetBlurProgress`/`ReportRowProgress`) are the lane's | owner |
