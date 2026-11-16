@@ -742,6 +742,14 @@ static KernelInfo *ParseKernelToken(const char *p,const char *token,
   return(new_kernel);
 }
 
+static void AppendKernelToList(KernelInfo **kernel,KernelInfo *new_kernel)
+{
+  if (*kernel == (KernelInfo *) NULL)
+    *kernel=new_kernel;
+  else
+    LastKernelInfo(*kernel)->next=new_kernel;
+}
+
 static MagickBooleanType AppendKernelToken(const char *p,const char *token,
   KernelInfo **kernel,ExceptionInfo *exception)
 {
@@ -762,10 +770,7 @@ static MagickBooleanType AppendKernelToken(const char *p,const char *token,
         }
 
       /* initialise or append the kernel list */
-      if (*kernel == (KernelInfo *) NULL)
-        *kernel=new_kernel;
-      else
-        LastKernelInfo(*kernel)->next=new_kernel;
+      AppendKernelToList(kernel,new_kernel);
     }
   return(MagickTrue);
 }
