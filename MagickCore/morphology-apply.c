@@ -1910,6 +1910,16 @@ static KernelInfo *AcquireDiagonalsKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *SetTypeAndRotateKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args)
+{
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+  kernel->type = type;
+  RotateKernelInfo(kernel, args->sigma);
+  return(kernel);
+}
+
 static KernelInfo *AcquireLineEndsKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -1936,11 +1946,7 @@ static KernelInfo *AcquireLineEndsKernel(KernelInfo *kernel,
       kernel=ParseKernelArray("3: 0,0,0  0,1,-  0,0,-");
       break;
   }
-  if (kernel == (KernelInfo *) NULL)
-    return(kernel);
-  kernel->type = type;
-  RotateKernelInfo(kernel, args->sigma);
-  return(kernel);
+  return(SetTypeAndRotateKernel(kernel,type,args));
 }
 
 static const KeyedKernelArray
