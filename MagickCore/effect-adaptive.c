@@ -509,6 +509,15 @@ typedef struct _AdaptiveEdge
     sigma;
 } AdaptiveEdge;
 
+static void ReplaceAdaptiveEdgeImage(Image **edge_image,Image *gaussian_image)
+{
+  if (gaussian_image != (Image *) NULL)
+    {
+      *edge_image=DestroyImage(*edge_image);
+      *edge_image=gaussian_image;
+    }
+}
+
 static MagickBooleanType PrepareAdaptiveEdge(const AdaptiveEdge *edge,
   Image **edge_image,ExceptionInfo *exception)
 {
@@ -520,11 +529,7 @@ static MagickBooleanType PrepareAdaptiveEdge(const AdaptiveEdge *edge,
     return(MagickFalse);
   (void) AutoLevelImage(*edge_image,exception);
   gaussian_image=BlurImage(*edge_image,edge->radius,edge->sigma,exception);
-  if (gaussian_image != (Image *) NULL)
-    {
-      *edge_image=DestroyImage(*edge_image);
-      *edge_image=gaussian_image;
-    }
+  ReplaceAdaptiveEdgeImage(edge_image,gaussian_image);
   (void) AutoLevelImage(*edge_image,exception);
   return(MagickTrue);
 }
