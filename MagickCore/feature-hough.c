@@ -161,6 +161,16 @@ static void CopyBlobToPrimitive(Image *image,DrawInfo *draw_info)
     }
 }
 
+static void ScaleHoughDrawing(Image *image,DrawInfo *draw_info)
+{
+  draw_info->affine.sx=image->resolution.x == 0.0 ? 1.0 : image->resolution.x/
+    DefaultResolution;
+  draw_info->affine.sy=image->resolution.y == 0.0 ? 1.0 : image->resolution.y/
+    DefaultResolution;
+  image->columns=CastDoubleToSizeT(draw_info->affine.sx*image->columns);
+  image->rows=CastDoubleToSizeT(draw_info->affine.sy*image->rows);
+}
+
 static Image *RenderHoughLines(const ImageInfo *image_info,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -188,12 +198,7 @@ static Image *RenderHoughLines(const ImageInfo *image_info,const size_t columns,
   image->columns=columns;
   image->rows=rows;
   draw_info=CloneDrawInfo(image_info,(DrawInfo *) NULL);
-  draw_info->affine.sx=image->resolution.x == 0.0 ? 1.0 : image->resolution.x/
-    DefaultResolution;
-  draw_info->affine.sy=image->resolution.y == 0.0 ? 1.0 : image->resolution.y/
-    DefaultResolution;
-  image->columns=CastDoubleToSizeT(draw_info->affine.sx*image->columns);
-  image->rows=CastDoubleToSizeT(draw_info->affine.sy*image->rows);
+  ScaleHoughDrawing(image,draw_info);
   status=SetImageExtent(image,image->columns,image->rows,exception);
   if (status == MagickFalse)
     return(DestroyImageList(image));
