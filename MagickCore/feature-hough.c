@@ -515,6 +515,17 @@ typedef struct _HoughOutput
     threshold;
 } HoughOutput;
 
+static size_t GetHoughLineCount(const Image *image,const size_t threshold)
+{
+  size_t
+    line_count;
+
+  line_count=image->columns > image->rows ? image->columns/4 : image->rows/4;
+  if (threshold != 0)
+    line_count=threshold;
+  return(line_count);
+}
+
 static MagickBooleanType WriteHoughFile(const HoughOutput *output,
   const HoughWindow window,char *path)
 {
@@ -545,9 +556,7 @@ static MagickBooleanType WriteHoughFile(const HoughOutput *output,
   if (file == -1)
     return(MagickFalse);
   status=WriteHoughHeader(image,file,&window,threshold);
-  line_count=image->columns > image->rows ? image->columns/4 : image->rows/4;
-  if (threshold != 0)
-    line_count=threshold;
+  line_count=GetHoughLineCount(image,threshold);
   segments.accumulator=accumulator;
   segments.image=image;
   segments.accumulator_width=accumulator_width;
