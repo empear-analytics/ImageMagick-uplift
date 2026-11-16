@@ -1192,6 +1192,22 @@ is worth it.
    copy as well, when no line of the family, comments and strings aside, names an object
    or a macro that header defines. Both files including it would define the object twice
    (a link error); the split is refused when the family names one.
+   A small `static` helper that both parts call is shared rather than refusing the split
+   (owner, 2026-11-16, "You can do all three"), one helper per split. Before the split, its
+   definition leaves the original for a new non-installed header of the same directory,
+   `MagickCore/<stem>-private.h` (listed under `MAGICKCORE_NOINST_HDRS` and, as the other
+   private headers are, in `MAGICKCORE_BASE_SRCS` of `MagickCore/Makefile.am`, both mirrored in
+   `Makefile.in`), as the one definition there: its text unchanged but for `inline` added after
+   `static`, under the header's include guard and `extern "C"` pair, after the `#include` lines
+   its body needs. The original includes the header at the end of its include block, so
+   `split_source.py` copies that line into the new file and finds no shared static. The helper
+   qualifies when it calls no other static of the original, names no file-scope object, type
+   or macro of the original (its parameter types are the library's), holds no `static` local
+   and no OpenMP pragma, and its name stands in both parts only as a call (no address taken).
+   Copying it into both files, and widening it to `MagickPrivate` (a symbol in the library's
+   internal ABI), stay refused. A later split of either product may share another helper the
+   same way (its own commit); a family that needs two helpers, or a helper together with a
+   type or macro of the original, at once is still refused.
 3. The public function keeps its declaration in the header it already has.
 4. List the new file wherever the original is listed: `tools/register_source.py` does it
    for `MagickCore/Makefile.am`, `Makefile.in` (by hand, mirroring what automake
@@ -1215,6 +1231,20 @@ is worth it.
   struct; the object comparison below (`tools/split_branch_check.py`, every moved function
   and every kept one IDENTICAL-MODULO-LAYOUT in the builds) is what shows that no offset or
   size moved.
+- A helper shared under step 2's `static inline` header keeps internal linkage: each file
+  that includes the header has its own definition of the function, as a `static` copy in
+  each file would, but from one source text, so the two cannot drift apart. `inline` is a
+  hint (C11 6.7.4): a call of an internal-linkage inline function calls that file's
+  definition, and since the helper holds no `static` local and names no file-scope object,
+  the two definitions share no state: every call reads its arguments and the library's
+  state and writes what it wrote before, so each file computes what the original did. The
+  compiler may now inline calls it did not, which changes instructions, not results; the
+  message says where the helper runs (per image, per row or per pixel), and a per-pixel
+  helper is timed against the baseline binary. `refactor_guard.py --combined` over the
+  original, the new file and the header counts every literal once, as before. The
+  header must compile in every configuration that compiles a file including it
+  (`tools/ci_linux_warnings.sh --campaign-a`), and an unused `static inline` draws no
+  warning.
 - An include left out under step 2's second exception is neither moved nor edited either:
   the original keeps the line, and the header's objects stay defined once, in the original's
   object. The family names none of them (the tool checks, with the header's macros), so every
@@ -21868,3 +21898,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | WORDING | KV | Step 7: the 3% slowdown limit is this recipe's own; AGENTS.md says only that a step slowing a hot path beyond measurement noise is not taken | The round-nineteen reviewer found the cited "AGENTS.md 3% rule" does not exist | owner |
 | 2026-11-16 | WORDING | rule | *OpenMP regions* points to AGENTS.md's ruling of 2026-11-15 as an exception to its first bullet; *Two levels of evidence* names WP step 8 among the guard-verified forms | The section still said never to edit a pragma after the owner's ruling; the guard-verified list omitted WP step 8, which AGENTS.md's list also does not yet name | owner |
 | 2026-11-16 | NEW | KV | Replace a Split Call Switch by a Table of Function Pointers of Two Signatures: a `switch` whose groups each make one call to a function of one of two signatures differing in one extra parameter, already split by a Recipe SD chain into look-alike helpers, becomes a `static const` table of `{ key, f, g }` (one pointer `NULL`) and a lookup; groups of another shape stay in the `switch`, whose `default:` does the lookup and keeps the innermost fallback; the SD helpers and their input struct go. *Careful* gives the argument (distinct labels along the chain, the same callee and arguments, the fallback for every other value); per-pixel callers timed against the baseline | `colorspace-convert.c`'s `ConvertRGBToGeneric` (campaign A, W30 lane c): two further SD levels probed 7.88 and 8.28 (*Code Duplication* among the helpers, *Overall Code Complexity*) against 9.08; the table probe 9.68 with no new finding | owner |
+| 2026-11-16 | AMEND | S | Step 2: a small `static` helper both parts call is shared, one per split, by moving its definition unchanged but for `inline` into a new non-installed `MagickCore/<stem>-private.h` (`MAGICKCORE_NOINST_HDRS` and `MAGICKCORE_BASE_SRCS`, mirrored in `Makefile.in`) that the original includes at the end of its include block, so the new file's copy includes it too; the helper calls no other static, names no file-scope object, type or macro of the original, holds no `static` local or pragma and has no address taken; copying and `MagickPrivate` widening stay refused; a family needing two helpers, or a helper with a type or macro, at once is still refused. *Careful* gives the argument (internal linkage in each file, one source text, no shared state, `inline` a hint) | Owner question (1) of the W32 round-twenty-one report: `threshold-image.c`, `enhance-tone.c` and `effect-filter.c` were refused by `split_source.py` for statics every root calls (`SetThresholdProgress`, `SetToneProgress`, `ReleaseFailedImage`) | owner |
