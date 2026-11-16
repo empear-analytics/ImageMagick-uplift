@@ -1262,6 +1262,26 @@ is worth it.
    shared variable only through its accessor, `(*NameReference())`, as the other file
    does (the accessor is declared in the same header, before the helpers); this is still
    one accessor per variable, its only new external name.
+   A file-scope variable of the original with external linkage (defined without `static` and
+   declared in no header, as `opencl.c`'s `MagickLibrary *openCL_library;`) that both parts
+   name is declared rather than shared through an accessor (owner, 2026-11-16, AGENTS.md,
+   answers to the round-twenty-five questions: a split may declare an existing external
+   global in the private header, its linkage unchanged). The original's existing
+   non-installed private header (`opencl-private.h`), or the split's `<stem>-private.h` when
+   it has none, gains one declaration `extern T` / `  declarator;`, the definition's type
+   specifiers and declarator unchanged, with no initialiser, qualifier, storage class or
+   visibility macro added, after the definition of every type it names and inside the
+   conditional that compiles those types; the original includes that header. The definition,
+   its initialiser and its storage stay in the original. The name has external linkage
+   before and after (C11 6.2.2p4-5), so in the new file it designates the object the original
+   defines, and every read and write reaches the storage it reached; in the original the
+   declaration only precedes a compatible definition (C11 6.7p4), so its object code does
+   not change (`tools/split_branch_check.py`), and the objects show one definition (`nm`:
+   `B` or `D` in the original's object, `U` in the new file's). A header that other files
+   also include gives them a declaration they do not use; the step checks (grep over
+   `MagickCore/`, `MagickWand/`, `coders/`) that no other file defines or declares the name
+   differently. The variable must be named by both parts (the original's functions and the
+   moved ones), so that the declaration has a user in each file.
    Copying a helper, type or macro into both files, and widening a helper to
    `MagickPrivate` (a symbol in the library's internal ABI), stay refused. A later split of
    either product (a chain of splits, owner, 2026-11-16) includes the same header and may
@@ -22389,3 +22409,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | AMEND | S | Step 2: a later split may put the helpers it shares into a second private header, `<stem>-<family>-private.h`, that includes the first and that only the files using the family include; it is written, registered and scored as the first header, every item used by at least two of its including files | `quantize.c`'s remap split: one header of 2,600 lines scored 9.38 (Lines of Code) and put the assign and dither family in `quantize-kmeans.c`'s view; a second header leaves `quantize-private.h` at 10.0. A reading of the core-header and shared-header rulings of 2026-11-16, for the owner's confirmation | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | S | Step 2: a file-scope `static const` declaration of arithmetic type that a moving helper names moves into the private header verbatim, declared only there; each including file has its own internal-linkage copy with the same initialiser, and nothing writes it; the read-only accessor stays the form when no moving helper names it; an `#if`/`#else` macro block moves under the `CacheShift` sentence's terms | `segment.c` (campaign A, W36 lane a): its shared scale-space core names `SafeMargin`, `TreeLength`, `Red`, `Green` and `Blue`, one `static const int` declaration; round twenty-four's question 7. The ruling is the owner's, the wording the lane's | owner |
 | 2026-11-16 | NEW | CH | Share an Identical Header Helper Through a Common Private Header: a `static inline` helper defined byte-identically in several private headers moves to one new private header that each of them includes; proof: every including `.c` file compiles to a byte-identical object (`-g0`, `__FILE__`/`__LINE__` pinned) against HEAD's and the new headers; a helper whose definitions differ in anything, its name included, is not taken | `ReleaseFailedImage` in `effect-private.h`, `effect-blur-adaptive-filters-private.h` and `visual-effects-pixel-methods-private.h` (campaign A, W36 lane a); round twenty-four's question 4. The ruling is the owner's; the recipe, its object proof and the exclusion of renamed twins (`SetBlurProgress`/`ReportRowProgress`) are the lane's | mandate (2026-10-24) |
+| 2026-11-16 | AMEND | S | Step 2: a file-scope variable of external linkage (no `static`, in no header) that both parts name is declared `extern T` / `  declarator;` in the original's existing non-installed private header (or the split's `<stem>-private.h`), after the types it names and inside their conditional, the definition and storage staying in the original; proof: split_branch_check IDENTICAL-MODULO-LAYOUT for both files, `nm` one definition, grep shows no other definition or declaration of the name | `opencl.c`'s `openCL_library`, which the `EnqueueOpenCLKernel`/`CopyMagickCLCacheInfo` split (campaign A, W37 lane a) needs; round twenty-five's question 4. The ruling is the owner's; the wording and the checks are the lane's | owner |
