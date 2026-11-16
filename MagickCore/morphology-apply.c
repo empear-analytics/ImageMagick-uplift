@@ -2436,12 +2436,9 @@ typedef enum
   EuclideanKernelDistance
 } DistanceKernelSide;
 
-static inline KernelInfo *AcquireManhattanOrEuclideanKernel(KernelInfo *kernel,
+static void SetManhattanOrEuclideanValues(KernelInfo *kernel,
   const GeometryInfo *args,const DistanceKernelSide side)
 {
-  const KernelRadius
-    radius = { 1.0, 3 };  /* default radius = 1 */
-
   ssize_t
     i;
 
@@ -2449,17 +2446,26 @@ static inline KernelInfo *AcquireManhattanOrEuclideanKernel(KernelInfo *kernel,
     u,
     v;
 
-  SetKernelRadius(kernel,args,&radius);
-
-  if (AcquireKernelValues(kernel) == MagickFalse)
-    return(DestroyKernelInfo(kernel));
-
   for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
     for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
       kernel->positive_range += ( kernel->values[i] =
         ((side == ManhattanKernelDistance) ?
         args->sigma*(labs((long) u)+labs((long) v)) :
         args->sigma*sqrt((double) (u*u+v*v))) );
+}
+
+static inline KernelInfo *AcquireManhattanOrEuclideanKernel(KernelInfo *kernel,
+  const GeometryInfo *args,const DistanceKernelSide side)
+{
+  const KernelRadius
+    radius = { 1.0, 3 };  /* default radius = 1 */
+
+  SetKernelRadius(kernel,args,&radius);
+
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  SetManhattanOrEuclideanValues(kernel,args,side);
   kernel->maximum = kernel->values[0];
   return(kernel);
 }
