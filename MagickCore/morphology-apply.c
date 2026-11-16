@@ -3052,6 +3052,18 @@ MagickExport KernelInfo *CloneKernelInfo(const KernelInfo *kernel)
   return(new_kernel);
 }
 
+static void AppendFloppedKernel(KernelInfo *last)
+{
+  KernelInfo
+    *clone;
+
+  clone = CloneKernelInfo(last);
+  if (clone == (KernelInfo *) NULL)
+    return;
+  RotateKernelInfo(clone, 180);  /* flop */
+  LastKernelInfo(last)->next = clone;
+}
+
 static void ExpandMirrorKernelInfo(KernelInfo *kernel)
 {
   KernelInfo
@@ -3074,11 +3086,7 @@ static void ExpandMirrorKernelInfo(KernelInfo *kernel)
   LastKernelInfo(last)->next = clone;
   last = clone;
 
-  clone = CloneKernelInfo(last);
-  if (clone == (KernelInfo *) NULL)
-    return;
-  RotateKernelInfo(clone, 180);  /* flop */
-  LastKernelInfo(last)->next = clone;
+  AppendFloppedKernel(last);
 
   return;
 }
