@@ -4610,8 +4610,8 @@ static void XPackContinuous8BitLSB(const XImageRowSource *source,
   }
 }
 
-static void XPackRedHigh32BitLSB(const XImageRowSource *source,
-  unsigned char *q)
+static magick_attribute((__always_inline__)) inline void XPackRedHigh32Bit(
+  const XImageRowSource *source,const XPackBitOrder side,unsigned char *q)
 {
   Image
     *const canvas = source->canvas;
@@ -4642,10 +4642,10 @@ static void XPackRedHigh32BitLSB(const XImageRowSource *source,
         /*
           Gamma correct canvas.
         */
-        q=XPackGammaRedHighRow(canvas,XPackLSBFirst,p,q);
+        q=XPackGammaRedHighRow(canvas,side,p,q);
         continue;
       }
-    q=XPackRedHighRow(canvas,XPackLSBFirst,p,q);
+    q=XPackRedHighRow(canvas,side,p,q);
   }
 }
 
@@ -4946,7 +4946,7 @@ static void XPackContinuousLSB(const XImage *ximage,
     default:
     {
       if (IsRedHigh32BitMap(ximage,map_info) != MagickFalse)
-        XPackRedHigh32BitLSB(&row_source,q);
+        XPackRedHigh32Bit(&row_source,XPackLSBFirst,q);
       else
         if (IsBlueHigh32BitMap(ximage,map_info) != MagickFalse)
           XPackBlueHigh32BitLSB(&row_source,q);
@@ -5776,45 +5776,6 @@ static void XPackContinuous8BitMSB(const XImageRowSource *source,
   }
 }
 
-static void XPackRedHigh32BitMSB(const XImageRowSource *source,
-  unsigned char *q)
-{
-  Image
-    *const canvas = source->canvas;
-
-  CacheView
-    *const canvas_view = source->canvas_view;
-
-  ExceptionInfo
-    *const exception = source->exception;
-
-  const Quantum
-    *p;
-
-  int
-    y;
-
-  /*
-    Convert to 32 bit continuous-tone X canvas.
-  */
-  for (y=0; y < (int) canvas->rows; y++)
-  {
-    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-      canvas->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    if (IsGammaCorrected() != MagickFalse)
-      {
-        /*
-          Gamma correct canvas.
-        */
-        q=XPackGammaRedHighRow(canvas,XPackMSBFirst,p,q);
-        continue;
-      }
-    q=XPackRedHighRow(canvas,XPackMSBFirst,p,q);
-  }
-}
-
 static void XPackBlueHigh32BitMSB(const XImageRowSource *source,
   unsigned char *q)
 {
@@ -6021,7 +5982,7 @@ static void XPackContinuousMSB(const XImage *ximage,
     default:
     {
       if (IsRedHigh32BitMap(ximage,map_info) != MagickFalse)
-        XPackRedHigh32BitMSB(&row_source,q);
+        XPackRedHigh32Bit(&row_source,XPackMSBFirst,q);
       else
         if (IsBlueHigh32BitMap(ximage,map_info) != MagickFalse)
           XPackBlueHigh32BitMSB(&row_source,q);
