@@ -546,16 +546,13 @@ static void HandleConfirmEvent(Display *display,XWindows *windows,
   }
 }
 
-static void MapConfirmWidget(Display *display,XWindows *windows)
+static void SetConfirmWidgetName(Display *display,XWindows *windows)
 {
   Status
     status;
 
   XTextProperty
     window_name;
-
-  XWindowChanges
-    window_changes;
 
   (void) CopyMagickString(windows->widget.name,"Confirm",MagickPathExtent);
   status=XStringListToTextProperty(&windows->widget.name,1,&window_name);
@@ -565,6 +562,14 @@ static void MapConfirmWidget(Display *display,XWindows *windows)
       XSetWMIconName(display,windows->widget.id,&window_name);
       (void) XFree((void *) window_name.value);
     }
+}
+
+static void MapConfirmWidget(Display *display,XWindows *windows)
+{
+  XWindowChanges
+    window_changes;
+
+  SetConfirmWidgetName(display,windows);
   window_changes.width=(int) windows->widget.width;
   window_changes.height=(int) windows->widget.height;
   window_changes.x=windows->widget.x;
