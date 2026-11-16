@@ -611,6 +611,24 @@ static void PositionConfirmWidget(XWindows *windows,
   XConstrainWindowPosition(display,&windows->widget);
 }
 
+static unsigned int GetConfirmTextWidth(XFontStruct *font_info,
+  const char *description)
+{
+  unsigned int
+    width;
+
+  width=WidgetTextWidth(font_info,CancelButtonText);
+  if (WidgetTextWidth(font_info,DismissButtonText) > width)
+    width=WidgetTextWidth(font_info,DismissButtonText);
+  if (WidgetTextWidth(font_info,YesButtonText) > width)
+    width=WidgetTextWidth(font_info,YesButtonText);
+  width<<=1;
+  if (description != (char *) NULL)
+    if (WidgetTextWidth(font_info,(char *) description) > width)
+      width=WidgetTextWidth(font_info,(char *) description);
+  return(width);
+}
+
 MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
   const char *reason,const char *description)
 {
@@ -654,15 +672,7 @@ MagickPrivate int XConfirmWidget(Display *display,XWindows *windows,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",reason);
   XCheckRefreshWindows(display,windows);
   font_info=windows->widget.font_info;
-  width=WidgetTextWidth(font_info,CancelButtonText);
-  if (WidgetTextWidth(font_info,DismissButtonText) > width)
-    width=WidgetTextWidth(font_info,DismissButtonText);
-  if (WidgetTextWidth(font_info,YesButtonText) > width)
-    width=WidgetTextWidth(font_info,YesButtonText);
-  width<<=1;
-  if (description != (char *) NULL)
-    if (WidgetTextWidth(font_info,(char *) description) > width)
-      width=WidgetTextWidth(font_info,(char *) description);
+  width=GetConfirmTextWidth(font_info,description);
   height=(unsigned int) (font_info->ascent+font_info->descent);
   layout.display=display;
   layout.font_info=font_info;
