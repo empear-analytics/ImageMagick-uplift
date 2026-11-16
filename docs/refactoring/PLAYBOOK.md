@@ -1193,7 +1193,8 @@ is worth it.
    or a macro that header defines. Both files including it would define the object twice
    (a link error); the split is refused when the family names one.
    A small `static` helper that both parts call is shared rather than refusing the split
-   (owner, 2026-11-16, "You can do all three"), one helper per split. Before the split, its
+   (owner, 2026-11-16, "You can do all three"; several helpers, typedefs and macros, the
+   owner's answers to the round-twenty-two questions of the same day). Before the split, its
    definition leaves the original for a new non-installed header of the same directory,
    `MagickCore/<stem>-private.h` (listed under `MAGICKCORE_NOINST_HDRS` and, as the other
    private headers are, in `MAGICKCORE_BASE_SRCS` of `MagickCore/Makefile.am`, both mirrored in
@@ -1201,13 +1202,28 @@ is worth it.
    `static`, under the header's include guard and `extern "C"` pair, after the `#include` lines
    its body needs. The original includes the header at the end of its include block, so
    `split_source.py` copies that line into the new file and finds no shared static. The helper
-   qualifies when it calls no other static of the original, names no file-scope object, type
-   or macro of the original (its parameter types are the library's), holds no `static` local
-   and no OpenMP pragma, and its name stands in both parts only as a call (no address taken).
-   Copying it into both files, and widening it to `MagickPrivate` (a symbol in the library's
-   internal ABI), stay refused. A later split of either product may share another helper the
-   same way (its own commit); a family that needs two helpers, or a helper together with a
-   type or macro of the original, at once is still refused.
+   qualifies when it calls no static of the original but one that moves into the header with
+   it, names no file-scope object of the original and no type or macro of the original but
+   one that moves into the header with it, holds no `static` local and no OpenMP pragma, and
+   its name stands in both parts only as a call (no address taken). Several helpers may move
+   into the one header for one split, each on these terms, in their order in the original. A
+   typedef that both parts name, or that a moving helper names, moves into the header with
+   them, verbatim, before the first helper that names it, and is then defined only there:
+   one file-scope declaration with no preprocessor line inside, whose members' types are the
+   library's or another typedef that moves (`threshold-image.c`'s `ThresholdLine`, the
+   `{ image, image_view, exception }` row context of its row helpers). A file-scope one-line
+   or multi-line `#define` that both parts or a moving helper name moves the same way,
+   verbatim, defined only in the header, when no line of the original `#undef`s or
+   redefines it. A macro that each part defines for itself needs neither (mandate,
+   2026-11-16): when every `#define NAME` of the original is the same one line, byte for
+   byte, no line `#undef`s `NAME`, and in the kept part and in the family alike the first
+   line that names `NAME` is such a define (a progress tag defined in each function body
+   that names it, as `threshold-image.c`'s `ThresholdImageTag` in six), each file keeps
+   the definitions that stand in its own text and nothing moves (`split_source.py` accepts
+   it). Copying a helper, type or macro into both files, and widening a helper to
+   `MagickPrivate` (a symbol in the library's internal ABI), stay refused. A later split of
+   either product (a chain of splits, owner, 2026-11-16) includes the same header and may
+   move further helpers into it in its own commit.
 3. The public function keeps its declaration in the header it already has.
 4. List the new file wherever the original is listed: `tools/register_source.py` does it
    for `MagickCore/Makefile.am`, `Makefile.in` (by hand, mirroring what automake
@@ -1244,7 +1260,19 @@ is worth it.
   original, the new file and the header counts every literal once, as before. The
   header must compile in every configuration that compiles a file including it
   (`tools/ci_linux_warnings.sh --campaign-a`), and an unused `static inline` draws no
-  warning.
+  warning. Several helpers in the header change nothing in this argument: each is its own
+  internal-linkage definition in each file, and a helper that calls another calls the
+  definition in its own file, as the original's call did. A typedef moved into the header
+  is one definition per translation unit, as before, from the same tokens, so each file
+  has the type the original had (the same members, in the same order); the two files never
+  pass one to each other, since only static functions of each file name it. A macro moved
+  into the header expands, in each file, to the tokens its one definition gave before,
+  because no line redefines or undefines it. A macro each part defines for itself (the
+  mandate form) keeps every one of its definitions in the file that holds the function
+  that holds it; all of them are the same line, so each use expands to the tokens it
+  expanded to before, from whichever definition precedes it (C11 6.10.3p2 allows the
+  identical redefinitions, as the original already did), and `refactor_guard.py
+  --combined` counts its literal as often as before.
 - An include left out under step 2's second exception is neither moved nor edited either:
   the original keeps the line, and the header's objects stay defined once, in the original's
   object. The family names none of them (the tool checks, with the header's macros), so every
@@ -21899,3 +21927,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | WORDING | rule | *OpenMP regions* points to AGENTS.md's ruling of 2026-11-15 as an exception to its first bullet; *Two levels of evidence* names WP step 8 among the guard-verified forms | The section still said never to edit a pragma after the owner's ruling; the guard-verified list omitted WP step 8, which AGENTS.md's list also does not yet name | owner |
 | 2026-11-16 | NEW | KV | Replace a Split Call Switch by a Table of Function Pointers of Two Signatures: a `switch` whose groups each make one call to a function of one of two signatures differing in one extra parameter, already split by a Recipe SD chain into look-alike helpers, becomes a `static const` table of `{ key, f, g }` (one pointer `NULL`) and a lookup; groups of another shape stay in the `switch`, whose `default:` does the lookup and keeps the innermost fallback; the SD helpers and their input struct go. *Careful* gives the argument (distinct labels along the chain, the same callee and arguments, the fallback for every other value); per-pixel callers timed against the baseline | `colorspace-convert.c`'s `ConvertRGBToGeneric` (campaign A, W30 lane c): two further SD levels probed 7.88 and 8.28 (*Code Duplication* among the helpers, *Overall Code Complexity*) against 9.08; the table probe 9.68 with no new finding | owner |
 | 2026-11-16 | AMEND | S | Step 2: a small `static` helper both parts call is shared, one per split, by moving its definition unchanged but for `inline` into a new non-installed `MagickCore/<stem>-private.h` (`MAGICKCORE_NOINST_HDRS` and `MAGICKCORE_BASE_SRCS`, mirrored in `Makefile.in`) that the original includes at the end of its include block, so the new file's copy includes it too; the helper calls no other static, names no file-scope object, type or macro of the original, holds no `static` local or pragma and has no address taken; copying and `MagickPrivate` widening stay refused; a family needing two helpers, or a helper with a type or macro, at once is still refused. *Careful* gives the argument (internal linkage in each file, one source text, no shared state, `inline` a hint) | Owner question (1) of the W32 round-twenty-one report: `threshold-image.c`, `enhance-tone.c` and `effect-filter.c` were refused by `split_source.py` for statics every root calls (`SetThresholdProgress`, `SetToneProgress`, `ReleaseFailedImage`) | owner |
+| 2026-11-16 | AMEND | S | Step 2: several `static` helpers may share the one non-installed header of one split, each on the one-helper terms (a helper may call or name another helper, typedef or macro that moves with it); a typedef that both parts or a moving helper name moves into the header verbatim (one file-scope declaration, no preprocessor line inside, library member types), and so does a file-scope `#define` no line redefines or undefines, each defined only there; a later split in a chain includes the same header and may add to it. *Careful* gives the argument (one definition per translation unit from one text; macros expand to the same tokens) | The owner's answers to the round-twenty-two questions (AGENTS.md, 2026-11-16): `threshold-image.c` and `enhance-tone.c` were refused because every cut shares three row helpers and the `ThresholdLine` / `ToneLine` typedef | owner |
+| 2026-11-16 | AMEND | S | Step 2: a macro that each part defines for itself (every `#define NAME` the same line byte for byte, no `#undef`, and in each part the first line naming it is such a define) neither moves nor refuses the split; `split_source.py` accepts it (its own `tools:` commit). *Careful* gives the argument (identical redefinitions, C11 6.10.3p2: each use expands to the same tokens) | `threshold-image.c`'s progress tag `ThresholdImageTag`, defined in six function bodies, three on each side of the cut at the `ThresholdImageRows` family; the tool refused it as a macro of the kept part used in the region | mandate (2026-10-24) |

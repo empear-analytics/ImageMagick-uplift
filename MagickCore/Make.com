@@ -88,6 +88,8 @@ $call Make enhance.c
 $call Make enhance-color.c
 $call Make enhance-clahe.c
 $call Make enhance-tone.c
+$call Make enhance-equalize.c
+$call Make enhance-level.c
 $call Make enhance-level-colors.c
 $call Make exception.c
 $call Make exception-throw.c
@@ -200,6 +202,7 @@ $call Make transform-region.c
 $call Make transform-tiles.c
 $call Make threshold.c
 $call Make threshold-image.c
+$call Make threshold-level.c
 $call Make threshold-adaptive.c
 $call Make threshold-auto.c
 $call Make type.c

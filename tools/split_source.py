@@ -214,6 +214,24 @@ def family_only_define(lines, name):
     one_line = [l for l in named if re.match(r"^#define\s+%s\b.*[^\\\s]\s*$" % name, l)]
     return named[0] if named == one_line[:1] else None
 
+def _names(lines, name):
+    return [l for l in lines if re.search(r"\b%s\b" % name, l)]
+
+def _is_define(line, name):
+    return re.match(r"^\s*#\s*define\s+%s\b" % name, line) is not None
+
+def defined_before_use_in_each_part(kept_lines, region, name):
+    """True when NAME's every `#define` in the file is the same one line, byte for byte, no line `#undef`s it, and in
+    the kept part and in the region alike the first line naming NAME is such a define (a progress tag that each function
+    defines in its own body before it names it, as threshold-image.c's ThresholdImageTag). Each part then expands NAME
+    to the same tokens from its own definitions, whatever the other part holds, so nothing moves (2026-11-16)."""
+    parts = [_names(kept_lines, name), _names(region.split("\n"), name)]
+    if not all(named and _is_define(named[0], name) for named in parts): return False
+    named = parts[0] + parts[1]
+    if any(re.match(r"^\s*#\s*undef\b", l) for l in named): return False
+    defs = {l.rstrip() for l in named if _is_define(l, name)}
+    return len(defs) == 1 and not next(iter(defs)).endswith("\\")
+
 def multiline_define_blocks(lines):
     """{name: (first line, last line)} of every multi-line `#define` (backslash continuation) of LINES."""
     blocks = {}
@@ -599,6 +617,7 @@ for mname in sorted(defined(rest), key=lambda m: next(i for i, l in enumerate(re
     if mname in copy_macros and len(dl) == 1 and re.fullmatch(r'#define\s+%s\s+"[^"\\]*"' % mname, dl[0]) \
         and not re.search(r"^\s*#\s*define\s+%s\b" % mname, region, re.M):
         macro_lines.append(dl[0]); continue
+    if defined_before_use_in_each_part(rest_lines, region, mname): continue
     only = family_only_define(rest_lines, mname)
     if only is None: sys.exit("refused: macro %s used in the region" % mname)
     moved_macros.append(only)
@@ -627,7 +646,8 @@ while k < len(rest_lines):
 forward = relocate_declarations(rest_lines, moved & static, moved_macros)
 rest = "\n".join(rest_lines)
 for mname in defined(region):
-    if re.search(r"\b%s\b" % mname, rest): sys.exit("refused: macro %s used outside" % mname)
+    if re.search(r"\b%s\b" % mname, rest) and not defined_before_use_in_each_part(rest_lines, region, mname):
+        sys.exit("refused: macro %s used outside" % mname)
 # a typedef elsewhere in the original that only the region uses moves with it
 moved_types = []
 for tname in sorted(set(re.findall(r"^\}\s*(\w+)\s*;", rest, re.M))):
