@@ -1689,9 +1689,6 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   MagickStatusType
     flags;
 
-  MontagePages
-    pages;
-
   MontageThumbnailInfo
     thumbnail_info;
 
@@ -1789,29 +1786,14 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   montage=AcquireImage(clone_info,exception);
   montage->background_color=montage_info->background_color;
   montage->scene=0;
-  pages.image_info=image_info;
-  pages.montage_info=montage_info;
-  pages.images=images;
-  pages.exception=exception;
-  pages.primary_list=primary_list;
-  pages.image_list=image_list;
-  pages.image=image;
-  pages.montage=montage;
-  pages.texture=texture;
-  pages.tile_image=tile_image;
-  pages.number_images=number_images;
-  pages.tiles_per_row=tiles_per_row;
-  pages.tiles_per_column=tiles_per_column;
-  pages.title_offset=title_offset;
-  pages.border_width=border_width;
-  pages.number_lines=number_lines;
-  pages.concatenate=concatenate;
-  pages.extract_info=extract_info;
-  pages.metrics=metrics;
-  pages.bevel_width=bevel_width;
-  pages.frame_info=frame_info;
-  pages.clone_info=clone_info;
-  pages.draw_info=draw_info;
-  pages.title=title;
-  return(ComposeMontagePages(&pages));
+  {
+    const MontagePages
+      pages = { image_info, montage_info, images, exception, primary_list,
+        image_list, image, montage, texture, tile_image, number_images,
+        tiles_per_row, tiles_per_column, title_offset, border_width,
+        number_lines, concatenate, extract_info, metrics, bevel_width,
+        frame_info, clone_info, draw_info, title };
+
+    return(ComposeMontagePages(&pages));
+  }
 }
