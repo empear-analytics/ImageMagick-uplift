@@ -155,7 +155,7 @@ typedef struct _UnsharpPixels
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static inline double GetSurfaceShade(const PrimaryInfo *normal,
+static inline double GetSlopedSurfaceShade(const PrimaryInfo *normal,
   const PrimaryInfo *light)
 {
   double
@@ -163,21 +163,29 @@ static inline double GetSurfaceShade(const PrimaryInfo *normal,
     normal_distance,
     shade;
 
+  shade=0.0;
+  distance=normal->x*light->x+normal->y*light->y+normal->z*light->z;
+  if (distance > MagickEpsilon)
+    {
+      normal_distance=normal->x*normal->x+normal->y*normal->y+
+        normal->z*normal->z;
+      if (normal_distance > (MagickEpsilon*MagickEpsilon))
+        shade=distance/sqrt((double) normal_distance);
+    }
+  return(shade);
+}
+
+static inline double GetSurfaceShade(const PrimaryInfo *normal,
+  const PrimaryInfo *light)
+{
+  double
+    shade;
+
   if ((fabs(normal->x) <= MagickEpsilon) &&
       (fabs(normal->y) <= MagickEpsilon))
     shade=light->z;
   else
-    {
-      shade=0.0;
-      distance=normal->x*light->x+normal->y*light->y+normal->z*light->z;
-      if (distance > MagickEpsilon)
-        {
-          normal_distance=normal->x*normal->x+normal->y*normal->y+
-            normal->z*normal->z;
-          if (normal_distance > (MagickEpsilon*MagickEpsilon))
-            shade=distance/sqrt((double) normal_distance);
-        }
-    }
+    shade=GetSlopedSurfaceShade(normal,light);
   return(shade);
 }
 
@@ -364,6 +372,14 @@ typedef struct _ShadeImageTargets
     **shade_image;
 } ShadeImageTargets;
 
+static void DestroyShadeImages(Image **linear_image,Image **shade_image)
+{
+  if ((*linear_image) != (Image *) NULL)
+    (*linear_image)=DestroyImage((*linear_image));
+  if ((*shade_image) != (Image *) NULL)
+    (*shade_image)=DestroyImage((*shade_image));
+}
+
 static MagickBooleanType AcquireShadeImages(const Image *image,
   ExceptionInfo *exception,const ShadeImageTargets *targets)
 {
@@ -375,10 +391,7 @@ static MagickBooleanType AcquireShadeImages(const Image *image,
   (*shade_image)=CloneImage(image,0,0,MagickTrue,exception);
   if (((*linear_image) == (Image *) NULL) || ((*shade_image) == (Image *) NULL))
     {
-      if ((*linear_image) != (Image *) NULL)
-        (*linear_image)=DestroyImage((*linear_image));
-      if ((*shade_image) != (Image *) NULL)
-        (*shade_image)=DestroyImage((*shade_image));
+      DestroyShadeImages(linear_image,shade_image);
       return(MagickFalse);
     }
   if (SetImageStorageClass((*shade_image),DirectClass,exception) == MagickFalse)
@@ -388,6 +401,13 @@ static MagickBooleanType AcquireShadeImages(const Image *image,
       return(MagickFalse);
     }
   return(MagickTrue);
+}
+
+static void SyncSharpenRow(MagickBooleanType *status,CacheView *view,
+  ExceptionInfo *exception)
+{
+  if (SyncCacheViewAuthenticPixels(view,exception) == MagickFalse)
+    (*status)=MagickFalse;
 }
 
 static MagickBooleanType ShadeHeadRow(MagickBooleanType *status,
@@ -416,6 +436,19 @@ static MagickBooleanType ShadeHeadRow(MagickBooleanType *status,
     }
   ShadeRowPixels(row,p,q);
   return(MagickTrue);
+}
+
+static PrimaryInfo GetShadeLight(const double azimuth,const double elevation)
+{
+  PrimaryInfo
+    light;
+
+  light.x=(double) QuantumRange*cos(DegreesToRadians(azimuth))*
+    cos(DegreesToRadians(elevation));
+  light.y=(double) QuantumRange*sin(DegreesToRadians(azimuth))*
+    cos(DegreesToRadians(elevation));
+  light.z=(double) QuantumRange*sin(DegreesToRadians(elevation));
+  return(light);
 }
 
 MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
@@ -460,11 +493,7 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
   /*
     Compute the light vector.
   */
-  light.x=(double) QuantumRange*cos(DegreesToRadians(azimuth))*
-    cos(DegreesToRadians(elevation));
-  light.y=(double) QuantumRange*sin(DegreesToRadians(azimuth))*
-    cos(DegreesToRadians(elevation));
-  light.z=(double) QuantumRange*sin(DegreesToRadians(elevation));
+  light=GetShadeLight(azimuth,elevation);
   /*
     Shade image.
   */
@@ -487,8 +516,7 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
 
     if (ShadeHeadRow(&status,&row) == MagickFalse)
       continue;
-    if (SyncCacheViewAuthenticPixels(shade_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncSharpenRow(&status,shade_view,exception);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -654,8 +682,7 @@ static MagickBooleanType UnsharpHeadRow(const UnsharpHead *head,const ssize_t y,
       return(MagickFalse);
     }
   UnsharpRow(&unsharp,p,q);
-  if (SyncCacheViewAuthenticPixels(unsharp_view,exception) == MagickFalse)
-    (*status)=MagickFalse;
+  SyncSharpenRow(status,unsharp_view,exception);
   return(MagickTrue);
 }
 
