@@ -54,9 +54,11 @@ if [ "$mode" = cover ]; then
   status=0
   for fn in "$@"; do
     awk -F: -v fn="$fn" '
-      BEGIN { re = "^(static|MagickExport|MagickPrivate).*[ *]" fn "\\(" }
+      BEGIN { re = "^(static|MagickExport|MagickPrivate).*[ *]" fn "\\(";
+              cont = "^  \\**" fn "\\(" }
       { src = $0; sub(/^[^:]*:[^:]*:/, "", src); c = $1; gsub(/ /, "", c); n = $2 + 0 }
-      !inside && src ~ re { inside = 1; found = 1 }
+      !inside && (src ~ re || (src ~ cont && head)) { inside = 1; found = 1 }
+      { head = (src ~ /^static [^;]*$/ && src !~ /\)$/) }
       inside {
         if (c != "-") { e++; if (c ~ /^#####|^=====/) { u++; lines = lines " " n } }
         if (src ~ /^}/) inside = 0

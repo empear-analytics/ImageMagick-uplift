@@ -38,12 +38,15 @@ expect DIFFERENT "$tmp/planted-last.c"
 expect DIFFERENT "$tmp/planted-bit.c"
 # cover: a packer every configuration runs reports no line left; XLogXImage, which the
 # harness never calls, and a name the file lacks make it fail.
-cover() {  # cover WANT_STATUS FUNCTION
+cover() {  # cover WANT_STATUS FUNCTION [FILE]
   local out st
-  out=$(XPACK_CAND="$tmp/orig.c" bash tools/xpack_compare.sh cover HEAD "$2" 2>&1); st=$?
+  out=$(XPACK_CAND="${3:-$tmp/orig.c}" bash tools/xpack_compare.sh cover HEAD "$2" 2>&1); st=$?
   if [ "$st" = "$1" ]; then echo "ok   cover $2 exit $st"; else echo "FAIL cover $2 exit $st, expected $1: $out"; fail=1; fi
 }
 cover 0 XPackCanvasMSB
+# a definition whose name stands on the second line (an attribute made the first too long)
+sed 's/^static void XPackCanvasMSB(/static void\n  XPackCanvasMSB(/' "$tmp/orig.c" > "$tmp/split.c"
+cover 0 XPackCanvasMSB "$tmp/split.c"
 cover 1 XLogXImage
 cover 1 NoSuchFunctionInTheFile
 exit $fail
