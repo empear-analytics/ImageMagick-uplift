@@ -614,6 +614,21 @@ static void XSetDrawStipple(Display *display,const GC draw_context,
     }
 }
 
+static void XDrawPolygonOutline(Display *display,
+  const Pixmap draw_pixmap,const GC draw_context,const XDrawInfo *draw_info)
+{
+  XPoint
+    *coordinate_info;
+
+  coordinate_info=draw_info->coordinate_info;
+  (void) XDrawLines(display,draw_pixmap,draw_context,coordinate_info,
+    (int) draw_info->number_coordinates,CoordModeOrigin);
+  (void) XDrawLine(display,draw_pixmap,draw_context,
+    coordinate_info[draw_info->number_coordinates-1].x,
+    coordinate_info[draw_info->number_coordinates-1].y,
+    coordinate_info[0].x,coordinate_info[0].y);
+}
+
 static void XDrawElementToPixmap(Display *display,const Pixmap draw_pixmap,
   const GC draw_context,const XDrawInfo *draw_info)
 {
@@ -637,16 +652,7 @@ static void XDrawElementToPixmap(Display *display,const Pixmap draw_pixmap,
     }
     case PolygonElement:
     {
-      XPoint
-        *coordinate_info;
-
-      coordinate_info=draw_info->coordinate_info;
-      (void) XDrawLines(display,draw_pixmap,draw_context,coordinate_info,
-        (int) draw_info->number_coordinates,CoordModeOrigin);
-      (void) XDrawLine(display,draw_pixmap,draw_context,
-        coordinate_info[draw_info->number_coordinates-1].x,
-        coordinate_info[draw_info->number_coordinates-1].y,
-        coordinate_info[0].x,coordinate_info[0].y);
+      XDrawPolygonOutline(display,draw_pixmap,draw_context,draw_info);
       break;
     }
     case FillPolygonElement:
