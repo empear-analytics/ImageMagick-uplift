@@ -150,22 +150,31 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static ssize_t LoadColorMatrixRow(const KernelInfo *color_matrix,
+  double ColorMatrix[][6],const ssize_t v,ssize_t i)
+{
+  ssize_t
+    u;
+
+  for (u=0; u < (ssize_t) color_matrix->width; u++)
+  {
+    if ((v < 6) && (u < 6))
+      ColorMatrix[v][u]=color_matrix->values[i];
+    i++;
+  }
+  return(i);
+}
+
 static void LoadColorMatrix(const KernelInfo *color_matrix,
   double ColorMatrix[][6])
 {
   ssize_t
     i,
-    u,
     v;
 
   i=0;
   for (v=0; v < (ssize_t) color_matrix->height; v++)
-    for (u=0; u < (ssize_t) color_matrix->width; u++)
-    {
-      if ((v < 6) && (u < 6))
-        ColorMatrix[v][u]=color_matrix->values[i];
-      i++;
-    }
+    i=LoadColorMatrixRow(color_matrix,ColorMatrix,v,i);
 }
 
 static double GetColorMatrixSum(const Image *image,
