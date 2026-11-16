@@ -1552,6 +1552,20 @@ static void SetPolarCoefficients(double *coeff,const Image *image,
     coeff[5] += Magick2PI; /* same angle is a full circle */
 }
 
+static void SetPolarRatios(double *coeff,const Image *image,
+  const DistortMethod *method)
+{
+  /* conversion ratios */
+  if ( *method == PolarDistortion ) {
+    coeff[6]=(double) image->columns/(coeff[5]-coeff[4]);
+    coeff[7]=(double) image->rows/(coeff[0]-coeff[1]);
+  }
+  else { /* *method == DePolarDistortion */
+    coeff[6]=(coeff[5]-coeff[4])/image->columns;
+    coeff[7]=(coeff[0]-coeff[1])/image->rows;
+  }
+}
+
 static double *PolarCoefficients(double *coeff,const DistortMethod *method,
   const CoefficientContext *context)
 {
@@ -1596,15 +1610,7 @@ static double *PolarCoefficients(double *coeff,const DistortMethod *method,
     coeff=(double *) RelinquishMagickMemory(coeff);
     return((double *) NULL);
   }
-  /* conversion ratios */
-  if ( *method == PolarDistortion ) {
-    coeff[6]=(double) image->columns/(coeff[5]-coeff[4]);
-    coeff[7]=(double) image->rows/(coeff[0]-coeff[1]);
-  }
-  else { /* *method == DePolarDistortion */
-    coeff[6]=(coeff[5]-coeff[4])/image->columns;
-    coeff[7]=(coeff[0]-coeff[1])/image->rows;
-  }
+  SetPolarRatios(coeff,image,method);
   return(coeff);
 }
 
