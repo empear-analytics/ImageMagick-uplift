@@ -1206,6 +1206,17 @@ static double *PerspectiveProjectionCoefficients(double *coeff,
   return(coeff);
 }
 
+static void SetBilinearVectors(double **vectors,double *coeff,
+  const size_t number_values)
+{
+  size_t
+    i;
+
+  /* fake a number_values x4 vectors matrix from coefficients array */
+  for (i=0; i < number_values; i++)
+    vectors[i] = &(coeff[i*4]);
+}
+
 static MagickBooleanType SolveBilinearCoefficients(double *coeff,
   double **matrix,double **vectors,const CoefficientContext *context)
 {
@@ -1229,9 +1240,7 @@ static MagickBooleanType SolveBilinearCoefficients(double *coeff,
   MagickBooleanType
     status;
 
-  /* fake a number_values x4 vectors matrix from coefficients array */
-  for (i=0; i < number_values; i++)
-    vectors[i] = &(coeff[i*4]);
+  SetBilinearVectors(vectors,coeff,number_values);
   /* Add given control point pairs for least squares solving */
   for (i=0; i < number_arguments; i+=cp_size) {
     terms[0] = arguments[i+cp_x];   /*  x  */
