@@ -2698,6 +2698,15 @@ static void AddRankedBlurGaussian(KernelInfo *kernel,const ssize_t v,
   }
 }
 
+static void SetBlurKernelWidth(KernelInfo *kernel,const GeometryInfo *args,
+  const double sigma)
+{
+  if ( args->rho >= 1.0 )
+    kernel->width = CastDoubleToSizeT(args->rho)*2+1;
+  else
+    kernel->width = GetOptimalKernelWidth1D(args->rho,sigma);
+}
+
 static KernelInfo *AcquireBlurKernel(KernelInfo *kernel,
   const GeometryInfo *args)
 {
@@ -2708,10 +2717,7 @@ static KernelInfo *AcquireBlurKernel(KernelInfo *kernel,
     sigma = fabs(args->sigma),
     alpha, beta;
 
-  if ( args->rho >= 1.0 )
-    kernel->width = CastDoubleToSizeT(args->rho)*2+1;
-  else
-    kernel->width = GetOptimalKernelWidth1D(args->rho,sigma);
+  SetBlurKernelWidth(kernel,args,sigma);
   kernel->height = 1;
   kernel->x = (ssize_t) (kernel->width-1)/2;
   kernel->y = 0;
