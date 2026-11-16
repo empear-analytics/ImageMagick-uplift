@@ -692,12 +692,22 @@ static void DivideEvaluatePixel(const Image *image,const size_t number_images,
     evaluate_pixel[x].channel[i]/=(double) number_images;
 }
 
+static void RootMeanSquareEvaluatePixel(const Image *image,
+  const size_t number_images,PixelChannels *evaluate_pixel,const ssize_t x)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    evaluate_pixel[x].channel[i]=sqrt(evaluate_pixel[x].channel[i]/
+      number_images);
+}
+
 static void NormalizeEvaluatePixels(const Image *image,
   const MagickEvaluateOperator op,const size_t number_images,
   PixelChannels *evaluate_pixel)
 {
   ssize_t
-    i,
     x;
 
   for (x=0; x < (ssize_t) image->columns; x++)
@@ -716,9 +726,7 @@ static void NormalizeEvaluatePixels(const Image *image,
       }
       case RootMeanSquareEvaluateOperator:
       {
-        for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          evaluate_pixel[x].channel[i]=sqrt(evaluate_pixel[x].channel[i]/
-            number_images);
+        RootMeanSquareEvaluatePixel(image,number_images,evaluate_pixel,x);
         break;
       }
       default:
