@@ -21670,7 +21670,12 @@ row (or drive a row loop that calls such a function), and one copy, or both, run
 oracle case because only an environment the oracle cannot provide selects it: the
 `XPack*LSB` and `XPack*MSB` row packers of `xwindow-image.c`, of which the MSB-first side
 runs only for an X server whose byte order is MSB-first (the oracle's server is
-LSB-first). The finding is *Number of Functions in a Single Module* (each merge removes a
+LSB-first). Under the owner's ruling of 2026-11-16 (answers to the round-twenty-five
+questions) it also covers the per-pixel twins of `xwindow-annotate.c`'s annotate and draw
+transfer (`SetAnnotateBoxPixel` and `SetAnnotatePenPixel`), which the wide oracle reaches
+only through its scripted X sessions, with the stencils those sessions choose: there the
+harness stands beside the oracle, not in place of it, and step 7's oracle run on the
+copies' caller is required. The finding is *Number of Functions in a Single Module* (each merge removes a
 function), or the *Code Duplication* the twins would show in a product of a later Recipe S
 carve (`xwindow-image.c`'s 146-function cut scored 7.10 and 6.89 in round twenty-two with
 *Code Duplication* in 57 functions, most of them such twins).
@@ -21694,7 +21699,10 @@ merges blocks of one function, not whole functions, and only when they differ in
    the working tree against one library, calls the copies' callers on synthetic inputs
    without the environment the oracle lacks, and compares every byte they write, with a
    planted-defect test (for `xwindow-image.c`: `tools/xpack_compare.sh` and
-   `tools/test_xpack_compare.sh`). Before the edit, its `cover` mode must report every
+   `tools/test_xpack_compare.sh`; for `xwindow-annotate.c`: `tools/xannotate_compare.sh`
+   and `tools/test_xannotate_compare.sh`, which call `XTransferAnnotatePixels` and
+   `XTransferDrawPixels` on hand-made XImages for every stencil and have the same
+   `check`, `cover` and `time` modes; steps 7 and 8 then name that script). Before the edit, its `cover` mode must report every
    line of both copies run (`tools/xpack_compare.sh cover HEAD <copyA> <copyB>`: `0 not
    run`); a line no configuration runs stops the step until a `tools:` commit adds a
    configuration that runs it. Exempt is a line outside every differing run that only a
@@ -22389,3 +22397,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | AMEND | S | Step 2: a later split may put the helpers it shares into a second private header, `<stem>-<family>-private.h`, that includes the first and that only the files using the family include; it is written, registered and scored as the first header, every item used by at least two of its including files | `quantize.c`'s remap split: one header of 2,600 lines scored 9.38 (Lines of Code) and put the assign and dither family in `quantize-kmeans.c`'s view; a second header leaves `quantize-private.h` at 10.0. A reading of the core-header and shared-header rulings of 2026-11-16, for the owner's confirmation | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | S | Step 2: a file-scope `static const` declaration of arithmetic type that a moving helper names moves into the private header verbatim, declared only there; each including file has its own internal-linkage copy with the same initialiser, and nothing writes it; the read-only accessor stays the form when no moving helper names it; an `#if`/`#else` macro block moves under the `CacheShift` sentence's terms | `segment.c` (campaign A, W36 lane a): its shared scale-space core names `SafeMargin`, `TreeLength`, `Red`, `Green` and `Blue`, one `static const int` declaration; round twenty-four's question 7. The ruling is the owner's, the wording the lane's | owner |
 | 2026-11-16 | NEW | CH | Share an Identical Header Helper Through a Common Private Header: a `static inline` helper defined byte-identically in several private headers moves to one new private header that each of them includes; proof: every including `.c` file compiles to a byte-identical object (`-g0`, `__FILE__`/`__LINE__` pinned) against HEAD's and the new headers; a helper whose definitions differ in anything, its name included, is not taken | `ReleaseFailedImage` in `effect-private.h`, `effect-blur-adaptive-filters-private.h` and `visual-effects-pixel-methods-private.h` (campaign A, W36 lane a); round twenty-four's question 4. The ruling is the owner's; the recipe, its object proof and the exclusion of renamed twins (`SetBlurProgress`/`ReportRowProgress`) are the lane's | mandate (2026-10-24) |
+| 2026-11-16 | AMEND | TH | *Use when*: also the per-pixel twins of `xwindow-annotate.c`'s annotate and draw transfer (`SetAnnotateBoxPixel`/`SetAnnotatePenPixel`), with the harness beside the oracle (step 7's oracle run on the copies' caller required); step 2 names that file's harness, `tools/xannotate_compare.sh` (`check`, `cover`, `time`) and its planted-defect test `tools/test_xannotate_compare.sh` (839a24a20) | The owner's ruling of 2026-11-16 on round twenty-five's question 3 (a timing harness for the annotate and draw paths so their per-pixel twins can take Recipe TH); the wide oracle reaches both copies (29 cases, scripted X sessions) but not every stencil, which the harness runs. The ruling is the owner's, the wording and the harness the lane's | owner |
