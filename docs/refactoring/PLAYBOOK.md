@@ -11844,7 +11844,8 @@ how an existing fill is rewritten. Recipe H, which moves preprocessor lines.
    The call is one expression statement ending in `;` (`F(...,&name,...);` or
    `v=F(...,&name,...);`), or the whole controlling expression of an `if` statement
    with no `else`, compared with a constant (`if (F(...,&name,...) == MagickFalse)
-   S`), whose body `S` does not name `name` (2026-11-11); the run and the call stand in
+   S`), whose body `S` does not name `name` (2026-11-11), or the whole expression of a
+   `return` statement (`return(F(...,&name,...));`, 2026-11-16); the run and the call stand in
    the same compound statement, and neither is the unbraced body of an `if`, `else` or
    loop, nor carries a label.
 4. Delete the declaration of `name` (with the blank line after it; a type line left with
@@ -11906,7 +11907,11 @@ how an existing fill is rewritten. Recipe H, which moves preprocessor lines.
   reaches them (C11 6.8p3), once per pass as the run was. Every member is set, so none
   is left to zero where it held an indeterminate value before. The struct now lives
   only for the call, which was its only use (step 3); `const` is a promise the compiler
-  checks, and the pointer-to-`const` parameter says the callee keeps to it.
+  checks, and the pointer-to-`const` parameter says the callee keeps to it. A call that
+  is a `return` statement's expression (step 3) is evaluated, the struct still alive,
+  before the function returns its value; leaving the compound statement through that
+  `return` ends the struct's lifetime as leaving the function ended the local's, and
+  nothing could read either afterwards.
 - The compound statement is not a decision: it adds no branch and no conditional
   nesting, and it is how C89 lets a declaration stand after statements
   (`-Wdeclaration-after-statement` is met). The name is declared once, in the inner
@@ -21929,3 +21934,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | AMEND | S | Step 2: a small `static` helper both parts call is shared, one per split, by moving its definition unchanged but for `inline` into a new non-installed `MagickCore/<stem>-private.h` (`MAGICKCORE_NOINST_HDRS` and `MAGICKCORE_BASE_SRCS`, mirrored in `Makefile.in`) that the original includes at the end of its include block, so the new file's copy includes it too; the helper calls no other static, names no file-scope object, type or macro of the original, holds no `static` local or pragma and has no address taken; copying and `MagickPrivate` widening stay refused; a family needing two helpers, or a helper with a type or macro, at once is still refused. *Careful* gives the argument (internal linkage in each file, one source text, no shared state, `inline` a hint) | Owner question (1) of the W32 round-twenty-one report: `threshold-image.c`, `enhance-tone.c` and `effect-filter.c` were refused by `split_source.py` for statics every root calls (`SetThresholdProgress`, `SetToneProgress`, `ReleaseFailedImage`) | owner |
 | 2026-11-16 | AMEND | S | Step 2: several `static` helpers may share the one non-installed header of one split, each on the one-helper terms (a helper may call or name another helper, typedef or macro that moves with it); a typedef that both parts or a moving helper name moves into the header verbatim (one file-scope declaration, no preprocessor line inside, library member types), and so does a file-scope `#define` no line redefines or undefines, each defined only there; a later split in a chain includes the same header and may add to it. *Careful* gives the argument (one definition per translation unit from one text; macros expand to the same tokens) | The owner's answers to the round-twenty-two questions (AGENTS.md, 2026-11-16): `threshold-image.c` and `enhance-tone.c` were refused because every cut shares three row helpers and the `ThresholdLine` / `ToneLine` typedef | owner |
 | 2026-11-16 | AMEND | S | Step 2: a macro that each part defines for itself (every `#define NAME` the same line byte for byte, no `#undef`, and in each part the first line naming it is such a define) neither moves nor refuses the split; `split_source.py` accepts it (its own `tools:` commit). *Careful* gives the argument (identical redefinitions, C11 6.10.3p2: each use expands to the same tokens) | `threshold-image.c`'s progress tag `ThresholdImageTag`, defined in six function bodies, three on each side of the cut at the `ThresholdImageRows` family; the tool refused it as a macro of the kept part used in the region | mandate (2026-10-24) |
+| 2026-11-16 | AMEND | FB | Step 3: the one call may also be the whole expression of a `return` statement, `return(F(...,&name,...));`; *Careful* gives the argument (the call is evaluated while the struct lives, and nothing reads the struct or the local after the return) | `montage.c`'s `MontageImageList` (campaign A, W34 lane c): its `MontagePages` fill (24 assignments) directly before `return(ComposeMontagePages(&pages));`, the tail Recipe N moved; as assignments the fill would move with the next extraction and make that helper a *Large Method*; a probe of the chain with the fill as an initialiser: 8.85 at this step, 9.38 after the next | mandate (2026-10-24) |
