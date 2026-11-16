@@ -350,6 +350,12 @@ static MagickBooleanType ColorMatrixImageRow(
   return(MagickTrue);
 }
 
+static void LogColorMatrixIfDebug(const Image *image,double ColorMatrix[][6])
+{
+  if (image->debug != MagickFalse)
+    LogColorMatrix(ColorMatrix);
+}
+
 MagickExport Image *ColorMatrixImage(const Image *image,
   const KernelInfo *color_matrix,ExceptionInfo *exception)
 {
@@ -397,8 +403,7 @@ MagickExport Image *ColorMatrixImage(const Image *image,
   */
   if (CloneEffectImage(image,&color_image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (image->debug != MagickFalse)
-    LogColorMatrix(ColorMatrix);
+  LogColorMatrixIfDebug(image,ColorMatrix);
   /*
     Apply the ColorMatrix to image.
   */
