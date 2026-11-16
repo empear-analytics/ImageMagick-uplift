@@ -372,6 +372,14 @@ typedef struct _ShadeImageTargets
     **shade_image;
 } ShadeImageTargets;
 
+static void DestroyShadeImages(Image **linear_image,Image **shade_image)
+{
+  if ((*linear_image) != (Image *) NULL)
+    (*linear_image)=DestroyImage((*linear_image));
+  if ((*shade_image) != (Image *) NULL)
+    (*shade_image)=DestroyImage((*shade_image));
+}
+
 static MagickBooleanType AcquireShadeImages(const Image *image,
   ExceptionInfo *exception,const ShadeImageTargets *targets)
 {
@@ -383,10 +391,7 @@ static MagickBooleanType AcquireShadeImages(const Image *image,
   (*shade_image)=CloneImage(image,0,0,MagickTrue,exception);
   if (((*linear_image) == (Image *) NULL) || ((*shade_image) == (Image *) NULL))
     {
-      if ((*linear_image) != (Image *) NULL)
-        (*linear_image)=DestroyImage((*linear_image));
-      if ((*shade_image) != (Image *) NULL)
-        (*shade_image)=DestroyImage((*shade_image));
+      DestroyShadeImages(linear_image,shade_image);
       return(MagickFalse);
     }
   if (SetImageStorageClass((*shade_image),DirectClass,exception) == MagickFalse)
