@@ -6807,25 +6807,29 @@ static double TransposeKernel(KernelInfo *kernel,double angle)
   return(angle);
 }
 
+static void RotateSquareKernelValues(KernelInfo *kernel)
+{
+  ssize_t
+    i,j,x,y;
+
+  MagickRealType
+    *k,t;
+
+  k=kernel->values;
+  for( i=0, x=(ssize_t) kernel->width-1;  i<=x;   i++, x--)
+    for( j=0, y=(ssize_t) kernel->height-1;  j<y;   j++, y--)
+      { t                    = k[i+j*(ssize_t) kernel->width];
+        k[i+j*(ssize_t) kernel->width] = k[j+x*(ssize_t) kernel->width];
+        k[j+x*(ssize_t) kernel->width] = k[x+y*(ssize_t) kernel->width];
+        k[x+y*(ssize_t) kernel->width] = k[y+i*(ssize_t) kernel->width];
+        k[y+i*(ssize_t) kernel->width] = t;
+      }
+}
+
 static double RotateSquareKernelBy90Degrees(KernelInfo *kernel,double angle)
 {
   /* Rotate a square array of values by 90 degrees */
-  { ssize_t
-      i,j,x,y;
-
-    MagickRealType
-      *k,t;
-
-    k=kernel->values;
-    for( i=0, x=(ssize_t) kernel->width-1;  i<=x;   i++, x--)
-      for( j=0, y=(ssize_t) kernel->height-1;  j<y;   j++, y--)
-        { t                    = k[i+j*(ssize_t) kernel->width];
-          k[i+j*(ssize_t) kernel->width] = k[j+x*(ssize_t) kernel->width];
-          k[j+x*(ssize_t) kernel->width] = k[x+y*(ssize_t) kernel->width];
-          k[x+y*(ssize_t) kernel->width] = k[y+i*(ssize_t) kernel->width];
-          k[y+i*(ssize_t) kernel->width] = t;
-        }
-  }
+  RotateSquareKernelValues(kernel);
   /* rotate the origin - relative to center of array */
   { ssize_t x,y;
     x = (ssize_t) (kernel->x*2-(ssize_t) kernel->width+1);
