@@ -800,6 +800,19 @@ static double *RigidAffineCoefficients(double *coeff,DistortMethod *method,
   return(coeff);
 }
 
+static void SetAffineProjectionCoefficients(double *coeff,
+  const double *arguments)
+{
+  size_t
+    i;
+
+  double inverse[8];
+  for(i=0; i<6UL; i++ )
+    inverse[i] = arguments[i];
+  AffineArgsToCoefficients(inverse); /* map into coefficients */
+  InvertAffineCoefficients(inverse, coeff); /* invert */
+}
+
 static double *AffineProjectionCoefficients(double *coeff,
   DistortMethod *method,const CoefficientContext *context)
 {
@@ -811,9 +824,6 @@ static double *AffineProjectionCoefficients(double *coeff,
 
   const size_t
     number_arguments = context->number_arguments;
-
-  size_t
-    i;
 
   /*
     Arguments: Affine Matrix (forward mapping)
@@ -828,7 +838,6 @@ static double *AffineProjectionCoefficients(double *coeff,
        + Will only work with a 2 number_values for Image Distortion
        + Can not be used for generating a sparse gradient (interpolation)
   */
-  double inverse[8];
   if (number_arguments != 6) {
     coeff = (double *) RelinquishMagickMemory(coeff);
     (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
@@ -837,10 +846,7 @@ static double *AffineProjectionCoefficients(double *coeff,
     return((double *) NULL);
   }
   /* FUTURE: trap test for sx*sy-rx*ry == 0 (determinant = 0, no inverse) */
-  for(i=0; i<6UL; i++ )
-    inverse[i] = arguments[i];
-  AffineArgsToCoefficients(inverse); /* map into coefficients */
-  InvertAffineCoefficients(inverse, coeff); /* invert */
+  SetAffineProjectionCoefficients(coeff,arguments);
   *method = AffineDistortion;
 
   return(coeff);
