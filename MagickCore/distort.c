@@ -4729,6 +4729,18 @@ static MagickBooleanType CreateDistortImage(const DistortCreateInput *create,
   return(MagickTrue);
 }
 
+static void ResetArcPage(Image *distort_image,const DistortMethod method,
+  const MagickBooleanType bestfit,const MagickBooleanType viewport_given)
+{
+  /* Arc does not return an offset unless 'bestfit' is in effect
+     And the user has not provided an overriding 'viewport'.
+   */
+  if (IsArcPageReset(method,bestfit,viewport_given) != MagickFalse) {
+    distort_image->page.x = 0;
+    distort_image->page.y = 0;
+  }
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -4803,13 +4815,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   if (CreateDistortImage(&create,coeff,&distort_image) == MagickFalse)
     return((Image *) NULL);
 
-  /* Arc does not return an offset unless 'bestfit' is in effect
-     And the user has not provided an overriding 'viewport'.
-   */
-  if (IsArcPageReset(method,bestfit,viewport_given) != MagickFalse) {
-    distort_image->page.x = 0;
-    distort_image->page.y = 0;
-  }
+  ResetArcPage(distort_image,method,bestfit,viewport_given);
   coeff=(double *) RelinquishMagickMemory(coeff);
   return(distort_image);
 }
