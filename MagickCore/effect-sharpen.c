@@ -418,6 +418,19 @@ static MagickBooleanType ShadeHeadRow(MagickBooleanType *status,
   return(MagickTrue);
 }
 
+static PrimaryInfo GetShadeLight(const double azimuth,const double elevation)
+{
+  PrimaryInfo
+    light;
+
+  light.x=(double) QuantumRange*cos(DegreesToRadians(azimuth))*
+    cos(DegreesToRadians(elevation));
+  light.y=(double) QuantumRange*sin(DegreesToRadians(azimuth))*
+    cos(DegreesToRadians(elevation));
+  light.z=(double) QuantumRange*sin(DegreesToRadians(elevation));
+  return(light);
+}
+
 MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
   const double azimuth,const double elevation,ExceptionInfo *exception)
 {
@@ -460,11 +473,7 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
   /*
     Compute the light vector.
   */
-  light.x=(double) QuantumRange*cos(DegreesToRadians(azimuth))*
-    cos(DegreesToRadians(elevation));
-  light.y=(double) QuantumRange*sin(DegreesToRadians(azimuth))*
-    cos(DegreesToRadians(elevation));
-  light.z=(double) QuantumRange*sin(DegreesToRadians(elevation));
+  light=GetShadeLight(azimuth,elevation);
   /*
     Shade image.
   */
