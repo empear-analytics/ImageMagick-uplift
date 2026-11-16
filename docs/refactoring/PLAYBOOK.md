@@ -21488,7 +21488,10 @@ merges blocks of one function, not whole functions, and only when they differ in
    `tools/test_xpack_compare.sh`). Before the edit, its `cover` mode must report every
    line of both copies run (`tools/xpack_compare.sh cover HEAD <copyA> <copyB>`: `0 not
    run`); a line no configuration runs stops the step until a `tools:` commit adds a
-   configuration that runs it.
+   configuration that runs it. Exempt is a line outside every differing run that only a
+   failure path reaches (the `break;` after a pixel fetch that returned `NULL`), when
+   step 7's fold check shows it the same in both copies; the message names each such
+   line.
 3. Selector. The two sides take one `typedef enum { NameA, NameB } NameSide;`, written
    directly above the first merged function of the file; every later merge of the same two
    sides reuses it (`XPackBitOrder`, `XPackLSBFirst`, `XPackMSBFirst`).
@@ -21519,9 +21522,11 @@ merges blocks of one function, not whole functions, and only when they differ in
    at 0 diverged; read each initialiser of step 5 against the parameter it replaced.
 8. Timing. `tools/xpack_compare.sh time <rev> <config> 9` on one configuration of each
    copy's path (9 alternating runs of base and candidate, both medians and their ratio
-   quoted). A ratio above 1.03 on either path stops the step (AGENTS.md: no slowdown
-   beyond noise); ratios within that band are reported as "no slowdown", never as a
-   speedup.
+   quoted). A ratio above 1.03 is measured once more with 21 runs, next to a run of the
+   base against itself (`XPACK_CAND` set to the base file); the step stops if the
+   21-run ratio is still above 1.03 (AGENTS.md: no slowdown beyond noise). Every
+   measurement is quoted; ratios within the band are reported as "no slowdown", never
+   as a speedup.
 
 **Before:**
 
@@ -22064,3 +22069,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | AMEND | S | Step 2: a small `static` helper both parts call is shared, one per split, by moving its definition unchanged but for `inline` into a new non-installed `MagickCore/<stem>-private.h` (`MAGICKCORE_NOINST_HDRS` and `MAGICKCORE_BASE_SRCS`, mirrored in `Makefile.in`) that the original includes at the end of its include block, so the new file's copy includes it too; the helper calls no other static, names no file-scope object, type or macro of the original, holds no `static` local or pragma and has no address taken; copying and `MagickPrivate` widening stay refused; a family needing two helpers, or a helper with a type or macro, at once is still refused. *Careful* gives the argument (internal linkage in each file, one source text, no shared state, `inline` a hint) | Owner question (1) of the W32 round-twenty-one report: `threshold-image.c`, `enhance-tone.c` and `effect-filter.c` were refused by `split_source.py` for statics every root calls (`SetThresholdProgress`, `SetToneProgress`, `ReleaseFailedImage`) | owner |
 | 2026-11-16 | NEW | TH | Merge Twin Functions Through a Constant Selector, Checked by a Harness: Recipe TI's merge (one `static inline` function, a `NameSide` selector, each differing run `((side == NameA) ? runA : runB)`, the copies leave) for twins of which one or both run in no oracle case, with a committed harness standing in for the oracle: its `cover` mode must show every line of both copies run before the edit and of the merged function after it, its `check` must print IDENTICAL, `tools/twin_fold_check.py` must fold the merged function back to each copy, `nm` must show it inlined, and each path is timed (9 alternating runs, ratio above 1.03 stops the step; within it, reported as no slowdown). Selector enum and struct reused by later merges; at most three parameters may take the selector as a parameter | `xwindow-image.c`'s `XPack*` LSB/MSB packers (campaign A, W34 lane b): the MSB-first side runs only for an MSB-first X server, which the oracle lacks. The owner's ruling of 2026-11-16 allows the timed merge chain; the wording is the lane's. Round twenty-two wrote it as a TI amendment with `Decided by: owner`; its reviewer asked for a new recipe (a different evidence level) and an honest decider | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | TH | Step 4: a differing run that is the selector's own constant (a copy passing `XPackLSBFirst` on to an earlier merged function) is written `side`, not `((side == NameA) ? NameA : NameB)`; `tools/twin_fold_check.py` (6e06e005d) writes the copy's constant back for the selector before comparing | The row drivers `XPackColormapped4BitLSB` and `...MSB` of `xwindow-image.c` differ, after the first merge, only in that constant; the conditional form would compare a constant with itself | mandate (2026-10-24) |
+| 2026-11-16 | AMEND | TH | Step 2: a line outside every differing run that only a failure path reaches (the `break;` after a `NULL` pixel fetch), the same in both copies by the fold check, need not run in the harness; the message names it. Step 8: a ratio above 1.03 is measured again with 21 runs beside an A/A run of the base against itself, the step stopping if the 21-run ratio stays above 1.03; every measurement quoted | The row drivers of `xwindow-image.c` hold such a `break;` (the harness cannot make the pixel cache fail); a 9-to-11-run timing under the load of three lanes swung 0.93 to 1.06 on one step, where 21 runs gave 0.96 and 1.00 and an A/A run 1.00 | mandate (2026-10-24) |
