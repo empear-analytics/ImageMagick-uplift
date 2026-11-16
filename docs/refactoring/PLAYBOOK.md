@@ -985,6 +985,13 @@ unreached one takes *Unreached functions* instead), the OpenMP condition of the 
 with no new helper finding and no new *Code Duplication*; the commit names the finding
 it removes and says that no *Code Duplication* was reported. A warning the block
 throws with `GetMagickModule()` now names the helper, which the oracle normalises.
+Form (b) may also serve the file's *Overall Code Complexity* (mandate, 2026-10-24; text
+added 2026-11-16, after its first use, 34f5fb29e in `effect-sharpen.c`) when the step
+belongs to a probed rule-2 plan: the message states the probe (the plan's steps applied
+together to a scratch copy and scored, and what any subset scored) and names the step's
+place in it; every other condition of the form stands. The replacement removes the
+block's branches from the function and adds no function, so it lowers the file's mean
+cyclomatic complexity as removing a function finding does.
 
 **A helper defined further down, or taking an input struct** (2026-11-11). Form (b),
 *Unreached functions* and *Object code that differs only in the caller* may call a
@@ -1214,8 +1221,8 @@ is worth it.
    `{ image, image_view, exception }` row context of its row helpers). A file-scope one-line
    or multi-line `#define` that both parts or a moving helper name moves the same way,
    verbatim, defined only in the header, when no line of the original `#undef`s or
-   redefines it. A macro that each part defines for itself needs neither (mandate,
-   2026-11-16): when every `#define NAME` of the original is the same one line, byte for
+   redefines it. A macro that each part defines for itself needs neither (under the
+   mandate of 2026-10-24; text and tool change of 2026-11-16): when every `#define NAME` of the original is the same one line, byte for
    byte, no line `#undef`s `NAME`, and in the kept part and in the family alike the first
    line that names `NAME` is such a define (a progress tag defined in each function body
    that names it, as `threshold-image.c`'s `ThresholdImageTag` in six), each file keeps
@@ -6341,6 +6348,15 @@ end, which is wrong for a block that reads the shared value or may leave it alon
 and Recipe O: E's OpenMP rule refuses any write to a variable declared outside the loop
 body, and O refuses every block inside an OpenMP region. Recipe Q and Recipe K: sequential
 functions only.
+A block of Recipe T's shape (it writes `status` only as `status=MagickFalse;` and never
+reads it) may still take this recipe (mandate, 2026-10-24; text added 2026-11-16, after
+its first use) when the same probed rule-2 plan also reuses the new helper through the
+status pointer by a Recipe D step (form (b), or its parallel-loop paragraph), as
+`effect-sharpen.c`'s sync test did: PS in ShadeImage's loop (83684530a), then D in
+UnsharpHeadRow (34f5fb29e). Recipe T's form would leave the caller's `if` in place and
+give the D step nothing to reuse. The argument is PS *Careful*'s: `(*status)` is the
+shared flag, written at the same point, nothing copied or deferred; a block that never
+reads `status` is the easier case of it.
 
 **How:**
 
@@ -21929,3 +21945,6 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | AMEND | S | Step 2: a small `static` helper both parts call is shared, one per split, by moving its definition unchanged but for `inline` into a new non-installed `MagickCore/<stem>-private.h` (`MAGICKCORE_NOINST_HDRS` and `MAGICKCORE_BASE_SRCS`, mirrored in `Makefile.in`) that the original includes at the end of its include block, so the new file's copy includes it too; the helper calls no other static, names no file-scope object, type or macro of the original, holds no `static` local or pragma and has no address taken; copying and `MagickPrivate` widening stay refused; a family needing two helpers, or a helper with a type or macro, at once is still refused. *Careful* gives the argument (internal linkage in each file, one source text, no shared state, `inline` a hint) | Owner question (1) of the W32 round-twenty-one report: `threshold-image.c`, `enhance-tone.c` and `effect-filter.c` were refused by `split_source.py` for statics every root calls (`SetThresholdProgress`, `SetToneProgress`, `ReleaseFailedImage`) | owner |
 | 2026-11-16 | AMEND | S | Step 2: several `static` helpers may share the one non-installed header of one split, each on the one-helper terms (a helper may call or name another helper, typedef or macro that moves with it); a typedef that both parts or a moving helper name moves into the header verbatim (one file-scope declaration, no preprocessor line inside, library member types), and so does a file-scope `#define` no line redefines or undefines, each defined only there; a later split in a chain includes the same header and may add to it. *Careful* gives the argument (one definition per translation unit from one text; macros expand to the same tokens) | The owner's answers to the round-twenty-two questions (AGENTS.md, 2026-11-16): `threshold-image.c` and `enhance-tone.c` were refused because every cut shares three row helpers and the `ThresholdLine` / `ToneLine` typedef | owner |
 | 2026-11-16 | AMEND | S | Step 2: a macro that each part defines for itself (every `#define NAME` the same line byte for byte, no `#undef`, and in each part the first line naming it is such a define) neither moves nor refuses the split; `split_source.py` accepts it (its own `tools:` commit). *Careful* gives the argument (identical redefinitions, C11 6.10.3p2: each use expands to the same tokens) | `threshold-image.c`'s progress tag `ThresholdImageTag`, defined in six function bodies, three on each side of the cut at the `ThresholdImageRows` family; the tool refused it as a macro of the kept part used in the region | mandate (2026-10-24) |
+| 2026-11-16 | AMEND | PS | *Not covered by*: a block of Recipe T's shape may take PS when the same probed rule-2 plan reuses the helper through the status pointer by a Recipe D step; text written after its first use | `effect-sharpen.c`: 83684530a (PS in ShadeImage's loop) and 34f5fb29e (D in UnsharpHeadRow), which the reviewer found outside the recipe text | mandate (2026-10-24) |
+| 2026-11-16 | AMEND | D | Form (b) of *Copies without a Code Duplication finding* may serve the file's *Overall Code Complexity* when the step belongs to a probed rule-2 plan stated in the message; text written after its first use | `effect-sharpen.c`'s 34f5fb29e, part of the five-step plan that took the file from 9.09 to 9.68 | mandate (2026-10-24) |
+| 2026-11-16 | WORDING | S | Step 2's self-defined-tag sentence names the mandate's date (2026-10-24) and the date of the text and tool change (2026-11-16), matching its Catalogue row | Reviewer of round twenty-three: the text said "mandate, 2026-11-16", the row "mandate (2026-10-24)" | mandate (2026-10-24) |
