@@ -423,6 +423,13 @@ static MagickBooleanType XDrawAnnotateText(Display *display,
   return(MagickTrue);
 }
 
+static void XSetAnnotateAlphaTrait(const XAnnotateInfo *annotate_info,
+  Image *annotate_image)
+{
+  if (annotate_info->stencil == ForegroundStencil)
+    annotate_image->alpha_trait=BlendPixelTrait;
+}
+
 MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
   const XPixelInfo *pixel,XAnnotateInfo *annotate_info,Image *image,
   ExceptionInfo *exception)
@@ -477,8 +484,7 @@ MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
   (void) XParseGeometry(annotate_info->geometry,&x,&y,&width,&height);
   (void) GetOneVirtualPixelInfo(image,UndefinedVirtualPixelMethod,(ssize_t) x,
     (ssize_t) y,&annotate_image->background_color,exception);
-  if (annotate_info->stencil == ForegroundStencil)
-    annotate_image->alpha_trait=BlendPixelTrait;
+  XSetAnnotateAlphaTrait(annotate_info,annotate_image);
   annotate_pixels.annotate_image=annotate_image;
   annotate_pixels.annotate_ximage=annotate_ximage;
   annotate_pixels.pixel=pixel;
