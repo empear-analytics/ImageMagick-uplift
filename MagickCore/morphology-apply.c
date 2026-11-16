@@ -1317,6 +1317,14 @@ static void SetCometKernelWidth(KernelInfo *kernel,const GeometryInfo *args,
     kernel->width = CastDoubleToSizeT(args->rho);
 }
 
+static void SetCometUnityKernel(KernelInfo *kernel)
+{
+  (void) memset(kernel->values,0, (size_t)
+    kernel->width*kernel->height*sizeof(*kernel->values));
+  kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
+  kernel->positive_range = 1.0;
+}
+
 static KernelInfo *AcquireCometKernel(KernelInfo *kernel,
   const GeometryInfo *args)
 {
@@ -1375,11 +1383,7 @@ static KernelInfo *AcquireCometKernel(KernelInfo *kernel,
 #endif
     }
   else /* special case - generate a unity kernel */
-    { (void) memset(kernel->values,0, (size_t)
-        kernel->width*kernel->height*sizeof(*kernel->values));
-      kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
-      kernel->positive_range = 1.0;
-    }
+    SetCometUnityKernel(kernel);
 
   kernel->minimum = 0.0;
   kernel->maximum = kernel->values[0];
