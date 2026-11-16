@@ -6778,6 +6778,18 @@ static double RotateKernelBy45Degrees(KernelInfo *kernel,double angle)
   return(angle);
 }
 
+static double TurnTransposedKernelAngle(KernelInfo *kernel,double angle)
+{
+  if ( kernel->width == 1 ) {
+    angle = fmod(angle+270.0, 360.0);     /* angle reduced 90 degrees */
+    kernel->angle = fmod(kernel->angle+90.0, 360.0);
+  } else {
+    angle = fmod(angle+90.0, 360.0);   /* angle increased 90 degrees */
+    kernel->angle = fmod(kernel->angle+270.0, 360.0);
+  }
+  return(angle);
+}
+
 static double TransposeKernel(KernelInfo *kernel,double angle)
 {
   /* Do a transpose of a 1 dimensional kernel,
@@ -6791,13 +6803,7 @@ static double TransposeKernel(KernelInfo *kernel,double angle)
   t = kernel->x;
   kernel->x = kernel->y;
   kernel->y = t;
-  if ( kernel->width == 1 ) {
-    angle = fmod(angle+270.0, 360.0);     /* angle reduced 90 degrees */
-    kernel->angle = fmod(kernel->angle+90.0, 360.0);
-  } else {
-    angle = fmod(angle+90.0, 360.0);   /* angle increased 90 degrees */
-    kernel->angle = fmod(kernel->angle+270.0, 360.0);
-  }
+  angle=TurnTransposedKernelAngle(kernel,angle);
   return(angle);
 }
 
