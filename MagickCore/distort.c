@@ -714,6 +714,24 @@ static void AddRigidAffineTerms(double **matrix,double *vectors[1],
   }
 }
 
+static void ConvertRigidAffineCoefficients(double *coeff)
+{
+  double
+    inverse[6];
+
+  /*
+    Convert (S, R, Tx, Ty) to an affine projection.
+  */
+  inverse[0]=coeff[0];
+  inverse[1]=coeff[1];
+  inverse[2]=(-coeff[1]);
+  inverse[3]=coeff[0];
+  inverse[4]=coeff[2];
+  inverse[5]=coeff[3];
+  AffineArgsToCoefficients(inverse);
+  InvertAffineCoefficients(inverse,coeff);
+}
+
 static double *RigidAffineCoefficients(double *coeff,DistortMethod *method,
   const CoefficientContext *context)
 {
@@ -728,7 +746,6 @@ static double *RigidAffineCoefficients(double *coeff,DistortMethod *method,
     cp_size = context->cp_size;
 
   double
-    inverse[6],
     **matrix,
     *vectors[1];
 
@@ -778,17 +795,7 @@ static double *RigidAffineCoefficients(double *coeff,DistortMethod *method,
         CommandOptionToMnemonic(MagickDistortOptions,*method));
       return((double *) NULL);
     }
-  /*
-    Convert (S, R, Tx, Ty) to an affine projection.
-  */
-  inverse[0]=coeff[0];
-  inverse[1]=coeff[1];
-  inverse[2]=(-coeff[1]);
-  inverse[3]=coeff[0];
-  inverse[4]=coeff[2];
-  inverse[5]=coeff[3];
-  AffineArgsToCoefficients(inverse);
-  InvertAffineCoefficients(inverse,coeff);
+  ConvertRigidAffineCoefficients(coeff);
   *method=AffineDistortion;
   return(coeff);
 }
