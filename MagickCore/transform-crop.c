@@ -211,6 +211,16 @@ static inline MagickBooleanType IsChopExtentTooLarge(const Image *image,
     MagickTrue : MagickFalse);
 }
 
+static Image *FinishChopImage(const Image *image,Image *chop_image,
+  CacheView *image_view,const MagickBooleanType status)
+{
+  image_view=DestroyCacheView(image_view);
+  chop_image->type=image->type;
+  if (status == MagickFalse)
+    chop_image=DestroyImage(chop_image);
+  return(chop_image);
+}
+
 #define ChopImageTag  "Chop/Image"
 
 static Image *ExtractChopImageBelow(const ChopRowImages *chop,

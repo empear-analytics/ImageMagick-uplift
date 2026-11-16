@@ -121,11 +121,60 @@ typedef struct _CopyRegion
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void AppendTransformProperty(const Image *image,
+  Image *transform_image,const char *format,ExceptionInfo *exception)
+{
+  char
+    transform[MagickPathExtent];
+
+  (void) FormatLocaleString(transform,MagickPathExtent,format,
+    (double) image->columns,(double) image->rows);
+  AppendImageProfileProperty(transform_image,"hdrgm","hdrgm:Transform",
+    transform,exception);
+}
+
 static void SetFlipPage(Image *flip_image,RectangleInfo page)
 {
   if (page.height != 0)
     page.y=((ssize_t) page.height-(ssize_t) flip_image->rows-page.y);
   flip_image->page=page;
+}
+
+typedef struct _TransformFinish
+{
+  const Image
+    *image;
+
+  MagickBooleanType
+    status;
+
+  ExceptionInfo
+    *exception;
+
+  const char
+    *format;
+} TransformFinish;
+
+static Image *FinishTransformImage(const TransformFinish *finish,
+  Image *transform_image)
+{
+  const Image
+    *const image = finish->image;
+
+  const MagickBooleanType
+    status = finish->status;
+
+  ExceptionInfo
+    *const exception = finish->exception;
+
+  const char
+    *const format = finish->format;
+
+  if (status != MagickFalse)
+    AppendTransformProperty(image,transform_image,format,exception);
+  if (status == MagickFalse)
+    transform_image=DestroyImage(transform_image);
+  return(transform_image);
 }
 
 static Image *FinishFlipImage(const Image *image,Image *flip_image,

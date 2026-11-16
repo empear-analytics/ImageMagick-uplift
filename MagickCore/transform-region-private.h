@@ -20,10 +20,8 @@
 
 #include "MagickCore/cache-view.h"
 #include "MagickCore/image.h"
-#include "MagickCore/locale_.h"
 #include "MagickCore/monitor.h"
 #include "MagickCore/pixel-accessor.h"
-#include "MagickCore/profile-private.h"
 
 #if defined(__cplusplus) || defined(c_plusplus)
 extern "C" {
@@ -65,16 +63,6 @@ static inline void CopyPixelChannelsTo(const Image *image,const Image *destinati
   }
 }
 
-static inline Image *FinishChopImage(const Image *image,Image *chop_image,
-  CacheView *image_view,const MagickBooleanType status)
-{
-  image_view=DestroyCacheView(image_view);
-  chop_image->type=image->type;
-  if (status == MagickFalse)
-    chop_image=DestroyImage(chop_image);
-  return(chop_image);
-}
-
 typedef struct _TransformLine
 {
   const Image
@@ -103,55 +91,6 @@ static inline void CopyPixelRow(const Image *image,const Image *destination,
     p+=(ptrdiff_t) GetPixelChannels(image);
     q+=(ptrdiff_t) GetPixelChannels(destination);
   }
-}
-
-static inline void AppendTransformProperty(const Image *image,
-  Image *transform_image,const char *format,ExceptionInfo *exception)
-{
-  char
-    transform[MagickPathExtent];
-
-  (void) FormatLocaleString(transform,MagickPathExtent,format,
-    (double) image->columns,(double) image->rows);
-  AppendImageProfileProperty(transform_image,"hdrgm","hdrgm:Transform",
-    transform,exception);
-}
-
-typedef struct _TransformFinish
-{
-  const Image
-    *image;
-
-  MagickBooleanType
-    status;
-
-  ExceptionInfo
-    *exception;
-
-  const char
-    *format;
-} TransformFinish;
-
-static inline Image *FinishTransformImage(const TransformFinish *finish,
-  Image *transform_image)
-{
-  const Image
-    *const image = finish->image;
-
-  const MagickBooleanType
-    status = finish->status;
-
-  ExceptionInfo
-    *const exception = finish->exception;
-
-  const char
-    *const format = finish->format;
-
-  if (status != MagickFalse)
-    AppendTransformProperty(image,transform_image,format,exception);
-  if (status == MagickFalse)
-    transform_image=DestroyImage(transform_image);
-  return(transform_image);
 }
 
 static inline void SyncTransformView(CacheView *view,ExceptionInfo *exception,
