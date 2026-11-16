@@ -233,15 +233,29 @@ static inline MagickBooleanType AcquireKernelValues(KernelInfo *kernel)
   return(kernel->values == (MagickRealType *) NULL ? MagickFalse : MagickTrue);
 }
 
+static ssize_t CountKernelArrayValues(const char *p,const char *end)
+{
+  char
+    token[MagickPathExtent];
+
+  ssize_t
+    i;
+
+  for (i=0; p < end; i++)
+  {
+    (void) GetNextToken(p,&p,MagickPathExtent,token);
+    if (*token == ',')
+      (void) GetNextToken(p,&p,MagickPathExtent,token);
+  }
+  return(i);
+}
+
 /* This was separated so that it could be used as a separate
 ** array input handling function, such as for -color-matrix
 */
 static const char *SetOddSquareKernelSize(KernelInfo *kernel,
   const char *kernel_string,const char *end)
 {
-  char
-    token[MagickPathExtent];
-
   const char
     *p;
 
@@ -253,12 +267,7 @@ static const char *SetOddSquareKernelSize(KernelInfo *kernel,
   p=(const char *) kernel_string;
   while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == '\''))
     p++;  /* ignore "'" chars for convolve filter usage - Cristy */
-  for (i=0; p < end; i++)
-  {
-    (void) GetNextToken(p,&p,MagickPathExtent,token);
-    if (*token == ',')
-      (void) GetNextToken(p,&p,MagickPathExtent,token);
-  }
+  i=CountKernelArrayValues(p,end);
   /* set the size of the kernel - old sized square */
   kernel->width = kernel->height=CastDoubleToSizeT(sqrt((double) i+1.0));
   kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
