@@ -468,6 +468,16 @@ static MagickBooleanType IsKernelArrayComplete(KernelInfo *kernel,
   return(MagickTrue);
 }
 
+static void ResetUserDefinedKernel(KernelInfo *kernel)
+{
+  (void) memset(kernel,0,sizeof(*kernel));
+  kernel->minimum = kernel->maximum = kernel->angle = 0.0;
+  kernel->negative_range = kernel->positive_range = 0.0;
+  kernel->type = UserDefinedKernel;
+  kernel->next = (KernelInfo *) NULL;
+  kernel->signature=MagickCoreSignature;
+}
+
 static KernelInfo *ParseKernelArray(const char *kernel_string)
 {
   KernelInfo
@@ -495,12 +505,7 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
   kernel=(KernelInfo *) AcquireMagickMemory(sizeof(*kernel));
   if (kernel == (KernelInfo *) NULL)
     return(kernel);
-  (void) memset(kernel,0,sizeof(*kernel));
-  kernel->minimum = kernel->maximum = kernel->angle = 0.0;
-  kernel->negative_range = kernel->positive_range = 0.0;
-  kernel->type = UserDefinedKernel;
-  kernel->next = (KernelInfo *) NULL;
-  kernel->signature=MagickCoreSignature;
+  ResetUserDefinedKernel(kernel);
   if (kernel_string == (const char *) NULL)
     return(kernel);
 
