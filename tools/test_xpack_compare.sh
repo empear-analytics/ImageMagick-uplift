@@ -1,0 +1,38 @@
+#!/bin/bash
+# test_xpack_compare.sh: planted-defect test of tools/xpack_compare.sh check.
+# The committed file against itself must print IDENTICAL; a copy with one colormap
+# lookup changed in the first (LSB-first) and, separately, in the last (MSB-first)
+# packer must print DIFFERENT, as must a copy whose MSB-first bitmap foreground bit moves.
+set -uo pipefail
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+git show HEAD:MagickCore/xwindow-image.c > "$tmp/orig.c"
+fail=0
+expect() {  # expect WORD FILE
+  local got
+  got=$(XPACK_CAND="$2" bash tools/xpack_compare.sh check HEAD 2>&1 | head -1 | cut -d: -f1)
+  if [ "$got" = "$1" ]; then echo "ok   $1 $(basename "$2")"; else echo "FAIL expected $1, got $got ($(basename "$2"))"; fail=1; fi
+}
+expect IDENTICAL "$tmp/orig.c"
+python3 - "$tmp" <<'EOF'
+import sys
+tmp = sys.argv[1]
+s = open(tmp + '/orig.c', encoding='utf-8', errors='surrogateescape').read()
+key = 'GetPixelIndex(canvas,p)]'
+first, last = s.index(key), s.rindex(key)
+assert first != last
+for name, at in (('first', first), ('last', last)):
+    t = s[:at] + 'GetPixelIndex(canvas,p)+1]' + s[at + len(key):]
+    open('%s/planted-%s.c' % (tmp, name), 'w', encoding='utf-8', errors='surrogateescape').write(t)
+key = '0x01 : 0x00);'
+at = s.index(key, s.index('XMakeImageMSBFirst() initializes'))
+at = s.index(key, at + 1)  # the foreground bit (the harness's foreground is the brighter)
+t = s[:at] + '0x02 : 0x00);' + s[at + len(key):]
+open(tmp + '/planted-bit.c', 'w', encoding='utf-8', errors='surrogateescape').write(t)
+EOF
+expect DIFFERENT "$tmp/planted-first.c"
+expect DIFFERENT "$tmp/planted-last.c"
+expect DIFFERENT "$tmp/planted-bit.c"
+exit $fail
