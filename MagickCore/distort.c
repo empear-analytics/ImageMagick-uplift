@@ -4643,6 +4643,18 @@ typedef struct _DistortCreateInput
     *exception;
 } DistortCreateInput;
 
+static void SetDistortImageAttributes(Image **distort_image,
+  const RectangleInfo geometry,ExceptionInfo *exception)
+{
+  if ((IsPixelInfoGray(&(*distort_image)->background_color) == MagickFalse) &&
+      (IsGrayColorspace((*distort_image)->colorspace) != MagickFalse))
+    (void) SetImageColorspace((*distort_image),sRGBColorspace,exception);
+  if ((*distort_image)->background_color.alpha_trait != UndefinedPixelTrait)
+    (*distort_image)->alpha_trait=BlendPixelTrait;
+  (*distort_image)->page.x=geometry.x;
+  (*distort_image)->page.y=geometry.y;
+}
+
 static MagickBooleanType CreateDistortImage(const DistortCreateInput *create,
   double *coeff,Image **distort_image)
 {
@@ -4691,13 +4703,7 @@ static MagickBooleanType CreateDistortImage(const DistortCreateInput *create,
       (*distort_image)=DestroyImage((*distort_image));
       return(MagickFalse);
     }
-  if ((IsPixelInfoGray(&(*distort_image)->background_color) == MagickFalse) &&
-      (IsGrayColorspace((*distort_image)->colorspace) != MagickFalse))
-    (void) SetImageColorspace((*distort_image),sRGBColorspace,exception);
-  if ((*distort_image)->background_color.alpha_trait != UndefinedPixelTrait)
-    (*distort_image)->alpha_trait=BlendPixelTrait;
-  (*distort_image)->page.x=geometry.x;
-  (*distort_image)->page.y=geometry.y;
+  SetDistortImageAttributes(distort_image,geometry,exception);
   ConformPixelInfo((*distort_image),&(*distort_image)->matte_color,&invalid,
     exception);
 
