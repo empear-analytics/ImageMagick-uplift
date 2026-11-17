@@ -11321,6 +11321,22 @@ static void XApplyChopCommand(const XMagickCommandContext *context)
     }
 }
 
+static void XApplyFlopToImage(Display *display,XWindows *windows,Image **image,
+  ExceptionInfo *exception)
+{
+  Image
+    *flop_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flop_image=FlopImage(*image,exception);
+  if (flop_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=flop_image;
+    }
+}
+
 static void XApplyFlopCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11346,20 +11362,10 @@ static void XApplyFlopCommand(const XMagickCommandContext *context)
     height,
     width;
 
-  Image
-    *flop_image;
-
   /*
     Flop image scanlines.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  flop_image=FlopImage(*image,exception);
-  if (flop_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=flop_image;
-    }
+  XApplyFlopToImage(display,windows,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.crop_geometry != (char *) NULL)
