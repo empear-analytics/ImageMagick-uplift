@@ -817,6 +817,14 @@ typedef struct _SparseColorRender
     *coeff;
 } SparseColorRender;
 
+static Image *FinishSparseColorImage(const MagickBooleanType status,
+  Image *sparse_image)
+{
+  if (status == MagickFalse)
+    sparse_image=DestroyImage(sparse_image);
+  return(sparse_image);
+}
+
 static Image *RenderSparseColorImage(const SparseColorRender *render,
   Image *sparse_image,ExceptionInfo *exception)
 {
@@ -896,9 +904,7 @@ static Image *RenderSparseColorImage(const SparseColorRender *render,
       }
   }
   sparse_view=DestroyCacheView(sparse_view);
-  if (status == MagickFalse)
-    sparse_image=DestroyImage(sparse_image);
-  return(sparse_image);
+  return(FinishSparseColorImage(status,sparse_image));
 }
 
 static SparseColorMethod SelectSparseColorMethod(
