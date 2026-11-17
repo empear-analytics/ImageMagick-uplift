@@ -10209,8 +10209,7 @@ static ssize_t TracePathLine(const PathTrace *trace)
     *q = (*trace->q);
 
   char
-    *token = trace->token,
-    *next_token;
+    *token = trace->token;
 
   const char
     *p = (*trace->p);
@@ -10227,21 +10226,9 @@ static ssize_t TracePathLine(const PathTrace *trace)
   */
   do
   {
-    (void) GetNextToken(p,&p,MagickPathExtent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+    if (GetPathValue(&p,token,&x) == MagickFalse)
       ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(p,&p,MagickPathExtent,token);
-    x=GetDrawValue(token,&next_token);
-    if (token == next_token)
-      ThrowPointExpectedException(token,exception);
-    (void) GetNextToken(p,&p,MagickPathExtent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(p,&p,MagickPathExtent,token);
-    y=GetDrawValue(token,&next_token);
-    if (token == next_token)
+    if (GetPathValue(&p,token,&y) == MagickFalse)
       ThrowPointExpectedException(token,exception);
     point.x=(double) (attribute == (int) 'L' ? x : point.x+x);
     point.y=(double) (attribute == (int) 'L' ? y : point.y+y);
