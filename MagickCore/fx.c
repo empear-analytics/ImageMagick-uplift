@@ -3434,8 +3434,8 @@ static inline MagickBooleanType IsExpressionEnd(FxInfo *pfx,
 static inline MagickBooleanType IsPendingLimitChar(FxInfo *pfx,
   const char *chLimit,const char *strLimit)
 {
-  return((*pfx->pex && !*chLimit &&
-    (strchr(strLimit,*pfx->pex)!=NULL)) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (*pfx->pex && !*chLimit &&
+    (strchr(strLimit,*pfx->pex)!=NULL)));
 }
 
 static inline MagickBooleanType IsOpenGroupOperator(const OperatorE op)
