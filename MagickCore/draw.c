@@ -9303,6 +9303,20 @@ static void SetDrawColorOption(const ImageInfo *image_info,const char *key,
     (void) QueryColorCompliance(option,AllCompliance,&(*color),exception);
 }
 
+static void SetDrawValueOption(const ImageInfo *image_info,const char *key,
+  double *value)
+{
+  char
+    *next_token;
+
+  const char
+    *option;
+
+  option=GetImageOption(image_info,key);
+  if (option != (const char *) NULL)
+    (*value)=GetDrawValue(option,&next_token);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -9329,8 +9343,6 @@ static void SetDrawColorOption(const ImageInfo *image_info,const char *key,
 */
 MagickExport void GetDrawInfo(const ImageInfo *image_info,DrawInfo *draw_info)
 {
-  char
-    *next_token;
 
   const char
     *option;
@@ -9398,20 +9410,16 @@ MagickExport void GetDrawInfo(const ImageInfo *image_info,DrawInfo *draw_info)
   if (option != (const char *) NULL)
     draw_info->gravity=(GravityType) ParseCommandOption(MagickGravityOptions,
       MagickFalse,option);
-  option=GetImageOption(draw_info->image_info,"interline-spacing");
-  if (option != (const char *) NULL)
-    draw_info->interline_spacing=GetDrawValue(option,&next_token);
-  option=GetImageOption(draw_info->image_info,"interword-spacing");
-  if (option != (const char *) NULL)
-    draw_info->interword_spacing=GetDrawValue(option,&next_token);
-  option=GetImageOption(draw_info->image_info,"kerning");
-  if (option != (const char *) NULL)
-    draw_info->kerning=GetDrawValue(option,&next_token);
+  SetDrawValueOption(draw_info->image_info,"interline-spacing",
+    &draw_info->interline_spacing);
+  SetDrawValueOption(draw_info->image_info,"interword-spacing",
+    &draw_info->interword_spacing);
+  SetDrawValueOption(draw_info->image_info,"kerning",
+    &draw_info->kerning);
   SetDrawColorOption(draw_info->image_info,"stroke",
     &draw_info->stroke,exception);
-  option=GetImageOption(draw_info->image_info,"strokewidth");
-  if (option != (const char *) NULL)
-    draw_info->stroke_width=GetDrawValue(option,&next_token);
+  SetDrawValueOption(draw_info->image_info,"strokewidth",
+    &draw_info->stroke_width);
   option=GetImageOption(draw_info->image_info,"style");
   if (option != (const char *) NULL)
     draw_info->style=(StyleType) ParseCommandOption(MagickStyleOptions,
