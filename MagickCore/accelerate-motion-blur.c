@@ -522,6 +522,74 @@ static MagickBooleanType FillMotionBlurOffsets(
   return(MagickTrue);
 }
 
+typedef struct _MotionBlurOutputSource
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  const Image
+    *image;
+
+  void
+    *filteredPixels;
+} MotionBlurOutputSource;
+
+static MagickBooleanType CreateMotionBlurOutputBuffer(
+  const MotionBlurOutputSource *source,cl_mem *filteredImageBuffer,
+  ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = source->clEnv;
+
+  const MagickCLDevice
+    device = source->device;
+
+  const Image
+    *const image = source->image;
+
+  void
+    *const filteredPixels = source->filteredPixels;
+
+  cl_int
+    clStatus;
+
+  cl_mem_flags
+    mem_flags;
+
+  size_t
+    length;
+
+  void
+    *hostPtr;
+
+  if (ALIGNED(filteredPixels,CLPixelPacket))
+  {
+    mem_flags = CL_MEM_WRITE_ONLY|CL_MEM_USE_HOST_PTR;
+    hostPtr = filteredPixels;
+  }
+  else
+  {
+    mem_flags = CL_MEM_WRITE_ONLY;
+    hostPtr = NULL;
+  }
+  /*
+    Create a CL buffer from image pixel buffer.
+  */
+  length = image->columns * image->rows;
+  *filteredImageBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags,
+    length * sizeof(CLPixelPacket), hostPtr, &clStatus);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) ThrowMagickException(exception, GetMagickModule(),
+      ResourceLimitError, "clEnv->library->clCreateBuffer failed.",".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
   const double *kernel,const size_t width,const OffsetInfo *offset,
   ExceptionInfo *exception)
@@ -565,8 +633,7 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
     length;
 
   void
-    *filteredPixels,
-    *hostPtr;
+    *filteredPixels;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -644,27 +711,13 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
     goto cleanup;
   }
 
-  if (ALIGNED(filteredPixels,CLPixelPacket))
   {
-    mem_flags = CL_MEM_WRITE_ONLY|CL_MEM_USE_HOST_PTR;
-    hostPtr = filteredPixels;
-  }
-  else
-  {
-    mem_flags = CL_MEM_WRITE_ONLY;
-    hostPtr = NULL;
-  }
-  /*
-    Create a CL buffer from image pixel buffer.
-  */
-  length = image->columns * image->rows;
-  filteredImageBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags,
-    length * sizeof(CLPixelPacket), hostPtr, &clStatus);
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) ThrowMagickException(exception, GetMagickModule(),
-      ResourceLimitError, "clEnv->library->clCreateBuffer failed.",".");
-    goto cleanup;
+    const MotionBlurOutputSource
+      source = { clEnv, device, image, filteredPixels };
+
+    if (CreateMotionBlurOutputBuffer(&source,&filteredImageBuffer,exception) ==
+        MagickFalse)
+      goto cleanup;
   }
 
 
