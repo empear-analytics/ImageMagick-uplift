@@ -9553,10 +9553,8 @@ static MagickBooleanType TraceBezier(MVGInfo *mvg_info,
     sizeof(*points));
   if ((coefficients == (double *) NULL) || (points == (PointInfo *) NULL))
     {
-      if (points != (PointInfo *) NULL)
-        points=(PointInfo *) RelinquishMagickMemory(points);
-      if (coefficients != (double *) NULL)
-        coefficients=(double *) RelinquishMagickMemory(coefficients);
+      points=(PointInfo *) RelinquishMagickMemory(points);
+      coefficients=(double *) RelinquishMagickMemory(coefficients);
       (void) ThrowMagickException(mvg_info->exception,GetMagickModule(),
         ResourceLimitError,"MemoryAllocationFailed","`%s'","");
       return(MagickFalse);
