@@ -417,6 +417,39 @@ typedef struct _CorrelationTotals
     *reconstruct_norm;
 } CorrelationTotals;
 
+static void MergeCorrelationTotals(const Image *image,
+  const Image *reconstruct_image,const CorrelationSums *sums,
+  const CorrelationSums *merged)
+{
+  double
+    *const channel_similarity = sums->channel_similarity,
+    *const channel_norm = sums->channel_norm,
+    *const channel_reconstruct_norm = sums->channel_reconstruct_norm,
+    *const similarity = merged->channel_similarity,
+    *const norm = merged->channel_norm,
+    *const reconstruct_norm = merged->channel_reconstruct_norm;
+
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,j);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
+      channel);
+    if (((traits & UpdatePixelTrait) == 0) ||
+        ((reconstruct_traits & UpdatePixelTrait) == 0))
+      continue;
+    similarity[j]+=channel_similarity[j];
+    similarity[CompositePixelChannel]+=channel_similarity[j];
+    norm[j]+=channel_norm[j];
+    norm[CompositePixelChannel]+=channel_norm[j];
+    reconstruct_norm[j]+=channel_reconstruct_norm[j];
+    reconstruct_norm[CompositePixelChannel]+=channel_reconstruct_norm[j];
+  }
+}
+
 static MagickBooleanType GetCorrelationTotals(const CorrelationTotals *totals,
   ExceptionInfo *exception)
 {
@@ -449,6 +482,9 @@ static MagickBooleanType GetCorrelationTotals(const CorrelationTotals *totals,
 
   ssize_t
     y;
+
+  const CorrelationSums
+    merged = { similarity, norm, reconstruct_norm };
 
   SetImageCompareBounds(image,reconstruct_image,&columns,&rows);
   image_view=AcquireVirtualCacheView(image,exception);
@@ -492,25 +528,7 @@ static MagickBooleanType GetCorrelationTotals(const CorrelationTotals *totals,
     #pragma omp critical (MagickCore_GetCorrelationTotals)
 #endif
     {
-      ssize_t
-        j;
-
-      for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,j);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
-          channel);
-        if (((traits & UpdatePixelTrait) == 0) ||
-            ((reconstruct_traits & UpdatePixelTrait) == 0))
-          continue;
-        similarity[j]+=channel_similarity[j];
-        similarity[CompositePixelChannel]+=channel_similarity[j];
-        norm[j]+=channel_norm[j];
-        norm[CompositePixelChannel]+=channel_norm[j];
-        reconstruct_norm[j]+=channel_reconstruct_norm[j];
-        reconstruct_norm[CompositePixelChannel]+=channel_reconstruct_norm[j];
-      }
+      MergeCorrelationTotals(image,reconstruct_image,&sums,&merged);
     }
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
