@@ -14617,6 +14617,23 @@ static void XApplyShearCommand(const XMagickCommandContext *context,char *color)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyCropAndScale(char *image_geometry,XWindows *windows,
+  Image **image,Display *display,XResourceInfo *resource_info,
+  ExceptionInfo *exception)
+{
+  (void) FormatLocaleString(image_geometry,MagickPathExtent,"%dx%d!",
+    windows->image.ximage->width,windows->image.ximage->height);
+  (void) TransformImage(image,windows->image.crop_geometry,image_geometry,
+    exception);
+  if (windows->image.crop_geometry != (char *) NULL)
+    windows->image.crop_geometry=(char *) RelinquishMagickMemory(
+      windows->image.crop_geometry);
+  windows->image.x=0;
+  windows->image.y=0;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyApplyCommand(const XMagickCommandContext *context)
 {
   Display
@@ -14647,17 +14664,8 @@ static void XApplyApplyCommand(const XMagickCommandContext *context)
   /*
     Crop and/or scale displayed image.
   */
-  (void) FormatLocaleString(image_geometry,MagickPathExtent,"%dx%d!",
-    windows->image.ximage->width,windows->image.ximage->height);
-  (void) TransformImage(image,windows->image.crop_geometry,image_geometry,
+  XApplyCropAndScale(image_geometry,windows,image,display,resource_info,
     exception);
-  if (windows->image.crop_geometry != (char *) NULL)
-    windows->image.crop_geometry=(char *) RelinquishMagickMemory(
-      windows->image.crop_geometry);
-  windows->image.x=0;
-  windows->image.y=0;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
-  (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
 static void XApplyRegionOfInterestCommand(const XMagickCommandContext *context)
