@@ -10363,10 +10363,7 @@ static ssize_t TracePathSmoothBezierCurve(const PathTrace *trace,
     q+=(ptrdiff_t) q->coordinates;
     point=end;
     last_attribute=attribute;
-    while (isspace((int) ((unsigned char) *p)) != 0)
-      p++;
-    if (*p == ',')
-      p++;
+    SkipPathSeparators(&p);
   } while (IsValidPoint(p) != MagickFalse);
   (*trace->p)=p;
   (*trace->q)=q;
