@@ -190,6 +190,22 @@ typedef struct _ResizeFilterPass
     resizeFilterCubicCoefficients;
 } ResizeFilterPass;
 
+static void SelectResizeWorkgroup(const cl_uint resizedColumns,
+  const unsigned int workgroupSize,unsigned int *chunkSize,
+  unsigned int *pixelPerWorkgroup)
+{
+  if (resizedColumns < workgroupSize)
+  {
+    *chunkSize=32;
+    *pixelPerWorkgroup=32;
+  }
+  else
+  {
+    *chunkSize=workgroupSize;
+    *pixelPerWorkgroup=workgroupSize;
+  }
+}
+
 static MagickBooleanType resizeHorizontalFilter(const ResizeFilterPass *pass,
   const float xFactor,ExceptionInfo *exception)
 {
@@ -241,16 +257,8 @@ static MagickBooleanType resizeHorizontalFilter(const ResizeFilterPass *pass,
   */
   support=GetResizeScaledSupport(pass->resizeFilter,xFactor);
 
-  if (pass->resizedColumns < workgroupSize)
-  {
-    chunkSize=32;
-    pixelPerWorkgroup=32;
-  }
-  else
-  {
-    chunkSize=workgroupSize;
-    pixelPerWorkgroup=workgroupSize;
-  }
+  SelectResizeWorkgroup(pass->resizedColumns,workgroupSize,&chunkSize,
+    &pixelPerWorkgroup);
 
 DisableMSCWarning(4127)
   while(1)
@@ -492,16 +500,8 @@ static MagickBooleanType resizeVerticalFilter(const ResizeFilterPass *pass,
   */
   support=GetResizeScaledSupport(pass->resizeFilter,yFactor);
 
-  if (pass->resizedRows < workgroupSize)
-  {
-    chunkSize=32;
-    pixelPerWorkgroup=32;
-  }
-  else
-  {
-    chunkSize=workgroupSize;
-    pixelPerWorkgroup=workgroupSize;
-  }
+  SelectResizeWorkgroup(pass->resizedRows,workgroupSize,&chunkSize,
+    &pixelPerWorkgroup);
 
 DisableMSCWarning(4127)
   while(1)
@@ -718,6 +718,83 @@ static MagickBooleanType ResizeHorizontalThenVertical(
   return(MagickTrue);
 }
 
+typedef struct _ResizeImageSource
+{
+  MagickCLEnv
+    clEnv;
+
+  const Image
+    *image;
+
+  size_t
+    resizedColumns,
+    resizedRows;
+} ResizeImageSource;
+
+typedef struct _ResizeImageTargets
+{
+  MagickCLDevice
+    *device;
+
+  cl_command_queue
+    *queue;
+
+  Image
+    **filteredImage;
+
+  cl_mem
+    *imageBuffer,
+    *filteredImageBuffer;
+} ResizeImageTargets;
+
+static MagickBooleanType AcquireResizeBuffers(const ResizeImageSource *source,
+  ExceptionInfo *exception,const ResizeImageTargets *targets)
+{
+  const MagickCLEnv
+    clEnv = source->clEnv;
+
+  const Image
+    *const image = source->image;
+
+  const size_t
+    resizedColumns = source->resizedColumns,
+    resizedRows = source->resizedRows;
+
+  MagickCLDevice
+    *const device = targets->device;
+
+  cl_command_queue
+    *const queue = targets->queue;
+
+  Image
+    **const filteredImage = targets->filteredImage;
+
+  cl_mem
+    *const imageBuffer = targets->imageBuffer,
+    *const filteredImageBuffer = targets->filteredImageBuffer;
+
+  *device=RequestOpenCLDevice(clEnv);
+  if (*device == (MagickCLDevice) NULL)
+    return(MagickFalse);
+  *queue=AcquireOpenCLCommandQueue(*device);
+  if (*queue == (cl_command_queue) NULL)
+    return(MagickFalse);
+  *filteredImage=CloneImage(image,resizedColumns,resizedRows,MagickTrue,
+    exception);
+  if (*filteredImage == (Image *) NULL)
+    return(MagickFalse);
+  if ((*filteredImage)->number_channels != image->number_channels)
+    return(MagickFalse);
+  *imageBuffer=GetAuthenticOpenCLBuffer(image,*device,exception);
+  if (*imageBuffer == (cl_mem) NULL)
+    return(MagickFalse);
+  *filteredImageBuffer=GetAuthenticOpenCLBuffer(*filteredImage,*device,
+    exception);
+  if (*filteredImageBuffer == (cl_mem) NULL)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType CreateCubicCoefficientsBuffer(
   MagickCLDevice device,const ResizeFilter *resizeFilter,
   cl_mem *cubicCoefficientsBuffer,ExceptionInfo *exception)
@@ -791,24 +868,17 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
   cubicCoefficientsBuffer=NULL;
   outputReady=MagickFalse;
 
-  device=RequestOpenCLDevice(clEnv);
-  if (device == (MagickCLDevice) NULL)
-    goto cleanup;
-  queue=AcquireOpenCLCommandQueue(device);
-  if (queue == (cl_command_queue) NULL)
-    goto cleanup;
-  filteredImage=CloneImage(image,resizedColumns,resizedRows,MagickTrue,
-    exception);
-  if (filteredImage == (Image *) NULL)
-    goto cleanup;
-  if (filteredImage->number_channels != image->number_channels)
-    goto cleanup;
-  imageBuffer=GetAuthenticOpenCLBuffer(image,device,exception);
-  if (imageBuffer == (cl_mem) NULL)
-    goto cleanup;
-  filteredImageBuffer=GetAuthenticOpenCLBuffer(filteredImage,device,exception);
-  if (filteredImageBuffer == (cl_mem) NULL)
-    goto cleanup;
+  {
+    const ResizeImageSource
+      source = { clEnv, image, resizedColumns, resizedRows };
+
+    const ResizeImageTargets
+      targets = { &device, &queue, &filteredImage, &imageBuffer,
+        &filteredImageBuffer };
+
+    if (AcquireResizeBuffers(&source,exception,&targets) == MagickFalse)
+      goto cleanup;
+  }
 
   if (CreateCubicCoefficientsBuffer(device,resizeFilter,
         &cubicCoefficientsBuffer,exception) == MagickFalse)
