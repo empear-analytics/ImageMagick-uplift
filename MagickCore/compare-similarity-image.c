@@ -1481,9 +1481,6 @@ static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
   return(dot_product_image);
 }
 
-static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
-  RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
-{
 #define ThrowMSESimilarityException() \
 { \
   if (alpha_image != (Image *) NULL) \
@@ -1506,6 +1503,9 @@ static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
   return((Image *) NULL); \
 }
 
+static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
+  RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
+{
   ChannelStatistics
     *channel_statistics = (ChannelStatistics *) NULL;
 
