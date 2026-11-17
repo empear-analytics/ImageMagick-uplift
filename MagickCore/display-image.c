@@ -22276,8 +22276,8 @@ static Image *XVisualDirectoryImage(Display *display,
   /*
     Read each image and convert them to a tile.
   */
-  backdrop=((windows->visual_info->klass == TrueColor) ||
-    (windows->visual_info->klass == DirectColor)) ? MagickTrue : MagickFalse;
+  backdrop=(MagickBooleanType) ((windows->visual_info->klass == TrueColor) ||
+    (windows->visual_info->klass == DirectColor));
   read_info=CloneImageInfo(resource_info->image_info);
   (void) SetImageOption(read_info,"jpeg:size","120x120");
   (void) CloneString(&read_info->size,DefaultTileGeometry);
