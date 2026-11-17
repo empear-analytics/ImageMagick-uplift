@@ -1588,8 +1588,8 @@ static inline MagickBooleanType IsUnqualifiedCoordFunction(
 static inline MagickBooleanType IsAttributeQualified(FxInfo *pfx,
   const PixelChannel chQual,const ImgAttrE iaQual)
 {
-  return((IsQualifier (pfx) && chQual == NO_CHAN_QUAL &&
-    iaQual != aNull) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (IsQualifier (pfx) && chQual == NO_CHAN_QUAL &&
+    iaQual != aNull));
 }
 
 static inline MagickBooleanType IsChannelQualifiedAttr(const ImgAttrE iaQual,
