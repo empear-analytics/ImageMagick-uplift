@@ -3791,6 +3791,17 @@ typedef struct _OperandTargets
     *UserSymNdx0;
 } OperandTargets;
 
+static int AddUserSymbolCopyFrom (FxInfo * pfx,
+  MagickBooleanType *const UserSymbol, MagickBooleanType *const NewUserSymbol,
+  int UserSymNdx1)
+{
+    if (*UserSymbol && !*NewUserSymbol) {
+      (void) AddAddressingElement (pfx, rCopyFrom, UserSymNdx1);
+      UserSymNdx1 = NULL_ADDRESS;
+    }
+  return(UserSymNdx1);
+}
+
 static MagickBooleanType GetExpressionOperand (FxInfo * pfx,
   const MagickBooleanType Assign, MagickBooleanType * needPopAll,
   const OperandTargets * targets)
@@ -3822,10 +3833,8 @@ static MagickBooleanType GetExpressionOperand (FxInfo * pfx,
         pfx->token, SetShortExp(pfx));
       return MagickFalse;
     }
-    if (*UserSymbol && !*NewUserSymbol) {
-      (void) AddAddressingElement (pfx, rCopyFrom, UserSymNdx1);
-      UserSymNdx1 = NULL_ADDRESS;
-    }
+    UserSymNdx1 = AddUserSymbolCopyFrom (pfx, UserSymbol, NewUserSymbol,
+      UserSymNdx1);
     *UserSymNdx0 = UserSymNdx1;
   return(MagickTrue);
 }
