@@ -3698,7 +3698,7 @@ static MagickBooleanType XBackgroundImage(
   XCheckRefreshWindows(display,windows);
   background_resources=(*resource_info);
   background_resources.window_id=window_id;
-  background_resources.backdrop=status != 0 ? MagickTrue : MagickFalse;
+  background_resources.backdrop=(MagickBooleanType) (status != 0);
   status=XDisplayBackgroundImage(display,&background_resources,*image,
     exception) == MagickFalse ? 0 : 1;
   if (status != MagickFalse)
