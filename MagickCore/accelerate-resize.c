@@ -190,6 +190,22 @@ typedef struct _ResizeFilterPass
     resizeFilterCubicCoefficients;
 } ResizeFilterPass;
 
+static void SelectResizeWorkgroup(const cl_uint resizedColumns,
+  const unsigned int workgroupSize,unsigned int *chunkSize,
+  unsigned int *pixelPerWorkgroup)
+{
+  if (resizedColumns < workgroupSize)
+  {
+    *chunkSize=32;
+    *pixelPerWorkgroup=32;
+  }
+  else
+  {
+    *chunkSize=workgroupSize;
+    *pixelPerWorkgroup=workgroupSize;
+  }
+}
+
 static MagickBooleanType resizeHorizontalFilter(const ResizeFilterPass *pass,
   const float xFactor,ExceptionInfo *exception)
 {
@@ -241,16 +257,8 @@ static MagickBooleanType resizeHorizontalFilter(const ResizeFilterPass *pass,
   */
   support=GetResizeScaledSupport(pass->resizeFilter,xFactor);
 
-  if (pass->resizedColumns < workgroupSize)
-  {
-    chunkSize=32;
-    pixelPerWorkgroup=32;
-  }
-  else
-  {
-    chunkSize=workgroupSize;
-    pixelPerWorkgroup=workgroupSize;
-  }
+  SelectResizeWorkgroup(pass->resizedColumns,workgroupSize,&chunkSize,
+    &pixelPerWorkgroup);
 
 DisableMSCWarning(4127)
   while(1)
