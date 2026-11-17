@@ -957,6 +957,12 @@ static MagickBooleanType ExtendOperatorStack (FxInfo * pfx)
   return MagickTrue;
 }
 
+static void TrackOperatorStackDepth (FxInfo * pfx)
+{
+  if (pfx->maxUsedOprStack < pfx->usedOprStack)
+    pfx->maxUsedOprStack = pfx->usedOprStack;
+}
+
 static MagickBooleanType PushOperatorStack (FxInfo * pfx, int op)
 {
   if (++pfx->usedOprStack >= pfx->numOprStack) {
@@ -965,8 +971,7 @@ static MagickBooleanType PushOperatorStack (FxInfo * pfx, int op)
   }
   pfx->OperatorStack[pfx->usedOprStack-1] = (OperatorE) op;
 
-  if (pfx->maxUsedOprStack < pfx->usedOprStack)
-    pfx->maxUsedOprStack = pfx->usedOprStack;
+  TrackOperatorStackDepth (pfx);
   return MagickTrue;
 }
 
