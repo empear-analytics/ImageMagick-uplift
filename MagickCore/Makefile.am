@@ -128,8 +128,10 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/colorspace-private.h \
   MagickCore/compare.c \
   MagickCore/compare-similarity.c \
+  MagickCore/compare-similarity-image.c \
   MagickCore/compare.h \
   MagickCore/compare-private.h \
+  MagickCore/compare-similarity-private.h \
   MagickCore/composite.c \
   MagickCore/composite.h \
   MagickCore/composite-private.h \
@@ -600,6 +602,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/color-private.h \
   MagickCore/colorspace-private.h \
   MagickCore/compare-private.h \
+  MagickCore/compare-similarity-private.h \
   MagickCore/composite-private.h \
   MagickCore/configure-private.h \
   MagickCore/constitute-private.h \

@@ -55,6 +55,7 @@ $call Make colorspace-convert.c
 $call Make colorspace-generic-rgb.c
 $call Make compare.c
 $call Make compare-similarity.c
+$call Make compare-similarity-image.c
 $call Make composite.c
 $call Make compress.c
 $call Make compress-lzw.c
