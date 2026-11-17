@@ -4252,11 +4252,11 @@ static MagickBooleanType ParseMVGPopGraphicContext(const MVGRenderState *state)
         n=0;
         break;
       }
-    if (IsNonSVGClipMask(graphic_context[n]) != MagickFalse)
-      if (LocaleCompare(graphic_context[n]->clip_mask,
-          graphic_context[n-1]->clip_mask) != 0)
-        status=SetImageMask(image,WritePixelMask,(Image *) NULL,
-          exception);
+    if ((IsNonSVGClipMask(graphic_context[n]) != MagickFalse) &&
+        (LocaleCompare(graphic_context[n]->clip_mask,
+         graphic_context[n-1]->clip_mask) != 0))
+      status=SetImageMask(image,WritePixelMask,(Image *) NULL,
+        exception);
     graphic_context[n]=DestroyDrawInfo(graphic_context[n]);
     n--;
     break;
