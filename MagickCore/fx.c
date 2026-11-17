@@ -3205,7 +3205,7 @@ static MagickBooleanType GetOperand (
 
 static inline MagickBooleanType IsRealOperator (OperatorE op)
 {
-  return (op < oOpenParen || op > oCloseBrace) ? MagickTrue : MagickFalse;
+  return (MagickBooleanType) (op < oOpenParen || op > oCloseBrace);
 }
 
 static MagickBooleanType ProcessTernaryColon (FxInfo * pfx, TernaryT * ptern)
