@@ -26892,6 +26892,20 @@ static void XLookupKeyPress(const DisplayEventContext *context,
   XHandleKeyPress(context,key_symbol,targets);
 }
 
+static void XLookupKeyRelease(const XResourceInfo *resource_info,
+  XEvent *event,char *command,const size_t extent)
+{
+  KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key release.
+  */
+  (void) XLookupString((XKeyEvent *) &event->xkey,command,(int)
+    extent,&key_symbol,(XComposeStatus *) NULL);
+  XLogKeyRelease(resource_info,key_symbol,command);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -26901,9 +26915,6 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   Image
     *display_image,
     *nexus;
-
-  KeySym
-    key_symbol;
 
   MagickStatusType
     status;
@@ -26966,15 +26977,8 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
           sizeof(command));
         break;
       case KeyRelease:
-      {
-        /*
-          Respond to a user key release.
-        */
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        XLogKeyRelease(resource_info,key_symbol,command);
+        XLookupKeyRelease(resource_info,&event,command,sizeof(command));
         break;
-      }
       default:
       {
         XDispatchButtonEvent(&event_context,&event_targets);
