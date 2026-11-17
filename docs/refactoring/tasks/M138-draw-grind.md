@@ -154,4 +154,9 @@ lowers the count.
   Recipe LT helper dropped draw.c 3.27 -> 3.17, although the helper alone (unused) kept 3.27 and
   stubbing another cc-9 function kept 3.27; CloneDrawInfo's dash-pattern block alone gave
   3.14, its gradient block alone 3.27; DrawImagePrimitive's composite read (clears its Complex
-  Method) 3.16. Every step is probed and dropped when the score falls.
+  Method) 3.16; CloneDrawInfo's four CloneImage copies (clears its Complex Method) 3.15. Every
+  step is probed and dropped when the score falls. Pattern so far: each drop cleared a
+  function's Complex Method while its Large Method stayed (ParseMVGClass, DrawImagePrimitive,
+  CloneDrawInfo); steps that cleared both, or cleared Complex Method on a function without
+  Large Method (AffineEdge, ParseMVGPrimitivePoints, TracePathMove), held 3.27. Shorten such a
+  function below Large Method first.
