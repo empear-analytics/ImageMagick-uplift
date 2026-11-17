@@ -925,6 +925,15 @@ static void ApplyXYWHToken (FxInfo * pfx, ImgAttrE * pop, int ret)
   }
 }
 
+static void ReportBadXYWHToken (FxInfo * pfx, int ret)
+{
+  if (!ret)
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Invalid 'x' or 'y' or 'width' or 'height' token=", "'%s' at '%s'",
+      pfx->token, SetShortExp(pfx));
+}
+
 static int MaybeXYWH (FxInfo * pfx, ImgAttrE * pop)
 /* If ".x" or ".y" or ".width" or ".height" increments *pop and returns 1 to 4 .
    Otherwise returns 0.
@@ -941,11 +950,7 @@ static int MaybeXYWH (FxInfo * pfx, ImgAttrE * pop)
   (void) GetToken (pfx);
   ret = MatchXYWHToken (pfx, ret);
 
-  if (!ret)
-    (void) ThrowMagickException (
-      pfx->exception, GetMagickModule(), OptionError,
-      "Invalid 'x' or 'y' or 'width' or 'height' token=", "'%s' at '%s'",
-      pfx->token, SetShortExp(pfx));
+  ReportBadXYWHToken (pfx, ret);
 
   ApplyXYWHToken (pfx, pop, ret);
   pfx->pex+=pfx->lenToken;
