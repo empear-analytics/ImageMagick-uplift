@@ -9930,6 +9930,23 @@ typedef struct _PathTrace
     *z_count;
 } PathTrace;
 
+static MagickBooleanType GetPathValue(const char **p,char *token,
+  double *value)
+{
+  char
+    *next_token;
+
+  (void) GetNextToken((*p),p,MagickPathExtent,token);
+  if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+    return(MagickFalse);
+  if (*token == ',')
+    (void) GetNextToken((*p),p,MagickPathExtent,token);
+  (*value)=GetDrawValue(token,&next_token);
+  if (token == next_token)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static ssize_t TracePathArc(const PathTrace *trace)
 {
   double
@@ -9952,8 +9969,7 @@ static ssize_t TracePathArc(const PathTrace *trace)
     *q = (*trace->q);
 
   char
-    *token = trace->token,
-    *next_token;
+    *token = trace->token;
 
   const char
     *p = (*trace->p);
@@ -9980,29 +9996,11 @@ static ssize_t TracePathArc(const PathTrace *trace)
     ArcPathShape
       shape;
 
-    (void) GetNextToken(p,&p,MagickPathExtent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+    if (GetPathValue(&p,token,&arc.x) == MagickFalse)
       ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(p,&p,MagickPathExtent,token);
-    arc.x=GetDrawValue(token,&next_token);
-    if (token == next_token)
+    if (GetPathValue(&p,token,&arc.y) == MagickFalse)
       ThrowPointExpectedException(token,exception);
-    (void) GetNextToken(p,&p,MagickPathExtent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(p,&p,MagickPathExtent,token);
-    arc.y=GetDrawValue(token,&next_token);
-    if (token == next_token)
-      ThrowPointExpectedException(token,exception);
-    (void) GetNextToken(p,&p,MagickPathExtent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(p,&p,MagickPathExtent,token);
-    angle=GetDrawValue(token,&next_token);
-    if (token == next_token)
+    if (GetPathValue(&p,token,&angle) == MagickFalse)
       ThrowPointExpectedException(token,exception);
     (void) GetNextToken(p,&p,MagickPathExtent,token);
     if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
@@ -10020,21 +10018,9 @@ static ssize_t TracePathArc(const PathTrace *trace)
       ThrowPointExpectedException(token,exception);
     if (*token == ',')
       (void) GetNextToken(p,&p,MagickPathExtent,token);
-    (void) GetNextToken(p,&p,MagickPathExtent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+    if (GetPathValue(&p,token,&x) == MagickFalse)
       ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(p,&p,MagickPathExtent,token);
-    x=GetDrawValue(token,&next_token);
-    if (token == next_token)
-      ThrowPointExpectedException(token,exception);
-    (void) GetNextToken(p,&p,MagickPathExtent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(p,&p,MagickPathExtent,token);
-    y=GetDrawValue(token,&next_token);
-    if (token == next_token)
+    if (GetPathValue(&p,token,&y) == MagickFalse)
       ThrowPointExpectedException(token,exception);
     end.x=(double) (attribute == (int) 'A' ? x : point.x+x);
     end.y=(double) (attribute == (int) 'A' ? y : point.y+y);
