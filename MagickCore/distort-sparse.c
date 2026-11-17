@@ -119,6 +119,13 @@
 %    o exception: return any errors or warnings in this structure
 %
 */
+static inline MagickBooleanType IsSparseBlackChannel(const Image *traits_image,
+  const Image *image)
+{
+  return((((GetPixelBlackTraits(traits_image) & UpdatePixelTrait) != 0) &&
+    (image->colorspace == CMYKColorspace)) ? MagickTrue : MagickFalse);
+}
+
 static void PrintBarycentricSparseFX(const Image *image,const double *coeff)
 {
   ssize_t x=0;
@@ -132,8 +139,7 @@ static void PrintBarycentricSparseFX(const Image *image,const double *coeff)
   if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
     (void) FormatLocaleFile(stderr, "  -channel B -fx '%+lf*i %+lf*j %+lf' \\\n",
         coeff[x], coeff[x+1], coeff[x+2]),x+=3;
-  if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
-      (image->colorspace == CMYKColorspace))
+  if (IsSparseBlackChannel(image,image) != MagickFalse)
     (void) FormatLocaleFile(stderr, "  -channel K -fx '%+lf*i %+lf*j %+lf' \\\n",
         coeff[x], coeff[x+1], coeff[x+2]),x+=3;
   if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
@@ -158,8 +164,7 @@ static void PrintBilinearSparseFX(const Image *image,const double *coeff)
     (void) FormatLocaleFile(stderr, "   -channel B -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
         coeff[ x ], coeff[x+1],
         coeff[x+2], coeff[x+3]),x+=4;
-  if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
-      (image->colorspace == CMYKColorspace))
+  if (IsSparseBlackChannel(image,image) != MagickFalse)
     (void) FormatLocaleFile(stderr, "   -channel K -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
         coeff[ x ], coeff[x+1],
         coeff[x+2], coeff[x+3]),x+=4;
@@ -205,8 +210,7 @@ static size_t GetSparseColorCount(const Image *image)
     number_colors++;
   if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
     number_colors++;
-  if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
-      (image->colorspace == CMYKColorspace))
+  if (IsSparseBlackChannel(image,image) != MagickFalse)
     number_colors++;
   if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
       (image->alpha_trait != UndefinedPixelTrait))
@@ -245,8 +249,7 @@ static void SetSparseControlColor(const SparseControlColor *control,
     pixel->green=arguments[x++];
   if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
     pixel->blue=arguments[x++];
-  if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-      (image->colorspace == CMYKColorspace))
+  if (IsSparseBlackChannel(sparse_image,image) != MagickFalse)
     pixel->black=arguments[x++];
   if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
       (sparse_image->alpha_trait != UndefinedPixelTrait))
@@ -401,8 +404,7 @@ static PixelInfo BarycentricSparseColor(const SparseColorPlane *plane,
   if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
     pixel.blue    = coeff[x]*i +coeff[x+1]*j
                     +coeff[x+2], x+=3;
-  if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-      (sparse_image->colorspace == CMYKColorspace))
+  if (IsSparseBlackChannel(sparse_image,sparse_image) != MagickFalse)
     pixel.black   = coeff[x]*i +coeff[x+1]*j
                     +coeff[x+2], x+=3;
   if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
@@ -425,8 +427,7 @@ static PixelInfo BilinearSparseColor(const SparseColorPlane *plane,
   if ((GetPixelBlueTraits(plane->sparse_image) & UpdatePixelTrait) != 0)
     pixel.blue    = plane->coeff[x]*plane->i     + plane->coeff[x+1]*plane->j +
                     plane->coeff[x+2]*plane->i*plane->j + plane->coeff[x+3], x+=4;
-  if (((GetPixelBlackTraits(plane->sparse_image) & UpdatePixelTrait) != 0) &&
-      (image->colorspace == CMYKColorspace))
+  if (IsSparseBlackChannel(plane->sparse_image,image) != MagickFalse)
     pixel.black   = plane->coeff[x]*plane->i     + plane->coeff[x+1]*plane->j +
                     plane->coeff[x+2]*plane->i*plane->j + plane->coeff[x+3], x+=4;
   if (((GetPixelAlphaTraits(plane->sparse_image) & UpdatePixelTrait) != 0) &&
@@ -445,8 +446,7 @@ static PixelInfo AddWeightedControlColor(const SparseControlColor *control,
     pixel.green   += control->arguments[x++]*weight;
   if ((GetPixelBlueTraits(control->sparse_image) & UpdatePixelTrait) != 0)
     pixel.blue    += control->arguments[x++]*weight;
-  if (((GetPixelBlackTraits(control->sparse_image) & UpdatePixelTrait) != 0) &&
-      (control->image->colorspace == CMYKColorspace))
+  if (IsSparseBlackChannel(control->sparse_image,control->image) != MagickFalse)
     pixel.black   += control->arguments[x++]*weight;
   if (((GetPixelAlphaTraits(control->sparse_image) & UpdatePixelTrait) != 0) &&
       (control->sparse_image->alpha_trait != UndefinedPixelTrait))
@@ -514,8 +514,7 @@ static PixelInfo ClearSparseColor(const Image *image,
     pixel.green=0.0;
   if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
     pixel.blue=0.0;
-  if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-      (image->colorspace == CMYKColorspace))
+  if (IsSparseBlackChannel(sparse_image,image) != MagickFalse)
     pixel.black=0.0;
   if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
       (sparse_image->alpha_trait != UndefinedPixelTrait))
@@ -549,8 +548,7 @@ static PixelInfo InverseSparseColor(const SparseColorWeights *inverse,
     pixel.green/=denominator;
   if ((GetPixelBlueTraits(inverse->sparse_image) & UpdatePixelTrait) != 0)
     pixel.blue/=denominator;
-  if (((GetPixelBlackTraits(inverse->sparse_image) & UpdatePixelTrait) != 0) &&
-      (inverse->image->colorspace == CMYKColorspace))
+  if (IsSparseBlackChannel(inverse->sparse_image,inverse->image) != MagickFalse)
     pixel.black/=denominator;
   if (((GetPixelAlphaTraits(inverse->sparse_image) & UpdatePixelTrait) != 0) &&
       (inverse->sparse_image->alpha_trait != UndefinedPixelTrait))
@@ -572,8 +570,7 @@ static PixelInfo ClampSparseColor(const Image *image,
   if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
     pixel.blue=(MagickRealType) ClampPixel((double) QuantumRange*
       pixel.blue);
-  if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-      (image->colorspace == CMYKColorspace))
+  if (IsSparseBlackChannel(sparse_image,image) != MagickFalse)
     pixel.black=(MagickRealType) ClampPixel((double) QuantumRange*
       pixel.black);
   if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
