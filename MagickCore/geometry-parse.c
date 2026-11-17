@@ -325,29 +325,54 @@ static void ParseGeometryXYOffsets(char **p,MagickStatusType *flags,
     ParseGeometryYOffset(p,flags,y);
 }
 
-MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
-  ssize_t *y,size_t *width,size_t *height)
+static MagickBooleanType SkipGeometrySeparator(const int c,char **p,
+  MagickStatusType *flags)
+{
+  switch (c)
+  {
+    case '(':
+    case ')':
+    {
+      (void) CopyMagickString(*p,*p+1,MagickPathExtent);
+      break;
+    }
+    case 'x':
+    case 'X':
+    {
+      (*flags)|=SeparatorValue;
+      (*p)++;
+      break;
+    }
+    case '.':
+    {
+      (*p)++;
+      (*flags)|=DecimalValue;
+      break;
+    }
+    case ':':
+    {
+      (*p)++;
+      (*flags)|=AspectRatioValue;
+      break;
+    }
+    default:
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType StripGeometry(char *pedantic_geometry,
+  MagickStatusType *flags)
 {
   char
-    *p,
-    pedantic_geometry[MagickPathExtent];
+    *p;
 
   int
     c;
 
   MagickStatusType
-    flag,
-    flags;
+    flag;
 
-  /*
-    Remove whitespace and meta characters from geometry specification.
-  */
-  flags=NoValue;
-  if ((geometry == (char *) NULL) || (*geometry == '\0'))
-    return(flags);
-  if (strlen(geometry) >= (MagickPathExtent-1))
-    return(flags);
-  (void) CopyMagickString(pedantic_geometry,geometry,MagickPathExtent);
   for (p=pedantic_geometry; *p != '\0'; )
   {
     if (isspace((int) ((unsigned char) *p)) != 0)
@@ -364,50 +389,18 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
     flag=GetGeometryMetaFlag(c);
     if (flag != NoValue)
       {
-        flags|=flag;
+        (*flags)|=flag;
         (void) CopyMagickString(p,p+1,MagickPathExtent);
-        continue;
       }
-    switch (c)
-    {
-      case '(':
-      case ')':
-      {
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case 'x':
-      case 'X':
-      {
-        flags|=SeparatorValue;
-        p++;
-        break;
-      }
-      case '.':
-      {
-        p++;
-        flags|=DecimalValue;
-        break;
-      }
-      case ':':
-      {
-        p++;
-        flags|=AspectRatioValue;
-        break;
-      }
-      default:
-        return(flags);
-    }
+    else if (SkipGeometrySeparator(c,&p,flags) == MagickFalse)
+      return(MagickFalse);
   }
-  /*
-    Parse width, height, x, and y.
-  */
-  p=pedantic_geometry;
-  if (*p == '\0')
-    return(flags);
-  flags=ParseGeometryWidth(&p,flags,width);
-  flags=ParseGeometryHeight(&p,flags,height);
-  ParseGeometryXYOffsets(&p,&flags,x,y);
+  return(MagickTrue);
+}
+
+static MagickStatusType FinishGeometryFlags(MagickStatusType flags,
+  size_t *width,size_t *height)
+{
   if ((flags & PercentValue) != 0)
     flags=SetPercentGeometrySize(flags,width,height);
 #if 0
@@ -422,6 +415,39 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
     *height,(long) *x,(long) *y);
 #endif
   return(flags);
+}
+
+MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
+  ssize_t *y,size_t *width,size_t *height)
+{
+  char
+    *p,
+    pedantic_geometry[MagickPathExtent];
+
+  MagickStatusType
+    flags;
+
+  /*
+    Remove whitespace and meta characters from geometry specification.
+  */
+  flags=NoValue;
+  if ((geometry == (char *) NULL) || (*geometry == '\0'))
+    return(flags);
+  if (strlen(geometry) >= (MagickPathExtent-1))
+    return(flags);
+  (void) CopyMagickString(pedantic_geometry,geometry,MagickPathExtent);
+  if (StripGeometry(pedantic_geometry,&flags) == MagickFalse)
+    return(flags);
+  /*
+    Parse width, height, x, and y.
+  */
+  p=pedantic_geometry;
+  if (*p == '\0')
+    return(flags);
+  flags=ParseGeometryWidth(&p,flags,width);
+  flags=ParseGeometryHeight(&p,flags,height);
+  ParseGeometryXYOffsets(&p,&flags,x,y);
+  return(FinishGeometryFlags(flags,width,height));
 }
 
 /*
@@ -719,6 +745,84 @@ static MagickStatusType ParseGeometryFields(char *p,
   return(flags);
 }
 
+static inline MagickBooleanType IsGeometryEmptyGroup(const int c,
+  const char *p)
+{
+  return(((c == '(') && (*(p+1) == ')')) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType SkipGeometryCharacter(const int c,char **p,
+  MagickStatusType *flags)
+{
+  MagickStatusType
+    flag;
+
+  flag=GetGeometryMetaFlag(c);
+  if (flag != NoValue)
+    {
+      (*flags)|=flag;
+      (void) CopyMagickString(*p,*p+1,MagickPathExtent);
+    }
+  else if (SkipGeometrySeparator(c,p,flags) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static MagickBooleanType TryStripGeometryInfo(char *pedantic_geometry,
+  MagickStatusType *flags,MagickStatusType *result)
+{
+  char
+    *p;
+
+  int
+    c;
+
+  for (p=pedantic_geometry; *p != '\0'; )
+  {
+    c=(int) ((unsigned char) *p);
+    if (isspace((int) ((unsigned char) c)) != 0)
+      {
+        (void) CopyMagickString(p,p+1,MagickPathExtent);
+        continue;
+      }
+    if (IsGeometryEmptyGroup(c,p) != MagickFalse)
+      {
+        (*result)=(*flags);
+        return(MagickTrue);
+      }
+    if ((IsGeometryAdvanceCharacter(c) != MagickFalse) || (c == '/'))
+      {
+        p++;
+      }
+    else if (SkipGeometryCharacter(c,&p,flags) == MagickFalse)
+      {
+        (*result)=NoValue;
+        return(MagickTrue);
+      }
+  }
+  return(MagickFalse);
+}
+
+static MagickStatusType FinishGeometryInfo(char *p,
+  const char *pedantic_geometry,MagickStatusType flags,
+  GeometryInfo *geometry_info)
+{
+  flags=ParseGeometryFields(p,pedantic_geometry,flags,geometry_info);
+#if 0
+  /* Debugging Geometry */
+  (void) fprintf(stderr,"ParseGeometry...\n");
+  (void) fprintf(stderr,"Flags: %c %c %s %s %s\n",
+    (flags & RhoValue) ? 'W' : ' ',(flags & SigmaValue) ? 'H' : ' ',
+    (flags & XiValue) ? ((flags & XiNegative) ? "-X" : "+X") : "  ",
+    (flags & PsiValue) ? ((flags & PsiNegative) ? "-Y" : "+Y") : "  ",
+    (flags & ChiValue) ? ((flags & ChiNegative) ? "-Z" : "+Z") : "  ");
+  (void) fprintf(stderr,"Geometry: %lg,%lg,%lg,%lg,%lg\n",geometry_info->rho,
+    geometry_info->sigma,geometry_info->xi,geometry_info->psi,
+    geometry_info->chi);
+#endif
+  return(flags);
+}
+
 MagickExport MagickStatusType ParseGeometry(const char *geometry,
   GeometryInfo *geometry_info)
 {
@@ -733,7 +837,6 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
     c;
 
   MagickStatusType
-    flag,
     flags;
 
   /*
@@ -761,82 +864,13 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
       return(flags);
     }
   (void) CopyMagickString(pedantic_geometry,geometry,MagickPathExtent);
-  for (p=pedantic_geometry; *p != '\0'; )
-  {
-    c=(int) ((unsigned char) *p);
-    if (isspace((int) ((unsigned char) c)) != 0)
-      {
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        continue;
-      }
-    if ((c == '(') && (*(p+1) == ')'))
-      return(flags);
-    if (IsGeometryAdvanceCharacter(c) != MagickFalse)
-      {
-        p++;
-        continue;
-      }
-    flag=GetGeometryMetaFlag(c);
-    if (flag != NoValue)
-      {
-        flags|=flag;
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        continue;
-      }
-    switch (c)
-    {
-      case '(':
-      case ')':
-      {
-        (void) CopyMagickString(p,p+1,MagickPathExtent);
-        break;
-      }
-      case 'x':
-      case 'X':
-      {
-        flags|=SeparatorValue;
-        p++;
-        break;
-      }
-      case '/':
-      {
-        p++;
-        break;
-      }
-      case '.':
-      {
-        p++;
-        flags|=DecimalValue;
-        break;
-      }
-      case ':':
-      {
-        p++;
-        flags|=AspectRatioValue;
-        break;
-      }
-      default:
-        return(NoValue);
-    }
-  }
+  if (TryStripGeometryInfo(pedantic_geometry,&flags,&flags) != MagickFalse)
+    return(flags);
   /*
     Parse rho, sigma, xi, psi, and optionally chi.
   */
   p=pedantic_geometry;
   if (*p == '\0')
     return(flags);
-  flags=ParseGeometryFields(p,pedantic_geometry,flags,geometry_info);
-#if 0
-  /* Debugging Geometry */
-  (void) fprintf(stderr,"ParseGeometry...\n");
-  (void) fprintf(stderr,"Flags: %c %c %s %s %s\n",
-    (flags & RhoValue) ? 'W' : ' ',(flags & SigmaValue) ? 'H' : ' ',
-    (flags & XiValue) ? ((flags & XiNegative) ? "-X" : "+X") : "  ",
-    (flags & PsiValue) ? ((flags & PsiNegative) ? "-Y" : "+Y") : "  ",
-    (flags & ChiValue) ? ((flags & ChiNegative) ? "-Z" : "+Z") : "  ");
-  (void) fprintf(stderr,"Geometry: %lg,%lg,%lg,%lg,%lg\n",geometry_info->rho,
-    geometry_info->sigma,geometry_info->xi,geometry_info->psi,
-    geometry_info->chi);
-#endif
-  return(flags);
+  return(FinishGeometryInfo(p,pedantic_geometry,flags,geometry_info));
 }

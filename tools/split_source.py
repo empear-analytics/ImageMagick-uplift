@@ -665,25 +665,45 @@ rest = "\n".join(rest_lines)
 for mname in defined(region):
     if re.search(r"\b%s\b" % mname, rest) and not defined_before_use_in_each_part(rest_lines, region, mname):
         sys.exit("refused: macro %s used outside" % mname)
-# a typedef elsewhere in the original that only the region uses moves with it
-moved_types = []
-for tname in sorted(set(re.findall(r"^\}\s*(\w+)\s*;", rest, re.M))):
-    if not re.search(r"\b%s\b" % tname, region): continue
+# a typedef elsewhere in the original that only the region uses moves with it; one that only
+# another moving typedef names (EdgeInfo, named by PolygonInfo) moves on a later pass, so the
+# passes repeat until none moves, and the moved typedefs keep the order they had in the file
+def typedef_span(tname):
+    """The first and last line of the typedef that ends `} TNAME;` in rest_lines, or None."""
     t1 = next(k for k, l in enumerate(rest_lines) if l == "} %s;" % tname)
     t0 = next((k for k in range(t1, -1, -1) if re.match(r"^typedef (struct|enum)( _\w+)?$", rest_lines[k])), None)
-    if t0 is None: continue
-    others = "\n".join(rest_lines[:t0] + rest_lines[t1 + 1:])
-    if re.search(r"\b%s\b" % tname, others): continue
-    moved_types.append("\n".join(rest_lines[t0:t1 + 1]))
-    note_banner(rest_lines, t0, moved_banners)
-    e = t1 + 1
-    if e < len(rest_lines) and rest_lines[e] == "": e += 1
-    del rest_lines[t0:e]
-    # a "Typedef declarations." comment left with nothing under it goes too
+    return None if t0 is None else (t0, t1)
+
+def drop_empty_typedef_comment(t0):
+    """Remove a "Typedef declarations." comment left with nothing under it at line T0."""
     if rest_lines[t0 - 3:t0] == ["/*", "  Typedef declarations.", "*/"] and \
         not rest_lines[t0].startswith("typedef"):
         del rest_lines[t0 - 3:t0]
-    rest = "\n".join(rest_lines)
+
+def move_region_only_typedef(tname):
+    """Remove the typedef TNAME from rest_lines when only the region names it; return its text."""
+    span = typedef_span(tname)
+    if span is None: return None
+    t0, t1 = span
+    if re.search(r"\b%s\b" % tname, "\n".join(rest_lines[:t0] + rest_lines[t1 + 1:])): return None
+    block = "\n".join(rest_lines[t0:t1 + 1])
+    note_banner(rest_lines, t0, moved_banners)
+    del rest_lines[t0:t1 + 1 + (rest_lines[t1 + 1:t1 + 2] == [""])]
+    drop_empty_typedef_comment(t0)
+    return block
+
+def move_region_only_typedefs():
+    """Move every typedef only the region names, pass after pass; return them in file order."""
+    moved = {}
+    while True:
+        names = sorted(set(re.findall(r"^\}\s*(\w+)\s*;", "\n".join(rest_lines), re.M)))
+        found = {t: move_region_only_typedef(t) for t in names if re.search(r"\b%s\b" % t, region)}
+        found = {L.index("} %s;" % t): b for t, b in found.items() if b is not None}
+        if not found: return [moved[n] for n in sorted(moved)]
+        moved.update(found)
+
+moved_types = move_region_only_typedefs()
+rest = "\n".join(rest_lines)
 # a `/* Title. */` banner whose declarations all moved goes too, when another banner follows it
 for banner in moved_banners: drop_banner_if_empty(rest_lines, banner)
 rest = "\n".join(rest_lines)
