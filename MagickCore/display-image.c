@@ -12036,6 +12036,15 @@ static void XApplyNegateCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyGrayscaleToImage(Display *display,XWindows *windows,
+  Image **image,ExceptionInfo *exception)
+{
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) SetImageType(*image,(*image)->alpha_trait == UndefinedPixelTrait ?
+    GrayscaleType : GrayscaleAlphaType,exception);
+}
+
 static void XApplyGrayscaleCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12056,10 +12065,7 @@ static void XApplyGrayscaleCommand(const XMagickCommandContext *context)
   /*
     Convert image to grayscale.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) SetImageType(*image,(*image)->alpha_trait == UndefinedPixelTrait ?
-    GrayscaleType : GrayscaleAlphaType,exception);
+  XApplyGrayscaleToImage(display,windows,image,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
