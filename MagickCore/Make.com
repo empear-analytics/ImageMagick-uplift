@@ -72,6 +72,7 @@ $call Make deprecate.c
 $call Make display.c
 $call Make display-image.c
 $call Make distort.c
+$call Make distort-sparse.c
 $call Make distort-affine.c
 $call Make distort-resize.c
 $call Make distribute-cache.c
@@ -84,14 +85,22 @@ $call Make effect-preview.c
 $call Make effect-blur.c
 $call Make effect-blur-adaptive.c
 $call Make effect-blur-adaptive-filters.c
+$call Make effect-emboss.c
+$call Make effect-blur-bilateral.c
+$call Make effect-blur-selective.c
+$call Make effect-adaptive.c
 $call Make enhance.c
 $call Make enhance-color.c
+$call Make enhance-balance.c
 $call Make enhance-clahe.c
 $call Make enhance-tone.c
+$call Make enhance-equalize.c
+$call Make enhance-level.c
 $call Make enhance-level-colors.c
 $call Make exception.c
 $call Make exception-throw.c
 $call Make feature.c
+$call Make feature-hough.c
 $call Make feature-texture.c
 $call Make fourier.c
 $call Make fourier-complex.c
@@ -113,6 +122,8 @@ $call Make image-filename.c
 $call Make image-view.c
 $call Make layer.c
 $call Make layer-frames.c
+$call Make layer-optimize.c
+$call Make layer-dispose.c
 $call Make layer-composite.c
 $call Make layer-merge.c
 $call Make list.c
@@ -132,7 +143,11 @@ $call Make montage.c
 $call Make montage-info.c
 $call Make morphology.c
 $call Make morphology-apply.c
+$call Make morphology-primitive.c
+$call Make morphology-builtin.c
 $call Make opencl.c
+$call Make opencl-environment.c
+$call Make opencl-enqueue.c
 $call Make opencl-device.c
 $call Make option.c
 $call Make option-image.c
@@ -151,6 +166,8 @@ $call Make PreRvIcccm.c
 $call Make profile.c
 $call Make profile-sync.c
 $call Make quantize.c
+$call Make quantize-remap.c
+$call Make quantize-kmeans.c
 $call Make quantize-error.c
 $call Make quantize-info.c
 $call Make quantize-posterize.c
@@ -169,6 +186,7 @@ $call Make resize-image.c
 $call Make magnify.c
 $call Make resource.c
 $call Make segment.c
+$call Make segment-threshold.c
 $call Make semaphore.c
 $call Make shear.c
 $call Make shear-rotate.c
@@ -177,6 +195,7 @@ $call Make signature.c
 $call Make splay-tree.c
 $call Make static.c
 $call Make statistic.c
+$call Make statistic-polynomial.c
 $call Make statistic-measure.c
 $call Make statistic-function.c
 $call Make statistic-moments.c
@@ -196,9 +215,11 @@ $call Make token-next.c
 $call Make token-glob.c
 $call Make transform.c
 $call Make transform-region.c
+$call Make transform-crop.c
 $call Make transform-tiles.c
 $call Make threshold.c
 $call Make threshold-image.c
+$call Make threshold-level.c
 $call Make threshold-adaptive.c
 $call Make threshold-auto.c
 $call Make type.c
@@ -210,12 +231,19 @@ $call Make vision.c
 $call Make vision-components.c
 $call Make vms.c
 $call Make widget.c
+$call Make widget-confirm.c
+$call Make widget-dialog.c
 $call Make xml-tree.c
 $call Make xml-tree-file.c
 $call Make xwindow.c
 $call Make xwindow-image.c
+$call Make xwindow-annotate.c
+$call Make xwindow-info.c
+$call Make xwindow-pixel.c
+$call Make xwindow-text.c
 $call Make xwindow-visual.c
 $call Make xwindow-import.c
+$call Make xwindow-search.c
 $ set default [-.filters]
 $ call Make analyze.c
 $ set default [-.magickwand]

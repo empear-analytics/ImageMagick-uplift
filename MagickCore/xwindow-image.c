@@ -92,6 +92,7 @@
 #include "MagickCore/xwindow.h"
 #include "MagickCore/xwindow-private.h"
 #include "MagickCore/version.h"
+#include "MagickCore/xwindow-image-private.h"
 #if defined(__BEOS__)
 #include <OS.h>
 #endif
@@ -145,16 +146,6 @@ typedef struct _MakeImageContext
 /*
   Define declarations.
 */
-#define XBlueGamma(color) ClampToQuantum(blue_gamma == 1.0 ? (double) \
-  (color) : ((pow((QuantumScale*(double) (color)),1.0* \
-  MagickSafeReciprocal((double) blue_gamma))*(double) QuantumRange)))
-#define XGammaPacket(map,color)  (size_t) (map->base_pixel+ \
-  ((ScaleQuantumToShort(XRedGamma((color)->red))*map->red_max/65535L)* \
-    map->red_mult)+ \
-  ((ScaleQuantumToShort(XGreenGamma((color)->green))*map->green_max/65535L)* \
-    map->green_mult)+ \
-  ((ScaleQuantumToShort(XBlueGamma((color)->blue))*map->blue_max/65535L)* \
-    map->blue_mult))
 #define XGammaPixel(image,map,color)  (size_t) (map->base_pixel+ \
   ((ScaleQuantumToShort(XRedGamma(GetPixelRed(image,color)))*map->red_max/65535L)* \
     map->red_mult)+ \
@@ -162,20 +153,6 @@ typedef struct _MakeImageContext
     map->green_mult)+ \
   ((ScaleQuantumToShort(XBlueGamma(GetPixelBlue(image,color)))*map->blue_max/65535L)* \
     map->blue_mult))
-#define XGreenGamma(color) ClampToQuantum(green_gamma == 1.0 ? (double) \
-  (color) : ((pow((QuantumScale*(double) (color)),1.0* \
-  MagickSafeReciprocal((double) green_gamma))*(double) QuantumRange)))
-#define XRedGamma(color) ClampToQuantum(red_gamma == 1.0 ? (double) \
-  (color) : ((pow((QuantumScale*(double) (color)),1.0* \
-  MagickSafeReciprocal((double) red_gamma))*(double) QuantumRange)))
-#define XStandardPixel(map,color)  (size_t) (map->base_pixel+ \
-  (((color)->red*map->red_max/65535L)*map->red_mult)+ \
-  (((color)->green*map->green_max/65535L)*map->green_mult)+ \
-  (((color)->blue*map->blue_max/65535L)*map->blue_mult))
-#define HighlightModulate  ScaleCharToQuantum(125)
-#define ShadowModulate  ScaleCharToQuantum(135)
-#define DepthModulate  ScaleCharToQuantum(185)
-#define TroughModulate  ScaleCharToQuantum(110)
 
 /*
   Constant declarations.
@@ -188,6 +165,21 @@ static double
   green_gamma = 1.0,
   red_gamma = 1.0;
 
+MagickPrivate double *XBlueGammaReference(void)
+{
+  return(&blue_gamma);
+}
+
+MagickPrivate double *XGreenGammaReference(void)
+{
+  return(&green_gamma);
+}
+
+MagickPrivate double *XRedGammaReference(void)
+{
+  return(&red_gamma);
+}
+
 /*
   Forward declarations.
 */
@@ -197,589 +189,7 @@ static void
   XMakeImageLSBFirst(const MakeImageContext *,Image *,XImage *,XImage *),
   XMakeImageMSBFirst(const MakeImageContext *,Image *,XImage *,XImage *);
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   X A n n o t a t e I m a g e                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  XAnnotateImage() annotates the image with text.
-%
-%  The format of the XAnnotateImage method is:
-%
-%      MagickBooleanType XAnnotateImage(Display *display,
-%        const XPixelInfo *pixel,XAnnotateInfo *annotate_info,Image *image,
-%        ExceptionInfo *exception)
-%
-%  A description of each parameter follows:
-%
-%    o display: Specifies a connection to an X server;  returned from
-%      XOpenDisplay.
-%
-%    o pixel: Specifies a pointer to a XPixelInfo structure.
-%
-%    o annotate_info: Specifies a pointer to a XAnnotateInfo structure.
-%
-%    o image: the image.
-%
-%    o exception: return any errors or warnings in this structure.
-%
-*/
-static void SetAnnotateBoxPixel(const Image *annotate_image,
-  const XPixelInfo *pixel,const XAnnotateInfo *annotate_info,Quantum *q)
-{
-  /*
-    Set this pixel to the background color.
-  */
-  SetPixelRed(annotate_image,ScaleShortToQuantum(
-    pixel->box_color.red),q);
-  SetPixelGreen(annotate_image,ScaleShortToQuantum(
-    pixel->box_color.green),q);
-  SetPixelBlue(annotate_image,ScaleShortToQuantum(
-    pixel->box_color.blue),q);
-  if ((annotate_info->stencil == ForegroundStencil) ||
-      (annotate_info->stencil == OpaqueStencil))
-    SetPixelAlpha(annotate_image,TransparentAlpha,q);
-}
-
-static void SetAnnotatePenPixel(const Image *annotate_image,
-  const XPixelInfo *pixel,const XAnnotateInfo *annotate_info,Quantum *q)
-{
-  /*
-    Set this pixel to the pen color.
-  */
-  SetPixelRed(annotate_image,ScaleShortToQuantum(
-    pixel->pen_color.red),q);
-  SetPixelGreen(annotate_image,ScaleShortToQuantum(
-    pixel->pen_color.green),q);
-  SetPixelBlue(annotate_image,ScaleShortToQuantum(
-    pixel->pen_color.blue),q);
-  if (annotate_info->stencil == BackgroundStencil)
-    SetPixelAlpha(annotate_image,TransparentAlpha,q);
-}
-
-typedef struct _AnnotatePixels
-{
-  Image
-    *annotate_image;
-
-  XImage
-    *annotate_ximage;
-
-  const XPixelInfo
-    *pixel;
-
-  XAnnotateInfo
-    *annotate_info;
-
-  ExceptionInfo
-    *exception;
-} AnnotatePixels;
-
-static void XSetAnnotateRow(const AnnotatePixels *annotate_pixels,
-  Quantum *magick_restrict q,const int y)
-{
-  Image
-    *const annotate_image = annotate_pixels->annotate_image;
-
-  XImage
-    *const annotate_ximage = annotate_pixels->annotate_ximage;
-
-  const XPixelInfo
-    *const pixel = annotate_pixels->pixel;
-
-  XAnnotateInfo
-    *const annotate_info = annotate_pixels->annotate_info;
-
-  int
-    x;
-
-  for (x=0; x < (int) annotate_image->columns; x++)
-  {
-    SetPixelAlpha(annotate_image,OpaqueAlpha,q);
-    if (XGetPixel(annotate_ximage,x,y) == 0)
-      SetAnnotateBoxPixel(annotate_image,pixel,annotate_info,q);
-    else
-      SetAnnotatePenPixel(annotate_image,pixel,annotate_info,q);
-    q+=(ptrdiff_t) GetPixelChannels(annotate_image);
-  }
-}
-
-static int XTransferAnnotatePixels(const AnnotatePixels *annotate_pixels)
-{
-  Image
-    *const annotate_image = annotate_pixels->annotate_image;
-
-  XImage
-    *const annotate_ximage = annotate_pixels->annotate_ximage;
-
-  ExceptionInfo
-    *const exception = annotate_pixels->exception;
-
-  CacheView
-    *annotate_view;
-
-  int
-    y;
-
-  annotate_view=AcquireAuthenticCacheView(annotate_image,exception);
-  for (y=0; y < (int) annotate_image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    q=GetCacheViewAuthenticPixels(annotate_view,0,(ssize_t) y,
-      annotate_image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    XSetAnnotateRow(annotate_pixels,q,y);
-    if (SyncCacheViewAuthenticPixels(annotate_view,exception) == MagickFalse)
-      break;
-  }
-  annotate_view=DestroyCacheView(annotate_view);
-  XDestroyImage(annotate_ximage);
-  return(y);
-}
-
-static Image *XScaleAnnotateImage(Image *annotate_image,
-  const unsigned int width,const unsigned int height,ExceptionInfo *exception)
-{
-  if ((width != (unsigned int) annotate_image->columns) ||
-      (height != (unsigned int) annotate_image->rows))
-    {
-      char
-        image_geometry[MagickPathExtent];
-
-      /*
-        Scale image.
-      */
-      (void) FormatLocaleString(image_geometry,MagickPathExtent,"%ux%u",
-        width,height);
-      (void) TransformImage(&annotate_image,(char *) NULL,image_geometry,
-        exception);
-    }
-  return(annotate_image);
-}
-
-static int XQuarterTurns(const double degrees)
-{
-  double
-    normalized_degrees;
-
-  int
-    rotations;
-
-  normalized_degrees=degrees;
-  while (normalized_degrees < -45.0)
-    normalized_degrees+=360.0;
-  for (rotations=0; normalized_degrees > 45.0; rotations++)
-    normalized_degrees-=90.0;
-  return(rotations);
-}
-
-static void XRotateAnnotateOrigin(const Image *annotate_image,
-  const int rotations,int *x,int *y)
-{
-  switch (rotations % 4)
-  {
-    default:
-    case 0:
-      break;
-    case 1:
-    {
-      /*
-        Rotate 90 degrees.
-      */
-      (*x)-=(int) annotate_image->columns/2;
-      (*y)+=(int) annotate_image->columns/2;
-      break;
-    }
-    case 2:
-    {
-      /*
-        Rotate 180 degrees.
-      */
-      (*x)=(*x)-(int) annotate_image->columns;
-      break;
-    }
-    case 3:
-    {
-      /*
-        Rotate 270 degrees.
-      */
-      (*x)=(*x)-(int) annotate_image->columns/2;
-      (*y)=(*y)-(int) (annotate_image->rows-(annotate_image->columns/2));
-      break;
-    }
-  }
-}
-
-static MagickBooleanType XAcquireAnnotateImage(
-  const XAnnotateInfo *annotate_info,Image **annotate_image,
-  ExceptionInfo *exception)
-{
-  (*annotate_image)=AcquireImage((ImageInfo *) NULL,exception);
-  if ((*annotate_image) == (Image *) NULL)
-    return(MagickFalse);
-  (*annotate_image)->columns=annotate_info->width;
-  (*annotate_image)->rows=annotate_info->height;
-  return(MagickTrue);
-}
-
-static MagickBooleanType XDrawAnnotateText(Display *display,
-  const XAnnotateInfo *annotate_info,XImage **annotate_ximage)
-{
-  GC
-    annotate_context;
-
-  Pixmap
-    annotate_pixmap;
-
-  unsigned int
-    depth;
-
-  Window
-    root_window;
-
-  XGCValues
-    context_values;
-
-  root_window=XRootWindow(display,XDefaultScreen(display));
-  depth=(unsigned int) XDefaultDepth(display,XDefaultScreen(display));
-  annotate_pixmap=XCreatePixmap(display,root_window,annotate_info->width,
-    annotate_info->height,depth);
-  if (annotate_pixmap == (Pixmap) NULL)
-    return(MagickFalse);
-  /*
-    Initialize graphics info.
-  */
-  context_values.background=0;
-  context_values.foreground=(size_t) (~0);
-  context_values.font=annotate_info->font_info->fid;
-  annotate_context=XCreateGC(display,root_window,(unsigned long)
-    (GCBackground | GCFont | GCForeground),&context_values);
-  if (annotate_context == (GC) NULL)
-    return(MagickFalse);
-  /*
-    Draw text to pixmap.
-  */
-  (void) XDrawImageString(display,annotate_pixmap,annotate_context,0,
-    (int) annotate_info->font_info->ascent,annotate_info->text,
-    (int) strlen(annotate_info->text));
-  (void) XFreeGC(display,annotate_context);
-  /*
-    Initialize annotated X image.
-  */
-  (*annotate_ximage)=XGetImage(display,annotate_pixmap,0,0,annotate_info->width,
-    annotate_info->height,AllPlanes,ZPixmap);
-  if ((*annotate_ximage) == (XImage *) NULL)
-    return(MagickFalse);
-  (void) XFreePixmap(display,annotate_pixmap);
-  return(MagickTrue);
-}
-
-MagickPrivate MagickBooleanType XAnnotateImage(Display *display,
-  const XPixelInfo *pixel,XAnnotateInfo *annotate_info,Image *image,
-  ExceptionInfo *exception)
-{
-  AnnotatePixels
-    annotate_pixels;
-
-  Image
-    *annotate_image;
-
-  int
-    x,
-    y;
-
-  PixelTrait
-    alpha_trait;
-
-  unsigned int
-    height,
-    width;
-
-  XImage
-    *annotate_ximage;
-
-  /*
-    Initialize annotated image.
-  */
-  assert(display != (Display *) NULL);
-  assert(pixel != (XPixelInfo *) NULL);
-  assert(annotate_info != (XAnnotateInfo *) NULL);
-  assert(image != (Image *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  /*
-    Initialize annotated pixmap.
-  */
-  if (XDrawAnnotateText(display,annotate_info,&annotate_ximage) == MagickFalse)
-    return(MagickFalse);
-  /*
-    Initialize annotated image.
-  */
-  if (XAcquireAnnotateImage(annotate_info,&annotate_image,exception) ==
-      MagickFalse)
-    return(MagickFalse);
-  /*
-    Transfer annotated X image to image.
-  */
-  width=(unsigned int) image->columns;
-  height=(unsigned int) image->rows;
-  x=0;
-  y=0;
-  (void) XParseGeometry(annotate_info->geometry,&x,&y,&width,&height);
-  (void) GetOneVirtualPixelInfo(image,UndefinedVirtualPixelMethod,(ssize_t) x,
-    (ssize_t) y,&annotate_image->background_color,exception);
-  if (annotate_info->stencil == ForegroundStencil)
-    annotate_image->alpha_trait=BlendPixelTrait;
-  annotate_pixels.annotate_image=annotate_image;
-  annotate_pixels.annotate_ximage=annotate_ximage;
-  annotate_pixels.pixel=pixel;
-  annotate_pixels.annotate_info=annotate_info;
-  annotate_pixels.exception=exception;
-  y=XTransferAnnotatePixels(&annotate_pixels);
-  /*
-    Determine annotate geometry.
-  */
-  (void) XParseGeometry(annotate_info->geometry,&x,&y,&width,&height);
-  annotate_image=XScaleAnnotateImage(annotate_image,width,height,exception);
-  if (annotate_info->degrees != 0.0)
-    {
-      Image
-        *rotate_image;
-
-      int
-        rotations;
-
-      /*
-        Rotate image.
-      */
-      rotate_image=RotateImage(annotate_image,annotate_info->degrees,exception);
-      if (rotate_image == (Image *) NULL)
-        return(MagickFalse);
-      annotate_image=DestroyImage(annotate_image);
-      annotate_image=rotate_image;
-      /*
-        Annotation is relative to the degree of rotation.
-      */
-      rotations=XQuarterTurns(annotate_info->degrees);
-      XRotateAnnotateOrigin(annotate_image,rotations,&x,&y);
-    }
-  /*
-    Composite text onto the image.
-  */
-  (void) XParseGeometry(annotate_info->geometry,&x,&y,&width,&height);
-  alpha_trait=image->alpha_trait;
-  (void) CompositeImage(image,annotate_image,
-    annotate_image->alpha_trait != UndefinedPixelTrait ? OverCompositeOp :
-    CopyCompositeOp,MagickTrue,(ssize_t) x,(ssize_t) y,exception);
-  image->alpha_trait=alpha_trait;
-  annotate_image=DestroyImage(annotate_image);
-  return(MagickTrue);
-}
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   X B e s t F o n t                                                         %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  XBestFont() returns the "best" font.  "Best" is defined as a font specified
-%  in the X resource database or a font such that the text width displayed
-%  with the font does not exceed the specified maximum width.
-%
-%  The format of the XBestFont method is:
-%
-%      XFontStruct *XBestFont(Display *display,
-%        const XResourceInfo *resource_info,const MagickBooleanType text_font)
-%
-%  A description of each parameter follows:
-%
-%    o font: XBestFont returns a pointer to a XFontStruct structure.
-%
-%    o display: Specifies a connection to an X server;  returned from
-%      XOpenDisplay.
-%
-%    o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
-%
-%    o text_font:  True is font should be mono-spaced (typewriter style).
-%
-*/
-
-static inline MagickBooleanType IsFontSeparator(const char *p)
-{
-  return(((*p == ':') || (*p == ';') || (*p == ',')) ? MagickTrue :
-    MagickFalse);
-}
-
-static unsigned int CountFonts(const char *font)
-{
-  const char
-    *p;
-
-  unsigned int
-    fonts;
-
-  fonts=1U;
-  for (p=font; *p != '\0'; p++)
-    if (IsFontSeparator(p) != MagickFalse)
-      fonts++;
-  return(fonts);
-}
-
-static char **FontToList(char *font)
-{
-  char
-    **fontlist;
-
-  char
-    *p,
-    *q;
-
-  int
-    i;
-
-  unsigned int
-    fonts;
-
-  if (font == (char *) NULL)
-    return((char **) NULL);
-  /*
-    Convert string to an ASCII list.
-  */
-  fonts=CountFonts(font);
-  fontlist=(char **) AcquireQuantumMemory((size_t) fonts+1UL,sizeof(*fontlist));
-  if (fontlist == (char **) NULL)
-    {
-      ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",font);
-      return((char **) NULL);
-    }
-  p=font;
-  for (i=0; i < (int) fonts; i++)
-  {
-    for (q=p; *q != '\0'; q++)
-      if (IsFontSeparator(q) != MagickFalse)
-        break;
-    fontlist[i]=(char *) AcquireQuantumMemory((size_t) (q-p)+1UL,
-      sizeof(*fontlist[i]));
-    if (fontlist[i] == (char *) NULL)
-      {
-        ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",font);
-        return((char **) NULL);
-      }
-    (void) CopyMagickString(fontlist[i],p,(size_t) (q-p+1));
-    p=q+1;
-  }
-  fontlist[i]=(char *) NULL;
-  return(fontlist);
-}
-
-static XFontStruct *XLoadFirstFont(Display *display,char **fontlist,
-  XFontStruct *font_info)
-{
-  int
-    i;
-
-  if (fontlist != (char **) NULL)
-    {
-      for (i=0; fontlist[i] != (char *) NULL; i++)
-      {
-        if (font_info == (XFontStruct *) NULL)
-          font_info=XLoadQueryFont(display,fontlist[i]);
-        fontlist[i]=DestroyString(fontlist[i]);
-      }
-      fontlist=(char **) RelinquishMagickMemory(fontlist);
-    }
-  return(font_info);
-}
-
-static XFontStruct *XLoadListedFont(Display *display,const char **p,
-  XFontStruct *font_info)
-{
-  while (*p != (char *) NULL)
-  {
-    if (font_info != (XFontStruct *) NULL)
-      break;
-    font_info=XLoadQueryFont(display,(char *) *p);
-    p++;
-  }
-  return(font_info);
-}
-
-MagickPrivate XFontStruct *XBestFont(Display *display,
-  const XResourceInfo *resource_info,const MagickBooleanType text_font)
-{
-  static const char
-    *Fonts[]=
-    {
-      "-*-helvetica-medium-r-normal--12-*-*-*-*-*-iso8859-1",
-      "-*-arial-medium-r-normal--12-*-*-*-*-*-iso8859-1",
-      "-*-helvetica-medium-r-normal--12-*-*-*-*-*-iso8859-15",
-      "-*-arial-medium-r-normal--12-*-*-*-*-*-iso8859-15",
-      "-*-helvetica-medium-r-normal--12-*-*-*-*-*-*-*",
-      "-*-arial-medium-r-normal--12-*-*-*-*-*-*-*",
-      "variable",
-      "fixed",
-      (char *) NULL
-    },
-    *TextFonts[]=
-    {
-      "-*-courier-medium-r-normal-*-12-*-*-*-*-*-iso8859-1",
-      "-*-courier-medium-r-normal-*-12-*-*-*-*-*-iso8859-15",
-      "-*-fixed-medium-r-normal-*-12-*-*-*-*-*-*-*",
-      "fixed",
-      (char *) NULL
-    };
-
-  char
-    *font_name;
-
-  const char
-    **p;
-
-  XFontStruct
-    *font_info;
-
-  font_info=(XFontStruct *) NULL;
-  font_name=resource_info->font;
-  if (text_font != MagickFalse)
-    font_name=resource_info->text_font;
-  if ((font_name != (char *) NULL) && (*font_name != '\0'))
-    {
-      char
-        **fontlist;
-
-      /*
-        Load preferred font specified in the X resource database.
-      */
-      fontlist=FontToList(font_name);
-      font_info=XLoadFirstFont(display,fontlist,font_info);
-      if (font_info == (XFontStruct *) NULL)
-        ThrowXWindowException(XServerError,"UnableToLoadFont",font_name);
-    }
-  /*
-    Load fonts from list of fonts until one is found.
-  */
-  p=Fonts;
-  if (text_font != MagickFalse)
-    p=TextFonts;
-  if (XDisplayHeight(display,XDefaultScreen(display)) >= 748)
-    p++;
-  font_info=XLoadListedFont(display,p,font_info);
-  return(font_info);
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1501,543 +911,6 @@ static void XDitherImage(Image *image,XImage *ximage,ExceptionInfo *exception)
   RelinquishDitherMaps(red_map,green_map,blue_map);
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   X D r a w I m a g e                                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  XDrawImage() draws a line on the image.
-%
-%  The format of the XDrawImage method is:
-%
-%    MagickBooleanType XDrawImage(Display *display,const XPixelInfo *pixel,
-%      XDrawInfo *draw_info,Image *image,ExceptionInfo *exception)
-%
-%  A description of each parameter follows:
-%
-%    o display: Specifies a connection to an X server;  returned from
-%      XOpenDisplay.
-%
-%    o pixel: Specifies a pointer to a XPixelInfo structure.
-%
-%    o draw_info: Specifies a pointer to a XDrawInfo structure.
-%
-%    o image: the image.
-%
-%    o exception: return any errors or warnings in this structure.
-%
-*/
-static void XDrawLineOrRectangle(Display *display,const Pixmap draw_pixmap,
-  const GC draw_context,const XDrawInfo *draw_info)
-{
-  switch (draw_info->element)
-  {
-    case PointElement:
-    default:
-    {
-      (void) XDrawLines(display,draw_pixmap,draw_context,
-        draw_info->coordinate_info,(int) draw_info->number_coordinates,
-        CoordModeOrigin);
-      break;
-    }
-    case LineElement:
-    {
-      (void) XDrawLine(display,draw_pixmap,draw_context,draw_info->line_info.x1,
-        draw_info->line_info.y1,draw_info->line_info.x2,
-        draw_info->line_info.y2);
-      break;
-    }
-    case RectangleElement:
-    {
-      (void) XDrawRectangle(display,draw_pixmap,draw_context,
-        (int) draw_info->rectangle_info.x,(int) draw_info->rectangle_info.y,
-        (unsigned int) draw_info->rectangle_info.width,
-        (unsigned int) draw_info->rectangle_info.height);
-      break;
-    }
-    case FillRectangleElement:
-    {
-      (void) XFillRectangle(display,draw_pixmap,draw_context,
-        (int) draw_info->rectangle_info.x,(int) draw_info->rectangle_info.y,
-        (unsigned int) draw_info->rectangle_info.width,
-        (unsigned int) draw_info->rectangle_info.height);
-      break;
-    }
-  }
-}
-
-static void XDrawArcElement(Display *display,const Pixmap draw_pixmap,
-  const GC draw_context,const XDrawInfo *draw_info)
-{
-  switch (draw_info->element)
-  {
-    default:
-    {
-      XDrawLineOrRectangle(display,draw_pixmap,draw_context,draw_info);
-      break;
-    }
-    case CircleElement:
-    case EllipseElement:
-    {
-      (void) XDrawArc(display,draw_pixmap,draw_context,
-        (int) draw_info->rectangle_info.x,(int) draw_info->rectangle_info.y,
-        (unsigned int) draw_info->rectangle_info.width,
-        (unsigned int) draw_info->rectangle_info.height,0,360*64);
-      break;
-    }
-    case FillCircleElement:
-    case FillEllipseElement:
-    {
-      (void) XFillArc(display,draw_pixmap,draw_context,
-        (int) draw_info->rectangle_info.x,(int) draw_info->rectangle_info.y,
-        (unsigned int) draw_info->rectangle_info.width,
-        (unsigned int) draw_info->rectangle_info.height,0,360*64);
-      break;
-    }
-  }
-}
-
-static void XDrawElementToPixmap(Display *display,const Pixmap draw_pixmap,
-  const GC draw_context,const XDrawInfo *draw_info)
-{
-  /*
-    Clear pixmap.
-  */
-  (void) XFillRectangle(display,draw_pixmap,draw_context,0,0,draw_info->width,
-    draw_info->height);
-  /*
-    Draw line to pixmap.
-  */
-  (void) XSetBackground(display,draw_context,0);
-  (void) XSetForeground(display,draw_context,(size_t) (~0));
-  if (draw_info->stipple !=  (Pixmap) NULL)
-    {
-      (void) XSetFillStyle(display,draw_context,FillOpaqueStippled);
-      (void) XSetStipple(display,draw_context,draw_info->stipple);
-    }
-  switch (draw_info->element)
-  {
-    default:
-    {
-      XDrawArcElement(display,draw_pixmap,draw_context,draw_info);
-      break;
-    }
-    case PolygonElement:
-    {
-      XPoint
-        *coordinate_info;
-
-      coordinate_info=draw_info->coordinate_info;
-      (void) XDrawLines(display,draw_pixmap,draw_context,coordinate_info,
-        (int) draw_info->number_coordinates,CoordModeOrigin);
-      (void) XDrawLine(display,draw_pixmap,draw_context,
-        coordinate_info[draw_info->number_coordinates-1].x,
-        coordinate_info[draw_info->number_coordinates-1].y,
-        coordinate_info[0].x,coordinate_info[0].y);
-      break;
-    }
-    case FillPolygonElement:
-    {
-      (void) XFillPolygon(display,draw_pixmap,draw_context,
-        draw_info->coordinate_info,(int) draw_info->number_coordinates,Complex,
-        CoordModeOrigin);
-      break;
-    }
-  }
-}
-
-typedef struct _DrawRotationTargets
-{
-  Image
-    **draw_image;
-
-  int
-    *x,
-    *y;
-} DrawRotationTargets;
-
-static MagickBooleanType XRotateDrawImage(const XDrawInfo *draw_info,
-  ExceptionInfo *exception,const DrawRotationTargets *targets)
-{
-  Image
-    **const draw_image = targets->draw_image;
-
-  int
-    *const x = targets->x,
-    *const y = targets->y;
-
-  if (draw_info->degrees != 0.0)
-    {
-      Image
-        *rotate_image;
-
-      int
-        rotations;
-
-      /*
-        Rotate image.
-      */
-      rotate_image=RotateImage((*draw_image),draw_info->degrees,exception);
-      if (rotate_image == (Image *) NULL)
-        return(MagickFalse);
-      *draw_image=DestroyImage(*draw_image);
-      (*draw_image)=rotate_image;
-      /*
-        Annotation is relative to the degree of rotation.
-      */
-      rotations=XQuarterTurns(draw_info->degrees);
-      switch (rotations % 4)
-      {
-        default:
-        case 0:
-          break;
-        case 1:
-        {
-          /*
-            Rotate 90 degrees.
-          */
-          (*x)=(*x)-(int) (*draw_image)->columns/2;
-          (*y)=(*y)+(int) (*draw_image)->columns/2;
-          break;
-        }
-        case 2:
-        {
-          /*
-            Rotate 180 degrees.
-          */
-          (*x)=(*x)-(int) (*draw_image)->columns;
-          break;
-        }
-        case 3:
-        {
-          /*
-            Rotate 270 degrees.
-          */
-          (*x)=(*x)-(int) (*draw_image)->columns/2;
-          (*y)=(*y)-(int) ((*draw_image)->rows-((*draw_image)->columns/2));
-          break;
-        }
-      }
-    }
-  return(MagickTrue);
-}
-
-static void XSetDrawRowOpacity(const Image *draw_image,const Image *image,
-  Quantum *magick_restrict q)
-{
-  int
-    x;
-
-  for (x=0; x < (int) draw_image->columns; x++)
-  {
-    if (GetPixelAlpha(image,q) != TransparentAlpha)
-      SetPixelAlpha(draw_image,OpaqueAlpha,q);
-    q+=(ptrdiff_t) GetPixelChannels(draw_image);
-  }
-}
-
-static int XSetDrawImageOpacity(const Image *draw_image,const Image *image,
-  ExceptionInfo *exception)
-{
-  CacheView
-    *draw_view;
-
-  int
-    y;
-
-  draw_view=AcquireAuthenticCacheView(draw_image,exception);
-  for (y=0; y < (int) draw_image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    q=GetCacheViewAuthenticPixels(draw_view,0,(ssize_t) y,draw_image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      break;
-    XSetDrawRowOpacity(draw_image,image,q);
-    if (SyncCacheViewAuthenticPixels(draw_view,exception) == MagickFalse)
-      break;
-  }
-  draw_view=DestroyCacheView(draw_view);
-  return(y);
-}
-
-typedef struct _DrawPixels
-{
-  Image
-    *draw_image;
-
-  XImage
-    *draw_ximage;
-
-  const XPixelInfo
-    *pixel;
-
-  XDrawInfo
-    *draw_info;
-
-  ExceptionInfo
-    *exception;
-} DrawPixels;
-
-static void XSetDrawRow(const DrawPixels *draw_pixels,
-  Quantum *magick_restrict q,const int y)
-{
-  Image
-    *const draw_image = draw_pixels->draw_image;
-
-  XImage
-    *const draw_ximage = draw_pixels->draw_ximage;
-
-  const XPixelInfo
-    *const pixel = draw_pixels->pixel;
-
-  XDrawInfo
-    *const draw_info = draw_pixels->draw_info;
-
-  int
-    x;
-
-  for (x=0; x < (int) draw_image->columns; x++)
-  {
-    if (XGetPixel(draw_ximage,x,y) == 0)
-      {
-        /*
-          Set this pixel to the background color.
-        */
-        SetPixelViaPixelInfo(draw_image,&draw_image->background_color,q);
-        SetPixelAlpha(draw_image,(Quantum) (draw_info->stencil ==
-          OpaqueStencil ? TransparentAlpha : OpaqueAlpha),q);
-      }
-    else
-      {
-        /*
-          Set this pixel to the pen color.
-        */
-        SetPixelRed(draw_image,ScaleShortToQuantum(
-          pixel->pen_color.red),q);
-        SetPixelGreen(draw_image,ScaleShortToQuantum(
-          pixel->pen_color.green),q);
-        SetPixelBlue(draw_image,ScaleShortToQuantum(
-          pixel->pen_color.blue),q);
-        SetPixelAlpha(draw_image,(Quantum) (draw_info->stencil ==
-          OpaqueStencil ? OpaqueAlpha : TransparentAlpha),q);
-      }
-    q+=(ptrdiff_t) GetPixelChannels(draw_image);
-  }
-}
-
-static int XTransferDrawPixels(const DrawPixels *draw_pixels)
-{
-  Image
-    *const draw_image = draw_pixels->draw_image;
-
-  XImage
-    *const draw_ximage = draw_pixels->draw_ximage;
-
-  ExceptionInfo
-    *const exception = draw_pixels->exception;
-
-  CacheView
-    *draw_view;
-
-  int
-    y;
-
-  draw_view=AcquireAuthenticCacheView(draw_image,exception);
-  for (y=0; y < (int) draw_image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    q=QueueCacheViewAuthenticPixels(draw_view,0,(ssize_t) y,draw_image->columns,
-      1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    XSetDrawRow(draw_pixels,q,y);
-    if (SyncCacheViewAuthenticPixels(draw_view,exception) == MagickFalse)
-      break;
-  }
-  draw_view=DestroyCacheView(draw_view);
-  XDestroyImage(draw_ximage);
-  return(y);
-}
-
-typedef struct _XDrawSource
-{
-  XImage
-    *draw_ximage;
-
-  const XPixelInfo
-    *pixel;
-
-  XDrawInfo
-    *draw_info;
-} XDrawSource;
-
-static MagickBooleanType XComposeDrawImage(const XDrawSource *source,
-  Image *image,ExceptionInfo *exception)
-{
-  XImage
-    *const draw_ximage = source->draw_ximage;
-
-  const XPixelInfo
-    *const pixel = source->pixel;
-
-  XDrawInfo
-    *const draw_info = source->draw_info;
-
-  DrawPixels
-    draw_pixels;
-
-  DrawRotationTargets
-    targets;
-
-  Image
-    *draw_image;
-
-  int
-    x,
-    y;
-
-  PixelTrait
-    alpha_trait;
-
-  unsigned int
-    height,
-    width;
-
-  /*
-    Initialize draw image.
-  */
-  draw_image=AcquireImage((ImageInfo *) NULL,exception);
-  if (draw_image == (Image *) NULL)
-    return(MagickFalse);
-  draw_image->columns=draw_info->width;
-  draw_image->rows=draw_info->height;
-  /*
-    Transfer drawn X image to image.
-  */
-  width=(unsigned int) image->columns;
-  height=(unsigned int) image->rows;
-  x=0;
-  y=0;
-  (void) XParseGeometry(draw_info->geometry,&x,&y,&width,&height);
-  (void) GetOneVirtualPixelInfo(image,UndefinedVirtualPixelMethod,(ssize_t) x,
-    (ssize_t) y,&draw_image->background_color,exception);
-  if (SetImageStorageClass(draw_image,DirectClass,exception) == MagickFalse)
-    return(MagickFalse);
-  draw_image->alpha_trait=BlendPixelTrait;
-  draw_pixels.draw_image=draw_image;
-  draw_pixels.draw_ximage=draw_ximage;
-  draw_pixels.pixel=pixel;
-  draw_pixels.draw_info=draw_info;
-  draw_pixels.exception=exception;
-  y=XTransferDrawPixels(&draw_pixels);
-  /*
-    Determine draw geometry.
-  */
-  (void) XParseGeometry(draw_info->geometry,&x,&y,&width,&height);
-  draw_image=XScaleAnnotateImage(draw_image,width,height,exception);
-  targets.draw_image=(&draw_image);
-  targets.x=(&x);
-  targets.y=(&y);
-  if (XRotateDrawImage(draw_info,exception,&targets) == MagickFalse)
-    return(MagickFalse);
-  /*
-    Composite text onto the image.
-  */
-  y=XSetDrawImageOpacity(draw_image,image,exception);
-  (void) XParseGeometry(draw_info->geometry,&x,&y,&width,&height);
-  if (draw_info->stencil == TransparentStencil)
-    (void) CompositeImage(image,draw_image,CopyAlphaCompositeOp,MagickTrue,
-      (ssize_t) x,(ssize_t) y,exception);
-  else
-    {
-      alpha_trait=image->alpha_trait;
-      (void) CompositeImage(image,draw_image,OverCompositeOp,MagickTrue,
-        (ssize_t) x,(ssize_t) y,exception);
-      image->alpha_trait=alpha_trait;
-    }
-  draw_image=DestroyImage(draw_image);
-  return(MagickTrue);
-}
-
-MagickPrivate MagickBooleanType XDrawImage(Display *display,
-  const XPixelInfo *pixel,XDrawInfo *draw_info,Image *image,
-  ExceptionInfo *exception)
-{
-  GC
-    draw_context;
-
-  Pixmap
-    draw_pixmap;
-
-  unsigned int
-    depth;
-
-  Window
-    root_window;
-
-  XDrawSource
-    source;
-
-  XGCValues
-    context_values;
-
-  XImage
-    *draw_ximage;
-
-  /*
-    Initialize drawd image.
-  */
-  assert(display != (Display *) NULL);
-  assert(pixel != (XPixelInfo *) NULL);
-  assert(draw_info != (XDrawInfo *) NULL);
-  assert(image != (Image *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  /*
-    Initialize drawd pixmap.
-  */
-  root_window=XRootWindow(display,XDefaultScreen(display));
-  depth=(unsigned int) XDefaultDepth(display,XDefaultScreen(display));
-  draw_pixmap=XCreatePixmap(display,root_window,draw_info->width,
-    draw_info->height,depth);
-  if (draw_pixmap == (Pixmap) NULL)
-    return(MagickFalse);
-  /*
-    Initialize graphics info.
-  */
-  context_values.background=(size_t) (~0);
-  context_values.foreground=0;
-  context_values.line_width=(int) draw_info->line_width;
-  draw_context=XCreateGC(display,root_window,(size_t)
-    (GCBackground | GCForeground | GCLineWidth),&context_values);
-  if (draw_context == (GC) NULL)
-    return(MagickFalse);
-  XDrawElementToPixmap(display,draw_pixmap,draw_context,draw_info);
-  (void) XFreeGC(display,draw_context);
-  /*
-    Initialize X image.
-  */
-  draw_ximage=XGetImage(display,draw_pixmap,0,0,draw_info->width,
-    draw_info->height,AllPlanes,ZPixmap);
-  if (draw_ximage == (XImage *) NULL)
-    return(MagickFalse);
-  (void) XFreePixmap(display,draw_pixmap);
-  source.draw_ximage=draw_ximage;
-  source.pixel=pixel;
-  source.draw_info=draw_info;
-  return(XComposeDrawImage(&source,image,exception));
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2113,119 +986,6 @@ MagickExport int XError(Display *display,XErrorEvent *error)
 }
 #endif
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   X F r e e R e s o u r c e s                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  XFreeResources() frees X11 resources.
-%
-%  The format of the XFreeResources method is:
-%
-%      void XFreeResources(Display *display,XVisualInfo *visual_info,
-%        XStandardColormap *map_info,XPixelInfo *pixel,XFontStruct *font_info,
-%        XResourceInfo *resource_info,XWindowInfo *window_info)
-%        resource_info,window_info)
-%
-%  A description of each parameter follows:
-%
-%    o display: Specifies a connection to an X server; returned from
-%      XOpenDisplay.
-%
-%    o visual_info: Specifies a pointer to a X11 XVisualInfo structure;
-%      returned from XGetVisualInfo.
-%
-%    o map_info: If map_type is specified, this structure is initialized
-%      with info from the Standard Colormap.
-%
-%    o pixel: Specifies a pointer to a XPixelInfo structure.
-%
-%    o font_info: Specifies a pointer to a XFontStruct structure.
-%
-%    o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
-%
-%    o window_info: Specifies a pointer to a X11 XWindowInfo structure.
-%
-*/
-static void XFreeWindowContexts(Display *display,const XVisualInfo *visual_info,
-  XWindowInfo *window_info)
-{
-  if (window_info->id != (Window) NULL)
-    {
-      /*
-        Free destroy window and free cursors.
-      */
-      if (window_info->id != XRootWindow(display,visual_info->screen))
-        (void) XDestroyWindow(display,window_info->id);
-      if (window_info->annotate_context != (GC) NULL)
-        (void) XFreeGC(display,window_info->annotate_context);
-      if (window_info->highlight_context != (GC) NULL)
-        (void) XFreeGC(display,window_info->highlight_context);
-      if (window_info->widget_context != (GC) NULL)
-        (void) XFreeGC(display,window_info->widget_context);
-      if (window_info->cursor != (Cursor) NULL)
-        (void) XFreeCursor(display,window_info->cursor);
-      window_info->cursor=(Cursor) NULL;
-      if (window_info->busy_cursor != (Cursor) NULL)
-        (void) XFreeCursor(display,window_info->busy_cursor);
-      window_info->busy_cursor=(Cursor) NULL;
-    }
-}
-
-static void XFreeWindowInfo(Display *display,const XVisualInfo *visual_info,
-  XWindowInfo *window_info)
-{
-  if (window_info != (XWindowInfo *) NULL)
-    {
-      /*
-        Free X image.
-      */
-      if (window_info->ximage != (XImage *) NULL)
-        XDestroyImage(window_info->ximage);
-      XFreeWindowContexts(display,visual_info,window_info);
-    }
-}
-
-MagickPrivate void XFreeResources(Display *display,XVisualInfo *visual_info,
-  XStandardColormap *map_info,XPixelInfo *pixel,XFontStruct *font_info,
-  XResourceInfo *resource_info,XWindowInfo *window_info)
-{
-  assert(display != (Display *) NULL);
-  assert(resource_info != (XResourceInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  XFreeWindowInfo(display,visual_info,window_info);
-  /*
-    Free font.
-  */
-  if (font_info != (XFontStruct *) NULL)
-    {
-      (void) XFreeFont(display,font_info);
-      font_info=(XFontStruct *) NULL;
-    }
-  if (map_info != (XStandardColormap *) NULL)
-    {
-      /*
-        Free X Standard Colormap.
-      */
-      if (resource_info->map_type == (char *) NULL)
-        (void) XFreeStandardColormap(display,visual_info,map_info,pixel);
-      (void) XFree((void *) map_info);
-    }
-  /*
-    Free X visual info.
-  */
-  if (visual_info != (XVisualInfo *) NULL)
-    (void) XFree((void *) visual_info);
-  if (resource_info->close_server != MagickFalse)
-    (void) XCloseDisplay(display);
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2297,50 +1057,6 @@ MagickPrivate void XFreeStandardColormap(Display *display,
     }
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   X G e t A n n o t a t e I n f o                                           %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  XGetAnnotateInfo() initializes the AnnotateInfo structure.
-%
-%  The format of the XGetAnnotateInfo method is:
-%
-%      void XGetAnnotateInfo(XAnnotateInfo *annotate_info)
-%
-%  A description of each parameter follows:
-%
-%    o annotate_info: Specifies a pointer to a XAnnotateInfo structure.
-%
-*/
-MagickPrivate void XGetAnnotateInfo(XAnnotateInfo *annotate_info)
-{
-  /*
-    Initialize annotate structure.
-  */
-  assert(annotate_info != (XAnnotateInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  annotate_info->x=0;
-  annotate_info->y=0;
-  annotate_info->width=0;
-  annotate_info->height=0;
-  annotate_info->stencil=ForegroundStencil;
-  annotate_info->degrees=0.0;
-  annotate_info->font_info=(XFontStruct *) NULL;
-  annotate_info->text=(char *) NULL;
-  *annotate_info->geometry='\0';
-  annotate_info->previous=(XAnnotateInfo *) NULL;
-  annotate_info->next=(XAnnotateInfo *) NULL;
-  (void) XSupportsLocale();
-  (void) XSetLocaleModifiers("");
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2403,349 +1119,6 @@ MagickPrivate void XGetMapInfo(const XVisualInfo *visual_info,
   map_info->base_pixel=0;
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   X G e t P i x e l I n f o                                                 %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  XGetPixelInfo() initializes the PixelInfo structure.
-%
-%  The format of the XGetPixelInfo method is:
-%
-%      void XGetPixelInfo(Display *display,const XVisualInfo *visual_info,
-%        const XStandardColormap *map_info,const XResourceInfo *resource_info,
-%        Image *image,XPixelInfo *pixel)
-%        pixel)
-%
-%  A description of each parameter follows:
-%
-%    o display: Specifies a connection to an X server; returned from
-%      XOpenDisplay.
-%
-%    o visual_info: Specifies a pointer to a X11 XVisualInfo structure;
-%      returned from XGetVisualInfo.
-%
-%    o map_info: If map_type is specified, this structure is initialized
-%      with info from the Standard Colormap.
-%
-%    o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
-%
-%    o image: the image.
-%
-%    o pixel: Specifies a pointer to a XPixelInfo structure.
-%
-*/
-static void XSetDisplayGamma(const XResourceInfo *resource_info,
-  const Image *image)
-{
-  if ((resource_info->gamma_correct != MagickFalse) &&
-      (image->gamma != 0.0))
-    {
-      GeometryInfo
-        geometry_info;
-
-      MagickStatusType
-        flags;
-
-      /*
-        Initialize map relative to display and image gamma.
-      */
-      flags=ParseGeometry(resource_info->display_gamma,&geometry_info);
-      if ((flags & RhoValue) != 0)
-        red_gamma=geometry_info.rho;
-      green_gamma=red_gamma;
-      if ((flags & SigmaValue) != 0)
-        green_gamma=geometry_info.sigma;
-      blue_gamma=red_gamma;
-      if ((flags & XiValue) != 0)
-        blue_gamma=geometry_info.xi;
-      red_gamma*=image->gamma;
-      green_gamma*=image->gamma;
-      blue_gamma*=image->gamma;
-    }
-}
-
-static void XInitializePseudoPixels(const XStandardColormap *map_info,
-  const Image *image,XPixelInfo *pixel)
-{
-  ssize_t
-    i;
-
-  if (image->storage_class == PseudoClass)
-    {
-      /*
-        Initialize pixel array for images of type PseudoClass.
-      */
-      for (i=0; i < (ssize_t) image->colors; i++)
-        pixel->pixels[i]=XGammaPacket(map_info,image->colormap+i);
-      for (i=0; i < MaxNumberPens; i++)
-        pixel->pixels[image->colors+(size_t) i]=pixel->pen_colors[i].pixel;
-      pixel->colors+=MaxNumberPens;
-    }
-}
-
-static void XGetModulatedColors(const XStandardColormap *map_info,
-  XPixelInfo *pixel)
-{
-  /*
-    Set highlight color.
-  */
-  pixel->highlight_color.red=(unsigned short) (((double)
-    pixel->matte_color.red*ScaleQuantumToShort(HighlightModulate))/65535L+
-    (ScaleQuantumToShort((Quantum) (QuantumRange-HighlightModulate))));
-  pixel->highlight_color.green=(unsigned short) (((double)
-    pixel->matte_color.green*ScaleQuantumToShort(HighlightModulate))/65535L+
-    (ScaleQuantumToShort((Quantum) (QuantumRange-HighlightModulate))));
-  pixel->highlight_color.blue=(unsigned short) (((double)
-    pixel->matte_color.blue*ScaleQuantumToShort(HighlightModulate))/65535L+
-    (ScaleQuantumToShort((Quantum) (QuantumRange-HighlightModulate))));
-  pixel->highlight_color.pixel=XStandardPixel(map_info,&pixel->highlight_color);
-  pixel->highlight_color.flags=(char) (DoRed | DoGreen | DoBlue);
-  /*
-    Set shadow color.
-  */
-  pixel->shadow_color.red=(unsigned short) (((double)
-    pixel->matte_color.red*ScaleQuantumToShort(ShadowModulate))/65535L);
-  pixel->shadow_color.green=(unsigned short) (((double)
-    pixel->matte_color.green*ScaleQuantumToShort(ShadowModulate))/65535L);
-  pixel->shadow_color.blue=(unsigned short) (((double)
-    pixel->matte_color.blue*ScaleQuantumToShort(ShadowModulate))/65535L);
-  pixel->shadow_color.pixel=XStandardPixel(map_info,&pixel->shadow_color);
-  pixel->shadow_color.flags=(char) (DoRed | DoGreen | DoBlue);
-  /*
-    Set depth color.
-  */
-  pixel->depth_color.red=(unsigned short) (((double)
-    pixel->matte_color.red*ScaleQuantumToShort(DepthModulate))/65535L);
-  pixel->depth_color.green=(unsigned short) (((double)
-    pixel->matte_color.green*ScaleQuantumToShort(DepthModulate))/65535L);
-  pixel->depth_color.blue=(unsigned short) (((double)
-    pixel->matte_color.blue*ScaleQuantumToShort(DepthModulate))/65535L);
-  pixel->depth_color.pixel=XStandardPixel(map_info,&pixel->depth_color);
-  pixel->depth_color.flags=(char) (DoRed | DoGreen | DoBlue);
-  /*
-    Set trough color.
-  */
-  pixel->trough_color.red=(unsigned short) (((double)
-    pixel->matte_color.red*ScaleQuantumToShort(TroughModulate))/65535L);
-  pixel->trough_color.green=(unsigned short) (((double)
-    pixel->matte_color.green*ScaleQuantumToShort(TroughModulate))/65535L);
-  pixel->trough_color.blue=(unsigned short) (((double)
-    pixel->matte_color.blue*ScaleQuantumToShort(TroughModulate))/65535L);
-  pixel->trough_color.pixel=XStandardPixel(map_info,&pixel->trough_color);
-  pixel->trough_color.flags=(char) (DoRed | DoGreen | DoBlue);
-}
-
-typedef struct _XPixelColorContext
-{
-  Display
-    *display;
-
-  Colormap
-    colormap;
-
-  const XStandardColormap
-    *map_info;
-
-  const XResourceInfo
-    *resource_info;
-
-  const char
-    **PenColors;
-} XPixelColorContext;
-
-static void XGetInterfaceColors(const XPixelColorContext *context,
-  XPixelInfo *pixel)
-{
-  Display
-    *const display = context->display;
-
-  const Colormap
-    colormap = context->colormap;
-
-  const XStandardColormap
-    *const map_info = context->map_info;
-
-  const XResourceInfo
-    *const resource_info = context->resource_info;
-
-  Status
-    status;
-
-  (void) XParseColor(display,colormap,(char *) ForegroundColor,
-    &pixel->foreground_color);
-  status=XParseColor(display,colormap,resource_info->foreground_color,
-    &pixel->foreground_color);
-  if (status == False)
-    ThrowXWindowException(XServerError,"ColorIsNotKnownToServer",
-      resource_info->foreground_color);
-  pixel->foreground_color.pixel=
-    XStandardPixel(map_info,&pixel->foreground_color);
-  pixel->foreground_color.flags=(char) (DoRed | DoGreen | DoBlue);
-  /*
-    Set background color.
-  */
-  (void) XParseColor(display,colormap,"#d6d6d6d6d6d6",&pixel->background_color);
-  status=XParseColor(display,colormap,resource_info->background_color,
-    &pixel->background_color);
-  if (status == False)
-    ThrowXWindowException(XServerError,"ColorIsNotKnownToServer",
-      resource_info->background_color);
-  pixel->background_color.pixel=
-    XStandardPixel(map_info,&pixel->background_color);
-  pixel->background_color.flags=(char) (DoRed | DoGreen | DoBlue);
-  /*
-    Set border color.
-  */
-  (void) XParseColor(display,colormap,(char *) BorderColor,
-    &pixel->border_color);
-  status=XParseColor(display,colormap,resource_info->border_color,
-    &pixel->border_color);
-  if (status == False)
-    ThrowXWindowException(XServerError,"ColorIsNotKnownToServer",
-      resource_info->border_color);
-  pixel->border_color.pixel=XStandardPixel(map_info,&pixel->border_color);
-  pixel->border_color.flags=(char) (DoRed | DoGreen | DoBlue);
-  /*
-    Set matte color.
-  */
-  pixel->matte_color=pixel->background_color;
-  if (resource_info->matte_color != (char *) NULL)
-    {
-      /*
-        Matte color is specified as a X resource or command line argument.
-      */
-      status=XParseColor(display,colormap,resource_info->matte_color,
-        &pixel->matte_color);
-      if (status == False)
-        ThrowXWindowException(XServerError,"ColorIsNotKnownToServer",
-          resource_info->matte_color);
-      pixel->matte_color.pixel=XStandardPixel(map_info,&pixel->matte_color);
-      pixel->matte_color.flags=(char) (DoRed | DoGreen | DoBlue);
-    }
-}
-
-static void XGetPenColors(const XPixelColorContext *context,
-  XPixelInfo *pixel)
-{
-  Display
-    *const display = context->display;
-
-  const Colormap
-    colormap = context->colormap;
-
-  const XStandardColormap
-    *const map_info = context->map_info;
-
-  const XResourceInfo
-    *const resource_info = context->resource_info;
-
-  const char
-    **const PenColors = context->PenColors;
-
-  ssize_t
-    i;
-
-  Status
-    status;
-
-  /*
-    Set pen color.
-  */
-  for (i=0; i < MaxNumberPens; i++)
-  {
-    (void) XParseColor(display,colormap,(char *) PenColors[i],
-      &pixel->pen_colors[i]);
-    status=XParseColor(display,colormap,resource_info->pen_colors[i],
-      &pixel->pen_colors[i]);
-    if (status == False)
-      ThrowXWindowException(XServerError,"ColorIsNotKnownToServer",
-        resource_info->pen_colors[i]);
-    pixel->pen_colors[i].pixel=XStandardPixel(map_info,&pixel->pen_colors[i]);
-    pixel->pen_colors[i].flags=(char) (DoRed | DoGreen | DoBlue);
-  }
-}
-
-MagickPrivate void XGetPixelInfo(Display *display,
-  const XVisualInfo *visual_info,const XStandardColormap *map_info,
-  const XResourceInfo *resource_info,Image *image,XPixelInfo *pixel)
-{
-  static const char
-    *PenColors[MaxNumberPens]=
-    {
-      "#000000000000",  /* black */
-      "#00000000ffff",  /* blue */
-      "#0000ffffffff",  /* cyan */
-      "#0000ffff0000",  /* green */
-      "#bdbdbdbdbdbd",  /* gray */
-      "#ffff00000000",  /* red */
-      "#ffff0000ffff",  /* magenta */
-      "#ffffffff0000",  /* yellow */
-      "#ffffffffffff",  /* white */
-      "#bdbdbdbdbdbd",  /* gray */
-      "#bdbdbdbdbdbd"   /* gray */
-    };
-
-  Colormap
-    colormap;
-
-  unsigned int
-    packets;
-
-  XPixelColorContext
-    context;
-
-  /*
-    Initialize pixel info.
-  */
-  assert(display != (Display *) NULL);
-  assert(visual_info != (XVisualInfo *) NULL);
-  assert(map_info != (XStandardColormap *) NULL);
-  assert(resource_info != (XResourceInfo *) NULL);
-  assert(pixel != (XPixelInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  pixel->colors=0;
-  if (image != (Image *) NULL)
-    if (image->storage_class == PseudoClass)
-      pixel->colors=(ssize_t) image->colors;
-  packets=(unsigned int)
-    MagickMax((int) pixel->colors,visual_info->colormap_size)+MaxNumberPens;
-  if (pixel->pixels != (unsigned long *) NULL)
-    pixel->pixels=(unsigned long *) RelinquishMagickMemory(pixel->pixels);
-  pixel->pixels=(unsigned long *) AcquireQuantumMemory(packets,
-    sizeof(*pixel->pixels));
-  if (pixel->pixels == (unsigned long *) NULL)
-    ThrowXWindowFatalException(ResourceLimitFatalError,"UnableToGetPixelInfo",
-      image->filename);
-  /*
-    Set foreground color.
-  */
-  colormap=map_info->colormap;
-  context.display=display;
-  context.colormap=colormap;
-  context.map_info=map_info;
-  context.resource_info=resource_info;
-  context.PenColors=PenColors;
-  XGetInterfaceColors(&context,pixel);
-  XGetModulatedColors(map_info,pixel);
-  XGetPenColors(&context,pixel);
-  pixel->box_color=pixel->background_color;
-  pixel->pen_color=pixel->foreground_color;
-  pixel->box_index=0;
-  pixel->pen_index=1;
-  if (image != (Image *) NULL)
-    {
-      XSetDisplayGamma(resource_info,image);
-      XInitializePseudoPixels(map_info,image,pixel);
-    }
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -2853,177 +1226,6 @@ MagickExport XrmDatabase XGetResourceDatabase(Display *display,
   return(resource_database);
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   X G e t W i n d o w I n f o                                               %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  XGetWindowInfo() initializes the XWindowInfo structure.
-%
-%  The format of the XGetWindowInfo method is:
-%
-%      void XGetWindowInfo(Display *display,XVisualInfo *visual_info,
-%        XStandardColormap *map_info,XPixelInfo *pixel,XFontStruct *font_info,
-%        XResourceInfo *resource_info,XWindowInfo *window)
-%        resource_info,window)
-%
-%  A description of each parameter follows:
-%
-%    o display: Specifies a connection to an X server; returned from
-%      XOpenDisplay.
-%
-%    o visual_info: Specifies a pointer to a X11 XVisualInfo structure;
-%      returned from XGetVisualInfo.
-%
-%    o map_info: If map_type is specified, this structure is initialized
-%      with info from the Standard Colormap.
-%
-%    o pixel: Specifies a pointer to a XPixelInfo structure.
-%
-%    o font_info: Specifies a pointer to a XFontStruct structure.
-%
-%    o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
-%
-*/
-static void XInitializeWindowGeometry(Display *display,const XPixelInfo *pixel,
-  const XResourceInfo *resource_info,XWindowInfo *window)
-{
-  window->cursor=XCreateFontCursor(display,XC_left_ptr);
-  window->busy_cursor=XCreateFontCursor(display,XC_watch);
-  window->geometry=(char *) NULL;
-  window->icon_geometry=(char *) NULL;
-  if (resource_info->icon_geometry != (char *) NULL)
-    (void) CloneString(&window->icon_geometry,resource_info->icon_geometry);
-  window->crop_geometry=(char *) NULL;
-  window->flags=(size_t) PSize;
-  window->width=1;
-  window->height=1;
-  window->min_width=1;
-  window->min_height=1;
-  window->width_inc=1;
-  window->height_inc=1;
-  window->border_width=resource_info->border_width;
-  window->annotate_context=pixel->annotate_context;
-  window->highlight_context=pixel->highlight_context;
-  window->widget_context=pixel->widget_context;
-  window->shadow_stipple=(Pixmap) NULL;
-  window->highlight_stipple=(Pixmap) NULL;
-  window->use_pixmap=MagickTrue;
-  window->immutable=MagickFalse;
-  window->shape=MagickFalse;
-  window->data=0;
-}
-
-static void XInitializeWindowOnce(Display *display,
-  const XVisualInfo *visual_info,XWindowInfo *window)
-{
-  window->id=(Window) NULL;
-  if (window->name == (char *) NULL)
-    window->name=AcquireString("");
-  if (window->icon_name == (char *) NULL)
-    window->icon_name=AcquireString("");
-  window->x=XDisplayWidth(display,visual_info->screen) >> 1;
-  window->y=XDisplayWidth(display,visual_info->screen) >> 1;
-  window->ximage=(XImage *) NULL;
-  window->matte_image=(XImage *) NULL;
-  window->pixmap=(Pixmap) NULL;
-  window->matte_pixmap=(Pixmap) NULL;
-  window->mapped=MagickFalse;
-  window->stasis=MagickFalse;
-  window->shared_memory=MagickTrue;
-  window->segment_info=(void *) NULL;
-}
-
-static void XResetWindowInfo(Display *display,XWindowInfo *window)
-{
-  if (window->cursor != (Cursor) NULL)
-    (void) XFreeCursor(display,window->cursor);
-  if (window->busy_cursor != (Cursor) NULL)
-    (void) XFreeCursor(display,window->busy_cursor);
-  if (window->highlight_stipple != (Pixmap) NULL)
-    (void) XFreePixmap(display,window->highlight_stipple);
-  if (window->shadow_stipple != (Pixmap) NULL)
-    (void) XFreePixmap(display,window->shadow_stipple);
-  if (window->name == (char *) NULL)
-    window->name=AcquireString("");
-  if (window->icon_name == (char *) NULL)
-    window->icon_name=AcquireString("");
-}
-
-MagickPrivate void XGetWindowInfo(Display *display,XVisualInfo *visual_info,
-  XStandardColormap *map_info,XPixelInfo *pixel,XFontStruct *font_info,
-  XResourceInfo *resource_info,XWindowInfo *window)
-{
-  /*
-    Initialize window info.
-  */
-  assert(display != (Display *) NULL);
-  assert(visual_info != (XVisualInfo *) NULL);
-  assert(map_info != (XStandardColormap *) NULL);
-  assert(pixel != (XPixelInfo *) NULL);
-  assert(resource_info != (XResourceInfo *) NULL);
-  assert(window != (XWindowInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  if (window->id != (Window) NULL)
-    XResetWindowInfo(display,window);
-  else
-    {
-      /*
-        Initialize these attributes just once.
-      */
-      XInitializeWindowOnce(display,visual_info,window);
-#if defined(MAGICKCORE_HAVE_SHARED_MEMORY)
-      {
-        XShmSegmentInfo
-          *segment_info;
-
-        if (window->segment_info == (void *) NULL)
-          window->segment_info=AcquireCriticalMemory(2*sizeof(*segment_info));
-        segment_info=(XShmSegmentInfo *) window->segment_info;
-        segment_info[0].shmid=(-1);
-        segment_info[0].shmaddr=(char *) NULL;
-        segment_info[1].shmid=(-1);
-        segment_info[1].shmaddr=(char *) NULL;
-      }
-#endif
-    }
-  /*
-    Initialize these attributes every time function is called.
-  */
-  window->screen=visual_info->screen;
-  window->root=XRootWindow(display,visual_info->screen);
-  window->visual=visual_info->visual;
-  window->storage_class=(unsigned int) visual_info->klass;
-  window->depth=(unsigned int) visual_info->depth;
-  window->visual_info=visual_info;
-  window->map_info=map_info;
-  window->pixel_info=pixel;
-  window->font_info=font_info;
-  XInitializeWindowGeometry(display,pixel,resource_info,window);
-  window->mask=(int) (CWBackingStore | CWBackPixel | CWBackPixmap |
-    CWBitGravity | CWBorderPixel | CWColormap | CWCursor | CWDontPropagate |
-    CWEventMask | CWOverrideRedirect | CWSaveUnder | CWWinGravity);
-  window->attributes.background_pixel=pixel->background_color.pixel;
-  window->attributes.background_pixmap=(Pixmap) NULL;
-  window->attributes.bit_gravity=ForgetGravity;
-  window->attributes.backing_store=WhenMapped;
-  window->attributes.save_under=MagickTrue;
-  window->attributes.border_pixel=pixel->border_color.pixel;
-  window->attributes.colormap=map_info->colormap;
-  window->attributes.cursor=window->cursor;
-  window->attributes.do_not_propagate_mask=NoEventMask;
-  window->attributes.event_mask=NoEventMask;
-  window->attributes.override_redirect=MagickFalse;
-  window->attributes.win_gravity=NorthWestGravity;
-  window->orphan=MagickFalse;
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3980,9 +2182,36 @@ static unsigned char *XPackColormapped2BitRowLSB(const Image *canvas,
   return(q);
 }
 
-static unsigned char *XPackColormapped4BitRowLSB(const Image *canvas,
-  const unsigned long *pixels,const Quantum *p,unsigned char *q)
+typedef enum
 {
+  XPackLSBFirst,
+  XPackMSBFirst
+} XPackBitOrder;
+
+typedef struct _XPackColormappedRow
+{
+  XPackBitOrder
+    side;
+
+  const Image
+    *canvas;
+
+  const unsigned long
+    *pixels;
+} XPackColormappedRow;
+
+static inline unsigned char *XPackColormapped4BitRow(
+  const XPackColormappedRow *row,const Quantum *p,unsigned char *q)
+{
+  const XPackBitOrder
+    side = row->side;
+
+  const Image
+    *const canvas = row->canvas;
+
+  const unsigned long
+    *const pixels = row->pixels;
+
   unsigned int
     nibble;
 
@@ -4000,13 +2229,15 @@ static unsigned char *XPackColormapped4BitRowLSB(const Image *canvas,
     {
       case 0:
       {
-        *q=(unsigned char) pixel;
+        *q=((side == XPackLSBFirst) ? (unsigned char) pixel :
+          (unsigned char) (pixel << 4));
         nibble++;
         break;
       }
       case 1:
       {
-        *q|=(unsigned char) (pixel << 4);
+        *q|=((side == XPackLSBFirst) ? (unsigned char) (pixel << 4) :
+          (unsigned char) pixel);
         q++;
         nibble=0;
         break;
@@ -4139,38 +2370,58 @@ static unsigned char *XPackContinuous4BitRowLSB(const Image *canvas,
   return(q);
 }
 
-static unsigned char *XPackGammaBGRARowLSB(const Image *canvas,const Quantum *p,
-  unsigned char *q)
+static magick_attribute((__always_inline__)) inline unsigned char
+  *XPackGammaRedHighRow(const Image *canvas,
+  const XPackBitOrder side,const Quantum *p,unsigned char *q)
 {
   int
     x;
 
   for (x=(int) canvas->columns-1; x >= 0; x--)
   {
-    *q++=ScaleQuantumToChar(XBlueGamma(
-      GetPixelBlue(canvas,p)));
-    *q++=ScaleQuantumToChar(XGreenGamma(
-      GetPixelGreen(canvas,p)));
-    *q++=ScaleQuantumToChar(XRedGamma(
-      GetPixelRed(canvas,p)));
-    *q++=0;
+    *q++=((side == XPackLSBFirst) ?
+      ScaleQuantumToChar(XBlueGamma(
+        GetPixelBlue(canvas,p))) :
+      0);
+    *q++=((side == XPackLSBFirst) ?
+      ScaleQuantumToChar(XGreenGamma(
+        GetPixelGreen(canvas,p))) :
+      ScaleQuantumToChar(XRedGamma(
+        GetPixelRed(canvas,p))));
+    *q++=((side == XPackLSBFirst) ?
+      ScaleQuantumToChar(XRedGamma(
+        GetPixelRed(canvas,p))) :
+      ScaleQuantumToChar(XGreenGamma(
+        GetPixelGreen(canvas,p))));
+    *q++=((side == XPackLSBFirst) ?
+      0 :
+      ScaleQuantumToChar(XBlueGamma(
+        GetPixelBlue(canvas,p))));
     p+=(ptrdiff_t) GetPixelChannels(canvas);
   }
   return(q);
 }
 
-static unsigned char *XPackBGRARowLSB(const Image *canvas,const Quantum *p,
-  unsigned char *q)
+static inline unsigned char *XPackRedHighRow(const Image *canvas,
+  const XPackBitOrder side,const Quantum *p,unsigned char *q)
 {
   int
     x;
 
   for (x=(int) canvas->columns-1; x >= 0; x--)
   {
-    *q++=ScaleQuantumToChar((Quantum) GetPixelBlue(canvas,p));
-    *q++=ScaleQuantumToChar((Quantum) GetPixelGreen(canvas,p));
-    *q++=ScaleQuantumToChar((Quantum) GetPixelRed(canvas,p));
-    *q++=0;
+    *q++=((side == XPackLSBFirst) ?
+      ScaleQuantumToChar((Quantum) GetPixelBlue(canvas,p)) :
+      0);
+    *q++=((side == XPackLSBFirst) ?
+      ScaleQuantumToChar((Quantum) GetPixelGreen(canvas,p)) :
+      ScaleQuantumToChar((Quantum) GetPixelRed(canvas,p)));
+    *q++=((side == XPackLSBFirst) ?
+      ScaleQuantumToChar((Quantum) GetPixelRed(canvas,p)) :
+      ScaleQuantumToChar((Quantum) GetPixelGreen(canvas,p)));
+    *q++=((side == XPackLSBFirst) ?
+      0 :
+      ScaleQuantumToChar((Quantum) GetPixelBlue(canvas,p)));
     p+=(ptrdiff_t) GetPixelChannels(canvas);
   }
   return(q);
@@ -4283,8 +2534,8 @@ static void XPackColormapped2BitLSB(const XImageRowSource *source,
   }
 }
 
-static void XPackColormapped4BitLSB(const XImageRowSource *source,
-  unsigned char *q)
+static inline void XPackColormapped4Bit(const XImageRowSource *source,
+  const XPackBitOrder side,unsigned char *q)
 {
   Image
     *const canvas = source->canvas;
@@ -4312,11 +2563,14 @@ static void XPackColormapped4BitLSB(const XImageRowSource *source,
   */
   for (y=0; y < (int) canvas->rows; y++)
   {
+    const XPackColormappedRow
+      row = { side, canvas, pixels };
+
     p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
       canvas->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    q=XPackColormapped4BitRowLSB(canvas,pixels,p,q);
+    q=XPackColormapped4BitRow(&row,p,q);
     q+=(ptrdiff_t) scanline_pad;
   }
 }
@@ -4558,8 +2812,8 @@ static void XPackContinuous8BitLSB(const XImageRowSource *source,
   }
 }
 
-static void XPackRedHigh32BitLSB(const XImageRowSource *source,
-  unsigned char *q)
+static magick_attribute((__always_inline__)) inline void XPackRedHigh32Bit(
+  const XImageRowSource *source,const XPackBitOrder side,unsigned char *q)
 {
   Image
     *const canvas = source->canvas;
@@ -4590,10 +2844,10 @@ static void XPackRedHigh32BitLSB(const XImageRowSource *source,
         /*
           Gamma correct canvas.
         */
-        q=XPackGammaBGRARowLSB(canvas,p,q);
+        q=XPackGammaRedHighRow(canvas,side,p,q);
         continue;
       }
-    q=XPackBGRARowLSB(canvas,p,q);
+    q=XPackRedHighRow(canvas,side,p,q);
   }
 }
 
@@ -4852,7 +3106,7 @@ static void XPackColormappedLSB(const XImage *ximage,
     }
     case 4:
     {
-      XPackColormapped4BitLSB(&row_source,q);
+      XPackColormapped4Bit(&row_source,XPackLSBFirst,q);
       break;
     }
     case 6:
@@ -4894,7 +3148,7 @@ static void XPackContinuousLSB(const XImage *ximage,
     default:
     {
       if (IsRedHigh32BitMap(ximage,map_info) != MagickFalse)
-        XPackRedHigh32BitLSB(&row_source,q);
+        XPackRedHigh32Bit(&row_source,XPackLSBFirst,q);
       else
         if (IsBlueHigh32BitMap(ximage,map_info) != MagickFalse)
           XPackBlueHigh32BitLSB(&row_source,q);
@@ -5182,43 +3436,6 @@ static inline MagickBooleanType IsImmutableAlphaImage(const XWindowInfo *window,
     (image->alpha_trait != UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
 }
 
-static unsigned char *XPackGammaARGBRowMSB(const Image *canvas,const Quantum *p,
-  unsigned char *q)
-{
-  int
-    x;
-
-  for (x=(int) canvas->columns-1; x >= 0; x--)
-  {
-    *q++=0;
-    *q++=ScaleQuantumToChar(XRedGamma(
-      GetPixelRed(canvas,p)));
-    *q++=ScaleQuantumToChar(XGreenGamma(
-      GetPixelGreen(canvas,p)));
-    *q++=ScaleQuantumToChar(XBlueGamma(
-      GetPixelBlue(canvas,p)));
-    p+=(ptrdiff_t) GetPixelChannels(canvas);
-  }
-  return(q);
-}
-
-static unsigned char *XPackARGBRowMSB(const Image *canvas,const Quantum *p,
-  unsigned char *q)
-{
-  int
-    x;
-
-  for (x=(int) canvas->columns-1; x >= 0; x--)
-  {
-    *q++=0;
-    *q++=ScaleQuantumToChar((Quantum) GetPixelRed(canvas,p));
-    *q++=ScaleQuantumToChar((Quantum) GetPixelGreen(canvas,p));
-    *q++=ScaleQuantumToChar((Quantum) GetPixelBlue(canvas,p));
-    p+=(ptrdiff_t) GetPixelChannels(canvas);
-  }
-  return(q);
-}
-
 static unsigned char *XPackGammaABGRRowMSB(const Image *canvas,const Quantum *p,
   unsigned char *q)
 {
@@ -5294,44 +3511,6 @@ static unsigned char *XPackColormapped2BitRowMSB(const Image *canvas,
         break;
       }
       case 3:
-      {
-        *q|=(unsigned char) pixel;
-        q++;
-        nibble=0;
-        break;
-      }
-    }
-    p+=(ptrdiff_t) GetPixelChannels(canvas);
-  }
-  return(q);
-}
-
-static unsigned char *XPackColormapped4BitRowMSB(const Image *canvas,
-  const unsigned long *pixels,const Quantum *p,unsigned char *q)
-{
-  int
-    x;
-
-  unsigned int
-    nibble;
-
-  unsigned long
-    pixel;
-
-  nibble=0;
-  for (x=0; x < (int) canvas->columns; x++)
-  {
-    pixel=pixels[(ssize_t)
-      GetPixelIndex(canvas,p)] & 0xf;
-    switch (nibble)
-    {
-      case 0:
-      {
-        *q=(unsigned char) (pixel << 4);
-        nibble++;
-        break;
-      }
-      case 1:
       {
         *q|=(unsigned char) pixel;
         q++;
@@ -5581,44 +3760,6 @@ static void XPackColormapped2BitMSB(const XImageRowSource *source,
   }
 }
 
-static void XPackColormapped4BitMSB(const XImageRowSource *source,
-  unsigned char *q)
-{
-  Image
-    *const canvas = source->canvas;
-
-  CacheView
-    *const canvas_view = source->canvas_view;
-
-  ExceptionInfo
-    *const exception = source->exception;
-
-  const unsigned int
-    scanline_pad = source->scanline_pad;
-
-  unsigned long
-    *const pixels = source->pixels;
-
-  const Quantum
-    *p;
-
-  int
-    y;
-
-  /*
-    Convert to 4 bit color-mapped X canvas.
-  */
-  for (y=0; y < (int) canvas->rows; y++)
-  {
-    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-      canvas->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    q=XPackColormapped4BitRowMSB(canvas,pixels,p,q);
-    q+=(ptrdiff_t) scanline_pad;
-  }
-}
-
 static void XPackColormapped8BitMSB(const XImageRowSource *source,
   unsigned char *q)
 {
@@ -5837,45 +3978,6 @@ static void XPackContinuous8BitMSB(const XImageRowSource *source,
   }
 }
 
-static void XPackRedHigh32BitMSB(const XImageRowSource *source,
-  unsigned char *q)
-{
-  Image
-    *const canvas = source->canvas;
-
-  CacheView
-    *const canvas_view = source->canvas_view;
-
-  ExceptionInfo
-    *const exception = source->exception;
-
-  const Quantum
-    *p;
-
-  int
-    y;
-
-  /*
-    Convert to 32 bit continuous-tone X canvas.
-  */
-  for (y=0; y < (int) canvas->rows; y++)
-  {
-    p=GetCacheViewVirtualPixels(canvas_view,0,(ssize_t) y,
-      canvas->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    if (IsGammaCorrected() != MagickFalse)
-      {
-        /*
-          Gamma correct canvas.
-        */
-        q=XPackGammaARGBRowMSB(canvas,p,q);
-        continue;
-      }
-    q=XPackARGBRowMSB(canvas,p,q);
-  }
-}
-
 static void XPackBlueHigh32BitMSB(const XImageRowSource *source,
   unsigned char *q)
 {
@@ -6040,7 +4142,7 @@ static void XPackColormappedMSB(const XImage *ximage,
     }
     case 4:
     {
-      XPackColormapped4BitMSB(&row_source,q);
+      XPackColormapped4Bit(&row_source,XPackMSBFirst,q);
       break;
     }
     case 6:
@@ -6082,7 +4184,7 @@ static void XPackContinuousMSB(const XImage *ximage,
     default:
     {
       if (IsRedHigh32BitMap(ximage,map_info) != MagickFalse)
-        XPackRedHigh32BitMSB(&row_source,q);
+        XPackRedHigh32Bit(&row_source,XPackMSBFirst,q);
       else
         if (IsBlueHigh32BitMap(ximage,map_info) != MagickFalse)
           XPackBlueHigh32BitMSB(&row_source,q);
@@ -9371,369 +7473,6 @@ MagickPrivate void XRefreshWindow(Display *display,const XWindowInfo *window,
   (void) XFlush(display);
 }
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   X R e n d e r I m a g e                                                   %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  XRenderImage() renders text on the image with an X11 font.  It also returns
-%  the bounding box of the text relative to the image.
-%
-%  The format of the XRenderImage method is:
-%
-%      MagickBooleanType XRenderImage(Image *image,DrawInfo *draw_info,
-%        const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
-%
-%  A description of each parameter follows:
-%
-%    o image: the image.
-%
-%    o draw_info: the draw info.
-%
-%    o offset: (x,y) location of text relative to image.
-%
-%    o metrics: bounding box of text.
-%
-%    o exception: return any errors or warnings in this structure.
-%
-*/
-static void XSetRenderMetrics(TypeMetric *metrics,const DrawInfo *draw_info,
-  const XFontStruct *font_info,const XAnnotateInfo annotate_info)
-{
-  metrics->pixels_per_em.x=(double) font_info->max_bounds.width;
-  metrics->pixels_per_em.y=(double) font_info->ascent+font_info->descent;
-  metrics->ascent=(double) font_info->ascent+4;
-  metrics->descent=(double) (-font_info->descent);
-  metrics->width=annotate_info.width/ExpandAffine(&draw_info->affine);
-  metrics->height=(double) font_info->ascent+font_info->descent;
-  metrics->max_advance=(double) font_info->max_bounds.width;
-  metrics->bounds.x1=0.0;
-  metrics->bounds.y1=metrics->descent;
-  metrics->bounds.x2=metrics->ascent+metrics->descent;
-  metrics->bounds.y2=metrics->ascent+metrics->descent;
-  metrics->underline_position=(-2.0);
-  metrics->underline_thickness=1.0;
-}
-
-typedef struct _XRenderTargets
-{
-  XrmDatabase
-    *resource_database;
-
-  XResourceInfo
-    *resource_info;
-
-  XStandardColormap
-    **map_info;
-
-  XVisualInfo
-    **visual_info;
-
-  XFontStruct
-    **font_info;
-
-  XPixelInfo
-    *pixel;
-
-  DrawInfo
-    *cache_info;
-
-  Display
-    **display;
-} XRenderTargets;
-
-static MagickBooleanType XInitializeRenderResources(const DrawInfo *draw_info,
-  const Image *image,Display *display,const XRenderTargets *targets)
-{
-  XrmDatabase
-    *const resource_database = targets->resource_database;
-
-  XResourceInfo
-    *const resource_info = targets->resource_info;
-
-  XStandardColormap
-    **const map_info = targets->map_info;
-
-  XVisualInfo
-    **const visual_info = targets->visual_info;
-
-  XFontStruct
-    **const font_info = targets->font_info;
-
-  XPixelInfo
-    *const pixel = targets->pixel;
-
-  DrawInfo
-    *const cache_info = targets->cache_info;
-
-  const char
-    *client_name;
-
-  ImageInfo
-    *image_info;
-
-  (void) XSetErrorHandler(XError);
-  image_info=AcquireImageInfo();
-  client_name=GetClientName();
-  (*resource_database)=XGetResourceDatabase(display,client_name);
-  XGetResourceInfo(image_info,(*resource_database),client_name,resource_info);
-  (*resource_info).close_server=MagickFalse;
-  (*resource_info).colormap=PrivateColormap;
-  (*resource_info).font=AcquireString(draw_info->font);
-  (*resource_info).background_color=AcquireString("#ffffffffffff");
-  (*resource_info).foreground_color=AcquireString("#000000000000");
-  (*map_info)=XAllocStandardColormap();
-  (*visual_info)=(XVisualInfo *) NULL;
-  (*font_info)=(XFontStruct *) NULL;
-  (*pixel).pixels=(unsigned long *) NULL;
-  if ((*map_info) == (XStandardColormap *) NULL)
-    {
-      ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
-        image->filename);
-      return(MagickFalse);
-    }
-  /*
-    Initialize visual info.
-  */
-  (*visual_info)=XBestVisualInfo(display,(*map_info),resource_info);
-  if ((*visual_info) == (XVisualInfo *) NULL)
-    {
-      XFreeResources(display,(*visual_info),(*map_info),pixel,(*font_info),
-        resource_info,(XWindowInfo *) NULL);
-      ThrowXWindowException(XServerError,"UnableToGetVisual",
-        image->filename);
-      return(MagickFalse);
-    }
-  (*map_info)->colormap=(Colormap) NULL;
-  /*
-    Initialize Standard Colormap info.
-  */
-  XGetMapInfo((*visual_info),XDefaultColormap(display,(*visual_info)->screen),
-    (*map_info));
-  XGetPixelInfo(display,(*visual_info),(*map_info),resource_info,(Image *) NULL,
-    pixel);
-  (*pixel).annotate_context=XDefaultGC(display,(*visual_info)->screen);
-  /*
-    Initialize font info.
-  */
-  (*font_info)=XBestFont(display,resource_info,MagickFalse);
-  if ((*font_info) == (XFontStruct *) NULL)
-    {
-      XFreeResources(display,(*visual_info),(*map_info),pixel,(*font_info),
-        resource_info,(XWindowInfo *) NULL);
-      ThrowXWindowException(XServerError,"UnableToLoadFont",
-        draw_info->font);
-      return(MagickFalse);
-    }
-  (*cache_info)=(*draw_info);
-  return(MagickTrue);
-}
-
-typedef struct _XRenderRequest
-{
-  Image
-    *image;
-
-  const DrawInfo
-    *draw_info;
-
-  const PointInfo
-    *offset;
-
-  TypeMetric
-    *metrics;
-
-  ExceptionInfo
-    *exception;
-} XRenderRequest;
-
-static MagickBooleanType XRenderFillColor(const XRenderRequest *request,
-  Display *display,XAnnotateInfo *annotate_info,XPixelInfo *pixel)
-{
-  Image
-    *const image = request->image;
-
-  const DrawInfo
-    *const draw_info = request->draw_info;
-
-  const PointInfo
-    *const offset = request->offset;
-
-  TypeMetric
-    *const metrics = request->metrics;
-
-  ExceptionInfo
-    *const exception = request->exception;
-
-  MagickBooleanType
-    status;
-
-  size_t
-    height,
-    width;
-
-  /*
-    Render fill color.
-  */
-  width=(*annotate_info).width;
-  height=(*annotate_info).height;
-  if ((fabs(draw_info->affine.rx) >= MagickEpsilon) ||
-      (fabs(draw_info->affine.ry) >= MagickEpsilon))
-    {
-      if ((fabs(draw_info->affine.sx-draw_info->affine.sy) < MagickEpsilon) &&
-          (fabs(draw_info->affine.rx+draw_info->affine.ry) < MagickEpsilon))
-        (*annotate_info).degrees=(double) (180.0/MagickPI)*
-          atan2(draw_info->affine.rx,draw_info->affine.sx);
-    }
-  (void) FormatLocaleString((*annotate_info).geometry,MagickPathExtent,
-    "%.17gx%.17g%+.20g%+.20g",(double) width,(double) height,
-    ceil(offset->x-0.5),ceil(offset->y-metrics->ascent-metrics->descent+
-    draw_info->interline_spacing-0.5));
-  (*pixel).pen_color.red=ScaleQuantumToShort(
-    ClampToQuantum(draw_info->fill.red));
-  (*pixel).pen_color.green=ScaleQuantumToShort(
-    ClampToQuantum(draw_info->fill.green));
-  (*pixel).pen_color.blue=ScaleQuantumToShort(
-    ClampToQuantum(draw_info->fill.blue));
-  status=XAnnotateImage(display,pixel,annotate_info,image,exception);
-  if (status == 0)
-    {
-      ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
-        image->filename);
-      return(MagickFalse);
-    }
-  return(MagickTrue);
-}
-
-static MagickBooleanType XChangeRenderFont(const DrawInfo *draw_info,
-  Display *display,char *font,const XRenderTargets *targets)
-{
-  XResourceInfo
-    *const resource_info = targets->resource_info;
-
-  XFontStruct
-    **const font_info = targets->font_info;
-
-  if (font != draw_info->font)
-    {
-      /*
-        Type name has changed.
-      */
-      (void) XFreeFont(display,(*font_info));
-      (void) CloneString(&(*resource_info).font,draw_info->font);
-      (*font_info)=XBestFont(display,resource_info,MagickFalse);
-      if ((*font_info) == (XFontStruct *) NULL)
-        {
-          ThrowXWindowException(XServerError,"UnableToLoadFont",
-            draw_info->font);
-          return(MagickFalse);
-        }
-    }
-  return(MagickTrue);
-}
-
-static MagickBooleanType XOpenRenderResources(const DrawInfo *draw_info,
-  const Image *image,const XRenderTargets *targets)
-{
-  Display
-    **const display = targets->display;
-
-  /*
-    Open X server connection.
-  */
-  (*display)=XOpenDisplay(draw_info->server_name);
-  if ((*display) == (Display *) NULL)
-    {
-      ThrowXWindowException(XServerError,"UnableToOpenXServer",
-        draw_info->server_name);
-      return(MagickFalse);
-    }
-  /*
-    Get user defaults from X resource database.
-  */
-  if (XInitializeRenderResources(draw_info,image,(*display),targets) == MagickFalse)
-    return(MagickFalse);
-  return(MagickTrue);
-}
-
-MagickPrivate MagickBooleanType XRenderImage(Image *image,
-  const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
-  ExceptionInfo *exception)
-{
-  XRenderRequest
-    request;
-
-  static Display
-    *display = (Display *) NULL;
-
-  static DrawInfo
-    cache_info;
-
-  static XAnnotateInfo
-    annotate_info;
-
-  static XFontStruct
-    *font_info;
-
-  static XPixelInfo
-    pixel;
-
-  static XResourceInfo
-    resource_info;
-
-  static XrmDatabase
-    resource_database;
-
-  static XStandardColormap
-    *map_info;
-
-  static XVisualInfo
-    *visual_info;
-
-  const XRenderTargets
-    targets = { &resource_database, &resource_info, &map_info, &visual_info,
-      &font_info, &pixel, &cache_info, &display };
-
-  if (display == (Display *) NULL)
-    {
-      if (XOpenRenderResources(draw_info,image,&targets) == MagickFalse)
-        return(MagickFalse);
-    }
-  /*
-    Initialize annotate info.
-  */
-  XGetAnnotateInfo(&annotate_info);
-  annotate_info.stencil=ForegroundStencil;
-  if (XChangeRenderFont(draw_info,display,cache_info.font,&targets) == MagickFalse)
-    return(MagickFalse);
-  if (draw_info->debug != MagickFalse)
-    (void) LogMagickEvent(AnnotateEvent,GetMagickModule(),
-      "Font %s; pointsize %g",draw_info->font != (char *) NULL ?
-      draw_info->font : "none",draw_info->pointsize);
-  cache_info=(*draw_info);
-  annotate_info.font_info=font_info;
-  annotate_info.text=(char *) draw_info->text;
-  annotate_info.width=(unsigned int) XTextWidth(font_info,draw_info->text,(int)
-    strlen(draw_info->text));
-  annotate_info.height=(unsigned int) (font_info->ascent+font_info->descent);
-  XSetRenderMetrics(metrics,draw_info,font_info,annotate_info);
-  if (draw_info->render == MagickFalse)
-    return(MagickTrue);
-  if (draw_info->fill.alpha == (double) TransparentAlpha)
-    return(MagickTrue);
-  request.image=image;
-  request.draw_info=draw_info;
-  request.offset=offset;
-  request.metrics=metrics;
-  request.exception=exception;
-  return(XRenderFillColor(&request,display,&annotate_info,&pixel));
-}
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -9800,48 +7539,4 @@ MagickPrivate void XSetCursorState(Display *display,XWindows *windows,
 
 #else
 
-/*
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%   X R e n d e r X 1 1                                                       %
-%                                                                             %
-%                                                                             %
-%                                                                             %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-%  XRenderImage() renders text on the image with an X11 font.  It also returns
-%  the bounding box of the text relative to the image.
-%
-%  The format of the XRenderImage method is:
-%
-%      MagickBooleanType XRenderImage(Image *image,DrawInfo *draw_info,
-%        const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
-%
-%  A description of each parameter follows:
-%
-%    o image: the image.
-%
-%    o draw_info: the draw info.
-%
-%    o offset: (x,y) location of text relative to image.
-%
-%    o metrics: bounding box of text.
-%
-%    o exception: return any errors or warnings in this structure.
-%
-*/
-MagickPrivate MagickBooleanType XRenderImage(Image *image,
-  const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
-  ExceptionInfo *exception)
-{
-  (void) draw_info;
-  (void) offset;
-  (void) metrics;
-  (void) ThrowMagickException(exception,GetMagickModule(),
-    MissingDelegateError,"DelegateLibrarySupportNotBuiltIn","'%s' (X11)",
-    image->filename);
-  return(MagickFalse);
-}
 #endif

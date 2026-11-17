@@ -36,11 +36,16 @@ in FILE's include block that holds every macro the block defines (a delegate's h
 is left out of NEW's copy when the family names none of those macros. A quoted `#include` of a header of the same directory that defines objects (a file-scope initialised
 variable, as accelerate-kernels-private.h's `accelerateKernels`) is left out of NEW's copy of the include
 block, since both files would define the variable, when no line of the family names a variable or macro
-that header defines; the split is refused when one does. A file-level
+that header defines. When the family names one and no line of the kept part names any, the include line
+moves to NEW instead, the original no longer including it (2026-11-16); the split is refused when both
+parts name them. A file-level
 `#if defined(...)` ... `#else` ... `#endif` block that holds whole functions of the family
 (a delegate's code and its stub of the same public function) moves whole, its directives
 included, when its `#endif` follows the family's last function; a function defined in both
-branches calls what either definition calls (owner, 2026-11-11).
+branches calls what either definition calls (owner, 2026-11-11). An `#if` with no `#else` standing
+directly above a run's first function (blank lines aside) moves whole the same way when its `#endif`
+stands inside the run, after the run's first function: `opencl.c`'s `#if
+!MAGICKCORE_ZERO_CONFIGURATION_SUPPORT` around its benchmark-profile readers (2026-11-16).
 
 When the family stands inside a file-level conditional that the rest of FILE keeps (a delegate's
 `#if defined(MAGICKCORE_X11_DELEGATE)` that wraps the whole file), NEW carries that conditional too:
@@ -213,6 +218,24 @@ def family_only_define(lines, name):
     named = [l for l in lines if re.search(r"\b%s\b" % name, l)]
     one_line = [l for l in named if re.match(r"^#define\s+%s\b.*[^\\\s]\s*$" % name, l)]
     return named[0] if named == one_line[:1] else None
+
+def _names(lines, name):
+    return [l for l in lines if re.search(r"\b%s\b" % name, l)]
+
+def _is_define(line, name):
+    return re.match(r"^\s*#\s*define\s+%s\b" % name, line) is not None
+
+def defined_before_use_in_each_part(kept_lines, region, name):
+    """True when NAME's every `#define` in the file is the same one line, byte for byte, no line `#undef`s it, and in
+    the kept part and in the region alike the first line naming NAME is such a define (a progress tag that each function
+    defines in its own body before it names it, as threshold-image.c's ThresholdImageTag). Each part then expands NAME
+    to the same tokens from its own definitions, whatever the other part holds, so nothing moves (2026-11-16)."""
+    parts = [_names(kept_lines, name), _names(region.split("\n"), name)]
+    if not all(named and _is_define(named[0], name) for named in parts): return False
+    named = parts[0] + parts[1]
+    if any(re.match(r"^\s*#\s*undef\b", l) for l in named): return False
+    defs = {l.rstrip() for l in named if _is_define(l, name)}
+    return len(defs) == 1 and not next(iter(defs)).endswith("\\")
 
 def multiline_define_blocks(lines):
     """{name: (first line, last line)} of every multi-line `#define` (backslash continuation) of LINES."""
@@ -406,7 +429,13 @@ path, new, title, roots = args[0], args[1], args[2], args[3:]
 src = open(path).read(); L = src.split("\n")
 defs = []; i = 0
 while i < len(L):
-    m = re.match(r"^((?:inline\s+)?static\s+(?:inline\s+)?|MagickExport\s+|MagickPrivate\s+)?[A-Za-z_][\w \*]*?\b([A-Za-z_]\w*)\s*\(", L[i])
+    # `static magick_attribute((__always_inline__)) inline T` names no function: the attribute is skipped, and a
+    # definition whose name then stands on the next line (`  *XPackGammaRedHighRow(`) is read with that line
+    head = L[i]
+    if re.match(r"static\s+magick_attribute\(\([\w ,]*\)\)\s", head):
+        head = re.sub(r"magick_attribute\(\([\w ,]*\)\)\s+", "", head, count=1)
+        if "(" not in head and i + 1 < len(L) and L[i + 1].startswith(" "): head += " " + L[i + 1].strip()
+    m = re.match(r"^((?:inline\s+)?static\s+(?:inline\s+)?|MagickExport\s+|MagickPrivate\s+)?[A-Za-z_][\w \*]*?\b([A-Za-z_]\w*)\s*\(", head)
     if m and not L[i].rstrip().endswith(";") and not L[i].startswith((" ", "#", "%", "/*")):
         j = i
         while j < len(L) and L[j] != "{" and not L[j].rstrip().endswith(";"): j += 1
@@ -503,6 +532,12 @@ for run in runs:
         if c >= 3 and L[c - 1].strip() == "#endif" and L[c - 2].strip() == 'extern "C" {' \
                 and re.match(r"#\s*if defined\(__cplusplus\)", L[c - 3].strip()):
             a = c - 3; externs += 1; continue
+        # an #if with no #else directly above the run's first function, whose #endif closes inside the run, moves
+        # whole with it (the mirror of the #endif taken after the run's last function, below; 2026-11-16)
+        cr = next((r for r in recs if r["if"] == c - 1), None) \
+            if c >= 1 and re.match(r"#\s*(if|ifdef|ifndef)\b", L[c - 1].strip()) else None
+        if cr and cr["end"] is not None and first[1] < cr["end"] <= last[2] and not cr["else"]:
+            a = c - 1; continue
         u = macro_block_start(L, c)
         if u is None: break
         a = u
@@ -599,6 +634,7 @@ for mname in sorted(defined(rest), key=lambda m: next(i for i, l in enumerate(re
     if mname in copy_macros and len(dl) == 1 and re.fullmatch(r'#define\s+%s\s+"[^"\\]*"' % mname, dl[0]) \
         and not re.search(r"^\s*#\s*define\s+%s\b" % mname, region, re.M):
         macro_lines.append(dl[0]); continue
+    if defined_before_use_in_each_part(rest_lines, region, mname): continue
     only = family_only_define(rest_lines, mname)
     if only is None: sys.exit("refused: macro %s used in the region" % mname)
     moved_macros.append(only)
@@ -627,7 +663,8 @@ while k < len(rest_lines):
 forward = relocate_declarations(rest_lines, moved & static, moved_macros)
 rest = "\n".join(rest_lines)
 for mname in defined(region):
-    if re.search(r"\b%s\b" % mname, rest): sys.exit("refused: macro %s used outside" % mname)
+    if re.search(r"\b%s\b" % mname, rest) and not defined_before_use_in_each_part(rest_lines, region, mname):
+        sys.exit("refused: macro %s used outside" % mname)
 # a typedef elsewhere in the original that only the region uses moves with it
 moved_types = []
 for tname in sorted(set(re.findall(r"^\}\s*(\w+)\s*;", rest, re.M))):
@@ -757,7 +794,18 @@ for k, line in enumerate(list(include_lines)):
     names_in = object_header_names(os.path.join(os.path.dirname(path), mi.group(1))) if mi else set()
     if not names_in: continue
     named = sorted(n for n in names_in if re.search(r"\b%s\b" % n, region_code))
-    if named: sys.exit("refused: the family names %s, defined by %s, which defines objects and cannot be included by both files" % (named, mi.group(1)))
+    if named:
+        # a header whose objects and macros only the family names moves to NEW: the original's include line leaves
+        # (2026-11-16), so the objects are still defined once, in NEW's object; the kept part may name none of them
+        kept_code = re.sub(r'"(?:\\.|[^"\\])*"', '""', re.sub(r"/\*.*?\*/", "", "\n".join(
+            l for l in rest_lines if l != line), flags=re.S))
+        kept_named = sorted(n for n in names_in if re.search(r"\b%s\b" % n, kept_code))
+        if kept_named or rest_lines.count(line) != 1:
+            sys.exit("refused: both parts name %s, defined by %s, which defines objects and cannot be included by both files"
+                     % (sorted(set(named) | set(kept_named)), mi.group(1)))
+        rest_lines.remove(line)
+        print("include block: %s defines objects only the family names (%s) and moves to the new file" % (mi.group(1), named))
+        continue
     include_lines[k] = None
     print("include block: %s defines objects and stays in the original only" % mi.group(1))
 include_lines = [l for l in include_lines if l is not None]

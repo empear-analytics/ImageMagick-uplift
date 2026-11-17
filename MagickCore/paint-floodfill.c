@@ -164,6 +164,14 @@ static ssize_t FillFloodplaneSpan(const FloodfillScan *scan,
   return(x);
 }
 
+static void SetFloodfillOpaqueAlpha(Image *image,const DrawInfo *draw_info,
+  ExceptionInfo *exception)
+{
+  if (((image->alpha_trait & BlendPixelTrait) == 0) &&
+      (draw_info->fill.alpha_trait != UndefinedPixelTrait))
+    (void) SetImageAlpha(image,OpaqueAlpha,exception);
+}
+
 static MagickBooleanType PrepareFloodfillImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -171,9 +179,7 @@ static MagickBooleanType PrepareFloodfillImage(Image *image,
     return(MagickFalse);
   if (IsGrayColorspace(image->colorspace) != MagickFalse)
     (void) SetImageColorspace(image,sRGBColorspace,exception);
-  if (((image->alpha_trait & BlendPixelTrait) == 0) &&
-      (draw_info->fill.alpha_trait != UndefinedPixelTrait))
-    (void) SetImageAlpha(image,OpaqueAlpha,exception);
+  SetFloodfillOpaqueAlpha(image,draw_info,exception);
   return(MagickTrue);
 }
 
@@ -316,6 +322,14 @@ static MagickBooleanType SkipFloodplaneRun(const FloodfillRow *row,
   return(MagickTrue);
 }
 
+static MagickBooleanType SyncFloodplaneLeft(const FloodfillRow *row)
+{
+  if (SyncCacheViewAuthenticPixels(row->floodplane_view,row->exception) ==
+      MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType FillFloodplaneLeft(const FloodfillRow *row,
   const ssize_t x1,ssize_t *x)
 {
@@ -347,10 +361,7 @@ static MagickBooleanType FillFloodplaneLeft(const FloodfillRow *row,
     p-=(ptrdiff_t)GetPixelChannels(row->image);
     q-=GetPixelChannels(row->floodplane_image);
   }
-  if (SyncCacheViewAuthenticPixels(row->floodplane_view,row->exception) ==
-      MagickFalse)
-    return(MagickFalse);
-  return(MagickTrue);
+  return(SyncFloodplaneLeft(row));
 }
 
 typedef struct _FloodfillTileView
@@ -777,6 +788,20 @@ typedef struct _FloodfillSegments
     y_offset;
 } FloodfillSegments;
 
+static MagickBooleanType PushFloodfillSeedBelow(
+  const FloodfillSegments *segments,const FloodfillStack *stack)
+{
+  {
+    const FloodfillSegment
+      segment = { segments->y_offset+1, segments->x_offset,
+        segments->x_offset, -1 };
+
+    if (PushFloodfillSegment(stack,&segment) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType PushFloodfillSeeds(const FloodfillSegments *segments,
   const FloodfillStack *stack)
 {
@@ -788,15 +813,7 @@ static MagickBooleanType PushFloodfillSeeds(const FloodfillSegments *segments,
     if (PushFloodfillSegment(stack,&segment) == MagickFalse)
       return(MagickFalse);
   }
-  {
-    const FloodfillSegment
-      segment = { segments->y_offset+1, segments->x_offset,
-        segments->x_offset, -1 };
-
-    if (PushFloodfillSegment(stack,&segment) == MagickFalse)
-      return(MagickFalse);
-  }
-  return(MagickTrue);
+  return(PushFloodfillSeedBelow(segments,stack));
 }
 
 static MagickBooleanType FillFloodplaneSegments(

@@ -191,7 +191,11 @@ typedef struct _HullFirstPass
     *r;
 } HullFirstPass;
 
-static void RaiseHullRow(const HullFirstPass *pass,ssize_t i)
+typedef MagickRealType
+  (*HullValueMethod)(const Quantum *,const ssize_t,MagickRealType);
+
+static inline void HullRow(const HullFirstPass *pass,ssize_t i,
+  const HullValueMethod method)
 {
   const size_t
     columns = pass->columns;
@@ -210,35 +214,20 @@ static void RaiseHullRow(const HullFirstPass *pass,ssize_t i)
   for (x=0; x < (ssize_t) columns; x++)
   {
     v=(MagickRealType) p[i];
-    v=RaiseHullValue(r,i,v);
+    v=method(r,i,v);
     q[i]=(Quantum) v;
     i++;
   }
 }
 
+static void RaiseHullRow(const HullFirstPass *pass,ssize_t i)
+{
+  HullRow(pass,i,RaiseHullValue);
+}
+
 static void LowerHullRow(const HullFirstPass *pass,ssize_t i)
 {
-  const size_t
-    columns = pass->columns;
-
-  Quantum
-    *const p = pass->p,
-    *const q = pass->q,
-    *const r = pass->r;
-
-  MagickRealType
-    v;
-
-  ssize_t
-    x;
-
-  for (x=0; x < (ssize_t) columns; x++)
-  {
-    v=(MagickRealType) p[i];
-    v=LowerHullValue(r,i,v);
-    q[i]=(Quantum) v;
-    i++;
-  }
+  HullRow(pass,i,LowerHullValue);
 }
 
 typedef struct _HullSecondPass
@@ -253,7 +242,12 @@ typedef struct _HullSecondPass
     *s;
 } HullSecondPass;
 
-static void RaiseHullEdgeRow(const HullSecondPass *pass,ssize_t i)
+typedef MagickRealType
+  (*HullEdgeValueMethod)(const Quantum *,const Quantum *,const ssize_t,
+    MagickRealType);
+
+static inline void HullEdgeRow(const HullSecondPass *pass,ssize_t i,
+  const HullEdgeValueMethod method)
 {
   const size_t
     columns = pass->columns;
@@ -273,36 +267,20 @@ static void RaiseHullEdgeRow(const HullSecondPass *pass,ssize_t i)
   for (x=0; x < (ssize_t) columns; x++)
   {
     v=(MagickRealType) q[i];
-    v=RaiseHullEdgeValue(r,s,i,v);
+    v=method(r,s,i,v);
     p[i]=(Quantum) v;
     i++;
   }
 }
 
+static void RaiseHullEdgeRow(const HullSecondPass *pass,ssize_t i)
+{
+  HullEdgeRow(pass,i,RaiseHullEdgeValue);
+}
+
 static void LowerHullEdgeRow(const HullSecondPass *pass,ssize_t i)
 {
-  const size_t
-    columns = pass->columns;
-
-  Quantum
-    *const p = pass->p,
-    *const q = pass->q,
-    *const r = pass->r,
-    *const s = pass->s;
-
-  MagickRealType
-    v;
-
-  ssize_t
-    x;
-
-  for (x=0; x < (ssize_t) columns; x++)
-  {
-    v=(MagickRealType) q[i];
-    v=LowerHullEdgeValue(r,s,i,v);
-    p[i]=(Quantum) v;
-    i++;
-  }
+  HullEdgeRow(pass,i,LowerHullEdgeValue);
 }
 
 static void HullFirstPassRow(const HullFirstPass *pass,const ssize_t i,

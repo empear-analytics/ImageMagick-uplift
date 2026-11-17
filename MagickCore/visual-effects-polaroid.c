@@ -1,0 +1,1016 @@
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%                  V   V  IIIII  SSSSS  U   U   AAA   L                       %
+%                  V   V    I    SS     U   U  A   A  L                       %
+%                  V   V    I     SSS   U   U  AAAAA  L                       %
+%                   V V     I       SS  U   U  A   A  L                       %
+%                    V    IIIII  SSSSS   UUU   A   A  LLLLL                   %
+%                                                                             %
+%               EEEEE  FFFFF  FFFFF  EEEEE   CCCC  TTTTT  SSSSS               %
+%               E      F      F      E      C        T    SS                  %
+%               EEE    FFF    FFF    EEE    C        T     SSS                %
+%               E      F      F      E      C        T       SS               %
+%               EEEEE  F      F      EEEEE   CCCC    T    SSSSS               %
+%                                                                             %
+%           PPPP    OOO   L       AAA   RRRR    OOO   IIIII  DDDD             %
+%           P   P  O   O  L      A   A  R   R  O   O    I    D   D            %
+%           PPPP   O   O  L      AAAAA  RRRR   O   O    I    D   D            %
+%           P      O   O  L      A   A  R R    O   O    I    D   D            %
+%           P       OOO   LLLLL  A   A  R  R    OOO   IIIII  DDDD             %
+%                                                                             %
+%                                                                             %
+%           MagickCore Polaroid, Shadow, Vignette and Wave Methods            %
+%                                                                             %
+%                               Software Design                               %
+%                                    Cristy                                   %
+%                                 October 1996                                %
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization         %
+%  dedicated to making software imaging solutions freely available.           %
+%                                                                             %
+%  You may not use this file except in compliance with the License.  You may  %
+%  obtain a copy of the License at                                            %
+%                                                                             %
+%    https://imagemagick.org/license/                                         %
+%                                                                             %
+%  Unless required by applicable law or agreed to in writing, software        %
+%  distributed under the License is distributed on an "AS IS" BASIS,          %
+%  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.   %
+%  See the License for the specific language governing permissions and        %
+%  limitations under the License.                                             %
+%                                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%
+%
+*/
+
+/*
+  Include declarations.
+*/
+#include "MagickCore/studio.h"
+#include "MagickCore/accelerate-private.h"
+#include "MagickCore/annotate.h"
+#include "MagickCore/artifact.h"
+#include "MagickCore/attribute.h"
+#include "MagickCore/cache.h"
+#include "MagickCore/cache-private.h"
+#include "MagickCore/cache-view.h"
+#include "MagickCore/channel.h"
+#include "MagickCore/color.h"
+#include "MagickCore/color-private.h"
+#include "MagickCore/colorspace-private.h"
+#include "MagickCore/composite.h"
+#include "MagickCore/decorate.h"
+#include "MagickCore/distort.h"
+#include "MagickCore/draw.h"
+#include "MagickCore/effect.h"
+#include "MagickCore/enhance.h"
+#include "MagickCore/exception.h"
+#include "MagickCore/exception-private.h"
+#include "MagickCore/gem.h"
+#include "MagickCore/gem-private.h"
+#include "MagickCore/geometry.h"
+#include "MagickCore/layer.h"
+#include "MagickCore/list.h"
+#include "MagickCore/log.h"
+#include "MagickCore/image.h"
+#include "MagickCore/image-private.h"
+#include "MagickCore/magick.h"
+#include "MagickCore/memory_.h"
+#include "MagickCore/memory-private.h"
+#include "MagickCore/monitor.h"
+#include "MagickCore/monitor-private.h"
+#include "MagickCore/option.h"
+#include "MagickCore/pixel.h"
+#include "MagickCore/pixel-accessor.h"
+#include "MagickCore/property.h"
+#include "MagickCore/quantum.h"
+#include "MagickCore/quantum-private.h"
+#include "MagickCore/random_.h"
+#include "MagickCore/random-private.h"
+#include "MagickCore/resample.h"
+#include "MagickCore/resample-private.h"
+#include "MagickCore/resize.h"
+#include "MagickCore/resource_.h"
+#include "MagickCore/splay-tree.h"
+#include "MagickCore/statistic.h"
+#include "MagickCore/string_.h"
+#include "MagickCore/string-private.h"
+#include "MagickCore/thread-private.h"
+#include "MagickCore/threshold.h"
+#include "MagickCore/transform.h"
+#include "MagickCore/transform-private.h"
+#include "MagickCore/utility.h"
+#include "MagickCore/visual-effects.h"
+#include "MagickCore/visual-effects-pixel-methods-private.h"
+
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%   P o l a r o i d I m a g e                                                 %
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  PolaroidImage() simulates a Polaroid picture.
+%
+%  The format of the PolaroidImage method is:
+%
+%      Image *PolaroidImage(const Image *image,const DrawInfo *draw_info,
+%        const char *caption,const double angle,
+%        const PixelInterpolateMethod method,ExceptionInfo exception)
+%
+%  A description of each parameter follows:
+%
+%    o image: the image.
+%
+%    o draw_info: the draw info.
+%
+%    o caption: the Polaroid caption.
+%
+%    o angle: Apply the effect along this angle.
+%
+%    o method: the pixel interpolation method.
+%
+%    o exception: return any errors or warnings in this structure.
+%
+*/
+typedef struct _PolaroidCaption
+{
+  Image
+    **caption_image;
+
+  size_t
+    *height;
+
+  char
+    **text;
+} PolaroidCaption;
+
+static void AnnotatePolaroidCaption(const Image *image,
+  const DrawInfo *draw_info,const PolaroidCaption *targets,
+  ExceptionInfo *exception)
+{
+  Image
+    **const caption_image = targets->caption_image;
+
+  size_t
+    *const height = targets->height;
+
+  char
+    **const text = targets->text;
+
+  char
+    geometry[MagickPathExtent];
+
+  DrawInfo
+    *annotate_info;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    count;
+
+  TypeMetric
+    metrics;
+
+  annotate_info=CloneDrawInfo((const ImageInfo *) NULL,draw_info);
+  (void) CloneString(&annotate_info->text,*text);
+  count=FormatMagickCaption(*caption_image,annotate_info,MagickTrue,
+    &metrics,text,exception);
+  status=SetImageExtent(*caption_image,image->columns,(size_t)
+    ((count+1)*(metrics.ascent-metrics.descent)+0.5),exception);
+  if (status == MagickFalse)
+    *caption_image=DestroyImage(*caption_image);
+  else
+    {
+      (*caption_image)->background_color=image->border_color;
+      (void) SetImageBackgroundColor(*caption_image,exception);
+      (void) CloneString(&annotate_info->text,*text);
+      (void) FormatLocaleString(geometry,MagickPathExtent,"+0+%.17g",
+        metrics.ascent);
+      if (annotate_info->gravity == UndefinedGravity)
+        (void) CloneString(&annotate_info->geometry,AcquireString(
+          geometry));
+      (void) AnnotateImage(*caption_image,annotate_info,exception);
+      *height+=(*caption_image)->rows;
+    }
+  annotate_info=DestroyDrawInfo(annotate_info);
+  *text=DestroyString(*text);
+}
+
+typedef struct _PolaroidFinish
+{
+  const Image
+    *image;
+
+  PixelInterpolateMethod
+    method;
+
+  ssize_t
+    quantum;
+
+  double
+    angle;
+} PolaroidFinish;
+
+static Image *TiltPolaroidImage(Image *polaroid_image,const double angle,
+  ExceptionInfo *exception)
+{
+  Image
+    *rotate_image,
+    *trim_image;
+
+  rotate_image=RotateImage(polaroid_image,angle,exception);
+  polaroid_image=DestroyImage(polaroid_image);
+  if (rotate_image == (Image *) NULL)
+    return((Image *) NULL);
+  polaroid_image=rotate_image;
+  trim_image=TrimImage(polaroid_image,exception);
+  polaroid_image=DestroyImage(polaroid_image);
+  if (trim_image == (Image *) NULL)
+    return((Image *) NULL);
+  polaroid_image=trim_image;
+  return(polaroid_image);
+}
+
+static Image *FinishPolaroidImage(const PolaroidFinish *polaroid_finish,
+  Image *picture_image,ExceptionInfo *exception)
+{
+  const Image
+    *const image = polaroid_finish->image;
+
+  const PixelInterpolateMethod
+    method = polaroid_finish->method;
+
+  const ssize_t
+    quantum = polaroid_finish->quantum;
+
+  const double
+    angle = polaroid_finish->angle;
+
+  Image
+    *bend_image,
+    *flop_image,
+    *polaroid_image,
+    *rotate_image;
+
+  rotate_image=RotateImage(picture_image,90.0,exception);
+  picture_image=DestroyImage(picture_image);
+  if (rotate_image == (Image *) NULL)
+    return((Image *) NULL);
+  picture_image=rotate_image;
+  bend_image=WaveImage(picture_image,0.01*picture_image->rows,2.0*
+    picture_image->columns,method,exception);
+  picture_image=DestroyImage(picture_image);
+  if (bend_image == (Image *) NULL)
+    return((Image *) NULL);
+  picture_image=bend_image;
+  rotate_image=RotateImage(picture_image,-90.0,exception);
+  picture_image=DestroyImage(picture_image);
+  if (rotate_image == (Image *) NULL)
+    return((Image *) NULL);
+  picture_image=rotate_image;
+  picture_image->background_color=image->background_color;
+  polaroid_image=ShadowImage(picture_image,80.0,2.0,quantum/3,quantum/3,
+    exception);
+  if (polaroid_image == (Image *) NULL)
+    {
+      picture_image=DestroyImage(picture_image);
+      return(picture_image);
+    }
+  flop_image=FlopImage(polaroid_image,exception);
+  polaroid_image=DestroyImage(polaroid_image);
+  if (flop_image == (Image *) NULL)
+    {
+      picture_image=DestroyImage(picture_image);
+      return(picture_image);
+    }
+  polaroid_image=flop_image;
+  (void) CompositeImage(polaroid_image,picture_image,OverCompositeOp,
+    MagickTrue,(ssize_t) (-0.01*picture_image->columns/2.0),0L,exception);
+  picture_image=DestroyImage(picture_image);
+  (void) QueryColorCompliance("none",AllCompliance,
+    &polaroid_image->background_color,exception);
+  return(TiltPolaroidImage(polaroid_image,angle,exception));
+}
+
+static void DestroyPolaroidCaption(Image *caption_image)
+{
+  if (caption_image != (Image *) NULL)
+    caption_image=DestroyImage(caption_image);
+}
+
+static ssize_t GetPolaroidQuantum(const Image *image)
+{
+  ssize_t
+    quantum;
+
+  quantum=(ssize_t) MagickMax(MagickMax((double) image->columns,(double)
+    image->rows)/25.0,10.0);
+  return(quantum);
+}
+
+static void MountPolaroidPicture(const Image *image,Image *picture_image,
+  const ssize_t quantum,ExceptionInfo *exception)
+{
+  picture_image->background_color=image->border_color;
+  (void) SetImageBackgroundColor(picture_image,exception);
+  (void) CompositeImage(picture_image,image,OverCompositeOp,MagickTrue,quantum,
+    quantum,exception);
+}
+
+MagickExport Image *PolaroidImage(const Image *image,const DrawInfo *draw_info,
+  const char *caption,const double angle,const PixelInterpolateMethod method,
+  ExceptionInfo *exception)
+{
+  Image
+    *caption_image,
+    *picture_image;
+
+  PolaroidFinish
+    polaroid_finish;
+
+  size_t
+    height;
+
+  ssize_t
+    quantum;
+
+  /*
+    Simulate a Polaroid picture.
+  */
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  quantum=GetPolaroidQuantum(image);
+  height=(size_t) ((ssize_t) image->rows+2*quantum);
+  caption_image=(Image *) NULL;
+  if (caption != (const char *) NULL)
+    {
+      char
+        *text;
+
+      const PolaroidCaption
+        caption_targets = { (&caption_image), (&height), (&text) };
+
+      /*
+        Generate caption image.
+      */
+      caption_image=CloneImage(image,image->columns,1,MagickTrue,exception);
+      if (caption_image == (Image *) NULL)
+        return((Image *) NULL);
+      text=InterpretImageProperties((ImageInfo *) NULL,(Image *) image,caption,
+        exception);
+      if (text != (char *) NULL)
+        AnnotatePolaroidCaption(image,draw_info,&caption_targets,exception);
+    }
+  picture_image=CloneImage(image,(size_t) ((ssize_t) image->columns+2*quantum),
+    height,MagickTrue,exception);
+  if (picture_image == (Image *) NULL)
+    {
+      DestroyPolaroidCaption(caption_image);
+      return((Image *) NULL);
+    }
+  MountPolaroidPicture(image,picture_image,quantum,exception);
+  if (caption_image != (Image *) NULL)
+    {
+      (void) CompositeImage(picture_image,caption_image,OverCompositeOp,
+        MagickTrue,quantum,((ssize_t) image->rows+3*quantum/2),exception);
+      caption_image=DestroyImage(caption_image);
+    }
+  (void) QueryColorCompliance("none",AllCompliance,
+    &picture_image->background_color,exception);
+  (void) SetImageAlphaChannel(picture_image,OpaqueAlphaChannel,exception);
+  polaroid_finish.image=image;
+  polaroid_finish.method=method;
+  polaroid_finish.quantum=quantum;
+  polaroid_finish.angle=angle;
+  return(FinishPolaroidImage(&polaroid_finish,picture_image,exception));
+}
+
+
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%     S h a d o w I m a g e                                                   %
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  ShadowImage() simulates a shadow from the specified image and returns it.
+%
+%  The format of the ShadowImage method is:
+%
+%      Image *ShadowImage(const Image *image,const double alpha,
+%        const double sigma,const ssize_t x_offset,const ssize_t y_offset,
+%        ExceptionInfo *exception)
+%
+%  A description of each parameter follows:
+%
+%    o image: the image.
+%
+%    o alpha: percentage transparency.
+%
+%    o sigma: the standard deviation of the Gaussian, in pixels.
+%
+%    o x_offset: the shadow x-offset.
+%
+%    o y_offset: the shadow y-offset.
+%
+%    o exception: return any errors or warnings in this structure.
+%
+*/
+static PixelInfo ShadowImageRow(const Image *border_image,
+  PixelInfo background_color,const double alpha,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) border_image->columns; x++)
+  {
+    if (border_image->alpha_trait != UndefinedPixelTrait)
+      background_color.alpha=(double) GetPixelAlpha(border_image,q)*alpha/
+        100.0;
+    SetPixelViaPixelInfo(border_image,&background_color,q);
+    q+=(ptrdiff_t) GetPixelChannels(border_image);
+  }
+  return(background_color);
+}
+
+static void OffsetShadowPage(Image *shadow_image,
+  const RectangleInfo border_info,const ssize_t x_offset,const ssize_t y_offset)
+{
+  if (shadow_image->page.width == 0)
+    shadow_image->page.width=shadow_image->columns;
+  if (shadow_image->page.height == 0)
+    shadow_image->page.height=shadow_image->rows;
+  shadow_image->page.width=(size_t) ((ssize_t) shadow_image->page.width+
+    x_offset-(ssize_t) border_info.width);
+  shadow_image->page.height=(size_t) ((ssize_t) shadow_image->page.height+
+    y_offset-(ssize_t) border_info.height);
+  shadow_image->page.x+=x_offset-(ssize_t) border_info.width;
+  shadow_image->page.y+=y_offset-(ssize_t) border_info.height;
+}
+
+static MagickBooleanType ShadowBorderImage(const Image *border_image,
+  const double alpha,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  MagickBooleanType
+    status;
+
+  PixelInfo
+    background_color;
+
+  ssize_t
+    y;
+
+  status=MagickTrue;
+  background_color=border_image->background_color;
+  background_color.alpha_trait=BlendPixelTrait;
+  image_view=AcquireAuthenticCacheView(border_image,exception);
+  for (y=0; y < (ssize_t) border_image->rows; y++)
+  {
+    Quantum
+      *magick_restrict q;
+
+    if (status == MagickFalse)
+      continue;
+    q=QueueCacheViewAuthenticPixels(image_view,0,y,border_image->columns,1,
+      exception);
+    if (q == (Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    background_color=ShadowImageRow(border_image,background_color,alpha,q);
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      status=MagickFalse;
+  }
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+static void PrepareShadowClone(const Image *image,Image *clone_image,
+  ExceptionInfo *exception)
+{
+  if (IsGrayColorspace(image->colorspace) != MagickFalse)
+    (void) SetImageColorspace(clone_image,sRGBColorspace,exception);
+  (void) SetImageVirtualPixelMethod(clone_image,EdgeVirtualPixelMethod,
+    exception);
+}
+
+static RectangleInfo GetShadowBorder(const double sigma)
+{
+  RectangleInfo
+    border_info;
+
+  border_info.width=CastDoubleToSizeT(2.0*sigma+0.5);
+  border_info.height=CastDoubleToSizeT(2.0*sigma+0.5);
+  border_info.x=0;
+  border_info.y=0;
+  return(border_info);
+}
+
+static void ClearShadowBorderColor(Image *clone_image,ExceptionInfo *exception)
+{
+  (void) QueryColorCompliance("none",AllCompliance,&clone_image->border_color,
+    exception);
+  clone_image->alpha_trait=BlendPixelTrait;
+}
+
+MagickExport Image *ShadowImage(const Image *image,const double alpha,
+  const double sigma,const ssize_t x_offset,const ssize_t y_offset,
+  ExceptionInfo *exception)
+{
+#define ShadowImageTag  "Shadow/Image"
+
+  ChannelType
+    channel_mask;
+
+  Image
+    *border_image,
+    *clone_image,
+    *shadow_image;
+
+  MagickBooleanType
+    status;
+
+  RectangleInfo
+    border_info;
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  clone_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (clone_image == (Image *) NULL)
+    return((Image *) NULL);
+  PrepareShadowClone(image,clone_image,exception);
+  border_info=GetShadowBorder(sigma);
+  ClearShadowBorderColor(clone_image,exception);
+  border_image=BorderImage(clone_image,&border_info,OverCompositeOp,exception);
+  clone_image=DestroyImage(clone_image);
+  if (border_image == (Image *) NULL)
+    return((Image *) NULL);
+  if (border_image->alpha_trait == UndefinedPixelTrait)
+    (void) SetImageAlphaChannel(border_image,OpaqueAlphaChannel,exception);
+  /*
+    Shadow image.
+  */
+  status=ShadowBorderImage(border_image,alpha,exception);
+  if (status == MagickFalse)
+    {
+      border_image=DestroyImage(border_image);
+      return((Image *) NULL);
+    }
+  channel_mask=SetImageChannelMask(border_image,AlphaChannel);
+  shadow_image=BlurImage(border_image,0.0,sigma,exception);
+  border_image=DestroyImage(border_image);
+  if (shadow_image == (Image *) NULL)
+    return((Image *) NULL);
+  (void) SetPixelChannelMask(shadow_image,channel_mask);
+  OffsetShadowPage(shadow_image,border_info,x_offset,y_offset);
+  return(shadow_image);
+}
+
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%     V i g n e t t e I m a g e                                               %
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  VignetteImage() softens the edges of the image in vignette style.
+%
+%  The format of the VignetteImage method is:
+%
+%      Image *VignetteImage(const Image *image,const double radius,
+%        const double sigma,const ssize_t x,const ssize_t y,
+%        ExceptionInfo *exception)
+%
+%  A description of each parameter follows:
+%
+%    o image: the image.
+%
+%    o radius: the radius of the pixel neighborhood.
+%
+%    o sigma: the standard deviation of the Gaussian, in pixels.
+%
+%    o x, y:  Define the x and y ellipse offset.
+%
+%    o exception: return any errors or warnings in this structure.
+%
+*/
+static void ClearVignetteOval(Image *oval_image,ExceptionInfo *exception)
+{
+  (void) QueryColorCompliance("#000000",AllCompliance,
+    &oval_image->background_color,exception);
+  (void) SetImageBackgroundColor(oval_image,exception);
+}
+
+static void SetVignetteColors(DrawInfo *draw_info,ExceptionInfo *exception)
+{
+  (void) QueryColorCompliance("#ffffff",AllCompliance,&draw_info->fill,
+    exception);
+  (void) QueryColorCompliance("#ffffff",AllCompliance,&draw_info->stroke,
+    exception);
+}
+
+static void SetVignettePrimitive(const Image *image,const ssize_t x,
+  const ssize_t y,DrawInfo *draw_info)
+{
+  char
+    ellipse[MagickPathExtent];
+
+  (void) FormatLocaleString(ellipse,MagickPathExtent,"ellipse %g,%g,%g,%g,"
+    "0.0,360.0",image->columns/2.0,image->rows/2.0,image->columns/2.0-x,
+    image->rows/2.0-y);
+  draw_info->primitive=AcquireString(ellipse);
+}
+
+static void CompositeVignetteMask(Image *canvas,Image *blur_image,
+  ExceptionInfo *exception)
+{
+  blur_image->alpha_trait=UndefinedPixelTrait;
+  (void) CompositeImage(canvas,blur_image,IntensityCompositeOp,MagickTrue,
+    0,0,exception);
+  blur_image=DestroyImage(blur_image);
+}
+
+static Image *FlattenVignetteImage(const Image *image,Image *canvas,
+  ExceptionInfo *exception)
+{
+  Image
+    *vignette_image;
+
+  vignette_image=MergeImageLayers(canvas,FlattenLayer,exception);
+  canvas=DestroyImage(canvas);
+  if (vignette_image != (Image *) NULL)
+    (void) TransformImageColorspace(vignette_image,image->colorspace,exception);
+  return(vignette_image);
+}
+
+MagickExport Image *VignetteImage(const Image *image,const double radius,
+  const double sigma,const ssize_t x,const ssize_t y,ExceptionInfo *exception)
+{
+  DrawInfo
+    *draw_info;
+
+  Image
+    *canvas,
+    *blur_image,
+    *oval_image;
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  canvas=CloneImage(image,0,0,MagickTrue,exception);
+  if (canvas == (Image *) NULL)
+    return((Image *) NULL);
+  if (SetImageStorageClass(canvas,DirectClass,exception) == MagickFalse)
+    {
+      canvas=DestroyImage(canvas);
+      return((Image *) NULL);
+    }
+  canvas->alpha_trait=BlendPixelTrait;
+  oval_image=CloneImage(canvas,canvas->columns,canvas->rows,MagickTrue,
+    exception);
+  if (oval_image == (Image *) NULL)
+    {
+      canvas=DestroyImage(canvas);
+      return((Image *) NULL);
+    }
+  ClearVignetteOval(oval_image,exception);
+  draw_info=CloneDrawInfo((const ImageInfo *) NULL,(const DrawInfo *) NULL);
+  SetVignetteColors(draw_info,exception);
+  SetVignettePrimitive(image,x,y,draw_info);
+  (void) DrawImage(oval_image,draw_info,exception);
+  draw_info=DestroyDrawInfo(draw_info);
+  blur_image=BlurImage(oval_image,radius,sigma,exception);
+  oval_image=DestroyImage(oval_image);
+  if (blur_image == (Image *) NULL)
+    {
+      canvas=DestroyImage(canvas);
+      return((Image *) NULL);
+    }
+  CompositeVignetteMask(canvas,blur_image,exception);
+  return(FlattenVignetteImage(image,canvas,exception));
+}
+
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%     W a v e I m a g e                                                       %
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  WaveImage() creates a "ripple" effect in the image by shifting the pixels
+%  vertically along a sine wave whose amplitude and wavelength is specified
+%  by the given parameters.
+%
+%  The format of the WaveImage method is:
+%
+%      Image *WaveImage(const Image *image,const double amplitude,
+%        const double wave_length,const PixelInterpolateMethod method,
+%        ExceptionInfo *exception)
+%
+%  A description of each parameter follows:
+%
+%    o image: the image.
+%
+%    o amplitude, wave_length:  Define the amplitude and wave length of the
+%      sine wave.
+%
+%    o interpolate: the pixel interpolation method.
+%
+%    o exception: return any errors or warnings in this structure.
+%
+*/
+typedef struct _WaveRow
+{
+  Image
+    *canvas_image,
+    *wave_image;
+
+  CacheView
+    *canvas_image_view,
+    *wave_view;
+
+  float
+    *sine_map;
+
+  PixelInterpolateMethod
+    method;
+
+  ExceptionInfo
+    *exception;
+} WaveRow;
+
+static MagickBooleanType WaveImageRow(const WaveRow *wave_row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  Image
+    *const canvas_image = wave_row->canvas_image,
+    *const wave_image = wave_row->wave_image;
+
+  CacheView
+    *const canvas_image_view = wave_row->canvas_image_view,
+    *const wave_view = wave_row->wave_view;
+
+  float
+    *const sine_map = wave_row->sine_map;
+
+  const PixelInterpolateMethod
+    method = wave_row->method;
+
+  ExceptionInfo
+    *const exception = wave_row->exception;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(canvas_image_view,0,y,canvas_image->columns,1,
+    exception);
+  q=QueueCacheViewAuthenticPixels(wave_view,0,y,wave_image->columns,1,
+    exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) wave_image->columns; x++)
+  {
+    (*status)=InterpolatePixelChannels(canvas_image,canvas_image_view,
+      wave_image,method,(double) x,(double) (y-sine_map[x]),q,exception);
+    if ((*status) == MagickFalse)
+      break;
+    p+=(ptrdiff_t) GetPixelChannels(canvas_image);
+    q+=(ptrdiff_t) GetPixelChannels(wave_image);
+  }
+  if (SyncCacheViewAuthenticPixels(wave_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
+static void FillSineMap(float *sine_map,const size_t columns,
+  const double amplitude,const double wave_length)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) columns; i++)
+    sine_map[i]=(float) (fabs(amplitude)+amplitude*sin((double)
+      ((2.0*MagickPI*i)*(double) MagickSafeReciprocal(wave_length))));
+}
+
+static void DestroyWaveResources(CacheView *wave_view,
+  CacheView *canvas_image_view,Image *canvas_image,float *sine_map)
+{
+  wave_view=DestroyCacheView(wave_view);
+  canvas_image_view=DestroyCacheView(canvas_image_view);
+  canvas_image=DestroyImage(canvas_image);
+  sine_map=(float *) RelinquishMagickMemory(sine_map);
+}
+
+static void SetWaveCanvasAlpha(Image *canvas_image,ExceptionInfo *exception)
+{
+  if ((canvas_image->alpha_trait == UndefinedPixelTrait) &&
+      (canvas_image->background_color.alpha != (double) OpaqueAlpha))
+    (void) SetImageAlpha(canvas_image,OpaqueAlpha,exception);
+}
+
+static MagickBooleanType CloneWaveCanvas(const Image *image,
+  Image **canvas_image,ExceptionInfo *exception)
+{
+  *canvas_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (*canvas_image == (Image *) NULL)
+    return(MagickFalse);
+  SetWaveCanvasAlpha(*canvas_image,exception);
+  return(MagickTrue);
+}
+
+#define WaveImageTag  "Wave/Image"
+
+typedef struct _WaveRender
+{
+  const Image
+    *image;
+
+  Image
+    *canvas_image,
+    *wave_image;
+
+  float
+    *sine_map;
+
+  PixelInterpolateMethod
+    method;
+
+  ExceptionInfo
+    *exception;
+} WaveRender;
+
+static Image *RenderWaveImage(const WaveRender *render)
+{
+  const Image
+    *const image = render->image;
+
+  Image
+    *const canvas_image = render->canvas_image,
+    *const wave_image = render->wave_image;
+
+  float
+    *const sine_map = render->sine_map;
+
+  const PixelInterpolateMethod
+    method = render->method;
+
+  ExceptionInfo
+    *const exception = render->exception;
+
+  CacheView
+    *canvas_image_view,
+    *wave_view;
+
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  ssize_t
+    y;
+
+  status=MagickTrue;
+  progress=0;
+  canvas_image_view=AcquireVirtualCacheView(canvas_image,exception);
+  wave_view=AcquireAuthenticCacheView(wave_image,exception);
+  (void) SetCacheViewVirtualPixelMethod(canvas_image_view,
+    BackgroundVirtualPixelMethod);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(progress,status) \
+    magick_number_threads(canvas_image,wave_image,wave_image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) wave_image->rows; y++)
+  {
+    const WaveRow
+      wave_row = { canvas_image, wave_image, canvas_image_view, wave_view,
+        sine_map, method, exception };
+
+    if (WaveImageRow(&wave_row,y,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        SetEffectProgress(canvas_image,WaveImageTag,progress,&status);
+      }
+  }
+  DestroyWaveResources(wave_view,canvas_image_view,canvas_image,sine_map);
+  return(ReleaseFailedImage(wave_image,status));
+}
+
+MagickExport Image *WaveImage(const Image *image,const double amplitude,
+  const double wave_length,const PixelInterpolateMethod method,
+  ExceptionInfo *exception)
+{
+  float
+    *sine_map;
+
+  Image
+    *canvas_image,
+    *wave_image;
+
+  WaveRender
+    render;
+
+  /*
+    Initialize wave image attributes.
+  */
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if (CloneWaveCanvas(image,&canvas_image,exception) == MagickFalse)
+    return((Image *) NULL);
+  wave_image=CloneImage(canvas_image,canvas_image->columns,(size_t)
+    (canvas_image->rows+2.0*fabs(amplitude)),MagickTrue,exception);
+  if (wave_image == (Image *) NULL)
+    {
+      canvas_image=DestroyImage(canvas_image);
+      return((Image *) NULL);
+    }
+  if (SetImageStorageClass(wave_image,DirectClass,exception) == MagickFalse)
+    {
+      canvas_image=DestroyImage(canvas_image);
+      wave_image=DestroyImage(wave_image);
+      return((Image *) NULL);
+    }
+  /*
+    Allocate sine map.
+  */
+  sine_map=(float *) AcquireQuantumMemory((size_t) wave_image->columns,
+    sizeof(*sine_map));
+  if (sine_map == (float *) NULL)
+    {
+      canvas_image=DestroyImage(canvas_image);
+      wave_image=DestroyImage(wave_image);
+      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
+    }
+  FillSineMap(sine_map,wave_image->columns,amplitude,wave_length);
+  /*
+    Wave image.
+  */
+  render.image=image;
+  render.canvas_image=canvas_image;
+  render.wave_image=wave_image;
+  render.sine_map=sine_map;
+  render.method=method;
+  render.exception=exception;
+  return(RenderWaveImage(&render));
+}

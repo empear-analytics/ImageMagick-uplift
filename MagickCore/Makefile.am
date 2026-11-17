@@ -158,8 +158,10 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/display.h \
   MagickCore/display-private.h \
   MagickCore/distort.c \
+  MagickCore/distort-sparse.c \
   MagickCore/distort-affine.c \
   MagickCore/distort-resize.c \
+  MagickCore/distort-private.h \
   MagickCore/distort.h \
   MagickCore/distribute-cache.c \
   MagickCore/distribute-cache.h \
@@ -175,21 +177,34 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/effect-blur.c \
   MagickCore/effect-blur-adaptive.c \
   MagickCore/effect-blur-adaptive-filters.c \
+  MagickCore/effect-emboss.c \
+  MagickCore/effect-blur-bilateral.c \
+  MagickCore/effect-blur-selective.c \
+  MagickCore/effect-adaptive.c \
   MagickCore/effect.h \
+  MagickCore/effect-blur-adaptive-filters-private.h \
   MagickCore/effect-private.h \
+  MagickCore/effect-common-private.h \
   MagickCore/enhance.c \
   MagickCore/enhance-color.c \
+  MagickCore/enhance-balance.c \
   MagickCore/enhance-clahe.c \
   MagickCore/enhance-tone.c \
+  MagickCore/enhance-equalize.c \
+  MagickCore/enhance-level.c \
   MagickCore/enhance-level-colors.c \
   MagickCore/enhance.h \
+  MagickCore/enhance-color-private.h \
+  MagickCore/enhance-private.h \
   MagickCore/exception.c \
   MagickCore/exception-throw.c \
   MagickCore/exception.h \
   MagickCore/exception-private.h \
   MagickCore/feature.c \
+  MagickCore/feature-hough.c \
   MagickCore/feature-texture.c \
   MagickCore/feature.h \
+  MagickCore/feature-private.h \
   MagickCore/fourier.c \
   MagickCore/fourier-complex.c \
   MagickCore/fourier.h \
@@ -221,9 +236,12 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/image-view.h \
   MagickCore/layer.c \
   MagickCore/layer-frames.c \
+  MagickCore/layer-optimize.c \
+  MagickCore/layer-dispose.c \
   MagickCore/layer-composite.c \
   MagickCore/layer-merge.c \
   MagickCore/layer.h \
+  MagickCore/layer-frames-private.h \
   MagickCore/linked-list.c \
   MagickCore/linked-list.h \
   MagickCore/list.c \
@@ -262,13 +280,19 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/montage.h \
   MagickCore/morphology.c \
   MagickCore/morphology-apply.c \
+  MagickCore/morphology-primitive.c \
+  MagickCore/morphology-builtin.c \
   MagickCore/morphology.h \
   MagickCore/morphology-private.h \
+  MagickCore/morphology-apply-private.h \
+  MagickCore/morphology-apply-kernel-private.h \
   MagickCore/mutex.h \
   MagickCore/nt-base.h \
   MagickCore/nt-base-private.h \
   MagickCore/nt-feature.h \
   MagickCore/opencl.c \
+  MagickCore/opencl-environment.c \
+  MagickCore/opencl-enqueue.c \
   MagickCore/opencl-device.c \
   MagickCore/opencl.h \
   MagickCore/opencl-private.h \
@@ -300,10 +324,14 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/profile.h \
   MagickCore/profile-private.h \
   MagickCore/quantize.c \
+  MagickCore/quantize-remap.c \
+  MagickCore/quantize-kmeans.c \
   MagickCore/quantize-error.c \
   MagickCore/quantize-info.c \
   MagickCore/quantize-posterize.c \
   MagickCore/quantize.h \
+  MagickCore/quantize-private.h \
+  MagickCore/quantize-assign-private.h \
   MagickCore/quantum.c \
   MagickCore/quantum-type.c \
   MagickCore/quantum.h \
@@ -330,7 +358,9 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/resource_.h \
   MagickCore/resource-private.h \
   MagickCore/segment.c \
+  MagickCore/segment-threshold.c \
   MagickCore/segment.h \
+  MagickCore/segment-private.h \
   MagickCore/semaphore.c \
   MagickCore/semaphore.h \
   MagickCore/semaphore-private.h \
@@ -346,11 +376,13 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/static.c \
   MagickCore/static.h \
   MagickCore/statistic.c \
+  MagickCore/statistic-polynomial.c \
   MagickCore/statistic-measure.c \
   MagickCore/statistic-function.c \
   MagickCore/statistic-moments.c \
   MagickCore/statistic-image.c \
   MagickCore/statistic.h \
+  MagickCore/statistic-evaluate-private.h \
   MagickCore/statistic-private.h \
   MagickCore/stream.c \
   MagickCore/stream-read.c \
@@ -378,13 +410,17 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/token-private.h \
   MagickCore/transform.c \
   MagickCore/transform-region.c \
+  MagickCore/transform-crop.c \
   MagickCore/transform-tiles.c \
   MagickCore/transform.h \
+  MagickCore/transform-region-private.h \
   MagickCore/threshold.c \
   MagickCore/threshold-image.c \
+  MagickCore/threshold-level.c \
   MagickCore/threshold-adaptive.c \
   MagickCore/threshold-auto.c \
   MagickCore/threshold.h \
+  MagickCore/threshold-private.h \
   MagickCore/type.c \
   MagickCore/type-list.c \
   MagickCore/type.h \
@@ -398,15 +434,26 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/visual-effects.c \
   MagickCore/visual-effects-pixel.c \
   MagickCore/visual-effects-pixel-methods.c \
+  MagickCore/visual-effects-polaroid.c \
+  MagickCore/visual-effects-color-matrix.c \
+  MagickCore/visual-effects-morph.c \
+  MagickCore/visual-effects-sepia.c \
+  MagickCore/visual-effects-colorize.c \
+  MagickCore/visual-effects-blueshift.c \
+  MagickCore/visual-effects-noise.c \
   MagickCore/visual-effects-wavelet.c \
   MagickCore/visual-effects-plasma.c \
   MagickCore/visual-effects-stegano.c \
   MagickCore/visual-effects.h \
+  MagickCore/visual-effects-pixel-methods-private.h \
   MagickCore/vision.c \
   MagickCore/vision-components.c \
   MagickCore/vision.h \
   MagickCore/widget.c \
+  MagickCore/widget-confirm.c \
+  MagickCore/widget-dialog.c \
   MagickCore/widget.h \
+  MagickCore/widget-core-private.h \
   MagickCore/widget-private.h \
   MagickCore/xml-tree.c \
   MagickCore/xml-tree-file.c \
@@ -414,8 +461,14 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/xml-tree-private.h \
   MagickCore/xwindow.c \
   MagickCore/xwindow-image.c \
+  MagickCore/xwindow-annotate.c \
+  MagickCore/xwindow-info.c \
+  MagickCore/xwindow-image-private.h \
+  MagickCore/xwindow-pixel.c \
+  MagickCore/xwindow-text.c \
   MagickCore/xwindow-visual.c \
   MagickCore/xwindow-import.c \
+  MagickCore/xwindow-search.c \
   MagickCore/xwindow.h
 
 if WIN32_NATIVE_BUILD
@@ -553,14 +606,21 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/delegate-private.h \
   MagickCore/delegate-private.h \
   MagickCore/display-private.h \
+  MagickCore/distort-private.h \
   MagickCore/distribute-cache-private.h \
   MagickCore/draw-private.h \
+  MagickCore/effect-blur-adaptive-filters-private.h \
   MagickCore/effect-private.h \
+  MagickCore/effect-common-private.h \
+  MagickCore/enhance-private.h \
+  MagickCore/enhance-color-private.h \
   MagickCore/exception-private.h \
+  MagickCore/feature-private.h \
   MagickCore/fx-private.h \
   MagickCore/gem-private.h \
   MagickCore/geometry-private.h \
   MagickCore/image-private.h \
+  MagickCore/layer-frames-private.h \
   MagickCore/linked-list-private.h \
   MagickCore/locale-private.h \
   MagickCore/log-private.h \
@@ -573,6 +633,8 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/module-private.h \
   MagickCore/monitor-private.h \
   MagickCore/morphology-private.h \
+  MagickCore/morphology-apply-private.h \
+  MagickCore/morphology-apply-kernel-private.h \
   MagickCore/mutex.h \
   MagickCore/nt-base.h \
   MagickCore/nt-feature.h \
@@ -581,6 +643,8 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/pixel-private.h \
   MagickCore/policy-private.h \
   MagickCore/profile-private.h \
+  MagickCore/quantize-private.h \
+  MagickCore/quantize-assign-private.h \
   MagickCore/quantum-private.h \
   MagickCore/random-private.h \
   MagickCore/registry-private.h \
@@ -588,22 +652,29 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/resize-private.h \
   MagickCore/resource-private.h \
   MagickCore/resource-private.h \
+  MagickCore/segment-private.h \
   MagickCore/semaphore-private.h \
   MagickCore/semaphore-private.h \
   MagickCore/signature-private.h \
+  MagickCore/statistic-evaluate-private.h \
   MagickCore/statistic-private.h \
   MagickCore/stream-private.h \
   MagickCore/string-private.h \
   MagickCore/thread_.h \
   MagickCore/thread-private.h \
+  MagickCore/threshold-private.h \
   MagickCore/timer-private.h \
   MagickCore/token-private.h \
   MagickCore/transform-private.h \
+  MagickCore/transform-region-private.h \
   MagickCore/type-private.h \
   MagickCore/utility-private.h \
   MagickCore/version-private.h \
+  MagickCore/visual-effects-pixel-methods-private.h \
+  MagickCore/widget-core-private.h \
   MagickCore/widget-private.h \
   MagickCore/xml-tree-private.h \
+  MagickCore/xwindow-image-private.h \
   MagickCore/xwindow-private.h
 
 MAGICKCORE_INCLUDEARCH_HDRS = \

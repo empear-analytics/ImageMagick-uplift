@@ -401,6 +401,15 @@ static MagickBooleanType SetPlasmaRowPixels(const PlasmaMidpoint *midpoint,
   return(MagickTrue);
 }
 
+static MagickBooleanType FinishSmallPlasmaSegment(
+  const SegmentInfo *segment,MagickStatusType status)
+{
+  if ((fabs(segment->x2-segment->x1) < 3.0) &&
+      (fabs(segment->y2-segment->y1) < 3.0))
+    return(status == 0 ? MagickFalse : MagickTrue);
+  return(MagickFalse);
+}
+
 static MagickBooleanType FinishPlasmaSegment(const PlasmaMidpoint *midpoint,
   MagickStatusType status)
 {
@@ -409,10 +418,15 @@ static MagickBooleanType FinishPlasmaSegment(const PlasmaMidpoint *midpoint,
 
   if (SetPlasmaMiddlePixel(midpoint,&status) == MagickFalse)
     return(MagickTrue);
-  if ((fabs(segment->x2-segment->x1) < 3.0) &&
-      (fabs(segment->y2-segment->y1) < 3.0))
-    return(status == 0 ? MagickFalse : MagickTrue);
-  return(MagickFalse);
+  return(FinishSmallPlasmaSegment(segment,status));
+}
+
+static MagickBooleanType FinishPlasmaColumnPixels(
+  const PlasmaMidpoint *midpoint,MagickStatusType status)
+{
+  if (SetPlasmaRowPixels(midpoint,&status) == MagickFalse)
+    return(MagickTrue);
+  return(FinishPlasmaSegment(midpoint,status));
 }
 
 static MagickBooleanType SetPlasmaColumnPixels(const PlasmaMidpoint *midpoint,
@@ -441,13 +455,11 @@ static MagickBooleanType SetPlasmaColumnPixels(const PlasmaMidpoint *midpoint,
               &status) == MagickFalse))
         return(MagickFalse);
     }
-  if (SetPlasmaRowPixels(midpoint,&status) == MagickFalse)
-    return(MagickTrue);
-  return(FinishPlasmaSegment(midpoint,status));
+  return(FinishPlasmaColumnPixels(midpoint,status));
 }
 
-static MagickBooleanType PlasmaImageProxy(const PlasmaContext *context,
-  const SegmentInfo *magick_restrict segment,size_t attenuate,size_t depth)
+static MagickBooleanType AveragePlasmaSegment(const PlasmaContext *context,
+  const SegmentInfo *magick_restrict segment,size_t attenuate)
 {
   double
     plasma;
@@ -462,11 +474,6 @@ static MagickBooleanType PlasmaImageProxy(const PlasmaContext *context,
     x_mid,
     y_mid;
 
-  if ((fabs(segment->x2-segment->x1) < MagickEpsilon) &&
-      (fabs(segment->y2-segment->y1) < MagickEpsilon))
-    return(MagickTrue);
-  if (depth != 0)
-    return(DividePlasmaSegment(context,segment,attenuate,depth));
   x_mid=CastDoubleToSsizeT(ceil((segment->x1+segment->x2)/2-0.5));
   y_mid=CastDoubleToSsizeT(ceil((segment->y1+segment->y2)/2-0.5));
   if (IsPlasmaSegmentAtMidpoint(segment,x_mid,y_mid) != MagickFalse)
@@ -482,6 +489,17 @@ static MagickBooleanType PlasmaImageProxy(const PlasmaContext *context,
   midpoint.y_mid=y_mid;
   midpoint.plasma=plasma;
   return(SetPlasmaColumnPixels(&midpoint,status));
+}
+
+static MagickBooleanType PlasmaImageProxy(const PlasmaContext *context,
+  const SegmentInfo *magick_restrict segment,size_t attenuate,size_t depth)
+{
+  if ((fabs(segment->x2-segment->x1) < MagickEpsilon) &&
+      (fabs(segment->y2-segment->y1) < MagickEpsilon))
+    return(MagickTrue);
+  if (depth != 0)
+    return(DividePlasmaSegment(context,segment,attenuate,depth));
+  return(AveragePlasmaSegment(context,segment,attenuate));
 }
 
 MagickExport MagickBooleanType PlasmaImage(Image *image,

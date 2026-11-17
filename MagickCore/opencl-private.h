@@ -417,6 +417,15 @@ typedef struct _MagickCLEnv
 #define CLCharQuantumScale 72340172838076673.0f
 #endif
 
+extern MagickLibrary
+  *openCL_library;
+
+extern MagickCLEnv
+  default_CLEnv;
+
+extern SemaphoreInfo
+  *openCL_lock;
+
 extern MagickPrivate cl_command_queue
   AcquireOpenCLCommandQueue(MagickCLDevice);
 

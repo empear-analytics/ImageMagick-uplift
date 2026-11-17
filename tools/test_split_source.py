@@ -201,6 +201,27 @@ class SplitSource(unittest.TestCase):
             self.assertNotEqual(r.returncode, 0, use)
             self.assertIn("refused", r.stderr + r.stdout)
 
+    def test_a_tag_each_part_defines_before_use_stays_in_both(self):
+        tag = '#define SynthTag  "Synth/Image"\n'
+        fam = FAMILY.replace("{\n  return(FamilyHelper(x));", "{\n" + tag + "  return(FamilyHelper(x)+sizeof(SynthTag));")
+        kept = KEPT.replace("{\n  return(x*2);", "{\n" + tag + "  return(x*2+(int) sizeof(SynthTag));")
+        r = self.split(fam + kept)
+        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        new = open(os.path.join(self.out, "synth-family.c")).read()
+        old = open(os.path.join(self.out, "synth.c")).read()
+        self.assertEqual(new.count(tag.strip()), 1)
+        self.assertEqual(old.count(tag.strip()), 1)
+        self.assertNotIn("Define declarations", new)
+        self.assert_both_compile()
+        # planted defects: the family names the tag before its own define; the two defines differ; an #undef
+        early = fam.replace("static int FamilyHelper(int x)\n{\n", "static int FamilyHelper(int x)\n{\n  (void) SynthTag;\n")
+        other = fam.replace(tag, tag.replace("Synth/Image", "Synth/Other"))
+        undef = kept.replace("  return(x*2", "#undef SynthTag\n  return(x*2")
+        for body in (early + kept, other + kept, fam + undef):
+            r = self.split(body)
+            self.assertNotEqual(r.returncode, 0)
+            self.assertIn("refused: macro SynthTag", r.stderr + r.stdout)
+
     def test_variables_that_only_the_family_names_move_with_it(self):
         # one declaration of two mutable static arrays between the moved functions, and a mutable static scalar at the top
         top = "static int\n  FamilyCount = 0;\n\n"
@@ -288,9 +309,20 @@ class SplitSource(unittest.TestCase):
         self.assertNotIn("objs.h", new)
         self.assertIn('#include "synth.h"', new)
 
-    def test_header_that_defines_objects_refused_when_the_family_names_one(self):
+    def test_header_that_defines_objects_moves_when_only_the_family_names_one(self):
+        # 2026-11-16: the include line leaves the original for the new file, so the objects stay defined once
         fam = FAMILY.replace("return(FamilyHelper(x));", "return(FamilyHelper(x)+kObjTable[0]);")
         r = self.split('#include "objs.h"\n' + fam + KEPT, objects_h=True)
+        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        self.assertIn("moves to the new file", r.stdout)
+        old = open(os.path.join(self.out, "synth.c")).read()
+        new = open(os.path.join(self.out, "synth-family.c")).read()
+        self.assertNotIn("objs.h", old)
+        self.assertIn('#include "objs.h"', new)
+
+    def test_header_that_defines_objects_refused_when_both_parts_name_one(self):
+        fam = FAMILY.replace("return(FamilyHelper(x));", "return(FamilyHelper(x)+kObjTable[0]);")
+        r = self.split('#include "objs.h"\n' + fam + KEPT.replace("x*2", "(int) kObjTable[0]"), objects_h=True)
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("kObjTable", r.stderr)
 
@@ -360,6 +392,19 @@ class SplitSource(unittest.TestCase):
         r = self.split_rec("--copy-struct", "_Rec", rec=rec)
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("holds a preprocessor line", r.stderr)
+
+    def test_always_inline_attribute_names_the_function(self):
+        body = ("\nstatic magick_attribute((__always_inline__)) inline int\n  FamilyInline(int x)\n{\n  return(x+2);\n}\n"
+                "\nstatic magick_attribute((__always_inline__)) inline int FamilyInline2(int x)\n{\n  return(x+3);\n}\n"
+                "\nMagickExport int FamilyRoot(int x)\n{\n  return(FamilyInline(x)+FamilyInline2(x));\n}\n" + KEPT)
+        r = self.split(body, extra_h="#define magick_attribute(x) __attribute__(x)\n")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        new = open(os.path.join(self.out, "synth-family.c")).read()
+        self.assertIn("FamilyInline(int x)", new)
+        self.assertIn("FamilyInline2(int x)", new)
+        self.assertNotIn("FamilyInline", open(os.path.join(self.out, "synth.c")).read())
+        self.assertTrue(self.compiles("synth-family.c")[0])
+        self.assertTrue(self.compiles("synth.c")[0])
 
     def test_shared_static_still_refused(self):
         r = self.split("#if defined(DELEGATE)\n" + FAMILY + KEPT.replace("x*2", "FamilyHelper(x)") + "#endif\n")
