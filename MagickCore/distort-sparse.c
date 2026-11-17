@@ -890,6 +890,18 @@ static Image *RenderSparseColorImage(const SparseColorRender *render,
   return(sparse_image);
 }
 
+static SparseColorMethod SelectSparseColorMethod(
+  const DistortMethod distort_method,const SparseColorMethod method)
+{
+  SparseColorMethod
+    sparse_method;
+
+  sparse_method = (SparseColorMethod) distort_method;
+  if ( distort_method == ShepardsDistortion )
+    sparse_method = method;   /* return non-distort methods to normal */
+  return(sparse_method);
+}
+
 MagickExport Image *SparseColorImage(const Image *image,
   const SparseColorMethod method,const size_t number_arguments,
   const double *arguments,ExceptionInfo *exception)
@@ -941,9 +953,7 @@ MagickExport Image *SparseColorImage(const Image *image,
       (Barycentric), which is also sparse_colr method.  This also ensures
       correct two and one color Barycentric handling.
     */
-    sparse_method = (SparseColorMethod) distort_method;
-    if ( distort_method == ShepardsDistortion )
-      sparse_method = method;   /* return non-distort methods to normal */
+    sparse_method=SelectSparseColorMethod(distort_method,method);
     if ( sparse_method == InverseColorInterpolate )
       coeff[0]=0.5;            /* sqrt() the squared distance for inverse */
   }
