@@ -6814,7 +6814,6 @@ static MagickBooleanType ParseMVGUse(const MVGRenderState *state)
 static MagickBooleanType ParseMVGViewbox(const MVGRenderState *state)
 {
   char
-    *next_token,
     *token = (*state->token);
 
   const char
@@ -6837,38 +6836,21 @@ static MagickBooleanType ParseMVGViewbox(const MVGRenderState *state)
 
   do
   {
-    (void) GetNextToken(q,&q,extent,token);
-    graphic_context[n]->viewbox.x=CastDoubleToSsizeT(ceil(
-      GetDrawValue(token,&next_token)-0.5));
-    if (token == next_token)
+    double
+      value;
+
+    if (GetMVGValue(&q,extent,token,&value) == MagickFalse)
       ThrowPointExpectedException(token,exception);
-    (void) GetNextToken(q,&q,extent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+    graphic_context[n]->viewbox.x=CastDoubleToSsizeT(ceil(value-0.5));
+    if (GetMVGListValue(&q,extent,token,&value) == MagickFalse)
       ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(q,&q,extent,token);
-    graphic_context[n]->viewbox.y=CastDoubleToSsizeT(
-      ceil(GetDrawValue(token,&next_token)-0.5));
-    if (token == next_token)
+    graphic_context[n]->viewbox.y=CastDoubleToSsizeT(ceil(value-0.5));
+    if (GetMVGListValue(&q,extent,token,&value) == MagickFalse)
       ThrowPointExpectedException(token,exception);
-    (void) GetNextToken(q,&q,extent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+    graphic_context[n]->viewbox.width=CastDoubleToSizeT(floor(value+0.5));
+    if (GetMVGListValue(&q,extent,token,&value) == MagickFalse)
       ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(q,&q,extent,token);
-    graphic_context[n]->viewbox.width=CastDoubleToSizeT(floor(
-      GetDrawValue(token,&next_token)+0.5));
-    if (token == next_token)
-      ThrowPointExpectedException(token,exception);
-    (void) GetNextToken(q,&q,extent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(q,&q,extent,token);
-    graphic_context[n]->viewbox.height=CastDoubleToSizeT(floor(
-      GetDrawValue(token,&next_token)+0.5));
-    if (token == next_token)
-      ThrowPointExpectedException(token,exception);
+    graphic_context[n]->viewbox.height=CastDoubleToSizeT(floor(value+0.5));
     break;
   } while (0);
   (*state->q)=q;
