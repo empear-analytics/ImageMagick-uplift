@@ -1742,37 +1742,6 @@ static inline fxFltType ShiftRightRegister (FxInfo * pfx, fxFltType regA, fxFltT
   return(regA);
 }
 
-static inline fxFltType ClampRegister (fxFltType regA)
-{
-  if (regA < 0) regA = 0.0;
-  else if (regA > 1.0) regA = 1.0;
-  return(regA);
-}
-
-static inline fxFltType GcdRegisters (fxFltType regA, fxFltType regB)
-{
-  if (!IsNaN((double) regA))
-    regA = FxGcd (regA, regB, 0);
-  return(regA);
-}
-
-static inline fxFltType ModRegisters (fxFltType regA, fxFltType regB)
-{
-  if (regB == 0) {
-    regA = 0;
-  } else {
-    regA = regA - floor((double) (regA/regB))*regB;
-  }
-  return(regA);
-}
-
-static inline fxFltType TruncRegister (fxFltType regA)
-{
-  if (regA >= 0) regA = floor ((double) regA);
-  else regA = ceil ((double) regA);
-  return(regA);
-}
-
 static inline MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *result,
   const fxPixelPosT * pos)
 {
@@ -2002,7 +1971,8 @@ static inline MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltTy
           }
           break;
         case fClamp:
-          regA = ClampRegister (regA);
+          if (regA < 0) regA = 0.0;
+          else if (regA > 1.0) regA = 1.0;
           break;
         case fCosh:
           regA = cosh ((double) regA);
@@ -2039,7 +2009,8 @@ static inline MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltTy
           regA = exp((double) (-regA*regA/2.0))/sqrt(2.0*MagickPI);
           break;
         case fGcd:
-          regA = GcdRegisters (regA, regB);
+          if (!IsNaN((double) regA))
+            regA = FxGcd (regA, regB, 0);
           break;
         case fHypot:
           regA = hypot ((double) regA, (double) regB);
@@ -2085,7 +2056,11 @@ static inline MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltTy
           regA = (regA < regB) ? regA : regB;
           break;
         case fMod:
-          regA = ModRegisters (regA, regB);
+          if (regB == 0) {
+            regA = 0;
+          } else {
+            regA = regA - floor((double) (regA/regB))*regB;
+          }
           break;
         case fNot:
           regA = (fxFltType) (regA < MagickEpsilon);
@@ -2128,7 +2103,8 @@ static inline MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltTy
           regA = tan ((double) regA);
           break;
         case fTrunc:
-          regA = TruncRegister (regA);
+          if (regA >= 0) regA = floor ((double) regA);
+          else regA = ceil ((double) regA);
           break;
 
         case fDo:
