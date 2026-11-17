@@ -969,7 +969,8 @@ static OperatorE GetLeadingOp (FxInfo * pfx)
 
 static inline MagickBooleanType OprIsUnaryPrefix (OperatorE op)
 {
-  return (op == oUnaryMinus || op == oUnaryPlus || op == oBitNot || op == oLogNot ? MagickTrue : MagickFalse);
+  return ((MagickBooleanType) (op == oUnaryMinus || op == oUnaryPlus ||
+    op == oBitNot || op == oLogNot));
 }
 
 static MagickBooleanType TopOprIsUnaryPrefix (FxInfo * pfx)
