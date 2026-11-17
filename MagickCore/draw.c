@@ -4545,6 +4545,9 @@ static MagickBooleanType ParseMVGPushPattern(const MVGRenderState *state)
       key[2*MagickPathExtent],
       name[MagickPathExtent];
 
+    double
+      value;
+
     RectangleInfo
       region;
 
@@ -4555,33 +4558,15 @@ static MagickBooleanType ParseMVGPushPattern(const MVGRenderState *state)
       &next_token)-0.5));
     if (token == next_token)
       ThrowPointExpectedException(token,exception);
-    (void) GetNextToken(q,&q,extent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+    if (GetMVGListValue(&q,extent,token,&value) == MagickFalse)
       ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(q,&q,extent,token);
-    region.y=CastDoubleToSsizeT(ceil(GetDrawValue(token,
-      &next_token)-0.5));
-    if (token == next_token)
+    region.y=CastDoubleToSsizeT(ceil(value-0.5));
+    if (GetMVGListValue(&q,extent,token,&value) == MagickFalse)
       ThrowPointExpectedException(token,exception);
-    (void) GetNextToken(q,&q,extent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+    region.width=CastDoubleToSizeT(floor(value+0.5));
+    if (GetMVGListValue(&q,extent,token,&value) == MagickFalse)
       ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(q,&q,extent,token);
-    region.width=CastDoubleToSizeT(floor(GetDrawValue(token,
-      &next_token)+0.5));
-    if (token == next_token)
-      ThrowPointExpectedException(token,exception);
-    (void) GetNextToken(q,&q,extent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(q,&q,extent,token);
-    region.height=CastDoubleToSizeT(GetDrawValue(token,
-      &next_token)+0.5);
-    if (token == next_token)
-      ThrowPointExpectedException(token,exception);
+    region.height=CastDoubleToSizeT(value+0.5);
     p=FindMVGPopKeyword(&q,extent,token,"pattern");
     if (IsMVGBlockEndOutside(q,p,extent) != MagickFalse)
       {
