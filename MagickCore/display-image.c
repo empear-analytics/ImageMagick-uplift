@@ -6051,6 +6051,20 @@ static void XCompositeEvent(const CompositeCommandInput *input,XEvent *event,
   }
 }
 
+static void XShowCompositeOffset(XWindows *windows,char *text,
+  RectangleInfo *composite_info,Display *display)
+{
+  if (windows->info.mapped != MagickFalse)
+    {
+      /*
+        Display pointer position.
+      */
+      (void) FormatLocaleString(text,MagickPathExtent," %+ld%+ld ",
+        (long) (*composite_info).x,(long) (*composite_info).y);
+      XInfoWidget(display,windows,text);
+    }
+}
+
 static void XCompositeStep(const CompositeCommandInput *input,
   const Cursor cursor,const CompositeEventTargets *targets)
 {
@@ -6081,15 +6095,7 @@ static void XCompositeStep(const CompositeCommandInput *input,
   XEvent
     event;
 
-  if (windows->info.mapped != MagickFalse)
-    {
-      /*
-        Display pointer position.
-      */
-      (void) FormatLocaleString(text,MagickPathExtent," %+ld%+ld ",
-        (long) (*composite_info).x,(long) (*composite_info).y);
-      XInfoWidget(display,windows,text);
-    }
+  XShowCompositeOffset(windows,text,composite_info,display);
   highlight_info=(*composite_info);
   highlight_info.x=(*composite_info).x-windows->image.x;
   highlight_info.y=(*composite_info).y-windows->image.y;
