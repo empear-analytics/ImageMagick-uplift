@@ -6617,10 +6617,10 @@ static inline MagickBooleanType IsNearBottomLeftCorner(const int x,const int y,
 static inline MagickBooleanType IsNearTopRightCorner(const int x,const int y,
   const RectangleInfo rectangle)
 {
-  return(((x < (int) (rectangle.x+(int) rectangle.width+RoiDelta)) &&
-    (x > (int) (rectangle.x+(int) rectangle.width-RoiDelta)) &&
-    (y < (int) (rectangle.y+RoiDelta)) &&
-    (y > (int) (rectangle.y-RoiDelta))) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((x < (int) (rectangle.x+(int)
+    rectangle.width+RoiDelta)) && (x > (int) (rectangle.x+(int)
+    rectangle.width-RoiDelta)) && (y < (int) (rectangle.y+RoiDelta)) && (y >
+    (int) (rectangle.y-RoiDelta))));
 }
 
 static inline MagickBooleanType IsNearBottomRightCorner(const int x,const int y,
