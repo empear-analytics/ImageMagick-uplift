@@ -13388,6 +13388,27 @@ static void XApplyWaveCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyOilPaintToImage(Display *display,XWindows *windows,
+  MagickStatusType *flags,char *radius,Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *paint_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(radius,&geometry_info);
+  paint_image=OilPaintImage(*image,geometry_info.rho,geometry_info.sigma,
+    exception);
+  if (paint_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=paint_image;
+    }
+}
+
 static void XApplyOilPaintCommand(const XMagickCommandContext *context,
   MagickStatusType *flags)
 {
@@ -13406,12 +13427,6 @@ static void XApplyOilPaintCommand(const XMagickCommandContext *context,
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  Image
-    *paint_image;
-
   static char
     radius[MagickPathExtent] = "0";
 
@@ -13425,16 +13440,7 @@ static void XApplyOilPaintCommand(const XMagickCommandContext *context,
   /*
     OilPaint image scanlines.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  *flags=ParseGeometry(radius,&geometry_info);
-  paint_image=OilPaintImage(*image,geometry_info.rho,geometry_info.sigma,
-    exception);
-  if (paint_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=paint_image;
-    }
+  XApplyOilPaintToImage(display,windows,flags,radius,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
