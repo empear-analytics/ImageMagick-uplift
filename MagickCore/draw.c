@@ -10641,8 +10641,6 @@ static MagickBooleanType TraceRectangle(PrimitiveInfo *primitive_info,
   PrimitiveInfo
     *p;
 
-  ssize_t
-    i;
 
   p=primitive_info;
   if (TracePoint(p,start) == MagickFalse)
@@ -10666,11 +10664,7 @@ static MagickBooleanType TraceRectangle(PrimitiveInfo *primitive_info,
   p+=(ptrdiff_t) p->coordinates;
   primitive_info->coordinates=(size_t) (p-primitive_info);
   primitive_info->closed_subpath=MagickTrue;
-  for (i=0; i < (ssize_t) primitive_info->coordinates; i++)
-  {
-    p->primitive=primitive_info->primitive;
-    p--;
-  }
+  SetTracedPrimitiveType(primitive_info,p);
   return(MagickTrue);
 }
 
