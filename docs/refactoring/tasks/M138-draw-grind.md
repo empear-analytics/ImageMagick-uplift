@@ -74,6 +74,10 @@ lowers the count.
   both baselines take about 9 s alone. The two entries were removed from
   `build-oracle/work/cache/953ce2019d7c6b2d-*.json` (backup `.bak-m138`); rerun: 0
   diverged. A cached timeout should probably not be kept.
+- Whole catalogue at 985809cfc: 15,961 cases, 5 diverged: the three known ones and the two
+  `-hough-lines` cases again, this time the *candidate* timing out under load; alone, 0
+  diverged. They take about 9 s alone and pass 30 s under a full run on either side:
+  candidates for `LOAD_SENSITIVE` (owner's call).
 
 ## Blocked, for the owner
 
