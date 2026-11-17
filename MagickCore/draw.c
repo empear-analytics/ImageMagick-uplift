@@ -8654,6 +8654,42 @@ static MagickStatusType DrawAlphaPrimitive(const DrawPrimitiveContext *context,
   return(status);
 }
 
+static MagickStatusType DrawColorPoint(const DrawPrimitiveContext *context,
+  MagickStatusType status)
+{
+  Image
+    *image = context->image;
+
+  const DrawInfo
+    *draw_info = context->draw_info;
+
+  CacheView
+    *image_view = context->image_view;
+
+  const ssize_t
+    x = context->x,
+    y = context->y;
+
+  ExceptionInfo
+    *exception = context->exception;
+
+  PixelInfo
+    pixel;
+
+  Quantum
+    *q;
+
+  q=GetCacheViewAuthenticPixels(image_view,x,y,1,1,exception);
+  if (q == (Quantum *) NULL)
+    return(status);
+  GetPixelInfo(image,&pixel);
+  GetFillColor(draw_info,x,y,&pixel,exception);
+  SetPixelViaPixelInfo(image,&pixel,q);
+  status&=(MagickStatusType) SyncCacheViewAuthenticPixels(image_view,
+    exception);
+  return(status);
+}
+
 static MagickStatusType DrawColorPrimitive(const DrawPrimitiveContext *context,
   MagickStatusType status)
 {
@@ -8681,20 +8717,7 @@ static MagickStatusType DrawColorPrimitive(const DrawPrimitiveContext *context,
     case PointMethod:
     default:
     {
-      PixelInfo
-        pixel;
-
-      Quantum
-        *q;
-
-      q=GetCacheViewAuthenticPixels(image_view,x,y,1,1,exception);
-      if (q == (Quantum *) NULL)
-        break;
-      GetPixelInfo(image,&pixel);
-      GetFillColor(draw_info,x,y,&pixel,exception);
-      SetPixelViaPixelInfo(image,&pixel,q);
-      status&=(MagickStatusType) SyncCacheViewAuthenticPixels(image_view,
-        exception);
+      status=DrawColorPoint(context,status);
       break;
     }
     case ReplaceMethod:
