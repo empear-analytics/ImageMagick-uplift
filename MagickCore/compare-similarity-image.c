@@ -221,10 +221,39 @@ static Image *SIMDerivativeImage(const Image *image,const char *kernel,
   return(derivative_image);
 }
 
-static void DivideRow(const Image *divide_image,
-  const Image *denominator_image,const Quantum *magick_restrict p,
+typedef struct _SIMPairRow
+{
+  const Image
+    *image,
+    *source;
+
+  const void
+    *arguments;
+
+  ssize_t
+    y;
+} SIMPairRow;
+
+typedef void
+  (*SIMPairRowMethod)(const SIMPairRow *,const Quantum *magick_restrict,
+    Quantum *magick_restrict);
+
+typedef struct _SIMPairRows
+{
+  SIMPairRowMethod
+    method;
+
+  const void
+    *arguments;
+} SIMPairRows;
+
+static void DivideRow(const SIMPairRow *row,const Quantum *magick_restrict p,
   Quantum *magick_restrict q)
 {
+  const Image
+    *const divide_image = row->image,
+    *const denominator_image = row->source;
+
   ssize_t
     x;
 
@@ -249,16 +278,12 @@ static void DivideRow(const Image *divide_image,
     q+=(ptrdiff_t) GetPixelChannels(divide_image);
   }
 }
-
-static Image *SIMDivideImage(const Image *numerator_image,
-  const Image *denominator_image,ExceptionInfo *exception)
+static MagickBooleanType SIMImagePairRows(Image *image,const Image *source,
+  const SIMPairRows *rows,ExceptionInfo *exception)
 {
   CacheView
-    *denominator_view,
-    *numerator_view;
-
-  Image
-    *divide_image;
+    *image_view,
+    *source_view;
 
   MagickBooleanType
     status = MagickTrue;
@@ -266,19 +291,13 @@ static Image *SIMDivideImage(const Image *numerator_image,
   ssize_t
     y;
 
-  /*
-    Divide one image into another.
-  */
-  divide_image=CloneImage(numerator_image,0,0,MagickTrue,exception);
-  if (divide_image == (Image *) NULL)
-    return(divide_image);
-  numerator_view=AcquireAuthenticCacheView(divide_image,exception);
-  denominator_view=AcquireVirtualCacheView(denominator_image,exception);
+  image_view=AcquireAuthenticCacheView(image,exception);
+  source_view=AcquireVirtualCacheView(source,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
   #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(denominator_image,divide_image,divide_image->rows,1)
+    magick_number_threads(source,image,image->rows,1)
 #endif
-  for (y=0; y < (ssize_t) divide_image->rows; y++)
+  for (y=0; y < (ssize_t) image->rows; y++)
   {
     const Quantum
       *magick_restrict p;
@@ -286,23 +305,51 @@ static Image *SIMDivideImage(const Image *numerator_image,
     Quantum
       *magick_restrict q;
 
+    SIMPairRow
+      row;
+
     if (status == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(denominator_view,0,y,
-      denominator_image->columns,1,exception);
-    q=GetCacheViewAuthenticPixels(numerator_view,0,y,divide_image->columns,1,
-      exception);
+    p=GetCacheViewVirtualPixels(source_view,0,y,source->columns,1,exception);
+    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
     if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
       {
         status=MagickFalse;
         continue;
       }
-    DivideRow(divide_image,denominator_image,p,q);
-    if (SyncCacheViewAuthenticPixels(numerator_view,exception) == MagickFalse)
+    row.image=image;
+    row.source=source;
+    row.arguments=rows->arguments;
+    row.y=y;
+    rows->method(&row,p,q);
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
   }
-  denominator_view=DestroyCacheView(denominator_view);
-  numerator_view=DestroyCacheView(numerator_view);
+  source_view=DestroyCacheView(source_view);
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+
+static Image *SIMDivideImage(const Image *numerator_image,
+  const Image *denominator_image,ExceptionInfo *exception)
+{
+  Image
+    *divide_image;
+
+  MagickBooleanType
+    status = MagickTrue;
+
+  const SIMPairRows
+    rows = { DivideRow,(const void *) NULL };
+
+  /*
+    Divide one image into another.
+  */
+  divide_image=CloneImage(numerator_image,0,0,MagickTrue,exception);
+  if (divide_image == (Image *) NULL)
+    return(divide_image);
+  status=SIMImagePairRows(divide_image,denominator_image,&rows,exception);
   if (status == MagickFalse)
     divide_image=DestroyImage(divide_image);
   return(divide_image);
@@ -950,35 +997,18 @@ static MagickBooleanType SIMSetImageMean(Image *image,
   return(SIMImageRows(image,&rows,exception));
 }
 
-typedef struct _SubtractMeanRowInfo
-{
-  Image
-    *subtract_image;
-
-  const Image
-    *beta_image;
-
-  const ChannelStatistics
-    *channel_statistics;
-
-  ssize_t
-    y;
-} SubtractMeanRowInfo;
-
-static void SubtractMeanRow(const SubtractMeanRowInfo *subtract_row,
+static void SubtractMeanRow(const SIMPairRow *row,
   const Quantum *magick_restrict p,Quantum *magick_restrict q)
 {
-  Image
-    *const subtract_image = subtract_row->subtract_image;
-
   const Image
-    *const beta_image = subtract_row->beta_image;
+    *const subtract_image = row->image,
+    *const beta_image = row->source;
 
   const ChannelStatistics
-    *const channel_statistics = subtract_row->channel_statistics;
+    *const channel_statistics = (const ChannelStatistics *) row->arguments;
 
   const ssize_t
-    y = subtract_row->y;
+    y = row->y;
 
   ssize_t
     x;
@@ -1012,18 +1042,14 @@ static Image *SIMSubtractImageMean(const Image *alpha_image,
   const Image *beta_image,const ChannelStatistics *channel_statistics,
   ExceptionInfo *exception)
 {
-  CacheView
-    *beta_view,
-    *image_view;
-
   Image
     *subtract_image;
 
   MagickBooleanType
     status = MagickTrue;
 
-  ssize_t
-    y;
+  const SIMPairRows
+    rows = { SubtractMeanRow,channel_statistics };
 
   /*
     Subtract the image mean and pad.
@@ -1032,43 +1058,7 @@ static Image *SIMSubtractImageMean(const Image *alpha_image,
     MagickTrue,exception);
   if (subtract_image == (Image *) NULL)
     return(subtract_image);
-  image_view=AcquireAuthenticCacheView(subtract_image,exception);
-  beta_view=AcquireVirtualCacheView(beta_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(beta_image,subtract_image,subtract_image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) subtract_image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
-    SubtractMeanRowInfo
-      subtract_row;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(beta_view,0,y,beta_image->columns,1,exception);
-    q=GetCacheViewAuthenticPixels(image_view,0,y,subtract_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    subtract_row.subtract_image=subtract_image;
-    subtract_row.beta_image=beta_image;
-    subtract_row.channel_statistics=channel_statistics;
-    subtract_row.y=y;
-    SubtractMeanRow(&subtract_row,p,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
-  }
-  beta_view=DestroyCacheView(beta_view);
-  image_view=DestroyCacheView(image_view);
+  status=SIMImagePairRows(subtract_image,beta_image,&rows,exception);
   if (status == MagickFalse)
     subtract_image=DestroyImage(subtract_image);
   return(subtract_image);
@@ -1154,10 +1144,13 @@ static Image *SIMUnityImage(const Image *alpha_image,const Image *beta_image,
   return(unity_image);
 }
 
-static void VarianceRow(const Image *variance_image,
-  const Image *beta_image,const Quantum *magick_restrict p,
+static void VarianceRow(const SIMPairRow *row,const Quantum *magick_restrict p,
   Quantum *magick_restrict q)
 {
+  const Image
+    *const variance_image = row->image,
+    *const beta_image = row->source;
+
   ssize_t
     x;
 
@@ -1189,18 +1182,14 @@ static void VarianceRow(const Image *variance_image,
 static Image *SIMVarianceImage(Image *alpha_image,const Image *beta_image,
   ExceptionInfo *exception)
 {
-  CacheView
-    *beta_view,
-    *image_view;
-
   Image
     *variance_image;
 
   MagickBooleanType
     status = MagickTrue;
 
-  ssize_t
-    y;
+  const SIMPairRows
+    rows = { VarianceRow,(const void *) NULL };
 
   /*
     Compute the variance of the two images.
@@ -1208,37 +1197,7 @@ static Image *SIMVarianceImage(Image *alpha_image,const Image *beta_image,
   variance_image=CloneImage(alpha_image,0,0,MagickTrue,exception);
   if (variance_image == (Image *) NULL)
     return(variance_image);
-  image_view=AcquireAuthenticCacheView(variance_image,exception);
-  beta_view=AcquireVirtualCacheView(beta_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(beta_image,variance_image,variance_image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) variance_image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(beta_view,0,y,beta_image->columns,1,
-      exception);
-    q=GetCacheViewAuthenticPixels(image_view,0,y,variance_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    VarianceRow(variance_image,beta_image,p,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
-  }
-  beta_view=DestroyCacheView(beta_view);
-  image_view=DestroyCacheView(image_view);
+  status=SIMImagePairRows(variance_image,beta_image,&rows,exception);
   if (status == MagickFalse)
     variance_image=DestroyImage(variance_image);
   return(variance_image);
