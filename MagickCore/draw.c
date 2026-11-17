@@ -732,6 +732,14 @@ static MagickBooleanType ShrinkPolygonEdgePoints(PolygonInfo *polygon_info)
   return(MagickTrue);
 }
 
+static void WidenEdgeBounds(const PointInfo point,SegmentInfo *bounds)
+{
+  if (point.x < (*bounds).x1)
+    (*bounds).x1=point.x;
+  if (point.x > (*bounds).x2)
+    (*bounds).x2=point.x;
+}
+
 static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
   ExceptionInfo *exception)
 {
@@ -907,10 +915,7 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
       }
     point=path_info[i].point;
     points[n]=point;
-    if (point.x < bounds.x1)
-      bounds.x1=point.x;
-    if (point.x > bounds.x2)
-      bounds.x2=point.x;
+    WidenEdgeBounds(point,&bounds);
     n++;
   }
   input.n=n;
