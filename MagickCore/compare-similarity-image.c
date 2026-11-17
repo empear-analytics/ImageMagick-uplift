@@ -331,28 +331,35 @@ static MagickBooleanType SIMImagePairRows(Image *image,const Image *source,
 }
 
 
-static Image *SIMDivideImage(const Image *numerator_image,
-  const Image *denominator_image,ExceptionInfo *exception)
+static inline Image *SIMClonePairRows(const Image *image,const Image *source,
+  const SIMPairRowMethod method,ExceptionInfo *exception)
 {
   Image
-    *divide_image;
+    *clone_image;
 
   MagickBooleanType
     status = MagickTrue;
 
   const SIMPairRows
-    rows = { DivideRow,(const void *) NULL };
+    rows = { method,(const void *) NULL };
 
+  clone_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (clone_image == (Image *) NULL)
+    return(clone_image);
+  status=SIMImagePairRows(clone_image,source,&rows,exception);
+  if (status == MagickFalse)
+    clone_image=DestroyImage(clone_image);
+  return(clone_image);
+}
+
+static Image *SIMDivideImage(const Image *numerator_image,
+  const Image *denominator_image,ExceptionInfo *exception)
+{
   /*
     Divide one image into another.
   */
-  divide_image=CloneImage(numerator_image,0,0,MagickTrue,exception);
-  if (divide_image == (Image *) NULL)
-    return(divide_image);
-  status=SIMImagePairRows(divide_image,denominator_image,&rows,exception);
-  if (status == MagickFalse)
-    divide_image=DestroyImage(divide_image);
-  return(divide_image);
+  return(SIMClonePairRows(numerator_image,denominator_image,DivideRow,
+    exception));
 }
 
 static Image *SIMDivideByMagnitude(Image *image,Image *magnitude_image,
@@ -1182,25 +1189,10 @@ static void VarianceRow(const SIMPairRow *row,const Quantum *magick_restrict p,
 static Image *SIMVarianceImage(Image *alpha_image,const Image *beta_image,
   ExceptionInfo *exception)
 {
-  Image
-    *variance_image;
-
-  MagickBooleanType
-    status = MagickTrue;
-
-  const SIMPairRows
-    rows = { VarianceRow,(const void *) NULL };
-
   /*
     Compute the variance of the two images.
   */
-  variance_image=CloneImage(alpha_image,0,0,MagickTrue,exception);
-  if (variance_image == (Image *) NULL)
-    return(variance_image);
-  status=SIMImagePairRows(variance_image,beta_image,&rows,exception);
-  if (status == MagickFalse)
-    variance_image=DestroyImage(variance_image);
-  return(variance_image);
+  return(SIMClonePairRows(alpha_image,beta_image,VarianceRow,exception));
 }
 
 #define ThrowDPCSimilarityException() \
