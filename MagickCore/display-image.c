@@ -10871,10 +10871,9 @@ static inline MagickBooleanType IsImageWindowUncropped(
 static inline MagickBooleanType IsImageWindowOriginalSize(
   const XWindows *windows,Image **image)
 {
-  return(((windows->image.width == (unsigned int) (*image)->columns) &&
-    (windows->image.height == (unsigned int) (*image)->rows) &&
-    (windows->image.crop_geometry == (char *) NULL)) ? MagickTrue :
-    MagickFalse);
+  return((MagickBooleanType) ((windows->image.width == (unsigned int)
+    (*image)->columns) && (windows->image.height == (unsigned int)
+    (*image)->rows) && (windows->image.crop_geometry == (char *) NULL)));
 }
 
 typedef struct _XMagickCommandContext
