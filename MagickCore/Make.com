@@ -154,6 +154,7 @@ $call Make morphology-primitive.c
 $call Make morphology-builtin.c
 $call Make opencl.c
 $call Make opencl-environment.c
+$call Make opencl-initialize.c
 $call Make opencl-enqueue.c
 $call Make opencl-device.c
 $call Make option.c
