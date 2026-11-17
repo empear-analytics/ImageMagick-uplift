@@ -4064,6 +4064,26 @@ static MagickBooleanType ParseMVGPopSymbol(const MVGRenderState *state)
   return(MagickTrue);
 }
 
+static const char *FindMVGPopKeyword(const char **q,const size_t extent,
+  char *token,const char *keyword)
+{
+  const char
+    *p;
+
+  for (p=(*q); *(*q) != '\0'; )
+  {
+    if (GetNextToken((*q),q,extent,token) < 1)
+      break;
+    if (LocaleCompare(token,"pop") != 0)
+      continue;
+    (void) GetNextToken((*q),(const char **) NULL,extent,token);
+    if (LocaleCompare(token,keyword) != 0)
+      continue;
+    break;
+  }
+  return(p);
+}
+
 static MagickBooleanType ParseMVGPushClass(const MVGRenderState *state)
 {
   char
@@ -4081,17 +4101,7 @@ static MagickBooleanType ParseMVGPushClass(const MVGRenderState *state)
     /*
       Class context.
     */
-    for (p=q; *q != '\0'; )
-    {
-      if (GetNextToken(q,&q,extent,token) < 1)
-        break;
-      if (LocaleCompare(token,"pop") != 0)
-        continue;
-      (void) GetNextToken(q,(const char **) NULL,extent,token);
-      if (LocaleCompare(token,"class") != 0)
-        continue;
-      break;
-    }
+    p=FindMVGPopKeyword(&q,extent,token,"class");
     (void) GetNextToken(q,&q,extent,token);
     break;
   } while (0);
@@ -4118,17 +4128,7 @@ static MagickBooleanType ParseMVGPushClipPath(const MVGRenderState *state)
   do
   {
     (void) GetNextToken(q,&q,extent,token);
-    for (p=q; *q != '\0'; )
-    {
-      if (GetNextToken(q,&q,extent,token) < 1)
-        break;
-      if (LocaleCompare(token,"pop") != 0)
-        continue;
-      (void) GetNextToken(q,(const char **) NULL,extent,token);
-      if (LocaleCompare(token,"clip-path") != 0)
-        continue;
-      break;
-    }
+    p=FindMVGPopKeyword(&q,extent,token,"clip-path");
     if (IsMVGBlockEndMissing(q,p) != MagickFalse)
       {
         status=MagickFalse;
@@ -4241,17 +4241,7 @@ static MagickBooleanType ParseMVGPushGradient(const MVGRenderState *state)
         if (*token == ',')
           (void) GetNextToken(q,&q,extent,token);
       }
-    for (p=q; *q != '\0'; )
-    {
-      if (GetNextToken(q,&q,extent,token) < 1)
-        break;
-      if (LocaleCompare(token,"pop") != 0)
-        continue;
-      (void) GetNextToken(q,(const char **) NULL,extent,token);
-      if (LocaleCompare(token,"gradient") != 0)
-        continue;
-      break;
-    }
+    p=FindMVGPopKeyword(&q,extent,token,"gradient");
     if (IsMVGBlockEndInvalid(q,p,extent) != MagickFalse)
       {
         status=MagickFalse;
@@ -4435,17 +4425,7 @@ static MagickBooleanType ParseMVGPushPattern(const MVGRenderState *state)
       &next_token)+0.5);
     if (token == next_token)
       ThrowPointExpectedException(token,exception);
-    for (p=q; *q != '\0'; )
-    {
-      if (GetNextToken(q,&q,extent,token) < 1)
-        break;
-      if (LocaleCompare(token,"pop") != 0)
-        continue;
-      (void) GetNextToken(q,(const char **) NULL,extent,token);
-      if (LocaleCompare(token,"pattern") != 0)
-        continue;
-      break;
-    }
+    p=FindMVGPopKeyword(&q,extent,token,"pattern");
     if (IsMVGBlockEndOutside(q,p,extent) != MagickFalse)
       {
         status=MagickFalse;
