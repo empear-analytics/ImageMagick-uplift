@@ -7003,6 +7003,26 @@ static const char *SkipMVGComment(const char *q)
   return(q);
 }
 
+static void PrepareMVGPrimitive(const MVGRenderState *state)
+{
+  MagickStatusType
+    *status = state->status;
+
+  do
+  {
+    ParseMVGPrimitivePoints(state);
+    if ((*status) == MagickFalse)
+      break;
+    EstimateMVGPrimitiveExtent(state);
+    if ((*status) == MagickFalse)
+      break;
+    ReserveMVGPrimitiveExtent(state);
+    if ((*status) == MagickFalse)
+      break;
+    TraceMVGPrimitive(state);
+  } while (0);
+}
+
 static MagickBooleanType RenderMVGContent(Image *image,
   const DrawInfo *draw_info,const size_t depth,ExceptionInfo *exception)
 {
@@ -7180,16 +7200,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     /*
       Parse the primitive attributes.
     */
-    ParseMVGPrimitivePoints(&render_state);
-    if (status == MagickFalse)
-      break;
-    EstimateMVGPrimitiveExtent(&render_state);
-    if (status == MagickFalse)
-      break;
-    ReserveMVGPrimitiveExtent(&render_state);
-    if (status == MagickFalse)
-      break;
-    TraceMVGPrimitive(&render_state);
+    PrepareMVGPrimitive(&render_state);
     if (status == 0)
       break;
     primitive_info[i].primitive=UndefinedPrimitive;
