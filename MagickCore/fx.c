@@ -4154,8 +4154,8 @@ static MagickBooleanType CollectStatistics (FxInfo * pfx)
 
 static inline MagickBooleanType IsStatisticsPending(const FxInfo *pfx)
 {
-  return((pfx->NeedStats && pfx->runType == rtEntireImage &&
-    !pfx->statistics) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (pfx->NeedStats && pfx->runType == rtEntireImage &&
+    !pfx->statistics));
 }
 
 static FxInfo *AllocateFxRuntimes (FxInfo * pfx)
