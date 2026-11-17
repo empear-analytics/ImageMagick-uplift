@@ -4209,6 +4209,14 @@ static inline MagickBooleanType IsStatisticsPending(const FxInfo *pfx)
     !pfx->statistics));
 }
 
+static void DestroyFxRuntimesBelow (FxInfo * pfx, ssize_t t)
+{
+  ssize_t t2;
+  for (t2 = t-1; t2 >= 0; t2--) {
+    DestroyFxRt (&pfx->fxrts[t2]);
+  }
+}
+
 static FxInfo *AllocateFxRuntimes (FxInfo * pfx)
 {
   size_t number_threads=(size_t) GetMagickResourceLimit(ThreadResource);
@@ -4233,12 +4241,7 @@ static FxInfo *AllocateFxRuntimes (FxInfo * pfx)
         pfx->exception, GetMagickModule(), ResourceLimitFatalError,
         "AllocFxRt t=", "%g",
         (double) t);
-      {
-        ssize_t t2;
-        for (t2 = t-1; t2 >= 0; t2--) {
-          DestroyFxRt (&pfx->fxrts[t2]);
-        }
-      }
+      DestroyFxRuntimesBelow (pfx, t);
       pfx->fxrts = (fxRtT *) RelinquishMagickMemory (pfx->fxrts);
       (void) DestroyRPN (pfx);
       pfx->expression = DestroyString (pfx->expression);
