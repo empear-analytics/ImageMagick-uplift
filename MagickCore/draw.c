@@ -159,6 +159,13 @@ typedef struct _MVGInfo
     *exception;
 } MVGInfo;
 
+typedef struct _ClippingMaskPath
+{
+  const char
+    *id,
+    *clip_path;
+} ClippingMaskPath;
+
 typedef struct _PolygonInfo
 {
   EdgeInfo
@@ -203,7 +210,7 @@ typedef struct _FillAlphaSample
   Forward declarations.
 */
 static Image
-  *DrawClippingMask(Image *,const DrawInfo *,const char *,const char *,
+  *DrawClippingMask(Image *,const DrawInfo *,const ClippingMaskPath *,
     ExceptionInfo *);
 
 static MagickBooleanType
@@ -1679,6 +1686,9 @@ static MagickBooleanType DrawBoundingRectangles(Image *image,
 MagickExport MagickBooleanType DrawClipPath(Image *image,
   const DrawInfo *draw_info,const char *id,ExceptionInfo *exception)
 {
+  ClippingMaskPath
+    clip_input;
+
   const char
     *clip_path;
 
@@ -1691,8 +1701,9 @@ MagickExport MagickBooleanType DrawClipPath(Image *image,
   clip_path=GetImageArtifact(image,id);
   if (clip_path == (const char *) NULL)
     return(MagickFalse);
-  clipping_mask=DrawClippingMask(image,draw_info,draw_info->clip_mask,clip_path,
-    exception);
+  clip_input.id=draw_info->clip_mask;
+  clip_input.clip_path=clip_path;
+  clipping_mask=DrawClippingMask(image,draw_info,&clip_input,exception);
   if (clipping_mask == (Image *) NULL)
     return(MagickFalse);
   status=SetImageMask(image,WritePixelMask,clipping_mask,exception);
@@ -1733,8 +1744,12 @@ MagickExport MagickBooleanType DrawClipPath(Image *image,
 %
 */
 static Image *DrawClippingMask(Image *image,const DrawInfo *draw_info,
-  const char *id,const char *clip_path,ExceptionInfo *exception)
+  const ClippingMaskPath *path,ExceptionInfo *exception)
 {
+  const char
+    *const id = path->id,
+    *const clip_path = path->clip_path;
+
   DrawInfo
     *clone_info;
 
@@ -4805,11 +4820,16 @@ static MagickBooleanType ParseMVGClipPath(const MVGRenderState *state)
     clip_path=(const char *) GetValueFromSplayTree(macros,token);
     if (clip_path != (const char *) NULL)
       {
+        ClippingMaskPath
+          clip_input;
+
         if (graphic_context[n]->clipping_mask != (Image *) NULL)
           graphic_context[n]->clipping_mask=
             DestroyImage(graphic_context[n]->clipping_mask);
+        clip_input.id=token;
+        clip_input.clip_path=clip_path;
         graphic_context[n]->clipping_mask=DrawClippingMask(image,
-          graphic_context[n],token,clip_path,exception);
+          graphic_context[n],&clip_input,exception);
         if (graphic_context[n]->compliance != SVGCompliance)
           {
             ApplyMVGClipPath(&arm_state);
