@@ -9961,6 +9961,16 @@ static void SkipPathSeparators(const char **p)
     (*p)++;
 }
 
+static MagickBooleanType SkipPathListToken(const char **p,char *token)
+{
+  (void) GetNextToken((*p),p,MagickPathExtent,token);
+  if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+    return(MagickFalse);
+  if (*token == ',')
+    (void) GetNextToken((*p),p,MagickPathExtent,token);
+  return(MagickTrue);
+}
+
 static MagickBooleanType GetPathValue(const char **p,char *token,
   double *value)
 {
@@ -10033,17 +10043,11 @@ static ssize_t TracePathArc(const PathTrace *trace)
       ThrowPointExpectedException(token,exception);
     if (GetPathValue(&p,token,&angle) == MagickFalse)
       ThrowPointExpectedException(token,exception);
-    (void) GetNextToken(p,&p,MagickPathExtent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+    if (SkipPathListToken(&p,token) == MagickFalse)
       ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(p,&p,MagickPathExtent,token);
     large_arc=StringToLong(token) != 0 ? MagickTrue : MagickFalse;
-    (void) GetNextToken(p,&p,MagickPathExtent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+    if (SkipPathListToken(&p,token) == MagickFalse)
       ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(p,&p,MagickPathExtent,token);
     sweep=StringToLong(token) != 0 ? MagickTrue : MagickFalse;
     if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
       ThrowPointExpectedException(token,exception);
