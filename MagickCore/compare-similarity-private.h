@@ -2207,15 +2207,15 @@ static inline void AccumulateSSIMChannels(const SSIMChannelInputs *inputs,
   }
 }
 
-static inline MagickBooleanType GetSSIMSimularity(const Image *image,
-  const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
-{
 #define SSIMRadius  5.0
 #define SSIMSigma  1.5
 #define SSIMK1  0.01
 #define SSIMK2  0.03
 #define SSIML  1.0
 
+static inline MagickBooleanType GetSSIMSimularity(const Image *image,
+  const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
+{
   CacheView
     *image_view,
     *reconstruct_view;
