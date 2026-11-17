@@ -221,10 +221,39 @@ static Image *SIMDerivativeImage(const Image *image,const char *kernel,
   return(derivative_image);
 }
 
-static void DivideRow(const Image *divide_image,
-  const Image *denominator_image,const Quantum *magick_restrict p,
+typedef struct _SIMPairRow
+{
+  const Image
+    *image,
+    *source;
+
+  const void
+    *arguments;
+
+  ssize_t
+    y;
+} SIMPairRow;
+
+typedef void
+  (*SIMPairRowMethod)(const SIMPairRow *,const Quantum *magick_restrict,
+    Quantum *magick_restrict);
+
+typedef struct _SIMPairRows
+{
+  SIMPairRowMethod
+    method;
+
+  const void
+    *arguments;
+} SIMPairRows;
+
+static void DivideRow(const SIMPairRow *row,const Quantum *magick_restrict p,
   Quantum *magick_restrict q)
 {
+  const Image
+    *const divide_image = row->image,
+    *const denominator_image = row->source;
+
   ssize_t
     x;
 
@@ -249,16 +278,12 @@ static void DivideRow(const Image *divide_image,
     q+=(ptrdiff_t) GetPixelChannels(divide_image);
   }
 }
-
-static Image *SIMDivideImage(const Image *numerator_image,
-  const Image *denominator_image,ExceptionInfo *exception)
+static MagickBooleanType SIMImagePairRows(Image *image,const Image *source,
+  const SIMPairRows *rows,ExceptionInfo *exception)
 {
   CacheView
-    *denominator_view,
-    *numerator_view;
-
-  Image
-    *divide_image;
+    *image_view,
+    *source_view;
 
   MagickBooleanType
     status = MagickTrue;
@@ -266,19 +291,13 @@ static Image *SIMDivideImage(const Image *numerator_image,
   ssize_t
     y;
 
-  /*
-    Divide one image into another.
-  */
-  divide_image=CloneImage(numerator_image,0,0,MagickTrue,exception);
-  if (divide_image == (Image *) NULL)
-    return(divide_image);
-  numerator_view=AcquireAuthenticCacheView(divide_image,exception);
-  denominator_view=AcquireVirtualCacheView(denominator_image,exception);
+  image_view=AcquireAuthenticCacheView(image,exception);
+  source_view=AcquireVirtualCacheView(source,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
   #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(denominator_image,divide_image,divide_image->rows,1)
+    magick_number_threads(source,image,image->rows,1)
 #endif
-  for (y=0; y < (ssize_t) divide_image->rows; y++)
+  for (y=0; y < (ssize_t) image->rows; y++)
   {
     const Quantum
       *magick_restrict p;
@@ -286,26 +305,61 @@ static Image *SIMDivideImage(const Image *numerator_image,
     Quantum
       *magick_restrict q;
 
+    SIMPairRow
+      row;
+
     if (status == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(denominator_view,0,y,
-      denominator_image->columns,1,exception);
-    q=GetCacheViewAuthenticPixels(numerator_view,0,y,divide_image->columns,1,
-      exception);
+    p=GetCacheViewVirtualPixels(source_view,0,y,source->columns,1,exception);
+    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
     if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
       {
         status=MagickFalse;
         continue;
       }
-    DivideRow(divide_image,denominator_image,p,q);
-    if (SyncCacheViewAuthenticPixels(numerator_view,exception) == MagickFalse)
+    row.image=image;
+    row.source=source;
+    row.arguments=rows->arguments;
+    row.y=y;
+    rows->method(&row,p,q);
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
   }
-  denominator_view=DestroyCacheView(denominator_view);
-  numerator_view=DestroyCacheView(numerator_view);
+  source_view=DestroyCacheView(source_view);
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+
+static inline Image *SIMClonePairRows(const Image *image,const Image *source,
+  const SIMPairRowMethod method,ExceptionInfo *exception)
+{
+  Image
+    *clone_image;
+
+  MagickBooleanType
+    status = MagickTrue;
+
+  const SIMPairRows
+    rows = { method,(const void *) NULL };
+
+  clone_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (clone_image == (Image *) NULL)
+    return(clone_image);
+  status=SIMImagePairRows(clone_image,source,&rows,exception);
   if (status == MagickFalse)
-    divide_image=DestroyImage(divide_image);
-  return(divide_image);
+    clone_image=DestroyImage(clone_image);
+  return(clone_image);
+}
+
+static Image *SIMDivideImage(const Image *numerator_image,
+  const Image *denominator_image,ExceptionInfo *exception)
+{
+  /*
+    Divide one image into another.
+  */
+  return(SIMClonePairRows(numerator_image,denominator_image,DivideRow,
+    exception));
 }
 
 static Image *SIMDivideByMagnitude(Image *image,Image *magnitude_image,
@@ -331,11 +385,13 @@ static Image *SIMDivideByMagnitude(Image *image,Image *magnitude_image,
   return(result_image);
 }
 
-static void ClearRowNaNs(const Image *image,Quantum *magick_restrict q)
+static void ClearRowNaNs(const Image *image,const void *arguments,
+  Quantum *magick_restrict q)
 {
   ssize_t
     x;
 
+  magick_unreferenced(arguments);
   for (x=0; x < (ssize_t) image->columns; x++)
   {
     ssize_t
@@ -354,7 +410,19 @@ static void ClearRowNaNs(const Image *image,Quantum *magick_restrict q)
   }
 }
 
-static MagickBooleanType SIMFilterImageNaNs(Image *image,
+typedef void
+  (*SIMRowMethod)(const Image *,const void *,Quantum *magick_restrict);
+
+typedef struct _SIMRows
+{
+  SIMRowMethod
+    method;
+
+  const void
+    *arguments;
+} SIMRows;
+
+static MagickBooleanType SIMImageRows(Image *image,const SIMRows *rows,
   ExceptionInfo *exception)
 {
   CacheView
@@ -366,9 +434,6 @@ static MagickBooleanType SIMFilterImageNaNs(Image *image,
   ssize_t
     y;
 
-  /*
-    Square each pixel in the image.
-  */
   image_view=AcquireAuthenticCacheView(image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
   #pragma omp parallel for schedule(static) shared(status) \
@@ -387,12 +452,24 @@ static MagickBooleanType SIMFilterImageNaNs(Image *image,
         status=MagickFalse;
         continue;
       }
-    ClearRowNaNs(image,q);
+    rows->method(image,rows->arguments,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
   }
   image_view=DestroyCacheView(image_view);
   return(status);
+}
+
+static MagickBooleanType SIMFilterImageNaNs(Image *image,
+  ExceptionInfo *exception)
+{
+  const SIMRows
+    rows = { ClearRowNaNs,(const void *) NULL };
+
+  /*
+    Square each pixel in the image.
+  */
+  return(SIMImageRows(image,&rows,exception));
 }
 
 static void SquarePixelChannels(const Image *square_image,
@@ -411,19 +488,30 @@ static void SquarePixelChannels(const Image *square_image,
   }
 }
 
+static void SquareRow(const Image *square_image,const void *arguments,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  magick_unreferenced(arguments);
+  for (x=0; x < (ssize_t) square_image->columns; x++)
+  {
+    SquarePixelChannels(square_image,q);
+    q+=(ptrdiff_t) GetPixelChannels(square_image);
+  }
+}
+
 static Image *SIMSquareImage(const Image *image,ExceptionInfo *exception)
 {
-  CacheView
-    *image_view;
-
   Image
     *square_image;
 
   MagickBooleanType
     status = MagickTrue;
 
-  ssize_t
-    y;
+  const SIMRows
+    rows = { SquareRow,(const void *) NULL };
 
   /*
     Square each pixel in the image.
@@ -431,37 +519,7 @@ static Image *SIMSquareImage(const Image *image,ExceptionInfo *exception)
   square_image=CloneImage(image,0,0,MagickTrue,exception);
   if (square_image == (Image *) NULL)
     return(square_image);
-  image_view=AcquireAuthenticCacheView(square_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(square_image,square_image,square_image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) square_image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,square_image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) square_image->columns; x++)
-    {
-      SquarePixelChannels(square_image,q);
-      q+=(ptrdiff_t) GetPixelChannels(square_image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
-  }
-  image_view=DestroyCacheView(image_view);
+  status=SIMImageRows(square_image,&rows,exception);
   if (status == MagickFalse)
     square_image=DestroyImage(square_image);
   return(square_image);
@@ -776,52 +834,50 @@ static void MultiplyPixelChannels(const Image *image,const double factor,
   }
 }
 
+typedef struct _MultiplyRowInfo
+{
+  double
+    factor;
+
+  const ChannelStatistics
+    *channel_statistics;
+} MultiplyRowInfo;
+
+static void MultiplyRow(const Image *image,const void *arguments,
+  Quantum *magick_restrict q)
+{
+  const MultiplyRowInfo
+    *multiply_row = (const MultiplyRowInfo *) arguments;
+
+  const double
+    factor = multiply_row->factor;
+
+  const ChannelStatistics
+    *channel_statistics = multiply_row->channel_statistics;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    MultiplyPixelChannels(image,factor,channel_statistics,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static MagickBooleanType SIMMultiplyImage(Image *image,const double factor,
   const ChannelStatistics *channel_statistics,ExceptionInfo *exception)
 {
-  CacheView
-    *image_view;
+  const MultiplyRowInfo
+    multiply_row = { factor, channel_statistics };
 
-  MagickBooleanType
-    status = MagickTrue;
-
-  ssize_t
-    y;
+  const SIMRows
+    rows = { MultiplyRow,&multiply_row };
 
   /*
     Multiply each pixel by a factor.
   */
-  image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(image,image,image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      MultiplyPixelChannels(image,factor,channel_statistics,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
-  }
-  image_view=DestroyCacheView(image_view);
-  return(status);
+  return(SIMImageRows(image,&rows,exception));
 }
 
 static Image *SIMPhaseCorrelationImage(const Image *target_image,
@@ -920,83 +976,46 @@ static void SetPixelChannelsMean(const Image *image,
   }
 }
 
+static void SetMeanRow(const Image *image,const void *arguments,
+  Quantum *magick_restrict q)
+{
+  const ChannelStatistics
+    *channel_statistics = (const ChannelStatistics *) arguments;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    SetPixelChannelsMean(image,channel_statistics,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static MagickBooleanType SIMSetImageMean(Image *image,
   const ChannelStatistics *channel_statistics,ExceptionInfo *exception)
 {
-  CacheView
-    *image_view;
-
-  MagickBooleanType
-    status = MagickTrue;
-
-  ssize_t
-    y;
+  const SIMRows
+    rows = { SetMeanRow,channel_statistics };
 
   /*
     Set image mean.
   */
-  image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(image,image,image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      SetPixelChannelsMean(image,channel_statistics,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
-  }
-  image_view=DestroyCacheView(image_view);
-  return(status);
+  return(SIMImageRows(image,&rows,exception));
 }
 
-typedef struct _SubtractMeanRowInfo
-{
-  Image
-    *subtract_image;
-
-  const Image
-    *beta_image;
-
-  const ChannelStatistics
-    *channel_statistics;
-
-  ssize_t
-    y;
-} SubtractMeanRowInfo;
-
-static void SubtractMeanRow(const SubtractMeanRowInfo *subtract_row,
+static void SubtractMeanRow(const SIMPairRow *row,
   const Quantum *magick_restrict p,Quantum *magick_restrict q)
 {
-  Image
-    *const subtract_image = subtract_row->subtract_image;
-
   const Image
-    *const beta_image = subtract_row->beta_image;
+    *const subtract_image = row->image,
+    *const beta_image = row->source;
 
   const ChannelStatistics
-    *const channel_statistics = subtract_row->channel_statistics;
+    *const channel_statistics = (const ChannelStatistics *) row->arguments;
 
   const ssize_t
-    y = subtract_row->y;
+    y = row->y;
 
   ssize_t
     x;
@@ -1030,18 +1049,14 @@ static Image *SIMSubtractImageMean(const Image *alpha_image,
   const Image *beta_image,const ChannelStatistics *channel_statistics,
   ExceptionInfo *exception)
 {
-  CacheView
-    *beta_view,
-    *image_view;
-
   Image
     *subtract_image;
 
   MagickBooleanType
     status = MagickTrue;
 
-  ssize_t
-    y;
+  const SIMPairRows
+    rows = { SubtractMeanRow,channel_statistics };
 
   /*
     Subtract the image mean and pad.
@@ -1050,43 +1065,7 @@ static Image *SIMSubtractImageMean(const Image *alpha_image,
     MagickTrue,exception);
   if (subtract_image == (Image *) NULL)
     return(subtract_image);
-  image_view=AcquireAuthenticCacheView(subtract_image,exception);
-  beta_view=AcquireVirtualCacheView(beta_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(beta_image,subtract_image,subtract_image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) subtract_image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
-    SubtractMeanRowInfo
-      subtract_row;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(beta_view,0,y,beta_image->columns,1,exception);
-    q=GetCacheViewAuthenticPixels(image_view,0,y,subtract_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    subtract_row.subtract_image=subtract_image;
-    subtract_row.beta_image=beta_image;
-    subtract_row.channel_statistics=channel_statistics;
-    subtract_row.y=y;
-    SubtractMeanRow(&subtract_row,p,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
-  }
-  beta_view=DestroyCacheView(beta_view);
-  image_view=DestroyCacheView(image_view);
+  status=SIMImagePairRows(subtract_image,beta_image,&rows,exception);
   if (status == MagickFalse)
     subtract_image=DestroyImage(subtract_image);
   return(subtract_image);
@@ -1172,10 +1151,13 @@ static Image *SIMUnityImage(const Image *alpha_image,const Image *beta_image,
   return(unity_image);
 }
 
-static void VarianceRow(const Image *variance_image,
-  const Image *beta_image,const Quantum *magick_restrict p,
+static void VarianceRow(const SIMPairRow *row,const Quantum *magick_restrict p,
   Quantum *magick_restrict q)
 {
+  const Image
+    *const variance_image = row->image,
+    *const beta_image = row->source;
+
   ssize_t
     x;
 
@@ -1207,64 +1189,12 @@ static void VarianceRow(const Image *variance_image,
 static Image *SIMVarianceImage(Image *alpha_image,const Image *beta_image,
   ExceptionInfo *exception)
 {
-  CacheView
-    *beta_view,
-    *image_view;
-
-  Image
-    *variance_image;
-
-  MagickBooleanType
-    status = MagickTrue;
-
-  ssize_t
-    y;
-
   /*
     Compute the variance of the two images.
   */
-  variance_image=CloneImage(alpha_image,0,0,MagickTrue,exception);
-  if (variance_image == (Image *) NULL)
-    return(variance_image);
-  image_view=AcquireAuthenticCacheView(variance_image,exception);
-  beta_view=AcquireVirtualCacheView(beta_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(beta_image,variance_image,variance_image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) variance_image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(beta_view,0,y,beta_image->columns,1,
-      exception);
-    q=GetCacheViewAuthenticPixels(image_view,0,y,variance_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    VarianceRow(variance_image,beta_image,p,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
-  }
-  beta_view=DestroyCacheView(beta_view);
-  image_view=DestroyCacheView(image_view);
-  if (status == MagickFalse)
-    variance_image=DestroyImage(variance_image);
-  return(variance_image);
+  return(SIMClonePairRows(alpha_image,beta_image,VarianceRow,exception));
 }
 
-static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
-  RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
-{
 #define ThrowDPCSimilarityException() \
 { \
   if (dot_product_image != (Image *) NULL) \
@@ -1292,6 +1222,9 @@ static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
   return((Image *) NULL); \
 }
 
+static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
+  RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
+{
   double
     edge_factor = 0.0,
     maxima = 0.0,
@@ -1472,9 +1405,6 @@ static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
   return(dot_product_image);
 }
 
-static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
-  RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
-{
 #define ThrowMSESimilarityException() \
 { \
   if (alpha_image != (Image *) NULL) \
@@ -1497,6 +1427,9 @@ static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
   return((Image *) NULL); \
 }
 
+static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
+  RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
+{
   ChannelStatistics
     *channel_statistics = (ChannelStatistics *) NULL;
 
@@ -1617,9 +1550,6 @@ static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
   return(mse_image);
 }
 
-static Image *NCCSimilarityImage(const Image *image,const Image *reconstruct,
-  RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
-{
 #define ThrowNCCSimilarityException() \
 { \
   if (alpha_image != (Image *) NULL) \
@@ -1646,6 +1576,9 @@ static Image *NCCSimilarityImage(const Image *image,const Image *reconstruct,
   return((Image *) NULL); \
 }
 
+static Image *NCCSimilarityImage(const Image *image,const Image *reconstruct,
+  RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
+{
   ChannelStatistics
     *channel_statistics = (ChannelStatistics *) NULL;
 
@@ -1775,9 +1708,6 @@ static Image *NCCSimilarityImage(const Image *image,const Image *reconstruct,
   return(ncc_image);
 }
 
-static Image *PhaseSimilarityImage(const Image *image,const Image *reconstruct,
-  RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
-{
 #define ThrowPhaseSimilarityException() \
 { \
   if (phase_image != (Image *) NULL) \
@@ -1801,6 +1731,9 @@ static Image *PhaseSimilarityImage(const Image *image,const Image *reconstruct,
   return((Image *) NULL); \
 }
 
+static Image *PhaseSimilarityImage(const Image *image,const Image *reconstruct,
+  RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
+{
   double
     maxima = 0.0;
 
@@ -1949,6 +1882,44 @@ static Image *RMSESimilarityImage(const Image *image,const Image *reconstruct,
     return(rmse_image);
   *similarity_metric=sqrt(*similarity_metric);
   return(rmse_image);
+}
+
+typedef Image
+  *(*FrequencySimilarityMethod)(const Image *,const Image *,RectangleInfo *,
+    double *,ExceptionInfo *);
+
+typedef struct _FrequencySimilarity
+{
+  MetricType
+    metric;
+
+  FrequencySimilarityMethod
+    similarity_image;
+} FrequencySimilarity;
+
+static const FrequencySimilarity
+  FrequencySimilarities[] =
+  {
+    { DotProductCorrelationErrorMetric, DPCSimilarityImage },
+    { MeanSquaredErrorMetric, MSESimilarityImage },
+    { NormalizedCrossCorrelationErrorMetric, NCCSimilarityImage },
+    { PeakSignalToNoiseRatioErrorMetric, PSNRSimilarityImage },
+    { PhaseCorrelationErrorMetric, PhaseSimilarityImage },
+    { RootMeanSquaredErrorMetric, RMSESimilarityImage },
+    { UndefinedErrorMetric, RMSESimilarityImage }
+  };
+
+static const FrequencySimilarity *GetFrequencySimilarity(
+  const MetricType metric)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(FrequencySimilarities)/
+       sizeof(*FrequencySimilarities)); i++)
+    if (FrequencySimilarities[i].metric == metric)
+      return(FrequencySimilarities+i);
+  return((const FrequencySimilarity *) NULL);
 }
 
 static inline MagickBooleanType IsFrequencyDomainSimilarity(
@@ -2322,47 +2293,16 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
   if (artifact == (const char *) NULL)
     artifact=GetImageArtifact(image,"compare:accelerate-ncc");
   if (IsFrequencyDomainSimilarity(image,artifact) != MagickFalse)
-    switch (metric)
     {
-      case DotProductCorrelationErrorMetric:
-      {
-        similarity_image=DPCSimilarityImage(image,reconstruct,offset,
-          similarity_metric,exception);
-        return(similarity_image);
-      }
-      case MeanSquaredErrorMetric:
-      {
-        similarity_image=MSESimilarityImage(image,reconstruct,offset,
-          similarity_metric,exception);
-        return(similarity_image);
-      }
-      case NormalizedCrossCorrelationErrorMetric:
-      {
-        similarity_image=NCCSimilarityImage(image,reconstruct,offset,
-          similarity_metric,exception);
-        return(similarity_image);
-      }
-      case PeakSignalToNoiseRatioErrorMetric:
-      {
-        similarity_image=PSNRSimilarityImage(image,reconstruct,offset,
-          similarity_metric,exception);
-        return(similarity_image);
-      }
-      case PhaseCorrelationErrorMetric:
-      {
-        similarity_image=PhaseSimilarityImage(image,reconstruct,offset,
-          similarity_metric,exception);
-        return(similarity_image);
-      }
-      case RootMeanSquaredErrorMetric:
-      case UndefinedErrorMetric:
-      {
-        similarity_image=RMSESimilarityImage(image,reconstruct,offset,
-          similarity_metric,exception);
-        return(similarity_image);
-      }
-      default:
-        break;
+      const FrequencySimilarity
+        *frequency = GetFrequencySimilarity(metric);
+
+      if (frequency != (const FrequencySimilarity *) NULL)
+        {
+          similarity_image=frequency->similarity_image(image,reconstruct,
+            offset,similarity_metric,exception);
+          return(similarity_image);
+        }
     }
 }
 #endif

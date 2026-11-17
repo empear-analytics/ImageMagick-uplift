@@ -399,25 +399,76 @@ static inline MagickBooleanType AcquireCorrelationStatistics(const Image *image,
   return(MagickTrue);
 }
 
-static inline MagickBooleanType GetDPCSimilarity(const Image *image,
-  const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
-{
 #define SimilarityImageTag  "Similarity/Image"
 
-  CacheView
-    *image_view,
-    *reconstruct_view;
+typedef struct _CorrelationTotals
+{
+  const Image
+    *image,
+    *reconstruct_image;
 
   ChannelStatistics
     *image_statistics,
     *reconstruct_statistics;
 
-  CorrelationStatisticsTargets
-    targets;
+  double
+    *similarity,
+    *norm,
+    *reconstruct_norm;
+} CorrelationTotals;
+
+static void MergeCorrelationTotals(const Image *image,
+  const Image *reconstruct_image,const CorrelationSums *sums,
+  const CorrelationSums *merged)
+{
+  double
+    *const channel_similarity = sums->channel_similarity,
+    *const channel_norm = sums->channel_norm,
+    *const channel_reconstruct_norm = sums->channel_reconstruct_norm,
+    *const similarity = merged->channel_similarity,
+    *const norm = merged->channel_norm,
+    *const reconstruct_norm = merged->channel_reconstruct_norm;
+
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,j);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
+      channel);
+    if (((traits & UpdatePixelTrait) == 0) ||
+        ((reconstruct_traits & UpdatePixelTrait) == 0))
+      continue;
+    similarity[j]+=channel_similarity[j];
+    similarity[CompositePixelChannel]+=channel_similarity[j];
+    norm[j]+=channel_norm[j];
+    norm[CompositePixelChannel]+=channel_norm[j];
+    reconstruct_norm[j]+=channel_reconstruct_norm[j];
+    reconstruct_norm[CompositePixelChannel]+=channel_reconstruct_norm[j];
+  }
+}
+
+static MagickBooleanType GetCorrelationTotals(const CorrelationTotals *totals,
+  ExceptionInfo *exception)
+{
+  const Image
+    *const image = totals->image,
+    *const reconstruct_image = totals->reconstruct_image;
+
+  ChannelStatistics
+    *const image_statistics = totals->image_statistics,
+    *const reconstruct_statistics = totals->reconstruct_statistics;
 
   double
-    norm[MaxPixelChannels+1] = { 0.0 },
-    reconstruct_norm[MaxPixelChannels+1] = { 0.0 };
+    *const similarity = totals->similarity,
+    *const norm = totals->norm,
+    *const reconstruct_norm = totals->reconstruct_norm;
+
+  CacheView
+    *image_view,
+    *reconstruct_view;
 
   MagickBooleanType
     status = MagickTrue;
@@ -430,18 +481,11 @@ static inline MagickBooleanType GetDPCSimilarity(const Image *image,
     rows;
 
   ssize_t
-    k,
     y;
 
-  /*
-    Compute the dot product correlation similarity.
-  */
-  targets.image_statistics=(&image_statistics);
-  targets.reconstruct_statistics=(&reconstruct_statistics);
-  if (AcquireCorrelationStatistics(image,reconstruct_image,exception,
-        &targets) == MagickFalse)
-    return(MagickFalse);
-  (void) memset(similarity,0,(MaxPixelChannels+1)*sizeof(*similarity));
+  const CorrelationSums
+    merged = { similarity, norm, reconstruct_norm };
+
   SetImageCompareBounds(image,reconstruct_image,&columns,&rows);
   image_view=AcquireVirtualCacheView(image,exception);
   reconstruct_view=AcquireVirtualCacheView(reconstruct_image,exception);
@@ -481,28 +525,10 @@ static inline MagickBooleanType GetDPCSimilarity(const Image *image,
     row.reconstruct_statistics=reconstruct_statistics;
     AccumulateCorrelationRow(&row,p,q,sums);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
-    #pragma omp critical (MagickCore_GetDPCSimilarity)
+    #pragma omp critical (MagickCore_GetCorrelationTotals)
 #endif
     {
-      ssize_t
-        j;
-
-      for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,j);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
-          channel);
-        if (((traits & UpdatePixelTrait) == 0) ||
-            ((reconstruct_traits & UpdatePixelTrait) == 0))
-          continue;
-        similarity[j]+=channel_similarity[j];
-        similarity[CompositePixelChannel]+=channel_similarity[j];
-        norm[j]+=channel_norm[j];
-        norm[CompositePixelChannel]+=channel_norm[j];
-        reconstruct_norm[j]+=channel_reconstruct_norm[j];
-        reconstruct_norm[CompositePixelChannel]+=channel_reconstruct_norm[j];
-      }
+      MergeCorrelationTotals(image,reconstruct_image,&sums,&merged);
     }
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
@@ -523,6 +549,49 @@ static inline MagickBooleanType GetDPCSimilarity(const Image *image,
   }
   reconstruct_view=DestroyCacheView(reconstruct_view);
   image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+static inline MagickBooleanType GetDPCSimilarity(const Image *image,
+  const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
+{
+  ChannelStatistics
+    *image_statistics,
+    *reconstruct_statistics;
+
+  CorrelationStatisticsTargets
+    targets;
+
+  CorrelationTotals
+    totals;
+
+  double
+    norm[MaxPixelChannels+1] = { 0.0 },
+    reconstruct_norm[MaxPixelChannels+1] = { 0.0 };
+
+  MagickBooleanType
+    status = MagickTrue;
+
+  ssize_t
+    k;
+
+  /*
+    Compute the dot product correlation similarity.
+  */
+  targets.image_statistics=(&image_statistics);
+  targets.reconstruct_statistics=(&reconstruct_statistics);
+  if (AcquireCorrelationStatistics(image,reconstruct_image,exception,
+        &targets) == MagickFalse)
+    return(MagickFalse);
+  (void) memset(similarity,0,(MaxPixelChannels+1)*sizeof(*similarity));
+  totals.image=image;
+  totals.reconstruct_image=reconstruct_image;
+  totals.image_statistics=image_statistics;
+  totals.reconstruct_statistics=reconstruct_statistics;
+  totals.similarity=similarity;
+  totals.norm=norm;
+  totals.reconstruct_norm=reconstruct_norm;
+  status=GetCorrelationTotals(&totals,exception);
   /*
     Compute dot product correlation: divide by mean.
   */
@@ -745,6 +814,50 @@ static inline void AccumulateMEPPPixel(const ComparePixels *pixels,
   }
 }
 
+typedef struct _MEPPErrors
+{
+  double
+    area,
+    mean_error,
+    maximum_error;
+} MEPPErrors;
+
+static inline void NormalizeMEPPSimilarity(Image *image,
+  const Image *reconstruct_image,const MEPPErrors *errors,double *similarity)
+{
+  double
+    area = errors->area;
+
+  const double
+    mean_error = errors->mean_error,
+    maximum_error = errors->maximum_error;
+
+  ssize_t
+    channels = 0,
+    k;
+
+  area=MagickSafeReciprocal(area);
+  for (k=0; k < (ssize_t) GetPixelChannels(image); k++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,k);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
+      channel);
+    if (((traits & UpdatePixelTrait) == 0) ||
+        ((reconstruct_traits & UpdatePixelTrait) == 0))
+      continue;
+    similarity[k]*=area;
+    channels++;
+  }
+  similarity[CompositePixelChannel]*=area;
+  if (channels != 0)
+    similarity[CompositePixelChannel]/=(double) channels;
+  image->error.mean_error_per_pixel=(double) QuantumRange*
+    similarity[CompositePixelChannel];
+  image->error.normalized_mean_error=mean_error*area;
+  image->error.normalized_maximum_error=maximum_error;
+}
+
 static inline MagickBooleanType GetMEPPSimilarity(Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -765,9 +878,10 @@ static inline MagickBooleanType GetMEPPSimilarity(Image *image,
     rows;
 
   ssize_t
-    channels = 0,
-    k,
     y;
+
+  MEPPErrors
+    errors;
 
   /*
     Compute the mean error per pixel similarity.
@@ -848,26 +962,10 @@ static inline MagickBooleanType GetMEPPSimilarity(Image *image,
   }
   reconstruct_view=DestroyCacheView(reconstruct_view);
   image_view=DestroyCacheView(image_view);
-  area=MagickSafeReciprocal(area);
-  for (k=0; k < (ssize_t) GetPixelChannels(image); k++)
-  {
-    PixelChannel channel = GetPixelChannelChannel(image,k);
-    PixelTrait traits = GetPixelChannelTraits(image,channel);
-    PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
-      channel);
-    if (((traits & UpdatePixelTrait) == 0) ||
-        ((reconstruct_traits & UpdatePixelTrait) == 0))
-      continue;
-    similarity[k]*=area;
-    channels++;
-  }
-  similarity[CompositePixelChannel]*=area;
-  if (channels != 0)
-    similarity[CompositePixelChannel]/=(double) channels;
-  image->error.mean_error_per_pixel=(double) QuantumRange*
-    similarity[CompositePixelChannel];
-  image->error.normalized_mean_error=mean_error*area;
-  image->error.normalized_maximum_error=maximum_error;
+  errors.area=area;
+  errors.mean_error=mean_error;
+  errors.maximum_error=maximum_error;
+  NormalizeMEPPSimilarity(image,reconstruct_image,&errors,similarity);
   return(status);
 }
 
@@ -938,16 +1036,15 @@ static inline MagickBooleanType GetMSESimilarity(const Image *image,
 static inline MagickBooleanType GetNCCSimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
-  CacheView
-    *image_view,
-    *reconstruct_view;
-
   ChannelStatistics
     *image_statistics,
     *reconstruct_statistics;
 
   CorrelationStatisticsTargets
     targets;
+
+  CorrelationTotals
+    totals;
 
   double
     reconstruct_variance[MaxPixelChannels+1] = { 0.0 },
@@ -956,16 +1053,8 @@ static inline MagickBooleanType GetNCCSimilarity(const Image *image,
   MagickBooleanType
     status = MagickTrue;
 
-  MagickOffsetType
-    progress = 0;
-
-  size_t
-    columns,
-    rows;
-
   ssize_t
-    k,
-    y;
+    k;
 
   /*
     Compute the normalized criss-correlation similarity.
@@ -976,88 +1065,14 @@ static inline MagickBooleanType GetNCCSimilarity(const Image *image,
         &targets) == MagickFalse)
     return(MagickFalse);
   (void) memset(similarity,0,(MaxPixelChannels+1)*sizeof(*similarity));
-  SetImageCompareBounds(image,reconstruct_image,&columns,&rows);
-  image_view=AcquireVirtualCacheView(image,exception);
-  reconstruct_view=AcquireVirtualCacheView(reconstruct_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(variance,reconstruct_variance,similarity,status) \
-    magick_number_threads(image,image,rows,1)
-#endif
-  for (y=0; y < (ssize_t) rows; y++)
-  {
-    const Quantum
-      *magick_restrict p,
-      *magick_restrict q;
-
-    double
-      channel_reconstruct_variance[MaxPixelChannels+1] = { 0.0 },
-      channel_similarity[MaxPixelChannels+1] = { 0.0 },
-      channel_variance[MaxPixelChannels+1] = { 0.0 };
-
-    const CorrelationSums
-      sums = { channel_similarity, channel_variance,
-        channel_reconstruct_variance };
-
-    CorrelationRow
-      row;
-
-    p=GetCacheViewVirtualPixels(image_view,0,y,columns,1,exception);
-    q=GetCacheViewVirtualPixels(reconstruct_view,0,y,columns,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (const Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    row.image=image;
-    row.reconstruct_image=reconstruct_image;
-    row.columns=columns;
-    row.image_statistics=image_statistics;
-    row.reconstruct_statistics=reconstruct_statistics;
-    AccumulateCorrelationRow(&row,p,q,sums);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-    #pragma omp critical (MagickCore_GetNCCSimilarity)
-#endif
-    {
-      ssize_t
-        j;
-
-      for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,j);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
-          channel);
-        if (((traits & UpdatePixelTrait) == 0) ||
-            ((reconstruct_traits & UpdatePixelTrait) == 0))
-          continue;
-        similarity[j]+=channel_similarity[j];
-        similarity[CompositePixelChannel]+=channel_similarity[j];
-        variance[j]+=channel_variance[j];
-        variance[CompositePixelChannel]+=channel_variance[j];
-        reconstruct_variance[j]+=channel_reconstruct_variance[j];
-        reconstruct_variance[CompositePixelChannel]+=
-          channel_reconstruct_variance[j];
-      }
-    }
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        proceed=SetImageProgress(image,SimilarityImageTag,progress,rows);
-        if (proceed == MagickFalse)
-          {
-            status=MagickFalse;
-            continue;
-          }
-      }
-  }
-  reconstruct_view=DestroyCacheView(reconstruct_view);
-  image_view=DestroyCacheView(image_view);
+  totals.image=image;
+  totals.reconstruct_image=reconstruct_image;
+  totals.image_statistics=image_statistics;
+  totals.reconstruct_statistics=reconstruct_statistics;
+  totals.similarity=similarity;
+  totals.norm=variance;
+  totals.reconstruct_norm=reconstruct_variance;
+  status=GetCorrelationTotals(&totals,exception);
   /*
     Compute normalized cross correlation: divide by standard deviation.
   */
@@ -1541,6 +1556,130 @@ static inline void AccumulatePHASEPixel(const PHASEPixel *phase,
   }
 }
 
+typedef struct _PHASECorrelationSums
+{
+  double
+    area,
+    *correlation,
+    *image_sum,
+    *image_sum_squared,
+    *reconstruct_sum,
+    *reconstruct_sum_squared;
+} PHASECorrelationSums;
+
+static inline double GetPHASEPearson(const PHASECorrelationSums *sums,
+  const ssize_t j)
+{
+  const double
+    area = sums->area;
+
+  double
+    *const correlation = sums->correlation,
+    *const image_sum = sums->image_sum,
+    *const image_sum_squared = sums->image_sum_squared,
+    *const reconstruct_sum = sums->reconstruct_sum,
+    *const reconstruct_sum_squared = sums->reconstruct_sum_squared;
+
+  double
+    denominator,
+    image_variance,
+    numerator,
+    pearson,
+    reconstruct_variance;
+
+  numerator=area*correlation[j]-image_sum[j]*reconstruct_sum[j];
+  image_variance=area*image_sum_squared[j]-image_sum[j]*image_sum[j];
+  reconstruct_variance=area*reconstruct_sum_squared[j]-reconstruct_sum[j]*
+    reconstruct_sum[j];
+  if ((image_variance < MagickEpsilon) &&
+      (reconstruct_variance < MagickEpsilon))
+    pearson=(fabs(image_sum[j]-reconstruct_sum[j]) < MagickEpsilon) ?
+      1.0 : 0.0;
+  else
+    {
+      denominator=sqrt(image_variance)*sqrt(reconstruct_variance);
+      pearson=denominator < MagickEpsilon ? 0.0 : numerator/denominator;
+    }
+  if (pearson < -1.0)
+    pearson=(-1.0);
+  if (pearson > 1.0)
+    pearson=1.0;
+  return(pearson);
+}
+
+typedef struct _PHASEReduction
+{
+  const Image
+    *image,
+    *reconstruct_image;
+
+  double
+    area,
+    *correlation,
+    *image_sum,
+    *image_sum_squared,
+    *reconstruct_sum,
+    *reconstruct_sum_squared;
+} PHASEReduction;
+
+static inline void ReducePHASESimilarity(const PHASEReduction *reduction,
+  double *similarity)
+{
+  const Image
+    *const image = reduction->image,
+    *const reconstruct_image = reduction->reconstruct_image;
+
+  const double
+    area = reduction->area;
+
+  double
+    *const correlation = reduction->correlation,
+    *const image_sum = reduction->image_sum,
+    *const image_sum_squared = reduction->image_sum_squared,
+    *const reconstruct_sum = reduction->reconstruct_sum,
+    *const reconstruct_sum_squared = reduction->reconstruct_sum_squared;
+
+  PHASECorrelationSums
+    sums;
+
+  ssize_t
+    channels = 0,
+    j;
+
+  similarity[CompositePixelChannel]=0.0;
+  for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+  {
+    double
+      pearson;
+
+    PixelChannel
+      channel;
+
+    PixelTrait
+      reconstruct_traits,
+      traits;
+
+    channel=GetPixelChannelChannel(image,j);
+    traits=GetPixelChannelTraits(image,channel);
+    reconstruct_traits=GetPixelChannelTraits(reconstruct_image,channel);
+    if (((traits & UpdatePixelTrait) == 0) ||
+        ((reconstruct_traits & UpdatePixelTrait) == 0))
+      continue;
+    sums.area=area;
+    sums.correlation=correlation;
+    sums.image_sum=image_sum;
+    sums.image_sum_squared=image_sum_squared;
+    sums.reconstruct_sum=reconstruct_sum;
+    sums.reconstruct_sum_squared=reconstruct_sum_squared;
+    pearson=GetPHASEPearson(&sums,j);
+    similarity[j]=pearson;
+    similarity[CompositePixelChannel]+=pearson;
+    channels++;
+  }
+  if (channels != 0)
+    similarity[CompositePixelChannel]/=(double) channels;
+}
+
 static inline MagickBooleanType GetPHASESimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -1570,9 +1709,10 @@ static inline MagickBooleanType GetPHASESimilarity(const Image *image,
     rows = 0;
 
   ssize_t
-    channels = 0,
-    j,
     y;
+
+  PHASEReduction
+    reduction;
 
   /*
     Compute a Pearson-correlation similarity between two Laplacian-of-
@@ -1694,52 +1834,15 @@ static inline MagickBooleanType GetPHASESimilarity(const Image *image,
   /*
     Reduce to a per-channel Pearson coefficient and average.
   */
-  similarity[CompositePixelChannel]=0.0;
-  for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-  {
-    double
-      denominator,
-      image_variance,
-      numerator,
-      pearson,
-      reconstruct_variance;
-
-    PixelChannel
-      channel;
-
-    PixelTrait
-      reconstruct_traits,
-      traits;
-
-    channel=GetPixelChannelChannel(image,j);
-    traits=GetPixelChannelTraits(image,channel);
-    reconstruct_traits=GetPixelChannelTraits(reconstruct_image,channel);
-    if (((traits & UpdatePixelTrait) == 0) ||
-        ((reconstruct_traits & UpdatePixelTrait) == 0))
-      continue;
-    numerator=area*correlation[j]-image_sum[j]*reconstruct_sum[j];
-    image_variance=area*image_sum_squared[j]-image_sum[j]*image_sum[j];
-    reconstruct_variance=area*reconstruct_sum_squared[j]-reconstruct_sum[j]*
-      reconstruct_sum[j];
-    if ((image_variance < MagickEpsilon) &&
-        (reconstruct_variance < MagickEpsilon))
-      pearson=(fabs(image_sum[j]-reconstruct_sum[j]) < MagickEpsilon) ?
-        1.0 : 0.0;
-    else
-      {
-        denominator=sqrt(image_variance)*sqrt(reconstruct_variance);
-        pearson=denominator < MagickEpsilon ? 0.0 : numerator/denominator;
-      }
-    if (pearson < -1.0)
-      pearson=(-1.0);
-    if (pearson > 1.0)
-      pearson=1.0;
-    similarity[j]=pearson;
-    similarity[CompositePixelChannel]+=pearson;
-    channels++;
-  }
-  if (channels != 0)
-    similarity[CompositePixelChannel]/=(double) channels;
+  reduction.image=image;
+  reduction.reconstruct_image=reconstruct_image;
+  reduction.area=area;
+  reduction.correlation=correlation;
+  reduction.image_sum=image_sum;
+  reduction.image_sum_squared=image_sum_squared;
+  reduction.reconstruct_sum=reconstruct_sum;
+  reduction.reconstruct_sum_squared=reconstruct_sum_squared;
+  ReducePHASESimilarity(&reduction,similarity);
   return(MagickTrue);
 }
 
@@ -2151,19 +2254,15 @@ static inline void AccumulateSSIMChannels(const SSIMChannelInputs *inputs,
   }
 }
 
-static inline MagickBooleanType GetSSIMSimularity(const Image *image,
-  const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
-{
 #define SSIMRadius  5.0
 #define SSIMSigma  1.5
 #define SSIMK1  0.01
 #define SSIMK2  0.03
 #define SSIML  1.0
 
-  CacheView
-    *image_view,
-    *reconstruct_view;
-
+static inline KernelInfo *AcquireSSIMKernel(const Image *image,
+  ExceptionInfo *exception)
+{
   char
     geometry[MagickPathExtent];
 
@@ -2171,11 +2270,58 @@ static inline MagickBooleanType GetSSIMSimularity(const Image *image,
     *artifact;
 
   double
-    area = 0.0,
-    c1,
-    c2,
     radius,
     sigma;
+
+  radius=SSIMRadius;
+  artifact=GetImageArtifact(image,"compare:ssim-radius");
+  if (artifact != (const char *) NULL)
+    radius=StringToDouble(artifact,(char **) NULL);
+  sigma=SSIMSigma;
+  artifact=GetImageArtifact(image,"compare:ssim-sigma");
+  if (artifact != (const char *) NULL)
+    sigma=StringToDouble(artifact,(char **) NULL);
+  (void) FormatLocaleString(geometry,MagickPathExtent,"gaussian:%.17gx%.17g",
+    radius,sigma);
+  return(AcquireKernelInfo(geometry,exception));
+}
+
+static void MergeSSIMSimilarity(const Image *image,
+  const Image *reconstruct_image,const double *channel_similarity,
+  double *similarity)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,j);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
+      channel);
+    if (((traits & UpdatePixelTrait) == 0) ||
+        ((reconstruct_traits & UpdatePixelTrait) == 0))
+      continue;
+    similarity[j]+=channel_similarity[j];
+  }
+  similarity[CompositePixelChannel]+=
+    channel_similarity[CompositePixelChannel];
+}
+
+static inline MagickBooleanType GetSSIMSimularity(const Image *image,
+  const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view,
+    *reconstruct_view;
+
+  const char
+    *artifact;
+
+  double
+    area = 0.0,
+    c1,
+    c2;
 
   KernelInfo
     *kernel_info;
@@ -2193,17 +2339,7 @@ static inline MagickBooleanType GetSSIMSimularity(const Image *image,
   /*
     Compute the structual similarity index similarity.
   */
-  radius=SSIMRadius;
-  artifact=GetImageArtifact(image,"compare:ssim-radius");
-  if (artifact != (const char *) NULL)
-    radius=StringToDouble(artifact,(char **) NULL);
-  sigma=SSIMSigma;
-  artifact=GetImageArtifact(image,"compare:ssim-sigma");
-  if (artifact != (const char *) NULL)
-    sigma=StringToDouble(artifact,(char **) NULL);
-  (void) FormatLocaleString(geometry,MagickPathExtent,"gaussian:%.17gx%.17g",
-    radius,sigma);
-  kernel_info=AcquireKernelInfo(geometry,exception);
+  kernel_info=AcquireSSIMKernel(image,exception);
   if (kernel_info == (KernelInfo *) NULL)
     ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
       image->filename);
@@ -2303,23 +2439,9 @@ static inline MagickBooleanType GetSSIMSimularity(const Image *image,
     #pragma omp critical (MagickCore_GetSSIMSimularity)
 #endif
     {
-      ssize_t
-        j;
-
       area+=channel_area;
-      for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,j);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
-          channel);
-        if (((traits & UpdatePixelTrait) == 0) ||
-            ((reconstruct_traits & UpdatePixelTrait) == 0))
-          continue;
-        similarity[j]+=channel_similarity[j];
-      }
-      similarity[CompositePixelChannel]+=
-        channel_similarity[CompositePixelChannel];
+      MergeSSIMSimilarity(image,reconstruct_image,channel_similarity,
+        similarity);
     }
   }
   image_view=DestroyCacheView(image_view);
@@ -2357,6 +2479,50 @@ static inline MagickBooleanType GetDSSIMSimilarity(const Image *image,
   return(status);
 }
 
+typedef MagickBooleanType
+  (*SimilarityMetricMethod)(const Image *,const Image *,double *,
+    ExceptionInfo *);
+
+typedef struct _SimilarityMetricEntry
+{
+  MetricType
+    metric;
+
+  SimilarityMetricMethod
+    get_similarity;
+} SimilarityMetricEntry;
+
+static const SimilarityMetricEntry
+  SimilarityMetricEntries[] =
+  {
+    { AbsoluteErrorMetric, GetAESimilarity },
+    { DotProductCorrelationErrorMetric, GetDPCSimilarity },
+    { FuzzErrorMetric, GetFUZZSimilarity },
+    { MeanAbsoluteErrorMetric, GetMAESimilarity },
+    { MeanSquaredErrorMetric, GetMSESimilarity },
+    { NormalizedCrossCorrelationErrorMetric, GetNCCSimilarity },
+    { PeakAbsoluteErrorMetric, GetPASimilarity },
+    { PeakSignalToNoiseRatioErrorMetric, GetPSNRSimilarity },
+    { PerceptualHashErrorMetric, GetPHASHSimilarity },
+    { PhaseCorrelationErrorMetric, GetPHASESimilarity },
+    { PixelDifferenceCountErrorMetric, GetPDCSimilarity },
+    { StructuralDissimilarityErrorMetric, GetDSSIMSimilarity },
+    { StructuralSimilarityErrorMetric, GetSSIMSimularity }
+  };
+
+static inline const SimilarityMetricEntry *GetSimilarityMetricEntry(
+  const MetricType metric)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(SimilarityMetricEntries)/
+       sizeof(*SimilarityMetricEntries)); i++)
+    if (SimilarityMetricEntries[i].metric == metric)
+      return(SimilarityMetricEntries+i);
+  return((const SimilarityMetricEntry *) NULL);
+}
+
 static inline MagickBooleanType GetSimilarityForMetric(Image *image,
   const Image *reconstruct_image,const MetricType metric,
   double *channel_similarity,ExceptionInfo *exception)
@@ -2366,96 +2532,23 @@ static inline MagickBooleanType GetSimilarityForMetric(Image *image,
 
   switch (metric)
   {
-    case AbsoluteErrorMetric:
-    {
-      status=GetAESimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case DotProductCorrelationErrorMetric:
-    {
-      status=GetDPCSimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case FuzzErrorMetric:
-    {
-      status=GetFUZZSimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case MeanAbsoluteErrorMetric:
-    {
-      status=GetMAESimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
     case MeanErrorPerPixelErrorMetric:
     {
       status=GetMEPPSimilarity(image,reconstruct_image,channel_similarity,
         exception);
       break;
     }
-    case MeanSquaredErrorMetric:
-    {
-      status=GetMSESimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case NormalizedCrossCorrelationErrorMetric:
-    {
-      status=GetNCCSimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case PeakAbsoluteErrorMetric:
-    {
-      status=GetPASimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case PeakSignalToNoiseRatioErrorMetric:
-    {
-      status=GetPSNRSimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case PerceptualHashErrorMetric:
-    {
-      status=GetPHASHSimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case PhaseCorrelationErrorMetric:
-    {
-      status=GetPHASESimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case PixelDifferenceCountErrorMetric:
-    {
-      status=GetPDCSimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case RootMeanSquaredErrorMetric:
-    case UndefinedErrorMetric:
     default:
     {
-      status=GetRMSESimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case StructuralDissimilarityErrorMetric:
-    {
-      status=GetDSSIMSimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case StructuralSimilarityErrorMetric:
-    {
-      status=GetSSIMSimularity(image,reconstruct_image,channel_similarity,
-        exception);
+      const SimilarityMetricEntry
+        *entry = GetSimilarityMetricEntry(metric);
+
+      if (entry == (const SimilarityMetricEntry *) NULL)
+        status=GetRMSESimilarity(image,reconstruct_image,channel_similarity,
+          exception);
+      else
+        status=entry->get_similarity(image,reconstruct_image,
+          channel_similarity,exception);
       break;
     }
   }
