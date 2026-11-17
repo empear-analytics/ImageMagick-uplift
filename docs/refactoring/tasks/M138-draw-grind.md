@@ -3,10 +3,10 @@
 Branched from `campaign/M137` after #123 merged it into `main` (ba6c3318d); this branch's
 PR goes to `main`. Scores come from cs-mcp 1.5.16 through `tools/ch.py`.
 
-Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 44 flagged functions, 222 -> 250
-functions (four merges, thirty-six helpers), 11,636 -> 11,567 lines. Function findings
-(one per function and category) 123 -> 82; the summed cc of the Complex Method
-functions 908 -> 639.
+Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 40 flagged functions, 222 -> 256
+functions (four merges, forty-two helpers), 11,636 -> 11,637 lines. Function findings
+(one per function and category) 123 -> 76; the summed cc of the Complex Method
+functions 908 -> 601.
 
 ## The function-count lesson
 
@@ -77,6 +77,10 @@ lowers the count.
 | b6df87070, a714e1382, d9d2b5df9 | MA | GetDrawInfo | nine option reads into SetDrawColorOption, SetDrawValueOption, SetDrawStringOption; cc 22 -> 13, 108 -> 94 lines |
 | 5bd7c27c6, d3b05f0d5 | V, E | ConvertPathToPolygon | edge-point shrink into ShrinkPolygonEdgePoints (throw left in the caller), bounds widening into WidenEdgeBounds; bumps 4 -> 3, cc 28 -> 25 |
 | 1b3d7ffe2 | E | DrawPrimitive | the text case into DrawTextPrimitive, as its sibling cases; cc 14 -> 13, 101 -> 89 lines |
+| fb30eaf00 | LB | ParseMVGPrimitivePoints | the point read into GetMVGPoint; no findings left |
+| 63cc228b1 | P | AffineEdge | the two out-of-image tests into IsAffineEdgeOutside; no findings left |
+| f9f7e02fa | E (two blocks) | DrawImagePrimitive | composite read into ReadCompositeImages, compositing tail into CompositeDrawImage; no findings left (each alone 3.17/3.16) |
+| b6bf59389, a94bd1d6f | FI; E (two blocks) | DrawAlphaPrimitive | the reset scan by initialiser; the alpha-channel setup and the point case into EnsureBlendAlphaChannel and DrawAlphaPoint; no findings left |
 
 ## Probed and dropped
 
@@ -128,7 +132,7 @@ lowers the count.
   of ORACLE.md's resize/6ee45e9cfa, in campaign A's code this branch does not touch.
   resize/6ee45e9cfa itself diverged once in a GetDrawInfo gate run (13,204 cases) and agreed
   alone three times.
-- Whole catalogue at 1b3d7ffe2: 15,967 cases, 3 diverged, all known.
+- Whole catalogue at 1b3d7ffe2 and at a94bd1d6f: 15,967 cases, 3 diverged, all known.
 
 ## Blocked, for the owner
 
