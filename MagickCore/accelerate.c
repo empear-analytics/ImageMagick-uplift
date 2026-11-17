@@ -208,14 +208,9 @@ MagickPrivate MagickBooleanType AccelerateContrastImage(Image *image,
 static void ReleaseGrayscaleResources(cl_mem imageBuffer,
   cl_kernel grayscaleKernel,cl_command_queue queue,MagickCLDevice device)
 {
-  if (imageBuffer != (cl_mem) NULL)
-    ReleaseOpenCLMemObject(imageBuffer);
-  if (grayscaleKernel != (cl_kernel) NULL)
-    ReleaseOpenCLKernel(grayscaleKernel);
-  if (queue != (cl_command_queue) NULL)
-    ReleaseOpenCLCommandQueue(device,queue);
-  if (device != (MagickCLDevice) NULL)
-    ReleaseOpenCLDevice(device);
+  ReleaseOpenCLBuffer(imageBuffer);
+  ReleaseKernel(grayscaleKernel);
+  ReleaseAccelerateQueue(device,queue);
 }
 
 typedef struct _GrayscaleResourceTargets
