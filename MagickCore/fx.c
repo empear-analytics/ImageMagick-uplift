@@ -2852,6 +2852,13 @@ static MagickBooleanType GetHexColourOperand (FxInfo * pfx)
   return MagickTrue;
 }
 
+static void SetLastElementChannel (FxInfo * pfx, PixelChannel chQual)
+{
+  ElementT * pel;
+  pel = &pfx->Elements[pfx->usedElements-1];
+  pel->channel_qual = chQual;
+}
+
 static MagickBooleanType AddImgAttrOperand (FxInfo * pfx, ImgAttrE ia)
 {
   fxFltType val = 0;
@@ -2860,7 +2867,6 @@ static MagickBooleanType AddImgAttrOperand (FxInfo * pfx, ImgAttrE ia)
   if (ImgAttrs[ia-(int) FirstImgAttr].need_stats != MagickFalse) {
     if (IsQualifier (pfx)) {
       PixelChannel chQual = GetChannelQualifier (pfx, (int) ia);
-      ElementT * pel;
       if (chQual == NO_CHAN_QUAL) {
         (void) ThrowMagickException (
           pfx->exception, GetMagickModule(), OptionError,
@@ -2869,8 +2875,7 @@ static MagickBooleanType AddImgAttrOperand (FxInfo * pfx, ImgAttrE ia)
         return MagickFalse;
       }
       /* Adjust the element */
-      pel = &pfx->Elements[pfx->usedElements-1];
-      pel->channel_qual = chQual;
+      SetLastElementChannel (pfx, chQual);
     }
   }
   return MagickTrue;
