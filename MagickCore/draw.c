@@ -1260,6 +1260,13 @@ static void LowerEdgeEnd(const double intercept,SegmentInfo *inverse_edge)
     (*inverse_edge).x2=x;
 }
 
+static inline MagickBooleanType IsAffineEdgeOutside(const double z,
+  const size_t extent)
+{
+  return(((z < 0.0) || ((size_t) floor(z+0.5) >= extent)) ? MagickTrue :
+    MagickFalse);
+}
+
 static SegmentInfo AffineEdge(const Image *image,const AffineMatrix *affine,
   const double y,const SegmentInfo *edge)
 {
@@ -1294,7 +1301,7 @@ static SegmentInfo AffineEdge(const Image *image,const AffineMatrix *affine,
         LowerEdgeEnd(intercept,&inverse_edge);
       }
     else
-      if ((z < 0.0) || ((size_t) floor(z+0.5) >= image->columns))
+      if (IsAffineEdgeOutside(z,image->columns) != MagickFalse)
         {
           inverse_edge.x2=edge->x1;
           return(inverse_edge);
@@ -1319,7 +1326,7 @@ static SegmentInfo AffineEdge(const Image *image,const AffineMatrix *affine,
         LowerEdgeEnd(intercept,&inverse_edge);
       }
     else
-      if ((z < 0.0) || ((size_t) floor(z+0.5) >= image->rows))
+      if (IsAffineEdgeOutside(z,image->rows) != MagickFalse)
         {
           inverse_edge.x2=edge->x2;
           return(inverse_edge);
