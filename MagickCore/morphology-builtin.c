@@ -2227,6 +2227,16 @@ static MagickBooleanType IsBaseKernelNeeded(const KernelInfoType type)
   return(MagickFalse);
 }
 
+static void InitializeBaseKernel(KernelInfo *kernel,const KernelInfoType type)
+{
+  (void) memset(kernel,0,sizeof(*kernel));
+  kernel->minimum = kernel->maximum = kernel->angle = 0.0;
+  kernel->negative_range = kernel->positive_range = 0.0;
+  kernel->type = type;
+  kernel->next = (KernelInfo *) NULL;
+  kernel->signature=MagickCoreSignature;
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -2256,12 +2266,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       kernel=(KernelInfo *) AcquireMagickMemory(sizeof(*kernel));
       if (kernel == (KernelInfo *) NULL)
         return(kernel);
-      (void) memset(kernel,0,sizeof(*kernel));
-      kernel->minimum = kernel->maximum = kernel->angle = 0.0;
-      kernel->negative_range = kernel->positive_range = 0.0;
-      kernel->type = type;
-      kernel->next = (KernelInfo *) NULL;
-      kernel->signature=MagickCoreSignature;
+      InitializeBaseKernel(kernel,type);
     }
 
   builtin.args=args;
