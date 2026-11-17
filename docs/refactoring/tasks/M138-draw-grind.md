@@ -3,10 +3,10 @@
 Branched from `campaign/M137` after #123 merged it into `main` (ba6c3318d); this branch's
 PR goes to `main`. Scores come from cs-mcp 1.5.16 through `tools/ch.py`.
 
-Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 33 flagged functions, 222 -> 269
-functions (four merges, fifty-five helpers), 11,636 -> 11,704 lines. Function findings
-(one per function and category) 123 -> 67; the summed cc of the Complex Method
-functions 908 -> 535.
+Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 32 flagged functions, 222 -> 274
+functions (four merges, sixty helpers), 11,636 -> 11,737 lines. Function findings
+(one per function and category) 123 -> 66; the summed cc of the Complex Method
+functions 908 -> 520.
 
 ## The function-count lesson
 
@@ -90,6 +90,7 @@ lowers the count.
 | b062cf787 | P | DrawStrokedPrimitive | the closed-path test through IsClosedEllipse (moved above its first user); leaves Complex Method |
 | a519f0ad8, 90256d467 | P, CN | ParseMVGPopGraphicContext | the outer clip-mask test into IsNonSVGClipMask, then combined with the inner test (IDENTICAL); no findings left |
 | 6cdf7f056 | E | GetRepeatGradientColor | the blending arm into BlendRepeatGradientStops (timed +0.8%); no findings left |
+| a198efbc3, 534bf61ca, 2e9b40a88 | NS, P, LB | TracePathSmoothBezierCurve | side selections named (IDENTICAL), three side tests as predicates, the x/y pair into GetPathPoint; no findings left |
 
 ## Probed and dropped
 
@@ -141,7 +142,8 @@ lowers the count.
   of ORACLE.md's resize/6ee45e9cfa, in campaign A's code this branch does not touch.
   resize/6ee45e9cfa itself diverged once in a GetDrawInfo gate run (13,204 cases) and agreed
   alone three times.
-- Whole catalogue at 1b3d7ffe2, a94bd1d6f, 69e5b567d, ea02b4b9e and 6cdf7f056: 15,967 cases, 3 diverged, all known.
+- Whole catalogue at 1b3d7ffe2, a94bd1d6f, 69e5b567d, ea02b4b9e, 6cdf7f056 and 2e9b40a88: 15,967 cases, 3
+  diverged, all known. check_trailers: 108 refactor commits, all valid.
 
 ## Blocked, for the owner
 
@@ -158,22 +160,16 @@ lowers the count.
 
 ## Next in draw.c
 
-- **At the threshold** (cc 9, one decision from clean): AffineEdge, ParseMVGClass,
-  ParseMVGPrimitivePoints, ClampPolygonBounds (NS fails IDENTICAL), TracePathMove.
-- **Shared tails left**: the primitive-type fill loop (`for (i=0; i < coordinates; i++)
-  { p->primitive=...; p--; }`) in five trace functions and the point-append block in four
-  path tracers take one decision each from functions that stay flagged.
-- **The score is not monotonic in findings.** Clearing ParseMVGClass's Complex Method with a
-  Recipe LT helper dropped draw.c 3.27 -> 3.17, although the helper alone (unused) kept 3.27 and
-  stubbing another cc-9 function kept 3.27; CloneDrawInfo's dash-pattern block alone gave
-  3.14, its gradient block alone 3.27; DrawImagePrimitive's composite read (clears its Complex
-  Method) 3.16; CloneDrawInfo's four CloneImage copies (clears its Complex Method) 3.15. Every
-  step is probed and dropped when the score falls. Pattern so far: each drop cleared a
-  function's Complex Method while its Large Method stayed (ParseMVGClass, DrawImagePrimitive,
-  CloneDrawInfo); steps that cleared both, or cleared Complex Method on a function without
-  Large Method (AffineEdge, ParseMVGPrimitivePoints, TracePathMove), held 3.27. Shorten such a
-  function below Large Method first. Confirmed twice: DrawImagePrimitive's two extractions
-  together held 3.27 where either alone dropped it; TracePathArc left Large Method with its
-  Complex Method kept, at 3.27.
-- **GetFillAlpha** (per pixel): its inner point loop as a helper clears Large Method but the
-  helper is itself a Complex Method (cc 13), which the pre-commit gate refuses; left.
+- **Probed and left:** Recipe DT on all thirty `? MagickTrue : MagickFalse` predicate returns
+  (IDENTICAL object code) leaves draw.c at 3.27 and Overall Code Complexity in place;
+  GetFillAlpha's point loop (its helper would be a Complex Method); CloneDrawInfo (its 92
+  lines are member copies); ParseMVGClass and DrawBoundingRectangles (extractions of six or
+  seven parameters).
+- **Label-run predicate:** IsValidListChar (cc 12) is allowed by the owner's ruling of
+  2026-11-07.
+- **Left for decomposition:** the large functions (TraceStrokePolygon cc 43, TraceMVGPrimitive
+  43, TracePath 39, RenderMVGContent 38, DrawPolygonPrimitive 30, ConvertPathToPolygon 25,
+  DrawDashPolygon 24, DrawAffineImage 23 and DrawGradientImage 13 with OpenMP loops) hold
+  most of the remaining findings; draw.c's score moves only once they go (M137's stub probe).
+- **Scoring rule of thumb:** never clear a function's Complex Method while its Large Method
+  stays; take both in one commit, or Large Method first.
