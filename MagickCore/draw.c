@@ -10173,6 +10173,16 @@ static inline double GetPathCoordinate(const int attribute,const int absolute,
   return((double) (attribute == absolute ? value : current+value));
 }
 
+static MagickBooleanType GetPathPoint(const char **p,char *token,double *x,
+  double *y)
+{
+  if (GetPathValue(p,token,&(*x)) == MagickFalse)
+    return(MagickFalse);
+  if (GetPathValue(p,token,&(*y)) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static ssize_t TracePathArc(const PathTrace *trace)
 {
   double
@@ -10637,9 +10647,7 @@ static ssize_t TracePathSmoothBezierCurve(const PathTrace *trace,
     ReflectBezierControlPoint(points,side);
     for (i=2; i < GetBezierPointCount(side); i++)
     {
-      if (GetPathValue(&p,token,&x) == MagickFalse)
-        ThrowPointExpectedException(token,exception);
-      if (GetPathValue(&p,token,&y) == MagickFalse)
+      if (GetPathPoint(&p,token,&x,&y) == MagickFalse)
         ThrowPointExpectedException(token,exception);
       if (IsCubicPathComma(side,p) != MagickFalse)
         p++;
