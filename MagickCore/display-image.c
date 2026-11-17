@@ -11780,6 +11780,14 @@ static void XApplySpiffCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyDullToImage(Display *display,XWindows *windows,Image **image,
+  ExceptionInfo *exception)
+{
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) ContrastImage(*image,MagickFalse,exception);
+}
+
 static void XApplyDullCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11800,9 +11808,7 @@ static void XApplyDullCommand(const XMagickCommandContext *context)
   /*
     Dull the image contrast.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) ContrastImage(*image,MagickFalse,exception);
+  XApplyDullToImage(display,windows,image,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
