@@ -12431,6 +12431,27 @@ static void XApplySharpenCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyBlurToImage(Display *display,XWindows *windows,
+  MagickStatusType *flags,char *radius,Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *blur_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(radius,&geometry_info);
+  blur_image=BlurImage(*image,geometry_info.rho,geometry_info.sigma,
+    exception);
+  if (blur_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=blur_image;
+    }
+}
+
 static void XApplyBlurCommand(const XMagickCommandContext *context,
   MagickStatusType *flags)
 {
@@ -12449,12 +12470,6 @@ static void XApplyBlurCommand(const XMagickCommandContext *context,
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  Image
-    *blur_image;
-
   static char
     radius[MagickPathExtent] = "0.0x1.0";
 
@@ -12468,16 +12483,7 @@ static void XApplyBlurCommand(const XMagickCommandContext *context,
   /*
     Blur an image.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  *flags=ParseGeometry(radius,&geometry_info);
-  blur_image=BlurImage(*image,geometry_info.rho,geometry_info.sigma,
-    exception);
-  if (blur_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=blur_image;
-    }
+  XApplyBlurToImage(display,windows,flags,radius,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
