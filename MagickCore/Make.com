@@ -29,6 +29,7 @@ $call Make accelerate-local-contrast.c
 $call Make accelerate-motion-blur.c
 $call Make accelerate-blur.c
 $call Make accelerate-denoise.c
+$call Make accelerate-despeckle.c
 $call Make accelerate-histogram.c
 $call Make accelerate-resize.c
 $call Make animate.c

@@ -80,6 +80,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/accelerate-motion-blur.c \
   MagickCore/accelerate-blur.c \
   MagickCore/accelerate-denoise.c \
+  MagickCore/accelerate-despeckle.c \
   MagickCore/accelerate-histogram.c \
   MagickCore/accelerate-resize.c \
   MagickCore/accelerate-private.h \
