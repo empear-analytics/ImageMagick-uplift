@@ -3367,6 +3367,14 @@ static void FindOperatorToken (FxInfo * pfx, OperatorE * op, size_t * len)
   }
 }
 
+static void SetOperatorFlags (OperatorE op, MagickBooleanType * Assign,
+  MagickBooleanType * Update, MagickBooleanType * IncrDecr)
+{
+  *Assign = (MagickBooleanType) (op==oAssign);
+  *Update = OprInPlace ((int) op);
+  *IncrDecr = (MagickBooleanType) (op == oPlusPlus || op == oSubSub);
+}
+
 static MagickBooleanType GetOperator (
   FxInfo * pfx,
   MagickBooleanType * Assign, MagickBooleanType * Update, MagickBooleanType * IncrDecr)
@@ -3393,9 +3401,7 @@ static MagickBooleanType GetOperator (
     return MagickFalse;
   }
 
-  *Assign = (MagickBooleanType) (op==oAssign);
-  *Update = OprInPlace ((int) op);
-  *IncrDecr = (MagickBooleanType) (op == oPlusPlus || op == oSubSub);
+  SetOperatorFlags (op, Assign, Update, IncrDecr);
 
   /* while top of OperatorStack is not empty and is not open-parens or assign,
        and top of OperatorStack is higher precedence than new op,
