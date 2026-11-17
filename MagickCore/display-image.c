@@ -11928,6 +11928,14 @@ static void XApplySigmoidalContrastCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyNormalizeToImage(Display *display,XWindows *windows,
+  Image **image,ExceptionInfo *exception)
+{
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) NormalizeImage(*image,exception);
+}
+
 static void XApplyNormalizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11948,9 +11956,7 @@ static void XApplyNormalizeCommand(const XMagickCommandContext *context)
   /*
     Perform histogram normalization on the image.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) NormalizeImage(*image,exception);
+  XApplyNormalizeToImage(display,windows,image,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
