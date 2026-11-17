@@ -1716,6 +1716,32 @@ static inline MagickBooleanType IsAttrStatisticsChannel(
     MagickTrue : MagickFalse);
 }
 
+static inline fxFltType ShiftLeftRegister (FxInfo * pfx, fxFltType regA, fxFltType regB)
+{
+  if (CastDoubleToSizeT((double) regB+0.5) >= (8*sizeof(size_t)))
+    {
+      (void) ThrowMagickException ( pfx->exception, GetMagickModule(),
+        OptionError, "undefined shift", "%g", (double) regB);
+      regA = (fxFltType) 0.0;
+      return(regA);
+    }
+  regA = (fxFltType) (CastDoubleToSizeT((double) regA+0.5) << CastDoubleToSizeT((double) regB+0.5));
+  return(regA);
+}
+
+static inline fxFltType ShiftRightRegister (FxInfo * pfx, fxFltType regA, fxFltType regB)
+{
+  if (CastDoubleToSizeT((double) regB+0.5) >= (8*sizeof(size_t)))
+    {
+      (void) ThrowMagickException ( pfx->exception, GetMagickModule(),
+        OptionError, "undefined shift", "%g", (double) regB);
+      regA = (fxFltType) 0.0;
+      return(regA);
+    }
+  regA = (fxFltType) (CastDoubleToSizeT((double) regA+0.5) >> CastDoubleToSizeT((double) regB+0.5));
+  return(regA);
+}
+
 static inline MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *result,
   const fxPixelPosT * pos)
 {
@@ -1821,24 +1847,10 @@ static inline MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltTy
           regA = -regA;
           break;
         case oLshift:
-          if (CastDoubleToSizeT((double) regB+0.5) >= (8*sizeof(size_t)))
-            {
-              (void) ThrowMagickException ( pfx->exception, GetMagickModule(),
-                OptionError, "undefined shift", "%g", (double) regB);
-              regA = (fxFltType) 0.0;
-              break;
-            }
-          regA = (fxFltType) (CastDoubleToSizeT((double) regA+0.5) << CastDoubleToSizeT((double) regB+0.5));
+          regA = ShiftLeftRegister (pfx, regA, regB);
           break;
         case oRshift:
-          if (CastDoubleToSizeT((double) regB+0.5) >= (8*sizeof(size_t)))
-            {
-              (void) ThrowMagickException ( pfx->exception, GetMagickModule(),
-                OptionError, "undefined shift", "%g", (double) regB);
-              regA = (fxFltType) 0.0;
-              break;
-            }
-          regA = (fxFltType) (CastDoubleToSizeT((double) regA+0.5) >> CastDoubleToSizeT((double) regB+0.5));
+          regA = ShiftRightRegister (pfx, regA, regB);
           break;
         case oEq:
           regA = fabs((double) (regA-regB)) < MagickEpsilon ? 1.0 : 0.0;
