@@ -1072,8 +1072,7 @@ static PixelChannel GetChannelQualifier (FxInfo * pfx, int op)
 
 static inline MagickBooleanType IsQualifierRequiredAttr(const ImgAttrE ia)
 {
-  return((ia == aPage || ia == aPrintsize || ia == aRes) ? MagickTrue :
-    MagickFalse);
+  return((MagickBooleanType) (ia == aPage || ia == aPrintsize || ia == aRes));
 }
 
 static ImgAttrE GetImgAttrToken (FxInfo * pfx)
