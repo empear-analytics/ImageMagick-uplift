@@ -48,6 +48,7 @@ if ( ! GetOptions(
 	 'compare.c',
 	 'compare-similarity.c',
 	 'composite.c',
+	 'composite-image.c',
 	 'constitute.c',
 	 'constitute-codec.c',
 	 'constitute-write.c',
