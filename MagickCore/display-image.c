@@ -8162,8 +8162,7 @@ static void XSelectDrawColor(const DrawEditContext *context,const int id,
     (const char **) ColorMenu,command);
   if (pen_number < 0)
     return;
-  transparent=pen_number == (MaxNumberPens-2) ? MagickTrue :
-    MagickFalse;
+  transparent=(MagickBooleanType) (pen_number == (MaxNumberPens-2));
   if (transparent != MagickFalse)
     {
       (*draw_info).stencil=TransparentStencil;
