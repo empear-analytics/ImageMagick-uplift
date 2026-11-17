@@ -3413,8 +3413,8 @@ static MagickBooleanType ResolveTernaryAddresses (FxInfo * pfx, TernaryT * ptern
 static inline MagickBooleanType IsExpressionContinuing(FxInfo *pfx,
   const char *strLimit)
 {
-  return((*pfx->pex && (!*strLimit ||
-    (strchr(strLimit,*pfx->pex)==NULL))) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (*pfx->pex && (!*strLimit ||
+    (strchr(strLimit,*pfx->pex)==NULL))));
 }
 
 static inline MagickBooleanType IsUserSymbolAssignment(
