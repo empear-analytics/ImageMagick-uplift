@@ -539,7 +539,8 @@ MagickExport MagickRealType GetPixelIntensity(
   return(IntensityFromSamples(image->intensity,&space,sample));
 }
 
-static void LoadAlphaWeightedPixels(const Image *magick_restrict image,
+static magick_attribute((__always_inline__)) inline void
+  LoadAlphaWeightedPixels(const Image *magick_restrict image,
   const PixelChannel channel,const Quantum *magick_restrict p,
   const ssize_t count,double *alpha,double *pixels)
 {
@@ -555,7 +556,8 @@ static void LoadAlphaWeightedPixels(const Image *magick_restrict image,
   }
 }
 
-static void LoadInterpolatePixels(const Image *magick_restrict image,
+static magick_attribute((__always_inline__)) inline void
+  LoadInterpolatePixels(const Image *magick_restrict image,
   const PixelChannel channel,const PixelTrait traits,
   const Quantum *magick_restrict p,const ssize_t count,double *alpha,
   double *pixels)
@@ -986,7 +988,7 @@ static MagickBooleanType InterpolateAveragePixelChannel(
   return(status);
 }
 
-static void InterpolateGridPixelChannel(const ChannelInterpolation grid,
+static void InterpolateGridPixelChannel(const ChannelInterpolation *grid,
   const PixelInterpolateMethod interpolate,double *pixel,
   MagickBooleanType *status)
 {
@@ -995,28 +997,28 @@ static void InterpolateGridPixelChannel(const ChannelInterpolation grid,
     case BilinearInterpolatePixel:
     default:
     {
-      (*status)=InterpolateBilinearPixelChannel(&grid,pixel,(*status));
+      (*status)=InterpolateBilinearPixelChannel(grid,pixel,(*status));
       break;
     }
     case BlendInterpolatePixel:
     {
-      (*status)=InterpolateBlendPixelChannel(&grid,pixel,(*status));
+      (*status)=InterpolateBlendPixelChannel(grid,pixel,(*status));
       break;
     }
     case CatromInterpolatePixel:
     {
-      (*status)=InterpolateCubicPixelChannel(&grid,CatromWeights,pixel,
+      (*status)=InterpolateCubicPixelChannel(grid,CatromWeights,pixel,
         (*status));
       break;
     }
     case MeshInterpolatePixel:
     {
-      (*status)=InterpolateMeshPixelChannel(&grid,pixel,(*status));
+      (*status)=InterpolateMeshPixelChannel(grid,pixel,(*status));
       break;
     }
     case SplineInterpolatePixel:
     {
-      (*status)=InterpolateCubicPixelChannel(&grid,SplineWeights,pixel,
+      (*status)=InterpolateCubicPixelChannel(grid,SplineWeights,pixel,
         (*status));
       break;
     }
@@ -1063,7 +1065,7 @@ static MagickBooleanType InterpolateIntegerPixelChannel(
   return(status);
 }
 
-static void InterpolatePointPixelChannel(const ChannelInterpolation grid,
+static void InterpolatePointPixelChannel(const ChannelInterpolation *grid,
   const PixelInterpolateMethod interpolate,double *pixel,
   MagickBooleanType *status)
 {
@@ -1076,12 +1078,12 @@ static void InterpolatePointPixelChannel(const ChannelInterpolation grid,
     }
     case IntegerInterpolatePixel:
     {
-      (*status)=InterpolateIntegerPixelChannel(&grid,pixel,(*status));
+      (*status)=InterpolateIntegerPixelChannel(grid,pixel,(*status));
       break;
     }
     case NearestInterpolatePixel:
     {
-      (*status)=InterpolateNearestPixelChannel(&grid,pixel,(*status));
+      (*status)=InterpolateNearestPixelChannel(grid,pixel,(*status));
       break;
     }
   }
@@ -1141,7 +1143,7 @@ MagickExport MagickBooleanType InterpolatePixelChannel(
     }
     default:
     {
-      InterpolatePointPixelChannel(grid,interpolate,pixel,&status);
+      InterpolatePointPixelChannel(&grid,interpolate,pixel,&status);
       break;
     }
   }
