@@ -3267,8 +3267,8 @@ static inline MagickBooleanType ProcessTernaryOpr (FxInfo * pfx, TernaryT * pter
 
 static inline MagickBooleanType IsOperatorStackBarrier(const OperatorE top)
 {
-  return((top == oOpenParen || top == oAssign ||
-    OprInPlace ((int) top)) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (top == oOpenParen || top == oAssign ||
+    OprInPlace ((int) top)));
 }
 
 static void MoveHigherPrecedenceOperators (FxInfo * pfx, OperatorE op)
