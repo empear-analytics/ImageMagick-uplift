@@ -7644,6 +7644,18 @@ static double GetEdgeDistance(const EdgeInfo *p,const ssize_t i,
   return(distance);
 }
 
+static ssize_t GetWindingEdgeIndex(EdgeInfo *p,const ssize_t y)
+{
+  ssize_t
+    i;
+
+  i=(ssize_t) MagickMax((double) p->highwater,1.0);
+  for ( ; i < (ssize_t) (p->number_points-1); i++)
+    if ((double) y <= p->points[i].y)
+      break;
+  return(i);
+}
+
 static ssize_t GetWindingNumber(PolygonInfo *polygon_info,const ssize_t x,
   const ssize_t y)
 {
@@ -7674,10 +7686,7 @@ static ssize_t GetWindingNumber(PolygonInfo *polygon_info,const ssize_t x,
         winding_number+=p->direction != 0 ? 1 : -1;
         continue;
       }
-    i=(ssize_t) MagickMax((double) p->highwater,1.0);
-    for ( ; i < (ssize_t) (p->number_points-1); i++)
-      if ((double) y <= p->points[i].y)
-        break;
+    i=GetWindingEdgeIndex(p,y);
     q=p->points+i-1;
     if ((((q+1)->x-q->x)*(y-q->y)) <= (((q+1)->y-q->y)*(x-q->x)))
       winding_number+=p->direction != 0 ? 1 : -1;
