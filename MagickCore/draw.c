@@ -9007,6 +9007,12 @@ static MagickStatusType DrawPointPrimitive(const DrawPrimitiveContext *context,
   return(status);
 }
 
+static inline MagickBooleanType IsClosedEllipse(const double x,const double y)
+{
+  return(((x < MagickEpsilon) && (y < MagickEpsilon)) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickStatusType DrawUnstrokedPolygon(
   const DrawPrimitiveContext *context,MagickStatusType status)
 {
@@ -9121,7 +9127,7 @@ static MagickStatusType DrawStrokedPrimitive(const DrawPrimitiveContext *context
       i=(ssize_t) primitive_info[0].coordinates;
       point_x=fabs(primitive_info[i-1].point.x-primitive_info[0].point.x);
       point_y=fabs(primitive_info[i-1].point.y-primitive_info[0].point.y);
-      if ((point_x < MagickEpsilon) && (point_y < MagickEpsilon))
+      if (IsClosedEllipse(point_x,point_y) != MagickFalse)
         closed_path=MagickTrue;
       if (IsRoundStrokeOrPrimitive(draw_info,closed_path,primitive_info,i) !=
           MagickFalse)
@@ -9967,12 +9973,6 @@ static double GetEllipseEndAngle(const PointInfo arc)
   while (y < arc.x)
     y+=360.0;
   return(y);
-}
-
-static inline MagickBooleanType IsClosedEllipse(const double x,const double y)
-{
-  return(((x < MagickEpsilon) && (y < MagickEpsilon)) ? MagickTrue :
-    MagickFalse);
 }
 
 static MagickBooleanType TraceEllipse(MVGInfo *mvg_info,const PointInfo center,
