@@ -10565,6 +10565,11 @@ static void ReflectBezierControlPoint(PointInfo *points,
   points[1].y=2.0*points[((side == CubicPathBezier) ? 3 : 2)].y-points[((side == CubicPathBezier) ? 2 : 1)].y;
 }
 
+static inline int GetBezierSmoothLetter(const PathBezierSide side)
+{
+  return((side == CubicPathBezier) ? 'S' : 'T');
+}
+
 static ssize_t TracePathSmoothBezierCurve(const PathTrace *trace,
   const PathBezierSide side)
 {
@@ -10610,7 +10615,7 @@ static ssize_t TracePathSmoothBezierCurve(const PathTrace *trace,
   do
   {
     ReflectBezierControlPoint(points,side);
-    for (i=2; i < ((side == CubicPathBezier) ? 4 : 3); i++)
+    for (i=2; i < GetBezierPointCount(side); i++)
     {
       if (GetPathValue(&p,token,&x) == MagickFalse)
         ThrowPointExpectedException(token,exception);
@@ -10618,8 +10623,8 @@ static ssize_t TracePathSmoothBezierCurve(const PathTrace *trace,
         ThrowPointExpectedException(token,exception);
       if ((side == CubicPathBezier) && (*p == ','))
         p++;
-      end.x=GetPathCoordinate(attribute,(int) ((side == CubicPathBezier) ? 'S' : 'T'),x,point.x);
-      end.y=GetPathCoordinate(attribute,(int) ((side == CubicPathBezier) ? 'S' : 'T'),y,point.y);
+      end.x=GetPathCoordinate(attribute,(int) GetBezierSmoothLetter(side),x,point.x);
+      end.y=GetPathCoordinate(attribute,(int) GetBezierSmoothLetter(side),y,point.y);
       points[i]=end;
     }
     if ((side == QuadraticPathBezier) && (status == MagickFalse))
