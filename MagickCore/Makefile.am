@@ -79,11 +79,17 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/accelerate-local-contrast.c \
   MagickCore/accelerate-motion-blur.c \
   MagickCore/accelerate-blur.c \
+  MagickCore/accelerate-rotational-blur.c \
+  MagickCore/accelerate-unsharp.c \
   MagickCore/accelerate-denoise.c \
+  MagickCore/accelerate-despeckle.c \
   MagickCore/accelerate-histogram.c \
+  MagickCore/accelerate-contrast-stretch.c \
   MagickCore/accelerate-resize.c \
   MagickCore/accelerate-private.h \
   MagickCore/accelerate-kernels-private.h \
+  MagickCore/accelerate-blur-private.h \
+  MagickCore/accelerate-histogram-private.h \
   MagickCore/accelerate-core-private.h \
   MagickCore/animate.c \
   MagickCore/animate-window.c \
@@ -306,10 +312,12 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/nt-feature.h \
   MagickCore/opencl.c \
   MagickCore/opencl-environment.c \
+  MagickCore/opencl-initialize.c \
   MagickCore/opencl-enqueue.c \
   MagickCore/opencl-device.c \
   MagickCore/opencl.h \
   MagickCore/opencl-private.h \
+  MagickCore/opencl-environment-private.h \
   MagickCore/option.c \
   MagickCore/option-image.c \
   MagickCore/option.h \
@@ -603,6 +611,8 @@ MAGICKCORE_INCLUDE_HDRS = \
 MAGICKCORE_NOINST_HDRS = \
   MagickCore/accelerate-private.h \
   MagickCore/accelerate-kernels-private.h \
+  MagickCore/accelerate-blur-private.h \
+  MagickCore/accelerate-histogram-private.h \
   MagickCore/accelerate-core-private.h \
   MagickCore/animate-private.h \
   MagickCore/annotate-private.h \
@@ -657,6 +667,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/nt-base.h \
   MagickCore/nt-feature.h \
   MagickCore/opencl-private.h \
+  MagickCore/opencl-environment-private.h \
   MagickCore/option-private.h \
   MagickCore/pixel-private.h \
   MagickCore/policy-private.h \

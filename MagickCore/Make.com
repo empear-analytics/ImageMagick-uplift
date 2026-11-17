@@ -28,8 +28,12 @@ $call Make accelerate-point.c
 $call Make accelerate-local-contrast.c
 $call Make accelerate-motion-blur.c
 $call Make accelerate-blur.c
+$call Make accelerate-rotational-blur.c
+$call Make accelerate-unsharp.c
 $call Make accelerate-denoise.c
+$call Make accelerate-despeckle.c
 $call Make accelerate-histogram.c
+$call Make accelerate-contrast-stretch.c
 $call Make accelerate-resize.c
 $call Make animate.c
 $call Make animate-window.c
@@ -157,6 +161,7 @@ $call Make morphology-primitive.c
 $call Make morphology-builtin.c
 $call Make opencl.c
 $call Make opencl-environment.c
+$call Make opencl-initialize.c
 $call Make opencl-enqueue.c
 $call Make opencl-device.c
 $call Make option.c
