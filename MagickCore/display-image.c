@@ -12309,6 +12309,27 @@ static void XApplyQuantizeCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyReduceNoiseToImage(Display *display,XWindows *windows,
+  MagickStatusType *flags,char *radius,Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *noise_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(radius,&geometry_info);
+  noise_image=StatisticImage(*image,NonpeakStatistic,(size_t)
+    geometry_info.rho,(size_t) geometry_info.rho,exception);
+  if (noise_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=noise_image;
+    }
+}
+
 static void XApplyReduceNoiseCommand(const XMagickCommandContext *context,
   MagickStatusType *flags)
 {
@@ -12327,12 +12348,6 @@ static void XApplyReduceNoiseCommand(const XMagickCommandContext *context,
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  Image
-    *noise_image;
-
   static char
     radius[MagickPathExtent] = "0";
 
@@ -12346,16 +12361,7 @@ static void XApplyReduceNoiseCommand(const XMagickCommandContext *context,
   /*
     Reduce noise in the image.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  *flags=ParseGeometry(radius,&geometry_info);
-  noise_image=StatisticImage(*image,NonpeakStatistic,(size_t)
-    geometry_info.rho,(size_t) geometry_info.rho,exception);
-  if (noise_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=noise_image;
-    }
+  XApplyReduceNoiseToImage(display,windows,flags,radius,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
