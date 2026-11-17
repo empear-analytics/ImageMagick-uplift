@@ -9317,6 +9317,17 @@ static void SetDrawValueOption(const ImageInfo *image_info,const char *key,
     (*value)=GetDrawValue(option,&next_token);
 }
 
+static void SetDrawStringOption(const ImageInfo *image_info,const char *key,
+  char **string)
+{
+  const char
+    *option;
+
+  option=GetImageOption(image_info,key);
+  if (option != (const char *) NULL)
+    (void) CloneString(&(*string),option);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -9398,12 +9409,10 @@ MagickExport void GetDrawInfo(const ImageInfo *image_info,DrawInfo *draw_info)
       MagickDirectionOptions,MagickFalse,option);
   else
     draw_info->direction=UndefinedDirection;
-  option=GetImageOption(draw_info->image_info,"encoding");
-  if (option != (const char *) NULL)
-    (void) CloneString(&draw_info->encoding,option);
-  option=GetImageOption(draw_info->image_info,"family");
-  if (option != (const char *) NULL)
-    (void) CloneString(&draw_info->family,option);
+  SetDrawStringOption(draw_info->image_info,"encoding",
+    &draw_info->encoding);
+  SetDrawStringOption(draw_info->image_info,"family",
+    &draw_info->family);
   SetDrawColorOption(draw_info->image_info,"fill",
     &draw_info->fill,exception);
   option=GetImageOption(draw_info->image_info,"gravity");
