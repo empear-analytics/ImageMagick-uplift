@@ -77,7 +77,7 @@ lowers the count.
 - Whole catalogue at 985809cfc: 15,961 cases, 5 diverged: the three known ones and the two
   `-hough-lines` cases again, this time the *candidate* timing out under load; alone, 0
   diverged. They take about 9 s alone and pass 30 s under a full run on either side:
-  candidates for `LOAD_SENSITIVE` (owner's call).
+  added to `LOAD_SENSITIVE` with the owner's OK (990ecda37).
 
 ## Blocked, for the owner
 
