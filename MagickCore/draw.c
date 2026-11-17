@@ -3205,8 +3205,7 @@ static void EstimateMVGPrimitiveExtent(const MVGRenderState *state)
     k,
     x = (*state->x);
 
-  if (primitive_info[j].text != (char *) NULL)
-    primitive_info[j].text=DestroyString(primitive_info[j].text);
+  primitive_info[j].text=DestroyString(primitive_info[j].text);
   primitive_info[j].primitive=primitive_type;
   primitive_info[j].coordinates=(size_t) x;
   primitive_info[j].method=FloodfillMethod;
