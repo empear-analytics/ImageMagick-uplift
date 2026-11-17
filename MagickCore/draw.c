@@ -10215,9 +10215,9 @@ static ssize_t TracePathAxisLine(const PathTrace *trace,
     if (GetPathValue(&p,token,&x) == MagickFalse)
       ThrowPointExpectedException(token,exception);
     if (side == HorizontalPathLine)
-      point.x=(double) (attribute == (int) 'H' ? x: point.x+x);
+      point.x=GetPathCoordinate(attribute,(int) 'H',x,point.x);
     else
-      point.y=(double) (attribute == (int) 'V' ? x : point.y+x);
+      point.y=GetPathCoordinate(attribute,(int) 'V',x,point.y);
     if (CheckPrimitiveExtent(mvg_info,PrimitiveExtentPad) == MagickFalse)
       return(-1);
     q=(*mvg_info->primitive_info)+mvg_info->offset;
