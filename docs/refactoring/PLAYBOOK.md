@@ -522,6 +522,20 @@ blocks of nested logic). Each bump is a missing function.
    one other value. The callee receives the same address and writes the same bytes of
    the caller's array; an array is never assigned or reseated as a whole, so nothing
    else of it changes, as for the pixel rows a block writes through `q`.
+   Such an array that the block also measures as `sizeof(v)` (`display-image.c`'s
+   `char command[MagickPathExtent]`, handed to `XLookupString` with `(int)
+   sizeof(command)` as its length) goes the same way, and the call passes `sizeof(v)`,
+   written in the caller where the array is declared, as one more argument, to a
+   parameter `const size_t extent`; the block's `sizeof(v)` becomes `extent`, nothing
+   else changed (2026-11-17, W39 lane c, under the mandate of 2026-10-24). `sizeof` of
+   an array is an integer constant of type `size_t` (C11 6.5.3.4p2 and p5), so the
+   parameter holds the value the block computed, and any cast or arithmetic on it is
+   unchanged; in the new function `sizeof(v)` would measure the pointer, which is why
+   that one expression stays in the caller (as in Recipe P's leading-operand form). The
+   block uses the array in no other way than as a pointer argument and in that `sizeof`.
+   When the block was the whole braced body of a `case`, its declarations all moving
+   with it, the braces around the call and the `break;` left behind may go: they
+   scoped only those declarations.
    One the block writes before it reads it on every path, that nothing after the block
    reads, and whose only use left in the caller would be a store before the block that
    nothing else reads (a column counter `x` set by `x=0;` above a loop that the block's
@@ -22472,3 +22486,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | AMEND | S | *Preprocessor branches*: an `#if` without `#else` directly above the family's first moved function whose `#endif` stands inside the moved run moves whole, directives verbatim; `split_source.py` 3423ec185 | `opencl.c`'s `#if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT` around the benchmark-profile readers (campaign A, W37 lane a) | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | S | Step 2: a chain of splits through private headers may drop the original between its steps, when a stub probe of the whole chain first shows its last state raising the original above its score before the chain and every product and header at or above that score; the dropping step goes `--no-verify` with the drop, the probe and the step that ends it in its message; the lane resets the branch if it cannot reach the probed end; each step keeps a split's checks (both catalogues, `omp_compare` for a region that moves, timing) | `morphology-apply.c` (8.26): round twenty-five's probe of a rotation header and the `MorphologyApply` split dropped the kept file to 8.01, the second split of the `AcquireKernelBuiltIn` side ends it at 10.0 (products 8.54 and 8.26, headers 9.68); round twenty-five's question 5. The ruling is the owner's, the wording and the products-and-headers condition the lane's | owner |
 | 2026-11-17 | AMEND | DT | Step 1: a condition whose top-level operator is a logical AND or OR qualifies whatever its operands are (C11 6.5.13p3, 6.5.14p3: the result is the int 1 or 0); *Use when*: also *Overall Code Complexity* (each step lowers the file total by one and adds no function) | `fx.c`'s translator predicates (campaign A, W39 lane c): 12 of its 47 boolean ternaries test a bare operand inside such a chain | mandate (2026-10-24) |
+| 2026-11-17 | AMEND | E | Step 4: an array the block passes as a pointer argument and also measures as `sizeof(v)` goes as a pointer parameter, the call passing `sizeof(v)` from the caller to a `const size_t extent` parameter that replaces the block's `sizeof(v)`; the braces of a case body whose declarations all moved may go | `display-image.c`'s `XDisplayImage` (Large Method, 80 lines): its KeyPress and KeyRelease cases hand the local `command` and `(int) sizeof(command)` to `XLookupString`; an earlier probe had stopped on this form (campaign A, W39 lane c) | mandate (2026-10-24) |
