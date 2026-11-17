@@ -1263,9 +1263,7 @@ static SegmentInfo AffineEdge(const Image *image,const AffineMatrix *affine,
     if (affine->sx < -MagickEpsilon)
       {
         intercept=(-z+(double) image->columns)/affine->sx;
-        x=intercept;
-        if (x > inverse_edge.x1)
-          inverse_edge.x1=x;
+        RaiseEdgeStart(intercept,&inverse_edge);
         intercept=(-z/affine->sx);
         x=intercept;
         if (x < inverse_edge.x2)
@@ -1284,9 +1282,7 @@ static SegmentInfo AffineEdge(const Image *image,const AffineMatrix *affine,
   if (affine->rx >= MagickEpsilon)
     {
       intercept=(-z/affine->rx);
-      x=intercept;
-      if (x > inverse_edge.x1)
-        inverse_edge.x1=x;
+      RaiseEdgeStart(intercept,&inverse_edge);
       intercept=(-z+(double) image->rows)/affine->rx;
       x=intercept;
       if (x < inverse_edge.x2)
@@ -1296,9 +1292,7 @@ static SegmentInfo AffineEdge(const Image *image,const AffineMatrix *affine,
     if (affine->rx < -MagickEpsilon)
       {
         intercept=(-z+(double) image->rows)/affine->rx;
-        x=intercept;
-        if (x > inverse_edge.x1)
-          inverse_edge.x1=x;
+        RaiseEdgeStart(intercept,&inverse_edge);
         intercept=(-z/affine->rx);
         x=intercept;
         if (x < inverse_edge.x2)
