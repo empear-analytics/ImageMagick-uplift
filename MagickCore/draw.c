@@ -10427,13 +10427,8 @@ static ssize_t TracePathSmoothBezierCurve(const PathTrace *trace,
         points[0]=point;
         points[1]=point;
       }
-    for (i=0; i < ((side == CubicPathBezier) ? 4 : 3); i++)
-      (q+i)->point=points[i];
-    if (TraceBezier(mvg_info,((side == CubicPathBezier) ? 4 : 3)) == MagickFalse)
+    if (TraceBezierPoints(mvg_info,points,side,&q) == MagickFalse)
       return(-1);
-    q=(*mvg_info->primitive_info)+mvg_info->offset;
-    mvg_info->offset+=(ssize_t) q->coordinates;
-    q+=(ptrdiff_t) q->coordinates;
     point=end;
     last_attribute=attribute;
     SkipPathSeparators(&p);
