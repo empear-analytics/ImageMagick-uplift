@@ -1892,7 +1892,8 @@ static MagickBooleanType QualifyCoordFunction (FxInfo * pfx,
 
       CoordQualifierTargets targets;
 
-      *coordQual = (GetCoordQualifier (pfx, (int) *fe) == 1) ? MagickTrue : MagickFalse;
+      *coordQual =
+        (MagickBooleanType) (GetCoordQualifier (pfx, (int) *fe) == 1);
 
       targets.fe=fe;
       targets.funStr=funStr;
