@@ -3508,6 +3508,15 @@ static void ReserveMVGPrimitiveExtent(const MVGRenderState *state)
   (*state->primitive_info)=primitive_info;
 }
 
+static ssize_t GetTracedPrimitiveEnd(const PrimitiveInfo *primitive_info,
+  const MagickStatusType status,const ssize_t j,ssize_t i)
+{
+  if (status == MagickFalse)
+    return(i);
+  i=j+(ssize_t) primitive_info[j].coordinates;
+  return(i);
+}
+
 static void TraceMVGPrimitive(const MVGRenderState *state)
 {
   char
@@ -3567,9 +3576,7 @@ static void TraceMVGPrimitive(const MVGRenderState *state)
       status&=(MagickStatusType) TracePoint(primitive_info+j,
         primitive_info[j].point);
       primitive_info=(*mvg_info.primitive_info);
-      if (status == MagickFalse)
-        break;
-      i=j+(ssize_t) primitive_info[j].coordinates;
+      i=GetTracedPrimitiveEnd(primitive_info,status,j,i);
       break;
     }
     case LinePrimitive:
