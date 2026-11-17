@@ -2393,14 +2393,19 @@ static MagickBooleanType AcquireReflectedKernel(const MorphologyMethod method,
   return(MagickTrue);
 }
 
+static void ReportKernelIterationState(const KernelInfo *this_kernel)
+{
+  if ( this_kernel->next != (KernelInfo *) NULL )
+    (void) FormatLocaleFile(stderr, " (re-iterate)");
+  else
+    (void) FormatLocaleFile(stderr, " (done)");
+}
+
 static void ReportKernelIteration(const MagickBooleanType verbose,
   const KernelInfo *this_kernel)
 {
   if (verbose != MagickFalse) {
-    if ( this_kernel->next != (KernelInfo *) NULL )
-      (void) FormatLocaleFile(stderr, " (re-iterate)");
-    else
-      (void) FormatLocaleFile(stderr, " (done)");
+    ReportKernelIterationState(this_kernel);
   }
 }
 
