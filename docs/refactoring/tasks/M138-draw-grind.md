@@ -3,10 +3,10 @@
 Branched from `campaign/M137` after #123 merged it into `main` (ba6c3318d); this branch's
 PR goes to `main`. Scores come from cs-mcp 1.5.16 through `tools/ch.py`.
 
-Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 35 flagged functions, 222 -> 267
-functions (four merges, fifty-three helpers), 11,636 -> 11,686 lines. Function findings
-(one per function and category) 123 -> 70; the summed cc of the Complex Method
-functions 908 -> 544.
+Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 33 flagged functions, 222 -> 269
+functions (four merges, fifty-five helpers), 11,636 -> 11,704 lines. Function findings
+(one per function and category) 123 -> 67; the summed cc of the Complex Method
+functions 908 -> 535.
 
 ## The function-count lesson
 
@@ -87,6 +87,9 @@ lowers the count.
 | 92d9d6ae9, b746b5f71 | P, E | TraceEllipse | zero-radius and closed tests into predicates, the angle wrap into GetEllipseEndAngle; no findings left |
 | 0c062eff3 | NS | TracePathBezierCurve | the side's letter and point count into GetBezierAbsoluteLetter and GetBezierPointCount (IDENTICAL); no findings left |
 | (playbook), ea02b4b9e | LB | ParseMVGViewbox | four cast-wrapped reads through GetMVGValue/GetMVGListValue (target unread on the exit path, checked through ParseMVGKeyword and RenderMVGContent); no findings left |
+| b062cf787 | P | DrawStrokedPrimitive | the closed-path test through IsClosedEllipse (moved above its first user); leaves Complex Method |
+| a519f0ad8, 90256d467 | P, CN | ParseMVGPopGraphicContext | the outer clip-mask test into IsNonSVGClipMask, then combined with the inner test (IDENTICAL); no findings left |
+| 6cdf7f056 | E | GetRepeatGradientColor | the blending arm into BlendRepeatGradientStops (timed +0.8%); no findings left |
 
 ## Probed and dropped
 
@@ -138,7 +141,7 @@ lowers the count.
   of ORACLE.md's resize/6ee45e9cfa, in campaign A's code this branch does not touch.
   resize/6ee45e9cfa itself diverged once in a GetDrawInfo gate run (13,204 cases) and agreed
   alone three times.
-- Whole catalogue at 1b3d7ffe2, a94bd1d6f, 69e5b567d and ea02b4b9e: 15,967 cases, 3 diverged, all known.
+- Whole catalogue at 1b3d7ffe2, a94bd1d6f, 69e5b567d, ea02b4b9e and 6cdf7f056: 15,967 cases, 3 diverged, all known.
 
 ## Blocked, for the owner
 
