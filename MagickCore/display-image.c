@@ -22903,28 +22903,12 @@ static void XCreateBackgroundPixmap(XWindowInfo *window_info,Display *display,
       image->filename);
 }
 
-static void XDisplayBackgroundPixmap(const BackgroundInput *input,
-  const BackgroundTargets *targets,const int width,const int height)
+static void XShowBackgroundPixmap(const int width,XWindowInfo *window_info,
+  const int height,Display *display,Image *image)
 {
-  Display
-    *const display = input->display;
-
-  Image
-    *const image = input->image;
-
-  XWindowInfo
-    *const window_info = targets->window_info;
-
   size_t
     delay;
 
-  /*
-    Create the X pixmap.
-  */
-  XCreateBackgroundPixmap(window_info,display,width,height,image);
-  /*
-    Display pixmap on the window.
-  */
   if (((unsigned int) width > (*window_info).width) ||
       ((unsigned int) height > (*window_info).height))
     (void) XFillRectangle(display,(*window_info).pixmap,
@@ -22940,6 +22924,28 @@ static void XDisplayBackgroundPixmap(const BackgroundInput *input,
   delay=1000*image->delay/(size_t) MagickMax(image->ticks_per_second,1L);
   XDelay(display,delay == 0UL ? 10UL : delay);
   (void) XSync(display,MagickFalse);
+}
+
+static void XDisplayBackgroundPixmap(const BackgroundInput *input,
+  const BackgroundTargets *targets,const int width,const int height)
+{
+  Display
+    *const display = input->display;
+
+  Image
+    *const image = input->image;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  /*
+    Create the X pixmap.
+  */
+  XCreateBackgroundPixmap(window_info,display,width,height,image);
+  /*
+    Display pixmap on the window.
+  */
+  XShowBackgroundPixmap(width,window_info,height,display,image);
 }
 
 MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
