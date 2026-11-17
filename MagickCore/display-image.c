@@ -22720,6 +22720,21 @@ static void XInitializeBackgroundColormap(XResourceInfo *resources,
     pixel,exception);
 }
 
+static void XInitializeBackgroundContext(XPixelInfo *pixel,Display *display,
+  XWindowInfo *window_info,Image *image)
+{
+  XGCValues
+    context_values;
+
+  context_values.background=(*pixel).foreground_color.pixel;
+  context_values.foreground=(*pixel).background_color.pixel;
+  (*pixel).annotate_context=XCreateGC(display,(*window_info).id,
+    (size_t) (GCBackground | GCForeground),&context_values);
+  if ((*pixel).annotate_context == (GC) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
+      image->filename);
+}
+
 static void XCreateBackgroundWindowInfo(Display *display,Image *image,
   ExceptionInfo *exception,const BackgroundTargets *targets)
 {
@@ -22738,9 +22753,6 @@ static void XCreateBackgroundWindowInfo(Display *display,Image *image,
   XWindowInfo
     *const window_info = targets->window_info;
 
-  XGCValues
-    context_values;
-
   /*
     Initialize Standard Colormap.
   */
@@ -22749,13 +22761,7 @@ static void XCreateBackgroundWindowInfo(Display *display,Image *image,
   /*
     Graphic context superclass.
   */
-  context_values.background=(*pixel).foreground_color.pixel;
-  context_values.foreground=(*pixel).background_color.pixel;
-  (*pixel).annotate_context=XCreateGC(display,(*window_info).id,
-    (size_t) (GCBackground | GCForeground),&context_values);
-  if ((*pixel).annotate_context == (GC) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
-      image->filename);
+  XInitializeBackgroundContext(pixel,display,window_info,image);
   /*
     Initialize Image window attributes.
   */
