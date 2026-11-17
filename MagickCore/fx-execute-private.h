@@ -1709,6 +1709,13 @@ static inline void PopArguments (const PopInputs * pop, const PopTargets * targe
     }
 }
 
+static inline MagickBooleanType IsAttrStatisticsChannel(
+  const ChannelStatistics *cs,const PixelChannel channel)
+{
+  return(((cs != (ChannelStatistics *) NULL) && (channel > 0)) ?
+    MagickTrue : MagickFalse);
+}
+
 static inline MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *result,
   const fxPixelPosT * pos)
 {
@@ -2222,23 +2229,23 @@ static inline MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltTy
           regA = (fxFltType) img->extent;
           break;
         case aKurtosis:
-          if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
+          if (IsAttrStatisticsChannel(cs,channel) != MagickFalse)
             regA = cs[WHICH_ATTR_CHAN].kurtosis;
           break;
         case aMaxima:
-          if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
+          if (IsAttrStatisticsChannel(cs,channel) != MagickFalse)
             regA = cs[WHICH_ATTR_CHAN].maxima;
           break;
         case aMean:
-          if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
+          if (IsAttrStatisticsChannel(cs,channel) != MagickFalse)
             regA = cs[WHICH_ATTR_CHAN].mean;
           break;
         case aMedian:
-          if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
+          if (IsAttrStatisticsChannel(cs,channel) != MagickFalse)
             regA = cs[WHICH_ATTR_CHAN].median;
           break;
         case aMinima:
-          if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
+          if (IsAttrStatisticsChannel(cs,channel) != MagickFalse)
             regA = cs[WHICH_ATTR_CHAN].minima;
           break;
         case aPage:
@@ -2275,11 +2282,11 @@ static inline MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltTy
           regA = (fxFltType) img->resolution.y;
           break;
         case aSkewness:
-          if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
+          if (IsAttrStatisticsChannel(cs,channel) != MagickFalse)
             regA = cs[WHICH_ATTR_CHAN].skewness;
           break;
         case aStdDev:
-          if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
+          if (IsAttrStatisticsChannel(cs,channel) != MagickFalse)
             regA = cs[WHICH_ATTR_CHAN].standard_deviation;
           break;
         case aH: /* image->rows */
