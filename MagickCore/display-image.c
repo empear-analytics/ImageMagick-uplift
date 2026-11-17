@@ -6448,6 +6448,18 @@ typedef struct _ConfigureNotifyInput
     y;
 } ConfigureNotifyInput;
 
+static void XFormatWindowManagerGeometry(XResourceInfo *resource_info,
+  char *geometry,Display *display,XWindows *windows)
+{
+  if (resource_info->image_geometry != (char *) NULL)
+    (void) FormatLocaleString(geometry,MagickPathExtent,"%s>!",
+      resource_info->image_geometry);
+  else
+    (void) FormatLocaleString(geometry,MagickPathExtent,"%ux%u+0+0>!",
+      XDisplayWidth(display,windows->image.screen),
+      XDisplayHeight(display,windows->image.screen));
+}
+
 static void XNotifyWindowManager(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const ConfigureNotifyInput *input)
 {
@@ -6466,13 +6478,7 @@ static void XNotifyWindowManager(Display *display,XResourceInfo *resource_info,
   XWindowChanges
     window_changes;
 
-  if (resource_info->image_geometry != (char *) NULL)
-    (void) FormatLocaleString(geometry,MagickPathExtent,"%s>!",
-      resource_info->image_geometry);
-  else
-    (void) FormatLocaleString(geometry,MagickPathExtent,"%ux%u+0+0>!",
-      XDisplayWidth(display,windows->image.screen),
-      XDisplayHeight(display,windows->image.screen));
+  XFormatWindowManagerGeometry(resource_info,geometry,display,windows);
   (void) ParseMetaGeometry(geometry,&x,&y,&width,&height);
   window_changes.width=(int) width;
   if (window_changes.width > XDisplayWidth(display,windows->image.screen))
