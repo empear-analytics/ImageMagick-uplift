@@ -430,7 +430,6 @@ static MagickBooleanType resizeVerticalFilter(MagickCLDevice device,
     workgroupSize = 256;
 
   float
-    scale,
     support;
 
   int
@@ -463,18 +462,7 @@ static MagickBooleanType resizeVerticalFilter(MagickCLDevice device,
   /*
   Apply filter to resize vertically from image to resize image.
   */
-  scale=(float) MAGICK_MAX(1.0/yFactor+MagickEpsilon,1.0);
-  support=scale*(float) GetResizeFilterSupport(resizeFilter);
-  if (support < 0.5)
-  {
-    /*
-    Support too small even for nearest neighbour: Reduce to point
-    sampling.
-    */
-    support=(float) 0.5;
-    scale=1.0;
-  }
-  scale=(float) MagickSafeReciprocal(scale);
+  support=GetResizeScaledSupport(resizeFilter,yFactor);
 
   if (resizedRows < workgroupSize)
   {
