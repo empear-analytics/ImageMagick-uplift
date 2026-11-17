@@ -711,6 +711,18 @@ static size_t ScanNonIccTokenLength (char * p, size_t len)
   return(len);
 }
 
+static size_t LimitTokenLength (FxInfo * pfx, size_t len)
+{
+  if (len >= MaxTokenLen) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "GetToken: too long", "%g at '%s'",
+      (double) len, SetShortExp(pfx));
+    len = MaxTokenLen;
+  }
+  return(len);
+}
+
 static size_t GetToken (FxInfo * pfx)
 /* Returns length of token that starts with an alpha,
      or 0 if it isn't a token that starts with an alpha.
@@ -740,13 +752,7 @@ static size_t GetToken (FxInfo * pfx)
   } else {
     len = ScanNonIccTokenLength (p, len);
   }
-  if (len >= MaxTokenLen) {
-    (void) ThrowMagickException (
-      pfx->exception, GetMagickModule(), OptionError,
-      "GetToken: too long", "%g at '%s'",
-      (double) len, SetShortExp(pfx));
-    len = MaxTokenLen;
-  }
+  len = LimitTokenLength (pfx, len);
   if (len) {
     (void) CopyMagickString (pfx->token, pfx->pex, (len+1<MaxTokenLen)?len+1:MaxTokenLen);
   }
