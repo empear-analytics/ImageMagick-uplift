@@ -411,13 +411,37 @@ static void SquarePixelChannels(const Image *square_image,
   }
 }
 
-static Image *SIMSquareImage(const Image *image,ExceptionInfo *exception)
+static void SquareRow(const Image *square_image,const void *arguments,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  magick_unreferenced(arguments);
+  for (x=0; x < (ssize_t) square_image->columns; x++)
+  {
+    SquarePixelChannels(square_image,q);
+    q+=(ptrdiff_t) GetPixelChannels(square_image);
+  }
+}
+
+typedef void
+  (*SIMRowMethod)(const Image *,const void *,Quantum *magick_restrict);
+
+typedef struct _SIMRows
+{
+  SIMRowMethod
+    method;
+
+  const void
+    *arguments;
+} SIMRows;
+
+static MagickBooleanType SIMImageRows(Image *image,const SIMRows *rows,
+  ExceptionInfo *exception)
 {
   CacheView
     *image_view;
-
-  Image
-    *square_image;
 
   MagickBooleanType
     status = MagickTrue;
@@ -425,43 +449,50 @@ static Image *SIMSquareImage(const Image *image,ExceptionInfo *exception)
   ssize_t
     y;
 
+  image_view=AcquireAuthenticCacheView(image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(image,image,image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    Quantum
+      *magick_restrict q;
+
+    if (status == MagickFalse)
+      continue;
+    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+    if (q == (Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    rows->method(image,rows->arguments,q);
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      status=MagickFalse;
+  }
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+static Image *SIMSquareImage(const Image *image,ExceptionInfo *exception)
+{
+  Image
+    *square_image;
+
+  MagickBooleanType
+    status = MagickTrue;
+
+  const SIMRows
+    rows = { SquareRow,(const void *) NULL };
+
   /*
     Square each pixel in the image.
   */
   square_image=CloneImage(image,0,0,MagickTrue,exception);
   if (square_image == (Image *) NULL)
     return(square_image);
-  image_view=AcquireAuthenticCacheView(square_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(square_image,square_image,square_image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) square_image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,square_image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) square_image->columns; x++)
-    {
-      SquarePixelChannels(square_image,q);
-      q+=(ptrdiff_t) GetPixelChannels(square_image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
-  }
-  image_view=DestroyCacheView(image_view);
+  status=SIMImageRows(square_image,&rows,exception);
   if (status == MagickFalse)
     square_image=DestroyImage(square_image);
   return(square_image);
@@ -776,52 +807,50 @@ static void MultiplyPixelChannels(const Image *image,const double factor,
   }
 }
 
+typedef struct _MultiplyRowInfo
+{
+  double
+    factor;
+
+  const ChannelStatistics
+    *channel_statistics;
+} MultiplyRowInfo;
+
+static void MultiplyRow(const Image *image,const void *arguments,
+  Quantum *magick_restrict q)
+{
+  const MultiplyRowInfo
+    *multiply_row = (const MultiplyRowInfo *) arguments;
+
+  const double
+    factor = multiply_row->factor;
+
+  const ChannelStatistics
+    *channel_statistics = multiply_row->channel_statistics;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    MultiplyPixelChannels(image,factor,channel_statistics,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static MagickBooleanType SIMMultiplyImage(Image *image,const double factor,
   const ChannelStatistics *channel_statistics,ExceptionInfo *exception)
 {
-  CacheView
-    *image_view;
+  const MultiplyRowInfo
+    multiply_row = { factor, channel_statistics };
 
-  MagickBooleanType
-    status = MagickTrue;
-
-  ssize_t
-    y;
+  const SIMRows
+    rows = { MultiplyRow,&multiply_row };
 
   /*
     Multiply each pixel by a factor.
   */
-  image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(image,image,image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      MultiplyPixelChannels(image,factor,channel_statistics,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
-  }
-  image_view=DestroyCacheView(image_view);
-  return(status);
+  return(SIMImageRows(image,&rows,exception));
 }
 
 static Image *SIMPhaseCorrelationImage(const Image *target_image,
@@ -920,52 +949,32 @@ static void SetPixelChannelsMean(const Image *image,
   }
 }
 
+static void SetMeanRow(const Image *image,const void *arguments,
+  Quantum *magick_restrict q)
+{
+  const ChannelStatistics
+    *channel_statistics = (const ChannelStatistics *) arguments;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    SetPixelChannelsMean(image,channel_statistics,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static MagickBooleanType SIMSetImageMean(Image *image,
   const ChannelStatistics *channel_statistics,ExceptionInfo *exception)
 {
-  CacheView
-    *image_view;
-
-  MagickBooleanType
-    status = MagickTrue;
-
-  ssize_t
-    y;
+  const SIMRows
+    rows = { SetMeanRow,channel_statistics };
 
   /*
     Set image mean.
   */
-  image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(image,image,image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      SetPixelChannelsMean(image,channel_statistics,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
-  }
-  image_view=DestroyCacheView(image_view);
-  return(status);
+  return(SIMImageRows(image,&rows,exception));
 }
 
 typedef struct _SubtractMeanRowInfo
