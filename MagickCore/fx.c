@@ -1603,8 +1603,8 @@ static inline MagickBooleanType IsUnqualifiedAccess(
   const MagickBooleanType coordQual,const PixelChannel chQual,
   const ImgAttrE iaQual)
 {
-  return((!coordQual && chQual == NO_CHAN_QUAL &&
-    iaQual == aNull) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (!coordQual && chQual == NO_CHAN_QUAL &&
+    iaQual == aNull));
 }
 
 static inline MagickBooleanType IsCompositeOnlyAccess(
