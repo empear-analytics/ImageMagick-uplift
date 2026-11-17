@@ -15591,27 +15591,9 @@ static void XMoveMagnifyPosition(XWindows *windows,const unsigned int quantum,
   }
 }
 
-static void XMagnifyWindowCommand(const MagnifyWindowInput *input,
-  const MagickStatusType state,const KeySym key_symbol)
+static void XApplyMagnifyKey(const KeySym key_symbol,Display *display,
+  XWindows *windows,unsigned int quantum)
 {
-  Display
-    *const display = input->display;
-
-  ExceptionInfo
-    *const exception = input->exception;
-
-  XWindows
-    *const windows = input->windows;
-
-  unsigned int
-    quantum;
-
-  /*
-    User specified a magnify factor or position.
-  */
-  quantum=1;
-  if ((state & Mod1Mask) != 0)
-    quantum=10;
   switch ((int) key_symbol)
   {
     case QuitCommand:
@@ -15633,6 +15615,30 @@ static void XMagnifyWindowCommand(const MagnifyWindowInput *input,
       break;
     }
   }
+}
+
+static void XMagnifyWindowCommand(const MagnifyWindowInput *input,
+  const MagickStatusType state,const KeySym key_symbol)
+{
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  XWindows
+    *const windows = input->windows;
+
+  unsigned int
+    quantum;
+
+  /*
+    User specified a magnify factor or position.
+  */
+  quantum=1;
+  if ((state & Mod1Mask) != 0)
+    quantum=10;
+  XApplyMagnifyKey(key_symbol,display,windows,quantum);
   XMakeMagnifyImage(display,windows,exception);
 }
 
