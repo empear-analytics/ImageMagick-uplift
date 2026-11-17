@@ -718,6 +718,33 @@ static MagickBooleanType ResizeHorizontalThenVertical(
   return(MagickTrue);
 }
 
+static MagickBooleanType CreateCubicCoefficientsBuffer(
+  MagickCLDevice device,const ResizeFilter *resizeFilter,
+  cl_mem *cubicCoefficientsBuffer,ExceptionInfo *exception)
+{
+  const double
+    *resizeFilterCoefficient;
+
+  float
+    coefficientBuffer[7];
+
+  size_t
+    i;
+
+  resizeFilterCoefficient=GetResizeFilterCoefficient(resizeFilter);
+  for (i = 0; i < 7; i++)
+    coefficientBuffer[i]=(float) resizeFilterCoefficient[i];
+  *cubicCoefficientsBuffer=CreateOpenCLBuffer(device,CL_MEM_COPY_HOST_PTR |
+    CL_MEM_READ_ONLY,sizeof(coefficientBuffer),&coefficientBuffer);
+  if (*cubicCoefficientsBuffer == (cl_mem) NULL)
+  {
+    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
+      ResourceLimitWarning,"CreateOpenCLBuffer failed.",".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
   const size_t resizedColumns,const size_t resizedRows,
   const ResizeFilter *resizeFilter,ExceptionInfo *exception)
@@ -734,11 +761,7 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
   cl_uint
     number_channels;
 
-  const double
-    *resizeFilterCoefficient;
-
   float
-    coefficientBuffer[7],
     xFactor,
     yFactor;
 
@@ -758,7 +781,6 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
     targets;
 
   size_t
-    i,
     length;
 
   queue=NULL;
@@ -788,17 +810,9 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
   if (filteredImageBuffer == (cl_mem) NULL)
     goto cleanup;
 
-  resizeFilterCoefficient=GetResizeFilterCoefficient(resizeFilter);
-  for (i = 0; i < 7; i++)
-    coefficientBuffer[i]=(float) resizeFilterCoefficient[i];
-  cubicCoefficientsBuffer=CreateOpenCLBuffer(device,CL_MEM_COPY_HOST_PTR |
-    CL_MEM_READ_ONLY,sizeof(coefficientBuffer),&coefficientBuffer);
-  if (cubicCoefficientsBuffer == (cl_mem) NULL)
-  {
-    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
-      ResourceLimitWarning,"CreateOpenCLBuffer failed.",".");
+  if (CreateCubicCoefficientsBuffer(device,resizeFilter,
+        &cubicCoefficientsBuffer,exception) == MagickFalse)
     goto cleanup;
-  }
 
   number_channels=(cl_uint) image->number_channels;
   xFactor=(float) resizedColumns/(float) image->columns;
