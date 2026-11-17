@@ -2774,6 +2774,17 @@ static inline MagickBooleanType IsHslSymbol(const SymbolE se)
   return((MagickBooleanType) (se==sHue || se==sSaturation || se==sLightness));
 }
 
+static double GetPrefixPower (char * tailptr, double Pow)
+{
+  const char Prefixes[] = "yzafpnum.kMGTPEZY";
+  const char * pSi = strchr (Prefixes, *tailptr);
+  if (pSi && *pSi != '.') Pow = (double) ((pSi - Prefixes) * 3 - 24);
+  else if (*tailptr == 'c') Pow = -2;
+  else if (*tailptr == 'h') Pow =  2;
+  else if (*tailptr == 'k') Pow =  3;
+  return(Pow);
+}
+
 static fxFltType ApplyNumberPrefix (FxInfo * pfx, char * tailptr, fxFltType val)
 {
   /* Could have "prefix" K, Ki, M etc.
@@ -2781,12 +2792,7 @@ static fxFltType ApplyNumberPrefix (FxInfo * pfx, char * tailptr, fxFltType val)
      and https://en.wikipedia.org/wiki/Binary_prefix
   */
   double Pow = 0.0;
-  const char Prefixes[] = "yzafpnum.kMGTPEZY";
-  const char * pSi = strchr (Prefixes, *tailptr);
-  if (pSi && *pSi != '.') Pow = (double) ((pSi - Prefixes) * 3 - 24);
-  else if (*tailptr == 'c') Pow = -2;
-  else if (*tailptr == 'h') Pow =  2;
-  else if (*tailptr == 'k') Pow =  3;
+  Pow = GetPrefixPower (tailptr, Pow);
   if (Pow != 0.0) {
     if (*(++pfx->pex) == 'i') {
       val *= pow (2.0, Pow/0.3);
