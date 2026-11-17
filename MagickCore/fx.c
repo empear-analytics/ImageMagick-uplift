@@ -3424,16 +3424,21 @@ static MagickBooleanType GetOperator (
   return MagickTrue;
 }
 
+static void LinkTernaryAddresses (FxInfo * pfx, TernaryT * ptern)
+{
+  pfx->Elements[ptern->addr_query].element_index = ptern->addr_colon + 1;
+  pfx->Elements[ptern->addr_colon].element_index = pfx->usedElements;
+  ptern->addr_query = NULL_ADDRESS;
+  ptern->addr_colon = NULL_ADDRESS;
+}
+
 static MagickBooleanType ResolveTernaryAddresses (FxInfo * pfx, TernaryT * ptern)
 {
   if (ptern->addr_query == NULL_ADDRESS && ptern->addr_colon == NULL_ADDRESS)
     return MagickTrue;
 
   if (ptern->addr_query != NULL_ADDRESS && ptern->addr_colon != NULL_ADDRESS) {
-    pfx->Elements[ptern->addr_query].element_index = ptern->addr_colon + 1;
-    pfx->Elements[ptern->addr_colon].element_index = pfx->usedElements;
-    ptern->addr_query = NULL_ADDRESS;
-    ptern->addr_colon = NULL_ADDRESS;
+    LinkTernaryAddresses (pfx, ptern);
   } else if (ptern->addr_query != NULL_ADDRESS) {
       (void) ThrowMagickException (
         pfx->exception, GetMagickModule(), OptionError,
