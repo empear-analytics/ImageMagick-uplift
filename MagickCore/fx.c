@@ -1030,8 +1030,8 @@ static inline MagickBooleanType IsChannelQualifiableOperator(const int op)
   for (i=0; i < (sizeof(ChannelQualifiableOperators)/sizeof(*ChannelQualifiableOperators)); i++)
     if (ChannelQualifiableOperators[i] == op)
       return(MagickTrue);
-  return(((op >= (int) FirstImgAttr && op <= aNull)
-    ) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((op >= (int) FirstImgAttr && op <= aNull)
+    ));
 }
 
 static inline MagickBooleanType IsAttributeWithVirtualChannel(const int op,
