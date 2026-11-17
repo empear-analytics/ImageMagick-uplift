@@ -6636,8 +6636,8 @@ static inline MagickBooleanType IsNearBottomRightCorner(const int x,const int y,
 static inline MagickBooleanType IsSelectionMovedOrDone(
   const RectangleInfo rectangle,const int x,const int y,const size_t state)
 {
-  return(((((int) rectangle.x != x) && ((int) rectangle.y != y)) ||
-    ((state & ExitState) != 0)) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((((int) rectangle.x != x) &&
+    ((int) rectangle.y != y)) || ((state & ExitState) != 0)));
 }
 
 static void XShowCropHelp(Display *display,XResourceInfo *resource_info,
