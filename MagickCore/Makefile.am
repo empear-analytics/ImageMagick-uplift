@@ -79,6 +79,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/accelerate-local-contrast.c \
   MagickCore/accelerate-motion-blur.c \
   MagickCore/accelerate-blur.c \
+  MagickCore/accelerate-rotational-blur.c \
   MagickCore/accelerate-unsharp.c \
   MagickCore/accelerate-denoise.c \
   MagickCore/accelerate-despeckle.c \
