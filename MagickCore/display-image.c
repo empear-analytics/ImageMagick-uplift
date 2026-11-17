@@ -15314,8 +15314,8 @@ static void XClampMagnifyPosition(XWindows *windows,int *x,int *y)
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static void XMagnifyImage(Display *display,XWindows *windows,XEvent *event,
-  ExceptionInfo *exception)
+static void XTrackMagnifyButton(Display *display,XWindows *windows,
+  XEvent *event,ExceptionInfo *exception)
 {
   int
     x,
@@ -15324,9 +15324,6 @@ static void XMagnifyImage(Display *display,XWindows *windows,XEvent *event,
   size_t
     state;
 
-  /*
-    Update magnified image until the mouse button is released.
-  */
   (void) XCheckDefineCursor(display,windows->image.id,windows->magnify.cursor);
   state=DefaultState;
   x=event->xbutton.x;
@@ -15373,6 +15370,15 @@ static void XMagnifyImage(Display *display,XWindows *windows,XEvent *event,
     */
     XClampMagnifyPosition(windows,&x,&y);
   } while ((state & ExitState) == 0);
+}
+
+static void XMagnifyImage(Display *display,XWindows *windows,XEvent *event,
+  ExceptionInfo *exception)
+{
+  /*
+    Update magnified image until the mouse button is released.
+  */
+  XTrackMagnifyButton(display,windows,event,exception);
   /*
     Display magnified image.
   */
