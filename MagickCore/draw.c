@@ -3279,6 +3279,16 @@ static MagickBooleanType GetMVGListValue(const char **q,const size_t extent,
   return(MagickTrue);
 }
 
+static MagickBooleanType GetMVGPoint(const char **q,const size_t extent,
+  char *token,PointInfo *point)
+{
+  if (GetMVGValue(q,extent,token,&(*point).x) == MagickFalse)
+    return(MagickFalse);
+  if (GetMVGListValue(q,extent,token,&(*point).y) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static void ParseMVGPrimitivePoints(const MVGRenderState *state)
 {
   char
@@ -3331,9 +3341,7 @@ static void ParseMVGPrimitivePoints(const MVGRenderState *state)
     */
     if (IsValidPoint(q) == MagickFalse)
       break;
-    if (GetMVGValue(&q,extent,token,&point.x) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    if (GetMVGListValue(&q,extent,token,&point.y) == MagickFalse)
+    if (GetMVGPoint(&q,extent,token,&point) == MagickFalse)
       ThrowPointExpectedException(token,exception);
     (void) GetNextToken(q,(const char **) NULL,extent,token);
     if (*token == ',')
