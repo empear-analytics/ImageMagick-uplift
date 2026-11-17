@@ -3347,45 +3347,18 @@ static void ParseMVGPrimitivePoints(const MVGRenderState *state)
   (*state->x)=x;
 }
 
-static void EstimateMVGPrimitiveExtent(const MVGRenderState *state)
+static SegmentInfo GetPrimitiveBounds(const PrimitiveInfo *primitive_info,
+  const ssize_t j)
 {
-  char
-    *token = (*state->token);
-
-  const char
-    *q = (*state->q);
-
-  double
-    coordinates = (*state->coordinates);
-
   PointInfo
     point;
-
-  PrimitiveInfo
-    *primitive_info = (*state->primitive_info);
-
-  PrimitiveType
-    primitive_type = (*state->primitive_type);
 
   SegmentInfo
     bounds;
 
-  size_t
-    extent = (*state->extent);
-
   ssize_t
-    j = (*state->j),
-    k,
-    x = (*state->x);
+    k;
 
-  primitive_info[j].text=DestroyString(primitive_info[j].text);
-  primitive_info[j].primitive=primitive_type;
-  primitive_info[j].coordinates=(size_t) x;
-  primitive_info[j].method=FloodfillMethod;
-  primitive_info[j].closed_subpath=MagickFalse;
-  /*
-    Circumscribe primitive within a circle.
-  */
   bounds.x1=primitive_info[j].point.x;
   bounds.y1=primitive_info[j].point.y;
   bounds.x2=primitive_info[j].point.x;
@@ -3402,6 +3375,46 @@ static void EstimateMVGPrimitiveExtent(const MVGRenderState *state)
     if (point.y > bounds.y2)
       bounds.y2=point.y;
   }
+  return(bounds);
+}
+
+static void EstimateMVGPrimitiveExtent(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  double
+    coordinates = (*state->coordinates);
+
+
+  PrimitiveInfo
+    *primitive_info = (*state->primitive_info);
+
+  PrimitiveType
+    primitive_type = (*state->primitive_type);
+
+  SegmentInfo
+    bounds;
+
+  size_t
+    extent = (*state->extent);
+
+  ssize_t
+    j = (*state->j),
+    x = (*state->x);
+
+  primitive_info[j].text=DestroyString(primitive_info[j].text);
+  primitive_info[j].primitive=primitive_type;
+  primitive_info[j].coordinates=(size_t) x;
+  primitive_info[j].method=FloodfillMethod;
+  primitive_info[j].closed_subpath=MagickFalse;
+  /*
+    Circumscribe primitive within a circle.
+  */
+  bounds=GetPrimitiveBounds(primitive_info,j);
   /*
     Speculate how many points our primitive might consume.
   */
