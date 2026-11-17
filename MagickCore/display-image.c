@@ -17197,6 +17197,13 @@ static void XTrackPanPointer(XWindows *windows,XEvent *event,Display *display,
   } while ((state & ExitState) == 0);
 }
 
+static void XRestorePanCursor(Display *display,XWindows *windows,Cursor cursor)
+{
+  (void) XCheckDefineCursor(display,windows->pan.id,windows->pan.cursor);
+  (void) XFreeCursor(display,cursor);
+  (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+}
+
 static void XPanImage(Display *display,XWindows *windows,XEvent *event,
   ExceptionInfo *exception)
 {
@@ -17215,9 +17222,7 @@ static void XPanImage(Display *display,XWindows *windows,XEvent *event,
   /*
     Restore cursor.
   */
-  (void) XCheckDefineCursor(display,windows->pan.id,windows->pan.cursor);
-  (void) XFreeCursor(display,cursor);
-  (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+  XRestorePanCursor(display,windows,cursor);
 }
 
 /*
