@@ -367,12 +367,22 @@ MagickExport void GetPixelInfo(const Image *image,PixelInfo *pixel)
 typedef MagickRealType
   (*PixelGammaHandler)(const MagickRealType);
 
+typedef struct _IntensityColorspace
+{
+  ColorspaceType
+    colorspace,  /* the colorspace of the samples */
+    linear,  /* a colorspace besides RGB whose samples are encoded */
+    nonlinear;  /* a colorspace besides sRGB whose samples are decoded */
+} IntensityColorspace;
+
 static const double
   rec601_weights[3] = { 0.298839, 0.586811, 0.114350 },
   rec709_weights[3] = { 0.212656, 0.715158, 0.072186 };
 
-static MagickRealType GammaWeightedIntensity(const MagickRealType *sample,
-  const PixelGammaHandler gamma,const double *weight)
+static magick_attribute((__always_inline__)) inline MagickRealType
+  GammaWeightedIntensity(const MagickRealType *sample,
+  const PixelGammaHandler gamma,const MagickBooleanType apply_gamma,
+  const double *weight)
 {
   MagickRealType
     blue,
@@ -382,7 +392,7 @@ static MagickRealType GammaWeightedIntensity(const MagickRealType *sample,
   red=sample[0];
   green=sample[1];
   blue=sample[2];
-  if (gamma != (PixelGammaHandler) NULL)
+  if (apply_gamma != MagickFalse)
     {
       red=gamma(red);
       green=gamma(green);
@@ -391,27 +401,23 @@ static MagickRealType GammaWeightedIntensity(const MagickRealType *sample,
   return(weight[0]*red+weight[1]*green+weight[2]*blue);
 }
 
-static MagickRealType LumaIntensityFromSamples(
-  const PixelIntensityMethod method,const PixelGammaHandler encode,
-  const PixelGammaHandler decode,const MagickRealType *sample)
+static magick_attribute((__always_inline__)) inline MagickBooleanType
+  IsLinearIntensity(const IntensityColorspace *space)
 {
-  switch (method)
-  {
-    case Rec601LumaPixelIntensityMethod:
-      return(GammaWeightedIntensity(sample,encode,rec601_weights));
-    case Rec601LuminancePixelIntensityMethod:
-      return(GammaWeightedIntensity(sample,decode,rec601_weights));
-    case Rec709LuminancePixelIntensityMethod:
-      return(GammaWeightedIntensity(sample,decode,rec709_weights));
-    default:
-      break;
-  }
-  return(GammaWeightedIntensity(sample,encode,rec709_weights));
+  return((MagickBooleanType) ((space->colorspace == RGBColorspace) ||
+    (space->colorspace == space->linear)));
 }
 
-static MagickRealType IntensityFromSamples(const PixelIntensityMethod method,
-  const PixelGammaHandler encode,const PixelGammaHandler decode,
-  const MagickRealType *sample)
+static magick_attribute((__always_inline__)) inline MagickBooleanType
+  IsNonlinearIntensity(const IntensityColorspace *space)
+{
+  return((MagickBooleanType) ((space->colorspace == sRGBColorspace) ||
+    (space->colorspace == space->nonlinear)));
+}
+
+static magick_attribute((__always_inline__)) inline MagickRealType
+  IntensityFromSamples(const PixelIntensityMethod method,
+  const IntensityColorspace *space,const MagickRealType *sample)
 {
   MagickRealType
     blue,
@@ -433,18 +439,31 @@ static MagickRealType IntensityFromSamples(const PixelIntensityMethod method,
     case MSPixelIntensityMethod:
       return((MagickRealType) (((double) red*red+green*green+blue*blue)/
         (3.0*(double) QuantumRange)));
+    case Rec601LumaPixelIntensityMethod:
+      return(GammaWeightedIntensity(sample,EncodePixelGamma,
+        IsLinearIntensity(space),rec601_weights));
+    case Rec601LuminancePixelIntensityMethod:
+      return(GammaWeightedIntensity(sample,DecodePixelGamma,
+        IsNonlinearIntensity(space),rec601_weights));
+    case Rec709LuminancePixelIntensityMethod:
+      return(GammaWeightedIntensity(sample,DecodePixelGamma,
+        IsNonlinearIntensity(space),rec709_weights));
     case RMSPixelIntensityMethod:
       return((MagickRealType) (sqrt((double) red*red+green*green+blue*blue)/
         sqrt(3.0)));
     default:
       break;
   }
-  return(LumaIntensityFromSamples(method,encode,decode,sample));
+  return(GammaWeightedIntensity(sample,EncodePixelGamma,
+    IsLinearIntensity(space),rec709_weights));
 }
 
 MagickExport MagickRealType GetPixelInfoIntensity(
   const Image *magick_restrict image,const PixelInfo *magick_restrict pixel)
 {
+  IntensityColorspace
+    space;
+
   MagickRealType
     sample[3];
 
@@ -457,9 +476,10 @@ MagickExport MagickRealType GetPixelInfoIntensity(
   sample[0]=pixel->red;
   sample[1]=pixel->green;
   sample[2]=pixel->blue;
-  return(IntensityFromSamples(method,
-    pixel->colorspace == RGBColorspace ? EncodePixelGamma : NULL,
-    pixel->colorspace == sRGBColorspace ? DecodePixelGamma : NULL,sample));
+  space.colorspace=pixel->colorspace;
+  space.linear=RGBColorspace;
+  space.nonlinear=sRGBColorspace;
+  return(IntensityFromSamples(method,&space,sample));
 }
 
 /*
@@ -502,6 +522,9 @@ MagickExport MagickRealType GetPixelInfoIntensity(
 MagickExport MagickRealType GetPixelIntensity(
   const Image *magick_restrict image,const Quantum *magick_restrict pixel)
 {
+  IntensityColorspace
+    space;
+
   MagickRealType
     sample[3];
 
@@ -510,11 +533,10 @@ MagickExport MagickRealType GetPixelIntensity(
     return(sample[0]);
   sample[1]=(MagickRealType) GetPixelGreen(image,pixel);
   sample[2]=(MagickRealType) GetPixelBlue(image,pixel);
-  return(IntensityFromSamples(image->intensity,
-    (image->colorspace == RGBColorspace) ||
-    (image->colorspace == LinearGRAYColorspace) ? EncodePixelGamma : NULL,
-    (image->colorspace == sRGBColorspace) ||
-    (image->colorspace == GRAYColorspace) ? DecodePixelGamma : NULL,sample));
+  space.colorspace=image->colorspace;
+  space.linear=LinearGRAYColorspace;
+  space.nonlinear=GRAYColorspace;
+  return(IntensityFromSamples(image->intensity,&space,sample));
 }
 
 static void LoadAlphaWeightedPixels(const Image *magick_restrict image,
