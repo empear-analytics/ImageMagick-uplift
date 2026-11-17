@@ -21991,6 +21991,130 @@ lane a.
 
 ---
 
+## Recipe TV - Share a Two-View Parallel Row Loop Through a Row Function
+
+**Use when:** CodeScene reports *Code Duplication* (and often *Complex Method* at cc 10) among
+functions of one file that each clone an image and then run the same parallel row loop over
+two cache views: the clone's authentic view and a second image's virtual view, each row's
+`p` fetched from the second image and `q` from the clone, one row of work on `(p,q)`, the
+sync, both views destroyed. `compare-similarity-image.c`'s `SIMDivideImage`,
+`SIMVarianceImage` and `SIMSubtractImageMean`.
+
+**Not covered by:** Recipe RL, whose driver has one authentic view and whose row function
+takes `(image,arguments,q)`; a second view and its `p` are a different shape (RL step 2), and
+RL has eight steps already. Recipe CF, whose copies hold no `#pragma` line. Recipe N step 1,
+which moves one function's loop whole, so that a second loop moved the same way clones the
+first.
+
+**How:**
+
+1. Copies. Two or more functions of one file, each holding one whole parallel loop under
+   Recipe N step 1's conditions, from the acquisition of the authentic view of the image the
+   function cloned (`image_view=AcquireAuthenticCacheView(I,exception);`) to the destruction
+   of that view after the virtual view of the second image `S` (`S_view=DestroyCacheView(...)`
+   then `image_view=DestroyCacheView(...)`). Check by script that the copies are the same
+   token sequence once `I` and `S` and their views are named `image`, `source`,
+   `image_view` and `source_view`, and the row work, the run between the null test's
+   `continue;` block and the sync, is written `rows->method(&row,p,q);` after the four
+   assignments of step 3. Each copy's pragma is then `magick_number_threads(source,image,
+   image->rows,1)` with the same other clauses, and nothing after the copy reads either view
+   or `y`.
+2. Row work. Each copy's row work is one call of a `static void` row function of the file
+   on `(I,S,p,q)` or on a struct filled in the iteration from `I`, `S`, the row `y` and one
+   input that the loop never writes. Each row function takes `(const SIMPairRow *row,const
+   Quantum *magick_restrict p,Quantum *magick_restrict q)` and binds, as its first
+   declarations, `const` locals of the old parameter names from `row->image`,
+   `row->source`, `row->y` and `row->arguments` (converted to the input's pointer type);
+   its body is otherwise unchanged. A row struct type that only that call used goes.
+3. Above the first row function write `typedef struct` `PairRow` with members
+   `const Image *image, *source`, `const void *arguments` and `ssize_t y`; the method
+   `typedef void (*PairRowMethod)(const PairRow *,const Quantum *magick_restrict,Quantum
+   *magick_restrict);`; and `PairRows` with `method` and `arguments`.
+4. Directly above the first caller, one non-inline `static MagickBooleanType` driver
+   `(Image *image,const Image *source,const PairRows *rows,ExceptionInfo *exception)`: the
+   copy's locals and loop text (step 1's names), with a `PairRow row;` local of the
+   iteration filled `row.image=image; row.source=source; row.arguments=rows->arguments;
+   row.y=y;` directly before `rows->method(&row,p,q);`, then the views destroyed in the
+   copies' order and `return(status);`.
+5. Each caller keeps its clone and its failure test before the copy and its
+   `if (status == MagickFalse) I=DestroyImage(I); return(I);` after it, declares `const
+   PairRows rows = { F,&input };` (`(const void *) NULL` when the row takes no input, the
+   pointer itself when the input is a pointer), and the copy becomes `status=Driver(I,S,
+   &rows,exception);`. Locals only the copy used leave the caller.
+6. Check by reading the region's write set (quoted in the message): `y`, `p`, `q`, the
+   shared `status` by the same statements, the iteration's own `row`, and row `y` through
+   `q`; `rows` and every object `arguments` points to are only read.
+7. All copies move in one commit. `refactor_guard.py --calls` shows the loop's callees down
+   by the copies less one and the driver, row functions and indirect call added.
+8. The whole catalogue, narrow and wide, stays at 0 diverged; `tools/omp_compare.sh` shows no
+   difference at one and four threads on cases big enough to start several threads; the
+   step is timed in the OpenMP -O2 build (one indirect call per row) at one and four
+   threads with an A/A run beside it.
+
+**Before:**
+
+```c
+static Image *SIMVarianceImage(Image *alpha_image,const Image *beta_image,
+  ExceptionInfo *exception)
+{
+  ...
+  variance_image=CloneImage(alpha_image,0,0,MagickTrue,exception);
+  if (variance_image == (Image *) NULL)
+    return(variance_image);
+  image_view=AcquireAuthenticCacheView(variance_image,exception);
+  beta_view=AcquireVirtualCacheView(beta_image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(beta_image,variance_image,variance_image->rows,1)
+#endif
+  for (y=0; y < (ssize_t) variance_image->rows; y++)
+  {
+    ...
+    VarianceRow(variance_image,beta_image,p,q);
+    ...
+  }
+  beta_view=DestroyCacheView(beta_view);
+  image_view=DestroyCacheView(image_view);
+  if (status == MagickFalse)
+    variance_image=DestroyImage(variance_image);
+  return(variance_image);
+}
+```
+
+**After:**
+
+```c
+  const SIMPairRows
+    rows = { VarianceRow,(const void *) NULL };
+  ...
+  variance_image=CloneImage(alpha_image,0,0,MagickTrue,exception);
+  if (variance_image == (Image *) NULL)
+    return(variance_image);
+  status=SIMImagePairRows(variance_image,beta_image,&rows,exception);
+  if (status == MagickFalse)
+    variance_image=DestroyImage(variance_image);
+  return(variance_image);
+```
+
+**Careful:**
+
+- The loop moves whole, pragma and all, as Recipe RL moves it: what the region writes and
+  what its clauses name are the driver's locals of the same names, so it shares and
+  privatises what it did. The row struct a copy filled in every iteration from the same
+  values is the iteration's own local in the driver, as it was in the copy.
+- The row functions' bindings add `const` to pointers they only read; the pixel arithmetic
+  is the copy's text.
+
+**Evidence level:** oracle (each copy reached by a case), with steps 1 and 6, `--calls`,
+`omp_compare.sh` and timing as above.
+
+**Provenance:** 2026-11-17, from `compare-similarity-image.c`'s `SIMDivideImage`,
+`SIMVarianceImage` and `SIMSubtractImageMean` (campaign A, round 28 lane b), whose
+*Code Duplication* and cc-10 *Complex Method* RL does not reach. Added by Claude Code
+(Claude Opus 5.5) under the owner's approval of 2026-10-24 to evolve the recipes.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -22462,3 +22586,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | AMEND | S | Step 2: a file-scope variable of external linkage that only the moved functions name (and no other file) moves with them, its declaration group and comment verbatim after the new file's *Forward declarations*; by hand, checked by a sorted-line comparison and `nm` | `opencl.c`'s `cache_directory` and `cache_directory_lock` (campaign A, W37 lane a); the declaration form of 82c165e07 asks that both parts name the variable | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | S | *Preprocessor branches*: an `#if` without `#else` directly above the family's first moved function whose `#endif` stands inside the moved run moves whole, directives verbatim; `split_source.py` 3423ec185 | `opencl.c`'s `#if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT` around the benchmark-profile readers (campaign A, W37 lane a) | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | S | Step 2: a chain of splits through private headers may drop the original between its steps, when a stub probe of the whole chain first shows its last state raising the original above its score before the chain and every product and header at or above that score; the dropping step goes `--no-verify` with the drop, the probe and the step that ends it in its message; the lane resets the branch if it cannot reach the probed end; each step keeps a split's checks (both catalogues, `omp_compare` for a region that moves, timing) | `morphology-apply.c` (8.26): round twenty-five's probe of a rotation header and the `MorphologyApply` split dropped the kept file to 8.01, the second split of the `AcquireKernelBuiltIn` side ends it at 10.0 (products 8.54 and 8.26, headers 9.68); round twenty-five's question 5. The ruling is the owner's, the wording and the products-and-headers condition the lane's | owner |
+| 2026-11-17 | NEW | TV | Share a Two-View Parallel Row Loop Through a Row Function: functions that clone an image and run the same parallel row loop over the clone's authentic view and a second image's virtual view, differing only in the row's work on `(p,q)`, move the loop into one non-inline `static` driver taking the clone, the second image and a `const` struct of a row function pointer and a `const void *` input; each row function takes a per-iteration `const` row struct (image, source, arguments, y); checked by script, a by-hand write-set reading, the whole catalogue narrow and wide, `omp_compare.sh` at 1 and 4 threads and OpenMP-build timing | `compare-similarity-image.c`'s `SIMDivideImage`, `SIMVarianceImage` and `SIMSubtractImageMean` (campaign A, round 28 lane b): *Code Duplication* and three cc-10 *Complex Method* findings that Recipe RL's one-view row type does not reach | mandate (2026-10-24) |
