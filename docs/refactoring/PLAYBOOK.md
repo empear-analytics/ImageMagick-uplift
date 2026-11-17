@@ -22820,6 +22820,138 @@ lane a.
 
 ---
 
+## Recipe SO - Extract Sibling Blocks Differing in One Value, Returning One Written Variable and Writing One Through a Pointer
+
+**Use when:** CodeScene reports *Complex Method*, *Bumpy Road Ahead* or *Large Method* on
+functions of one file that hold copies of one small block, the same text except for one
+constant, where each copy writes two of its caller's locals that the caller reads after
+it: one assigned whole before the copy reads it (`p=q` at a scan's start), the other
+read and advanced (the cursor `q`). `draw.c`'s `ParseMVGPushClass`,
+`ParseMVGPushClipPath`, `ParseMVGPushGradient` and `ParseMVGPushPattern` each scan the
+MVG text for `pop <keyword>` with the same loop, differing only in the keyword.
+
+**Not covered by:** Recipe SV, which takes its copies' variables by value and lets a copy
+write one variable (its return value), and whose copies stand in one function; Recipe O,
+which moves one block with a pointer per written variable and passes no constant, so four
+copies would become four helpers differing in one literal; Recipe TW, whose copies are
+two and whose inputs, five or more, go in a struct, under Recipe E's one-output rule;
+Recipe D, whose *Use when* is a reported *Code Duplication* (these copies are not
+reported).
+
+**How:**
+
+1. Each copy is a run of whole statements of its function outside every OpenMP region,
+   with no `#` line, and meets Recipe O steps 1 to 3 (a `break` or `continue` of a loop
+   inside it is fine; none leaves it). The copies may stand in one function or in
+   several functions of the file, at most one copy per function.
+2. Check by script that the copies are the same token sequence once one value is
+   replaced by a name (whitespace and line breaks ignored, no variable renamed): a
+   string literal, a numeric literal or an enumeration constant, the same at each of
+   its positions in a copy, differing between at least two copies.
+3. Written variables. Each copy writes exactly two variables of its caller that the
+   caller reads after it, the same two names in every copy, each a plain local under
+   Recipe O step 2: `r`, which the copy assigns whole before it reads it on every path
+   (SV step 2's returned variable), and `v`, which it may read first. Every other
+   variable a copy names it only reads, or writes only through calls that receive it
+   as a pointer and keep no copy (a token buffer filled by `GetNextToken`).
+4. Write one `static` function directly above the first caller, returning `r`'s type:
+   `r` is a local declared at its top with `r`'s declaration (no initialiser when the
+   caller's had one the copy overwrites), `v` is a parameter `T *v`, then the read
+   variables by value under their caller types (`const` added to a by-value one), then the value as a `const`
+   parameter of the type Recipe SV step 3 gives it; at most four parameters. The body
+   is one copy's text with the value replaced by its parameter, every use of `v`
+   written `(*v)` and each `&v` passed to a callee written `v` (Recipe O step 5),
+   nothing else changed, followed by `return(r);`.
+5. Replace every copy with `r=Helper(&v,...,value);`, each read variable in the
+   position of its parameter, and that copy's value.
+6. Check by script that each copy equals the helper's body, `(*v)` read back as `v`,
+   `v` passed to a callee read back as `&v` and the parameter as that copy's value, and
+   by reading that every argument fills its parameter. All copies move in one commit
+   (one recipe; the functions are named in the message).
+7. Run `refactor_guard.py` (a `WARN` whose counts only dropped, every value present, is
+   the deduplication) and `--calls` (the copies' callees down by the copies removed but
+   one, the helper `+1` plus one per copy), then the oracle on the cases of every
+   caller, each copy reached by a case.
+
+**Before:**
+
+```c
+    (void) GetNextToken(q,&q,extent,token);
+    for (p=q; *q != '\0'; )
+    {
+      if (GetNextToken(q,&q,extent,token) < 1)
+        break;
+      if (LocaleCompare(token,"pop") != 0)
+        continue;
+      (void) GetNextToken(q,(const char **) NULL,extent,token);
+      if (LocaleCompare(token,"clip-path") != 0)
+        continue;
+      break;
+    }
+    if (IsMVGBlockEndMissing(q,p) != MagickFalse)
+```
+
+**After:**
+
+```c
+static const char *FindMVGPopKeyword(const char **q,const size_t extent,
+  char *token,const char *keyword)
+{
+  const char
+    *p;
+
+  for (p=(*q); *(*q) != '\0'; )
+  {
+    if (GetNextToken((*q),q,extent,token) < 1)
+      break;
+    ...
+    if (LocaleCompare(token,keyword) != 0)
+      continue;
+    break;
+  }
+  return(p);
+}
+...
+    (void) GetNextToken(q,&q,extent,token);
+    p=FindMVGPopKeyword(&q,extent,token,"clip-path");
+    if (IsMVGBlockEndMissing(q,p) != MagickFalse)
+```
+
+**Careful:**
+
+- Why the behaviour is the same. `r` is assigned whole before the copy reads it, so the
+  helper's local starts where the copy's did (the value on entry was never read) and
+  takes the same writes; `return(r);` hands back the value the copy left, and the
+  caller's `r=` stores it where the copy did. `v` is the caller's own object, reached
+  through the pointer: each read sees the value it saw (the caller's on entry, then the
+  block's own writes), each write lands in the caller's variable in the same order,
+  and a callee given `v` receives `&v`, the same address. Recipe O step 2's rule on
+  addresses means no other pointer reaches `v` or `r` while the helper runs.
+- The value is a constant with no side effect, evaluated at the call instead of at its
+  use, of the type Recipe SV step 3 gives it, so nothing converts differently. A string
+  literal passed to a `const char *` parameter is the same characters; the callee
+  (`LocaleCompare`) reads them as before. Two copies holding the same literal may have
+  shared one array; the callee only reads it, so nothing depends on its address.
+- A read variable goes by value: the copy did not write it, so the copy and the helper
+  read the same value. A buffer it fills through a callee (`token`) is written through
+  the same pointer value, into the caller's buffer.
+- The extra call adds an indirection to `v` that the compiler may keep or inline; the
+  values do not change. A per-pixel copy would need timing; a parser scan runs per
+  keyword.
+
+**Evidence level:** oracle (each copy reached by a case), with steps 2 and 6 checked by
+script, `refactor_guard.py` and `--calls` as step 7 says.
+
+**Provenance:** 2026-11-17, from `draw.c`'s four MVG push handlers (campaign B, M137): in a
+probe `ParseMVGPushClipPath` leaves *Complex Method* (cc 9 to 5), `ParseMVGPushGradient`
+cc 22 to 16 with one bump fewer, `ParseMVGPushPattern` cc 19 to 13 and leaves *Bumpy Road
+Ahead*; the helper has no finding; draw.c stays 3.27. SV refuses the copies (two written
+variables, four functions), O would write four helpers differing in one literal, and the
+five inputs exceed four parameters without SV's returned form for `p`. Added by Claude Code
+(Claude Opus 5.5) under the owner's authorisation of 2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -23311,3 +23443,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | AMEND | S | Step 2: a file-scope variable of external linkage that only the moved functions name (and no other file) moves with them, its declaration group and comment verbatim after the new file's *Forward declarations*; by hand, checked by a sorted-line comparison and `nm` | `opencl.c`'s `cache_directory` and `cache_directory_lock` (campaign A, W37 lane a); the declaration form of 82c165e07 asks that both parts name the variable | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | S | *Preprocessor branches*: an `#if` without `#else` directly above the family's first moved function whose `#endif` stands inside the moved run moves whole, directives verbatim; `split_source.py` 3423ec185 | `opencl.c`'s `#if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT` around the benchmark-profile readers (campaign A, W37 lane a) | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | S | Step 2: a chain of splits through private headers may drop the original between its steps, when a stub probe of the whole chain first shows its last state raising the original above its score before the chain and every product and header at or above that score; the dropping step goes `--no-verify` with the drop, the probe and the step that ends it in its message; the lane resets the branch if it cannot reach the probed end; each step keeps a split's checks (both catalogues, `omp_compare` for a region that moves, timing) | `morphology-apply.c` (8.26): round twenty-five's probe of a rotation header and the `MorphologyApply` split dropped the kept file to 8.01, the second split of the `AcquireKernelBuiltIn` side ends it at 10.0 (products 8.54 and 8.26, headers 9.68); round twenty-five's question 5. The ruling is the owner's, the wording and the products-and-headers condition the lane's | owner |
+| 2026-11-17 | NEW | SO | Extract Sibling Blocks Differing in One Value, Returning One Written Variable and Writing One Through a Pointer: copies of one small block in one or several functions of a file, differing in one constant and writing two caller locals (one assigned whole first, one advanced), become one `static` function returning the first and taking the second by pointer | `draw.c`'s MVG push handlers (`ParseMVGPushClass`, `-ClipPath`, `-Gradient`, `-Pattern`): `ParseMVGPushClipPath` leaves *Complex Method*, `-Gradient` cc 22 to 16, `-Pattern` 19 to 13 and leaves *Bumpy Road Ahead* in a probe; campaign B, M137 | mandate (2026-10-24) |
