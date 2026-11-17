@@ -9881,11 +9881,7 @@ static MagickBooleanType TraceEllipse(MVGInfo *mvg_info,const PointInfo center,
     primitive_info[primitive_info->coordinates-1].point.y);
   if ((x < MagickEpsilon) && (y < MagickEpsilon))
     primitive_info->closed_subpath=MagickTrue;
-  for (i=0; i < (ssize_t) primitive_info->coordinates; i++)
-  {
-    p->primitive=primitive_info->primitive;
-    p--;
-  }
+  SetTracedPrimitiveType(primitive_info,p);
   return(MagickTrue);
 }
 
