@@ -1626,9 +1626,6 @@ static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
   return(mse_image);
 }
 
-static Image *NCCSimilarityImage(const Image *image,const Image *reconstruct,
-  RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
-{
 #define ThrowNCCSimilarityException() \
 { \
   if (alpha_image != (Image *) NULL) \
@@ -1655,6 +1652,9 @@ static Image *NCCSimilarityImage(const Image *image,const Image *reconstruct,
   return((Image *) NULL); \
 }
 
+static Image *NCCSimilarityImage(const Image *image,const Image *reconstruct,
+  RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
+{
   ChannelStatistics
     *channel_statistics = (ChannelStatistics *) NULL;
 
