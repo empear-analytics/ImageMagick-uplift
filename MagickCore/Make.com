@@ -24,6 +24,7 @@ $endif
 $
 $write sys$output "Making MagickCore..."
 $call Make accelerate.c
+$call Make accelerate-local-contrast.c
 $call Make accelerate-motion-blur.c
 $call Make accelerate-blur.c
 $call Make accelerate-denoise.c
