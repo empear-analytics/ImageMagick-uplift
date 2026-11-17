@@ -12602,6 +12602,26 @@ static void XApplyEdgeDetectCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplySpreadToImage(Display *display,XWindows *windows,
+  MagickStatusType *flags,char *amount,Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *spread_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(amount,&geometry_info);
+  spread_image=EdgeImage(*image,geometry_info.rho,exception);
+  if (spread_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=spread_image;
+    }
+}
+
 static void XApplySpreadCommand(const XMagickCommandContext *context,
   MagickStatusType *flags)
 {
@@ -12620,12 +12640,6 @@ static void XApplySpreadCommand(const XMagickCommandContext *context,
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  Image
-    *spread_image;
-
   static char
     amount[MagickPathExtent] = "2";
 
@@ -12639,15 +12653,7 @@ static void XApplySpreadCommand(const XMagickCommandContext *context,
   /*
     Displace image pixels by a random amount.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  *flags=ParseGeometry(amount,&geometry_info);
-  spread_image=EdgeImage(*image,geometry_info.rho,exception);
-  if (spread_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=spread_image;
-    }
+  XApplySpreadToImage(display,windows,flags,amount,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
