@@ -26358,6 +26358,17 @@ static MagickStatusType XMakeDisplayXImages(const DisplayEventContext *context,
   return(status);
 }
 
+static void XInitializePanWindow(const DisplayEventContext *context,
+  XWindows *windows,Display *display)
+{
+  XMakePanWindow(context);
+  if (windows->info.mapped != MagickFalse)
+    (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+  if ((windows->image.mapped == MagickFalse) ||
+      (windows->backdrop.id != (Window) NULL))
+    (void) XMapWindow(display,windows->image.id);
+}
+
 static void XMakeDisplayWindows(const DisplayEventContext *context,
   Image *display_image)
 {
@@ -26425,12 +26436,7 @@ static void XMakeDisplayWindows(const DisplayEventContext *context,
   /*
     Initialize panning window.
   */
-  XMakePanWindow(context);
-  if (windows->info.mapped != MagickFalse)
-    (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
-  if ((windows->image.mapped == MagickFalse) ||
-      (windows->backdrop.id != (Window) NULL))
-    (void) XMapWindow(display,windows->image.id);
+  XInitializePanWindow(context,windows,display);
 }
 
 static void XMakeIconWindow(const DisplayEventContext *context,
