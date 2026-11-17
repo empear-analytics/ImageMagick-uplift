@@ -713,6 +713,25 @@ static MagickBooleanType FlushFinalEdge(PolygonInfo *polygon_info,
   return(MagickTrue);
 }
 
+static MagickBooleanType ShrinkPolygonEdgePoints(PolygonInfo *polygon_info)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) polygon_info->number_edges; i++)
+  {
+    EdgeInfo
+      *edge_info;
+
+    edge_info=polygon_info->edges+i;
+    edge_info->points=(PointInfo *) ResizeQuantumMemory(edge_info->points,
+      edge_info->number_points,sizeof(*edge_info->points));
+    if (edge_info->points == (PointInfo *) NULL)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
   ExceptionInfo *exception)
 {
@@ -912,21 +931,12 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
         ResourceLimitError,"MemoryAllocationFailed","`%s'","");
       return(DestroyPolygonInfo(polygon_info));
     }
-  for (i=0; i < (ssize_t) polygon_info->number_edges; i++)
-  {
-    EdgeInfo
-      *edge_info;
-
-    edge_info=polygon_info->edges+i;
-    edge_info->points=(PointInfo *) ResizeQuantumMemory(edge_info->points,
-      edge_info->number_points,sizeof(*edge_info->points));
-    if (edge_info->points == (PointInfo *) NULL)
-      {
-        (void) ThrowMagickException(exception,GetMagickModule(),
-          ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-        return(DestroyPolygonInfo(polygon_info));
-      }
-  }
+  if (ShrinkPolygonEdgePoints(polygon_info) == MagickFalse)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'","");
+      return(DestroyPolygonInfo(polygon_info));
+    }
   qsort(polygon_info->edges,(size_t) polygon_info->number_edges,
     sizeof(*polygon_info->edges),DrawCompareEdges);
   if ((GetLogEventMask() & DrawEvent) != 0)
