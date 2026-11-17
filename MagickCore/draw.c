@@ -1219,6 +1219,16 @@ MagickExport DrawInfo *DestroyDrawInfo(DrawInfo *draw_info)
 %
 */
 
+static void RaiseEdgeStart(const double intercept,SegmentInfo *inverse_edge)
+{
+  double
+    x;
+
+  x=intercept;
+  if (x > (*inverse_edge).x1)
+    (*inverse_edge).x1=x;
+}
+
 static SegmentInfo AffineEdge(const Image *image,const AffineMatrix *affine,
   const double y,const SegmentInfo *edge)
 {
@@ -1243,9 +1253,7 @@ static SegmentInfo AffineEdge(const Image *image,const AffineMatrix *affine,
   if (affine->sx >= MagickEpsilon)
     {
       intercept=(-z/affine->sx);
-      x=intercept;
-      if (x > inverse_edge.x1)
-        inverse_edge.x1=x;
+      RaiseEdgeStart(intercept,&inverse_edge);
       intercept=(-z+(double) image->columns)/affine->sx;
       x=intercept;
       if (x < inverse_edge.x2)
