@@ -899,6 +899,59 @@ static Image *DiscardLocalContrastOutput(MagickBooleanType outputReady,
   return(filteredImage);
 }
 
+typedef struct _LocalContrastPrepareTargets
+{
+  MagickCLDevice
+    *device;
+
+  cl_command_queue
+    *queue;
+
+  CacheView
+    **image_view;
+
+  cl_mem
+    *imageBuffer;
+
+  Image
+    **filteredImage;
+
+  CacheView
+    **filteredImage_view;
+
+  void
+    **filteredPixels;
+
+  cl_mem
+    *filteredImageBuffer;
+} LocalContrastPrepareTargets;
+
+static MagickBooleanType PrepareLocalContrastImage(MagickCLEnv clEnv,
+  const Image *image,ExceptionInfo *exception,
+  const LocalContrastPrepareTargets *prepare)
+{
+  {
+    const LocalContrastResourceTargets targets = { prepare->device,
+      prepare->queue, prepare->image_view, prepare->imageBuffer };
+
+    if (AcquireLocalContrastResources(clEnv,image,exception,&targets) ==
+        MagickFalse)
+      return(MagickFalse);
+  }
+
+  {
+    const LocalContrastOutputInputs inputs = { clEnv, *prepare->device,
+      image };
+    const LocalContrastOutputTargets targets = { prepare->filteredImage,
+      prepare->filteredImage_view, prepare->filteredPixels,
+      prepare->filteredImageBuffer };
+
+    if (CreateLocalContrastOutput(&inputs,exception,&targets) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 typedef struct _LocalContrastCleanupInputs
 {
   MagickCLEnv
@@ -1001,20 +1054,12 @@ static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
   outputReady=MagickFalse;
 
   {
-    const LocalContrastResourceTargets targets = { &device, &queue,
-      &image_view, &imageBuffer };
+    const LocalContrastPrepareTargets targets = { &device, &queue,
+      &image_view, &imageBuffer, &filteredImage, &filteredImage_view,
+      &filteredPixels, &filteredImageBuffer };
 
-    if (AcquireLocalContrastResources(clEnv,image,exception,&targets) ==
+    if (PrepareLocalContrastImage(clEnv,image,exception,&targets) ==
         MagickFalse)
-      goto cleanup;
-  }
-
-  {
-    const LocalContrastOutputInputs inputs = { clEnv, device, image };
-    const LocalContrastOutputTargets targets = { &filteredImage,
-      &filteredImage_view, &filteredPixels, &filteredImageBuffer };
-
-    if (CreateLocalContrastOutput(&inputs,exception,&targets) == MagickFalse)
       goto cleanup;
   }
 
