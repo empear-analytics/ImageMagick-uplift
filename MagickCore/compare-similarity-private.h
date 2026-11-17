@@ -2445,6 +2445,50 @@ static inline MagickBooleanType GetDSSIMSimilarity(const Image *image,
   return(status);
 }
 
+typedef MagickBooleanType
+  (*SimilarityMetricMethod)(const Image *,const Image *,double *,
+    ExceptionInfo *);
+
+typedef struct _SimilarityMetricEntry
+{
+  MetricType
+    metric;
+
+  SimilarityMetricMethod
+    get_similarity;
+} SimilarityMetricEntry;
+
+static const SimilarityMetricEntry
+  SimilarityMetricEntries[] =
+  {
+    { AbsoluteErrorMetric, GetAESimilarity },
+    { DotProductCorrelationErrorMetric, GetDPCSimilarity },
+    { FuzzErrorMetric, GetFUZZSimilarity },
+    { MeanAbsoluteErrorMetric, GetMAESimilarity },
+    { MeanSquaredErrorMetric, GetMSESimilarity },
+    { NormalizedCrossCorrelationErrorMetric, GetNCCSimilarity },
+    { PeakAbsoluteErrorMetric, GetPASimilarity },
+    { PeakSignalToNoiseRatioErrorMetric, GetPSNRSimilarity },
+    { PerceptualHashErrorMetric, GetPHASHSimilarity },
+    { PhaseCorrelationErrorMetric, GetPHASESimilarity },
+    { PixelDifferenceCountErrorMetric, GetPDCSimilarity },
+    { StructuralDissimilarityErrorMetric, GetDSSIMSimilarity },
+    { StructuralSimilarityErrorMetric, GetSSIMSimularity }
+  };
+
+static inline const SimilarityMetricEntry *GetSimilarityMetricEntry(
+  const MetricType metric)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(SimilarityMetricEntries)/
+       sizeof(*SimilarityMetricEntries)); i++)
+    if (SimilarityMetricEntries[i].metric == metric)
+      return(SimilarityMetricEntries+i);
+  return((const SimilarityMetricEntry *) NULL);
+}
+
 static inline MagickBooleanType GetSimilarityForMetric(Image *image,
   const Image *reconstruct_image,const MetricType metric,
   double *channel_similarity,ExceptionInfo *exception)
@@ -2454,96 +2498,23 @@ static inline MagickBooleanType GetSimilarityForMetric(Image *image,
 
   switch (metric)
   {
-    case AbsoluteErrorMetric:
-    {
-      status=GetAESimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case DotProductCorrelationErrorMetric:
-    {
-      status=GetDPCSimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case FuzzErrorMetric:
-    {
-      status=GetFUZZSimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case MeanAbsoluteErrorMetric:
-    {
-      status=GetMAESimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
     case MeanErrorPerPixelErrorMetric:
     {
       status=GetMEPPSimilarity(image,reconstruct_image,channel_similarity,
         exception);
       break;
     }
-    case MeanSquaredErrorMetric:
-    {
-      status=GetMSESimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case NormalizedCrossCorrelationErrorMetric:
-    {
-      status=GetNCCSimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case PeakAbsoluteErrorMetric:
-    {
-      status=GetPASimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case PeakSignalToNoiseRatioErrorMetric:
-    {
-      status=GetPSNRSimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case PerceptualHashErrorMetric:
-    {
-      status=GetPHASHSimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case PhaseCorrelationErrorMetric:
-    {
-      status=GetPHASESimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case PixelDifferenceCountErrorMetric:
-    {
-      status=GetPDCSimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case RootMeanSquaredErrorMetric:
-    case UndefinedErrorMetric:
     default:
     {
-      status=GetRMSESimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case StructuralDissimilarityErrorMetric:
-    {
-      status=GetDSSIMSimilarity(image,reconstruct_image,channel_similarity,
-        exception);
-      break;
-    }
-    case StructuralSimilarityErrorMetric:
-    {
-      status=GetSSIMSimularity(image,reconstruct_image,channel_similarity,
-        exception);
+      const SimilarityMetricEntry
+        *entry = GetSimilarityMetricEntry(metric);
+
+      if (entry == (const SimilarityMetricEntry *) NULL)
+        status=GetRMSESimilarity(image,reconstruct_image,channel_similarity,
+          exception);
+      else
+        status=entry->get_similarity(image,reconstruct_image,
+          channel_similarity,exception);
       break;
     }
   }
