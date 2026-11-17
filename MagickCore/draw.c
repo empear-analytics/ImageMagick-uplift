@@ -4078,6 +4078,16 @@ static void ApplyMVGClipPath(const MVGRenderState *state)
   (*state->status)=status;
 }
 
+static ssize_t RepeatOddDashPattern(DrawInfo **graphic_context,
+  const ssize_t n,const ssize_t x,ssize_t j)
+{
+  if (((x & 0x01) != 0) && (j == x))
+    for ( ; j < (2*x); j++)
+      graphic_context[n]->dash_pattern[j]=
+        graphic_context[n]->dash_pattern[j-x];
+  return(j);
+}
+
 static void ParseMVGDashPattern(const MVGRenderState *state)
 {
   char
@@ -4111,10 +4121,7 @@ static void ParseMVGDashPattern(const MVGRenderState *state)
     if (graphic_context[n]->dash_pattern[j] <= 0.0)
       status=MagickFalse;
   }
-  if (((x & 0x01) != 0) && (j == x))
-    for ( ; j < (2*x); j++)
-      graphic_context[n]->dash_pattern[j]=
-        graphic_context[n]->dash_pattern[j-x];
+  j=RepeatOddDashPattern(graphic_context,n,x,j);
   graphic_context[n]->dash_pattern[j]=0.0;
   (*state->q)=q;
   (*state->status)=status;
