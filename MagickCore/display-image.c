@@ -12164,6 +12164,22 @@ static void XApplyQuitCommand(const XMagickCommandContext *context)
   XQuitDisplayProgram(resource_info,display,windows);
 }
 
+static void XApplyDespeckleToImage(Display *display,XWindows *windows,
+  Image **image,ExceptionInfo *exception)
+{
+  Image
+    *despeckle_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  despeckle_image=DespeckleImage(*image,exception);
+  if (despeckle_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=despeckle_image;
+    }
+}
+
 static void XApplyDespeckleCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12181,20 +12197,10 @@ static void XApplyDespeckleCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
-  Image
-    *despeckle_image;
-
   /*
     Despeckle image.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  despeckle_image=DespeckleImage(*image,exception);
-  if (despeckle_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=despeckle_image;
-    }
+  XApplyDespeckleToImage(display,windows,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
