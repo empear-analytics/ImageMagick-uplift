@@ -75,8 +75,22 @@ MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_DEPENDENC
 MAGICKCORE_BASE_SRCS = \
   MagickCore/MagickCore.h \
   MagickCore/accelerate.c \
+  MagickCore/accelerate-point.c \
+  MagickCore/accelerate-local-contrast.c \
+  MagickCore/accelerate-motion-blur.c \
+  MagickCore/accelerate-blur.c \
+  MagickCore/accelerate-rotational-blur.c \
+  MagickCore/accelerate-unsharp.c \
+  MagickCore/accelerate-denoise.c \
+  MagickCore/accelerate-despeckle.c \
+  MagickCore/accelerate-histogram.c \
+  MagickCore/accelerate-contrast-stretch.c \
+  MagickCore/accelerate-resize.c \
   MagickCore/accelerate-private.h \
   MagickCore/accelerate-kernels-private.h \
+  MagickCore/accelerate-blur-private.h \
+  MagickCore/accelerate-histogram-private.h \
+  MagickCore/accelerate-core-private.h \
   MagickCore/animate.c \
   MagickCore/animate-window.c \
   MagickCore/animate.h \
@@ -129,11 +143,15 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/colorspace-private.h \
   MagickCore/compare.c \
   MagickCore/compare-similarity.c \
+  MagickCore/compare-similarity-image.c \
   MagickCore/compare.h \
   MagickCore/compare-private.h \
+  MagickCore/compare-similarity-private.h \
   MagickCore/composite.c \
+  MagickCore/composite-image.c \
   MagickCore/composite.h \
   MagickCore/composite-private.h \
+  MagickCore/composite-row-private.h \
   MagickCore/compress.c \
   MagickCore/compress-lzw.c \
   MagickCore/compress.h \
@@ -210,8 +228,10 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/fourier-complex.c \
   MagickCore/fourier.h \
   MagickCore/fx.c \
+  MagickCore/fx-execute.c \
   MagickCore/fx.h \
   MagickCore/fx-private.h \
+  MagickCore/fx-execute-private.h \
   MagickCore/gem.c \
   MagickCore/gem.h \
   MagickCore/gem-private.h \
@@ -293,10 +313,12 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/nt-feature.h \
   MagickCore/opencl.c \
   MagickCore/opencl-environment.c \
+  MagickCore/opencl-initialize.c \
   MagickCore/opencl-enqueue.c \
   MagickCore/opencl-device.c \
   MagickCore/opencl.h \
   MagickCore/opencl-private.h \
+  MagickCore/opencl-environment-private.h \
   MagickCore/option.c \
   MagickCore/option-image.c \
   MagickCore/option.h \
@@ -590,6 +612,9 @@ MAGICKCORE_INCLUDE_HDRS = \
 MAGICKCORE_NOINST_HDRS = \
   MagickCore/accelerate-private.h \
   MagickCore/accelerate-kernels-private.h \
+  MagickCore/accelerate-blur-private.h \
+  MagickCore/accelerate-histogram-private.h \
+  MagickCore/accelerate-core-private.h \
   MagickCore/animate-private.h \
   MagickCore/annotate-private.h \
   MagickCore/blob-private.h \
@@ -601,7 +626,9 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/color-private.h \
   MagickCore/colorspace-private.h \
   MagickCore/compare-private.h \
+  MagickCore/compare-similarity-private.h \
   MagickCore/composite-private.h \
+  MagickCore/composite-row-private.h \
   MagickCore/configure-private.h \
   MagickCore/constitute-private.h \
   MagickCore/delegate-private.h \
@@ -618,6 +645,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/exception-private.h \
   MagickCore/feature-private.h \
   MagickCore/fx-private.h \
+  MagickCore/fx-execute-private.h \
   MagickCore/gem-private.h \
   MagickCore/geometry-private.h \
   MagickCore/image-private.h \
@@ -640,6 +668,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/nt-base.h \
   MagickCore/nt-feature.h \
   MagickCore/opencl-private.h \
+  MagickCore/opencl-environment-private.h \
   MagickCore/option-private.h \
   MagickCore/pixel-private.h \
   MagickCore/policy-private.h \

@@ -7,9 +7,10 @@ The original object and the object of the file split off it number a function's 
 (clang's `XMagickCommand.radius.203` is `.196` once other numbered names no longer come before it), so a
 reference to the variable must compare equal across the two objects and a reference to another variable must
 not. canonical_reference_names() names each such reference by its rank among the numbers of its stem that the functions use; the planted
-defects below are the references that must still differ.
+defects below are the references that must still differ. Further tests cover .data.rel.ro.local tables, a
+leading `endbr64` in one object only, and a report that lists every differing function.
 """
-import importlib.util, os, unittest
+import contextlib, importlib.util, io, os, unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 spec = importlib.util.spec_from_file_location("split_branch_check", os.path.join(ROOT, "tools", "split_branch_check.py"))
@@ -58,6 +59,60 @@ class CanonicalReferenceNames(unittest.TestCase):
     def test_plain_names_other_sections_and_other_references_are_untouched(self):
         self.assertEqual(renamed(ref(".bss", "counter", 4), "mov %eax,%ebx", ref(".data.rel.local", "t.7", 8)),
                          [ref(".bss", "counter", 4), "mov %eax,%ebx", ref(".data.rel.local", "t.#0", 8)])
+
+
+class ReadOnlyLocalTables(unittest.TestCase):
+    """gcc's PIC code puts a file-scope `static const` table of string pointers (fx.c's `Operators`) in
+    .data.rel.ro.local; a split that moves other tables shifts its offset, which must not count, while a reference
+    to another table must."""
+    SEC = ".data.rel.ro.local"
+    OLD = {SEC: [(0x000, 0x1e0, "Constants"), (0x1e0, 0x268, "Operators")]}
+    NEW = {SEC: [(0x000, 0x268, "Operators"), (0x268, 0x1e0, "Constants")]}
+
+    def test_shifted_table_resolves_to_the_same_symbol(self):
+        self.assertEqual(sbc.symbol_at(self.OLD, self.SEC, 0x1e0 + 0x10), sbc.symbol_at(self.NEW, self.SEC, 0x10))
+
+    def test_another_table_differs(self):
+        # planted defect: the new code reads Constants where the old read Operators
+        self.assertNotEqual(sbc.symbol_at(self.OLD, self.SEC, 0x1e0 + 0x10),
+                            sbc.symbol_at(self.NEW, self.SEC, 0x268 + 0x10))
+
+    def test_numbered_names_are_ranked_in_this_section_too(self):
+        self.assertEqual(renamed(ref(self.SEC, "tab.12", 64)), [ref(self.SEC, "tab.#0", 64)])
+
+
+class LeadingEndbr64(unittest.TestCase):
+    BODY = ["mov %rdi,%rax", "ret"]
+
+    def test_a_leading_endbr64_in_one_object_only_is_counted_not_reported(self):
+        kinds, bad = sbc.compare_by_name({"f": ["<f>", "endbr64"] + self.BODY}, {"f": ["<f>"] + self.BODY})
+        self.assertEqual((kinds, bad), ({"leading endbr64": 1}, []))
+
+    def test_endbr64_in_both_objects_is_no_difference(self):
+        both = {"f": ["<f>", "endbr64"] + self.BODY}
+        self.assertEqual(sbc.compare_by_name(both, dict(both)), ({}, []))
+
+    def test_an_endbr64_elsewhere_still_differs(self):
+        # planted defect: an endbr64 that is not the function's first instruction
+        _, bad = sbc.compare_by_name({"f": ["<f>", "mov %rdi,%rax", "endbr64", "ret"]}, {"f": ["<f>"] + self.BODY})
+        self.assertNotEqual(bad, [])
+
+    def test_a_different_instruction_after_the_endbr64_still_differs(self):
+        # planted defect: the leading endbr64 hides nothing that follows it
+        _, bad = sbc.compare_by_name({"f": ["<f>", "endbr64", "mov %rsi,%rax", "ret"]}, {"f": ["<f>"] + self.BODY})
+        self.assertEqual(bad, [("f", "mov %rsi,%rax", "mov %rdi,%rax")])
+
+
+class ReportListsEveryFunction(unittest.TestCase):
+    def test_more_than_ten_differing_functions_are_all_listed(self):
+        names = ["f%02d" % i for i in range(12)]
+        kinds, bad = sbc.compare_by_name({n: ["<%s>" % n, "mov $0x1,%eax"] for n in names},
+                                         {n: ["<%s>" % n, "mov $0x2,%ebx"] for n in names})
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), self.assertRaises(SystemExit):
+            sbc.report(kinds, bad)
+        self.assertIn("DIFFERENT: 12 function(s): " + " ".join(names), out.getvalue())
+        self.assertEqual(out.getvalue().count("  <f"), 12)
 
 
 if __name__ == "__main__":

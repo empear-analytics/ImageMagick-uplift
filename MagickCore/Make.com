@@ -24,6 +24,17 @@ $endif
 $
 $write sys$output "Making MagickCore..."
 $call Make accelerate.c
+$call Make accelerate-point.c
+$call Make accelerate-local-contrast.c
+$call Make accelerate-motion-blur.c
+$call Make accelerate-blur.c
+$call Make accelerate-rotational-blur.c
+$call Make accelerate-unsharp.c
+$call Make accelerate-denoise.c
+$call Make accelerate-despeckle.c
+$call Make accelerate-histogram.c
+$call Make accelerate-contrast-stretch.c
+$call Make accelerate-resize.c
 $call Make animate.c
 $call Make animate-window.c
 $call Make annotate.c
@@ -56,7 +67,9 @@ $call Make colorspace-convert.c
 $call Make colorspace-generic-rgb.c
 $call Make compare.c
 $call Make compare-similarity.c
+$call Make compare-similarity-image.c
 $call Make composite.c
+$call Make composite-image.c
 $call Make compress.c
 $call Make compress-lzw.c
 $call Make configure.c
@@ -106,6 +119,7 @@ $call Make feature-texture.c
 $call Make fourier.c
 $call Make fourier-complex.c
 $call Make fx.c
+$call Make fx-execute.c
 $call Make gem.c
 $call Make geometry.c
 $call Make geometry-meta.c
@@ -148,6 +162,7 @@ $call Make morphology-primitive.c
 $call Make morphology-builtin.c
 $call Make opencl.c
 $call Make opencl-environment.c
+$call Make opencl-initialize.c
 $call Make opencl-enqueue.c
 $call Make opencl-device.c
 $call Make option.c

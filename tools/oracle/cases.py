@@ -4859,6 +4859,22 @@ GAP_COMMANDS += [
     "-size 3000x6 xc:white -fill black -draw \"point 2900,1\" -draw \"line 0,3 1900,3\" -draw \"point 5,5\" -write fax:t.fax +delete fax:t.fax",
     "-size 100x6 xc:white -fill black -draw \"line 0,1 99,1\" -draw \"line 50,3 99,3\" -draw \"point 99,5\" -write fax:t.fax +delete fax:t.fax",
 ]
+# compare-similarity-image.c: the frequency-domain DPC and PHASE subimage searches
+# (DPCSimilarityImage, PhaseSimilarityImage and the helpers only they call:
+# SIMDerivativeImage, SIMMagnitudeImage, SIMDivideByMagnitude, SIMFilterImageNaNs,
+# SIMPhaseCorrelationImage), against an exact patch and a blurred one
+GAP_COMMANDS += [
+    "compare -metric DPC -subimage-search {C}/rose.miff ( {C}/rose.miff -crop 20x20+10+10 +repage )",
+    "compare -metric DPC -subimage-search {C}/rose.miff ( {C}/rose_blur.miff -crop 20x20+30+20 +repage )",
+    "compare -metric PHASE -subimage-search {C}/rose.miff ( {C}/rose.miff -crop 20x20+10+10 +repage )",
+    "compare -metric PHASE -subimage-search {C}/rose.miff ( {C}/rose_blur.miff -crop 20x20+30+20 +repage )",
+]
+# compare-similarity-private.h: SSIM and DSSIM with the compare:ssim-radius, -sigma, -k1 and
+# -k2 defines, which no other case sets (GetSSIMSimularity's parameter set-up)
+GAP_COMMANDS += [
+    "compare -metric SSIM -define compare:ssim-radius=3 -define compare:ssim-sigma=0.8 {C}/rose.miff {C}/rose_blur.miff",
+    "compare -metric DSSIM -define compare:ssim-k1=0.02 -define compare:ssim-k2=0.05 {C}/rose.miff {C}/rose_blur.miff",
+]
 # Commands whose output must not be converted to floating point: -stegano hides
 # the watermark in the low-order bits, which a float output does not keep.
 GAP_PLAIN_COMMANDS = [
