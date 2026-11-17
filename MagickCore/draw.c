@@ -947,10 +947,40 @@ static void LogPathInfo(const PathInfo *path_info)
   (void) LogMagickEvent(DrawEvent,GetMagickModule(),"    end vector-path");
 }
 
-static inline MagickBooleanType IsNewSubpathPoint(const PathInfoCode code,
-  const size_t coordinates,const PointInfo q,
-  const PrimitiveInfo *primitive_info,const size_t i)
+typedef struct _NewSubpathPointInput
 {
+  PathInfoCode
+    code;
+
+  size_t
+    coordinates;
+
+  PointInfo
+    q;
+
+  const PrimitiveInfo
+    *primitive_info;
+
+  size_t
+    i;
+} NewSubpathPointInput;
+
+static inline MagickBooleanType IsNewSubpathPoint(
+  const NewSubpathPointInput *input)
+{
+  const PathInfoCode
+    code = input->code;
+
+  const size_t
+    coordinates = input->coordinates,
+    i = input->i;
+
+  const PointInfo
+    q = input->q;
+
+  const PrimitiveInfo
+    *const primitive_info = input->primitive_info;
+
   return(((code == MoveToCode) || (coordinates <= 0) ||
     (fabs(q.x-primitive_info[i].point.x) >= MagickEpsilon) ||
     (fabs(q.y-primitive_info[i].point.y) >= MagickEpsilon)) ? MagickTrue :
@@ -1014,6 +1044,9 @@ static PathInfo *ConvertPrimitiveToPath(const PrimitiveInfo *primitive_info,
   start=0;
   for (i=0; primitive_info[i].primitive != UndefinedPrimitive; i++)
   {
+    NewSubpathPointInput
+      subpath;
+
     code=LineToCode;
     if (coordinates <= 0)
       {
@@ -1027,7 +1060,12 @@ static PathInfo *ConvertPrimitiveToPath(const PrimitiveInfo *primitive_info,
         closed_subpath=primitive_info[i].closed_subpath;
       }
     coordinates--;
-    if (IsNewSubpathPoint(code,coordinates,q,primitive_info,i) != MagickFalse)
+    subpath.code=code;
+    subpath.coordinates=coordinates;
+    subpath.q=q;
+    subpath.primitive_info=primitive_info;
+    subpath.i=i;
+    if (IsNewSubpathPoint(&subpath) != MagickFalse)
       {
         /*
           Eliminate duplicate points.
