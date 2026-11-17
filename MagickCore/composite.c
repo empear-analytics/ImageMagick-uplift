@@ -337,6 +337,14 @@ static MagickBooleanType CopyTextureImage(Image *image,Image *texture_image,
   return(status);
 }
 
+static void PrepareTextureImage(const Image *image,Image *texture_image,
+  ExceptionInfo *exception)
+{
+  (void) TransformImageColorspace(texture_image,image->colorspace,exception);
+  (void) SetImageVirtualPixelMethod(texture_image,TileVirtualPixelMethod,
+    exception);
+}
+
 MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
   ExceptionInfo *exception)
 {
@@ -357,9 +365,7 @@ MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
   texture_image=CloneImage(texture,0,0,MagickTrue,exception);
   if (texture_image == (const Image *) NULL)
     return(MagickFalse);
-  (void) TransformImageColorspace(texture_image,image->colorspace,exception);
-  (void) SetImageVirtualPixelMethod(texture_image,TileVirtualPixelMethod,
-    exception);
+  PrepareTextureImage(image,texture_image,exception);
   status=MagickTrue;
   if (IsTextureComposited(image,texture_image) != MagickFalse)
     return(TileTextureImage(image,texture_image,status,exception));
