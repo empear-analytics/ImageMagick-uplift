@@ -1886,8 +1886,7 @@ static void XSelectAnnotateFontColor(const AnnotateMenuInput *menu,
     (const char **) ColorMenu,command);
   if (pen_number < 0)
     return;
-  (*transparent_pen)=pen_number == (MaxNumberPens-2) ? MagickTrue :
-    MagickFalse;
+  (*transparent_pen)=(MagickBooleanType) (pen_number == (MaxNumberPens-2));
   if ((*transparent_pen) != MagickFalse)
     return;
   if (pen_number == (MaxNumberPens-1))
