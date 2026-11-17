@@ -3360,9 +3360,9 @@ static MagickBooleanType GetOperator (
     return MagickFalse;
   }
 
-  *Assign = (op==oAssign) ? MagickTrue : MagickFalse;
+  *Assign = (MagickBooleanType) (op==oAssign);
   *Update = OprInPlace ((int) op);
-  *IncrDecr = (op == oPlusPlus || op == oSubSub) ? MagickTrue : MagickFalse;
+  *IncrDecr = (MagickBooleanType) (op == oPlusPlus || op == oSubSub);
 
   /* while top of OperatorStack is not empty and is not open-parens or assign,
        and top of OperatorStack is higher precedence than new op,
