@@ -10570,6 +10570,26 @@ static inline int GetBezierSmoothLetter(const PathBezierSide side)
   return((side == CubicPathBezier) ? 'S' : 'T');
 }
 
+static inline MagickBooleanType IsCubicPathComma(const PathBezierSide side,
+  const char *p)
+{
+  return(((side == CubicPathBezier) && (*p == ',')) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsQuadraticPathFailed(
+  const PathBezierSide side,const MagickBooleanType status)
+{
+  return(((side == QuadraticPathBezier) && (status == MagickFalse)) ?
+    MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsSmoothPathRestart(const PathBezierSide side,
+  const int last_attribute)
+{
+  return((strchr(((side == CubicPathBezier) ? "CcSs" : "QqTt"),last_attribute) ==
+    (char *) NULL) ? MagickTrue : MagickFalse);
+}
+
 static ssize_t TracePathSmoothBezierCurve(const PathTrace *trace,
   const PathBezierSide side)
 {
@@ -10621,15 +10641,15 @@ static ssize_t TracePathSmoothBezierCurve(const PathTrace *trace,
         ThrowPointExpectedException(token,exception);
       if (GetPathValue(&p,token,&y) == MagickFalse)
         ThrowPointExpectedException(token,exception);
-      if ((side == CubicPathBezier) && (*p == ','))
+      if (IsCubicPathComma(side,p) != MagickFalse)
         p++;
       end.x=GetPathCoordinate(attribute,(int) GetBezierSmoothLetter(side),x,point.x);
       end.y=GetPathCoordinate(attribute,(int) GetBezierSmoothLetter(side),y,point.y);
       points[i]=end;
     }
-    if ((side == QuadraticPathBezier) && (status == MagickFalse))
+    if (IsQuadraticPathFailed(side,status) != MagickFalse)
       break;
-    if (strchr(((side == CubicPathBezier) ? "CcSs" : "QqTt"),last_attribute) == (char *) NULL)
+    if (IsSmoothPathRestart(side,last_attribute) != MagickFalse)
       {
         points[0]=point;
         points[1]=point;
