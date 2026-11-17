@@ -2517,12 +2517,11 @@ static MagickBooleanType XPasteSelectionText(
   return(MagickTrue);
 }
 
-static void XSetBoxPixelIndex(XWindows *windows,const unsigned int box_id)
+static void XFindBoxPixelIndex(XWindows *windows,const unsigned int box_id)
 {
   ssize_t
     i;
 
-  windows->pixel_info->box_color=windows->pixel_info->pen_colors[box_id];
   if (windows->pixel_info->colors != 0)
     for (i=0; i < (ssize_t) windows->pixel_info->colors; i++)
       if (windows->pixel_info->pixels[i] ==
@@ -2531,6 +2530,12 @@ static void XSetBoxPixelIndex(XWindows *windows,const unsigned int box_id)
           windows->pixel_info->box_index=(unsigned short) i;
           break;
         }
+}
+
+static void XSetBoxPixelIndex(XWindows *windows,const unsigned int box_id)
+{
+  windows->pixel_info->box_color=windows->pixel_info->pen_colors[box_id];
+  XFindBoxPixelIndex(windows,box_id);
 }
 
 static void XSetPenPixelIndex(XWindows *windows,const unsigned int pen_id)
