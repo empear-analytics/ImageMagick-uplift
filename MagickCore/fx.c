@@ -3421,8 +3421,7 @@ static inline MagickBooleanType IsUserSymbolAssignment(
   const MagickBooleanType UserSymbol,const MagickBooleanType Assign,
   const MagickBooleanType Update,const MagickBooleanType IncrDecr)
 {
-  return((UserSymbol && (Assign || Update) && !IncrDecr) ? MagickTrue :
-    MagickFalse);
+  return((MagickBooleanType) (UserSymbol && (Assign || Update) && !IncrDecr));
 }
 
 static inline MagickBooleanType IsExpressionEnd(FxInfo *pfx,
