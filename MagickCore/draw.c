@@ -8970,6 +8970,39 @@ static MagickStatusType DrawUnstrokedPolygon(
   return(status);
 }
 
+static MagickStatusType DrawTextPrimitive(const DrawPrimitiveContext *context,
+  MagickStatusType status)
+{
+  Image
+    *image = context->image;
+
+  const DrawInfo
+    *draw_info = context->draw_info;
+
+  const PrimitiveInfo
+    *primitive_info = context->primitive_info;
+
+  ExceptionInfo
+    *exception = context->exception;
+
+  char
+    geometry[MagickPathExtent];
+
+  DrawInfo
+    *clone_info;
+
+  if (primitive_info->text == (char *) NULL)
+    return(status);
+  clone_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
+  (void) CloneString(&clone_info->text,primitive_info->text);
+  (void) FormatLocaleString(geometry,MagickPathExtent,"%+f%+f",
+    primitive_info->point.x,primitive_info->point.y);
+  (void) CloneString(&clone_info->geometry,geometry);
+  status&=(MagickStatusType) AnnotateImage(image,clone_info,exception);
+  clone_info=DestroyDrawInfo(clone_info);
+  return(status);
+}
+
 static MagickStatusType DrawStrokedPrimitive(const DrawPrimitiveContext *context,
   MagickStatusType status)
 {
@@ -9116,21 +9149,7 @@ MagickExport MagickBooleanType DrawPrimitive(Image *image,
     }
     case TextPrimitive:
     {
-      char
-        geometry[MagickPathExtent];
-
-      DrawInfo
-        *clone_info;
-
-      if (primitive_info->text == (char *) NULL)
-        break;
-      clone_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
-      (void) CloneString(&clone_info->text,primitive_info->text);
-      (void) FormatLocaleString(geometry,MagickPathExtent,"%+f%+f",
-        primitive_info->point.x,primitive_info->point.y);
-      (void) CloneString(&clone_info->geometry,geometry);
-      status&=(MagickStatusType) AnnotateImage(image,clone_info,exception);
-      clone_info=DestroyDrawInfo(clone_info);
+      status=DrawTextPrimitive(&context,status);
       break;
     }
     default:
