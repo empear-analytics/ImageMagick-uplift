@@ -3223,6 +3223,17 @@ typedef struct _MVGRenderState
     **stops;
 } MVGRenderState;
 
+static MagickBooleanType SkipMVGListToken(const char **q,const size_t extent,
+  char *token)
+{
+  (void) GetNextToken((*q),q,extent,token);
+  if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+    return(MagickFalse);
+  if (*token == ',')
+    (void) GetNextToken((*q),q,extent,token);
+  return(MagickTrue);
+}
+
 static MagickBooleanType GetMVGValue(const char **q,const size_t extent,
   char *token,double *value)
 {
@@ -4347,13 +4358,8 @@ static MagickBooleanType ParseMVGPushGradient(const MVGRenderState *state)
     if (GetMVGListValue(&q,extent,token,&segment.y2) == MagickFalse)
       ThrowPointExpectedException(token,exception);
     if (LocaleCompare(type,"radial") == 0)
-      {
-        (void) GetNextToken(q,&q,extent,token);
-        if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-          ThrowPointExpectedException(token,exception);
-        if (*token == ',')
-          (void) GetNextToken(q,&q,extent,token);
-      }
+      if (SkipMVGListToken(&q,extent,token) == MagickFalse)
+        ThrowPointExpectedException(token,exception);
     p=FindMVGPopKeyword(&q,extent,token,"gradient");
     if (IsMVGBlockEndInvalid(q,p,extent) != MagickFalse)
       {
