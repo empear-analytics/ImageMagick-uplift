@@ -500,16 +500,8 @@ static MagickBooleanType resizeVerticalFilter(const ResizeFilterPass *pass,
   */
   support=GetResizeScaledSupport(pass->resizeFilter,yFactor);
 
-  if (pass->resizedRows < workgroupSize)
-  {
-    chunkSize=32;
-    pixelPerWorkgroup=32;
-  }
-  else
-  {
-    chunkSize=workgroupSize;
-    pixelPerWorkgroup=workgroupSize;
-  }
+  SelectResizeWorkgroup(pass->resizedRows,workgroupSize,&chunkSize,
+    &pixelPerWorkgroup);
 
 DisableMSCWarning(4127)
   while(1)
