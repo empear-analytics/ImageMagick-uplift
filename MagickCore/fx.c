@@ -221,8 +221,8 @@ static MagickBooleanType GetOperand (
 
 static inline MagickBooleanType IsHslOrIntensityChannel(const PixelChannel pc)
 {
-  return((pc==HUE_CHANNEL || pc==SAT_CHANNEL || pc==LIGHT_CHANNEL ||
-    pc==INTENSITY_CHANNEL) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (pc==HUE_CHANNEL || pc==SAT_CHANNEL ||
+    pc==LIGHT_CHANNEL || pc==INTENSITY_CHANNEL));
 }
 
 static inline MagickBooleanType ChanIsVirtual (PixelChannel pc)
