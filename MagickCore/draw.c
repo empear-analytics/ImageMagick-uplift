@@ -10774,12 +10774,7 @@ static void GetStrokeSlope(const double dx,const double dy,double *slope,
     GetEpsilonSlope(dx,dy,slope);
   else
     if (fabs(dy) < MagickEpsilon)
-      {
-        if (dy >= 0.0)
-          *inverse_slope=dx < 0.0 ? -1.0/MagickEpsilon : 1.0/MagickEpsilon;
-        else
-          *inverse_slope=dx < 0.0 ? 1.0/MagickEpsilon : -1.0/MagickEpsilon;
-      }
+      GetEpsilonSlope(dy,dx,inverse_slope);
     else
       {
         *slope=dy/dx;
