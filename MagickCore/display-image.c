@@ -13069,23 +13069,9 @@ static void XApplyImplodeCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
-static void XApplyVignetteCommand(const XMagickCommandContext *context)
+static void XApplyVignetteToImage(Display *display,XWindows *windows,
+  char *geometry,Image **image,ExceptionInfo *exception)
 {
-  Display
-    *const display = context->display;
-
-  XResourceInfo
-    *const resource_info = context->resource_info;
-
-  XWindows
-    *const windows = context->windows;
-
-  Image
-    **const image = context->image;
-
-  ExceptionInfo
-    *const exception = context->exception;
-
   GeometryInfo
     geometry_info;
 
@@ -13095,19 +13081,6 @@ static void XApplyVignetteCommand(const XMagickCommandContext *context)
   Image
     *vignette_image;
 
-  static char
-    geometry[MagickPathExtent] = "0x20";
-
-  /*
-    Query user for the vignette geometry.
-  */
-  (void) XDialogWidget(display,windows,"Vignette",
-    "Enter the radius, sigma, and x and y offsets:",geometry);
-  if (*geometry == '\0')
-    return;
-  /*
-    Soften the edges of the image in vignette style
-  */
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
   flags=ParseGeometry(geometry,&geometry_info);
@@ -13125,6 +13098,39 @@ static void XApplyVignetteCommand(const XMagickCommandContext *context)
       *image=DestroyImage(*image);
       *image=vignette_image;
     }
+}
+
+static void XApplyVignetteCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  static char
+    geometry[MagickPathExtent] = "0x20";
+
+  /*
+    Query user for the vignette geometry.
+  */
+  (void) XDialogWidget(display,windows,"Vignette",
+    "Enter the radius, sigma, and x and y offsets:",geometry);
+  if (*geometry == '\0')
+    return;
+  /*
+    Soften the edges of the image in vignette style
+  */
+  XApplyVignetteToImage(display,windows,geometry,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
