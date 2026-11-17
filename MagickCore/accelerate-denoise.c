@@ -144,6 +144,75 @@ static MagickBooleanType AcquireWaveletDenoiseBuffers(MagickCLEnv clEnv,
   return(MagickTrue);
 }
 
+typedef struct _WaveletDenoisePassInputs
+{
+  cl_command_queue
+    queue;
+
+  cl_kernel
+    denoiseKernel;
+
+  const Image
+    *image;
+
+  Image
+    *filteredImage;
+
+  size_t
+    passes;
+
+  cl_uint
+    width,
+    height;
+
+  int
+    SIZE,
+    TILESIZE;
+
+  MagickBooleanType
+    outputReady;
+} WaveletDenoisePassInputs;
+
+static MagickBooleanType EnqueueWaveletDenoisePasses(
+  const WaveletDenoisePassInputs *pass,ExceptionInfo *exception)
+{
+  const size_t
+    passes = pass->passes;
+
+  const cl_uint
+    width = pass->width,
+    height = pass->height;
+
+  const int
+    SIZE = pass->SIZE,
+    TILESIZE = pass->TILESIZE;
+
+  MagickBooleanType
+    outputReady = pass->outputReady;
+
+  size_t
+    goffset[2],
+    gsize[2],
+    lsize[2],
+    x;
+
+  for (x = 0; x < passes; ++x)
+  {
+    gsize[0]=((width+(SIZE-1))/SIZE)*TILESIZE;
+    gsize[1]=((((height+(SIZE-1))/SIZE)+passes-1)/passes)*4;
+    lsize[0]=TILESIZE;
+    lsize[1]=4;
+    goffset[0]=0;
+    goffset[1]=x*gsize[1];
+
+    outputReady=EnqueueOpenCLKernel(pass->queue,pass->denoiseKernel,2,goffset,gsize,lsize,
+      pass->image,pass->filteredImage,MagickTrue,exception);
+    if (outputReady == MagickFalse)
+      break;
+  }
+  return(outputReady);
+}
+
 typedef struct _WaveletDenoiseLaunchInputs
 {
   MagickCLDevice
@@ -199,12 +268,8 @@ static void LaunchWaveletDenoiseKernel(const WaveletDenoiseLaunchInputs *inputs,
     max_channels;
 
   size_t
-    goffset[2],
-    gsize[2],
     i,
-    lsize[2],
-    passes,
-    x;
+    passes;
 
   *launch->denoiseKernel=AcquireOpenCLKernel(inputs->device,"WaveletDenoise");
   if (*launch->denoiseKernel == (cl_kernel) NULL)
@@ -240,19 +305,12 @@ static void LaunchWaveletDenoiseKernel(const WaveletDenoiseLaunchInputs *inputs,
       return;
     }
 
-  for (x = 0; x < passes; ++x)
   {
-    gsize[0]=((width+(SIZE-1))/SIZE)*TILESIZE;
-    gsize[1]=((((height+(SIZE-1))/SIZE)+passes-1)/passes)*4;
-    lsize[0]=TILESIZE;
-    lsize[1]=4;
-    goffset[0]=0;
-    goffset[1]=x*gsize[1];
+    const WaveletDenoisePassInputs pass = { inputs->queue,
+      *launch->denoiseKernel, inputs->image, inputs->filteredImage, passes,
+      width, height, SIZE, TILESIZE, *launch->outputReady };
 
-    *launch->outputReady=EnqueueOpenCLKernel(inputs->queue,*launch->denoiseKernel,2,goffset,gsize,lsize,
-      inputs->image,inputs->filteredImage,MagickTrue,exception);
-    if (*launch->outputReady == MagickFalse)
-      break;
+    *launch->outputReady=EnqueueWaveletDenoisePasses(&pass,exception);
   }
 }
 
