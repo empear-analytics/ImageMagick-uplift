@@ -13139,6 +13139,28 @@ static void XApplyVignetteCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyRollToImage(Display *display,XWindows *windows,Image **image,
+  char *geometry,ExceptionInfo *exception)
+{
+  RectangleInfo
+    page_geometry;
+
+  Image
+    *roll_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) ParsePageGeometry(*image,geometry,&page_geometry,
+    exception);
+  roll_image=RollImage(*image,page_geometry.x,page_geometry.y,
+    exception);
+  if (roll_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=roll_image;
+    }
+}
+
 static void XApplyRollCommand(const XMagickCommandContext *context)
 {
   Display
@@ -13156,12 +13178,6 @@ static void XApplyRollCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
-  RectangleInfo
-    page_geometry;
-
-  Image
-    *roll_image;
-
   static char
     geometry[MagickPathExtent] = "+2+2";
 
@@ -13177,17 +13193,7 @@ static void XApplyRollCommand(const XMagickCommandContext *context)
   */
   (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
     exception);
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) ParsePageGeometry(*image,geometry,&page_geometry,
-    exception);
-  roll_image=RollImage(*image,page_geometry.x,page_geometry.y,
-    exception);
-  if (roll_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=roll_image;
-    }
+  XApplyRollToImage(display,windows,image,geometry,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
