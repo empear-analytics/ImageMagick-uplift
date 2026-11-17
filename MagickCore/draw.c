@@ -9976,6 +9976,17 @@ static inline MagickBooleanType IsZeroEllipseRadii(const PointInfo radii)
     MagickTrue : MagickFalse);
 }
 
+static double GetEllipseEndAngle(const PointInfo arc)
+{
+  double
+    y;
+
+  y=arc.y;
+  while (y < arc.x)
+    y+=360.0;
+  return(y);
+}
+
 static inline MagickBooleanType IsClosedEllipse(const double x,const double y)
 {
   return(((x < MagickEpsilon) && (y < MagickEpsilon)) ? MagickTrue :
@@ -10015,9 +10026,7 @@ static MagickBooleanType TraceEllipse(MVGInfo *mvg_info,const PointInfo center,
   delta=MagickSafeReciprocal(MagickMax(radii.x,radii.y));
   step=MagickPI/(MagickPI*MagickSafeReciprocal(delta))/8.0;
   angle.x=DegreesToRadians(arc.x);
-  y=arc.y;
-  while (y < arc.x)
-    y+=360.0;
+  y=GetEllipseEndAngle(arc);
   angle.y=DegreesToRadians(y);
   coordinates=ceil((angle.y-angle.x)/step+1.0);
   if (CheckPrimitiveExtent(mvg_info,coordinates+1) == MagickFalse)
