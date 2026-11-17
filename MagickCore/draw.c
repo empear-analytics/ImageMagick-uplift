@@ -8875,6 +8875,33 @@ static MagickStatusType DrawPointPrimitive(const DrawPrimitiveContext *context,
   return(status);
 }
 
+static MagickStatusType DrawUnstrokedPolygon(
+  const DrawPrimitiveContext *context,MagickStatusType status)
+{
+  Image
+    *image = context->image;
+
+  const DrawInfo
+    *draw_info = context->draw_info;
+
+  const PrimitiveInfo
+    *primitive_info = context->primitive_info;
+
+  ExceptionInfo
+    *exception = context->exception;
+
+  DrawInfo
+    *clone_info;
+
+  clone_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
+  clone_info->stroke_width=0.0;
+  clone_info->stroke.alpha=(MagickRealType) TransparentAlpha;
+  status&=(MagickStatusType) DrawPolygonPrimitive(image,clone_info,
+    primitive_info,exception);
+  clone_info=DestroyDrawInfo(clone_info);
+  return(status);
+}
+
 static MagickStatusType DrawStrokedPrimitive(const DrawPrimitiveContext *context,
   MagickStatusType status)
 {
@@ -8908,12 +8935,7 @@ static MagickStatusType DrawStrokedPrimitive(const DrawPrimitiveContext *context
       /*
         Draw dash polygon.
       */
-      clone_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
-      clone_info->stroke_width=0.0;
-      clone_info->stroke.alpha=(MagickRealType) TransparentAlpha;
-      status&=(MagickStatusType) DrawPolygonPrimitive(image,clone_info,
-        primitive_info,exception);
-      clone_info=DestroyDrawInfo(clone_info);
+      status=DrawUnstrokedPolygon(context,status);
       if (status != MagickFalse)
         status&=(MagickStatusType) DrawDashPolygon(draw_info,primitive_info,
           image,exception);
