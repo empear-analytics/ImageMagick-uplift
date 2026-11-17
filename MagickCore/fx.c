@@ -557,9 +557,9 @@ static inline MagickBooleanType OprInPlace(int op)
 
 static inline MagickBooleanType IsJumpElement(const ElementT *pel)
 {
-  return((pel->operator_index == rGoto || pel->operator_index == rGotoChk ||
-    pel->operator_index == rIfZeroGoto ||
-    pel->operator_index == rIfNotZeroGoto) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (pel->operator_index == rGoto ||
+    pel->operator_index == rGotoChk || pel->operator_index == rIfZeroGoto ||
+    pel->operator_index == rIfNotZeroGoto));
 }
 
 static inline MagickBooleanType IsPixelReferenceElement(const ElementT *pel)
