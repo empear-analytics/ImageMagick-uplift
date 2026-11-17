@@ -8047,9 +8047,8 @@ static inline MagickBooleanType IsBoxedElement(const ElementType v)
 static inline MagickBooleanType IsElementComplete(const ElementType element,
   const unsigned int distance)
 {
-  return((((element != PolygonElement) &&
-    (element != FillPolygonElement)) || (distance <= 9)) ? MagickTrue :
-    MagickFalse);
+  return((MagickBooleanType) (((element != PolygonElement) &&
+    (element != FillPolygonElement)) || (distance <= 9)));
 }
 
 typedef struct _DrawEditContext
