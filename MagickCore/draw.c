@@ -9888,6 +9888,14 @@ typedef struct _PathTrace
     *z_count;
 } PathTrace;
 
+static void SkipPathSeparators(const char **p)
+{
+  while (isspace((int) ((unsigned char) *(*p))) != 0)
+    (*p)++;
+  if (*(*p) == ',')
+    (*p)++;
+}
+
 static MagickBooleanType GetPathValue(const char **p,char *token,
   double *value)
 {
@@ -9992,10 +10000,7 @@ static ssize_t TracePathArc(const PathTrace *trace)
     mvg_info->offset+=(ssize_t) q->coordinates;
     q+=(ptrdiff_t) q->coordinates;
     point=end;
-    while (isspace((int) ((unsigned char) *p)) != 0)
-      p++;
-    if (*p == ',')
-      p++;
+    SkipPathSeparators(&p);
   } while (IsValidPoint(p) != MagickFalse);
   (*trace->p)=p;
   (*trace->q)=q;
