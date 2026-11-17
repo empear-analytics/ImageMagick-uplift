@@ -3,9 +3,10 @@
 Branched from `campaign/M137` after #123 merged it into `main` (ba6c3318d); this branch's
 PR goes to `main`. Scores come from cs-mcp 1.5.16 through `tools/ch.py`.
 
-Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 45 flagged functions, 222 -> 242
-functions (four merges, twenty-eight helpers), 11,636 -> 11,501 lines. Function findings
-(one per function and category) 123 -> 83.
+Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 44 flagged functions, 222 -> 250
+functions (four merges, thirty-six helpers), 11,636 -> 11,567 lines. Function findings
+(one per function and category) 123 -> 82; total cc of the flagged functions down by
+about a quarter.
 
 ## The function-count lesson
 
@@ -69,6 +70,13 @@ lowers the count.
 | fd48c43c1 | playbook | LB amended | step 7, converted-read form |
 | dbafd288e | LB | ParseMVGPushPattern | three cast-wrapped list reads through GetMVGListValue; no findings left (one case reaches it) |
 | d9d468c2b, f879a2a24, 58ed7dc9d | E, E, D | DrawColorPrimitive, DrawAlphaPrimitive | the color point case into DrawColorPoint, the fill-to-border target into SetFillToBorderTarget; DrawColorPrimitive no findings left |
+| 9e2852dc3 | LB | TracePathArc | two flag-token skips into SkipPathListToken; cc 18 -> 16 |
+| e4b035b89 | playbook | NS amended | step 1, offset form `(c ? v : w+v)` |
+| bf1cb28fe ... b01ae5ee2 | NS | six path tracers | twelve absolute/relative coordinate selections into GetPathCoordinate (IDENTICAL object code); TracePathMove leaves Complex Method |
+| cd10ef1e6 | playbook | MA amended | keyed address form |
+| b6df87070, a714e1382, d9d2b5df9 | MA | GetDrawInfo | nine option reads into SetDrawColorOption, SetDrawValueOption, SetDrawStringOption; cc 22 -> 13, 108 -> 94 lines |
+| 5bd7c27c6, d3b05f0d5 | V, E | ConvertPathToPolygon | edge-point shrink into ShrinkPolygonEdgePoints (throw left in the caller), bounds widening into WidenEdgeBounds; bumps 4 -> 3, cc 28 -> 25 |
+| 1b3d7ffe2 | E | DrawPrimitive | the text case into DrawTextPrimitive, as its sibling cases; cc 14 -> 13, 101 -> 89 lines |
 
 ## Probed and dropped
 
@@ -118,6 +126,9 @@ lowers the count.
 - Whole catalogue at 58ed7dc9d: 3 known and resize/f6be4a23b4 (half write mask, `-resize
   150%`), which then diverged once in three runs alone: the random write-mask resize family
   of ORACLE.md's resize/6ee45e9cfa, in campaign A's code this branch does not touch.
+  resize/6ee45e9cfa itself diverged once in a GetDrawInfo gate run (13,204 cases) and agreed
+  alone three times.
+- Whole catalogue at 1b3d7ffe2: 15,967 cases, 3 diverged, all known.
 
 ## Blocked, for the owner
 
