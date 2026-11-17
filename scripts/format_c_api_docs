@@ -47,6 +47,7 @@ if ( ! GetOptions(
 	 'colorspace-generic-rgb.c',
 	 'compare.c',
 	 'compare-similarity.c',
+	 'compare-similarity-image.c',
 	 'composite.c',
 	 'composite-image.c',
 	 'constitute.c',
