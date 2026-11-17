@@ -10096,6 +10096,17 @@ static MagickBooleanType SkipPathListSeparator(const char **p,char *token)
   return(MagickTrue);
 }
 
+static PrimitiveInfo *AdvancePrimitiveOffset(MVGInfo *mvg_info)
+{
+  PrimitiveInfo
+    *q;
+
+  q=(*mvg_info->primitive_info)+mvg_info->offset;
+  mvg_info->offset+=(ssize_t) q->coordinates;
+  q+=(ptrdiff_t) q->coordinates;
+  return(q);
+}
+
 static MagickBooleanType SkipPathListToken(const char **p,char *token)
 {
   (void) GetNextToken((*p),p,MagickPathExtent,token);
@@ -10202,9 +10213,7 @@ static ssize_t TracePathArc(const PathTrace *trace)
       if (TraceArcPath(mvg_info,point,end,&shape) == MagickFalse)
         return(-1);
     }
-    q=(*mvg_info->primitive_info)+mvg_info->offset;
-    mvg_info->offset+=(ssize_t) q->coordinates;
-    q+=(ptrdiff_t) q->coordinates;
+    q=AdvancePrimitiveOffset(mvg_info);
     point=end;
     SkipPathSeparators(&p);
   } while (IsValidPoint(p) != MagickFalse);
