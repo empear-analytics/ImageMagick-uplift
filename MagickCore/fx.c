@@ -1548,8 +1548,8 @@ static inline MagickBooleanType IsUnexpectedLimit(const char chLimit,
 
 static inline MagickBooleanType IsDefaultArgsFunction(const FunctionE fe)
 {
-  return((fe == fP || fe == fS || fe == fU || fe == fChannel) ? MagickTrue :
-    MagickFalse);
+  return((MagickBooleanType) (fe == fP || fe == fS || fe == fU ||
+    fe == fChannel));
 }
 
 static inline MagickBooleanType IsNoArgsFunction(const FunctionE fe,
