@@ -240,7 +240,8 @@ typedef struct _SparseControlColor
     *arguments;
 } SparseControlColor;
 
-static void SetSparseControlColor(const SparseControlColor *control,
+static magick_attribute((__always_inline__)) inline void
+  SetSparseControlColor(const SparseControlColor *control,
   const size_t k,PixelInfo *pixel)
 {
   const Image
