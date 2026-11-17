@@ -11964,6 +11964,14 @@ static void XApplyNormalizeCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyEqualizeToImage(Display *display,XWindows *windows,
+  Image **image,ExceptionInfo *exception)
+{
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) EqualizeImage(*image,exception);
+}
+
 static void XApplyEqualizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11984,9 +11992,7 @@ static void XApplyEqualizeCommand(const XMagickCommandContext *context)
   /*
     Perform histogram equalization on the image.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) EqualizeImage(*image,exception);
+  XApplyEqualizeToImage(display,windows,image,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
