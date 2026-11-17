@@ -180,26 +180,32 @@ static void PrintBilinearSparseFX(const Image *image,const double *coeff)
         coeff[x+2], coeff[x+3]),x+=4;
 }
 
+static void PrintSparseColorMethodFX(const Image *image,const double *coeff,
+  const SparseColorMethod sparse_method)
+{
+  switch (sparse_method) {
+    case BarycentricColorInterpolate:
+    {
+      PrintBarycentricSparseFX(image,coeff);
+      break;
+    }
+    case BilinearColorInterpolate:
+    {
+      PrintBilinearSparseFX(image,coeff);
+      break;
+    }
+    default:
+      /* sparse color method is too complex for FX emulation */
+      break;
+  }
+}
+
 static void PrintSparseColorFX(const Image *image,const double *coeff,
   const SparseColorMethod sparse_method)
 {
   if (IsStringTrue(GetImageArtifact(image,"verbose")) != MagickFalse) {
 
-    switch (sparse_method) {
-      case BarycentricColorInterpolate:
-      {
-        PrintBarycentricSparseFX(image,coeff);
-        break;
-      }
-      case BilinearColorInterpolate:
-      {
-        PrintBilinearSparseFX(image,coeff);
-        break;
-      }
-      default:
-        /* sparse color method is too complex for FX emulation */
-        break;
-    }
+    PrintSparseColorMethodFX(image,coeff,sparse_method);
   }
 }
 
