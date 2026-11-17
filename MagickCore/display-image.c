@@ -12947,6 +12947,27 @@ static void XApplySolarizeCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplySwirlToImage(Display *display,XWindows *windows,
+  MagickStatusType *flags,char *degrees,Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *swirl_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(degrees,&geometry_info);
+  swirl_image=SwirlImage(*image,geometry_info.rho,(*image)->interpolate,
+    exception);
+  if (swirl_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=swirl_image;
+    }
+}
+
 static void XApplySwirlCommand(const XMagickCommandContext *context,
   MagickStatusType *flags)
 {
@@ -12965,12 +12986,6 @@ static void XApplySwirlCommand(const XMagickCommandContext *context,
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  Image
-    *swirl_image;
-
   static char
     degrees[MagickPathExtent] = "60";
 
@@ -12984,16 +12999,7 @@ static void XApplySwirlCommand(const XMagickCommandContext *context,
   /*
     Swirl image pixels about the center.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  *flags=ParseGeometry(degrees,&geometry_info);
-  swirl_image=SwirlImage(*image,geometry_info.rho,(*image)->interpolate,
-    exception);
-  if (swirl_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=swirl_image;
-    }
+  XApplySwirlToImage(display,windows,flags,degrees,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
