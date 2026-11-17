@@ -2738,8 +2738,7 @@ static inline MagickBooleanType IsLoopOrIfFunction(const FunctionE fe)
 
 static inline MagickBooleanType IsHslSymbol(const SymbolE se)
 {
-  return((se==sHue || se==sSaturation || se==sLightness) ? MagickTrue :
-    MagickFalse);
+  return((MagickBooleanType) (se==sHue || se==sSaturation || se==sLightness));
 }
 
 static fxFltType ApplyNumberPrefix (FxInfo * pfx, char * tailptr, fxFltType val)
