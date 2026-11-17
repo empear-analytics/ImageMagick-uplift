@@ -2479,8 +2479,8 @@ typedef struct _RepeatGradientInfo
     antialias;
 } RepeatGradientInfo;
 
-static PixelInfo GetRepeatGradientColor(const RepeatGradientInfo *repeat_info,
-  PixelInfo composite)
+static PixelInfo BlendRepeatGradientStops(const RepeatGradientInfo *repeat_info,
+  ssize_t i,PixelInfo composite)
 {
   const GradientInfo
     *gradient = repeat_info->gradient;
@@ -2497,8 +2497,37 @@ static PixelInfo GetRepeatGradientColor(const RepeatGradientInfo *repeat_info,
     alpha;
 
   ssize_t
-    i,
     j;
+
+  j=i;
+  i--;
+  alpha=(offset-gradient->stops[i].offset)/
+    (gradient->stops[j].offset-gradient->stops[i].offset);
+  if (antialias != MagickFalse)
+    {
+      if (gradient->type == LinearGradient)
+        alpha=length-repeat;
+      else
+        alpha=gradient->radius-repeat;
+      i=0;
+      j=(ssize_t) gradient->number_stops-1L;
+    }
+  CompositePixelInfoBlend(&gradient->stops[i].color,1.0-alpha,
+    &gradient->stops[j].color,alpha,&composite);
+  return(composite);
+}
+
+static PixelInfo GetRepeatGradientColor(const RepeatGradientInfo *repeat_info,
+  PixelInfo composite)
+{
+  const GradientInfo
+    *gradient = repeat_info->gradient;
+
+  const double
+    offset = repeat_info->offset;
+
+  ssize_t
+    i;
 
   for (i=0; i < (ssize_t) gradient->number_stops; i++)
     if (offset < gradient->stops[i].offset)
@@ -2509,23 +2538,7 @@ static PixelInfo GetRepeatGradientColor(const RepeatGradientInfo *repeat_info,
     if (i == (ssize_t) gradient->number_stops)
       composite=gradient->stops[gradient->number_stops-1].color;
     else
-      {
-        j=i;
-        i--;
-        alpha=(offset-gradient->stops[i].offset)/
-          (gradient->stops[j].offset-gradient->stops[i].offset);
-        if (antialias != MagickFalse)
-          {
-            if (gradient->type == LinearGradient)
-              alpha=length-repeat;
-            else
-              alpha=gradient->radius-repeat;
-            i=0;
-            j=(ssize_t) gradient->number_stops-1L;
-          }
-        CompositePixelInfoBlend(&gradient->stops[i].color,1.0-alpha,
-          &gradient->stops[j].color,alpha,&composite);
-      }
+      composite=BlendRepeatGradientStops(repeat_info,i,composite);
   return(composite);
 }
 
