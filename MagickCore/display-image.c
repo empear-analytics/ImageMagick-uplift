@@ -1979,8 +1979,7 @@ static void XSelectAnnotateBoxColor(const AnnotateMenuInput *menu,
     (const char **) ColorMenu,command);
   if (pen_number < 0)
     return;
-  (*transparent_box)=pen_number == (MaxNumberPens-2) ? MagickTrue :
-    MagickFalse;
+  (*transparent_box)=(MagickBooleanType) (pen_number == (MaxNumberPens-2));
   if ((*transparent_box) != MagickFalse)
     return;
   if (pen_number == (MaxNumberPens-1))
