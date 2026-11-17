@@ -6674,13 +6674,7 @@ static MagickBooleanType ParseMVGTranslate(const MVGRenderState *state)
     affine.tx=GetDrawValue(token,&next_token);
     if (token == next_token)
       ThrowPointExpectedException(token,exception);
-    (void) GetNextToken(q,&q,extent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(q,&q,extent,token);
-    affine.ty=GetDrawValue(token,&next_token);
-    if (token == next_token)
+    if (GetMVGListValue(&q,extent,token,&affine.ty) == MagickFalse)
       ThrowPointExpectedException(token,exception);
     cursor=0.0;
     break;
