@@ -529,6 +529,23 @@ static PixelInfo ClearSparseColor(const Image *image,
   return(pixel);
 }
 
+static PixelInfo DivideSparseColor(const SparseColorWeights *inverse,
+  PixelInfo pixel,const double denominator)
+{
+  if ((GetPixelRedTraits(inverse->sparse_image) & UpdatePixelTrait) != 0)
+    pixel.red/=denominator;
+  if ((GetPixelGreenTraits(inverse->sparse_image) & UpdatePixelTrait) != 0)
+    pixel.green/=denominator;
+  if ((GetPixelBlueTraits(inverse->sparse_image) & UpdatePixelTrait) != 0)
+    pixel.blue/=denominator;
+  if (IsSparseBlackChannel(inverse->sparse_image,inverse->image) != MagickFalse)
+    pixel.black/=denominator;
+  if (IsSparseAlphaChannel(inverse->sparse_image,
+      inverse->sparse_image) != MagickFalse)
+    pixel.alpha/=denominator;
+  return(pixel);
+}
+
 static PixelInfo InverseSparseColor(const SparseColorWeights *inverse,
   PixelInfo pixel)
 {
@@ -549,17 +566,7 @@ static PixelInfo InverseSparseColor(const SparseColorWeights *inverse,
   weights.i=inverse->i;
   weights.j=inverse->j;
   AccumulateInverseSparseColor(&weights,&pixel,&denominator);
-  if ((GetPixelRedTraits(inverse->sparse_image) & UpdatePixelTrait) != 0)
-    pixel.red/=denominator;
-  if ((GetPixelGreenTraits(inverse->sparse_image) & UpdatePixelTrait) != 0)
-    pixel.green/=denominator;
-  if ((GetPixelBlueTraits(inverse->sparse_image) & UpdatePixelTrait) != 0)
-    pixel.blue/=denominator;
-  if (IsSparseBlackChannel(inverse->sparse_image,inverse->image) != MagickFalse)
-    pixel.black/=denominator;
-  if (IsSparseAlphaChannel(inverse->sparse_image,
-      inverse->sparse_image) != MagickFalse)
-    pixel.alpha/=denominator;
+  pixel=DivideSparseColor(inverse,pixel,denominator);
   return(pixel);
 }
 
