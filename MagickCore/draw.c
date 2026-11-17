@@ -9970,6 +9970,18 @@ static MagickBooleanType TraceCircle(MVGInfo *mvg_info,const PointInfo start,
   return(TraceEllipse(mvg_info,start,offset,degrees));
 }
 
+static inline MagickBooleanType IsZeroEllipseRadii(const PointInfo radii)
+{
+  return(((fabs(radii.x) < MagickEpsilon) || (fabs(radii.y) < MagickEpsilon)) ?
+    MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsClosedEllipse(const double x,const double y)
+{
+  return(((x < MagickEpsilon) && (y < MagickEpsilon)) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickBooleanType TraceEllipse(MVGInfo *mvg_info,const PointInfo center,
   const PointInfo radii,const PointInfo arc)
 {
@@ -9998,7 +10010,7 @@ static MagickBooleanType TraceEllipse(MVGInfo *mvg_info,const PointInfo center,
   */
   primitive_info=(*mvg_info->primitive_info)+mvg_info->offset;
   primitive_info->coordinates=0;
-  if ((fabs(radii.x) < MagickEpsilon) || (fabs(radii.y) < MagickEpsilon))
+  if (IsZeroEllipseRadii(radii) != MagickFalse)
     return(MagickTrue);
   delta=MagickSafeReciprocal(MagickMax(radii.x,radii.y));
   step=MagickPI/(MagickPI*MagickSafeReciprocal(delta))/8.0;
@@ -10033,7 +10045,7 @@ static MagickBooleanType TraceEllipse(MVGInfo *mvg_info,const PointInfo center,
     primitive_info[primitive_info->coordinates-1].point.x);
   y=fabs(primitive_info[0].point.y-
     primitive_info[primitive_info->coordinates-1].point.y);
-  if ((x < MagickEpsilon) && (y < MagickEpsilon))
+  if (IsClosedEllipse(x,y) != MagickFalse)
     primitive_info->closed_subpath=MagickTrue;
   SetTracedPrimitiveType(primitive_info,p);
   return(MagickTrue);
