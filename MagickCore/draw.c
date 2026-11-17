@@ -3216,6 +3216,23 @@ typedef struct _MVGRenderState
     **stops;
 } MVGRenderState;
 
+static MagickBooleanType GetMVGListValue(const char **q,const size_t extent,
+  char *token,double *value)
+{
+  char
+    *next_token;
+
+  (void) GetNextToken((*q),q,extent,token);
+  if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+    return(MagickFalse);
+  if (*token == ',')
+    (void) GetNextToken((*q),q,extent,token);
+  (*value)=GetDrawValue(token,&next_token);
+  if (token == next_token)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static void ParseMVGPrimitivePoints(const MVGRenderState *state)
 {
   char
@@ -3273,13 +3290,7 @@ static void ParseMVGPrimitivePoints(const MVGRenderState *state)
     point.x=GetDrawValue(token,&next_token);
     if (token == next_token)
       ThrowPointExpectedException(token,exception);
-    (void) GetNextToken(q,&q,extent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(q,&q,extent,token);
-    point.y=GetDrawValue(token,&next_token);
-    if (token == next_token)
+    if (GetMVGListValue(&q,extent,token,&point.y) == MagickFalse)
       ThrowPointExpectedException(token,exception);
     (void) GetNextToken(q,(const char **) NULL,extent,token);
     if (*token == ',')
