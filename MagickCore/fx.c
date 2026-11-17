@@ -233,6 +233,16 @@ static inline MagickBooleanType ChanIsVirtual (PixelChannel pc)
   return MagickFalse;
 }
 
+static void DestroyImgViewsBelow (FxInfo * pfx, ssize_t i)
+{
+  ImgT * pimg;
+
+      for ( ; i > 0; i--) {
+        pimg = &pfx->Imgs[i-1];
+        pimg->View = DestroyCacheView (pimg->View);
+      }
+}
+
 static MagickBooleanType InitFx (FxInfo * pfx, const Image * img,
   MagickBooleanType CalcAllStats, ExceptionInfo *exception)
 {
@@ -275,10 +285,7 @@ static MagickBooleanType InitFx (FxInfo * pfx, const Image * img,
         "View", "[%li]",
         (long) i);
       /* dealloc any done so far, and Imgs */
-      for ( ; i > 0; i--) {
-        pimg = &pfx->Imgs[i-1];
-        pimg->View = DestroyCacheView (pimg->View);
-      }
+      DestroyImgViewsBelow (pfx, i);
       pfx->Imgs=(ImgT *) RelinquishMagickMemory (pfx->Imgs);
       return MagickFalse;
     }
