@@ -24099,46 +24099,10 @@ static void XNameImageWindow(const DisplayEventContext *context,
     }
 }
 
-static void XInitializeBackdropWindow(const DisplayEventContext *context)
+static void XMakeBackdropWindow(XResourceInfo *resource_info,XWindows *windows,
+  Display *display,XVisualInfo *visual_info,XWMHints *manager_hints,
+  Window root_window,char **argv,int argc,XClassHint *class_hints)
 {
-  Display
-    *const display = context->display;
-
-  XResourceInfo
-    *const resource_info = context->resource_info;
-
-  XWindows
-    *const windows = context->windows;
-
-  XPixelInfo
-    *const pixel = context->pixel;
-
-  XStandardColormap
-    *const map_info = context->map_info;
-
-  const Window
-    root_window = context->root_window;
-
-  XVisualInfo
-    *const visual_info = context->visual_info;
-
-  XFontStruct
-    *const font_info = context->font_info;
-
-  char
-    **const argv = context->argv;
-
-  const int
-    argc = context->argc;
-
-  XClassHint
-    *const class_hints = context->class_hints;
-
-  XWMHints
-    *const manager_hints = context->manager_hints;
-
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->backdrop);
   if ((resource_info->backdrop) || (windows->backdrop.id != (Window) NULL))
     {
       /*
@@ -24184,6 +24148,50 @@ static void XInitializeBackdropWindow(const DisplayEventContext *context)
       windows->image.y=(XDisplayHeight(display,visual_info->screen)/2)-
         ((int) windows->image.height/2);
     }
+}
+
+static void XInitializeBackdropWindow(const DisplayEventContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  XPixelInfo
+    *const pixel = context->pixel;
+
+  XStandardColormap
+    *const map_info = context->map_info;
+
+  const Window
+    root_window = context->root_window;
+
+  XVisualInfo
+    *const visual_info = context->visual_info;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  char
+    **const argv = context->argv;
+
+  const int
+    argc = context->argc;
+
+  XClassHint
+    *const class_hints = context->class_hints;
+
+  XWMHints
+    *const manager_hints = context->manager_hints;
+
+  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
+    resource_info,&windows->backdrop);
+  XMakeBackdropWindow(resource_info,windows,display,visual_info,manager_hints,
+    root_window,argv,argc,class_hints);
 }
 
 static void XMakeImageWindow(const DisplayEventContext *context)
