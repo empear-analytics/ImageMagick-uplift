@@ -21111,7 +21111,7 @@ static void XSetCropGeometry(Display *display,XWindows *windows,
 */
 static inline MagickBooleanType IsTileNameCharacter(const char *q)
 {
-  return(((*q != '\xff') && (*q != '\0')) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((*q != '\xff') && (*q != '\0')));
 }
 
 typedef struct _XTileFillInfo
