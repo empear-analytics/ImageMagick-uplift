@@ -14005,31 +14005,12 @@ static void XApplyZoomCommand(const XMagickCommandContext *context)
     }
 }
 
-static void XApplyShowPreviewCommand(const XMagickCommandContext *context)
+static void XShowImagePreview(Display *display,XWindows *windows,
+  char *preview_type,Image **image,char *filename,ImageInfo *image_info,
+  ExceptionInfo *exception)
 {
-  Display
-    *const display = context->display;
-
-  XWindows
-    *const windows = context->windows;
-
-  Image
-    **const image = context->image;
-
-  ImageInfo
-    *const image_info = context->image_info;
-
-  ExceptionInfo
-    *const exception = context->exception;
-
   MagickStatusType
     status;
-
-  char
-    filename[MagickPathExtent];
-
-  char
-    **previews;
 
   Image
     *preview_image;
@@ -14037,24 +14018,6 @@ static void XApplyShowPreviewCommand(const XMagickCommandContext *context)
   PreviewType
     preview;
 
-  static char
-    preview_type[MagickPathExtent] = "Gamma";
-
-  /*
-    Select preview type from menu.
-  */
-  previews=GetCommandOptions(MagickPreviewOptions);
-  if (previews == (char **) NULL)
-    return;
-  XListBrowserWidget(display,windows,&windows->widget,
-    (const char **) previews,"Preview",
-    "Select an enhancement, effect, or F/X:",preview_type);
-  previews=DestroyStringList(previews);
-  if (*preview_type == '\0')
-    return;
-  /*
-    Show image preview.
-  */
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
   preview=(PreviewType) ParseCommandOption(MagickPreviewOptions,
@@ -14077,6 +14040,51 @@ static void XApplyShowPreviewCommand(const XMagickCommandContext *context)
       (*image)->filename);
   XDelay(display,1500);
   XSetCursorState(display,windows,MagickFalse);
+}
+
+static void XApplyShowPreviewCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ImageInfo
+    *const image_info = context->image_info;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  char
+    filename[MagickPathExtent];
+
+  char
+    **previews;
+
+  static char
+    preview_type[MagickPathExtent] = "Gamma";
+
+  /*
+    Select preview type from menu.
+  */
+  previews=GetCommandOptions(MagickPreviewOptions);
+  if (previews == (char **) NULL)
+    return;
+  XListBrowserWidget(display,windows,&windows->widget,
+    (const char **) previews,"Preview",
+    "Select an enhancement, effect, or F/X:",preview_type);
+  previews=DestroyStringList(previews);
+  if (*preview_type == '\0')
+    return;
+  /*
+    Show image preview.
+  */
+  XShowImagePreview(display,windows,preview_type,image,filename,image_info,
+    exception);
 }
 
 static void XApplyShowHistogramCommand(const XMagickCommandContext *context)
