@@ -9269,6 +9269,15 @@ static void XSizeDrawRegion(const DrawEditContext *context,
     (*draw_info).x+x,(*draw_info).y+y);
 }
 
+static void XFlipDrawLineVertical(XDrawInfo *draw_info)
+{
+  if ((*draw_info).line_info.y2 < 0)
+    {
+      (*draw_info).line_info.y2=(-(*draw_info).line_info.y2);
+      Swap((*draw_info).line_info.y1,(*draw_info).line_info.y2);
+    }
+}
+
 static void XSetDrawLineInfo(XDrawInfo *draw_info,const XSegment *line_info,
   const unsigned int line_width)
 {
@@ -9291,11 +9300,7 @@ static void XSetDrawLineInfo(XDrawInfo *draw_info,const XSegment *line_info,
       (*draw_info).line_info.x2=(-(*draw_info).line_info.x2);
       Swap((*draw_info).line_info.x1,(*draw_info).line_info.x2);
     }
-  if ((*draw_info).line_info.y2 < 0)
-    {
-      (*draw_info).line_info.y2=(-(*draw_info).line_info.y2);
-      Swap((*draw_info).line_info.y1,(*draw_info).line_info.y2);
-    }
+  XFlipDrawLineVertical(draw_info);
 }
 
 static void XDrawStartEvent(const DrawEditContext *context,
