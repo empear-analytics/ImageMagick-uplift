@@ -654,30 +654,29 @@ static MagickBooleanType FlushFinalEdge(PolygonInfo *polygon_info,
   const SegmentInfo
     bounds = input->bounds;
 
-  if ((*points) != (PointInfo *) NULL)
+  if ((*points) == (PointInfo *) NULL)
+    return(MagickTrue);
+  if (n < 2)
+    (*points)=(PointInfo *) RelinquishMagickMemory((*points));
+  else
     {
-      if (n < 2)
-        (*points)=(PointInfo *) RelinquishMagickMemory((*points));
-      else
-        {
-          if (GrowPolygonEdges(polygon_info,(*edge),number_edges) == MagickFalse)
-            return(MagickFalse);
-          polygon_info->edges[(*edge)].number_points=(size_t) n;
-          polygon_info->edges[(*edge)].scanline=(-1.0);
-          polygon_info->edges[(*edge)].highwater=0;
-          polygon_info->edges[(*edge)].ghostline=(*ghostline);
-          polygon_info->edges[(*edge)].direction=(ssize_t) (direction > 0);
-          if (direction < 0)
-            ReversePoints((*points),(size_t) n);
-          polygon_info->edges[(*edge)].points=(*points);
-          polygon_info->edges[(*edge)].bounds=bounds;
-          polygon_info->edges[(*edge)].bounds.y1=(*points)[0].y;
-          polygon_info->edges[(*edge)].bounds.y2=(*points)[n-1].y;
-          (*points)=(PointInfo *) NULL;
-          (*ghostline)=MagickFalse;
-          (*edge)++;
-          polygon_info->number_edges=(*edge);
-        }
+      if (GrowPolygonEdges(polygon_info,(*edge),number_edges) == MagickFalse)
+        return(MagickFalse);
+      polygon_info->edges[(*edge)].number_points=(size_t) n;
+      polygon_info->edges[(*edge)].scanline=(-1.0);
+      polygon_info->edges[(*edge)].highwater=0;
+      polygon_info->edges[(*edge)].ghostline=(*ghostline);
+      polygon_info->edges[(*edge)].direction=(ssize_t) (direction > 0);
+      if (direction < 0)
+        ReversePoints((*points),(size_t) n);
+      polygon_info->edges[(*edge)].points=(*points);
+      polygon_info->edges[(*edge)].bounds=bounds;
+      polygon_info->edges[(*edge)].bounds.y1=(*points)[0].y;
+      polygon_info->edges[(*edge)].bounds.y2=(*points)[n-1].y;
+      (*points)=(PointInfo *) NULL;
+      (*ghostline)=MagickFalse;
+      (*edge)++;
+      polygon_info->number_edges=(*edge);
     }
   return(MagickTrue);
 }
