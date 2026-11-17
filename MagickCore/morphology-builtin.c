@@ -1993,6 +1993,14 @@ static void SetBlurKernelWidth(KernelInfo *kernel,const GeometryInfo *args,
     kernel->width = GetOptimalKernelWidth1D(args->rho,sigma);
 }
 
+static void SetBlurKernelGeometry(KernelInfo *kernel)
+{
+  kernel->height = 1;
+  kernel->x = (ssize_t) (kernel->width-1)/2;
+  kernel->y = 0;
+  kernel->negative_range = kernel->positive_range = 0.0;
+}
+
 static KernelInfo *AcquireBlurKernel(KernelInfo *kernel,
   const GeometryInfo *args)
 {
@@ -2004,10 +2012,7 @@ static KernelInfo *AcquireBlurKernel(KernelInfo *kernel,
     alpha, beta;
 
   SetBlurKernelWidth(kernel,args,sigma);
-  kernel->height = 1;
-  kernel->x = (ssize_t) (kernel->width-1)/2;
-  kernel->y = 0;
-  kernel->negative_range = kernel->positive_range = 0.0;
+  SetBlurKernelGeometry(kernel);
   if (AcquireKernelValues(kernel) == MagickFalse)
     return(DestroyKernelInfo(kernel));
 
