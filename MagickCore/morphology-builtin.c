@@ -670,6 +670,13 @@ static void SetBinomialKernelValues(KernelInfo *kernel,const size_t order_f)
     }
 }
 
+static void SetBinomialKernelRange(KernelInfo *kernel)
+{
+  kernel->minimum = 1.0;
+  kernel->maximum = kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width];
+  kernel->negative_range = 0.0;
+}
+
 static KernelInfo *AcquireBinomialKernel(KernelInfo *kernel,
   const GeometryInfo *args)
 {
@@ -696,9 +703,7 @@ static KernelInfo *AcquireBinomialKernel(KernelInfo *kernel,
 
   /* set all kernel values within diamond area to scale given */
   SetBinomialKernelValues(kernel,order_f);
-  kernel->minimum = 1.0;
-  kernel->maximum = kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width];
-  kernel->negative_range = 0.0;
+  SetBinomialKernelRange(kernel);
   return(kernel);
 }
 
