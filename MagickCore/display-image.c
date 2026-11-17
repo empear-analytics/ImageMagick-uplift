@@ -26686,21 +26686,27 @@ static void XTraceDisplayImage(Image **image)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",(*image)->filename);
 }
 
-static void XRestoreDisplayState(const WarningHandler warning_handler,
-  char *working_directory,XResourceInfo *resource_info,
-  ExceptionInfo *exception)
+static void XReturnToHomeDirectory(char *working_directory,
+  XResourceInfo *resource_info,ExceptionInfo *exception)
 {
   char
     *directory;
 
+  directory=getcwd(working_directory,MagickPathExtent);
+  (void) directory;
+  XChangeToHomeDirectory(resource_info,exception);
+}
+
+static void XRestoreDisplayState(const WarningHandler warning_handler,
+  char *working_directory,XResourceInfo *resource_info,
+  ExceptionInfo *exception)
+{
   (void) SetErrorHandler(warning_handler);
   (void) SetWarningHandler(warning_handler);
   /*
     Change to home directory.
   */
-  directory=getcwd(working_directory,MagickPathExtent);
-  (void) directory;
-  XChangeToHomeDirectory(resource_info,exception);
+  XReturnToHomeDirectory(working_directory,resource_info,exception);
 }
 
 typedef struct _DisplayContextInput
