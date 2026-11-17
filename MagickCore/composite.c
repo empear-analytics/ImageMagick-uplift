@@ -284,6 +284,57 @@ static void CopyTextureRow(Image *image,Image *texture_image,
   }
 }
 
+typedef struct _TextureCopyRow
+{
+  Image
+    *image,
+    *texture_image;
+
+  CacheView
+    *texture_view,
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+} TextureCopyRow;
+
+static void CopyTextureImageRow(const TextureCopyRow *row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  Image
+    *const image = row->image,
+    *const texture_image = row->texture_image;
+
+  CacheView
+    *const texture_view = row->texture_view,
+    *const image_view = row->image_view;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  const Quantum
+    *pixels;
+
+  Quantum
+    *q;
+
+  if ((*status) == MagickFalse)
+    return;
+  pixels=GetCacheViewVirtualPixels(texture_view,texture_image->tile_offset.x,
+    (y+texture_image->tile_offset.y) % (ssize_t) texture_image->rows,
+    texture_image->columns,1,exception);
+  q=QueueCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if ((pixels == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  CopyTextureRow(image,texture_image,pixels,q);
+  SyncCompositeRow(image_view,exception,status);
+  if (ReportTextureProgress(image,y) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static MagickBooleanType CopyTextureImage(Image *image,Image *texture_image,
   ExceptionInfo *exception)
 {
@@ -309,27 +360,10 @@ static MagickBooleanType CopyTextureImage(Image *image,Image *texture_image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *pixels;
+    const TextureCopyRow
+      row = { image, texture_image, texture_view, image_view, exception };
 
-    Quantum
-      *q;
-
-    if (status == MagickFalse)
-      continue;
-    pixels=GetCacheViewVirtualPixels(texture_view,texture_image->tile_offset.x,
-      (y+texture_image->tile_offset.y) % (ssize_t) texture_image->rows,
-      texture_image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if ((pixels == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    CopyTextureRow(image,texture_image,pixels,q);
-    SyncCompositeRow(image_view,exception,&status);
-    if (ReportTextureProgress(image,y) == MagickFalse)
-      status=MagickFalse;
+    CopyTextureImageRow(&row,y,&status);
   }
   texture_view=DestroyCacheView(texture_view);
   image_view=DestroyCacheView(image_view);
