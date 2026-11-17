@@ -6599,10 +6599,10 @@ static MagickBooleanType XConfigureImage(Display *display,
 static inline MagickBooleanType IsNearTopLeftCorner(const int x,const int y,
   const RectangleInfo rectangle)
 {
-  return(((x < (int) (rectangle.x+RoiDelta)) &&
+  return((MagickBooleanType) ((x < (int) (rectangle.x+RoiDelta)) &&
     (x > (int) (rectangle.x-RoiDelta)) &&
     (y < (int) (rectangle.y+RoiDelta)) &&
-    (y > (int) (rectangle.y-RoiDelta))) ? MagickTrue : MagickFalse);
+    (y > (int) (rectangle.y-RoiDelta))));
 }
 
 static inline MagickBooleanType IsNearBottomLeftCorner(const int x,const int y,
