@@ -4432,6 +4432,21 @@ the block's depth.
    script to be identical in every copy). The block writes no variable `S` reads or
    writes, and contains no `break` that leaves it; steps 1 to 4 hold as written, with
    `S continue;` in place of `break;`. A bare `continue;` is the form with `S` empty.
+   Exit-statement form (2026-11-17). Every exit of the block may instead be one statement
+   `X` that stays in the caller, the same text at every exit (checked by script), whose
+   expansion ends the enclosing loop or `do { } while (0)` (`ThrowPointExpectedException
+   (token,exception);`, a macro that throws, sets `status` and ends in `break;`). Each
+   `X` becomes `return(MagickFalse);`, one for one, and the caller writes
+   `if (Helper(...) == MagickFalse) X`, `X` unchanged, so the exception it throws still
+   names the caller (`GetMagickModule()` stays where it was). `X` may read a variable the
+   block writes (the `token` buffer): the block writes nothing after its exit, so `X`
+   reads the value it read before. A variable the block assigns from an expression and
+   the caller reads after it (`x=GetDrawValue(token,&next_token);`) is written through a
+   pointer parameter, `(*value)=...`; a temporary only the block reads (`next_token`) is
+   declared in the new function, and its declaration leaves a caller that no longer
+   uses it. Copies of the block in other functions of the file, the same text but for
+   that written variable (checked by script), call the same function (Recipe Y step 7),
+   one commit per caller, the first adding the function.
 8. A block that writes two to four variables of the caller that the caller reads after
    it (step 2's `v`, more than one) passes their addresses in one `const` struct,
    Recipe I's form (steps 3, 5 and 6): a `typedef struct` directly above the new
@@ -4588,6 +4603,13 @@ tile row loop's body, whose tile loop body fetches the tile and ends the tile lo
 through `break;` on a failed fetch; left in place it repeats the 90-degree helper's tile
 loop, which CodeScene reports as *Code Duplication* once that helper exists (7.58 in a
 probe). Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Exit-statement form (2026-11-17, campaign B, M138): `draw.c`'s path tracers, whose
+fourteen copies of the value read (`GetNextToken`, the list-character test, the comma
+skip, `GetDrawValue`, the empty-value test) each leave through
+`ThrowPointExpectedException`; one `GetPathValue` serves six functions, taking their cc
+down by two per copy (`TracePathArc` 30 to 20) and `TracePathBezierCurve` out of
+*Large Method* in a probe, draw.c holding at 3.27. Added by Claude Code (Claude Opus 5.5)
+under the mandate of 2026-10-24.
 
 ---
 
@@ -23489,3 +23511,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-17 | AMEND | MT | Step 4: the folding form, whole-body twins differing in one local's name, one assigned member and one constant; the differing assignment pair as `if (side == A) SA else SB`, each call replaced by the new function with its constant and both functions removed | `draw.c`'s `TracePathHorizontalLine` and `TracePathVerticalLine` (cc 10 each to one function of cc 12, one function fewer); campaign B, M138 | mandate (2026-10-24) |
 | 2026-11-17 | AMEND | MT | Step 4's folding form widened: any runs of steps 1 and 4, plus (b) an `if (c) S` in copy B only, written `if ((side == NameB) && (c)) S` | `draw.c`'s `TracePathQuadraticBezier` and `TracePathCubicBezier` (four findings to two, one function fewer); campaign B, M138 | mandate (2026-10-24) |
 | 2026-11-17 | AMEND | MT | Folding form (b): the one-copy `if (c) S` may stand in either copy and `S` may be a `break;` of a loop enclosing it in both | `draw.c`'s `TracePathSmoothCubicBezier` and `TracePathSmoothQuadraticBezier` (four findings to two, one function fewer); campaign B, M138 | mandate (2026-10-24) |
+| 2026-11-17 | AMEND | LB | Step 7, exit-statement form: every exit one statement `X` left in the caller (a throwing macro ending in `break;`), `if (Helper(...) == MagickFalse) X`; a written variable through a pointer; copies in other functions call the same function, one commit per caller | `draw.c`'s fourteen path-value reads in six tracers, one `GetPathValue`; campaign B, M138 | mandate (2026-10-24) |
