@@ -37,6 +37,12 @@ extern "C" {
 #define ALIGNED(pointer,type) ((((size_t)(pointer)) & (sizeof(type)-1)) == 0)
 
 /*
+  Method prototypes.
+*/
+static void
+  TraceAccelerateImage(const Image *);
+
+/*
   Helper functions.
 */
 static inline MagickBooleanType IsUnsupportedColorspace(const Image *image)
@@ -295,6 +301,14 @@ static inline cl_mem_flags GetInputBufferFlags(const void *inputPixels)
     mem_flags = CL_MEM_READ_ONLY|CL_MEM_COPY_HOST_PTR;
   }
   return(mem_flags);
+}
+
+static inline void TraceAccelerateImage(const Image *image)
+{
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
 }
 
 #endif /* MAGICKCORE_OPENCL_SUPPORT */
