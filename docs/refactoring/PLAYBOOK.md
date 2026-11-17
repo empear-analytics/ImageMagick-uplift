@@ -7758,6 +7758,15 @@ SD, which move statements: the decision moves with them and the helper inherits 
    type that every path to the site has assigned (`mw_hash`, `mb_hash`, tables allocated
    and checked before the loop), with no call, assignment or increment; they become
    parameters of that type after those of `c`, and the function returns that type.
+   Offset form (2026-11-17): `k1` may be a variable `v` and `k2` the sum `w+v` of a
+   variable or member access `w` and that same `v` (`(attribute == (int) 'A' ? x :
+   point.x+x)`, an absolute coordinate or one relative to the current point), all of one
+   floating type, and the constant of `c`'s comparison may itself be a selection
+   between two character constants (`((side == CubicPathBezier) ? 'C' : 'Q')`); the
+   function takes `c`'s variable, the constant (an `int` parameter, the site passing
+   `(int) <constant or selection>` as written), `v` and `w`, in that order, and returns
+   `(c' ? value : current+value)` with the site's own cast. Step 5's `IDENTICAL` is the
+   proof, as for every form.
 2. Write a `static inline` function directly above the first function that uses it,
    with one parameter per variable expression of `c` (`const size_t extent` for
    `geometry.width`), of that expression's exact type, returning the type of `k1`:
@@ -7841,6 +7850,11 @@ Variable form (2026-11-14, same lane): `compress.c`'s `HuffmanDecodeImage`, whos
 `(color != MagickFalse) ? mw_hash : mb_hash` is the last decision that keeps its scanline
 loop, as a helper, at cc 9; a probe of the chain 9.44 to 10.0.
 Lane: b
+Offset form (2026-11-17, campaign B, M138): `draw.c`'s path tracers, twelve
+`(double) (attribute == (int) <letter> ? <v> : point.<x|y>+<v>)` sites in six
+functions, one `GetPathCoordinate`; `IDENTICAL` object code, `TracePathMove` out of
+*Complex Method*. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-10-24.
 
 ---
 
@@ -23804,3 +23818,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-17 | AMEND | MT | Folding form (b): the one-copy `if (c) S` may stand in either copy and `S` may be a `break;` of a loop enclosing it in both | `draw.c`'s `TracePathSmoothCubicBezier` and `TracePathSmoothQuadraticBezier` (four findings to two, one function fewer); campaign B, M138 | mandate (2026-10-24) |
 | 2026-11-17 | AMEND | LB | Step 7, exit-statement form: every exit one statement `X` left in the caller (a throwing macro ending in `break;`), `if (Helper(...) == MagickFalse) X`; a written variable through a pointer; copies in other functions call the same function, one commit per caller | `draw.c`'s fourteen path-value reads in six tracers, one `GetPathValue`; campaign B, M138 | mandate (2026-10-24) |
 | 2026-11-17 | AMEND | LB | Step 7, converted-read form: a copy assigning a conversion of the read value reads into a `double` temporary through the helper and assigns the same conversion of it after the call, when the target is a local the exit leaves unread | `draw.c`'s `ParseMVGPushPattern` (three `region` reads; leaves Complex Method and Large Method); campaign B, M138 | mandate (2026-10-24) |
+| 2026-11-17 | AMEND | NS | Step 1, offset form: `(c ? v : w+v)` of one floating type, the comparison's constant possibly a selection between two character constants; the function takes the variable, the constant as `int`, `v` and `w` | `draw.c`'s twelve path-coordinate selections in six tracers, one `GetPathCoordinate`, IDENTICAL; campaign B, M138 | mandate (2026-10-24) |
