@@ -22750,7 +22750,7 @@ MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
   input.window_attributes=(&window_attributes);
   XAdjustBackgroundSize(&input,&targets,&width,&height);
   XDisplayBackgroundPixmap(&input,&targets,width,height);
-  return(window_info.id == root_window ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (window_info.id == root_window));
 }
 
 static void XPositionCommandAndWidget(Display *display,XWindows *windows,
