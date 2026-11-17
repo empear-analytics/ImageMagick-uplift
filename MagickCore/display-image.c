@@ -12838,6 +12838,26 @@ static void XApplySegmentCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplySepiaToneToImage(Display *display,XWindows *windows,
+  char *factor,Image **image,ExceptionInfo *exception)
+{
+  double
+    threshold;
+
+  Image
+    *sepia_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  threshold=StringToDoubleInterval(factor,(double) QuantumRange+1.0);
+  sepia_image=SepiaToneImage(*image,threshold,exception);
+  if (sepia_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=sepia_image;
+    }
+}
+
 static void XApplySepiaToneCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12855,12 +12875,6 @@ static void XApplySepiaToneCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
-  double
-    threshold;
-
-  Image
-    *sepia_image;
-
   static char
     factor[MagickPathExtent] = "80%";
 
@@ -12874,15 +12888,7 @@ static void XApplySepiaToneCommand(const XMagickCommandContext *context)
   /*
     Sepia tone image pixels.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  threshold=StringToDoubleInterval(factor,(double) QuantumRange+1.0);
-  sepia_image=SepiaToneImage(*image,threshold,exception);
-  if (sepia_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=sepia_image;
-    }
+  XApplySepiaToneToImage(display,windows,factor,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
