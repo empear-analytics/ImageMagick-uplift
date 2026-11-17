@@ -2641,6 +2641,13 @@ static void SwapMorphologyImages(const MorphologyStages *stages,
     (*work_image) = (Image *) NULL; /* replace input 'image' */
 }
 
+static void AddMorphologyChanges(size_t *kernel_changed,
+  size_t *method_changed,const ssize_t *changed)
+{
+  (*kernel_changed) = (size_t) ((ssize_t) (*kernel_changed)+(*changed));
+  (*method_changed) = (size_t) ((ssize_t) (*method_changed)+(*changed));
+}
+
 static MagickBooleanType IterateMorphologyKernel(
   const MorphologyStages *stages,const MorphologyMethod primitive,
   KernelInfo *this_kernel,const MorphologyIterationTargets *targets)
@@ -2696,8 +2703,7 @@ static MagickBooleanType IterateMorphologyKernel(
     }
     if ( (*changed) < 0 )
       return(MagickFalse);
-    (*kernel_changed) = (size_t) ((ssize_t) (*kernel_changed)+(*changed));
-    (*method_changed) = (size_t) ((ssize_t) (*method_changed)+(*changed));
+    AddMorphologyChanges(kernel_changed,method_changed,changed);
 
     /* prepare next loop */
     SwapMorphologyImages(stages,work_image,curr_image);
