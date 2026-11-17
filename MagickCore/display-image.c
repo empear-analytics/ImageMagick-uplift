@@ -1663,8 +1663,8 @@ static void
 static inline MagickBooleanType IsSelectionUnusable(const int status,
   const Atom type,const int format,const unsigned long length)
 {
-  return(((status != Success) || (type != XA_STRING) || (format == 32) ||
-    (length == 0)) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((status != Success) || (type != XA_STRING) ||
+    (format == 32) || (length == 0)));
 }
 
 typedef struct _AnnotateTargets
