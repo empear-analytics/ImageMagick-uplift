@@ -127,6 +127,31 @@ class SplitSource(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("FamilyOne, an enumerator", r.stderr + r.stdout)
 
+    def test_typedef_named_only_by_another_moving_typedef_moves_too(self):
+        # draw.c's EdgeInfo, which only PolygonInfo and the family name, both far above the family (a kept
+        # function between): by name order EdgeInfo is looked at while PolygonInfo still stands in the kept
+        # part, so it moves on a second pass
+        types = ("\ntypedef struct _Edge\n{\n  int\n    x;\n} Edge;\n"
+                 "\ntypedef struct _Polygon\n{\n  Edge\n    *edges;\n} Polygon;\n")
+        fam = FAMILY.replace("static int FamilyHelper(int x)\n{\n  return(x+1);",
+                             "static int FamilyHelper(int x)\n{\n  Edge\n    edge;\n\n  Polygon\n    polygon;\n\n"
+                             "  edge.x=x;\n  polygon.edges=(&edge);\n  return(polygon.edges->x+1);")
+        r = self.split(types + KEPT + fam)
+        self.assertEqual(r.returncode, 0, r.stderr + r.stdout)
+        new = open(os.path.join(self.out, "synth-family.c")).read()
+        old = open(os.path.join(self.out, "synth.c")).read()
+        self.assertEqual(new.count("} Edge;"), 1)
+        self.assertEqual(new.count("} Polygon;"), 1)
+        self.assertLess(new.index("} Edge;"), new.index("} Polygon;"))
+        self.assertNotIn("Edge", old)
+        self.assertNotIn("Polygon", old)
+        self.assert_both_compile()
+        # planted defect: the kept root names Edge, so Edge stays and Polygon may move alone
+        kept = KEPT.replace("  return(x*2);", "  Edge\n    edge;\n\n  edge.x=x;\n  return(edge.x*2);")
+        r = self.split(types + kept + fam)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("type Edge defined outside the region", r.stderr + r.stdout)
+
     def test_inline_static_helper_is_a_static(self):
         # `inline static T Name(...)` is a static: it moves with its only caller, and a kept caller makes it shared
         fam = FAMILY.replace("static int FamilyHelper", "inline static int FamilyHelper")
