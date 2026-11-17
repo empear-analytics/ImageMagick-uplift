@@ -1147,6 +1147,10 @@ static KernelInfo *AcquireDiagonalsKernelPair(const KernelInfoType type)
   return(kernel);
 }
 
+static KernelInfo *
+  SetTypeAndRotateKernel(KernelInfo *,const KernelInfoType,
+    const GeometryInfo *);
+
 static KernelInfo *AcquireDiagonalsKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args)
 {
@@ -1161,11 +1165,7 @@ static KernelInfo *AcquireDiagonalsKernel(KernelInfo *kernel,
       kernel=ParseKernelArray("3: 0,0,1  0,-,1  0,1,-");
       break;
   }
-  if (kernel == (KernelInfo *) NULL)
-    return(kernel);
-  kernel->type = type;
-  RotateKernelInfo(kernel, args->sigma);
-  return(kernel);
+  return(SetTypeAndRotateKernel(kernel,type,args));
 }
 
 static KernelInfo *SetTypeAndRotateKernel(KernelInfo *kernel,
