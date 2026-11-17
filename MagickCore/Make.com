@@ -24,6 +24,7 @@ $endif
 $
 $write sys$output "Making MagickCore..."
 $call Make accelerate.c
+$call Make accelerate-resize.c
 $call Make animate.c
 $call Make animate-window.c
 $call Make annotate.c
