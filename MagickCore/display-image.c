@@ -26439,6 +26439,21 @@ static void XMakeDisplayWindows(const DisplayEventContext *context,
   XInitializePanWindow(context,windows,display);
 }
 
+static void XInitializeIconContext(XPixelInfo *icon_pixel,Display *display,
+  XGCValues *context_values,XWindows *windows,Image *display_image)
+{
+  if (icon_pixel->annotate_context != (GC) NULL)
+    (void) XFreeGC(display,icon_pixel->annotate_context);
+  (*context_values).background=icon_pixel->background_color.pixel;
+  (*context_values).foreground=icon_pixel->foreground_color.pixel;
+  icon_pixel->annotate_context=XCreateGC(display,windows->icon.id,
+    (size_t) (GCBackground | GCForeground),context_values);
+  if (icon_pixel->annotate_context == (GC) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
+      display_image->filename);
+  windows->icon.annotate_context=icon_pixel->annotate_context;
+}
+
 static void XMakeIconWindow(const DisplayEventContext *context,
   Image *display_image,XGCValues *context_values)
 {
@@ -26494,16 +26509,8 @@ static void XMakeIconWindow(const DisplayEventContext *context,
   /*
     Initialize graphic context for icon window.
   */
-  if (icon_pixel->annotate_context != (GC) NULL)
-    (void) XFreeGC(display,icon_pixel->annotate_context);
-  (*context_values).background=icon_pixel->background_color.pixel;
-  (*context_values).foreground=icon_pixel->foreground_color.pixel;
-  icon_pixel->annotate_context=XCreateGC(display,windows->icon.id,
-    (size_t) (GCBackground | GCForeground),context_values);
-  if (icon_pixel->annotate_context == (GC) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
-      display_image->filename);
-  windows->icon.annotate_context=icon_pixel->annotate_context;
+  XInitializeIconContext(icon_pixel,display,context_values,windows,
+    display_image);
 }
 
 static void XMakeContextWindow(const DisplayEventContext *context)
