@@ -20,7 +20,11 @@ functions out in does not matter), line by line. Allowed differences, each count
     string or slot count still prints DIFFERENT,
   - a `.bss` or `.data` reference (a function's `static` variable): the offset in the section differs when
     other variables stand before it, so each reference is resolved to the symbol (name and size) it points
-    into, plus the offset inside it, and a reference to another variable still prints DIFFERENT,
+    into, plus the offset inside it, and a reference to another variable still prints DIFFERENT; the same
+    for `.data.rel.local` and `.data.rel.ro.local` (a file-scope `static const` table of string pointers,
+    which gcc's PIC code places there: fx.c's `Operators`, shifted when a split moves other tables),
+  - a leading `endbr64` present in one object only: a function that became `static inline` in a private
+    header loses it (gcc, -fcf-protection), and nothing else in the function changes; counted,
   - the label objdump prints for a `call` or `jmp` whose target a relocation names (the line after it, which
     is compared): the placeholder address resolves to whatever symbol stands at it in each object,
   - the address of a function taken from another object: `lea F(%rip),%r` with an R_X86_64_PC32 relocation
@@ -29,7 +33,8 @@ functions out in does not matter), line by line. Allowed differences, each count
     read as the lea form and the symbol and addend are compared,
 and the alignment padding after a function's last instruction (nop forms), which depends on what follows
 the function in its object, is not compared.
-Prints IDENTICAL-MODULO-LAYOUT or DIFFERENT (with the first differing lines) and exits 0 or 1.
+Prints IDENTICAL-MODULO-LAYOUT or DIFFERENT (with every differing function and its differing lines) and
+exits 0 or 1.
 """
 import os, re, subprocess, sys, tempfile
 
@@ -77,7 +82,7 @@ def canonical_reference_names(out):
     had made before, so it differs between the original object and the object of the file split off it, while the
     rank among the variables the compared functions use does not: a reference to the same variable has the same
     rank, and a reference to another variable of the stem, to another stem or to a variable that is gone does not."""
-    pat = re.compile(r"(?<![\w.])(\.bss|\.data(?:\.rel\.local)?)\[(.+?)\.(\d+):")
+    pat = re.compile(r"(?<![\w.])(\.bss|\.data(?:\.rel(?:\.ro)?\.local)?)\[(.+?)\.(\d+):")
     numbers = {}
     for lines in out.values():
         for line in lines:
@@ -86,9 +91,10 @@ def canonical_reference_names(out):
     return {name: [pat.sub(rank, line) for line in lines] for name, lines in out.items()}
 
 def data_symbols(obj):
-    """Map a section (.bss, .data, .data.rel.local) of OBJ to its (value, size, name) object symbols."""
+    """Map a section (.bss, .data, .data.rel.local, .data.rel.ro.local) of OBJ to its (value, size, name) object
+    symbols."""
     syms = {}
-    for value, sec, size, name in re.findall(r"(?m)^([0-9a-f]+) .{7} (\.bss|\.data\.rel\.local|\.data)\s+([0-9a-f]+) (\S+)$",
+    for value, sec, size, name in re.findall(r"(?m)^([0-9a-f]+) .{7} (\.bss|\.data\.rel\.ro\.local|\.data\.rel\.local|\.data)\s+([0-9a-f]+) (\S+)$",
                                              sh("objdump", "-t", obj, text=True).stdout):
         if name != sec: syms.setdefault(sec, []).append((int(value, 16), int(size, 16), name))
     return syms
@@ -138,7 +144,7 @@ def disasm(obj, names, src):
         for k in range(len(lines) - 1):
             # a PC-relative reference to a variable: the target is the addend plus 4 plus the bytes of any
             # immediate between the displacement and the end of the instruction, found from the addresses
-            m = re.match(r"^R_X86_64_PC32\s+(\.bss|\.data\.rel\.local|\.data)(?:([+-])0x([0-9a-f]+))?\s*$", lines[k])
+            m = re.match(r"^R_X86_64_PC32\s+(\.bss|\.data\.rel\.ro\.local|\.data\.rel\.local|\.data)(?:([+-])0x([0-9a-f]+))?\s*$", lines[k])
             if m:
                 nxt = next((at[name][j] for j in range(k + 1, len(lines)) if not lines[j].startswith("R_X86_64_")), None)
                 addend = int(m.group(3) or "0", 16) * (-1 if m.group(2) == "-" else 1)
@@ -150,6 +156,11 @@ def disasm(obj, names, src):
                 lines[k] = re.sub(r"^mov(\s+)", r"lea\1", lines[k])
                 lines[k + 1] = lines[k + 1].replace("R_X86_64_REX_GOTPCRELX", "R_X86_64_PC32", 1)
     return canonical_reference_names({name: drop_padding(lines) for name, lines in out.items()})
+
+def drop_leading_endbr64(funcs):
+    """FUNCS (name -> lines, the first line the name) without a leading `endbr64`, and the names that had one."""
+    had = {name for name, lines in funcs.items() if len(lines) > 1 and lines[1].strip() == "endbr64"}
+    return {name: lines[:1] + lines[2:] if name in had else lines for name, lines in funcs.items()}, had
 
 def label_kind(x, y):
     """The kind of label number X and Y differ in alone, or None."""
@@ -182,14 +193,18 @@ def compare_by_name(a, b):
     """Compare the functions of A and B (name -> lines) one by name, so a different function order in the two
     objects (a compiler's choice) is not a difference. A name in one only, or a different length, is one."""
     kinds, bad = {}, []
+    a, had_a = drop_leading_endbr64(a)
+    b, had_b = drop_leading_endbr64(b)
     for name in sorted(set(a) | set(b)):
         if name not in a or name not in b or len(a[name]) != len(b[name]):
-            bad.append(("<%s> %s" % (name, "missing in old" if name not in a else "%d lines" % len(a[name])),
+            bad.append((name, "<%s> %s" % (name, "missing in old" if name not in a else "%d lines" % len(a[name])),
                         "<%s> %s" % (name, "missing in new" if name not in b else "%d lines" % len(b[name]))))
             continue
+        if (name in had_a) != (name in had_b):
+            kinds["leading endbr64"] = kinds.get("leading endbr64", 0) + 1
         k, d = compare(a[name], b[name])
         for key, n in k.items(): kinds[key] = kinds.get(key, 0) + n
-        bad += d
+        bad += [(name, x, y) for x, y in d]
     return kinds, bad
 
 def compile_both(bdir, old, new, tmp):
@@ -208,8 +223,9 @@ def compile_both(bdir, old, new, tmp):
 def report(kinds, bad):
     print("allowed differences:", kinds or "none")
     if bad:
-        print("DIFFERENT")
-        for x, y in bad[:10]: print("  -", x, "\n  +", y)
+        names = sorted({name for name, _, _ in bad})
+        print("DIFFERENT: %d function(s): %s" % (len(names), " ".join(names)))
+        for name, x, y in bad: print("  <%s>\n  -" % name, x, "\n  +", y)
         sys.exit(1)
     print("IDENTICAL-MODULO-LAYOUT")
 
