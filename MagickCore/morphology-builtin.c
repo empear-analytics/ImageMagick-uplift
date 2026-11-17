@@ -1241,11 +1241,7 @@ static KernelInfo *AcquireLineJunctionsKernel(KernelInfo *kernel,
     /* set of kernels to find all line junctions */
     return(AcquireKernelInfo("LineJunctions:1@;LineJunctions:2>",exception));
   kernel=ParseKernelArray(LineJunctionsKernelArrays[i].definition);
-  if (kernel == (KernelInfo *) NULL)
-    return(kernel);
-  kernel->type = type;
-  RotateKernelInfo(kernel, args->sigma);
-  return(kernel);
+  return(SetTypeAndRotateKernel(kernel,type,args));
 }
 
 static const char
