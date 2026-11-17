@@ -63,8 +63,13 @@ def makefile_in(s):
         if (("_la-%s." % orig) in line and "libMagickCore_" in line) or \
                 line == "  MagickCore/%s.c \\" % orig:
             # the last entry of the object list has no continuation: it gains one and the new entry ends the list
-            if line.endswith(lo): line += " \\"; out += [line, sub(line)[:-2]]
-            else: out += [line, sub(line)]
+            # the first entry of a list stands on its `name = ` line (am__objects_1 = ...accelerate.lo): the new
+            # entry is a continuation line, indented by a tab as automake writes the others
+            entry = sub(line)
+            m = re.match(r"^[\w@]+ = (.*)$", entry)
+            if m: entry = "\t" + m.group(1)
+            if line.endswith(lo): line += " \\"; out += [line, entry]
+            else: out += [line, entry]
             n += 1
             i += 1
             continue
