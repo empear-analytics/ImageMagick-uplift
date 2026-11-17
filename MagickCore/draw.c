@@ -9974,7 +9974,14 @@ static ssize_t TracePathCubicBezier(const PathTrace *trace)
   return(0);
 }
 
-static ssize_t TracePathHorizontalLine(const PathTrace *trace)
+typedef enum
+{
+  HorizontalPathLine,
+  VerticalPathLine
+} PathLineSide;
+
+static ssize_t TracePathAxisLine(const PathTrace *trace,
+  const PathLineSide side)
 {
   ExceptionInfo
     *exception = trace->exception;
@@ -10014,7 +10021,10 @@ static ssize_t TracePathHorizontalLine(const PathTrace *trace)
     x=GetDrawValue(token,&next_token);
     if (token == next_token)
       ThrowPointExpectedException(token,exception);
-    point.x=(double) (attribute == (int) 'H' ? x: point.x+x);
+    if (side == HorizontalPathLine)
+      point.x=(double) (attribute == (int) 'H' ? x: point.x+x);
+    else
+      point.y=(double) (attribute == (int) 'V' ? x : point.y+x);
     if (CheckPrimitiveExtent(mvg_info,PrimitiveExtentPad) == MagickFalse)
       return(-1);
     q=(*mvg_info->primitive_info)+mvg_info->offset;
@@ -10490,68 +10500,6 @@ static ssize_t TracePathSmoothQuadraticBezier(const PathTrace *trace)
   return(0);
 }
 
-static ssize_t TracePathVerticalLine(const PathTrace *trace)
-{
-  ExceptionInfo
-    *exception = trace->exception;
-
-  MVGInfo
-    *mvg_info = trace->mvg_info;
-
-  MagickBooleanType
-    status = (*trace->status);
-
-  PointInfo
-    point = (*trace->point);
-
-  PrimitiveInfo
-    *q = (*trace->q);
-
-  char
-    *token = trace->token,
-    *next_token;
-
-  const char
-    *p = (*trace->p);
-
-  const int
-    attribute = (*trace->attribute);
-
-  double
-    y;
-
-  /*
-    Line to.
-  */
-  do
-  {
-    (void) GetNextToken(p,&p,MagickPathExtent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(p,&p,MagickPathExtent,token);
-    y=GetDrawValue(token,&next_token);
-    if (token == next_token)
-      ThrowPointExpectedException(token,exception);
-    point.y=(double) (attribute == (int) 'V' ? y : point.y+y);
-    if (CheckPrimitiveExtent(mvg_info,PrimitiveExtentPad) == MagickFalse)
-      return(-1);
-    q=(*mvg_info->primitive_info)+mvg_info->offset;
-    if (TracePoint(q,point) == MagickFalse)
-      return(-1);
-    mvg_info->offset+=(ssize_t) q->coordinates;
-    q+=(ptrdiff_t) q->coordinates;
-    while (isspace((int) ((unsigned char) *p)) != 0)
-      p++;
-    if (*p == ',')
-      p++;
-  } while (IsValidPoint(p) != MagickFalse);
-  (*trace->p)=p;
-  (*trace->q)=q;
-  (*trace->point)=point;
-  (*trace->status)=status;
-  return(0);
-}
 
 static ssize_t TracePathClose(const PathTrace *trace)
 {
@@ -10684,7 +10632,7 @@ static ssize_t TracePath(MVGInfo *mvg_info,const char *path,
       case 'H':
       case 'h':
       {
-        if (TracePathHorizontalLine(&trace) == -1)
+        if (TracePathAxisLine(&trace,HorizontalPathLine) == -1)
           return(-1);
         break;
       }
@@ -10726,7 +10674,7 @@ static ssize_t TracePath(MVGInfo *mvg_info,const char *path,
       case 'v':
       case 'V':
       {
-        if (TracePathVerticalLine(&trace) == -1)
+        if (TracePathAxisLine(&trace,VerticalPathLine) == -1)
           return(-1);
         break;
       }
