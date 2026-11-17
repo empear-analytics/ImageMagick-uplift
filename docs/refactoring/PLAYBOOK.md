@@ -4482,6 +4482,13 @@ the block's depth.
    statement leaves and nothing reads `t` on the exit path (the `region` of a `do { }
    while (0)` the macro's `break;` ends). The value is computed once from the same token
    in both forms and converted the same way; only an assignment no path reads goes away.
+   The target may instead outlive the block (2026-11-17, `ParseMVGViewbox`'s
+   `graphic_context[n]->viewbox.<m>`) when every path from the exit statement reaches the
+   object's destruction without reading it: the macro sets `status` false and ends the
+   keyword handler, `ParseMVGKeyword` returns the handler's value, and `RenderMVGContent`
+   breaks out of its loop on that status into its cleanup, which destroys the graphic
+   contexts (`DestroyMVGGraphicContexts`). The commit names each function on that path,
+   checked by reading.
 8. A block that writes two to four variables of the caller that the caller reads after
    it (step 2's `v`, more than one) passes their addresses in one `const` struct,
    Recipe I's form (steps 3, 5 and 6): a `typedef struct` directly above the new
@@ -23830,3 +23837,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-17 | AMEND | LB | Step 7, converted-read form: a copy assigning a conversion of the read value reads into a `double` temporary through the helper and assigns the same conversion of it after the call, when the target is a local the exit leaves unread | `draw.c`'s `ParseMVGPushPattern` (three `region` reads; leaves Complex Method and Large Method); campaign B, M138 | mandate (2026-10-24) |
 | 2026-11-17 | AMEND | NS | Step 1, offset form: `(c ? v : w+v)` of one floating type, the comparison's constant possibly a selection between two character constants; the function takes the variable, the constant as `int`, `v` and `w` | `draw.c`'s twelve path-coordinate selections in six tracers, one `GetPathCoordinate`, IDENTICAL; campaign B, M138 | mandate (2026-10-24) |
 | 2026-11-17 | AMEND | MA | Step 2's address form widened: no role (b) condition when the block opens with a side-effect-free call reading a role (a) constant key; the key a `const char *` parameter, the result a local; one function per lvalue type | `draw.c`'s `GetDrawInfo` (nine option reads, three helpers; cc 22 to 13); campaign B, M138 | mandate (2026-10-24) |
+| 2026-11-17 | AMEND | LB | Step 7's converted-read form: the target may outlive the block when every path from the exit reaches its destruction unread (checked by reading the callers' exit path) | `draw.c`'s `ParseMVGViewbox` (four viewbox reads; leaves Complex Method); campaign B, M138 | mandate (2026-10-24) |
