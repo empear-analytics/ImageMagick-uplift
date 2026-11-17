@@ -1055,6 +1055,12 @@ static void SetPeaksKernelCenter(KernelInfo *kernel,
   }
 }
 
+static void SetRingKernelOrigin(KernelInfo *kernel)
+{
+  kernel->height = kernel->width;
+  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+}
+
 static KernelInfo *AcquireRingKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args,const double nan)
 {
@@ -1085,8 +1091,7 @@ static KernelInfo *AcquireRingKernel(KernelInfo *kernel,
   if ( limit2 <= 0 )
     kernel->width = 7L, limit1 = 7L, limit2 = 11L;
 
-  kernel->height = kernel->width;
-  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+  SetRingKernelOrigin(kernel);
   if (AcquireKernelValues(kernel) == MagickFalse)
     return(DestroyKernelInfo(kernel));
 
