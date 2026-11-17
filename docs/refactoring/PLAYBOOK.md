@@ -10741,6 +10741,11 @@ the slot of a shared object inside a parallel loop, not a member chosen per copy
    `windows->widget.mapped`: `windows->M.mapped`), with no call and no subscript in it
    (2026-11-11). All lvalues of role (c) have one declared type `T`. Any other difference
    stops the step.
+   Address form (2026-11-17): the block may take the address of its role (c) lvalue, only
+   as an argument of one call that writes through it (`CloneString(&clone_info->m,...)`),
+   when the role (b) operand is the same member of another object (`draw_info->m`). The
+   new function writes `&(*value)` there, the address the caller passes, so the callee
+   receives the same pointer; step 7's check reads `&(*value)` back as `&e.m`.
 3. Write one `static void` function directly above the caller (or in place of step 1's
    helper): its parameters are the variables a copy reads, or the input struct the
    copies already read, then one parameter per role (a) of the constant's type (Recipe
@@ -10865,6 +10870,12 @@ function), the function leaves *Bumpy Road Ahead* (probe 3.04 to 3.06). Step 2 (
 `XGetMapInfo`: its three mask blocks assign `map_info-><c>_max` from `visual_info-><c>_mask`
 and update `map_info-><c>_mult` beside it, so each copy names two lvalues and reads the
 mask first; one helper serves the three and the function leaves Bumpy Road Ahead and Complex Method.
+Step 2's address form (2026-11-17, campaign B, M138): `draw.c`'s `CloneDrawInfo`, whose
+eleven `if (draw_info->m != (char *) NULL) (void) CloneString(&clone_info->m,
+draw_info->m);` copies (id, primitive, geometry, text, font, metrics, family, encoding,
+density, server_name, clip_mask) are each a decision: cc 22 to 11 in a probe, no finding
+on the new function. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-10-24.
 
 ---
 
@@ -23444,3 +23455,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | AMEND | S | *Preprocessor branches*: an `#if` without `#else` directly above the family's first moved function whose `#endif` stands inside the moved run moves whole, directives verbatim; `split_source.py` 3423ec185 | `opencl.c`'s `#if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT` around the benchmark-profile readers (campaign A, W37 lane a) | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | S | Step 2: a chain of splits through private headers may drop the original between its steps, when a stub probe of the whole chain first shows its last state raising the original above its score before the chain and every product and header at or above that score; the dropping step goes `--no-verify` with the drop, the probe and the step that ends it in its message; the lane resets the branch if it cannot reach the probed end; each step keeps a split's checks (both catalogues, `omp_compare` for a region that moves, timing) | `morphology-apply.c` (8.26): round twenty-five's probe of a rotation header and the `MorphologyApply` split dropped the kept file to 8.01, the second split of the `AcquireKernelBuiltIn` side ends it at 10.0 (products 8.54 and 8.26, headers 9.68); round twenty-five's question 5. The ruling is the owner's, the wording and the products-and-headers condition the lane's | owner |
 | 2026-11-17 | NEW | SO | Extract Sibling Blocks Differing in One Value, Returning One Written Variable and Writing One Through a Pointer: copies of one small block in one or several functions of a file, differing in one constant and writing two caller locals (one assigned whole first, one advanced), become one `static` function returning the first and taking the second by pointer | `draw.c`'s MVG push handlers (`ParseMVGPushClass`, `-ClipPath`, `-Gradient`, `-Pattern`): `ParseMVGPushClipPath` leaves *Complex Method*, `-Gradient` cc 22 to 16, `-Pattern` 19 to 13 and leaves *Bumpy Road Ahead* in a probe; campaign B, M137 | mandate (2026-10-24) |
+| 2026-11-17 | AMEND | MA | Step 2: the address form, a role (c) lvalue whose address the block passes to one call that writes through it, the role (b) operand the same member of another object; the new function passes `&(*value)` | `draw.c`'s `CloneDrawInfo` (eleven guarded `CloneString` copies; cc 22 to 11 in a probe); campaign B, M138 | mandate (2026-10-24) |
