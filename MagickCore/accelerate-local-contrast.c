@@ -899,6 +899,60 @@ static Image *DiscardLocalContrastOutput(MagickBooleanType outputReady,
   return(filteredImage);
 }
 
+typedef struct _LocalContrastCleanupInputs
+{
+  MagickCLEnv
+    clEnv;
+
+  CacheView
+    *image_view,
+    *filteredImage_view;
+
+  cl_mem
+    imageBuffer,
+    filteredImageBuffer,
+    tempImageBuffer,
+    imageKernelBuffer;
+
+  cl_kernel
+    blurRowKernel,
+    blurColumnKernel;
+
+  cl_command_queue
+    queue;
+
+  MagickCLDevice
+    device;
+
+  MagickBooleanType
+    outputReady;
+} LocalContrastCleanupInputs;
+
+static Image *ReleaseLocalContrastResources(
+  const LocalContrastCleanupInputs *cleanup,Image *filteredImage)
+{
+  CacheView
+    *image_view = cleanup->image_view,
+    *filteredImage_view = cleanup->filteredImage_view;
+
+  image_view=DestroyCacheView(image_view);
+  if (filteredImage_view != NULL)
+    filteredImage_view=DestroyCacheView(filteredImage_view);
+
+  {
+    const LocalContrastBufferInputs inputs = { cleanup->clEnv,
+      cleanup->imageBuffer, cleanup->filteredImageBuffer,
+      cleanup->tempImageBuffer, cleanup->imageKernelBuffer };
+
+    ReleaseLocalContrastBuffers(&inputs);
+  }
+  ReleaseLocalContrastKernels(cleanup->blurRowKernel,
+    cleanup->blurColumnKernel,cleanup->queue,cleanup->device);
+  filteredImage=DiscardLocalContrastOutput(cleanup->outputReady,
+    filteredImage);
+  return(filteredImage);
+}
+
 static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
   const double radius,const double strength,ExceptionInfo *exception)
 {
@@ -977,18 +1031,14 @@ static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
 
 cleanup:
 
-  image_view=DestroyCacheView(image_view);
-  if (filteredImage_view != NULL)
-    filteredImage_view=DestroyCacheView(filteredImage_view);
-
   {
-    const LocalContrastBufferInputs inputs = { clEnv, imageBuffer,
-      filteredImageBuffer, tempImageBuffer, imageKernelBuffer };
+    const LocalContrastCleanupInputs inputs = { clEnv, image_view,
+      filteredImage_view, imageBuffer, filteredImageBuffer, tempImageBuffer,
+      imageKernelBuffer, blurRowKernel, blurColumnKernel, queue, device,
+      outputReady };
 
-    ReleaseLocalContrastBuffers(&inputs);
+    filteredImage=ReleaseLocalContrastResources(&inputs,filteredImage);
   }
-  ReleaseLocalContrastKernels(blurRowKernel,blurColumnKernel,queue,device);
-  filteredImage=DiscardLocalContrastOutput(outputReady,filteredImage);
 
   return(filteredImage);
 }
