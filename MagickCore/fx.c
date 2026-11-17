@@ -1582,8 +1582,8 @@ static inline MagickBooleanType IsUnqualifiedPixelFunction(
 static inline MagickBooleanType IsUnqualifiedCoordFunction(
   const PixelChannel chQual,const FunctionE fe)
 {
-  return((chQual == NO_CHAN_QUAL && (fe == fU || fe == fV ||
-    fe == fS)) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (chQual == NO_CHAN_QUAL && (fe == fU || fe == fV ||
+    fe == fS)));
 }
 
 static inline MagickBooleanType IsAttributeQualified(FxInfo *pfx,
