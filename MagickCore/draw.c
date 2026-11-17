@@ -1099,39 +1099,26 @@ MagickExport DrawInfo *DestroyDrawInfo(DrawInfo *draw_info)
   assert(draw_info->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  if (draw_info->id != (char *) NULL)
-    draw_info->id=DestroyString(draw_info->id);
-  if (draw_info->primitive != (char *) NULL)
-    draw_info->primitive=DestroyString(draw_info->primitive);
-  if (draw_info->text != (char *) NULL)
-    draw_info->text=DestroyString(draw_info->text);
-  if (draw_info->geometry != (char *) NULL)
-    draw_info->geometry=DestroyString(draw_info->geometry);
+  draw_info->id=DestroyString(draw_info->id);
+  draw_info->primitive=DestroyString(draw_info->primitive);
+  draw_info->text=DestroyString(draw_info->text);
+  draw_info->geometry=DestroyString(draw_info->geometry);
   if (draw_info->fill_pattern != (Image *) NULL)
     draw_info->fill_pattern=DestroyImage(draw_info->fill_pattern);
   if (draw_info->stroke_pattern != (Image *) NULL)
     draw_info->stroke_pattern=DestroyImage(draw_info->stroke_pattern);
-  if (draw_info->font != (char *) NULL)
-    draw_info->font=DestroyString(draw_info->font);
-  if (draw_info->metrics != (char *) NULL)
-    draw_info->metrics=DestroyString(draw_info->metrics);
-  if (draw_info->family != (char *) NULL)
-    draw_info->family=DestroyString(draw_info->family);
-  if (draw_info->encoding != (char *) NULL)
-    draw_info->encoding=DestroyString(draw_info->encoding);
-  if (draw_info->density != (char *) NULL)
-    draw_info->density=DestroyString(draw_info->density);
-  if (draw_info->server_name != (char *) NULL)
-    draw_info->server_name=(char *)
-     RelinquishMagickMemory(draw_info->server_name);
-  if (draw_info->dash_pattern != (double *) NULL)
-    draw_info->dash_pattern=(double *) RelinquishMagickMemory(
-      draw_info->dash_pattern);
-  if (draw_info->gradient.stops != (StopInfo *) NULL)
-    draw_info->gradient.stops=(StopInfo *) RelinquishMagickMemory(
-      draw_info->gradient.stops);
-  if (draw_info->clip_mask != (char *) NULL)
-    draw_info->clip_mask=DestroyString(draw_info->clip_mask);
+  draw_info->font=DestroyString(draw_info->font);
+  draw_info->metrics=DestroyString(draw_info->metrics);
+  draw_info->family=DestroyString(draw_info->family);
+  draw_info->encoding=DestroyString(draw_info->encoding);
+  draw_info->density=DestroyString(draw_info->density);
+  draw_info->server_name=(char *)
+   RelinquishMagickMemory(draw_info->server_name);
+  draw_info->dash_pattern=(double *) RelinquishMagickMemory(
+    draw_info->dash_pattern);
+  draw_info->gradient.stops=(StopInfo *) RelinquishMagickMemory(
+    draw_info->gradient.stops);
+  draw_info->clip_mask=DestroyString(draw_info->clip_mask);
   if (draw_info->clipping_mask != (Image *) NULL)
     draw_info->clipping_mask=DestroyImage(draw_info->clipping_mask);
   if (draw_info->composite_mask != (Image *) NULL)
