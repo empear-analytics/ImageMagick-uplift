@@ -12060,20 +12060,9 @@ static void XApplyResizeCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
-static void XApplyQuitCommand(const XMagickCommandContext *context)
+static void XQuitDisplayProgram(XResourceInfo *resource_info,Display *display,
+  XWindows *windows)
 {
-  Display
-    *const display = context->display;
-
-  XResourceInfo
-    *const resource_info = context->resource_info;
-
-  XWindows
-    *const windows = context->windows;
-
-  /*
-    exit program.
-  */
   if (resource_info->confirm_exit == MagickFalse)
     XClientMessage(display,windows->image.id,windows->im_protocols,
       windows->im_exit,CurrentTime);
@@ -12091,6 +12080,23 @@ static void XApplyQuitCommand(const XMagickCommandContext *context)
         XClientMessage(display,windows->image.id,windows->im_protocols,
           windows->im_exit,CurrentTime);
     }
+}
+
+static void XApplyQuitCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  /*
+    exit program.
+  */
+  XQuitDisplayProgram(resource_info,display,windows);
 }
 
 static void XApplyDespeckleCommand(const XMagickCommandContext *context)
