@@ -1438,6 +1438,16 @@ static MagickBooleanType TryColourSpaceColour (const ColourSpaceNames * names,
   return(MagickFalse);
 }
 
+static void CopyColourSpaceName (FxInfo * pfx, char * ColSp)
+{
+  char
+    *p;
+
+  (void) CopyMagickString (ColSp, pfx->token, MaxTokenLen);
+  p = ColSp + pfx->lenToken - 1;
+  if (*p == 'a' || *p == 'A') *p = '\0';
+}
+
 static inline ssize_t GetConstantColour (FxInfo * pfx, fxFltType *v0, fxFltType *v1, fxFltType *v2)
 /* Finds named colour such as "blue" and colorspace function such as "lab(10,20,30)".
    Returns number of characters to swallow.
@@ -1450,9 +1460,6 @@ static inline ssize_t GetConstantColour (FxInfo * pfx, fxFltType *v0, fxFltType 
 
   ExceptionInfo
     *dummy_exception = AcquireExceptionInfo ();
-
-  char
-    *p;
 
   MagickBooleanType
     IsGray,
@@ -1469,9 +1476,7 @@ static inline ssize_t GetConstantColour (FxInfo * pfx, fxFltType *v0, fxFltType 
     returned;
 
   char ColSp[MagickPathExtent];
-  (void) CopyMagickString (ColSp, pfx->token, MaxTokenLen);
-  p = ColSp + pfx->lenToken - 1;
-  if (*p == 'a' || *p == 'A') *p = '\0';
+  CopyColourSpaceName (pfx, ColSp);
 
   (void) GetPixelInfo (pfx->image, &colour);
 
