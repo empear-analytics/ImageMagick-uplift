@@ -811,9 +811,8 @@ static MagickBooleanType AddElement(FxInfo * pfx,fxFltType val,int oprNum)
 
 static inline MagickBooleanType IsAddressingOperator(const int oprNum)
 {
-  return((oprNum == rGoto || oprNum == rGotoChk || oprNum == rIfZeroGoto ||
-    oprNum == rIfNotZeroGoto
-    || oprNum == rZerStk) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (oprNum == rGoto || oprNum == rGotoChk ||
+    oprNum == rIfZeroGoto || oprNum == rIfNotZeroGoto || oprNum == rZerStk));
 }
 
 static MagickBooleanType AddAddressingElement (FxInfo * pfx, int oprNum, int EleNdx)
