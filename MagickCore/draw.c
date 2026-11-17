@@ -10435,8 +10435,8 @@ static ssize_t TracePathSmoothBezierCurve(const PathTrace *trace,
         ThrowPointExpectedException(token,exception);
       if ((side == CubicPathBezier) && (*p == ','))
         p++;
-      end.x=(double) (attribute == (int) ((side == CubicPathBezier) ? 'S' : 'T') ? x : point.x+x);
-      end.y=(double) (attribute == (int) ((side == CubicPathBezier) ? 'S' : 'T') ? y : point.y+y);
+      end.x=GetPathCoordinate(attribute,(int) ((side == CubicPathBezier) ? 'S' : 'T'),x,point.x);
+      end.y=GetPathCoordinate(attribute,(int) ((side == CubicPathBezier) ? 'S' : 'T'),y,point.y);
       points[i]=end;
     }
     if ((side == QuadraticPathBezier) && (status == MagickFalse))
