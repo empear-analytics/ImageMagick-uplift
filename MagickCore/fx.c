@@ -3442,8 +3442,8 @@ static inline MagickBooleanType IsPendingLimitChar(FxInfo *pfx,
 
 static inline MagickBooleanType IsOpenGroupOperator(const OperatorE op)
 {
-  return((op == oOpenParen || op == oOpenBracket ||
-    op == oOpenBrace) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (op == oOpenParen || op == oOpenBracket ||
+    op == oOpenBrace));
 }
 
 static inline MagickBooleanType IsMisplacedAssignment(const OperatorE op,
