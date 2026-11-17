@@ -7112,8 +7112,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
   mvg_info.extent=(&number_points);
   mvg_info.exception=exception;
   graphic_context[n]=CloneDrawInfo((ImageInfo *) NULL,draw_info);
-  if (graphic_context[n]->primitive != (char *) NULL)
-    graphic_context[n]->primitive=DestroyString(graphic_context[n]->primitive);
+  graphic_context[n]->primitive=DestroyString(graphic_context[n]->primitive);
   graphic_context[n]->viewbox=image->page;
   if ((image->page.width == 0) || (image->page.height == 0))
     {
@@ -7201,8 +7200,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
       primitive_info=(PrimitiveInfo *) RelinquishMagickMemory(primitive_info);
     }
   primitive=DestroyString(primitive);
-  if (stops != (StopInfo *) NULL)
-    stops=(StopInfo *) RelinquishMagickMemory(stops);
+  stops=(StopInfo *) RelinquishMagickMemory(stops);
   graphic_context=DestroyMVGGraphicContexts(graphic_context,n);
   if ((status == MagickFalse) && (exception->severity < ErrorException))
     ThrowBinaryException(DrawError,"NonconformingDrawingPrimitiveDefinition",
