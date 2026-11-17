@@ -4345,19 +4345,24 @@ FxInfo *AcquireFxInfo (const Image * images, const char * expression, ExceptionI
   return AcquireFxInfoPrivate (images, expression, MagickFalse, exception);
 }
 
-FxInfo *DestroyFxInfo (FxInfo * pfx)
+static void DestroyFxRuntimes (FxInfo * pfx)
 {
   ssize_t t;
 
+  for (t=0; t < (ssize_t) GetMagickResourceLimit(ThreadResource); t++) {
+    DestroyFxRt (&pfx->fxrts[t]);
+  }
+}
+
+FxInfo *DestroyFxInfo (FxInfo * pfx)
+{
   assert (pfx != NULL);
   assert (pfx->image != NULL);
   assert (pfx->Images != NULL);
   assert (pfx->Imgs != NULL);
   assert (pfx->fxrts != NULL);
 
-  for (t=0; t < (ssize_t) GetMagickResourceLimit(ThreadResource); t++) {
-    DestroyFxRt (&pfx->fxrts[t]);
-  }
+  DestroyFxRuntimes (pfx);
   pfx->fxrts = (fxRtT *) RelinquishMagickMemory (pfx->fxrts);
 
   DestroyRPN (pfx);
