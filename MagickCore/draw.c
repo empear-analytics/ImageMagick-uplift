@@ -8636,12 +8636,7 @@ static MagickStatusType DrawAlphaPrimitive(const DrawPrimitiveContext *context,
 
       status&=(MagickStatusType) GetOneVirtualPixelInfo(image,
         TileVirtualPixelMethod,x,y,&target,exception);
-      if (primitive_info->method == FillToBorderMethod)
-        {
-          target.red=(double) draw_info->border_color.red;
-          target.green=(double) draw_info->border_color.green;
-          target.blue=(double) draw_info->border_color.blue;
-        }
+      SetFillToBorderTarget(primitive_info,draw_info,&target);
       channel_mask=SetImageChannelMask(image,AlphaChannel);
       status&=(MagickStatusType) FloodfillPaintImage(image,draw_info,
         &target,x,y,primitive_info->method == FloodfillMethod ?
