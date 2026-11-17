@@ -1566,15 +1566,19 @@ static void SetLoGKernelValues(KernelInfo *kernel,const double sigma)
   SetLoGKernelLoop(kernel,A,B);
 }
 
+static void SetUnityKernelValues(KernelInfo *kernel)
+{
+  (void) memset(kernel->values,0, (size_t)
+    kernel->width*kernel->height*sizeof(*kernel->values));
+  kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
+}
+
 static void SetLoGOrUnityKernelValues(KernelInfo *kernel,const double sigma)
 {
   if ( sigma > MagickEpsilon )
     SetLoGKernelValues(kernel,sigma);
   else /* special case - generate a unity kernel */
-    { (void) memset(kernel->values,0, (size_t)
-        kernel->width*kernel->height*sizeof(*kernel->values));
-      kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
-    }
+    SetUnityKernelValues(kernel);
 }
 
 static MagickBooleanType IsGaussianSigmaWidest(const KernelInfoType type,
