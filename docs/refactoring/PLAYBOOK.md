@@ -1973,6 +1973,19 @@ merges code, not parameters.
    loop, as Recipe OC step 6 and Recipe LB step 4 fill theirs, when nothing from the
    fill to the loop's end writes an identifier or a member that an initialiser reads
    (row pointers advanced along the row are not members). Every other step holds.
+   Block form (2026-11-17): a struct whose initialiser has member accesses, casts, or a
+   dereference `*p` of a pointer local whose target the caller's own statements wrote
+   (`*tempImageBuffer`, filled by an earlier call), may instead be declared `const`
+   with that initialiser as the only declaration of a compound statement of its own,
+   placed where the call stood and holding only the declaration, a blank line and the
+   call, as Recipe FB step 4 writes it (a call that an `if` tests takes the whole `if`
+   with it). The initialiser is then evaluated directly before the one call with
+   nothing between, which is step 4's condition for member accesses and casts; a
+   dereference is read the same way, its target unchanged between the read and the
+   call. A second `static` function of the file whose group has the same names and
+   exact types as one an earlier step of this recipe bundled may take that `Name`
+   rather than a second typedef repeating it member for member (Recipe N step 8's
+   shared-typedef form).
 6. A struct declared outside a `#pragma omp` region and read inside it is `const`, and
    none of its members point to data the region writes through the struct. A struct
    the function reaches only through its `const Name *name` parameter, a local of the
@@ -22462,3 +22475,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | AMEND | S | Step 2: a file-scope variable of external linkage that only the moved functions name (and no other file) moves with them, its declaration group and comment verbatim after the new file's *Forward declarations*; by hand, checked by a sorted-line comparison and `nm` | `opencl.c`'s `cache_directory` and `cache_directory_lock` (campaign A, W37 lane a); the declaration form of 82c165e07 asks that both parts name the variable | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | S | *Preprocessor branches*: an `#if` without `#else` directly above the family's first moved function whose `#endif` stands inside the moved run moves whole, directives verbatim; `split_source.py` 3423ec185 | `opencl.c`'s `#if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT` around the benchmark-profile readers (campaign A, W37 lane a) | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | S | Step 2: a chain of splits through private headers may drop the original between its steps, when a stub probe of the whole chain first shows its last state raising the original above its score before the chain and every product and header at or above that score; the dropping step goes `--no-verify` with the drop, the probe and the step that ends it in its message; the lane resets the branch if it cannot reach the probed end; each step keeps a split's checks (both catalogues, `omp_compare` for a region that moves, timing) | `morphology-apply.c` (8.26): round twenty-five's probe of a rotation header and the `MorphologyApply` split dropped the kept file to 8.01, the second split of the `AcquireKernelBuiltIn` side ends it at 10.0 (products 8.54 and 8.26, headers 9.68); round twenty-five's question 5. The ruling is the owner's, the wording and the products-and-headers condition the lane's | owner |
+| 2026-11-17 | AMEND | B | Step 5, block form: a struct whose initialiser has member accesses, casts or a dereference of a pointer local (`*tempImageBuffer`) may be declared `const` with that initialiser as the only declaration of a compound statement of its own holding only it and the one call (Recipe FB step 4's shape), evaluated directly before the call as step 4 requires; a second function whose group has the same names and exact types may reuse the typedef (Recipe N step 8's form) | `accelerate-resize.c`'s `resizeHorizontalFilter` and `resizeVerticalFilter` (campaign A, W39 lane a, round 28): 15 parameters each, called twice each with casts (`(cl_uint) image->columns`) and `*tempImageBuffer`; the member-by-member fill of step 5 adds 52 lines to the callers and measured 7.12 to 7.01 in a probe, the block form 7.12 to 7.37 | mandate (2026-10-24) |
