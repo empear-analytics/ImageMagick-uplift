@@ -92,6 +92,8 @@ Include declarations.
 #include "MagickCore/accelerate-core-private.h"
 #if defined(MAGICKCORE_OPENCL_SUPPORT)
 
+/* pad the global workgroup size to the next multiple of
+   the local workgroup size */
 inline static unsigned int padGlobalWorkgroupSizeToLocalWorkgroupSize(
   const unsigned int orgGlobalSize,const unsigned int localGroupSize)
 {

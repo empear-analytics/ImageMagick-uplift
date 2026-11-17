@@ -83,11 +83,6 @@ Include declarations.
 
 #if defined(MAGICKCORE_OPENCL_SUPPORT)
 
-
-/* pad the global workgroup size to the next multiple of
-   the local workgroup size */
-
-
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
