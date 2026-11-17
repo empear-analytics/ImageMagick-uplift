@@ -10225,7 +10225,8 @@ static ssize_t TracePathMove(const PathTrace *trace)
 }
 
 
-static ssize_t TracePathSmoothCubicBezier(const PathTrace *trace)
+static ssize_t TracePathSmoothBezierCurve(const PathTrace *trace,
+  const PathBezierSide side)
 {
   ExceptionInfo
     *exception = trace->exception;
@@ -10269,10 +10270,10 @@ static ssize_t TracePathSmoothCubicBezier(const PathTrace *trace)
   */
   do
   {
-    points[0]=points[3];
-    points[1].x=2.0*points[3].x-points[2].x;
-    points[1].y=2.0*points[3].y-points[2].y;
-    for (i=2; i < 4; i++)
+    points[0]=points[((side == CubicPathBezier) ? 3 : 2)];
+    points[1].x=2.0*points[((side == CubicPathBezier) ? 3 : 2)].x-points[((side == CubicPathBezier) ? 2 : 1)].x;
+    points[1].y=2.0*points[((side == CubicPathBezier) ? 3 : 2)].y-points[((side == CubicPathBezier) ? 2 : 1)].y;
+    for (i=2; i < ((side == CubicPathBezier) ? 4 : 3); i++)
     {
       (void) GetNextToken(p,&p,MagickPathExtent,token);
       if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
@@ -10290,119 +10291,22 @@ static ssize_t TracePathSmoothCubicBezier(const PathTrace *trace)
       y=GetDrawValue(token,&next_token);
       if (token == next_token)
         ThrowPointExpectedException(token,exception);
-      if (*p == ',')
+      if ((side == CubicPathBezier) && (*p == ','))
         p++;
-      end.x=(double) (attribute == (int) 'S' ? x : point.x+x);
-      end.y=(double) (attribute == (int) 'S' ? y : point.y+y);
+      end.x=(double) (attribute == (int) ((side == CubicPathBezier) ? 'S' : 'T') ? x : point.x+x);
+      end.y=(double) (attribute == (int) ((side == CubicPathBezier) ? 'S' : 'T') ? y : point.y+y);
       points[i]=end;
     }
-    if (strchr("CcSs",last_attribute) == (char *) NULL)
-      {
-        points[0]=point;
-        points[1]=point;
-      }
-    for (i=0; i < 4; i++)
-      (q+i)->point=points[i];
-    if (TraceBezier(mvg_info,4) == MagickFalse)
-      return(-1);
-    q=(*mvg_info->primitive_info)+mvg_info->offset;
-    mvg_info->offset+=(ssize_t) q->coordinates;
-    q+=(ptrdiff_t) q->coordinates;
-    point=end;
-    last_attribute=attribute;
-    while (isspace((int) ((unsigned char) *p)) != 0)
-      p++;
-    if (*p == ',')
-      p++;
-  } while (IsValidPoint(p) != MagickFalse);
-  (*trace->p)=p;
-  (*trace->q)=q;
-  (*trace->point)=point;
-  (*trace->end)=end;
-  (*trace->status)=status;
-  (*trace->last_attribute)=last_attribute;
-  return(0);
-}
-
-static ssize_t TracePathSmoothQuadraticBezier(const PathTrace *trace)
-{
-  ExceptionInfo
-    *exception = trace->exception;
-
-  MVGInfo
-    *mvg_info = trace->mvg_info;
-
-  MagickBooleanType
-    status = (*trace->status);
-
-  PointInfo
-    *points = trace->points,
-    point = (*trace->point),
-    end = (*trace->end);
-
-  PrimitiveInfo
-    *q = (*trace->q);
-
-  char
-    *token = trace->token,
-    *next_token;
-
-  const char
-    *p = (*trace->p);
-
-  const int
-    attribute = (*trace->attribute);
-
-  double
-    x,
-    y;
-
-  int
-    last_attribute = (*trace->last_attribute);
-
-  ssize_t
-    i;
-
-  /*
-    Quadratic Bézier curve.
-  */
-  do
-  {
-    points[0]=points[2];
-    points[1].x=2.0*points[2].x-points[1].x;
-    points[1].y=2.0*points[2].y-points[1].y;
-    for (i=2; i < 3; i++)
-    {
-      (void) GetNextToken(p,&p,MagickPathExtent,token);
-      if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-        ThrowPointExpectedException(token,exception);
-      if (*token == ',')
-        (void) GetNextToken(p,&p,MagickPathExtent,token);
-      x=GetDrawValue(token,&next_token);
-      if (token == next_token)
-        ThrowPointExpectedException(token,exception);
-      (void) GetNextToken(p,&p,MagickPathExtent,token);
-      if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-        ThrowPointExpectedException(token,exception);
-      if (*token == ',')
-        (void) GetNextToken(p,&p,MagickPathExtent,token);
-      y=GetDrawValue(token,&next_token);
-      if (token == next_token)
-        ThrowPointExpectedException(token,exception);
-      end.x=(double) (attribute == (int) 'T' ? x : point.x+x);
-      end.y=(double) (attribute == (int) 'T' ? y : point.y+y);
-      points[i]=end;
-    }
-    if (status == MagickFalse)
+    if ((side == QuadraticPathBezier) && (status == MagickFalse))
       break;
-    if (strchr("QqTt",last_attribute) == (char *) NULL)
+    if (strchr(((side == CubicPathBezier) ? "CcSs" : "QqTt"),last_attribute) == (char *) NULL)
       {
         points[0]=point;
         points[1]=point;
       }
-    for (i=0; i < 3; i++)
+    for (i=0; i < ((side == CubicPathBezier) ? 4 : 3); i++)
       (q+i)->point=points[i];
-    if (TraceBezier(mvg_info,3) == MagickFalse)
+    if (TraceBezier(mvg_info,((side == CubicPathBezier) ? 4 : 3)) == MagickFalse)
       return(-1);
     q=(*mvg_info->primitive_info)+mvg_info->offset;
     mvg_info->offset+=(ssize_t) q->coordinates;
@@ -10422,6 +10326,7 @@ static ssize_t TracePathSmoothQuadraticBezier(const PathTrace *trace)
   (*trace->last_attribute)=last_attribute;
   return(0);
 }
+
 
 
 static ssize_t TracePathClose(const PathTrace *trace)
@@ -10583,14 +10488,14 @@ static ssize_t TracePath(MVGInfo *mvg_info,const char *path,
       case 's':
       case 'S':
       {
-        if (TracePathSmoothCubicBezier(&trace) == -1)
+        if (TracePathSmoothBezierCurve(&trace,CubicPathBezier) == -1)
           return(-1);
         break;
       }
       case 't':
       case 'T':
       {
-        if (TracePathSmoothQuadraticBezier(&trace) == -1)
+        if (TracePathSmoothBezierCurve(&trace,QuadraticPathBezier) == -1)
           return(-1);
         break;
       }
