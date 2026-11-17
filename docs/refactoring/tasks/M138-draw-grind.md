@@ -3,8 +3,8 @@
 Branched from `campaign/M137` after #123 merged it into `main` (ba6c3318d); this branch's
 PR goes to `main`. Scores come from cs-mcp 1.5.16 through `tools/ch.py`.
 
-Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 56 flagged functions, 222 -> 219
-functions, 11,636 -> 11,494 lines.
+Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 51 flagged functions, 222 -> 223
+functions (three merges, seven shared helpers), 11,636 -> 11,426 lines.
 
 ## The function-count lesson
 
@@ -13,7 +13,7 @@ function. Extracting CloneDrawInfo's dash-pattern and gradient-stop blocks (Reci
 helpers) cleared its *Bumpy Road Ahead* and *Complex Method* and still dropped draw.c
 3.27 -> 3.16; reverted. In draw.c, and in other files at a module-level limit
 (annotate.c, resource.c, xml-tree.c below), a step pays only when it adds no function:
-Recipe NG, CN, G, MA into one helper serving many copies, or a merge that removes a
+Recipe NG, CN, G, B, MA or LB into one helper serving many copies, or a merge that removes a
 function (Recipe MT's new folding form). Extractions wait for a split (Recipe S) that
 lowers the count.
 
@@ -39,6 +39,15 @@ lowers the count.
 | 21159a190 | B | IsRenderableClass | leaves Excess Number of Function Arguments |
 | f1244915e | B | IsNewSubpathPoint | leaves Excess Number of Function Arguments |
 | 985809cfc | B | IsDashSegmentPending | leaves Excess Number of Function Arguments |
+| 2cb5acab7 | B | DrawClippingMask | leaves Excess Number of Function Arguments |
+| 27cd4bd7d | B | DrawCompositeMask | leaves Excess Number of Function Arguments |
+| bd76a842b | B | TraceArcPath | leaves Excess Number of Function Arguments (7) |
+| 9b410ebcb | playbook | LB amended | step 7, exit-statement form (a throwing macro left in the caller) |
+| 318e07295 ... 58d76cd0b | LB | six path tracers | 14 value reads into GetPathValue; TracePathBezierCurve leaves Large Method; Arc cc 30 -> 20 |
+| 36a124bf5 ... 4c844566d | LB | five MVG handlers | 11 list reads into GetMVGListValue; ParseMVGAffine leaves Complex Method (cc 18); PushGradient cc 16 -> 10 |
+| 2acc1f110, 6466c4876 | LB | ParseMVGPrimitivePoints, PushGradient | first value read into GetMVGValue; PrimitivePoints leaves Large Method |
+| 8439e661e ... 21334be30 | E, D | six path tracers | separator skip into SkipPathSeparators; TracePathLine and AxisLine leave Complex Method, TracePathMove leaves Large Method |
+| aef7f0364 | LB | ParseMVGDashPattern | list read into GetMVGListValue; leaves Complex Method |
 
 ## Probed and dropped
 
@@ -78,6 +87,9 @@ lowers the count.
   `-hough-lines` cases again, this time the *candidate* timing out under load; alone, 0
   diverged. They take about 9 s alone and pass 30 s under a full run on either side:
   added to `LOAD_SENSITIVE` with the owner's OK (990ecda37).
+- Whole catalogue at aef7f0364: 15,961 cases, 4 diverged: the three known ones and
+  resize/b41fd3fe32 (write mask + `-scale`, M137's load-sensitive candidate), 0 diverged
+  alone three times. Not added to `LOAD_SENSITIVE`: that needs its own OK.
 
 ## Blocked, for the owner
 
