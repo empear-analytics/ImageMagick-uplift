@@ -10196,10 +10196,7 @@ static ssize_t TracePathLine(const PathTrace *trace)
       return(-1);
     mvg_info->offset+=(ssize_t) q->coordinates;
     q+=(ptrdiff_t) q->coordinates;
-    while (isspace((int) ((unsigned char) *p)) != 0)
-      p++;
-    if (*p == ',')
-      p++;
+    SkipPathSeparators(&p);
   } while (IsValidPoint(p) != MagickFalse);
   (*trace->p)=p;
   (*trace->q)=q;
