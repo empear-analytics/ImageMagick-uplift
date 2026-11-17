@@ -64,16 +64,6 @@ extern "C" {
 #endif
 
 /*
-  Define declarations.
-*/
-#define RMSESquareRoot(x)  sqrt((x) < 0.0 ? 0.0 : (x))
-#define SSIMRadius  5.0
-#define SSIMSigma  1.5
-#define SSIMK1  0.01
-#define SSIMK2  0.03
-#define SSIML  1.0
-
-/*
   Typedef declarations.
 */
 typedef struct _ComparePixels
