@@ -1277,7 +1277,7 @@ static ssize_t GetProperty (FxInfo * pfx, fxFltType *val, fxFltType *seconds)
 static inline MagickBooleanType IsColourSpaceNamed(const ssize_t type,
   const MagickBooleanType IsIcc,const MagickBooleanType IsDev)
 {
-  return((type >= 0 || IsIcc || IsDev) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (type >= 0 || IsIcc || IsDev));
 }
 
 static ssize_t ReportColourSpaceWithoutArgs (FxInfo * pfx,
