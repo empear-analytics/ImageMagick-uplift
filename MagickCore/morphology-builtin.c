@@ -1596,6 +1596,12 @@ static void SetGaussianFamilyValues(KernelInfo *kernel,
     }
 }
 
+static void NormalizeGaussianKernel(KernelInfo *kernel)
+{
+  CalcKernelMetaData(kernel);  /* the other kernel meta-data */
+  ScaleKernelInfo(kernel, 1.0, CorrelateNormalizeValue);
+}
+
 static KernelInfo *AcquireGaussianKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args)
 {
@@ -1636,8 +1642,7 @@ static KernelInfo *AcquireGaussianKernel(KernelInfo *kernel,
   ** NB: a CorrelateNormalize performs a normal Normalize if
   ** there are no negative values.
   */
-  CalcKernelMetaData(kernel);  /* the other kernel meta-data */
-  ScaleKernelInfo(kernel, 1.0, CorrelateNormalizeValue);
+  NormalizeGaussianKernel(kernel);
 
   return(kernel);
 }
