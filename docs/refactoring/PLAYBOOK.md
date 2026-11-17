@@ -22115,6 +22115,123 @@ static Image *SIMVarianceImage(Image *alpha_image,const Image *beta_image,
 
 ---
 
+## Recipe KX - Replace an Enumerator-Keyed Switch of Assigned Calls by a Table of Function Pointers
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead* on a
+function whose complexity is a `switch` over an enumerated value whose groups each assign
+one call's result, `v=F(args);`, to the same local and then either all `return(v);` or all
+`break;` to the statement after the `switch`, each group calling a different function of
+one signature with the same arguments: `compare-similarity-image.c`'s `SimilarityImage`
+(six groups `similarity_image=<Metric>SimilarityImage(image,reconstruct,offset,
+similarity_metric,exception); return(similarity_image);`, `default: break;`) and
+`compare-similarity-private.h`'s `GetSimilarityForMetric` (fifteen labels, each
+`status=Get<Metric>Similarity(image,reconstruct_image,channel_similarity,exception);
+break;`, one group sharing `default:`).
+
+**Not covered by:** Recipe KF, whose groups make the call as a statement (`F(args);
+break;`), not an assignment kept by the function; Recipe KD, whose run is a
+`LocaleCompare` ladder; Recipe KT, whose groups differ in one constant argument of the
+same call; Recipes KS and KR, whose groups assign or return constants; Recipe KV, whose
+groups are statements split by an SD chain.
+
+**How:**
+
+1. The `switch` lies outside every OpenMP region. Its controlling expression is a
+   parameter or local `e` that no group writes. Every *table group* is one or more
+   constant labels and the two statements `v=F(args);` and `return(v);` (all table groups),
+   or `v=F(args);` and `break;` (all table groups), with `args` the same text in every
+   group and free of side effects, and `F` a `static` (or `static inline`) function of the
+   file or its private header, all of one signature. The labels are distinct.
+2. A group that is not a table group (another signature, more statements) stays in the
+   `switch` as written. The group holding `default:` is the fallback: in the `return`
+   form it is `default: break;`; in the `break` form it may be `v=G(args); break;`, its
+   other labels then go with it (no element; the fallback serves them as `default:` does).
+3. Directly above the function (or above the first function of the file that the table
+   must follow, when the callees are defined after it) write `typedef R (*NameMethod)(...)`
+   of the callees' exact signature, a `typedef struct` of the key (the enumeration type)
+   and a `NameMethod` member, and a `static const` array with one element `{ L, F }` per
+   label of the table groups, in the labels' source order (a group of two labels gives two
+   elements naming the same function).
+4. Below the table write `static const T *Get<Name>(const E key)` that scans the array and
+   returns the first element whose key equals `key`, or `NULL`.
+5. Replace the table groups. `return` form: the `switch` (when nothing else is left in
+   it) becomes `{ const T *m = Get<Name>(e); if (m != (const T *) NULL) { v=m->method(args);
+   return(v); } }`. `break` form: the groups go, and the fallback group becomes `default:
+   { const T *m = Get<Name>(e); if (m == (const T *) NULL) v=G(args); else
+   v=m->method(args); break; }` (or, when no group is left but the fallback, the `switch`
+   becomes that block without the `default:` label and `break;`).
+6. Check by reading that each label of a table group has exactly one element naming the
+   function its group called, that no fallback label has one, and that the elements'
+   order is the labels' order. `refactor_guard.py --calls` lists each callee as one call
+   fewer (it is now a designator in the table) and the lookup added.
+7. Timing: the lookup scans at most the table's length once per call of the function; when
+   the function runs per offset or per pixel (a subimage search), time it in the OpenMP
+   -O2 build at one and four threads with an A/A run beside it, 21 rounds; a gap above
+   the A/A of more than 0.03 stops the step. A `static inline` callee taken by address is
+   emitted out of line and called through the pointer: quote `objdump -d`'s count of
+   indirect calls before and after.
+8. Run `tools/ci_warnings.sh` and `tools/ci_linux_warnings.sh` on the file (and on each file
+   including a private header), and the oracle for the function, with a case for each
+   table group's call where the catalogue has one.
+
+**Before:**
+
+```c
+    switch (metric)
+    {
+      case DotProductCorrelationErrorMetric:
+      {
+        similarity_image=DPCSimilarityImage(image,reconstruct,offset,
+          similarity_metric,exception);
+        return(similarity_image);
+      }
+      ...
+      case RootMeanSquaredErrorMetric:
+      case UndefinedErrorMetric:
+      {
+        similarity_image=RMSESimilarityImage(image,reconstruct,offset,
+          similarity_metric,exception);
+        return(similarity_image);
+      }
+      default:
+        break;
+    }
+```
+
+**After:**
+
+```c
+    {
+      const FrequencySimilarity
+        *frequency = GetFrequencySimilarity(metric);
+
+      if (frequency != (const FrequencySimilarity *) NULL)
+        {
+          similarity_image=frequency->similarity_image(image,reconstruct,
+            offset,similarity_metric,exception);
+          return(similarity_image);
+        }
+    }
+```
+
+**Careful:**
+
+- Labels are distinct, so the scan finds the element of the label the `switch` would
+  have jumped to, and calls the same function with the same arguments; a value with no
+  element takes the fallback, as `default:` did.
+- The table is `static const`, of function designators and enumeration constants only;
+  nothing writes it.
+
+**Evidence level:** oracle (the cases that reach the function), with step 6 by reading and
+step 7's timing.
+
+**Provenance:** 2026-11-17, from `compare-similarity-image.c`'s `SimilarityImage`
+frequency-domain dispatch and `compare-similarity-private.h`'s `GetSimilarityForMetric`
+(campaign A, round 28 lane b). Added by Claude Code (Claude Opus 5.5) under the owner's
+approval of 2026-10-24 to evolve the recipes.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -22587,3 +22704,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | AMEND | S | *Preprocessor branches*: an `#if` without `#else` directly above the family's first moved function whose `#endif` stands inside the moved run moves whole, directives verbatim; `split_source.py` 3423ec185 | `opencl.c`'s `#if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT` around the benchmark-profile readers (campaign A, W37 lane a) | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | S | Step 2: a chain of splits through private headers may drop the original between its steps, when a stub probe of the whole chain first shows its last state raising the original above its score before the chain and every product and header at or above that score; the dropping step goes `--no-verify` with the drop, the probe and the step that ends it in its message; the lane resets the branch if it cannot reach the probed end; each step keeps a split's checks (both catalogues, `omp_compare` for a region that moves, timing) | `morphology-apply.c` (8.26): round twenty-five's probe of a rotation header and the `MorphologyApply` split dropped the kept file to 8.01, the second split of the `AcquireKernelBuiltIn` side ends it at 10.0 (products 8.54 and 8.26, headers 9.68); round twenty-five's question 5. The ruling is the owner's, the wording and the products-and-headers condition the lane's | owner |
 | 2026-11-17 | NEW | TV | Share a Two-View Parallel Row Loop Through a Row Function: functions that clone an image and run the same parallel row loop over the clone's authentic view and a second image's virtual view, differing only in the row's work on `(p,q)`, move the loop into one non-inline `static` driver taking the clone, the second image and a `const` struct of a row function pointer and a `const void *` input; each row function takes a per-iteration `const` row struct (image, source, arguments, y); checked by script, a by-hand write-set reading, the whole catalogue narrow and wide, `omp_compare.sh` at 1 and 4 threads and OpenMP-build timing | `compare-similarity-image.c`'s `SIMDivideImage`, `SIMVarianceImage` and `SIMSubtractImageMean` (campaign A, round 28 lane b): *Code Duplication* and three cc-10 *Complex Method* findings that Recipe RL's one-view row type does not reach | mandate (2026-10-24) |
+| 2026-11-17 | NEW | KX | Replace an Enumerator-Keyed Switch of Assigned Calls by a Table of Function Pointers: a `switch` whose groups each assign one call's result to the same local (`v=F(args);`) and all `return(v);` or all `break;`, the callees of one signature with the same arguments, becomes a `static const` table of `{ label, function }` and a lookup; groups of another signature stay in the `switch`, the default group is the fallback; timed when the function runs per offset or per pixel, indirect calls counted | `compare-similarity-image.c`'s `SimilarityImage` (frequency-domain dispatch, six groups returning the call) and `compare-similarity-private.h`'s `GetSimilarityForMetric` (fifteen labels assigning `status`), which Recipe KF (statement calls) and KD (a `LocaleCompare` ladder) do not reach (campaign A, round 28 lane b) | mandate (2026-10-24) |
