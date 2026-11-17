@@ -12492,6 +12492,18 @@ static void XApplyBlurCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyThresholdToImage(Display *display,XWindows *windows,
+  char *factor,Image **image,ExceptionInfo *exception)
+{
+  double
+    threshold;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  threshold=StringToDoubleInterval(factor,(double) QuantumRange+1.0);
+  (void) BilevelImage(*image,threshold,exception);
+}
+
 static void XApplyThresholdCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12509,9 +12521,6 @@ static void XApplyThresholdCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
-  double
-    threshold;
-
   static char
     factor[MagickPathExtent] = "128";
 
@@ -12525,10 +12534,7 @@ static void XApplyThresholdCommand(const XMagickCommandContext *context)
   /*
     Gamma correct image.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  threshold=StringToDoubleInterval(factor,(double) QuantumRange+1.0);
-  (void) BilevelImage(*image,threshold,exception);
+  XApplyThresholdToImage(display,windows,factor,image,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
