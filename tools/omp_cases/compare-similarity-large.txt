@@ -1,0 +1,21 @@
+# compare-similarity.c header helpers holding parallel regions (GetPixelMetricSimilarity, GetMEPPSimilarity, GetNCCSimilarity, GetDPCSimilarity, GetPHASESimilarity, GetSSIMSimularity): 1000x1000 and 1200x800 images, above the one-thread threshold of about 262144 pixels
+compare -metric AE -size 1000x1000 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric AE -fuzz 20% -size 1000x1000 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric Fuzz -fuzz 10% -size 1200x800 gradient:"#ff0000-#ff000000" gradient:"#0000ff-#0000ff00" null:
+compare -metric MAE -size 1200x800 gradient:"#ff0000-#ff000000" gradient:"#0000ff-#0000ff00" null:
+compare -metric MSE -size 1000x1000 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric PAE -size 1000x1000 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric PDC -fuzz 5% -size 1200x800 gradient:"#ff0000-#ff000000" gradient:"#0000ff-#0000ff00" null:
+compare -metric PSNR -size 1000x1000 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric RMSE -colorspace CMYK -size 1000x1000 gradient:"#00ffff-#ffff00" gradient:"#ff00ff-#ffff00" null:
+compare -metric MEPP -size 1000x1000 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric NCC -size 1000x1000 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric DPC -size 1000x1000 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric PHASE -size 1000x1000 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric SSIM -size 1000x1000 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric DSSIM -size 1200x800 gradient:"#ff0000-#ff000000" gradient:"#0000ff-#0000ff00" null:
+compare -metric PHASH -size 1000x1000 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+-size 1000x1000 gradient:"#ff0000-#0000ff" \( +clone -blur 0x2 \) -metric MAE -compare -format "%[distortion]\n" info:
+-size 1000x1000 gradient:"#ff0000-#0000ff" \( +clone -blur 0x2 \) -metric NCC -compare -format "%[distortion]\n" info:
+compare -metric RMSE -subimage-search -size 600x600 gradient:"#ff0000-#0000ff" -size 20x20 gradient:"#ff0000-#00ff00" null:
+compare -metric NCC -subimage-search -size 600x600 gradient:"#ff0000-#0000ff" -size 20x20 gradient:"#ff0000-#00ff00" null:

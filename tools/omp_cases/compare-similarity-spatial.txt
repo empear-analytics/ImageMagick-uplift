@@ -1,0 +1,9 @@
+# lane b round 28: spatial subimage searches (GetSimilarityForMetric per offset)
+compare -dissimilarity-threshold 1 -metric AE -subimage-search -size 200x200 gradient:"#ff0000-#0000ff" -size 12x12 gradient:"#ff0000-#00ff00" null:
+compare -dissimilarity-threshold 1 -metric MAE -subimage-search -size 200x200 gradient:"#ff0000-#0000ff" -size 12x12 gradient:"#ff0000-#00ff00" null:
+compare -dissimilarity-threshold 1 -metric PAE -subimage-search -size 200x200 gradient:"#ff0000-#0000ff" -size 12x12 gradient:"#ff0000-#00ff00" null:
+compare -dissimilarity-threshold 1 -metric MEPP -subimage-search -size 200x200 gradient:"#ff0000-#0000ff" -size 12x12 gradient:"#ff0000-#00ff00" null:
+compare -dissimilarity-threshold 1 -metric FUZZ -subimage-search -size 200x200 gradient:"#ff0000-#0000ff" -size 12x12 gradient:"#ff0000-#00ff00" null:
+compare -dissimilarity-threshold 1 -metric MAE -subimage-search -size 200x200 gradient:"#ff0000-#0000ff" -size 12x12 gradient:"#ff0000-#00ff00" -depth 16 ppm:- | md5sum
+compare -define compare:frequency-domain=false -dissimilarity-threshold 1 -metric NCC -subimage-search -size 48x48 gradient:"#ff0000-#0000ff" -size 12x12 gradient:"#ff0000-#00ff00" null:
+compare -define compare:frequency-domain=false -dissimilarity-threshold 1 -metric DPC -subimage-search -size 48x48 gradient:"#ff0000-#0000ff" -size 12x12 gradient:"#ff0000-#00ff00" null:

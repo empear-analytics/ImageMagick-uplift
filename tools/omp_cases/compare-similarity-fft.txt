@@ -1,0 +1,11 @@
+# lane b round 28: frequency-domain subimage search at sizes that start threads; image bytes hashed
+compare -dissimilarity-threshold 1 -metric RMSE -subimage-search -size 1000x1000 gradient:"#ff0000-#0000ff" -size 40x40 gradient:"#ff0000-#00ff00" null:
+compare -dissimilarity-threshold 1 -metric MSE -subimage-search -size 1000x1000 gradient:"#ff0000-#0000ff" -size 40x40 gradient:"#ff0000-#00ff00" null:
+compare -dissimilarity-threshold 1 -metric PSNR -subimage-search -size 1000x1000 gradient:"#ff0000-#0000ff" -size 40x40 gradient:"#ff0000-#00ff00" null:
+compare -dissimilarity-threshold 1 -metric NCC -subimage-search -size 1000x1000 gradient:"#ff0000-#0000ff" -size 40x40 gradient:"#ff0000-#00ff00" null:
+compare -dissimilarity-threshold 1 -metric DPC -subimage-search -size 1000x1000 gradient:"#ff0000-#0000ff" -size 40x40 gradient:"#ff0000-#00ff00" null:
+compare -dissimilarity-threshold 1 -metric PHASE -subimage-search -size 1000x1000 gradient:"#ff0000-#0000ff" -size 40x40 gradient:"#ff0000-#00ff00" null:
+compare -dissimilarity-threshold 1 -metric RMSE -subimage-search -size 1000x1000 gradient:"#ff0000-#0000ff" -size 40x40 gradient:"#ff0000-#00ff00" -depth 16 ppm:- | md5sum
+compare -dissimilarity-threshold 1 -metric NCC -subimage-search -size 1000x1000 gradient:"#ff0000-#0000ff" -size 40x40 gradient:"#ff0000-#00ff00" -depth 16 ppm:- | md5sum
+compare -dissimilarity-threshold 1 -metric DPC -subimage-search -size 1000x1000 gradient:"#ff0000-#0000ff" -size 40x40 gradient:"#ff0000-#00ff00" -depth 16 ppm:- | md5sum
+compare -dissimilarity-threshold 1 -metric PHASE -subimage-search -size 1000x1000 gradient:"#ff0000-#0000ff" -size 40x40 gradient:"#ff0000-#00ff00" -depth 16 ppm:- | md5sum

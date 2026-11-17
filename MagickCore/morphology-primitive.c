@@ -228,7 +228,8 @@ typedef struct _MorphologyIntensityTap
     i;
 } MorphologyIntensityTap;
 
-static void SelectMinimumIntensityPixel(const MorphologyIntensityTap *tap,
+static magick_attribute((__always_inline__)) inline void
+  SelectMinimumIntensityPixel(const MorphologyIntensityTap *tap,
   const Quantum *magick_restrict *quantum_pixels,double *pixel,double *minimum)
 {
   if (tap->intensity < (*minimum))
@@ -239,7 +240,8 @@ static void SelectMinimumIntensityPixel(const MorphologyIntensityTap *tap,
     }
 }
 
-static void SelectMaximumIntensityPixel(const MorphologyIntensityTap *tap,
+static magick_attribute((__always_inline__)) inline void
+  SelectMaximumIntensityPixel(const MorphologyIntensityTap *tap,
   double *pixel,const Quantum *magick_restrict *quantum_pixels,double *maximum)
 {
   if (tap->intensity > (*maximum))
@@ -347,7 +349,8 @@ typedef struct _MorphologyIntensityWalk
     *extremum;
 } MorphologyIntensityWalk;
 
-static inline void WalkIntensityKernel(const MorphologyKernelWalk *walk,
+static magick_attribute((__always_inline__)) inline void
+  WalkIntensityKernel(const MorphologyKernelWalk *walk,
   const MorphologyIntensityWalk *select,
   const Quantum *magick_restrict *quantum_pixels,double *pixel)
 {
@@ -355,7 +358,9 @@ static inline void WalkIntensityKernel(const MorphologyKernelWalk *walk,
     side = select->side;
 
   double
-    *const extremum = select->extremum;
+    *const extremum = select->extremum,
+    extremum_value = *select->extremum,
+    pixel_value = *pixel;
 
   const Image
     *image = walk->image;
@@ -378,6 +383,9 @@ static inline void WalkIntensityKernel(const MorphologyKernelWalk *walk,
   MorphologyIntensityTap
     intensity_tap;
 
+  const Quantum
+    *magick_restrict selected_pixels = *quantum_pixels;
+
   ssize_t
     u,
     v;
@@ -395,16 +403,19 @@ static inline void WalkIntensityKernel(const MorphologyKernelWalk *walk,
           intensity_tap.intensity=intensity;
           intensity_tap.i=i;
           ((side == ForwardKernelWalk) ?
-            SelectMinimumIntensityPixel(&intensity_tap,quantum_pixels,
-              pixel,extremum) :
-            SelectMaximumIntensityPixel(&intensity_tap,pixel,
-              quantum_pixels,extremum));
+            SelectMinimumIntensityPixel(&intensity_tap,&selected_pixels,
+              &pixel_value,&extremum_value) :
+            SelectMaximumIntensityPixel(&intensity_tap,&pixel_value,
+              &selected_pixels,&extremum_value));
         }
       ((side == ForwardKernelWalk) ? k++ : k--);
       pixels+=(ptrdiff_t) GetPixelChannels(image);
     }
     pixels+=(image->columns-1)*GetPixelChannels(image);
   }
+  (*quantum_pixels)=selected_pixels;
+  (*pixel)=pixel_value;
+  (*extremum)=extremum_value;
 }
 
 static void WalkHitAndMissKernel(const MorphologyKernelWalk *walk,
@@ -1666,7 +1677,8 @@ typedef struct _MorphologyDirectPixel
     i;
 } MorphologyDirectPixel;
 
-static double MinimizeLeadingRowDistance(const MorphologyDirectPixel *row,
+static magick_attribute((__always_inline__)) inline double
+  MinimizeLeadingRowDistance(const MorphologyDirectPixel *row,
   const OffsetInfo offset,double pixel)
 {
   Image
@@ -1706,7 +1718,8 @@ static double MinimizeLeadingRowDistance(const MorphologyDirectPixel *row,
   return(pixel);
 }
 
-static double MinimizeTrailingRowDistance(const MorphologyDirectPixel *row,
+static magick_attribute((__always_inline__)) inline double
+  MinimizeTrailingRowDistance(const MorphologyDirectPixel *row,
   const OffsetInfo offset,const MagickRealType *magick_restrict k,double pixel)
 {
   Image
@@ -1754,7 +1767,8 @@ typedef struct _MorphologyKernelRows
     i;
 } MorphologyKernelRows;
 
-static void MinimizeKernelRowDistance(const MorphologyKernelRows *rows,
+static magick_attribute((__always_inline__)) inline void
+  MinimizeKernelRowDistance(const MorphologyKernelRows *rows,
   double *pixel,const MagickRealType *magick_restrict *k,
   const Quantum *magick_restrict *pixels)
 {
@@ -1779,7 +1793,8 @@ static void MinimizeKernelRowDistance(const MorphologyKernelRows *rows,
   *pixels+=(image->columns-1)*GetPixelChannels(image);
 }
 
-static double MinimizeTrailingRowsDistance(const MorphologyKernelRows *rows,
+static magick_attribute((__always_inline__)) inline double
+  MinimizeTrailingRowsDistance(const MorphologyKernelRows *rows,
   const OffsetInfo offset,const Quantum *magick_restrict pixels,double pixel)
 {
   Image
@@ -2393,14 +2408,19 @@ static MagickBooleanType AcquireReflectedKernel(const MorphologyMethod method,
   return(MagickTrue);
 }
 
+static void ReportKernelIterationState(const KernelInfo *this_kernel)
+{
+  if ( this_kernel->next != (KernelInfo *) NULL )
+    (void) FormatLocaleFile(stderr, " (re-iterate)");
+  else
+    (void) FormatLocaleFile(stderr, " (done)");
+}
+
 static void ReportKernelIteration(const MagickBooleanType verbose,
   const KernelInfo *this_kernel)
 {
   if (verbose != MagickFalse) {
-    if ( this_kernel->next != (KernelInfo *) NULL )
-      (void) FormatLocaleFile(stderr, " (re-iterate)");
-    else
-      (void) FormatLocaleFile(stderr, " (done)");
+    ReportKernelIterationState(this_kernel);
   }
 }
 
@@ -2468,28 +2488,34 @@ typedef struct _MorphologyStageSelection
     stage_loop;
 } MorphologyStageSelection;
 
+static void SelectSmoothPrimitive(const MorphologyStageSelection *selection,
+  KernelInfo **this_kernel,MorphologyMethod *primitive)
+{
+  switch ( selection->stage_loop ) {
+    case 1: /* start an open method, which starts with Erode */
+      (*primitive) = ErodeMorphology;
+      break;
+    case 2:  /* now Dilate the Erode */
+      (*primitive) = DilateMorphology;
+      break;
+    case 3:  /* Reflect kernel a close */
+      (*this_kernel) = selection->rflt_kernel; /* use the reflected kernel */
+      (*primitive) = DilateMorphology;
+      break;
+    case 4:  /* Finish the Close */
+      (*this_kernel) = selection->rflt_kernel; /* use the reflected kernel */
+      (*primitive) = ErodeMorphology;
+      break;
+  }
+}
+
 static void SelectSmoothOrCorrelatePrimitive(
   const MorphologyStageSelection *selection,KernelInfo **this_kernel,
   MorphologyMethod *primitive)
 {
   switch( selection->method ) {
     case SmoothMorphology:         /* open, close */
-      switch ( selection->stage_loop ) {
-        case 1: /* start an open method, which starts with Erode */
-          (*primitive) = ErodeMorphology;
-          break;
-        case 2:  /* now Dilate the Erode */
-          (*primitive) = DilateMorphology;
-          break;
-        case 3:  /* Reflect kernel a close */
-          (*this_kernel) = selection->rflt_kernel; /* use the reflected kernel */
-          (*primitive) = DilateMorphology;
-          break;
-        case 4:  /* Finish the Close */
-          (*this_kernel) = selection->rflt_kernel; /* use the reflected kernel */
-          (*primitive) = ErodeMorphology;
-          break;
-      }
+      SelectSmoothPrimitive(selection,this_kernel,primitive);
       break;
     case CorrelateMorphology:
       /* A Correlation is a Convolution with a reflected kernel.
@@ -2635,6 +2661,13 @@ static void SwapMorphologyImages(const MorphologyStages *stages,
     (*work_image) = (Image *) NULL; /* replace input 'image' */
 }
 
+static void AddMorphologyChanges(size_t *kernel_changed,
+  size_t *method_changed,const ssize_t *changed)
+{
+  (*kernel_changed) = (size_t) ((ssize_t) (*kernel_changed)+(*changed));
+  (*method_changed) = (size_t) ((ssize_t) (*method_changed)+(*changed));
+}
+
 static MagickBooleanType IterateMorphologyKernel(
   const MorphologyStages *stages,const MorphologyMethod primitive,
   KernelInfo *this_kernel,const MorphologyIterationTargets *targets)
@@ -2690,8 +2723,7 @@ static MagickBooleanType IterateMorphologyKernel(
     }
     if ( (*changed) < 0 )
       return(MagickFalse);
-    (*kernel_changed) = (size_t) ((ssize_t) (*kernel_changed)+(*changed));
-    (*method_changed) = (size_t) ((ssize_t) (*method_changed)+(*changed));
+    AddMorphologyChanges(kernel_changed,method_changed,changed);
 
     /* prepare next loop */
     SwapMorphologyImages(stages,work_image,curr_image);
@@ -3150,6 +3182,21 @@ static KernelInfo *NextReflectedKernel(KernelInfo *rflt_kernel)
   return(rflt_kernel);
 }
 
+static void CollectLoopKernelResult(const MorphologyMethodLoop *loop,
+  KernelInfo *this_kernel,Image **rslt_image,Image **curr_image)
+{
+  MorphologyKernelResult
+    kernel_result;
+
+  kernel_result.kernel=loop->kernel;
+  kernel_result.rslt_compose=loop->rslt_compose;
+  kernel_result.verbose=loop->verbose;
+  kernel_result.this_kernel=this_kernel;
+  kernel_result.image=loop->image;
+  kernel_result.exception=loop->exception;
+  CollectKernelResult(&kernel_result,rslt_image,curr_image);
+}
+
 static MagickBooleanType ApplyMorphologyMethodLoop(
   const MorphologyMethodLoop *loop,const MorphologyApplyTargets *targets)
 {
@@ -3196,9 +3243,6 @@ static MagickBooleanType ApplyMorphologyMethodLoop(
           loop->stage_limit, loop->kernel_limit, loop->v_info,
           loop->exception };
 
-      MorphologyKernelResult
-        kernel_result;
-
       /* Loop 3: Compound Morphology Staging - Select Primitive to apply */
       if (ApplyMorphologyStages(&stages,&stage_targets) == MagickFalse)
         return(MagickFalse);
@@ -3213,13 +3257,7 @@ static MagickBooleanType ApplyMorphologyMethodLoop(
       FinishCompoundStages(loop,curr_image,save_image);
 
       /* multi-kernel handling:  re-iterate, or compose results */
-      kernel_result.kernel=loop->kernel;
-      kernel_result.rslt_compose=loop->rslt_compose;
-      kernel_result.verbose=loop->verbose;
-      kernel_result.this_kernel=this_kernel;
-      kernel_result.image=loop->image;
-      kernel_result.exception=loop->exception;
-      CollectKernelResult(&kernel_result,rslt_image,curr_image);
+      CollectLoopKernelResult(loop,this_kernel,rslt_image,curr_image);
       EndKernelReportLine(loop);
 
       /* loop to the next kernel in a multi-kernel list */
