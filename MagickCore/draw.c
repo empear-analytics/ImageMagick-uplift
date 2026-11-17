@@ -8676,13 +8676,9 @@ static MagickStatusType DrawAlphaPrimitive(const DrawPrimitiveContext *context,
     }
     case ResetMethod:
     {
-      PrimitiveScanInfo
-        scan;
+      const PrimitiveScanInfo
+        scan = { image, image_view, draw_info, exception };
 
-      scan.image=image;
-      scan.image_view=image_view;
-      scan.draw_info=draw_info;
-      scan.exception=exception;
       status=ResetScanPixels(&scan,status,AlphaPixelReset);
       break;
     }
