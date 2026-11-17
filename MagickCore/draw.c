@@ -7708,6 +7708,13 @@ static inline ssize_t GetEdgeDirectionSign(const ssize_t direction)
   return(direction != 0 ? 1 : -1);
 }
 
+static inline MagickBooleanType IsWindingEdgeSkipped(const EdgeInfo *p,
+  const ssize_t x,const ssize_t y)
+{
+  return((((double) y > p->bounds.y2) || ((double) x <= p->bounds.x1)) ?
+    MagickTrue : MagickFalse);
+}
+
 static ssize_t GetWindingEdgeIndex(EdgeInfo *p,const ssize_t y)
 {
   ssize_t
@@ -7743,7 +7750,7 @@ static ssize_t GetWindingNumber(PolygonInfo *polygon_info,const ssize_t x,
   {
     if ((double) y <= p->bounds.y1)
       break;
-    if (((double) y > p->bounds.y2) || ((double) x <= p->bounds.x1))
+    if (IsWindingEdgeSkipped(p,x,y) != MagickFalse)
       continue;
     if ((double) x > p->bounds.x2)
       {
