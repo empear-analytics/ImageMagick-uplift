@@ -4304,7 +4304,6 @@ static MagickBooleanType ParseMVGPushGradient(const MVGRenderState *state)
 {
   char
     geometry[MagickPathExtent],
-    *next_token,
     *token = (*state->token);
 
   const char
@@ -4346,9 +4345,7 @@ static MagickBooleanType ParseMVGPushGradient(const MVGRenderState *state)
     (void) CopyMagickString(name,token,MagickPathExtent);
     (void) GetNextToken(q,&q,extent,token);
     (void) CopyMagickString(type,token,MagickPathExtent);
-    (void) GetNextToken(q,&q,extent,token);
-    segment.x1=GetDrawValue(token,&next_token);
-    if (token == next_token)
+    if (GetMVGValue(&q,extent,token,&segment.x1) == MagickFalse)
       ThrowPointExpectedException(token,exception);
     if (GetMVGListValue(&q,extent,token,&segment.y1) == MagickFalse)
       ThrowPointExpectedException(token,exception);
