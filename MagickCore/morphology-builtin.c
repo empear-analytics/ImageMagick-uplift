@@ -1459,11 +1459,7 @@ static KernelInfo *AcquireThinSEKernel(KernelInfo *kernel,
     if (ThinSEKernelArrays[i].key == key)
       break;
   kernel=ParseKernelArray(ThinSEKernelArrays[i].definition);
-  if (kernel == (KernelInfo *) NULL)
-    return(kernel);
-  kernel->type = type;
-  RotateKernelInfo(kernel, args->sigma);
-  return(kernel);
+  return(SetTypeAndRotateKernel(kernel,type,args));
 }
 
 static KernelInfo *AcquireChebyshevKernel(KernelInfo *kernel,
