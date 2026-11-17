@@ -105,6 +105,84 @@ Include declarations.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 */
 
+typedef struct _RotationalBlurTableInputs
+{
+  MagickCLDevice
+    device;
+
+  double
+    angle;
+
+  cl_uint
+    cossin_theta_size;
+} RotationalBlurTableInputs;
+
+typedef struct _RotationalBlurTableTargets
+{
+  cl_mem
+    *sinThetaBuffer,
+    *cosThetaBuffer;
+} RotationalBlurTableTargets;
+
+static MagickBooleanType CreateRotationalBlurTables(
+  const RotationalBlurTableInputs *inputs,ExceptionInfo *exception,
+  const RotationalBlurTableTargets *tables)
+{
+  const MagickCLDevice
+    device = inputs->device;
+
+  const double
+    angle = inputs->angle;
+
+  const cl_uint
+    cossin_theta_size = inputs->cossin_theta_size;
+
+  cl_mem
+    *const sinThetaBuffer = tables->sinThetaBuffer,
+    *const cosThetaBuffer = tables->cosThetaBuffer;
+
+  float
+    *cosThetaPtr,
+    offset,
+    *sinThetaPtr,
+    theta;
+
+  size_t
+    i;
+
+  cosThetaPtr=(float *) AcquireQuantumMemory(cossin_theta_size,sizeof(float));
+  if (cosThetaPtr == (float *) NULL)
+    return(MagickFalse);
+  sinThetaPtr=(float *) AcquireQuantumMemory(cossin_theta_size,sizeof(float));
+  if (sinThetaPtr == (float *) NULL)
+  {
+    cosThetaPtr=(float *) RelinquishMagickMemory(cosThetaPtr);
+    return(MagickFalse);
+  }
+
+  theta=(float) (DegreesToRadians(angle)/(double) (cossin_theta_size-1));
+  offset=theta*(float) ((cossin_theta_size-1)/2.0);
+  for (i=0; i < (size_t) cossin_theta_size; i++)
+  {
+    cosThetaPtr[i]=(float)cos((double) (theta*i-offset));
+    sinThetaPtr[i]=(float)sin((double) (theta*i-offset));
+  }
+
+  *sinThetaBuffer=CreateOpenCLBuffer(device,CL_MEM_READ_ONLY |
+    CL_MEM_COPY_HOST_PTR,cossin_theta_size*sizeof(float),sinThetaPtr);
+  sinThetaPtr=(float *) RelinquishMagickMemory(sinThetaPtr);
+  *cosThetaBuffer=CreateOpenCLBuffer(device,CL_MEM_READ_ONLY |
+    CL_MEM_COPY_HOST_PTR,cossin_theta_size*sizeof(float),cosThetaPtr);
+  cosThetaPtr=(float *) RelinquishMagickMemory(cosThetaPtr);
+  if ((*sinThetaBuffer == (cl_mem) NULL) || (*cosThetaBuffer == (cl_mem) NULL))
+  {
+    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
+      ResourceLimitWarning,"CreateOpenCLBuffer failed.",".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static Image* ComputeRotationalBlurImage(const Image *image,MagickCLEnv clEnv,
   const double angle,ExceptionInfo *exception)
 {
@@ -132,11 +210,7 @@ static Image* ComputeRotationalBlurImage(const Image *image,MagickCLEnv clEnv,
     number_channels;
 
   float
-    blurRadius,
-    *cosThetaPtr,
-    offset,
-    *sinThetaPtr,
-    theta;
+    blurRadius;
 
   Image
     *filteredImage;
@@ -175,35 +249,14 @@ static Image* ComputeRotationalBlurImage(const Image *image,MagickCLEnv clEnv,
   cossin_theta_size=(unsigned int) fabs(4.0*DegreesToRadians(angle)*sqrt(
     (double) blurRadius)+2UL);
 
-  cosThetaPtr=(float *) AcquireQuantumMemory(cossin_theta_size,sizeof(float));
-  if (cosThetaPtr == (float *) NULL)
-    goto cleanup;
-  sinThetaPtr=(float *) AcquireQuantumMemory(cossin_theta_size,sizeof(float));
-  if (sinThetaPtr == (float *) NULL)
   {
-    cosThetaPtr=(float *) RelinquishMagickMemory(cosThetaPtr);
-    goto cleanup;
-  }
+    const RotationalBlurTableInputs inputs = { device, angle,
+      cossin_theta_size };
+    const RotationalBlurTableTargets tables = { &sinThetaBuffer,
+      &cosThetaBuffer };
 
-  theta=(float) (DegreesToRadians(angle)/(double) (cossin_theta_size-1));
-  offset=theta*(float) ((cossin_theta_size-1)/2.0);
-  for (i=0; i < (size_t) cossin_theta_size; i++)
-  {
-    cosThetaPtr[i]=(float)cos((double) (theta*i-offset));
-    sinThetaPtr[i]=(float)sin((double) (theta*i-offset));
-  }
-
-  sinThetaBuffer=CreateOpenCLBuffer(device,CL_MEM_READ_ONLY |
-    CL_MEM_COPY_HOST_PTR,cossin_theta_size*sizeof(float),sinThetaPtr);
-  sinThetaPtr=(float *) RelinquishMagickMemory(sinThetaPtr);
-  cosThetaBuffer=CreateOpenCLBuffer(device,CL_MEM_READ_ONLY |
-    CL_MEM_COPY_HOST_PTR,cossin_theta_size*sizeof(float),cosThetaPtr);
-  cosThetaPtr=(float *) RelinquishMagickMemory(cosThetaPtr);
-  if ((sinThetaBuffer == (cl_mem) NULL) || (cosThetaBuffer == (cl_mem) NULL))
-  {
-    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
-      ResourceLimitWarning,"CreateOpenCLBuffer failed.",".");
-    goto cleanup;
+    if (CreateRotationalBlurTables(&inputs,exception,&tables) == MagickFalse)
+      goto cleanup;
   }
 
   rotationalBlurKernel=AcquireOpenCLKernel(device,"RotationalBlur");
