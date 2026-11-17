@@ -10848,6 +10848,14 @@ the slot of a shared object inside a parallel loop, not a member chosen per copy
    when the role (b) operand is the same member of another object (`draw_info->m`). The
    new function writes `&(*value)` there, the address the caller passes, so the callee
    receives the same pointer; step 7's check reads `&(*value)` back as `&e.m`.
+   Widened the same day: the role (b) condition is dropped when the block's opening
+   statement is a call with no side effect that reads a role (a) constant
+   (`option=GetImageOption(draw_info->image_info,"fill");`), its result tested and passed
+   to the writing call: the constant becomes a `const char *key` parameter, the call's
+   result a local of the new function, and the lvalue's address the parameter. A
+   temporary only the copies use (`next_token`) is declared in the new function and
+   leaves the caller once no copy remains. Copies whose lvalues have different declared
+   types (`PixelInfo`, `double`, `char *`) are separate groups, each its own function.
 3. Write one `static void` function directly above the caller (or in place of step 1's
    helper): its parameters are the variables a copy reads, or the input struct the
    copies already read, then one parameter per role (a) of the constant's type (Recipe
@@ -10977,7 +10985,9 @@ eleven `if (draw_info->m != (char *) NULL) (void) CloneString(&clone_info->m,
 draw_info->m);` copies (id, primitive, geometry, text, font, metrics, family, encoding,
 density, server_name, clip_mask) are each a decision: cc 22 to 11 in a probe, no finding
 on the new function. Added by Claude Code (Claude Opus 5.5) under the mandate of
-2026-10-24.
+2026-10-24. Widened the same day for `GetDrawInfo`'s option reads: three color options
+(QueryColorCompliance), four numeric (GetDrawValue) and two strings (CloneString), each keyed
+by its option name; cc 22 to 13 in a probe.
 
 ---
 
@@ -23819,3 +23829,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-17 | AMEND | LB | Step 7, exit-statement form: every exit one statement `X` left in the caller (a throwing macro ending in `break;`), `if (Helper(...) == MagickFalse) X`; a written variable through a pointer; copies in other functions call the same function, one commit per caller | `draw.c`'s fourteen path-value reads in six tracers, one `GetPathValue`; campaign B, M138 | mandate (2026-10-24) |
 | 2026-11-17 | AMEND | LB | Step 7, converted-read form: a copy assigning a conversion of the read value reads into a `double` temporary through the helper and assigns the same conversion of it after the call, when the target is a local the exit leaves unread | `draw.c`'s `ParseMVGPushPattern` (three `region` reads; leaves Complex Method and Large Method); campaign B, M138 | mandate (2026-10-24) |
 | 2026-11-17 | AMEND | NS | Step 1, offset form: `(c ? v : w+v)` of one floating type, the comparison's constant possibly a selection between two character constants; the function takes the variable, the constant as `int`, `v` and `w` | `draw.c`'s twelve path-coordinate selections in six tracers, one `GetPathCoordinate`, IDENTICAL; campaign B, M138 | mandate (2026-10-24) |
+| 2026-11-17 | AMEND | MA | Step 2's address form widened: no role (b) condition when the block opens with a side-effect-free call reading a role (a) constant key; the key a `const char *` parameter, the result a local; one function per lvalue type | `draw.c`'s `GetDrawInfo` (nine option reads, three helpers; cc 22 to 13); campaign B, M138 | mandate (2026-10-24) |
