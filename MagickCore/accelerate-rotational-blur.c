@@ -105,6 +105,17 @@ Include declarations.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 */
 
+static cl_uint GetRotationalBlurTableSize(const cl_float2 blurCenter,
+  const double angle)
+{
+  float
+    blurRadius;
+
+  blurRadius=(float) hypot(blurCenter.x,blurCenter.y);
+  return((unsigned int) fabs(4.0*DegreesToRadians(angle)*sqrt(
+    (double) blurRadius)+2UL));
+}
+
 typedef struct _RotationalBlurTableInputs
 {
   MagickCLDevice
@@ -325,9 +336,6 @@ static Image* ComputeRotationalBlurImage(const Image *image,MagickCLEnv clEnv,
   cl_uint
     cossin_theta_size;
 
-  float
-    blurRadius;
-
   Image
     *filteredImage;
 
@@ -357,9 +365,7 @@ static Image* ComputeRotationalBlurImage(const Image *image,MagickCLEnv clEnv,
 
   blurCenter.x=(cl_float) ((image->columns-1)/2.0);
   blurCenter.y=(cl_float) ((image->rows-1)/2.0);
-  blurRadius=(float) hypot(blurCenter.x,blurCenter.y);
-  cossin_theta_size=(unsigned int) fabs(4.0*DegreesToRadians(angle)*sqrt(
-    (double) blurRadius)+2UL);
+  cossin_theta_size=GetRotationalBlurTableSize(blurCenter,angle);
 
   {
     const RotationalBlurTableInputs inputs = { device, angle,
