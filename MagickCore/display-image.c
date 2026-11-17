@@ -14334,6 +14334,23 @@ static void XApplyBrowseDocumentationCommand(
   XSetCursorState(display,windows,MagickFalse);
 }
 
+static void XApplyAddNoiseToImage(Display *display,XWindows *windows,
+  Image **image,char *noise_type,ExceptionInfo *exception)
+{
+  Image
+    *noise_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  noise_image=AddNoiseImage(*image,(NoiseType) ParseCommandOption(
+    MagickNoiseOptions,MagickFalse,noise_type),1.0,exception);
+  if (noise_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=noise_image;
+    }
+}
+
 static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
 {
   Display
@@ -14354,9 +14371,6 @@ static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
   char
     **noises;
 
-  Image
-    *noise_image;
-
   static char
     noise_type[MagickPathExtent] = "Gaussian";
 
@@ -14372,15 +14386,7 @@ static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
   noises=DestroyStringList(noises);
   if (*noise_type == '\0')
     return;
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  noise_image=AddNoiseImage(*image,(NoiseType) ParseCommandOption(
-    MagickNoiseOptions,MagickFalse,noise_type),1.0,exception);
-  if (noise_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=noise_image;
-    }
+  XApplyAddNoiseToImage(display,windows,image,noise_type,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
