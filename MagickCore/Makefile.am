@@ -75,6 +75,7 @@ MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_DEPENDENC
 MAGICKCORE_BASE_SRCS = \
   MagickCore/MagickCore.h \
   MagickCore/accelerate.c \
+  MagickCore/accelerate-denoise.c \
   MagickCore/accelerate-histogram.c \
   MagickCore/accelerate-resize.c \
   MagickCore/accelerate-private.h \
