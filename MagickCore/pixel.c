@@ -539,8 +539,7 @@ MagickExport MagickRealType GetPixelIntensity(
   return(IntensityFromSamples(image->intensity,&space,sample));
 }
 
-static magick_attribute((__always_inline__)) inline void
-  LoadAlphaWeightedPixels(const Image *magick_restrict image,
+static void LoadAlphaWeightedPixels(const Image *magick_restrict image,
   const PixelChannel channel,const Quantum *magick_restrict p,
   const ssize_t count,double *alpha,double *pixels)
 {
