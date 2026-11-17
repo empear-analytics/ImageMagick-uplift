@@ -9788,11 +9788,7 @@ static MagickBooleanType TraceBezier(MVGInfo *mvg_info,
   p+=(ptrdiff_t) p->coordinates;
   primitive_info->coordinates=(size_t) (p-primitive_info);
   primitive_info->closed_subpath=MagickFalse;
-  for (i=0; i < (ssize_t) primitive_info->coordinates; i++)
-  {
-    p->primitive=primitive_info->primitive;
-    p--;
-  }
+  SetTracedPrimitiveType(primitive_info,p);
   points=(PointInfo *) RelinquishMagickMemory(points);
   coefficients=(double *) RelinquishMagickMemory(coefficients);
   return(MagickTrue);
