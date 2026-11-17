@@ -1037,9 +1037,8 @@ static inline MagickBooleanType IsChannelQualifiableOperator(const int op)
 static inline MagickBooleanType IsAttributeWithVirtualChannel(const int op,
   const ChannelT *pch)
 {
-  return((op >= (int) FirstImgAttr && op <= (int) ((OperatorE)aNull) &&
-    ChanIsVirtual (pch->pixel_channel)
-    ) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (op >= (int) FirstImgAttr &&
+    op <= (int) ((OperatorE)aNull) && ChanIsVirtual (pch->pixel_channel) ));
 }
 
 static PixelChannel GetChannelQualifier (FxInfo * pfx, int op)
