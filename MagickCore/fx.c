@@ -2128,7 +2128,7 @@ static void ApplyPixelAccessQualifiers (
     if (IsPixelAccessFunction(fe) != MagickFalse)
     {
       ElementT * pel = &pfx->Elements[pfx->usedElements-1];
-      pel->is_relative = (expChLimit == ']' ? MagickTrue : MagickFalse);
+      pel->is_relative = ((MagickBooleanType) (expChLimit == ']'));
       if (chQual >= 0) pel->channel_qual = chQual;
       if (IsQualifiedCoordFunction(iaQual,fe) != MagickFalse) {
         /* Note: we don't allow "p[2,3].mean" or "p.mean" etc. */
