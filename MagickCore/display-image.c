@@ -13008,6 +13008,27 @@ static void XApplySwirlCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyImplodeToImage(Display *display,XWindows *windows,
+  MagickStatusType *flags,char *factor,Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *implode_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(factor,&geometry_info);
+  implode_image=ImplodeImage(*image,geometry_info.rho,(*image)->interpolate,
+    exception);
+  if (implode_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=implode_image;
+    }
+}
+
 static void XApplyImplodeCommand(const XMagickCommandContext *context,
   MagickStatusType *flags)
 {
@@ -13026,12 +13047,6 @@ static void XApplyImplodeCommand(const XMagickCommandContext *context,
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  Image
-    *implode_image;
-
   static char
     factor[MagickPathExtent] = "0.3";
 
@@ -13045,16 +13060,7 @@ static void XApplyImplodeCommand(const XMagickCommandContext *context,
   /*
     Implode image pixels about the center.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  *flags=ParseGeometry(factor,&geometry_info);
-  implode_image=ImplodeImage(*image,geometry_info.rho,(*image)->interpolate,
-    exception);
-  if (implode_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=implode_image;
-    }
+  XApplyImplodeToImage(display,windows,flags,factor,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
