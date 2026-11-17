@@ -919,6 +919,17 @@ static SparseColorMethod SelectSparseColorMethod(
   return(sparse_method);
 }
 
+static DistortMethod GetSparseDistortMethod(const SparseColorMethod method)
+{
+  DistortMethod
+    distort_method;
+
+  distort_method=(DistortMethod) method;
+  if ( distort_method >= SentinelDistortion )
+    distort_method = ShepardsDistortion; /* Pretend to be Shepards */
+  return(distort_method);
+}
+
 MagickExport Image *SparseColorImage(const Image *image,
   const SparseColorMethod method,const size_t number_arguments,
   const double *arguments,ExceptionInfo *exception)
@@ -958,9 +969,7 @@ MagickExport Image *SparseColorImage(const Image *image,
     const CoefficientInput input = { number_arguments, arguments,
       number_colors };
 
-    distort_method=(DistortMethod) method;
-    if ( distort_method >= SentinelDistortion )
-      distort_method = ShepardsDistortion; /* Pretend to be Shepards */
+    distort_method=GetSparseDistortMethod(method);
     coeff = GenerateCoefficients(image, &distort_method, &input, exception);
     if ( coeff == (double *) NULL )
       return((Image *) NULL);
