@@ -2732,8 +2732,8 @@ static MagickBooleanType IsStealth (int op)
 
 static inline MagickBooleanType IsLoopOrIfFunction(const FunctionE fe)
 {
-  return((fe == fDo || fe == fFor || fe == fIf || fe == fWhile) ? MagickTrue :
-    MagickFalse);
+  return((MagickBooleanType) (fe == fDo || fe == fFor || fe == fIf ||
+    fe == fWhile));
 }
 
 static inline MagickBooleanType IsHslSymbol(const SymbolE se)
