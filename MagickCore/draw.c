@@ -1918,10 +1918,38 @@ static Image *DrawCompositeMask(Image *image,const DrawInfo *draw_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static inline MagickBooleanType IsDashSegmentPending(
-  const MagickStatusType status,const double total_length,
-  const double maximum_length,const ssize_t n,const ssize_t j)
+typedef struct _DashSegmentPendingInput
 {
+  MagickStatusType
+    status;
+
+  double
+    total_length;
+
+  double
+    maximum_length;
+
+  ssize_t
+    n;
+
+  ssize_t
+    j;
+} DashSegmentPendingInput;
+
+static inline MagickBooleanType IsDashSegmentPending(
+  const DashSegmentPendingInput *input)
+{
+  const MagickStatusType
+    status = input->status;
+
+  const double
+    total_length = input->total_length,
+    maximum_length = input->maximum_length;
+
+  const ssize_t
+    n = input->n,
+    j = input->j;
+
   return(((status != MagickFalse) && (total_length < maximum_length) &&
     ((n & 0x01) == 0) && (j > 1)) ? MagickTrue : MagickFalse);
 }
@@ -2068,6 +2096,9 @@ static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
   ssize_t
     i;
 
+  DashSegmentPendingInput
+    pending;
+
   size_t
     number_vertices;
 
@@ -2170,8 +2201,12 @@ static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
     dash_polygon[j].coordinates=1;
     j++;
   }
-  if (IsDashSegmentPending(status,total_length,maximum_length,n,j) !=
-      MagickFalse)
+  pending.status=status;
+  pending.total_length=total_length;
+  pending.maximum_length=maximum_length;
+  pending.n=n;
+  pending.j=j;
+  if (IsDashSegmentPending(&pending) != MagickFalse)
     {
       dash_polygon[j]=primitive_info[i-1];
       dash_polygon[j].closed_subpath=MagickFalse;
