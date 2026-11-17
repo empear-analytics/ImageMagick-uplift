@@ -12542,6 +12542,26 @@ static void XApplyThresholdCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyEdgeDetectToImage(Display *display,XWindows *windows,
+  MagickStatusType *flags,char *radius,Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *edge_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(radius,&geometry_info);
+  edge_image=EdgeImage(*image,geometry_info.rho,exception);
+  if (edge_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=edge_image;
+    }
+}
+
 static void XApplyEdgeDetectCommand(const XMagickCommandContext *context,
   MagickStatusType *flags)
 {
@@ -12560,12 +12580,6 @@ static void XApplyEdgeDetectCommand(const XMagickCommandContext *context,
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  Image
-    *edge_image;
-
   static char
     radius[MagickPathExtent] = "0";
 
@@ -12579,15 +12593,7 @@ static void XApplyEdgeDetectCommand(const XMagickCommandContext *context,
   /*
     Detect edge in image.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  *flags=ParseGeometry(radius,&geometry_info);
-  edge_image=EdgeImage(*image,geometry_info.rho,exception);
-  if (edge_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=edge_image;
-    }
+  XApplyEdgeDetectToImage(display,windows,flags,radius,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
