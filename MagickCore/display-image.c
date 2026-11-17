@@ -17125,12 +17125,9 @@ static void XDisplayPanOffset(Display *display,XWindows *windows,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static void XPanImage(Display *display,XWindows *windows,XEvent *event,
+static void XTrackPanPointer(XWindows *windows,XEvent *event,Display *display,
   ExceptionInfo *exception)
 {
-  Cursor
-    cursor;
-
   double
     x_factor,
     y_factor;
@@ -17141,14 +17138,6 @@ static void XPanImage(Display *display,XWindows *windows,XEvent *event,
   size_t
     state;
 
-  /*
-    Define cursor.
-  */
-  cursor=XSelectPanCursor(display,windows);
-  (void) XCheckDefineCursor(display,windows->pan.id,cursor);
-  /*
-    Pan image as pointer moves until the mouse button is released.
-  */
   x_factor=(double) windows->image.ximage->width/windows->pan.width;
   y_factor=(double) windows->image.ximage->height/windows->pan.height;
   pan_info.width=windows->pan.width*windows->image.width/
@@ -17206,6 +17195,23 @@ static void XPanImage(Display *display,XWindows *windows,XEvent *event,
     if ((state & ExitState) == 0)
       XScreenEvent(display,windows,event,exception);
   } while ((state & ExitState) == 0);
+}
+
+static void XPanImage(Display *display,XWindows *windows,XEvent *event,
+  ExceptionInfo *exception)
+{
+  Cursor
+    cursor;
+
+  /*
+    Define cursor.
+  */
+  cursor=XSelectPanCursor(display,windows);
+  (void) XCheckDefineCursor(display,windows->pan.id,cursor);
+  /*
+    Pan image as pointer moves until the mouse button is released.
+  */
+  XTrackPanPointer(windows,event,display,exception);
   /*
     Restore cursor.
   */
