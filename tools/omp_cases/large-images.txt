@@ -1,0 +1,85 @@
+# Large-image cases for tools/omp_compare.sh: GetMagickNumberThreads returns 1 thread below about 262144 pixels (factor 1) or 1048576 (factor 4, CompositeCopyImage), so the 60x40 and 300x300 cases of the other files never run a region in parallel even at OMP_NUM_THREADS=4; these cases do.
+# composite.c (2200x2200 canvas, 2000x2000 overlay), compare-similarity.c (1200x1200) and fourier.c (1024x1024)
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Multiply -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Screen -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Xor -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose VividLight -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose SoftLight -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose SoftBurn -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Stereo -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Threshold -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Hue -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Saturate -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Luminize -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Stamp -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Over -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Atop -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose In -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Out -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose DstOver -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Overlay -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose HardLight -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Difference -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Exclusion -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Lighten -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Darken -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Plus -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Minus -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose ColorDodge -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose ColorBurn -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose LinearLight -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose PinLight -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Mathematics -define compose:args=0.5,0.3,-0.2,0.1 -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Blend -define compose:args=40 -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Dissolve -define compose:args=30,70 -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Modulate -define compose:args=80,120 -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Copy -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Dst -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Src -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Clear -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Add -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Subtract -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -geometry +37+19 -compose Divide -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" -alpha set \( -size 2000x2000 gradient:"#00ff00-#ffff00" -alpha set -channel A -evaluate set 60% +channel \) -geometry -50+90 -compose Atop -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -compose Copy -geometry +5+5 -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -compose Intensity -composite -format %# info:
+-size 2200x2200 gradient:"#ff0000-#0000ff" \( -size 2000x2000 gradient:"#00ff00-#ffff00" \) -compose Intensity -clamp -composite -format %# info:
+compare -metric AE -size 1200x1200 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric AE -fuzz 10% -size 1200x1200 gradient:"#ff0000-#ff000000" gradient:"#0000ff-#0000ff00" null:
+compare -metric Fuzz -size 1200x1200 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric Fuzz -fuzz 10% -size 1200x1200 gradient:"#ff0000-#ff000000" gradient:"#0000ff-#0000ff00" null:
+compare -metric MAE -size 1200x1200 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric MAE -fuzz 10% -size 1200x1200 gradient:"#ff0000-#ff000000" gradient:"#0000ff-#0000ff00" null:
+compare -metric MSE -size 1200x1200 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric MSE -fuzz 10% -size 1200x1200 gradient:"#ff0000-#ff000000" gradient:"#0000ff-#0000ff00" null:
+compare -metric PAE -size 1200x1200 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric PAE -fuzz 10% -size 1200x1200 gradient:"#ff0000-#ff000000" gradient:"#0000ff-#0000ff00" null:
+compare -metric PDC -size 1200x1200 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric PDC -fuzz 10% -size 1200x1200 gradient:"#ff0000-#ff000000" gradient:"#0000ff-#0000ff00" null:
+compare -metric PSNR -size 1200x1200 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric PSNR -fuzz 10% -size 1200x1200 gradient:"#ff0000-#ff000000" gradient:"#0000ff-#0000ff00" null:
+compare -metric RMSE -size 1200x1200 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric RMSE -fuzz 10% -size 1200x1200 gradient:"#ff0000-#ff000000" gradient:"#0000ff-#0000ff00" null:
+-size 1024x1024 plasma:fractal -fft -format "%# %wx%h %[channels]
+" info:
+-size 1024x1024 plasma:fractal +fft -format "%# %wx%h %[channels]
+" info:
+-size 1024x1024 plasma:fractal -fft -ift -format "%# %wx%h %[channels]
+" info:
+-size 1024x1024 plasma:fractal +fft +ift -format "%# %wx%h %[channels]
+" info:
+-size 1024x1024 plasma:fractal -colorspace gray -fft -format "%# %wx%h %[channels]
+" info:
+-size 1024x1024 plasma:fractal -colorspace CMYK -fft -format "%# %wx%h %[channels]
+" info:
+-size 1024x1024 plasma:fractal -alpha set -fft -format "%# %wx%h %[channels]
+" info:
+-size 1024x1024 plasma:fractal -colorspace gray +fft +ift -format "%# %wx%h %[channels]
+" info:
+# statistic.c EvaluateImages (three 1500x1500 gradients, unseeded: a -seed sets the random secret key, and magick_number_threads(...,key == ~0UL) then runs one thread)
+-size 1500x1500 gradient:red-blue gradient:green-yellow radial-gradient:white-black -evaluate-sequence Median -format %# info:
+-size 1500x1500 gradient:red-blue gradient:green-yellow radial-gradient:white-black -evaluate-sequence Mean -format %# info:
+-size 1500x1500 gradient:red-blue gradient:green-yellow radial-gradient:white-black -evaluate-sequence Add -format %# info:
+-size 1500x1500 gradient:red-blue gradient:green-yellow radial-gradient:white-black -evaluate-sequence Max -format %# info:
+-size 1500x1500 gradient:red-blue gradient:green-yellow radial-gradient:white-black -evaluate-sequence RootMeanSquare -format %# info:
+-size 1500x1500 gradient:red-blue gradient:green-yellow radial-gradient:white-black -evaluate-sequence Multiply -format %# info:

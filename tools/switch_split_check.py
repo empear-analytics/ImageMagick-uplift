@@ -27,8 +27,16 @@ the `Targets` form of step 8). The script reads the groups of every `switch` in 
     original's chain had, label for label (every label in exactly one group of exactly one
     `switch`, `default:` in the innermost one, no label lost, added or doubled);
   - every group's body is the original's, token for token, once each bound member `(*v)` is
-    read as `v` and a `&p` of a pointer parameter as `p` (the rewrite Recipe O step 5 and
-    Recipe SD step 8 give); a group the caller keeps is the original's as written;
+    read as `v`, then a `(*p)` of a pointer parameter as `p`, then a `&p` of a pointer
+    parameter as `p` (the rewrites Recipe O step 5, Recipe Z step 4 and Recipe SD step 8
+    give: a written variable `v` passed as a pointer is `(*v)` at every use, `&v` is
+    `&(*v)`); a group the caller keeps is the original's as written;
+  - a binding may also read a member of a context struct that the caller does not fill
+    by a `const` initialiser but member by member, Recipe N step 8's sibling fill
+    `x.v=v;` or `x.v=&v;` before its `switch` (`x` a local of the struct's type): a member
+    filled by address is used only as `(*v)` in the helper's groups, one filled by value
+    never so; members the step adds go at the end of the typedef and their fills directly
+    after the existing fills, in the same order, and nothing else of the file changes;
   - no moved group holds a `return`, `continue` or `goto`, and within each `switch` the
     groups keep their original order.
 
@@ -244,16 +252,22 @@ def address_of_at(body, i, ptr_params):
     return (body[i + 1], 2) if body[i + 1] in ptr_params else None
 
 
-def normalise(body, bound, ptr_params):
-    """(*v) -> v for bound members, &p -> p for pointer parameters."""
+def rewrite_pass(body, at):
+    """body with every match of at(body, i) -> (token, width) replaced by its token."""
     out = []
     i = 0
     while i < len(body):
-        rewrite = bound_member_at(body, i, bound) or address_of_at(body, i, ptr_params)
-        token, width = rewrite or (body[i], 1)
+        token, width = at(body, i) or (body[i], 1)
         out.append(token)
         i += width
-    return tuple(out)
+    return out
+
+
+def normalise(body, bound, ptr_params):
+    """(*v) -> v for bound members and pointer parameters, then &p -> p for pointer
+    parameters (so `&(*p)` reads as `p`, the address the caller's `&v` gave)."""
+    out = rewrite_pass(list(body), lambda b, i: bound_member_at(b, i, bound | ptr_params))
+    return tuple(rewrite_pass(out, lambda b, i: address_of_at(b, i, ptr_params)))
 
 
 @dataclass
@@ -505,21 +519,133 @@ def initialiser_problems(text, ptype, members):
     return []
 
 
-def cut_spans(src, caller, drop):
-    """The spans to cut: the functions dropped (marker None) and the caller's switches."""
+def caller_local(src, caller, ptype):
+    """The name of the caller's local declared `ptype x;`, None when there is none."""
+    fn = src.funcs[caller]
+    toks = src.toks
+    for i in range(fn.body_open + 1, fn.body_close - 2):
+        if toks[i] == ptype and re.match(r"[A-Za-z_]\w*$", toks[i + 1]) and toks[i + 2] == ";":
+            return toks[i + 1]
+    return None
+
+
+def fill_statements(src, caller, ptype):
+    """[(start, end, member, by_address)] of the caller's statements `x.m=m;` or `x.m=&m;`
+    before its first switch, for its local x of type ptype; None when it has no such local."""
+    x = caller_local(src, caller, ptype)
+    if x is None:
+        return None
+    fn = src.funcs[caller]
+    toks = src.toks
+    found = switches(toks, fn.body_open + 1, fn.body_close)
+    stop = found[0][0] if found else fn.body_close
+    out = []
+    for i in range(fn.body_open + 1, stop):
+        if toks[i] != x or toks[i + 1] != "." or toks[i + 3] != "=":
+            continue
+        m = toks[i + 2]
+        rhs = toks[i + 4:i + 7]
+        if rhs[:2] == [m, ";"]:
+            out.append((i, i + 5, m, False))
+        elif rhs == ["&", m, ";"]:
+            out.append((i, i + 6, m, True))
+    return out
+
+
+def caller_fills(src, caller, ptype):
+    """{member: by_address} of the caller's member-by-member fill of ptype, or None."""
+    fills = fill_statements(src, caller, ptype)
+    if not fills:
+        return None
+    return {m: by_address for (_, _, m, by_address) in fills}
+
+
+def fill_binding_problems(chain, member, fills):
+    """A member must be filled; one filled by address is used as `(*v)` only, one by value
+    never so."""
+    if member not in fills:
+        return ["%s: member %s is bound but the caller does not fill it" % (chain.name, member)]
+    problems = []
+    for labels, body in chain.groups:
+        b = list(body)
+        for i, t in enumerate(b):
+            if t != member or (i > 0 and b[i - 1] in ("->", ".")):
+                continue
+            deref = b[max(0, i - 2):i] == ["(", "*"] and b[i + 1:i + 2] == [")"]
+            if fills[member] and not deref:
+                problems.append("%s: group %s uses %s, filled by address, without (*%s)" %
+                                (chain.name, " ".join(labels), member, member))
+            if deref and not fills[member]:
+                problems.append("%s: group %s uses (*%s), filled by value" %
+                                (chain.name, " ".join(labels), member))
+    return problems
+
+
+def typedef_body_span(src, ptype):
+    """(open, close) token indices of the braces of `typedef struct _X { ... } ptype;`."""
+    toks = src.toks
+    for i in range(len(toks) - 1):
+        if toks[i] == "}" and toks[i + 1] == ptype and toks[i + 2:i + 3] == [";"]:
+            depth = 0
+            for j in range(i, -1, -1):
+                depth += (toks[j] == "}") - (toks[j] == "{")
+                if depth == 0:
+                    return j, i
+    return None
+
+
+def appended_member_problems(old, new, caller, ptype):
+    """The step may only append members to ptype's typedef, each filled, in order, by a
+    statement directly after the existing fills."""
+    om, nm = typedef_members(old.text, ptype), typedef_members(new.text, ptype)
+    if nm[:len(om)] != om:
+        return ["%s: members changed or reordered, not only appended" % ptype]
+    span = typedef_body_span(old, ptype), typedef_body_span(new, ptype)
+    if None in span:
+        return ["%s: typedef not found" % ptype]
+    odecl = old.toks[span[0][0]:span[0][1] + 1]
+    ndecl = new.toks[span[1][0]:span[1][1] + 1]
+    if ndecl[:len(odecl) - 1] != odecl[:-1]:
+        return ["%s: declarations of the existing members changed" % ptype]
+    of = fill_statements(old, caller, ptype) or []
+    nf = fill_statements(new, caller, ptype) or []
+    if [new.toks[a:b + 1] for a, b, _, _ in nf[:len(of)]] != \
+            [old.toks[a:b + 1] for a, b, _, _ in of]:
+        return ["%s: the existing fills changed" % ptype]
+    extra = nf[len(of):]
+    if [m for _, _, m, _ in extra] != nm[len(om):]:
+        return ["%s: the appended members %s are not filled in order (fills %s)" %
+                (ptype, nm[len(om):], [m for _, _, m, _ in extra])]
+    last = nf[len(of) - 1][1] if of else None
+    for a, b, m, _ in extra:
+        if last is not None and a != last + 1:
+            return ["%s: the fill of %s does not directly follow the fills before it" %
+                    (ptype, m)]
+        last = b
+    return []
+
+
+def cut_spans(src, caller, drop, ptypes=()):
+    """The spans to cut: the functions dropped (marker None), the caller's switches, and for
+    each member-by-member filled struct type its typedef body and the caller's fills."""
     spans = [(src.funcs[name].start, src.funcs[name].body_close, None)
              for name in drop if name in src.funcs]
     fn = src.funcs[caller]
     spans += [(i, bclose, "SWITCH")
               for (i, pc, bopen, bclose) in switches(src.toks, fn.body_open + 1, fn.body_close)]
+    for ptype in ptypes:
+        body = typedef_body_span(src, ptype)
+        if body is not None:
+            spans.append((body[0], body[1], "MEMBERS"))
+        spans += [(a, b, None) for a, b, _, _ in (fill_statements(src, caller, ptype) or [])]
     return sorted(spans)
 
 
-def residue(src, caller, drop):
+def residue(src, caller, drop, ptypes=()):
     """The tokens left once the dropped functions and the caller's switches are cut out."""
     out = []
     pos = 0
-    for start, end, marker in cut_spans(src, caller, drop):
+    for start, end, marker in cut_spans(src, caller, drop, ptypes):
         out.extend(src.toks[pos:start])
         if marker:
             out.append(marker)
@@ -638,13 +764,15 @@ class StepCheck:
                              if index != sorted(index))
 
     def check_bindings(self):
-        """The members of the targets typedef, filled by the caller's initialiser."""
-        bindings = [(c.name, param, member)
-                    for c in self.new_chains for param, member in c.bound.values()]
-        for binding in bindings:
-            self.check_binding(*binding)
+        """The members of the targets typedef, filled by the caller's initialiser, or of a
+        context struct the caller fills member by member."""
+        self.filled_types = {}
+        for c in self.new_chains:
+            for param, member in c.bound.values():
+                self.check_binding(c, param, member)
 
-    def check_binding(self, function, param, member):
+    def check_binding(self, chain, param, member):
+        function = chain.name
         ptype = parameter_type(self.new, function, param)
         if ptype is None:
             self.problems.append("%s: parameter %s has no type" % (function, param))
@@ -653,14 +781,27 @@ class StepCheck:
         if member not in members:
             self.problems.append("%s: %s is not a member of %s" % (function, member, ptype))
             return
-        self.problems.extend(initialiser_problems(self.new.text, ptype, members))
+        problems = initialiser_problems(self.new.text, ptype, members)
+        if problems and problems[0].startswith("no const"):
+            fills = caller_fills(self.new, self.caller, ptype)
+            if fills is not None:
+                self.filled_types[ptype] = fills
+                self.problems.extend(fill_binding_problems(chain, member, fills))
+                return
+        self.problems.extend(problems)
 
     def check_residue(self):
-        """Nothing else changed: cut the helpers and the caller's switches, compare the rest."""
-        ores = residue(self.old, self.caller, [])
-        nres = residue(self.new, self.caller, self.helpers)
+        """Nothing else changed: cut the helpers and the caller's switches, compare the rest.
+        A context struct filled member by member is compared on its own: its typedef body
+        and its fills are cut, and the step may only append members and their fills."""
+        ptypes = sorted(self.filled_types)
+        ores = residue(self.old, self.caller, [], ptypes)
+        nres = residue(self.new, self.caller, self.helpers, ptypes)
         if ores != nres:
             self.problems.append(residue_difference(ores, nres))
+        for ptype in ptypes:
+            self.problems.extend(appended_member_problems(self.old, self.new, self.caller,
+                                                          ptype))
 
     def summary(self):
         return ("%d labels in %d groups before, %d labels in %d groups across %d switches "

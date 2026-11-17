@@ -73,6 +73,20 @@ Never, in any commit:
   symbol. ImageMagick is a library; its ABI belongs to everyone who links it.
 - **Edit an OpenMP pragma**, or move code into, out of, or across a `#pragma omp` region
   (see the playbook). The oracle runs single-threaded and cannot see a data race.
+  Ruling of 2026-11-15 (owner: "you can touch openmp files. If the test cases still pass,
+  it's fine!"): files with OpenMP regions may be edited, including pragma lines and moves into,
+  out of or across a `#pragma omp` region, one commit per step, when (1) the whole catalogue, narrow
+  and wide, stays at 0 diverged, and (2) `tools/omp_compare.sh` (an OpenMP-enabled build of base
+  and candidate at one and at four threads) shows no difference on cases that reach the region.
+  The agents' conditions on top of the owner's, to keep the oracle's single-threaded blind spot
+  honest: every variable the moved or edited region writes keeps the protection it had
+  (private, `reduction`, `atomic` or the same `critical`), the commit message quotes that by-hand
+  reading, a changed `critical` name says which regions now share one lock, and a step that
+  slows the region by more than measurement noise is not taken.
+  `GetMagickNumberThreads` runs a region on one thread below about 262144 pixels (four times that
+  for `CompositeCopyImage`), so an `omp_compare` run counts only with cases big enough to start
+  several threads: `tools/omp_cases/large-images.txt` has such cases for `composite.c`,
+  `compare-similarity.c` and `fourier.c`; add one for any other region before relying on it.
 - Touch code in a preprocessor branch this build does not compile (X11, OpenCL, Windows,
   a delegate library that is not installed). Nothing can check it.
   The one exception (owner, 2026-11-01): a branch no configuration compiles, `#if 0`, may
@@ -93,12 +107,34 @@ Never, in any commit:
   quoted in the commit, plus the cases that reach it run with `OMP_NUM_THREADS=1` and
   `=4` and compared; an NS step may accept a reached function whose object code differs;
   an error call moved into a helper may name the helper in `GetMagickModule()`.
+  Rulings of 2026-11-13 (owner, "2 and 5 sounds good to me. As long as the tests pass"):
+  a Recipe S split may move an `#if defined(__cplusplus)`/`extern "C" {` pair verbatim with the
+  family it wraps (the C++ side holds no code), when the split's other checks pass; a
+  `LogMagickEvent(...GetMagickModule()...)` call moved into a helper may name the helper, as an
+  error call may; a Recipe E (or N, O, Y, Z) step may move a nested `#if defined(...)` block
+  whole, directive lines included, into a helper, and may add an `#if defined(...)` pair around
+  the helper's definition when the caller keeps its own, if the block is compiled by an available
+  build (the wide build for the X11 and shared-memory blocks) and the object comparison there
+  (`tools/obj_modulo.sh` or `obj_identical.sh`) is IDENTICAL or MODULO-IDENTICAL. In every case the
+  whole catalogue, narrow and wide, must stay at 0 diverged and `ci_linux_warnings.sh` must pass.
   Rulings of 2026-11-13 (owner): a function's opening block, its `LogMagickEvent(TraceEvent,
   GetMagickModule(),...)` call included, may move into a helper, so that trace logs name the
   helper; and the `%` doc-comment banners above functions may be shortened or reworded by a
   recipe (guard level: `tools/obj_identical.sh` IDENTICAL, no code token changed), keeping
   what each says about the API, where CodeScene counts their near-identical text as Code
   Duplication.
+  Ruling of 2026-11-15 (owner, "that sounds like ok side effects if the tests pass"): Recipe SZ
+  (sink a run of zeroing writes to their first reader) is allowed: a `memset` of a plain local
+  or of a heap block the function allocated, or a `static void` helper made of such calls, may
+  move past statements that do not name it, as the recipe's conditions require, when the whole
+  catalogue, narrow and wide, stays at 0 diverged.
+- (Owner, 2026-11-16, answering "which rule may I relax to push the campaign A scores toward 10?") **A file that a Recipe S split produced may be carved again** (Number of Functions, Lines of Code), each new file under the same conditions as the first split (the playbook's Recipe S and its Texture-family rules, the gate that a split product scores at least what its original did, a build in every configuration that compiles the file, no public or MagickPrivate name changed, one function or family per commit). **Long flat chains** (about 30 to 55 one-helper steps whose score does not move until the last) may be committed in a dedicated lane, each intermediate commit that the CodeScene gate refuses taken with `--no-verify` and disclosed, **provided the chain's end score was first measured on a stub probe** and the lane resets the branch if it cannot finish. Public and MagickPrivate signatures stay as they were (the owner did not relax that rule).
+- (Owner, 2026-11-16, "You can do all three") **A Recipe S split may share a small `static` helper between the two files** by one `static inline` definition, byte-identical to the original, in a new non-installed private header that both files include (listed under `MAGICKCORE_NOINST_HDRS` in `MagickCore/Makefile.am`); widening the helper to `MagickPrivate` is not taken (it would add a symbol to the library's internal ABI), and copying the helper into both files stays forbidden. The split's own conditions stay (the gate that both products score at least what the original did, a build in every configuration, no public or MagickPrivate name changed, no hot path slowed beyond noise). The lane writes the recipe or amendment in its own `playbook:` commit first. **A timed merge chain for near-twin per-pixel functions** (the `XPack*` LSB/MSB row packers of `xwindow-image.c`) is allowed with the playbook's Recipe MT or a new recipe, each step timed against the baseline binary (median of several runs, no slowdown beyond noise). **A longer lane** may take the 51 to 54 steps of `morphology-apply.c` under the long-flat-chain ruling above.
+- (Owner, 2026-11-16, answers to the round-twenty-two questions) **A Recipe S split may share several `static` helpers, a typedef and macros** through the one non-installed private header of the ruling above, each `static inline` function and each typedef and macro byte-identical to the original and defined only there; the ruling's other conditions stand (no copying, no `MagickPrivate` widening, both products at least the original's score, a build in every configuration, no public or `MagickPrivate` name changed, no hot path slowed beyond noise). **A file may be split more than once** (a chain of splits), each split under these rules. **`xwindow-image.c` continues** in a long dedicated lane (the `XPack*` packer merges, the Magnify and annotate/draw twin merges, the carves), each per-pixel step timed against the baseline binary.
+- (Owner, 2026-11-16, answers to the round-twenty-three questions) Under the split rulings above: **the private header may hold a shared core of any size** (for example about 30 or more `static inline` helpers, typedefs and macros, as in `quantize.c`'s colour tree); there is no fixed size limit, but **the header is scored like every split product** and must score at least the original's score before the split. **Split files may share a file-scope variable through one accessor**: the variable stays defined once, in one `.c` file, and keeps its storage there; one accessor function, defined in that file and declared in the private header (not installed, not `MagickExport`), is the only new external name per variable; every per-pixel use is timed against the baseline binary as for Recipe TH. **A macro the original defines twice, byte-identically, may become one definition in the private header.** **`visual-effects-pixel-methods.c` may take its three-split chain**, its intermediate drops disclosed. The owner confirmed the lane-written readings of round twenty-three (the self-defined tag in Recipe S, Recipe FB's `return` form, the Recipe PS and D form (b) amendments, Recipe TH and its timing rule) and accepts a disclosed `--no-verify` drop inside a chain of any length when the chain was stub-probed first and its last step raises the file.
+- (Owner, 2026-11-16, answers to the round-twenty-four questions) Under the split rulings above: **a private-header helper may hold an OpenMP pragma or a function-level `static` local** (the `quantize.c` remap split), each such helper timed against the baseline binary and its parallel region checked as the OpenMP ruling asks (by-hand write-set reading, `omp_compare` at 1 and 4 threads on cases that really start threads); **a private header may carry a file-scope `static const` object and an `#if`/`#else` macro block verbatim** (`segment.c`); **identical helpers in several private headers may be shared** through one common private header that the others include; **flat carves that add split files without raising the original are accepted** (the two `xwindow-image.c` carves); the seven-split `visual-effects-pixel-methods.c` chain and `visual-effects-polaroid.c`'s grouping by public argument count are accepted; **small Recipe E extractions taken only to clear Overall Code Complexity are accepted** (as `424f6c6ac`); and the round-twenty-four mandate readings are confirmed (Recipe RL step 8, read-only accessors for `static const` objects, a non-inline header helper and a qsort comparator in a header, the disclosed `--no-verify` on a revert to a gate-accepted state).
+- (Owner, 2026-11-16, answers to the round-twenty-five questions) **The object code a split duplicates between files (about 38 KB for `quantize.c`) is accepted when it does not really hurt performance** (each duplicated hot path timed against the baseline binary). "If the test cases pass" the owner allows: **a second family header** `<stem>-<family>-private.h` included only by the files that use the family; **a timing harness for `xwindow-image.c`'s annotate and draw paths** so their per-pixel twins can take Recipe TH; **a split declaring an existing external global** (`opencl.c`'s `openCL_library`) in the private header, its linkage unchanged; and **a `morphology-apply.c` chain through a header of 20 or more statics** with a disclosed intermediate drop. "Test cases pass" is read as the narrow and wide oracle catalogues with 0 diverged, plus the timing and OpenMP checks the rulings above already ask for. The question whether `xwindow-image.c` (8.28) is recorded as a plateau was not answered.
+- (Owner, 2026-11-17, answers to the round-twenty-six questions: "yes to the questions that lead toward CH 10; if performance will be much impacted, ask again") Read by the agent as: **the `openCL_library` ruling extends to every existing external global that both parts of a split name** (`default_CLEnv`, `openCL_lock`), and a family-only external variable or object-defining include moves with its family; **`split_branch_check` DIFFERENT is accepted when the only differences are lost cross-file inlining and GOT access** and the oracle that reaches the code (wide for OpenCL) is clean; **a chain that raises the original to 10.0 by moving debt into products at or above the original's score is kept**, and the products are then worked toward 10.0 like any other file; a twin merge that lowers its file is not taken; `split_branch_check.py` lists every differing function. Files are **not** recorded as plateaus while a step toward 10.0 may exist. **Any step that measurably slows a hot path beyond noise stops and goes to the owner** before it is committed.
 - Modify a `static const` data table.
 - Fix a bug you noticed. Report it.
 
@@ -128,7 +164,9 @@ python3 tools/oracle/casemap.py <Function>     # which cases execute it
   `tools/obj_modulo.sh`; owner, 2026-11-10); and Recipe SD with its *Unreached functions:
   Recipe SD* checks (`tools/switch_split_check.py`, `tools/obj_modulo.sh`,
   `refactor_guard.py --calls`; **the agent's addition of 2026-11-13 under the owner's OK of
-  2026-11-10 to evolve the recipes, for the owner's confirmation**).
+  2026-11-10 to evolve the recipes, for the owner's confirmation**); and Recipe WP's step 8
+  for a wrapper no code calls (`tools/obj_modulo.sh`, `refactor_guard.py --calls`; **the
+  agents' addition of 2026-11-15 under the same OK, for the owner's confirmation**).
 
 The rules are in the playbook, *Two levels of evidence*; the reasoning and the measured
 results are in [`docs/refactoring/VERIFICATION.md`](docs/refactoring/VERIFICATION.md).

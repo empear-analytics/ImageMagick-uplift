@@ -83,7 +83,10 @@ def make_com(s):
 def api_docs(s):
     a = "\t '%s.c',\n" % orig
     if s.count(a) != 1:
-        return s, 0
+        # the first entry of the list stands on the `@srcs = (` line (animate.c)
+        a = "@srcs = ('%s.c',\n" % orig
+        if s.count(a) != 1:
+            return s, 0
     return s.replace(a, a + "\t '%s.c',\n" % new), 1
 
 

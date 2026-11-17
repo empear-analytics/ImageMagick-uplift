@@ -1,0 +1,27 @@
+# GetPixelMetricSimilarity (compare-similarity.c): the AE, Fuzz, MAE, MSE, PAE, PDC, PSNR and RMSE row loops over opaque, alpha, CMYK, channel-restricted and fuzzed images
+compare -metric AE -size 300x300 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric AE -fuzz 20% -size 300x300 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric Fuzz -size 300x300 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric Fuzz -fuzz 10% -size 400x200 gradient:"#ff0000-#ff000000" gradient:"#0000ff-#0000ff00" null:
+compare -metric MAE -size 300x300 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric MAE -size 400x200 gradient:"#ff0000-#ff000000" gradient:"#0000ff-#0000ff00" null:
+compare -metric MSE -size 300x300 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric MSE -size 400x200 gradient:"#ff0000-#ff000000" gradient:"#0000ff-#0000ff00" null:
+compare -metric PAE -size 300x300 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric PAE -size 400x200 gradient:"#ff0000-#ff000000" gradient:"#0000ff-#0000ff00" null:
+compare -metric PDC -size 300x300 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric PDC -fuzz 5% -size 400x200 gradient:"#ff0000-#ff000000" gradient:"#0000ff-#0000ff00" null:
+compare -metric PSNR -size 300x300 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric RMSE -size 300x300 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric RMSE -colorspace CMYK -size 300x300 gradient:"#00ffff-#ffff00" gradient:"#ff00ff-#ffff00" null:
+compare -metric MAE rose: rose: null:
+compare -metric PAE -channel red -size 300x300 gradient:"#ff0000-#0000ff" gradient:"#ff0000-#00ff00" null:
+compare -metric MAE -channel blue,alpha -size 400x200 gradient:"#ff0000-#ff000000" gradient:"#0000ff-#0000ff00" null:
+compare -metric AE -define compare:virtual-pixels=true -size 300x300 gradient:"#ff0000-#0000ff" -size 250x320 gradient:"#ff0000-#00ff00" null:
+compare -metric MSE -size 300x300 gradient:"#ff0000-#0000ff" -size 250x320 gradient:"#ff0000-#00ff00" null:
+rose: -resize 400% \( +clone -blur 0x2 \) -metric MAE -compare -format "%[distortion]\n" info:
+rose: -resize 400% \( +clone -blur 0x2 \) -metric PDC -fuzz 2% -compare -format "%[distortion]\n" info:
+rose: -resize 400% \( +clone -blur 0x2 \) -metric Fuzz -fuzz 2% -compare -format "%[distortion]\n" info:
+rose: -resize 400% \( +clone -blur 0x2 \) -metric PAE -compare -format "%[distortion]\n" info:
+rose: -resize 400% \( +clone -blur 0x2 \) -metric AE -fuzz 3% -compare -format "%[distortion]\n" info:
+logo: -resize 50% \( +clone -negate \) -metric MSE -compare -format "%[distortion]\n" info:

@@ -1441,9 +1441,270 @@ static void LogMontageImages(const Image *images)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
 }
 
-MagickExport Image *MontageImageList(const ImageInfo *image_info,
-  const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
+typedef struct _MontagePages
 {
+  const ImageInfo
+    *image_info;
+
+  const MontageInfo
+    *montage_info;
+
+  const Image
+    *images;
+
+  ExceptionInfo
+    *exception;
+
+  Image
+    **primary_list,
+    **image_list,
+    *image,
+    *montage,
+    *texture,
+    *tile_image;
+
+  size_t
+    number_images,
+    tiles_per_row,
+    tiles_per_column,
+    title_offset,
+    border_width,
+    number_lines;
+
+  MagickBooleanType
+    concatenate;
+
+  RectangleInfo
+    extract_info;
+
+  TypeMetric
+    metrics;
+
+  ssize_t
+    bevel_width;
+
+  FrameInfo
+    frame_info;
+
+  ImageInfo
+    *clone_info;
+
+  DrawInfo
+    *draw_info;
+
+  char
+    *title;
+} MontagePages;
+
+static size_t LayoutMontagePage(const MontagePages *pages,Image *montage,
+  Image **image_list,const size_t number_images)
+{
+  const MontageInfo
+    *const montage_info = pages->montage_info;
+
+  ExceptionInfo
+    *const exception = pages->exception;
+
+  const size_t
+    tiles_per_row = pages->tiles_per_row,
+    tiles_per_column = pages->tiles_per_column,
+    title_offset = pages->title_offset,
+    border_width = pages->border_width,
+    number_lines = pages->number_lines;
+
+  const MagickBooleanType
+    concatenate = pages->concatenate;
+
+  const RectangleInfo
+    extract_info = pages->extract_info;
+
+  const TypeMetric
+    metrics = pages->metrics;
+
+  RectangleInfo
+    bounds;
+
+  size_t
+    tiles_per_page;
+
+  ssize_t
+    x_offset,
+    y_offset;
+
+  /*
+    Determine bounding box.
+  */
+  tiles_per_page=tiles_per_row*tiles_per_column;
+  GetMontageOffsets(montage_info,number_images,&x_offset,&y_offset);
+  tiles_per_page=tiles_per_row*tiles_per_column;
+  y_offset+=(ssize_t) title_offset;
+  {
+    const MontageBoundsInfo
+      bounds_info = { tiles_per_page, number_images, tiles_per_row,
+        border_width, number_lines, concatenate, image_list, montage_info,
+        extract_info, metrics };
+
+    GetMontageBounds(x_offset,y_offset,&bounds_info,&bounds);
+  }
+  InitializeMontageCanvas(montage_info,&bounds,montage,exception);
+  return(tiles_per_page);
+}
+
+static Image *FinishMontagePages(const MontagePages *pages,Image *montage)
+{
+  Image
+    **primary_list = pages->primary_list,
+    *texture = pages->texture,
+    *tile_image = pages->tile_image;
+
+  ImageInfo
+    *clone_info = pages->clone_info;
+
+  DrawInfo
+    *draw_info = pages->draw_info;
+
+  char
+    *title = pages->title;
+
+  tile_image=DestroyImage(tile_image);
+  texture=DestroyMontageTexture(texture);
+  title=DestroyString(title);
+  primary_list=(Image **) RelinquishMagickMemory(primary_list);
+  draw_info=DestroyDrawInfo(draw_info);
+  clone_info=DestroyImageInfo(clone_info);
+  return(GetFirstImageInList(montage));
+}
+
+static Image *ComposeMontagePages(const MontagePages *pages)
+{
+  ExceptionInfo
+    *const exception = pages->exception;
+
+  Image
+    *image = pages->image,
+    **image_list = pages->image_list,
+    *montage = pages->montage;
+
+  MagickOffsetType
+    tiles;
+
+  MagickProgressMonitor
+    progress_monitor;
+
+  ssize_t
+    i;
+
+  size_t
+    extent,
+    images_per_page,
+    number_images = pages->number_images,
+    tiles_per_page,
+    total_tiles;
+
+  const MontageTileTargets
+    tile_targets = { (&image), (&progress_monitor), (&tiles) };
+
+  const MontagePageTargets
+    page_targets = { (&montage), (&image_list), (&number_images) };
+
+  images_per_page=(number_images-1)/(pages->tiles_per_row*
+    pages->tiles_per_column)+1;
+  tiles=0;
+  total_tiles=(size_t) number_images;
+  for (i=0; i < (ssize_t) images_per_page; i++)
+  {
+    tiles_per_page=LayoutMontagePage(pages,montage,image_list,number_images);
+    /*
+      Set montage geometry.
+    */
+    extent=GetMontageDirectoryExtent(image_list,tiles_per_page,number_images);
+    if (AcquireMontageStrings(montage,extent) == MagickFalse)
+      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
+    {
+      const MontagePageInfo
+        page_info = { montage, tiles_per_page, number_images, image_list,
+          extent, exception, pages->texture, pages->montage_info,
+          pages->image_info, pages->draw_info, pages->extract_info,
+          pages->title, pages->title_offset, pages->border_width,
+          pages->metrics, pages->number_lines };
+
+      SetMontagePage(&page_info);
+    }
+    /*
+      Copy tile to the composite.
+    */
+    {
+      const MontageTileCopy
+        copy = { pages->montage_info, number_images, pages->extract_info,
+          pages->title_offset, tiles_per_page, image_list, exception,
+          pages->concatenate, pages->border_width, pages->tile_image,
+          pages->bevel_width, pages->frame_info, pages->metrics, montage,
+          pages->draw_info, pages->tiles_per_row, pages->number_lines,
+          pages->images, total_tiles };
+
+      if (CopyMontageTiles(&copy,&tile_targets) == MagickFalse)
+        ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
+    }
+    {
+      const MontageNextPage
+        next = { i, images_per_page, pages->clone_info, exception,
+          pages->montage_info, tiles_per_page };
+
+      if (AdvanceMontagePage(&next,&page_targets) == MagickFalse)
+        return((Image *) NULL);
+    }
+  }
+  return(FinishMontagePages(pages,montage));
+}
+
+typedef struct _MontageTiling
+{
+  const ImageInfo
+    *image_info;
+
+  const MontageInfo
+    *montage_info;
+
+  const Image
+    *images;
+
+  ExceptionInfo
+    *exception;
+
+  Image
+    **primary_list,
+    **image_list,
+    *image;
+
+  size_t
+    number_images,
+    tiles_per_row,
+    tiles_per_column;
+
+  MagickBooleanType
+    concatenate;
+
+  RectangleInfo
+    extract_info;
+} MontageTiling;
+
+static Image *ComposeMontage(const MontageTiling *tiling)
+{
+  const MontageInfo
+    *const montage_info = tiling->montage_info;
+
+  ExceptionInfo
+    *const exception = tiling->exception;
+
+  Image
+    **const image_list = tiling->image_list;
+
+  const size_t
+    number_images = tiling->number_images;
+
+  RectangleInfo
+    extract_info = tiling->extract_info;
+
   char
     *title;
 
@@ -1454,9 +1715,6 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     frame_info;
 
   Image
-    *image,
-    **image_list,
-    **primary_list,
     *montage,
     *texture,
     *tile_image;
@@ -1464,11 +1722,75 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   ImageInfo
     *clone_info;
 
+  size_t
+    border_width,
+    number_lines,
+    title_offset;
+
+  ssize_t
+    bevel_width;
+
+  TypeMetric
+    metrics;
+
+  border_width=montage_info->border_width;
+  bevel_width=0;
+  (void) memset(&frame_info,0,sizeof(frame_info));
+  if (montage_info->frame != (char *) NULL)
+    {
+      frame_info=ParseMontageFrame(montage_info,frame_info,extract_info);
+      bevel_width=(ssize_t) MagickMax(frame_info.inner_bevel,
+        frame_info.outer_bevel);
+      border_width=(size_t) MagickMax((ssize_t) frame_info.width,
+        (ssize_t) frame_info.height);
+    }
+  extract_info=GetLargestTileExtent(extract_info,image_list,number_images);
+  /*
+    Initialize draw attributes.
+  */
+  clone_info=CloneImageInfo(tiling->image_info);
+  clone_info->background_color=montage_info->background_color;
+  clone_info->border_color=montage_info->border_color;
+  draw_info=AcquireMontageDrawInfo(clone_info,montage_info);
+  (void) GetTypeMetrics(image_list[0],draw_info,&metrics,exception);
+  texture=ReadMontageTexture(clone_info,montage_info,exception);
+  /*
+    Determine the number of lines in an next label.
+  */
+  title=InterpretImageProperties(clone_info,image_list[0],montage_info->title,
+    exception);
+  title_offset=GetMontageTitleOffset(montage_info,metrics,title,extract_info);
+  number_lines=GetMaximumLabelLines(image_list,number_images,exception);
+  /*
+    Allocate next structure.
+  */
+  tile_image=AcquireImage((ImageInfo *) NULL,exception);
+  montage=AcquireImage(clone_info,exception);
+  montage->background_color=montage_info->background_color;
+  montage->scene=0;
+  {
+    const MontagePages
+      pages = { tiling->image_info, montage_info, tiling->images, exception,
+        tiling->primary_list, image_list, tiling->image, montage, texture,
+        tile_image, number_images, tiling->tiles_per_row,
+        tiling->tiles_per_column, title_offset, border_width, number_lines,
+        tiling->concatenate, extract_info, metrics, bevel_width, frame_info,
+        clone_info, draw_info, title };
+
+    return(ComposeMontagePages(&pages));
+  }
+}
+
+MagickExport Image *MontageImageList(const ImageInfo *image_info,
+  const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
+{
+  Image
+    *image,
+    **image_list,
+    **primary_list;
+
   MagickBooleanType
     concatenate;
-
-  MagickOffsetType
-    tiles;
 
   MagickProgressMonitor
     progress_monitor;
@@ -1479,41 +1801,19 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   MontageThumbnailInfo
     thumbnail_info;
 
+  MontageTiling
+    tiling;
+
   const MontageThumbnailTargets
     thumbnail_targets = { (&image), (&progress_monitor), (&flags) };
 
-  const MontageTileTargets
-    tile_targets = { (&image), (&progress_monitor), (&tiles) };
-
-  ssize_t
-    i;
-
   RectangleInfo
-    bounds,
     extract_info;
 
   size_t
-    border_width,
-    extent,
-    images_per_page,
     number_images,
-    number_lines,
     tiles_per_column,
-    tiles_per_page,
-    tiles_per_row,
-    title_offset,
-    total_tiles;
-
-  ssize_t
-    bevel_width,
-    x_offset,
-    y_offset;
-
-  TypeMetric
-    metrics;
-
-  const MontagePageTargets
-    page_targets = { (&montage), (&image_list), (&number_images) };
+    tiles_per_row;
 
   /*
     Create image tiles.
@@ -1554,104 +1854,17 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   extract_info.y=(ssize_t) montage_info->border_width;
   GetMontageTileGeometry(montage_info->geometry,&extract_info,&flags,
     &concatenate);
-  border_width=montage_info->border_width;
-  bevel_width=0;
-  (void) memset(&frame_info,0,sizeof(frame_info));
-  if (montage_info->frame != (char *) NULL)
-    {
-      frame_info=ParseMontageFrame(montage_info,frame_info,extract_info);
-      bevel_width=(ssize_t) MagickMax(frame_info.inner_bevel,
-        frame_info.outer_bevel);
-      border_width=(size_t) MagickMax((ssize_t) frame_info.width,
-        (ssize_t) frame_info.height);
-    }
-  extract_info=GetLargestTileExtent(extract_info,image_list,number_images);
-  /*
-    Initialize draw attributes.
-  */
-  clone_info=CloneImageInfo(image_info);
-  clone_info->background_color=montage_info->background_color;
-  clone_info->border_color=montage_info->border_color;
-  draw_info=AcquireMontageDrawInfo(clone_info,montage_info);
-  (void) GetTypeMetrics(image_list[0],draw_info,&metrics,exception);
-  texture=ReadMontageTexture(clone_info,montage_info,exception);
-  /*
-    Determine the number of lines in an next label.
-  */
-  title=InterpretImageProperties(clone_info,image_list[0],montage_info->title,
-    exception);
-  title_offset=GetMontageTitleOffset(montage_info,metrics,title,extract_info);
-  number_lines=GetMaximumLabelLines(image_list,number_images,exception);
-  /*
-    Allocate next structure.
-  */
-  tile_image=AcquireImage((ImageInfo *) NULL,exception);
-  montage=AcquireImage(clone_info,exception);
-  montage->background_color=montage_info->background_color;
-  montage->scene=0;
-  images_per_page=(number_images-1)/(tiles_per_row*tiles_per_column)+1;
-  tiles=0;
-  total_tiles=(size_t) number_images;
-  for (i=0; i < (ssize_t) images_per_page; i++)
-  {
-    /*
-      Determine bounding box.
-    */
-    tiles_per_page=tiles_per_row*tiles_per_column;
-    GetMontageOffsets(montage_info,number_images,&x_offset,&y_offset);
-    tiles_per_page=tiles_per_row*tiles_per_column;
-    y_offset+=(ssize_t) title_offset;
-    {
-      const MontageBoundsInfo
-        bounds_info = { tiles_per_page, number_images, tiles_per_row,
-          border_width, number_lines, concatenate, image_list, montage_info,
-          extract_info, metrics };
-
-      GetMontageBounds(x_offset,y_offset,&bounds_info,&bounds);
-    }
-    InitializeMontageCanvas(montage_info,&bounds,montage,exception);
-    /*
-      Set montage geometry.
-    */
-    extent=GetMontageDirectoryExtent(image_list,tiles_per_page,number_images);
-    if (AcquireMontageStrings(montage,extent) == MagickFalse)
-      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-    {
-      const MontagePageInfo
-        page_info = { montage, tiles_per_page, number_images, image_list,
-          extent, exception, texture, montage_info, image_info, draw_info,
-          extract_info, title, title_offset, border_width, metrics,
-          number_lines };
-
-      SetMontagePage(&page_info);
-    }
-    /*
-      Copy tile to the composite.
-    */
-    {
-      const MontageTileCopy
-        copy = { montage_info, number_images, extract_info, title_offset,
-          tiles_per_page, image_list, exception, concatenate, border_width,
-          tile_image, bevel_width, frame_info, metrics, montage, draw_info,
-          tiles_per_row, number_lines, images, total_tiles };
-
-      if (CopyMontageTiles(&copy,&tile_targets) == MagickFalse)
-        ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-    }
-    {
-      const MontageNextPage
-        next = { i, images_per_page, clone_info, exception, montage_info,
-          tiles_per_page };
-
-      if (AdvanceMontagePage(&next,&page_targets) == MagickFalse)
-        return((Image *) NULL);
-    }
-  }
-  tile_image=DestroyImage(tile_image);
-  texture=DestroyMontageTexture(texture);
-  title=DestroyString(title);
-  primary_list=(Image **) RelinquishMagickMemory(primary_list);
-  draw_info=DestroyDrawInfo(draw_info);
-  clone_info=DestroyImageInfo(clone_info);
-  return(GetFirstImageInList(montage));
+  tiling.image_info=image_info;
+  tiling.montage_info=montage_info;
+  tiling.images=images;
+  tiling.exception=exception;
+  tiling.primary_list=primary_list;
+  tiling.image_list=image_list;
+  tiling.image=image;
+  tiling.number_images=number_images;
+  tiling.tiles_per_row=tiles_per_row;
+  tiling.tiles_per_column=tiles_per_column;
+  tiling.concatenate=concatenate;
+  tiling.extract_info=extract_info;
+  return(ComposeMontage(&tiling));
 }

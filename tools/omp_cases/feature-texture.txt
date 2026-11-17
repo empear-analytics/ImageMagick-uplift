@@ -1,0 +1,14 @@
+# GetImageFeatures (feature-texture.c): -features / identify:features over gray, colour, CMYK, alpha, flat and gradient images
+rose: -define identify:features=1 -verbose info:
+rose: -define identify:features=2 -verbose info:
+wizard: -define identify:features=1 -verbose info:
+logo: -define identify:features=3 -verbose info:
+granite: -define identify:features=1 -verbose info:
+netscape: -define identify:features=1 -verbose info:
+rose: -colorspace CMYK -posterize 3 -define identify:features=1 -verbose info:
+rose: -alpha on -channel A -evaluate set 50% +channel -define identify:features=1 -verbose info:
+rose: -colorspace Gray -posterize 4 -define identify:features=1 -verbose info:
+-size 300x200 gradient:red-blue -define identify:features=1 -verbose info:
+-size 200x200 xc:gray50 -define identify:features=1 -verbose info:
+rose: -depth 8 -features 1 -format %[features] info:
+rose: -colors 8 -define identify:features=1 -verbose info:
