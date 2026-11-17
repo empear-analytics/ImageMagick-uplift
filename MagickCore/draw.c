@@ -7501,6 +7501,28 @@ static PolygonInfo **AcquirePolygonTLS(const PrimitiveInfo *primitive_info,
   return(polygon_info);
 }
 
+static MagickBooleanType ClonePolygonEdgePoints(PolygonInfo **polygon_info,
+  const ssize_t i)
+{
+  EdgeInfo
+    *edge_info;
+
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) polygon_info[i]->number_edges; j++)
+  {
+    edge_info=polygon_info[0]->edges+j;
+    polygon_info[i]->edges[j].points=(PointInfo *) AcquireQuantumMemory(
+      edge_info->number_points,sizeof(*edge_info));
+    if (polygon_info[i]->edges[j].points == (PointInfo *) NULL)
+      return(MagickFalse);
+    (void) memcpy(polygon_info[i]->edges[j].points,edge_info->points,
+      edge_info->number_points*sizeof(*edge_info->points));
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ClonePolygonEdgesTLS(PolygonInfo **polygon_info,
   const size_t number_threads,ExceptionInfo *exception)
 {
@@ -7538,20 +7560,12 @@ static MagickBooleanType ClonePolygonEdgesTLS(PolygonInfo **polygon_info,
     for (j=0; j < (ssize_t) polygon_info[i]->number_edges; j++)
       polygon_info[i]->edges[j].points=(PointInfo *) NULL;
     polygon_info[i]->number_edges=polygon_info[0]->number_edges;
-    for (j=0; j < (ssize_t) polygon_info[i]->number_edges; j++)
-    {
-      edge_info=polygon_info[0]->edges+j;
-      polygon_info[i]->edges[j].points=(PointInfo *) AcquireQuantumMemory(
-        edge_info->number_points,sizeof(*edge_info));
-      if (polygon_info[i]->edges[j].points == (PointInfo *) NULL)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-          return(MagickFalse);
-        }
-      (void) memcpy(polygon_info[i]->edges[j].points,edge_info->points,
-        edge_info->number_points*sizeof(*edge_info->points));
-    }
+    if (ClonePolygonEdgePoints(polygon_info,i) == MagickFalse)
+      {
+        (void) ThrowMagickException(exception,GetMagickModule(),
+          ResourceLimitError,"MemoryAllocationFailed","`%s'","");
+        return(MagickFalse);
+      }
   }
   return(MagickTrue);
 }
