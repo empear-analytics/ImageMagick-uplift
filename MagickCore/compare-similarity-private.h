@@ -2286,6 +2286,28 @@ static inline KernelInfo *AcquireSSIMKernel(const Image *image,
   return(AcquireKernelInfo(geometry,exception));
 }
 
+static void MergeSSIMSimilarity(const Image *image,
+  const Image *reconstruct_image,const double *channel_similarity,
+  double *similarity)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,j);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
+      channel);
+    if (((traits & UpdatePixelTrait) == 0) ||
+        ((reconstruct_traits & UpdatePixelTrait) == 0))
+      continue;
+    similarity[j]+=channel_similarity[j];
+  }
+  similarity[CompositePixelChannel]+=
+    channel_similarity[CompositePixelChannel];
+}
+
 static inline MagickBooleanType GetSSIMSimularity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -2417,23 +2439,9 @@ static inline MagickBooleanType GetSSIMSimularity(const Image *image,
     #pragma omp critical (MagickCore_GetSSIMSimularity)
 #endif
     {
-      ssize_t
-        j;
-
       area+=channel_area;
-      for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,j);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
-          channel);
-        if (((traits & UpdatePixelTrait) == 0) ||
-            ((reconstruct_traits & UpdatePixelTrait) == 0))
-          continue;
-        similarity[j]+=channel_similarity[j];
-      }
-      similarity[CompositePixelChannel]+=
-        channel_similarity[CompositePixelChannel];
+      MergeSSIMSimilarity(image,reconstruct_image,channel_similarity,
+        similarity);
     }
   }
   image_view=DestroyCacheView(image_view);
