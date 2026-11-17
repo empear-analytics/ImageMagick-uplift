@@ -3347,6 +3347,36 @@ static void ParseMVGPrimitivePoints(const MVGRenderState *state)
   (*state->x)=x;
 }
 
+static double EstimatePathCoordinates(const char **q,const size_t extent,
+  char *token)
+{
+  char
+    *s,
+    *t;
+
+  double
+    coordinates;
+
+  (void) GetNextToken((*q),q,extent,token);
+  coordinates=1.0;
+  t=token;
+  for (s=token; *s != '\0'; s=t)
+  {
+    double
+      value;
+
+    value=GetDrawValue(s,&t);
+    (void) value;
+    if (s == t)
+      {
+        t++;
+        continue;
+      }
+    coordinates++;
+  }
+  return(coordinates);
+}
+
 static void AddPathCurveCoordinates(char *token,double *coordinates)
 {
   char
@@ -3458,27 +3488,7 @@ static void EstimateMVGPrimitiveExtent(const MVGRenderState *state)
     }
     case PathPrimitive:
     {
-      char
-        *s,
-        *t;
-
-      (void) GetNextToken(q,&q,extent,token);
-      coordinates=1.0;
-      t=token;
-      for (s=token; *s != '\0'; s=t)
-      {
-        double
-          value;
-
-        value=GetDrawValue(s,&t);
-        (void) value;
-        if (s == t)
-          {
-            t++;
-            continue;
-          }
-        coordinates++;
-      }
+      coordinates=EstimatePathCoordinates(&q,extent,token);
       AddPathCurveCoordinates(token,&coordinates);
       break;
     }
