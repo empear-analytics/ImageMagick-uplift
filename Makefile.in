@@ -438,8 +438,8 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/colorspace.c MagickCore/colorspace-transform.c MagickCore/colorspace-transform-image.c MagickCore/colorspace-convert.c MagickCore/colorspace-generic-rgb.c MagickCore/colorspace.h \
 	MagickCore/colorspace-private.h MagickCore/compare.c MagickCore/compare-similarity.c \
 	MagickCore/compare.h MagickCore/compare-private.h \
-	MagickCore/composite.c MagickCore/composite.h \
-	MagickCore/composite-private.h MagickCore/compress.c MagickCore/compress-lzw.c \
+	MagickCore/composite.c MagickCore/composite-image.c MagickCore/composite.h \
+	MagickCore/composite-private.h MagickCore/composite-row-private.h MagickCore/compress.c MagickCore/compress-lzw.c \
 	MagickCore/compress.h MagickCore/configure.c MagickCore/configure-paths.c \
 	MagickCore/configure.h MagickCore/constitute.c MagickCore/constitute-codec.c MagickCore/constitute-write.c MagickCore/constitute-pixels.c \
 	MagickCore/constitute.h MagickCore/decorate.c MagickCore/decorate-raise.c \
@@ -456,8 +456,8 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/enhance.h MagickCore/enhance-color-private.h MagickCore/enhance-private.h MagickCore/exception.c MagickCore/exception-throw.c \
 	MagickCore/exception.h MagickCore/exception-private.h \
 	MagickCore/feature.c MagickCore/feature-hough.c MagickCore/feature-texture.c MagickCore/feature.h MagickCore/feature-private.h MagickCore/fourier.c MagickCore/fourier-complex.c \
-	MagickCore/fourier.h MagickCore/fx.c MagickCore/fx.h \
-	MagickCore/fx-private.h MagickCore/gem.c MagickCore/gem.h \
+	MagickCore/fourier.h MagickCore/fx.c MagickCore/fx-execute.c MagickCore/fx.h \
+	MagickCore/fx-private.h MagickCore/fx-execute-private.h MagickCore/gem.c MagickCore/gem.h \
 	MagickCore/gem-private.h MagickCore/geometry.c MagickCore/geometry-meta.c MagickCore/geometry-parse.c \
 	MagickCore/geometry.h MagickCore/geometry-private.h \
 	MagickCore/histogram.c MagickCore/histogram.h \
@@ -638,6 +638,7 @@ am__objects_1 = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFF
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare-similarity.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite.lo \
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite-image.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compress.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compress-lzw.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-configure.lo \
@@ -687,6 +688,7 @@ am__objects_1 = MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFF
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fourier.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fourier-complex.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fx.lo \
+	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fx-execute.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-gem.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-geometry.lo \
 	MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-geometry-meta.lo \
@@ -2420,6 +2422,7 @@ am__depfiles_remade = ./$(DEPDIR)/dummy.Po \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare-similarity.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite.Plo \
+	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite-image.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compress.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compress-lzw.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-configure.Plo \
@@ -2469,6 +2472,7 @@ am__depfiles_remade = ./$(DEPDIR)/dummy.Po \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fourier.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fourier-complex.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fx.Plo \
+	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fx-execute.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-gem.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-geometry.Plo \
 	MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-geometry-meta.Plo \
@@ -5708,8 +5712,10 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/compare.h \
   MagickCore/compare-private.h \
   MagickCore/composite.c \
+  MagickCore/composite-image.c \
   MagickCore/composite.h \
   MagickCore/composite-private.h \
+  MagickCore/composite-row-private.h \
   MagickCore/compress.c \
   MagickCore/compress-lzw.c \
   MagickCore/compress.h \
@@ -5786,8 +5792,10 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/fourier-complex.c \
   MagickCore/fourier.h \
   MagickCore/fx.c \
+  MagickCore/fx-execute.c \
   MagickCore/fx.h \
   MagickCore/fx-private.h \
+  MagickCore/fx-execute-private.h \
   MagickCore/gem.c \
   MagickCore/gem.h \
   MagickCore/gem-private.h \
@@ -6173,6 +6181,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/colorspace-private.h \
   MagickCore/compare-private.h \
   MagickCore/composite-private.h \
+  MagickCore/composite-row-private.h \
   MagickCore/configure-private.h \
   MagickCore/constitute-private.h \
   MagickCore/delegate-private.h \
@@ -6189,6 +6198,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/exception-private.h \
   MagickCore/feature-private.h \
   MagickCore/fx-private.h \
+  MagickCore/fx-execute-private.h \
   MagickCore/gem-private.h \
   MagickCore/geometry-private.h \
   MagickCore/image-private.h \
@@ -7321,6 +7331,9 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare-s
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite.lo:  \
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite-image.lo:  \
+	MagickCore/$(am__dirstamp) \
+	MagickCore/$(DEPDIR)/$(am__dirstamp)
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compress.lo:  \
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
@@ -7466,6 +7479,9 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fourier-c
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fx.lo:  \
+	MagickCore/$(am__dirstamp) \
+	MagickCore/$(DEPDIR)/$(am__dirstamp)
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fx-execute.lo:  \
 	MagickCore/$(am__dirstamp) \
 	MagickCore/$(DEPDIR)/$(am__dirstamp)
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-gem.lo:  \
@@ -9369,6 +9385,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare-similarity.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite-image.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compress.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compress-lzw.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-configure.Plo@am__quote@ # am--include-marker
@@ -9418,6 +9435,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fourier.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fourier-complex.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fx.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fx-execute.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-gem.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-geometry.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-geometry-meta.Plo@am__quote@ # am--include-marker
@@ -10153,6 +10171,13 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite.lo `test -f 'MagickCore/composite.c' || echo '$(srcdir)/'`MagickCore/composite.c
 
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite-image.lo: MagickCore/composite-image.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite-image.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite-image.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite-image.lo `test -f 'MagickCore/composite-image.c' || echo '$(srcdir)/'`MagickCore/composite-image.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite-image.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite-image.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/composite-image.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite-image.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite-image.lo `test -f 'MagickCore/composite-image.c' || echo '$(srcdir)/'`MagickCore/composite-image.c
+
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compress.lo: MagickCore/compress.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compress.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compress.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compress.lo `test -f 'MagickCore/compress.c' || echo '$(srcdir)/'`MagickCore/compress.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compress.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compress.Plo
@@ -10495,6 +10520,13 @@ MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fx.lo: Ma
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/fx.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fx.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fx.lo `test -f 'MagickCore/fx.c' || echo '$(srcdir)/'`MagickCore/fx.c
+
+MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fx-execute.lo: MagickCore/fx-execute.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fx-execute.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fx-execute.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fx-execute.lo `test -f 'MagickCore/fx-execute.c' || echo '$(srcdir)/'`MagickCore/fx-execute.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fx-execute.Tpo MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fx-execute.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='MagickCore/fx-execute.c' object='MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fx-execute.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fx-execute.lo `test -f 'MagickCore/fx-execute.c' || echo '$(srcdir)/'`MagickCore/fx-execute.c
 
 MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-gem.lo: MagickCore/gem.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-gem.lo -MD -MP -MF MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-gem.Tpo -c -o MagickCore/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-gem.lo `test -f 'MagickCore/gem.c' || echo '$(srcdir)/'`MagickCore/gem.c
@@ -15195,6 +15227,7 @@ distclean: distclean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare-similarity.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite-image.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compress.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compress-lzw.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-configure.Plo
@@ -15244,6 +15277,7 @@ distclean: distclean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fourier.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fourier-complex.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fx.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fx-execute.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-gem.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-geometry.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-geometry-meta.Plo
@@ -15847,6 +15881,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compare-similarity.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-composite-image.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compress.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-compress-lzw.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-configure.Plo
@@ -15896,6 +15931,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fourier.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fourier-complex.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fx.Plo
+	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-fx-execute.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-gem.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-geometry.Plo
 	-rm -f MagickCore/$(DEPDIR)/libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la-geometry-meta.Plo

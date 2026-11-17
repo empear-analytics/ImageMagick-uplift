@@ -56,6 +56,7 @@ $call Make colorspace-generic-rgb.c
 $call Make compare.c
 $call Make compare-similarity.c
 $call Make composite.c
+$call Make composite-image.c
 $call Make compress.c
 $call Make compress-lzw.c
 $call Make configure.c
@@ -105,6 +106,7 @@ $call Make feature-texture.c
 $call Make fourier.c
 $call Make fourier-complex.c
 $call Make fx.c
+$call Make fx-execute.c
 $call Make gem.c
 $call Make geometry.c
 $call Make geometry-meta.c

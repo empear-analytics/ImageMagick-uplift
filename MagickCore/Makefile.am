@@ -131,8 +131,10 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/compare.h \
   MagickCore/compare-private.h \
   MagickCore/composite.c \
+  MagickCore/composite-image.c \
   MagickCore/composite.h \
   MagickCore/composite-private.h \
+  MagickCore/composite-row-private.h \
   MagickCore/compress.c \
   MagickCore/compress-lzw.c \
   MagickCore/compress.h \
@@ -209,8 +211,10 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/fourier-complex.c \
   MagickCore/fourier.h \
   MagickCore/fx.c \
+  MagickCore/fx-execute.c \
   MagickCore/fx.h \
   MagickCore/fx-private.h \
+  MagickCore/fx-execute-private.h \
   MagickCore/gem.c \
   MagickCore/gem.h \
   MagickCore/gem-private.h \
@@ -601,6 +605,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/colorspace-private.h \
   MagickCore/compare-private.h \
   MagickCore/composite-private.h \
+  MagickCore/composite-row-private.h \
   MagickCore/configure-private.h \
   MagickCore/constitute-private.h \
   MagickCore/delegate-private.h \
@@ -617,6 +622,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/exception-private.h \
   MagickCore/feature-private.h \
   MagickCore/fx-private.h \
+  MagickCore/fx-execute-private.h \
   MagickCore/gem-private.h \
   MagickCore/geometry-private.h \
   MagickCore/image-private.h \
