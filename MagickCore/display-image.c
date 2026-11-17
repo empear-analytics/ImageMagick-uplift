@@ -20466,11 +20466,10 @@ static MagickBooleanType XRotateImage(Display *display,
 static inline MagickBooleanType IsPostscriptFormat(
   const ImageInfo *image_info)
 {
-  return(((LocaleCompare(image_info->magick,"EPS") == 0) ||
+  return((MagickBooleanType) ((LocaleCompare(image_info->magick,"EPS") == 0) ||
     (LocaleCompare(image_info->magick,"PDF") == 0) ||
     (LocaleCompare(image_info->magick,"PS") == 0) ||
-    (LocaleCompare(image_info->magick,"PS2") == 0)) ? MagickTrue :
-    MagickFalse);
+    (LocaleCompare(image_info->magick,"PS2") == 0)));
 }
 
 static void XSelectPageGeometry(Display *display,XWindows *windows,
