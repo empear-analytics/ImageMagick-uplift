@@ -22852,6 +22852,24 @@ typedef struct _BackgroundInput
     *window_attributes;
 } BackgroundInput;
 
+static void XCenterBackdropImage(XResourceInfo *resources,
+  XWindowInfo *window_info,const XWindowAttributes *window_attributes,
+  int *width,int *height)
+{
+  if ((*resources).backdrop != MagickFalse)
+    {
+      /*
+        Center image on window.
+      */
+      (*window_info).x=((*window_attributes).width/2)-
+        ((*window_info).ximage->width/2);
+      (*window_info).y=((*window_attributes).height/2)-
+        ((*window_info).ximage->height/2);
+      (*width)=(*window_attributes).width;
+      (*height)=(*window_attributes).height;
+    }
+}
+
 static void XAdjustBackgroundSize(const BackgroundInput *input,
   const BackgroundTargets *targets,int *width,int *height)
 {
@@ -22875,18 +22893,7 @@ static void XAdjustBackgroundSize(const BackgroundInput *input,
 
   (*width)=(int) (*window_info).width;
   (*height)=(int) (*window_info).height;
-  if ((*resources).backdrop != MagickFalse)
-    {
-      /*
-        Center image on window.
-      */
-      (*window_info).x=((*window_attributes).width/2)-
-        ((*window_info).ximage->width/2);
-      (*window_info).y=((*window_attributes).height/2)-
-        ((*window_info).ximage->height/2);
-      (*width)=(*window_attributes).width;
-      (*height)=(*window_attributes).height;
-    }
+  XCenterBackdropImage(resources,window_info,window_attributes,width,height);
   if (((*resources).image_geometry != (char *) NULL) &&
       (*(*resources).image_geometry != '\0'))
     {
