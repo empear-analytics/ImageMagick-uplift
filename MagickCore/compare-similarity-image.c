@@ -1884,6 +1884,44 @@ static Image *RMSESimilarityImage(const Image *image,const Image *reconstruct,
   return(rmse_image);
 }
 
+typedef Image
+  *(*FrequencySimilarityMethod)(const Image *,const Image *,RectangleInfo *,
+    double *,ExceptionInfo *);
+
+typedef struct _FrequencySimilarity
+{
+  MetricType
+    metric;
+
+  FrequencySimilarityMethod
+    similarity_image;
+} FrequencySimilarity;
+
+static const FrequencySimilarity
+  FrequencySimilarities[] =
+  {
+    { DotProductCorrelationErrorMetric, DPCSimilarityImage },
+    { MeanSquaredErrorMetric, MSESimilarityImage },
+    { NormalizedCrossCorrelationErrorMetric, NCCSimilarityImage },
+    { PeakSignalToNoiseRatioErrorMetric, PSNRSimilarityImage },
+    { PhaseCorrelationErrorMetric, PhaseSimilarityImage },
+    { RootMeanSquaredErrorMetric, RMSESimilarityImage },
+    { UndefinedErrorMetric, RMSESimilarityImage }
+  };
+
+static const FrequencySimilarity *GetFrequencySimilarity(
+  const MetricType metric)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(FrequencySimilarities)/
+       sizeof(*FrequencySimilarities)); i++)
+    if (FrequencySimilarities[i].metric == metric)
+      return(FrequencySimilarities+i);
+  return((const FrequencySimilarity *) NULL);
+}
+
 static inline MagickBooleanType IsFrequencyDomainSimilarity(
   const Image *image,const char *artifact)
 {
@@ -2255,47 +2293,16 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
   if (artifact == (const char *) NULL)
     artifact=GetImageArtifact(image,"compare:accelerate-ncc");
   if (IsFrequencyDomainSimilarity(image,artifact) != MagickFalse)
-    switch (metric)
     {
-      case DotProductCorrelationErrorMetric:
-      {
-        similarity_image=DPCSimilarityImage(image,reconstruct,offset,
-          similarity_metric,exception);
-        return(similarity_image);
-      }
-      case MeanSquaredErrorMetric:
-      {
-        similarity_image=MSESimilarityImage(image,reconstruct,offset,
-          similarity_metric,exception);
-        return(similarity_image);
-      }
-      case NormalizedCrossCorrelationErrorMetric:
-      {
-        similarity_image=NCCSimilarityImage(image,reconstruct,offset,
-          similarity_metric,exception);
-        return(similarity_image);
-      }
-      case PeakSignalToNoiseRatioErrorMetric:
-      {
-        similarity_image=PSNRSimilarityImage(image,reconstruct,offset,
-          similarity_metric,exception);
-        return(similarity_image);
-      }
-      case PhaseCorrelationErrorMetric:
-      {
-        similarity_image=PhaseSimilarityImage(image,reconstruct,offset,
-          similarity_metric,exception);
-        return(similarity_image);
-      }
-      case RootMeanSquaredErrorMetric:
-      case UndefinedErrorMetric:
-      {
-        similarity_image=RMSESimilarityImage(image,reconstruct,offset,
-          similarity_metric,exception);
-        return(similarity_image);
-      }
-      default:
-        break;
+      const FrequencySimilarity
+        *frequency = GetFrequencySimilarity(metric);
+
+      if (frequency != (const FrequencySimilarity *) NULL)
+        {
+          similarity_image=frequency->similarity_image(image,reconstruct,
+            offset,similarity_metric,exception);
+          return(similarity_image);
+        }
     }
 }
 #endif
