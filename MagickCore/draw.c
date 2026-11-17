@@ -9487,6 +9487,19 @@ static MagickBooleanType TraceArc(MVGInfo *mvg_info,const PointInfo start,
   return(TraceEllipse(mvg_info,center,radius,degrees));
 }
 
+static void SetTracedPrimitiveType(const PrimitiveInfo *primitive_info,
+  PrimitiveInfo *p)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) primitive_info->coordinates; i++)
+  {
+    p->primitive=primitive_info->primitive;
+    p--;
+  }
+}
+
 static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
   const PointInfo end,const ArcPathShape *shape)
 {
@@ -9637,11 +9650,7 @@ static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
   primitive_info=(*mvg_info->primitive_info)+mvg_info->offset;
   primitive_info->coordinates=(size_t) (p-primitive_info);
   primitive_info->closed_subpath=MagickFalse;
-  for (i=0; i < (ssize_t) primitive_info->coordinates; i++)
-  {
-    p->primitive=primitive_info->primitive;
-    p--;
-  }
+  SetTracedPrimitiveType(primitive_info,p);
   return(MagickTrue);
 }
 
