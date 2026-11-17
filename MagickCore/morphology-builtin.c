@@ -1312,18 +1312,12 @@ static KernelInfo *AcquireRidgesKernel(KernelInfo *kernel,
   return(kernel);
 }
 
-static KernelInfo *AcquireConvexHullKernel(KernelInfo *kernel,
+static KernelInfo *AppendConvexHullMirrors(KernelInfo *kernel,
   const KernelInfoType type)
 {
   KernelInfo
     *new_kernel;
-  /* first set of 8 kernels */
-  kernel=ParseKernelArray("3: 1,1,-  1,0,-  1,-,0");
-  if (kernel == (KernelInfo *) NULL)
-    return(kernel);
-  kernel->type = type;
-  ExpandRotateKernelInfo(kernel, 90.0);
-  /* append the mirror versions too - no flip function yet */
+
   new_kernel=ParseKernelArray("3: 1,1,1  1,0,-  -,-,0");
   if (new_kernel == (KernelInfo *) NULL)
     return(DestroyKernelInfo(kernel));
@@ -1331,6 +1325,19 @@ static KernelInfo *AcquireConvexHullKernel(KernelInfo *kernel,
   ExpandRotateKernelInfo(new_kernel, 90.0);
   LastKernelInfo(kernel)->next = new_kernel;
   return(kernel);
+}
+
+static KernelInfo *AcquireConvexHullKernel(KernelInfo *kernel,
+  const KernelInfoType type)
+{
+  /* first set of 8 kernels */
+  kernel=ParseKernelArray("3: 1,1,-  1,0,-  1,-,0");
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+  kernel->type = type;
+  ExpandRotateKernelInfo(kernel, 90.0);
+  /* append the mirror versions too - no flip function yet */
+  return(AppendConvexHullMirrors(kernel,type));
 }
 
 static KernelInfo *AcquireCyclicSkeletonKernel(KernelInfo *kernel,
