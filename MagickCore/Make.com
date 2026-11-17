@@ -105,6 +105,7 @@ $call Make feature-texture.c
 $call Make fourier.c
 $call Make fourier-complex.c
 $call Make fx.c
+$call Make fx-execute.c
 $call Make gem.c
 $call Make geometry.c
 $call Make geometry-meta.c

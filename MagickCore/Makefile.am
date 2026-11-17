@@ -209,8 +209,10 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/fourier-complex.c \
   MagickCore/fourier.h \
   MagickCore/fx.c \
+  MagickCore/fx-execute.c \
   MagickCore/fx.h \
   MagickCore/fx-private.h \
+  MagickCore/fx-execute-private.h \
   MagickCore/gem.c \
   MagickCore/gem.h \
   MagickCore/gem-private.h \
@@ -617,6 +619,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/exception-private.h \
   MagickCore/feature-private.h \
   MagickCore/fx-private.h \
+  MagickCore/fx-execute-private.h \
   MagickCore/gem-private.h \
   MagickCore/geometry-private.h \
   MagickCore/image-private.h \

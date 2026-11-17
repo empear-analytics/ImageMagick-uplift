@@ -82,6 +82,7 @@ if ( ! GetOptions(
 	 'exception.c',
 	 'exception-throw.c',
 	 'fx.c',
+	 'fx-execute.c',
 	 'image.c',
 	 'image-mask.c',
 	 'image-fill.c',
