@@ -1541,6 +1541,57 @@ static inline void AccumulatePHASEPixel(const PHASEPixel *phase,
   }
 }
 
+typedef struct _PHASECorrelationSums
+{
+  double
+    area,
+    *correlation,
+    *image_sum,
+    *image_sum_squared,
+    *reconstruct_sum,
+    *reconstruct_sum_squared;
+} PHASECorrelationSums;
+
+static inline double GetPHASEPearson(const PHASECorrelationSums *sums,
+  const ssize_t j)
+{
+  const double
+    area = sums->area;
+
+  double
+    *const correlation = sums->correlation,
+    *const image_sum = sums->image_sum,
+    *const image_sum_squared = sums->image_sum_squared,
+    *const reconstruct_sum = sums->reconstruct_sum,
+    *const reconstruct_sum_squared = sums->reconstruct_sum_squared;
+
+  double
+    denominator,
+    image_variance,
+    numerator,
+    pearson,
+    reconstruct_variance;
+
+  numerator=area*correlation[j]-image_sum[j]*reconstruct_sum[j];
+  image_variance=area*image_sum_squared[j]-image_sum[j]*image_sum[j];
+  reconstruct_variance=area*reconstruct_sum_squared[j]-reconstruct_sum[j]*
+    reconstruct_sum[j];
+  if ((image_variance < MagickEpsilon) &&
+      (reconstruct_variance < MagickEpsilon))
+    pearson=(fabs(image_sum[j]-reconstruct_sum[j]) < MagickEpsilon) ?
+      1.0 : 0.0;
+  else
+    {
+      denominator=sqrt(image_variance)*sqrt(reconstruct_variance);
+      pearson=denominator < MagickEpsilon ? 0.0 : numerator/denominator;
+    }
+  if (pearson < -1.0)
+    pearson=(-1.0);
+  if (pearson > 1.0)
+    pearson=1.0;
+  return(pearson);
+}
+
 static inline MagickBooleanType GetPHASESimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -1573,6 +1624,9 @@ static inline MagickBooleanType GetPHASESimilarity(const Image *image,
     channels = 0,
     j,
     y;
+
+  PHASECorrelationSums
+    sums;
 
   /*
     Compute a Pearson-correlation similarity between two Laplacian-of-
@@ -1698,11 +1752,7 @@ static inline MagickBooleanType GetPHASESimilarity(const Image *image,
   for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
   {
     double
-      denominator,
-      image_variance,
-      numerator,
-      pearson,
-      reconstruct_variance;
+      pearson;
 
     PixelChannel
       channel;
@@ -1717,23 +1767,13 @@ static inline MagickBooleanType GetPHASESimilarity(const Image *image,
     if (((traits & UpdatePixelTrait) == 0) ||
         ((reconstruct_traits & UpdatePixelTrait) == 0))
       continue;
-    numerator=area*correlation[j]-image_sum[j]*reconstruct_sum[j];
-    image_variance=area*image_sum_squared[j]-image_sum[j]*image_sum[j];
-    reconstruct_variance=area*reconstruct_sum_squared[j]-reconstruct_sum[j]*
-      reconstruct_sum[j];
-    if ((image_variance < MagickEpsilon) &&
-        (reconstruct_variance < MagickEpsilon))
-      pearson=(fabs(image_sum[j]-reconstruct_sum[j]) < MagickEpsilon) ?
-        1.0 : 0.0;
-    else
-      {
-        denominator=sqrt(image_variance)*sqrt(reconstruct_variance);
-        pearson=denominator < MagickEpsilon ? 0.0 : numerator/denominator;
-      }
-    if (pearson < -1.0)
-      pearson=(-1.0);
-    if (pearson > 1.0)
-      pearson=1.0;
+    sums.area=area;
+    sums.correlation=correlation;
+    sums.image_sum=image_sum;
+    sums.image_sum_squared=image_sum_squared;
+    sums.reconstruct_sum=reconstruct_sum;
+    sums.reconstruct_sum_squared=reconstruct_sum_squared;
+    pearson=GetPHASEPearson(&sums,j);
     similarity[j]=pearson;
     similarity[CompositePixelChannel]+=pearson;
     channels++;
