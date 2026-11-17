@@ -10264,6 +10264,16 @@ typedef enum
   QuadraticPathBezier
 } PathBezierSide;
 
+static inline int GetBezierAbsoluteLetter(const PathBezierSide side)
+{
+  return((side == CubicPathBezier) ? 'C' : 'Q');
+}
+
+static inline int GetBezierPointCount(const PathBezierSide side)
+{
+  return((side == CubicPathBezier) ? 4 : 3);
+}
+
 static MagickBooleanType TraceBezierPoints(MVGInfo *mvg_info,
   const PointInfo *points,const PathBezierSide side,PrimitiveInfo **q)
 {
@@ -10322,7 +10332,7 @@ static ssize_t TracePathBezierCurve(const PathTrace *trace,
   do
   {
     points[0]=point;
-    for (i=1; i < ((side == CubicPathBezier) ? 4 : 3); i++)
+    for (i=1; i < GetBezierPointCount(side); i++)
     {
       if (GetPathValue(&p,token,&x) == MagickFalse)
         ThrowPointExpectedException(token,exception);
@@ -10330,8 +10340,8 @@ static ssize_t TracePathBezierCurve(const PathTrace *trace,
         ThrowPointExpectedException(token,exception);
       if ((side == QuadraticPathBezier) && (*p == ','))
         p++;
-      end.x=GetPathCoordinate(attribute,(int) ((side == CubicPathBezier) ? 'C' : 'Q'),x,point.x);
-      end.y=GetPathCoordinate(attribute,(int) ((side == CubicPathBezier) ? 'C' : 'Q'),y,point.y);
+      end.x=GetPathCoordinate(attribute,(int) GetBezierAbsoluteLetter(side),x,point.x);
+      end.y=GetPathCoordinate(attribute,(int) GetBezierAbsoluteLetter(side),y,point.y);
       points[i]=end;
     }
     if (TraceBezierPoints(mvg_info,points,side,&q) == MagickFalse)
