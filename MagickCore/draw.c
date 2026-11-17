@@ -4216,6 +4216,12 @@ static MagickBooleanType ParseMVGPopDefs(const MVGRenderState *state)
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsNonSVGClipMask(const DrawInfo *draw_info)
+{
+  return(((draw_info->clip_mask != (char *) NULL) &&
+    (draw_info->compliance != SVGCompliance)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType ParseMVGPopGraphicContext(const MVGRenderState *state)
 {
   char
@@ -4246,8 +4252,7 @@ static MagickBooleanType ParseMVGPopGraphicContext(const MVGRenderState *state)
         n=0;
         break;
       }
-    if ((graphic_context[n]->clip_mask != (char *) NULL) &&
-        (graphic_context[n]->compliance != SVGCompliance))
+    if (IsNonSVGClipMask(graphic_context[n]) != MagickFalse)
       if (LocaleCompare(graphic_context[n]->clip_mask,
           graphic_context[n-1]->clip_mask) != 0)
         status=SetImageMask(image,WritePixelMask,(Image *) NULL,
