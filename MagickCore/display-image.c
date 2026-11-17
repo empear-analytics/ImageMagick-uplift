@@ -22711,6 +22711,15 @@ static void XInitializeBackgroundVisual(Display *display,const Image *image,
   (*window_info).matte_pixmap=(Pixmap) NULL;
 }
 
+static void XInitializeBackgroundColormap(XResourceInfo *resources,
+  Display *display,XVisualInfo **visual_info,Image *image,
+  XStandardColormap **map_info,XPixelInfo *pixel,ExceptionInfo *exception)
+{
+  (*resources).colormap=SharedColormap;
+  XMakeStandardColormap(display,(*visual_info),resources,image,(*map_info),
+    pixel,exception);
+}
+
 static void XCreateBackgroundWindowInfo(Display *display,Image *image,
   ExceptionInfo *exception,const BackgroundTargets *targets)
 {
@@ -22735,8 +22744,7 @@ static void XCreateBackgroundWindowInfo(Display *display,Image *image,
   /*
     Initialize Standard Colormap.
   */
-  (*resources).colormap=SharedColormap;
-  XMakeStandardColormap(display,(*visual_info),resources,image,(*map_info),
+  XInitializeBackgroundColormap(resources,display,visual_info,image,map_info,
     pixel,exception);
   /*
     Graphic context superclass.
