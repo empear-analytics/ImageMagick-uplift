@@ -13697,7 +13697,9 @@ M120): cc 12 to 7, the file 6.02 to 6.21, object file unchanged. Added by Claude
 `(<expr>) ? MagickTrue : MagickFalse` where `<expr>` is a comparison or a chain of
 comparisons joined by `&&` and `||` (the form Recipe P gives its predicates; `policy.c`'s
 `IsPolicyPathSeparator`, `IsNewPolicyPath`, `IsLimitPolicyDomain` and `IsPathAuthorized`).
-Each `?:` counts as a branch.
+Each `?:` counts as a branch. It serves *Overall Code Complexity* (the mean cyclomatic
+complexity of the file's functions) as well: each step lowers the file's total by one
+without adding a function (`fx.c`, W39 lane c, 2026-11-17).
 
 **Not covered by:** Recipe P, which writes the ternary; Recipe CN, which merges nested
 tests. Neither removes one.
@@ -13706,7 +13708,14 @@ tests. Neither removes one.
 
 1. Find `? MagickTrue : MagickFalse` (or `? MagickFalse : MagickTrue`, with the test's
    sense kept as written) whose condition is a comparison (`==`, `!=`, `<`, ...), a `!`
-   test, or `&&` / `||` of those, all of which yield `0` or `1` in C.
+   test, or `&&` / `||` of those, all of which yield `0` or `1` in C. A condition whose
+   top-level operator is `&&` or `||` qualifies whatever its operands are (a bare
+   `MagickBooleanType`, a pointer, a character: `UserSymbol && !Assign`, `*pfx->pex &&
+   ...`, `type >= 0 || IsIcc || IsDev`): C11 6.5.13p3 and 6.5.14p3 give the result of
+   `&&` and `||` as the `int` `1` or `0` for any scalar operands, so the value is `0` or
+   `1` as for a comparison (amendment of 2026-11-17, W39 lane c, under the mandate of
+   2026-10-24; step 4's object comparison still decides). A bare operand on its own, not
+   joined by `&&` or `||` at the top, is still refused (step 2).
 2. Delete the ternary and keep the condition inside a cast to the destination's type:
    `return((MagickBooleanType) (a == b));`, `status=(MagickBooleanType) ((a != b) &&
    (c == d));`, and the same for an argument passed to a `MagickBooleanType` parameter.
@@ -22462,3 +22471,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-16 | AMEND | S | Step 2: a file-scope variable of external linkage that only the moved functions name (and no other file) moves with them, its declaration group and comment verbatim after the new file's *Forward declarations*; by hand, checked by a sorted-line comparison and `nm` | `opencl.c`'s `cache_directory` and `cache_directory_lock` (campaign A, W37 lane a); the declaration form of 82c165e07 asks that both parts name the variable | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | S | *Preprocessor branches*: an `#if` without `#else` directly above the family's first moved function whose `#endif` stands inside the moved run moves whole, directives verbatim; `split_source.py` 3423ec185 | `opencl.c`'s `#if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT` around the benchmark-profile readers (campaign A, W37 lane a) | mandate (2026-10-24) |
 | 2026-11-16 | AMEND | S | Step 2: a chain of splits through private headers may drop the original between its steps, when a stub probe of the whole chain first shows its last state raising the original above its score before the chain and every product and header at or above that score; the dropping step goes `--no-verify` with the drop, the probe and the step that ends it in its message; the lane resets the branch if it cannot reach the probed end; each step keeps a split's checks (both catalogues, `omp_compare` for a region that moves, timing) | `morphology-apply.c` (8.26): round twenty-five's probe of a rotation header and the `MorphologyApply` split dropped the kept file to 8.01, the second split of the `AcquireKernelBuiltIn` side ends it at 10.0 (products 8.54 and 8.26, headers 9.68); round twenty-five's question 5. The ruling is the owner's, the wording and the products-and-headers condition the lane's | owner |
+| 2026-11-17 | AMEND | DT | Step 1: a condition whose top-level operator is a logical AND or OR qualifies whatever its operands are (C11 6.5.13p3, 6.5.14p3: the result is the int 1 or 0); *Use when*: also *Overall Code Complexity* (each step lowers the file total by one and adds no function) | `fx.c`'s translator predicates (campaign A, W39 lane c): 12 of its 47 boolean ternaries test a bare operand inside such a chain | mandate (2026-10-24) |
