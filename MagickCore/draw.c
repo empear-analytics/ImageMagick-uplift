@@ -7703,6 +7703,11 @@ static double GetEdgeDistance(const EdgeInfo *p,const ssize_t i,
   return(distance);
 }
 
+static inline ssize_t GetEdgeDirectionSign(const ssize_t direction)
+{
+  return(direction != 0 ? 1 : -1);
+}
+
 static ssize_t GetWindingEdgeIndex(EdgeInfo *p,const ssize_t y)
 {
   ssize_t
@@ -7742,13 +7747,13 @@ static ssize_t GetWindingNumber(PolygonInfo *polygon_info,const ssize_t x,
       continue;
     if ((double) x > p->bounds.x2)
       {
-        winding_number+=p->direction != 0 ? 1 : -1;
+        winding_number+=GetEdgeDirectionSign(p->direction);
         continue;
       }
     i=GetWindingEdgeIndex(p,y);
     q=p->points+i-1;
     if ((((q+1)->x-q->x)*(y-q->y)) <= (((q+1)->y-q->y)*(x-q->x)))
-      winding_number+=p->direction != 0 ? 1 : -1;
+      winding_number+=GetEdgeDirectionSign(p->direction);
   }
   return(winding_number);
 }
