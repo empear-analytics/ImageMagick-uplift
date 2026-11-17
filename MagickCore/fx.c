@@ -1101,8 +1101,8 @@ static ImgAttrE GetImgAttrToken (FxInfo * pfx)
 
 static inline MagickBooleanType IsImageReferenceOperator(const int op)
 {
-  return((op == (OperatorE)fU || op == (OperatorE)fV || op == (OperatorE)fP ||
-    op == (OperatorE)fS) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (op == (OperatorE)fU || op == (OperatorE)fV ||
+    op == (OperatorE)fP || op == (OperatorE)fS));
 }
 
 static ImgAttrE GetImgAttrQualifier (FxInfo * pfx, int op)
