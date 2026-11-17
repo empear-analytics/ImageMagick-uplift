@@ -10863,10 +10863,9 @@ static DisplayCommand XImageWindowCommand(const ImageWindowKeyInput *input,
 static inline MagickBooleanType IsImageWindowUncropped(
   const XWindows *windows,Image **image)
 {
-  return(((windows->image.crop_geometry == (char *) NULL) &&
+  return((MagickBooleanType) ((windows->image.crop_geometry == (char *) NULL) &&
     ((int) (*image)->columns == windows->image.ximage->width) &&
-    ((int) (*image)->rows == windows->image.ximage->height)) ? MagickTrue :
-    MagickFalse);
+    ((int) (*image)->rows == windows->image.ximage->height)));
 }
 
 static inline MagickBooleanType IsImageWindowOriginalSize(
