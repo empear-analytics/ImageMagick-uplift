@@ -3,8 +3,8 @@
 Branched from `campaign/M137` after #123 merged it into `main` (ba6c3318d); this branch's
 PR goes to `main`. Scores come from cs-mcp 1.5.16 through `tools/ch.py`.
 
-Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 61 flagged functions, 222 -> 220
-functions, 11,636 -> 11,481 lines.
+Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 56 flagged functions, 222 -> 219
+functions, 11,636 -> 11,494 lines.
 
 ## The function-count lesson
 
@@ -33,6 +33,12 @@ lowers the count.
 | 072242df0 | MT | TracePathHorizontalLine/VerticalLine | two Complex Method -> one; one function fewer |
 | 23c3e9fe1 | playbook | MT widened | folding form (b): a one-copy `if (c) S` as `if ((side == B) && (c)) S` |
 | 4171c522b | MT | TracePathCubicBezier/QuadraticBezier | four findings -> two; one function fewer |
+| 3f826192a | playbook | MT widened | folding form (b): either copy, and `S` may be a `break;` |
+| fef8d5575 | MT | TracePathSmoothCubicBezier/SmoothQuadraticBezier | four findings -> two; one function fewer |
+| 3647e76d0 | G | FlushFinalEdge | leaves Bumpy Road Ahead |
+| 21159a190 | B | IsRenderableClass | leaves Excess Number of Function Arguments |
+| f1244915e | B | IsNewSubpathPoint | leaves Excess Number of Function Arguments |
+| 985809cfc | B | IsDashSegmentPending | leaves Excess Number of Function Arguments |
 
 ## Probed and dropped
 
@@ -47,6 +53,10 @@ lowers the count.
 - **draw.c ParseMVGPopGraphicContext** (Recipe CN): Complex Conditional, 3.27 -> 3.19.
 - **draw.c ReplaceAlphaPixels/ReplaceColorPixels** (MT folding): two Bumpy Road -> Bumpy
   Road plus Complex Method (cc 9); no gain.
+- **draw.c DrawAlphaPrimitive/DrawColorPrimitive** (MT folding): four findings -> two in a
+  probe, token-checked, but `channel_mask` (set and restored only on the alpha side) is
+  *may be uninitialized* under `-Wconditional-uninitialized` (MSVC C4701, an error in
+  CI); an initialiser would add a value. Reverted.
 - **Stub probes** (one function stubbed at a time): cache.c and blob.c do not move for any
   single function (blob.c OpenBlob 2.71 -> 2.77); constitute-codec.c WriteImage 9.35,
   ReadImage 9.25; geometry-meta.c ParseMetaGeometry 9.26; memory.c AcquireMagickMemory
