@@ -1521,23 +1521,32 @@ static void SubtractGaussianKernelValues(KernelInfo *kernel,
     kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] -= 1.0;
 }
 
-static void SetLoGKernelValues(KernelInfo *kernel,const double sigma)
+static void SetLoGKernelLoop(KernelInfo *kernel,const double A,
+  const double B)
 {
   double
-    A, B, R;
+    R;
 
   ssize_t
     i,
     u,
     v;
 
-  A = 1.0/(2.0*sigma*sigma);  /* simplify loop expressions */
-  B = (double) (1.0/(MagickPI*sigma*sigma*sigma*sigma));
   for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
     for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
       { R = ((double)(u*u+v*v))*A;
         kernel->values[i] = (1-R)*exp(-R)*B;
       }
+}
+
+static void SetLoGKernelValues(KernelInfo *kernel,const double sigma)
+{
+  double
+    A, B;
+
+  A = 1.0/(2.0*sigma*sigma);  /* simplify loop expressions */
+  B = (double) (1.0/(MagickPI*sigma*sigma*sigma*sigma));
+  SetLoGKernelLoop(kernel,A,B);
 }
 
 static void SetLoGOrUnityKernelValues(KernelInfo *kernel,const double sigma)
