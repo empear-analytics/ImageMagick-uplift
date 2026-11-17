@@ -10864,6 +10864,12 @@ static void ClampRoundCornerArc(double *arc,const double segment)
     (*arc)=0.5*segment;
 }
 
+static inline MagickBooleanType IsDegenerateSegment(const PointInfo segment)
+{
+  return(((segment.x < MagickEpsilon) || (segment.y < MagickEpsilon)) ?
+    MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType TraceRoundCorner(MVGInfo *mvg_info,
   const PointInfo point,const PointInfo arc,const PointInfo degrees)
 {
@@ -10898,7 +10904,7 @@ static MagickBooleanType TraceRoundRectangle(MVGInfo *mvg_info,
   offset=mvg_info->offset;
   segment.x=fabs(end.x-start.x);
   segment.y=fabs(end.y-start.y);
-  if ((segment.x < MagickEpsilon) || (segment.y < MagickEpsilon))
+  if (IsDegenerateSegment(segment) != MagickFalse)
     {
       (*mvg_info->primitive_info+mvg_info->offset)->coordinates=0;
       return(MagickTrue);
