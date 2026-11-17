@@ -2993,9 +2993,38 @@ static inline MagickBooleanType IsMVGBlockEndOutside(const char *q,
     ((q-4) < p) || ((size_t) (q-p+4+1) > extent)) ? MagickTrue : MagickFalse);
 }
 
-static inline MagickBooleanType IsRenderableClass(DrawInfo **graphic_context,
-  const ssize_t n,const char *mvg_class,const char *p,const char *primitive)
+typedef struct _RenderableClassInput
 {
+  DrawInfo
+    **graphic_context;
+
+  ssize_t
+    n;
+
+  const char
+    *mvg_class;
+
+  const char
+    *p;
+
+  const char
+    *primitive;
+} RenderableClassInput;
+
+static inline MagickBooleanType IsRenderableClass(
+  const RenderableClassInput *input)
+{
+  DrawInfo
+    **const graphic_context = input->graphic_context;
+
+  const ssize_t
+    n = input->n;
+
+  const char
+    *const mvg_class = input->mvg_class,
+    *const p = input->p,
+    *const primitive = input->primitive;
+
   return(((graphic_context[n]->render != MagickFalse) &&
     (mvg_class != (const char *) NULL) && (p > primitive)) ? MagickTrue :
     MagickFalse);
@@ -4586,6 +4615,9 @@ static MagickBooleanType ParseMVGClass(const MVGRenderState *state)
     const char
       *mvg_class;
 
+    RenderableClassInput
+      renderable;
+
     (void) GetNextToken(q,&q,extent,token);
     if ((*token == '\0') || (*token == ';'))
       {
@@ -4608,8 +4640,12 @@ static MagickBooleanType ParseMVGClass(const MVGRenderState *state)
         break;
       }
     mvg_class=(const char *) GetValueFromSplayTree(macros,token);
-    if (IsRenderableClass(graphic_context,n,mvg_class,p,primitive) !=
-        MagickFalse)
+    renderable.graphic_context=graphic_context;
+    renderable.n=n;
+    renderable.mvg_class=mvg_class;
+    renderable.p=p;
+    renderable.primitive=primitive;
+    if (IsRenderableClass(&renderable) != MagickFalse)
       {
         char
           *elements;
