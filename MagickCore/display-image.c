@@ -12782,6 +12782,24 @@ static void XApplyRaiseCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplySegmentToImage(Display *display,XWindows *windows,
+  char *threshold,Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flags=ParseGeometry(threshold,&geometry_info);
+  if ((flags & SigmaValue) == 0)
+    geometry_info.sigma=1.0;
+  (void) SegmentImage(*image,sRGBColorspace,MagickFalse,geometry_info.rho,
+    geometry_info.sigma,exception);
+}
+
 static void XApplySegmentCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12799,12 +12817,6 @@ static void XApplySegmentCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  MagickStatusType
-    flags;
-
   static char
     threshold[MagickPathExtent] = "1.0x1.5";
 
@@ -12818,13 +12830,7 @@ static void XApplySegmentCommand(const XMagickCommandContext *context)
   /*
     Segment an image.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  flags=ParseGeometry(threshold,&geometry_info);
-  if ((flags & SigmaValue) == 0)
-    geometry_info.sigma=1.0;
-  (void) SegmentImage(*image,sRGBColorspace,MagickFalse,geometry_info.rho,
-    geometry_info.sigma,exception);
+  XApplySegmentToImage(display,windows,threshold,image,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
