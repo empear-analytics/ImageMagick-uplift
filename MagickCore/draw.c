@@ -10153,8 +10153,7 @@ static ssize_t TracePathAxisLine(const PathTrace *trace,
     *q = (*trace->q);
 
   char
-    *token = trace->token,
-    *next_token;
+    *token = trace->token;
 
   const char
     *p = (*trace->p);
@@ -10167,13 +10166,7 @@ static ssize_t TracePathAxisLine(const PathTrace *trace,
 
   do
   {
-    (void) GetNextToken(p,&p,MagickPathExtent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(p,&p,MagickPathExtent,token);
-    x=GetDrawValue(token,&next_token);
-    if (token == next_token)
+    if (GetPathValue(&p,token,&x) == MagickFalse)
       ThrowPointExpectedException(token,exception);
     if (side == HorizontalPathLine)
       point.x=(double) (attribute == (int) 'H' ? x: point.x+x);
