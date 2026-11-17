@@ -8688,10 +8688,8 @@ static MagickStatusType DrawImagePrimitive(const DrawPrimitiveContext *context,
         (void) SetImageInfo(clone_info,1,exception);
         (void) CopyMagickString(clone_info->filename,primitive_info->text,
           MagickPathExtent);
-        if (clone_info->size != (char *) NULL)
-          clone_info->size=DestroyString(clone_info->size);
-        if (clone_info->extract != (char *) NULL)
-          clone_info->extract=DestroyString(clone_info->extract);
+        clone_info->size=DestroyString(clone_info->size);
+        clone_info->extract=DestroyString(clone_info->extract);
         clone_info->coder_depth=draw_info->image_info->coder_depth;
         composite_images=StrictReadImage(clone_info,exception);
         draw_info->image_info->coder_depth=clone_info->coder_depth;
