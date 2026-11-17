@@ -159,6 +159,19 @@ typedef struct _MVGInfo
     *exception;
 } MVGInfo;
 
+typedef struct _ArcPathShape
+{
+  PointInfo
+    arc;
+
+  double
+    angle;
+
+  MagickBooleanType
+    large_arc,
+    sweep;
+} ArcPathShape;
+
 typedef struct _CompositeMaskPath
 {
   const char
@@ -225,8 +238,7 @@ static MagickBooleanType
     ExceptionInfo *),
   RenderMVGContent(Image *,const DrawInfo *,const size_t,ExceptionInfo *),
   TraceArc(MVGInfo *,const PointInfo,const PointInfo,const PointInfo),
-  TraceArcPath(MVGInfo *,const PointInfo,const PointInfo,const PointInfo,
-    const double,const MagickBooleanType,const MagickBooleanType),
+  TraceArcPath(MVGInfo *,const PointInfo,const PointInfo,const ArcPathShape *),
   TraceBezier(MVGInfo *,const size_t),
   TraceCircle(MVGInfo *,const PointInfo,const PointInfo),
   TraceEllipse(MVGInfo *,const PointInfo,const PointInfo,const PointInfo),
@@ -9486,9 +9498,18 @@ static MagickBooleanType TraceArc(MVGInfo *mvg_info,const PointInfo start,
 }
 
 static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
-  const PointInfo end,const PointInfo arc,const double angle,
-  const MagickBooleanType large_arc,const MagickBooleanType sweep)
+  const PointInfo end,const ArcPathShape *shape)
 {
+  const PointInfo
+    arc = shape->arc;
+
+  const double
+    angle = shape->angle;
+
+  const MagickBooleanType
+    large_arc = shape->large_arc,
+    sweep = shape->sweep;
+
   double
     alpha,
     beta,
@@ -9956,6 +9977,9 @@ static ssize_t TracePathArc(const PathTrace *trace)
   */
   do
   {
+    ArcPathShape
+      shape;
+
     (void) GetNextToken(p,&p,MagickPathExtent,token);
     if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
       ThrowPointExpectedException(token,exception);
@@ -10014,7 +10038,11 @@ static ssize_t TracePathArc(const PathTrace *trace)
       ThrowPointExpectedException(token,exception);
     end.x=(double) (attribute == (int) 'A' ? x : point.x+x);
     end.y=(double) (attribute == (int) 'A' ? y : point.y+y);
-    if (TraceArcPath(mvg_info,point,end,arc,angle,large_arc,sweep) == MagickFalse)
+    shape.arc=arc;
+    shape.angle=angle;
+    shape.large_arc=large_arc;
+    shape.sweep=sweep;
+    if (TraceArcPath(mvg_info,point,end,&shape) == MagickFalse)
       return(-1);
     q=(*mvg_info->primitive_info)+mvg_info->offset;
     mvg_info->offset+=(ssize_t) q->coordinates;
