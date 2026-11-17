@@ -20640,7 +20640,7 @@ static MagickBooleanType XSaveImage(Display *display,
   save_image=DestroyImage(save_image);
   image_info=DestroyImageInfo(image_info);
   XSetCursorState(display,windows,MagickFalse);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (status != 0));
 }
 
 /*
