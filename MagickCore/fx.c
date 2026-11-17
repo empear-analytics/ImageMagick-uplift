@@ -876,8 +876,8 @@ static MagickBooleanType ExpectChar (FxInfo * pfx, char c)
 
 static inline MagickBooleanType IsUnqualifiableAttr(const ImgAttrE *pop)
 {
-  return((*pop != aPage && *pop != aPrintsize && *pop != aRes) ? MagickTrue :
-    MagickFalse);
+  return((MagickBooleanType) (*pop != aPage && *pop != aPrintsize &&
+    *pop != aRes));
 }
 
 static int MatchXYWHToken (FxInfo * pfx, int ret)
