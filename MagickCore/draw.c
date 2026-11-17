@@ -10682,8 +10682,6 @@ static MagickBooleanType TraceRoundRectangle(MVGInfo *mvg_info,
   PrimitiveInfo
     *p;
 
-  ssize_t
-    i;
 
   ssize_t
     offset;
@@ -10742,11 +10740,7 @@ static MagickBooleanType TraceRoundRectangle(MVGInfo *mvg_info,
   primitive_info=(*mvg_info->primitive_info)+offset;
   primitive_info->coordinates=(size_t) (p-primitive_info);
   primitive_info->closed_subpath=MagickTrue;
-  for (i=0; i < (ssize_t) primitive_info->coordinates; i++)
-  {
-    p->primitive=primitive_info->primitive;
-    p--;
-  }
+  SetTracedPrimitiveType(primitive_info,p);
   return(MagickTrue);
 }
 
