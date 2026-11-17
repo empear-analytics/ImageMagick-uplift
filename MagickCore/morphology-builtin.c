@@ -546,11 +546,16 @@ static KernelInfo *AcquireDiamondKernel(KernelInfo *kernel,
   return(kernel);
 }
 
-static KernelInfo *AcquireUnityKernel(KernelInfo *kernel,
-  const GeometryInfo *args)
+static void SetUnityKernelSize(KernelInfo *kernel)
 {
   kernel->height = kernel->width = (size_t) 1;
   kernel->x = kernel->y = (ssize_t) 0;
+}
+
+static KernelInfo *AcquireUnityKernel(KernelInfo *kernel,
+  const GeometryInfo *args)
+{
+  SetUnityKernelSize(kernel);
   kernel->values=(MagickRealType *) MagickAssumeAligned(
     AcquireAlignedMemory(1,sizeof(*kernel->values)));
   if (kernel->values == (MagickRealType *) NULL)
