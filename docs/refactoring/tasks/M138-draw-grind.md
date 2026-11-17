@@ -3,9 +3,9 @@
 Branched from `campaign/M137` after #123 merged it into `main` (ba6c3318d); this branch's
 PR goes to `main`. Scores come from cs-mcp 1.5.16 through `tools/ch.py`.
 
-Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 48 flagged functions, 222 -> 236
-functions (four merges, twenty-two helpers), 11,636 -> 11,468 lines. Function findings
-(one per function and category) 123 -> 90.
+Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 45 flagged functions, 222 -> 242
+functions (four merges, twenty-eight helpers), 11,636 -> 11,501 lines. Function findings
+(one per function and category) 123 -> 83.
 
 ## The function-count lesson
 
@@ -62,6 +62,13 @@ lowers the count.
 | 84511a6ee, 623ad156b, 04c2aca89 | E | EstimateMVGPrimitiveExtent | bounds, curve count and path-token count into three helpers; no findings left (was Bumpy 3, cc 16, 102 lines) |
 | f077afa69 ... 296b8075a | E, D | five trace functions | the closing primitive-type loop into SetTracedPrimitiveType; TraceRoundRectangle 76 -> 70 lines |
 | 2f03f7f2d | merge | origin/main (campaign A's W38, #122) | clean; draw.c untouched |
+| 7a1752f1e, 8d1c7d074 | V, D | TraceRoundRectangle | the four corner tails into TraceRoundCorner; leaves Large Method |
+| f52eb157d | E | ParseMVGDashPattern | the odd-list repetition into RepeatOddDashPattern; no findings left |
+| 94df112c2 | E | TracePathSmoothBezierCurve | the control-point reflection into ReflectBezierControlPoint; leaves Large Method, cc 25 -> 20 |
+| ee585eefe, ead864ad3 | V, D | TracePathBezierCurve, TracePathSmoothBezierCurve | the point copy, TraceBezier call and advance into TraceBezierPoints; cc 16 -> 13, 20 -> 17 |
+| fd48c43c1 | playbook | LB amended | step 7, converted-read form |
+| dbafd288e | LB | ParseMVGPushPattern | three cast-wrapped list reads through GetMVGListValue; no findings left (one case reaches it) |
+| d9d468c2b, f879a2a24, 58ed7dc9d | E, E, D | DrawColorPrimitive, DrawAlphaPrimitive | the color point case into DrawColorPoint, the fill-to-border target into SetFillToBorderTarget; DrawColorPrimitive no findings left |
 
 ## Probed and dropped
 
@@ -106,6 +113,11 @@ lowers the count.
   alone three times. Not added to `LOAD_SENSITIVE`: that needs its own OK.
 - Whole catalogue at 874610f68, fffec6216 and 26453f1d8: 15,961 cases, 3 diverged, all known.
 - After merging main (71f80adb8, campaign A's W38): 15,967 cases, 3 diverged, all known.
+- Case map rebuilt after the merge (2026-11-17, 15,967 cases, 10,008 functions); the old
+  one kept as `build-oracle/work/casemap-2026-11-17.json`.
+- Whole catalogue at 58ed7dc9d: 3 known and resize/f6be4a23b4 (half write mask, `-resize
+  150%`), which then diverged once in three runs alone: the random write-mask resize family
+  of ORACLE.md's resize/6ee45e9cfa, in campaign A's code this branch does not touch.
 
 ## Blocked, for the owner
 
@@ -130,4 +142,5 @@ lowers the count.
 - **The score is not monotonic in findings.** Clearing ParseMVGClass's Complex Method with a
   Recipe LT helper dropped draw.c 3.27 -> 3.17, although the helper alone (unused) kept 3.27 and
   stubbing another cc-9 function kept 3.27; CloneDrawInfo's dash-pattern block alone gave
-  3.14, its gradient block alone 3.27. Every step is probed and dropped when the score falls.
+  3.14, its gradient block alone 3.27; DrawImagePrimitive's composite read (clears its Complex
+  Method) 3.16. Every step is probed and dropped when the score falls.
