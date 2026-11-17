@@ -4605,45 +4605,15 @@ static MagickBooleanType ParseMVGAffine(const MVGRenderState *state)
     affine.sx=GetDrawValue(token,&next_token);
     if (token == next_token)
       ThrowPointExpectedException(token,exception);
-    (void) GetNextToken(q,&q,extent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+    if (GetMVGListValue(&q,extent,token,&affine.ry) == MagickFalse)
       ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(q,&q,extent,token);
-    affine.ry=GetDrawValue(token,&next_token);
-    if (token == next_token)
+    if (GetMVGListValue(&q,extent,token,&affine.rx) == MagickFalse)
       ThrowPointExpectedException(token,exception);
-    (void) GetNextToken(q,&q,extent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
+    if (GetMVGListValue(&q,extent,token,&affine.sy) == MagickFalse)
       ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(q,&q,extent,token);
-    affine.rx=GetDrawValue(token,&next_token);
-    if (token == next_token)
+    if (GetMVGListValue(&q,extent,token,&affine.tx) == MagickFalse)
       ThrowPointExpectedException(token,exception);
-    (void) GetNextToken(q,&q,extent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(q,&q,extent,token);
-    affine.sy=GetDrawValue(token,&next_token);
-    if (token == next_token)
-      ThrowPointExpectedException(token,exception);
-    (void) GetNextToken(q,&q,extent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(q,&q,extent,token);
-    affine.tx=GetDrawValue(token,&next_token);
-    if (token == next_token)
-      ThrowPointExpectedException(token,exception);
-    (void) GetNextToken(q,&q,extent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(q,&q,extent,token);
-    affine.ty=GetDrawValue(token,&next_token);
-    if (token == next_token)
+    if (GetMVGListValue(&q,extent,token,&affine.ty) == MagickFalse)
       ThrowPointExpectedException(token,exception);
     break;
   } while (0);
