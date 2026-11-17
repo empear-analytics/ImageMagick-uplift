@@ -10074,10 +10074,13 @@ way clones the first.
    (`TracePathHorizontalLine`/`TracePathVerticalLine`: `point.x=...`/`point.y=...`),
    written `if (side == NameA) SA else SB`, each statement verbatim but for one local
    whose name differs between the copies, which takes copy A's name throughout (Recipe
-   TW step 1's renaming); or (b) an `if (c) S` that stands in copy B only, `c` with no
-   side effect and `S` an expression statement, written `if ((side == NameB) && (c)) S`
-   (`TracePathQuadraticBezier`'s `if (*p == ',') p++;`), the operands in that order so
-   that `c` is evaluated only on copy B's side, as before. When each of the two
+   TW step 1's renaming); or (b) an `if (c) S` that stands in one copy only, `c` with no
+   side effect and `S` an expression statement or a `break;` of a loop that encloses the
+   statement in both copies, written `if ((side == NameX) && (c)) S` with that copy's
+   constant (`TracePathQuadraticBezier`'s `if (*p == ',') p++;`;
+   `TracePathSmoothQuadraticBezier`'s `if (status == MagickFalse) break;`), the operands
+   in that order so that `c` is evaluated only on that copy's side, as before; the
+   `break` leaves the same loop it left. When each of the two
    functions is called only from the file and its every call is `Name(args)`, step 5
    replaces each call by `New(args,NameX)` with that copy's constant, and both
    functions leave the file: the file holds one function where it held two (a module
@@ -10290,7 +10293,9 @@ under the mandate of 2026-10-24. Form (b) the same day: `TracePathQuadraticBezie
 `TracePathCubicBezier` (cc 16 and 15, both *Large Method*), merged as
 `TracePathBezierCurve` (cc 22, *Large Method*); written as a nested `if` the one-copy
 statement made the new function *Deep, Nested Complexity* and *Bumpy Road Ahead*
-(probe 3.12), as the combined test it does not (3.27).
+(probe 3.12), as the combined test it does not (3.27). Form (b)'s `break;` and either-copy reading the
+same day: `TracePathSmoothCubicBezier` and `TracePathSmoothQuadraticBezier` (cc 17 and
+Large Method each) merged as `TracePathSmoothBezierCurve` (cc 31, Large Method).
 
 ---
 
@@ -23483,3 +23488,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-17 | AMEND | MA | Step 2: the address form, a role (c) lvalue whose address the block passes to one call that writes through it, the role (b) operand the same member of another object; the new function passes `&(*value)` | `draw.c`'s `CloneDrawInfo` (eleven guarded `CloneString` copies; cc 22 to 11 in a probe); campaign B, M138 | mandate (2026-10-24) |
 | 2026-11-17 | AMEND | MT | Step 4: the folding form, whole-body twins differing in one local's name, one assigned member and one constant; the differing assignment pair as `if (side == A) SA else SB`, each call replaced by the new function with its constant and both functions removed | `draw.c`'s `TracePathHorizontalLine` and `TracePathVerticalLine` (cc 10 each to one function of cc 12, one function fewer); campaign B, M138 | mandate (2026-10-24) |
 | 2026-11-17 | AMEND | MT | Step 4's folding form widened: any runs of steps 1 and 4, plus (b) an `if (c) S` in copy B only, written `if ((side == NameB) && (c)) S` | `draw.c`'s `TracePathQuadraticBezier` and `TracePathCubicBezier` (four findings to two, one function fewer); campaign B, M138 | mandate (2026-10-24) |
+| 2026-11-17 | AMEND | MT | Folding form (b): the one-copy `if (c) S` may stand in either copy and `S` may be a `break;` of a loop enclosing it in both | `draw.c`'s `TracePathSmoothCubicBezier` and `TracePathSmoothQuadraticBezier` (four findings to two, one function fewer); campaign B, M138 | mandate (2026-10-24) |
