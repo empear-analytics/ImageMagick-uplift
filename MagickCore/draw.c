@@ -8593,6 +8593,50 @@ static void SetFillToBorderTarget(const PrimitiveInfo *primitive_info,
     }
 }
 
+static MagickStatusType EnsureBlendAlphaChannel(Image *image,
+  MagickStatusType status,ExceptionInfo *exception)
+{
+  if ((image->alpha_trait & BlendPixelTrait) == 0)
+    status&=(MagickStatusType) SetImageAlphaChannel(image,
+      OpaqueAlphaChannel,exception);
+  return(status);
+}
+
+static MagickStatusType DrawAlphaPoint(const DrawPrimitiveContext *context,
+  MagickStatusType status)
+{
+  Image
+    *image = context->image;
+
+  const DrawInfo
+    *draw_info = context->draw_info;
+
+  CacheView
+    *image_view = context->image_view;
+
+  const ssize_t
+    x = context->x,
+    y = context->y;
+
+  ExceptionInfo
+    *exception = context->exception;
+
+  PixelInfo
+    pixel;
+
+  Quantum
+    *q;
+
+  q=GetCacheViewAuthenticPixels(image_view,x,y,1,1,exception);
+  if (q == (Quantum *) NULL)
+    return(status);
+  GetFillColor(draw_info,x,y,&pixel,exception);
+  SetPixelAlpha(image,ClampToQuantum(pixel.alpha),q);
+  status&=(MagickStatusType) SyncCacheViewAuthenticPixels(image_view,
+    exception);
+  return(status);
+}
+
 static MagickStatusType DrawAlphaPrimitive(const DrawPrimitiveContext *context,
   MagickStatusType status)
 {
@@ -8615,27 +8659,13 @@ static MagickStatusType DrawAlphaPrimitive(const DrawPrimitiveContext *context,
   ExceptionInfo
     *exception = context->exception;
 
-  if ((image->alpha_trait & BlendPixelTrait) == 0)
-    status&=(MagickStatusType) SetImageAlphaChannel(image,
-      OpaqueAlphaChannel,exception);
+  status=EnsureBlendAlphaChannel(image,status,exception);
   switch (primitive_info->method)
   {
     case PointMethod:
     default:
     {
-      PixelInfo
-        pixel;
-
-      Quantum
-        *q;
-
-      q=GetCacheViewAuthenticPixels(image_view,x,y,1,1,exception);
-      if (q == (Quantum *) NULL)
-        break;
-      GetFillColor(draw_info,x,y,&pixel,exception);
-      SetPixelAlpha(image,ClampToQuantum(pixel.alpha),q);
-      status&=(MagickStatusType) SyncCacheViewAuthenticPixels(image_view,
-        exception);
+      status=DrawAlphaPoint(context,status);
       break;
     }
     case ReplaceMethod:
