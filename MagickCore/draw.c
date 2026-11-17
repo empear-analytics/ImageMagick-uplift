@@ -9292,6 +9292,17 @@ MagickExport void GetAffineMatrix(AffineMatrix *affine_matrix)
   affine_matrix->sy=1.0;
 }
 
+static void SetDrawColorOption(const ImageInfo *image_info,const char *key,
+  PixelInfo *color,ExceptionInfo *exception)
+{
+  const char
+    *option;
+
+  option=GetImageOption(image_info,key);
+  if (option != (const char *) NULL)
+    (void) QueryColorCompliance(option,AllCompliance,&(*color),exception);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -9381,10 +9392,8 @@ MagickExport void GetDrawInfo(const ImageInfo *image_info,DrawInfo *draw_info)
   option=GetImageOption(draw_info->image_info,"family");
   if (option != (const char *) NULL)
     (void) CloneString(&draw_info->family,option);
-  option=GetImageOption(draw_info->image_info,"fill");
-  if (option != (const char *) NULL)
-    (void) QueryColorCompliance(option,AllCompliance,&draw_info->fill,
-      exception);
+  SetDrawColorOption(draw_info->image_info,"fill",
+    &draw_info->fill,exception);
   option=GetImageOption(draw_info->image_info,"gravity");
   if (option != (const char *) NULL)
     draw_info->gravity=(GravityType) ParseCommandOption(MagickGravityOptions,
@@ -9398,10 +9407,8 @@ MagickExport void GetDrawInfo(const ImageInfo *image_info,DrawInfo *draw_info)
   option=GetImageOption(draw_info->image_info,"kerning");
   if (option != (const char *) NULL)
     draw_info->kerning=GetDrawValue(option,&next_token);
-  option=GetImageOption(draw_info->image_info,"stroke");
-  if (option != (const char *) NULL)
-    (void) QueryColorCompliance(option,AllCompliance,&draw_info->stroke,
-      exception);
+  SetDrawColorOption(draw_info->image_info,"stroke",
+    &draw_info->stroke,exception);
   option=GetImageOption(draw_info->image_info,"strokewidth");
   if (option != (const char *) NULL)
     draw_info->stroke_width=GetDrawValue(option,&next_token);
@@ -9409,10 +9416,8 @@ MagickExport void GetDrawInfo(const ImageInfo *image_info,DrawInfo *draw_info)
   if (option != (const char *) NULL)
     draw_info->style=(StyleType) ParseCommandOption(MagickStyleOptions,
       MagickFalse,option);
-  option=GetImageOption(draw_info->image_info,"undercolor");
-  if (option != (const char *) NULL)
-    (void) QueryColorCompliance(option,AllCompliance,&draw_info->undercolor,
-      exception);
+  SetDrawColorOption(draw_info->image_info,"undercolor",
+    &draw_info->undercolor,exception);
   option=GetImageOption(draw_info->image_info,"weight");
   if (option != (const char *) NULL)
     {
