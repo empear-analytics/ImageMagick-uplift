@@ -537,6 +537,50 @@ typedef struct _MotionBlurOutputSource
     *filteredPixels;
 } MotionBlurOutputSource;
 
+typedef struct _MotionBlurImageTargets
+{
+  Image
+    **filteredImage;
+
+  CacheView
+    **filteredImage_view;
+
+  void
+    **filteredPixels;
+} MotionBlurImageTargets;
+
+static MagickBooleanType CloneMotionBlurImage(const Image *image,
+  ExceptionInfo *exception,const MotionBlurImageTargets *targets)
+{
+  Image
+    **const filteredImage = targets->filteredImage;
+
+  CacheView
+    **const filteredImage_view = targets->filteredImage_view;
+
+  void
+    **const filteredPixels = targets->filteredPixels;
+
+  *filteredImage = CloneImage(image,image->columns,image->rows,
+    MagickTrue,exception);
+  assert(*filteredImage != NULL);
+  if (SetImageStorageClass(*filteredImage,DirectClass,exception) != MagickTrue)
+  {
+    (void) ThrowMagickException(exception, GetMagickModule(),
+      ResourceLimitError, "CloneImage failed.", ".");
+    return(MagickFalse);
+  }
+  *filteredImage_view=AcquireAuthenticCacheView(*filteredImage,exception);
+  *filteredPixels=GetCacheViewAuthenticPixels(*filteredImage_view,0,0,(*filteredImage)->columns,(*filteredImage)->rows,exception);
+  if (*filteredPixels == (void *) NULL)
+  {
+    (void) ThrowMagickException(exception,GetMagickModule(),CacheError,
+      "UnableToReadPixelCache.","`%s'",(*filteredImage)->filename);
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType CreateMotionBlurOutputBuffer(
   const MotionBlurOutputSource *source,cl_mem *filteredImageBuffer,
   ExceptionInfo *exception)
@@ -693,22 +737,12 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
   }
 
 
-  filteredImage = CloneImage(image,image->columns,image->rows,
-    MagickTrue,exception);
-  assert(filteredImage != NULL);
-  if (SetImageStorageClass(filteredImage,DirectClass,exception) != MagickTrue)
   {
-    (void) ThrowMagickException(exception, GetMagickModule(),
-      ResourceLimitError, "CloneImage failed.", ".");
-    goto cleanup;
-  }
-  filteredImage_view=AcquireAuthenticCacheView(filteredImage,exception);
-  filteredPixels=GetCacheViewAuthenticPixels(filteredImage_view,0,0,filteredImage->columns,filteredImage->rows,exception);
-  if (filteredPixels == (void *) NULL)
-  {
-    (void) ThrowMagickException(exception,GetMagickModule(),CacheError,
-      "UnableToReadPixelCache.","`%s'",filteredImage->filename);
-    goto cleanup;
+    const MotionBlurImageTargets
+      targets = { &filteredImage, &filteredImage_view, &filteredPixels };
+
+    if (CloneMotionBlurImage(image,exception,&targets) == MagickFalse)
+      goto cleanup;
   }
 
   {
