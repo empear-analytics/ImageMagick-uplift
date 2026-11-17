@@ -12603,7 +12603,7 @@ static void XApplyShadeCommand(const XMagickCommandContext *context)
   flags=ParseGeometry(geometry,&geometry_info);
   if ((flags & SigmaValue) == 0)
     geometry_info.sigma=1.0;
-  shade_image=ShadeImage(*image,status != 0 ? MagickTrue : MagickFalse,
+  shade_image=ShadeImage(*image,(MagickBooleanType) (status != 0),
     geometry_info.rho,geometry_info.sigma,exception);
   if (shade_image != (Image *) NULL)
     {
