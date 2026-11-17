@@ -5,8 +5,8 @@ PR goes to `main`. Scores come from cs-mcp 1.5.16 through `tools/ch.py`.
 
 Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 44 flagged functions, 222 -> 250
 functions (four merges, thirty-six helpers), 11,636 -> 11,567 lines. Function findings
-(one per function and category) 123 -> 82; total cc of the flagged functions down by
-about a quarter.
+(one per function and category) 123 -> 82; the summed cc of the Complex Method
+functions 908 -> 639.
 
 ## The function-count lesson
 
