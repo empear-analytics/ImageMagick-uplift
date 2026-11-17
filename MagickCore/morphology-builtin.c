@@ -576,6 +576,13 @@ static void SetCometUnityKernel(KernelInfo *kernel)
   kernel->positive_range = 1.0;
 }
 
+static void SetCometKernelRange(KernelInfo *kernel)
+{
+  kernel->minimum = 0.0;
+  kernel->maximum = kernel->values[0];
+  kernel->negative_range = 0.0;
+}
+
 static KernelInfo *AcquireCometKernel(KernelInfo *kernel,
   const GeometryInfo *args)
 {
@@ -636,9 +643,7 @@ static KernelInfo *AcquireCometKernel(KernelInfo *kernel,
   else /* special case - generate a unity kernel */
     SetCometUnityKernel(kernel);
 
-  kernel->minimum = 0.0;
-  kernel->maximum = kernel->values[0];
-  kernel->negative_range = 0.0;
+  SetCometKernelRange(kernel);
 
   ScaleKernelInfo(kernel, 1.0, NormalizeValue); /* Normalize */
   RotateKernelInfo(kernel, args->xi); /* Rotate by angle */
