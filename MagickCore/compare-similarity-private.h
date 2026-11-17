@@ -401,23 +401,41 @@ static inline MagickBooleanType AcquireCorrelationStatistics(const Image *image,
 
 #define SimilarityImageTag  "Similarity/Image"
 
-static inline MagickBooleanType GetDPCSimilarity(const Image *image,
-  const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
+typedef struct _CorrelationTotals
 {
-  CacheView
-    *image_view,
-    *reconstruct_view;
+  const Image
+    *image,
+    *reconstruct_image;
 
   ChannelStatistics
     *image_statistics,
     *reconstruct_statistics;
 
-  CorrelationStatisticsTargets
-    targets;
+  double
+    *similarity,
+    *norm,
+    *reconstruct_norm;
+} CorrelationTotals;
+
+static MagickBooleanType GetCorrelationTotals(const CorrelationTotals *totals,
+  ExceptionInfo *exception)
+{
+  const Image
+    *const image = totals->image,
+    *const reconstruct_image = totals->reconstruct_image;
+
+  ChannelStatistics
+    *const image_statistics = totals->image_statistics,
+    *const reconstruct_statistics = totals->reconstruct_statistics;
 
   double
-    norm[MaxPixelChannels+1] = { 0.0 },
-    reconstruct_norm[MaxPixelChannels+1] = { 0.0 };
+    *const similarity = totals->similarity,
+    *const norm = totals->norm,
+    *const reconstruct_norm = totals->reconstruct_norm;
+
+  CacheView
+    *image_view,
+    *reconstruct_view;
 
   MagickBooleanType
     status = MagickTrue;
@@ -430,18 +448,8 @@ static inline MagickBooleanType GetDPCSimilarity(const Image *image,
     rows;
 
   ssize_t
-    k,
     y;
 
-  /*
-    Compute the dot product correlation similarity.
-  */
-  targets.image_statistics=(&image_statistics);
-  targets.reconstruct_statistics=(&reconstruct_statistics);
-  if (AcquireCorrelationStatistics(image,reconstruct_image,exception,
-        &targets) == MagickFalse)
-    return(MagickFalse);
-  (void) memset(similarity,0,(MaxPixelChannels+1)*sizeof(*similarity));
   SetImageCompareBounds(image,reconstruct_image,&columns,&rows);
   image_view=AcquireVirtualCacheView(image,exception);
   reconstruct_view=AcquireVirtualCacheView(reconstruct_image,exception);
@@ -481,7 +489,7 @@ static inline MagickBooleanType GetDPCSimilarity(const Image *image,
     row.reconstruct_statistics=reconstruct_statistics;
     AccumulateCorrelationRow(&row,p,q,sums);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
-    #pragma omp critical (MagickCore_GetDPCSimilarity)
+    #pragma omp critical (MagickCore_GetCorrelationTotals)
 #endif
     {
       ssize_t
@@ -523,6 +531,49 @@ static inline MagickBooleanType GetDPCSimilarity(const Image *image,
   }
   reconstruct_view=DestroyCacheView(reconstruct_view);
   image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+static inline MagickBooleanType GetDPCSimilarity(const Image *image,
+  const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
+{
+  ChannelStatistics
+    *image_statistics,
+    *reconstruct_statistics;
+
+  CorrelationStatisticsTargets
+    targets;
+
+  CorrelationTotals
+    totals;
+
+  double
+    norm[MaxPixelChannels+1] = { 0.0 },
+    reconstruct_norm[MaxPixelChannels+1] = { 0.0 };
+
+  MagickBooleanType
+    status = MagickTrue;
+
+  ssize_t
+    k;
+
+  /*
+    Compute the dot product correlation similarity.
+  */
+  targets.image_statistics=(&image_statistics);
+  targets.reconstruct_statistics=(&reconstruct_statistics);
+  if (AcquireCorrelationStatistics(image,reconstruct_image,exception,
+        &targets) == MagickFalse)
+    return(MagickFalse);
+  (void) memset(similarity,0,(MaxPixelChannels+1)*sizeof(*similarity));
+  totals.image=image;
+  totals.reconstruct_image=reconstruct_image;
+  totals.image_statistics=image_statistics;
+  totals.reconstruct_statistics=reconstruct_statistics;
+  totals.similarity=similarity;
+  totals.norm=norm;
+  totals.reconstruct_norm=reconstruct_norm;
+  status=GetCorrelationTotals(&totals,exception);
   /*
     Compute dot product correlation: divide by mean.
   */
@@ -938,16 +989,15 @@ static inline MagickBooleanType GetMSESimilarity(const Image *image,
 static inline MagickBooleanType GetNCCSimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
-  CacheView
-    *image_view,
-    *reconstruct_view;
-
   ChannelStatistics
     *image_statistics,
     *reconstruct_statistics;
 
   CorrelationStatisticsTargets
     targets;
+
+  CorrelationTotals
+    totals;
 
   double
     reconstruct_variance[MaxPixelChannels+1] = { 0.0 },
@@ -956,16 +1006,8 @@ static inline MagickBooleanType GetNCCSimilarity(const Image *image,
   MagickBooleanType
     status = MagickTrue;
 
-  MagickOffsetType
-    progress = 0;
-
-  size_t
-    columns,
-    rows;
-
   ssize_t
-    k,
-    y;
+    k;
 
   /*
     Compute the normalized criss-correlation similarity.
@@ -976,88 +1018,14 @@ static inline MagickBooleanType GetNCCSimilarity(const Image *image,
         &targets) == MagickFalse)
     return(MagickFalse);
   (void) memset(similarity,0,(MaxPixelChannels+1)*sizeof(*similarity));
-  SetImageCompareBounds(image,reconstruct_image,&columns,&rows);
-  image_view=AcquireVirtualCacheView(image,exception);
-  reconstruct_view=AcquireVirtualCacheView(reconstruct_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(variance,reconstruct_variance,similarity,status) \
-    magick_number_threads(image,image,rows,1)
-#endif
-  for (y=0; y < (ssize_t) rows; y++)
-  {
-    const Quantum
-      *magick_restrict p,
-      *magick_restrict q;
-
-    double
-      channel_reconstruct_variance[MaxPixelChannels+1] = { 0.0 },
-      channel_similarity[MaxPixelChannels+1] = { 0.0 },
-      channel_variance[MaxPixelChannels+1] = { 0.0 };
-
-    const CorrelationSums
-      sums = { channel_similarity, channel_variance,
-        channel_reconstruct_variance };
-
-    CorrelationRow
-      row;
-
-    p=GetCacheViewVirtualPixels(image_view,0,y,columns,1,exception);
-    q=GetCacheViewVirtualPixels(reconstruct_view,0,y,columns,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (const Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    row.image=image;
-    row.reconstruct_image=reconstruct_image;
-    row.columns=columns;
-    row.image_statistics=image_statistics;
-    row.reconstruct_statistics=reconstruct_statistics;
-    AccumulateCorrelationRow(&row,p,q,sums);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-    #pragma omp critical (MagickCore_GetNCCSimilarity)
-#endif
-    {
-      ssize_t
-        j;
-
-      for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,j);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
-          channel);
-        if (((traits & UpdatePixelTrait) == 0) ||
-            ((reconstruct_traits & UpdatePixelTrait) == 0))
-          continue;
-        similarity[j]+=channel_similarity[j];
-        similarity[CompositePixelChannel]+=channel_similarity[j];
-        variance[j]+=channel_variance[j];
-        variance[CompositePixelChannel]+=channel_variance[j];
-        reconstruct_variance[j]+=channel_reconstruct_variance[j];
-        reconstruct_variance[CompositePixelChannel]+=
-          channel_reconstruct_variance[j];
-      }
-    }
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-        #pragma omp atomic
-#endif
-        progress++;
-        proceed=SetImageProgress(image,SimilarityImageTag,progress,rows);
-        if (proceed == MagickFalse)
-          {
-            status=MagickFalse;
-            continue;
-          }
-      }
-  }
-  reconstruct_view=DestroyCacheView(reconstruct_view);
-  image_view=DestroyCacheView(image_view);
+  totals.image=image;
+  totals.reconstruct_image=reconstruct_image;
+  totals.image_statistics=image_statistics;
+  totals.reconstruct_statistics=reconstruct_statistics;
+  totals.similarity=similarity;
+  totals.norm=variance;
+  totals.reconstruct_norm=reconstruct_variance;
+  status=GetCorrelationTotals(&totals,exception);
   /*
     Compute normalized cross correlation: divide by standard deviation.
   */
