@@ -6110,9 +6110,8 @@ static MagickBooleanType ParseMVGStrokeDasharray(const MVGRenderState *state)
 
   do
   {
-    if (graphic_context[n]->dash_pattern != (double *) NULL)
-      graphic_context[n]->dash_pattern=(double *)
-        RelinquishMagickMemory(graphic_context[n]->dash_pattern);
+    graphic_context[n]->dash_pattern=(double *)
+      RelinquishMagickMemory(graphic_context[n]->dash_pattern);
     if (IsValidPoint(q) != MagickFalse)
       {
         const char
