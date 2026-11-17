@@ -25588,8 +25588,8 @@ static inline MagickBooleanType IsSelectiveColormapCrossing(Display *display,
   const XStandardColormap *map_info,const XVisualInfo *visual_info,
   const int mode)
 {
-  return(((map_info->colormap != XDefaultColormap(display,visual_info->screen)) &&
-    (mode != NotifyUngrab)) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((map_info->colormap !=
+    XDefaultColormap(display,visual_info->screen)) && (mode != NotifyUngrab)));
 }
 
 static void XDispatchWindowStateEvent(const DisplayEventContext *event_context,
