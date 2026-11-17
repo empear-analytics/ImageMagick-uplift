@@ -5934,13 +5934,7 @@ static MagickBooleanType ParseMVGScale(const MVGRenderState *state)
     affine.sx=GetDrawValue(token,&next_token);
     if (token == next_token)
       ThrowPointExpectedException(token,exception);
-    (void) GetNextToken(q,&q,extent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(q,&q,extent,token);
-    affine.sy=GetDrawValue(token,&next_token);
-    if (token == next_token)
+    if (GetMVGListValue(&q,extent,token,&affine.sy) == MagickFalse)
       ThrowPointExpectedException(token,exception);
     break;
   } while (0);
