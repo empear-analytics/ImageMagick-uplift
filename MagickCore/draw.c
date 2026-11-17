@@ -281,6 +281,25 @@ MagickExport DrawInfo *AcquireDrawInfo(void)
   return(draw_info);
 }
 
+static void CloneDrawInfoGradientStops(const DrawInfo *draw_info,
+  DrawInfo *clone_info)
+{
+  if (draw_info->gradient.stops != (StopInfo *) NULL)
+    {
+      size_t
+        number_stops;
+
+      number_stops=clone_info->gradient.number_stops;
+      clone_info->gradient.stops=(StopInfo *) AcquireQuantumMemory((size_t)
+        number_stops,sizeof(*clone_info->gradient.stops));
+      if (clone_info->gradient.stops == (StopInfo *) NULL)
+        ThrowFatalException(ResourceLimitFatalError,
+          "UnableToAllocateDashPattern");
+      (void) memcpy(clone_info->gradient.stops,draw_info->gradient.stops,
+        (size_t) number_stops*sizeof(*clone_info->gradient.stops));
+    }
+}
+
 static void CloneDrawInfoString(const char *source,char **value)
 {
   if (source != (char *) NULL)
@@ -389,20 +408,7 @@ MagickExport DrawInfo *CloneDrawInfo(const ImageInfo *image_info,
         x*sizeof(*clone_info->dash_pattern));
     }
   clone_info->gradient=draw_info->gradient;
-  if (draw_info->gradient.stops != (StopInfo *) NULL)
-    {
-      size_t
-        number_stops;
-
-      number_stops=clone_info->gradient.number_stops;
-      clone_info->gradient.stops=(StopInfo *) AcquireQuantumMemory((size_t)
-        number_stops,sizeof(*clone_info->gradient.stops));
-      if (clone_info->gradient.stops == (StopInfo *) NULL)
-        ThrowFatalException(ResourceLimitFatalError,
-          "UnableToAllocateDashPattern");
-      (void) memcpy(clone_info->gradient.stops,draw_info->gradient.stops,
-        (size_t) number_stops*sizeof(*clone_info->gradient.stops));
-    }
+  CloneDrawInfoGradientStops(draw_info,clone_info);
   clone_info->bounds=draw_info->bounds;
   clone_info->fill_alpha=draw_info->fill_alpha;
   clone_info->stroke_alpha=draw_info->stroke_alpha;
