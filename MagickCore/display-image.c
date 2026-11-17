@@ -6390,6 +6390,26 @@ static MagickBooleanType XCompositeImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void XSetPanSizeHints(XSizeHints *size_hints,
+  XWindowChanges window_changes,Display *display,XWindows *windows)
+{
+  if (size_hints != (XSizeHints *) NULL)
+    {
+      /*
+        Set new size hints.
+      */
+      size_hints->flags=PSize | PMinSize | PMaxSize;
+      size_hints->width=window_changes.width;
+      size_hints->height=window_changes.height;
+      size_hints->min_width=size_hints->width;
+      size_hints->min_height=size_hints->height;
+      size_hints->max_width=size_hints->width;
+      size_hints->max_height=size_hints->height;
+      (void) XSetNormalHints(display,windows->pan.id,size_hints);
+      (void) XFree((void *) size_hints);
+    }
+}
+
 static void XResizePanWindow(Display *display,XWindows *windows,Image *image)
 {
   XSizeHints
@@ -6412,21 +6432,7 @@ static void XResizePanWindow(Display *display,XWindows *windows,Image *image)
   window_changes.width=(int) windows->pan.width;
   window_changes.height=(int) windows->pan.height;
   size_hints=XAllocSizeHints();
-  if (size_hints != (XSizeHints *) NULL)
-    {
-      /*
-        Set new size hints.
-      */
-      size_hints->flags=PSize | PMinSize | PMaxSize;
-      size_hints->width=window_changes.width;
-      size_hints->height=window_changes.height;
-      size_hints->min_width=size_hints->width;
-      size_hints->min_height=size_hints->height;
-      size_hints->max_width=size_hints->width;
-      size_hints->max_height=size_hints->height;
-      (void) XSetNormalHints(display,windows->pan.id,size_hints);
-      (void) XFree((void *) size_hints);
-    }
+  XSetPanSizeHints(size_hints,window_changes,display,windows);
   (void) XReconfigureWMWindow(display,windows->pan.id,windows->pan.screen,
     (unsigned int) (CWWidth | CWHeight),&window_changes);
 }
