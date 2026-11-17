@@ -32,6 +32,11 @@ extern "C" {
 #if defined(MAGICKCORE_OPENCL_SUPPORT)
 
 /*
+  Define declarations.
+*/
+#define ALIGNED(pointer,type) ((((size_t)(pointer)) & (sizeof(type)-1)) == 0)
+
+/*
   Helper functions.
 */
 static inline MagickBooleanType IsUnsupportedColorspace(const Image *image)
@@ -168,6 +173,128 @@ static inline Image *DestroyUnfinishedImage(const MagickBooleanType outputReady,
   if ((outputReady == MagickFalse) && (filteredImage != (Image *) NULL))
     filteredImage=DestroyImage(filteredImage);
   return(filteredImage);
+}
+
+static inline MagickBooleanType HasUndefinedRGBATraits(const Image *image)
+{
+  return(((GetPixelRedTraits(image) == UndefinedPixelTrait) ||
+      (GetPixelGreenTraits(image) == UndefinedPixelTrait) ||
+      (GetPixelBlueTraits(image) == UndefinedPixelTrait) ||
+      (GetPixelAlphaTraits(image) == UndefinedPixelTrait)) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType checkAccelerateConditionRGBA(const Image* image)
+{
+  if (checkAccelerateCondition(image) == MagickFalse)
+    return(MagickFalse);
+
+  /* the order will be RGBA if the image has 4 channels */
+  if (image->number_channels != 4)
+    return(MagickFalse);
+
+  if (HasUndefinedRGBATraits(image) != MagickFalse)
+    return(MagickFalse);
+
+  return(MagickTrue);
+}
+
+static inline MagickBooleanType IsLumaIntensityMethod(
+  const PixelIntensityMethod method)
+{
+  return(((method == Rec601LumaPixelIntensityMethod) ||
+    (method == Rec709LumaPixelIntensityMethod)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsLuminanceIntensityMethod(
+  const PixelIntensityMethod method)
+{
+  return(((method == Rec601LuminancePixelIntensityMethod) ||
+    (method == Rec709LuminancePixelIntensityMethod)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType checkPixelIntensity(const Image *image,
+  const PixelIntensityMethod method)
+{
+  /* EncodePixelGamma and DecodePixelGamma are not supported */
+  if ((IsLumaIntensityMethod(method) != MagickFalse) &&
+      (image->colorspace == RGBColorspace))
+    return(MagickFalse);
+
+  if ((IsLuminanceIntensityMethod(method) != MagickFalse) &&
+      (image->colorspace == sRGBColorspace))
+    return(MagickFalse);
+
+  return(MagickTrue);
+}
+
+static inline MagickBooleanType checkHistogramCondition(const Image *image,
+  const PixelIntensityMethod method)
+{
+  /* ensure this is the only pass get in for now. */
+  if ((image->channel_mask & SyncChannels) == 0)
+    return MagickFalse;
+
+  return(checkPixelIntensity(image,method));
+}
+
+typedef enum
+{
+  BasicAccelerateCheck,
+  RGBAAccelerateCheck,
+  HistogramAccelerateCheck
+} AccelerateCheck;
+
+static inline MagickBooleanType checkAccelerateKind(const Image *image,
+  const AccelerateCheck check)
+{
+  if (check == BasicAccelerateCheck)
+    return(checkAccelerateCondition(image));
+  if (checkAccelerateConditionRGBA(image) == MagickFalse)
+    return(MagickFalse);
+  if (check == RGBAAccelerateCheck)
+    return(MagickTrue);
+  return(checkHistogramCondition(image,image->intensity));
+}
+
+static inline MagickCLEnv getAccelerateEnvironment(const Image *image,
+  const AccelerateCheck check,const char *trace_function,
+  ExceptionInfo *exception)
+{
+  assert(image != NULL);
+  assert(exception != (ExceptionInfo *) NULL);
+  if ((trace_function != (const char *) NULL) &&
+      (IsEventLogging() != MagickFalse))
+    (void) LogMagickEvent(TraceEvent,__FILE__,trace_function,(const size_t)
+      __LINE__,"%s",image->filename);
+  if (checkAccelerateKind(image,check) == MagickFalse)
+    return((MagickCLEnv) NULL);
+  return(getOpenCLEnvironment(exception));
+}
+
+static inline cl_int get32BitChannelValue(const ChannelType channel)
+{
+#if defined(MAGICKCORE_64BIT_CHANNEL_MASK_SUPPORT)
+  if (channel == AllChannels)
+    return(0x7ffffff);
+#endif
+  return((cl_int) channel);
+}
+
+static inline cl_mem_flags GetInputBufferFlags(const void *inputPixels)
+{
+  cl_mem_flags
+    mem_flags;
+
+  if (ALIGNED(inputPixels,CLPixelPacket))
+  {
+    mem_flags = CL_MEM_READ_ONLY|CL_MEM_USE_HOST_PTR;
+  }
+  else
+  {
+    mem_flags = CL_MEM_READ_ONLY|CL_MEM_COPY_HOST_PTR;
+  }
+  return(mem_flags);
 }
 
 #endif /* MAGICKCORE_OPENCL_SUPPORT */
