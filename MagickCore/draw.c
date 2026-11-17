@@ -3216,6 +3216,19 @@ typedef struct _MVGRenderState
     **stops;
 } MVGRenderState;
 
+static MagickBooleanType GetMVGValue(const char **q,const size_t extent,
+  char *token,double *value)
+{
+  char
+    *next_token;
+
+  (void) GetNextToken((*q),q,extent,token);
+  (*value)=GetDrawValue(token,&next_token);
+  if (token == next_token)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType GetMVGListValue(const char **q,const size_t extent,
   char *token,double *value)
 {
@@ -3236,7 +3249,6 @@ static MagickBooleanType GetMVGListValue(const char **q,const size_t extent,
 static void ParseMVGPrimitivePoints(const MVGRenderState *state)
 {
   char
-    *next_token,
     *token = (*state->token);
 
   const char
@@ -3286,9 +3298,7 @@ static void ParseMVGPrimitivePoints(const MVGRenderState *state)
     */
     if (IsValidPoint(q) == MagickFalse)
       break;
-    (void) GetNextToken(q,&q,extent,token);
-    point.x=GetDrawValue(token,&next_token);
-    if (token == next_token)
+    if (GetMVGValue(&q,extent,token,&point.x) == MagickFalse)
       ThrowPointExpectedException(token,exception);
     if (GetMVGListValue(&q,extent,token,&point.y) == MagickFalse)
       ThrowPointExpectedException(token,exception);
