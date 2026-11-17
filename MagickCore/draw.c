@@ -10166,9 +10166,6 @@ static ssize_t TracePathArc(const PathTrace *trace)
   */
   do
   {
-    ArcPathShape
-      shape;
-
     if (GetPathValue(&p,token,&arc.x) == MagickFalse)
       ThrowPointExpectedException(token,exception);
     if (GetPathValue(&p,token,&arc.y) == MagickFalse)
@@ -10191,12 +10188,13 @@ static ssize_t TracePathArc(const PathTrace *trace)
       ThrowPointExpectedException(token,exception);
     end.x=GetPathCoordinate(attribute,(int) 'A',x,point.x);
     end.y=GetPathCoordinate(attribute,(int) 'A',y,point.y);
-    shape.arc=arc;
-    shape.angle=angle;
-    shape.large_arc=large_arc;
-    shape.sweep=sweep;
-    if (TraceArcPath(mvg_info,point,end,&shape) == MagickFalse)
-      return(-1);
+    {
+      const ArcPathShape
+        shape = { arc, angle, large_arc, sweep };
+
+      if (TraceArcPath(mvg_info,point,end,&shape) == MagickFalse)
+        return(-1);
+    }
     q=(*mvg_info->primitive_info)+mvg_info->offset;
     mvg_info->offset+=(ssize_t) q->coordinates;
     q+=(ptrdiff_t) q->coordinates;
