@@ -13449,6 +13449,32 @@ static void XApplyOilPaintCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyCharcoalDrawToImage(Display *display,XWindows *windows,
+  char *radius,Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  Image
+    *charcoal_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flags=ParseGeometry(radius,&geometry_info);
+  if ((flags & SigmaValue) == 0)
+    geometry_info.sigma=geometry_info.rho;
+  charcoal_image=CharcoalImage(*image,geometry_info.rho,geometry_info.sigma,
+    exception);
+  if (charcoal_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=charcoal_image;
+    }
+}
+
 static void XApplyCharcoalDrawCommand(const XMagickCommandContext *context)
 {
   Display
@@ -13466,15 +13492,6 @@ static void XApplyCharcoalDrawCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  MagickStatusType
-    flags;
-
-  Image
-    *charcoal_image;
-
   static char
     radius[MagickPathExtent] = "0x1";
 
@@ -13490,18 +13507,7 @@ static void XApplyCharcoalDrawCommand(const XMagickCommandContext *context)
   */
   (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
     exception);
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  flags=ParseGeometry(radius,&geometry_info);
-  if ((flags & SigmaValue) == 0)
-    geometry_info.sigma=geometry_info.rho;
-  charcoal_image=CharcoalImage(*image,geometry_info.rho,geometry_info.sigma,
-    exception);
-  if (charcoal_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=charcoal_image;
-    }
+  XApplyCharcoalDrawToImage(display,windows,radius,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
