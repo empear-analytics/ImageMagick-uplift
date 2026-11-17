@@ -21209,14 +21209,13 @@ static void XScreenMap(Display *display,XWindows *windows,XEvent *event)
     }
 }
 
-static void XScreenMotion(Display *display,XWindows *windows,XEvent *event,
-  ExceptionInfo *exception)
+static void XTrackScreenMagnify(XEvent *event,XWindows *windows,
+  Display *display,ExceptionInfo *exception)
 {
   int
     x,
     y;
 
-  while (XCheckMaskEvent(display,ButtonMotionMask,event)) ;
   if ((event->xmotion.window == windows->image.id) &&
       (windows->magnify.mapped != MagickFalse))
     {
@@ -21228,6 +21227,13 @@ static void XScreenMotion(Display *display,XWindows *windows,XEvent *event,
       XSetMagnifyPosition(windows,x,y);
       XMakeMagnifyImage(display,windows,exception);
     }
+}
+
+static void XScreenMotion(Display *display,XWindows *windows,XEvent *event,
+  ExceptionInfo *exception)
+{
+  while (XCheckMaskEvent(display,ButtonMotionMask,event)) ;
+  XTrackScreenMagnify(event,windows,display,exception);
 }
 
 static void XScreenUnmap(Display *display,XWindows *windows,XEvent *event)
