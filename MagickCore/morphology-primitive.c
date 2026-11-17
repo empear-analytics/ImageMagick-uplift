@@ -1666,7 +1666,8 @@ typedef struct _MorphologyDirectPixel
     i;
 } MorphologyDirectPixel;
 
-static double MinimizeLeadingRowDistance(const MorphologyDirectPixel *row,
+static magick_attribute((__always_inline__)) inline double
+  MinimizeLeadingRowDistance(const MorphologyDirectPixel *row,
   const OffsetInfo offset,double pixel)
 {
   Image
@@ -1706,7 +1707,8 @@ static double MinimizeLeadingRowDistance(const MorphologyDirectPixel *row,
   return(pixel);
 }
 
-static double MinimizeTrailingRowDistance(const MorphologyDirectPixel *row,
+static magick_attribute((__always_inline__)) inline double
+  MinimizeTrailingRowDistance(const MorphologyDirectPixel *row,
   const OffsetInfo offset,const MagickRealType *magick_restrict k,double pixel)
 {
   Image
@@ -1754,7 +1756,8 @@ typedef struct _MorphologyKernelRows
     i;
 } MorphologyKernelRows;
 
-static void MinimizeKernelRowDistance(const MorphologyKernelRows *rows,
+static magick_attribute((__always_inline__)) inline void
+  MinimizeKernelRowDistance(const MorphologyKernelRows *rows,
   double *pixel,const MagickRealType *magick_restrict *k,
   const Quantum *magick_restrict *pixels)
 {
@@ -1779,7 +1782,8 @@ static void MinimizeKernelRowDistance(const MorphologyKernelRows *rows,
   *pixels+=(image->columns-1)*GetPixelChannels(image);
 }
 
-static double MinimizeTrailingRowsDistance(const MorphologyKernelRows *rows,
+static magick_attribute((__always_inline__)) inline double
+  MinimizeTrailingRowsDistance(const MorphologyKernelRows *rows,
   const OffsetInfo offset,const Quantum *magick_restrict pixels,double pixel)
 {
   Image

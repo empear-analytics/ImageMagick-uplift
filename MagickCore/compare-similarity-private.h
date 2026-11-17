@@ -2201,7 +2201,8 @@ typedef struct _SSIMChannelInputs
     c2;
 } SSIMChannelInputs;
 
-static inline void AccumulateSSIMChannels(const SSIMChannelInputs *inputs,
+static magick_attribute((__always_inline__)) inline void
+  AccumulateSSIMChannels(const SSIMChannelInputs *inputs,
   double *channel_similarity)
 {
   const Image
