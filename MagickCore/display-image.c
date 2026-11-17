@@ -26307,6 +26307,22 @@ static void XConfirmDisplayExit(const DisplayExitInputs *inputs,
       }
 }
 
+static void XWithdrawBackdropWindow(XResourceInfo *resource_info,
+  XWindows *windows,Display *display)
+{
+  if ((resource_info->backdrop == MagickFalse) && (windows->backdrop.mapped))
+    {
+      (void) XWithdrawWindow(display,windows->backdrop.id,
+        windows->backdrop.screen);
+      (void) XDestroyWindow(display,windows->backdrop.id);
+      windows->backdrop.id=(Window) NULL;
+      (void) XWithdrawWindow(display,windows->image.id,
+        windows->image.screen);
+      (void) XDestroyWindow(display,windows->image.id);
+      windows->image.id=(Window) NULL;
+    }
+}
+
 static void XCloseDisplayWindows(const DisplayEventContext *context)
 {
   Display
@@ -26324,17 +26340,7 @@ static void XCloseDisplayWindows(const DisplayEventContext *context)
   XWithdrawDynamicWindows(display,windows);
   if (windows->pan.mapped != MagickFalse)
     (void) XWithdrawWindow(display,windows->pan.id,windows->pan.screen);
-  if ((resource_info->backdrop == MagickFalse) && (windows->backdrop.mapped))
-    {
-      (void) XWithdrawWindow(display,windows->backdrop.id,
-        windows->backdrop.screen);
-      (void) XDestroyWindow(display,windows->backdrop.id);
-      windows->backdrop.id=(Window) NULL;
-      (void) XWithdrawWindow(display,windows->image.id,
-        windows->image.screen);
-      (void) XDestroyWindow(display,windows->image.id);
-      windows->image.id=(Window) NULL;
-    }
+  XWithdrawBackdropWindow(resource_info,windows,display);
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
   if (((*state & FormerImageState) != 0) || ((*state & NextImageState) != 0))
