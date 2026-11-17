@@ -10068,18 +10068,21 @@ way clones the first.
    `status` is written `(*status)`, and the copy becomes `if (Name(...) ==
    MagickFalse) continue;` before the tail.
    Folding form (2026-11-17). Two copies that are each the whole body of a `static`
-   function, the two functions differing in the name of one local, one member
-   designator of one lvalue and one constant (`TracePathHorizontalLine` and
-   `TracePathVerticalLine`: `x`/`y`, `point.x`/`point.y`, `'H'`/`'V'`), may merge
-   when a differing pair is a whole expression statement assigning two different lvalues:
-   it is written `if (side == NameA) SA else SB`, each statement verbatim but for the
-   one local, which takes copy A's name throughout (Recipe TW step 1's renaming). When
-   each of the two functions is called only from the file and its every call is
-   `Name(args)`, step 5 instead replaces each call by `New(args,NameX)` with that copy's
-   constant, and both functions leave the file, so that the file holds one function
-   where it held two (a module at its function-count limit gains). Check by script that
-   the new body with each side's statement and local name substituted gives each
-   copy's token sequence (comments ignored).
+   function, differing in runs this step and step 1 admit, merge into one function
+   that both callers call directly. Besides those runs, a differing pair may be (a) a
+   whole expression statement assigning two different lvalues
+   (`TracePathHorizontalLine`/`TracePathVerticalLine`: `point.x=...`/`point.y=...`),
+   written `if (side == NameA) SA else SB`, each statement verbatim but for one local
+   whose name differs between the copies, which takes copy A's name throughout (Recipe
+   TW step 1's renaming); or (b) an `if (c) S` that stands in copy B only, `c` with no
+   side effect and `S` an expression statement, written `if ((side == NameB) && (c)) S`
+   (`TracePathQuadraticBezier`'s `if (*p == ',') p++;`), the operands in that order so
+   that `c` is evaluated only on copy B's side, as before. When each of the two
+   functions is called only from the file and its every call is `Name(args)`, step 5
+   replaces each call by `New(args,NameX)` with that copy's constant, and both
+   functions leave the file: the file holds one function where it held two (a module
+   at its function-count limit gains). Check by script that the new body with each
+   side's runs substituted gives each copy's token sequence (comments ignored).
 5. Replace each copy by a call that passes its own enumeration constant (directly, or in
    the initialiser of the `const` struct declared at the top of the block that holds the
    call), never a variable or a computed value, and each variable in the position of its
@@ -10283,7 +10286,11 @@ Folding form (2026-11-17, campaign B, M138): `draw.c`'s `TracePathHorizontalLine
 `TracePathVerticalLine`, *Complex Method* twins (cc 10 each) called once each from
 `TracePath`'s `switch`; merged as `TracePathAxisLine` (cc 12), the file holds one
 function and one finding fewer and 66 lines less. Added by Claude Code (Claude Opus 5.5)
-under the mandate of 2026-10-24.
+under the mandate of 2026-10-24. Form (b) the same day: `TracePathQuadraticBezier` and
+`TracePathCubicBezier` (cc 16 and 15, both *Large Method*), merged as
+`TracePathBezierCurve` (cc 22, *Large Method*); written as a nested `if` the one-copy
+statement made the new function *Deep, Nested Complexity* and *Bumpy Road Ahead*
+(probe 3.12), as the combined test it does not (3.27).
 
 ---
 
@@ -23475,3 +23482,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-17 | NEW | SO | Extract Sibling Blocks Differing in One Value, Returning One Written Variable and Writing One Through a Pointer: copies of one small block in one or several functions of a file, differing in one constant and writing two caller locals (one assigned whole first, one advanced), become one `static` function returning the first and taking the second by pointer | `draw.c`'s MVG push handlers (`ParseMVGPushClass`, `-ClipPath`, `-Gradient`, `-Pattern`): `ParseMVGPushClipPath` leaves *Complex Method*, `-Gradient` cc 22 to 16, `-Pattern` 19 to 13 and leaves *Bumpy Road Ahead* in a probe; campaign B, M137 | mandate (2026-10-24) |
 | 2026-11-17 | AMEND | MA | Step 2: the address form, a role (c) lvalue whose address the block passes to one call that writes through it, the role (b) operand the same member of another object; the new function passes `&(*value)` | `draw.c`'s `CloneDrawInfo` (eleven guarded `CloneString` copies; cc 22 to 11 in a probe); campaign B, M138 | mandate (2026-10-24) |
 | 2026-11-17 | AMEND | MT | Step 4: the folding form, whole-body twins differing in one local's name, one assigned member and one constant; the differing assignment pair as `if (side == A) SA else SB`, each call replaced by the new function with its constant and both functions removed | `draw.c`'s `TracePathHorizontalLine` and `TracePathVerticalLine` (cc 10 each to one function of cc 12, one function fewer); campaign B, M138 | mandate (2026-10-24) |
+| 2026-11-17 | AMEND | MT | Step 4's folding form widened: any runs of steps 1 and 4, plus (b) an `if (c) S` in copy B only, written `if ((side == NameB) && (c)) S` | `draw.c`'s `TracePathQuadraticBezier` and `TracePathCubicBezier` (four findings to two, one function fewer); campaign B, M138 | mandate (2026-10-24) |
