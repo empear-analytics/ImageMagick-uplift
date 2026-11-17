@@ -5,7 +5,7 @@ PR goes to `main`. Scores come from cs-mcp 1.5.16 through `tools/ch.py`.
 
 Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 50 flagged functions, 222 -> 227
 functions (three merges, eleven shared helpers), 11,636 -> 11,418 lines. Function findings
-fell from 160 to about 120 over the branch.
+(one per function and category) 123 -> 98.
 
 ## The function-count lesson
 
