@@ -399,11 +399,11 @@ static inline MagickBooleanType AcquireCorrelationStatistics(const Image *image,
   return(MagickTrue);
 }
 
+#define SimilarityImageTag  "Similarity/Image"
+
 static inline MagickBooleanType GetDPCSimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
-#define SimilarityImageTag  "Similarity/Image"
-
   CacheView
     *image_view,
     *reconstruct_view;
