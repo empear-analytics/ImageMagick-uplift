@@ -4474,6 +4474,14 @@ the block's depth.
    uses it. Copies of the block in other functions of the file, the same text but for
    that written variable (checked by script), call the same function (Recipe Y step 7),
    one commit per caller, the first adding the function.
+   Converted-read form (2026-11-17). A copy whose written variable is assigned a conversion
+   of the read value, `t=C(GetDrawValue(token,&next_token)R);` (`CastDoubleToSsizeT(ceil(`
+   ... `-0.5))`), may call the same function with the address of a `double` temporary
+   `value` declared in the caller's block, and assign `t=C(value)R;` directly after the
+   call, the conversion's text unchanged, when `t` is a local of the block that the exit
+   statement leaves and nothing reads `t` on the exit path (the `region` of a `do { }
+   while (0)` the macro's `break;` ends). The value is computed once from the same token
+   in both forms and converted the same way; only an assignment no path reads goes away.
 8. A block that writes two to four variables of the caller that the caller reads after
    it (step 2's `v`, more than one) passes their addresses in one `const` struct,
    Recipe I's form (steps 3, 5 and 6): a `typedef struct` directly above the new
@@ -4636,7 +4644,8 @@ skip, `GetDrawValue`, the empty-value test) each leave through
 `ThrowPointExpectedException`; one `GetPathValue` serves six functions, taking their cc
 down by two per copy (`TracePathArc` 30 to 20) and `TracePathBezierCurve` out of
 *Large Method* in a probe, draw.c holding at 3.27. Added by Claude Code (Claude Opus 5.5)
-under the mandate of 2026-10-24.
+under the mandate of 2026-10-24. Converted-read form the same day: `ParseMVGPushPattern`'s three `region` reads,
+which took it out of *Complex Method* (cc 13) and *Large Method* (81 lines).
 
 ---
 
@@ -23794,3 +23803,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-17 | AMEND | MT | Step 4's folding form widened: any runs of steps 1 and 4, plus (b) an `if (c) S` in copy B only, written `if ((side == NameB) && (c)) S` | `draw.c`'s `TracePathQuadraticBezier` and `TracePathCubicBezier` (four findings to two, one function fewer); campaign B, M138 | mandate (2026-10-24) |
 | 2026-11-17 | AMEND | MT | Folding form (b): the one-copy `if (c) S` may stand in either copy and `S` may be a `break;` of a loop enclosing it in both | `draw.c`'s `TracePathSmoothCubicBezier` and `TracePathSmoothQuadraticBezier` (four findings to two, one function fewer); campaign B, M138 | mandate (2026-10-24) |
 | 2026-11-17 | AMEND | LB | Step 7, exit-statement form: every exit one statement `X` left in the caller (a throwing macro ending in `break;`), `if (Helper(...) == MagickFalse) X`; a written variable through a pointer; copies in other functions call the same function, one commit per caller | `draw.c`'s fourteen path-value reads in six tracers, one `GetPathValue`; campaign B, M138 | mandate (2026-10-24) |
+| 2026-11-17 | AMEND | LB | Step 7, converted-read form: a copy assigning a conversion of the read value reads into a `double` temporary through the helper and assigns the same conversion of it after the call, when the target is a local the exit leaves unread | `draw.c`'s `ParseMVGPushPattern` (three `region` reads; leaves Complex Method and Large Method); campaign B, M138 | mandate (2026-10-24) |
