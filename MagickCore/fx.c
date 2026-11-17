@@ -859,7 +859,7 @@ static inline MagickBooleanType PeekStr (FxInfo * pfx, const char * str)
 {
   SkipSpaces (pfx);
 
-  return (LocaleNCompare (pfx->pex, str, strlen(str))==0 ? MagickTrue : MagickFalse);
+  return ((MagickBooleanType) (LocaleNCompare (pfx->pex, str, strlen(str))==0));
 }
 
 static MagickBooleanType ExpectChar (FxInfo * pfx, char c)
