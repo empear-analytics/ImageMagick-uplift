@@ -5414,6 +5414,16 @@ static MagickBooleanType XColorEditUpdate(const ColorEditContext *context,
   return(MagickTrue);
 }
 
+static void XColorEditMagnifyOffset(XEvent *event,
+  const ColorEditContext *context,int *x,int *y)
+{
+  if ((*event).xany.window == context->windows->magnify.id)
+    {
+      (*x)=context->windows->magnify.x-context->windows->image.x;
+      (*y)=context->windows->magnify.y-context->windows->image.y;
+    }
+}
+
 static MagickBooleanType XColorEditStep(const ColorEditContext *context,
   const ColorEditTargets *targets)
 {
@@ -5447,11 +5457,7 @@ static MagickBooleanType XColorEditStep(const ColorEditContext *context,
       return(MagickTrue);
     }
   XColorEditEvent(context,targets);
-  if ((*event).xany.window == context->windows->magnify.id)
-    {
-      (*x)=context->windows->magnify.x-context->windows->image.x;
-      (*y)=context->windows->magnify.y-context->windows->image.y;
-    }
+  XColorEditMagnifyOffset(event,context,x,y);
   x_offset=(*x);
   y_offset=(*y);
   if (XColorEditUpdate(context,targets,x_offset,y_offset) == MagickFalse)
