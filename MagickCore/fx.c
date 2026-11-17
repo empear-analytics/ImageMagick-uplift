@@ -1536,7 +1536,7 @@ static inline ssize_t GetHexColour (FxInfo * pfx, fxFltType *v0, fxFltType *v1, 
 
 static inline MagickBooleanType IsPadFunction(const FunctionE fe)
 {
-  return((fe == fP || fe == fS|| fe == fIf) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (fe == fP || fe == fS|| fe == fIf));
 }
 
 static inline MagickBooleanType IsUnexpectedLimit(const char chLimit,
