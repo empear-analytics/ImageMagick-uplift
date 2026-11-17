@@ -7673,15 +7673,9 @@ static void XCropWaitEvent(const CropContext *context,
   }
 }
 
-static MagickBooleanType XCropWaitHead(const CropContext *context,
-  const CropTargets *targets,RectangleInfo *highlight_info)
+static void XShowCropGeometryInfo(const CropContext *context,
+  RectangleInfo *crop_info)
 {
-  size_t
-    *const state = targets->state;
-
-  RectangleInfo
-    *const crop_info = targets->crop_info;
-
   if (context->windows->info.mapped != MagickFalse)
     {
       /*
@@ -7692,6 +7686,18 @@ static MagickBooleanType XCropWaitHead(const CropContext *context,
         (*crop_info).height,(double) (*crop_info).x,(double) (*crop_info).y);
       XInfoWidget(context->display,context->windows,context->text);
     }
+}
+
+static MagickBooleanType XCropWaitHead(const CropContext *context,
+  const CropTargets *targets,RectangleInfo *highlight_info)
+{
+  size_t
+    *const state = targets->state;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  XShowCropGeometryInfo(context,crop_info);
   (*highlight_info)=(*crop_info);
   (*highlight_info).x=(*crop_info).x-context->windows->image.x;
   (*highlight_info).y=(*crop_info).y-context->windows->image.y;
