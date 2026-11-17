@@ -773,6 +773,15 @@ static MagickBooleanType TokenMaybeUserSymbol (FxInfo * pfx)
   return MagickTrue;
 }
 
+static void SetElementNumberArgs (ElementT * pel, int oprNum)
+{
+  if (oprNum <= oNull) pel->number_args = Operators[oprNum].number_args;
+  else if (oprNum <= fNull) pel->number_args = Functions[oprNum-(int) FirstFunc].number_args;
+  else if (oprNum <= aNull) pel->number_args = 0;
+  else if (oprNum <= sNull) pel->number_args = 0;
+  else                      pel->number_args = Controls[oprNum-(int) FirstCont].number_args;
+}
+
 static MagickBooleanType AddElement(FxInfo * pfx,fxFltType val,int oprNum)
 {
   ElementT * pel;
@@ -806,11 +815,7 @@ static MagickBooleanType AddElement(FxInfo * pfx,fxFltType val,int oprNum)
   pel->exp_start = NULL;
   pel->exp_len = 0;
 
-  if (oprNum <= oNull) pel->number_args = Operators[oprNum].number_args;
-  else if (oprNum <= fNull) pel->number_args = Functions[oprNum-(int) FirstFunc].number_args;
-  else if (oprNum <= aNull) pel->number_args = 0;
-  else if (oprNum <= sNull) pel->number_args = 0;
-  else                      pel->number_args = Controls[oprNum-(int) FirstCont].number_args;
+  SetElementNumberArgs (pel, oprNum);
 
   return MagickTrue;
 }
