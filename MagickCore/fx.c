@@ -1110,6 +1110,11 @@ static inline MagickBooleanType IsQualifierRequiredAttr(const ImgAttrE ia)
   return((MagickBooleanType) (ia == aPage || ia == aPrintsize || ia == aRes));
 }
 
+static void NoteAttrNeedsStats (FxInfo * pfx, ImgAttrE ia)
+{
+      if (ImgAttrs[ia-(int) FirstImgAttr].need_stats != MagickFalse) pfx->NeedStats = MagickTrue;
+}
+
 static ImgAttrE GetImgAttrToken (FxInfo * pfx)
 {
   ImgAttrE ia = aNull;
@@ -1118,7 +1123,7 @@ static ImgAttrE GetImgAttrToken (FxInfo * pfx)
     iaStr = ImgAttrs[ia-(int) FirstImgAttr].str;
     if (LocaleCompare (iaStr, pfx->token)==0) {
       pfx->pex += strlen(pfx->token);
-      if (ImgAttrs[ia-(int) FirstImgAttr].need_stats != MagickFalse) pfx->NeedStats = MagickTrue;
+      NoteAttrNeedsStats (pfx, ia);
       MaybeXYWH (pfx, &ia);
       break;
     }
