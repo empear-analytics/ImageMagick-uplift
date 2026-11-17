@@ -10072,6 +10072,22 @@ typedef enum
   QuadraticPathBezier
 } PathBezierSide;
 
+static MagickBooleanType TraceBezierPoints(MVGInfo *mvg_info,
+  const PointInfo *points,const PathBezierSide side,PrimitiveInfo **q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < ((side == CubicPathBezier) ? 4 : 3); i++)
+    ((*q)+i)->point=points[i];
+  if (TraceBezier(mvg_info,((side == CubicPathBezier) ? 4 : 3)) == MagickFalse)
+    return(MagickFalse);
+  (*q)=(*mvg_info->primitive_info)+mvg_info->offset;
+  mvg_info->offset+=(ssize_t) (*q)->coordinates;
+  (*q)+=(ptrdiff_t) (*q)->coordinates;
+  return(MagickTrue);
+}
+
 static ssize_t TracePathBezierCurve(const PathTrace *trace,
   const PathBezierSide side)
 {
@@ -10126,13 +10142,8 @@ static ssize_t TracePathBezierCurve(const PathTrace *trace,
       end.y=(double) (attribute == (int) ((side == CubicPathBezier) ? 'C' : 'Q') ? y : point.y+y);
       points[i]=end;
     }
-    for (i=0; i < ((side == CubicPathBezier) ? 4 : 3); i++)
-      (q+i)->point=points[i];
-    if (TraceBezier(mvg_info,((side == CubicPathBezier) ? 4 : 3)) == MagickFalse)
+    if (TraceBezierPoints(mvg_info,points,side,&q) == MagickFalse)
       return(-1);
-    q=(*mvg_info->primitive_info)+mvg_info->offset;
-    mvg_info->offset+=(ssize_t) q->coordinates;
-    q+=(ptrdiff_t) q->coordinates;
     point=end;
     SkipPathSeparators(&p);
   } while (IsValidPoint(p) != MagickFalse);
