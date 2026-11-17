@@ -1510,6 +1510,14 @@ static char *SkipHexDigits (char * p)
   return(p);
 }
 
+static void SetColourValues (const PixelInfo * colour, fxFltType *v0,
+  fxFltType *v1, fxFltType *v2)
+{
+  *v0 = QuantumScale*colour->red;
+  *v1 = QuantumScale*colour->green;
+  *v2 = QuantumScale*colour->blue;
+}
+
 static inline ssize_t GetHexColour (FxInfo * pfx, fxFltType *v0, fxFltType *v1, fxFltType *v2)
 /* Returns number of characters to swallow.
    Negative return means it starts with '#', but invalid hex number.
@@ -1553,9 +1561,7 @@ static inline ssize_t GetHexColour (FxInfo * pfx, fxFltType *v0, fxFltType *v1, 
     return -1;
   }
 
-  *v0 = QuantumScale*colour.red;
-  *v1 = QuantumScale*colour.green;
-  *v2 = QuantumScale*colour.blue;
+  SetColourValues (&colour, v0, v1, v2);
 
   return (ssize_t) len;
 }
