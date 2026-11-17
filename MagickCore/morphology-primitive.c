@@ -228,7 +228,8 @@ typedef struct _MorphologyIntensityTap
     i;
 } MorphologyIntensityTap;
 
-static void SelectMinimumIntensityPixel(const MorphologyIntensityTap *tap,
+static magick_attribute((__always_inline__)) inline void
+  SelectMinimumIntensityPixel(const MorphologyIntensityTap *tap,
   const Quantum *magick_restrict *quantum_pixels,double *pixel,double *minimum)
 {
   if (tap->intensity < (*minimum))
@@ -239,7 +240,8 @@ static void SelectMinimumIntensityPixel(const MorphologyIntensityTap *tap,
     }
 }
 
-static void SelectMaximumIntensityPixel(const MorphologyIntensityTap *tap,
+static magick_attribute((__always_inline__)) inline void
+  SelectMaximumIntensityPixel(const MorphologyIntensityTap *tap,
   double *pixel,const Quantum *magick_restrict *quantum_pixels,double *maximum)
 {
   if (tap->intensity > (*maximum))
@@ -347,7 +349,8 @@ typedef struct _MorphologyIntensityWalk
     *extremum;
 } MorphologyIntensityWalk;
 
-static inline void WalkIntensityKernel(const MorphologyKernelWalk *walk,
+static magick_attribute((__always_inline__)) inline void
+  WalkIntensityKernel(const MorphologyKernelWalk *walk,
   const MorphologyIntensityWalk *select,
   const Quantum *magick_restrict *quantum_pixels,double *pixel)
 {
@@ -355,7 +358,9 @@ static inline void WalkIntensityKernel(const MorphologyKernelWalk *walk,
     side = select->side;
 
   double
-    *const extremum = select->extremum;
+    *const extremum = select->extremum,
+    extremum_value = *select->extremum,
+    pixel_value = *pixel;
 
   const Image
     *image = walk->image;
@@ -378,6 +383,9 @@ static inline void WalkIntensityKernel(const MorphologyKernelWalk *walk,
   MorphologyIntensityTap
     intensity_tap;
 
+  const Quantum
+    *magick_restrict selected_pixels = *quantum_pixels;
+
   ssize_t
     u,
     v;
@@ -395,16 +403,19 @@ static inline void WalkIntensityKernel(const MorphologyKernelWalk *walk,
           intensity_tap.intensity=intensity;
           intensity_tap.i=i;
           ((side == ForwardKernelWalk) ?
-            SelectMinimumIntensityPixel(&intensity_tap,quantum_pixels,
-              pixel,extremum) :
-            SelectMaximumIntensityPixel(&intensity_tap,pixel,
-              quantum_pixels,extremum));
+            SelectMinimumIntensityPixel(&intensity_tap,&selected_pixels,
+              &pixel_value,&extremum_value) :
+            SelectMaximumIntensityPixel(&intensity_tap,&pixel_value,
+              &selected_pixels,&extremum_value));
         }
       ((side == ForwardKernelWalk) ? k++ : k--);
       pixels+=(ptrdiff_t) GetPixelChannels(image);
     }
     pixels+=(image->columns-1)*GetPixelChannels(image);
   }
+  (*quantum_pixels)=selected_pixels;
+  (*pixel)=pixel_value;
+  (*extremum)=extremum_value;
 }
 
 static void WalkHitAndMissKernel(const MorphologyKernelWalk *walk,
