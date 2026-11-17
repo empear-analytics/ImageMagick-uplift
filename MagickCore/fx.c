@@ -1457,9 +1457,9 @@ static inline ssize_t GetConstantColour (FxInfo * pfx, fxFltType *v0, fxFltType 
 
   /* "gray" is both a colorspace and a named colour. */
 
-  IsGray = (LocaleCompare (ColSp, "gray") == 0) ? MagickTrue : MagickFalse;
-  IsIcc = (LocaleCompare (ColSp, "icc-color") == 0) ? MagickTrue : MagickFalse;
-  IsDev = (LocaleNCompare (ColSp, "device-", 7) == 0) ? MagickTrue : MagickFalse;
+  IsGray = (MagickBooleanType) (LocaleCompare (ColSp, "gray") == 0);
+  IsIcc = (MagickBooleanType) (LocaleCompare (ColSp, "icc-color") == 0);
+  IsDev = (MagickBooleanType) (LocaleNCompare (ColSp, "device-", 7) == 0);
 
   /* QueryColorCompliance will raise a warning if it isn't a colour, so we discard any exceptions.
   */
