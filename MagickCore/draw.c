@@ -159,6 +159,13 @@ typedef struct _MVGInfo
     *exception;
 } MVGInfo;
 
+typedef struct _CompositeMaskPath
+{
+  const char
+    *id,
+    *mask_path;
+} CompositeMaskPath;
+
 typedef struct _ClippingMaskPath
 {
   const char
@@ -1842,8 +1849,12 @@ static Image *DrawClippingMask(Image *image,const DrawInfo *draw_info,
 %
 */
 static Image *DrawCompositeMask(Image *image,const DrawInfo *draw_info,
-  const char *id,const char *mask_path,ExceptionInfo *exception)
+  const CompositeMaskPath *path,ExceptionInfo *exception)
 {
+  const char
+    *const id = path->id,
+    *const mask_path = path->mask_path;
+
   Image
     *composite_mask,
     *separate_mask;
@@ -5772,11 +5783,16 @@ static MagickBooleanType ParseMVGMask(const MVGRenderState *state)
   mask_path=(const char *) GetValueFromSplayTree(macros,token);
   if (mask_path != (const char *) NULL)
     {
+      CompositeMaskPath
+        mask_input;
+
       if (graphic_context[n]->composite_mask != (Image *) NULL)
         graphic_context[n]->composite_mask=
           DestroyImage(graphic_context[n]->composite_mask);
+      mask_input.id=token;
+      mask_input.mask_path=mask_path;
       graphic_context[n]->composite_mask=DrawCompositeMask(image,
-        graphic_context[n],token,mask_path,exception);
+        graphic_context[n],&mask_input,exception);
       if (graphic_context[n]->compliance != SVGCompliance)
         status=SetImageMask(image,CompositePixelMask,
           graphic_context[n]->composite_mask,exception);
