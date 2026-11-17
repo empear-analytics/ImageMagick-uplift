@@ -331,11 +331,13 @@ static Image *SIMDivideByMagnitude(Image *image,Image *magnitude_image,
   return(result_image);
 }
 
-static void ClearRowNaNs(const Image *image,Quantum *magick_restrict q)
+static void ClearRowNaNs(const Image *image,const void *arguments,
+  Quantum *magick_restrict q)
 {
   ssize_t
     x;
 
+  magick_unreferenced(arguments);
   for (x=0; x < (ssize_t) image->columns; x++)
   {
     ssize_t
@@ -351,77 +353,6 @@ static void ClearRowNaNs(const Image *image,Quantum *magick_restrict q)
         q[i]=(Quantum) 0;
     }
     q+=(ptrdiff_t) GetPixelChannels(image);
-  }
-}
-
-static MagickBooleanType SIMFilterImageNaNs(Image *image,
-  ExceptionInfo *exception)
-{
-  CacheView
-    *image_view;
-
-  MagickBooleanType
-    status = MagickTrue;
-
-  ssize_t
-    y;
-
-  /*
-    Square each pixel in the image.
-  */
-  image_view=AcquireAuthenticCacheView(image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(image,image,image->rows,1)
-#endif
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    ClearRowNaNs(image,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
-  }
-  image_view=DestroyCacheView(image_view);
-  return(status);
-}
-
-static void SquarePixelChannels(const Image *square_image,
-  Quantum *magick_restrict q)
-{
-  ssize_t
-    i;
-
-  for (i=0; i < (ssize_t) GetPixelChannels(square_image); i++)
-  {
-    PixelChannel channel = GetPixelChannelChannel(square_image,i);
-    PixelTrait traits = GetPixelChannelTraits(square_image,channel);
-    if ((traits & UpdatePixelTrait) == 0)
-      continue;
-    q[i]=(Quantum) (QuantumScale*(double) q[i]*(double) q[i]);
-  }
-}
-
-static void SquareRow(const Image *square_image,const void *arguments,
-  Quantum *magick_restrict q)
-{
-  ssize_t
-    x;
-
-  magick_unreferenced(arguments);
-  for (x=0; x < (ssize_t) square_image->columns; x++)
-  {
-    SquarePixelChannels(square_image,q);
-    q+=(ptrdiff_t) GetPixelChannels(square_image);
   }
 }
 
@@ -473,6 +404,48 @@ static MagickBooleanType SIMImageRows(Image *image,const SIMRows *rows,
   }
   image_view=DestroyCacheView(image_view);
   return(status);
+}
+
+static MagickBooleanType SIMFilterImageNaNs(Image *image,
+  ExceptionInfo *exception)
+{
+  const SIMRows
+    rows = { ClearRowNaNs,(const void *) NULL };
+
+  /*
+    Square each pixel in the image.
+  */
+  return(SIMImageRows(image,&rows,exception));
+}
+
+static void SquarePixelChannels(const Image *square_image,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(square_image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(square_image,i);
+    PixelTrait traits = GetPixelChannelTraits(square_image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    q[i]=(Quantum) (QuantumScale*(double) q[i]*(double) q[i]);
+  }
+}
+
+static void SquareRow(const Image *square_image,const void *arguments,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  magick_unreferenced(arguments);
+  for (x=0; x < (ssize_t) square_image->columns; x++)
+  {
+    SquarePixelChannels(square_image,q);
+    q+=(ptrdiff_t) GetPixelChannels(square_image);
+  }
 }
 
 static Image *SIMSquareImage(const Image *image,ExceptionInfo *exception)
