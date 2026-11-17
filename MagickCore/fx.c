@@ -889,6 +889,21 @@ static int MatchXYWHToken (FxInfo * pfx, int ret)
   return ret;
 }
 
+static void ApplyXYWHToken (FxInfo * pfx, ImgAttrE * pop, int ret)
+{
+  if (*pop == aPage) (*pop) = (ImgAttrE) ((int) *pop + ret);
+  else {
+    if (ret > 2) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Invalid 'width' or 'height' token=", "'%s' at '%s'",
+        pfx->token, SetShortExp(pfx));
+    } else {
+      (*pop) = (ImgAttrE) ((int) *pop + ret);
+    }
+  }
+}
+
 static int MaybeXYWH (FxInfo * pfx, ImgAttrE * pop)
 /* If ".x" or ".y" or ".width" or ".height" increments *pop and returns 1 to 4 .
    Otherwise returns 0.
@@ -911,17 +926,7 @@ static int MaybeXYWH (FxInfo * pfx, ImgAttrE * pop)
       "Invalid 'x' or 'y' or 'width' or 'height' token=", "'%s' at '%s'",
       pfx->token, SetShortExp(pfx));
 
-  if (*pop == aPage) (*pop) = (ImgAttrE) ((int) *pop + ret);
-  else {
-    if (ret > 2) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Invalid 'width' or 'height' token=", "'%s' at '%s'",
-        pfx->token, SetShortExp(pfx));
-    } else {
-      (*pop) = (ImgAttrE) ((int) *pop + ret);
-    }
-  }
+  ApplyXYWHToken (pfx, pop, ret);
   pfx->pex+=pfx->lenToken;
 
   return ret;
