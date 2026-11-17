@@ -3447,8 +3447,8 @@ static inline MagickBooleanType IsOpenGroupOperator(const OperatorE op)
 static inline MagickBooleanType IsMisplacedAssignment(const OperatorE op,
   const MagickBooleanType Assign,const MagickBooleanType Update)
 {
-  return(( (op==oAssign && !Assign) || (OprInPlace((int) op) &&
-    !Update) ) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ( (op==oAssign && !Assign) ||
+    (OprInPlace((int) op) && !Update) ));
 }
 
 static inline MagickBooleanType IsUnassignedUserSymbolRead(
