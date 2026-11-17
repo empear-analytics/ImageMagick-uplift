@@ -22893,6 +22893,16 @@ static void XAdjustBackgroundSize(const BackgroundInput *input,
     }
 }
 
+static void XCreateBackgroundPixmap(XWindowInfo *window_info,Display *display,
+  const int width,const int height,Image *image)
+{
+  (*window_info).pixmap=XCreatePixmap(display,(*window_info).id,
+    (unsigned int) width,(unsigned int) height,(*window_info).depth);
+  if ((*window_info).pixmap == (Pixmap) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXPixmap",
+      image->filename);
+}
+
 static void XDisplayBackgroundPixmap(const BackgroundInput *input,
   const BackgroundTargets *targets,const int width,const int height)
 {
@@ -22911,11 +22921,7 @@ static void XDisplayBackgroundPixmap(const BackgroundInput *input,
   /*
     Create the X pixmap.
   */
-  (*window_info).pixmap=XCreatePixmap(display,(*window_info).id,
-    (unsigned int) width,(unsigned int) height,(*window_info).depth);
-  if ((*window_info).pixmap == (Pixmap) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXPixmap",
-      image->filename);
+  XCreateBackgroundPixmap(window_info,display,width,height,image);
   /*
     Display pixmap on the window.
   */
