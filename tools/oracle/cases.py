@@ -4869,6 +4869,12 @@ GAP_COMMANDS += [
     "compare -metric PHASE -subimage-search {C}/rose.miff ( {C}/rose.miff -crop 20x20+10+10 +repage )",
     "compare -metric PHASE -subimage-search {C}/rose.miff ( {C}/rose_blur.miff -crop 20x20+30+20 +repage )",
 ]
+# compare-similarity-private.h: SSIM and DSSIM with the compare:ssim-radius, -sigma, -k1 and
+# -k2 defines, which no other case sets (GetSSIMSimularity's parameter set-up)
+GAP_COMMANDS += [
+    "compare -metric SSIM -define compare:ssim-radius=3 -define compare:ssim-sigma=0.8 {C}/rose.miff {C}/rose_blur.miff",
+    "compare -metric DSSIM -define compare:ssim-k1=0.02 -define compare:ssim-k2=0.05 {C}/rose.miff {C}/rose_blur.miff",
+]
 # Commands whose output must not be converted to floating point: -stegano hides
 # the watermark in the low-order bits, which a float output does not keep.
 GAP_PLAIN_COMMANDS = [
