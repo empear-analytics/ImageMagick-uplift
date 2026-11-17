@@ -10688,6 +10688,17 @@ static DisplayCommand XImmutableWindowCommand(const KeySym key_symbol)
   return(NullCommand);
 }
 
+static void XTrimBottomEdge(const KeySym key_symbol,
+  XResourceInfo *resource_info,RectangleInfo *crop_info)
+{
+  if ((key_symbol == XK_Down) || (key_symbol == XK_KP_Down))
+    {
+      XClampTrimBottomQuantum(resource_info,(*crop_info));
+      (*crop_info).y+=resource_info->quantum;
+      (*crop_info).height-=(size_t) resource_info->quantum;
+    }
+}
+
 static void XTrimVerticalEdges(XResourceInfo *resource_info,
   const KeySym key_symbol,RectangleInfo *crop_info)
 {
@@ -10696,12 +10707,7 @@ static void XTrimVerticalEdges(XResourceInfo *resource_info,
       XClampTrimTopQuantum(resource_info,(*crop_info));
       (*crop_info).height-=(size_t) resource_info->quantum;
     }
-  if ((key_symbol == XK_Down) || (key_symbol == XK_KP_Down))
-    {
-      XClampTrimBottomQuantum(resource_info,(*crop_info));
-      (*crop_info).y+=resource_info->quantum;
-      (*crop_info).height-=(size_t) resource_info->quantum;
-    }
+  XTrimBottomEdge(key_symbol,resource_info,crop_info);
 }
 
 static DisplayCommand XTrimImageWindowEdge(const ImageWindowKeyInput *input,
