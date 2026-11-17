@@ -26745,7 +26745,7 @@ typedef struct _DisplayContextInput
     argc;
 } DisplayContextInput;
 
-static void XFillDisplayEventContext(const DisplayContextInput *input,
+static void XInitializeDisplayColormap(const DisplayContextInput *input,
   DisplayEventContext *event_context)
 {
   Window
@@ -26775,13 +26775,6 @@ static void XFillDisplayEventContext(const DisplayContextInput *input,
   XWMHints
     *manager_hints;
 
-  /*
-    Initialize font info.
-  */
-  XLoadDisplayFont(input->display,input->resource_info,input->windows);
-  /*
-    Initialize Standard Colormap.
-  */
   map_info=input->windows->map_info;
   icon_map=input->windows->icon_map;
   visual_info=input->windows->visual_info;
@@ -26822,6 +26815,19 @@ static void XFillDisplayEventContext(const DisplayContextInput *input,
   (*event_context).class_hints=class_hints;
   (*event_context).manager_hints=manager_hints;
   (*event_context).icon_resources=icon_resources;
+}
+
+static void XFillDisplayEventContext(const DisplayContextInput *input,
+  DisplayEventContext *event_context)
+{
+  /*
+    Initialize font info.
+  */
+  XLoadDisplayFont(input->display,input->resource_info,input->windows);
+  /*
+    Initialize Standard Colormap.
+  */
+  XInitializeDisplayColormap(input,event_context);
 }
 
 typedef struct _DisplayWindowsInput
