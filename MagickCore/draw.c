@@ -8552,6 +8552,17 @@ typedef struct _DrawPrimitiveContext
     *exception;
 } DrawPrimitiveContext;
 
+static void SetFillToBorderTarget(const PrimitiveInfo *primitive_info,
+  const DrawInfo *draw_info,PixelInfo *target)
+{
+  if (primitive_info->method == FillToBorderMethod)
+    {
+      (*target).red=(double) draw_info->border_color.red;
+      (*target).green=(double) draw_info->border_color.green;
+      (*target).blue=(double) draw_info->border_color.blue;
+    }
+}
+
 static MagickStatusType DrawAlphaPrimitive(const DrawPrimitiveContext *context,
   MagickStatusType status)
 {
@@ -8745,12 +8756,7 @@ static MagickStatusType DrawColorPrimitive(const DrawPrimitiveContext *context,
 
       status&=(MagickStatusType) GetOneVirtualPixelInfo(image,
         TileVirtualPixelMethod,x,y,&target,exception);
-      if (primitive_info->method == FillToBorderMethod)
-        {
-          target.red=(double) draw_info->border_color.red;
-          target.green=(double) draw_info->border_color.green;
-          target.blue=(double) draw_info->border_color.blue;
-        }
+      SetFillToBorderTarget(primitive_info,draw_info,&target);
       status&=(MagickStatusType) FloodfillPaintImage(image,draw_info,
         &target,x,y,primitive_info->method == FloodfillMethod ?
         MagickFalse : MagickTrue,exception);
