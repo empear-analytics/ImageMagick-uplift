@@ -552,7 +552,7 @@ static MagickBooleanType ExtendRPN(FxInfo * pfx)
 
 static inline MagickBooleanType OprInPlace(int op)
 {
-  return(op >= oAddEq && op <= oSubSub ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (op >= oAddEq && op <= oSubSub));
 }
 
 static inline MagickBooleanType IsJumpElement(const ElementT *pel)
