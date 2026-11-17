@@ -1784,9 +1784,6 @@ static Image *NCCSimilarityImage(const Image *image,const Image *reconstruct,
   return(ncc_image);
 }
 
-static Image *PhaseSimilarityImage(const Image *image,const Image *reconstruct,
-  RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
-{
 #define ThrowPhaseSimilarityException() \
 { \
   if (phase_image != (Image *) NULL) \
@@ -1810,6 +1807,9 @@ static Image *PhaseSimilarityImage(const Image *image,const Image *reconstruct,
   return((Image *) NULL); \
 }
 
+static Image *PhaseSimilarityImage(const Image *image,const Image *reconstruct,
+  RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
+{
   double
     maxima = 0.0;
 
