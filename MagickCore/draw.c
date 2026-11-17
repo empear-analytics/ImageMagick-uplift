@@ -3589,9 +3589,7 @@ static void TraceMVGPrimitive(const MVGRenderState *state)
       status&=(MagickStatusType) TraceLine(primitive_info+j,
         primitive_info[j].point,primitive_info[j+1].point);
       primitive_info=(*mvg_info.primitive_info);
-      if (status == MagickFalse)
-        break;
-      i=j+(ssize_t) primitive_info[j].coordinates;
+      i=GetTracedPrimitiveEnd(primitive_info,status,j,i);
       break;
     }
     case RectanglePrimitive:
@@ -3604,9 +3602,7 @@ static void TraceMVGPrimitive(const MVGRenderState *state)
       status&=(MagickStatusType) TraceRectangle(primitive_info+j,
         primitive_info[j].point,primitive_info[j+1].point);
       primitive_info=(*mvg_info.primitive_info);
-      if (status == MagickFalse)
-        break;
-      i=j+(ssize_t) primitive_info[j].coordinates;
+      i=GetTracedPrimitiveEnd(primitive_info,status,j,i);
       break;
     }
     case RoundRectanglePrimitive:
@@ -3636,9 +3632,7 @@ static void TraceMVGPrimitive(const MVGRenderState *state)
         primitive_info[j].point,primitive_info[j+1].point,
         primitive_info[j+2].point);
       primitive_info=(*mvg_info.primitive_info);
-      if (status == MagickFalse)
-        break;
-      i=j+(ssize_t) primitive_info[j].coordinates;
+      i=GetTracedPrimitiveEnd(primitive_info,status,j,i);
       break;
     }
     case ArcPrimitive:
@@ -3651,9 +3645,7 @@ static void TraceMVGPrimitive(const MVGRenderState *state)
       status&=(MagickStatusType) TraceArc(&mvg_info,primitive_info[j].point,
         primitive_info[j+1].point,primitive_info[j+2].point);
       primitive_info=(*mvg_info.primitive_info);
-      if (status == MagickFalse)
-        break;
-      i=j+(ssize_t) primitive_info[j].coordinates;
+      i=GetTracedPrimitiveEnd(primitive_info,status,j,i);
       break;
     }
     case EllipsePrimitive:
@@ -3673,9 +3665,7 @@ static void TraceMVGPrimitive(const MVGRenderState *state)
         primitive_info[j].point,primitive_info[j+1].point,
         primitive_info[j+2].point);
       primitive_info=(*mvg_info.primitive_info);
-      if (status == MagickFalse)
-        break;
-      i=j+(ssize_t) primitive_info[j].coordinates;
+      i=GetTracedPrimitiveEnd(primitive_info,status,j,i);
       break;
     }
     case CirclePrimitive:
@@ -3688,9 +3678,7 @@ static void TraceMVGPrimitive(const MVGRenderState *state)
       status&=(MagickStatusType) TraceCircle(&mvg_info,
         primitive_info[j].point,primitive_info[j+1].point);
       primitive_info=(*mvg_info.primitive_info);
-      if (status == MagickFalse)
-        break;
-      i=j+(ssize_t) primitive_info[j].coordinates;
+      i=GetTracedPrimitiveEnd(primitive_info,status,j,i);
       break;
     }
     case PolylinePrimitive:
@@ -3726,9 +3714,7 @@ static void TraceMVGPrimitive(const MVGRenderState *state)
       status&=(MagickStatusType) TraceBezier(&mvg_info,
         primitive_info[j].coordinates);
       primitive_info=(*mvg_info.primitive_info);
-      if (status == MagickFalse)
-        break;
-      i=j+(ssize_t) primitive_info[j].coordinates;
+      i=GetTracedPrimitiveEnd(primitive_info,status,j,i);
       break;
     }
     case PathPrimitive:
