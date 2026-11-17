@@ -24194,6 +24194,23 @@ static void XInitializeBackdropWindow(const DisplayEventContext *context)
     root_window,argv,argc,class_hints);
 }
 
+static void XFollowGroupLeader(XWindows *windows,XWMHints *manager_hints,
+  Display *display,XResourceInfo *resource_info)
+{
+  if (windows->group_leader.id != (Window) NULL)
+    {
+      /*
+        Follow the leader.
+      */
+      manager_hints->flags|=WindowGroupHint;
+      manager_hints->window_group=windows->group_leader.id;
+      (void) XSelectInput(display,windows->group_leader.id,StructureNotifyMask);
+      if (resource_info->debug != MagickFalse)
+        (void) LogMagickEvent(X11Event,GetMagickModule(),
+          "Window id: 0x%lx (group leader)",windows->group_leader.id);
+    }
+}
+
 static void XMakeImageWindow(const DisplayEventContext *context)
 {
   Display
@@ -24225,18 +24242,7 @@ static void XMakeImageWindow(const DisplayEventContext *context)
   manager_hints->input=MagickTrue;
   manager_hints->initial_state=resource_info->iconic ? IconicState :
     NormalState;
-  if (windows->group_leader.id != (Window) NULL)
-    {
-      /*
-        Follow the leader.
-      */
-      manager_hints->flags|=WindowGroupHint;
-      manager_hints->window_group=windows->group_leader.id;
-      (void) XSelectInput(display,windows->group_leader.id,StructureNotifyMask);
-      if (resource_info->debug != MagickFalse)
-        (void) LogMagickEvent(X11Event,GetMagickModule(),
-          "Window id: 0x%lx (group leader)",windows->group_leader.id);
-    }
+  XFollowGroupLeader(windows,manager_hints,display,resource_info);
   XMakeWindow(display,
     (Window) (resource_info->backdrop ? windows->backdrop.id : root_window),
     argv,argc,class_hints,manager_hints,&windows->image);
