@@ -4859,6 +4859,16 @@ GAP_COMMANDS += [
     "-size 3000x6 xc:white -fill black -draw \"point 2900,1\" -draw \"line 0,3 1900,3\" -draw \"point 5,5\" -write fax:t.fax +delete fax:t.fax",
     "-size 100x6 xc:white -fill black -draw \"line 0,1 99,1\" -draw \"line 50,3 99,3\" -draw \"point 99,5\" -write fax:t.fax +delete fax:t.fax",
 ]
+# compare-similarity-image.c: the frequency-domain DPC and PHASE subimage searches
+# (DPCSimilarityImage, PhaseSimilarityImage and the helpers only they call:
+# SIMDerivativeImage, SIMMagnitudeImage, SIMDivideByMagnitude, SIMFilterImageNaNs,
+# SIMPhaseCorrelationImage), against an exact patch and a blurred one
+GAP_COMMANDS += [
+    "compare -metric DPC -subimage-search {C}/rose.miff ( {C}/rose.miff -crop 20x20+10+10 +repage )",
+    "compare -metric DPC -subimage-search {C}/rose.miff ( {C}/rose_blur.miff -crop 20x20+30+20 +repage )",
+    "compare -metric PHASE -subimage-search {C}/rose.miff ( {C}/rose.miff -crop 20x20+10+10 +repage )",
+    "compare -metric PHASE -subimage-search {C}/rose.miff ( {C}/rose_blur.miff -crop 20x20+30+20 +repage )",
+]
 # Commands whose output must not be converted to floating point: -stegano hides
 # the watermark in the low-order bits, which a float output does not keep.
 GAP_PLAIN_COMMANDS = [
