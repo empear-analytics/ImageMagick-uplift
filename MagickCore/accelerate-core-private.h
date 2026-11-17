@@ -311,6 +311,43 @@ static inline void TraceAccelerateImage(const Image *image)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
 }
 
+typedef struct _AccelerateImageBufferTargets
+{
+  MagickCLDevice
+    *device;
+
+  cl_command_queue
+    *queue;
+
+  cl_mem
+    *imageBuffer;
+} AccelerateImageBufferTargets;
+
+static inline MagickBooleanType AcquireAccelerateImageBuffer(MagickCLEnv clEnv,
+  const Image *image,ExceptionInfo *exception,
+  const AccelerateImageBufferTargets *targets)
+{
+  MagickCLDevice
+    *const device = targets->device;
+
+  cl_command_queue
+    *const queue = targets->queue;
+
+  cl_mem
+    *const imageBuffer = targets->imageBuffer;
+
+  *device=RequestOpenCLDevice(clEnv);
+  if (*device == (MagickCLDevice) NULL)
+    return(MagickFalse);
+  *queue=AcquireOpenCLCommandQueue(*device);
+  if (*queue == (cl_command_queue) NULL)
+    return(MagickFalse);
+  *imageBuffer=GetAuthenticOpenCLBuffer(image,*device,exception);
+  if (*imageBuffer == (cl_mem) NULL)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 #endif /* MAGICKCORE_OPENCL_SUPPORT */
 
 #if defined(__cplusplus) || defined(c_plusplus)
