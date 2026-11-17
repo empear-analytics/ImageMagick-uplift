@@ -255,6 +255,12 @@ MagickExport DrawInfo *AcquireDrawInfo(void)
   return(draw_info);
 }
 
+static void CloneDrawInfoString(const char *source,char **value)
+{
+  if (source != (char *) NULL)
+    (void) CloneString(&(*value),source);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -296,12 +302,9 @@ MagickExport DrawInfo *CloneDrawInfo(const ImageInfo *image_info,
   if (draw_info == (DrawInfo *) NULL)
     return(clone_info);
   exception=AcquireExceptionInfo();
-  if (draw_info->id != (char *) NULL)
-    (void) CloneString(&clone_info->id,draw_info->id);
-  if (draw_info->primitive != (char *) NULL)
-    (void) CloneString(&clone_info->primitive,draw_info->primitive);
-  if (draw_info->geometry != (char *) NULL)
-    (void) CloneString(&clone_info->geometry,draw_info->geometry);
+  CloneDrawInfoString(draw_info->id,&clone_info->id);
+  CloneDrawInfoString(draw_info->primitive,&clone_info->primitive);
+  CloneDrawInfoString(draw_info->geometry,&clone_info->geometry);
   clone_info->compliance=draw_info->compliance;
   clone_info->viewbox=draw_info->viewbox;
   clone_info->affine=draw_info->affine;
@@ -324,32 +327,25 @@ MagickExport DrawInfo *CloneDrawInfo(const ImageInfo *image_info,
   clone_info->dash_offset=draw_info->dash_offset;
   clone_info->decorate=draw_info->decorate;
   clone_info->compose=draw_info->compose;
-  if (draw_info->text != (char *) NULL)
-    (void) CloneString(&clone_info->text,draw_info->text);
-  if (draw_info->font != (char *) NULL)
-    (void) CloneString(&clone_info->font,draw_info->font);
-  if (draw_info->metrics != (char *) NULL)
-    (void) CloneString(&clone_info->metrics,draw_info->metrics);
-  if (draw_info->family != (char *) NULL)
-    (void) CloneString(&clone_info->family,draw_info->family);
+  CloneDrawInfoString(draw_info->text,&clone_info->text);
+  CloneDrawInfoString(draw_info->font,&clone_info->font);
+  CloneDrawInfoString(draw_info->metrics,&clone_info->metrics);
+  CloneDrawInfoString(draw_info->family,&clone_info->family);
   clone_info->style=draw_info->style;
   clone_info->stretch=draw_info->stretch;
   clone_info->weight=draw_info->weight;
-  if (draw_info->encoding != (char *) NULL)
-    (void) CloneString(&clone_info->encoding,draw_info->encoding);
+  CloneDrawInfoString(draw_info->encoding,&clone_info->encoding);
   clone_info->pointsize=draw_info->pointsize;
   clone_info->kerning=draw_info->kerning;
   clone_info->interline_spacing=draw_info->interline_spacing;
   clone_info->interword_spacing=draw_info->interword_spacing;
   clone_info->direction=draw_info->direction;
   clone_info->word_break=draw_info->word_break;
-  if (draw_info->density != (char *) NULL)
-    (void) CloneString(&clone_info->density,draw_info->density);
+  CloneDrawInfoString(draw_info->density,&clone_info->density);
   clone_info->align=draw_info->align;
   clone_info->undercolor=draw_info->undercolor;
   clone_info->border_color=draw_info->border_color;
-  if (draw_info->server_name != (char *) NULL)
-    (void) CloneString(&clone_info->server_name,draw_info->server_name);
+  CloneDrawInfoString(draw_info->server_name,&clone_info->server_name);
   if (draw_info->dash_pattern != (double *) NULL)
     {
       ssize_t
@@ -387,8 +383,7 @@ MagickExport DrawInfo *CloneDrawInfo(const ImageInfo *image_info,
   clone_info->element_reference=draw_info->element_reference;
   clone_info->clip_path=draw_info->clip_path;
   clone_info->clip_units=draw_info->clip_units;
-  if (draw_info->clip_mask != (char *) NULL)
-    (void) CloneString(&clone_info->clip_mask,draw_info->clip_mask);
+  CloneDrawInfoString(draw_info->clip_mask,&clone_info->clip_mask);
   if (draw_info->clipping_mask != (Image *) NULL)
     clone_info->clipping_mask=CloneImage(draw_info->clipping_mask,0,0,
       MagickTrue,exception);
