@@ -10858,6 +10858,12 @@ static MagickBooleanType TraceRectangle(PrimitiveInfo *primitive_info,
   return(MagickTrue);
 }
 
+static void ClampRoundCornerArc(double *arc,const double segment)
+{
+  if ((*arc) > (0.5*segment))
+    (*arc)=0.5*segment;
+}
+
 static MagickBooleanType TraceRoundCorner(MVGInfo *mvg_info,
   const PointInfo point,const PointInfo arc,const PointInfo degrees)
 {
@@ -10897,10 +10903,8 @@ static MagickBooleanType TraceRoundRectangle(MVGInfo *mvg_info,
       (*mvg_info->primitive_info+mvg_info->offset)->coordinates=0;
       return(MagickTrue);
     }
-  if (arc.x > (0.5*segment.x))
-    arc.x=0.5*segment.x;
-  if (arc.y > (0.5*segment.y))
-    arc.y=0.5*segment.y;
+  ClampRoundCornerArc(&arc.x,segment.x);
+  ClampRoundCornerArc(&arc.y,segment.y);
   point.x=start.x+segment.x-arc.x;
   point.y=start.y+arc.y;
   degrees.x=270.0;
