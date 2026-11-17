@@ -3427,8 +3427,8 @@ static inline MagickBooleanType IsUserSymbolAssignment(
 static inline MagickBooleanType IsExpressionEnd(FxInfo *pfx,
   const char *strLimit)
 {
-  return(( (!*pfx->pex) || (*strLimit &&
-    (strchr(strLimit,*pfx->pex)!=NULL) ) ) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ( (!*pfx->pex) || (*strLimit &&
+    (strchr(strLimit,*pfx->pex)!=NULL) ) ));
 }
 
 static inline MagickBooleanType IsPendingLimitChar(FxInfo *pfx,
