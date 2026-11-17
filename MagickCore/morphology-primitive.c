@@ -3156,6 +3156,21 @@ static KernelInfo *NextReflectedKernel(KernelInfo *rflt_kernel)
   return(rflt_kernel);
 }
 
+static void CollectLoopKernelResult(const MorphologyMethodLoop *loop,
+  KernelInfo *this_kernel,Image **rslt_image,Image **curr_image)
+{
+  MorphologyKernelResult
+    kernel_result;
+
+  kernel_result.kernel=loop->kernel;
+  kernel_result.rslt_compose=loop->rslt_compose;
+  kernel_result.verbose=loop->verbose;
+  kernel_result.this_kernel=this_kernel;
+  kernel_result.image=loop->image;
+  kernel_result.exception=loop->exception;
+  CollectKernelResult(&kernel_result,rslt_image,curr_image);
+}
+
 static MagickBooleanType ApplyMorphologyMethodLoop(
   const MorphologyMethodLoop *loop,const MorphologyApplyTargets *targets)
 {
@@ -3202,9 +3217,6 @@ static MagickBooleanType ApplyMorphologyMethodLoop(
           loop->stage_limit, loop->kernel_limit, loop->v_info,
           loop->exception };
 
-      MorphologyKernelResult
-        kernel_result;
-
       /* Loop 3: Compound Morphology Staging - Select Primitive to apply */
       if (ApplyMorphologyStages(&stages,&stage_targets) == MagickFalse)
         return(MagickFalse);
@@ -3219,13 +3231,7 @@ static MagickBooleanType ApplyMorphologyMethodLoop(
       FinishCompoundStages(loop,curr_image,save_image);
 
       /* multi-kernel handling:  re-iterate, or compose results */
-      kernel_result.kernel=loop->kernel;
-      kernel_result.rslt_compose=loop->rslt_compose;
-      kernel_result.verbose=loop->verbose;
-      kernel_result.this_kernel=this_kernel;
-      kernel_result.image=loop->image;
-      kernel_result.exception=loop->exception;
-      CollectKernelResult(&kernel_result,rslt_image,curr_image);
+      CollectLoopKernelResult(loop,this_kernel,rslt_image,curr_image);
       EndKernelReportLine(loop);
 
       /* loop to the next kernel in a multi-kernel list */
