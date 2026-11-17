@@ -11744,6 +11744,14 @@ static void XApplyGammaCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplySpiffToImage(Display *display,XWindows *windows,Image **image,
+  ExceptionInfo *exception)
+{
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) ContrastImage(*image,MagickTrue,exception);
+}
+
 static void XApplySpiffCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11764,9 +11772,7 @@ static void XApplySpiffCommand(const XMagickCommandContext *context)
   /*
     Sharpen the image contrast.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) ContrastImage(*image,MagickTrue,exception);
+  XApplySpiffToImage(display,windows,image,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
