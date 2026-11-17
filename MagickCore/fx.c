@@ -564,9 +564,9 @@ static inline MagickBooleanType IsJumpElement(const ElementT *pel)
 
 static inline MagickBooleanType IsPixelReferenceElement(const ElementT *pel)
 {
-  return((pel->operator_index == fP || pel->operator_index == fUP ||
-    pel->operator_index == fVP || pel->operator_index == fSP) ? MagickTrue :
-    MagickFalse);
+  return((MagickBooleanType) (pel->operator_index == fP ||
+    pel->operator_index == fUP || pel->operator_index == fVP ||
+    pel->operator_index == fSP));
 }
 
 static void CountJumpDestination (FxInfo * pfx, int i)
