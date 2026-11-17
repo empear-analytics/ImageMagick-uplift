@@ -23323,6 +23323,23 @@ typedef struct _DisplayEventContext
     *icon_resources;
 } DisplayEventContext;
 
+static void XUpdateStaticImageWindow(XWindows *windows,const XEvent event,
+  Display *display,XResourceInfo *resource_info,Image *display_image,
+  ExceptionInfo *exception)
+{
+  if (windows->image.mapped != MagickFalse &&
+      windows->image.stasis != MagickFalse)
+    {
+      /*
+        Update image window configuration.
+      */
+      windows->image.window_changes.width=event.xconfigure.width;
+      windows->image.window_changes.height=event.xconfigure.height;
+      (void) XConfigureImage(display,resource_info,windows,
+        display_image,exception);
+    }
+}
+
 static void XConfigureImageWindow(const DisplayEventContext *context,
   const XEvent event,Image *display_image,const XPoint vid_info)
 {
@@ -23361,17 +23378,8 @@ static void XConfigureImageWindow(const DisplayEventContext *context,
       windows->image.x=vid_info.x;
       windows->image.y=vid_info.y;
     }
-  if (windows->image.mapped != MagickFalse &&
-      windows->image.stasis != MagickFalse)
-    {
-      /*
-        Update image window configuration.
-      */
-      windows->image.window_changes.width=event.xconfigure.width;
-      windows->image.window_changes.height=event.xconfigure.height;
-      (void) XConfigureImage(display,resource_info,windows,
-        display_image,exception);
-    }
+  XUpdateStaticImageWindow(windows,event,display,resource_info,display_image,
+    exception);
   /*
     Update pan window configuration.
   */
