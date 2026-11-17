@@ -87,6 +87,63 @@ Include declarations.
 #if defined(MAGICKCORE_OPENCL_SUPPORT)
 
 
+typedef struct _WaveletDenoiseTargets
+{
+  MagickCLDevice
+    *device;
+
+  cl_command_queue
+    *queue;
+
+  Image
+    **filteredImage;
+
+  cl_mem
+    *imageBuffer,
+    *filteredImageBuffer;
+} WaveletDenoiseTargets;
+
+static MagickBooleanType AcquireWaveletDenoiseBuffers(MagickCLEnv clEnv,
+  const Image *image,ExceptionInfo *exception,
+  const WaveletDenoiseTargets *targets)
+{
+  MagickCLDevice
+    *const device = targets->device;
+
+  cl_command_queue
+    *const queue = targets->queue;
+
+  Image
+    **const filteredImage = targets->filteredImage;
+
+  cl_mem
+    *const imageBuffer = targets->imageBuffer,
+    *const filteredImageBuffer = targets->filteredImageBuffer;
+
+  *device=RequestOpenCLDevice(clEnv);
+  if (*device == (MagickCLDevice) NULL)
+    return(MagickFalse);
+  /* Work around an issue on low end Intel devices */
+  if (strcmp("Intel(R) HD Graphics",(*device)->name) == 0)
+    return(MagickFalse);
+  *queue=AcquireOpenCLCommandQueue(*device);
+  if (*queue == (cl_command_queue) NULL)
+    return(MagickFalse);
+  *filteredImage=CloneImage(image,0,0,MagickTrue,
+    exception);
+  if (*filteredImage == (Image *) NULL)
+    return(MagickFalse);
+  if ((*filteredImage)->number_channels != image->number_channels)
+    return(MagickFalse);
+  *imageBuffer=GetAuthenticOpenCLBuffer(image,*device,exception);
+  if (*imageBuffer == (cl_mem) NULL)
+    return(MagickFalse);
+  *filteredImageBuffer=GetAuthenticOpenCLBuffer(*filteredImage,*device,exception);
+  if (*filteredImageBuffer == (cl_mem) NULL)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static Image *ComputeWaveletDenoiseImage(const Image *image,MagickCLEnv clEnv,
   const double threshold,ExceptionInfo *exception)
 {
@@ -144,27 +201,14 @@ static Image *ComputeWaveletDenoiseImage(const Image *image,MagickCLEnv clEnv,
   queue=NULL;
   outputReady=MagickFalse;
 
-  device=RequestOpenCLDevice(clEnv);
-  if (device == (MagickCLDevice) NULL)
-    goto cleanup;
-  /* Work around an issue on low end Intel devices */
-  if (strcmp("Intel(R) HD Graphics",device->name) == 0)
-    goto cleanup;
-  queue=AcquireOpenCLCommandQueue(device);
-  if (queue == (cl_command_queue) NULL)
-    goto cleanup;
-  filteredImage=CloneImage(image,0,0,MagickTrue,
-    exception);
-  if (filteredImage == (Image *) NULL)
-    goto cleanup;
-  if (filteredImage->number_channels != image->number_channels)
-    goto cleanup;
-  imageBuffer=GetAuthenticOpenCLBuffer(image,device,exception);
-  if (imageBuffer == (cl_mem) NULL)
-    goto cleanup;
-  filteredImageBuffer=GetAuthenticOpenCLBuffer(filteredImage,device,exception);
-  if (filteredImageBuffer == (cl_mem) NULL)
-    goto cleanup;
+  {
+    const WaveletDenoiseTargets targets = { &device, &queue, &filteredImage,
+      &imageBuffer, &filteredImageBuffer };
+
+    if (AcquireWaveletDenoiseBuffers(clEnv,image,exception,&targets) ==
+        MagickFalse)
+      goto cleanup;
+  }
 
   denoiseKernel=AcquireOpenCLKernel(device,"WaveletDenoise");
   if (denoiseKernel == (cl_kernel) NULL)
