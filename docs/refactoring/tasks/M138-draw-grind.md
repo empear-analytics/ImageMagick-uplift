@@ -3,8 +3,9 @@
 Branched from `campaign/M137` after #123 merged it into `main` (ba6c3318d); this branch's
 PR goes to `main`. Scores come from cs-mcp 1.5.16 through `tools/ch.py`.
 
-Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 50 flagged functions, 222 -> 225
-functions (three merges, nine shared helpers), 11,636 -> 11,417 lines.
+Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 50 flagged functions, 222 -> 227
+functions (three merges, eleven shared helpers), 11,636 -> 11,418 lines. Function findings
+fell from 160 to about 120 over the branch.
 
 ## The function-count lesson
 
@@ -50,6 +51,7 @@ lowers the count.
 | aef7f0364 | LB | ParseMVGDashPattern | list read into GetMVGListValue; leaves Complex Method |
 | ea01cacc0, 377fcb7f1 | E, D | GetStrokeSlope | the two epsilon-slope blocks into GetEpsilonSlope; leaves Bumpy Road and Complex Method |
 | 8fce72280, 874610f68 | E, D | TraceMVGPrimitive | eight case tails into GetTracedPrimitiveEnd; cc 51 -> 43, 290 -> 274 lines |
+| 035feac90 ... fffec6216 | E, D | AffineEdge | the eight edge clamps into RaiseEdgeStart and LowerEdgeEnd; leaves Bumpy Road (4) and Large Method, cc 17 -> 9 |
 
 ## Probed and dropped
 
@@ -92,7 +94,7 @@ lowers the count.
 - Whole catalogue at aef7f0364: 15,961 cases, 4 diverged: the three known ones and
   resize/b41fd3fe32 (write mask + `-scale`, M137's load-sensitive candidate), 0 diverged
   alone three times. Not added to `LOAD_SENSITIVE`: that needs its own OK.
-- Whole catalogue at 874610f68: 15,961 cases, 3 diverged, all known.
+- Whole catalogue at 874610f68 and at fffec6216: 15,961 cases, 3 diverged, all known.
 
 ## Blocked, for the owner
 
@@ -106,3 +108,13 @@ lowers the count.
 - **profile.c ProfileImage**: needs the Q8 and non-HDRI oracle builds (question 6).
 - **annotate.c Raqm functions** (ContainsRaqmParagraphSeparator 5.83 -> 6.37 alone): Raqm
   is not installed.
+
+## Next in draw.c
+
+- **At the threshold** (cc 9, one decision from clean): AffineEdge, ParseMVGClass,
+  ParseMVGPrimitivePoints, ClampPolygonBounds (NS fails IDENTICAL), TracePathMove.
+- **Shared tails left**: the primitive-type fill loop (`for (i=0; i < coordinates; i++)
+  { p->primitive=...; p--; }`) in five trace functions and the point-append block in four
+  path tracers take one decision each from functions that stay flagged.
+- **Function count**: draw.c holds 227 functions; each helper so far left the score at 3.27,
+  but two at once (CloneDrawInfo, Recipe E) cost 0.11. Probe before every helper.
