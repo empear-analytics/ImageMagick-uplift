@@ -17114,6 +17114,17 @@ static Cursor XSelectPanCursor(Display *display,XWindows *windows)
   return(cursor);
 }
 
+static void XClampPanOffsetY(RectangleInfo *pan_info,XWindows *windows)
+{
+  if ((*pan_info).y < 0)
+    (*pan_info).y=0;
+  else
+    if ((int) ((*pan_info).y+windows->image.height) >
+        windows->image.ximage->height)
+      (*pan_info).y=(ssize_t) (windows->image.ximage->height-(int)
+        windows->image.height);
+}
+
 static void XClampPanOffset(XWindows *windows,RectangleInfo *pan_info,
   const double x_factor,const double y_factor)
 {
@@ -17134,13 +17145,7 @@ static void XClampPanOffset(XWindows *windows,RectangleInfo *pan_info,
   else
     (*pan_info).y=(ssize_t) (y_factor*((*pan_info).y-((int)
       (*pan_info).height/2)));
-  if ((*pan_info).y < 0)
-    (*pan_info).y=0;
-  else
-    if ((int) ((*pan_info).y+windows->image.height) >
-        windows->image.ximage->height)
-      (*pan_info).y=(ssize_t) (windows->image.ximage->height-(int)
-        windows->image.height);
+  XClampPanOffsetY(pan_info,windows);
 }
 
 static void XDisplayPanOffset(Display *display,XWindows *windows,
