@@ -7504,15 +7504,9 @@ static void XCropSizeEvent(const CropContext *context,
   }
 }
 
-static void XCropDrawRegion(const CropContext *context,
-  const CropTargets *targets,RectangleInfo *highlight_info)
+static void XHighlightCropRegion(RectangleInfo *highlight_info,
+  const CropContext *context,RectangleInfo *crop_info)
 {
-  RectangleInfo
-    *const crop_info = targets->crop_info;
-
-  (*highlight_info)=(*crop_info);
-  (*highlight_info).x=(*crop_info).x-context->windows->image.x;
-  (*highlight_info).y=(*crop_info).y-context->windows->image.y;
   if (((*highlight_info).width > 3) && ((*highlight_info).height > 3))
     {
       /*
@@ -7530,6 +7524,18 @@ static void XCropDrawRegion(const CropContext *context,
     if (context->windows->info.mapped != MagickFalse)
       (void) XWithdrawWindow(context->display,context->windows->info.id,
         context->windows->info.screen);
+}
+
+static void XCropDrawRegion(const CropContext *context,
+  const CropTargets *targets,RectangleInfo *highlight_info)
+{
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  (*highlight_info)=(*crop_info);
+  (*highlight_info).x=(*crop_info).x-context->windows->image.x;
+  (*highlight_info).y=(*crop_info).y-context->windows->image.y;
+  XHighlightCropRegion(highlight_info,context,crop_info);
 }
 
 static void XCropSizeRegion(const CropContext *context,
