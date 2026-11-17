@@ -3347,6 +3347,16 @@ static void ParseMVGPrimitivePoints(const MVGRenderState *state)
   (*state->x)=x;
 }
 
+static void AddPathCurveCoordinates(char *token,double *coordinates)
+{
+  char
+    *s;
+
+  for (s=token; *s != '\0'; s++)
+    if (strspn(s,"AaCcQqSsTt") != 0)
+      (*coordinates)+=(20.0*BezierQuantum)+360.0;
+}
+
 static SegmentInfo GetPrimitiveBounds(const PrimitiveInfo *primitive_info,
   const ssize_t j)
 {
@@ -3469,9 +3479,7 @@ static void EstimateMVGPrimitiveExtent(const MVGRenderState *state)
           }
         coordinates++;
       }
-      for (s=token; *s != '\0'; s++)
-        if (strspn(s,"AaCcQqSsTt") != 0)
-          coordinates+=(20.0*BezierQuantum)+360.0;
+      AddPathCurveCoordinates(token,&coordinates);
       break;
     }
     default:
