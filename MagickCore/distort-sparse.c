@@ -126,6 +126,13 @@ static inline MagickBooleanType IsSparseBlackChannel(const Image *traits_image,
     (image->colorspace == CMYKColorspace)) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsSparseAlphaChannel(const Image *traits_image,
+  const Image *image)
+{
+  return((((GetPixelAlphaTraits(traits_image) & UpdatePixelTrait) != 0) &&
+    (image->alpha_trait != UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
+}
+
 static void PrintBarycentricSparseFX(const Image *image,const double *coeff)
 {
   ssize_t x=0;
@@ -142,8 +149,7 @@ static void PrintBarycentricSparseFX(const Image *image,const double *coeff)
   if (IsSparseBlackChannel(image,image) != MagickFalse)
     (void) FormatLocaleFile(stderr, "  -channel K -fx '%+lf*i %+lf*j %+lf' \\\n",
         coeff[x], coeff[x+1], coeff[x+2]),x+=3;
-  if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
-      (image->alpha_trait != UndefinedPixelTrait))
+  if (IsSparseAlphaChannel(image,image) != MagickFalse)
     (void) FormatLocaleFile(stderr, "  -channel A -fx '%+lf*i %+lf*j %+lf' \\\n",
         coeff[x], coeff[x+1], coeff[x+2]),x+=3;
 }
@@ -168,8 +174,7 @@ static void PrintBilinearSparseFX(const Image *image,const double *coeff)
     (void) FormatLocaleFile(stderr, "   -channel K -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
         coeff[ x ], coeff[x+1],
         coeff[x+2], coeff[x+3]),x+=4;
-  if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
-      (image->alpha_trait != UndefinedPixelTrait))
+  if (IsSparseAlphaChannel(image,image) != MagickFalse)
     (void) FormatLocaleFile(stderr, "   -channel A -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
         coeff[ x ], coeff[x+1],
         coeff[x+2], coeff[x+3]),x+=4;
@@ -212,8 +217,7 @@ static size_t GetSparseColorCount(const Image *image)
     number_colors++;
   if (IsSparseBlackChannel(image,image) != MagickFalse)
     number_colors++;
-  if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
-      (image->alpha_trait != UndefinedPixelTrait))
+  if (IsSparseAlphaChannel(image,image) != MagickFalse)
     number_colors++;
   return(number_colors);
 }
@@ -251,8 +255,7 @@ static void SetSparseControlColor(const SparseControlColor *control,
     pixel->blue=arguments[x++];
   if (IsSparseBlackChannel(sparse_image,image) != MagickFalse)
     pixel->black=arguments[x++];
-  if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-      (sparse_image->alpha_trait != UndefinedPixelTrait))
+  if (IsSparseAlphaChannel(sparse_image,sparse_image) != MagickFalse)
     pixel->alpha=arguments[x++];
 }
 
@@ -407,8 +410,7 @@ static PixelInfo BarycentricSparseColor(const SparseColorPlane *plane,
   if (IsSparseBlackChannel(sparse_image,sparse_image) != MagickFalse)
     pixel.black   = coeff[x]*i +coeff[x+1]*j
                     +coeff[x+2], x+=3;
-  if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-      (sparse_image->alpha_trait != UndefinedPixelTrait))
+  if (IsSparseAlphaChannel(sparse_image,sparse_image) != MagickFalse)
     pixel.alpha = coeff[x]*i +coeff[x+1]*j
                     +coeff[x+2], x+=3;
   return(pixel);
@@ -430,8 +432,8 @@ static PixelInfo BilinearSparseColor(const SparseColorPlane *plane,
   if (IsSparseBlackChannel(plane->sparse_image,image) != MagickFalse)
     pixel.black   = plane->coeff[x]*plane->i     + plane->coeff[x+1]*plane->j +
                     plane->coeff[x+2]*plane->i*plane->j + plane->coeff[x+3], x+=4;
-  if (((GetPixelAlphaTraits(plane->sparse_image) & UpdatePixelTrait) != 0) &&
-      (plane->sparse_image->alpha_trait != UndefinedPixelTrait))
+  if (IsSparseAlphaChannel(plane->sparse_image,
+      plane->sparse_image) != MagickFalse)
     pixel.alpha = plane->coeff[x]*plane->i     + plane->coeff[x+1]*plane->j +
                     plane->coeff[x+2]*plane->i*plane->j + plane->coeff[x+3], x+=4;
   return(pixel);
@@ -448,8 +450,8 @@ static PixelInfo AddWeightedControlColor(const SparseControlColor *control,
     pixel.blue    += control->arguments[x++]*weight;
   if (IsSparseBlackChannel(control->sparse_image,control->image) != MagickFalse)
     pixel.black   += control->arguments[x++]*weight;
-  if (((GetPixelAlphaTraits(control->sparse_image) & UpdatePixelTrait) != 0) &&
-      (control->sparse_image->alpha_trait != UndefinedPixelTrait))
+  if (IsSparseAlphaChannel(control->sparse_image,
+      control->sparse_image) != MagickFalse)
     pixel.alpha += control->arguments[x++]*weight;
   return(pixel);
 }
@@ -516,8 +518,7 @@ static PixelInfo ClearSparseColor(const Image *image,
     pixel.blue=0.0;
   if (IsSparseBlackChannel(sparse_image,image) != MagickFalse)
     pixel.black=0.0;
-  if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-      (sparse_image->alpha_trait != UndefinedPixelTrait))
+  if (IsSparseAlphaChannel(sparse_image,sparse_image) != MagickFalse)
     pixel.alpha=0.0;
   return(pixel);
 }
@@ -550,8 +551,8 @@ static PixelInfo InverseSparseColor(const SparseColorWeights *inverse,
     pixel.blue/=denominator;
   if (IsSparseBlackChannel(inverse->sparse_image,inverse->image) != MagickFalse)
     pixel.black/=denominator;
-  if (((GetPixelAlphaTraits(inverse->sparse_image) & UpdatePixelTrait) != 0) &&
-      (inverse->sparse_image->alpha_trait != UndefinedPixelTrait))
+  if (IsSparseAlphaChannel(inverse->sparse_image,
+      inverse->sparse_image) != MagickFalse)
     pixel.alpha/=denominator;
   return(pixel);
 }
@@ -573,8 +574,7 @@ static PixelInfo ClampSparseColor(const Image *image,
   if (IsSparseBlackChannel(sparse_image,image) != MagickFalse)
     pixel.black=(MagickRealType) ClampPixel((double) QuantumRange*
       pixel.black);
-  if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-      (image->alpha_trait != UndefinedPixelTrait))
+  if (IsSparseAlphaChannel(sparse_image,image) != MagickFalse)
     pixel.alpha=(MagickRealType) ClampPixel((double) QuantumRange*
       pixel.alpha);
   return(pixel);
