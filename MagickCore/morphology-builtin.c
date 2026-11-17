@@ -763,15 +763,22 @@ static KernelInfo *AcquireLaplacianKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static void RotateOutOfBoundsFreiChenKernel(KernelInfo *kernel,
+  const GeometryInfo *args)
+{
+  if ( args->rho > 30.0 || args->rho < -30.0 )
+    /* Rotate by out of bounds 'type' */
+    RotateKernelInfo(kernel, args->rho);
+}
+
 static KernelInfo *RotateFreiChenKernel(KernelInfo *kernel,
   const GeometryInfo *args)
 {
   if ( fabs(args->sigma) >= MagickEpsilon )
     /* Rotate by correctly supplied 'angle' */
     RotateKernelInfo(kernel, args->sigma);
-  else if ( args->rho > 30.0 || args->rho < -30.0 )
-    /* Rotate by out of bounds 'type' */
-    RotateKernelInfo(kernel, args->rho);
+  else
+    RotateOutOfBoundsFreiChenKernel(kernel,args);
   return(kernel);
 }
 
