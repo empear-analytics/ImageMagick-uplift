@@ -3,9 +3,9 @@
 Branched from `campaign/M137` after #123 merged it into `main` (ba6c3318d); this branch's
 PR goes to `main`. Scores come from cs-mcp 1.5.16 through `tools/ch.py`.
 
-Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 49 flagged functions, 222 -> 229
-functions (four merges, fourteen helpers), 11,636 -> 11,411 lines. Function findings
-(one per function and category) 123 -> 95.
+Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 48 flagged functions, 222 -> 236
+functions (four merges, twenty-two helpers), 11,636 -> 11,468 lines. Function findings
+(one per function and category) 123 -> 90.
 
 ## The function-count lesson
 
@@ -56,6 +56,12 @@ lowers the count.
 | f2602e082 | E | CloneDrawInfo | gradient-stop copy into CloneDrawInfoGradientStops; leaves Bumpy Road (the dash-pattern block alone: 3.27 -> 3.14, left) |
 | 565d0ae02 | V | ClonePolygonEdgesTLS | per-edge point copy into ClonePolygonEdgePoints, the throw left in the caller; leaves Bumpy Road |
 | 26453f1d8 | E | GetWindingNumber | edge-index search into GetWindingEdgeIndex; leaves Bumpy Road (cc 13 -> 11) |
+| 79da55aab, b7ef2e5ae | E, D | DrawStrokedPrimitive | the unstroked fill into DrawUnstrokedPolygon (context pass-through); leaves Large Method |
+| 8e2513918, 164d9b253 | LB, CN | ParseMVGPushGradient | the radial token skip into SkipMVGListToken, then the radial test and the skip combined; leaves Bumpy Road |
+| b81e108fb | V | TraceBezier | the coefficient-range scan into GetBezierQuantum, the throw left in the caller; cc 16 -> 12, bumps 3 -> 2 |
+| 84511a6ee, 623ad156b, 04c2aca89 | E | EstimateMVGPrimitiveExtent | bounds, curve count and path-token count into three helpers; no findings left (was Bumpy 3, cc 16, 102 lines) |
+| f077afa69 ... 296b8075a | E, D | five trace functions | the closing primitive-type loop into SetTracedPrimitiveType; TraceRoundRectangle 76 -> 70 lines |
+| 2f03f7f2d | merge | origin/main (campaign A's W38, #122) | clean; draw.c untouched |
 
 ## Probed and dropped
 
@@ -99,6 +105,7 @@ lowers the count.
   resize/b41fd3fe32 (write mask + `-scale`, M137's load-sensitive candidate), 0 diverged
   alone three times. Not added to `LOAD_SENSITIVE`: that needs its own OK.
 - Whole catalogue at 874610f68, fffec6216 and 26453f1d8: 15,961 cases, 3 diverged, all known.
+- After merging main (71f80adb8, campaign A's W38): 15,967 cases, 3 diverged, all known.
 
 ## Blocked, for the owner
 
