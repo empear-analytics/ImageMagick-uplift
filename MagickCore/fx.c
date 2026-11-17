@@ -1555,8 +1555,8 @@ static inline MagickBooleanType IsDefaultArgsFunction(const FunctionE fe)
 static inline MagickBooleanType IsNoArgsFunction(const FunctionE fe,
   const int FndArgs)
 {
-  return((fe != fS && fe != fV && FndArgs == 0 &&
-    Functions[fe-(int) FirstFunc].number_args == 0) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (fe != fS && fe != fV && FndArgs == 0 &&
+    Functions[fe-(int) FirstFunc].number_args == 0));
 }
 
 static const FunctionE
