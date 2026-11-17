@@ -348,6 +348,14 @@ static MagickBooleanType HasGrayscaleInputChannels(const Image *image)
   return(MagickTrue);
 }
 
+static MagickBooleanType IsUnsupportedGrayscaleImage(const Image *image,
+  const PixelIntensityMethod method)
+{
+  return(((checkAccelerateCondition(image) == MagickFalse) ||
+      (checkPixelIntensity(image,method) == MagickFalse)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickPrivate MagickBooleanType AccelerateGrayscaleImage(Image* image,
   const PixelIntensityMethod method,ExceptionInfo *exception)
 {
@@ -362,8 +370,7 @@ MagickPrivate MagickBooleanType AccelerateGrayscaleImage(Image* image,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
 
-  if ((checkAccelerateCondition(image) == MagickFalse) ||
-      (checkPixelIntensity(image,method) == MagickFalse))
+  if (IsUnsupportedGrayscaleImage(image,method) != MagickFalse)
     return(MagickFalse);
 
   if (HasGrayscaleInputChannels(image) == MagickFalse)
