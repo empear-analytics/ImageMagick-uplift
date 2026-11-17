@@ -994,7 +994,7 @@ static MagickBooleanType PopOprOpenParen (FxInfo * pfx, OperatorE op)
 
 static inline MagickBooleanType IsNotCoordFunction(const int op)
 {
-  return((op != fU && op != fV && op != fS) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (op != fU && op != fV && op != fS));
 }
 
 static int GetCoordQualifier (FxInfo * pfx, int op)
