@@ -2726,9 +2726,8 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 
 static MagickBooleanType IsStealth (int op)
 {
-  return (op == fU0 || op == fUP || op == fSP || op == fVP ||
-           (op >= FirstCont && op <= rNull) ? MagickTrue : MagickFalse
-         );
+  return ((MagickBooleanType) (op == fU0 || op == fUP || op == fSP ||
+    op == fVP || (op >= FirstCont && op <= rNull)) );
 }
 
 static inline MagickBooleanType IsLoopOrIfFunction(const FunctionE fe)
