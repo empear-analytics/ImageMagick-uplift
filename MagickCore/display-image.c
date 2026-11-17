@@ -13258,6 +13258,32 @@ static void XApplyHueCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyEmbossToImage(Display *display,XWindows *windows,char *radius,
+  Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  Image
+    *emboss_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flags=ParseGeometry(radius,&geometry_info);
+  if ((flags & SigmaValue) == 0)
+    geometry_info.sigma=1.0;
+  emboss_image=EmbossImage(*image,geometry_info.rho,geometry_info.sigma,
+    exception);
+  if (emboss_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=emboss_image;
+    }
+}
+
 static void XApplyEmbossCommand(const XMagickCommandContext *context)
 {
   Display
@@ -13275,15 +13301,6 @@ static void XApplyEmbossCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  MagickStatusType
-    flags;
-
-  Image
-    *emboss_image;
-
   static char
     radius[MagickPathExtent] = "0.0x1.0";
 
@@ -13297,18 +13314,7 @@ static void XApplyEmbossCommand(const XMagickCommandContext *context)
   /*
     Reduce noise in the image.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  flags=ParseGeometry(radius,&geometry_info);
-  if ((flags & SigmaValue) == 0)
-    geometry_info.sigma=1.0;
-  emboss_image=EmbossImage(*image,geometry_info.rho,geometry_info.sigma,
-    exception);
-  if (emboss_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=emboss_image;
-    }
+  XApplyEmbossToImage(display,windows,radius,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
