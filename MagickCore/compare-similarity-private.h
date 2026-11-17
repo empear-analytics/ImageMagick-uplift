@@ -1592,6 +1592,79 @@ static inline double GetPHASEPearson(const PHASECorrelationSums *sums,
   return(pearson);
 }
 
+typedef struct _PHASEReduction
+{
+  const Image
+    *image,
+    *reconstruct_image;
+
+  double
+    area,
+    *correlation,
+    *image_sum,
+    *image_sum_squared,
+    *reconstruct_sum,
+    *reconstruct_sum_squared;
+} PHASEReduction;
+
+static inline void ReducePHASESimilarity(const PHASEReduction *reduction,
+  double *similarity)
+{
+  const Image
+    *const image = reduction->image,
+    *const reconstruct_image = reduction->reconstruct_image;
+
+  const double
+    area = reduction->area;
+
+  double
+    *const correlation = reduction->correlation,
+    *const image_sum = reduction->image_sum,
+    *const image_sum_squared = reduction->image_sum_squared,
+    *const reconstruct_sum = reduction->reconstruct_sum,
+    *const reconstruct_sum_squared = reduction->reconstruct_sum_squared;
+
+  PHASECorrelationSums
+    sums;
+
+  ssize_t
+    channels = 0,
+    j;
+
+  similarity[CompositePixelChannel]=0.0;
+  for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+  {
+    double
+      pearson;
+
+    PixelChannel
+      channel;
+
+    PixelTrait
+      reconstruct_traits,
+      traits;
+
+    channel=GetPixelChannelChannel(image,j);
+    traits=GetPixelChannelTraits(image,channel);
+    reconstruct_traits=GetPixelChannelTraits(reconstruct_image,channel);
+    if (((traits & UpdatePixelTrait) == 0) ||
+        ((reconstruct_traits & UpdatePixelTrait) == 0))
+      continue;
+    sums.area=area;
+    sums.correlation=correlation;
+    sums.image_sum=image_sum;
+    sums.image_sum_squared=image_sum_squared;
+    sums.reconstruct_sum=reconstruct_sum;
+    sums.reconstruct_sum_squared=reconstruct_sum_squared;
+    pearson=GetPHASEPearson(&sums,j);
+    similarity[j]=pearson;
+    similarity[CompositePixelChannel]+=pearson;
+    channels++;
+  }
+  if (channels != 0)
+    similarity[CompositePixelChannel]/=(double) channels;
+}
+
 static inline MagickBooleanType GetPHASESimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -1621,12 +1694,10 @@ static inline MagickBooleanType GetPHASESimilarity(const Image *image,
     rows = 0;
 
   ssize_t
-    channels = 0,
-    j,
     y;
 
-  PHASECorrelationSums
-    sums;
+  PHASEReduction
+    reduction;
 
   /*
     Compute a Pearson-correlation similarity between two Laplacian-of-
@@ -1748,38 +1819,15 @@ static inline MagickBooleanType GetPHASESimilarity(const Image *image,
   /*
     Reduce to a per-channel Pearson coefficient and average.
   */
-  similarity[CompositePixelChannel]=0.0;
-  for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-  {
-    double
-      pearson;
-
-    PixelChannel
-      channel;
-
-    PixelTrait
-      reconstruct_traits,
-      traits;
-
-    channel=GetPixelChannelChannel(image,j);
-    traits=GetPixelChannelTraits(image,channel);
-    reconstruct_traits=GetPixelChannelTraits(reconstruct_image,channel);
-    if (((traits & UpdatePixelTrait) == 0) ||
-        ((reconstruct_traits & UpdatePixelTrait) == 0))
-      continue;
-    sums.area=area;
-    sums.correlation=correlation;
-    sums.image_sum=image_sum;
-    sums.image_sum_squared=image_sum_squared;
-    sums.reconstruct_sum=reconstruct_sum;
-    sums.reconstruct_sum_squared=reconstruct_sum_squared;
-    pearson=GetPHASEPearson(&sums,j);
-    similarity[j]=pearson;
-    similarity[CompositePixelChannel]+=pearson;
-    channels++;
-  }
-  if (channels != 0)
-    similarity[CompositePixelChannel]/=(double) channels;
+  reduction.image=image;
+  reduction.reconstruct_image=reconstruct_image;
+  reduction.area=area;
+  reduction.correlation=correlation;
+  reduction.image_sum=image_sum;
+  reduction.image_sum_squared=image_sum_squared;
+  reduction.reconstruct_sum=reconstruct_sum;
+  reduction.reconstruct_sum_squared=reconstruct_sum_squared;
+  ReducePHASESimilarity(&reduction,similarity);
   return(MagickTrue);
 }
 
