@@ -782,6 +782,22 @@ static void SetElementNumberArgs (ElementT * pel, int oprNum)
   else                      pel->number_args = Controls[oprNum-(int) FirstCont].number_args;
 }
 
+static void InitElement (ElementT * pel, fxFltType val, int oprNum)
+{
+  pel->type = TypeOfOpr (oprNum);
+  pel->val = val;
+  pel->val1 = (fxFltType) 0;
+  pel->val2 = (fxFltType) 0;
+  pel->operator_index = oprNum;
+  pel->do_push = MagickTrue;
+  pel->element_index = 0;
+  pel->channel_qual = NO_CHAN_QUAL;
+  pel->img_attr_qual = aNull;
+  pel->number_dest = 0;
+  pel->exp_start = NULL;
+  pel->exp_len = 0;
+}
+
 static MagickBooleanType AddElement(FxInfo * pfx,fxFltType val,int oprNum)
 {
   ElementT * pel;
@@ -802,18 +818,7 @@ static MagickBooleanType AddElement(FxInfo * pfx,fxFltType val,int oprNum)
       return(MagickFalse);
     }
   pel = &pfx->Elements[pfx->usedElements-1];
-  pel->type = TypeOfOpr (oprNum);
-  pel->val = val;
-  pel->val1 = (fxFltType) 0;
-  pel->val2 = (fxFltType) 0;
-  pel->operator_index = oprNum;
-  pel->do_push = MagickTrue;
-  pel->element_index = 0;
-  pel->channel_qual = NO_CHAN_QUAL;
-  pel->img_attr_qual = aNull;
-  pel->number_dest = 0;
-  pel->exp_start = NULL;
-  pel->exp_len = 0;
+  InitElement (pel, val, oprNum);
 
   SetElementNumberArgs (pel, oprNum);
 
