@@ -1663,8 +1663,8 @@ static void
 static inline MagickBooleanType IsSelectionUnusable(const int status,
   const Atom type,const int format,const unsigned long length)
 {
-  return(((status != Success) || (type != XA_STRING) || (format == 32) ||
-    (length == 0)) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((status != Success) || (type != XA_STRING) ||
+    (format == 32) || (length == 0)));
 }
 
 typedef struct _AnnotateTargets
@@ -1886,8 +1886,7 @@ static void XSelectAnnotateFontColor(const AnnotateMenuInput *menu,
     (const char **) ColorMenu,command);
   if (pen_number < 0)
     return;
-  (*transparent_pen)=pen_number == (MaxNumberPens-2) ? MagickTrue :
-    MagickFalse;
+  (*transparent_pen)=(MagickBooleanType) (pen_number == (MaxNumberPens-2));
   if ((*transparent_pen) != MagickFalse)
     return;
   if (pen_number == (MaxNumberPens-1))
@@ -1980,8 +1979,7 @@ static void XSelectAnnotateBoxColor(const AnnotateMenuInput *menu,
     (const char **) ColorMenu,command);
   if (pen_number < 0)
     return;
-  (*transparent_box)=pen_number == (MaxNumberPens-2) ? MagickTrue :
-    MagickFalse;
+  (*transparent_box)=(MagickBooleanType) (pen_number == (MaxNumberPens-2));
   if ((*transparent_box) != MagickFalse)
     return;
   if (pen_number == (MaxNumberPens-1))
@@ -2519,12 +2517,11 @@ static MagickBooleanType XPasteSelectionText(
   return(MagickTrue);
 }
 
-static void XSetBoxPixelIndex(XWindows *windows,const unsigned int box_id)
+static void XFindBoxPixelIndex(XWindows *windows,const unsigned int box_id)
 {
   ssize_t
     i;
 
-  windows->pixel_info->box_color=windows->pixel_info->pen_colors[box_id];
   if (windows->pixel_info->colors != 0)
     for (i=0; i < (ssize_t) windows->pixel_info->colors; i++)
       if (windows->pixel_info->pixels[i] ==
@@ -2533,6 +2530,12 @@ static void XSetBoxPixelIndex(XWindows *windows,const unsigned int box_id)
           windows->pixel_info->box_index=(unsigned short) i;
           break;
         }
+}
+
+static void XSetBoxPixelIndex(XWindows *windows,const unsigned int box_id)
+{
+  windows->pixel_info->box_color=windows->pixel_info->pen_colors[box_id];
+  XFindBoxPixelIndex(windows,box_id);
 }
 
 static void XSetPenPixelIndex(XWindows *windows,const unsigned int pen_id)
@@ -3307,6 +3310,17 @@ static MagickBooleanType XAnnotateRenderLines(const AnnotateContext *context,
   return(MagickTrue);
 }
 
+static void XFallBackToDefaultFont(XFontStruct **font_info,Display *display,
+  XWindows *windows,XResourceInfo *resource_info,const unsigned int font_id)
+{
+  if ((*font_info) == (XFontStruct *) NULL)
+    {
+      XNoticeWidget(display,windows,"Unable to load font:",
+        resource_info->font_name[font_id]);
+      (*font_info)=windows->font_info;
+    }
+}
+
 static MagickBooleanType XAnnotateLoadFont(const AnnotateContext *context,
   const AnnotateTargets *targets,XFontStruct **font_info)
 {
@@ -3330,12 +3344,7 @@ static MagickBooleanType XAnnotateLoadFont(const AnnotateContext *context,
     Set font info and check boundary conditions.
   */
   (*font_info)=XLoadQueryFont(display,resource_info->font_name[font_id]);
-  if ((*font_info) == (XFontStruct *) NULL)
-    {
-      XNoticeWidget(display,windows,"Unable to load font:",
-        resource_info->font_name[font_id]);
-      (*font_info)=windows->font_info;
-    }
+  XFallBackToDefaultFont(font_info,display,windows,resource_info,font_id);
   if (((*x)+(*font_info)->max_bounds.width) >= (int) windows->image.width)
     (*x)=(int) windows->image.width-(*font_info)->max_bounds.width;
   if ((*y) < (int) ((*font_info)->ascent+(*font_info)->descent))
@@ -3700,7 +3709,7 @@ static MagickBooleanType XBackgroundImage(
   XCheckRefreshWindows(display,windows);
   background_resources=(*resource_info);
   background_resources.window_id=window_id;
-  background_resources.backdrop=status != 0 ? MagickTrue : MagickFalse;
+  background_resources.backdrop=(MagickBooleanType) (status != 0);
   status=XDisplayBackgroundImage(display,&background_resources,*image,
     exception) == MagickFalse ? 0 : 1;
   if (status != MagickFalse)
@@ -3768,11 +3777,9 @@ static void XTrackInfoWidget(Display *display,XWindows *windows,const int x,
       (void) XMapWindow(display,windows->info.id);
 }
 
-static void XClampChopSegment(const XWindows *windows,XSegment *segment_info)
+static void XClampChopSegmentToImage(XSegment *segment_info,
+  const XWindows *windows)
 {
-  /*
-    Check boundary conditions.
-  */
   if ((*segment_info).x2 < 0)
     (*segment_info).x2=0;
   else
@@ -3785,6 +3792,24 @@ static void XClampChopSegment(const XWindows *windows,XSegment *segment_info)
       (*segment_info).y2=windows->image.ximage->height;
 }
 
+static void XClampChopSegment(const XWindows *windows,XSegment *segment_info)
+{
+  /*
+    Check boundary conditions.
+  */
+  XClampChopSegmentToImage(segment_info,windows);
+}
+
+static void XSetChopWidthFromRight(const XSegment *segment_info,
+  RectangleInfo *chop_info,const XWindows *windows)
+{
+  if ((*segment_info).x1 > (*segment_info).x2)
+    {
+      (*chop_info).width=(size_t) ((*segment_info).x1-(*segment_info).x2+1);
+      (*chop_info).x=(ssize_t) windows->image.x+(*segment_info).x2;
+    }
+}
+
 static void XChopHorizontalGeometry(const XWindows *windows,
   const XSegment *segment_info,RectangleInfo *chop_info)
 {
@@ -3792,11 +3817,7 @@ static void XChopHorizontalGeometry(const XWindows *windows,
   (*chop_info).height=0;
   (*chop_info).x=(ssize_t) windows->image.x+(*segment_info).x1;
   (*chop_info).y=0;
-  if ((*segment_info).x1 > (*segment_info).x2)
-    {
-      (*chop_info).width=(size_t) ((*segment_info).x1-(*segment_info).x2+1);
-      (*chop_info).x=(ssize_t) windows->image.x+(*segment_info).x2;
-    }
+  XSetChopWidthFromRight(segment_info,chop_info,windows);
 }
 
 static void XChopVerticalGeometry(const XWindows *windows,
@@ -4614,7 +4635,7 @@ static void XColorFloodfill(const ColorEditPixelInput *pixel_input)
     AllCompliance,&draw_info->fill,exception);
   (void) FloodfillPaintImage(*image,draw_info,&target,
     (ssize_t)x_offset,(ssize_t)y_offset,
-    method != FloodfillMethod ? MagickTrue : MagickFalse,exception);
+    (MagickBooleanType) (method != FloodfillMethod),exception);
   draw_info=DestroyDrawInfo(draw_info);
 }
 
@@ -5393,6 +5414,16 @@ static MagickBooleanType XColorEditUpdate(const ColorEditContext *context,
   return(MagickTrue);
 }
 
+static void XColorEditMagnifyOffset(XEvent *event,
+  const ColorEditContext *context,int *x,int *y)
+{
+  if ((*event).xany.window == context->windows->magnify.id)
+    {
+      (*x)=context->windows->magnify.x-context->windows->image.x;
+      (*y)=context->windows->magnify.y-context->windows->image.y;
+    }
+}
+
 static MagickBooleanType XColorEditStep(const ColorEditContext *context,
   const ColorEditTargets *targets)
 {
@@ -5426,11 +5457,7 @@ static MagickBooleanType XColorEditStep(const ColorEditContext *context,
       return(MagickTrue);
     }
   XColorEditEvent(context,targets);
-  if ((*event).xany.window == context->windows->magnify.id)
-    {
-      (*x)=context->windows->magnify.x-context->windows->image.x;
-      (*y)=context->windows->magnify.y-context->windows->image.y;
-    }
+  XColorEditMagnifyOffset(event,context,x,y);
   x_offset=(*x);
   y_offset=(*y);
   if (XColorEditUpdate(context,targets,x_offset,y_offset) == MagickFalse)
@@ -6047,6 +6074,20 @@ static void XCompositeEvent(const CompositeCommandInput *input,XEvent *event,
   }
 }
 
+static void XShowCompositeOffset(XWindows *windows,char *text,
+  RectangleInfo *composite_info,Display *display)
+{
+  if (windows->info.mapped != MagickFalse)
+    {
+      /*
+        Display pointer position.
+      */
+      (void) FormatLocaleString(text,MagickPathExtent," %+ld%+ld ",
+        (long) (*composite_info).x,(long) (*composite_info).y);
+      XInfoWidget(display,windows,text);
+    }
+}
+
 static void XCompositeStep(const CompositeCommandInput *input,
   const Cursor cursor,const CompositeEventTargets *targets)
 {
@@ -6077,15 +6118,7 @@ static void XCompositeStep(const CompositeCommandInput *input,
   XEvent
     event;
 
-  if (windows->info.mapped != MagickFalse)
-    {
-      /*
-        Display pointer position.
-      */
-      (void) FormatLocaleString(text,MagickPathExtent," %+ld%+ld ",
-        (long) (*composite_info).x,(long) (*composite_info).y);
-      XInfoWidget(display,windows,text);
-    }
+  XShowCompositeOffset(windows,text,composite_info,display);
   highlight_info=(*composite_info);
   highlight_info.x=(*composite_info).x-windows->image.x;
   highlight_info.y=(*composite_info).y-windows->image.y;
@@ -6380,6 +6413,26 @@ static MagickBooleanType XCompositeImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void XSetPanSizeHints(XSizeHints *size_hints,
+  const XWindowChanges *window_changes,Display *display,XWindows *windows)
+{
+  if (size_hints != (XSizeHints *) NULL)
+    {
+      /*
+        Set new size hints.
+      */
+      size_hints->flags=PSize | PMinSize | PMaxSize;
+      size_hints->width=(*window_changes).width;
+      size_hints->height=(*window_changes).height;
+      size_hints->min_width=size_hints->width;
+      size_hints->min_height=size_hints->height;
+      size_hints->max_width=size_hints->width;
+      size_hints->max_height=size_hints->height;
+      (void) XSetNormalHints(display,windows->pan.id,size_hints);
+      (void) XFree((void *) size_hints);
+    }
+}
+
 static void XResizePanWindow(Display *display,XWindows *windows,Image *image)
 {
   XSizeHints
@@ -6402,21 +6455,7 @@ static void XResizePanWindow(Display *display,XWindows *windows,Image *image)
   window_changes.width=(int) windows->pan.width;
   window_changes.height=(int) windows->pan.height;
   size_hints=XAllocSizeHints();
-  if (size_hints != (XSizeHints *) NULL)
-    {
-      /*
-        Set new size hints.
-      */
-      size_hints->flags=PSize | PMinSize | PMaxSize;
-      size_hints->width=window_changes.width;
-      size_hints->height=window_changes.height;
-      size_hints->min_width=size_hints->width;
-      size_hints->min_height=size_hints->height;
-      size_hints->max_width=size_hints->width;
-      size_hints->max_height=size_hints->height;
-      (void) XSetNormalHints(display,windows->pan.id,size_hints);
-      (void) XFree((void *) size_hints);
-    }
+  XSetPanSizeHints(size_hints,&window_changes,display,windows);
   (void) XReconfigureWMWindow(display,windows->pan.id,windows->pan.screen,
     (unsigned int) (CWWidth | CWHeight),&window_changes);
 }
@@ -6431,6 +6470,18 @@ typedef struct _ConfigureNotifyInput
     x,
     y;
 } ConfigureNotifyInput;
+
+static void XFormatWindowManagerGeometry(XResourceInfo *resource_info,
+  char *geometry,Display *display,XWindows *windows)
+{
+  if (resource_info->image_geometry != (char *) NULL)
+    (void) FormatLocaleString(geometry,MagickPathExtent,"%s>!",
+      resource_info->image_geometry);
+  else
+    (void) FormatLocaleString(geometry,MagickPathExtent,"%ux%u+0+0>!",
+      XDisplayWidth(display,windows->image.screen),
+      XDisplayHeight(display,windows->image.screen));
+}
 
 static void XNotifyWindowManager(Display *display,XResourceInfo *resource_info,
   XWindows *windows,const ConfigureNotifyInput *input)
@@ -6450,13 +6501,7 @@ static void XNotifyWindowManager(Display *display,XResourceInfo *resource_info,
   XWindowChanges
     window_changes;
 
-  if (resource_info->image_geometry != (char *) NULL)
-    (void) FormatLocaleString(geometry,MagickPathExtent,"%s>!",
-      resource_info->image_geometry);
-  else
-    (void) FormatLocaleString(geometry,MagickPathExtent,"%ux%u+0+0>!",
-      XDisplayWidth(display,windows->image.screen),
-      XDisplayHeight(display,windows->image.screen));
+  XFormatWindowManagerGeometry(resource_info,geometry,display,windows);
   (void) ParseMetaGeometry(geometry,&x,&y,&width,&height);
   window_changes.width=(int) width;
   if (window_changes.width > XDisplayWidth(display,windows->image.screen))
@@ -6475,6 +6520,14 @@ static void XNotifyWindowManager(Display *display,XResourceInfo *resource_info,
     }
   (void) XReconfigureWMWindow(display,windows->image.id,windows->image.screen,
     (unsigned int) mask,&window_changes);
+}
+
+static void XUpdateMagnifyConfiguration(XWindows *windows,Display *display,
+  Image *image,ExceptionInfo *exception)
+{
+  if (windows->magnify.mapped != MagickFalse)
+    XMakeMagnifyImage(display,windows,exception);
+  XResizePanWindow(display,windows,image);
 }
 
 static MagickBooleanType XConfigureImage(Display *display,
@@ -6544,9 +6597,7 @@ static MagickBooleanType XConfigureImage(Display *display,
   /*
     Update Magnify window configuration.
   */
-  if (windows->magnify.mapped != MagickFalse)
-    XMakeMagnifyImage(display,windows,exception);
-  XResizePanWindow(display,windows,image);
+  XUpdateMagnifyConfiguration(windows,display,image,exception);
   /*
     Update icon window configuration.
   */
@@ -6557,7 +6608,7 @@ static MagickBooleanType XConfigureImage(Display *display,
   (void) XReconfigureWMWindow(display,windows->icon.id,windows->icon.screen,
     (unsigned int) (CWWidth | CWHeight),&window_changes);
   XSetCursorState(display,windows,MagickFalse);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (status != 0));
 }
 
 /*
@@ -6601,46 +6652,45 @@ static MagickBooleanType XConfigureImage(Display *display,
 static inline MagickBooleanType IsNearTopLeftCorner(const int x,const int y,
   const RectangleInfo rectangle)
 {
-  return(((x < (int) (rectangle.x+RoiDelta)) &&
+  return((MagickBooleanType) ((x < (int) (rectangle.x+RoiDelta)) &&
     (x > (int) (rectangle.x-RoiDelta)) &&
     (y < (int) (rectangle.y+RoiDelta)) &&
-    (y > (int) (rectangle.y-RoiDelta))) ? MagickTrue : MagickFalse);
+    (y > (int) (rectangle.y-RoiDelta))));
 }
 
 static inline MagickBooleanType IsNearBottomLeftCorner(const int x,const int y,
   const RectangleInfo rectangle)
 {
-  return(((x < (int) (rectangle.x+RoiDelta)) &&
+  return((MagickBooleanType) ((x < (int) (rectangle.x+RoiDelta)) &&
     (x > (int) (rectangle.x-RoiDelta)) &&
     (y < (int) (rectangle.y+(int) rectangle.height+RoiDelta)) &&
-    (y > (int) (rectangle.y+(int) rectangle.height-RoiDelta))) ? MagickTrue :
-    MagickFalse);
+    (y > (int) (rectangle.y+(int) rectangle.height-RoiDelta))));
 }
 
 static inline MagickBooleanType IsNearTopRightCorner(const int x,const int y,
   const RectangleInfo rectangle)
 {
-  return(((x < (int) (rectangle.x+(int) rectangle.width+RoiDelta)) &&
-    (x > (int) (rectangle.x+(int) rectangle.width-RoiDelta)) &&
-    (y < (int) (rectangle.y+RoiDelta)) &&
-    (y > (int) (rectangle.y-RoiDelta))) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((x < (int) (rectangle.x+(int)
+    rectangle.width+RoiDelta)) && (x > (int) (rectangle.x+(int)
+    rectangle.width-RoiDelta)) && (y < (int) (rectangle.y+RoiDelta)) && (y >
+    (int) (rectangle.y-RoiDelta))));
 }
 
 static inline MagickBooleanType IsNearBottomRightCorner(const int x,const int y,
   const RectangleInfo rectangle)
 {
-  return(((x < (int) (rectangle.x+(int) rectangle.width+RoiDelta)) &&
-    (x > (int) (rectangle.x+(int) rectangle.width-RoiDelta)) &&
-    (y < (int) (rectangle.y+(int) rectangle.height+RoiDelta)) &&
-    (y > (int) (rectangle.y+(int) rectangle.height-RoiDelta))) ? MagickTrue :
-    MagickFalse);
+  return((MagickBooleanType) ((x < (int) (rectangle.x+(int)
+    rectangle.width+RoiDelta)) && (x > (int) (rectangle.x+(int)
+    rectangle.width-RoiDelta)) && (y < (int) (rectangle.y+(int)
+    rectangle.height+RoiDelta)) && (y > (int) (rectangle.y+(int)
+    rectangle.height-RoiDelta))));
 }
 
 static inline MagickBooleanType IsSelectionMovedOrDone(
   const RectangleInfo rectangle,const int x,const int y,const size_t state)
 {
-  return(((((int) rectangle.x != x) && ((int) rectangle.y != y)) ||
-    ((state & ExitState) != 0)) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((((int) rectangle.x != x) &&
+    ((int) rectangle.y != y)) || ((state & ExitState) != 0)));
 }
 
 static void XShowCropHelp(Display *display,XResourceInfo *resource_info,
@@ -7477,15 +7527,9 @@ static void XCropSizeEvent(const CropContext *context,
   }
 }
 
-static void XCropDrawRegion(const CropContext *context,
-  const CropTargets *targets,RectangleInfo *highlight_info)
+static void XHighlightCropRegion(RectangleInfo *highlight_info,
+  const CropContext *context,RectangleInfo *crop_info)
 {
-  RectangleInfo
-    *const crop_info = targets->crop_info;
-
-  (*highlight_info)=(*crop_info);
-  (*highlight_info).x=(*crop_info).x-context->windows->image.x;
-  (*highlight_info).y=(*crop_info).y-context->windows->image.y;
   if (((*highlight_info).width > 3) && ((*highlight_info).height > 3))
     {
       /*
@@ -7503,6 +7547,18 @@ static void XCropDrawRegion(const CropContext *context,
     if (context->windows->info.mapped != MagickFalse)
       (void) XWithdrawWindow(context->display,context->windows->info.id,
         context->windows->info.screen);
+}
+
+static void XCropDrawRegion(const CropContext *context,
+  const CropTargets *targets,RectangleInfo *highlight_info)
+{
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  (*highlight_info)=(*crop_info);
+  (*highlight_info).x=(*crop_info).x-context->windows->image.x;
+  (*highlight_info).y=(*crop_info).y-context->windows->image.y;
+  XHighlightCropRegion(highlight_info,context,crop_info);
 }
 
 static void XCropSizeRegion(const CropContext *context,
@@ -7617,15 +7673,9 @@ static void XCropWaitEvent(const CropContext *context,
   }
 }
 
-static MagickBooleanType XCropWaitHead(const CropContext *context,
-  const CropTargets *targets,RectangleInfo *highlight_info)
+static void XShowCropGeometryInfo(const CropContext *context,
+  RectangleInfo *crop_info)
 {
-  size_t
-    *const state = targets->state;
-
-  RectangleInfo
-    *const crop_info = targets->crop_info;
-
   if (context->windows->info.mapped != MagickFalse)
     {
       /*
@@ -7636,6 +7686,18 @@ static MagickBooleanType XCropWaitHead(const CropContext *context,
         (*crop_info).height,(double) (*crop_info).x,(double) (*crop_info).y);
       XInfoWidget(context->display,context->windows,context->text);
     }
+}
+
+static MagickBooleanType XCropWaitHead(const CropContext *context,
+  const CropTargets *targets,RectangleInfo *highlight_info)
+{
+  size_t
+    *const state = targets->state;
+
+  RectangleInfo
+    *const crop_info = targets->crop_info;
+
+  XShowCropGeometryInfo(context,crop_info);
   (*highlight_info)=(*crop_info);
   (*highlight_info).x=(*crop_info).x-context->windows->image.x;
   (*highlight_info).y=(*crop_info).y-context->windows->image.y;
@@ -8050,9 +8112,8 @@ static inline MagickBooleanType IsBoxedElement(const ElementType v)
 static inline MagickBooleanType IsElementComplete(const ElementType element,
   const unsigned int distance)
 {
-  return((((element != PolygonElement) &&
-    (element != FillPolygonElement)) || (distance <= 9)) ? MagickTrue :
-    MagickFalse);
+  return((MagickBooleanType) (((element != PolygonElement) &&
+    (element != FillPolygonElement)) || (distance <= 9)));
 }
 
 typedef struct _DrawEditContext
@@ -8166,8 +8227,7 @@ static void XSelectDrawColor(const DrawEditContext *context,const int id,
     (const char **) ColorMenu,command);
   if (pen_number < 0)
     return;
-  transparent=pen_number == (MaxNumberPens-2) ? MagickTrue :
-    MagickFalse;
+  transparent=(MagickBooleanType) (pen_number == (MaxNumberPens-2));
   if (transparent != MagickFalse)
     {
       (*draw_info).stencil=TransparentStencil;
@@ -9209,6 +9269,15 @@ static void XSizeDrawRegion(const DrawEditContext *context,
     (*draw_info).x+x,(*draw_info).y+y);
 }
 
+static void XFlipDrawLineVertical(XDrawInfo *draw_info)
+{
+  if ((*draw_info).line_info.y2 < 0)
+    {
+      (*draw_info).line_info.y2=(-(*draw_info).line_info.y2);
+      Swap((*draw_info).line_info.y1,(*draw_info).line_info.y2);
+    }
+}
+
 static void XSetDrawLineInfo(XDrawInfo *draw_info,const XSegment *line_info,
   const unsigned int line_width)
 {
@@ -9231,11 +9300,7 @@ static void XSetDrawLineInfo(XDrawInfo *draw_info,const XSegment *line_info,
       (*draw_info).line_info.x2=(-(*draw_info).line_info.x2);
       Swap((*draw_info).line_info.x1,(*draw_info).line_info.x2);
     }
-  if ((*draw_info).line_info.y2 < 0)
-    {
-      (*draw_info).line_info.y2=(-(*draw_info).line_info.y2);
-      Swap((*draw_info).line_info.y1,(*draw_info).line_info.y2);
-    }
+  XFlipDrawLineVertical(draw_info);
 }
 
 static void XDrawStartEvent(const DrawEditContext *context,
@@ -9909,7 +9974,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
   }
   XSetCursorState(display,windows,MagickFalse);
   coordinate_info=(XPoint *) RelinquishMagickMemory(coordinate_info);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (status != 0));
 }
 
 /*
@@ -10045,6 +10110,16 @@ static void XTrimUndoCache(const XResourceInfo *resource_info,size_t *bytes,
     }
 }
 
+static void XCopyCropGeometryToCache(XWindows *windows,Image *cache_image)
+{
+  if (windows->image.crop_geometry != (char *) NULL)
+    {
+      cache_image->geometry=AcquireString((char *) NULL);
+      (void) CopyMagickString(cache_image->geometry,
+        windows->image.crop_geometry,MagickPathExtent);
+    }
+}
+
 static Image *XSaveUndoImage(const XImageCacheContext *cache_context,
   Image *undo_image)
 {
@@ -10091,12 +10166,7 @@ static Image *XSaveUndoImage(const XImageCacheContext *cache_context,
   cache_image->columns=(size_t) windows->image.ximage->width;
   cache_image->rows=(size_t) windows->image.ximage->height;
   cache_image->geometry=windows->image.crop_geometry;
-  if (windows->image.crop_geometry != (char *) NULL)
-    {
-      cache_image->geometry=AcquireString((char *) NULL);
-      (void) CopyMagickString(cache_image->geometry,
-        windows->image.crop_geometry,MagickPathExtent);
-    }
+  XCopyCropGeometryToCache(windows,cache_image);
   if (undo_image == (Image *) NULL)
     {
       undo_image=cache_image;
@@ -10241,6 +10311,16 @@ static void XUndoImageCache(const XImageCacheContext *cache_context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XShowImageCacheInfo(Display *display,XWindows *windows,
+  XResourceInfo *resource_info,Image *undo_image,Image **image,
+  ExceptionInfo *exception)
+{
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  XDisplayImageInfo(display,resource_info,windows,undo_image,*image,exception);
+  XSetCursorState(display,windows,MagickFalse);
+}
+
 static void XRedoOrShowImageCache(const XImageCacheContext *cache_context,
   const DisplayCommand command,Image **redo_image,Image *undo_image)
 {
@@ -10289,10 +10369,7 @@ static void XRedoOrShowImageCache(const XImageCacheContext *cache_context,
   /*
     Display image info.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  XDisplayImageInfo(display,resource_info,windows,undo_image,*image,exception);
-  XSetCursorState(display,windows,MagickFalse);
+  XShowImageCacheInfo(display,windows,resource_info,undo_image,image,exception);
 }
 
 static void XImageCache(const XImageCacheContext *cache_context,
@@ -10611,6 +10688,17 @@ static DisplayCommand XImmutableWindowCommand(const KeySym key_symbol)
   return(NullCommand);
 }
 
+static void XTrimBottomEdge(const KeySym key_symbol,
+  XResourceInfo *resource_info,RectangleInfo *crop_info)
+{
+  if ((key_symbol == XK_Down) || (key_symbol == XK_KP_Down))
+    {
+      XClampTrimBottomQuantum(resource_info,(*crop_info));
+      (*crop_info).y+=resource_info->quantum;
+      (*crop_info).height-=(size_t) resource_info->quantum;
+    }
+}
+
 static void XTrimVerticalEdges(XResourceInfo *resource_info,
   const KeySym key_symbol,RectangleInfo *crop_info)
 {
@@ -10619,12 +10707,7 @@ static void XTrimVerticalEdges(XResourceInfo *resource_info,
       XClampTrimTopQuantum(resource_info,(*crop_info));
       (*crop_info).height-=(size_t) resource_info->quantum;
     }
-  if ((key_symbol == XK_Down) || (key_symbol == XK_KP_Down))
-    {
-      XClampTrimBottomQuantum(resource_info,(*crop_info));
-      (*crop_info).y+=resource_info->quantum;
-      (*crop_info).height-=(size_t) resource_info->quantum;
-    }
+  XTrimBottomEdge(key_symbol,resource_info,crop_info);
 }
 
 static DisplayCommand XTrimImageWindowEdge(const ImageWindowKeyInput *input,
@@ -10868,19 +10951,17 @@ static DisplayCommand XImageWindowCommand(const ImageWindowKeyInput *input,
 static inline MagickBooleanType IsImageWindowUncropped(
   const XWindows *windows,Image **image)
 {
-  return(((windows->image.crop_geometry == (char *) NULL) &&
+  return((MagickBooleanType) ((windows->image.crop_geometry == (char *) NULL) &&
     ((int) (*image)->columns == windows->image.ximage->width) &&
-    ((int) (*image)->rows == windows->image.ximage->height)) ? MagickTrue :
-    MagickFalse);
+    ((int) (*image)->rows == windows->image.ximage->height)));
 }
 
 static inline MagickBooleanType IsImageWindowOriginalSize(
   const XWindows *windows,Image **image)
 {
-  return(((windows->image.width == (unsigned int) (*image)->columns) &&
-    (windows->image.height == (unsigned int) (*image)->rows) &&
-    (windows->image.crop_geometry == (char *) NULL)) ? MagickTrue :
-    MagickFalse);
+  return((MagickBooleanType) ((windows->image.width == (unsigned int)
+    (*image)->columns) && (windows->image.height == (unsigned int)
+    (*image)->rows) && (windows->image.crop_geometry == (char *) NULL)));
 }
 
 typedef struct _XMagickCommandContext
@@ -11328,6 +11409,22 @@ static void XApplyChopCommand(const XMagickCommandContext *context)
     }
 }
 
+static void XApplyFlopToImage(Display *display,XWindows *windows,Image **image,
+  ExceptionInfo *exception)
+{
+  Image
+    *flop_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flop_image=FlopImage(*image,exception);
+  if (flop_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=flop_image;
+    }
+}
+
 static void XApplyFlopCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11353,20 +11450,10 @@ static void XApplyFlopCommand(const XMagickCommandContext *context)
     height,
     width;
 
-  Image
-    *flop_image;
-
   /*
     Flop image scanlines.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  flop_image=FlopImage(*image,exception);
-  if (flop_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=flop_image;
-    }
+  XApplyFlopToImage(display,windows,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.crop_geometry != (char *) NULL)
@@ -11385,6 +11472,22 @@ static void XApplyFlopCommand(const XMagickCommandContext *context)
   if (windows->image.orphan != MagickFalse)
     return;
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyFlipToImage(Display *display,XWindows *windows,Image **image,
+  ExceptionInfo *exception)
+{
+  Image
+    *flip_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flip_image=FlipImage(*image,exception);
+  if (flip_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=flip_image;
+    }
 }
 
 static void XApplyFlipCommand(const XMagickCommandContext *context)
@@ -11412,20 +11515,10 @@ static void XApplyFlipCommand(const XMagickCommandContext *context)
     height,
     width;
 
-  Image
-    *flip_image;
-
   /*
     Flip image scanlines.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  flip_image=FlipImage(*image,exception);
-  if (flip_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=flip_image;
-    }
+  XApplyFlipToImage(display,windows,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.crop_geometry != (char *) NULL)
@@ -11586,6 +11679,18 @@ static void XApplyTrimCommand(const XMagickCommandContext *context)
     }
 }
 
+static void XApplySaturationToImage(Display *display,XWindows *windows,
+  char *modulate_factors,char *saturation_percent,Image **image,
+  ExceptionInfo *exception)
+{
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) CopyMagickString(modulate_factors,"100.0/",MagickPathExtent);
+  (void) ConcatenateMagickString(modulate_factors,saturation_percent,
+    MagickPathExtent);
+  (void) ModulateImage(*image,modulate_factors,exception);
+}
+
 static void XApplySaturationCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11619,17 +11724,24 @@ static void XApplySaturationCommand(const XMagickCommandContext *context)
   /*
     Vary color saturation.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) CopyMagickString(modulate_factors,"100.0/",MagickPathExtent);
-  (void) ConcatenateMagickString(modulate_factors,saturation_percent,
-    MagickPathExtent);
-  (void) ModulateImage(*image,modulate_factors,exception);
+  XApplySaturationToImage(display,windows,modulate_factors,saturation_percent,
+    image,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyBrightnessToImage(Display *display,XWindows *windows,
+  char *modulate_factors,char *brightness_percent,Image **image,
+  ExceptionInfo *exception)
+{
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) CopyMagickString(modulate_factors,brightness_percent,
+    MagickPathExtent);
+  (void) ModulateImage(*image,modulate_factors,exception);
 }
 
 static void XApplyBrightnessCommand(const XMagickCommandContext *context)
@@ -11665,16 +11777,21 @@ static void XApplyBrightnessCommand(const XMagickCommandContext *context)
   /*
     Vary the color brightness.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) CopyMagickString(modulate_factors,brightness_percent,
-    MagickPathExtent);
-  (void) ModulateImage(*image,modulate_factors,exception);
+  XApplyBrightnessToImage(display,windows,modulate_factors,brightness_percent,
+    image,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyGammaToImage(Display *display,XWindows *windows,Image **image,
+  char *factor,ExceptionInfo *exception)
+{
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) GammaImage(*image,strtod(factor,(char **) NULL),exception);
 }
 
 static void XApplyGammaCommand(const XMagickCommandContext *context)
@@ -11707,14 +11824,20 @@ static void XApplyGammaCommand(const XMagickCommandContext *context)
   /*
     Gamma correct image.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) GammaImage(*image,strtod(factor,(char **) NULL),exception);
+  XApplyGammaToImage(display,windows,image,factor,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplySpiffToImage(Display *display,XWindows *windows,Image **image,
+  ExceptionInfo *exception)
+{
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) ContrastImage(*image,MagickTrue,exception);
 }
 
 static void XApplySpiffCommand(const XMagickCommandContext *context)
@@ -11737,14 +11860,20 @@ static void XApplySpiffCommand(const XMagickCommandContext *context)
   /*
     Sharpen the image contrast.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) ContrastImage(*image,MagickTrue,exception);
+  XApplySpiffToImage(display,windows,image,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyDullToImage(Display *display,XWindows *windows,Image **image,
+  ExceptionInfo *exception)
+{
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) ContrastImage(*image,MagickFalse,exception);
 }
 
 static void XApplyDullCommand(const XMagickCommandContext *context)
@@ -11767,9 +11896,7 @@ static void XApplyDullCommand(const XMagickCommandContext *context)
   /*
     Dull the image contrast.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) ContrastImage(*image,MagickFalse,exception);
+  XApplyDullToImage(display,windows,image,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
@@ -11889,6 +12016,14 @@ static void XApplySigmoidalContrastCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyNormalizeToImage(Display *display,XWindows *windows,
+  Image **image,ExceptionInfo *exception)
+{
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) NormalizeImage(*image,exception);
+}
+
 static void XApplyNormalizeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11909,14 +12044,20 @@ static void XApplyNormalizeCommand(const XMagickCommandContext *context)
   /*
     Perform histogram normalization on the image.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) NormalizeImage(*image,exception);
+  XApplyNormalizeToImage(display,windows,image,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyEqualizeToImage(Display *display,XWindows *windows,
+  Image **image,ExceptionInfo *exception)
+{
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) EqualizeImage(*image,exception);
 }
 
 static void XApplyEqualizeCommand(const XMagickCommandContext *context)
@@ -11939,14 +12080,20 @@ static void XApplyEqualizeCommand(const XMagickCommandContext *context)
   /*
     Perform histogram equalization on the image.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) EqualizeImage(*image,exception);
+  XApplyEqualizeToImage(display,windows,image,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyNegateToImage(Display *display,XWindows *windows,
+  Image **image,ExceptionInfo *exception)
+{
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) NegateImage(*image,MagickFalse,exception);
 }
 
 static void XApplyNegateCommand(const XMagickCommandContext *context)
@@ -11969,14 +12116,21 @@ static void XApplyNegateCommand(const XMagickCommandContext *context)
   /*
     Negate colors in image.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) NegateImage(*image,MagickFalse,exception);
+  XApplyNegateToImage(display,windows,image,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyGrayscaleToImage(Display *display,XWindows *windows,
+  Image **image,ExceptionInfo *exception)
+{
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) SetImageType(*image,(*image)->alpha_trait == UndefinedPixelTrait ?
+    GrayscaleType : GrayscaleAlphaType,exception);
 }
 
 static void XApplyGrayscaleCommand(const XMagickCommandContext *context)
@@ -11999,10 +12153,7 @@ static void XApplyGrayscaleCommand(const XMagickCommandContext *context)
   /*
     Convert image to grayscale.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) SetImageType(*image,(*image)->alpha_trait == UndefinedPixelTrait ?
-    GrayscaleType : GrayscaleAlphaType,exception);
+  XApplyGrayscaleToImage(display,windows,image,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
@@ -12062,20 +12213,9 @@ static void XApplyResizeCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
-static void XApplyQuitCommand(const XMagickCommandContext *context)
+static void XQuitDisplayProgram(XResourceInfo *resource_info,Display *display,
+  XWindows *windows)
 {
-  Display
-    *const display = context->display;
-
-  XResourceInfo
-    *const resource_info = context->resource_info;
-
-  XWindows
-    *const windows = context->windows;
-
-  /*
-    exit program.
-  */
   if (resource_info->confirm_exit == MagickFalse)
     XClientMessage(display,windows->image.id,windows->im_protocols,
       windows->im_exit,CurrentTime);
@@ -12092,6 +12232,39 @@ static void XApplyQuitCommand(const XMagickCommandContext *context)
       if (status > 0)
         XClientMessage(display,windows->image.id,windows->im_protocols,
           windows->im_exit,CurrentTime);
+    }
+}
+
+static void XApplyQuitCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  /*
+    exit program.
+  */
+  XQuitDisplayProgram(resource_info,display,windows);
+}
+
+static void XApplyDespeckleToImage(Display *display,XWindows *windows,
+  Image **image,ExceptionInfo *exception)
+{
+  Image
+    *despeckle_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  despeckle_image=DespeckleImage(*image,exception);
+  if (despeckle_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=despeckle_image;
     }
 }
 
@@ -12112,20 +12285,10 @@ static void XApplyDespeckleCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
-  Image
-    *despeckle_image;
-
   /*
     Despeckle image.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  despeckle_image=DespeckleImage(*image,exception);
-  if (despeckle_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=despeckle_image;
-    }
+  XApplyDespeckleToImage(display,windows,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
@@ -12234,6 +12397,27 @@ static void XApplyQuantizeCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyReduceNoiseToImage(Display *display,XWindows *windows,
+  MagickStatusType *flags,char *radius,Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *noise_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(radius,&geometry_info);
+  noise_image=StatisticImage(*image,NonpeakStatistic,(size_t)
+    geometry_info.rho,(size_t) geometry_info.rho,exception);
+  if (noise_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=noise_image;
+    }
+}
+
 static void XApplyReduceNoiseCommand(const XMagickCommandContext *context,
   MagickStatusType *flags)
 {
@@ -12252,12 +12436,6 @@ static void XApplyReduceNoiseCommand(const XMagickCommandContext *context,
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  Image
-    *noise_image;
-
   static char
     radius[MagickPathExtent] = "0";
 
@@ -12271,22 +12449,34 @@ static void XApplyReduceNoiseCommand(const XMagickCommandContext *context,
   /*
     Reduce noise in the image.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  *flags=ParseGeometry(radius,&geometry_info);
-  noise_image=StatisticImage(*image,NonpeakStatistic,(size_t)
-    geometry_info.rho,(size_t) geometry_info.rho,exception);
-  if (noise_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=noise_image;
-    }
+  XApplyReduceNoiseToImage(display,windows,flags,radius,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplySharpenToImage(Display *display,XWindows *windows,
+  MagickStatusType *flags,char *radius,Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *sharp_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(radius,&geometry_info);
+  sharp_image=SharpenImage(*image,geometry_info.rho,geometry_info.sigma,
+    exception);
+  if (sharp_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=sharp_image;
+    }
 }
 
 static void XApplySharpenCommand(const XMagickCommandContext *context,
@@ -12307,12 +12497,6 @@ static void XApplySharpenCommand(const XMagickCommandContext *context,
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  Image
-    *sharp_image;
-
   static char
     radius[MagickPathExtent] = "0.0x1.0";
 
@@ -12326,22 +12510,34 @@ static void XApplySharpenCommand(const XMagickCommandContext *context,
   /*
     Sharpen image scanlines.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  *flags=ParseGeometry(radius,&geometry_info);
-  sharp_image=SharpenImage(*image,geometry_info.rho,geometry_info.sigma,
-    exception);
-  if (sharp_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=sharp_image;
-    }
+  XApplySharpenToImage(display,windows,flags,radius,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyBlurToImage(Display *display,XWindows *windows,
+  MagickStatusType *flags,char *radius,Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *blur_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(radius,&geometry_info);
+  blur_image=BlurImage(*image,geometry_info.rho,geometry_info.sigma,
+    exception);
+  if (blur_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=blur_image;
+    }
 }
 
 static void XApplyBlurCommand(const XMagickCommandContext *context,
@@ -12362,12 +12558,6 @@ static void XApplyBlurCommand(const XMagickCommandContext *context,
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  Image
-    *blur_image;
-
   static char
     radius[MagickPathExtent] = "0.0x1.0";
 
@@ -12381,22 +12571,25 @@ static void XApplyBlurCommand(const XMagickCommandContext *context,
   /*
     Blur an image.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  *flags=ParseGeometry(radius,&geometry_info);
-  blur_image=BlurImage(*image,geometry_info.rho,geometry_info.sigma,
-    exception);
-  if (blur_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=blur_image;
-    }
+  XApplyBlurToImage(display,windows,flags,radius,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyThresholdToImage(Display *display,XWindows *windows,
+  char *factor,Image **image,ExceptionInfo *exception)
+{
+  double
+    threshold;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  threshold=StringToDoubleInterval(factor,(double) QuantumRange+1.0);
+  (void) BilevelImage(*image,threshold,exception);
 }
 
 static void XApplyThresholdCommand(const XMagickCommandContext *context)
@@ -12416,9 +12609,6 @@ static void XApplyThresholdCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
-  double
-    threshold;
-
   static char
     factor[MagickPathExtent] = "128";
 
@@ -12432,15 +12622,32 @@ static void XApplyThresholdCommand(const XMagickCommandContext *context)
   /*
     Gamma correct image.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  threshold=StringToDoubleInterval(factor,(double) QuantumRange+1.0);
-  (void) BilevelImage(*image,threshold,exception);
+  XApplyThresholdToImage(display,windows,factor,image,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyEdgeDetectToImage(Display *display,XWindows *windows,
+  MagickStatusType *flags,char *radius,Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *edge_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(radius,&geometry_info);
+  edge_image=EdgeImage(*image,geometry_info.rho,exception);
+  if (edge_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=edge_image;
+    }
 }
 
 static void XApplyEdgeDetectCommand(const XMagickCommandContext *context,
@@ -12461,12 +12668,6 @@ static void XApplyEdgeDetectCommand(const XMagickCommandContext *context,
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  Image
-    *edge_image;
-
   static char
     radius[MagickPathExtent] = "0";
 
@@ -12480,21 +12681,33 @@ static void XApplyEdgeDetectCommand(const XMagickCommandContext *context,
   /*
     Detect edge in image.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  *flags=ParseGeometry(radius,&geometry_info);
-  edge_image=EdgeImage(*image,geometry_info.rho,exception);
-  if (edge_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=edge_image;
-    }
+  XApplyEdgeDetectToImage(display,windows,flags,radius,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplySpreadToImage(Display *display,XWindows *windows,
+  MagickStatusType *flags,char *amount,Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *spread_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(amount,&geometry_info);
+  spread_image=EdgeImage(*image,geometry_info.rho,exception);
+  if (spread_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=spread_image;
+    }
 }
 
 static void XApplySpreadCommand(const XMagickCommandContext *context,
@@ -12515,12 +12728,6 @@ static void XApplySpreadCommand(const XMagickCommandContext *context,
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  Image
-    *spread_image;
-
   static char
     amount[MagickPathExtent] = "2";
 
@@ -12534,21 +12741,39 @@ static void XApplySpreadCommand(const XMagickCommandContext *context,
   /*
     Displace image pixels by a random amount.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  *flags=ParseGeometry(amount,&geometry_info);
-  spread_image=EdgeImage(*image,geometry_info.rho,exception);
-  if (spread_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=spread_image;
-    }
+  XApplySpreadToImage(display,windows,flags,amount,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyShadeToImage(Display *display,XWindows *windows,
+  char *geometry,Image **image,int status,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  Image
+    *shade_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flags=ParseGeometry(geometry,&geometry_info);
+  if ((flags & SigmaValue) == 0)
+    geometry_info.sigma=1.0;
+  shade_image=ShadeImage(*image,(MagickBooleanType) (status != 0),
+    geometry_info.rho,geometry_info.sigma,exception);
+  if (shade_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=shade_image;
+    }
 }
 
 static void XApplyShadeCommand(const XMagickCommandContext *context)
@@ -12568,15 +12793,6 @@ static void XApplyShadeCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  MagickStatusType
-    flags;
-
-  Image
-    *shade_image;
-
   int
     status;
 
@@ -12593,24 +12809,26 @@ static void XApplyShadeCommand(const XMagickCommandContext *context)
   /*
     Shade image pixels.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  flags=ParseGeometry(geometry,&geometry_info);
-  if ((flags & SigmaValue) == 0)
-    geometry_info.sigma=1.0;
-  shade_image=ShadeImage(*image,status != 0 ? MagickTrue : MagickFalse,
-    geometry_info.rho,geometry_info.sigma,exception);
-  if (shade_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=shade_image;
-    }
+  XApplyShadeToImage(display,windows,geometry,image,status,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyRaiseToImage(Display *display,XWindows *windows,Image **image,
+  char *bevel_width,ExceptionInfo *exception)
+{
+  RectangleInfo
+    page_geometry;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) ParsePageGeometry(*image,bevel_width,&page_geometry,
+    exception);
+  (void) RaiseImage(*image,&page_geometry,MagickTrue,exception);
 }
 
 static void XApplyRaiseCommand(const XMagickCommandContext *context)
@@ -12630,9 +12848,6 @@ static void XApplyRaiseCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
-  RectangleInfo
-    page_geometry;
-
   static char
     bevel_width[MagickPathExtent] = "10";
 
@@ -12647,16 +12862,30 @@ static void XApplyRaiseCommand(const XMagickCommandContext *context)
   */
   (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
     exception);
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) ParsePageGeometry(*image,bevel_width,&page_geometry,
-    exception);
-  (void) RaiseImage(*image,&page_geometry,MagickTrue,exception);
+  XApplyRaiseToImage(display,windows,image,bevel_width,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplySegmentToImage(Display *display,XWindows *windows,
+  char *threshold,Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flags=ParseGeometry(threshold,&geometry_info);
+  if ((flags & SigmaValue) == 0)
+    geometry_info.sigma=1.0;
+  (void) SegmentImage(*image,sRGBColorspace,MagickFalse,geometry_info.rho,
+    geometry_info.sigma,exception);
 }
 
 static void XApplySegmentCommand(const XMagickCommandContext *context)
@@ -12676,12 +12905,6 @@ static void XApplySegmentCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  MagickStatusType
-    flags;
-
   static char
     threshold[MagickPathExtent] = "1.0x1.5";
 
@@ -12695,18 +12918,32 @@ static void XApplySegmentCommand(const XMagickCommandContext *context)
   /*
     Segment an image.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  flags=ParseGeometry(threshold,&geometry_info);
-  if ((flags & SigmaValue) == 0)
-    geometry_info.sigma=1.0;
-  (void) SegmentImage(*image,sRGBColorspace,MagickFalse,geometry_info.rho,
-    geometry_info.sigma,exception);
+  XApplySegmentToImage(display,windows,threshold,image,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplySepiaToneToImage(Display *display,XWindows *windows,
+  char *factor,Image **image,ExceptionInfo *exception)
+{
+  double
+    threshold;
+
+  Image
+    *sepia_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  threshold=StringToDoubleInterval(factor,(double) QuantumRange+1.0);
+  sepia_image=SepiaToneImage(*image,threshold,exception);
+  if (sepia_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=sepia_image;
+    }
 }
 
 static void XApplySepiaToneCommand(const XMagickCommandContext *context)
@@ -12726,12 +12963,6 @@ static void XApplySepiaToneCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
-  double
-    threshold;
-
-  Image
-    *sepia_image;
-
   static char
     factor[MagickPathExtent] = "80%";
 
@@ -12745,21 +12976,25 @@ static void XApplySepiaToneCommand(const XMagickCommandContext *context)
   /*
     Sepia tone image pixels.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  threshold=StringToDoubleInterval(factor,(double) QuantumRange+1.0);
-  sepia_image=SepiaToneImage(*image,threshold,exception);
-  if (sepia_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=sepia_image;
-    }
+  XApplySepiaToneToImage(display,windows,factor,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplySolarizeToImage(Display *display,XWindows *windows,
+  char *factor,Image **image,ExceptionInfo *exception)
+{
+  double
+    threshold;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  threshold=StringToDoubleInterval(factor,(double) QuantumRange+1.0);
+  (void) SolarizeImage(*image,threshold,exception);
 }
 
 static void XApplySolarizeCommand(const XMagickCommandContext *context)
@@ -12779,9 +13014,6 @@ static void XApplySolarizeCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
-  double
-    threshold;
-
   static char
     factor[MagickPathExtent] = "60%";
 
@@ -12795,15 +13027,33 @@ static void XApplySolarizeCommand(const XMagickCommandContext *context)
   /*
     Solarize image pixels.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  threshold=StringToDoubleInterval(factor,(double) QuantumRange+1.0);
-  (void) SolarizeImage(*image,threshold,exception);
+  XApplySolarizeToImage(display,windows,factor,image,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplySwirlToImage(Display *display,XWindows *windows,
+  MagickStatusType *flags,char *degrees,Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *swirl_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(degrees,&geometry_info);
+  swirl_image=SwirlImage(*image,geometry_info.rho,(*image)->interpolate,
+    exception);
+  if (swirl_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=swirl_image;
+    }
 }
 
 static void XApplySwirlCommand(const XMagickCommandContext *context,
@@ -12824,12 +13074,6 @@ static void XApplySwirlCommand(const XMagickCommandContext *context,
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  Image
-    *swirl_image;
-
   static char
     degrees[MagickPathExtent] = "60";
 
@@ -12843,22 +13087,34 @@ static void XApplySwirlCommand(const XMagickCommandContext *context,
   /*
     Swirl image pixels about the center.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  *flags=ParseGeometry(degrees,&geometry_info);
-  swirl_image=SwirlImage(*image,geometry_info.rho,(*image)->interpolate,
-    exception);
-  if (swirl_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=swirl_image;
-    }
+  XApplySwirlToImage(display,windows,flags,degrees,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyImplodeToImage(Display *display,XWindows *windows,
+  MagickStatusType *flags,char *factor,Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *implode_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(factor,&geometry_info);
+  implode_image=ImplodeImage(*image,geometry_info.rho,(*image)->interpolate,
+    exception);
+  if (implode_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=implode_image;
+    }
 }
 
 static void XApplyImplodeCommand(const XMagickCommandContext *context,
@@ -12879,12 +13135,6 @@ static void XApplyImplodeCommand(const XMagickCommandContext *context,
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  Image
-    *implode_image;
-
   static char
     factor[MagickPathExtent] = "0.3";
 
@@ -12898,22 +13148,44 @@ static void XApplyImplodeCommand(const XMagickCommandContext *context,
   /*
     Implode image pixels about the center.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  *flags=ParseGeometry(factor,&geometry_info);
-  implode_image=ImplodeImage(*image,geometry_info.rho,(*image)->interpolate,
-    exception);
-  if (implode_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=implode_image;
-    }
+  XApplyImplodeToImage(display,windows,flags,factor,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyVignetteToImage(Display *display,XWindows *windows,
+  char *geometry,Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  Image
+    *vignette_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flags=ParseGeometry(geometry,&geometry_info);
+  if ((flags & SigmaValue) == 0)
+    geometry_info.sigma=1.0;
+  if ((flags & XiValue) == 0)
+    geometry_info.xi=0.1*(*image)->columns;
+  if ((flags & PsiValue) == 0)
+    geometry_info.psi=0.1*(*image)->rows;
+  vignette_image=VignetteImage(*image,geometry_info.rho,0.0,(ssize_t)
+    ceil(geometry_info.xi-0.5),(ssize_t) ceil(geometry_info.psi-0.5),
+    exception);
+  if (vignette_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=vignette_image;
+    }
 }
 
 static void XApplyVignetteCommand(const XMagickCommandContext *context)
@@ -12933,15 +13205,6 @@ static void XApplyVignetteCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  MagickStatusType
-    flags;
-
-  Image
-    *vignette_image;
-
   static char
     geometry[MagickPathExtent] = "0x20";
 
@@ -12955,29 +13218,35 @@ static void XApplyVignetteCommand(const XMagickCommandContext *context)
   /*
     Soften the edges of the image in vignette style
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  flags=ParseGeometry(geometry,&geometry_info);
-  if ((flags & SigmaValue) == 0)
-    geometry_info.sigma=1.0;
-  if ((flags & XiValue) == 0)
-    geometry_info.xi=0.1*(*image)->columns;
-  if ((flags & PsiValue) == 0)
-    geometry_info.psi=0.1*(*image)->rows;
-  vignette_image=VignetteImage(*image,geometry_info.rho,0.0,(ssize_t)
-    ceil(geometry_info.xi-0.5),(ssize_t) ceil(geometry_info.psi-0.5),
-    exception);
-  if (vignette_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=vignette_image;
-    }
+  XApplyVignetteToImage(display,windows,geometry,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyRollToImage(Display *display,XWindows *windows,Image **image,
+  char *geometry,ExceptionInfo *exception)
+{
+  RectangleInfo
+    page_geometry;
+
+  Image
+    *roll_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) ParsePageGeometry(*image,geometry,&page_geometry,
+    exception);
+  roll_image=RollImage(*image,page_geometry.x,page_geometry.y,
+    exception);
+  if (roll_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=roll_image;
+    }
 }
 
 static void XApplyRollCommand(const XMagickCommandContext *context)
@@ -12997,12 +13266,6 @@ static void XApplyRollCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
-  RectangleInfo
-    page_geometry;
-
-  Image
-    *roll_image;
-
   static char
     geometry[MagickPathExtent] = "+2+2";
 
@@ -13018,17 +13281,7 @@ static void XApplyRollCommand(const XMagickCommandContext *context)
   */
   (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
     exception);
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) ParsePageGeometry(*image,geometry,&page_geometry,
-    exception);
-  roll_image=RollImage(*image,page_geometry.x,page_geometry.y,
-    exception);
-  if (roll_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=roll_image;
-    }
+  XApplyRollToImage(display,windows,image,geometry,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
@@ -13037,6 +13290,18 @@ static void XApplyRollCommand(const XMagickCommandContext *context)
   windows->image.window_changes.height=(int) (*image)->rows;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyHueToImage(Display *display,XWindows *windows,
+  char *modulate_factors,char *hue_percent,Image **image,
+  ExceptionInfo *exception)
+{
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) CopyMagickString(modulate_factors,"100.0/100.0/",MagickPathExtent);
+  (void) ConcatenateMagickString(modulate_factors,hue_percent,
+    MagickPathExtent);
+  (void) ModulateImage(*image,modulate_factors,exception);
 }
 
 static void XApplyHueCommand(const XMagickCommandContext *context)
@@ -13072,17 +13337,39 @@ static void XApplyHueCommand(const XMagickCommandContext *context)
   /*
     Vary the image hue.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) CopyMagickString(modulate_factors,"100.0/100.0/",MagickPathExtent);
-  (void) ConcatenateMagickString(modulate_factors,hue_percent,
-    MagickPathExtent);
-  (void) ModulateImage(*image,modulate_factors,exception);
+  XApplyHueToImage(display,windows,modulate_factors,hue_percent,image,
+    exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyEmbossToImage(Display *display,XWindows *windows,char *radius,
+  Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  Image
+    *emboss_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flags=ParseGeometry(radius,&geometry_info);
+  if ((flags & SigmaValue) == 0)
+    geometry_info.sigma=1.0;
+  emboss_image=EmbossImage(*image,geometry_info.rho,geometry_info.sigma,
+    exception);
+  if (emboss_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=emboss_image;
+    }
 }
 
 static void XApplyEmbossCommand(const XMagickCommandContext *context)
@@ -13102,15 +13389,6 @@ static void XApplyEmbossCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  MagickStatusType
-    flags;
-
-  Image
-    *emboss_image;
-
   static char
     radius[MagickPathExtent] = "0.0x1.0";
 
@@ -13124,24 +13402,39 @@ static void XApplyEmbossCommand(const XMagickCommandContext *context)
   /*
     Reduce noise in the image.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  flags=ParseGeometry(radius,&geometry_info);
-  if ((flags & SigmaValue) == 0)
-    geometry_info.sigma=1.0;
-  emboss_image=EmbossImage(*image,geometry_info.rho,geometry_info.sigma,
-    exception);
-  if (emboss_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=emboss_image;
-    }
+  XApplyEmbossToImage(display,windows,radius,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyWaveToImage(Display *display,XWindows *windows,char *geometry,
+  Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  Image
+    *wave_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flags=ParseGeometry(geometry,&geometry_info);
+  if ((flags & SigmaValue) == 0)
+    geometry_info.sigma=1.0;
+  wave_image=WaveImage(*image,geometry_info.rho,geometry_info.sigma,
+    (*image)->interpolate,exception);
+  if (wave_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=wave_image;
+    }
 }
 
 static void XApplyWaveCommand(const XMagickCommandContext *context)
@@ -13161,15 +13454,6 @@ static void XApplyWaveCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  MagickStatusType
-    flags;
-
-  Image
-    *wave_image;
-
   static char
     geometry[MagickPathExtent] = "25x150";
 
@@ -13183,24 +13467,34 @@ static void XApplyWaveCommand(const XMagickCommandContext *context)
   /*
     Alter an image along a sine wave.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  flags=ParseGeometry(geometry,&geometry_info);
-  if ((flags & SigmaValue) == 0)
-    geometry_info.sigma=1.0;
-  wave_image=WaveImage(*image,geometry_info.rho,geometry_info.sigma,
-    (*image)->interpolate,exception);
-  if (wave_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=wave_image;
-    }
+  XApplyWaveToImage(display,windows,geometry,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyOilPaintToImage(Display *display,XWindows *windows,
+  MagickStatusType *flags,char *radius,Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *paint_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(radius,&geometry_info);
+  paint_image=OilPaintImage(*image,geometry_info.rho,geometry_info.sigma,
+    exception);
+  if (paint_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=paint_image;
+    }
 }
 
 static void XApplyOilPaintCommand(const XMagickCommandContext *context,
@@ -13221,12 +13515,6 @@ static void XApplyOilPaintCommand(const XMagickCommandContext *context,
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  Image
-    *paint_image;
-
   static char
     radius[MagickPathExtent] = "0";
 
@@ -13240,22 +13528,39 @@ static void XApplyOilPaintCommand(const XMagickCommandContext *context,
   /*
     OilPaint image scanlines.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  *flags=ParseGeometry(radius,&geometry_info);
-  paint_image=OilPaintImage(*image,geometry_info.rho,geometry_info.sigma,
-    exception);
-  if (paint_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=paint_image;
-    }
+  XApplyOilPaintToImage(display,windows,flags,radius,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
   XConfigureImageColormap(display,resource_info,windows,*image,exception);
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
+static void XApplyCharcoalDrawToImage(Display *display,XWindows *windows,
+  char *radius,Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  Image
+    *charcoal_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flags=ParseGeometry(radius,&geometry_info);
+  if ((flags & SigmaValue) == 0)
+    geometry_info.sigma=geometry_info.rho;
+  charcoal_image=CharcoalImage(*image,geometry_info.rho,geometry_info.sigma,
+    exception);
+  if (charcoal_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=charcoal_image;
+    }
 }
 
 static void XApplyCharcoalDrawCommand(const XMagickCommandContext *context)
@@ -13275,15 +13580,6 @@ static void XApplyCharcoalDrawCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  MagickStatusType
-    flags;
-
-  Image
-    *charcoal_image;
-
   static char
     radius[MagickPathExtent] = "0x1";
 
@@ -13299,18 +13595,7 @@ static void XApplyCharcoalDrawCommand(const XMagickCommandContext *context)
   */
   (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
     exception);
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  flags=ParseGeometry(radius,&geometry_info);
-  if ((flags & SigmaValue) == 0)
-    geometry_info.sigma=geometry_info.rho;
-  charcoal_image=CharcoalImage(*image,geometry_info.rho,geometry_info.sigma,
-    exception);
-  if (charcoal_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=charcoal_image;
-    }
+  XApplyCharcoalDrawToImage(display,windows,radius,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
@@ -13789,31 +14074,12 @@ static void XApplyZoomCommand(const XMagickCommandContext *context)
     }
 }
 
-static void XApplyShowPreviewCommand(const XMagickCommandContext *context)
+static void XShowImagePreview(Display *display,XWindows *windows,
+  char *preview_type,Image **image,char *filename,ImageInfo *image_info,
+  ExceptionInfo *exception)
 {
-  Display
-    *const display = context->display;
-
-  XWindows
-    *const windows = context->windows;
-
-  Image
-    **const image = context->image;
-
-  ImageInfo
-    *const image_info = context->image_info;
-
-  ExceptionInfo
-    *const exception = context->exception;
-
   MagickStatusType
     status;
-
-  char
-    filename[MagickPathExtent];
-
-  char
-    **previews;
 
   Image
     *preview_image;
@@ -13821,24 +14087,6 @@ static void XApplyShowPreviewCommand(const XMagickCommandContext *context)
   PreviewType
     preview;
 
-  static char
-    preview_type[MagickPathExtent] = "Gamma";
-
-  /*
-    Select preview type from menu.
-  */
-  previews=GetCommandOptions(MagickPreviewOptions);
-  if (previews == (char **) NULL)
-    return;
-  XListBrowserWidget(display,windows,&windows->widget,
-    (const char **) previews,"Preview",
-    "Select an enhancement, effect, or F/X:",preview_type);
-  previews=DestroyStringList(previews);
-  if (*preview_type == '\0')
-    return;
-  /*
-    Show image preview.
-  */
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
   preview=(PreviewType) ParseCommandOption(MagickPreviewOptions,
@@ -13861,6 +14109,51 @@ static void XApplyShowPreviewCommand(const XMagickCommandContext *context)
       (*image)->filename);
   XDelay(display,1500);
   XSetCursorState(display,windows,MagickFalse);
+}
+
+static void XApplyShowPreviewCommand(const XMagickCommandContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ImageInfo
+    *const image_info = context->image_info;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
+  char
+    filename[MagickPathExtent];
+
+  char
+    **previews;
+
+  static char
+    preview_type[MagickPathExtent] = "Gamma";
+
+  /*
+    Select preview type from menu.
+  */
+  previews=GetCommandOptions(MagickPreviewOptions);
+  if (previews == (char **) NULL)
+    return;
+  XListBrowserWidget(display,windows,&windows->widget,
+    (const char **) previews,"Preview",
+    "Select an enhancement, effect, or F/X:",preview_type);
+  previews=DestroyStringList(previews);
+  if (*preview_type == '\0')
+    return;
+  /*
+    Show image preview.
+  */
+  XShowImagePreview(display,windows,preview_type,image,filename,image_info,
+    exception);
 }
 
 static void XApplyShowHistogramCommand(const XMagickCommandContext *context)
@@ -14137,6 +14430,23 @@ static void XApplyBrowseDocumentationCommand(
   XSetCursorState(display,windows,MagickFalse);
 }
 
+static void XApplyAddNoiseToImage(Display *display,XWindows *windows,
+  Image **image,char *noise_type,ExceptionInfo *exception)
+{
+  Image
+    *noise_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  noise_image=AddNoiseImage(*image,(NoiseType) ParseCommandOption(
+    MagickNoiseOptions,MagickFalse,noise_type),1.0,exception);
+  if (noise_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=noise_image;
+    }
+}
+
 static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
 {
   Display
@@ -14157,9 +14467,6 @@ static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
   char
     **noises;
 
-  Image
-    *noise_image;
-
   static char
     noise_type[MagickPathExtent] = "Gaussian";
 
@@ -14175,15 +14482,7 @@ static void XApplyAddNoiseCommand(const XMagickCommandContext *context)
   noises=DestroyStringList(noises);
   if (*noise_type == '\0')
     return;
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  noise_image=AddNoiseImage(*image,(NoiseType) ParseCommandOption(
-    MagickNoiseOptions,MagickFalse,noise_type),1.0,exception);
-  if (noise_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=noise_image;
-    }
+  XApplyAddNoiseToImage(display,windows,image,noise_type,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
@@ -14387,6 +14686,23 @@ static void XApplyShearCommand(const XMagickCommandContext *context,char *color)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyCropAndScale(char *image_geometry,XWindows *windows,
+  Image **image,Display *display,XResourceInfo *resource_info,
+  ExceptionInfo *exception)
+{
+  (void) FormatLocaleString(image_geometry,MagickPathExtent,"%dx%d!",
+    windows->image.ximage->width,windows->image.ximage->height);
+  (void) TransformImage(image,windows->image.crop_geometry,image_geometry,
+    exception);
+  if (windows->image.crop_geometry != (char *) NULL)
+    windows->image.crop_geometry=(char *) RelinquishMagickMemory(
+      windows->image.crop_geometry);
+  windows->image.x=0;
+  windows->image.y=0;
+  XConfigureImageColormap(display,resource_info,windows,*image,exception);
+  (void) XConfigureImage(display,resource_info,windows,*image,exception);
+}
+
 static void XApplyApplyCommand(const XMagickCommandContext *context)
 {
   Display
@@ -14417,17 +14733,8 @@ static void XApplyApplyCommand(const XMagickCommandContext *context)
   /*
     Crop and/or scale displayed image.
   */
-  (void) FormatLocaleString(image_geometry,MagickPathExtent,"%dx%d!",
-    windows->image.ximage->width,windows->image.ximage->height);
-  (void) TransformImage(image,windows->image.crop_geometry,image_geometry,
+  XApplyCropAndScale(image_geometry,windows,image,display,resource_info,
     exception);
-  if (windows->image.crop_geometry != (char *) NULL)
-    windows->image.crop_geometry=(char *) RelinquishMagickMemory(
-      windows->image.crop_geometry);
-  windows->image.x=0;
-  windows->image.y=0;
-  XConfigureImageColormap(display,resource_info,windows,*image,exception);
-  (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
 static void XApplyRegionOfInterestCommand(const XMagickCommandContext *context)
@@ -15076,8 +15383,8 @@ static void XClampMagnifyPosition(XWindows *windows,int *x,int *y)
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static void XMagnifyImage(Display *display,XWindows *windows,XEvent *event,
-  ExceptionInfo *exception)
+static void XTrackMagnifyButton(Display *display,XWindows *windows,
+  XEvent *event,ExceptionInfo *exception)
 {
   int
     x,
@@ -15086,9 +15393,6 @@ static void XMagnifyImage(Display *display,XWindows *windows,XEvent *event,
   size_t
     state;
 
-  /*
-    Update magnified image until the mouse button is released.
-  */
   (void) XCheckDefineCursor(display,windows->image.id,windows->magnify.cursor);
   state=DefaultState;
   x=event->xbutton.x;
@@ -15135,6 +15439,15 @@ static void XMagnifyImage(Display *display,XWindows *windows,XEvent *event,
     */
     XClampMagnifyPosition(windows,&x,&y);
   } while ((state & ExitState) == 0);
+}
+
+static void XMagnifyImage(Display *display,XWindows *windows,XEvent *event,
+  ExceptionInfo *exception)
+{
+  /*
+    Update magnified image until the mouse button is released.
+  */
+  XTrackMagnifyButton(display,windows,event,exception);
   /*
     Display magnified image.
   */
@@ -15278,27 +15591,9 @@ static void XMoveMagnifyPosition(XWindows *windows,const unsigned int quantum,
   }
 }
 
-static void XMagnifyWindowCommand(const MagnifyWindowInput *input,
-  const MagickStatusType state,const KeySym key_symbol)
+static void XApplyMagnifyKey(const KeySym key_symbol,Display *display,
+  XWindows *windows,unsigned int quantum)
 {
-  Display
-    *const display = input->display;
-
-  ExceptionInfo
-    *const exception = input->exception;
-
-  XWindows
-    *const windows = input->windows;
-
-  unsigned int
-    quantum;
-
-  /*
-    User specified a magnify factor or position.
-  */
-  quantum=1;
-  if ((state & Mod1Mask) != 0)
-    quantum=10;
   switch ((int) key_symbol)
   {
     case QuitCommand:
@@ -15320,6 +15615,30 @@ static void XMagnifyWindowCommand(const MagnifyWindowInput *input,
       break;
     }
   }
+}
+
+static void XMagnifyWindowCommand(const MagnifyWindowInput *input,
+  const MagickStatusType state,const KeySym key_symbol)
+{
+  Display
+    *const display = input->display;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  XWindows
+    *const windows = input->windows;
+
+  unsigned int
+    quantum;
+
+  /*
+    User specified a magnify factor or position.
+  */
+  quantum=1;
+  if ((state & Mod1Mask) != 0)
+    quantum=10;
+  XApplyMagnifyKey(key_symbol,display,windows,quantum);
   XMakeMagnifyImage(display,windows,exception);
 }
 
@@ -15730,7 +16049,7 @@ static void XMatteFloodfill(const MatteEditPixelInput *pixel_input)
   channel_mask=SetImageChannelMask(*image,AlphaChannel);
   (void) FloodfillPaintImage(*image,draw_info,&target,(ssize_t)
     x_offset,(ssize_t) y_offset,
-    method != FloodfillMethod ? MagickTrue : MagickFalse,exception);
+    (MagickBooleanType) (method != FloodfillMethod),exception);
   (void) SetPixelChannelMask(*image,channel_mask);
   draw_info=DestroyDrawInfo(draw_info);
 }
@@ -16795,6 +17114,17 @@ static Cursor XSelectPanCursor(Display *display,XWindows *windows)
   return(cursor);
 }
 
+static void XClampPanOffsetY(RectangleInfo *pan_info,XWindows *windows)
+{
+  if ((*pan_info).y < 0)
+    (*pan_info).y=0;
+  else
+    if ((int) ((*pan_info).y+windows->image.height) >
+        windows->image.ximage->height)
+      (*pan_info).y=(ssize_t) (windows->image.ximage->height-(int)
+        windows->image.height);
+}
+
 static void XClampPanOffset(XWindows *windows,RectangleInfo *pan_info,
   const double x_factor,const double y_factor)
 {
@@ -16815,13 +17145,7 @@ static void XClampPanOffset(XWindows *windows,RectangleInfo *pan_info,
   else
     (*pan_info).y=(ssize_t) (y_factor*((*pan_info).y-((int)
       (*pan_info).height/2)));
-  if ((*pan_info).y < 0)
-    (*pan_info).y=0;
-  else
-    if ((int) ((*pan_info).y+windows->image.height) >
-        windows->image.ximage->height)
-      (*pan_info).y=(ssize_t) (windows->image.ximage->height-(int)
-        windows->image.height);
+  XClampPanOffsetY(pan_info,windows);
 }
 
 static void XDisplayPanOffset(Display *display,XWindows *windows,
@@ -16881,12 +17205,9 @@ static void XDisplayPanOffset(Display *display,XWindows *windows,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static void XPanImage(Display *display,XWindows *windows,XEvent *event,
+static void XTrackPanPointer(XWindows *windows,XEvent *event,Display *display,
   ExceptionInfo *exception)
 {
-  Cursor
-    cursor;
-
   double
     x_factor,
     y_factor;
@@ -16897,14 +17218,6 @@ static void XPanImage(Display *display,XWindows *windows,XEvent *event,
   size_t
     state;
 
-  /*
-    Define cursor.
-  */
-  cursor=XSelectPanCursor(display,windows);
-  (void) XCheckDefineCursor(display,windows->pan.id,cursor);
-  /*
-    Pan image as pointer moves until the mouse button is released.
-  */
   x_factor=(double) windows->image.ximage->width/windows->pan.width;
   y_factor=(double) windows->image.ximage->height/windows->pan.height;
   pan_info.width=windows->pan.width*windows->image.width/
@@ -16962,12 +17275,34 @@ static void XPanImage(Display *display,XWindows *windows,XEvent *event,
     if ((state & ExitState) == 0)
       XScreenEvent(display,windows,event,exception);
   } while ((state & ExitState) == 0);
-  /*
-    Restore cursor.
-  */
+}
+
+static void XRestorePanCursor(Display *display,XWindows *windows,Cursor cursor)
+{
   (void) XCheckDefineCursor(display,windows->pan.id,windows->pan.cursor);
   (void) XFreeCursor(display,cursor);
   (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+}
+
+static void XPanImage(Display *display,XWindows *windows,XEvent *event,
+  ExceptionInfo *exception)
+{
+  Cursor
+    cursor;
+
+  /*
+    Define cursor.
+  */
+  cursor=XSelectPanCursor(display,windows);
+  (void) XCheckDefineCursor(display,windows->pan.id,cursor);
+  /*
+    Pan image as pointer moves until the mouse button is released.
+  */
+  XTrackPanPointer(windows,event,display,exception);
+  /*
+    Restore cursor.
+  */
+  XRestorePanCursor(display,windows,cursor);
 }
 
 /*
@@ -17735,7 +18070,7 @@ static MagickBooleanType XPrintImage(Display *display,
   print_image=DestroyImage(print_image);
   image_info=DestroyImageInfo(image_info);
   XSetCursorState(display,windows,MagickFalse);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (status != 0));
 }
 
 /*
@@ -20461,11 +20796,10 @@ static MagickBooleanType XRotateImage(Display *display,
 static inline MagickBooleanType IsPostscriptFormat(
   const ImageInfo *image_info)
 {
-  return(((LocaleCompare(image_info->magick,"EPS") == 0) ||
+  return((MagickBooleanType) ((LocaleCompare(image_info->magick,"EPS") == 0) ||
     (LocaleCompare(image_info->magick,"PDF") == 0) ||
     (LocaleCompare(image_info->magick,"PS") == 0) ||
-    (LocaleCompare(image_info->magick,"PS2") == 0)) ? MagickTrue :
-    MagickFalse);
+    (LocaleCompare(image_info->magick,"PS2") == 0)));
 }
 
 static void XSelectPageGeometry(Display *display,XWindows *windows,
@@ -20636,7 +20970,7 @@ static MagickBooleanType XSaveImage(Display *display,
   save_image=DestroyImage(save_image);
   image_info=DestroyImageInfo(image_info);
   XSetCursorState(display,windows,MagickFalse);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (status != 0));
 }
 
 /*
@@ -20875,14 +21209,13 @@ static void XScreenMap(Display *display,XWindows *windows,XEvent *event)
     }
 }
 
-static void XScreenMotion(Display *display,XWindows *windows,XEvent *event,
-  ExceptionInfo *exception)
+static void XTrackScreenMagnify(XEvent *event,XWindows *windows,
+  Display *display,ExceptionInfo *exception)
 {
   int
     x,
     y;
 
-  while (XCheckMaskEvent(display,ButtonMotionMask,event)) ;
   if ((event->xmotion.window == windows->image.id) &&
       (windows->magnify.mapped != MagickFalse))
     {
@@ -20894,6 +21227,13 @@ static void XScreenMotion(Display *display,XWindows *windows,XEvent *event,
       XSetMagnifyPosition(windows,x,y);
       XMakeMagnifyImage(display,windows,exception);
     }
+}
+
+static void XScreenMotion(Display *display,XWindows *windows,XEvent *event,
+  ExceptionInfo *exception)
+{
+  while (XCheckMaskEvent(display,ButtonMotionMask,event)) ;
+  XTrackScreenMagnify(event,windows,display,exception);
 }
 
 static void XScreenUnmap(Display *display,XWindows *windows,XEvent *event)
@@ -20945,12 +21285,9 @@ static void XScreenOtherEvent(Display *display,XWindows *windows,XEvent *event,
   }
 }
 
-static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
-  ExceptionInfo *exception)
+static void XDispatchScreenEvent(XEvent *event,Display *display,
+  XWindows *windows,ExceptionInfo *exception)
 {
-  (void) XIfEvent(display,event,XPredicate,(char *) windows);
-  if (event->xany.window == windows->command.id)
-    return;
   switch (event->type)
   {
     case ButtonPress:
@@ -20975,6 +21312,15 @@ static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
       break;
     }
   }
+}
+
+static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
+  ExceptionInfo *exception)
+{
+  (void) XIfEvent(display,event,XPredicate,(char *) windows);
+  if (event->xany.window == windows->command.id)
+    return;
+  XDispatchScreenEvent(event,display,windows,exception);
 }
 
 /*
@@ -21107,7 +21453,7 @@ static void XSetCropGeometry(Display *display,XWindows *windows,
 */
 static inline MagickBooleanType IsTileNameCharacter(const char *q)
 {
-  return(((*q != '\xff') && (*q != '\0')) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((*q != '\xff') && (*q != '\0')));
 }
 
 typedef struct _XTileFillInfo
@@ -22272,8 +22618,8 @@ static Image *XVisualDirectoryImage(Display *display,
   /*
     Read each image and convert them to a tile.
   */
-  backdrop=((windows->visual_info->klass == TrueColor) ||
-    (windows->visual_info->klass == DirectColor)) ? MagickTrue : MagickFalse;
+  backdrop=(MagickBooleanType) ((windows->visual_info->klass == TrueColor) ||
+    (windows->visual_info->klass == DirectColor));
   read_info=CloneImageInfo(resource_info->image_info);
   (void) SetImageOption(read_info,"jpeg:size","120x120");
   (void) CloneString(&read_info->size,DefaultTileGeometry);
@@ -22333,8 +22679,8 @@ static Image *XVisualDirectoryImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static MagickBooleanType XFindBackgroundWindow(Display *display,
-  char *window_id,const Window root_window,XWindowInfo *window_info)
+static void XLookupBackgroundWindowId(char *window_id,XWindowInfo *window_info,
+  const Window root_window,Display *display)
 {
   if (LocaleCompare(window_id,"root") == 0)
     (*window_info).id=root_window;
@@ -22346,6 +22692,12 @@ static MagickBooleanType XFindBackgroundWindow(Display *display,
       if ((*window_info).id == (Window) NULL)
         (*window_info).id=XWindowByName(display,root_window,window_id);
     }
+}
+
+static MagickBooleanType XFindBackgroundWindow(Display *display,
+  char *window_id,const Window root_window,XWindowInfo *window_info)
+{
+  XLookupBackgroundWindowId(window_id,window_info,root_window,display);
   if ((*window_info).id == (Window) NULL)
     {
       ThrowXWindowException(XServerError,"NoWindowWithSpecifiedIDExists",
@@ -22457,6 +22809,40 @@ static void XInitializeBackgroundVisual(Display *display,const Image *image,
   (*window_info).matte_pixmap=(Pixmap) NULL;
 }
 
+static void XInitializeBackgroundColormap(XResourceInfo *resources,
+  Display *display,XVisualInfo **visual_info,Image *image,
+  XStandardColormap **map_info,XPixelInfo *pixel,ExceptionInfo *exception)
+{
+  (*resources).colormap=SharedColormap;
+  XMakeStandardColormap(display,(*visual_info),resources,image,(*map_info),
+    pixel,exception);
+}
+
+static void XInitializeBackgroundContext(XPixelInfo *pixel,Display *display,
+  XWindowInfo *window_info,Image *image)
+{
+  XGCValues
+    context_values;
+
+  context_values.background=(*pixel).foreground_color.pixel;
+  context_values.foreground=(*pixel).background_color.pixel;
+  (*pixel).annotate_context=XCreateGC(display,(*window_info).id,
+    (size_t) (GCBackground | GCForeground),&context_values);
+  if ((*pixel).annotate_context == (GC) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
+      image->filename);
+}
+
+static void XInitializeBackgroundAttributes(XWindowInfo *window_info,
+  Display *display,XVisualInfo **visual_info,XStandardColormap **map_info,
+  XPixelInfo *pixel,XResourceInfo *resources)
+{
+  (*window_info).name=AcquireString("\0");
+  (*window_info).icon_name=AcquireString("\0");
+  XGetWindowInfo(display,(*visual_info),(*map_info),pixel,(XFontStruct *) NULL,
+    resources,window_info);
+}
+
 static void XCreateBackgroundWindowInfo(Display *display,Image *image,
   ExceptionInfo *exception,const BackgroundTargets *targets)
 {
@@ -22475,32 +22861,20 @@ static void XCreateBackgroundWindowInfo(Display *display,Image *image,
   XWindowInfo
     *const window_info = targets->window_info;
 
-  XGCValues
-    context_values;
-
   /*
     Initialize Standard Colormap.
   */
-  (*resources).colormap=SharedColormap;
-  XMakeStandardColormap(display,(*visual_info),resources,image,(*map_info),
+  XInitializeBackgroundColormap(resources,display,visual_info,image,map_info,
     pixel,exception);
   /*
     Graphic context superclass.
   */
-  context_values.background=(*pixel).foreground_color.pixel;
-  context_values.foreground=(*pixel).background_color.pixel;
-  (*pixel).annotate_context=XCreateGC(display,(*window_info).id,
-    (size_t) (GCBackground | GCForeground),&context_values);
-  if ((*pixel).annotate_context == (GC) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
-      image->filename);
+  XInitializeBackgroundContext(pixel,display,window_info,image);
   /*
     Initialize Image window attributes.
   */
-  (*window_info).name=AcquireString("\0");
-  (*window_info).icon_name=AcquireString("\0");
-  XGetWindowInfo(display,(*visual_info),(*map_info),pixel,(XFontStruct *) NULL,
-    resources,window_info);
+  XInitializeBackgroundAttributes(window_info,display,visual_info,map_info,
+    pixel,resources);
 }
 
 static void XSizeBackgroundWindow(const Image *image,XWindowInfo *window_info)
@@ -22546,6 +22920,24 @@ typedef struct _BackgroundInput
     *window_attributes;
 } BackgroundInput;
 
+static void XCenterBackdropImage(XResourceInfo *resources,
+  XWindowInfo *window_info,const XWindowAttributes *window_attributes,
+  int *width,int *height)
+{
+  if ((*resources).backdrop != MagickFalse)
+    {
+      /*
+        Center image on window.
+      */
+      (*window_info).x=((*window_attributes).width/2)-
+        ((*window_info).ximage->width/2);
+      (*window_info).y=((*window_attributes).height/2)-
+        ((*window_info).ximage->height/2);
+      (*width)=(*window_attributes).width;
+      (*height)=(*window_attributes).height;
+    }
+}
+
 static void XAdjustBackgroundSize(const BackgroundInput *input,
   const BackgroundTargets *targets,int *width,int *height)
 {
@@ -22569,18 +22961,7 @@ static void XAdjustBackgroundSize(const BackgroundInput *input,
 
   (*width)=(int) (*window_info).width;
   (*height)=(int) (*window_info).height;
-  if ((*resources).backdrop != MagickFalse)
-    {
-      /*
-        Center image on window.
-      */
-      (*window_info).x=((*window_attributes).width/2)-
-        ((*window_info).ximage->width/2);
-      (*window_info).y=((*window_attributes).height/2)-
-        ((*window_info).ximage->height/2);
-      (*width)=(*window_attributes).width;
-      (*height)=(*window_attributes).height;
-    }
+  XCenterBackdropImage(resources,window_info,window_attributes,width,height);
   if (((*resources).image_geometry != (char *) NULL) &&
       (*(*resources).image_geometry != '\0'))
     {
@@ -22617,32 +22998,22 @@ static void XAdjustBackgroundSize(const BackgroundInput *input,
     }
 }
 
-static void XDisplayBackgroundPixmap(const BackgroundInput *input,
-  const BackgroundTargets *targets,const int width,const int height)
+static void XCreateBackgroundPixmap(XWindowInfo *window_info,Display *display,
+  const int width,const int height,Image *image)
 {
-  Display
-    *const display = input->display;
-
-  Image
-    *const image = input->image;
-
-  XWindowInfo
-    *const window_info = targets->window_info;
-
-  size_t
-    delay;
-
-  /*
-    Create the X pixmap.
-  */
   (*window_info).pixmap=XCreatePixmap(display,(*window_info).id,
     (unsigned int) width,(unsigned int) height,(*window_info).depth);
   if ((*window_info).pixmap == (Pixmap) NULL)
     ThrowXWindowFatalException(XServerFatalError,"UnableToCreateXPixmap",
       image->filename);
-  /*
-    Display pixmap on the window.
-  */
+}
+
+static void XShowBackgroundPixmap(const int width,XWindowInfo *window_info,
+  const int height,Display *display,Image *image)
+{
+  size_t
+    delay;
+
   if (((unsigned int) width > (*window_info).width) ||
       ((unsigned int) height > (*window_info).height))
     (void) XFillRectangle(display,(*window_info).pixmap,
@@ -22658,6 +23029,28 @@ static void XDisplayBackgroundPixmap(const BackgroundInput *input,
   delay=1000*image->delay/(size_t) MagickMax(image->ticks_per_second,1L);
   XDelay(display,delay == 0UL ? 10UL : delay);
   (void) XSync(display,MagickFalse);
+}
+
+static void XDisplayBackgroundPixmap(const BackgroundInput *input,
+  const BackgroundTargets *targets,const int width,const int height)
+{
+  Display
+    *const display = input->display;
+
+  Image
+    *const image = input->image;
+
+  XWindowInfo
+    *const window_info = targets->window_info;
+
+  /*
+    Create the X pixmap.
+  */
+  XCreateBackgroundPixmap(window_info,display,width,height,image);
+  /*
+    Display pixmap on the window.
+  */
+  XShowBackgroundPixmap(width,window_info,height,display,image);
 }
 
 MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
@@ -22746,7 +23139,7 @@ MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
   input.window_attributes=(&window_attributes);
   XAdjustBackgroundSize(&input,&targets,&width,&height);
   XDisplayBackgroundPixmap(&input,&targets,width,height);
-  return(window_info.id == root_window ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (window_info.id == root_window));
 }
 
 static void XPositionCommandAndWidget(Display *display,XWindows *windows,
@@ -22930,6 +23323,23 @@ typedef struct _DisplayEventContext
     *icon_resources;
 } DisplayEventContext;
 
+static void XUpdateStaticImageWindow(XWindows *windows,const XEvent event,
+  Display *display,XResourceInfo *resource_info,Image *display_image,
+  ExceptionInfo *exception)
+{
+  if (windows->image.mapped != MagickFalse &&
+      windows->image.stasis != MagickFalse)
+    {
+      /*
+        Update image window configuration.
+      */
+      windows->image.window_changes.width=event.xconfigure.width;
+      windows->image.window_changes.height=event.xconfigure.height;
+      (void) XConfigureImage(display,resource_info,windows,
+        display_image,exception);
+    }
+}
+
 static void XConfigureImageWindow(const DisplayEventContext *context,
   const XEvent event,Image *display_image,const XPoint vid_info)
 {
@@ -22968,17 +23378,8 @@ static void XConfigureImageWindow(const DisplayEventContext *context,
       windows->image.x=vid_info.x;
       windows->image.y=vid_info.y;
     }
-  if (windows->image.mapped != MagickFalse &&
-      windows->image.stasis != MagickFalse)
-    {
-      /*
-        Update image window configuration.
-      */
-      windows->image.window_changes.width=event.xconfigure.width;
-      windows->image.window_changes.height=event.xconfigure.height;
-      (void) XConfigureImage(display,resource_info,windows,
-        display_image,exception);
-    }
+  XUpdateStaticImageWindow(windows,event,display,resource_info,display_image,
+    exception);
   /*
     Update pan window configuration.
   */
@@ -23774,46 +24175,10 @@ static void XNameImageWindow(const DisplayEventContext *context,
     }
 }
 
-static void XInitializeBackdropWindow(const DisplayEventContext *context)
+static void XMakeBackdropWindow(XResourceInfo *resource_info,XWindows *windows,
+  Display *display,XVisualInfo *visual_info,XWMHints *manager_hints,
+  Window root_window,char **argv,int argc,XClassHint *class_hints)
 {
-  Display
-    *const display = context->display;
-
-  XResourceInfo
-    *const resource_info = context->resource_info;
-
-  XWindows
-    *const windows = context->windows;
-
-  XPixelInfo
-    *const pixel = context->pixel;
-
-  XStandardColormap
-    *const map_info = context->map_info;
-
-  const Window
-    root_window = context->root_window;
-
-  XVisualInfo
-    *const visual_info = context->visual_info;
-
-  XFontStruct
-    *const font_info = context->font_info;
-
-  char
-    **const argv = context->argv;
-
-  const int
-    argc = context->argc;
-
-  XClassHint
-    *const class_hints = context->class_hints;
-
-  XWMHints
-    *const manager_hints = context->manager_hints;
-
-  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
-    resource_info,&windows->backdrop);
   if ((resource_info->backdrop) || (windows->backdrop.id != (Window) NULL))
     {
       /*
@@ -23861,6 +24226,67 @@ static void XInitializeBackdropWindow(const DisplayEventContext *context)
     }
 }
 
+static void XInitializeBackdropWindow(const DisplayEventContext *context)
+{
+  Display
+    *const display = context->display;
+
+  XResourceInfo
+    *const resource_info = context->resource_info;
+
+  XWindows
+    *const windows = context->windows;
+
+  XPixelInfo
+    *const pixel = context->pixel;
+
+  XStandardColormap
+    *const map_info = context->map_info;
+
+  const Window
+    root_window = context->root_window;
+
+  XVisualInfo
+    *const visual_info = context->visual_info;
+
+  XFontStruct
+    *const font_info = context->font_info;
+
+  char
+    **const argv = context->argv;
+
+  const int
+    argc = context->argc;
+
+  XClassHint
+    *const class_hints = context->class_hints;
+
+  XWMHints
+    *const manager_hints = context->manager_hints;
+
+  XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
+    resource_info,&windows->backdrop);
+  XMakeBackdropWindow(resource_info,windows,display,visual_info,manager_hints,
+    root_window,argv,argc,class_hints);
+}
+
+static void XFollowGroupLeader(XWindows *windows,XWMHints *manager_hints,
+  Display *display,XResourceInfo *resource_info)
+{
+  if (windows->group_leader.id != (Window) NULL)
+    {
+      /*
+        Follow the leader.
+      */
+      manager_hints->flags|=WindowGroupHint;
+      manager_hints->window_group=windows->group_leader.id;
+      (void) XSelectInput(display,windows->group_leader.id,StructureNotifyMask);
+      if (resource_info->debug != MagickFalse)
+        (void) LogMagickEvent(X11Event,GetMagickModule(),
+          "Window id: 0x%lx (group leader)",windows->group_leader.id);
+    }
+}
+
 static void XMakeImageWindow(const DisplayEventContext *context)
 {
   Display
@@ -23892,18 +24318,7 @@ static void XMakeImageWindow(const DisplayEventContext *context)
   manager_hints->input=MagickTrue;
   manager_hints->initial_state=resource_info->iconic ? IconicState :
     NormalState;
-  if (windows->group_leader.id != (Window) NULL)
-    {
-      /*
-        Follow the leader.
-      */
-      manager_hints->flags|=WindowGroupHint;
-      manager_hints->window_group=windows->group_leader.id;
-      (void) XSelectInput(display,windows->group_leader.id,StructureNotifyMask);
-      if (resource_info->debug != MagickFalse)
-        (void) LogMagickEvent(X11Event,GetMagickModule(),
-          "Window id: 0x%lx (group leader)",windows->group_leader.id);
-    }
+  XFollowGroupLeader(windows,manager_hints,display,resource_info);
   XMakeWindow(display,
     (Window) (resource_info->backdrop ? windows->backdrop.id : root_window),
     argv,argc,class_hints,manager_hints,&windows->image);
@@ -25584,8 +25999,8 @@ static inline MagickBooleanType IsSelectiveColormapCrossing(Display *display,
   const XStandardColormap *map_info,const XVisualInfo *visual_info,
   const int mode)
 {
-  return(((map_info->colormap != XDefaultColormap(display,visual_info->screen)) &&
-    (mode != NotifyUngrab)) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) ((map_info->colormap !=
+    XDefaultColormap(display,visual_info->screen)) && (mode != NotifyUngrab)));
 }
 
 static void XDispatchWindowStateEvent(const DisplayEventContext *event_context,
@@ -25968,6 +26383,22 @@ static void XConfirmDisplayExit(const DisplayExitInputs *inputs,
       }
 }
 
+static void XWithdrawBackdropWindow(XResourceInfo *resource_info,
+  XWindows *windows,Display *display)
+{
+  if ((resource_info->backdrop == MagickFalse) && (windows->backdrop.mapped))
+    {
+      (void) XWithdrawWindow(display,windows->backdrop.id,
+        windows->backdrop.screen);
+      (void) XDestroyWindow(display,windows->backdrop.id);
+      windows->backdrop.id=(Window) NULL;
+      (void) XWithdrawWindow(display,windows->image.id,
+        windows->image.screen);
+      (void) XDestroyWindow(display,windows->image.id);
+      windows->image.id=(Window) NULL;
+    }
+}
+
 static void XCloseDisplayWindows(const DisplayEventContext *context)
 {
   Display
@@ -25985,17 +26416,7 @@ static void XCloseDisplayWindows(const DisplayEventContext *context)
   XWithdrawDynamicWindows(display,windows);
   if (windows->pan.mapped != MagickFalse)
     (void) XWithdrawWindow(display,windows->pan.id,windows->pan.screen);
-  if ((resource_info->backdrop == MagickFalse) && (windows->backdrop.mapped))
-    {
-      (void) XWithdrawWindow(display,windows->backdrop.id,
-        windows->backdrop.screen);
-      (void) XDestroyWindow(display,windows->backdrop.id);
-      windows->backdrop.id=(Window) NULL;
-      (void) XWithdrawWindow(display,windows->image.id,
-        windows->image.screen);
-      (void) XDestroyWindow(display,windows->image.id);
-      windows->image.id=(Window) NULL;
-    }
+  XWithdrawBackdropWindow(resource_info,windows,display);
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
   if (((*state & FormerImageState) != 0) || ((*state & NextImageState) != 0))
@@ -26070,6 +26491,17 @@ static MagickStatusType XMakeDisplayXImages(const DisplayEventContext *context,
   return(status);
 }
 
+static void XInitializePanWindow(const DisplayEventContext *context,
+  XWindows *windows,Display *display)
+{
+  XMakePanWindow(context);
+  if (windows->info.mapped != MagickFalse)
+    (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
+  if ((windows->image.mapped == MagickFalse) ||
+      (windows->backdrop.id != (Window) NULL))
+    (void) XMapWindow(display,windows->image.id);
+}
+
 static void XMakeDisplayWindows(const DisplayEventContext *context,
   Image *display_image)
 {
@@ -26137,12 +26569,22 @@ static void XMakeDisplayWindows(const DisplayEventContext *context,
   /*
     Initialize panning window.
   */
-  XMakePanWindow(context);
-  if (windows->info.mapped != MagickFalse)
-    (void) XWithdrawWindow(display,windows->info.id,windows->info.screen);
-  if ((windows->image.mapped == MagickFalse) ||
-      (windows->backdrop.id != (Window) NULL))
-    (void) XMapWindow(display,windows->image.id);
+  XInitializePanWindow(context,windows,display);
+}
+
+static void XInitializeIconContext(XPixelInfo *icon_pixel,Display *display,
+  XGCValues *context_values,XWindows *windows,Image *display_image)
+{
+  if (icon_pixel->annotate_context != (GC) NULL)
+    (void) XFreeGC(display,icon_pixel->annotate_context);
+  (*context_values).background=icon_pixel->background_color.pixel;
+  (*context_values).foreground=icon_pixel->foreground_color.pixel;
+  icon_pixel->annotate_context=XCreateGC(display,windows->icon.id,
+    (size_t) (GCBackground | GCForeground),context_values);
+  if (icon_pixel->annotate_context == (GC) NULL)
+    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
+      display_image->filename);
+  windows->icon.annotate_context=icon_pixel->annotate_context;
 }
 
 static void XMakeIconWindow(const DisplayEventContext *context,
@@ -26200,16 +26642,8 @@ static void XMakeIconWindow(const DisplayEventContext *context,
   /*
     Initialize graphic context for icon window.
   */
-  if (icon_pixel->annotate_context != (GC) NULL)
-    (void) XFreeGC(display,icon_pixel->annotate_context);
-  (*context_values).background=icon_pixel->background_color.pixel;
-  (*context_values).foreground=icon_pixel->foreground_color.pixel;
-  icon_pixel->annotate_context=XCreateGC(display,windows->icon.id,
-    (size_t) (GCBackground | GCForeground),context_values);
-  if (icon_pixel->annotate_context == (GC) NULL)
-    ThrowXWindowFatalException(XServerFatalError,"UnableToCreateGraphicContext",
-      display_image->filename);
-  windows->icon.annotate_context=icon_pixel->annotate_context;
+  XInitializeIconContext(icon_pixel,display,context_values,windows,
+    display_image);
 }
 
 static void XMakeContextWindow(const DisplayEventContext *context)
@@ -26385,21 +26819,27 @@ static void XTraceDisplayImage(Image **image)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",(*image)->filename);
 }
 
-static void XRestoreDisplayState(const WarningHandler warning_handler,
-  char *working_directory,XResourceInfo *resource_info,
-  ExceptionInfo *exception)
+static void XReturnToHomeDirectory(char *working_directory,
+  XResourceInfo *resource_info,ExceptionInfo *exception)
 {
   char
     *directory;
 
+  directory=getcwd(working_directory,MagickPathExtent);
+  (void) directory;
+  XChangeToHomeDirectory(resource_info,exception);
+}
+
+static void XRestoreDisplayState(const WarningHandler warning_handler,
+  char *working_directory,XResourceInfo *resource_info,
+  ExceptionInfo *exception)
+{
   (void) SetErrorHandler(warning_handler);
   (void) SetWarningHandler(warning_handler);
   /*
     Change to home directory.
   */
-  directory=getcwd(working_directory,MagickPathExtent);
-  (void) directory;
-  XChangeToHomeDirectory(resource_info,exception);
+  XReturnToHomeDirectory(working_directory,resource_info,exception);
 }
 
 typedef struct _DisplayContextInput
@@ -26438,7 +26878,7 @@ typedef struct _DisplayContextInput
     argc;
 } DisplayContextInput;
 
-static void XFillDisplayEventContext(const DisplayContextInput *input,
+static void XInitializeDisplayColormap(const DisplayContextInput *input,
   DisplayEventContext *event_context)
 {
   Window
@@ -26468,13 +26908,6 @@ static void XFillDisplayEventContext(const DisplayContextInput *input,
   XWMHints
     *manager_hints;
 
-  /*
-    Initialize font info.
-  */
-  XLoadDisplayFont(input->display,input->resource_info,input->windows);
-  /*
-    Initialize Standard Colormap.
-  */
   map_info=input->windows->map_info;
   icon_map=input->windows->icon_map;
   visual_info=input->windows->visual_info;
@@ -26515,6 +26948,19 @@ static void XFillDisplayEventContext(const DisplayContextInput *input,
   (*event_context).class_hints=class_hints;
   (*event_context).manager_hints=manager_hints;
   (*event_context).icon_resources=icon_resources;
+}
+
+static void XFillDisplayEventContext(const DisplayContextInput *input,
+  DisplayEventContext *event_context)
+{
+  /*
+    Initialize font info.
+  */
+  XLoadDisplayFont(input->display,input->resource_info,input->windows);
+  /*
+    Initialize Standard Colormap.
+  */
+  XInitializeDisplayColormap(input,event_context);
 }
 
 typedef struct _DisplayWindowsInput
