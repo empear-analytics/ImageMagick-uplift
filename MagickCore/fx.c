@@ -723,6 +723,13 @@ static size_t LimitTokenLength (FxInfo * pfx, size_t len)
   return(len);
 }
 
+static void CopyToken (FxInfo * pfx, size_t len)
+{
+  if (len) {
+    (void) CopyMagickString (pfx->token, pfx->pex, (len+1<MaxTokenLen)?len+1:MaxTokenLen);
+  }
+}
+
 static size_t GetToken (FxInfo * pfx)
 /* Returns length of token that starts with an alpha,
      or 0 if it isn't a token that starts with an alpha.
@@ -753,9 +760,7 @@ static size_t GetToken (FxInfo * pfx)
     len = ScanNonIccTokenLength (p, len);
   }
   len = LimitTokenLength (pfx, len);
-  if (len) {
-    (void) CopyMagickString (pfx->token, pfx->pex, (len+1<MaxTokenLen)?len+1:MaxTokenLen);
-  }
+  CopyToken (pfx, len);
 
   pfx->lenToken = strlen (pfx->token);
   return len;
