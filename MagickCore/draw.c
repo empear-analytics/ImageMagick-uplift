@@ -8924,8 +8924,6 @@ static MagickStatusType DrawStrokedPrimitive(const DrawPrimitiveContext *context
     mid,
     scale;
 
-  DrawInfo
-    *clone_info;
 
   if (IsEventLogging() != MagickFalse)
     LogPrimitiveInfo(primitive_info);
@@ -8967,12 +8965,7 @@ static MagickStatusType DrawStrokedPrimitive(const DrawPrimitiveContext *context
             primitive_info,exception);
           return(status);
         }
-      clone_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
-      clone_info->stroke_width=0.0;
-      clone_info->stroke.alpha=(MagickRealType) TransparentAlpha;
-      status&=(MagickStatusType) DrawPolygonPrimitive(image,clone_info,
-        primitive_info,exception);
-      clone_info=DestroyDrawInfo(clone_info);
+      status=DrawUnstrokedPolygon(context,status);
       if (status != MagickFalse)
         status&=(MagickStatusType) DrawStrokePolygon(image,draw_info,
           primitive_info,exception);
