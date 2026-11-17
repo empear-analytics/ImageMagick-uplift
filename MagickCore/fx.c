@@ -1504,6 +1504,12 @@ static inline ssize_t GetConstantColour (FxInfo * pfx, fxFltType *v0, fxFltType 
   return (ssize_t)strlen (pfx->token);
 }
 
+static char *SkipHexDigits (char * p)
+{
+  while (isxdigit ((int)*p)) p++;
+  return(p);
+}
+
 static inline ssize_t GetHexColour (FxInfo * pfx, fxFltType *v0, fxFltType *v1, fxFltType *v2)
 /* Returns number of characters to swallow.
    Negative return means it starts with '#', but invalid hex number.
@@ -1517,7 +1523,7 @@ static inline ssize_t GetHexColour (FxInfo * pfx, fxFltType *v0, fxFltType *v1, 
 
   /* find end of hex digits. */
   p = pfx->pex + 1;
-  while (isxdigit ((int)*p)) p++;
+  p = SkipHexDigits (p);
   if (isalpha ((int)*p)) {
     (void) ThrowMagickException (
       pfx->exception, GetMagickModule(), OptionError,
