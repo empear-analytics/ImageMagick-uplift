@@ -4357,9 +4357,9 @@ static MagickBooleanType ParseMVGPushGradient(const MVGRenderState *state)
       ThrowPointExpectedException(token,exception);
     if (GetMVGListValue(&q,extent,token,&segment.y2) == MagickFalse)
       ThrowPointExpectedException(token,exception);
-    if (LocaleCompare(type,"radial") == 0)
-      if (SkipMVGListToken(&q,extent,token) == MagickFalse)
-        ThrowPointExpectedException(token,exception);
+    if ((LocaleCompare(type,"radial") == 0) &&
+        (SkipMVGListToken(&q,extent,token) == MagickFalse))
+      ThrowPointExpectedException(token,exception);
     p=FindMVGPopKeyword(&q,extent,token,"gradient");
     if (IsMVGBlockEndInvalid(q,p,extent) != MagickFalse)
       {
