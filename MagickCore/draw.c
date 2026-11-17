@@ -9614,6 +9614,33 @@ static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
   return(MagickTrue);
 }
 
+static MagickBooleanType GetBezierQuantum(const PrimitiveInfo *primitive_info,
+  const size_t number_coordinates,size_t *quantum)
+{
+  double
+    alpha;
+
+  ssize_t
+    i,
+    j;
+
+  for (i=0; i < (ssize_t) number_coordinates; i++)
+  {
+    for (j=i+1; j < (ssize_t) number_coordinates; j++)
+    {
+      alpha=fabs(primitive_info[j].point.x-primitive_info[i].point.x);
+      if (alpha > (double) GetMaxMemoryRequest())
+        return(MagickFalse);
+      if (alpha > (double) (*quantum))
+        (*quantum)=(size_t) alpha;
+      alpha=fabs(primitive_info[j].point.y-primitive_info[i].point.y);
+      if (alpha > (double) (*quantum))
+        (*quantum)=(size_t) alpha;
+    }
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType TraceBezier(MVGInfo *mvg_info,
   const size_t number_coordinates)
 {
@@ -9646,24 +9673,13 @@ static MagickBooleanType TraceBezier(MVGInfo *mvg_info,
   */
   primitive_info=(*mvg_info->primitive_info)+mvg_info->offset;
   quantum=number_coordinates;
-  for (i=0; i < (ssize_t) number_coordinates; i++)
-  {
-    for (j=i+1; j < (ssize_t) number_coordinates; j++)
+  if (GetBezierQuantum(primitive_info,number_coordinates,&quantum) ==
+      MagickFalse)
     {
-      alpha=fabs(primitive_info[j].point.x-primitive_info[i].point.x);
-      if (alpha > (double) GetMaxMemoryRequest())
-        {
-          (void) ThrowMagickException(mvg_info->exception,GetMagickModule(),
-            ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-          return(MagickFalse);
-        }
-      if (alpha > (double) quantum)
-        quantum=(size_t) alpha;
-      alpha=fabs(primitive_info[j].point.y-primitive_info[i].point.y);
-      if (alpha > (double) quantum)
-        quantum=(size_t) alpha;
+      (void) ThrowMagickException(mvg_info->exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'","");
+      return(MagickFalse);
     }
-  }
   primitive_info=(*mvg_info->primitive_info)+mvg_info->offset;
   quantum=MagickMin(quantum/number_coordinates,BezierQuantum);
   coefficients=(double *) AcquireQuantumMemory(number_coordinates,
