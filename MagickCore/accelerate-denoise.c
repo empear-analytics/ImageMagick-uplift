@@ -144,12 +144,40 @@ static MagickBooleanType AcquireWaveletDenoiseBuffers(MagickCLEnv clEnv,
   return(MagickTrue);
 }
 
-static Image *ComputeWaveletDenoiseImage(const Image *image,MagickCLEnv clEnv,
-  const double threshold,ExceptionInfo *exception)
+typedef struct _WaveletDenoiseLaunchInputs
 {
+  MagickCLDevice
+    device;
+
   cl_command_queue
     queue;
 
+  const Image
+    *image;
+
+  Image
+    *filteredImage;
+
+  cl_mem
+    imageBuffer,
+    filteredImageBuffer;
+
+  double
+    threshold;
+} WaveletDenoiseLaunchInputs;
+
+typedef struct _WaveletDenoiseLaunchTargets
+{
+  cl_kernel
+    *denoiseKernel;
+
+  MagickBooleanType
+    *outputReady;
+} WaveletDenoiseLaunchTargets;
+
+static void LaunchWaveletDenoiseKernel(const WaveletDenoiseLaunchInputs *inputs,
+  ExceptionInfo *exception,const WaveletDenoiseLaunchTargets *launch)
+{
   const cl_int
     PASSES=5;
 
@@ -164,18 +192,82 @@ static Image *ComputeWaveletDenoiseImage(const Image *image,MagickCLEnv clEnv,
   cl_int
     status;
 
+  cl_uint
+    number_channels,
+    width,
+    height,
+    max_channels;
+
+  size_t
+    goffset[2],
+    gsize[2],
+    i,
+    lsize[2],
+    passes,
+    x;
+
+  *launch->denoiseKernel=AcquireOpenCLKernel(inputs->device,"WaveletDenoise");
+  if (*launch->denoiseKernel == (cl_kernel) NULL)
+  {
+    (void) OpenCLThrowMagickException(inputs->device,exception,GetMagickModule(),
+      ResourceLimitWarning,"AcquireOpenCLKernel failed.",".");
+    return;
+  }
+
+  number_channels=(cl_uint)inputs->image->number_channels;
+  width=(cl_uint)inputs->image->columns;
+  height=(cl_uint)inputs->image->rows;
+  max_channels=number_channels;
+  if ((max_channels == 4) || (max_channels == 2))
+    max_channels=max_channels-1;
+  thresh=(cl_float) inputs->threshold;
+  passes=(size_t) ((((1.0f*inputs->image->columns)*inputs->image->rows)+1999999.0f)/2000000.0f);
+  passes=(passes < 1) ? 1 : passes;
+
+  i=0;
+  status =SetOpenCLKernelArg(*launch->denoiseKernel,i++,sizeof(cl_mem),(void *)&inputs->imageBuffer);
+  status|=SetOpenCLKernelArg(*launch->denoiseKernel,i++,sizeof(cl_mem),(void *)&inputs->filteredImageBuffer);
+  status|=SetOpenCLKernelArg(*launch->denoiseKernel,i++,sizeof(cl_uint),(void *)&number_channels);
+  status|=SetOpenCLKernelArg(*launch->denoiseKernel,i++,sizeof(cl_uint),(void *)&max_channels);
+  status|=SetOpenCLKernelArg(*launch->denoiseKernel,i++,sizeof(cl_float),(void *)&thresh);
+  status|=SetOpenCLKernelArg(*launch->denoiseKernel,i++,sizeof(cl_int),(void *)&PASSES);
+  status|=SetOpenCLKernelArg(*launch->denoiseKernel,i++,sizeof(cl_uint),(void *)&width);
+  status|=SetOpenCLKernelArg(*launch->denoiseKernel,i++,sizeof(cl_uint),(void *)&height);
+  if (status != CL_SUCCESS)
+    {
+      (void) OpenCLThrowMagickException(inputs->device,exception,GetMagickModule(),
+        ResourceLimitWarning,"SetOpenCLKernelArg failed.",".");
+      return;
+    }
+
+  for (x = 0; x < passes; ++x)
+  {
+    gsize[0]=((width+(SIZE-1))/SIZE)*TILESIZE;
+    gsize[1]=((((height+(SIZE-1))/SIZE)+passes-1)/passes)*4;
+    lsize[0]=TILESIZE;
+    lsize[1]=4;
+    goffset[0]=0;
+    goffset[1]=x*gsize[1];
+
+    *launch->outputReady=EnqueueOpenCLKernel(inputs->queue,*launch->denoiseKernel,2,goffset,gsize,lsize,
+      inputs->image,inputs->filteredImage,MagickTrue,exception);
+    if (*launch->outputReady == MagickFalse)
+      break;
+  }
+}
+
+static Image *ComputeWaveletDenoiseImage(const Image *image,MagickCLEnv clEnv,
+  const double threshold,ExceptionInfo *exception)
+{
+  cl_command_queue
+    queue;
+
   cl_kernel
     denoiseKernel;
 
   cl_mem
     filteredImageBuffer,
     imageBuffer;
-
-  cl_uint
-    number_channels,
-    width,
-    height,
-    max_channels;
 
   Image
     *filteredImage;
@@ -185,14 +277,6 @@ static Image *ComputeWaveletDenoiseImage(const Image *image,MagickCLEnv clEnv,
 
   MagickCLDevice
     device;
-
-  size_t
-    goffset[2],
-    gsize[2],
-    i,
-    lsize[2],
-    passes,
-    x;
 
   filteredImage=NULL;
   imageBuffer=NULL;
@@ -210,53 +294,13 @@ static Image *ComputeWaveletDenoiseImage(const Image *image,MagickCLEnv clEnv,
       goto cleanup;
   }
 
-  denoiseKernel=AcquireOpenCLKernel(device,"WaveletDenoise");
-  if (denoiseKernel == (cl_kernel) NULL)
   {
-    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
-      ResourceLimitWarning,"AcquireOpenCLKernel failed.",".");
-    goto cleanup;
-  }
+    const WaveletDenoiseLaunchInputs inputs = { device, queue, image,
+      filteredImage, imageBuffer, filteredImageBuffer, threshold };
+    const WaveletDenoiseLaunchTargets launch = { &denoiseKernel,
+      &outputReady };
 
-  number_channels=(cl_uint)image->number_channels;
-  width=(cl_uint)image->columns;
-  height=(cl_uint)image->rows;
-  max_channels=number_channels;
-  if ((max_channels == 4) || (max_channels == 2))
-    max_channels=max_channels-1;
-  thresh=(cl_float) threshold;
-  passes=(size_t) ((((1.0f*image->columns)*image->rows)+1999999.0f)/2000000.0f);
-  passes=(passes < 1) ? 1 : passes;
-
-  i=0;
-  status =SetOpenCLKernelArg(denoiseKernel,i++,sizeof(cl_mem),(void *)&imageBuffer);
-  status|=SetOpenCLKernelArg(denoiseKernel,i++,sizeof(cl_mem),(void *)&filteredImageBuffer);
-  status|=SetOpenCLKernelArg(denoiseKernel,i++,sizeof(cl_uint),(void *)&number_channels);
-  status|=SetOpenCLKernelArg(denoiseKernel,i++,sizeof(cl_uint),(void *)&max_channels);
-  status|=SetOpenCLKernelArg(denoiseKernel,i++,sizeof(cl_float),(void *)&thresh);
-  status|=SetOpenCLKernelArg(denoiseKernel,i++,sizeof(cl_int),(void *)&PASSES);
-  status|=SetOpenCLKernelArg(denoiseKernel,i++,sizeof(cl_uint),(void *)&width);
-  status|=SetOpenCLKernelArg(denoiseKernel,i++,sizeof(cl_uint),(void *)&height);
-  if (status != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
-        ResourceLimitWarning,"SetOpenCLKernelArg failed.",".");
-      goto cleanup;
-    }
-
-  for (x = 0; x < passes; ++x)
-  {
-    gsize[0]=((width+(SIZE-1))/SIZE)*TILESIZE;
-    gsize[1]=((((height+(SIZE-1))/SIZE)+passes-1)/passes)*4;
-    lsize[0]=TILESIZE;
-    lsize[1]=4;
-    goffset[0]=0;
-    goffset[1]=x*gsize[1];
-
-    outputReady=EnqueueOpenCLKernel(queue,denoiseKernel,2,goffset,gsize,lsize,
-      image,filteredImage,MagickTrue,exception);
-    if (outputReady == MagickFalse)
-      break;
+    LaunchWaveletDenoiseKernel(&inputs,exception,&launch);
   }
 
 cleanup:
