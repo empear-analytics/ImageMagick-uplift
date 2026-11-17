@@ -10721,26 +10721,20 @@ static MagickBooleanType TraceRoundRectangle(MVGInfo *mvg_info,
   point.y=start.y+segment.y-arc.y;
   degrees.x=0.0;
   degrees.y=90.0;
-  if (TraceEllipse(mvg_info,point,arc,degrees) == MagickFalse)
+  if (TraceRoundCorner(mvg_info,point,arc,degrees) == MagickFalse)
     return(MagickFalse);
-  p=(*mvg_info->primitive_info)+(ptrdiff_t) mvg_info->offset;
-  mvg_info->offset+=(ssize_t) p->coordinates;
   point.x=start.x+arc.x;
   point.y=start.y+segment.y-arc.y;
   degrees.x=90.0;
   degrees.y=180.0;
-  if (TraceEllipse(mvg_info,point,arc,degrees) == MagickFalse)
+  if (TraceRoundCorner(mvg_info,point,arc,degrees) == MagickFalse)
     return(MagickFalse);
-  p=(*mvg_info->primitive_info)+(ptrdiff_t) mvg_info->offset;
-  mvg_info->offset+=(ssize_t) p->coordinates;
   point.x=start.x+arc.x;
   point.y=start.y+arc.y;
   degrees.x=180.0;
   degrees.y=270.0;
-  if (TraceEllipse(mvg_info,point,arc,degrees) == MagickFalse)
+  if (TraceRoundCorner(mvg_info,point,arc,degrees) == MagickFalse)
     return(MagickFalse);
-  p=(*mvg_info->primitive_info)+(ptrdiff_t) mvg_info->offset;
-  mvg_info->offset+=(ssize_t) p->coordinates;
   if (CheckPrimitiveExtent(mvg_info,PrimitiveExtentPad) == MagickFalse)
     return(MagickFalse);
   p=(*mvg_info->primitive_info)+(ptrdiff_t) mvg_info->offset;
