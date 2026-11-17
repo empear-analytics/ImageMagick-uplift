@@ -1541,8 +1541,8 @@ static inline MagickBooleanType IsPadFunction(const FunctionE fe)
 static inline MagickBooleanType IsUnexpectedLimit(const char chLimit,
   const char expChLimit)
 {
-  return((chLimit && chLimit != expChLimit && chLimit != ',' ) ? MagickTrue :
-    MagickFalse);
+  return((MagickBooleanType) (chLimit && chLimit != expChLimit &&
+    chLimit != ',' ));
 }
 
 static inline MagickBooleanType IsDefaultArgsFunction(const FunctionE fe)
