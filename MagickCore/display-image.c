@@ -6555,7 +6555,7 @@ static MagickBooleanType XConfigureImage(Display *display,
   (void) XReconfigureWMWindow(display,windows->icon.id,windows->icon.screen,
     (unsigned int) (CWWidth | CWHeight),&window_changes);
   XSetCursorState(display,windows,MagickFalse);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (status != 0));
 }
 
 /*
