@@ -1611,8 +1611,8 @@ static inline MagickBooleanType IsCompositeOnlyAccess(
   const MagickBooleanType coordQual,const PixelChannel chQual,
   const ImgAttrE iaQual)
 {
-  return((!coordQual && chQual == CompositePixelChannel &&
-    iaQual == aNull) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (!coordQual && chQual == CompositePixelChannel &&
+    iaQual == aNull));
 }
 
 static const FunctionE
