@@ -12287,6 +12287,27 @@ static void XApplyReduceNoiseCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplySharpenToImage(Display *display,XWindows *windows,
+  MagickStatusType *flags,char *radius,Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  Image
+    *sharp_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  *flags=ParseGeometry(radius,&geometry_info);
+  sharp_image=SharpenImage(*image,geometry_info.rho,geometry_info.sigma,
+    exception);
+  if (sharp_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=sharp_image;
+    }
+}
+
 static void XApplySharpenCommand(const XMagickCommandContext *context,
   MagickStatusType *flags)
 {
@@ -12305,12 +12326,6 @@ static void XApplySharpenCommand(const XMagickCommandContext *context,
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  Image
-    *sharp_image;
-
   static char
     radius[MagickPathExtent] = "0.0x1.0";
 
@@ -12324,16 +12339,7 @@ static void XApplySharpenCommand(const XMagickCommandContext *context,
   /*
     Sharpen image scanlines.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  *flags=ParseGeometry(radius,&geometry_info);
-  sharp_image=SharpenImage(*image,geometry_info.rho,geometry_info.sigma,
-    exception);
-  if (sharp_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=sharp_image;
-    }
+  XApplySharpenToImage(display,windows,flags,radius,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
