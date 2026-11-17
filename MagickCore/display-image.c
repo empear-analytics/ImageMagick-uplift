@@ -10248,6 +10248,16 @@ static void XUndoImageCache(const XImageCacheContext *cache_context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XShowImageCacheInfo(Display *display,XWindows *windows,
+  XResourceInfo *resource_info,Image *undo_image,Image **image,
+  ExceptionInfo *exception)
+{
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  XDisplayImageInfo(display,resource_info,windows,undo_image,*image,exception);
+  XSetCursorState(display,windows,MagickFalse);
+}
+
 static void XRedoOrShowImageCache(const XImageCacheContext *cache_context,
   const DisplayCommand command,Image **redo_image,Image *undo_image)
 {
@@ -10296,10 +10306,7 @@ static void XRedoOrShowImageCache(const XImageCacheContext *cache_context,
   /*
     Display image info.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  XDisplayImageInfo(display,resource_info,windows,undo_image,*image,exception);
-  XSetCursorState(display,windows,MagickFalse);
+  XShowImageCacheInfo(display,windows,resource_info,undo_image,image,exception);
 }
 
 static void XImageCache(const XImageCacheContext *cache_context,
