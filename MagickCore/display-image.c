@@ -26871,6 +26871,41 @@ static void XInitializeDisplayImage(const DisplayImageInput *image_input,
   }
 }
 
+static void XLookupKeyPress(const DisplayEventContext *context,
+  const DisplayEventTargets *targets,char *command,const size_t extent)
+{
+  XEvent
+    *const event = targets->event;
+
+  int
+    length;
+
+  KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key press.
+  */
+  length=XLookupString((XKeyEvent *) &event->xkey,command,(int)
+    extent,&key_symbol,(XComposeStatus *) NULL);
+  *(command+length)='\0';
+  XHandleKeyPress(context,key_symbol,targets);
+}
+
+static void XLookupKeyRelease(const XResourceInfo *resource_info,
+  XEvent *event,char *command,const size_t extent)
+{
+  KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key release.
+  */
+  (void) XLookupString((XKeyEvent *) &event->xkey,command,(int)
+    extent,&key_symbol,(XComposeStatus *) NULL);
+  XLogKeyRelease(resource_info,key_symbol,command);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -26880,9 +26915,6 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   Image
     *display_image,
     *nexus;
-
-  KeySym
-    key_symbol;
 
   MagickStatusType
     status;
@@ -26941,29 +26973,12 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
     switch (event.type)
     {
       case KeyPress:
-      {
-        int
-          length;
-
-        /*
-          Respond to a user key press.
-        */
-        length=XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        *(command+length)='\0';
-        XHandleKeyPress(&event_context,key_symbol,&event_targets);
+        XLookupKeyPress(&event_context,&event_targets,command,
+          sizeof(command));
         break;
-      }
       case KeyRelease:
-      {
-        /*
-          Respond to a user key release.
-        */
-        (void) XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        XLogKeyRelease(resource_info,key_symbol,command);
+        XLookupKeyRelease(resource_info,&event,command,sizeof(command));
         break;
-      }
       default:
       {
         XDispatchButtonEvent(&event_context,&event_targets);
