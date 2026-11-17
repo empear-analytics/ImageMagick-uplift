@@ -1642,7 +1642,7 @@ static inline MagickBooleanType IsQualifiedCoordFunction(const ImgAttrE iaQual,
 
 static inline MagickBooleanType IsCoordFunction(const FunctionE fe)
 {
-  return((fe == fU || fe == fV || fe == fS) ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (fe == fU || fe == fV || fe == fS));
 }
 
 static MagickBooleanType AddEpochSeconds (FxInfo * pfx, fxFltType seconds,
