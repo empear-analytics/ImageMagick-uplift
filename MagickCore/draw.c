@@ -10348,8 +10348,8 @@ static ssize_t TracePathMove(const PathTrace *trace)
       ThrowPointExpectedException(token,exception);
     if (GetPathValue(&p,token,&y) == MagickFalse)
       ThrowPointExpectedException(token,exception);
-    point.x=(double) (attribute == (int) 'M' ? x : point.x+x);
-    point.y=(double) (attribute == (int) 'M' ? y : point.y+y);
+    point.x=GetPathCoordinate(attribute,(int) 'M',x,point.x);
+    point.y=GetPathCoordinate(attribute,(int) 'M',y,point.y);
     if (i == 0)
       start=point;
     i++;
