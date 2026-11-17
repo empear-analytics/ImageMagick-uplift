@@ -8803,47 +8803,15 @@ static MagickStatusType DrawColorPrimitive(const DrawPrimitiveContext *context,
   return(status);
 }
 
-static MagickStatusType DrawImagePrimitive(const DrawPrimitiveContext *context,
-  MagickStatusType status)
+static Image *ReadCompositeImages(const PrimitiveInfo *primitive_info,
+  const DrawInfo *draw_info,ExceptionInfo *exception)
 {
   Image
-    *image = context->image;
-
-  const DrawInfo
-    *draw_info = context->draw_info;
-
-  const PrimitiveInfo
-    *primitive_info = context->primitive_info;
-
-  const ssize_t
-    x = context->x,
-    y = context->y;
-
-  ExceptionInfo
-    *exception = context->exception;
-
-  AffineMatrix
-    affine;
-
-  char
-    composite_geometry[MagickPathExtent];
-
-  Image
-    *composite_image,
     *composite_images;
 
   ImageInfo
     *clone_info;
 
-  RectangleInfo
-    geometry;
-
-  ssize_t
-    x1,
-    y1;
-
-  if (primitive_info->text == (char *) NULL)
-    return(status);
   clone_info=AcquireImageInfo();
   composite_images=(Image *) NULL;
   if (LocaleNCompare(primitive_info->text,"data:",5) == 0)
@@ -8867,6 +8835,85 @@ static MagickStatusType DrawImagePrimitive(const DrawPrimitiveContext *context,
         draw_info->image_info->coder_depth=clone_info->coder_depth;
       }
   clone_info=DestroyImageInfo(clone_info);
+  return(composite_images);
+}
+
+static MagickStatusType CompositeDrawImage(const DrawPrimitiveContext *context,
+  Image *composite_image,MagickStatusType status)
+{
+  Image
+    *image = context->image;
+
+  const DrawInfo
+    *draw_info = context->draw_info;
+
+  const ssize_t
+    x = context->x,
+    y = context->y;
+
+  ExceptionInfo
+    *exception = context->exception;
+
+  AffineMatrix
+    affine;
+
+  char
+    composite_geometry[MagickPathExtent];
+
+  RectangleInfo
+    geometry;
+
+  SetGeometry(image,&geometry);
+  image->gravity=draw_info->gravity;
+  geometry.x=x;
+  geometry.y=y;
+  (void) FormatLocaleString(composite_geometry,MagickPathExtent,
+    "%.17gx%.17g%+.20g%+.20g",(double) composite_image->columns,(double)
+    composite_image->rows,(double) geometry.x,(double) geometry.y);
+  (void) ParseGravityGeometry(image,composite_geometry,&geometry,exception);
+  affine=draw_info->affine;
+  affine.tx=(double) geometry.x;
+  affine.ty=(double) geometry.y;
+  composite_image->interpolate=image->interpolate;
+  if ((draw_info->compose == OverCompositeOp) ||
+      (draw_info->compose == SrcOverCompositeOp))
+    status&=(MagickStatusType) DrawAffineImage(image,composite_image,
+      &affine,exception);
+  else
+    status&=(MagickStatusType) CompositeImage(image,composite_image,
+      draw_info->compose,MagickTrue,geometry.x,geometry.y,exception);
+  return(status);
+}
+
+static MagickStatusType DrawImagePrimitive(const DrawPrimitiveContext *context,
+  MagickStatusType status)
+{
+  Image
+    *image = context->image;
+
+  const DrawInfo
+    *draw_info = context->draw_info;
+
+  const PrimitiveInfo
+    *primitive_info = context->primitive_info;
+
+  ExceptionInfo
+    *exception = context->exception;
+
+  char
+    composite_geometry[MagickPathExtent];
+
+  Image
+    *composite_image,
+    *composite_images;
+
+  ssize_t
+    x1,
+    y1;
+
+  if (primitive_info->text == (char *) NULL)
+    return(status);
+  composite_images=ReadCompositeImages(primitive_info,draw_info,exception);
   if (composite_images == (Image *) NULL)
     {
       status=MagickFalse;
@@ -8895,25 +8942,7 @@ static MagickStatusType DrawImagePrimitive(const DrawPrimitiveContext *context,
   if (draw_info->alpha != OpaqueAlpha)
     status&=(MagickStatusType) SetImageAlpha(composite_image,
       draw_info->alpha,exception);
-  SetGeometry(image,&geometry);
-  image->gravity=draw_info->gravity;
-  geometry.x=x;
-  geometry.y=y;
-  (void) FormatLocaleString(composite_geometry,MagickPathExtent,
-    "%.17gx%.17g%+.20g%+.20g",(double) composite_image->columns,(double)
-    composite_image->rows,(double) geometry.x,(double) geometry.y);
-  (void) ParseGravityGeometry(image,composite_geometry,&geometry,exception);
-  affine=draw_info->affine;
-  affine.tx=(double) geometry.x;
-  affine.ty=(double) geometry.y;
-  composite_image->interpolate=image->interpolate;
-  if ((draw_info->compose == OverCompositeOp) ||
-      (draw_info->compose == SrcOverCompositeOp))
-    status&=(MagickStatusType) DrawAffineImage(image,composite_image,
-      &affine,exception);
-  else
-    status&=(MagickStatusType) CompositeImage(image,composite_image,
-      draw_info->compose,MagickTrue,geometry.x,geometry.y,exception);
+  status=CompositeDrawImage(context,composite_image,status);
   composite_image=DestroyImage(composite_image);
   return(status);
 }
