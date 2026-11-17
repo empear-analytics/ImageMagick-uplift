@@ -1271,9 +1271,6 @@ static Image *SIMVarianceImage(Image *alpha_image,const Image *beta_image,
   return(variance_image);
 }
 
-static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
-  RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
-{
 #define ThrowDPCSimilarityException() \
 { \
   if (dot_product_image != (Image *) NULL) \
@@ -1301,6 +1298,9 @@ static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
   return((Image *) NULL); \
 }
 
+static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
+  RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
+{
   double
     edge_factor = 0.0,
     maxima = 0.0,
