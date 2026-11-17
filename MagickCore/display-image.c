@@ -3800,6 +3800,16 @@ static void XClampChopSegment(const XWindows *windows,XSegment *segment_info)
   XClampChopSegmentToImage(segment_info,windows);
 }
 
+static void XSetChopWidthFromRight(const XSegment *segment_info,
+  RectangleInfo *chop_info,const XWindows *windows)
+{
+  if ((*segment_info).x1 > (*segment_info).x2)
+    {
+      (*chop_info).width=(size_t) ((*segment_info).x1-(*segment_info).x2+1);
+      (*chop_info).x=(ssize_t) windows->image.x+(*segment_info).x2;
+    }
+}
+
 static void XChopHorizontalGeometry(const XWindows *windows,
   const XSegment *segment_info,RectangleInfo *chop_info)
 {
@@ -3807,11 +3817,7 @@ static void XChopHorizontalGeometry(const XWindows *windows,
   (*chop_info).height=0;
   (*chop_info).x=(ssize_t) windows->image.x+(*segment_info).x1;
   (*chop_info).y=0;
-  if ((*segment_info).x1 > (*segment_info).x2)
-    {
-      (*chop_info).width=(size_t) ((*segment_info).x1-(*segment_info).x2+1);
-      (*chop_info).x=(ssize_t) windows->image.x+(*segment_info).x2;
-    }
+  XSetChopWidthFromRight(segment_info,chop_info,windows);
 }
 
 static void XChopVerticalGeometry(const XWindows *windows,
