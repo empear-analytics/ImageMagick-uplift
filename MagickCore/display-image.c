@@ -9904,7 +9904,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
   }
   XSetCursorState(display,windows,MagickFalse);
   coordinate_info=(XPoint *) RelinquishMagickMemory(coordinate_info);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (status != 0));
 }
 
 /*
