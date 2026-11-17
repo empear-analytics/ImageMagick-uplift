@@ -1596,8 +1596,7 @@ static inline MagickBooleanType IsAttributeQualified(FxInfo *pfx,
 static inline MagickBooleanType IsChannelQualifiedAttr(const ImgAttrE iaQual,
   const PixelChannel chQual)
 {
-  return((iaQual != aNull && chQual != NO_CHAN_QUAL) ? MagickTrue :
-    MagickFalse);
+  return((MagickBooleanType) (iaQual != aNull && chQual != NO_CHAN_QUAL));
 }
 
 static inline MagickBooleanType IsUnqualifiedAccess(
