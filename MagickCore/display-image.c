@@ -11645,6 +11645,17 @@ static void XApplySaturationCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyBrightnessToImage(Display *display,XWindows *windows,
+  char *modulate_factors,char *brightness_percent,Image **image,
+  ExceptionInfo *exception)
+{
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) CopyMagickString(modulate_factors,brightness_percent,
+    MagickPathExtent);
+  (void) ModulateImage(*image,modulate_factors,exception);
+}
+
 static void XApplyBrightnessCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11678,11 +11689,8 @@ static void XApplyBrightnessCommand(const XMagickCommandContext *context)
   /*
     Vary the color brightness.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) CopyMagickString(modulate_factors,brightness_percent,
-    MagickPathExtent);
-  (void) ModulateImage(*image,modulate_factors,exception);
+  XApplyBrightnessToImage(display,windows,modulate_factors,brightness_percent,
+    image,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
