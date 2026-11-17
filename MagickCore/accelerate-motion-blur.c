@@ -537,6 +537,36 @@ typedef struct _MotionBlurOutputSource
     *filteredPixels;
 } MotionBlurOutputSource;
 
+typedef struct _MotionBlurViewTargets
+{
+  CacheView
+    **image_view;
+
+  const void
+    **inputPixels;
+} MotionBlurViewTargets;
+
+static MagickBooleanType AcquireMotionBlurPixels(const Image *image,
+  ExceptionInfo *exception,const MotionBlurViewTargets *targets)
+{
+  CacheView
+    **const image_view = targets->image_view;
+
+  const void
+    **const inputPixels = targets->inputPixels;
+
+  *image_view=AcquireAuthenticCacheView(image,exception);
+  *inputPixels=GetCacheViewAuthenticPixels(*image_view,0,0,image->columns,
+    image->rows,exception);
+  if (*inputPixels == (const void *) NULL)
+  {
+    (void) ThrowMagickException(exception,GetMagickModule(),CacheError,
+      "UnableToReadPixelCache.","`%s'",image->filename);
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 typedef struct _MotionBlurImageTargets
 {
   Image
@@ -700,14 +730,12 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
 
   /* Create and initialize OpenCL buffers. */
 
-  image_view=AcquireAuthenticCacheView(image,exception);
-  inputPixels=GetCacheViewAuthenticPixels(image_view,0,0,image->columns,
-    image->rows,exception);
-  if (inputPixels == (const void *) NULL)
   {
-    (void) ThrowMagickException(exception,GetMagickModule(),CacheError,
-      "UnableToReadPixelCache.","`%s'",image->filename);
-    goto cleanup;
+    const MotionBlurViewTargets
+      targets = { &image_view, &inputPixels };
+
+    if (AcquireMotionBlurPixels(image,exception,&targets) == MagickFalse)
+      goto cleanup;
   }
 
   /*
