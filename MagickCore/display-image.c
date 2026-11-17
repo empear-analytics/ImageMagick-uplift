@@ -4612,7 +4612,7 @@ static void XColorFloodfill(const ColorEditPixelInput *pixel_input)
     AllCompliance,&draw_info->fill,exception);
   (void) FloodfillPaintImage(*image,draw_info,&target,
     (ssize_t)x_offset,(ssize_t)y_offset,
-    method != FloodfillMethod ? MagickTrue : MagickFalse,exception);
+    (MagickBooleanType) (method != FloodfillMethod),exception);
   draw_info=DestroyDrawInfo(draw_info);
 }
 
