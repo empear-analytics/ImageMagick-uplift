@@ -10668,6 +10668,19 @@ static MagickBooleanType TraceRectangle(PrimitiveInfo *primitive_info,
   return(MagickTrue);
 }
 
+static MagickBooleanType TraceRoundCorner(MVGInfo *mvg_info,
+  const PointInfo point,const PointInfo arc,const PointInfo degrees)
+{
+  PrimitiveInfo
+    *p;
+
+  if (TraceEllipse(mvg_info,point,arc,degrees) == MagickFalse)
+    return(MagickFalse);
+  p=(*mvg_info->primitive_info)+(ptrdiff_t) mvg_info->offset;
+  mvg_info->offset+=(ssize_t) p->coordinates;
+  return(MagickTrue);
+}
+
 static MagickBooleanType TraceRoundRectangle(MVGInfo *mvg_info,
   const PointInfo start,const PointInfo end,PointInfo arc)
 {
@@ -10702,10 +10715,8 @@ static MagickBooleanType TraceRoundRectangle(MVGInfo *mvg_info,
   point.y=start.y+arc.y;
   degrees.x=270.0;
   degrees.y=360.0;
-  if (TraceEllipse(mvg_info,point,arc,degrees) == MagickFalse)
+  if (TraceRoundCorner(mvg_info,point,arc,degrees) == MagickFalse)
     return(MagickFalse);
-  p=(*mvg_info->primitive_info)+(ptrdiff_t) mvg_info->offset;
-  mvg_info->offset+=(ssize_t) p->coordinates;
   point.x=start.x+segment.x-arc.x;
   point.y=start.y+segment.y-arc.y;
   degrees.x=0.0;
