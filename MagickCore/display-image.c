@@ -10110,6 +10110,16 @@ static void XTrimUndoCache(const XResourceInfo *resource_info,size_t *bytes,
     }
 }
 
+static void XCopyCropGeometryToCache(XWindows *windows,Image *cache_image)
+{
+  if (windows->image.crop_geometry != (char *) NULL)
+    {
+      cache_image->geometry=AcquireString((char *) NULL);
+      (void) CopyMagickString(cache_image->geometry,
+        windows->image.crop_geometry,MagickPathExtent);
+    }
+}
+
 static Image *XSaveUndoImage(const XImageCacheContext *cache_context,
   Image *undo_image)
 {
@@ -10156,12 +10166,7 @@ static Image *XSaveUndoImage(const XImageCacheContext *cache_context,
   cache_image->columns=(size_t) windows->image.ximage->width;
   cache_image->rows=(size_t) windows->image.ximage->height;
   cache_image->geometry=windows->image.crop_geometry;
-  if (windows->image.crop_geometry != (char *) NULL)
-    {
-      cache_image->geometry=AcquireString((char *) NULL);
-      (void) CopyMagickString(cache_image->geometry,
-        windows->image.crop_geometry,MagickPathExtent);
-    }
+  XCopyCropGeometryToCache(windows,cache_image);
   if (undo_image == (Image *) NULL)
     {
       undo_image=cache_image;
