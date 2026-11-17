@@ -12730,6 +12730,19 @@ static void XApplyShadeCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyRaiseToImage(Display *display,XWindows *windows,Image **image,
+  char *bevel_width,ExceptionInfo *exception)
+{
+  RectangleInfo
+    page_geometry;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) ParsePageGeometry(*image,bevel_width,&page_geometry,
+    exception);
+  (void) RaiseImage(*image,&page_geometry,MagickTrue,exception);
+}
+
 static void XApplyRaiseCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12747,9 +12760,6 @@ static void XApplyRaiseCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
-  RectangleInfo
-    page_geometry;
-
   static char
     bevel_width[MagickPathExtent] = "10";
 
@@ -12764,11 +12774,7 @@ static void XApplyRaiseCommand(const XMagickCommandContext *context)
   */
   (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
     exception);
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) ParsePageGeometry(*image,bevel_width,&page_geometry,
-    exception);
-  (void) RaiseImage(*image,&page_geometry,MagickTrue,exception);
+  XApplyRaiseToImage(display,windows,image,bevel_width,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
