@@ -10757,18 +10757,21 @@ static inline MagickBooleanType IsRoundStrokeJoin(const DrawInfo *draw_info,
     (closed_path != MagickFalse))) ? MagickTrue : MagickFalse);
 }
 
+static void GetEpsilonSlope(const double dx,const double dy,double *slope)
+{
+  if (dx >= 0.0)
+    *slope=dy < 0.0 ? -1.0/MagickEpsilon : 1.0/MagickEpsilon;
+  else
+    *slope=dy < 0.0 ? 1.0/MagickEpsilon : -1.0/MagickEpsilon;
+}
+
 static void GetStrokeSlope(const double dx,const double dy,double *slope,
   double *inverse_slope)
 {
   *slope=0.0;
   *inverse_slope=0.0;
   if (fabs(dx) < MagickEpsilon)
-    {
-      if (dx >= 0.0)
-        *slope=dy < 0.0 ? -1.0/MagickEpsilon : 1.0/MagickEpsilon;
-      else
-        *slope=dy < 0.0 ? 1.0/MagickEpsilon : -1.0/MagickEpsilon;
-    }
+    GetEpsilonSlope(dx,dy,slope);
   else
     if (fabs(dy) < MagickEpsilon)
       {
