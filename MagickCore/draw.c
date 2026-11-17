@@ -1246,9 +1246,6 @@ static SegmentInfo AffineEdge(const Image *image,const AffineMatrix *affine,
     intercept,
     z;
 
-  double
-    x;
-
   SegmentInfo
     inverse_edge;
 
@@ -1273,9 +1270,7 @@ static SegmentInfo AffineEdge(const Image *image,const AffineMatrix *affine,
         intercept=(-z+(double) image->columns)/affine->sx;
         RaiseEdgeStart(intercept,&inverse_edge);
         intercept=(-z/affine->sx);
-        x=intercept;
-        if (x < inverse_edge.x2)
-          inverse_edge.x2=x;
+        LowerEdgeEnd(intercept,&inverse_edge);
       }
     else
       if ((z < 0.0) || ((size_t) floor(z+0.5) >= image->columns))
@@ -1292,9 +1287,7 @@ static SegmentInfo AffineEdge(const Image *image,const AffineMatrix *affine,
       intercept=(-z/affine->rx);
       RaiseEdgeStart(intercept,&inverse_edge);
       intercept=(-z+(double) image->rows)/affine->rx;
-      x=intercept;
-      if (x < inverse_edge.x2)
-        inverse_edge.x2=x;
+      LowerEdgeEnd(intercept,&inverse_edge);
     }
   else
     if (affine->rx < -MagickEpsilon)
@@ -1302,9 +1295,7 @@ static SegmentInfo AffineEdge(const Image *image,const AffineMatrix *affine,
         intercept=(-z+(double) image->rows)/affine->rx;
         RaiseEdgeStart(intercept,&inverse_edge);
         intercept=(-z/affine->rx);
-        x=intercept;
-        if (x < inverse_edge.x2)
-          inverse_edge.x2=x;
+        LowerEdgeEnd(intercept,&inverse_edge);
       }
     else
       if ((z < 0.0) || ((size_t) floor(z+0.5) >= image->rows))
