@@ -17740,7 +17740,7 @@ static MagickBooleanType XPrintImage(Display *display,
   print_image=DestroyImage(print_image);
   image_info=DestroyImageInfo(image_info);
   XSetCursorState(display,windows,MagickFalse);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return((MagickBooleanType) (status != 0));
 }
 
 /*
