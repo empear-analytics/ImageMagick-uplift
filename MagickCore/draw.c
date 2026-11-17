@@ -8417,8 +8417,14 @@ static MagickStatusType ReplaceColorPixels(const PrimitiveScanInfo *scan,
   return(status);
 }
 
-static MagickStatusType ResetAlphaPixels(const PrimitiveScanInfo *scan,
-  MagickStatusType status)
+typedef enum
+{
+  AlphaPixelReset,
+  ColorPixelReset
+} PixelResetSide;
+
+static MagickStatusType ResetScanPixels(const PrimitiveScanInfo *scan,
+  MagickStatusType status,const PixelResetSide side)
 {
   Image
     *const image = scan->image;
@@ -8439,6 +8445,8 @@ static MagickStatusType ResetAlphaPixels(const PrimitiveScanInfo *scan,
     x,
     y;
 
+  if (side == ColorPixelReset)
+    GetPixelInfo(image,&pixel);
   for (y=0; y < (ssize_t) image->rows; y++)
   {
     Quantum
@@ -8451,7 +8459,8 @@ static MagickStatusType ResetAlphaPixels(const PrimitiveScanInfo *scan,
     for (x=0; x < (ssize_t) image->columns; x++)
     {
       GetFillColor(draw_info,x,y,&pixel,exception);
-      SetPixelAlpha(image,ClampToQuantum(pixel.alpha),q);
+      ((side == AlphaPixelReset) ? SetPixelAlpha(image,
+        ClampToQuantum(pixel.alpha),q) : SetPixelViaPixelInfo(image,&pixel,q));
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     status&=(MagickStatusType) SyncCacheViewAuthenticPixels(image_view,
@@ -8462,51 +8471,6 @@ static MagickStatusType ResetAlphaPixels(const PrimitiveScanInfo *scan,
   return(status);
 }
 
-static MagickStatusType ResetColorPixels(const PrimitiveScanInfo *scan,
-  MagickStatusType status)
-{
-  Image
-    *const image = scan->image;
-
-  CacheView
-    *const image_view = scan->image_view;
-
-  const DrawInfo
-    *const draw_info = scan->draw_info;
-
-  ExceptionInfo
-    *const exception = scan->exception;
-
-  PixelInfo
-    pixel;
-
-  ssize_t
-    x,
-    y;
-
-  GetPixelInfo(image,&pixel);
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      GetFillColor(draw_info,x,y,&pixel,exception);
-      SetPixelViaPixelInfo(image,&pixel,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    status&=(MagickStatusType) SyncCacheViewAuthenticPixels(image_view,
-      exception);
-    if (status == MagickFalse)
-      break;
-  }
-  return(status);
-}
 
 typedef struct _DrawPrimitiveContext
 {
@@ -8625,7 +8589,7 @@ static MagickStatusType DrawAlphaPrimitive(const DrawPrimitiveContext *context,
       scan.image_view=image_view;
       scan.draw_info=draw_info;
       scan.exception=exception;
-      status=ResetAlphaPixels(&scan,status);
+      status=ResetScanPixels(&scan,status,AlphaPixelReset);
       break;
     }
   }
@@ -8720,7 +8684,7 @@ static MagickStatusType DrawColorPrimitive(const DrawPrimitiveContext *context,
       scan.image_view=image_view;
       scan.draw_info=draw_info;
       scan.exception=exception;
-      status=ResetColorPixels(&scan,status);
+      status=ResetScanPixels(&scan,status,ColorPixelReset);
       break;
     }
   }
