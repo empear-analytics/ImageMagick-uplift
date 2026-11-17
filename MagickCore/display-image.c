@@ -12000,6 +12000,14 @@ static void XApplyEqualizeCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyNegateToImage(Display *display,XWindows *windows,
+  Image **image,ExceptionInfo *exception)
+{
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) NegateImage(*image,MagickFalse,exception);
+}
+
 static void XApplyNegateCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12020,9 +12028,7 @@ static void XApplyNegateCommand(const XMagickCommandContext *context)
   /*
     Negate colors in image.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) NegateImage(*image,MagickFalse,exception);
+  XApplyNegateToImage(display,windows,image,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
