@@ -3,10 +3,10 @@
 Branched from `campaign/M137` after #123 merged it into `main` (ba6c3318d); this branch's
 PR goes to `main`. Scores come from cs-mcp 1.5.16 through `tools/ch.py`.
 
-Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 40 flagged functions, 222 -> 258
-functions (four merges, forty-four helpers), 11,636 -> 11,651 lines. Function findings
-(one per function and category) 123 -> 75; the summed cc of the Complex Method
-functions 908 -> 600.
+Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 35 flagged functions, 222 -> 267
+functions (four merges, fifty-three helpers), 11,636 -> 11,686 lines. Function findings
+(one per function and category) 123 -> 70; the summed cc of the Complex Method
+functions 908 -> 544.
 
 ## The function-count lesson
 
@@ -82,6 +82,11 @@ lowers the count.
 | f9f7e02fa | E (two blocks) | DrawImagePrimitive | composite read into ReadCompositeImages, compositing tail into CompositeDrawImage; no findings left (each alone 3.17/3.16) |
 | b6bf59389, a94bd1d6f | FI; E (two blocks) | DrawAlphaPrimitive | the reset scan by initialiser; the alpha-channel setup and the point case into EnsureBlendAlphaChannel and DrawAlphaPoint; no findings left |
 | 2e6378097, 004681e75, 69e5b567d | FB, LB, E | TracePathArc | shape by initialiser, the separator check into SkipPathListSeparator, the advance into AdvancePrimitiveOffset; leaves Large Method (cc 13 stays) |
+| 417b7cd4e, 374142775 | NS, P | GetWindingNumber | direction sign into GetEdgeDirectionSign (IDENTICAL), skip test into IsWindingEdgeSkipped; no findings left |
+| aa0a69e2f, 869ecc368 | MA, P | TraceRoundRectangle | the two radius clamps into ClampRoundCornerArc, the degenerate test into IsDegenerateSegment; no findings left |
+| 92d9d6ae9, b746b5f71 | P, E | TraceEllipse | zero-radius and closed tests into predicates, the angle wrap into GetEllipseEndAngle; no findings left |
+| 0c062eff3 | NS | TracePathBezierCurve | the side's letter and point count into GetBezierAbsoluteLetter and GetBezierPointCount (IDENTICAL); no findings left |
+| (playbook), ea02b4b9e | LB | ParseMVGViewbox | four cast-wrapped reads through GetMVGValue/GetMVGListValue (target unread on the exit path, checked through ParseMVGKeyword and RenderMVGContent); no findings left |
 
 ## Probed and dropped
 
@@ -133,7 +138,7 @@ lowers the count.
   of ORACLE.md's resize/6ee45e9cfa, in campaign A's code this branch does not touch.
   resize/6ee45e9cfa itself diverged once in a GetDrawInfo gate run (13,204 cases) and agreed
   alone three times.
-- Whole catalogue at 1b3d7ffe2, a94bd1d6f and 69e5b567d: 15,967 cases, 3 diverged, all known.
+- Whole catalogue at 1b3d7ffe2, a94bd1d6f, 69e5b567d and ea02b4b9e: 15,967 cases, 3 diverged, all known.
 
 ## Blocked, for the owner
 
