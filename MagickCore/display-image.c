@@ -12662,6 +12662,32 @@ static void XApplySpreadCommand(const XMagickCommandContext *context,
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyShadeToImage(Display *display,XWindows *windows,
+  char *geometry,Image **image,int status,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  Image
+    *shade_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flags=ParseGeometry(geometry,&geometry_info);
+  if ((flags & SigmaValue) == 0)
+    geometry_info.sigma=1.0;
+  shade_image=ShadeImage(*image,(MagickBooleanType) (status != 0),
+    geometry_info.rho,geometry_info.sigma,exception);
+  if (shade_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=shade_image;
+    }
+}
+
 static void XApplyShadeCommand(const XMagickCommandContext *context)
 {
   Display
@@ -12679,15 +12705,6 @@ static void XApplyShadeCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  MagickStatusType
-    flags;
-
-  Image
-    *shade_image;
-
   int
     status;
 
@@ -12704,18 +12721,7 @@ static void XApplyShadeCommand(const XMagickCommandContext *context)
   /*
     Shade image pixels.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  flags=ParseGeometry(geometry,&geometry_info);
-  if ((flags & SigmaValue) == 0)
-    geometry_info.sigma=1.0;
-  shade_image=ShadeImage(*image,(MagickBooleanType) (status != 0),
-    geometry_info.rho,geometry_info.sigma,exception);
-  if (shade_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=shade_image;
-    }
+  XApplyShadeToImage(display,windows,geometry,image,status,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
