@@ -775,6 +775,12 @@ static void SparseColorRow(const SparseColorRowInput *row,const ssize_t j,
   }
 }
 
+static void SetSparseColorRGB(Image **sparse_image,ExceptionInfo *exception)
+{
+  if (IsGrayColorspace((*sparse_image)->colorspace) != MagickFalse)
+    (void) SetImageColorspace((*sparse_image),sRGBColorspace,exception);
+}
+
 static MagickBooleanType CloneSparseColorImage(const Image *image,
   Image **sparse_image,ExceptionInfo *exception)
 {
@@ -786,8 +792,7 @@ static MagickBooleanType CloneSparseColorImage(const Image *image,
       (*sparse_image)=DestroyImage((*sparse_image));
       return(MagickFalse);
     }
-  if (IsGrayColorspace((*sparse_image)->colorspace) != MagickFalse)
-    (void) SetImageColorspace((*sparse_image),sRGBColorspace,exception);
+  SetSparseColorRGB(sparse_image,exception);
   return(MagickTrue);
 }
 
