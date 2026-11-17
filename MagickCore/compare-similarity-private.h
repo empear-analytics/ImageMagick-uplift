@@ -2213,13 +2213,9 @@ static inline void AccumulateSSIMChannels(const SSIMChannelInputs *inputs,
 #define SSIMK2  0.03
 #define SSIML  1.0
 
-static inline MagickBooleanType GetSSIMSimularity(const Image *image,
-  const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
+static inline KernelInfo *AcquireSSIMKernel(const Image *image,
+  ExceptionInfo *exception)
 {
-  CacheView
-    *image_view,
-    *reconstruct_view;
-
   char
     geometry[MagickPathExtent];
 
@@ -2227,11 +2223,36 @@ static inline MagickBooleanType GetSSIMSimularity(const Image *image,
     *artifact;
 
   double
-    area = 0.0,
-    c1,
-    c2,
     radius,
     sigma;
+
+  radius=SSIMRadius;
+  artifact=GetImageArtifact(image,"compare:ssim-radius");
+  if (artifact != (const char *) NULL)
+    radius=StringToDouble(artifact,(char **) NULL);
+  sigma=SSIMSigma;
+  artifact=GetImageArtifact(image,"compare:ssim-sigma");
+  if (artifact != (const char *) NULL)
+    sigma=StringToDouble(artifact,(char **) NULL);
+  (void) FormatLocaleString(geometry,MagickPathExtent,"gaussian:%.17gx%.17g",
+    radius,sigma);
+  return(AcquireKernelInfo(geometry,exception));
+}
+
+static inline MagickBooleanType GetSSIMSimularity(const Image *image,
+  const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view,
+    *reconstruct_view;
+
+  const char
+    *artifact;
+
+  double
+    area = 0.0,
+    c1,
+    c2;
 
   KernelInfo
     *kernel_info;
@@ -2249,17 +2270,7 @@ static inline MagickBooleanType GetSSIMSimularity(const Image *image,
   /*
     Compute the structual similarity index similarity.
   */
-  radius=SSIMRadius;
-  artifact=GetImageArtifact(image,"compare:ssim-radius");
-  if (artifact != (const char *) NULL)
-    radius=StringToDouble(artifact,(char **) NULL);
-  sigma=SSIMSigma;
-  artifact=GetImageArtifact(image,"compare:ssim-sigma");
-  if (artifact != (const char *) NULL)
-    sigma=StringToDouble(artifact,(char **) NULL);
-  (void) FormatLocaleString(geometry,MagickPathExtent,"gaussian:%.17gx%.17g",
-    radius,sigma);
-  kernel_info=AcquireKernelInfo(geometry,exception);
+  kernel_info=AcquireSSIMKernel(image,exception);
   if (kernel_info == (KernelInfo *) NULL)
     ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
       image->filename);
