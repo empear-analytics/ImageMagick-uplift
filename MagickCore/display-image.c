@@ -22611,8 +22611,8 @@ static Image *XVisualDirectoryImage(Display *display,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static MagickBooleanType XFindBackgroundWindow(Display *display,
-  char *window_id,const Window root_window,XWindowInfo *window_info)
+static void XLookupBackgroundWindowId(char *window_id,XWindowInfo *window_info,
+  const Window root_window,Display *display)
 {
   if (LocaleCompare(window_id,"root") == 0)
     (*window_info).id=root_window;
@@ -22624,6 +22624,12 @@ static MagickBooleanType XFindBackgroundWindow(Display *display,
       if ((*window_info).id == (Window) NULL)
         (*window_info).id=XWindowByName(display,root_window,window_id);
     }
+}
+
+static MagickBooleanType XFindBackgroundWindow(Display *display,
+  char *window_id,const Window root_window,XWindowInfo *window_info)
+{
+  XLookupBackgroundWindowId(window_id,window_info,root_window,display);
   if ((*window_info).id == (Window) NULL)
     {
       ThrowXWindowException(XServerError,"NoWindowWithSpecifiedIDExists",
