@@ -3766,11 +3766,9 @@ static void XTrackInfoWidget(Display *display,XWindows *windows,const int x,
       (void) XMapWindow(display,windows->info.id);
 }
 
-static void XClampChopSegment(const XWindows *windows,XSegment *segment_info)
+static void XClampChopSegmentToImage(XSegment *segment_info,
+  const XWindows *windows)
 {
-  /*
-    Check boundary conditions.
-  */
   if ((*segment_info).x2 < 0)
     (*segment_info).x2=0;
   else
@@ -3781,6 +3779,14 @@ static void XClampChopSegment(const XWindows *windows,XSegment *segment_info)
   else
     if ((*segment_info).y2 > windows->image.ximage->height)
       (*segment_info).y2=windows->image.ximage->height;
+}
+
+static void XClampChopSegment(const XWindows *windows,XSegment *segment_info)
+{
+  /*
+    Check boundary conditions.
+  */
+  XClampChopSegmentToImage(segment_info,windows);
 }
 
 static void XChopHorizontalGeometry(const XWindows *windows,
