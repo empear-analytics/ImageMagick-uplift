@@ -183,6 +183,124 @@ static MagickBooleanType CreateRotationalBlurTables(
   return(MagickTrue);
 }
 
+typedef struct _RotationalBlurLaunchInputs
+{
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  const Image
+    *image;
+
+  Image
+    *filteredImage;
+
+  cl_mem
+    imageBuffer;
+
+  cl_int
+    channel_mask;
+
+  cl_float2
+    blurCenter;
+
+  cl_mem
+    cosThetaBuffer,
+    sinThetaBuffer;
+
+  cl_uint
+    cossin_theta_size;
+
+  cl_mem
+    filteredImageBuffer;
+} RotationalBlurLaunchInputs;
+
+typedef struct _RotationalBlurLaunchTargets
+{
+  cl_kernel
+    *rotationalBlurKernel;
+
+  MagickBooleanType
+    *outputReady;
+} RotationalBlurLaunchTargets;
+
+static void LaunchRotationalBlurKernel(const RotationalBlurLaunchInputs *inputs,
+  ExceptionInfo *exception,const RotationalBlurLaunchTargets *launch)
+{
+  const MagickCLDevice
+    device = inputs->device;
+
+  const cl_command_queue
+    queue = inputs->queue;
+
+  const Image
+    *const image = inputs->image;
+
+  Image
+    *const filteredImage = inputs->filteredImage;
+
+  cl_mem
+    imageBuffer = inputs->imageBuffer,
+    cosThetaBuffer = inputs->cosThetaBuffer,
+    sinThetaBuffer = inputs->sinThetaBuffer,
+    filteredImageBuffer = inputs->filteredImageBuffer;
+
+  cl_int
+    channel_mask = inputs->channel_mask,
+    status;
+
+  cl_float2
+    blurCenter = inputs->blurCenter;
+
+  cl_uint
+    cossin_theta_size = inputs->cossin_theta_size,
+    number_channels;
+
+  cl_kernel
+    *const rotationalBlurKernel = launch->rotationalBlurKernel;
+
+  MagickBooleanType
+    *const outputReady = launch->outputReady;
+
+  size_t
+    gsize[2],
+    i;
+
+  *rotationalBlurKernel=AcquireOpenCLKernel(device,"RotationalBlur");
+  if (*rotationalBlurKernel == (cl_kernel) NULL)
+  {
+    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
+      ResourceLimitWarning,"AcquireOpenCLKernel failed.",".");
+    return;
+  }
+
+  number_channels=(cl_uint) image->number_channels;
+
+  i=0;
+  status =SetOpenCLKernelArg(*rotationalBlurKernel,i++,sizeof(cl_mem),(void *)&imageBuffer);
+  status|=SetOpenCLKernelArg(*rotationalBlurKernel,i++,sizeof(cl_uint),&number_channels);
+  status|=SetOpenCLKernelArg(*rotationalBlurKernel,i++,sizeof(cl_int),&channel_mask);
+  status|=SetOpenCLKernelArg(*rotationalBlurKernel,i++,sizeof(cl_float2), &blurCenter);
+  status|=SetOpenCLKernelArg(*rotationalBlurKernel,i++,sizeof(cl_mem),(void *)&cosThetaBuffer);
+  status|=SetOpenCLKernelArg(*rotationalBlurKernel,i++,sizeof(cl_mem),(void *)&sinThetaBuffer);
+  status|=SetOpenCLKernelArg(*rotationalBlurKernel,i++,sizeof(cl_uint), &cossin_theta_size);
+  status|=SetOpenCLKernelArg(*rotationalBlurKernel,i++,sizeof(cl_mem),(void *)&filteredImageBuffer);
+  if (status != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
+      ResourceLimitWarning,"clEnv->library->clSetKernelArg failed.",".");
+    return;
+  }
+
+  gsize[0]=image->columns;
+  gsize[1]=image->rows;
+  *outputReady=EnqueueOpenCLKernel(queue,*rotationalBlurKernel,2,
+    (const size_t *) NULL,gsize,(const size_t *) NULL,image,filteredImage,
+    MagickFalse,exception);
+}
+
 static Image* ComputeRotationalBlurImage(const Image *image,MagickCLEnv clEnv,
   const double angle,ExceptionInfo *exception)
 {
@@ -193,8 +311,7 @@ static Image* ComputeRotationalBlurImage(const Image *image,MagickCLEnv clEnv,
     blurCenter;
 
   cl_int
-    channel_mask=get32BitChannelValue(image->channel_mask),
-    status;
+    channel_mask=get32BitChannelValue(image->channel_mask);
 
   cl_mem
     cosThetaBuffer,
@@ -206,8 +323,7 @@ static Image* ComputeRotationalBlurImage(const Image *image,MagickCLEnv clEnv,
     rotationalBlurKernel;
 
   cl_uint
-    cossin_theta_size,
-    number_channels;
+    cossin_theta_size;
 
   float
     blurRadius;
@@ -220,10 +336,6 @@ static Image* ComputeRotationalBlurImage(const Image *image,MagickCLEnv clEnv,
 
   MagickCLDevice
     device;
-
-  size_t
-    gsize[2],
-    i;
 
   const AccelerateBufferTargets
     targets = { &device, &queue, &filteredImage, &imageBuffer,
@@ -259,37 +371,15 @@ static Image* ComputeRotationalBlurImage(const Image *image,MagickCLEnv clEnv,
       goto cleanup;
   }
 
-  rotationalBlurKernel=AcquireOpenCLKernel(device,"RotationalBlur");
-  if (rotationalBlurKernel == (cl_kernel) NULL)
   {
-    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
-      ResourceLimitWarning,"AcquireOpenCLKernel failed.",".");
-    goto cleanup;
+    const RotationalBlurLaunchInputs inputs = { device, queue, image,
+      filteredImage, imageBuffer, channel_mask, blurCenter, cosThetaBuffer,
+      sinThetaBuffer, cossin_theta_size, filteredImageBuffer };
+    const RotationalBlurLaunchTargets launch = { &rotationalBlurKernel,
+      &outputReady };
+
+    LaunchRotationalBlurKernel(&inputs,exception,&launch);
   }
-
-  number_channels=(cl_uint) image->number_channels;
-
-  i=0;
-  status =SetOpenCLKernelArg(rotationalBlurKernel,i++,sizeof(cl_mem),(void *)&imageBuffer);
-  status|=SetOpenCLKernelArg(rotationalBlurKernel,i++,sizeof(cl_uint),&number_channels);
-  status|=SetOpenCLKernelArg(rotationalBlurKernel,i++,sizeof(cl_int),&channel_mask);
-  status|=SetOpenCLKernelArg(rotationalBlurKernel,i++,sizeof(cl_float2), &blurCenter);
-  status|=SetOpenCLKernelArg(rotationalBlurKernel,i++,sizeof(cl_mem),(void *)&cosThetaBuffer);
-  status|=SetOpenCLKernelArg(rotationalBlurKernel,i++,sizeof(cl_mem),(void *)&sinThetaBuffer);
-  status|=SetOpenCLKernelArg(rotationalBlurKernel,i++,sizeof(cl_uint), &cossin_theta_size);
-  status|=SetOpenCLKernelArg(rotationalBlurKernel,i++,sizeof(cl_mem),(void *)&filteredImageBuffer);
-  if (status != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
-      ResourceLimitWarning,"clEnv->library->clSetKernelArg failed.",".");
-    goto cleanup;
-  }
-
-  gsize[0]=image->columns;
-  gsize[1]=image->rows;
-  outputReady=EnqueueOpenCLKernel(queue,rotationalBlurKernel,2,
-    (const size_t *) NULL,gsize,(const size_t *) NULL,image,filteredImage,
-    MagickFalse,exception);
 
 cleanup:
 
