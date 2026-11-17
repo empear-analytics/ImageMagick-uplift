@@ -11386,6 +11386,22 @@ static void XApplyFlopCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyFlipToImage(Display *display,XWindows *windows,Image **image,
+  ExceptionInfo *exception)
+{
+  Image
+    *flip_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flip_image=FlipImage(*image,exception);
+  if (flip_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=flip_image;
+    }
+}
+
 static void XApplyFlipCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11411,20 +11427,10 @@ static void XApplyFlipCommand(const XMagickCommandContext *context)
     height,
     width;
 
-  Image
-    *flip_image;
-
   /*
     Flip image scanlines.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  flip_image=FlipImage(*image,exception);
-  if (flip_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=flip_image;
-    }
+  XApplyFlipToImage(display,windows,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.crop_geometry != (char *) NULL)
