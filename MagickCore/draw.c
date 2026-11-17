@@ -4039,7 +4039,6 @@ static void ApplyMVGClipPath(const MVGRenderState *state)
 static void ParseMVGDashPattern(const MVGRenderState *state)
 {
   char
-    *next_token,
     *token = (*state->token);
 
   const char
@@ -4064,14 +4063,8 @@ static void ParseMVGDashPattern(const MVGRenderState *state)
 
   for (j=0; j < x; j++)
   {
-    (void) GetNextToken(q,&q,extent,token);
-    if (IsValidListChar((int) ((unsigned char) *token)) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    if (*token == ',')
-      (void) GetNextToken(q,&q,extent,token);
-    graphic_context[n]->dash_pattern[j]=GetDrawValue(token,
-      &next_token);
-    if (token == next_token)
+    if (GetMVGListValue(&q,extent,token,
+        &graphic_context[n]->dash_pattern[j]) == MagickFalse)
       ThrowPointExpectedException(token,exception);
     if (graphic_context[n]->dash_pattern[j] <= 0.0)
       status=MagickFalse;
