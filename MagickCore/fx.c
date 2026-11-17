@@ -1636,8 +1636,8 @@ static inline MagickBooleanType IsPixelAccessFunction(const FunctionE fe)
 static inline MagickBooleanType IsQualifiedCoordFunction(const ImgAttrE iaQual,
   const FunctionE fe)
 {
-  return((iaQual != aNull && (fe == fU || fe == fV || fe == fS)) ? MagickTrue :
-    MagickFalse);
+  return((MagickBooleanType) (iaQual != aNull && (fe == fU || fe == fV ||
+    fe == fS)));
 }
 
 static inline MagickBooleanType IsCoordFunction(const FunctionE fe)
