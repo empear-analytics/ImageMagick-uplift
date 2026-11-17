@@ -6481,6 +6481,14 @@ static void XNotifyWindowManager(Display *display,XResourceInfo *resource_info,
     (unsigned int) mask,&window_changes);
 }
 
+static void XUpdateMagnifyConfiguration(XWindows *windows,Display *display,
+  Image *image,ExceptionInfo *exception)
+{
+  if (windows->magnify.mapped != MagickFalse)
+    XMakeMagnifyImage(display,windows,exception);
+  XResizePanWindow(display,windows,image);
+}
+
 static MagickBooleanType XConfigureImage(Display *display,
   XResourceInfo *resource_info,XWindows *windows,Image *image,
   ExceptionInfo *exception)
@@ -6548,9 +6556,7 @@ static MagickBooleanType XConfigureImage(Display *display,
   /*
     Update Magnify window configuration.
   */
-  if (windows->magnify.mapped != MagickFalse)
-    XMakeMagnifyImage(display,windows,exception);
-  XResizePanWindow(display,windows,image);
+  XUpdateMagnifyConfiguration(windows,display,image,exception);
   /*
     Update icon window configuration.
   */
