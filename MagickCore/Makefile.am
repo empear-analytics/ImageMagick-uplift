@@ -82,9 +82,11 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/accelerate-denoise.c \
   MagickCore/accelerate-despeckle.c \
   MagickCore/accelerate-histogram.c \
+  MagickCore/accelerate-contrast-stretch.c \
   MagickCore/accelerate-resize.c \
   MagickCore/accelerate-private.h \
   MagickCore/accelerate-kernels-private.h \
+  MagickCore/accelerate-histogram-private.h \
   MagickCore/accelerate-core-private.h \
   MagickCore/animate.c \
   MagickCore/animate-window.c \
@@ -600,6 +602,7 @@ MAGICKCORE_INCLUDE_HDRS = \
 MAGICKCORE_NOINST_HDRS = \
   MagickCore/accelerate-private.h \
   MagickCore/accelerate-kernels-private.h \
+  MagickCore/accelerate-histogram-private.h \
   MagickCore/accelerate-core-private.h \
   MagickCore/animate-private.h \
   MagickCore/annotate-private.h \
