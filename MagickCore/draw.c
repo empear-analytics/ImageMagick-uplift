@@ -10344,6 +10344,14 @@ static ssize_t TracePathMove(const PathTrace *trace)
 }
 
 
+static void ReflectBezierControlPoint(PointInfo *points,
+  const PathBezierSide side)
+{
+  points[0]=points[((side == CubicPathBezier) ? 3 : 2)];
+  points[1].x=2.0*points[((side == CubicPathBezier) ? 3 : 2)].x-points[((side == CubicPathBezier) ? 2 : 1)].x;
+  points[1].y=2.0*points[((side == CubicPathBezier) ? 3 : 2)].y-points[((side == CubicPathBezier) ? 2 : 1)].y;
+}
+
 static ssize_t TracePathSmoothBezierCurve(const PathTrace *trace,
   const PathBezierSide side)
 {
@@ -10388,9 +10396,7 @@ static ssize_t TracePathSmoothBezierCurve(const PathTrace *trace,
   */
   do
   {
-    points[0]=points[((side == CubicPathBezier) ? 3 : 2)];
-    points[1].x=2.0*points[((side == CubicPathBezier) ? 3 : 2)].x-points[((side == CubicPathBezier) ? 2 : 1)].x;
-    points[1].y=2.0*points[((side == CubicPathBezier) ? 3 : 2)].y-points[((side == CubicPathBezier) ? 2 : 1)].y;
+    ReflectBezierControlPoint(points,side);
     for (i=2; i < ((side == CubicPathBezier) ? 4 : 3); i++)
     {
       if (GetPathValue(&p,token,&x) == MagickFalse)
