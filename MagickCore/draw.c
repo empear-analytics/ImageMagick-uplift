@@ -9988,6 +9988,12 @@ static MagickBooleanType GetPathValue(const char **p,char *token,
   return(MagickTrue);
 }
 
+static inline double GetPathCoordinate(const int attribute,const int absolute,
+  const double value,const double current)
+{
+  return((double) (attribute == absolute ? value : current+value));
+}
+
 static ssize_t TracePathArc(const PathTrace *trace)
 {
   double
@@ -10057,8 +10063,8 @@ static ssize_t TracePathArc(const PathTrace *trace)
       ThrowPointExpectedException(token,exception);
     if (GetPathValue(&p,token,&y) == MagickFalse)
       ThrowPointExpectedException(token,exception);
-    end.x=(double) (attribute == (int) 'A' ? x : point.x+x);
-    end.y=(double) (attribute == (int) 'A' ? y : point.y+y);
+    end.x=GetPathCoordinate(attribute,(int) 'A',x,point.x);
+    end.y=GetPathCoordinate(attribute,(int) 'A',y,point.y);
     shape.arc=arc;
     shape.angle=angle;
     shape.large_arc=large_arc;
