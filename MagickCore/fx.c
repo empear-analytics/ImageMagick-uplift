@@ -3455,8 +3455,8 @@ static inline MagickBooleanType IsUnassignedUserSymbolRead(
   const MagickBooleanType UserSymbol,const MagickBooleanType Assign,
   const MagickBooleanType Update,const int UserSymNdx0)
 {
-  return((UserSymbol && !Assign && !Update && UserSymNdx0 != NULL_ADDRESS) ?
-    MagickTrue : MagickFalse);
+  return((MagickBooleanType) (UserSymbol && !Assign && !Update &&
+    UserSymNdx0 != NULL_ADDRESS));
 }
 
 static void FlushUnaryPrefixOperators (FxInfo * pfx)
