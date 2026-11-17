@@ -11591,6 +11591,18 @@ static void XApplyTrimCommand(const XMagickCommandContext *context)
     }
 }
 
+static void XApplySaturationToImage(Display *display,XWindows *windows,
+  char *modulate_factors,char *saturation_percent,Image **image,
+  ExceptionInfo *exception)
+{
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  (void) CopyMagickString(modulate_factors,"100.0/",MagickPathExtent);
+  (void) ConcatenateMagickString(modulate_factors,saturation_percent,
+    MagickPathExtent);
+  (void) ModulateImage(*image,modulate_factors,exception);
+}
+
 static void XApplySaturationCommand(const XMagickCommandContext *context)
 {
   Display
@@ -11624,12 +11636,8 @@ static void XApplySaturationCommand(const XMagickCommandContext *context)
   /*
     Vary color saturation.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  (void) CopyMagickString(modulate_factors,"100.0/",MagickPathExtent);
-  (void) ConcatenateMagickString(modulate_factors,saturation_percent,
-    MagickPathExtent);
-  (void) ModulateImage(*image,modulate_factors,exception);
+  XApplySaturationToImage(display,windows,modulate_factors,saturation_percent,
+    image,exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
