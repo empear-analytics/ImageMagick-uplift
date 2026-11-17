@@ -21285,12 +21285,9 @@ static void XScreenOtherEvent(Display *display,XWindows *windows,XEvent *event,
   }
 }
 
-static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
-  ExceptionInfo *exception)
+static void XDispatchScreenEvent(XEvent *event,Display *display,
+  XWindows *windows,ExceptionInfo *exception)
 {
-  (void) XIfEvent(display,event,XPredicate,(char *) windows);
-  if (event->xany.window == windows->command.id)
-    return;
   switch (event->type)
   {
     case ButtonPress:
@@ -21315,6 +21312,15 @@ static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
       break;
     }
   }
+}
+
+static void XScreenEvent(Display *display,XWindows *windows,XEvent *event,
+  ExceptionInfo *exception)
+{
+  (void) XIfEvent(display,event,XPredicate,(char *) windows);
+  if (event->xany.window == windows->command.id)
+    return;
+  XDispatchScreenEvent(event,display,windows,exception);
 }
 
 /*
