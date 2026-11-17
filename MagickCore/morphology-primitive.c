@@ -2468,28 +2468,34 @@ typedef struct _MorphologyStageSelection
     stage_loop;
 } MorphologyStageSelection;
 
+static void SelectSmoothPrimitive(const MorphologyStageSelection *selection,
+  KernelInfo **this_kernel,MorphologyMethod *primitive)
+{
+  switch ( selection->stage_loop ) {
+    case 1: /* start an open method, which starts with Erode */
+      (*primitive) = ErodeMorphology;
+      break;
+    case 2:  /* now Dilate the Erode */
+      (*primitive) = DilateMorphology;
+      break;
+    case 3:  /* Reflect kernel a close */
+      (*this_kernel) = selection->rflt_kernel; /* use the reflected kernel */
+      (*primitive) = DilateMorphology;
+      break;
+    case 4:  /* Finish the Close */
+      (*this_kernel) = selection->rflt_kernel; /* use the reflected kernel */
+      (*primitive) = ErodeMorphology;
+      break;
+  }
+}
+
 static void SelectSmoothOrCorrelatePrimitive(
   const MorphologyStageSelection *selection,KernelInfo **this_kernel,
   MorphologyMethod *primitive)
 {
   switch( selection->method ) {
     case SmoothMorphology:         /* open, close */
-      switch ( selection->stage_loop ) {
-        case 1: /* start an open method, which starts with Erode */
-          (*primitive) = ErodeMorphology;
-          break;
-        case 2:  /* now Dilate the Erode */
-          (*primitive) = DilateMorphology;
-          break;
-        case 3:  /* Reflect kernel a close */
-          (*this_kernel) = selection->rflt_kernel; /* use the reflected kernel */
-          (*primitive) = DilateMorphology;
-          break;
-        case 4:  /* Finish the Close */
-          (*this_kernel) = selection->rflt_kernel; /* use the reflected kernel */
-          (*primitive) = ErodeMorphology;
-          break;
-      }
+      SelectSmoothPrimitive(selection,this_kernel,primitive);
       break;
     case CorrelateMorphology:
       /* A Correlation is a Convolution with a reflected kernel.
