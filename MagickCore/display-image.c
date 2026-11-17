@@ -26871,6 +26871,27 @@ static void XInitializeDisplayImage(const DisplayImageInput *image_input,
   }
 }
 
+static void XLookupKeyPress(const DisplayEventContext *context,
+  const DisplayEventTargets *targets,char *command,const size_t extent)
+{
+  XEvent
+    *const event = targets->event;
+
+  int
+    length;
+
+  KeySym
+    key_symbol;
+
+  /*
+    Respond to a user key press.
+  */
+  length=XLookupString((XKeyEvent *) &event->xkey,command,(int)
+    extent,&key_symbol,(XComposeStatus *) NULL);
+  *(command+length)='\0';
+  XHandleKeyPress(context,key_symbol,targets);
+}
+
 MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
   char **argv,int argc,Image **image,size_t *state,ExceptionInfo *exception)
 {
@@ -26941,19 +26962,9 @@ MagickExport Image *XDisplayImage(Display *display,XResourceInfo *resource_info,
     switch (event.type)
     {
       case KeyPress:
-      {
-        int
-          length;
-
-        /*
-          Respond to a user key press.
-        */
-        length=XLookupString((XKeyEvent *) &event.xkey,command,(int)
-          sizeof(command),&key_symbol,(XComposeStatus *) NULL);
-        *(command+length)='\0';
-        XHandleKeyPress(&event_context,key_symbol,&event_targets);
+        XLookupKeyPress(&event_context,&event_targets,command,
+          sizeof(command));
         break;
-      }
       case KeyRelease:
       {
         /*
