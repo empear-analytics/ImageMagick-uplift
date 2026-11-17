@@ -3,10 +3,10 @@
 Branched from `campaign/M137` after #123 merged it into `main` (ba6c3318d); this branch's
 PR goes to `main`. Scores come from cs-mcp 1.5.16 through `tools/ch.py`.
 
-Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 40 flagged functions, 222 -> 256
-functions (four merges, forty-two helpers), 11,636 -> 11,637 lines. Function findings
-(one per function and category) 123 -> 76; the summed cc of the Complex Method
-functions 908 -> 601.
+Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 40 flagged functions, 222 -> 258
+functions (four merges, forty-four helpers), 11,636 -> 11,651 lines. Function findings
+(one per function and category) 123 -> 75; the summed cc of the Complex Method
+functions 908 -> 600.
 
 ## The function-count lesson
 
@@ -81,6 +81,7 @@ lowers the count.
 | 63cc228b1 | P | AffineEdge | the two out-of-image tests into IsAffineEdgeOutside; no findings left |
 | f9f7e02fa | E (two blocks) | DrawImagePrimitive | composite read into ReadCompositeImages, compositing tail into CompositeDrawImage; no findings left (each alone 3.17/3.16) |
 | b6bf59389, a94bd1d6f | FI; E (two blocks) | DrawAlphaPrimitive | the reset scan by initialiser; the alpha-channel setup and the point case into EnsureBlendAlphaChannel and DrawAlphaPoint; no findings left |
+| 2e6378097, 004681e75, 69e5b567d | FB, LB, E | TracePathArc | shape by initialiser, the separator check into SkipPathListSeparator, the advance into AdvancePrimitiveOffset; leaves Large Method (cc 13 stays) |
 
 ## Probed and dropped
 
@@ -132,7 +133,7 @@ lowers the count.
   of ORACLE.md's resize/6ee45e9cfa, in campaign A's code this branch does not touch.
   resize/6ee45e9cfa itself diverged once in a GetDrawInfo gate run (13,204 cases) and agreed
   alone three times.
-- Whole catalogue at 1b3d7ffe2 and at a94bd1d6f: 15,967 cases, 3 diverged, all known.
+- Whole catalogue at 1b3d7ffe2, a94bd1d6f and 69e5b567d: 15,967 cases, 3 diverged, all known.
 
 ## Blocked, for the owner
 
@@ -163,4 +164,8 @@ lowers the count.
   function's Complex Method while its Large Method stayed (ParseMVGClass, DrawImagePrimitive,
   CloneDrawInfo); steps that cleared both, or cleared Complex Method on a function without
   Large Method (AffineEdge, ParseMVGPrimitivePoints, TracePathMove), held 3.27. Shorten such a
-  function below Large Method first.
+  function below Large Method first. Confirmed twice: DrawImagePrimitive's two extractions
+  together held 3.27 where either alone dropped it; TracePathArc left Large Method with its
+  Complex Method kept, at 3.27.
+- **GetFillAlpha** (per pixel): its inner point loop as a helper clears Large Method but the
+  helper is itself a Complex Method (cc 13), which the pre-commit gate refuses; left.
