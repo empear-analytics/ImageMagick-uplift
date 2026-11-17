@@ -796,6 +796,50 @@ static inline void AccumulateMEPPPixel(const ComparePixels *pixels,
   }
 }
 
+typedef struct _MEPPErrors
+{
+  double
+    area,
+    mean_error,
+    maximum_error;
+} MEPPErrors;
+
+static inline void NormalizeMEPPSimilarity(Image *image,
+  const Image *reconstruct_image,const MEPPErrors *errors,double *similarity)
+{
+  double
+    area = errors->area;
+
+  const double
+    mean_error = errors->mean_error,
+    maximum_error = errors->maximum_error;
+
+  ssize_t
+    channels = 0,
+    k;
+
+  area=MagickSafeReciprocal(area);
+  for (k=0; k < (ssize_t) GetPixelChannels(image); k++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,k);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
+      channel);
+    if (((traits & UpdatePixelTrait) == 0) ||
+        ((reconstruct_traits & UpdatePixelTrait) == 0))
+      continue;
+    similarity[k]*=area;
+    channels++;
+  }
+  similarity[CompositePixelChannel]*=area;
+  if (channels != 0)
+    similarity[CompositePixelChannel]/=(double) channels;
+  image->error.mean_error_per_pixel=(double) QuantumRange*
+    similarity[CompositePixelChannel];
+  image->error.normalized_mean_error=mean_error*area;
+  image->error.normalized_maximum_error=maximum_error;
+}
+
 static inline MagickBooleanType GetMEPPSimilarity(Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -816,9 +860,10 @@ static inline MagickBooleanType GetMEPPSimilarity(Image *image,
     rows;
 
   ssize_t
-    channels = 0,
-    k,
     y;
+
+  MEPPErrors
+    errors;
 
   /*
     Compute the mean error per pixel similarity.
@@ -899,26 +944,10 @@ static inline MagickBooleanType GetMEPPSimilarity(Image *image,
   }
   reconstruct_view=DestroyCacheView(reconstruct_view);
   image_view=DestroyCacheView(image_view);
-  area=MagickSafeReciprocal(area);
-  for (k=0; k < (ssize_t) GetPixelChannels(image); k++)
-  {
-    PixelChannel channel = GetPixelChannelChannel(image,k);
-    PixelTrait traits = GetPixelChannelTraits(image,channel);
-    PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
-      channel);
-    if (((traits & UpdatePixelTrait) == 0) ||
-        ((reconstruct_traits & UpdatePixelTrait) == 0))
-      continue;
-    similarity[k]*=area;
-    channels++;
-  }
-  similarity[CompositePixelChannel]*=area;
-  if (channels != 0)
-    similarity[CompositePixelChannel]/=(double) channels;
-  image->error.mean_error_per_pixel=(double) QuantumRange*
-    similarity[CompositePixelChannel];
-  image->error.normalized_mean_error=mean_error*area;
-  image->error.normalized_maximum_error=maximum_error;
+  errors.area=area;
+  errors.mean_error=mean_error;
+  errors.maximum_error=maximum_error;
+  NormalizeMEPPSimilarity(image,reconstruct_image,&errors,similarity);
   return(status);
 }
 
