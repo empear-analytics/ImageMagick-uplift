@@ -13323,6 +13323,32 @@ static void XApplyEmbossCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
+static void XApplyWaveToImage(Display *display,XWindows *windows,char *geometry,
+  Image **image,ExceptionInfo *exception)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  Image
+    *wave_image;
+
+  XSetCursorState(display,windows,MagickTrue);
+  XCheckRefreshWindows(display,windows);
+  flags=ParseGeometry(geometry,&geometry_info);
+  if ((flags & SigmaValue) == 0)
+    geometry_info.sigma=1.0;
+  wave_image=WaveImage(*image,geometry_info.rho,geometry_info.sigma,
+    (*image)->interpolate,exception);
+  if (wave_image != (Image *) NULL)
+    {
+      *image=DestroyImage(*image);
+      *image=wave_image;
+    }
+}
+
 static void XApplyWaveCommand(const XMagickCommandContext *context)
 {
   Display
@@ -13340,15 +13366,6 @@ static void XApplyWaveCommand(const XMagickCommandContext *context)
   ExceptionInfo
     *const exception = context->exception;
 
-  GeometryInfo
-    geometry_info;
-
-  MagickStatusType
-    flags;
-
-  Image
-    *wave_image;
-
   static char
     geometry[MagickPathExtent] = "25x150";
 
@@ -13362,18 +13379,7 @@ static void XApplyWaveCommand(const XMagickCommandContext *context)
   /*
     Alter an image along a sine wave.
   */
-  XSetCursorState(display,windows,MagickTrue);
-  XCheckRefreshWindows(display,windows);
-  flags=ParseGeometry(geometry,&geometry_info);
-  if ((flags & SigmaValue) == 0)
-    geometry_info.sigma=1.0;
-  wave_image=WaveImage(*image,geometry_info.rho,geometry_info.sigma,
-    (*image)->interpolate,exception);
-  if (wave_image != (Image *) NULL)
-    {
-      *image=DestroyImage(*image);
-      *image=wave_image;
-    }
+  XApplyWaveToImage(display,windows,geometry,image,exception);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
