@@ -3310,6 +3310,17 @@ static MagickBooleanType XAnnotateRenderLines(const AnnotateContext *context,
   return(MagickTrue);
 }
 
+static void XFallBackToDefaultFont(XFontStruct **font_info,Display *display,
+  XWindows *windows,XResourceInfo *resource_info,const unsigned int font_id)
+{
+  if ((*font_info) == (XFontStruct *) NULL)
+    {
+      XNoticeWidget(display,windows,"Unable to load font:",
+        resource_info->font_name[font_id]);
+      (*font_info)=windows->font_info;
+    }
+}
+
 static MagickBooleanType XAnnotateLoadFont(const AnnotateContext *context,
   const AnnotateTargets *targets,XFontStruct **font_info)
 {
@@ -3333,12 +3344,7 @@ static MagickBooleanType XAnnotateLoadFont(const AnnotateContext *context,
     Set font info and check boundary conditions.
   */
   (*font_info)=XLoadQueryFont(display,resource_info->font_name[font_id]);
-  if ((*font_info) == (XFontStruct *) NULL)
-    {
-      XNoticeWidget(display,windows,"Unable to load font:",
-        resource_info->font_name[font_id]);
-      (*font_info)=windows->font_info;
-    }
+  XFallBackToDefaultFont(font_info,display,windows,resource_info,font_id);
   if (((*x)+(*font_info)->max_bounds.width) >= (int) windows->image.width)
     (*x)=(int) windows->image.width-(*font_info)->max_bounds.width;
   if ((*y) < (int) ((*font_info)->ascent+(*font_info)->descent))
