@@ -5616,6 +5616,16 @@ static MagickBooleanType TraceBezierControlPoints(
   return(MagickTrue);
 }
 
+static void SetBezierCoefficients(double *coefficients,
+  const size_t number_coordinates)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) number_coordinates; i++)
+    coefficients[i]=Permutate((ssize_t) number_coordinates-1,i);
+}
+
 static MagickBooleanType ReleaseBezierBuffers(PointInfo *points,
   double *coefficients)
 {
@@ -5683,8 +5693,7 @@ static MagickBooleanType TraceBezier(MVGInfo *mvg_info,
     Compute bezier points.
   */
   end=primitive_info[number_coordinates-1].point;
-  for (i=0; i < (ssize_t) number_coordinates; i++)
-    coefficients[i]=Permutate((ssize_t) number_coordinates-1,i);
+  SetBezierCoefficients(coefficients,number_coordinates);
   weight=0.0;
   for (i=0; i < (ssize_t) control_points; i++)
   {
