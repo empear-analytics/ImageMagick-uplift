@@ -10274,9 +10274,7 @@ static ssize_t TracePathArc(const PathTrace *trace)
     sweep=StringToLong(token) != 0 ? MagickTrue : MagickFalse;
     if (SkipPathListSeparator(&p,token) == MagickFalse)
       ThrowPointExpectedException(token,exception);
-    if (GetPathValue(&p,token,&x) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    if (GetPathValue(&p,token,&y) == MagickFalse)
+    if (GetPathPoint(&p,token,&x,&y) == MagickFalse)
       ThrowPointExpectedException(token,exception);
     end.x=GetPathCoordinate(attribute,(int) 'A',x,point.x);
     end.y=GetPathCoordinate(attribute,(int) 'A',y,point.y);
