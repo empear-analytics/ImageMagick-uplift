@@ -586,8 +586,8 @@ static void ApplyMorphologyIntensity(const MorphologyKernelWalk *walk,
   }
 }
 
-static void ApplyMorphologyHitAndMiss(const MorphologyKernelWalk *walk,
-  const Quantum *magick_restrict *quantum_pixels,double *pixel)
+static void SetHitAndMissPixel(const MorphologyKernelWalk *walk,
+  double minimum,const double maximum,double *pixel)
 {
   const MorphologyMethod
     method = walk->method;
@@ -598,6 +598,23 @@ static void ApplyMorphologyHitAndMiss(const MorphologyKernelWalk *walk,
   const ssize_t
     center = walk->center,
     i = walk->i;
+
+  minimum-=maximum;
+  if (minimum < 0.0)
+    minimum=0.0;
+  (*pixel)=minimum;
+  if (method == ThinningMorphology)
+    (*pixel)=(double) p[center+i]-minimum;
+  else
+    if (method == ThickenMorphology)
+      (*pixel)=(double) p[center+i]+minimum;
+}
+
+static void ApplyMorphologyHitAndMiss(const MorphologyKernelWalk *walk,
+  const Quantum *magick_restrict *quantum_pixels,double *pixel)
+{
+  const MorphologyMethod
+    method = walk->method;
 
   double
     maximum = walk->maximum,
@@ -622,15 +639,7 @@ static void ApplyMorphologyHitAndMiss(const MorphologyKernelWalk *walk,
          greyscale image.
       */
       WalkHitAndMissKernel(walk,&minimum,&maximum);
-      minimum-=maximum;
-      if (minimum < 0.0)
-        minimum=0.0;
-      (*pixel)=minimum;
-      if (method == ThinningMorphology)
-        (*pixel)=(double) p[center+i]-minimum;
-      else
-        if (method == ThickenMorphology)
-          (*pixel)=(double) p[center+i]+minimum;
+      SetHitAndMissPixel(walk,minimum,maximum,pixel);
       break;
     }
     default:
