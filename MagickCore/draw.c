@@ -4420,6 +4420,27 @@ static MagickBooleanType ParseMVGPushDefs(const MVGRenderState *state)
   return(MagickTrue);
 }
 
+static SegmentInfo GetGradientBounds(DrawInfo **graphic_context,
+  const ssize_t n,const SegmentInfo segment)
+{
+  SegmentInfo
+    bounds;
+
+  bounds.x1=graphic_context[n]->affine.sx*segment.x1+
+    graphic_context[n]->affine.ry*segment.y1+
+    graphic_context[n]->affine.tx;
+  bounds.y1=graphic_context[n]->affine.rx*segment.x1+
+    graphic_context[n]->affine.sy*segment.y1+
+    graphic_context[n]->affine.ty;
+  bounds.x2=graphic_context[n]->affine.sx*segment.x2+
+    graphic_context[n]->affine.ry*segment.y2+
+    graphic_context[n]->affine.tx;
+  bounds.y2=graphic_context[n]->affine.rx*segment.x2+
+    graphic_context[n]->affine.sy*segment.y2+
+    graphic_context[n]->affine.ty;
+  return(bounds);
+}
+
 static MagickBooleanType ParseMVGPushGradient(const MVGRenderState *state)
 {
   char
@@ -4483,18 +4504,7 @@ static MagickBooleanType ParseMVGPushGradient(const MVGRenderState *state)
         break;
       }
     (void) CopyMagickString(token,p,(size_t) (q-p-4+1));
-    bounds.x1=graphic_context[n]->affine.sx*segment.x1+
-      graphic_context[n]->affine.ry*segment.y1+
-      graphic_context[n]->affine.tx;
-    bounds.y1=graphic_context[n]->affine.rx*segment.x1+
-      graphic_context[n]->affine.sy*segment.y1+
-      graphic_context[n]->affine.ty;
-    bounds.x2=graphic_context[n]->affine.sx*segment.x2+
-      graphic_context[n]->affine.ry*segment.y2+
-      graphic_context[n]->affine.tx;
-    bounds.y2=graphic_context[n]->affine.rx*segment.x2+
-      graphic_context[n]->affine.sy*segment.y2+
-      graphic_context[n]->affine.ty;
+    bounds=GetGradientBounds(graphic_context,n,segment);
     (void) FormatLocaleString(key,MagickPathExtent,"%s",name);
     (void) SetImageArtifact(image,key,token);
     (void) FormatLocaleString(key,MagickPathExtent,"%s-type",name);
