@@ -311,6 +311,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/morphology-builtin-type-private.h \
   MagickCore/morphology-builtin-base-private.h \
   MagickCore/morphology-primitive-walk-private.h \
+  MagickCore/morphology-primitive-direct-private.h \
   MagickCore/mutex.h \
   MagickCore/nt-base.h \
   MagickCore/nt-base-private.h \
@@ -672,6 +673,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/morphology-builtin-type-private.h \
   MagickCore/morphology-builtin-base-private.h \
   MagickCore/morphology-primitive-walk-private.h \
+  MagickCore/morphology-primitive-direct-private.h \
   MagickCore/mutex.h \
   MagickCore/nt-base.h \
   MagickCore/nt-feature.h \
