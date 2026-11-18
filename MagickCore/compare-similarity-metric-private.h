@@ -324,6 +324,57 @@ static magick_attribute((__always_inline__)) inline void
   }
 }
 
+typedef struct _MEPPMerge
+{
+  Image
+    *image;
+
+  const Image
+    *reconstruct_image;
+
+  const double
+    *channel_similarity;
+
+  double
+    channel_mean_error,
+    channel_maximum_error;
+} MEPPMerge;
+
+static void MergeMEPPRow(const MEPPMerge *merge,double *similarity,
+  double *mean_error,double *maximum_error)
+{
+  Image
+    *const image = merge->image;
+
+  const Image
+    *const reconstruct_image = merge->reconstruct_image;
+
+  const double
+    *const channel_similarity = merge->channel_similarity,
+    channel_mean_error = merge->channel_mean_error,
+    channel_maximum_error = merge->channel_maximum_error;
+
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,j);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
+      channel);
+    if (((traits & UpdatePixelTrait) == 0) ||
+        ((reconstruct_traits & UpdatePixelTrait) == 0))
+      continue;
+    similarity[j]+=channel_similarity[j];
+  }
+  similarity[CompositePixelChannel]+=
+    channel_similarity[CompositePixelChannel];
+  (*mean_error)+=channel_mean_error;
+  if (channel_maximum_error > (*maximum_error))
+    (*maximum_error)=channel_maximum_error;
+}
+
 static inline MagickBooleanType GetMEPPSimilarity(Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -377,6 +428,9 @@ static inline MagickBooleanType GetMEPPSimilarity(Image *image,
     MEPPRowTargets
       targets;
 
+    MEPPMerge
+      merge;
+
     if (status == MagickFalse)
       continue;
     p=GetCacheViewVirtualPixels(image_view,0,y,columns,1,exception);
@@ -396,30 +450,17 @@ static inline MagickBooleanType GetMEPPSimilarity(Image *image,
     targets.channel_maximum_error=(&channel_maximum_error);
     targets.channel_area=(&channel_area);
     AccumulateMEPPRow(&row,&targets);
+    merge.image=image;
+    merge.reconstruct_image=reconstruct_image;
+    merge.channel_similarity=channel_similarity;
+    merge.channel_mean_error=channel_mean_error;
+    merge.channel_maximum_error=channel_maximum_error;
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
     #pragma omp critical (MagickCore_GetMEPPSimilarity)
 #endif
     {
-      ssize_t
-        j;
-
       area+=channel_area;
-      for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,j);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
-          channel);
-        if (((traits & UpdatePixelTrait) == 0) ||
-            ((reconstruct_traits & UpdatePixelTrait) == 0))
-          continue;
-        similarity[j]+=channel_similarity[j];
-      }
-      similarity[CompositePixelChannel]+=
-        channel_similarity[CompositePixelChannel];
-      mean_error+=channel_mean_error;
-      if (channel_maximum_error > maximum_error)
-        maximum_error=channel_maximum_error;
+      MergeMEPPRow(&merge,similarity,&mean_error,&maximum_error);
     }
   }
   reconstruct_view=DestroyCacheView(reconstruct_view);
