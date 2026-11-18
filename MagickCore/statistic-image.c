@@ -176,15 +176,20 @@ static PixelList *DestroyPixelList(PixelList *pixel_list)
   return(pixel_list);
 }
 
-static PixelList **DestroyPixelListTLS(PixelList **pixel_list)
+static void DestroyPixelListEntries(PixelList **pixel_list)
 {
   ssize_t
     i;
 
-  assert(pixel_list != (PixelList **) NULL);
   for (i=0; i < (ssize_t) GetMagickResourceLimit(ThreadResource); i++)
     if (pixel_list[i] != (PixelList *) NULL)
       pixel_list[i]=DestroyPixelList(pixel_list[i]);
+}
+
+static PixelList **DestroyPixelListTLS(PixelList **pixel_list)
+{
+  assert(pixel_list != (PixelList **) NULL);
+  DestroyPixelListEntries(pixel_list);
   pixel_list=(PixelList **) RelinquishMagickMemory(pixel_list);
   return(pixel_list);
 }
