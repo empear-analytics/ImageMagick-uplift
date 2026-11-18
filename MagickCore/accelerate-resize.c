@@ -317,6 +317,49 @@ typedef struct _ResizeFilterRun
     factor;
 } ResizeFilterRun;
 
+typedef struct _ResizeFilterLaunch
+{
+  cl_kernel
+    filterKernel;
+
+  unsigned int
+    pixelPerWorkgroup,
+    workgroupSize;
+} ResizeFilterLaunch;
+
+static MagickBooleanType EnqueueResizeFilterKernel(const ResizeFilterRun *run,
+  const ResizeFilterLaunch *launch,ExceptionInfo *exception)
+{
+  const ResizeFilterSide
+    side = run->side;
+
+  const ResizeFilterPass
+    *const pass = run->pass;
+
+  const cl_kernel
+    filterKernel = launch->filterKernel;
+
+  const unsigned int
+    pixelPerWorkgroup = launch->pixelPerWorkgroup,
+    workgroupSize = launch->workgroupSize;
+
+  size_t
+    gsize[2],
+    lsize[2];
+
+  gsize[0]=((side == HorizontalResizeFilter) ?
+    (pass->resizedColumns+pixelPerWorkgroup-1)/pixelPerWorkgroup*
+    workgroupSize : pass->resizedColumns);
+  gsize[1]=((side == HorizontalResizeFilter) ? pass->resizedRows :
+    (pass->resizedRows+pixelPerWorkgroup-1)/pixelPerWorkgroup*
+    workgroupSize);
+  lsize[0]=((side == HorizontalResizeFilter) ? workgroupSize : 1);
+  lsize[1]=((side == HorizontalResizeFilter) ? 1 : workgroupSize);
+  return(EnqueueOpenCLKernel(pass->queue,filterKernel,2,
+    (const size_t *) NULL,gsize,lsize,pass->image,pass->filteredImage,MagickFalse,
+    exception));
+}
+
 static inline MagickBooleanType ResizeFilterImagePass(
   const ResizeFilterRun *run,ExceptionInfo *exception)
 {
@@ -349,15 +392,16 @@ static inline MagickBooleanType ResizeFilterImagePass(
   MagickBooleanType
     outputReady;
 
+  ResizeFilterLaunch
+    launch;
+
   ResizeVerticalArgs
     args;
 
   size_t
     gammaAccumulatorLocalMemorySize,
-    gsize[2],
     imageCacheLocalMemorySize,
     pixelAccumulatorLocalMemorySize,
-    lsize[2],
     totalLocalMemorySize,
     weightAccumulatorLocalMemorySize;
 
@@ -456,17 +500,10 @@ RestoreMSCWarning
     goto cleanup;
   }
 
-  gsize[0]=((side == HorizontalResizeFilter) ?
-    (pass->resizedColumns+pixelPerWorkgroup-1)/pixelPerWorkgroup*
-    workgroupSize : pass->resizedColumns);
-  gsize[1]=((side == HorizontalResizeFilter) ? pass->resizedRows :
-    (pass->resizedRows+pixelPerWorkgroup-1)/pixelPerWorkgroup*
-    workgroupSize);
-  lsize[0]=((side == HorizontalResizeFilter) ? workgroupSize : 1);
-  lsize[1]=((side == HorizontalResizeFilter) ? 1 : workgroupSize);
-  outputReady=EnqueueOpenCLKernel(pass->queue,filterKernel,2,
-    (const size_t *) NULL,gsize,lsize,pass->image,pass->filteredImage,MagickFalse,
-    exception);
+  launch.filterKernel=filterKernel;
+  launch.pixelPerWorkgroup=pixelPerWorkgroup;
+  launch.workgroupSize=workgroupSize;
+  outputReady=EnqueueResizeFilterKernel(run,&launch,exception);
 
 cleanup:
 
