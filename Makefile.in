@@ -474,7 +474,7 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/module.h MagickCore/monitor.c MagickCore/monitor.h \
 	MagickCore/monitor-private.h MagickCore/montage.c MagickCore/montage-info.c \
 	MagickCore/montage.h MagickCore/morphology.c MagickCore/morphology-apply.c MagickCore/morphology-primitive.c MagickCore/morphology-builtin.c \
-	MagickCore/morphology.h MagickCore/morphology-private.h MagickCore/morphology-apply-private.h MagickCore/morphology-apply-kernel-private.h MagickCore/morphology-builtin-shape-private.h MagickCore/morphology-builtin-type-private.h \
+	MagickCore/morphology.h MagickCore/morphology-private.h MagickCore/morphology-apply-private.h MagickCore/morphology-apply-kernel-private.h MagickCore/morphology-builtin-shape-private.h MagickCore/morphology-builtin-type-private.h MagickCore/morphology-builtin-base-private.h \
 	MagickCore/mutex.h MagickCore/nt-base.h \
 	MagickCore/nt-base-private.h MagickCore/nt-feature.h \
 	MagickCore/opencl.c MagickCore/opencl-environment.c MagickCore/opencl-initialize.c MagickCore/opencl-enqueue.c MagickCore/opencl-device.c MagickCore/opencl.h \
@@ -5914,6 +5914,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/morphology-apply-kernel-private.h \
   MagickCore/morphology-builtin-shape-private.h \
   MagickCore/morphology-builtin-type-private.h \
+  MagickCore/morphology-builtin-base-private.h \
   MagickCore/mutex.h \
   MagickCore/nt-base.h \
   MagickCore/nt-base-private.h \
@@ -6268,6 +6269,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/morphology-apply-kernel-private.h \
   MagickCore/morphology-builtin-shape-private.h \
   MagickCore/morphology-builtin-type-private.h \
+  MagickCore/morphology-builtin-base-private.h \
   MagickCore/mutex.h \
   MagickCore/nt-base.h \
   MagickCore/nt-feature.h \

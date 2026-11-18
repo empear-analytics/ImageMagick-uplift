@@ -94,41 +94,7 @@
 #include "MagickCore/morphology-apply-kernel-private.h"
 #include "MagickCore/morphology-builtin-shape-private.h"
 #include "MagickCore/morphology-builtin-type-private.h"
-
-static MagickBooleanType IsBaseKernelNeeded(const KernelInfoType type)
-{
-  if (IsKernelBuiltWithoutBase(type) != MagickFalse)
-    return(MagickFalse); /* A pre-generated kernel is not needed */
-  switch(type) {
-#if 0
-    /* set to 1 to do a compile-time check that we haven't missed anything */
-    case UnityKernel:
-    case GaussianKernel:
-    case DoGKernel:
-    case LoGKernel:
-    case BlurKernel:
-    case CometKernel:
-    case BinomialKernel:
-    case DiamondKernel:
-    case SquareKernel:
-    case RectangleKernel:
-    case OctagonKernel:
-    case DiskKernel:
-    case PlusKernel:
-    case CrossKernel:
-    case RingKernel:
-    case PeaksKernel:
-    case ChebyshevKernel:
-    case ManhattanKernel:
-    case OctagonalKernel:
-    case EuclideanKernel:
-#else
-    default:
-#endif
-      return(MagickTrue);
-  }
-  return(MagickFalse);
-}
+#include "MagickCore/morphology-builtin-base-private.h"
 
 static void InitializeBaseKernel(KernelInfo *kernel,const KernelInfoType type)
 {
