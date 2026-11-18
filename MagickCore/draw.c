@@ -4934,6 +4934,19 @@ static void PrepareMVGPrimitive(const MVGRenderState *state)
   } while (0);
 }
 
+static char *AcquireMVGPrimitive(const DrawInfo *draw_info,const size_t depth,
+  ExceptionInfo *exception)
+{
+  char
+    *primitive;
+
+  if (IsMVGFileReference(draw_info,depth) != MagickFalse)
+    primitive=FileToString(draw_info->primitive,~0UL,exception);
+  else
+    primitive=AcquireString(draw_info->primitive);
+  return(primitive);
+}
+
 static MagickBooleanType PrepareMVGImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -5099,10 +5112,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     (void) LogMagickEvent(DrawEvent,GetMagickModule(),"begin draw-image");
   if (PrepareMVGImage(image,exception) == MagickFalse)
     return(MagickFalse);
-  if (IsMVGFileReference(draw_info,depth) != MagickFalse)
-    primitive=FileToString(draw_info->primitive,~0UL,exception);
-  else
-    primitive=AcquireString(draw_info->primitive);
+  primitive=AcquireMVGPrimitive(draw_info,depth,exception);
   if (primitive == (char *) NULL)
     return(MagickFalse);
   primitive_extent=(double) strlen(primitive);
