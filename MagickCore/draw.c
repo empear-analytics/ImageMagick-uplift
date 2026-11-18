@@ -553,6 +553,16 @@ static MagickBooleanType GetMVGMacroToken(const char **p,const size_t extent,
   return(MagickTrue);
 }
 
+static void MatchMVGMacroPop(const char *token,const char *p,
+  const char **end,ssize_t *n)
+{
+  if (LocaleCompare(token,"pop") == 0)
+    {
+      (*end)=p-strlen(token)-1;
+      (*n)--;
+    }
+}
+
 static SplayTreeInfo *GetMVGMacros(const char *primitive,
   ExceptionInfo *exception)
 {
@@ -614,11 +624,7 @@ static SplayTreeInfo *GetMVGMacros(const char *primitive,
 
       if (GetMVGMacroToken(&p,extent,token) == MagickFalse)
         break;
-      if (LocaleCompare(token,"pop") == 0)
-        {
-          end=p-strlen(token)-1;
-          n--;
-        }
+      MatchMVGMacroPop(token,p,&end,&n);
       if ((LocaleCompare(token,"push") == 0) &&
           (n++ >= MagickMaxRecursionDepth))
         {
