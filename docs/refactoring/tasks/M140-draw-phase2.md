@@ -13,6 +13,8 @@ On `main` after #124 and #125. Scores from cs-mcp through `tools/ch.py`.
 | 65a038075, 3d568898a, 1ebd89b49 | N, N, Q | TraceStrokePolygon | the polygon assembly, the starting boxes and the first-segment scan into helpers; cc 43 -> 35, 362 -> 327 lines, 3.50 -> 3.55 |
 | 6c5c0be35 | CS | RenderMVGContent | the first graphic context's setup and the release tail through render_state; cc 38 -> 35, draw.c 3.81 -> 3.83 |
 | 5076e5f20 | Q | TraceMVGPrimitive | the text arm's cursor block into AdvanceMVGTextCursor; cc 43 -> 40; draw.c 3.83 -> 4.41, mostly an artifact (below) |
+| (playbook 021c5d86c), 788cd4610 | GP (new) | TraceMVGPrimitive | the round-rectangle and ellipse point checks into predicates; cc 40 -> 34, 260 -> 238 lines; draw.c 4.41 -> 4.46 |
+| a15f38fa4 | E | TraceArcPath | the tail into FinishArcPath; cc 11 -> 10; 4.46 -> 4.47 |
 
 ## Probed and dropped
 
@@ -80,6 +82,21 @@ versions:
 - **Every commit:** build, warnings, guards, the oracle on the function's cases, and
   the OpenMP compare and timing.
 - **Whole narrow catalogue at the tip:** 15,967 cases, 3 diverged, all known.
+
+## TracePath needs a recipe of its own
+
+TracePath (cc 39) is a 20-label `switch` over path commands. Each group is
+`if (Tracer(&trace[,side]) == -1) return(-1); break;`, and the default group throws
+through ThrowPointExpectedException, which sets the caller's `status` by name.
+- **SD** refuses groups that `return`.
+- **SW** needs every group to end in `return(R);`.
+- **EX** needs two kinds of exit.
+- **W** cannot move the default group: the macro writes `status` by name.
+- **KV/KF** need tracers of one or two signatures that differ in one parameter. Here
+  there are three (no side, a PathBezierSide, a PathLineSide).
+
+The way through is a table of command letters to tracers, a widening of Recipe KV. That
+needs a design and the owner's look before an agent writes it.
 
 ## Where Phase 2 stands
 
