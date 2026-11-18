@@ -4934,6 +4934,18 @@ static void PrepareMVGPrimitive(const MVGRenderState *state)
   } while (0);
 }
 
+static MagickBooleanType IsMVGRenderable(const Image *image,
+  const DrawInfo *draw_info,const size_t depth,ExceptionInfo *exception)
+{
+  if (depth >= MagickMaxRecursionDepth)
+    ThrowBinaryException(DrawError,"VectorGraphicsNestedTooDeeply",
+      image->filename);
+  if ((draw_info->primitive == (char *) NULL) ||
+      (*draw_info->primitive == '\0'))
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static void InitializeMVGGraphicContext(const MVGRenderState *state)
 {
   const DrawInfo
@@ -5071,11 +5083,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
   assert(draw_info->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (depth >= MagickMaxRecursionDepth)
-    ThrowBinaryException(DrawError,"VectorGraphicsNestedTooDeeply",
-      image->filename);
-  if ((draw_info->primitive == (char *) NULL) ||
-      (*draw_info->primitive == '\0'))
+  if (IsMVGRenderable(image,draw_info,depth,exception) == MagickFalse)
     return(MagickFalse);
   if (draw_info->debug != MagickFalse)
     (void) LogMagickEvent(DrawEvent,GetMagickModule(),"begin draw-image");
