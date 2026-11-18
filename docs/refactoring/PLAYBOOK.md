@@ -23552,20 +23552,36 @@ block may hold no `break` that leaves it, and a run of groups is not one block.
    is uninitialised where the `switch` stands, so a by-value copy would read an
    indeterminate value, and `returned` when the `default:` group holds an earlier RX
    step's call and `return(returned);` (a chain; that `return` takes step 4's form). The
-   caller keeps its own declaration where it still uses the name (2026-11-18). Nothing
-   else of the caller is written.
+   caller keeps its own declaration where it still uses the name (2026-11-18). A plain
+   local that a moved group writes on a path that breaks to the statements after the
+   `switch`, and that the caller reads there, goes by address on Recipe RV step 6 (b) and
+   (d)'s terms (2026-11-18, second amendment; `CompositeImage`'s Displace and Blur groups
+   write `canvas_image`, `source_image` and `geometry_info`, which the general composite
+   reads): `&v` is a member of step 5's input struct, at most six such members, the
+   helper binds `T *const v = name->v;`, and each use of `v` in the moved text becomes
+   `(*v)` (`&v` becomes `v` inside the parentheses it stood in). Recipe O step 2 holds for
+   each: the caller takes `&v` nowhere else but in calls that keep no copy, or in a
+   `const` targets struct the helper also receives (`argument_targets.geometry_info`)
+   when no path through the helper uses both names (the targets struct only on the
+   `default:` path, the pointer only in the other groups). Nothing else of the caller
+   is written.
 4. Cut the moved groups, labels and bodies, in their order, into a new `static
    MagickBooleanType` function directly above the caller, whose body is `switch (e) { ...
    }` with the same text of `e`, followed by `return(MagickFalse);`. Each `return(R);`
    becomes `{ (*result)=R; return(MagickTrue); }` (the braces only where it stood as the
-   body of an `if`; otherwise the two statements); nothing else in the text changes. The
-   function takes, last, `MagickBooleanType *result`.
+   body of an `if`; otherwise the two statements); nothing else in the text changes but
+   step 3's `(*v)`. The function takes, last, `MagickBooleanType *result`.
 5. Inputs: at most four parameters in all. When the moved groups read more variables than
    fit, those they only read (and those step 3 passes by value) go in a `const` input
    struct of Recipe N (steps 2 and 3), the helper binding a `const` local of the same name
    and type per member it reads (N step 4) and, for a by-value variable it writes, a local
    without `const` (`T v = name->v;`, RV step 6 (c)); `e` and a passed-on targets struct
-   stay parameters.
+   stay parameters. When the `default:` group holds an earlier RX step's call whose input
+   struct already has a member for every variable the newly moved groups read or write
+   through step 3's addresses, the helper takes that struct as its input struct, binds
+   only the members it uses, and passes it on to the earlier helper unchanged (RV step
+   6 (c)'s pass-through); the fill stays where it stands in the caller's `default:`
+   block (2026-11-18, second amendment).
 6. Where the `default:` group stood, write `default:` and a compound block holding, when
    step 5 made an input struct, its fill in Recipe FB's form (`const Name name = { v1,
    v2, ... };`, the members' variables in declaration order, then a blank line), then `if
@@ -23631,6 +23647,10 @@ block may hold no `break` that leaves it, and a run of groups is not one block.
   keeps its value, which nothing reads after a returning path.
 - The input struct lives in the `default:` block, filled where the call stands, so every
   member holds the value the groups would have read in the caller.
+- A local written through step 3's address stays the caller's own object: the helper's
+  `(*v)` reads and writes it at the point the group did, in the same order, and on the
+  breaking path the caller reads after its `switch` what the group left there, as
+  before. No other name for it is used on the same path while the helper runs.
 
 **Evidence level:** oracle (the cases that reach the function).
 
@@ -24153,5 +24173,6 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-18 | AMEND | CB | Step 1: the statement a `critical` governs may be one unbraced statement (a `switch`), which moves whole, the pragma then governing the call statement; step 3: a plain struct the body assigns whole or reads by member goes by pointer as a scalar, `(*v)`, and a private struct value it only reads may be a member of the step 5 input struct, filled before the pragma | `compare-similarity-image.c`'s `SimilarityImage` (campaign A, W41 lane a): its row loop's best-offset merge is an unbraced `switch` under `critical (MagickCore_GetSimilarityMetric)` (cc 30, four bumps); the chain CB then two E steps on the helper's groups, stub-probed, 5.83 to 5.92 | mandate (2026-10-24) |
 | 2026-11-18 | NEW | RX | Split a Selection at its Default, Returning Whether a Moved Group Returned: the `default` group and groups beside it of a `switch` in a `MagickBooleanType` function, groups that `return(R);` with different `R` on some paths and `break;` to code that follows the `switch` on others, move into a `static MagickBooleanType` helper holding `switch (e)` and `return(MagickFalse);`, each `return(R);` becoming `(*result)=R; return(MagickTrue);`; the caller's `default:` fills an input struct in FB form and writes `if (Helper(...,&returned) != MagickFalse) return(returned); break;`; locals written only on returning paths go by value (RV step 6 (b)) | `composite-image.c`'s `CompositeImage` (campaign A, round 30 lane c): after two Recipe SD steps its Copy and Intensity groups return `CompositeCopyImage(...)` or break to the general composite; SD, SR, ST, RC and RV each refuse that shape | mandate (2026-10-24) |
 | 2026-11-18 | AMEND | RX | Step 3: a plain local that every moved group writing it assigns before any read, and that nothing after the `switch` reads before assigning it (RV step 2, E step 4), is declared by the helper as its own local (`status`, uninitialised where the `switch` stands, so a by-value copy would read an indeterminate value; `returned` of an earlier RX step's call held by the `default:` group, a chain); the caller keeps its own declaration where it still uses the name | `composite-image.c`'s `CompositeImage` (campaign A, W42 round 31 lane c): its Saliency and Seamless groups assign `status` from the blend call and `return(status);`, and its `default:` group holds round 30's `CompositeCopyGroups` call and `return(returned);`; moving them with the default gives 7.48 to 7.55 | mandate (2026-10-24) |
+| 2026-11-18 | AMEND | RX | Step 3: a plain local that a moved group writes on a path breaking to the statements after the `switch`, and that the caller reads there, goes by address in step 5's input struct on Recipe RV step 6 (b) and (d)'s terms (at most six; the helper binds `T *const v` and writes `(*v)`; Recipe O step 2, with a `const` targets struct holding the same address allowed when no path uses both names); step 4 names the `(*v)` rewriting; step 5: a chain's helper whose moved groups use only members of the earlier RX step's input struct takes that struct and passes it on unchanged (RV step 6 (c)) | `composite-image.c`'s `CompositeImage` (campaign A, W43 round 31 second batch, lane c): its Displace/Distort and Blur groups clone the canvas, swap `source_image` for it and parse `compose:args` into `geometry_info`, all read by the general composite after the `switch`, so step 3's "nothing else of the caller is written" refused them; the Displace step measures 8.81 to 8.91 (a single helper for both groups was a Large Method, 8.60) | mandate (2026-10-24) |
 | 2026-11-18 | AMEND | OH | Form A, step 1: a doc comment in the leading run that documents a function with external linkage that stays (its `%` banner, with a plain comment block directly after it) moves, unchanged, to directly above that function in the same commit instead of into the header; comments are not tokens, so pp and object identity hold, and `scripts/format_c_api_docs` (which reads the `.c` files it lists) still finds the banner | `composite-image.c` (campaign A, W42 round 31 lane c): its leading run begins with the `CompositeImage` banner and the SVG composition notes (lines 135-233), which a carve would otherwise put into `composite-image-blend-private.h` and so drop `CompositeImage` from the generated API page; probe of the four-header chain with the comments kept above `CompositeImage`: 7.55 to 8.81, headers 9.38, 9.38, 10.0, 9.38 | mandate (2026-10-24) |
 | 2026-11-18 | AMEND | OH | Form A on a private header that a Recipe S split produced: the split header is the one includer of the new header; the run may begin after its `extern "C"` opener and the new header then carries its own pair; step 4's pp and object identity is shown on every `.c` file that includes the split header (headers of `HEAD` against the working tree), since `pp_identical.sh` compiles against the working tree's headers; each moved static keeps its text and its one copy per including file | `compare-similarity-private.h` (campaign A, W42 round 31 lane a): 2,589 lines, *Lines of Code in a Single File* and *Code Duplication* over 20 functions held it at 5.13; a stub-probed chain of three leading runs gives 5.44, 6.93 and 8.37 with headers of 8.79, 7.27 and 7.99 | mandate (2026-10-24) |

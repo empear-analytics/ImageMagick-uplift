@@ -1082,12 +1082,219 @@ static MagickBooleanType CompositeBlendGroups(const BlendCompositeInputs *blend,
   return(MagickFalse);
 }
 
+typedef struct _CanvasCompositeInputs
+{
+  Image
+    *image;
+
+  const Image
+    *composite;
+
+  ssize_t
+    x_offset,
+    y_offset;
+
+  CompositeSetup
+    setup;
+
+  ExceptionInfo
+    *exception;
+
+  Image
+    **canvas_image,
+    **source_image;
+
+  GeometryInfo
+    *geometry_info;
+} CanvasCompositeInputs;
+
+static MagickBooleanType CompositeDisplaceGroups(
+  const CanvasCompositeInputs *canvas_inputs,const CompositeOperator compose,
+  const ComposeArgumentTargets *targets,MagickBooleanType *result)
+{
+  Image
+    *const image = canvas_inputs->image;
+
+  const Image
+    *const composite = canvas_inputs->composite;
+
+  const ssize_t
+    x_offset = canvas_inputs->x_offset,
+    y_offset = canvas_inputs->y_offset;
+
+  const CompositeSetup
+    setup = canvas_inputs->setup;
+
+  ExceptionInfo
+    *const exception = canvas_inputs->exception;
+
+  Image
+    **const canvas_image = canvas_inputs->canvas_image,
+    **const source_image = canvas_inputs->source_image;
+
+  GeometryInfo
+    *const geometry_info = canvas_inputs->geometry_info;
+
+  MagickBooleanType
+    returned;
+
+  MagickStatusType
+    flags;
+
+  switch (compose)
+  {
+    case DisplaceCompositeOp:
+    case DistortCompositeOp:
+    {
+      /*
+        Displace/Distort based on overlay gradient map:
+          X = red_channel;  Y = green_channel;
+          compose:args = x_scale[,y_scale[,center.x,center.y]]
+      */
+      (*canvas_image)=CloneImage(image,0,0,MagickTrue,exception);
+      if ((*canvas_image) == (Image *) NULL)
+        {
+          (*source_image)=DestroyImage((*source_image));
+          (*result)=MagickFalse;
+          return(MagickTrue);
+        }
+      GetDisplaceArguments(image,geometry_info,&flags);
+      {
+        const DisplaceCanvasInputs
+          canvas = { (*canvas_image), image, (*source_image), compose, flags,
+            (*geometry_info), x_offset, y_offset, exception };
+
+        DisplaceCompositeCanvas(&canvas);
+      }
+      (*source_image)=DestroyImage((*source_image));
+      (*source_image)=(*canvas_image);
+      break;
+    }
+    default:
+    {
+      const BlendCompositeInputs
+        blend = { image, composite, (*source_image), x_offset, y_offset, setup,
+          exception };
+
+      if (CompositeBlendGroups(&blend,compose,targets,&returned) !=
+          MagickFalse)
+        {
+          (*result)=returned;
+          return(MagickTrue);
+        }
+      break;
+    }
+  }
+  return(MagickFalse);
+}
+
+static MagickBooleanType CompositeBlurGroups(
+  const CanvasCompositeInputs *canvas_inputs,const CompositeOperator compose,
+  const ComposeArgumentTargets *argument_targets,MagickBooleanType *result)
+{
+  Image
+    *const image = canvas_inputs->image;
+
+  const ssize_t
+    x_offset = canvas_inputs->x_offset,
+    y_offset = canvas_inputs->y_offset;
+
+  ExceptionInfo
+    *const exception = canvas_inputs->exception;
+
+  Image
+    **const canvas_image = canvas_inputs->canvas_image,
+    **const source_image = canvas_inputs->source_image;
+
+  GeometryInfo
+    *const geometry_info = canvas_inputs->geometry_info;
+
+  MagickBooleanType
+    returned;
+
+  MagickStatusType
+    flags;
+
+  switch (compose)
+  {
+    case BlurCompositeOp:
+    {
+      BlurCanvasTargets
+        blur_targets;
+
+      /*
+        Blur Image by resampling dictated by an overlay gradient map:
+          X = red_channel; Y = green_channel; compose:args =
+          x_scale[,y_scale[,angle]].
+      */
+      blur_targets.canvas_image=(canvas_image);
+      blur_targets.flags=(&flags);
+      blur_targets.geometry_info=(geometry_info);
+      if (AcquireBlurCanvas(image,(*source_image),exception,&blur_targets) ==
+          MagickFalse)
+        {
+          (*result)=MagickFalse;
+          return(MagickTrue);
+        }
+      {
+        const BlurGeometryInputs
+          geometry = { (*geometry_info), flags, (*canvas_image), image,
+            (*source_image), x_offset, y_offset, exception };
+
+        BlurCompositeGeometry(&geometry);
+      }
+      (*source_image)=DestroyImage((*source_image));
+      (*source_image)=(*canvas_image);
+      break;
+    }
+    default:
+    {
+      if (CompositeDisplaceGroups(canvas_inputs,compose,argument_targets,
+          &returned) != MagickFalse)
+        {
+          (*result)=returned;
+          return(MagickTrue);
+        }
+      break;
+    }
+  }
+  return(MagickFalse);
+}
+
+static void SetCompositeRowOperators(CompositeRowInputs *rows,
+  const CompositeOperator compose)
+{
+  (*rows).union_coverage=IsListedOperator(UnionCoverageOperators,
+    sizeof(UnionCoverageOperators)/sizeof(*UnionCoverageOperators),compose);
+  (*rows).canvas_alpha=IsListedOperator(CanvasAlphaOperators,
+    sizeof(CanvasAlphaOperators)/sizeof(*CanvasAlphaOperators),compose);
+  (*rows).source_alpha=IsListedOperator(SourceAlphaOperators,
+    sizeof(SourceAlphaOperators)/sizeof(*SourceAlphaOperators),compose);
+  (*rows).pixel_info_inputs=IsListedOperator(PixelInfoInputOperators,
+    sizeof(PixelInfoInputOperators)/sizeof(*PixelInfoInputOperators),compose);
+  (*rows).intensity_inputs=IsListedOperator(IntensityInputOperators,
+    sizeof(IntensityInputOperators)/sizeof(*IntensityInputOperators),compose);
+}
+
+static CompositeSetup GetCompositeSetup(const ssize_t x_offset,
+  const ssize_t y_offset,const MagickBooleanType clamp)
+{
+  CompositeSetup
+    setup;
+
+  setup.x_offset=x_offset;
+  setup.y_offset=y_offset;
+  setup.clamp=clamp;
+  setup.intensity=MagickFalse;
+  return(setup);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
 %                                                                             %
 %                                                                             %
-%   C o m p o s i t e I m a g e                                               %
+%   C o m p o s i t e I m a g e                                           %
 %                                                                             %
 %                                                                             %
 %                                                                             %
@@ -1225,9 +1432,6 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     source_dissolve,
     threshold;
 
-  MagickStatusType
-    flags;
-
   const ComposeArgumentTargets
     argument_targets = { &geometry_info, &percent_luma, &percent_chroma,
       &amount, &threshold, &source_dissolve, &canvas_dissolve };
@@ -1266,76 +1470,15 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
   percent_chroma=100.0;
   source_dissolve=1.0;
   threshold=0.05f;
-  setup.x_offset=x_offset;
-  setup.y_offset=y_offset;
-  setup.clamp=clamp;
-  setup.intensity=MagickFalse;
-  switch (compose)
+  setup=GetCompositeSetup(x_offset,y_offset,clamp);
   {
-    case BlurCompositeOp:
-    {
-      BlurCanvasTargets
-        blur_targets;
+    const CanvasCompositeInputs
+      canvas_inputs = { image, composite, x_offset, y_offset, setup,
+        exception, &canvas_image, &source_image, &geometry_info };
 
-      /*
-        Blur Image by resampling dictated by an overlay gradient map:
-          X = red_channel; Y = green_channel; compose:args =
-          x_scale[,y_scale[,angle]].
-      */
-      blur_targets.canvas_image=(&canvas_image);
-      blur_targets.flags=(&flags);
-      blur_targets.geometry_info=(&geometry_info);
-      if (AcquireBlurCanvas(image,source_image,exception,&blur_targets) ==
-          MagickFalse)
-        return(MagickFalse);
-      {
-        const BlurGeometryInputs
-          geometry = { geometry_info, flags, canvas_image, image, source_image,
-            x_offset, y_offset, exception };
-
-        BlurCompositeGeometry(&geometry);
-      }
-      source_image=DestroyImage(source_image);
-      source_image=canvas_image;
-      break;
-    }
-    case DisplaceCompositeOp:
-    case DistortCompositeOp:
-    {
-      /*
-        Displace/Distort based on overlay gradient map:
-          X = red_channel;  Y = green_channel;
-          compose:args = x_scale[,y_scale[,center.x,center.y]]
-      */
-      canvas_image=CloneImage(image,0,0,MagickTrue,exception);
-      if (canvas_image == (Image *) NULL)
-        {
-          source_image=DestroyImage(source_image);
-          return(MagickFalse);
-        }
-      GetDisplaceArguments(image,&geometry_info,&flags);
-      {
-        const DisplaceCanvasInputs
-          canvas = { canvas_image, image, source_image, compose, flags,
-            geometry_info, x_offset, y_offset, exception };
-
-        DisplaceCompositeCanvas(&canvas);
-      }
-      source_image=DestroyImage(source_image);
-      source_image=canvas_image;
-      break;
-    }
-    default:
-    {
-      const BlendCompositeInputs
-        blend = { image, composite, source_image, x_offset, y_offset, setup,
-          exception };
-
-      if (CompositeBlendGroups(&blend,compose,&argument_targets,&returned) !=
-          MagickFalse)
-        return(returned);
-      break;
-    }
+    if (CompositeBlurGroups(&canvas_inputs,compose,&argument_targets,
+        &returned) != MagickFalse)
+      return(returned);
   }
   /*
     Composite image.
@@ -1344,16 +1487,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
   rows.image=image;
   rows.source_image=source_image;
   rows.compose=compose;
-  rows.union_coverage=IsListedOperator(UnionCoverageOperators,
-    sizeof(UnionCoverageOperators)/sizeof(*UnionCoverageOperators),compose);
-  rows.canvas_alpha=IsListedOperator(CanvasAlphaOperators,
-    sizeof(CanvasAlphaOperators)/sizeof(*CanvasAlphaOperators),compose);
-  rows.source_alpha=IsListedOperator(SourceAlphaOperators,
-    sizeof(SourceAlphaOperators)/sizeof(*SourceAlphaOperators),compose);
-  rows.pixel_info_inputs=IsListedOperator(PixelInfoInputOperators,
-    sizeof(PixelInfoInputOperators)/sizeof(*PixelInfoInputOperators),compose);
-  rows.intensity_inputs=IsListedOperator(IntensityInputOperators,
-    sizeof(IntensityInputOperators)/sizeof(*IntensityInputOperators),compose);
+  SetCompositeRowOperators(&rows,compose);
   rows.clip_to_self=clip_to_self;
   rows.x_offset=x_offset;
   rows.y_offset=y_offset;
