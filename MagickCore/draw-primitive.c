@@ -489,6 +489,14 @@ static void WidenEdgeBounds(const PointInfo point,SegmentInfo *bounds)
     (*bounds).x2=point.x;
 }
 
+static PolygonInfo *ThrowPolygonAllocationFailure(PolygonInfo *polygon_info,
+  ExceptionInfo *exception)
+{
+  (void) ThrowMagickException(exception,GetMagickModule(),
+    ResourceLimitError,"MemoryAllocationFailed","`%s'","");
+  return(DestroyPolygonInfo(polygon_info));
+}
+
 static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
   ExceptionInfo *exception)
 {
@@ -538,11 +546,7 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
   polygon_info->edges=(EdgeInfo *) AcquireQuantumMemory(number_edges,
     sizeof(*polygon_info->edges));
   if (polygon_info->edges == (EdgeInfo *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-      return(DestroyPolygonInfo(polygon_info));
-    }
+    return(ThrowPolygonAllocationFailure(polygon_info,exception));
   (void) memset(polygon_info->edges,0,number_edges*
     sizeof(*polygon_info->edges));
   direction=0;
@@ -585,11 +589,7 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
               sizeof(*points));
           }
         if (points == (PointInfo *) NULL)
-          {
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-            return(DestroyPolygonInfo(polygon_info));
-          }
+          return(ThrowPolygonAllocationFailure(polygon_info,exception));
         ghostline=path_info[i].code == GhostlineCode ? MagickTrue : MagickFalse;
         point=path_info[i].point;
         points[0]=point;
@@ -635,11 +635,7 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
         points=(PointInfo *) AcquireQuantumMemory((size_t) number_points,
           sizeof(*points));
         if (points == (PointInfo *) NULL)
-          {
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-            return(DestroyPolygonInfo(polygon_info));
-          }
+          return(ThrowPolygonAllocationFailure(polygon_info,exception));
         n=1;
         ghostline=MagickFalse;
         points[0]=point;
@@ -656,11 +652,7 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
         points=(PointInfo *) ResizeQuantumMemory(points,(size_t) number_points,
           sizeof(*points));
         if (points == (PointInfo *) NULL)
-          {
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-            return(DestroyPolygonInfo(polygon_info));
-          }
+          return(ThrowPolygonAllocationFailure(polygon_info,exception));
       }
     point=path_info[i].point;
     points[n]=point;
@@ -671,26 +663,14 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
   input.direction=direction;
   input.bounds=bounds;
   if (FlushFinalEdge(polygon_info,&input,&targets) == MagickFalse)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-      return(DestroyPolygonInfo(polygon_info));
-    }
+    return(ThrowPolygonAllocationFailure(polygon_info,exception));
   polygon_info->number_edges=edge;
   polygon_info->edges=(EdgeInfo *) ResizeQuantumMemory(polygon_info->edges,
     polygon_info->number_edges,sizeof(*polygon_info->edges));
   if (polygon_info->edges == (EdgeInfo *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-      return(DestroyPolygonInfo(polygon_info));
-    }
+    return(ThrowPolygonAllocationFailure(polygon_info,exception));
   if (ShrinkPolygonEdgePoints(polygon_info) == MagickFalse)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-      return(DestroyPolygonInfo(polygon_info));
-    }
+    return(ThrowPolygonAllocationFailure(polygon_info,exception));
   qsort(polygon_info->edges,(size_t) polygon_info->number_edges,
     sizeof(*polygon_info->edges),DrawCompareEdges);
   if ((GetLogEventMask() & DrawEvent) != 0)
@@ -1290,6 +1270,52 @@ static MagickBooleanType DrawDashSegment(const DashSegmentInfo *segment,
   return(MagickTrue);
 }
 
+typedef struct _DashOffsetInput
+{
+  const DrawInfo
+    *draw_info;
+
+  double
+    scale,
+    offset;
+} DashOffsetInput;
+
+static void SkipDashOffset(const DashOffsetInput *dash,double *length,
+  ssize_t *n,ssize_t *j)
+{
+  const DrawInfo
+    *const draw_info = dash->draw_info;
+
+  const double
+    scale = dash->scale;
+
+  double
+    offset = dash->offset;
+
+  (*j)=1;
+  for ((*n)=0; offset > 0.0; (*j)=0)
+  {
+    if (draw_info->dash_pattern[(*n)] <= 0.0)
+      break;
+    (*length)=scale*(draw_info->dash_pattern[(*n)]+((*n) == 0 ? -0.5 : 0.5));
+    if (offset > (*length))
+      {
+        offset-=(*length);
+        (*n)++;
+        (*length)=scale*draw_info->dash_pattern[(*n)];
+        continue;
+      }
+    if (offset < (*length))
+      {
+        (*length)-=offset;
+        offset=0.0;
+        break;
+      }
+    offset=0.0;
+    (*n)++;
+  }
+}
+
 static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
   const PrimitiveInfo *primitive_info,Image *image,ExceptionInfo *exception)
 {
@@ -1313,6 +1339,9 @@ static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
 
   ssize_t
     i;
+
+  DashOffsetInput
+    dash;
 
   DashSegmentPendingInput
     pending;
@@ -1347,28 +1376,10 @@ static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
   length=scale*draw_info->dash_pattern[0];
   offset=fabs(draw_info->dash_offset) >= MagickEpsilon ?
     scale*draw_info->dash_offset : 0.0;
-  j=1;
-  for (n=0; offset > 0.0; j=0)
-  {
-    if (draw_info->dash_pattern[n] <= 0.0)
-      break;
-    length=scale*(draw_info->dash_pattern[n]+(n == 0 ? -0.5 : 0.5));
-    if (offset > length)
-      {
-        offset-=length;
-        n++;
-        length=scale*draw_info->dash_pattern[n];
-        continue;
-      }
-    if (offset < length)
-      {
-        length-=offset;
-        offset=0.0;
-        break;
-      }
-    offset=0.0;
-    n++;
-  }
+  dash.draw_info=draw_info;
+  dash.scale=scale;
+  dash.offset=offset;
+  SkipDashOffset(&dash,&length,&n,&j);
   status=MagickTrue;
   maximum_length=0.0;
   total_length=0.0;
@@ -3810,6 +3821,163 @@ static MagickBooleanType TraceZeroLengthSubpath(
   return(MagickFalse);
 }
 
+typedef struct _StrokeFirstInput
+{
+  PrimitiveInfo
+    *polygon_primitive;
+
+  size_t
+    number_vertices;
+} StrokeFirstInput;
+
+static void FindStrokeFirstSegment(const StrokeFirstInput *first,
+  StrokeSegment *dx,StrokeSegment *dy,ssize_t *n)
+{
+  PrimitiveInfo
+    *const polygon_primitive = first->polygon_primitive;
+
+  const size_t
+    number_vertices = first->number_vertices;
+
+  (*dx).p=0.0;
+  (*dy).p=0.0;
+  for ((*n)=1; (*n) < (ssize_t) number_vertices; (*n)++)
+  {
+    (*dx).p=polygon_primitive[(*n)].point.x-polygon_primitive[0].point.x;
+    (*dy).p=polygon_primitive[(*n)].point.y-polygon_primitive[0].point.y;
+    if ((fabs((*dx).p) >= MagickEpsilon) || (fabs((*dy).p) >= MagickEpsilon))
+      break;
+  }
+}
+
+typedef struct _StrokeStartInput
+{
+  PrimitiveInfo
+    *polygon_primitive;
+
+  ssize_t
+    n;
+
+  PointInfo
+    offset;
+
+  StrokeSegment
+    dx,
+    dy,
+    inverse_slope;
+} StrokeStartInput;
+
+static void SetStrokeStartBoxes(const StrokeBoxes *boxes,
+  const StrokeStartInput *start)
+{
+  PointInfo
+    *const box_p = boxes->box_p,
+    *const box_q = boxes->box_q;
+
+  PrimitiveInfo
+    *const polygon_primitive = start->polygon_primitive;
+
+  const ssize_t
+    n = start->n;
+
+  const PointInfo
+    offset = start->offset;
+
+  const StrokeSegment
+    dx = start->dx,
+    dy = start->dy,
+    inverse_slope = start->inverse_slope;
+
+  if ((dy.p*offset.x-dx.p*offset.y) > 0.0)
+    {
+      box_p[0].x=polygon_primitive[0].point.x-offset.x;
+      box_p[0].y=polygon_primitive[0].point.y-offset.x*inverse_slope.p;
+      box_p[1].x=polygon_primitive[n].point.x-offset.x;
+      box_p[1].y=polygon_primitive[n].point.y-offset.x*inverse_slope.p;
+      box_q[0].x=polygon_primitive[0].point.x+offset.x;
+      box_q[0].y=polygon_primitive[0].point.y+offset.x*inverse_slope.p;
+      box_q[1].x=polygon_primitive[n].point.x+offset.x;
+      box_q[1].y=polygon_primitive[n].point.y+offset.x*inverse_slope.p;
+    }
+  else
+    {
+      box_p[0].x=polygon_primitive[0].point.x+offset.x;
+      box_p[0].y=polygon_primitive[0].point.y+offset.y;
+      box_p[1].x=polygon_primitive[n].point.x+offset.x;
+      box_p[1].y=polygon_primitive[n].point.y+offset.y;
+      box_q[0].x=polygon_primitive[0].point.x-offset.x;
+      box_q[0].y=polygon_primitive[0].point.y-offset.y;
+      box_q[1].x=polygon_primitive[n].point.x-offset.x;
+      box_q[1].y=polygon_primitive[n].point.y-offset.y;
+    }
+}
+
+typedef struct _StrokePolygonInput
+{
+  PrimitiveInfo
+    *polygon_primitive;
+
+  PointInfo
+    *stroke_p,
+    *stroke_q;
+
+  ssize_t
+    p,
+    q;
+
+  MagickBooleanType
+    closed_path;
+} StrokePolygonInput;
+
+static void AssembleStrokePolygon(const StrokePolygonInput *assembly,
+  PrimitiveInfo *stroke_polygon)
+{
+  PrimitiveInfo
+    *const polygon_primitive = assembly->polygon_primitive;
+
+  PointInfo
+    *const stroke_p = assembly->stroke_p,
+    *const stroke_q = assembly->stroke_q;
+
+  const ssize_t
+    p = assembly->p,
+    q = assembly->q;
+
+  const MagickBooleanType
+    closed_path = assembly->closed_path;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) p; i++)
+  {
+    stroke_polygon[i]=polygon_primitive[0];
+    stroke_polygon[i].point=stroke_p[i];
+  }
+  if (closed_path != MagickFalse)
+    {
+      stroke_polygon[i]=polygon_primitive[0];
+      stroke_polygon[i].point=stroke_polygon[0].point;
+      i++;
+    }
+  for ( ; i < (ssize_t) (p+q+closed_path); i++)
+  {
+    stroke_polygon[i]=polygon_primitive[0];
+    stroke_polygon[i].point=stroke_q[p+q+closed_path-(i+1)];
+  }
+  if (closed_path != MagickFalse)
+    {
+      stroke_polygon[i]=polygon_primitive[0];
+      stroke_polygon[i].point=stroke_polygon[p+closed_path].point;
+      i++;
+    }
+  stroke_polygon[i]=polygon_primitive[0];
+  stroke_polygon[i].point=stroke_polygon[0].point;
+  i++;
+  stroke_polygon[i].primitive=UndefinedPrimitive;
+  stroke_polygon[0].coordinates=(size_t) (p+q+2*closed_path+1);
+}
+
 static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
   const PrimitiveInfo *primitive_info,ExceptionInfo *exception)
 {
@@ -3912,6 +4080,15 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
   StrokeArc
     arc;
 
+  StrokePolygonInput
+    assembly;
+
+  StrokeStartInput
+    start;
+
+  StrokeFirstInput
+    first;
+
   /*
     Allocate paths.
   */
@@ -3940,15 +4117,9 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
     Compute the slope for the first line segment, p.
   */
   closed_path=primitive_info[0].closed_subpath;
-  dx.p=0.0;
-  dy.p=0.0;
-  for (n=1; n < (ssize_t) number_vertices; n++)
-  {
-    dx.p=polygon_primitive[n].point.x-polygon_primitive[0].point.x;
-    dy.p=polygon_primitive[n].point.y-polygon_primitive[0].point.y;
-    if ((fabs(dx.p) >= MagickEpsilon) || (fabs(dy.p) >= MagickEpsilon))
-      break;
-  }
+  first.polygon_primitive=polygon_primitive;
+  first.number_vertices=number_vertices;
+  FindStrokeFirstSegment(&first,&dx,&dy,&n);
   subpath.draw_info=draw_info;
   subpath.polygon_primitive=polygon_primitive;
   subpath.number_vertices=number_vertices;
@@ -3978,28 +4149,13 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
     (void) TraceSquareLinecap(polygon_primitive,number_vertices,mid);
   offset.x=sqrt((double) (mid*mid/(inverse_slope.p*inverse_slope.p+1.0)));
   offset.y=(double) (offset.x*inverse_slope.p);
-  if ((dy.p*offset.x-dx.p*offset.y) > 0.0)
-    {
-      box_p[0].x=polygon_primitive[0].point.x-offset.x;
-      box_p[0].y=polygon_primitive[0].point.y-offset.x*inverse_slope.p;
-      box_p[1].x=polygon_primitive[n].point.x-offset.x;
-      box_p[1].y=polygon_primitive[n].point.y-offset.x*inverse_slope.p;
-      box_q[0].x=polygon_primitive[0].point.x+offset.x;
-      box_q[0].y=polygon_primitive[0].point.y+offset.x*inverse_slope.p;
-      box_q[1].x=polygon_primitive[n].point.x+offset.x;
-      box_q[1].y=polygon_primitive[n].point.y+offset.x*inverse_slope.p;
-    }
-  else
-    {
-      box_p[0].x=polygon_primitive[0].point.x+offset.x;
-      box_p[0].y=polygon_primitive[0].point.y+offset.y;
-      box_p[1].x=polygon_primitive[n].point.x+offset.x;
-      box_p[1].y=polygon_primitive[n].point.y+offset.y;
-      box_q[0].x=polygon_primitive[0].point.x-offset.x;
-      box_q[0].y=polygon_primitive[0].point.y-offset.y;
-      box_q[1].x=polygon_primitive[n].point.x-offset.x;
-      box_q[1].y=polygon_primitive[n].point.y-offset.y;
-    }
+  start.polygon_primitive=polygon_primitive;
+  start.n=n;
+  start.offset=offset;
+  start.dx=dx;
+  start.dy=dy;
+  start.inverse_slope=inverse_slope;
+  SetStrokeStartBoxes(&boxes,&start);
   /*
     Create strokes for the line join attribute: bevel, miter, round.
   */
@@ -4168,33 +4324,13 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
         polygon_primitive);
       return(stroke_polygon);
     }
-  for (i=0; i < (ssize_t) p; i++)
-  {
-    stroke_polygon[i]=polygon_primitive[0];
-    stroke_polygon[i].point=stroke_p[i];
-  }
-  if (closed_path != MagickFalse)
-    {
-      stroke_polygon[i]=polygon_primitive[0];
-      stroke_polygon[i].point=stroke_polygon[0].point;
-      i++;
-    }
-  for ( ; i < (ssize_t) (p+q+closed_path); i++)
-  {
-    stroke_polygon[i]=polygon_primitive[0];
-    stroke_polygon[i].point=stroke_q[p+q+closed_path-(i+1)];
-  }
-  if (closed_path != MagickFalse)
-    {
-      stroke_polygon[i]=polygon_primitive[0];
-      stroke_polygon[i].point=stroke_polygon[p+closed_path].point;
-      i++;
-    }
-  stroke_polygon[i]=polygon_primitive[0];
-  stroke_polygon[i].point=stroke_polygon[0].point;
-  i++;
-  stroke_polygon[i].primitive=UndefinedPrimitive;
-  stroke_polygon[0].coordinates=(size_t) (p+q+2*closed_path+1);
+  assembly.polygon_primitive=polygon_primitive;
+  assembly.stroke_p=stroke_p;
+  assembly.stroke_q=stroke_q;
+  assembly.p=p;
+  assembly.q=q;
+  assembly.closed_path=closed_path;
+  AssembleStrokePolygon(&assembly,stroke_polygon);
   stroke_p=(PointInfo *) RelinquishMagickMemory(stroke_p);
   stroke_q=(PointInfo *) RelinquishMagickMemory(stroke_q);
   polygon_primitive=(PrimitiveInfo *) RelinquishMagickMemory(polygon_primitive);

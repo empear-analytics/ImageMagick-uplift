@@ -23349,6 +23349,233 @@ approval of 2026-10-24 to evolve the recipes.
 
 ---
 
+## Recipe GP - Move a Run of Guards Sharing One Exit into a Predicate
+
+**Use when:** CodeScene reports *Complex Method* (or *Large Method*) on a function in which
+a run of consecutive `if` statements tests several conditions and every one of them takes
+the same exit: `draw.c`'s `TraceMVGPrimitive`, whose round-rectangle arm rejects its
+points with four guards, each `{ status=MagickFalse; break; }`.
+
+**Not covered by:** Recipe P, which moves one expression and leaves every `if`; Recipe GD,
+which splits one disjunction into guards (the opposite direction); Recipes LB and V, whose
+exits leave a loop or the function and become `return(MagickFalse);` one by one, but whose
+block must leave a loop (LB) or jump or return (V), never only a `switch`; Recipe EI, which
+chains exiting guards of an `else`.
+
+**How:**
+
+1. Find a run `if (A1) X if (A2) X ... if (An) X`, `n` two or more, of consecutive
+   statements of one block, outside every OpenMP region, with no `#` line, no `else` on
+   any of them, and no statement between them. `X` is the same text in every `if`
+   (checked by script, whitespace aside): a statement or a braced block that leaves the
+   enclosing statement on every path (`break;`, `continue;`, `return(...)`, `goto`, or a
+   block ending in one). Each `Ai` contains no assignment, increment, decrement or call
+   of a function that writes anything (library predicates and pure arithmetic only,
+   checked by reading), and reads only variables the run does not write.
+2. Write directly above the function a `static MagickBooleanType` predicate taking every
+   variable the conditions read (at most four parameters, by value; Recipe N's input
+   struct when more), whose body is `if (A1) return(MagickTrue); ... if (An)
+   return(MagickTrue); return(MagickFalse);`, each `Ai` character for character.
+3. Replace the run by `if (<Predicate>(args) != MagickFalse) X`, `X` unchanged.
+4. Every such run of one function may go in one commit (one recipe, one function).
+5. Check by script that the predicate's conditions are the run's, in order, and that the
+   `X` kept is the run's `X`; run the guard (`--calls` moves only the functions the
+   conditions call: none, or each once into the predicate) and the oracle on the
+   function's cases.
+
+**Why it behaves the same.** The original evaluates `A1`, and when it holds runs `X`, which
+leaves; otherwise `A2`, and so on; when none holds, control passes the run. The predicate
+evaluates the same conditions in the same order, stops at the first that holds, and
+returns `MagickTrue` then, `MagickFalse` when none holds; the caller runs `X` exactly when
+it returns `MagickTrue`. No condition has a side effect, so evaluating them in a callee
+at the same point reads the same values; `X` stands where the run stood, inside the same
+loops and `switch`es, so its `break` or `continue` leaves what it left.
+
+**Before:**
+
+```c
+      if (primitive_info[j].coordinates != 3)
+        {
+          status=MagickFalse;
+          break;
+        }
+      if ((primitive_info[j+2].point.x < 0.0) ||
+          (primitive_info[j+2].point.y < 0.0))
+        {
+          status=MagickFalse;
+          break;
+        }
+```
+
+**After:**
+
+```c
+static MagickBooleanType IsInvalidRoundRectangle(
+  const PrimitiveInfo *primitive_info,const ssize_t j)
+{
+  if (primitive_info[j].coordinates != 3)
+    return(MagickTrue);
+  if ((primitive_info[j+2].point.x < 0.0) ||
+      (primitive_info[j+2].point.y < 0.0))
+    return(MagickTrue);
+  return(MagickFalse);
+}
+...
+      if (IsInvalidRoundRectangle(primitive_info,j) != MagickFalse)
+        {
+          status=MagickFalse;
+          break;
+        }
+```
+
+**Careful:**
+
+- A condition that calls a function with an effect (allocation, I/O, a cursor advanced)
+  refuses the step: the run would be the same, but the argument above needs pure
+  conditions.
+- `X` must be identical in every `if`; a run whose exits differ (one also throws) is not
+  this recipe.
+
+**Evidence level:** oracle, with step 5's script.
+
+**Provenance:** 2026-11-18, from `draw.c`'s `TraceMVGPrimitive` (campaign B, M140), whose
+round-rectangle and ellipse arms validate their points with runs of guards that each set
+`status` false and leave the `switch`. Added by Claude Code (Claude Opus 5.5) under the
+mandate of 2026-10-24.
+
+---
+
+## Recipe KG - Replace a Character-Keyed Switch of Checked Calls by a Table of Calls
+
+**Use when:** CodeScene reports *Complex Method* on a function whose complexity is a
+`switch` whose groups each make one checked call, `if (F(args) == c) return(c);
+break;`, the functions of up to three signatures that differ only in one trailing
+constant argument of an enumeration type (none, `PathBezierSide`, `PathLineSide`), with a
+`default:` group that throws through a macro: `draw.c`'s `TracePath`, twenty labels (each
+path command in both cases) over ten groups.
+
+**Not covered by:** Recipe KF, whose groups are a bare call `F(args); break;` of one
+signature; Recipe KV, whose two signatures differ by one *parameter* of the function
+inserted in the arguments, and whose groups are bare calls; Recipes SD and SW, which
+keep every label as a branch and refuse (SD) or need (SW) a `return` in every group;
+Recipe EX, which needs two kinds of exit.
+
+**How:**
+
+1. The `switch (e)` lies outside every OpenMP region and contains no `#` line. `e` is a
+   variable that no group writes. Every group but `default:` is one or more constant
+   labels and the body `if (F(a,...) == c) return(c); break;` (braces around the body
+   allowed), where `a,...` is the same text in every group, free of side effects, `c` is
+   the same constant in every group, and `F(a,...)` is either a call of a function of
+   the base signature `R F(A,...)` or of a *sided* signature `R G(A,...,const S s)`,
+   called with one enumeration constant of `S` as its last argument. At most two sided
+   signatures (two enumeration types `S1`, `S2`). Labels are distinct.
+2. The `default:` group is the one statement `X` followed by `break;`, or `X` alone when
+   `X` is a macro whose expansion ends in `break;` (`ThrowPointExpectedException`), and
+   it is the last group.
+3. Directly above the function write `typedef struct _Name { <key type> key; R
+   (*f)(A,...); R (*f1)(A,...,const S1); R (*f2)(A,...,const S2); S1 s1; S2 s2; } Name;`
+   and a `static const Name Table[]` with one element per label, in the labels' source
+   order: `{ L, F, NULL, NULL, <S1's first enumerator>, <S2's first enumerator> }` for a
+   base call, `{ L, NULL, G, NULL, <the group's constant>, <S2's first> }` for an `S1`
+   call, and likewise for `S2`. Labels of one group give elements naming the same call.
+4. Below the table write the lookup `static const Name *Get<Name>(const K key)` (KF step
+   3), and a dispatch `static R Call<Name>(const Name *entry,A a,...)` that returns
+   `entry->f(a,...)` when `f` is set, else `entry->f1(a,...,entry->s1)` when `f1` is set,
+   else `entry->f2(a,...,entry->s2)`.
+5. Replace the `switch` by `entry=Get<Name>(e); if (entry == (const Name *) NULL) { X }
+   else if (Call<Name>(entry,a,...) == c) return(c);` (`X` in braces: a macro that
+   expands to a braced block cannot stand before `else` with its semicolon), `entry` a `const Name *` declared
+   at the top of the function, `X` unchanged.
+6. The default exit. When `X` ends in `break;` its `break` no longer leaves the `switch`
+   but the loop around it. Take the step only when the `switch` is the last statement of
+   that loop's body and the loop would have ended at once anyway: `X` writes a flag
+   (`status=MagickFalse;`) that the loop body tests first (`if (status == MagickFalse)
+   break;`), and the loop's condition and increment have no side effect, so leaving the
+   loop directly skips only side-effect-free evaluations. Check this by reading.
+7. Check by script that every label of the `switch` is the key of exactly one element,
+   in order, that each element's non-`NULL` pointer is the function its group called and
+   its side constant the group's argument, and that the other side fields hold their
+   type's first enumerator (never read).
+8. Run `ci_warnings.sh`, `cxx_warnings.sh`, `refactor_guard.py` (`--calls` lists each
+   tracer as gone, by design: each is named in the table) and the oracle for the
+   function, with every command of the table reached by a case.
+
+**Why it behaves the same.** For a label of the table the lookup returns the element of
+that label, the dispatch calls the function the group called with the same arguments,
+and the caller returns `c` exactly when the group did; a value with no element reaches
+`X` as `default:` did. The table is `static const` and holds only function designators
+and enumeration constants; nothing writes it.
+
+**Before:**
+
+```c
+    switch (attribute)
+    {
+      case 'a':
+      case 'A':
+      {
+        if (TracePathArc(&trace) == -1)
+          return(-1);
+        break;
+      }
+      case 'c':
+      case 'C':
+      {
+        if (TracePathBezierCurve(&trace,CubicPathBezier) == -1)
+          return(-1);
+        break;
+      }
+      ...
+      default:
+      {
+        ThrowPointExpectedException(token,exception);
+        break;
+      }
+    }
+```
+
+**After:**
+
+```c
+static const PathCommandInfo
+  PathCommands[] =
+  {
+    { 'a', TracePathArc, NULL, NULL, CubicPathBezier, HorizontalPathLine },
+    { 'A', TracePathArc, NULL, NULL, CubicPathBezier, HorizontalPathLine },
+    { 'c', NULL, TracePathBezierCurve, NULL, CubicPathBezier, HorizontalPathLine },
+    ...
+  };
+...
+    command=GetPathCommandInfo(attribute);
+    if (command == (const PathCommandInfo *) NULL)
+      {
+        ThrowPointExpectedException(token,exception);
+      }
+    else
+      if (CallPathCommand(command,&trace) == -1)
+        return(-1);
+```
+
+**Careful:**
+
+- Step 6 is the one place the text's control flow changes: check by reading that nothing
+  with an effect runs between the end of the `switch` and the loop's exit in the
+  original.
+- Every element sets exactly one pointer; a `NULL` dereference would mean an element
+  with none, which step 7's script rules out.
+- The table and its two functions add three names; watch the file's function-count
+  threshold.
+
+**Evidence level:** oracle, with steps 6 and 7 by reading and script.
+
+**Provenance:** 2026-11-18, from `draw.c`'s `TracePath` (campaign B, M140), designed at the
+owner's request ("Yes, design it") after SD, SW, EX, W, KF and KV were each found not to
+take its command switch. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -23856,3 +24083,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-17 | AMEND | MA | Step 2's address form widened: no role (b) condition when the block opens with a side-effect-free call reading a role (a) constant key; the key a `const char *` parameter, the result a local; one function per lvalue type | `draw.c`'s `GetDrawInfo` (nine option reads, three helpers; cc 22 to 13); campaign B, M138 | mandate (2026-10-24) |
 | 2026-11-17 | AMEND | LB | Step 7's converted-read form: the target may outlive the block when every path from the exit reaches its destruction unread (checked by reading the callers' exit path) | `draw.c`'s `ParseMVGViewbox` (four viewbox reads; leaves Complex Method); campaign B, M138 | mandate (2026-10-24) |
 | 2026-11-18 | AMEND | K | Step 6, outside-region form: the function may hold OpenMP regions when the block lies outside every one of them and writes no local a region uses or names in a clause; the file's OpenMP conditions (whole catalogue, `omp_compare.sh`) still apply. *Careful* gives the argument | `draw.c`'s `DrawAffineImage`: its minimum/maximum scan over the four extent corners writes `min` and `max` before the parallel row loop, which reads neither; campaign B, M138 | mandate (2026-10-24) |
+| 2026-11-18 | NEW | GP | Move a Run of Guards Sharing One Exit into a Predicate: consecutive `if (Ai) X` with the same `X` (an exit) and side-effect-free conditions become `if (Pred(...) != MagickFalse) X`, the predicate returning `MagickTrue` at the first condition that holds, in order | `draw.c`'s `TraceMVGPrimitive` (round-rectangle and ellipse point checks, each `{ status=MagickFalse; break; }` out of a `switch`, which LB and V do not take); campaign B, M140 | mandate (2026-10-24) |
+| 2026-11-18 | NEW | KG | Replace a Character-Keyed Switch of Checked Calls by a Table of Calls: groups `if (F(args) == c) return(c); break;` over functions of a base signature and up to two sided signatures (one trailing enumeration constant) become a `static const` table of `{key, f, f1, f2, s1, s2}`, a lookup and a dispatch; the throwing `default:` stays, its macro's `break` leaving the loop only where the loop would end at once (step 6) | `draw.c`'s `TracePath` (twenty labels, three tracer signatures, `ThrowPointExpectedException` default); designed at the owner's request, campaign B, M140 | mandate (2026-10-24) |

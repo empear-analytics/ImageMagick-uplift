@@ -63,3 +63,21 @@ Grind the products:
 Ceilings from the plan's stub probes: draw.c 7.10 / 8.81, draw-primitive.c 7.78 / 9.38,
 draw-gradient.c 9.38 / 10. Past them, Phase 3 needs the ruling on a header used by one
 file (W38 question 4).
+
+## Correction (2026-11-18, M140)
+
+Three commit messages of this split cite "the same instructions" from a comparison
+script whose objdump call failed silently under the x86 Python (the script printed
+nothing, which read as "no difference"). Each pair was compiled again with gcc-16 -O2
+and compared properly:
+
+- **81fdf6459 (gradient split):** DrawGradientImage's OpenMP function is the same
+  instructions apart from its address and two alignment `nop`s. The claim holds in
+  substance.
+- **6cfdbfffe (DrawInfo split):** DrawPolygonPrimitive's two OpenMP functions are the same
+  apart from addresses and one alignment `nop`. The claim holds in substance.
+- **e583b0fa0 (primitive split):** the message says the per-pixel functions "differ in
+  register allocation only". They differ only in addresses and alignment `nop`s.
+
+The script now runs objdump by absolute path under the arm64 Python and fails when
+objdump prints nothing.

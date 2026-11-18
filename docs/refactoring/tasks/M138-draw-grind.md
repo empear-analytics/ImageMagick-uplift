@@ -197,9 +197,15 @@ The function count still matters in annotate.c and resource.c.
   all within A/A. At one thread the shapes and path workloads read +0.7% to +1.4%
   (A/A up to +0.7%). A scan of eight points along the branch showed no step, and the
   object code settles it: DrawPolygonPrimitive's two per-pixel OpenMP functions differ
-  between main and the tip only in register names and alignment `nop`s, and one
-  commit that measured +1.0% (374142775) compiles to the same code as its parent in
-  every function. Readings of about 1% at one thread are within this harness's noise.
+  between main and the tip only in register names and alignment `nop`s. Readings of
+  about 1% at one thread are within this harness's noise.
+  **Correction (2026-11-18, M140):** an earlier version of this paragraph said that
+  374142775, which measured +1.0% once, "compiles to the same code as its parent in
+  every function". That came from a comparison script whose objdump call failed
+  silently under the x86 Python and so compared nothing. Compiled again and compared
+  properly, 374142775 changes DrawPolygonPrimitive's main per-pixel OpenMP function in
+  132 lines: register allocation and scheduling, the same 526 instructions. Its single
+  +1.0% reading therefore stands unexplained rather than as noise on identical code.
 - **profile.c ProfileImage**: needs the Q8 and non-HDRI oracle builds (question 6).
 - **annotate.c Raqm functions** (ContainsRaqmParagraphSeparator 5.83 -> 6.37 alone): Raqm
   is not installed.
