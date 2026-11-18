@@ -8071,6 +8071,36 @@ static double GetSubpathBeta(double beta,const double distance)
   return(beta);
 }
 
+static double GetFillOpacity(PolygonInfo *polygon_info,
+  const FillAlphaSample *sample,const FillRule fill_rule,
+  const double subpath_alpha)
+{
+  const MagickBooleanType
+    fill = sample->fill;
+
+  const ssize_t
+    x = sample->x,
+    y = sample->y;
+
+  ssize_t
+    winding_number;
+
+  if (fill == MagickFalse)
+    return(0.0);
+  if (subpath_alpha >= 1.0)
+    return(1.0);
+  winding_number=GetWindingNumber(polygon_info,x,y);
+  if (fill_rule != NonZeroRule)
+    {
+      if ((MagickAbsoluteValue(winding_number) & 0x01) != 0)
+        return(1.0);
+    }
+  else
+    if (MagickAbsoluteValue(winding_number) != 0)
+      return(1.0);
+  return(subpath_alpha);
+}
+
 static double GetFillAlpha(PolygonInfo *polygon_info,
   const FillAlphaSample *sample,const FillRule fill_rule,double *stroke_alpha)
 {
@@ -8095,8 +8125,7 @@ static double GetFillAlpha(PolygonInfo *polygon_info,
 
   ssize_t
     i,
-    j,
-    winding_number;
+    j;
 
   /*
     Compute fill & stroke opacity for this (x,y) point.
@@ -8152,20 +8181,7 @@ static double GetFillAlpha(PolygonInfo *polygon_info,
   /*
     Compute fill opacity.
   */
-  if (fill == MagickFalse)
-    return(0.0);
-  if (subpath_alpha >= 1.0)
-    return(1.0);
-  winding_number=GetWindingNumber(polygon_info,x,y);
-  if (fill_rule != NonZeroRule)
-    {
-      if ((MagickAbsoluteValue(winding_number) & 0x01) != 0)
-        return(1.0);
-    }
-  else
-    if (MagickAbsoluteValue(winding_number) != 0)
-      return(1.0);
-  return(subpath_alpha);
+  return(GetFillOpacity(polygon_info,sample,fill_rule,subpath_alpha));
 }
 
 static inline MagickBooleanType IsBoundsOutsideImage(const Image *image,
