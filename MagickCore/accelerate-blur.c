@@ -213,8 +213,7 @@ static Image *ComputeBlurImage(const BlurImageRequest *request,
     queue;
 
   cl_int
-    channel_mask=get32BitChannelValue(image->channel_mask),
-    status;
+    channel_mask=get32BitChannelValue(image->channel_mask);
 
   cl_kernel
     blurColumnKernel,
@@ -244,7 +243,6 @@ static Image *ComputeBlurImage(const BlurImageRequest *request,
   size_t
     chunkSize=256,
     gsize[2],
-    i,
     length,
     lsize[2];
 
@@ -321,21 +319,14 @@ static Image *ComputeBlurImage(const BlurImageRequest *request,
     goto cleanup;
   }
 
-  i=0;
-  status =SetOpenCLKernelArg(blurColumnKernel,i++,sizeof(cl_mem),(void *)&tempImageBuffer);
-  status|=SetOpenCLKernelArg(blurColumnKernel,i++,sizeof(cl_uint),&number_channels);
-  status|=SetOpenCLKernelArg(blurColumnKernel,i++,sizeof(cl_int),&channel_mask);
-  status|=SetOpenCLKernelArg(blurColumnKernel,i++,sizeof(cl_mem),(void *)&imageKernelBuffer);
-  status|=SetOpenCLKernelArg(blurColumnKernel,i++,sizeof(cl_uint),(void *)&kernelWidth);
-  status|=SetOpenCLKernelArg(blurColumnKernel,i++,sizeof(cl_uint),(void *)&imageColumns);
-  status|=SetOpenCLKernelArg(blurColumnKernel,i++,sizeof(cl_uint),(void *)&imageRows);
-  status|=SetOpenCLKernelArg(blurColumnKernel,i++,sizeof(cl_float4)*(chunkSize+kernelWidth),(void *) NULL);
-  status|=SetOpenCLKernelArg(blurColumnKernel,i++,sizeof(cl_mem),(void *)&filteredImageBuffer);
-  if (status != CL_SUCCESS)
   {
-    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
-      ResourceLimitWarning,"SetOpenCLKernelArg failed.",".");
-    goto cleanup;
+    const BlurKernelArgs
+      args = { device, blurColumnKernel, tempImageBuffer, number_channels,
+        channel_mask, imageKernelBuffer, kernelWidth, imageColumns, imageRows,
+        chunkSize, filteredImageBuffer };
+
+    if (SetBlurKernelArgs(&args,exception) == MagickFalse)
+      goto cleanup;
   }
 
   gsize[0]=image->columns;
