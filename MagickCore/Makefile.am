@@ -153,6 +153,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/composite-channel-private.h \
   MagickCore/composite-image-blend-private.h \
   MagickCore/composite-image-over-private.h \
+  MagickCore/composite-image-virtual-private.h \
   MagickCore/composite-private.h \
   MagickCore/composite-row-private.h \
   MagickCore/compress.c \
@@ -639,6 +640,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/composite-channel-private.h \
   MagickCore/composite-image-blend-private.h \
   MagickCore/composite-image-over-private.h \
+  MagickCore/composite-image-virtual-private.h \
   MagickCore/composite-private.h \
   MagickCore/composite-row-private.h \
   MagickCore/configure-private.h \
