@@ -368,8 +368,8 @@ static void AccumulateMomentAndCorrelation(const TextureDirection *texture,
       cooccurrence[x][y].direction[i].alpha;
 }
 
-static void AccumulateInverseDifferenceAndSum(const TextureDirection *texture,
-  const ssize_t x,const ssize_t y)
+static void AccumulateInverseDifferenceMoment(
+  const TextureDirection *texture,const ssize_t x,const ssize_t y)
 {
   const Image
     *const image = texture->image;
@@ -378,8 +378,7 @@ static void AccumulateInverseDifferenceAndSum(const TextureDirection *texture,
     *const channel_features = texture->channel_features;
 
   FeatureStatistics
-    **const cooccurrence = texture->cooccurrence,
-    *const density_xy = texture->density_xy;
+    **const cooccurrence = texture->cooccurrence;
 
   const ssize_t
     i = texture->i;
@@ -399,6 +398,22 @@ static void AccumulateInverseDifferenceAndSum(const TextureDirection *texture,
   if (image->alpha_trait != UndefinedPixelTrait)
     channel_features[AlphaPixelChannel].inverse_difference_moment[i]+=
       cooccurrence[x][y].direction[i].alpha/((y-x)*(y-x)+1);
+}
+
+static void AccumulateInverseDifferenceAndSum(const TextureDirection *texture,
+  const ssize_t x,const ssize_t y)
+{
+  const Image
+    *const image = texture->image;
+
+  FeatureStatistics
+    **const cooccurrence = texture->cooccurrence,
+    *const density_xy = texture->density_xy;
+
+  const ssize_t
+    i = texture->i;
+
+  AccumulateInverseDifferenceMoment(texture,x,y);
   /*
     Sum average.
   */
