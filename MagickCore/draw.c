@@ -9312,6 +9312,25 @@ static MagickBooleanType DrawRoundLinecap(Image *image,
   return(DrawPolygonPrimitive(image,draw_info,linecap,exception));
 }
 
+static MagickStatusType DrawStrokeSubpathPolygon(Image *image,
+  const DrawInfo *draw_info,const DrawInfo *clone_info,
+  const PrimitiveInfo *p,ExceptionInfo *exception)
+{
+  MagickStatusType
+    status;
+
+  PrimitiveInfo
+    *stroke_polygon;
+
+  stroke_polygon=TraceStrokePolygon(draw_info,p,exception);
+  if (stroke_polygon == (PrimitiveInfo *) NULL)
+    return(0);
+  status=(MagickStatusType) DrawPolygonPrimitive(image,clone_info,
+    stroke_polygon,exception);
+  stroke_polygon=(PrimitiveInfo *) RelinquishMagickMemory(stroke_polygon);
+  return(status);
+}
+
 static MagickBooleanType DrawStrokePolygon(Image *image,
   const DrawInfo *draw_info,const PrimitiveInfo *primitive_info,
   ExceptionInfo *exception)
@@ -9324,9 +9343,6 @@ static MagickBooleanType DrawStrokePolygon(Image *image,
 
   MagickStatusType
     status;
-
-  PrimitiveInfo
-    *stroke_polygon;
 
   const PrimitiveInfo
     *p,
@@ -9353,15 +9369,7 @@ static MagickBooleanType DrawStrokePolygon(Image *image,
   {
     if (p->coordinates == 1)
       continue;
-    stroke_polygon=TraceStrokePolygon(draw_info,p,exception);
-    if (stroke_polygon == (PrimitiveInfo *) NULL)
-      {
-        status=0;
-        break;
-      }
-    status&=(MagickStatusType) DrawPolygonPrimitive(image,clone_info,
-      stroke_polygon,exception);
-    stroke_polygon=(PrimitiveInfo *) RelinquishMagickMemory(stroke_polygon);
+    status&=DrawStrokeSubpathPolygon(image,draw_info,clone_info,p,exception);
     if (status == 0)
       break;
     q=p+p->coordinates-1;
