@@ -306,6 +306,30 @@ static void CloneDrawInfoString(const char *source,char **value)
     (void) CloneString(&(*value),source);
 }
 
+static void CloneDrawInfoTextAttributes(const DrawInfo *draw_info,
+  DrawInfo *clone_info)
+{
+  CloneDrawInfoString(draw_info->text,&clone_info->text);
+  CloneDrawInfoString(draw_info->font,&clone_info->font);
+  CloneDrawInfoString(draw_info->metrics,&clone_info->metrics);
+  CloneDrawInfoString(draw_info->family,&clone_info->family);
+  clone_info->style=draw_info->style;
+  clone_info->stretch=draw_info->stretch;
+  clone_info->weight=draw_info->weight;
+  CloneDrawInfoString(draw_info->encoding,&clone_info->encoding);
+  clone_info->pointsize=draw_info->pointsize;
+  clone_info->kerning=draw_info->kerning;
+  clone_info->interline_spacing=draw_info->interline_spacing;
+  clone_info->interword_spacing=draw_info->interword_spacing;
+  clone_info->direction=draw_info->direction;
+  clone_info->word_break=draw_info->word_break;
+  CloneDrawInfoString(draw_info->density,&clone_info->density);
+  clone_info->align=draw_info->align;
+  clone_info->undercolor=draw_info->undercolor;
+  clone_info->border_color=draw_info->border_color;
+  CloneDrawInfoString(draw_info->server_name,&clone_info->server_name);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -372,25 +396,7 @@ MagickExport DrawInfo *CloneDrawInfo(const ImageInfo *image_info,
   clone_info->dash_offset=draw_info->dash_offset;
   clone_info->decorate=draw_info->decorate;
   clone_info->compose=draw_info->compose;
-  CloneDrawInfoString(draw_info->text,&clone_info->text);
-  CloneDrawInfoString(draw_info->font,&clone_info->font);
-  CloneDrawInfoString(draw_info->metrics,&clone_info->metrics);
-  CloneDrawInfoString(draw_info->family,&clone_info->family);
-  clone_info->style=draw_info->style;
-  clone_info->stretch=draw_info->stretch;
-  clone_info->weight=draw_info->weight;
-  CloneDrawInfoString(draw_info->encoding,&clone_info->encoding);
-  clone_info->pointsize=draw_info->pointsize;
-  clone_info->kerning=draw_info->kerning;
-  clone_info->interline_spacing=draw_info->interline_spacing;
-  clone_info->interword_spacing=draw_info->interword_spacing;
-  clone_info->direction=draw_info->direction;
-  clone_info->word_break=draw_info->word_break;
-  CloneDrawInfoString(draw_info->density,&clone_info->density);
-  clone_info->align=draw_info->align;
-  clone_info->undercolor=draw_info->undercolor;
-  clone_info->border_color=draw_info->border_color;
-  CloneDrawInfoString(draw_info->server_name,&clone_info->server_name);
+  CloneDrawInfoTextAttributes(draw_info,clone_info);
   if (draw_info->dash_pattern != (double *) NULL)
     {
       ssize_t
