@@ -441,23 +441,7 @@ static double GetPadSpreadOffset(const GradientOffsetInfo *offset_info,
 static double GetReflectSpreadOffset(const GradientOffsetInfo *offset_info,
   double offset)
 {
-  const GradientInfo
-    *gradient = offset_info->gradient;
-
-  const SegmentInfo
-    *gradient_vector = offset_info->gradient_vector;
-
-  const double
-    length = offset_info->length;
-
-  const ssize_t
-    x = offset_info->x,
-    y = offset_info->y;
-
-  if (IsOffGradientOrigin(gradient_vector,x,y) != MagickFalse)
-    {
-      offset=GetScaledStopOffset(gradient,length,x,y);
-    }
+  offset=GetPadSpreadOffset(offset_info,offset);
   if (offset < 0.0)
     offset=(-offset);
   if ((ssize_t) fmod(offset,2.0) == 0)

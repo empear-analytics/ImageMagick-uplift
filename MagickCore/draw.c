@@ -1193,6 +1193,102 @@ static ssize_t GetTracedPrimitiveEnd(const PrimitiveInfo *primitive_info,
   return(i);
 }
 
+static MagickBooleanType IsInvalidRoundRectanglePoints(
+  const PrimitiveInfo *primitive_info,const ssize_t j)
+{
+  if (primitive_info[j].coordinates != 3)
+    return(MagickTrue);
+  if ((primitive_info[j+2].point.x < 0.0) ||
+      (primitive_info[j+2].point.y < 0.0))
+    return(MagickTrue);
+  if ((primitive_info[j+1].point.x-primitive_info[j].point.x) < 0.0)
+    return(MagickTrue);
+  if ((primitive_info[j+1].point.y-primitive_info[j].point.y) < 0.0)
+    return(MagickTrue);
+  return(MagickFalse);
+}
+
+static MagickBooleanType IsInvalidEllipsePoints(const PrimitiveInfo *primitive_info,
+  const ssize_t j)
+{
+  if (primitive_info[j].coordinates != 3)
+    return(MagickTrue);
+  if ((primitive_info[j+1].point.x < 0.0) ||
+      (primitive_info[j+1].point.y < 0.0))
+    return(MagickTrue);
+  return(MagickFalse);
+}
+
+typedef struct _MVGTextInput
+{
+  DrawInfo
+    **graphic_context;
+
+  ssize_t
+    n;
+
+  PrimitiveInfo
+    *primitive_info;
+
+  char
+    *token;
+
+  Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+} MVGTextInput;
+
+static void AdvanceMVGTextCursor(const MVGTextInput *text,MVGInfo *mvg_info,
+  double *cursor,MagickStatusType *status)
+{
+  DrawInfo
+    **const graphic_context = text->graphic_context;
+
+  const ssize_t
+    n = text->n;
+
+  PrimitiveInfo
+    *const primitive_info = text->primitive_info;
+
+  char
+    *const token = text->token;
+
+  Image
+    *const image = text->image;
+
+  ExceptionInfo
+    *const exception = text->exception;
+
+  DrawInfo
+    *clone_info;
+
+  TypeMetric
+    metrics;
+
+  clone_info=CloneDrawInfo((ImageInfo *) NULL,graphic_context[n]);
+  if ((fabs((*mvg_info).point.x-primitive_info->point.x) < MagickEpsilon) &&
+      (fabs((*mvg_info).point.y-primitive_info->point.y) < MagickEpsilon))
+    {
+      (*mvg_info).point=primitive_info->point;
+      primitive_info->point.x+=(*cursor);
+    }
+  else
+    {
+      (*mvg_info).point=primitive_info->point;
+      (*cursor)=0.0;
+    }
+  clone_info->render=MagickFalse;
+  clone_info->text=AcquireString(token);
+  (*status)&=(MagickStatusType) GetTypeMetrics(image,clone_info,
+    &metrics,exception);
+  clone_info=DestroyDrawInfo(clone_info);
+  (*cursor)+=metrics.width;
+  if (graphic_context[n]->compliance != SVGCompliance)
+    (*cursor)=0.0;
+}
+
 static void TraceMVGPrimitive(const MVGRenderState *state)
 {
   char
@@ -1206,7 +1302,6 @@ static void TraceMVGPrimitive(const MVGRenderState *state)
     cursor = (*state->cursor);
 
   DrawInfo
-    *clone_info,
     **graphic_context = (*state->graphic_context);
 
   ExceptionInfo
@@ -1235,8 +1330,8 @@ static void TraceMVGPrimitive(const MVGRenderState *state)
     j = (*state->j),
     n = (*state->n);
 
-  TypeMetric
-    metrics;
+  MVGTextInput
+    text;
 
   mvg_info.offset=j;
   switch (primitive_type)
@@ -1283,23 +1378,7 @@ static void TraceMVGPrimitive(const MVGRenderState *state)
     }
     case RoundRectanglePrimitive:
     {
-      if (primitive_info[j].coordinates != 3)
-        {
-          status=MagickFalse;
-          break;
-        }
-      if ((primitive_info[j+2].point.x < 0.0) ||
-          (primitive_info[j+2].point.y < 0.0))
-        {
-          status=MagickFalse;
-          break;
-        }
-      if ((primitive_info[j+1].point.x-primitive_info[j].point.x) < 0.0)
-        {
-          status=MagickFalse;
-          break;
-        }
-      if ((primitive_info[j+1].point.y-primitive_info[j].point.y) < 0.0)
+      if (IsInvalidRoundRectanglePoints(primitive_info,j) != MagickFalse)
         {
           status=MagickFalse;
           break;
@@ -1326,13 +1405,7 @@ static void TraceMVGPrimitive(const MVGRenderState *state)
     }
     case EllipsePrimitive:
     {
-      if (primitive_info[j].coordinates != 3)
-        {
-          status=MagickFalse;
-          break;
-        }
-      if ((primitive_info[j+1].point.x < 0.0) ||
-          (primitive_info[j+1].point.y < 0.0))
+      if (IsInvalidEllipsePoints(primitive_info,j) != MagickFalse)
         {
           status=MagickFalse;
           break;
@@ -1441,26 +1514,13 @@ static void TraceMVGPrimitive(const MVGRenderState *state)
       /*
         Compute text cursor offset.
       */
-      clone_info=CloneDrawInfo((ImageInfo *) NULL,graphic_context[n]);
-      if ((fabs(mvg_info.point.x-primitive_info->point.x) < MagickEpsilon) &&
-          (fabs(mvg_info.point.y-primitive_info->point.y) < MagickEpsilon))
-        {
-          mvg_info.point=primitive_info->point;
-          primitive_info->point.x+=cursor;
-        }
-      else
-        {
-          mvg_info.point=primitive_info->point;
-          cursor=0.0;
-        }
-      clone_info->render=MagickFalse;
-      clone_info->text=AcquireString(token);
-      status&=(MagickStatusType) GetTypeMetrics(image,clone_info,
-        &metrics,exception);
-      clone_info=DestroyDrawInfo(clone_info);
-      cursor+=metrics.width;
-      if (graphic_context[n]->compliance != SVGCompliance)
-        cursor=0.0;
+      text.graphic_context=graphic_context;
+      text.n=n;
+      text.primitive_info=primitive_info;
+      text.token=token;
+      text.image=image;
+      text.exception=exception;
+      AdvanceMVGTextCursor(&text,&mvg_info,&cursor,&status);
       break;
     }
     case ImagePrimitive:
@@ -4768,6 +4828,69 @@ static void PrepareMVGPrimitive(const MVGRenderState *state)
   } while (0);
 }
 
+static void InitializeMVGGraphicContext(const MVGRenderState *state)
+{
+  const DrawInfo
+    *draw_info = state->draw_info;
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  Image
+    *image = state->image;
+
+  ssize_t
+    n = (*state->n);
+
+  graphic_context[n]=CloneDrawInfo((ImageInfo *) NULL,draw_info);
+  graphic_context[n]->primitive=DestroyString(graphic_context[n]->primitive);
+  graphic_context[n]->viewbox=image->page;
+  if ((image->page.width == 0) || (image->page.height == 0))
+    {
+      graphic_context[n]->viewbox.width=image->columns;
+      graphic_context[n]->viewbox.height=image->rows;
+    }
+}
+
+static void ReleaseMVGRenderResources(const MVGRenderState *state)
+{
+  char
+    *primitive = (*state->primitive),
+    *token = (*state->token);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  PrimitiveInfo
+    *primitive_info = (*state->primitive_info);
+
+  SplayTreeInfo
+    *macros = (*state->macros);
+
+  ssize_t
+    n = (*state->n);
+
+  StopInfo
+    *stops = (*state->stops);
+
+  macros=DestroySplayTree(macros);
+  token=DestroyString(token);
+  if (primitive_info != (PrimitiveInfo *) NULL)
+    {
+      DestroyMVGPrimitiveText(primitive_info);
+      primitive_info=(PrimitiveInfo *) RelinquishMagickMemory(primitive_info);
+    }
+  primitive=DestroyString(primitive);
+  stops=(StopInfo *) RelinquishMagickMemory(stops);
+  graphic_context=DestroyMVGGraphicContexts(graphic_context,n);
+  (*state->primitive)=primitive;
+  (*state->token)=token;
+  (*state->graphic_context)=graphic_context;
+  (*state->primitive_info)=primitive_info;
+  (*state->macros)=macros;
+  (*state->stops)=stops;
+}
+
 static MagickBooleanType RenderMVGContent(Image *image,
   const DrawInfo *draw_info,const size_t depth,ExceptionInfo *exception)
 {
@@ -4891,14 +5014,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
   mvg_info.primitive_info=(&primitive_info);
   mvg_info.extent=(&number_points);
   mvg_info.exception=exception;
-  graphic_context[n]=CloneDrawInfo((ImageInfo *) NULL,draw_info);
-  graphic_context[n]->primitive=DestroyString(graphic_context[n]->primitive);
-  graphic_context[n]->viewbox=image->page;
-  if ((image->page.width == 0) || (image->page.height == 0))
-    {
-      graphic_context[n]->viewbox.width=image->columns;
-      graphic_context[n]->viewbox.height=image->rows;
-    }
+  InitializeMVGGraphicContext(&render_state);
   token=AcquireString(primitive);
   extent=strlen(token)+MagickPathExtent;
   defsDepth=0;
@@ -4972,16 +5088,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
   /*
     Relinquish resources.
   */
-  macros=DestroySplayTree(macros);
-  token=DestroyString(token);
-  if (primitive_info != (PrimitiveInfo *) NULL)
-    {
-      DestroyMVGPrimitiveText(primitive_info);
-      primitive_info=(PrimitiveInfo *) RelinquishMagickMemory(primitive_info);
-    }
-  primitive=DestroyString(primitive);
-  stops=(StopInfo *) RelinquishMagickMemory(stops);
-  graphic_context=DestroyMVGGraphicContexts(graphic_context,n);
+  ReleaseMVGRenderResources(&render_state);
   if ((status == MagickFalse) && (exception->severity < ErrorException))
     ThrowBinaryException(DrawError,"NonconformingDrawingPrimitiveDefinition",
       keyword);
@@ -5215,6 +5322,22 @@ static double GetArcCenterFactor(const double alpha,const double beta,
   return(factor);
 }
 
+static MagickBooleanType FinishArcPath(MVGInfo *mvg_info,
+  const MagickStatusType status,const ssize_t offset,PrimitiveInfo *p)
+{
+  PrimitiveInfo
+    *primitive_info;
+
+  if (status == 0)
+    return(MagickFalse);
+  mvg_info->offset=offset;
+  primitive_info=(*mvg_info->primitive_info)+mvg_info->offset;
+  primitive_info->coordinates=(size_t) (p-primitive_info);
+  primitive_info->closed_subpath=MagickFalse;
+  SetTracedPrimitiveType(primitive_info,p);
+  return(MagickTrue);
+}
+
 typedef struct _ArcSegmentInput
 {
   double
@@ -5416,14 +5539,7 @@ static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
     mvg_info->offset+=(ssize_t) p->coordinates;
     p+=(ptrdiff_t) p->coordinates;
   }
-  if (status == 0)
-    return(MagickFalse);
-  mvg_info->offset=offset;
-  primitive_info=(*mvg_info->primitive_info)+mvg_info->offset;
-  primitive_info->coordinates=(size_t) (p-primitive_info);
-  primitive_info->closed_subpath=MagickFalse;
-  SetTracedPrimitiveType(primitive_info,p);
-  return(MagickTrue);
+  return(FinishArcPath(mvg_info,status,offset,p));
 }
 
 static MagickBooleanType GetBezierQuantum(const PrimitiveInfo *primitive_info,
@@ -6363,6 +6479,70 @@ static ssize_t TracePathClose(const PathTrace *trace)
   return(0);
 }
 
+typedef struct _PathCommandInfo
+{
+  int
+    key;
+
+  ssize_t
+    (*trace)(const PathTrace *),
+    (*trace_bezier)(const PathTrace *,const PathBezierSide),
+    (*trace_line)(const PathTrace *,const PathLineSide);
+
+  PathBezierSide
+    bezier_side;
+
+  PathLineSide
+    line_side;
+} PathCommandInfo;
+
+static const PathCommandInfo
+  PathCommands[] =
+  {
+    { 'a', TracePathArc, NULL, NULL, CubicPathBezier, HorizontalPathLine },
+    { 'A', TracePathArc, NULL, NULL, CubicPathBezier, HorizontalPathLine },
+    { 'c', NULL, TracePathBezierCurve, NULL, CubicPathBezier, HorizontalPathLine },
+    { 'C', NULL, TracePathBezierCurve, NULL, CubicPathBezier, HorizontalPathLine },
+    { 'H', NULL, NULL, TracePathAxisLine, CubicPathBezier, HorizontalPathLine },
+    { 'h', NULL, NULL, TracePathAxisLine, CubicPathBezier, HorizontalPathLine },
+    { 'l', TracePathLine, NULL, NULL, CubicPathBezier, HorizontalPathLine },
+    { 'L', TracePathLine, NULL, NULL, CubicPathBezier, HorizontalPathLine },
+    { 'M', TracePathMove, NULL, NULL, CubicPathBezier, HorizontalPathLine },
+    { 'm', TracePathMove, NULL, NULL, CubicPathBezier, HorizontalPathLine },
+    { 'q', NULL, TracePathBezierCurve, NULL, QuadraticPathBezier, HorizontalPathLine },
+    { 'Q', NULL, TracePathBezierCurve, NULL, QuadraticPathBezier, HorizontalPathLine },
+    { 's', NULL, TracePathSmoothBezierCurve, NULL, CubicPathBezier, HorizontalPathLine },
+    { 'S', NULL, TracePathSmoothBezierCurve, NULL, CubicPathBezier, HorizontalPathLine },
+    { 't', NULL, TracePathSmoothBezierCurve, NULL, QuadraticPathBezier, HorizontalPathLine },
+    { 'T', NULL, TracePathSmoothBezierCurve, NULL, QuadraticPathBezier, HorizontalPathLine },
+    { 'v', NULL, NULL, TracePathAxisLine, CubicPathBezier, VerticalPathLine },
+    { 'V', NULL, NULL, TracePathAxisLine, CubicPathBezier, VerticalPathLine },
+    { 'z', TracePathClose, NULL, NULL, CubicPathBezier, HorizontalPathLine },
+    { 'Z', TracePathClose, NULL, NULL, CubicPathBezier, HorizontalPathLine }
+  };
+
+static const PathCommandInfo *GetPathCommandInfo(const int key)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(PathCommands)/sizeof(*PathCommands)); i++)
+    if (PathCommands[i].key == key)
+      return(PathCommands+i);
+  return((const PathCommandInfo *) NULL);
+}
+
+static ssize_t CallPathCommand(const PathCommandInfo *command,
+  const PathTrace *trace)
+{
+  if (command->trace != (ssize_t (*)(const PathTrace *)) NULL)
+    return(command->trace(trace));
+  if (command->trace_bezier !=
+      (ssize_t (*)(const PathTrace *,const PathBezierSide)) NULL)
+    return(command->trace_bezier(trace,command->bezier_side));
+  return(command->trace_line(trace,command->line_side));
+}
+
 static ssize_t TracePath(MVGInfo *mvg_info,const char *path,
   ExceptionInfo *exception)
 {
@@ -6390,6 +6570,9 @@ static ssize_t TracePath(MVGInfo *mvg_info,const char *path,
 
   PrimitiveType
     primitive_type;
+
+  const PathCommandInfo
+    *command;
 
   PrimitiveInfo
     *q;
@@ -6427,84 +6610,14 @@ static ssize_t TracePath(MVGInfo *mvg_info,const char *path,
       break;
     last_attribute=attribute;
     attribute=(int) (*p++);
-    switch (attribute)
-    {
-      case 'a':
-      case 'A':
-      {
-        if (TracePathArc(&trace) == -1)
-          return(-1);
-        break;
-      }
-      case 'c':
-      case 'C':
-      {
-        if (TracePathBezierCurve(&trace,CubicPathBezier) == -1)
-          return(-1);
-        break;
-      }
-      case 'H':
-      case 'h':
-      {
-        if (TracePathAxisLine(&trace,HorizontalPathLine) == -1)
-          return(-1);
-        break;
-      }
-      case 'l':
-      case 'L':
-      {
-        if (TracePathLine(&trace) == -1)
-          return(-1);
-        break;
-      }
-      case 'M':
-      case 'm':
-      {
-        if (TracePathMove(&trace) == -1)
-          return(-1);
-        break;
-      }
-      case 'q':
-      case 'Q':
-      {
-        if (TracePathBezierCurve(&trace,QuadraticPathBezier) == -1)
-          return(-1);
-        break;
-      }
-      case 's':
-      case 'S':
-      {
-        if (TracePathSmoothBezierCurve(&trace,CubicPathBezier) == -1)
-          return(-1);
-        break;
-      }
-      case 't':
-      case 'T':
-      {
-        if (TracePathSmoothBezierCurve(&trace,QuadraticPathBezier) == -1)
-          return(-1);
-        break;
-      }
-      case 'v':
-      case 'V':
-      {
-        if (TracePathAxisLine(&trace,VerticalPathLine) == -1)
-          return(-1);
-        break;
-      }
-      case 'z':
-      case 'Z':
-      {
-        if (TracePathClose(&trace) == -1)
-          return(-1);
-        break;
-      }
-      default:
+    command=GetPathCommandInfo(attribute);
+    if (command == (const PathCommandInfo *) NULL)
       {
         ThrowPointExpectedException(token,exception);
-        break;
       }
-    }
+    else
+      if (CallPathCommand(command,&trace) == -1)
+        return(-1);
   }
   if (status == MagickFalse)
     return(-1);
