@@ -816,6 +816,12 @@ static Image *BlendSeamlessMeanImage(const Image *image,
   return(mean_image);
 }
 
+static void ReleaseSeamlessImages(Image *mean_image,Image *residual_image)
+{
+  mean_image=DestroyImage(mean_image);
+  residual_image=DestroyImage(residual_image);
+}
+
 static MagickBooleanType SeamlessBlendImage(Image *image,
   const Image *source_image,const BlendRequest *request,
   ExceptionInfo *exception)
@@ -864,8 +870,7 @@ static MagickBooleanType SeamlessBlendImage(Image *image,
     if (RelaxBlendImage(image,&relaxation,request,exception) == MagickFalse)
       return(MagickFalse);
   }
-  mean_image=DestroyImage(mean_image);
-  residual_image=DestroyImage(residual_image);
+  ReleaseSeamlessImages(mean_image,residual_image);
   /*
     Composite the foreground image over the background image.
   */
