@@ -2182,6 +2182,14 @@ accumulators.
    (Recipe O step 2); steps 1, 3, 4 and 5 hold as written. The written locals may be
    cursors the block advances and the caller reads afterwards (a partition's `l` and
    `h`), not only sums.
+   Outside-region form (2026-11-18). The function may hold OpenMP regions when the block
+   lies outside every one of them, in the function's own sequential code (before a
+   region's `#pragma omp` line or after its end), and none of the locals it writes is
+   named in a region's data-sharing clause or used inside a region: the block runs on
+   the caller's thread alone, as in a function with none. The rest of this step holds
+   as written. The file's OpenMP conditions (the owner's ruling of 2026-11-15) still
+   apply to the commit: the whole catalogue and `tools/omp_compare.sh` on cases that
+   reach the region.
 
 **Before:**
 
@@ -2240,6 +2248,10 @@ static void AccumulateFUZZPixel(...,double *channel_similarity,
   O step 5's argument); the value the caller reads after the call is the one the block
   left. A macro argument written `pixels[*l]` for `pixels[l]` expands to the same
   access.
+- Under step 6's outside-region form the argument is the same: no thread runs the block
+  but the caller's, the locals it writes are none that a region reads, writes or names in
+  a clause, so moving the block changes nothing a region sees; the region's own variables
+  keep the protection they had.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls`, and steps 1 to 3 checked by
 reading.
@@ -2251,7 +2263,12 @@ refused after the single-accumulator siblings (`GetAESimilarity`, `GetMAESimilar
 `GetMSESimilarity`, `GetPASimilarity`, `GetPDCSimilarity`) had taken Recipe E. Added by
 Claude Code (Claude Opus 5.5) during task M02, under the mandate of 2026-10-24. Step 6
 (2026-10-30, task W09): `statistic.c`'s `GetMedianPixel`, whose quickselect partition
-loop advances the two cursors `l` and `h` that the caller then reads.
+loop advances the two cursors `l` and `h` that the caller then reads. Step 6's
+outside-region form (2026-11-18, campaign B, M138): `draw.c`'s `DrawAffineImage`, whose
+minimum/maximum scan over the four extent corners (the scan of `shear.c`'s
+`CropToFitImage` above) runs before the function's parallel row loop and writes `min` and
+`max`, which only the sequential code after it reads. Added by Claude Code (Claude Opus
+5.5) under the mandate of 2026-10-24.
 
 ---
 
@@ -4459,6 +4476,36 @@ the block's depth.
    script to be identical in every copy). The block writes no variable `S` reads or
    writes, and contains no `break` that leaves it; steps 1 to 4 hold as written, with
    `S continue;` in place of `break;`. A bare `continue;` is the form with `S` empty.
+   Exit-statement form (2026-11-17). Every exit of the block may instead be one statement
+   `X` that stays in the caller, the same text at every exit (checked by script), whose
+   expansion ends the enclosing loop or `do { } while (0)` (`ThrowPointExpectedException
+   (token,exception);`, a macro that throws, sets `status` and ends in `break;`). Each
+   `X` becomes `return(MagickFalse);`, one for one, and the caller writes
+   `if (Helper(...) == MagickFalse) X`, `X` unchanged, so the exception it throws still
+   names the caller (`GetMagickModule()` stays where it was). `X` may read a variable the
+   block writes (the `token` buffer): the block writes nothing after its exit, so `X`
+   reads the value it read before. A variable the block assigns from an expression and
+   the caller reads after it (`x=GetDrawValue(token,&next_token);`) is written through a
+   pointer parameter, `(*value)=...`; a temporary only the block reads (`next_token`) is
+   declared in the new function, and its declaration leaves a caller that no longer
+   uses it. Copies of the block in other functions of the file, the same text but for
+   that written variable (checked by script), call the same function (Recipe Y step 7),
+   one commit per caller, the first adding the function.
+   Converted-read form (2026-11-17). A copy whose written variable is assigned a conversion
+   of the read value, `t=C(GetDrawValue(token,&next_token)R);` (`CastDoubleToSsizeT(ceil(`
+   ... `-0.5))`), may call the same function with the address of a `double` temporary
+   `value` declared in the caller's block, and assign `t=C(value)R;` directly after the
+   call, the conversion's text unchanged, when `t` is a local of the block that the exit
+   statement leaves and nothing reads `t` on the exit path (the `region` of a `do { }
+   while (0)` the macro's `break;` ends). The value is computed once from the same token
+   in both forms and converted the same way; only an assignment no path reads goes away.
+   The target may instead outlive the block (2026-11-17, `ParseMVGViewbox`'s
+   `graphic_context[n]->viewbox.<m>`) when every path from the exit statement reaches the
+   object's destruction without reading it: the macro sets `status` false and ends the
+   keyword handler, `ParseMVGKeyword` returns the handler's value, and `RenderMVGContent`
+   breaks out of its loop on that status into its cleanup, which destroys the graphic
+   contexts (`DestroyMVGGraphicContexts`). The commit names each function on that path,
+   checked by reading.
 8. A block that writes two to four variables of the caller that the caller reads after
    it (step 2's `v`, more than one) passes their addresses in one `const` struct,
    Recipe I's form (steps 3, 5 and 6): a `typedef struct` directly above the new
@@ -4615,6 +4662,14 @@ tile row loop's body, whose tile loop body fetches the tile and ends the tile lo
 through `break;` on a failed fetch; left in place it repeats the 90-degree helper's tile
 loop, which CodeScene reports as *Code Duplication* once that helper exists (7.58 in a
 probe). Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Exit-statement form (2026-11-17, campaign B, M138): `draw.c`'s path tracers, whose
+fourteen copies of the value read (`GetNextToken`, the list-character test, the comma
+skip, `GetDrawValue`, the empty-value test) each leave through
+`ThrowPointExpectedException`; one `GetPathValue` serves six functions, taking their cc
+down by two per copy (`TracePathArc` 30 to 20) and `TracePathBezierCurve` out of
+*Large Method* in a probe, draw.c holding at 3.27. Added by Claude Code (Claude Opus 5.5)
+under the mandate of 2026-10-24. Converted-read form the same day: `ParseMVGPushPattern`'s three `region` reads,
+which took it out of *Complex Method* (cc 13) and *Large Method* (81 lines).
 
 ---
 
@@ -7727,6 +7782,15 @@ SD, which move statements: the decision moves with them and the helper inherits 
    type that every path to the site has assigned (`mw_hash`, `mb_hash`, tables allocated
    and checked before the loop), with no call, assignment or increment; they become
    parameters of that type after those of `c`, and the function returns that type.
+   Offset form (2026-11-17): `k1` may be a variable `v` and `k2` the sum `w+v` of a
+   variable or member access `w` and that same `v` (`(attribute == (int) 'A' ? x :
+   point.x+x)`, an absolute coordinate or one relative to the current point), all of one
+   floating type, and the constant of `c`'s comparison may itself be a selection
+   between two character constants (`((side == CubicPathBezier) ? 'C' : 'Q')`); the
+   function takes `c`'s variable, the constant (an `int` parameter, the site passing
+   `(int) <constant or selection>` as written), `v` and `w`, in that order, and returns
+   `(c' ? value : current+value)` with the site's own cast. Step 5's `IDENTICAL` is the
+   proof, as for every form.
 2. Write a `static inline` function directly above the first function that uses it,
    with one parameter per variable expression of `c` (`const size_t extent` for
    `geometry.width`), of that expression's exact type, returning the type of `k1`:
@@ -7810,6 +7874,11 @@ Variable form (2026-11-14, same lane): `compress.c`'s `HuffmanDecodeImage`, whos
 `(color != MagickFalse) ? mw_hash : mb_hash` is the last decision that keeps its scanline
 loop, as a helper, at cc 9; a probe of the chain 9.44 to 10.0.
 Lane: b
+Offset form (2026-11-17, campaign B, M138): `draw.c`'s path tracers, twelve
+`(double) (attribute == (int) <letter> ? <v> : point.<x|y>+<v>)` sites in six
+functions, one `GetPathCoordinate`; `IDENTICAL` object code, `TracePathMove` out of
+*Complex Method*. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-10-24.
 
 ---
 
@@ -10094,6 +10163,25 @@ way clones the first.
    becomes `return(MagickFalse);`, the function ends with `return(MagickTrue);`,
    `status` is written `(*status)`, and the copy becomes `if (Name(...) ==
    MagickFalse) continue;` before the tail.
+   Folding form (2026-11-17). Two copies that are each the whole body of a `static`
+   function, differing in runs this step and step 1 admit, merge into one function
+   that both callers call directly. Besides those runs, a differing pair may be (a) a
+   whole expression statement assigning two different lvalues
+   (`TracePathHorizontalLine`/`TracePathVerticalLine`: `point.x=...`/`point.y=...`),
+   written `if (side == NameA) SA else SB`, each statement verbatim but for one local
+   whose name differs between the copies, which takes copy A's name throughout (Recipe
+   TW step 1's renaming); or (b) an `if (c) S` that stands in one copy only, `c` with no
+   side effect and `S` an expression statement or a `break;` of a loop that encloses the
+   statement in both copies, written `if ((side == NameX) && (c)) S` with that copy's
+   constant (`TracePathQuadraticBezier`'s `if (*p == ',') p++;`;
+   `TracePathSmoothQuadraticBezier`'s `if (status == MagickFalse) break;`), the operands
+   in that order so that `c` is evaluated only on that copy's side, as before; the
+   `break` leaves the same loop it left. When each of the two
+   functions is called only from the file and its every call is `Name(args)`, step 5
+   replaces each call by `New(args,NameX)` with that copy's constant, and both
+   functions leave the file: the file holds one function where it held two (a module
+   at its function-count limit gains). Check by script that the new body with each
+   side's runs substituted gives each copy's token sequence (comments ignored).
 5. Replace each copy by a call that passes its own enumeration constant (directly, or in
    the initialiser of the `const` struct declared at the top of the block that holds the
    call), never a variable or a computed value, and each variable in the position of its
@@ -10293,6 +10381,17 @@ merged too (-3.4%). Probes: 4.82 to 5.27 (the nested pair), 5.35 (the heads), 5.
 passes), the file's stub ceiling for the function; no finding on a new function, no
 *Code Duplication*. Added by Claude Code (Claude Opus 5.5) under the owner's OK of
 2026-11-10 to evolve the recipes.
+Folding form (2026-11-17, campaign B, M138): `draw.c`'s `TracePathHorizontalLine` and
+`TracePathVerticalLine`, *Complex Method* twins (cc 10 each) called once each from
+`TracePath`'s `switch`; merged as `TracePathAxisLine` (cc 12), the file holds one
+function and one finding fewer and 66 lines less. Added by Claude Code (Claude Opus 5.5)
+under the mandate of 2026-10-24. Form (b) the same day: `TracePathQuadraticBezier` and
+`TracePathCubicBezier` (cc 16 and 15, both *Large Method*), merged as
+`TracePathBezierCurve` (cc 22, *Large Method*); written as a nested `if` the one-copy
+statement made the new function *Deep, Nested Complexity* and *Bumpy Road Ahead*
+(probe 3.12), as the combined test it does not (3.27). Form (b)'s `break;` and either-copy reading the
+same day: `TracePathSmoothCubicBezier` and `TracePathSmoothQuadraticBezier` (cc 17 and
+Large Method each) merged as `TracePathSmoothBezierCurve` (cc 31, Large Method).
 
 ---
 
@@ -10768,6 +10867,19 @@ the slot of a shared object inside a parallel loop, not a member chosen per copy
    `windows->widget.mapped`: `windows->M.mapped`), with no call and no subscript in it
    (2026-11-11). All lvalues of role (c) have one declared type `T`. Any other difference
    stops the step.
+   Address form (2026-11-17): the block may take the address of its role (c) lvalue, only
+   as an argument of one call that writes through it (`CloneString(&clone_info->m,...)`),
+   when the role (b) operand is the same member of another object (`draw_info->m`). The
+   new function writes `&(*value)` there, the address the caller passes, so the callee
+   receives the same pointer; step 7's check reads `&(*value)` back as `&e.m`.
+   Widened the same day: the role (b) condition is dropped when the block's opening
+   statement is a call with no side effect that reads a role (a) constant
+   (`option=GetImageOption(draw_info->image_info,"fill");`), its result tested and passed
+   to the writing call: the constant becomes a `const char *key` parameter, the call's
+   result a local of the new function, and the lvalue's address the parameter. A
+   temporary only the copies use (`next_token`) is declared in the new function and
+   leaves the caller once no copy remains. Copies whose lvalues have different declared
+   types (`PixelInfo`, `double`, `char *`) are separate groups, each its own function.
 3. Write one `static void` function directly above the caller (or in place of step 1's
    helper): its parameters are the variables a copy reads, or the input struct the
    copies already read, then one parameter per role (a) of the constant's type (Recipe
@@ -10892,6 +11004,14 @@ function), the function leaves *Bumpy Road Ahead* (probe 3.04 to 3.06). Step 2 (
 `XGetMapInfo`: its three mask blocks assign `map_info-><c>_max` from `visual_info-><c>_mask`
 and update `map_info-><c>_mult` beside it, so each copy names two lvalues and reads the
 mask first; one helper serves the three and the function leaves Bumpy Road Ahead and Complex Method.
+Step 2's address form (2026-11-17, campaign B, M138): `draw.c`'s `CloneDrawInfo`, whose
+eleven `if (draw_info->m != (char *) NULL) (void) CloneString(&clone_info->m,
+draw_info->m);` copies (id, primitive, geometry, text, font, metrics, family, encoding,
+density, server_name, clip_mask) are each a decision: cc 22 to 11 in a probe, no finding
+on the new function. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-10-24. Widened the same day for `GetDrawInfo`'s option reads: three color options
+(QueryColorCompliance), four numeric (GetDrawValue) and two strings (CloneString), each keyed
+by its option name; cc 22 to 13 in a probe.
 
 ---
 
@@ -23726,3 +23846,13 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-17 | NEW | TV | Share a Two-View Parallel Row Loop Through a Row Function: functions that clone an image and run the same parallel row loop over the clone's authentic view and a second image's virtual view, differing only in the row's work on `(p,q)`, move the loop into one non-inline `static` driver taking the clone, the second image and a `const` struct of a row function pointer and a `const void *` input; each row function takes a per-iteration `const` row struct (image, source, arguments, y); checked by script, a by-hand write-set reading, the whole catalogue narrow and wide, `omp_compare.sh` at 1 and 4 threads and OpenMP-build timing | `compare-similarity-image.c`'s `SIMDivideImage`, `SIMVarianceImage` and `SIMSubtractImageMean` (campaign A, round 28 lane b): *Code Duplication* and three cc-10 *Complex Method* findings that Recipe RL's one-view row type does not reach | mandate (2026-10-24) |
 | 2026-11-17 | NEW | KX | Replace an Enumerator-Keyed Switch of Assigned Calls by a Table of Function Pointers: a `switch` whose groups each assign one call's result to the same local (`v=F(args);`) and all `return(v);` or all `break;`, the callees of one signature with the same arguments, becomes a `static const` table of `{ label, function }` and a lookup; groups of another signature stay in the `switch`, the default group is the fallback; timed when the function runs per offset or per pixel, indirect calls counted | `compare-similarity-image.c`'s `SimilarityImage` (frequency-domain dispatch, six groups returning the call) and `compare-similarity-private.h`'s `GetSimilarityForMetric` (fifteen labels assigning `status`), which Recipe KF (statement calls) and KD (a `LocaleCompare` ladder) do not reach (campaign A, round 28 lane b) | mandate (2026-10-24) |
 | 2026-11-17 | NEW | SO | Extract Sibling Blocks Differing in One Value, Returning One Written Variable and Writing One Through a Pointer: copies of one small block in one or several functions of a file, differing in one constant and writing two caller locals (one assigned whole first, one advanced), become one `static` function returning the first and taking the second by pointer | `draw.c`'s MVG push handlers (`ParseMVGPushClass`, `-ClipPath`, `-Gradient`, `-Pattern`): `ParseMVGPushClipPath` leaves *Complex Method*, `-Gradient` cc 22 to 16, `-Pattern` 19 to 13 and leaves *Bumpy Road Ahead* in a probe; campaign B, M137 | mandate (2026-10-24) |
+| 2026-11-17 | AMEND | MA | Step 2: the address form, a role (c) lvalue whose address the block passes to one call that writes through it, the role (b) operand the same member of another object; the new function passes `&(*value)` | `draw.c`'s `CloneDrawInfo` (eleven guarded `CloneString` copies; cc 22 to 11 in a probe); campaign B, M138 | mandate (2026-10-24) |
+| 2026-11-17 | AMEND | MT | Step 4: the folding form, whole-body twins differing in one local's name, one assigned member and one constant; the differing assignment pair as `if (side == A) SA else SB`, each call replaced by the new function with its constant and both functions removed | `draw.c`'s `TracePathHorizontalLine` and `TracePathVerticalLine` (cc 10 each to one function of cc 12, one function fewer); campaign B, M138 | mandate (2026-10-24) |
+| 2026-11-17 | AMEND | MT | Step 4's folding form widened: any runs of steps 1 and 4, plus (b) an `if (c) S` in copy B only, written `if ((side == NameB) && (c)) S` | `draw.c`'s `TracePathQuadraticBezier` and `TracePathCubicBezier` (four findings to two, one function fewer); campaign B, M138 | mandate (2026-10-24) |
+| 2026-11-17 | AMEND | MT | Folding form (b): the one-copy `if (c) S` may stand in either copy and `S` may be a `break;` of a loop enclosing it in both | `draw.c`'s `TracePathSmoothCubicBezier` and `TracePathSmoothQuadraticBezier` (four findings to two, one function fewer); campaign B, M138 | mandate (2026-10-24) |
+| 2026-11-17 | AMEND | LB | Step 7, exit-statement form: every exit one statement `X` left in the caller (a throwing macro ending in `break;`), `if (Helper(...) == MagickFalse) X`; a written variable through a pointer; copies in other functions call the same function, one commit per caller | `draw.c`'s fourteen path-value reads in six tracers, one `GetPathValue`; campaign B, M138 | mandate (2026-10-24) |
+| 2026-11-17 | AMEND | LB | Step 7, converted-read form: a copy assigning a conversion of the read value reads into a `double` temporary through the helper and assigns the same conversion of it after the call, when the target is a local the exit leaves unread | `draw.c`'s `ParseMVGPushPattern` (three `region` reads; leaves Complex Method and Large Method); campaign B, M138 | mandate (2026-10-24) |
+| 2026-11-17 | AMEND | NS | Step 1, offset form: `(c ? v : w+v)` of one floating type, the comparison's constant possibly a selection between two character constants; the function takes the variable, the constant as `int`, `v` and `w` | `draw.c`'s twelve path-coordinate selections in six tracers, one `GetPathCoordinate`, IDENTICAL; campaign B, M138 | mandate (2026-10-24) |
+| 2026-11-17 | AMEND | MA | Step 2's address form widened: no role (b) condition when the block opens with a side-effect-free call reading a role (a) constant key; the key a `const char *` parameter, the result a local; one function per lvalue type | `draw.c`'s `GetDrawInfo` (nine option reads, three helpers; cc 22 to 13); campaign B, M138 | mandate (2026-10-24) |
+| 2026-11-17 | AMEND | LB | Step 7's converted-read form: the target may outlive the block when every path from the exit reaches its destruction unread (checked by reading the callers' exit path) | `draw.c`'s `ParseMVGViewbox` (four viewbox reads; leaves Complex Method); campaign B, M138 | mandate (2026-10-24) |
+| 2026-11-18 | AMEND | K | Step 6, outside-region form: the function may hold OpenMP regions when the block lies outside every one of them and writes no local a region uses or names in a clause; the file's OpenMP conditions (whole catalogue, `omp_compare.sh`) still apply. *Careful* gives the argument | `draw.c`'s `DrawAffineImage`: its minimum/maximum scan over the four extent corners writes `min` and `max` before the parallel row loop, which reads neither; campaign B, M138 | mandate (2026-10-24) |

@@ -5625,6 +5625,17 @@ LOAD_SENSITIVE = {label: _INFO_PRESS for label in (
     "xevents display chop, horizontal",
     "xevents display chop, vertical",
 )}
+# Two -hough-lines cases with -limit memory 0 -limit map 0, whose accumulator matrix lives in a
+# file (matrix.c AcquireMatrixInfo, MapMatrixDisk). Alone each takes about 9 s on the Mac; in a
+# full run (16 jobs) a side passed the 30 s TIMEOUT: the baseline on 2026-11-17 (cached, so it
+# diverged on every later run until the entry was dropped) and the candidate in the next full
+# run. Alone they agree every time (M138).
+_DISK_MATRIX = ("a matrix on disk under -limit memory 0 -limit map 0 takes about 9 s alone and passed "
+                "the 30 s timeout in full runs, on either side")
+LOAD_SENSITIVE.update({label: _DISK_MATRIX for label in (
+    "-hough-lines accumulator, matrix on disk",
+    "-hough-lines matrix on disk",
+)})
 # The magnifier (plus): a q or Escape sent to the magnify window itself (use:2) closes it, which a
 # q to the image window did not; the grab, with no use before it, is the magnify window. Moved
 # with the arrow keys, its factor set with a digit (xwindow.c XMakeMagnifyImage, display.c's
