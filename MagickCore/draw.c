@@ -1379,6 +1379,86 @@ static AffineMatrix InverseAffineMatrix(const AffineMatrix *affine)
   return(inverse_affine);
 }
 
+typedef struct _AffineRowInput
+{
+  const Image
+    *source;
+
+  CacheView
+    *source_view;
+
+  Image
+    *image;
+
+  AffineMatrix
+    inverse_affine;
+
+  PixelInfo
+    zero;
+
+  ssize_t
+    y;
+
+  ExceptionInfo
+    *exception;
+} AffineRowInput;
+
+static void DrawAffineRowPixels(const AffineRowInput *input,
+  const SegmentInfo inverse_edge,Quantum *magick_restrict q,
+  MagickBooleanType *status)
+{
+  const Image
+    *source = input->source;
+
+  CacheView
+    *source_view = input->source_view;
+
+  Image
+    *image = input->image;
+
+  const AffineMatrix
+    inverse_affine = input->inverse_affine;
+
+  const PixelInfo
+    zero = input->zero;
+
+  const ssize_t
+    y = input->y;
+
+  ExceptionInfo
+    *exception = input->exception;
+
+  PixelInfo
+    composite,
+    pixel;
+
+  PointInfo
+    point;
+
+  ssize_t
+    x;
+
+  pixel=zero;
+  composite=zero;
+  for (x=CastDoubleToSsizeT(ceil(inverse_edge.x1-0.5));
+       x <= CastDoubleToSsizeT(floor(inverse_edge.x2+0.5)); x++)
+  {
+    point.x=(double) x*inverse_affine.sx+y*inverse_affine.ry+
+      inverse_affine.tx;
+    point.y=(double) x*inverse_affine.rx+y*inverse_affine.sy+
+      inverse_affine.ty;
+    (*status)=InterpolatePixelInfo(source,source_view,
+      UndefinedInterpolatePixel,point.x,point.y,&pixel,exception);
+    if ((*status) == MagickFalse)
+      break;
+    GetPixelInfoPixel(image,q,&composite);
+    CompositePixelInfoOver(&pixel,pixel.alpha,&composite,composite.alpha,
+      &composite);
+    SetPixelViaPixelInfo(image,&composite,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType DrawAffineImage(Image *image,
   const Image *source,const AffineMatrix *affine,ExceptionInfo *exception)
 {
@@ -1477,21 +1557,15 @@ MagickExport MagickBooleanType DrawAffineImage(Image *image,
 #endif
   for (y=start; y <= stop; y++)
   {
-    PixelInfo
-      composite,
-      pixel;
-
-    PointInfo
-      point;
+    const AffineRowInput
+      input = { source, source_view, image, inverse_affine, zero, y,
+        exception };
 
     Quantum
       *magick_restrict q;
 
     SegmentInfo
       inverse_edge;
-
-    ssize_t
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -1507,25 +1581,7 @@ MagickExport MagickBooleanType DrawAffineImage(Image *image,
       inverse_edge.x2+0.5)-ceil(inverse_edge.x1-0.5)+1),1,exception);
     if (q == (Quantum *) NULL)
       continue;
-    pixel=zero;
-    composite=zero;
-    for (x=CastDoubleToSsizeT(ceil(inverse_edge.x1-0.5));
-         x <= CastDoubleToSsizeT(floor(inverse_edge.x2+0.5)); x++)
-    {
-      point.x=(double) x*inverse_affine.sx+y*inverse_affine.ry+
-        inverse_affine.tx;
-      point.y=(double) x*inverse_affine.rx+y*inverse_affine.sy+
-        inverse_affine.ty;
-      status=InterpolatePixelInfo(source,source_view,UndefinedInterpolatePixel,
-        point.x,point.y,&pixel,exception);
-      if (status == MagickFalse)
-        break;
-      GetPixelInfoPixel(image,q,&composite);
-      CompositePixelInfoOver(&pixel,pixel.alpha,&composite,composite.alpha,
-        &composite);
-      SetPixelViaPixelInfo(image,&composite,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    DrawAffineRowPixels(&input,inverse_edge,q,&status);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
   }
