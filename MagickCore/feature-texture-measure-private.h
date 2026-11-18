@@ -660,7 +660,8 @@ static void AccumulateSumEntropyAndVariance(const TextureDirection *texture,
       density_xy[x].direction[i].alpha;
 }
 
-static void ComputeSumFeatures(const TextureDirection *texture)
+static void AccumulateSumAverage(const TextureDirection *texture,
+  const ssize_t x)
 {
   const Image
     *const image = texture->image;
@@ -671,6 +672,28 @@ static void ComputeSumFeatures(const TextureDirection *texture)
   FeatureStatistics
     *const density_xy = texture->density_xy;
 
+  const ssize_t
+    i = texture->i;
+
+  /*
+    Sum average.
+  */
+  channel_features[RedPixelChannel].sum_average[i]+=
+    x*density_xy[x].direction[i].red;
+  channel_features[GreenPixelChannel].sum_average[i]+=
+    x*density_xy[x].direction[i].green;
+  channel_features[BluePixelChannel].sum_average[i]+=
+    x*density_xy[x].direction[i].blue;
+  if (image->colorspace == CMYKColorspace)
+    channel_features[BlackPixelChannel].sum_average[i]+=
+      x*density_xy[x].direction[i].black;
+  if (image->alpha_trait != UndefinedPixelTrait)
+    channel_features[AlphaPixelChannel].sum_average[i]+=
+      x*density_xy[x].direction[i].alpha;
+}
+
+static void ComputeSumFeatures(const TextureDirection *texture)
+{
   const unsigned int
     number_grays = texture->number_grays;
 
@@ -682,21 +705,7 @@ static void ComputeSumFeatures(const TextureDirection *texture)
 
   for (x=2; x < (ssize_t) (2*number_grays); x++)
   {
-    /*
-      Sum average.
-    */
-    channel_features[RedPixelChannel].sum_average[i]+=
-      x*density_xy[x].direction[i].red;
-    channel_features[GreenPixelChannel].sum_average[i]+=
-      x*density_xy[x].direction[i].green;
-    channel_features[BluePixelChannel].sum_average[i]+=
-      x*density_xy[x].direction[i].blue;
-    if (image->colorspace == CMYKColorspace)
-      channel_features[BlackPixelChannel].sum_average[i]+=
-        x*density_xy[x].direction[i].black;
-    if (image->alpha_trait != UndefinedPixelTrait)
-      channel_features[AlphaPixelChannel].sum_average[i]+=
-        x*density_xy[x].direction[i].alpha;
+    AccumulateSumAverage(texture,x);
     AccumulateSumEntropyAndVariance(texture,x);
   }
 }
