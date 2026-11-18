@@ -1173,6 +1173,18 @@ typedef struct _MorphologyColumnFetch
     x;
 } MorphologyColumnFetch;
 
+static MagickBooleanType CheckMorphologyColumn(
+  const Quantum *magick_restrict *p,Quantum *magick_restrict *q,
+  MagickBooleanType *status)
+{
+  if (((*p) == (const Quantum *) NULL) || ((*q) == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType FetchMorphologyColumn(
   const MorphologyColumnFetch *fetch,const Quantum *magick_restrict *p,
   Quantum *magick_restrict *q,MagickBooleanType *status)
@@ -1205,12 +1217,7 @@ static MagickBooleanType FetchMorphologyColumn(
     kernel->height-1,exception);
   (*q)=GetCacheViewAuthenticPixels(morphology_view,x,0,1,
     morphology_image->rows,exception);
-  if (((*p) == (const Quantum *) NULL) || ((*q) == (Quantum *) NULL))
-    {
-      (*status)=MagickFalse;
-      return(MagickFalse);
-    }
-  return(MagickTrue);
+  return(CheckMorphologyColumn(p,q,status));
 }
 
 static void SetMorphologyKernelOrigin(const MorphologyMethod method,
