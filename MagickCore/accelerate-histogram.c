@@ -488,6 +488,72 @@ static void ReleaseEqualizeBuffers(const EqualizeBuffers *buffers)
     histogram=(cl_uint4 *) RelinquishMagickMemory(histogram);
 }
 
+typedef struct _EqualizeReadback
+{
+  MagickCLEnv
+    clEnv;
+
+  cl_command_queue
+    queue;
+
+  cl_mem
+    imageBuffer;
+
+  Image
+    *image;
+
+  void
+    *inputPixels;
+
+  MagickCLDevice
+    device;
+} EqualizeReadback;
+
+static MagickBooleanType ReadEqualizedImageBuffer(
+  const EqualizeReadback *readback,ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = readback->clEnv;
+
+  const cl_command_queue
+    queue = readback->queue;
+
+  const cl_mem
+    imageBuffer = readback->imageBuffer;
+
+  Image
+    *const image = readback->image;
+
+  void
+    *const inputPixels = readback->inputPixels;
+
+  const MagickCLDevice
+    device = readback->device;
+
+  cl_int
+    clStatus;
+
+  size_t
+    length;
+
+  if (ALIGNED(inputPixels,CLPixelPacket))
+  {
+    length = image->columns * image->rows;
+    clEnv->library->clEnqueueMapBuffer(queue, imageBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(CLPixelPacket), 0, NULL, NULL, &clStatus);
+  }
+  else
+  {
+    length = image->columns * image->rows;
+    clStatus = clEnv->library->clEnqueueReadBuffer(queue, imageBuffer, CL_TRUE, 0, length * sizeof(CLPixelPacket), inputPixels, 0, NULL, NULL);
+  }
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -753,20 +819,12 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   RecordProfileData(device,equalizeKernel,event);
 
   /* read the data back */
-  if (ALIGNED(inputPixels,CLPixelPacket))
   {
-    length = image->columns * image->rows;
-    clEnv->library->clEnqueueMapBuffer(queue, imageBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(CLPixelPacket), 0, NULL, NULL, &clStatus);
-  }
-  else
-  {
-    length = image->columns * image->rows;
-    clStatus = clEnv->library->clEnqueueReadBuffer(queue, imageBuffer, CL_TRUE, 0, length * sizeof(CLPixelPacket), inputPixels, 0, NULL, NULL);
-  }
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
-    goto cleanup;
+    const EqualizeReadback
+      readback = { clEnv, queue, imageBuffer, image, inputPixels, device };
+
+    if (ReadEqualizedImageBuffer(&readback,exception) == MagickFalse)
+      goto cleanup;
   }
 
   outputReady=SyncCacheViewAuthenticPixels(image_view,exception);
