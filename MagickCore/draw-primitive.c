@@ -3821,6 +3821,68 @@ static MagickBooleanType TraceZeroLengthSubpath(
   return(MagickFalse);
 }
 
+typedef struct _StrokeStartInput
+{
+  PrimitiveInfo
+    *polygon_primitive;
+
+  ssize_t
+    n;
+
+  PointInfo
+    offset;
+
+  StrokeSegment
+    dx,
+    dy,
+    inverse_slope;
+} StrokeStartInput;
+
+static void SetStrokeStartBoxes(const StrokeBoxes *boxes,
+  const StrokeStartInput *start)
+{
+  PointInfo
+    *const box_p = boxes->box_p,
+    *const box_q = boxes->box_q;
+
+  PrimitiveInfo
+    *const polygon_primitive = start->polygon_primitive;
+
+  const ssize_t
+    n = start->n;
+
+  const PointInfo
+    offset = start->offset;
+
+  const StrokeSegment
+    dx = start->dx,
+    dy = start->dy,
+    inverse_slope = start->inverse_slope;
+
+  if ((dy.p*offset.x-dx.p*offset.y) > 0.0)
+    {
+      box_p[0].x=polygon_primitive[0].point.x-offset.x;
+      box_p[0].y=polygon_primitive[0].point.y-offset.x*inverse_slope.p;
+      box_p[1].x=polygon_primitive[n].point.x-offset.x;
+      box_p[1].y=polygon_primitive[n].point.y-offset.x*inverse_slope.p;
+      box_q[0].x=polygon_primitive[0].point.x+offset.x;
+      box_q[0].y=polygon_primitive[0].point.y+offset.x*inverse_slope.p;
+      box_q[1].x=polygon_primitive[n].point.x+offset.x;
+      box_q[1].y=polygon_primitive[n].point.y+offset.x*inverse_slope.p;
+    }
+  else
+    {
+      box_p[0].x=polygon_primitive[0].point.x+offset.x;
+      box_p[0].y=polygon_primitive[0].point.y+offset.y;
+      box_p[1].x=polygon_primitive[n].point.x+offset.x;
+      box_p[1].y=polygon_primitive[n].point.y+offset.y;
+      box_q[0].x=polygon_primitive[0].point.x-offset.x;
+      box_q[0].y=polygon_primitive[0].point.y-offset.y;
+      box_q[1].x=polygon_primitive[n].point.x-offset.x;
+      box_q[1].y=polygon_primitive[n].point.y-offset.y;
+    }
+}
+
 typedef struct _StrokePolygonInput
 {
   PrimitiveInfo
@@ -3992,6 +4054,9 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
   StrokePolygonInput
     assembly;
 
+  StrokeStartInput
+    start;
+
   /*
     Allocate paths.
   */
@@ -4058,28 +4123,13 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
     (void) TraceSquareLinecap(polygon_primitive,number_vertices,mid);
   offset.x=sqrt((double) (mid*mid/(inverse_slope.p*inverse_slope.p+1.0)));
   offset.y=(double) (offset.x*inverse_slope.p);
-  if ((dy.p*offset.x-dx.p*offset.y) > 0.0)
-    {
-      box_p[0].x=polygon_primitive[0].point.x-offset.x;
-      box_p[0].y=polygon_primitive[0].point.y-offset.x*inverse_slope.p;
-      box_p[1].x=polygon_primitive[n].point.x-offset.x;
-      box_p[1].y=polygon_primitive[n].point.y-offset.x*inverse_slope.p;
-      box_q[0].x=polygon_primitive[0].point.x+offset.x;
-      box_q[0].y=polygon_primitive[0].point.y+offset.x*inverse_slope.p;
-      box_q[1].x=polygon_primitive[n].point.x+offset.x;
-      box_q[1].y=polygon_primitive[n].point.y+offset.x*inverse_slope.p;
-    }
-  else
-    {
-      box_p[0].x=polygon_primitive[0].point.x+offset.x;
-      box_p[0].y=polygon_primitive[0].point.y+offset.y;
-      box_p[1].x=polygon_primitive[n].point.x+offset.x;
-      box_p[1].y=polygon_primitive[n].point.y+offset.y;
-      box_q[0].x=polygon_primitive[0].point.x-offset.x;
-      box_q[0].y=polygon_primitive[0].point.y-offset.y;
-      box_q[1].x=polygon_primitive[n].point.x-offset.x;
-      box_q[1].y=polygon_primitive[n].point.y-offset.y;
-    }
+  start.polygon_primitive=polygon_primitive;
+  start.n=n;
+  start.offset=offset;
+  start.dx=dx;
+  start.dy=dy;
+  start.inverse_slope=inverse_slope;
+  SetStrokeStartBoxes(&boxes,&start);
   /*
     Create strokes for the line join attribute: bevel, miter, round.
   */
