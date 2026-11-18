@@ -4853,9 +4853,6 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       BlurCanvasTargets
         blur_targets;
 
-      BlurGeometryInputs
-        geometry;
-
       /*
         Blur Image by resampling dictated by an overlay gradient map:
           X = red_channel; Y = green_channel; compose:args =
@@ -4867,15 +4864,13 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       if (AcquireBlurCanvas(image,source_image,exception,&blur_targets) ==
           MagickFalse)
         return(MagickFalse);
-      geometry.geometry_info=geometry_info;
-      geometry.flags=flags;
-      geometry.canvas_image=canvas_image;
-      geometry.image=image;
-      geometry.source_image=source_image;
-      geometry.x_offset=x_offset;
-      geometry.y_offset=y_offset;
-      geometry.exception=exception;
-      BlurCompositeGeometry(&geometry);
+      {
+        const BlurGeometryInputs
+          geometry = { geometry_info, flags, canvas_image, image, source_image,
+            x_offset, y_offset, exception };
+
+        BlurCompositeGeometry(&geometry);
+      }
       source_image=DestroyImage(source_image);
       source_image=canvas_image;
       break;
