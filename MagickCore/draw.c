@@ -9349,10 +9349,32 @@ static MagickBooleanType DrawRoundLinecap(Image *image,
   return(DrawPolygonPrimitive(image,draw_info,linecap,exception));
 }
 
-static MagickStatusType DrawStrokeSubpathPolygon(Image *image,
-  const DrawInfo *draw_info,const DrawInfo *clone_info,
-  const PrimitiveInfo *p,ExceptionInfo *exception)
+typedef struct _StrokeSubpathPaint
 {
+  Image
+    *image;
+
+  const DrawInfo
+    *draw_info,
+    *clone_info;
+
+  ExceptionInfo
+    *exception;
+} StrokeSubpathPaint;
+
+static MagickStatusType DrawStrokeSubpathPolygon(
+  const StrokeSubpathPaint *paint,const PrimitiveInfo *p)
+{
+  Image
+    *const image = paint->image;
+
+  const DrawInfo
+    *const draw_info = paint->draw_info,
+    *const clone_info = paint->clone_info;
+
+  ExceptionInfo
+    *const exception = paint->exception;
+
   MagickStatusType
     status;
 
@@ -9425,6 +9447,9 @@ static MagickBooleanType DrawStrokePolygon(Image *image,
   const PrimitiveInfo
     *p;
 
+  StrokeSubpathPaint
+    paint;
+
   /*
     Draw stroked polygon.
   */
@@ -9433,11 +9458,15 @@ static MagickBooleanType DrawStrokePolygon(Image *image,
       "    begin draw-stroke-polygon");
   clone_info=CloneStrokeFillInfo(draw_info,exception);
   status=MagickTrue;
+  paint.image=image;
+  paint.draw_info=draw_info;
+  paint.clone_info=clone_info;
+  paint.exception=exception;
   for (p=primitive_info; p->primitive != UndefinedPrimitive; p+=(ptrdiff_t) p->coordinates)
   {
     if (p->coordinates == 1)
       continue;
-    status&=DrawStrokeSubpathPolygon(image,draw_info,clone_info,p,exception);
+    status&=DrawStrokeSubpathPolygon(&paint,p);
     if (status == 0)
       break;
     status&=DrawSubpathRoundLinecaps(image,draw_info,p,exception);
