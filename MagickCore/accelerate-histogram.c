@@ -431,6 +431,63 @@ static void ReleaseEqualizeKernels(MagickCLDevice device,cl_command_queue queue,
     ReleaseOpenCLDevice(device);
 }
 
+typedef struct _EqualizeBuffers
+{
+  MagickCLEnv
+    clEnv;
+
+  cl_mem
+    imageBuffer;
+
+  cl_float4
+    *map;
+
+  cl_mem
+    equalizeMapBuffer;
+
+  PixelPacket
+    *equalize_map;
+
+  cl_mem
+    histogramBuffer;
+
+  cl_uint4
+    *histogram;
+} EqualizeBuffers;
+
+static void ReleaseEqualizeBuffers(const EqualizeBuffers *buffers)
+{
+  const MagickCLEnv
+    clEnv = buffers->clEnv;
+
+  const cl_mem
+    imageBuffer = buffers->imageBuffer,
+    equalizeMapBuffer = buffers->equalizeMapBuffer,
+    histogramBuffer = buffers->histogramBuffer;
+
+  cl_float4
+    *map = buffers->map;
+
+  PixelPacket
+    *equalize_map = buffers->equalize_map;
+
+  cl_uint4
+    *histogram = buffers->histogram;
+
+  if (imageBuffer!=NULL)
+    clEnv->library->clReleaseMemObject(imageBuffer);
+  if (map!=NULL)
+    map=(cl_float4 *) RelinquishMagickMemory(map);
+  if (equalizeMapBuffer!=NULL)
+    clEnv->library->clReleaseMemObject(equalizeMapBuffer);
+  if (equalize_map!=NULL)
+    equalize_map=(PixelPacket *) RelinquishMagickMemory(equalize_map);
+  if (histogramBuffer!=NULL)
+    clEnv->library->clReleaseMemObject(histogramBuffer);
+  if (histogram!=NULL)
+    histogram=(cl_uint4 *) RelinquishMagickMemory(histogram);
+}
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -718,18 +775,13 @@ cleanup:
 
   image_view=DestroyCacheView(image_view);
 
-  if (imageBuffer!=NULL)
-    clEnv->library->clReleaseMemObject(imageBuffer);
-  if (map!=NULL)
-    map=(cl_float4 *) RelinquishMagickMemory(map);
-  if (equalizeMapBuffer!=NULL)
-    clEnv->library->clReleaseMemObject(equalizeMapBuffer);
-  if (equalize_map!=NULL)
-    equalize_map=(PixelPacket *) RelinquishMagickMemory(equalize_map);
-  if (histogramBuffer!=NULL)
-    clEnv->library->clReleaseMemObject(histogramBuffer);
-  if (histogram!=NULL)
-    histogram=(cl_uint4 *) RelinquishMagickMemory(histogram);
+  {
+    const EqualizeBuffers
+      buffers = { clEnv, imageBuffer, map, equalizeMapBuffer, equalize_map,
+        histogramBuffer, histogram };
+
+    ReleaseEqualizeBuffers(&buffers);
+  }
   ReleaseEqualizeKernels(device,queue,histogramKernel,equalizeKernel);
 
   return(outputReady);
