@@ -3821,6 +3821,35 @@ static MagickBooleanType TraceZeroLengthSubpath(
   return(MagickFalse);
 }
 
+typedef struct _StrokeFirstInput
+{
+  PrimitiveInfo
+    *polygon_primitive;
+
+  size_t
+    number_vertices;
+} StrokeFirstInput;
+
+static void FindStrokeFirstSegment(const StrokeFirstInput *first,
+  StrokeSegment *dx,StrokeSegment *dy,ssize_t *n)
+{
+  PrimitiveInfo
+    *const polygon_primitive = first->polygon_primitive;
+
+  const size_t
+    number_vertices = first->number_vertices;
+
+  (*dx).p=0.0;
+  (*dy).p=0.0;
+  for ((*n)=1; (*n) < (ssize_t) number_vertices; (*n)++)
+  {
+    (*dx).p=polygon_primitive[(*n)].point.x-polygon_primitive[0].point.x;
+    (*dy).p=polygon_primitive[(*n)].point.y-polygon_primitive[0].point.y;
+    if ((fabs((*dx).p) >= MagickEpsilon) || (fabs((*dy).p) >= MagickEpsilon))
+      break;
+  }
+}
+
 typedef struct _StrokeStartInput
 {
   PrimitiveInfo
@@ -4057,6 +4086,9 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
   StrokeStartInput
     start;
 
+  StrokeFirstInput
+    first;
+
   /*
     Allocate paths.
   */
@@ -4085,15 +4117,9 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
     Compute the slope for the first line segment, p.
   */
   closed_path=primitive_info[0].closed_subpath;
-  dx.p=0.0;
-  dy.p=0.0;
-  for (n=1; n < (ssize_t) number_vertices; n++)
-  {
-    dx.p=polygon_primitive[n].point.x-polygon_primitive[0].point.x;
-    dy.p=polygon_primitive[n].point.y-polygon_primitive[0].point.y;
-    if ((fabs(dx.p) >= MagickEpsilon) || (fabs(dy.p) >= MagickEpsilon))
-      break;
-  }
+  first.polygon_primitive=polygon_primitive;
+  first.number_vertices=number_vertices;
+  FindStrokeFirstSegment(&first,&dx,&dy,&n);
   subpath.draw_info=draw_info;
   subpath.polygon_primitive=polygon_primitive;
   subpath.number_vertices=number_vertices;
