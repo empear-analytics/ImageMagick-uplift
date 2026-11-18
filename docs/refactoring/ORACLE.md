@@ -149,6 +149,13 @@ times when it diverges, and reports it as `SETTLED` when a pair agrees (`last-re
 the presses below y=30, as the draw-mode cases already do, would remove the cause but make
 new cases (new ids, a new `casemap-wide.json`); that is left to the owner.
 
+Two narrow cases are listed for another reason (2026-11-17, owner): `matrix/f2913328b4` and
+`matrix/e1095950b7`, `-hough-lines` with `-limit memory 0 -limit map 0`, whose accumulator
+matrix lives in a file. Alone each takes about 9 s on the Mac; in a full run a side passed the
+30 s timeout, once the baseline and once the candidate. A baseline timeout is cached like any
+result, so it made the case diverge on every later run until its entry was removed from
+`build-oracle/work/cache/`; listed, the case is rerun alone on both sides and settles.
+
 ## What it reaches
 
 Line coverage, measured with a coverage build (`tools/oracle/build.sh cov`,

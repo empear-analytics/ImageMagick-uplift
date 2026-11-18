@@ -1,0 +1,5 @@
+# Large-image cases for tools/omp_compare.sh: draw.c's DrawAffineImage (the image primitive with the Over operator), a 900x900 source drawn onto a 1200x1200 canvas, above GetMagickNumberThreads' one-thread limit; plain, rotated, affine with alpha, and partly off the canvas.
+-size 1200x1200 xc:white \( -size 900x900 gradient:red-blue -write mpr:src +delete \) -draw "image over 50,60 0,0 'mpr:src'" -format %# info:
+-size 1200x1200 xc:white \( -size 900x900 gradient:red-blue -write mpr:src +delete \) -draw "rotate 17 image over 300,40 0,0 'mpr:src'" -format %# info:
+-size 1200x1200 xc:white \( -size 900x900 gradient:red-blue -alpha set -channel A -evaluate set 60% +channel -write mpr:src +delete \) -draw "affine 1.1,0.2,0.3,0.9,10,20 image over 100,100 0,0 'mpr:src'" -format %# info:
+-size 1200x1200 xc:white \( -size 900x900 gradient:red-blue -write mpr:src +delete \) -draw "rotate -33 image over 600,-200 0,0 'mpr:src'" -format %# info:

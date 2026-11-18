@@ -1,0 +1,7 @@
+# Large-image cases for tools/omp_compare.sh: draw.c's DrawGradientImage, reached through GradientImage (the gradient: and radial-gradient: coders, pad spread; reflect and repeat are reached only through the oracle's driver), 1500x1500, above GetMagickNumberThreads' one-thread limit.
+-size 1500x1500 gradient:red-blue -format %# info:
+-size 1500x1500 -define gradient:angle=33 gradient:white-black -format %# info:
+-size 1500x1100 -define gradient:direction=East gradient:yellow-navy -format %# info:
+-size 1500x1500 radial-gradient:yellow-navy -format %# info:
+-size 1500x1500 -define gradient:center=200,300 -define gradient:radii=700,400 -define gradient:extent=Diagonal radial-gradient:red-green -format %# info:
+-size 1500x1500 gradient:#ff000080-#0000ff20 -format %# info:
