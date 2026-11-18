@@ -1034,6 +1034,22 @@ static inline MagickBooleanType IsNewSubpathPoint(
     MagickFalse);
 }
 
+static MagickBooleanType IsNonPathPrimitive(const PrimitiveType primitive)
+{
+  switch (primitive)
+  {
+    case AlphaPrimitive:
+    case ColorPrimitive:
+    case ImagePrimitive:
+    case PointPrimitive:
+    case TextPrimitive:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+
 static PathInfo *ConvertPrimitiveToPath(const PrimitiveInfo *primitive_info,
   ExceptionInfo *exception)
 {
@@ -1061,17 +1077,8 @@ static PathInfo *ConvertPrimitiveToPath(const PrimitiveInfo *primitive_info,
   /*
     Converts a PrimitiveInfo structure into a vector path structure.
   */
-  switch (primitive_info->primitive)
-  {
-    case AlphaPrimitive:
-    case ColorPrimitive:
-    case ImagePrimitive:
-    case PointPrimitive:
-    case TextPrimitive:
-      return((PathInfo *) NULL);
-    default:
-      break;
-  }
+  if (IsNonPathPrimitive(primitive_info->primitive) != MagickFalse)
+    return((PathInfo *) NULL);
   for (i=0; primitive_info[i].primitive != UndefinedPrimitive; i++) ;
   path_info=(PathInfo *) AcquireQuantumMemory((size_t) (3UL*i+1UL),
     sizeof(*path_info));
