@@ -4806,6 +4806,96 @@ static MagickBooleanType CompositeCopyGroups(const CopyCompositeInputs *copy,
   return(MagickFalse);
 }
 
+typedef struct _BlendCompositeInputs
+{
+  Image
+    *image;
+
+  const Image
+    *composite;
+
+  Image
+    *source_image;
+
+  ssize_t
+    x_offset,
+    y_offset;
+
+  CompositeSetup
+    setup;
+
+  ExceptionInfo
+    *exception;
+} BlendCompositeInputs;
+
+static MagickBooleanType CompositeBlendGroups(const BlendCompositeInputs *blend,
+  const CompositeOperator compose,const ComposeArgumentTargets *targets,
+  MagickBooleanType *result)
+{
+  Image
+    *const image = blend->image;
+
+  const Image
+    *const composite = blend->composite;
+
+  Image
+    *source_image = blend->source_image;
+
+  const ssize_t
+    x_offset = blend->x_offset,
+    y_offset = blend->y_offset;
+
+  const CompositeSetup
+    setup = blend->setup;
+
+  ExceptionInfo
+    *const exception = blend->exception;
+
+  MagickBooleanType
+    returned,
+    status;
+
+  switch (compose)
+  {
+    case SaliencyBlendCompositeOp:
+    {
+      BlendRequest
+        request;
+
+      request=GetBlendRequest(image,x_offset,y_offset);
+      status=SaliencyBlendImage(image,composite,&request,exception);
+      source_image=DestroyImage(source_image);
+      (*result)=status;
+      return(MagickTrue);
+    }
+    case SeamlessBlendCompositeOp:
+    {
+      BlendRequest
+        request;
+
+      request=GetBlendRequest(image,x_offset,y_offset);
+      status=SeamlessBlendImage(image,composite,&request,exception);
+      source_image=DestroyImage(source_image);
+      (*result)=status;
+      return(MagickTrue);
+    }
+    default:
+    {
+      const CopyCompositeInputs
+        copy = { image, source_image, x_offset, y_offset, setup, exception };
+
+      if (CompositeCopyGroups(&copy,compose,targets,&returned) !=
+          MagickFalse)
+        {
+          (*result)=returned;
+          return(MagickTrue);
+        }
+      break;
+    }
+  }
+  return(MagickFalse);
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -4950,32 +5040,13 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       source_image=canvas_image;
       break;
     }
-    case SaliencyBlendCompositeOp:
-    {
-      BlendRequest
-        request;
-
-      request=GetBlendRequest(image,x_offset,y_offset);
-      status=SaliencyBlendImage(image,composite,&request,exception);
-      source_image=DestroyImage(source_image);
-      return(status);
-    }
-    case SeamlessBlendCompositeOp:
-    {
-      BlendRequest
-        request;
-
-      request=GetBlendRequest(image,x_offset,y_offset);
-      status=SeamlessBlendImage(image,composite,&request,exception);
-      source_image=DestroyImage(source_image);
-      return(status);
-    }
     default:
     {
-      const CopyCompositeInputs
-        copy = { image, source_image, x_offset, y_offset, setup, exception };
+      const BlendCompositeInputs
+        blend = { image, composite, source_image, x_offset, y_offset, setup,
+          exception };
 
-      if (CompositeCopyGroups(&copy,compose,&argument_targets,&returned) !=
+      if (CompositeBlendGroups(&blend,compose,&argument_targets,&returned) !=
           MagickFalse)
         return(returned);
       break;
