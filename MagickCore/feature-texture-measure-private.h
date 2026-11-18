@@ -421,7 +421,7 @@ static void AccumulateInverseDifferenceAndSum(const TextureDirection *texture,
     &cooccurrence[x][y].direction[i]);
 }
 
-static void AccumulateEntropyAndDensities(const TextureDirection *texture,
+static void AccumulateCooccurrenceEntropy(const TextureDirection *texture,
   const ssize_t x,const ssize_t y)
 {
   const Image
@@ -431,9 +431,7 @@ static void AccumulateEntropyAndDensities(const TextureDirection *texture,
     *const channel_features = texture->channel_features;
 
   FeatureStatistics
-    **const cooccurrence = texture->cooccurrence,
-    *const density_x = texture->density_x,
-    *const density_y = texture->density_y;
+    **const cooccurrence = texture->cooccurrence;
 
   const ssize_t
     i = texture->i;
@@ -458,6 +456,23 @@ static void AccumulateEntropyAndDensities(const TextureDirection *texture,
     channel_features[AlphaPixelChannel].entropy[i]-=
       cooccurrence[x][y].direction[i].alpha*
       log2(cooccurrence[x][y].direction[i].alpha);
+}
+
+static void AccumulateEntropyAndDensities(const TextureDirection *texture,
+  const ssize_t x,const ssize_t y)
+{
+  const Image
+    *const image = texture->image;
+
+  FeatureStatistics
+    **const cooccurrence = texture->cooccurrence,
+    *const density_x = texture->density_x,
+    *const density_y = texture->density_y;
+
+  const ssize_t
+    i = texture->i;
+
+  AccumulateCooccurrenceEntropy(texture,x,y);
   /*
     Information Measures of Correlation.
   */
