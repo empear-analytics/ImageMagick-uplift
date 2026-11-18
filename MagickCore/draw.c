@@ -5616,6 +5616,14 @@ static MagickBooleanType TraceBezierControlPoints(
   return(MagickTrue);
 }
 
+static MagickBooleanType ReleaseBezierBuffers(PointInfo *points,
+  double *coefficients)
+{
+  points=(PointInfo *) RelinquishMagickMemory(points);
+  coefficients=(double *) RelinquishMagickMemory(coefficients);
+  return(MagickFalse);
+}
+
 static MagickBooleanType TraceBezier(MVGInfo *mvg_info,
   const size_t number_coordinates)
 {
@@ -5669,11 +5677,7 @@ static MagickBooleanType TraceBezier(MVGInfo *mvg_info,
     }
   control_points=quantum*number_coordinates;
   if (CheckPrimitiveExtent(mvg_info,(double) control_points+1) == MagickFalse)
-    {
-      points=(PointInfo *) RelinquishMagickMemory(points);
-      coefficients=(double *) RelinquishMagickMemory(coefficients);
-      return(MagickFalse);
-    }
+    return(ReleaseBezierBuffers(points,coefficients));
   primitive_info=(*mvg_info->primitive_info)+mvg_info->offset;
   /*
     Compute bezier points.
@@ -5694,17 +5698,9 @@ static MagickBooleanType TraceBezier(MVGInfo *mvg_info,
   */
   if (TraceBezierControlPoints(primitive_info,points,control_points,&p) ==
       MagickFalse)
-    {
-      points=(PointInfo *) RelinquishMagickMemory(points);
-      coefficients=(double *) RelinquishMagickMemory(coefficients);
-      return(MagickFalse);
-    }
+    return(ReleaseBezierBuffers(points,coefficients));
   if (TracePoint(p,end) == MagickFalse)
-    {
-      points=(PointInfo *) RelinquishMagickMemory(points);
-      coefficients=(double *) RelinquishMagickMemory(coefficients);
-      return(MagickFalse);
-    }
+    return(ReleaseBezierBuffers(points,coefficients));
   p+=(ptrdiff_t) p->coordinates;
   primitive_info->coordinates=(size_t) (p-primitive_info);
   primitive_info->closed_subpath=MagickFalse;
