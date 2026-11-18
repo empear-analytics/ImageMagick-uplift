@@ -83,7 +83,7 @@ versions:
   the OpenMP compare and timing.
 - **Whole narrow catalogue at the tip:** 15,967 cases, 3 diverged, all known.
 
-## TracePath: Recipe KG, written but not applied (owner decision needed)
+## TracePath: Recipe KG, applied (5257cc60f) under a new owner rule
 
 **What KG does.** Recipe KG (573d77c7e), designed at the owner's request, replaces
 TracePath's 20-label command switch with a `static const` table:
@@ -105,9 +105,12 @@ smaller, so draw.c falls back under CodeScene's duplication size limit (above), 
 55-function Code Duplication finding returns. Like for like, with the same padding
 hiding duplication on both sides, the step is worth 4.47 -> 4.74.
 
-The gate refuses a drop, and only the owner can make an exception. The step is kept as
-`docs/refactoring/patches/M140-kg-tracepath.patch`, to apply with `git apply` once the
-owner rules.
+The repository's CodeScene pre-commit hook refuses any drop. **The owner's rule
+(2026-11-18, "yes, that's a good rule. use it"):** `--no-verify` is allowed only when a
+drop comes solely from the duplication finding reappearing, the message gives both
+measurements, and no function gains any other finding. 5257cc60f is the first commit
+made under it. The patch file that held the step is removed. The rule is recorded here
+and in the commit; AGENTS.md is the owner's to amend.
 
 **Another caution from the same probes:** adding *more* trivial functions keeps raising
 the score (30 of them: 5.01). Raw scores near that limit are not trustworthy, and no
