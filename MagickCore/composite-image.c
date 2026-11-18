@@ -1082,6 +1082,112 @@ static MagickBooleanType CompositeBlendGroups(const BlendCompositeInputs *blend,
   return(MagickFalse);
 }
 
+typedef struct _CanvasCompositeInputs
+{
+  Image
+    *image;
+
+  const Image
+    *composite;
+
+  ssize_t
+    x_offset,
+    y_offset;
+
+  CompositeSetup
+    setup;
+
+  ExceptionInfo
+    *exception;
+
+  Image
+    **canvas_image,
+    **source_image;
+
+  GeometryInfo
+    *geometry_info;
+} CanvasCompositeInputs;
+
+static MagickBooleanType CompositeDisplaceGroups(
+  const CanvasCompositeInputs *canvas_inputs,const CompositeOperator compose,
+  const ComposeArgumentTargets *targets,MagickBooleanType *result)
+{
+  Image
+    *const image = canvas_inputs->image;
+
+  const Image
+    *const composite = canvas_inputs->composite;
+
+  const ssize_t
+    x_offset = canvas_inputs->x_offset,
+    y_offset = canvas_inputs->y_offset;
+
+  const CompositeSetup
+    setup = canvas_inputs->setup;
+
+  ExceptionInfo
+    *const exception = canvas_inputs->exception;
+
+  Image
+    **const canvas_image = canvas_inputs->canvas_image,
+    **const source_image = canvas_inputs->source_image;
+
+  GeometryInfo
+    *const geometry_info = canvas_inputs->geometry_info;
+
+  MagickBooleanType
+    returned;
+
+  MagickStatusType
+    flags;
+
+  switch (compose)
+  {
+    case DisplaceCompositeOp:
+    case DistortCompositeOp:
+    {
+      /*
+        Displace/Distort based on overlay gradient map:
+          X = red_channel;  Y = green_channel;
+          compose:args = x_scale[,y_scale[,center.x,center.y]]
+      */
+      (*canvas_image)=CloneImage(image,0,0,MagickTrue,exception);
+      if ((*canvas_image) == (Image *) NULL)
+        {
+          (*source_image)=DestroyImage((*source_image));
+          (*result)=MagickFalse;
+          return(MagickTrue);
+        }
+      GetDisplaceArguments(image,geometry_info,&flags);
+      {
+        const DisplaceCanvasInputs
+          canvas = { (*canvas_image), image, (*source_image), compose, flags,
+            (*geometry_info), x_offset, y_offset, exception };
+
+        DisplaceCompositeCanvas(&canvas);
+      }
+      (*source_image)=DestroyImage((*source_image));
+      (*source_image)=(*canvas_image);
+      break;
+    }
+    default:
+    {
+      const BlendCompositeInputs
+        blend = { image, composite, (*source_image), x_offset, y_offset, setup,
+          exception };
+
+      if (CompositeBlendGroups(&blend,compose,targets,&returned) !=
+          MagickFalse)
+        {
+          (*result)=returned;
+          return(MagickTrue);
+        }
+      break;
+    }
+  }
+  return(MagickFalse);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1299,40 +1405,14 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       source_image=canvas_image;
       break;
     }
-    case DisplaceCompositeOp:
-    case DistortCompositeOp:
-    {
-      /*
-        Displace/Distort based on overlay gradient map:
-          X = red_channel;  Y = green_channel;
-          compose:args = x_scale[,y_scale[,center.x,center.y]]
-      */
-      canvas_image=CloneImage(image,0,0,MagickTrue,exception);
-      if (canvas_image == (Image *) NULL)
-        {
-          source_image=DestroyImage(source_image);
-          return(MagickFalse);
-        }
-      GetDisplaceArguments(image,&geometry_info,&flags);
-      {
-        const DisplaceCanvasInputs
-          canvas = { canvas_image, image, source_image, compose, flags,
-            geometry_info, x_offset, y_offset, exception };
-
-        DisplaceCompositeCanvas(&canvas);
-      }
-      source_image=DestroyImage(source_image);
-      source_image=canvas_image;
-      break;
-    }
     default:
     {
-      const BlendCompositeInputs
-        blend = { image, composite, source_image, x_offset, y_offset, setup,
-          exception };
+      const CanvasCompositeInputs
+        canvas_inputs = { image, composite, x_offset, y_offset, setup,
+          exception, &canvas_image, &source_image, &geometry_info };
 
-      if (CompositeBlendGroups(&blend,compose,&argument_targets,&returned) !=
-          MagickFalse)
+      if (CompositeDisplaceGroups(&canvas_inputs,compose,&argument_targets,
+          &returned) != MagickFalse)
         return(returned);
       break;
     }
