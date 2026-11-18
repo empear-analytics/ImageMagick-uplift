@@ -7384,6 +7384,31 @@ MagickExport MagickBooleanType DrawImage(Image *image,const DrawInfo *draw_info,
   return(status);
 }
 
+static DrawInfo *ClonePatternDrawInfo(const Image *image,
+  const DrawInfo *draw_info,const char *name)
+{
+  char
+    property[MagickPathExtent];
+
+  const char
+    *type;
+
+  DrawInfo
+    *clone_info;
+
+  clone_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
+  if (clone_info->fill_pattern != (Image *) NULL)
+    clone_info->fill_pattern=DestroyImage(clone_info->fill_pattern);
+  if (clone_info->stroke_pattern != (Image *) NULL)
+    clone_info->stroke_pattern=DestroyImage(clone_info->stroke_pattern);
+  (void) FormatLocaleString(property,MagickPathExtent,"%s-type",name);
+  type=GetImageArtifact(image,property);
+  if (type != (const char *) NULL)
+    clone_info->gradient.type=(GradientType) ParseCommandOption(
+      MagickGradientOptions,MagickFalse,type);
+  return(clone_info);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -7424,8 +7449,7 @@ MagickExport MagickBooleanType DrawPatternPath(Image *image,
 
   const char
     *geometry,
-    *path,
-    *type;
+    *path;
 
   DrawInfo
     *clone_info;
@@ -7462,16 +7486,7 @@ MagickExport MagickBooleanType DrawPatternPath(Image *image,
   if (draw_info->debug != MagickFalse)
     (void) LogMagickEvent(DrawEvent,GetMagickModule(),
       "begin pattern-path %s %s",name,geometry);
-  clone_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
-  if (clone_info->fill_pattern != (Image *) NULL)
-    clone_info->fill_pattern=DestroyImage(clone_info->fill_pattern);
-  if (clone_info->stroke_pattern != (Image *) NULL)
-    clone_info->stroke_pattern=DestroyImage(clone_info->stroke_pattern);
-  (void) FormatLocaleString(property,MagickPathExtent,"%s-type",name);
-  type=GetImageArtifact(image,property);
-  if (type != (const char *) NULL)
-    clone_info->gradient.type=(GradientType) ParseCommandOption(
-      MagickGradientOptions,MagickFalse,type);
+  clone_info=ClonePatternDrawInfo(image,draw_info,name);
   (void) CloneString(&clone_info->primitive,path);
   status=RenderMVGContent(*pattern,clone_info,0,exception);
   clone_info=DestroyDrawInfo(clone_info);
