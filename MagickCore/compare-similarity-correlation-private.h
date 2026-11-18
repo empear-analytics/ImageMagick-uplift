@@ -500,10 +500,7 @@ static MagickBooleanType GetCorrelationTotals(const CorrelationTotals *totals,
         progress++;
         proceed=SetImageProgress(image,SimilarityImageTag,progress,rows);
         if (proceed == MagickFalse)
-          {
-            status=MagickFalse;
-            continue;
-          }
+          status=MagickFalse;
       }
   }
   reconstruct_view=DestroyCacheView(reconstruct_view);
