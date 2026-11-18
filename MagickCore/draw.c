@@ -1034,6 +1034,18 @@ static inline MagickBooleanType IsNewSubpathPoint(
     MagickFalse);
 }
 
+static PathInfo *TerminatePathInfo(PathInfo *path_info,const ssize_t n)
+{
+  path_info[n].code=EndCode;
+  path_info[n].point.x=0.0;
+  path_info[n].point.y=0.0;
+  if (IsEventLogging() != MagickFalse)
+    LogPathInfo(path_info);
+  path_info=(PathInfo *) ResizeQuantumMemory(path_info,(size_t) (n+1),
+    sizeof(*path_info));
+  return(path_info);
+}
+
 static MagickBooleanType IsNonPathPrimitive(const PrimitiveType primitive)
 {
   switch (primitive)
@@ -1147,14 +1159,7 @@ static PathInfo *ConvertPrimitiveToPath(const PrimitiveInfo *primitive_info,
     path_info[n].point=p;
     n++;
   }
-  path_info[n].code=EndCode;
-  path_info[n].point.x=0.0;
-  path_info[n].point.y=0.0;
-  if (IsEventLogging() != MagickFalse)
-    LogPathInfo(path_info);
-  path_info=(PathInfo *) ResizeQuantumMemory(path_info,(size_t) (n+1),
-    sizeof(*path_info));
-  return(path_info);
+  return(TerminatePathInfo(path_info,n));
 }
 
 /*
