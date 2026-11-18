@@ -17949,6 +17949,13 @@ variables or one that leaves the loop.
    `if (s == MagickFalse) break;` (or `== 0`) (form B). In form A the segment may also
    be a run of statements nested inside the body (in a `switch` group, an `if` block or
    an inner loop's body), when no `break`, `continue` or `return` in it leaves it.
+   *Outside-loop form* (2026-11-18): in form A the segment may also be a run of whole
+   statements of the caller's own body outside every loop (before its loop or after
+   it), with no `break`, `continue`, `goto` or `return` in it but those of loops or
+   `switch`es nested inside it, when the caller already declares the state struct of
+   step 3 as its last declaration. The rest of the recipe holds as written: the copies
+   in read the values the locals hold at that point, a segment outside the loop runs
+   once, and the copy out writes the values back before the caller's next statement.
 2. Variables as Recipe CK step 2: locals, parameters, arrays; temporaries (written
    before read on every path through the segment, read by nothing after it before being
    written again) are declared in the helper, and leave the caller when nothing else
@@ -24085,3 +24092,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-18 | AMEND | K | Step 6, outside-region form: the function may hold OpenMP regions when the block lies outside every one of them and writes no local a region uses or names in a clause; the file's OpenMP conditions (whole catalogue, `omp_compare.sh`) still apply. *Careful* gives the argument | `draw.c`'s `DrawAffineImage`: its minimum/maximum scan over the four extent corners writes `min` and `max` before the parallel row loop, which reads neither; campaign B, M138 | mandate (2026-10-24) |
 | 2026-11-18 | NEW | GP | Move a Run of Guards Sharing One Exit into a Predicate: consecutive `if (Ai) X` with the same `X` (an exit) and side-effect-free conditions become `if (Pred(...) != MagickFalse) X`, the predicate returning `MagickTrue` at the first condition that holds, in order | `draw.c`'s `TraceMVGPrimitive` (round-rectangle and ellipse point checks, each `{ status=MagickFalse; break; }` out of a `switch`, which LB and V do not take); campaign B, M140 | mandate (2026-10-24) |
 | 2026-11-18 | NEW | KG | Replace a Character-Keyed Switch of Checked Calls by a Table of Calls: groups `if (F(args) == c) return(c); break;` over functions of a base signature and up to two sided signatures (one trailing enumeration constant) become a `static const` table of `{key, f, f1, f2, s1, s2}`, a lookup and a dispatch; the throwing `default:` stays, its macro's `break` leaving the loop only where the loop would end at once (step 6) | `draw.c`'s `TracePath` (twenty labels, three tracer signatures, `ThrowPointExpectedException` default); designed at the owner's request, campaign B, M140 | mandate (2026-10-24) |
+| 2026-11-18 | AMEND | CS | Step 1, outside-loop form: in form A the segment may be a run of the caller's own body outside every loop, with no exit of its own, when the caller already declares the state struct | `draw.c`'s `RenderMVGContent` (6c5c0be35, merged in #127, labelled CS form A before this text existed: the first graphic context's setup and the release after the loop); campaign B, M141 | mandate (2026-10-24) |
