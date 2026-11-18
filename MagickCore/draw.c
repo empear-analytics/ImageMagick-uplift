@@ -6479,6 +6479,70 @@ static ssize_t TracePathClose(const PathTrace *trace)
   return(0);
 }
 
+typedef struct _PathCommandInfo
+{
+  int
+    key;
+
+  ssize_t
+    (*trace)(const PathTrace *),
+    (*trace_bezier)(const PathTrace *,const PathBezierSide),
+    (*trace_line)(const PathTrace *,const PathLineSide);
+
+  PathBezierSide
+    bezier_side;
+
+  PathLineSide
+    line_side;
+} PathCommandInfo;
+
+static const PathCommandInfo
+  PathCommands[] =
+  {
+    { 'a', TracePathArc, NULL, NULL, CubicPathBezier, HorizontalPathLine },
+    { 'A', TracePathArc, NULL, NULL, CubicPathBezier, HorizontalPathLine },
+    { 'c', NULL, TracePathBezierCurve, NULL, CubicPathBezier, HorizontalPathLine },
+    { 'C', NULL, TracePathBezierCurve, NULL, CubicPathBezier, HorizontalPathLine },
+    { 'H', NULL, NULL, TracePathAxisLine, CubicPathBezier, HorizontalPathLine },
+    { 'h', NULL, NULL, TracePathAxisLine, CubicPathBezier, HorizontalPathLine },
+    { 'l', TracePathLine, NULL, NULL, CubicPathBezier, HorizontalPathLine },
+    { 'L', TracePathLine, NULL, NULL, CubicPathBezier, HorizontalPathLine },
+    { 'M', TracePathMove, NULL, NULL, CubicPathBezier, HorizontalPathLine },
+    { 'm', TracePathMove, NULL, NULL, CubicPathBezier, HorizontalPathLine },
+    { 'q', NULL, TracePathBezierCurve, NULL, QuadraticPathBezier, HorizontalPathLine },
+    { 'Q', NULL, TracePathBezierCurve, NULL, QuadraticPathBezier, HorizontalPathLine },
+    { 's', NULL, TracePathSmoothBezierCurve, NULL, CubicPathBezier, HorizontalPathLine },
+    { 'S', NULL, TracePathSmoothBezierCurve, NULL, CubicPathBezier, HorizontalPathLine },
+    { 't', NULL, TracePathSmoothBezierCurve, NULL, QuadraticPathBezier, HorizontalPathLine },
+    { 'T', NULL, TracePathSmoothBezierCurve, NULL, QuadraticPathBezier, HorizontalPathLine },
+    { 'v', NULL, NULL, TracePathAxisLine, CubicPathBezier, VerticalPathLine },
+    { 'V', NULL, NULL, TracePathAxisLine, CubicPathBezier, VerticalPathLine },
+    { 'z', TracePathClose, NULL, NULL, CubicPathBezier, HorizontalPathLine },
+    { 'Z', TracePathClose, NULL, NULL, CubicPathBezier, HorizontalPathLine }
+  };
+
+static const PathCommandInfo *GetPathCommandInfo(const int key)
+{
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(PathCommands)/sizeof(*PathCommands)); i++)
+    if (PathCommands[i].key == key)
+      return(PathCommands+i);
+  return((const PathCommandInfo *) NULL);
+}
+
+static ssize_t CallPathCommand(const PathCommandInfo *command,
+  const PathTrace *trace)
+{
+  if (command->trace != (ssize_t (*)(const PathTrace *)) NULL)
+    return(command->trace(trace));
+  if (command->trace_bezier !=
+      (ssize_t (*)(const PathTrace *,const PathBezierSide)) NULL)
+    return(command->trace_bezier(trace,command->bezier_side));
+  return(command->trace_line(trace,command->line_side));
+}
+
 static ssize_t TracePath(MVGInfo *mvg_info,const char *path,
   ExceptionInfo *exception)
 {
@@ -6506,6 +6570,9 @@ static ssize_t TracePath(MVGInfo *mvg_info,const char *path,
 
   PrimitiveType
     primitive_type;
+
+  const PathCommandInfo
+    *command;
 
   PrimitiveInfo
     *q;
@@ -6543,84 +6610,14 @@ static ssize_t TracePath(MVGInfo *mvg_info,const char *path,
       break;
     last_attribute=attribute;
     attribute=(int) (*p++);
-    switch (attribute)
-    {
-      case 'a':
-      case 'A':
-      {
-        if (TracePathArc(&trace) == -1)
-          return(-1);
-        break;
-      }
-      case 'c':
-      case 'C':
-      {
-        if (TracePathBezierCurve(&trace,CubicPathBezier) == -1)
-          return(-1);
-        break;
-      }
-      case 'H':
-      case 'h':
-      {
-        if (TracePathAxisLine(&trace,HorizontalPathLine) == -1)
-          return(-1);
-        break;
-      }
-      case 'l':
-      case 'L':
-      {
-        if (TracePathLine(&trace) == -1)
-          return(-1);
-        break;
-      }
-      case 'M':
-      case 'm':
-      {
-        if (TracePathMove(&trace) == -1)
-          return(-1);
-        break;
-      }
-      case 'q':
-      case 'Q':
-      {
-        if (TracePathBezierCurve(&trace,QuadraticPathBezier) == -1)
-          return(-1);
-        break;
-      }
-      case 's':
-      case 'S':
-      {
-        if (TracePathSmoothBezierCurve(&trace,CubicPathBezier) == -1)
-          return(-1);
-        break;
-      }
-      case 't':
-      case 'T':
-      {
-        if (TracePathSmoothBezierCurve(&trace,QuadraticPathBezier) == -1)
-          return(-1);
-        break;
-      }
-      case 'v':
-      case 'V':
-      {
-        if (TracePathAxisLine(&trace,VerticalPathLine) == -1)
-          return(-1);
-        break;
-      }
-      case 'z':
-      case 'Z':
-      {
-        if (TracePathClose(&trace) == -1)
-          return(-1);
-        break;
-      }
-      default:
+    command=GetPathCommandInfo(attribute);
+    if (command == (const PathCommandInfo *) NULL)
       {
         ThrowPointExpectedException(token,exception);
-        break;
       }
-    }
+    else
+      if (CallPathCommand(command,&trace) == -1)
+        return(-1);
   }
   if (status == MagickFalse)
     return(-1);
