@@ -680,6 +680,14 @@ static Image *BlendDivergenceImage(const BlendGradientSet *selected,
   return(divergent_image);
 }
 
+static void DestroyBlendGradientSets(BlendGradientSet *selected,
+  BlendGradientSet *beta,BlendGradientSet *alpha)
+{
+  DestroyBlendGradients(selected);
+  DestroyBlendGradients(beta);
+  DestroyBlendGradients(alpha);
+}
+
 static Image *BlendDivergentImage(const Image *alpha_image,
   const Image *beta_image,ExceptionInfo *exception)
 {
@@ -701,9 +709,7 @@ static Image *BlendDivergentImage(const Image *alpha_image,
     status=SelectBlendGradients(&alpha,&beta,&selected,exception);
   if (status != MagickFalse)
     divergent_image=BlendDivergenceImage(&selected,exception);
-  DestroyBlendGradients(&selected);
-  DestroyBlendGradients(&beta);
-  DestroyBlendGradients(&alpha);
+  DestroyBlendGradientSets(&selected,&beta,&alpha);
   return(divergent_image);
 }
 
