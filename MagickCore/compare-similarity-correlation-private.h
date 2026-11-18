@@ -409,6 +409,17 @@ static void MergeCorrelationTotals(const Image *image,
   }
 }
 
+static inline void SetCorrelationProgress(const Image *image,
+  const MagickOffsetType progress,const size_t rows,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,SimilarityImageTag,progress,rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static MagickBooleanType GetCorrelationTotals(const CorrelationTotals *totals,
   ExceptionInfo *exception)
 {
@@ -491,16 +502,11 @@ static MagickBooleanType GetCorrelationTotals(const CorrelationTotals *totals,
     }
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,SimilarityImageTag,progress,rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetCorrelationProgress(image,progress,rows,&status);
       }
   }
   reconstruct_view=DestroyCacheView(reconstruct_view);
