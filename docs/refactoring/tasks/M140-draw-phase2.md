@@ -8,6 +8,11 @@ On `main` after #124 and #125. Scores from cs-mcp through `tools/ch.py`.
 | --- | --- | --- | --- |
 | 66871c216 | D | GetReflectSpreadOffset (draw-gradient.c) | its opening block is GetPadSpreadOffset's body, now a call; one Code Duplication pair gone; draw-gradient.c stays 8.37 |
 | 9200018f0 | docs | M138, M139 reports | object-code claims corrected (see below) |
+| d96d88527 | Q | DrawDashPolygon | the dash-offset walk into SkipDashOffset; cc 24 -> 18, draw-primitive.c 3.43 -> 3.45 |
+| 608a35c63 | D | ConvertPathToPolygon | seven identical allocation-failure exits into ThrowPolygonAllocationFailure; 187 -> 159 lines, 3.45 -> 3.50 |
+| 65a038075, 3d568898a, 1ebd89b49 | N, N, Q | TraceStrokePolygon | the polygon assembly, the starting boxes and the first-segment scan into helpers; cc 43 -> 35, 362 -> 327 lines, 3.50 -> 3.55 |
+| 6c5c0be35 | CS | RenderMVGContent | the first graphic context's setup and the release tail through render_state; cc 38 -> 35, draw.c 3.81 -> 3.83 |
+| 5076e5f20 | Q | TraceMVGPrimitive | the text arm's cursor block into AdvanceMVGTextCursor; cc 43 -> 40; draw.c 3.83 -> 4.41, mostly an artifact (below) |
 
 ## Probed and dropped
 
@@ -30,6 +35,30 @@ On `main` after #124 and #125. Scores from cs-mcp through `tools/ch.py`.
   boilerplate leaves 45 of about 55 clones. The duplication is in the parsing logic
   itself (token, option or value, assignment), so it needs a long chain of merges, not
   one step.
+
+## A CodeScene artifact: duplication disappears above a size limit
+
+draw.c's jump to 4.41 at 5076e5f20 is mostly not that step.
+
+**What happened:** draw.c's whole *Code Duplication* finding (55 functions) stops being
+reported once the file passes a code-size limit.
+
+**Probes on the parent:**
+
+| Parent with | Score | Code Duplication |
+| --- | --- | --- |
+| nothing changed | 3.83 | reported |
+| only the moved block deleted | 3.87 | reported |
+| one empty function added | 3.83 | reported |
+| 60 comment lines added | 3.83 | reported |
+| twelve trivial functions added (about 60 lines of code) | 4.38 | gone |
+
+**What it means:**
+- The 12,000-line draw.c never reported duplication, and its split products did. This
+  is the same effect.
+- The clones are still in the file.
+- A step that shrinks draw.c back below the limit will bring the finding back.
+- No step here pads a file to exploit this.
 
 ## A tooling error, found and corrected
 
