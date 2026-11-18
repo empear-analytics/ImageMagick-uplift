@@ -1290,6 +1290,52 @@ static MagickBooleanType DrawDashSegment(const DashSegmentInfo *segment,
   return(MagickTrue);
 }
 
+typedef struct _DashOffsetInput
+{
+  const DrawInfo
+    *draw_info;
+
+  double
+    scale,
+    offset;
+} DashOffsetInput;
+
+static void SkipDashOffset(const DashOffsetInput *dash,double *length,
+  ssize_t *n,ssize_t *j)
+{
+  const DrawInfo
+    *const draw_info = dash->draw_info;
+
+  const double
+    scale = dash->scale;
+
+  double
+    offset = dash->offset;
+
+  (*j)=1;
+  for ((*n)=0; offset > 0.0; (*j)=0)
+  {
+    if (draw_info->dash_pattern[(*n)] <= 0.0)
+      break;
+    (*length)=scale*(draw_info->dash_pattern[(*n)]+((*n) == 0 ? -0.5 : 0.5));
+    if (offset > (*length))
+      {
+        offset-=(*length);
+        (*n)++;
+        (*length)=scale*draw_info->dash_pattern[(*n)];
+        continue;
+      }
+    if (offset < (*length))
+      {
+        (*length)-=offset;
+        offset=0.0;
+        break;
+      }
+    offset=0.0;
+    (*n)++;
+  }
+}
+
 static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
   const PrimitiveInfo *primitive_info,Image *image,ExceptionInfo *exception)
 {
@@ -1313,6 +1359,9 @@ static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
 
   ssize_t
     i;
+
+  DashOffsetInput
+    dash;
 
   DashSegmentPendingInput
     pending;
@@ -1347,28 +1396,10 @@ static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
   length=scale*draw_info->dash_pattern[0];
   offset=fabs(draw_info->dash_offset) >= MagickEpsilon ?
     scale*draw_info->dash_offset : 0.0;
-  j=1;
-  for (n=0; offset > 0.0; j=0)
-  {
-    if (draw_info->dash_pattern[n] <= 0.0)
-      break;
-    length=scale*(draw_info->dash_pattern[n]+(n == 0 ? -0.5 : 0.5));
-    if (offset > length)
-      {
-        offset-=length;
-        n++;
-        length=scale*draw_info->dash_pattern[n];
-        continue;
-      }
-    if (offset < length)
-      {
-        length-=offset;
-        offset=0.0;
-        break;
-      }
-    offset=0.0;
-    n++;
-  }
+  dash.draw_info=draw_info;
+  dash.scale=scale;
+  dash.offset=offset;
+  SkipDashOffset(&dash,&length,&n,&j);
   status=MagickTrue;
   maximum_length=0.0;
   total_length=0.0;
