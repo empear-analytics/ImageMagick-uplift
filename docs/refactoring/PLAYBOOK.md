@@ -2182,6 +2182,14 @@ accumulators.
    (Recipe O step 2); steps 1, 3, 4 and 5 hold as written. The written locals may be
    cursors the block advances and the caller reads afterwards (a partition's `l` and
    `h`), not only sums.
+   Outside-region form (2026-11-18). The function may hold OpenMP regions when the block
+   lies outside every one of them, in the function's own sequential code (before a
+   region's `#pragma omp` line or after its end), and none of the locals it writes is
+   named in a region's data-sharing clause or used inside a region: the block runs on
+   the caller's thread alone, as in a function with none. The rest of this step holds
+   as written. The file's OpenMP conditions (the owner's ruling of 2026-11-15) still
+   apply to the commit: the whole catalogue and `tools/omp_compare.sh` on cases that
+   reach the region.
 
 **Before:**
 
@@ -2240,6 +2248,10 @@ static void AccumulateFUZZPixel(...,double *channel_similarity,
   O step 5's argument); the value the caller reads after the call is the one the block
   left. A macro argument written `pixels[*l]` for `pixels[l]` expands to the same
   access.
+- Under step 6's outside-region form the argument is the same: no thread runs the block
+  but the caller's, the locals it writes are none that a region reads, writes or names in
+  a clause, so moving the block changes nothing a region sees; the region's own variables
+  keep the protection they had.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls`, and steps 1 to 3 checked by
 reading.
@@ -2251,7 +2263,12 @@ refused after the single-accumulator siblings (`GetAESimilarity`, `GetMAESimilar
 `GetMSESimilarity`, `GetPASimilarity`, `GetPDCSimilarity`) had taken Recipe E. Added by
 Claude Code (Claude Opus 5.5) during task M02, under the mandate of 2026-10-24. Step 6
 (2026-10-30, task W09): `statistic.c`'s `GetMedianPixel`, whose quickselect partition
-loop advances the two cursors `l` and `h` that the caller then reads.
+loop advances the two cursors `l` and `h` that the caller then reads. Step 6's
+outside-region form (2026-11-18, campaign B, M138): `draw.c`'s `DrawAffineImage`, whose
+minimum/maximum scan over the four extent corners (the scan of `shear.c`'s
+`CropToFitImage` above) runs before the function's parallel row loop and writes `min` and
+`max`, which only the sequential code after it reads. Added by Claude Code (Claude Opus
+5.5) under the mandate of 2026-10-24.
 
 ---
 
@@ -23838,3 +23855,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-17 | AMEND | NS | Step 1, offset form: `(c ? v : w+v)` of one floating type, the comparison's constant possibly a selection between two character constants; the function takes the variable, the constant as `int`, `v` and `w` | `draw.c`'s twelve path-coordinate selections in six tracers, one `GetPathCoordinate`, IDENTICAL; campaign B, M138 | mandate (2026-10-24) |
 | 2026-11-17 | AMEND | MA | Step 2's address form widened: no role (b) condition when the block opens with a side-effect-free call reading a role (a) constant key; the key a `const char *` parameter, the result a local; one function per lvalue type | `draw.c`'s `GetDrawInfo` (nine option reads, three helpers; cc 22 to 13); campaign B, M138 | mandate (2026-10-24) |
 | 2026-11-17 | AMEND | LB | Step 7's converted-read form: the target may outlive the block when every path from the exit reaches its destruction unread (checked by reading the callers' exit path) | `draw.c`'s `ParseMVGViewbox` (four viewbox reads; leaves Complex Method); campaign B, M138 | mandate (2026-10-24) |
+| 2026-11-18 | AMEND | K | Step 6, outside-region form: the function may hold OpenMP regions when the block lies outside every one of them and writes no local a region uses or names in a clause; the file's OpenMP conditions (whole catalogue, `omp_compare.sh`) still apply. *Careful* gives the argument | `draw.c`'s `DrawAffineImage`: its minimum/maximum scan over the four extent corners writes `min` and `max` before the parallel row loop, which reads neither; campaign B, M138 | mandate (2026-10-24) |
