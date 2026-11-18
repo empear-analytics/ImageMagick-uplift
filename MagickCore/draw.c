@@ -9534,6 +9534,28 @@ MagickExport void GetAffineMatrix(AffineMatrix *affine_matrix)
   affine_matrix->sy=1.0;
 }
 
+static void SetDrawInfoDefaults(DrawInfo *draw_info)
+{
+  draw_info->stroke_antialias=draw_info->image_info->antialias;
+  draw_info->stroke_width=1.0;
+  draw_info->fill_rule=EvenOddRule;
+  draw_info->alpha=OpaqueAlpha;
+  draw_info->fill_alpha=OpaqueAlpha;
+  draw_info->stroke_alpha=OpaqueAlpha;
+  draw_info->linecap=ButtCap;
+  draw_info->linejoin=MiterJoin;
+  draw_info->miterlimit=10;
+  draw_info->decorate=NoDecoration;
+  draw_info->pointsize=12.0;
+  draw_info->undercolor.alpha=(MagickRealType) TransparentAlpha;
+  draw_info->compose=OverCompositeOp;
+  draw_info->render=MagickTrue;
+  draw_info->clip_path=MagickFalse;
+  draw_info->debug=(GetLogEventMask() & (DrawEvent | AnnotateEvent)) != 0 ?
+    MagickTrue : MagickFalse;
+  draw_info->macro_expansion=(size_t *) NULL;
+}
+
 static void SetDrawColorOption(const ImageInfo *image_info,const char *key,
   PixelInfo *color,ExceptionInfo *exception)
 {
@@ -9617,24 +9639,7 @@ MagickExport void GetDrawInfo(const ImageInfo *image_info,DrawInfo *draw_info)
     exception);
   (void) QueryColorCompliance("#FFF0",AllCompliance,&draw_info->stroke,
     exception);
-  draw_info->stroke_antialias=draw_info->image_info->antialias;
-  draw_info->stroke_width=1.0;
-  draw_info->fill_rule=EvenOddRule;
-  draw_info->alpha=OpaqueAlpha;
-  draw_info->fill_alpha=OpaqueAlpha;
-  draw_info->stroke_alpha=OpaqueAlpha;
-  draw_info->linecap=ButtCap;
-  draw_info->linejoin=MiterJoin;
-  draw_info->miterlimit=10;
-  draw_info->decorate=NoDecoration;
-  draw_info->pointsize=12.0;
-  draw_info->undercolor.alpha=(MagickRealType) TransparentAlpha;
-  draw_info->compose=OverCompositeOp;
-  draw_info->render=MagickTrue;
-  draw_info->clip_path=MagickFalse;
-  draw_info->debug=(GetLogEventMask() & (DrawEvent | AnnotateEvent)) != 0 ?
-    MagickTrue : MagickFalse;
-  draw_info->macro_expansion=(size_t *) NULL;
+  SetDrawInfoDefaults(draw_info);
   if (draw_info->image_info->font != (char *) NULL)
     draw_info->font=AcquireString(draw_info->image_info->font);
   if (draw_info->image_info->density != (char *) NULL)
