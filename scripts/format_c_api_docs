@@ -59,6 +59,7 @@ if ( ! GetOptions(
 	 'decorate-raise.c',
    'deprecate.c',
 	 'draw.c',
+	 'draw-gradient.c',
 	 'draw-affine.c',
 	 'drawing-wand.c',
 	 'display.c',

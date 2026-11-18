@@ -91,6 +91,7 @@ $call Make distort-affine.c
 $call Make distort-resize.c
 $call Make distribute-cache.c
 $call Make draw.c
+$call Make draw-gradient.c
 $call Make draw-affine.c
 $call Make effect.c
 $call Make effect-filter.c
