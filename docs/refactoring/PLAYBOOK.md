@@ -20450,6 +20450,14 @@ which drop `case` labels of a `switch`, not a statement of a loop body.
 1. The `if (cond) continue;` is the last statement of the body of a `for`, `while` or
    `do` loop, with no `else`, and the `continue` belongs to that loop (no `switch` or
    inner loop between them).
+   Nested form (2026-11-18). The `continue;` may instead be the last statement of a braced
+   block that ends the body through nested `if` statements with no `else`, each the last
+   statement of the block around it (`if (monitor != NULL) { ... if (proceed ==
+   MagickFalse) { status=MagickFalse; continue; } }` closing a parallel loop body): no
+   statement of the body follows it on any path, so it goes where falling off the end
+   goes. Only the `continue;` is deleted (step 3), with the braces of a block left
+   holding one statement; the test and the statements before the `continue;` stay, and
+   step 2 does not apply, since no test is removed. Step 4's proof holds as written.
 2. `cond` has no side effect: no assignment, increment, decrement or call (a dereference
    and comparisons of locals, as `*token != '='`, qualify). A call refuses the step.
 3. Delete the two lines; nothing else changes.
@@ -20490,6 +20498,12 @@ which drop `case` labels of a `switch`, not a statement of a loop body.
 LoadLocaleCache cc 22 to 20, locale.c 6.46 to 6.50 in a probe, object code identical.
 Lane: c
 Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+Step 1's nested form (2026-11-18, campaign A, W43 lane a):
+`compare-similarity-correlation-private.h`'s `GetCorrelationTotals`, whose parallel row
+loop ends in the progress block's `if (proceed == MagickFalse) { status=MagickFalse;
+continue; }`; with the `continue;` gone the report is a Recipe PS block, and with a PC head
+the function leaves *Bumpy Road Ahead* and *Large Method* (stub-probed chain: 8.79, 8.81,
+8.97, 9.38). Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
 
 ---
 
@@ -24176,3 +24190,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-18 | AMEND | RX | Step 3: a plain local that a moved group writes on a path breaking to the statements after the `switch`, and that the caller reads there, goes by address in step 5's input struct on Recipe RV step 6 (b) and (d)'s terms (at most six; the helper binds `T *const v` and writes `(*v)`; Recipe O step 2, with a `const` targets struct holding the same address allowed when no path uses both names); step 4 names the `(*v)` rewriting; step 5: a chain's helper whose moved groups use only members of the earlier RX step's input struct takes that struct and passes it on unchanged (RV step 6 (c)) | `composite-image.c`'s `CompositeImage` (campaign A, W43 round 31 second batch, lane c): its Displace/Distort and Blur groups clone the canvas, swap `source_image` for it and parse `compose:args` into `geometry_info`, all read by the general composite after the `switch`, so step 3's "nothing else of the caller is written" refused them; the Displace step measures 8.81 to 8.91 (a single helper for both groups was a Large Method, 8.60) | mandate (2026-10-24) |
 | 2026-11-18 | AMEND | OH | Form A, step 1: a doc comment in the leading run that documents a function with external linkage that stays (its `%` banner, with a plain comment block directly after it) moves, unchanged, to directly above that function in the same commit instead of into the header; comments are not tokens, so pp and object identity hold, and `scripts/format_c_api_docs` (which reads the `.c` files it lists) still finds the banner | `composite-image.c` (campaign A, W42 round 31 lane c): its leading run begins with the `CompositeImage` banner and the SVG composition notes (lines 135-233), which a carve would otherwise put into `composite-image-blend-private.h` and so drop `CompositeImage` from the generated API page; probe of the four-header chain with the comments kept above `CompositeImage`: 7.55 to 8.81, headers 9.38, 9.38, 10.0, 9.38 | mandate (2026-10-24) |
 | 2026-11-18 | AMEND | OH | Form A on a private header that a Recipe S split produced: the split header is the one includer of the new header; the run may begin after its `extern "C"` opener and the new header then carries its own pair; step 4's pp and object identity is shown on every `.c` file that includes the split header (headers of `HEAD` against the working tree), since `pp_identical.sh` compiles against the working tree's headers; each moved static keeps its text and its one copy per including file | `compare-similarity-private.h` (campaign A, W42 round 31 lane a): 2,589 lines, *Lines of Code in a Single File* and *Code Duplication* over 20 functions held it at 5.13; a stub-probed chain of three leading runs gives 5.44, 6.93 and 8.37 with headers of 8.79, 7.27 and 7.99 | mandate (2026-10-24) |
+| 2026-11-18 | AMEND | TC | Step 1, nested form: the `continue;` may be the last statement of a braced block that ends the loop body through nested `if`s with no `else` (`if (proceed == MagickFalse) { status=MagickFalse; continue; }` closing a progress block); only the `continue;` (and the braces left around one statement) is deleted, the test and the statements before it stay; proof unchanged (`obj_identical.sh` IDENTICAL) | `compare-similarity-correlation-private.h`'s `GetCorrelationTotals` (campaign A, W43 lane a): the trailing `continue;` keeps the progress report out of Recipe PS (step 1); chain TC, PS, PC stub-probed 8.79 to 9.38 | mandate (2026-10-24) |
