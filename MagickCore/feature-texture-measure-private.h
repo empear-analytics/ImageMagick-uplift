@@ -299,8 +299,8 @@ typedef struct _TextureSlots
     *variance;
 } TextureSlots;
 
-static void AccumulateMomentAndCorrelation(const TextureDirection *texture,
-  PixelInfo *correlation,const ssize_t x,const ssize_t y)
+static void AccumulateAngularSecondMoment(const TextureDirection *texture,
+  const ssize_t x,const ssize_t y)
 {
   const Image
     *const image = texture->image;
@@ -309,8 +309,7 @@ static void AccumulateMomentAndCorrelation(const TextureDirection *texture,
     *const channel_features = texture->channel_features;
 
   FeatureStatistics
-    **const cooccurrence = texture->cooccurrence,
-    *const sum = texture->sum;
+    **const cooccurrence = texture->cooccurrence;
 
   const ssize_t
     i = texture->i;
@@ -335,6 +334,22 @@ static void AccumulateMomentAndCorrelation(const TextureDirection *texture,
     channel_features[AlphaPixelChannel].angular_second_moment[i]+=
       cooccurrence[x][y].direction[i].alpha*
       cooccurrence[x][y].direction[i].alpha;
+}
+
+static void AccumulateMomentAndCorrelation(const TextureDirection *texture,
+  PixelInfo *correlation,const ssize_t x,const ssize_t y)
+{
+  const Image
+    *const image = texture->image;
+
+  FeatureStatistics
+    **const cooccurrence = texture->cooccurrence,
+    *const sum = texture->sum;
+
+  const ssize_t
+    i = texture->i;
+
+  AccumulateAngularSecondMoment(texture,x,y);
   /*
     Correlation: measure of linear-dependencies in the image.
   */
