@@ -1518,6 +1518,14 @@ static ssize_t ConvolveMorphologyColumns(const MorphologyPrimitiveSetup *setup)
   return(status ? (ssize_t) (changed/GetImageChannels(image)) : 0);
 }
 
+static ssize_t RunMorphologyPrimitive(const MorphologyMethod method,
+  const KernelInfo *kernel,const MorphologyPrimitiveSetup *setup)
+{
+  if ((method == ConvolveMorphology) && (kernel->width == 1))
+    return(ConvolveMorphologyColumns(setup));
+  return(MorphologyRows(setup));
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -1587,9 +1595,7 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   setup.changes=changes;
   setup.width=width;
   setup.exception=exception;
-  if ((method == ConvolveMorphology) && (kernel->width == 1))
-    return(ConvolveMorphologyColumns(&setup));
-  return(MorphologyRows(&setup));
+  return(RunMorphologyPrimitive(method,kernel,&setup));
 }
 
 /*
