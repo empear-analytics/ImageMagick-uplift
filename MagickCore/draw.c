@@ -4934,6 +4934,16 @@ static void PrepareMVGPrimitive(const MVGRenderState *state)
   } while (0);
 }
 
+static inline MagickBooleanType IsMVGRenderStopped(
+  const MagickBooleanType proceed,const MagickStatusType status)
+{
+  if (proceed == MagickFalse)
+    return(MagickTrue);
+  if (status == 0)
+    return(MagickTrue);
+  return(MagickFalse);
+}
+
 static inline MagickBooleanType IsMVGDebugSpan(const DrawInfo *draw_info,
   const char *p,const char *q)
 {
@@ -5224,9 +5234,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     DrawMVGPrimitive(&render_state);
     proceed=SetImageProgress(image,RenderImageTag,q-primitive,(MagickSizeType)
       primitive_extent);
-    if (proceed == MagickFalse)
-      break;
-    if (status == 0)
+    if (IsMVGRenderStopped(proceed,status) != MagickFalse)
       break;
   }
   if (draw_info->debug != MagickFalse)
