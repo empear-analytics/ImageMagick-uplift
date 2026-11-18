@@ -1459,6 +1459,89 @@ static void DrawAffineRowPixels(const AffineRowInput *input,
   }
 }
 
+typedef struct _AffineImageRowInput
+{
+  const Image
+    *source;
+
+  CacheView
+    *source_view;
+
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  AffineMatrix
+    inverse_affine;
+
+  SegmentInfo
+    edge;
+
+  PixelInfo
+    zero;
+
+  ExceptionInfo
+    *exception;
+} AffineImageRowInput;
+
+static void DrawAffineImageRow(const AffineImageRowInput *row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  const Image
+    *source = row->source;
+
+  CacheView
+    *source_view = row->source_view;
+
+  Image
+    *image = row->image;
+
+  CacheView
+    *image_view = row->image_view;
+
+  const AffineMatrix
+    inverse_affine = row->inverse_affine;
+
+  const SegmentInfo
+    edge = row->edge;
+
+  const PixelInfo
+    zero = row->zero;
+
+  ExceptionInfo
+    *exception = row->exception;
+
+  const AffineRowInput
+    input = { source, source_view, image, inverse_affine, zero, y,
+      exception };
+
+  Quantum
+    *magick_restrict q;
+
+  SegmentInfo
+    inverse_edge;
+
+  if ((*status) == MagickFalse)
+    return;
+  inverse_edge=AffineEdge(source,&inverse_affine,(double) y,&edge);
+  if (inverse_edge.x2 < inverse_edge.x1)
+    return;
+  if (inverse_edge.x1 < 0.0)
+    inverse_edge.x1=0.0;
+  if (inverse_edge.x2 > ((double) image->columns-1.0))
+    inverse_edge.x2=(double) image->columns-1.0;
+  q=GetCacheViewAuthenticPixels(image_view,CastDoubleToSsizeT(
+    ceil(inverse_edge.x1-0.5)),y,(size_t) CastDoubleToSsizeT(floor(
+    inverse_edge.x2+0.5)-ceil(inverse_edge.x1-0.5)+1),1,exception);
+  if (q == (Quantum *) NULL)
+    return;
+  DrawAffineRowPixels(&input,inverse_edge,q,status);
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport MagickBooleanType DrawAffineImage(Image *image,
   const Image *source,const AffineMatrix *affine,ExceptionInfo *exception)
 {
@@ -1557,33 +1640,11 @@ MagickExport MagickBooleanType DrawAffineImage(Image *image,
 #endif
   for (y=start; y <= stop; y++)
   {
-    const AffineRowInput
-      input = { source, source_view, image, inverse_affine, zero, y,
-        exception };
+    const AffineImageRowInput
+      row = { source, source_view, image, image_view, inverse_affine, edge,
+        zero, exception };
 
-    Quantum
-      *magick_restrict q;
-
-    SegmentInfo
-      inverse_edge;
-
-    if (status == MagickFalse)
-      continue;
-    inverse_edge=AffineEdge(source,&inverse_affine,(double) y,&edge);
-    if (inverse_edge.x2 < inverse_edge.x1)
-      continue;
-    if (inverse_edge.x1 < 0.0)
-      inverse_edge.x1=0.0;
-    if (inverse_edge.x2 > ((double) image->columns-1.0))
-      inverse_edge.x2=(double) image->columns-1.0;
-    q=GetCacheViewAuthenticPixels(image_view,CastDoubleToSsizeT(
-      ceil(inverse_edge.x1-0.5)),y,(size_t) CastDoubleToSsizeT(floor(
-      inverse_edge.x2+0.5)-ceil(inverse_edge.x1-0.5)+1),1,exception);
-    if (q == (Quantum *) NULL)
-      continue;
-    DrawAffineRowPixels(&input,inverse_edge,q,&status);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    DrawAffineImageRow(&row,y,&status);
   }
   source_view=DestroyCacheView(source_view);
   image_view=DestroyCacheView(image_view);
