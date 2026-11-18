@@ -1459,6 +1459,31 @@ static void DrawAffineRowPixels(const AffineRowInput *input,
   }
 }
 
+static void GetAffineImageExtent(const Image *source,
+  const AffineMatrix *affine,PointInfo *extent)
+{
+  ssize_t
+    i;
+
+  extent[0].x=0.0;
+  extent[0].y=0.0;
+  extent[1].x=(double) source->columns;
+  extent[1].y=0.0;
+  extent[2].x=(double) source->columns;
+  extent[2].y=(double) source->rows;
+  extent[3].x=0.0;
+  extent[3].y=(double) source->rows;
+  for (i=0; i < 4; i++)
+  {
+    PointInfo
+      point;
+
+    point=extent[i];
+    extent[i].x=point.x*affine->sx+point.y*affine->ry+affine->tx;
+    extent[i].y=point.x*affine->rx+point.y*affine->sy+affine->ty;
+  }
+}
+
 typedef struct _AffineImageRowInput
 {
   const Image
@@ -1584,23 +1609,7 @@ MagickExport MagickBooleanType DrawAffineImage(Image *image,
   assert(source != (const Image *) NULL);
   assert(source->signature == MagickCoreSignature);
   assert(affine != (AffineMatrix *) NULL);
-  extent[0].x=0.0;
-  extent[0].y=0.0;
-  extent[1].x=(double) source->columns;
-  extent[1].y=0.0;
-  extent[2].x=(double) source->columns;
-  extent[2].y=(double) source->rows;
-  extent[3].x=0.0;
-  extent[3].y=(double) source->rows;
-  for (i=0; i < 4; i++)
-  {
-    PointInfo
-      point;
-
-    point=extent[i];
-    extent[i].x=point.x*affine->sx+point.y*affine->ry+affine->tx;
-    extent[i].y=point.x*affine->rx+point.y*affine->sy+affine->ty;
-  }
+  GetAffineImageExtent(source,affine,extent);
   min=extent[0];
   max=extent[0];
   for (i=1; i < 4; i++)
