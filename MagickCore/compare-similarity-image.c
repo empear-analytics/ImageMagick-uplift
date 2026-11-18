@@ -573,6 +573,17 @@ static Image *AcquireSimilarityImage(const Image *image,
   return(similarity_image);
 }
 
+static void SetSimilarityProperties(const Image *image,
+  const double *similarity_metric,const RectangleInfo *offset)
+{
+  (void) FormatImageProperty((Image *) image,"similarity","%.*g",
+    GetMagickPrecision(),*similarity_metric);
+  (void) FormatImageProperty((Image *) image,"similarity.offset.x","%.*g",
+    GetMagickPrecision(),(double) offset->x);
+  (void) FormatImageProperty((Image *) image,"similarity.offset.y","%.*g",
+    GetMagickPrecision(),(double) offset->y);
+}
+
 MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
   const MetricType metric,const double similarity_threshold,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
@@ -690,11 +701,6 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
     *similarity_metric=0.0;
   offset->x=similarity_info.x;
   offset->y=similarity_info.y;
-  (void) FormatImageProperty((Image *) image,"similarity","%.*g",
-    GetMagickPrecision(),*similarity_metric);
-  (void) FormatImageProperty((Image *) image,"similarity.offset.x","%.*g",
-    GetMagickPrecision(),(double) offset->x);
-  (void) FormatImageProperty((Image *) image,"similarity.offset.y","%.*g",
-    GetMagickPrecision(),(double) offset->y);
+  SetSimilarityProperties(image,similarity_metric,offset);
   return(similarity_image);
 }
