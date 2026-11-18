@@ -9331,13 +9331,9 @@ static MagickStatusType DrawStrokeSubpathPolygon(Image *image,
   return(status);
 }
 
-static MagickBooleanType DrawStrokePolygon(Image *image,
-  const DrawInfo *draw_info,const PrimitiveInfo *primitive_info,
-  ExceptionInfo *exception)
+static MagickStatusType DrawSubpathRoundLinecaps(Image *image,
+  const DrawInfo *draw_info,const PrimitiveInfo *p,ExceptionInfo *exception)
 {
-  DrawInfo
-    *clone_info;
-
   MagickBooleanType
     closed_path;
 
@@ -9345,8 +9341,33 @@ static MagickBooleanType DrawStrokePolygon(Image *image,
     status;
 
   const PrimitiveInfo
-    *p,
     *q;
+
+  status=MagickTrue;
+  q=p+p->coordinates-1;
+  closed_path=p->closed_subpath;
+  if ((draw_info->linecap == RoundCap) && (closed_path == MagickFalse))
+    {
+      status&=(MagickStatusType) DrawRoundLinecap(image,draw_info,p,
+        exception);
+      status&=(MagickStatusType) DrawRoundLinecap(image,draw_info,q,
+        exception);
+    }
+  return(status);
+}
+
+static MagickBooleanType DrawStrokePolygon(Image *image,
+  const DrawInfo *draw_info,const PrimitiveInfo *primitive_info,
+  ExceptionInfo *exception)
+{
+  DrawInfo
+    *clone_info;
+
+  MagickStatusType
+    status;
+
+  const PrimitiveInfo
+    *p;
 
   /*
     Draw stroked polygon.
@@ -9372,15 +9393,7 @@ static MagickBooleanType DrawStrokePolygon(Image *image,
     status&=DrawStrokeSubpathPolygon(image,draw_info,clone_info,p,exception);
     if (status == 0)
       break;
-    q=p+p->coordinates-1;
-    closed_path=p->closed_subpath;
-    if ((draw_info->linecap == RoundCap) && (closed_path == MagickFalse))
-      {
-        status&=(MagickStatusType) DrawRoundLinecap(image,draw_info,p,
-          exception);
-        status&=(MagickStatusType) DrawRoundLinecap(image,draw_info,q,
-          exception);
-      }
+    status&=DrawSubpathRoundLinecaps(image,draw_info,p,exception);
   }
   clone_info=DestroyDrawInfo(clone_info);
   if (draw_info->debug != MagickFalse)
