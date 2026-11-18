@@ -23375,6 +23375,10 @@ the include block (`morphology-primitive.c` 9.09, `morphology-builtin.c` 8.79);
 (B) a *family*: a function that the no-slowdown ruling of 2026-11-17 protects (a per-pixel
 function, `composite-image.c`'s `CompositeChannelColor`), with every `static` only it reaches
 and the typedefs they name, wherever they stand in the file.
+Form A also applies to a private header that a Recipe S split produced and that carries
+*Lines of Code in a Single File* (`compare-similarity-private.h`): the split header is then
+the one file that includes the new header (the owner's 2026-11-16 ruling that a split product
+may be carved again, and the 2026-11-18 reading of a header that one file includes).
 
 **Not covered by:** Recipe S, which moves a public root into a new `.c` file and shares helpers
 through a header that two `.c` files include; here nothing public leaves and no second `.c`
@@ -23406,18 +23410,26 @@ inside one file). Recipe E and relatives (change the text; this recipe changes n
 2. The header. Create `MagickCore/<stem>-<theme>-private.h` (not installed: list it under
    `MAGICKCORE_NOINST_HDRS` and `MAGICKCORE_BASE_SRCS` of `MagickCore/Makefile.am`, mirrored in
    `Makefile.in`): the short licence of the private headers, an include guard
-   `MAGICKCORE_<STEM>_<THEME>_PRIVATE_H`, optionally the `extern "C"` pair, and the items
+   `MAGICKCORE_<STEM>_<THEME>_PRIVATE_H`, optionally the `extern "C"` pair (required when
+   the run stood inside a split header's own pair), and the items
    verbatim in their order in the file, byte for byte. No `inline` is added: one file
    includes it and calls every moved static, so no unused-function warning arises and no
    inlining hint changes.
 3. The file. Delete the items (Form B: each with the blank line after it) and write
    `#include "MagickCore/<stem>-<theme>-private.h"` as the last line of the include block.
    Nothing else changes. `grep -rl` over the tree finds only this `.c` file as includer.
+   In a split header the run may begin directly after the header's `extern "C"` opener (the
+   `#if defined(__cplusplus)` ... `#endif` lines, empty in C), and the split header is the
+   only includer.
 4. Proof of identity. Form A: `sh tools/pp_identical.sh MagickCore/<file>.c` and `sh
    tools/obj_identical.sh MagickCore/<file>.c` both print `IDENTICAL`; when the run holds an
    OpenMP region or a hot path, the object that the OpenMP -O2 build compiles from the
    working tree has the same `.text` as from the base (`objdump -d --no-show-raw-insn`,
-   `cmp`). Form B (the order changes, so pp and object text differ):
+   `cmp`). For a split header, `pp_identical.sh` cannot see the change (it compiles the
+   file against the working tree's headers): preprocess and compile every `.c` file that
+   includes the split header against the headers of `HEAD` and of the working tree, with the
+   oracle build's flags and `__LINE__`/`__FILE__` pinned, and show both identical. Form B
+   (the order changes, so pp and object text differ):
    `tools/split_branch_check.py HEAD:<file> <file> cand` prints `IDENTICAL-MODULO-LAYOUT` in
    the oracle build and, when the file has parallel regions, in the OpenMP build under
    `build-oracle/`.
@@ -23475,6 +23487,10 @@ they name.
 - The header belongs to one file: a second includer would get a second copy of every static.
   A header that two `.c` files include is a Recipe S split header under the 2026-11-16
   rulings (`static inline`), not this recipe.
+- A split header's new header reaches the same `.c` files as before, through the split
+  header: each moved static keeps one copy per including `.c` file, as it had, and the items
+  stay used by both (the standing rule for split headers). The items keep their text,
+  `static inline` or plain `static`; nothing is widened.
 - The step moves debt, it does not remove it: the header is scored like a split product and
   worked toward 10.0 (owner, 2026-11-17 and 2026-11-18).
 - A layout change is not a code change but can be a speed change (`pixel.c`, `d38d2ac17`):
@@ -23482,6 +23498,7 @@ they name.
 
 **Evidence level:** Form A: guard, with the preprocessed and object identity of step 4.
 Form B: oracle (cases that reach the items), with step 4's object proof and step 5's timing.
+Form A on a split header: guard, with step 4's identity shown on every including `.c` file.
 
 **Provenance:** 2026-11-18, campaign A, round 30. Form A: `morphology-primitive.c` (9.09) and
 `morphology-builtin.c` (8.79), lane b (probes 9.09 to 9.68 and 8.79 to 10.0 with two headers
@@ -24137,3 +24154,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-18 | NEW | RX | Split a Selection at its Default, Returning Whether a Moved Group Returned: the `default` group and groups beside it of a `switch` in a `MagickBooleanType` function, groups that `return(R);` with different `R` on some paths and `break;` to code that follows the `switch` on others, move into a `static MagickBooleanType` helper holding `switch (e)` and `return(MagickFalse);`, each `return(R);` becoming `(*result)=R; return(MagickTrue);`; the caller's `default:` fills an input struct in FB form and writes `if (Helper(...,&returned) != MagickFalse) return(returned); break;`; locals written only on returning paths go by value (RV step 6 (b)) | `composite-image.c`'s `CompositeImage` (campaign A, round 30 lane c): after two Recipe SD steps its Copy and Intensity groups return `CompositeCopyImage(...)` or break to the general composite; SD, SR, ST, RC and RV each refuse that shape | mandate (2026-10-24) |
 | 2026-11-18 | AMEND | RX | Step 3: a plain local that every moved group writing it assigns before any read, and that nothing after the `switch` reads before assigning it (RV step 2, E step 4), is declared by the helper as its own local (`status`, uninitialised where the `switch` stands, so a by-value copy would read an indeterminate value; `returned` of an earlier RX step's call held by the `default:` group, a chain); the caller keeps its own declaration where it still uses the name | `composite-image.c`'s `CompositeImage` (campaign A, W42 round 31 lane c): its Saliency and Seamless groups assign `status` from the blend call and `return(status);`, and its `default:` group holds round 30's `CompositeCopyGroups` call and `return(returned);`; moving them with the default gives 7.48 to 7.55 | mandate (2026-10-24) |
 | 2026-11-18 | AMEND | OH | Form A, step 1: a doc comment in the leading run that documents a function with external linkage that stays (its `%` banner, with a plain comment block directly after it) moves, unchanged, to directly above that function in the same commit instead of into the header; comments are not tokens, so pp and object identity hold, and `scripts/format_c_api_docs` (which reads the `.c` files it lists) still finds the banner | `composite-image.c` (campaign A, W42 round 31 lane c): its leading run begins with the `CompositeImage` banner and the SVG composition notes (lines 135-233), which a carve would otherwise put into `composite-image-blend-private.h` and so drop `CompositeImage` from the generated API page; probe of the four-header chain with the comments kept above `CompositeImage`: 7.55 to 8.81, headers 9.38, 9.38, 10.0, 9.38 | mandate (2026-10-24) |
+| 2026-11-18 | AMEND | OH | Form A on a private header that a Recipe S split produced: the split header is the one includer of the new header; the run may begin after its `extern "C"` opener and the new header then carries its own pair; step 4's pp and object identity is shown on every `.c` file that includes the split header (headers of `HEAD` against the working tree), since `pp_identical.sh` compiles against the working tree's headers; each moved static keeps its text and its one copy per including file | `compare-similarity-private.h` (campaign A, W42 round 31 lane a): 2,589 lines, *Lines of Code in a Single File* and *Code Duplication* over 20 functions held it at 5.13; a stub-probed chain of three leading runs gives 5.44, 6.93 and 8.37 with headers of 8.79, 7.27 and 7.99 | mandate (2026-10-24) |
