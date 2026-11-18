@@ -4623,6 +4623,76 @@ static MagickBooleanType CompositeImageRows(const CompositeRowInputs *rows)
   return(status);
 }
 
+typedef struct _ComposeArgumentTargets
+{
+  GeometryInfo
+    *geometry_info;
+
+  MagickRealType
+    *percent_luma,
+    *percent_chroma,
+    *amount,
+    *threshold;
+} ComposeArgumentTargets;
+
+static void GetComposeArguments(Image *image,const CompositeOperator compose,
+  ExceptionInfo *exception,const ComposeArgumentTargets *targets)
+{
+  GeometryInfo
+    *const geometry_info = targets->geometry_info;
+
+  MagickRealType
+    *const percent_luma = targets->percent_luma,
+    *const percent_chroma = targets->percent_chroma,
+    *const amount = targets->amount,
+    *const threshold = targets->threshold;
+
+  switch (compose)
+  {
+    case CopyAlphaCompositeOp:
+    case ChangeMaskCompositeOp:
+    {
+      /*
+        Modify canvas outside the overlaid region and require an alpha
+        channel to exist, to add transparency.
+      */
+      SetCanvasAlphaChannel(image,exception);
+      break;
+    }
+    case MathematicsCompositeOp:
+    {
+      /*
+        Just collect the values from "compose:args", setting.
+        Unused values are set to zero automagically.
+
+        Arguments are normally a comma separated list, so this probably should
+        be changed to some 'general comma list' parser, (with a minimum
+        number of values)
+      */
+      GetMathematicsArguments(image,geometry_info,exception);
+      break;
+    }
+    case ModulateCompositeOp:
+    {
+      /*
+        Determine the luma and chroma scale.
+      */
+      GetModulateArguments(image,geometry_info,percent_luma,percent_chroma);
+      break;
+    }
+    case ThresholdCompositeOp:
+    {
+      /*
+        Determine the amount and threshold.
+      */
+      GetThresholdArguments(image,geometry_info,amount,threshold);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -4671,6 +4741,10 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
 
   MagickStatusType
     flags;
+
+  const ComposeArgumentTargets
+    argument_targets = { &geometry_info, &percent_luma, &percent_chroma,
+      &amount, &threshold };
 
   const ComposeArtifactTargets
     targets = { &white_luminance, &illuminant, &colorspace, &clamp,
@@ -4728,16 +4802,6 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
         break;
       setup.intensity=MagickTrue;
       return(CompositeCopyImage(image,source_image,&setup,exception));
-    }
-    case CopyAlphaCompositeOp:
-    case ChangeMaskCompositeOp:
-    {
-      /*
-        Modify canvas outside the overlaid region and require an alpha
-        channel to exist, to add transparency.
-      */
-      SetCanvasAlphaChannel(image,exception);
-      break;
     }
     case BlurCompositeOp:
     {
@@ -4837,37 +4901,11 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       source_image=DestroyImage(source_image);
       return(status);
     }
-    case MathematicsCompositeOp:
-    {
-      /*
-        Just collect the values from "compose:args", setting.
-        Unused values are set to zero automagically.
-
-        Arguments are normally a comma separated list, so this probably should
-        be changed to some 'general comma list' parser, (with a minimum
-        number of values)
-      */
-      GetMathematicsArguments(image,&geometry_info,exception);
-      break;
-    }
-    case ModulateCompositeOp:
-    {
-      /*
-        Determine the luma and chroma scale.
-      */
-      GetModulateArguments(image,&geometry_info,&percent_luma,&percent_chroma);
-      break;
-    }
-    case ThresholdCompositeOp:
-    {
-      /*
-        Determine the amount and threshold.
-      */
-      GetThresholdArguments(image,&geometry_info,&amount,&threshold);
-      break;
-    }
     default:
+    {
+      GetComposeArguments(image,compose,exception,&argument_targets);
       break;
+    }
   }
   /*
     Composite image.
