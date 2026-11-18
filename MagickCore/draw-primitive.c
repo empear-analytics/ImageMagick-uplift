@@ -3821,6 +3821,72 @@ static MagickBooleanType TraceZeroLengthSubpath(
   return(MagickFalse);
 }
 
+typedef struct _StrokePolygonInput
+{
+  PrimitiveInfo
+    *polygon_primitive;
+
+  PointInfo
+    *stroke_p,
+    *stroke_q;
+
+  ssize_t
+    p,
+    q;
+
+  MagickBooleanType
+    closed_path;
+} StrokePolygonInput;
+
+static void AssembleStrokePolygon(const StrokePolygonInput *assembly,
+  PrimitiveInfo *stroke_polygon)
+{
+  PrimitiveInfo
+    *const polygon_primitive = assembly->polygon_primitive;
+
+  PointInfo
+    *const stroke_p = assembly->stroke_p,
+    *const stroke_q = assembly->stroke_q;
+
+  const ssize_t
+    p = assembly->p,
+    q = assembly->q;
+
+  const MagickBooleanType
+    closed_path = assembly->closed_path;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) p; i++)
+  {
+    stroke_polygon[i]=polygon_primitive[0];
+    stroke_polygon[i].point=stroke_p[i];
+  }
+  if (closed_path != MagickFalse)
+    {
+      stroke_polygon[i]=polygon_primitive[0];
+      stroke_polygon[i].point=stroke_polygon[0].point;
+      i++;
+    }
+  for ( ; i < (ssize_t) (p+q+closed_path); i++)
+  {
+    stroke_polygon[i]=polygon_primitive[0];
+    stroke_polygon[i].point=stroke_q[p+q+closed_path-(i+1)];
+  }
+  if (closed_path != MagickFalse)
+    {
+      stroke_polygon[i]=polygon_primitive[0];
+      stroke_polygon[i].point=stroke_polygon[p+closed_path].point;
+      i++;
+    }
+  stroke_polygon[i]=polygon_primitive[0];
+  stroke_polygon[i].point=stroke_polygon[0].point;
+  i++;
+  stroke_polygon[i].primitive=UndefinedPrimitive;
+  stroke_polygon[0].coordinates=(size_t) (p+q+2*closed_path+1);
+}
+
 static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
   const PrimitiveInfo *primitive_info,ExceptionInfo *exception)
 {
@@ -3922,6 +3988,9 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
 
   StrokeArc
     arc;
+
+  StrokePolygonInput
+    assembly;
 
   /*
     Allocate paths.
@@ -4179,33 +4248,13 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
         polygon_primitive);
       return(stroke_polygon);
     }
-  for (i=0; i < (ssize_t) p; i++)
-  {
-    stroke_polygon[i]=polygon_primitive[0];
-    stroke_polygon[i].point=stroke_p[i];
-  }
-  if (closed_path != MagickFalse)
-    {
-      stroke_polygon[i]=polygon_primitive[0];
-      stroke_polygon[i].point=stroke_polygon[0].point;
-      i++;
-    }
-  for ( ; i < (ssize_t) (p+q+closed_path); i++)
-  {
-    stroke_polygon[i]=polygon_primitive[0];
-    stroke_polygon[i].point=stroke_q[p+q+closed_path-(i+1)];
-  }
-  if (closed_path != MagickFalse)
-    {
-      stroke_polygon[i]=polygon_primitive[0];
-      stroke_polygon[i].point=stroke_polygon[p+closed_path].point;
-      i++;
-    }
-  stroke_polygon[i]=polygon_primitive[0];
-  stroke_polygon[i].point=stroke_polygon[0].point;
-  i++;
-  stroke_polygon[i].primitive=UndefinedPrimitive;
-  stroke_polygon[0].coordinates=(size_t) (p+q+2*closed_path+1);
+  assembly.polygon_primitive=polygon_primitive;
+  assembly.stroke_p=stroke_p;
+  assembly.stroke_q=stroke_q;
+  assembly.p=p;
+  assembly.q=q;
+  assembly.closed_path=closed_path;
+  AssembleStrokePolygon(&assembly,stroke_polygon);
   stroke_p=(PointInfo *) RelinquishMagickMemory(stroke_p);
   stroke_q=(PointInfo *) RelinquishMagickMemory(stroke_q);
   polygon_primitive=(PrimitiveInfo *) RelinquishMagickMemory(polygon_primitive);
