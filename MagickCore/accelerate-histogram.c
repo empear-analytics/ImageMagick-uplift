@@ -418,6 +418,19 @@ static MagickBooleanType CreateHostBuffer(const HostBufferSource *source,
   return(MagickTrue);
 }
 
+static void ReleaseEqualizeKernels(MagickCLDevice device,cl_command_queue queue,
+  cl_kernel histogramKernel,cl_kernel equalizeKernel)
+{
+  if (histogramKernel!=NULL)
+    ReleaseOpenCLKernel(histogramKernel);
+  if (equalizeKernel!=NULL)
+    ReleaseOpenCLKernel(equalizeKernel);
+  if (queue != NULL)
+    ReleaseOpenCLCommandQueue(device, queue);
+  if (device != NULL)
+    ReleaseOpenCLDevice(device);
+}
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -717,14 +730,7 @@ cleanup:
     clEnv->library->clReleaseMemObject(histogramBuffer);
   if (histogram!=NULL)
     histogram=(cl_uint4 *) RelinquishMagickMemory(histogram);
-  if (histogramKernel!=NULL)
-    ReleaseOpenCLKernel(histogramKernel);
-  if (equalizeKernel!=NULL)
-    ReleaseOpenCLKernel(equalizeKernel);
-  if (queue != NULL)
-    ReleaseOpenCLCommandQueue(device, queue);
-  if (device != NULL)
-    ReleaseOpenCLDevice(device);
+  ReleaseEqualizeKernels(device,queue,histogramKernel,equalizeKernel);
 
   return(outputReady);
 }
