@@ -489,6 +489,14 @@ static void WidenEdgeBounds(const PointInfo point,SegmentInfo *bounds)
     (*bounds).x2=point.x;
 }
 
+static PolygonInfo *ThrowPolygonAllocationFailure(PolygonInfo *polygon_info,
+  ExceptionInfo *exception)
+{
+  (void) ThrowMagickException(exception,GetMagickModule(),
+    ResourceLimitError,"MemoryAllocationFailed","`%s'","");
+  return(DestroyPolygonInfo(polygon_info));
+}
+
 static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
   ExceptionInfo *exception)
 {
@@ -538,11 +546,7 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
   polygon_info->edges=(EdgeInfo *) AcquireQuantumMemory(number_edges,
     sizeof(*polygon_info->edges));
   if (polygon_info->edges == (EdgeInfo *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-      return(DestroyPolygonInfo(polygon_info));
-    }
+    return(ThrowPolygonAllocationFailure(polygon_info,exception));
   (void) memset(polygon_info->edges,0,number_edges*
     sizeof(*polygon_info->edges));
   direction=0;
@@ -585,11 +589,7 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
               sizeof(*points));
           }
         if (points == (PointInfo *) NULL)
-          {
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-            return(DestroyPolygonInfo(polygon_info));
-          }
+          return(ThrowPolygonAllocationFailure(polygon_info,exception));
         ghostline=path_info[i].code == GhostlineCode ? MagickTrue : MagickFalse;
         point=path_info[i].point;
         points[0]=point;
@@ -635,11 +635,7 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
         points=(PointInfo *) AcquireQuantumMemory((size_t) number_points,
           sizeof(*points));
         if (points == (PointInfo *) NULL)
-          {
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-            return(DestroyPolygonInfo(polygon_info));
-          }
+          return(ThrowPolygonAllocationFailure(polygon_info,exception));
         n=1;
         ghostline=MagickFalse;
         points[0]=point;
@@ -656,11 +652,7 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
         points=(PointInfo *) ResizeQuantumMemory(points,(size_t) number_points,
           sizeof(*points));
         if (points == (PointInfo *) NULL)
-          {
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-            return(DestroyPolygonInfo(polygon_info));
-          }
+          return(ThrowPolygonAllocationFailure(polygon_info,exception));
       }
     point=path_info[i].point;
     points[n]=point;
@@ -671,26 +663,14 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
   input.direction=direction;
   input.bounds=bounds;
   if (FlushFinalEdge(polygon_info,&input,&targets) == MagickFalse)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-      return(DestroyPolygonInfo(polygon_info));
-    }
+    return(ThrowPolygonAllocationFailure(polygon_info,exception));
   polygon_info->number_edges=edge;
   polygon_info->edges=(EdgeInfo *) ResizeQuantumMemory(polygon_info->edges,
     polygon_info->number_edges,sizeof(*polygon_info->edges));
   if (polygon_info->edges == (EdgeInfo *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-      return(DestroyPolygonInfo(polygon_info));
-    }
+    return(ThrowPolygonAllocationFailure(polygon_info,exception));
   if (ShrinkPolygonEdgePoints(polygon_info) == MagickFalse)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-      return(DestroyPolygonInfo(polygon_info));
-    }
+    return(ThrowPolygonAllocationFailure(polygon_info,exception));
   qsort(polygon_info->edges,(size_t) polygon_info->number_edges,
     sizeof(*polygon_info->edges),DrawCompareEdges);
   if ((GetLogEventMask() & DrawEvent) != 0)
