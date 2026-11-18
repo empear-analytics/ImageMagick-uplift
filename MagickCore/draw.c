@@ -9213,6 +9213,49 @@ static MagickStatusType DrawStrokedPrimitive(const DrawPrimitiveContext *context
     primitive_info,exception);
   return(status);
 }
+
+static MagickStatusType DrawPrimitiveByType(
+  const DrawPrimitiveContext *context,MagickStatusType status)
+{
+  const PrimitiveInfo
+    *primitive_info = context->primitive_info;
+
+  switch (primitive_info->primitive)
+  {
+    case AlphaPrimitive:
+    {
+      status=DrawAlphaPrimitive(context,status);
+      break;
+    }
+    case ColorPrimitive:
+    {
+      status=DrawColorPrimitive(context,status);
+      break;
+    }
+    case ImagePrimitive:
+    {
+      status=DrawImagePrimitive(context,status);
+      break;
+    }
+    case PointPrimitive:
+    {
+      status=DrawPointPrimitive(context,status);
+      break;
+    }
+    case TextPrimitive:
+    {
+      status=DrawTextPrimitive(context,status);
+      break;
+    }
+    default:
+    {
+      status=DrawStrokedPrimitive(context,status);
+      break;
+    }
+  }
+  return(status);
+}
+
 MagickExport MagickBooleanType DrawPrimitive(Image *image,
   const DrawInfo *draw_info,const PrimitiveInfo *primitive_info,
   ExceptionInfo *exception)
@@ -9262,39 +9305,7 @@ MagickExport MagickBooleanType DrawPrimitive(Image *image,
   context.x=x;
   context.y=y;
   context.exception=exception;
-  switch (primitive_info->primitive)
-  {
-    case AlphaPrimitive:
-    {
-      status=DrawAlphaPrimitive(&context,status);
-      break;
-    }
-    case ColorPrimitive:
-    {
-      status=DrawColorPrimitive(&context,status);
-      break;
-    }
-    case ImagePrimitive:
-    {
-      status=DrawImagePrimitive(&context,status);
-      break;
-    }
-    case PointPrimitive:
-    {
-      status=DrawPointPrimitive(&context,status);
-      break;
-    }
-    case TextPrimitive:
-    {
-      status=DrawTextPrimitive(&context,status);
-      break;
-    }
-    default:
-    {
-      status=DrawStrokedPrimitive(&context,status);
-      break;
-    }
-  }
+  status=DrawPrimitiveByType(&context,status);
   image_view=DestroyCacheView(image_view);
   if (draw_info->compliance == SVGCompliance)
     {
