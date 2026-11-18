@@ -436,7 +436,7 @@ am__MagickCore_libMagickCore_@MAGICK_MAJOR_VERSION@_@MAGICK_ABI_SUFFIX@_la_SOURC
 	MagickCore/color-private.h MagickCore/colormap.c \
 	MagickCore/colormap.h MagickCore/colormap-private.h \
 	MagickCore/colorspace.c MagickCore/colorspace-transform.c MagickCore/colorspace-transform-image.c MagickCore/colorspace-convert.c MagickCore/colorspace-generic-rgb.c MagickCore/colorspace.h \
-	MagickCore/colorspace-private.h MagickCore/compare.c MagickCore/compare-similarity.c MagickCore/compare-similarity-image.c \n	MagickCore/compare.h MagickCore/compare-private.h MagickCore/compare-similarity-private.h \n	MagickCore/composite.c MagickCore/composite-image.c MagickCore/composite.h \n	MagickCore/composite-channel-private.h MagickCore/composite-private.h MagickCore/composite-row-private.h MagickCore/compress.c MagickCore/compress-lzw.c \n	MagickCore/compress.h MagickCore/configure.c MagickCore/configure-paths.c \
+	MagickCore/colorspace-private.h MagickCore/compare.c MagickCore/compare-similarity.c MagickCore/compare-similarity-image.c \n	MagickCore/compare.h MagickCore/compare-private.h MagickCore/compare-similarity-private.h \n	MagickCore/composite.c MagickCore/composite-image.c MagickCore/composite.h \n	MagickCore/composite-channel-private.h MagickCore/composite-image-blend-private.h MagickCore/composite-private.h MagickCore/composite-row-private.h MagickCore/compress.c MagickCore/compress-lzw.c \n	MagickCore/compress.h MagickCore/configure.c MagickCore/configure-paths.c \
 	MagickCore/configure.h MagickCore/constitute.c MagickCore/constitute-codec.c MagickCore/constitute-write.c MagickCore/constitute-pixels.c \
 	MagickCore/constitute.h MagickCore/decorate.c MagickCore/decorate-raise.c \
 	MagickCore/decorate.h MagickCore/delegate.c MagickCore/delegate-invoke.c \
@@ -5756,6 +5756,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/composite-image.c \
   MagickCore/composite.h \
   MagickCore/composite-channel-private.h \
+  MagickCore/composite-image-blend-private.h \
   MagickCore/composite-private.h \
   MagickCore/composite-row-private.h \
   MagickCore/compress.c \
@@ -6235,6 +6236,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/compare-private.h \
   MagickCore/compare-similarity-private.h \
   MagickCore/composite-channel-private.h \
+  MagickCore/composite-image-blend-private.h \
   MagickCore/composite-private.h \
   MagickCore/composite-row-private.h \
   MagickCore/configure-private.h \
