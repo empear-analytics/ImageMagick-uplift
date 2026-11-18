@@ -621,6 +621,15 @@ static void DestroyBlendGradients(BlendGradientSet *gradients)
     gradients->dx_image=DestroyImage(gradients->dx_image);
 }
 
+static void ReleaseUnselectedGradients(BlendGradientSet *alpha,
+  BlendGradientSet *beta)
+{
+  beta->dx_image=DestroyImage(beta->dx_image);
+  alpha->dx_image=DestroyImage(alpha->dx_image);
+  beta->magnitude_image=DestroyImage(beta->magnitude_image);
+  alpha->magnitude_image=DestroyImage(alpha->magnitude_image);
+}
+
 static MagickBooleanType SelectBlendGradients(BlendGradientSet *alpha,
   BlendGradientSet *beta,BlendGradientSet *selected,ExceptionInfo *exception)
 {
@@ -639,10 +648,7 @@ static MagickBooleanType SelectBlendGradients(BlendGradientSet *alpha,
     beta->dy_image,exception);
   if (selected->dy_image == (Image *) NULL)
     return(MagickFalse);
-  beta->dx_image=DestroyImage(beta->dx_image);
-  alpha->dx_image=DestroyImage(alpha->dx_image);
-  beta->magnitude_image=DestroyImage(beta->magnitude_image);
-  alpha->magnitude_image=DestroyImage(alpha->magnitude_image);
+  ReleaseUnselectedGradients(alpha,beta);
   return(MagickTrue);
 }
 
