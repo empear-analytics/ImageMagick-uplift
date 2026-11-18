@@ -619,6 +619,91 @@ static void MatchMVGMacroPop(const char *token,const char *p,
     }
 }
 
+typedef struct _MVGMacroState
+{
+  char
+    **macro,
+    **token;
+
+  const char
+    **q;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
+    *extent;
+
+  SplayTreeInfo
+    **macros;
+} MVGMacroState;
+
+static void ScanMVGMacro(const MVGMacroState *state)
+{
+  char
+    *macro = (*state->macro),
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  size_t
+    extent = (*state->extent);
+
+  SplayTreeInfo
+    *macros = (*state->macros);
+
+  char
+    name[MagickPathExtent];
+
+  const char
+    *end,
+    *p,
+    *start;
+
+  ssize_t
+    n;
+
+  start=q;
+  end=q;
+  (void) CopyMagickString(name,token,MagickPathExtent);
+  n=1;
+  for (p=q; *p != '\0'; )
+  {
+    MVGMacroExtract
+      extract;
+
+    if (GetMVGMacroToken(&p,extent,token) == MagickFalse)
+      break;
+    MatchMVGMacroPop(token,p,&end,&n);
+    if ((LocaleCompare(token,"push") == 0) &&
+        (n++ >= MagickMaxRecursionDepth))
+      {
+        (void) ThrowMagickException(exception,GetMagickModule(),
+          DrawError,"VectorGraphicsNestedTooDeeply","`%s'",token);
+        break;
+      }
+    if ((n != 0) || (end < start))
+      continue;
+    /*
+      Extract macro.
+    */
+    extract.start=start;
+    extract.end=end;
+    extract.p=p;
+    extract.extent=extent;
+    extract.token=token;
+    extract.macro=macro;
+    extract.macros=macros;
+    extract.name=name;
+    AddMVGMacro(&extract);
+    break;
+  }
+}
+
 static SplayTreeInfo *GetMVGMacros(const char *primitive,
   ExceptionInfo *exception)
 {
@@ -635,6 +720,9 @@ static SplayTreeInfo *GetMVGMacros(const char *primitive,
   SplayTreeInfo
     *macros;
 
+  const MVGMacroState
+    macro_state = { &macro, &token, &q, exception, &extent, &macros };
+
   /*
     Scan graphic primitives for definitions and classes.
   */
@@ -647,17 +735,6 @@ static SplayTreeInfo *GetMVGMacros(const char *primitive,
   extent=strlen(token)+MagickPathExtent;
   for (q=primitive; *q != '\0'; )
   {
-    char
-      name[MagickPathExtent];
-
-    const char
-      *end,
-      *p,
-      *start;
-
-    ssize_t
-      n;
-
     if (GetMVGMacroToken(&q,extent,token) == MagickFalse)
       break;
     if (LocaleCompare("push",token) != 0)
@@ -669,41 +746,7 @@ static SplayTreeInfo *GetMVGMacros(const char *primitive,
       Named macro (e.g. push graphic-context "wheel").
     */
     (void) GetNextToken(q,&q,extent,token);
-    start=q;
-    end=q;
-    (void) CopyMagickString(name,token,MagickPathExtent);
-    n=1;
-    for (p=q; *p != '\0'; )
-    {
-      MVGMacroExtract
-        extract;
-
-      if (GetMVGMacroToken(&p,extent,token) == MagickFalse)
-        break;
-      MatchMVGMacroPop(token,p,&end,&n);
-      if ((LocaleCompare(token,"push") == 0) &&
-          (n++ >= MagickMaxRecursionDepth))
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            DrawError,"VectorGraphicsNestedTooDeeply","`%s'",token);
-          break;
-        }
-      if ((n != 0) || (end < start))
-        continue;
-      /*
-        Extract macro.
-      */
-      extract.start=start;
-      extract.end=end;
-      extract.p=p;
-      extract.extent=extent;
-      extract.token=token;
-      extract.macro=macro;
-      extract.macros=macros;
-      extract.name=name;
-      AddMVGMacro(&extract);
-      break;
-    }
+    ScanMVGMacro(&macro_state);
   }
   token=DestroyString(token);
   macro=DestroyString(macro);
