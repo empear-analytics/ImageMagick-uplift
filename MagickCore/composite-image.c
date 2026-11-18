@@ -1188,12 +1188,85 @@ static MagickBooleanType CompositeDisplaceGroups(
   return(MagickFalse);
 }
 
+static MagickBooleanType CompositeBlurGroups(
+  const CanvasCompositeInputs *canvas_inputs,const CompositeOperator compose,
+  const ComposeArgumentTargets *argument_targets,MagickBooleanType *result)
+{
+  Image
+    *const image = canvas_inputs->image;
+
+  const ssize_t
+    x_offset = canvas_inputs->x_offset,
+    y_offset = canvas_inputs->y_offset;
+
+  ExceptionInfo
+    *const exception = canvas_inputs->exception;
+
+  Image
+    **const canvas_image = canvas_inputs->canvas_image,
+    **const source_image = canvas_inputs->source_image;
+
+  GeometryInfo
+    *const geometry_info = canvas_inputs->geometry_info;
+
+  MagickBooleanType
+    returned;
+
+  MagickStatusType
+    flags;
+
+  switch (compose)
+  {
+    case BlurCompositeOp:
+    {
+      BlurCanvasTargets
+        blur_targets;
+
+      /*
+        Blur Image by resampling dictated by an overlay gradient map:
+          X = red_channel; Y = green_channel; compose:args =
+          x_scale[,y_scale[,angle]].
+      */
+      blur_targets.canvas_image=(canvas_image);
+      blur_targets.flags=(&flags);
+      blur_targets.geometry_info=(geometry_info);
+      if (AcquireBlurCanvas(image,(*source_image),exception,&blur_targets) ==
+          MagickFalse)
+        {
+          (*result)=MagickFalse;
+          return(MagickTrue);
+        }
+      {
+        const BlurGeometryInputs
+          geometry = { (*geometry_info), flags, (*canvas_image), image,
+            (*source_image), x_offset, y_offset, exception };
+
+        BlurCompositeGeometry(&geometry);
+      }
+      (*source_image)=DestroyImage((*source_image));
+      (*source_image)=(*canvas_image);
+      break;
+    }
+    default:
+    {
+      if (CompositeDisplaceGroups(canvas_inputs,compose,argument_targets,
+          &returned) != MagickFalse)
+        {
+          (*result)=returned;
+          return(MagickTrue);
+        }
+      break;
+    }
+  }
+  return(MagickFalse);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
 %                                                                             %
 %                                                                             %
-%   C o m p o s i t e I m a g e                                               %
+%   C o m p o s i t e I m a g e                                             %
 %                                                                             %
 %                                                                             %
 %                                                                             %
@@ -1331,9 +1404,6 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     source_dissolve,
     threshold;
 
-  MagickStatusType
-    flags;
-
   const ComposeArgumentTargets
     argument_targets = { &geometry_info, &percent_luma, &percent_chroma,
       &amount, &threshold, &source_dissolve, &canvas_dissolve };
@@ -1376,46 +1446,14 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
   setup.y_offset=y_offset;
   setup.clamp=clamp;
   setup.intensity=MagickFalse;
-  switch (compose)
   {
-    case BlurCompositeOp:
-    {
-      BlurCanvasTargets
-        blur_targets;
+    const CanvasCompositeInputs
+      canvas_inputs = { image, composite, x_offset, y_offset, setup,
+        exception, &canvas_image, &source_image, &geometry_info };
 
-      /*
-        Blur Image by resampling dictated by an overlay gradient map:
-          X = red_channel; Y = green_channel; compose:args =
-          x_scale[,y_scale[,angle]].
-      */
-      blur_targets.canvas_image=(&canvas_image);
-      blur_targets.flags=(&flags);
-      blur_targets.geometry_info=(&geometry_info);
-      if (AcquireBlurCanvas(image,source_image,exception,&blur_targets) ==
-          MagickFalse)
-        return(MagickFalse);
-      {
-        const BlurGeometryInputs
-          geometry = { geometry_info, flags, canvas_image, image, source_image,
-            x_offset, y_offset, exception };
-
-        BlurCompositeGeometry(&geometry);
-      }
-      source_image=DestroyImage(source_image);
-      source_image=canvas_image;
-      break;
-    }
-    default:
-    {
-      const CanvasCompositeInputs
-        canvas_inputs = { image, composite, x_offset, y_offset, setup,
-          exception, &canvas_image, &source_image, &geometry_info };
-
-      if (CompositeDisplaceGroups(&canvas_inputs,compose,&argument_targets,
-          &returned) != MagickFalse)
-        return(returned);
-      break;
-    }
+    if (CompositeBlurGroups(&canvas_inputs,compose,&argument_targets,
+        &returned) != MagickFalse)
+      return(returned);
   }
   /*
     Composite image.
