@@ -1289,6 +1289,24 @@ static CompositeSetup GetCompositeSetup(const ssize_t x_offset,
   return(setup);
 }
 
+static Image *AcquireCompositeSource(Image *image,const Image *composite,
+  ExceptionInfo *exception)
+{
+  Image
+    *source_image;
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(composite != (Image *) NULL);
+  assert(composite->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+    return((Image *) NULL);
+  source_image=CloneImage(composite,0,0,MagickTrue,exception);
+  return(source_image);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1421,15 +1439,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
   rows.colorspace=HCLColorspace;
   rows.white_luminance=10000.0;
   rows.illuminant=D65Illuminant;
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(composite != (Image *) NULL);
-  assert(composite->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-    return(MagickFalse);
-  source_image=CloneImage(composite,0,0,MagickTrue,exception);
+  source_image=AcquireCompositeSource(image,composite,exception);
   if (source_image == (const Image *) NULL)
     return(MagickFalse);
   (void) SetImageColorspace(source_image,image->colorspace,exception);
