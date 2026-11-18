@@ -4768,6 +4768,69 @@ static void PrepareMVGPrimitive(const MVGRenderState *state)
   } while (0);
 }
 
+static void InitializeMVGGraphicContext(const MVGRenderState *state)
+{
+  const DrawInfo
+    *draw_info = state->draw_info;
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  Image
+    *image = state->image;
+
+  ssize_t
+    n = (*state->n);
+
+  graphic_context[n]=CloneDrawInfo((ImageInfo *) NULL,draw_info);
+  graphic_context[n]->primitive=DestroyString(graphic_context[n]->primitive);
+  graphic_context[n]->viewbox=image->page;
+  if ((image->page.width == 0) || (image->page.height == 0))
+    {
+      graphic_context[n]->viewbox.width=image->columns;
+      graphic_context[n]->viewbox.height=image->rows;
+    }
+}
+
+static void ReleaseMVGRenderResources(const MVGRenderState *state)
+{
+  char
+    *primitive = (*state->primitive),
+    *token = (*state->token);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  PrimitiveInfo
+    *primitive_info = (*state->primitive_info);
+
+  SplayTreeInfo
+    *macros = (*state->macros);
+
+  ssize_t
+    n = (*state->n);
+
+  StopInfo
+    *stops = (*state->stops);
+
+  macros=DestroySplayTree(macros);
+  token=DestroyString(token);
+  if (primitive_info != (PrimitiveInfo *) NULL)
+    {
+      DestroyMVGPrimitiveText(primitive_info);
+      primitive_info=(PrimitiveInfo *) RelinquishMagickMemory(primitive_info);
+    }
+  primitive=DestroyString(primitive);
+  stops=(StopInfo *) RelinquishMagickMemory(stops);
+  graphic_context=DestroyMVGGraphicContexts(graphic_context,n);
+  (*state->primitive)=primitive;
+  (*state->token)=token;
+  (*state->graphic_context)=graphic_context;
+  (*state->primitive_info)=primitive_info;
+  (*state->macros)=macros;
+  (*state->stops)=stops;
+}
+
 static MagickBooleanType RenderMVGContent(Image *image,
   const DrawInfo *draw_info,const size_t depth,ExceptionInfo *exception)
 {
@@ -4891,14 +4954,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
   mvg_info.primitive_info=(&primitive_info);
   mvg_info.extent=(&number_points);
   mvg_info.exception=exception;
-  graphic_context[n]=CloneDrawInfo((ImageInfo *) NULL,draw_info);
-  graphic_context[n]->primitive=DestroyString(graphic_context[n]->primitive);
-  graphic_context[n]->viewbox=image->page;
-  if ((image->page.width == 0) || (image->page.height == 0))
-    {
-      graphic_context[n]->viewbox.width=image->columns;
-      graphic_context[n]->viewbox.height=image->rows;
-    }
+  InitializeMVGGraphicContext(&render_state);
   token=AcquireString(primitive);
   extent=strlen(token)+MagickPathExtent;
   defsDepth=0;
@@ -4972,16 +5028,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
   /*
     Relinquish resources.
   */
-  macros=DestroySplayTree(macros);
-  token=DestroyString(token);
-  if (primitive_info != (PrimitiveInfo *) NULL)
-    {
-      DestroyMVGPrimitiveText(primitive_info);
-      primitive_info=(PrimitiveInfo *) RelinquishMagickMemory(primitive_info);
-    }
-  primitive=DestroyString(primitive);
-  stops=(StopInfo *) RelinquishMagickMemory(stops);
-  graphic_context=DestroyMVGGraphicContexts(graphic_context,n);
+  ReleaseMVGRenderResources(&render_state);
   if ((status == MagickFalse) && (exception->severity < ErrorException))
     ThrowBinaryException(DrawError,"NonconformingDrawingPrimitiveDefinition",
       keyword);
