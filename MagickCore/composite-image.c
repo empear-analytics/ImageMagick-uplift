@@ -1307,6 +1307,15 @@ static Image *AcquireCompositeSource(Image *image,const Image *composite,
   return(source_image);
 }
 
+static void SetCompositeRowDefaults(CompositeRowInputs *rows)
+{
+  SetGeometryInfo(&(*rows).geometry_info);
+  (*rows).percent_luma=100.0;
+  (*rows).percent_chroma=100.0;
+  (*rows).source_dissolve=1.0;
+  (*rows).threshold=0.05f;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1456,11 +1465,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
   canvas_image=(Image *) NULL;
   rows.canvas_dissolve=1.0;
   GetComposeArtifacts(image,&targets);
-  SetGeometryInfo(&rows.geometry_info);
-  rows.percent_luma=100.0;
-  rows.percent_chroma=100.0;
-  rows.source_dissolve=1.0;
-  rows.threshold=0.05f;
+  SetCompositeRowDefaults(&rows);
   setup=GetCompositeSetup(x_offset,y_offset,rows.clamp);
   {
     const CanvasCompositeInputs
