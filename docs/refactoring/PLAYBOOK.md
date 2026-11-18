@@ -23229,6 +23229,112 @@ approval of 2026-10-24 to evolve the recipes.
 
 ---
 
+## Recipe OH - Move a Family into a Private Header That Only Its File Includes
+
+**Use when:** CodeScene reports *Complex Method* and *Large Method* on a function of a file
+that no legal step may simplify further without a measured slowdown (a per-pixel function
+the no-slowdown ruling of 2026-11-17 protects, as `composite-image.c`'s
+`CompositeChannelColor`), or *Number of Functions in a Single Module* on a file with one
+public root, where a Recipe S split is refused because every `static` stays reached from
+the one root; and a stub probe shows the file rising when the function and the statics
+only it reaches leave the file.
+
+**Not covered by:** Recipe S, which moves a public root and its statics into a new `.c`
+file and shares only the helpers both products call through a private header both include;
+a one-root file has no second product. Recipe CH, which moves an identical helper from
+several headers into one. Recipe E and its relatives, which change the function's text;
+this recipe changes none.
+
+**How:**
+
+1. Probe first. Copy the file with the family (the function, every `static` it calls that
+   nothing else in the file calls, transitively, and every `typedef` that a moving item names)
+   deleted, and copy the family alone, both under `build-oracle/probe/`; score both with
+   `tools/ch.py`. Take the step only when the file rises and the family scores at least
+   the file's score before the step (owner, 2026-11-18: a private header that only one file
+   includes is allowed when it raises that file and scores at least the file's score before
+   the move).
+2. The family qualifies when no item of it names a file-scope variable, a file-scope
+   `static const` object or a macro that the file defines, and no item holds an OpenMP
+   pragma or an `#if`. A `typedef` that a moving item names moves too, also when kept
+   functions name it (the file includes the header before its own definitions, so they
+   see the type as before); its own members must name no type of the file that stays.
+3. New header `MagickCore/<stem>-<family>-private.h` (not installed: `MAGICKCORE_NOINST_HDRS`
+   and `MAGICKCORE_BASE_SRCS` of `MagickCore/Makefile.am`, mirrored in `Makefile.in`), with
+   the short licence of the private headers, its own include guard and an `extern "C"` pair,
+   holding the moved items verbatim, in their order in the file. A function keeps its text
+   exactly, `static` without `inline` added: the header has one includer, which calls
+   every moved function (directly or through another moved one), so no unused-function
+   warning arises, and the compiler's inlining choices are not moved by a new keyword.
+4. The file loses the moved items (each with the blank line after it) and includes the
+   new header as the last line of its include block. Check by `grep -l` over the tree that
+   no other file includes the header.
+5. Proof of the object code: `tools/split_branch_check.py HEAD:<file> <file> cand` (and
+   with an OpenMP build directory under `build-oracle/` when the file has parallel regions)
+   prints `IDENTICAL-MODULO-LAYOUT`: every function compiles to the same instructions;
+   only their place in the object moves.
+6. Timing: the object's layout changes, and in the statically linked OpenMP build that can
+   move hot loops to another alignment. Time the operations that reach the moved family in
+   the OpenMP -O2 build, `MAGICK_THREAD_LIMIT=1` and 4, alternating with an A/A run, 21
+   rounds; a ratio above its A/A by more than 0.03 stops the step (re-run at 41 rounds when
+   borderline).
+7. Run `refactor_guard.py --combined` over the file and the header (`OK`, every literal and
+   call counted once), `tools/ci_warnings.sh`, `tools/cxx_warnings.sh` and
+   `tools/ci_linux_warnings.sh --campaign-a`, the oracle on the cases that reach the family's
+   root, both catalogues before the branch is reported, and score the file and the header.
+8. One family per commit, `refactor(<file>): move <Function> into <header>`, `Recipe: OH`,
+   `Verified: oracle`, the probe's and the result's scores, step 5's output and step 6's
+   ratios in the message.
+
+**Before:** (`composite-image.c`)
+
+```c
+#include "MagickCore/composite-row-private.h"
+...
+typedef struct _CompositeRowInputs
+{
+...
+static MagickRealType GetColorDodgeBlend(const MagickRealType S,
+  const MagickRealType D)
+{
+...
+static void CompositeChannelColor(const CompositeRowInputs *row,
+  const CompositePixelInputs *authentic,const CompositeChannelInputs *tile,
+...
+```
+
+**After:** (`composite-image.c`; the same text stands in `composite-channel-private.h`)
+
+```c
+#include "MagickCore/composite-row-private.h"
+#include "MagickCore/composite-channel-private.h"
+...
+```
+
+**Careful:**
+
+- The header has one includer, so each moved function is still one internal-linkage
+  definition in one translation unit; the text of the translation unit is the same tokens,
+  with the moved items now standing before the file's own definitions. A `static` function
+  needs no prototype order (each is defined before its first call in the header, as it was
+  in the file, and the kept functions now follow all of them), and a `typedef` defined
+  earlier than before is the same type.
+- The step moves debt, it does not remove it: the header is a product scored like a split
+  product and is worked toward 10.0 like any other file (owner, 2026-11-18).
+- A layout change is not a code change, but it can be a speed change (`pixel.c`,
+  `d38d2ac17`): step 6 is not optional, also when step 5 is clean.
+
+**Evidence level:** oracle (the cases that reach the family's root), with step 5's
+object proof and step 6's timing.
+
+**Provenance:** 2026-11-18, `composite-image.c`'s `CompositeChannelColor` family (campaign
+A, round 30 lane c): the per-pixel function the no-slowdown ruling protects held the file
+at 5.01; the owner's answers of 2026-11-18 allow a private header that only one file
+includes. Added by Claude Code (Claude Opus 5.5) under the owner's approval of 2026-10-24
+to evolve the recipes.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -23726,3 +23832,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-17 | NEW | TV | Share a Two-View Parallel Row Loop Through a Row Function: functions that clone an image and run the same parallel row loop over the clone's authentic view and a second image's virtual view, differing only in the row's work on `(p,q)`, move the loop into one non-inline `static` driver taking the clone, the second image and a `const` struct of a row function pointer and a `const void *` input; each row function takes a per-iteration `const` row struct (image, source, arguments, y); checked by script, a by-hand write-set reading, the whole catalogue narrow and wide, `omp_compare.sh` at 1 and 4 threads and OpenMP-build timing | `compare-similarity-image.c`'s `SIMDivideImage`, `SIMVarianceImage` and `SIMSubtractImageMean` (campaign A, round 28 lane b): *Code Duplication* and three cc-10 *Complex Method* findings that Recipe RL's one-view row type does not reach | mandate (2026-10-24) |
 | 2026-11-17 | NEW | KX | Replace an Enumerator-Keyed Switch of Assigned Calls by a Table of Function Pointers: a `switch` whose groups each assign one call's result to the same local (`v=F(args);`) and all `return(v);` or all `break;`, the callees of one signature with the same arguments, becomes a `static const` table of `{ label, function }` and a lookup; groups of another signature stay in the `switch`, the default group is the fallback; timed when the function runs per offset or per pixel, indirect calls counted | `compare-similarity-image.c`'s `SimilarityImage` (frequency-domain dispatch, six groups returning the call) and `compare-similarity-private.h`'s `GetSimilarityForMetric` (fifteen labels assigning `status`), which Recipe KF (statement calls) and KD (a `LocaleCompare` ladder) do not reach (campaign A, round 28 lane b) | mandate (2026-10-24) |
 | 2026-11-17 | NEW | SO | Extract Sibling Blocks Differing in One Value, Returning One Written Variable and Writing One Through a Pointer: copies of one small block in one or several functions of a file, differing in one constant and writing two caller locals (one assigned whole first, one advanced), become one `static` function returning the first and taking the second by pointer | `draw.c`'s MVG push handlers (`ParseMVGPushClass`, `-ClipPath`, `-Gradient`, `-Pattern`): `ParseMVGPushClipPath` leaves *Complex Method*, `-Gradient` cc 22 to 16, `-Pattern` 19 to 13 and leaves *Bumpy Road Ahead* in a probe; campaign B, M137 | mandate (2026-10-24) |
+| 2026-11-18 | NEW | OH | Move a Family into a Private Header That Only Its File Includes: a function the no-slowdown ruling protects (or a one-root file's family), with every `static` only it reaches and the typedefs they name, moves verbatim (no `inline` added) into a new non-installed `MagickCore/<stem>-<family>-private.h` that only its file includes, when a stub probe shows the file rising and the family scoring at least the file's score; proof: `split_branch_check.py` IDENTICAL-MODULO-LAYOUT, the oracle, and timing of the operations that reach the family in the OpenMP -O2 build (layout can move hot loops) | `composite-image.c`'s `CompositeChannelColor` family (campaign A, round 30 lane c): probe 5.01 to 7.27 for the file, 5.65 for the header; the owner's answers of 2026-11-18 (a private header included by one file is allowed when it raises the file and scores at least the file's score before the move) | owner |
