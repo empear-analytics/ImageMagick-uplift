@@ -1193,6 +1193,76 @@ static ssize_t GetTracedPrimitiveEnd(const PrimitiveInfo *primitive_info,
   return(i);
 }
 
+typedef struct _MVGTextInput
+{
+  DrawInfo
+    **graphic_context;
+
+  ssize_t
+    n;
+
+  PrimitiveInfo
+    *primitive_info;
+
+  char
+    *token;
+
+  Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+} MVGTextInput;
+
+static void AdvanceMVGTextCursor(const MVGTextInput *text,MVGInfo *mvg_info,
+  double *cursor,MagickStatusType *status)
+{
+  DrawInfo
+    **const graphic_context = text->graphic_context;
+
+  const ssize_t
+    n = text->n;
+
+  PrimitiveInfo
+    *const primitive_info = text->primitive_info;
+
+  char
+    *const token = text->token;
+
+  Image
+    *const image = text->image;
+
+  ExceptionInfo
+    *const exception = text->exception;
+
+  DrawInfo
+    *clone_info;
+
+  TypeMetric
+    metrics;
+
+  clone_info=CloneDrawInfo((ImageInfo *) NULL,graphic_context[n]);
+  if ((fabs((*mvg_info).point.x-primitive_info->point.x) < MagickEpsilon) &&
+      (fabs((*mvg_info).point.y-primitive_info->point.y) < MagickEpsilon))
+    {
+      (*mvg_info).point=primitive_info->point;
+      primitive_info->point.x+=(*cursor);
+    }
+  else
+    {
+      (*mvg_info).point=primitive_info->point;
+      (*cursor)=0.0;
+    }
+  clone_info->render=MagickFalse;
+  clone_info->text=AcquireString(token);
+  (*status)&=(MagickStatusType) GetTypeMetrics(image,clone_info,
+    &metrics,exception);
+  clone_info=DestroyDrawInfo(clone_info);
+  (*cursor)+=metrics.width;
+  if (graphic_context[n]->compliance != SVGCompliance)
+    (*cursor)=0.0;
+}
+
 static void TraceMVGPrimitive(const MVGRenderState *state)
 {
   char
@@ -1206,7 +1276,6 @@ static void TraceMVGPrimitive(const MVGRenderState *state)
     cursor = (*state->cursor);
 
   DrawInfo
-    *clone_info,
     **graphic_context = (*state->graphic_context);
 
   ExceptionInfo
@@ -1235,8 +1304,8 @@ static void TraceMVGPrimitive(const MVGRenderState *state)
     j = (*state->j),
     n = (*state->n);
 
-  TypeMetric
-    metrics;
+  MVGTextInput
+    text;
 
   mvg_info.offset=j;
   switch (primitive_type)
@@ -1441,26 +1510,13 @@ static void TraceMVGPrimitive(const MVGRenderState *state)
       /*
         Compute text cursor offset.
       */
-      clone_info=CloneDrawInfo((ImageInfo *) NULL,graphic_context[n]);
-      if ((fabs(mvg_info.point.x-primitive_info->point.x) < MagickEpsilon) &&
-          (fabs(mvg_info.point.y-primitive_info->point.y) < MagickEpsilon))
-        {
-          mvg_info.point=primitive_info->point;
-          primitive_info->point.x+=cursor;
-        }
-      else
-        {
-          mvg_info.point=primitive_info->point;
-          cursor=0.0;
-        }
-      clone_info->render=MagickFalse;
-      clone_info->text=AcquireString(token);
-      status&=(MagickStatusType) GetTypeMetrics(image,clone_info,
-        &metrics,exception);
-      clone_info=DestroyDrawInfo(clone_info);
-      cursor+=metrics.width;
-      if (graphic_context[n]->compliance != SVGCompliance)
-        cursor=0.0;
+      text.graphic_context=graphic_context;
+      text.n=n;
+      text.primitive_info=primitive_info;
+      text.token=token;
+      text.image=image;
+      text.exception=exception;
+      AdvanceMVGTextCursor(&text,&mvg_info,&cursor,&status);
       break;
     }
     case ImagePrimitive:
