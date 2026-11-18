@@ -376,6 +376,102 @@ static inline double GetSSIMConstant(const Image *image,
   return(c);
 }
 
+typedef struct _SSIMRow
+{
+  const Image
+    *image,
+    *reconstruct_image;
+
+  double
+    c1,
+    c2;
+
+  KernelInfo
+    *kernel_info;
+
+  size_t
+    columns;
+} SSIMRow;
+
+typedef struct _SSIMRowTargets
+{
+  const Quantum
+    *magick_restrict *p,
+    *magick_restrict *q;
+
+  double
+    (*channel_similarity)[MaxPixelChannels+1],
+    *channel_area;
+} SSIMRowTargets;
+
+static magick_attribute((__always_inline__)) inline void
+  AccumulateSSIMRow(const SSIMRow *row,const SSIMRowTargets *targets)
+{
+  const Quantum
+    *magick_restrict *const p = targets->p,
+    *magick_restrict *const q = targets->q;
+
+  double
+    (*const channel_similarity)[MaxPixelChannels+1] =
+      targets->channel_similarity,
+    *const channel_area = targets->channel_area;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) row->columns; x++)
+  {
+    double
+      x_pixel_mu[MaxPixelChannels+1] = { 0.0 },
+      x_pixel_sigma_squared[MaxPixelChannels+1] = { 0.0 },
+      xy_sigma[MaxPixelChannels+1] = { 0.0 },
+      y_pixel_mu[MaxPixelChannels+1] = { 0.0 },
+      y_pixel_sigma_squared[MaxPixelChannels+1] = { 0.0 };
+
+    SSIMChannelInputs
+      channel_inputs;
+
+    SSIMTapTargets
+      sums;
+
+    SSIMWindow
+      window;
+
+    if ((GetPixelReadMask(row->image,(*p)) <= (QuantumRange/2)) ||
+        (GetPixelReadMask(row->reconstruct_image,(*q)) <= (QuantumRange/2)))
+      {
+        (*p)+=(ptrdiff_t) GetPixelChannels(row->image);
+        (*q)+=(ptrdiff_t) GetPixelChannels(row->reconstruct_image);
+        continue;
+      }
+    window.kernel_info=row->kernel_info;
+    window.image=row->image;
+    window.reconstruct_image=row->reconstruct_image;
+    window.p=(*p);
+    window.q=(*q);
+    window.columns=row->columns;
+    sums.x_pixel_mu=(&x_pixel_mu);
+    sums.x_pixel_sigma_squared=(&x_pixel_sigma_squared);
+    sums.y_pixel_mu=(&y_pixel_mu);
+    sums.y_pixel_sigma_squared=(&y_pixel_sigma_squared);
+    sums.xy_sigma=(&xy_sigma);
+    SumSSIMWindow(&window,&sums);
+    channel_inputs.image=row->image;
+    channel_inputs.reconstruct_image=row->reconstruct_image;
+    channel_inputs.x_pixel_mu=x_pixel_mu;
+    channel_inputs.x_pixel_sigma_squared=x_pixel_sigma_squared;
+    channel_inputs.xy_sigma=xy_sigma;
+    channel_inputs.y_pixel_mu=y_pixel_mu;
+    channel_inputs.y_pixel_sigma_squared=y_pixel_sigma_squared;
+    channel_inputs.c1=row->c1;
+    channel_inputs.c2=row->c2;
+    AccumulateSSIMChannels(&channel_inputs,(*channel_similarity));
+    (*p)+=(ptrdiff_t) GetPixelChannels(row->image);
+    (*q)+=(ptrdiff_t) GetPixelChannels(row->reconstruct_image);
+    (*channel_area)++;
+  }
+}
+
 static inline MagickBooleanType GetSSIMSimularity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -431,8 +527,11 @@ static inline MagickBooleanType GetSSIMSimularity(const Image *image,
       channel_area = 0.0,
       channel_similarity[MaxPixelChannels+1] = { 0.0 };
 
-    ssize_t
-      x;
+    SSIMRow
+      row;
+
+    SSIMRowTargets
+      targets;
 
     if (status == MagickFalse)
       continue;
@@ -447,57 +546,17 @@ static inline MagickBooleanType GetSSIMSimularity(const Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) columns; x++)
-    {
-      double
-        x_pixel_mu[MaxPixelChannels+1] = { 0.0 },
-        x_pixel_sigma_squared[MaxPixelChannels+1] = { 0.0 },
-        xy_sigma[MaxPixelChannels+1] = { 0.0 },
-        y_pixel_mu[MaxPixelChannels+1] = { 0.0 },
-        y_pixel_sigma_squared[MaxPixelChannels+1] = { 0.0 };
-
-      SSIMChannelInputs
-        channel_inputs;
-
-      SSIMTapTargets
-        sums;
-
-      SSIMWindow
-        window;
-
-      if ((GetPixelReadMask(image,p) <= (QuantumRange/2)) ||
-          (GetPixelReadMask(reconstruct_image,q) <= (QuantumRange/2)))
-        {
-          p+=(ptrdiff_t) GetPixelChannels(image);
-          q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
-          continue;
-        }
-      window.kernel_info=kernel_info;
-      window.image=image;
-      window.reconstruct_image=reconstruct_image;
-      window.p=p;
-      window.q=q;
-      window.columns=columns;
-      sums.x_pixel_mu=(&x_pixel_mu);
-      sums.x_pixel_sigma_squared=(&x_pixel_sigma_squared);
-      sums.y_pixel_mu=(&y_pixel_mu);
-      sums.y_pixel_sigma_squared=(&y_pixel_sigma_squared);
-      sums.xy_sigma=(&xy_sigma);
-      SumSSIMWindow(&window,&sums);
-      channel_inputs.image=image;
-      channel_inputs.reconstruct_image=reconstruct_image;
-      channel_inputs.x_pixel_mu=x_pixel_mu;
-      channel_inputs.x_pixel_sigma_squared=x_pixel_sigma_squared;
-      channel_inputs.xy_sigma=xy_sigma;
-      channel_inputs.y_pixel_mu=y_pixel_mu;
-      channel_inputs.y_pixel_sigma_squared=y_pixel_sigma_squared;
-      channel_inputs.c1=c1;
-      channel_inputs.c2=c2;
-      AccumulateSSIMChannels(&channel_inputs,channel_similarity);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
-      channel_area++;
-    }
+    row.image=image;
+    row.reconstruct_image=reconstruct_image;
+    row.c1=c1;
+    row.c2=c2;
+    row.kernel_info=kernel_info;
+    row.columns=columns;
+    targets.p=(&p);
+    targets.q=(&q);
+    targets.channel_similarity=(&channel_similarity);
+    targets.channel_area=(&channel_area);
+    AccumulateSSIMRow(&row,&targets);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
     #pragma omp critical (MagickCore_GetSSIMSimularity)
 #endif
