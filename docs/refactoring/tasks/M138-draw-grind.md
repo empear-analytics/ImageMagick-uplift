@@ -3,9 +3,9 @@
 Branched from `campaign/M137` after #123 merged it into `main` (ba6c3318d); this branch's
 PR goes to `main`. Scores come from cs-mcp 1.5.16 through `tools/ch.py`.
 
-Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 25 flagged functions, 222 -> 286
+Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 24 flagged functions, 222 -> 294
 functions (four merges, about eighty helpers), 11,636 -> 11,929 lines. Function findings
-(one per function and category) 123 -> 53; the summed cc of the Complex Method
+(one per function and category) 123 -> 49; the summed cc of the Complex Method
 functions 908 -> 430.
 
 ## The function-count lesson
@@ -108,6 +108,9 @@ The function count still matters in annotate.c and resource.c.
 | 6166919af, bea801488 | E | CloneDrawInfo | the text attributes into CloneDrawInfoTextAttributes, then the dash pattern into CloneDrawInfoDashPattern; no findings left |
 | 9b74839f6, 9d11cee7b | E, LB | ParseMVGPushGradient | the affine transform into GetGradientBounds, the four segment reads into GetMVGSegment; no findings left |
 | a030b4a5f, ff8371e1f | E, V | TraceBezier | the Bernstein sum into GetBezierPoint, the control-point trace into TraceBezierControlPoints; cc 11 -> 9, 97 -> 82 lines, leaves Bumpy Road |
+| 9ae7a352f, 442d79366, bda3bb874, (playbook 33131a77e), 9acb019e0 | PS, PS, E, K | DrawAffineImage | the column loop into DrawAffineRowPixels, the whole row body into DrawAffineImageRow (both in the parallel loop, timed in the OpenMP build: within A/A), the corner transform into GetAffineImageExtent, the min/max scan into GetAffineImageBounds (Recipe K's new outside-region form); no findings left |
+| c848e000d | Q | DrawGradientImage | the per-pixel spread switch into GetSpreadGradientColor (timed through magick and the driver in the OpenMP build: within A/A at 21 runs); cc 13 -> 9, 140 -> 92 lines, leaves Bumpy Road |
+| 62037b202 | revert | ResetAlphaPixels/ResetColorPixels | 460d384e0's merge reverted: in the OpenMP build the merged loop made the alpha reset 10.7% slower |
 
 ## Probed and dropped
 
@@ -162,6 +165,7 @@ The function count still matters in annotate.c and resource.c.
 - Whole catalogue at 1b3d7ffe2, a94bd1d6f, 69e5b567d, ea02b4b9e, 6cdf7f056 and 2e9b40a88: 15,967 cases, 3
   diverged, all known. check_trailers: 108 refactor commits, all valid.
 - Whole catalogue at ff8371e1f (fifteenth batch): 15,967 cases, 3 diverged, all known.
+- Whole catalogue at 62037b202 (sixteenth batch): 15,967 cases, 3 diverged, all known.
   check_trailers over ba6c3318d..HEAD: 379 refactor commits (128 of them on draw.c, the
   rest from the main merge), all valid.
 
@@ -179,9 +183,19 @@ The function count still matters in annotate.c and resource.c.
   script runs under `arch -arm64`. The result reports `Features: OpenMP` and a 3000x3000
   blur takes 3.33 s at one thread and 1.06 s at four. Nothing was installed; the script
   is unchanged. The OpenMP -O2 timing of the 2026-11-17 ruling can now be done here.
-  The two per-pixel steps of this branch (460d384e0, 6cdf7f056) were timed only in the
-  oracle build, which that ruling says is not enough; they should be re-timed in this
-  build before the PR merges.
+  The two per-pixel steps of this branch timed only in the oracle build were re-timed
+  here: 6cdf7f056 (BlendRepeatGradientStops) is within A/A on radial and linear repeat;
+  460d384e0 (the ResetScanPixels merge) made the alpha reset 10.7% slower and is
+  reverted (62037b202).
+- **Branch-wide timing (2026-11-18):** `main`'s draw.c against the tip's in the gcc-16
+  OpenMP build, six drawing workloads at 2000x2000 (polygon, shapes, Bezier path, dashes,
+  round joins, nonzero fill): omp_compare 0 diverged at 1 and 4 threads; at 4 threads
+  all within A/A. At one thread the shapes and path workloads read +0.7% to +1.4%
+  (A/A up to +0.7%). A scan of eight points along the branch showed no step, and the
+  object code settles it: DrawPolygonPrimitive's two per-pixel OpenMP functions differ
+  between main and the tip only in register names and alignment `nop`s, and one
+  commit that measured +1.0% (374142775) compiles to the same code as its parent in
+  every function. Readings of about 1% at one thread are within this harness's noise.
 - **profile.c ProfileImage**: needs the Q8 and non-HDRI oracle builds (question 6).
 - **annotate.c Raqm functions** (ContainsRaqmParagraphSeparator 5.83 -> 6.37 alone): Raqm
   is not installed.
@@ -210,3 +224,7 @@ The function count still matters in annotate.c and resource.c.
   remaining blocks would take five parameters.
 - **Gate fix:** the gate script now refuses a step that leaves a new or larger finding on
   any other function, and an oracle run that reached no case.
+- **DrawGradientImage's row body (Recipe PS step 7), dropped for speed:** cleared both
+  findings, 0 diverged and omp_compare 0, but the repeat spread at one thread measured
+  +1.9%, +1.4% and +0.7% (A/A +0.4%, +0.1%, +0.1%); the member form (no local copies)
+  +1.5% and +0.5%. Not committed under the 2026-11-17 ruling.
