@@ -23662,6 +23662,132 @@ owner's approval of 2026-10-24 to evolve the recipes.
 
 ---
 
+## Recipe LM - Keep Locals in the Struct Members They Are Copied Into
+
+**Use when:** CodeScene reports *Large Method* on a function that computes several locals
+(defaults, values parsed from artifacts, values a helper writes through a `const` targets
+struct of their addresses) and, at its end, copies each of them into the member of a
+struct local of the same type, `s.m=v;`, before the call that reads the struct:
+`composite-image.c`'s `CompositeImage`, whose `rows` fill copies thirteen locals
+(`amount`, `geometry_info`, `clamp`, `colorspace`, ...) that nothing reads after the copy.
+Each local costs its declaration and its copy, and the fill reads about twenty values, so
+no extraction of the fill fits in four parameters.
+
+**Not covered by:** Recipes FI, FB and FU, which rewrite a member-by-member fill as an
+initialiser but keep every value in its own variable (here the copies cannot become an
+initialiser either: the fill holds a call, `SetCompositeRowOperators(&rows,compose)`, and
+leaves two members unset); Recipes E, O and N, whose new function would take the twenty
+values the fill reads, as parameters or as an input struct that repeats the struct being
+filled; Recipe SM, whose block passes the struct on and binds its members; Recipe SZ,
+which moves zeroing writes and keeps the variable.
+
+**How:**
+
+1. The struct local `s` of the function is declared without an initialiser, of a
+   `typedef struct` type, before every declaration whose initialiser step 3 will make
+   name it. Up to the copy of each chosen local (step 2), every statement that names `s`
+   only writes members other than the chosen ones, directly (`s.k=e;`) or by passing `&s`
+   to a `static` function of the file that writes such members and reads none (checked
+   by reading its body); nothing reads `s` whole, copies it or keeps its address before
+   the run of copies ends.
+2. Each chosen local `v` is a block-scope object of the function (not a parameter, not
+   `static`, not `volatile`), declared with exactly the declared type of the member `m`
+   it is copied into (`MagickRealType` into `MagickRealType`, `GeometryInfo` into
+   `GeometryInfo`), and the function holds exactly one statement `s.m=v;`. After that
+   statement nothing names `v` or uses an address of it: an object initialised with `&v`
+   (a member of a `const` targets struct) is used only by statements before the copy.
+   `v`'s type is a scalar, a pointer, or a struct whose object representation nothing
+   reads (no `memcmp`, no byte-wise output of `s`).
+3. Delete the statement `s.m=v;` and `v`'s declarator (a type line left with no name
+   under it goes, with its blank line). Write every other occurrence of the identifier
+   `v` in the function as `s.m`: `v=e;` becomes `s.m=e;`, `&v` becomes `&s.m`, a read
+   `v` becomes `s.m`; nothing else in those statements changes.
+4. A declarator `v = c` whose initialiser `c` is a constant (a literal or an enumeration
+   constant) becomes the statement `s.m=c;`, placed with the other such statements
+   directly after the declarations, before the function's first statement, in the order
+   the declarators stood: a block's initialisers run when execution reaches the
+   declarations, before its first statement, and a later declaration's initialiser that
+   names `&s.m` (step 3) only takes an address. Any other initialiser refuses `v`.
+5. Every local of one function copied into the same struct `s` goes in one commit (one
+   recipe, one function). Nothing outside the function changes.
+6. Run `tools/refactor_guard.py` (literals `OK`) and `--calls` (no change), the CI and
+   C++ warning checks, and the oracle on the function's cases. A function that runs per
+   pixel or per row is timed against its parent as the timing rule asks; a function that
+   runs once per call is timed on its cases with callgrind instruction counts and an A/A
+   run beside the comparison.
+
+**Before:**
+
+```c
+  MagickRealType
+    amount,
+    ...
+    threshold;
+
+  const ComposeArgumentTargets
+    argument_targets = { &geometry_info, &percent_luma, &percent_chroma,
+      &amount, &threshold, &source_dissolve, &canvas_dissolve };
+  ...
+  amount=0.5;
+  ...
+  threshold=0.05f;
+  ...
+  rows.exception=exception;
+  rows.amount=amount;
+  ...
+  rows.threshold=threshold;
+  ...
+  status=CompositeImageRows(&rows);
+```
+
+**After:**
+
+```c
+  const ComposeArgumentTargets
+    argument_targets = { &rows.geometry_info, &rows.percent_luma,
+      &rows.percent_chroma, &rows.amount, &rows.threshold,
+      &rows.source_dissolve, &rows.canvas_dissolve };
+  ...
+  rows.amount=0.5;
+  ...
+  rows.threshold=0.05f;
+  ...
+  rows.exception=exception;
+  status=CompositeImageRows(&rows);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The member has the local's declared type, so every
+  write stores the same value after the same conversion (`s.m=0.05f` converts the `float`
+  constant to `MagickRealType` as `v=0.05f` did) and every read returns it; a callee
+  given `&s.m` instead of `&v` receives a pointer of the same type to an object holding
+  the same value. Up to the old copy nothing else reads or writes `s.m` (step 1), so at
+  every point `s.m` holds what `v` held; the copy stored `v`'s final value in `s.m`,
+  which now already holds it, and `v` was dead after it (step 2).
+- A constant initialiser runs before the first statement either way (step 4); a path
+  that leaves the function before the fill (an early `return`) wrote a member nothing
+  reads, as it wrote a local nothing read.
+- Members the fill never set (`rows.y`, `rows.pixels`, the callee's own) stay as they
+  were; the members the step touches end with the values the copies gave them.
+- The struct's address is now taken in the targets initialisers, as the locals'
+  addresses were; the struct already lived in memory (the call takes `&s`). The step
+  removes copies, it adds none.
+
+**Evidence level:** oracle on the function's cases, with `refactor_guard.py` and
+`--calls`, `ci_warnings.sh`, `ci_linux_warnings.sh --campaign-a` and `cxx_warnings.sh`,
+steps 1 and 2 checked by reading; callgrind instruction counts and A/A-bounded timing
+for the function's cases.
+
+**Provenance:** 2026-11-18, from `composite-image.c`'s `CompositeImage` (campaign A, W44
+round 31 third batch, lane c): a *Large Method* of 107 lines after rounds 30 and 31,
+held by thirteen locals and their copies into `rows`, with its seven public arguments
+staying; a probe of this step takes it to 80 lines (9.11 to 9.25), and with a Recipe HN
+head and a Recipe E defaults block below the threshold (9.68). Added by Claude Code
+(Claude Opus 5.5) under the mandate of 2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -24176,3 +24302,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-18 | AMEND | RX | Step 3: a plain local that a moved group writes on a path breaking to the statements after the `switch`, and that the caller reads there, goes by address in step 5's input struct on Recipe RV step 6 (b) and (d)'s terms (at most six; the helper binds `T *const v` and writes `(*v)`; Recipe O step 2, with a `const` targets struct holding the same address allowed when no path uses both names); step 4 names the `(*v)` rewriting; step 5: a chain's helper whose moved groups use only members of the earlier RX step's input struct takes that struct and passes it on unchanged (RV step 6 (c)) | `composite-image.c`'s `CompositeImage` (campaign A, W43 round 31 second batch, lane c): its Displace/Distort and Blur groups clone the canvas, swap `source_image` for it and parse `compose:args` into `geometry_info`, all read by the general composite after the `switch`, so step 3's "nothing else of the caller is written" refused them; the Displace step measures 8.81 to 8.91 (a single helper for both groups was a Large Method, 8.60) | mandate (2026-10-24) |
 | 2026-11-18 | AMEND | OH | Form A, step 1: a doc comment in the leading run that documents a function with external linkage that stays (its `%` banner, with a plain comment block directly after it) moves, unchanged, to directly above that function in the same commit instead of into the header; comments are not tokens, so pp and object identity hold, and `scripts/format_c_api_docs` (which reads the `.c` files it lists) still finds the banner | `composite-image.c` (campaign A, W42 round 31 lane c): its leading run begins with the `CompositeImage` banner and the SVG composition notes (lines 135-233), which a carve would otherwise put into `composite-image-blend-private.h` and so drop `CompositeImage` from the generated API page; probe of the four-header chain with the comments kept above `CompositeImage`: 7.55 to 8.81, headers 9.38, 9.38, 10.0, 9.38 | mandate (2026-10-24) |
 | 2026-11-18 | AMEND | OH | Form A on a private header that a Recipe S split produced: the split header is the one includer of the new header; the run may begin after its `extern "C"` opener and the new header then carries its own pair; step 4's pp and object identity is shown on every `.c` file that includes the split header (headers of `HEAD` against the working tree), since `pp_identical.sh` compiles against the working tree's headers; each moved static keeps its text and its one copy per including file | `compare-similarity-private.h` (campaign A, W42 round 31 lane a): 2,589 lines, *Lines of Code in a Single File* and *Code Duplication* over 20 functions held it at 5.13; a stub-probed chain of three leading runs gives 5.44, 6.93 and 8.37 with headers of 8.79, 7.27 and 7.99 | mandate (2026-10-24) |
+| 2026-11-18 | NEW | LM | Keep Locals in the Struct Members They Are Copied Into: locals of a function that are each copied once, `s.m=v;`, into a member of the same declared type of a struct local filled before its call, and named nowhere after the copy, are written as that member throughout (`v=e;` as `s.m=e;`, `&v` as `&s.m`), the copy and the declarator deleted; a constant initialiser becomes `s.m=c;` before the first statement; up to the copies nothing reads `s` or the chosen members. *Careful* gives the argument (same type, same values at every point, the copy redundant, `v` dead after it) | `composite-image.c`'s `CompositeImage` (campaign A, W44 round 31 third batch, lane c): a *Large Method* of 107 lines whose `rows` fill copies thirteen locals and reads about twenty values, so E, O, N and FB refuse it; a probe of the step gives 80 lines (9.11 to 9.25), and with a Recipe HN head and a Recipe E defaults block the finding leaves (9.68) | mandate (2026-10-24) |
