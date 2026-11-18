@@ -3,10 +3,10 @@
 Branched from `campaign/M137` after #123 merged it into `main` (ba6c3318d); this branch's
 PR goes to `main`. Scores come from cs-mcp 1.5.16 through `tools/ch.py`.
 
-Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 32 flagged functions, 222 -> 274
-functions (four merges, sixty helpers), 11,636 -> 11,737 lines. Function findings
-(one per function and category) 123 -> 66; the summed cc of the Complex Method
-functions 908 -> 520.
+Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 25 flagged functions, 222 -> 286
+functions (four merges, about eighty helpers), 11,636 -> 11,929 lines. Function findings
+(one per function and category) 123 -> 53; the summed cc of the Complex Method
+functions 908 -> 430.
 
 ## The function-count lesson
 
@@ -18,6 +18,11 @@ helpers) cleared its *Bumpy Road Ahead* and *Complex Method* and still dropped d
 Recipe NG, CN, G, B, MA or LB into one helper serving many copies, or a merge that removes a
 function (Recipe MT's new folding form). Extractions wait for a split (Recipe S) that
 lowers the count.
+
+**Revised (fifteenth batch):** in draw.c the drop came from clearing CloneDrawInfo's
+*Complex Method* while its *Large Method* stayed, not from the count. Taking both together
+(bea801488), and about twenty other extractions that each added a function, held 3.27.
+The function count still matters in annotate.c and resource.c.
 
 ## Commits
 
@@ -91,6 +96,18 @@ lowers the count.
 | a519f0ad8, 90256d467 | P, CN | ParseMVGPopGraphicContext | the outer clip-mask test into IsNonSVGClipMask, then combined with the inner test (IDENTICAL); no findings left |
 | 6cdf7f056 | E | GetRepeatGradientColor | the blending arm into BlendRepeatGradientStops (timed +0.8%); no findings left |
 | a198efbc3, 534bf61ca, 2e9b40a88 | NS, P, LB | TracePathSmoothBezierCurve | side selections named (IDENTICAL), three side tests as predicates, the x/y pair into GetPathPoint; no findings left |
+| 255f6d4a0, 0f6fe3571, 23433b9e0 | E | DrawStrokePolygon | per-subpath trace and fill into DrawStrokeSubpathPolygon, the round caps into DrawSubpathRoundLinecaps, the stroke clone into CloneStrokeFillInfo; no findings left |
+| 15537f632 | B | DrawStrokeSubpathPolygon | its five parameters (a new finding of 255f6d4a0 the gate did not show) bundled into StrokeSubpathPaint, filled once before the loop; no findings left |
+| 2d2b74d00, 8412a1647 | P, LB | TracePathArc | the end point through GetPathPoint, the arc's shape reads into GetPathArcShape (the commit says Recipe E; it is LB step 7's exit-statement form); no findings left |
+| d6ea8a367 | E | DrawStrokedPrimitive | the wide-stroke arm into DrawWideStrokedPrimitive; no findings left |
+| 4b6dff923 | E | DrawPatternPath | the pattern clone setup into ClonePatternDrawInfo; leaves Complex Method (its five public arguments stay) |
+| 6cec0c04a | LB | GetMVGMacros | the two-exit token read of both scans into GetMVGMacroToken; cc 19 -> 17 |
+| 23b9f122e, 5e8d578dd | LP, E | ConvertPrimitiveToPath | the non-path primitive labels into IsNonPathPrimitive, the tail into TerminatePathInfo; cc 17 -> 11, 96 -> 80 lines |
+| 3c7dc9535 | E | DrawPrimitive | the dispatch switch into DrawPrimitiveByType; no findings left |
+| 63db10b47, eda78be26 | E | GetDrawInfo | the defaults into SetDrawInfoDefaults, then the image-info attributes and the weight option in one commit; no findings left |
+| 6166919af, bea801488 | E | CloneDrawInfo | the text attributes into CloneDrawInfoTextAttributes, then the dash pattern into CloneDrawInfoDashPattern; no findings left |
+| 9b74839f6, 9d11cee7b | E, LB | ParseMVGPushGradient | the affine transform into GetGradientBounds, the four segment reads into GetMVGSegment; no findings left |
+| a030b4a5f, ff8371e1f | E, V | TraceBezier | the Bernstein sum into GetBezierPoint, the control-point trace into TraceBezierControlPoints; cc 11 -> 9, 97 -> 82 lines, leaves Bumpy Road |
 
 ## Probed and dropped
 
@@ -144,6 +161,9 @@ lowers the count.
   alone three times.
 - Whole catalogue at 1b3d7ffe2, a94bd1d6f, 69e5b567d, ea02b4b9e, 6cdf7f056 and 2e9b40a88: 15,967 cases, 3
   diverged, all known. check_trailers: 108 refactor commits, all valid.
+- Whole catalogue at ff8371e1f (fifteenth batch): 15,967 cases, 3 diverged, all known.
+  check_trailers over ba6c3318d..HEAD: 379 refactor commits (128 of them on draw.c, the
+  rest from the main merge), all valid.
 
 ## Blocked, for the owner
 
@@ -152,8 +172,16 @@ lowers the count.
   (ReadSceneImages: 0 cases). May an agent add it?
 - **module.c** (6.63; all four flagged 9.26): lines 69-1672 compile only with
   `MAGICKCORE_MODULES_SUPPORT`; the `cand-mod` proof of M136 still awaits a ruling.
-- **OpenMP on this Mac**: no libomp, so SortImagePixels, WriteImages and similar progress
-  blocks cannot be checked here.
+- **OpenMP on this Mac: unblocked (2026-11-18).** Apple clang has no libomp, but Homebrew's
+  gcc-16 ships libgomp. `tools/omp_compare.sh build` works when gcc and g++ resolve to
+  gcc-16 and g++-16 (symlinks in a scratch directory put first in PATH, plus
+  `CXX=g++-16` for Magick++), anaconda's x86 `as`/`ld` are taken out of PATH, and the
+  script runs under `arch -arm64`. The result reports `Features: OpenMP` and a 3000x3000
+  blur takes 3.33 s at one thread and 1.06 s at four. Nothing was installed; the script
+  is unchanged. The OpenMP -O2 timing of the 2026-11-17 ruling can now be done here.
+  The two per-pixel steps of this branch (460d384e0, 6cdf7f056) were timed only in the
+  oracle build, which that ruling says is not enough; they should be re-timed in this
+  build before the PR merges.
 - **profile.c ProfileImage**: needs the Q8 and non-HDRI oracle builds (question 6).
 - **annotate.c Raqm functions** (ContainsRaqmParagraphSeparator 5.83 -> 6.37 alone): Raqm
   is not installed.
@@ -172,4 +200,13 @@ lowers the count.
   DrawDashPolygon 24, DrawAffineImage 23 and DrawGradientImage 13 with OpenMP loops) hold
   most of the remaining findings; draw.c's score moves only once they go (M137's stub probe).
 - **Scoring rule of thumb:** never clear a function's Complex Method while its Large Method
-  stays; take both in one commit, or Large Method first.
+  stays; take both in one commit, or Large Method first. Under that rule, extractions hold
+  3.27 (the fifteenth batch added about twenty helpers); the earlier CloneDrawInfo drop
+  (above) was this trap, not the function count.
+- **Probed and left (fifteenth batch):** GetMVGMacros's inner scan as a Recipe CS helper
+  clears GetMVGMacros but the helper is a Complex Method (cc 10), so it was reset;
+  GetPolygonBounds, LogPrimitiveInfo and DrawBoundingRectangles have no case; ParseMVGClass
+  (one case) needs a two-output split to leave Large Method; ConvertPrimitiveToPath's
+  remaining blocks would take five parameters.
+- **Gate fix:** the gate script now refuses a step that leaves a new or larger finding on
+  any other function, and an oracle run that reached no case.
