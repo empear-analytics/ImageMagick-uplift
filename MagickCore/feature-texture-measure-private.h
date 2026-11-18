@@ -299,8 +299,8 @@ typedef struct _TextureSlots
     *variance;
 } TextureSlots;
 
-static void AccumulateMomentAndCorrelation(const TextureDirection *texture,
-  PixelInfo *correlation,const ssize_t x,const ssize_t y)
+static void AccumulateAngularSecondMoment(const TextureDirection *texture,
+  const ssize_t x,const ssize_t y)
 {
   const Image
     *const image = texture->image;
@@ -309,8 +309,7 @@ static void AccumulateMomentAndCorrelation(const TextureDirection *texture,
     *const channel_features = texture->channel_features;
 
   FeatureStatistics
-    **const cooccurrence = texture->cooccurrence,
-    *const sum = texture->sum;
+    **const cooccurrence = texture->cooccurrence;
 
   const ssize_t
     i = texture->i;
@@ -335,6 +334,22 @@ static void AccumulateMomentAndCorrelation(const TextureDirection *texture,
     channel_features[AlphaPixelChannel].angular_second_moment[i]+=
       cooccurrence[x][y].direction[i].alpha*
       cooccurrence[x][y].direction[i].alpha;
+}
+
+static void AccumulateMomentAndCorrelation(const TextureDirection *texture,
+  PixelInfo *correlation,const ssize_t x,const ssize_t y)
+{
+  const Image
+    *const image = texture->image;
+
+  FeatureStatistics
+    **const cooccurrence = texture->cooccurrence,
+    *const sum = texture->sum;
+
+  const ssize_t
+    i = texture->i;
+
+  AccumulateAngularSecondMoment(texture,x,y);
   /*
     Correlation: measure of linear-dependencies in the image.
   */
@@ -353,8 +368,8 @@ static void AccumulateMomentAndCorrelation(const TextureDirection *texture,
       cooccurrence[x][y].direction[i].alpha;
 }
 
-static void AccumulateInverseDifferenceAndSum(const TextureDirection *texture,
-  const ssize_t x,const ssize_t y)
+static void AccumulateInverseDifferenceMoment(
+  const TextureDirection *texture,const ssize_t x,const ssize_t y)
 {
   const Image
     *const image = texture->image;
@@ -363,8 +378,7 @@ static void AccumulateInverseDifferenceAndSum(const TextureDirection *texture,
     *const channel_features = texture->channel_features;
 
   FeatureStatistics
-    **const cooccurrence = texture->cooccurrence,
-    *const density_xy = texture->density_xy;
+    **const cooccurrence = texture->cooccurrence;
 
   const ssize_t
     i = texture->i;
@@ -384,6 +398,22 @@ static void AccumulateInverseDifferenceAndSum(const TextureDirection *texture,
   if (image->alpha_trait != UndefinedPixelTrait)
     channel_features[AlphaPixelChannel].inverse_difference_moment[i]+=
       cooccurrence[x][y].direction[i].alpha/((y-x)*(y-x)+1);
+}
+
+static void AccumulateInverseDifferenceAndSum(const TextureDirection *texture,
+  const ssize_t x,const ssize_t y)
+{
+  const Image
+    *const image = texture->image;
+
+  FeatureStatistics
+    **const cooccurrence = texture->cooccurrence,
+    *const density_xy = texture->density_xy;
+
+  const ssize_t
+    i = texture->i;
+
+  AccumulateInverseDifferenceMoment(texture,x,y);
   /*
     Sum average.
   */
@@ -391,7 +421,7 @@ static void AccumulateInverseDifferenceAndSum(const TextureDirection *texture,
     &cooccurrence[x][y].direction[i]);
 }
 
-static void AccumulateEntropyAndDensities(const TextureDirection *texture,
+static void AccumulateCooccurrenceEntropy(const TextureDirection *texture,
   const ssize_t x,const ssize_t y)
 {
   const Image
@@ -401,9 +431,7 @@ static void AccumulateEntropyAndDensities(const TextureDirection *texture,
     *const channel_features = texture->channel_features;
 
   FeatureStatistics
-    **const cooccurrence = texture->cooccurrence,
-    *const density_x = texture->density_x,
-    *const density_y = texture->density_y;
+    **const cooccurrence = texture->cooccurrence;
 
   const ssize_t
     i = texture->i;
@@ -428,6 +456,23 @@ static void AccumulateEntropyAndDensities(const TextureDirection *texture,
     channel_features[AlphaPixelChannel].entropy[i]-=
       cooccurrence[x][y].direction[i].alpha*
       log2(cooccurrence[x][y].direction[i].alpha);
+}
+
+static void AccumulateEntropyAndDensities(const TextureDirection *texture,
+  const ssize_t x,const ssize_t y)
+{
+  const Image
+    *const image = texture->image;
+
+  FeatureStatistics
+    **const cooccurrence = texture->cooccurrence,
+    *const density_x = texture->density_x,
+    *const density_y = texture->density_y;
+
+  const ssize_t
+    i = texture->i;
+
+  AccumulateCooccurrenceEntropy(texture,x,y);
   /*
     Information Measures of Correlation.
   */
@@ -615,7 +660,8 @@ static void AccumulateSumEntropyAndVariance(const TextureDirection *texture,
       density_xy[x].direction[i].alpha;
 }
 
-static void ComputeSumFeatures(const TextureDirection *texture)
+static void AccumulateSumAverage(const TextureDirection *texture,
+  const ssize_t x)
 {
   const Image
     *const image = texture->image;
@@ -626,6 +672,28 @@ static void ComputeSumFeatures(const TextureDirection *texture)
   FeatureStatistics
     *const density_xy = texture->density_xy;
 
+  const ssize_t
+    i = texture->i;
+
+  /*
+    Sum average.
+  */
+  channel_features[RedPixelChannel].sum_average[i]+=
+    x*density_xy[x].direction[i].red;
+  channel_features[GreenPixelChannel].sum_average[i]+=
+    x*density_xy[x].direction[i].green;
+  channel_features[BluePixelChannel].sum_average[i]+=
+    x*density_xy[x].direction[i].blue;
+  if (image->colorspace == CMYKColorspace)
+    channel_features[BlackPixelChannel].sum_average[i]+=
+      x*density_xy[x].direction[i].black;
+  if (image->alpha_trait != UndefinedPixelTrait)
+    channel_features[AlphaPixelChannel].sum_average[i]+=
+      x*density_xy[x].direction[i].alpha;
+}
+
+static void ComputeSumFeatures(const TextureDirection *texture)
+{
   const unsigned int
     number_grays = texture->number_grays;
 
@@ -637,21 +705,7 @@ static void ComputeSumFeatures(const TextureDirection *texture)
 
   for (x=2; x < (ssize_t) (2*number_grays); x++)
   {
-    /*
-      Sum average.
-    */
-    channel_features[RedPixelChannel].sum_average[i]+=
-      x*density_xy[x].direction[i].red;
-    channel_features[GreenPixelChannel].sum_average[i]+=
-      x*density_xy[x].direction[i].green;
-    channel_features[BluePixelChannel].sum_average[i]+=
-      x*density_xy[x].direction[i].blue;
-    if (image->colorspace == CMYKColorspace)
-      channel_features[BlackPixelChannel].sum_average[i]+=
-        x*density_xy[x].direction[i].black;
-    if (image->alpha_trait != UndefinedPixelTrait)
-      channel_features[AlphaPixelChannel].sum_average[i]+=
-        x*density_xy[x].direction[i].alpha;
+    AccumulateSumAverage(texture,x);
     AccumulateSumEntropyAndVariance(texture,x);
   }
 }
@@ -768,7 +822,7 @@ static void AccumulateCorrelationEntropies(const TextureDirection *texture,
       density_x[x].direction[i].alpha*density_y[y].direction[i].alpha));
 }
 
-static void ComputeVarianceFeatures(const TextureDirection *texture,
+static void SetVarianceSumOfSquares(const TextureDirection *texture,
   const TextureSlots *slots)
 {
   const PixelInfo
@@ -780,11 +834,28 @@ static void ComputeVarianceFeatures(const TextureDirection *texture,
   ChannelFeatures
     *const channel_features = texture->channel_features;
 
-  const unsigned int
-    number_grays = texture->number_grays;
-
   const ssize_t
     i = texture->i;
+
+  channel_features[RedPixelChannel].variance_sum_of_squares[i]=
+    variance->red;
+  channel_features[GreenPixelChannel].variance_sum_of_squares[i]=
+    variance->green;
+  channel_features[BluePixelChannel].variance_sum_of_squares[i]=
+    variance->blue;
+  if (image->colorspace == CMYKColorspace)
+    channel_features[BlackPixelChannel].variance_sum_of_squares[i]=
+      variance->black;
+  if (image->alpha_trait != UndefinedPixelTrait)
+    channel_features[AlphaPixelChannel].variance_sum_of_squares[i]=
+      variance->alpha;
+}
+
+static void ComputeVarianceFeatures(const TextureDirection *texture,
+  const TextureSlots *slots)
+{
+  const unsigned int
+    number_grays = texture->number_grays;
 
   ssize_t
     y;
@@ -800,18 +871,7 @@ static void ComputeVarianceFeatures(const TextureDirection *texture,
       AccumulateCorrelationEntropies(texture,slots,x,y);
     }
   }
-  channel_features[RedPixelChannel].variance_sum_of_squares[i]=
-    variance->red;
-  channel_features[GreenPixelChannel].variance_sum_of_squares[i]=
-    variance->green;
-  channel_features[BluePixelChannel].variance_sum_of_squares[i]=
-    variance->blue;
-  if (image->colorspace == CMYKColorspace)
-    channel_features[BlackPixelChannel].variance_sum_of_squares[i]=
-      variance->black;
-  if (image->alpha_trait != UndefinedPixelTrait)
-    channel_features[AlphaPixelChannel].variance_sum_of_squares[i]=
-      variance->alpha;
+  SetVarianceSumOfSquares(texture,slots);
 }
 
 static void AccumulateDifferenceVariance(const TextureDirection *texture,

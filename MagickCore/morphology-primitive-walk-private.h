@@ -586,8 +586,8 @@ static void ApplyMorphologyIntensity(const MorphologyKernelWalk *walk,
   }
 }
 
-static void ApplyMorphologyHitAndMiss(const MorphologyKernelWalk *walk,
-  const Quantum *magick_restrict *quantum_pixels,double *pixel)
+static void SetHitAndMissPixel(const MorphologyKernelWalk *walk,
+  double minimum,const double maximum,double *pixel)
 {
   const MorphologyMethod
     method = walk->method;
@@ -598,6 +598,23 @@ static void ApplyMorphologyHitAndMiss(const MorphologyKernelWalk *walk,
   const ssize_t
     center = walk->center,
     i = walk->i;
+
+  minimum-=maximum;
+  if (minimum < 0.0)
+    minimum=0.0;
+  (*pixel)=minimum;
+  if (method == ThinningMorphology)
+    (*pixel)=(double) p[center+i]-minimum;
+  else
+    if (method == ThickenMorphology)
+      (*pixel)=(double) p[center+i]+minimum;
+}
+
+static void ApplyMorphologyHitAndMiss(const MorphologyKernelWalk *walk,
+  const Quantum *magick_restrict *quantum_pixels,double *pixel)
+{
+  const MorphologyMethod
+    method = walk->method;
 
   double
     maximum = walk->maximum,
@@ -622,15 +639,7 @@ static void ApplyMorphologyHitAndMiss(const MorphologyKernelWalk *walk,
          greyscale image.
       */
       WalkHitAndMissKernel(walk,&minimum,&maximum);
-      minimum-=maximum;
-      if (minimum < 0.0)
-        minimum=0.0;
-      (*pixel)=minimum;
-      if (method == ThinningMorphology)
-        (*pixel)=(double) p[center+i]-minimum;
-      else
-        if (method == ThickenMorphology)
-          (*pixel)=(double) p[center+i]+minimum;
+      SetHitAndMissPixel(walk,minimum,maximum,pixel);
       break;
     }
     default:
@@ -955,6 +964,15 @@ typedef struct _MorphologyColumn
     id;
 } MorphologyColumn;
 
+static double NormalizeMorphologyColumnGamma(const MorphologyColumn *column,
+  double gamma,const size_t count)
+{
+  gamma=MagickSafeReciprocal(gamma);
+  if (count != 0)
+    gamma*=(double) column->kernel->height/count;
+  return(gamma);
+}
+
 static void ConvolveMorphologyColumnChannel(const MorphologyColumn *column,
   const Quantum *magick_restrict p,Quantum *magick_restrict q,const ssize_t i)
 {
@@ -1006,9 +1024,7 @@ static void ConvolveMorphologyColumnChannel(const MorphologyColumn *column,
   ConvolveColumnChannelValue(&walk,&pixel,&gamma,&count);
   if (fabs(pixel-(double) p[column->center+i]) >= MagickEpsilon)
     column->changes[column->id]++;
-  gamma=MagickSafeReciprocal(gamma);
-  if (count != 0)
-    gamma*=(double) column->kernel->height/count;
+  gamma=NormalizeMorphologyColumnGamma(column,gamma,count);
   SetPixelChannel(column->morphology_image,channel,ClampToQuantum(gamma*
     pixel),q);
 }
@@ -1173,6 +1189,18 @@ typedef struct _MorphologyColumnFetch
     x;
 } MorphologyColumnFetch;
 
+static MagickBooleanType CheckMorphologyColumn(
+  const Quantum *magick_restrict *p,Quantum *magick_restrict *q,
+  MagickBooleanType *status)
+{
+  if (((*p) == (const Quantum *) NULL) || ((*q) == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType FetchMorphologyColumn(
   const MorphologyColumnFetch *fetch,const Quantum *magick_restrict *p,
   Quantum *magick_restrict *q,MagickBooleanType *status)
@@ -1205,12 +1233,7 @@ static MagickBooleanType FetchMorphologyColumn(
     kernel->height-1,exception);
   (*q)=GetCacheViewAuthenticPixels(morphology_view,x,0,1,
     morphology_image->rows,exception);
-  if (((*p) == (const Quantum *) NULL) || ((*q) == (Quantum *) NULL))
-    {
-      (*status)=MagickFalse;
-      return(MagickFalse);
-    }
-  return(MagickTrue);
+  return(CheckMorphologyColumn(p,q,status));
 }
 
 static void SetMorphologyKernelOrigin(const MorphologyMethod method,
@@ -1336,6 +1359,27 @@ static size_t SumMorphologyChanges(size_t changed,const size_t *changes)
   return(changed);
 }
 
+static ssize_t FinishMorphologyRows(const MorphologyPrimitiveSetup *setup,
+  const MagickBooleanType status)
+{
+  const Image
+    *image = setup->image;
+
+  CacheView
+    *image_view = setup->image_view,
+    *morphology_view = setup->morphology_view;
+
+  size_t
+    changed = setup->changed,
+    *changes = setup->changes;
+
+  morphology_view=DestroyCacheView(morphology_view);
+  image_view=DestroyCacheView(image_view);
+  changed=SumMorphologyChanges(changed,changes);
+  changes=(size_t *) RelinquishMagickMemory(changes);
+  return(status ? (ssize_t) (changed/GetImageChannels(image)) : -1);
+}
+
 static ssize_t MorphologyRows(const MorphologyPrimitiveSetup *setup)
 {
   const MorphologyMethod
@@ -1367,7 +1411,6 @@ static ssize_t MorphologyRows(const MorphologyPrimitiveSetup *setup)
     offset = setup->offset;
 
   size_t
-    changed = setup->changed,
     *changes = setup->changes;
 
   const size_t
@@ -1406,11 +1449,7 @@ static ssize_t MorphologyRows(const MorphologyPrimitiveSetup *setup)
         ReportMorphologyProgress(image,progress,image->rows,&status);
       }
   }
-  morphology_view=DestroyCacheView(morphology_view);
-  image_view=DestroyCacheView(image_view);
-  changed=SumMorphologyChanges(changed,changes);
-  changes=(size_t *) RelinquishMagickMemory(changes);
-  return(status ? (ssize_t) (changed/GetImageChannels(image)) : -1);
+  return(FinishMorphologyRows(setup,status));
 }
 
 static ssize_t ConvolveMorphologyColumns(const MorphologyPrimitiveSetup *setup)
@@ -1502,6 +1541,14 @@ static ssize_t ConvolveMorphologyColumns(const MorphologyPrimitiveSetup *setup)
   return(status ? (ssize_t) (changed/GetImageChannels(image)) : 0);
 }
 
+static ssize_t RunMorphologyPrimitive(const MorphologyMethod method,
+  const KernelInfo *kernel,const MorphologyPrimitiveSetup *setup)
+{
+  if ((method == ConvolveMorphology) && (kernel->width == 1))
+    return(ConvolveMorphologyColumns(setup));
+  return(MorphologyRows(setup));
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -1571,9 +1618,7 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   setup.changes=changes;
   setup.width=width;
   setup.exception=exception;
-  if ((method == ConvolveMorphology) && (kernel->width == 1))
-    return(ConvolveMorphologyColumns(&setup));
-  return(MorphologyRows(&setup));
+  return(RunMorphologyPrimitive(method,kernel,&setup));
 }
 
 /*
