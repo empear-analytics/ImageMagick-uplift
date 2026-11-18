@@ -2822,6 +2822,102 @@ static double GetReflectSpreadOffset(const GradientOffsetInfo *offset_info,
   return(offset);
 }
 
+typedef struct _GradientSpreadInput
+{
+  const GradientInfo
+    *gradient;
+
+  const SegmentInfo
+    *gradient_vector;
+
+  double
+    length;
+
+  ssize_t
+    x,
+    y;
+} GradientSpreadInput;
+
+static void GetSpreadGradientColor(const GradientSpreadInput *spread,
+  double *offset,PixelInfo *composite)
+{
+  const GradientInfo
+    *gradient = spread->gradient;
+
+  const SegmentInfo
+    *gradient_vector = spread->gradient_vector;
+
+  const double
+    length = spread->length;
+
+  const ssize_t
+    x = spread->x,
+    y = spread->y;
+
+  switch (gradient->spread)
+  {
+    case UndefinedSpread:
+    case PadSpread:
+    {
+      GradientOffsetInfo
+        offset_info;
+
+      offset_info.gradient=gradient;
+      offset_info.gradient_vector=gradient_vector;
+      offset_info.length=length;
+      offset_info.x=x;
+      offset_info.y=y;
+      (*offset)=GetPadSpreadOffset(&offset_info,(*offset));
+      (*composite)=GetPadGradientColor(gradient,(*offset),(*composite));
+      break;
+    }
+    case ReflectSpread:
+    {
+      GradientOffsetInfo
+        offset_info;
+
+      offset_info.gradient=gradient;
+      offset_info.gradient_vector=gradient_vector;
+      offset_info.length=length;
+      offset_info.x=x;
+      offset_info.y=y;
+      (*offset)=GetReflectSpreadOffset(&offset_info,(*offset));
+      (*composite)=GetReflectGradientColor(gradient,(*offset),(*composite));
+      break;
+    }
+    case RepeatSpread:
+    {
+      double
+        repeat;
+
+      MagickBooleanType
+        antialias;
+
+      RepeatGradientInfo
+        repeat_info;
+
+      GradientOffsetInfo
+        offset_info;
+
+      antialias=MagickFalse;
+      repeat=0.0;
+      offset_info.gradient=gradient;
+      offset_info.gradient_vector=gradient_vector;
+      offset_info.length=length;
+      offset_info.x=x;
+      offset_info.y=y;
+      GetRepeatSpreadOffset(&offset_info,offset,&repeat,&antialias);
+      repeat_info.gradient=gradient;
+      repeat_info.length=length;
+      repeat_info.offset=(*offset);
+      repeat_info.repeat=repeat;
+      repeat_info.antialias=antialias;
+      (*composite)=GetRepeatGradientColor(&repeat_info,(*composite));
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType DrawGradientImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -2912,69 +3008,16 @@ MagickExport MagickBooleanType DrawGradientImage(Image *image,
     width=(size_t) (bounding_box.x+(ssize_t) bounding_box.width);
     for (x=bounding_box.x; x < (ssize_t) width; x++)
     {
+      GradientSpreadInput
+        spread;
+
       GetPixelInfoPixel(image,q,&pixel);
-      switch (gradient->spread)
-      {
-        case UndefinedSpread:
-        case PadSpread:
-        {
-          GradientOffsetInfo
-            offset_info;
-
-          offset_info.gradient=gradient;
-          offset_info.gradient_vector=gradient_vector;
-          offset_info.length=length;
-          offset_info.x=x;
-          offset_info.y=y;
-          offset=GetPadSpreadOffset(&offset_info,offset);
-          composite=GetPadGradientColor(gradient,offset,composite);
-          break;
-        }
-        case ReflectSpread:
-        {
-          GradientOffsetInfo
-            offset_info;
-
-          offset_info.gradient=gradient;
-          offset_info.gradient_vector=gradient_vector;
-          offset_info.length=length;
-          offset_info.x=x;
-          offset_info.y=y;
-          offset=GetReflectSpreadOffset(&offset_info,offset);
-          composite=GetReflectGradientColor(gradient,offset,composite);
-          break;
-        }
-        case RepeatSpread:
-        {
-          double
-            repeat;
-
-          MagickBooleanType
-            antialias;
-
-          RepeatGradientInfo
-            repeat_info;
-
-          GradientOffsetInfo
-            offset_info;
-
-          antialias=MagickFalse;
-          repeat=0.0;
-          offset_info.gradient=gradient;
-          offset_info.gradient_vector=gradient_vector;
-          offset_info.length=length;
-          offset_info.x=x;
-          offset_info.y=y;
-          GetRepeatSpreadOffset(&offset_info,&offset,&repeat,&antialias);
-          repeat_info.gradient=gradient;
-          repeat_info.length=length;
-          repeat_info.offset=offset;
-          repeat_info.repeat=repeat;
-          repeat_info.antialias=antialias;
-          composite=GetRepeatGradientColor(&repeat_info,composite);
-          break;
-        }
-      }
+      spread.gradient=gradient;
+      spread.gradient_vector=gradient_vector;
+      spread.length=length;
+      spread.x=x;
+      spread.y=y;
+      GetSpreadGradientColor(&spread,&offset,&composite);
       CompositePixelInfoOver(&composite,composite.alpha,&pixel,pixel.alpha,
         &pixel);
       SetPixelViaPixelInfo(image,&pixel,q);
