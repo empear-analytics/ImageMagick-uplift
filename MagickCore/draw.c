@@ -10039,6 +10039,23 @@ static PointInfo GetBezierPoint(const PrimitiveInfo *primitive_info,
   return(point);
 }
 
+static MagickBooleanType TraceBezierControlPoints(
+  PrimitiveInfo *primitive_info,const PointInfo *points,
+  const size_t control_points,PrimitiveInfo **p)
+{
+  ssize_t
+    i;
+
+  *p=primitive_info;
+  for (i=0; i < (ssize_t) control_points; i++)
+  {
+    if (TracePoint(*p,points[i]) == MagickFalse)
+      return(MagickFalse);
+    *p+=(ptrdiff_t) (*p)->coordinates;
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType TraceBezier(MVGInfo *mvg_info,
   const size_t number_coordinates)
 {
@@ -10115,17 +10132,13 @@ static MagickBooleanType TraceBezier(MVGInfo *mvg_info,
   /*
     Bezier curves are just short segmented polys.
   */
-  p=primitive_info;
-  for (i=0; i < (ssize_t) control_points; i++)
-  {
-    if (TracePoint(p,points[i]) == MagickFalse)
-      {
-        points=(PointInfo *) RelinquishMagickMemory(points);
-        coefficients=(double *) RelinquishMagickMemory(coefficients);
-        return(MagickFalse);
-      }
-    p+=(ptrdiff_t) p->coordinates;
-  }
+  if (TraceBezierControlPoints(primitive_info,points,control_points,&p) ==
+      MagickFalse)
+    {
+      points=(PointInfo *) RelinquishMagickMemory(points);
+      coefficients=(double *) RelinquishMagickMemory(coefficients);
+      return(MagickFalse);
+    }
   if (TracePoint(p,end) == MagickFalse)
     {
       points=(PointInfo *) RelinquishMagickMemory(points);
