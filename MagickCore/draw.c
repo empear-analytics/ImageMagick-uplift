@@ -5322,6 +5322,22 @@ static double GetArcCenterFactor(const double alpha,const double beta,
   return(factor);
 }
 
+static MagickBooleanType FinishArcPath(MVGInfo *mvg_info,
+  const MagickStatusType status,const ssize_t offset,PrimitiveInfo *p)
+{
+  PrimitiveInfo
+    *primitive_info;
+
+  if (status == 0)
+    return(MagickFalse);
+  mvg_info->offset=offset;
+  primitive_info=(*mvg_info->primitive_info)+mvg_info->offset;
+  primitive_info->coordinates=(size_t) (p-primitive_info);
+  primitive_info->closed_subpath=MagickFalse;
+  SetTracedPrimitiveType(primitive_info,p);
+  return(MagickTrue);
+}
+
 typedef struct _ArcSegmentInput
 {
   double
@@ -5523,14 +5539,7 @@ static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
     mvg_info->offset+=(ssize_t) p->coordinates;
     p+=(ptrdiff_t) p->coordinates;
   }
-  if (status == 0)
-    return(MagickFalse);
-  mvg_info->offset=offset;
-  primitive_info=(*mvg_info->primitive_info)+mvg_info->offset;
-  primitive_info->coordinates=(size_t) (p-primitive_info);
-  primitive_info->closed_subpath=MagickFalse;
-  SetTracedPrimitiveType(primitive_info,p);
-  return(MagickTrue);
+  return(FinishArcPath(mvg_info,status,offset,p));
 }
 
 static MagickBooleanType GetBezierQuantum(const PrimitiveInfo *primitive_info,
