@@ -466,25 +466,51 @@ typedef struct _SimilarityMerge
     channel_info;
 } SimilarityMerge;
 
-static void MergeHigherSimilarityInfo(const double similarity_threshold,
-  const SimilarityInfo channel_info,SimilarityInfo *similarity_info,
-  MagickBooleanType *threshold_trigger)
+typedef enum
 {
-  if ((similarity_threshold != DefaultSimilarityThreshold) &&
-      (channel_info.similarity >= similarity_threshold))
-    (*threshold_trigger)=MagickTrue;
-  if (channel_info.similarity >= (*similarity_info).similarity)
-    (*similarity_info)=channel_info;
+  HigherSimilaritySide,
+  LowerSimilaritySide
+} SimilaritySide;
+
+typedef struct _SimilaritySideMerge
+{
+  SimilaritySide
+    side;
+
+  double
+    similarity_threshold;
+
+  SimilarityInfo
+    channel_info;
+} SimilaritySideMerge;
+
+static inline int IsSideSimilarityMet(const SimilaritySideMerge *name,
+  const double limit)
+{
+  const SimilaritySide
+    side = name->side;
+
+  const SimilarityInfo
+    channel_info = name->channel_info;
+
+  return((side == HigherSimilaritySide) ?
+    (channel_info.similarity >= limit) :
+    (channel_info.similarity < limit));
 }
 
-static void MergeLowerSimilarityInfo(const double similarity_threshold,
-  const SimilarityInfo channel_info,SimilarityInfo *similarity_info,
-  MagickBooleanType *threshold_trigger)
+static inline void MergeSideSimilarityInfo(const SimilaritySideMerge *name,
+  SimilarityInfo *similarity_info,MagickBooleanType *threshold_trigger)
 {
+  const double
+    similarity_threshold = name->similarity_threshold;
+
+  const SimilarityInfo
+    channel_info = name->channel_info;
+
   if ((similarity_threshold != DefaultSimilarityThreshold) &&
-      (channel_info.similarity < similarity_threshold))
+      IsSideSimilarityMet(name,similarity_threshold))
     (*threshold_trigger)=MagickTrue;
-  if (channel_info.similarity < (*similarity_info).similarity)
+  if (IsSideSimilarityMet(name,(*similarity_info).similarity))
     (*similarity_info)=channel_info;
 }
 
@@ -508,14 +534,18 @@ static void MergeSimilarityInfo(const SimilarityMerge *merge,
     case PhaseCorrelationErrorMetric:
     case StructuralSimilarityErrorMetric:
     {
-      MergeHigherSimilarityInfo(similarity_threshold,channel_info,
-        similarity_info,threshold_trigger);
+      const SimilaritySideMerge
+        name = { HigherSimilaritySide, similarity_threshold, channel_info };
+
+      MergeSideSimilarityInfo(&name,similarity_info,threshold_trigger);
       break;
     }
     default:
     {
-      MergeLowerSimilarityInfo(similarity_threshold,channel_info,
-        similarity_info,threshold_trigger);
+      const SimilaritySideMerge
+        name = { LowerSimilaritySide, similarity_threshold, channel_info };
+
+      MergeSideSimilarityInfo(&name,similarity_info,threshold_trigger);
       break;
     }
   }
