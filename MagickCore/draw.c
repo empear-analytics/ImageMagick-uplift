@@ -2955,6 +2955,16 @@ static int MVGMacroCompare(const void *target,const void *source)
   return(strcmp(p,q));
 }
 
+static MagickBooleanType GetMVGMacroToken(const char **p,const size_t extent,
+  char *token)
+{
+  if (GetNextToken((*p),p,extent,token) < 1)
+    return(MagickFalse);
+  if (*token == '\0')
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static SplayTreeInfo *GetMVGMacros(const char *primitive,
   ExceptionInfo *exception)
 {
@@ -2994,9 +3004,7 @@ static SplayTreeInfo *GetMVGMacros(const char *primitive,
     ssize_t
       n;
 
-    if (GetNextToken(q,&q,extent,token) < 1)
-      break;
-    if (*token == '\0')
+    if (GetMVGMacroToken(&q,extent,token) == MagickFalse)
       break;
     if (LocaleCompare("push",token) != 0)
       continue;
@@ -3016,9 +3024,7 @@ static SplayTreeInfo *GetMVGMacros(const char *primitive,
       size_t
         length;
 
-      if (GetNextToken(p,&p,extent,token) < 1)
-        break;
-      if (*token == '\0')
+      if (GetMVGMacroToken(&p,extent,token) == MagickFalse)
         break;
       if (LocaleCompare(token,"pop") == 0)
         {
