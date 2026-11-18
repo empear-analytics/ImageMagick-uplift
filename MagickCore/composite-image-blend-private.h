@@ -652,6 +652,12 @@ static MagickBooleanType SelectBlendGradients(BlendGradientSet *alpha,
   return(MagickTrue);
 }
 
+static void ReleaseDivergenceImages(Image *dy_divergent,Image *dx_divergent)
+{
+  dy_divergent=DestroyImage(dy_divergent);
+  dx_divergent=DestroyImage(dx_divergent);
+}
+
 static Image *BlendDivergenceImage(const BlendGradientSet *selected,
   ExceptionInfo *exception)
 {
@@ -675,8 +681,7 @@ static Image *BlendDivergenceImage(const BlendGradientSet *selected,
     return((Image *) NULL);
   divergent_image=BlendSumImage(dx_divergent,dy_divergent,&quarter_sum,
     exception);
-  dy_divergent=DestroyImage(dy_divergent);
-  dx_divergent=DestroyImage(dx_divergent);
+  ReleaseDivergenceImages(dy_divergent,dx_divergent);
   return(divergent_image);
 }
 
