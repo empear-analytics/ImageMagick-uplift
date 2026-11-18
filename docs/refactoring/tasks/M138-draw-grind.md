@@ -3,9 +3,9 @@
 Branched from `campaign/M137` after #123 merged it into `main` (ba6c3318d); this branch's
 PR goes to `main`. Scores come from cs-mcp 1.5.16 through `tools/ch.py`.
 
-Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 24 flagged functions, 222 -> 292
+Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 23 flagged functions, 222 -> 292
 functions (four merges, about eighty helpers), 11,636 -> 12,140 lines. Function findings
-(one per function and category) 123 -> 49; the summed cc of the Complex Method
+(one per function and category) 123 -> 46; the summed cc of the Complex Method
 functions 908 -> 403.
 
 ## The function-count lesson
@@ -111,6 +111,9 @@ The function count still matters in annotate.c and resource.c.
 | 9ae7a352f, 442d79366, bda3bb874, (playbook 33131a77e), 9acb019e0 | PS, PS, E, K | DrawAffineImage | the column loop into DrawAffineRowPixels, the whole row body into DrawAffineImageRow (both in the parallel loop, timed in the OpenMP build: within A/A), the corner transform into GetAffineImageExtent, the min/max scan into GetAffineImageBounds (Recipe K's new outside-region form); no findings left |
 | c848e000d | Q | DrawGradientImage | the per-pixel spread switch into GetSpreadGradientColor (timed through magick and the driver in the OpenMP build: within A/A at 21 runs); cc 13 -> 9, 140 -> 92 lines, leaves Bumpy Road |
 | 62037b202 | revert | ResetAlphaPixels/ResetColorPixels | 460d384e0's merge reverted: in the OpenMP build the merged loop made the alpha reset 10.7% slower |
+| 47470cf36 | CS | ParseMVGClipPath | the clip-path node into DrawMVGClipPathNode through the arm_state it already builds; no findings left |
+| cff57879f, c42e97468, 487d476e2 | E, E, N | TraceArcPath | the centre factor and the sweep wrap into value helpers, the per-segment geometry into TraceArcSegmentPoints; cc 20 -> 11, 141 -> 107 lines, leaves Bumpy Road |
+| 6f093b200 | E | GetFillAlpha | the fill-opacity tail into GetFillOpacity (per pixel; same per-pixel object code in the OpenMP build); leaves Large Method, cc 25 -> 20 |
 
 ## Probed and dropped
 
@@ -166,6 +169,7 @@ The function count still matters in annotate.c and resource.c.
   diverged, all known. check_trailers: 108 refactor commits, all valid.
 - Whole catalogue at ff8371e1f (fifteenth batch): 15,967 cases, 3 diverged, all known.
 - Whole catalogue at 62037b202 (sixteenth batch): 15,967 cases, 3 diverged, all known.
+- Whole catalogue at 6f093b200 (seventeenth batch): 15,967 cases, 3 diverged, all known.
   check_trailers over ba6c3318d..HEAD: 379 refactor commits (128 of them on draw.c, the
   rest from the main merge), all valid.
 
@@ -213,6 +217,12 @@ The function count still matters in annotate.c and resource.c.
   43, TracePath 39, RenderMVGContent 38, DrawPolygonPrimitive 30, ConvertPathToPolygon 25,
   DrawDashPolygon 24, DrawAffineImage 23 and DrawGradientImage 13 with OpenMP loops) hold
   most of the remaining findings; draw.c's score moves only once they go (M137's stub probe).
+- **Ceiling:** M137's stub probe put draw.c at 7.10 with every function finding gone (the
+  file-level *Number of Functions* and *Overall Code Complexity* stay), so 10.0 needs a
+  split, not more steps. And not every function finding can go under the rules:
+  GetPolygonBounds, DrawBoundingRectangles and LogPrimitiveInfo have no oracle case,
+  DrawPatternPath's five arguments are public API, and IsValidListChar is an allowed
+  label run.
 - **Scoring rule of thumb:** never clear a function's Complex Method while its Large Method
   stays; take both in one commit, or Large Method first. Under that rule, extractions hold
   3.27 (the fifteenth batch added about twenty helpers); the earlier CloneDrawInfo drop
