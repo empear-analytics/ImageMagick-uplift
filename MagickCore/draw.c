@@ -10056,6 +10056,16 @@ static void SetTracedPrimitiveType(const PrimitiveInfo *primitive_info,
   }
 }
 
+static double GetArcSweepTheta(double theta,const MagickBooleanType sweep)
+{
+  if ((theta < 0.0) && (sweep != MagickFalse))
+    theta+=2.0*MagickPI;
+  else
+    if ((theta > 0.0) && (sweep == MagickFalse))
+      theta-=2.0*MagickPI;
+  return(theta);
+}
+
 static double GetArcCenterFactor(const double alpha,const double beta,
   const MagickBooleanType large_arc,const MagickBooleanType sweep)
 {
@@ -10158,11 +10168,7 @@ static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
   center.y=(double) ((points[0].y+points[1].y)/2+factor*alpha);
   alpha=atan2(points[0].y-center.y,points[0].x-center.x);
   theta=atan2(points[1].y-center.y,points[1].x-center.x)-alpha;
-  if ((theta < 0.0) && (sweep != MagickFalse))
-    theta+=2.0*MagickPI;
-  else
-    if ((theta > 0.0) && (sweep == MagickFalse))
-      theta-=2.0*MagickPI;
+  theta=GetArcSweepTheta(theta,sweep);
   arc_segments=(size_t) CastDoubleToSsizeT(ceil(fabs((double) (theta/(0.5*
     MagickPI+MagickEpsilon)))));
   status=MagickTrue;
