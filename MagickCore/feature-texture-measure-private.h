@@ -813,7 +813,7 @@ static void AccumulateCorrelationEntropies(const TextureDirection *texture,
       density_x[x].direction[i].alpha*density_y[y].direction[i].alpha));
 }
 
-static void ComputeVarianceFeatures(const TextureDirection *texture,
+static void SetVarianceSumOfSquares(const TextureDirection *texture,
   const TextureSlots *slots)
 {
   const PixelInfo
@@ -825,11 +825,28 @@ static void ComputeVarianceFeatures(const TextureDirection *texture,
   ChannelFeatures
     *const channel_features = texture->channel_features;
 
-  const unsigned int
-    number_grays = texture->number_grays;
-
   const ssize_t
     i = texture->i;
+
+  channel_features[RedPixelChannel].variance_sum_of_squares[i]=
+    variance->red;
+  channel_features[GreenPixelChannel].variance_sum_of_squares[i]=
+    variance->green;
+  channel_features[BluePixelChannel].variance_sum_of_squares[i]=
+    variance->blue;
+  if (image->colorspace == CMYKColorspace)
+    channel_features[BlackPixelChannel].variance_sum_of_squares[i]=
+      variance->black;
+  if (image->alpha_trait != UndefinedPixelTrait)
+    channel_features[AlphaPixelChannel].variance_sum_of_squares[i]=
+      variance->alpha;
+}
+
+static void ComputeVarianceFeatures(const TextureDirection *texture,
+  const TextureSlots *slots)
+{
+  const unsigned int
+    number_grays = texture->number_grays;
 
   ssize_t
     y;
@@ -845,18 +862,7 @@ static void ComputeVarianceFeatures(const TextureDirection *texture,
       AccumulateCorrelationEntropies(texture,slots,x,y);
     }
   }
-  channel_features[RedPixelChannel].variance_sum_of_squares[i]=
-    variance->red;
-  channel_features[GreenPixelChannel].variance_sum_of_squares[i]=
-    variance->green;
-  channel_features[BluePixelChannel].variance_sum_of_squares[i]=
-    variance->blue;
-  if (image->colorspace == CMYKColorspace)
-    channel_features[BlackPixelChannel].variance_sum_of_squares[i]=
-      variance->black;
-  if (image->alpha_trait != UndefinedPixelTrait)
-    channel_features[AlphaPixelChannel].variance_sum_of_squares[i]=
-      variance->alpha;
+  SetVarianceSumOfSquares(texture,slots);
 }
 
 static void AccumulateDifferenceVariance(const TextureDirection *texture,
