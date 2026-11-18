@@ -4934,6 +4934,15 @@ static void PrepareMVGPrimitive(const MVGRenderState *state)
   } while (0);
 }
 
+static MagickBooleanType FinishMVGRender(const MagickStatusType status,
+  const char *keyword,ExceptionInfo *exception)
+{
+  if ((status == MagickFalse) && (exception->severity < ErrorException))
+    ThrowBinaryException(DrawError,"NonconformingDrawingPrimitiveDefinition",
+      keyword);
+  return(status != 0 ? MagickTrue : MagickFalse);
+}
+
 static char *AcquireMVGPrimitive(const DrawInfo *draw_info,const size_t depth,
   ExceptionInfo *exception)
 {
@@ -5219,10 +5228,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     Relinquish resources.
   */
   ReleaseMVGRenderResources(&render_state);
-  if ((status == MagickFalse) && (exception->severity < ErrorException))
-    ThrowBinaryException(DrawError,"NonconformingDrawingPrimitiveDefinition",
-      keyword);
-  return(status != 0 ? MagickTrue : MagickFalse);
+  return(FinishMVGRender(status,keyword,exception));
 }
 
 MagickExport MagickBooleanType DrawImage(Image *image,const DrawInfo *draw_info,
