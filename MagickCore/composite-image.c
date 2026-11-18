@@ -1261,12 +1261,27 @@ static MagickBooleanType CompositeBlurGroups(
   return(MagickFalse);
 }
 
+static void SetCompositeRowOperators(CompositeRowInputs *rows,
+  const CompositeOperator compose)
+{
+  (*rows).union_coverage=IsListedOperator(UnionCoverageOperators,
+    sizeof(UnionCoverageOperators)/sizeof(*UnionCoverageOperators),compose);
+  (*rows).canvas_alpha=IsListedOperator(CanvasAlphaOperators,
+    sizeof(CanvasAlphaOperators)/sizeof(*CanvasAlphaOperators),compose);
+  (*rows).source_alpha=IsListedOperator(SourceAlphaOperators,
+    sizeof(SourceAlphaOperators)/sizeof(*SourceAlphaOperators),compose);
+  (*rows).pixel_info_inputs=IsListedOperator(PixelInfoInputOperators,
+    sizeof(PixelInfoInputOperators)/sizeof(*PixelInfoInputOperators),compose);
+  (*rows).intensity_inputs=IsListedOperator(IntensityInputOperators,
+    sizeof(IntensityInputOperators)/sizeof(*IntensityInputOperators),compose);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
 %                                                                             %
 %                                                                             %
-%   C o m p o s i t e I m a g e                                             %
+%   C o m p o s i t e I m a g e                                           %
 %                                                                             %
 %                                                                             %
 %                                                                             %
@@ -1462,16 +1477,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
   rows.image=image;
   rows.source_image=source_image;
   rows.compose=compose;
-  rows.union_coverage=IsListedOperator(UnionCoverageOperators,
-    sizeof(UnionCoverageOperators)/sizeof(*UnionCoverageOperators),compose);
-  rows.canvas_alpha=IsListedOperator(CanvasAlphaOperators,
-    sizeof(CanvasAlphaOperators)/sizeof(*CanvasAlphaOperators),compose);
-  rows.source_alpha=IsListedOperator(SourceAlphaOperators,
-    sizeof(SourceAlphaOperators)/sizeof(*SourceAlphaOperators),compose);
-  rows.pixel_info_inputs=IsListedOperator(PixelInfoInputOperators,
-    sizeof(PixelInfoInputOperators)/sizeof(*PixelInfoInputOperators),compose);
-  rows.intensity_inputs=IsListedOperator(IntensityInputOperators,
-    sizeof(IntensityInputOperators)/sizeof(*IntensityInputOperators),compose);
+  SetCompositeRowOperators(&rows,compose);
   rows.clip_to_self=clip_to_self;
   rows.x_offset=x_offset;
   rows.y_offset=y_offset;
