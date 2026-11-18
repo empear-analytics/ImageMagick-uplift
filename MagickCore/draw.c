@@ -553,6 +553,157 @@ static MagickBooleanType GetMVGMacroToken(const char **p,const size_t extent,
   return(MagickTrue);
 }
 
+typedef struct _MVGMacroExtract
+{
+  const char
+    *start,
+    *end,
+    *p;
+
+  size_t
+    extent;
+
+  char
+    *token,
+    *macro;
+
+  SplayTreeInfo
+    *macros;
+
+  char
+    *name;
+} MVGMacroExtract;
+
+static void AddMVGMacro(const MVGMacroExtract *extract)
+{
+  const char
+    *const start = extract->start,
+    *const end = extract->end;
+
+  const char
+    *p = extract->p;
+
+  const size_t
+    extent = extract->extent;
+
+  char
+    *const token = extract->token,
+    *const macro = extract->macro;
+
+  SplayTreeInfo
+    *const macros = extract->macros;
+
+  char
+    *const name = extract->name;
+
+  size_t
+    length;
+
+  length=(size_t) (end-start);
+  (void) GetNextToken(p,&p,extent,token);
+  if (length > 0)
+    {
+      (void) CopyMagickString(macro,start,length);
+      (void) AddValueToSplayTree(macros,ConstantString(name),
+        ConstantString(macro));
+    }
+}
+
+static void MatchMVGMacroPop(const char *token,const char *p,
+  const char **end,ssize_t *n)
+{
+  if (LocaleCompare(token,"pop") == 0)
+    {
+      (*end)=p-strlen(token)-1;
+      (*n)--;
+    }
+}
+
+typedef struct _MVGMacroState
+{
+  char
+    **macro,
+    **token;
+
+  const char
+    **q;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
+    *extent;
+
+  SplayTreeInfo
+    **macros;
+} MVGMacroState;
+
+static void ScanMVGMacro(const MVGMacroState *state)
+{
+  char
+    *macro = (*state->macro),
+    *token = (*state->token);
+
+  const char
+    *q = (*state->q);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  size_t
+    extent = (*state->extent);
+
+  SplayTreeInfo
+    *macros = (*state->macros);
+
+  char
+    name[MagickPathExtent];
+
+  const char
+    *end,
+    *p,
+    *start;
+
+  ssize_t
+    n;
+
+  start=q;
+  end=q;
+  (void) CopyMagickString(name,token,MagickPathExtent);
+  n=1;
+  for (p=q; *p != '\0'; )
+  {
+    MVGMacroExtract
+      extract;
+
+    if (GetMVGMacroToken(&p,extent,token) == MagickFalse)
+      break;
+    MatchMVGMacroPop(token,p,&end,&n);
+    if ((LocaleCompare(token,"push") == 0) &&
+        (n++ >= MagickMaxRecursionDepth))
+      {
+        (void) ThrowMagickException(exception,GetMagickModule(),
+          DrawError,"VectorGraphicsNestedTooDeeply","`%s'",token);
+        break;
+      }
+    if ((n != 0) || (end < start))
+      continue;
+    /*
+      Extract macro.
+    */
+    extract.start=start;
+    extract.end=end;
+    extract.p=p;
+    extract.extent=extent;
+    extract.token=token;
+    extract.macro=macro;
+    extract.macros=macros;
+    extract.name=name;
+    AddMVGMacro(&extract);
+    break;
+  }
+}
+
 static SplayTreeInfo *GetMVGMacros(const char *primitive,
   ExceptionInfo *exception)
 {
@@ -569,6 +720,9 @@ static SplayTreeInfo *GetMVGMacros(const char *primitive,
   SplayTreeInfo
     *macros;
 
+  const MVGMacroState
+    macro_state = { &macro, &token, &q, exception, &extent, &macros };
+
   /*
     Scan graphic primitives for definitions and classes.
   */
@@ -581,17 +735,6 @@ static SplayTreeInfo *GetMVGMacros(const char *primitive,
   extent=strlen(token)+MagickPathExtent;
   for (q=primitive; *q != '\0'; )
   {
-    char
-      name[MagickPathExtent];
-
-    const char
-      *end,
-      *p,
-      *start;
-
-    ssize_t
-      n;
-
     if (GetMVGMacroToken(&q,extent,token) == MagickFalse)
       break;
     if (LocaleCompare("push",token) != 0)
@@ -603,44 +746,7 @@ static SplayTreeInfo *GetMVGMacros(const char *primitive,
       Named macro (e.g. push graphic-context "wheel").
     */
     (void) GetNextToken(q,&q,extent,token);
-    start=q;
-    end=q;
-    (void) CopyMagickString(name,token,MagickPathExtent);
-    n=1;
-    for (p=q; *p != '\0'; )
-    {
-      size_t
-        length;
-
-      if (GetMVGMacroToken(&p,extent,token) == MagickFalse)
-        break;
-      if (LocaleCompare(token,"pop") == 0)
-        {
-          end=p-strlen(token)-1;
-          n--;
-        }
-      if ((LocaleCompare(token,"push") == 0) &&
-          (n++ >= MagickMaxRecursionDepth))
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            DrawError,"VectorGraphicsNestedTooDeeply","`%s'",token);
-          break;
-        }
-      if ((n != 0) || (end < start))
-        continue;
-      /*
-        Extract macro.
-      */
-      length=(size_t) (end-start);
-      (void) GetNextToken(p,&p,extent,token);
-      if (length > 0)
-        {
-          (void) CopyMagickString(macro,start,length);
-          (void) AddValueToSplayTree(macros,ConstantString(name),
-            ConstantString(macro));
-        }
-      break;
-    }
+    ScanMVGMacro(&macro_state);
   }
   token=DestroyString(token);
   macro=DestroyString(macro);
@@ -5616,6 +5722,24 @@ static MagickBooleanType TraceBezierControlPoints(
   return(MagickTrue);
 }
 
+static void SetBezierCoefficients(double *coefficients,
+  const size_t number_coordinates)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) number_coordinates; i++)
+    coefficients[i]=Permutate((ssize_t) number_coordinates-1,i);
+}
+
+static MagickBooleanType ReleaseBezierBuffers(PointInfo *points,
+  double *coefficients)
+{
+  points=(PointInfo *) RelinquishMagickMemory(points);
+  coefficients=(double *) RelinquishMagickMemory(coefficients);
+  return(MagickFalse);
+}
+
 static MagickBooleanType TraceBezier(MVGInfo *mvg_info,
   const size_t number_coordinates)
 {
@@ -5669,18 +5793,13 @@ static MagickBooleanType TraceBezier(MVGInfo *mvg_info,
     }
   control_points=quantum*number_coordinates;
   if (CheckPrimitiveExtent(mvg_info,(double) control_points+1) == MagickFalse)
-    {
-      points=(PointInfo *) RelinquishMagickMemory(points);
-      coefficients=(double *) RelinquishMagickMemory(coefficients);
-      return(MagickFalse);
-    }
+    return(ReleaseBezierBuffers(points,coefficients));
   primitive_info=(*mvg_info->primitive_info)+mvg_info->offset;
   /*
     Compute bezier points.
   */
   end=primitive_info[number_coordinates-1].point;
-  for (i=0; i < (ssize_t) number_coordinates; i++)
-    coefficients[i]=Permutate((ssize_t) number_coordinates-1,i);
+  SetBezierCoefficients(coefficients,number_coordinates);
   weight=0.0;
   for (i=0; i < (ssize_t) control_points; i++)
   {
@@ -5694,17 +5813,9 @@ static MagickBooleanType TraceBezier(MVGInfo *mvg_info,
   */
   if (TraceBezierControlPoints(primitive_info,points,control_points,&p) ==
       MagickFalse)
-    {
-      points=(PointInfo *) RelinquishMagickMemory(points);
-      coefficients=(double *) RelinquishMagickMemory(coefficients);
-      return(MagickFalse);
-    }
+    return(ReleaseBezierBuffers(points,coefficients));
   if (TracePoint(p,end) == MagickFalse)
-    {
-      points=(PointInfo *) RelinquishMagickMemory(points);
-      coefficients=(double *) RelinquishMagickMemory(coefficients);
-      return(MagickFalse);
-    }
+    return(ReleaseBezierBuffers(points,coefficients));
   p+=(ptrdiff_t) p->coordinates;
   primitive_info->coordinates=(size_t) (p-primitive_info);
   primitive_info->closed_subpath=MagickFalse;
@@ -6479,6 +6590,38 @@ static ssize_t TracePathClose(const PathTrace *trace)
   return(0);
 }
 
+static ssize_t FinishTracedPath(const PathTrace *trace,
+  const PrimitiveType primitive_type)
+{
+  MVGInfo
+    *mvg_info = trace->mvg_info;
+
+  PrimitiveInfo
+    *primitive_info,
+    *q = (*trace->q);
+
+  size_t
+    number_coordinates = (*trace->number_coordinates),
+    z_count = (*trace->z_count);
+
+  ssize_t
+    i,
+    subpath_offset = (*trace->subpath_offset);
+
+  primitive_info=(*mvg_info->primitive_info)+subpath_offset;
+  primitive_info->coordinates=(size_t) (q-primitive_info);
+  number_coordinates+=primitive_info->coordinates;
+  for (i=0; i < (ssize_t) number_coordinates; i++)
+  {
+    q--;
+    q->primitive=primitive_type;
+    if (z_count > 1)
+      q->method=FillToBorderMethod;
+  }
+  q=primitive_info;
+  return((ssize_t) number_coordinates);
+}
+
 typedef struct _PathCommandInfo
 {
   int
@@ -6577,9 +6720,6 @@ static ssize_t TracePath(MVGInfo *mvg_info,const char *path,
   PrimitiveInfo
     *q;
 
-  ssize_t
-    i;
-
   size_t
     number_coordinates,
     z_count;
@@ -6621,18 +6761,7 @@ static ssize_t TracePath(MVGInfo *mvg_info,const char *path,
   }
   if (status == MagickFalse)
     return(-1);
-  primitive_info=(*mvg_info->primitive_info)+subpath_offset;
-  primitive_info->coordinates=(size_t) (q-primitive_info);
-  number_coordinates+=primitive_info->coordinates;
-  for (i=0; i < (ssize_t) number_coordinates; i++)
-  {
-    q--;
-    q->primitive=primitive_type;
-    if (z_count > 1)
-      q->method=FillToBorderMethod;
-  }
-  q=primitive_info;
-  return((ssize_t) number_coordinates);
+  return(FinishTracedPath(&trace,primitive_type));
 }
 
 static void ClampRoundCornerArc(double *arc,const double segment)
