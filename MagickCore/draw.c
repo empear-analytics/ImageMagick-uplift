@@ -9091,6 +9091,54 @@ static MagickStatusType DrawTextPrimitive(const DrawPrimitiveContext *context,
   return(status);
 }
 
+static MagickStatusType DrawWideStrokedPrimitive(
+  const DrawPrimitiveContext *context,MagickStatusType status)
+{
+  Image
+    *image = context->image;
+
+  const DrawInfo
+    *draw_info = context->draw_info;
+
+  const PrimitiveInfo
+    *primitive_info = context->primitive_info;
+
+  ExceptionInfo
+    *exception = context->exception;
+
+  double
+    point_x,
+    point_y;
+
+  MagickBooleanType
+    closed_path;
+
+  ssize_t
+    i;
+
+  /*
+    Draw strokes while respecting line cap/join attributes.
+  */
+  closed_path=primitive_info[0].closed_subpath;
+  i=(ssize_t) primitive_info[0].coordinates;
+  point_x=fabs(primitive_info[i-1].point.x-primitive_info[0].point.x);
+  point_y=fabs(primitive_info[i-1].point.y-primitive_info[0].point.y);
+  if (IsClosedEllipse(point_x,point_y) != MagickFalse)
+    closed_path=MagickTrue;
+  if (IsRoundStrokeOrPrimitive(draw_info,closed_path,primitive_info,i) !=
+      MagickFalse)
+    {
+      status&=(MagickStatusType) DrawPolygonPrimitive(image,draw_info,
+        primitive_info,exception);
+      return(status);
+    }
+  status=DrawUnstrokedPolygon(context,status);
+  if (status != MagickFalse)
+    status&=(MagickStatusType) DrawStrokePolygon(image,draw_info,
+      primitive_info,exception);
+  return(status);
+}
+
 static MagickStatusType DrawStrokedPrimitive(const DrawPrimitiveContext *context,
   MagickStatusType status)
 {
@@ -9105,9 +9153,6 @@ static MagickStatusType DrawStrokedPrimitive(const DrawPrimitiveContext *context
 
   ExceptionInfo
     *exception = context->exception;
-
-  ssize_t
-    i;
 
   double
     mid,
@@ -9130,36 +9175,7 @@ static MagickStatusType DrawStrokedPrimitive(const DrawPrimitiveContext *context
     }
   mid=ExpandAffine(&draw_info->affine)*draw_info->stroke_width/2.0;
   if (IsVisibleWideStroke(mid,draw_info) != MagickFalse)
-    {
-      double
-        point_x,
-        point_y;
-
-      MagickBooleanType
-        closed_path;
-
-      /*
-        Draw strokes while respecting line cap/join attributes.
-      */
-      closed_path=primitive_info[0].closed_subpath;
-      i=(ssize_t) primitive_info[0].coordinates;
-      point_x=fabs(primitive_info[i-1].point.x-primitive_info[0].point.x);
-      point_y=fabs(primitive_info[i-1].point.y-primitive_info[0].point.y);
-      if (IsClosedEllipse(point_x,point_y) != MagickFalse)
-        closed_path=MagickTrue;
-      if (IsRoundStrokeOrPrimitive(draw_info,closed_path,primitive_info,i) !=
-          MagickFalse)
-        {
-          status&=(MagickStatusType) DrawPolygonPrimitive(image,draw_info,
-            primitive_info,exception);
-          return(status);
-        }
-      status=DrawUnstrokedPolygon(context,status);
-      if (status != MagickFalse)
-        status&=(MagickStatusType) DrawStrokePolygon(image,draw_info,
-          primitive_info,exception);
-      return(status);
-    }
+    return(DrawWideStrokedPrimitive(context,status));
   status&=(MagickStatusType) DrawPolygonPrimitive(image,draw_info,
     primitive_info,exception);
   return(status);
