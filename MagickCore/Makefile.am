@@ -148,6 +148,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/compare-private.h \
   MagickCore/compare-similarity-private.h \
   MagickCore/compare-similarity-correlation-private.h \
+  MagickCore/compare-similarity-metric-private.h \
   MagickCore/compare-similarity-frequency-private.h \
   MagickCore/composite.c \
   MagickCore/composite-image.c \
@@ -637,6 +638,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/compare-private.h \
   MagickCore/compare-similarity-private.h \
   MagickCore/compare-similarity-correlation-private.h \
+  MagickCore/compare-similarity-metric-private.h \
   MagickCore/compare-similarity-frequency-private.h \
   MagickCore/composite-channel-private.h \
   MagickCore/composite-private.h \
