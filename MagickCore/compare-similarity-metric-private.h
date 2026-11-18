@@ -262,6 +262,68 @@ static inline void NormalizeMEPPSimilarity(Image *image,
   image->error.normalized_maximum_error=maximum_error;
 }
 
+typedef struct _MEPPRow
+{
+  Image
+    *image;
+
+  const Image
+    *reconstruct_image;
+
+  size_t
+    columns;
+} MEPPRow;
+
+typedef struct _MEPPRowTargets
+{
+  const Quantum
+    *magick_restrict *p,
+    *magick_restrict *q;
+
+  double
+    (*channel_similarity)[MaxPixelChannels+1],
+    *channel_mean_error,
+    *channel_maximum_error,
+    *channel_area;
+} MEPPRowTargets;
+
+static magick_attribute((__always_inline__)) inline void
+  AccumulateMEPPRow(const MEPPRow *row,const MEPPRowTargets *targets)
+{
+  const Quantum
+    *magick_restrict *const p = targets->p,
+    *magick_restrict *const q = targets->q;
+
+  double
+    (*const channel_similarity)[MaxPixelChannels+1] =
+      targets->channel_similarity,
+    *const channel_mean_error = targets->channel_mean_error,
+    *const channel_maximum_error = targets->channel_maximum_error,
+    *const channel_area = targets->channel_area;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) row->columns; x++)
+  {
+    const ComparePixels pixels = { row->image, row->reconstruct_image, (*p),
+      (*q) };
+
+    if ((GetPixelReadMask(row->image,(*p)) <= (QuantumRange/2)) ||
+        (GetPixelReadMask(row->reconstruct_image,(*q)) <= (QuantumRange/2)))
+      {
+        (*p)+=(ptrdiff_t) GetPixelChannels(row->image);
+        (*q)+=(ptrdiff_t) GetPixelChannels(row->reconstruct_image);
+        continue;
+      }
+    AccumulateMEPPPixel(&pixels,(*channel_similarity),
+      channel_mean_error,channel_maximum_error);
+    (*channel_area)++;
+    (*p)+=(ptrdiff_t) GetPixelChannels(row->image);
+    (*q)+=(ptrdiff_t) GetPixelChannels(row->reconstruct_image);
+  }
+}
+
 static inline MagickBooleanType GetMEPPSimilarity(Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -309,8 +371,11 @@ static inline MagickBooleanType GetMEPPSimilarity(Image *image,
       channel_maximum_error = maximum_error,
       channel_mean_error = 0.0;
 
-    ssize_t
-      x;
+    MEPPRow
+      row;
+
+    MEPPRowTargets
+      targets;
 
     if (status == MagickFalse)
       continue;
@@ -321,23 +386,16 @@ static inline MagickBooleanType GetMEPPSimilarity(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) columns; x++)
-    {
-      const ComparePixels pixels = { image, reconstruct_image, p, q };
-
-      if ((GetPixelReadMask(image,p) <= (QuantumRange/2)) ||
-          (GetPixelReadMask(reconstruct_image,q) <= (QuantumRange/2)))
-        {
-          p+=(ptrdiff_t) GetPixelChannels(image);
-          q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
-          continue;
-        }
-      AccumulateMEPPPixel(&pixels,channel_similarity,
-        &channel_mean_error,&channel_maximum_error);
-      channel_area++;
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
-    }
+    row.image=image;
+    row.reconstruct_image=reconstruct_image;
+    row.columns=columns;
+    targets.p=(&p);
+    targets.q=(&q);
+    targets.channel_similarity=(&channel_similarity);
+    targets.channel_mean_error=(&channel_mean_error);
+    targets.channel_maximum_error=(&channel_maximum_error);
+    targets.channel_area=(&channel_area);
+    AccumulateMEPPRow(&row,&targets);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
     #pragma omp critical (MagickCore_GetMEPPSimilarity)
 #endif
