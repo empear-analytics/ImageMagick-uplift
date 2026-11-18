@@ -2260,6 +2260,17 @@ typedef struct _SimilarityMerge
     channel_info;
 } SimilarityMerge;
 
+static void MergeHigherSimilarityInfo(const double similarity_threshold,
+  const SimilarityInfo channel_info,SimilarityInfo *similarity_info,
+  MagickBooleanType *threshold_trigger)
+{
+  if ((similarity_threshold != DefaultSimilarityThreshold) &&
+      (channel_info.similarity >= similarity_threshold))
+    (*threshold_trigger)=MagickTrue;
+  if (channel_info.similarity >= (*similarity_info).similarity)
+    (*similarity_info)=channel_info;
+}
+
 static void MergeSimilarityInfo(const SimilarityMerge *merge,
   SimilarityInfo *similarity_info,MagickBooleanType *threshold_trigger)
 {
@@ -2280,11 +2291,8 @@ static void MergeSimilarityInfo(const SimilarityMerge *merge,
     case PhaseCorrelationErrorMetric:
     case StructuralSimilarityErrorMetric:
     {
-      if ((similarity_threshold != DefaultSimilarityThreshold) &&
-          (channel_info.similarity >= similarity_threshold))
-        (*threshold_trigger)=MagickTrue;
-      if (channel_info.similarity >= (*similarity_info).similarity)
-        (*similarity_info)=channel_info;
+      MergeHigherSimilarityInfo(similarity_threshold,channel_info,
+        similarity_info,threshold_trigger);
       break;
     }
     default:
