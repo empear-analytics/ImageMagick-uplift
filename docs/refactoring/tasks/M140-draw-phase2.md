@@ -83,20 +83,35 @@ versions:
   the OpenMP compare and timing.
 - **Whole narrow catalogue at the tip:** 15,967 cases, 3 diverged, all known.
 
-## TracePath needs a recipe of its own
+## TracePath: Recipe KG, written but not applied (owner decision needed)
 
-TracePath (cc 39) is a 20-label `switch` over path commands. Each group is
-`if (Tracer(&trace[,side]) == -1) return(-1); break;`, and the default group throws
-through ThrowPointExpectedException, which sets the caller's `status` by name.
-- **SD** refuses groups that `return`.
-- **SW** needs every group to end in `return(R);`.
-- **EX** needs two kinds of exit.
-- **W** cannot move the default group: the macro writes `status` by name.
-- **KV/KF** need tracers of one or two signatures that differ in one parameter. Here
-  there are three (no side, a PathBezierSide, a PathLineSide).
+**What KG does.** Recipe KG (573d77c7e), designed at the owner's request, replaces
+TracePath's 20-label command switch with a `static const` table:
+- **Keys:** the command letter.
+- **Calls:** each element holds the tracer, through one of three pointer types (no side,
+  PathBezierSide, PathLineSide), and its side constant.
+- **Lookup and dispatch:** one function finds the element, another calls it.
+- **Default:** the throwing default stays. Step 6 says why its macro's `break` may leave
+  the loop: the switch ends the loop body, and the loop's next test of `status` would
+  end it anyway.
 
-The way through is a table of command letters to tracers, a widening of Recipe KV. That
-needs a design and the owner's look before an agent writes it.
+**Applied to TracePath:**
+- cc 39 -> 10, 146 -> 78 lines, one bump fewer.
+- The oracle's 50 cases: 0 diverged.
+- A script checked all 20 labels against the table, in order.
+
+**Why it is not committed.** draw.c *drops* from 4.47 to 4.14. The step makes the file
+smaller, so draw.c falls back under CodeScene's duplication size limit (above), and the
+55-function Code Duplication finding returns. Like for like, with the same padding
+hiding duplication on both sides, the step is worth 4.47 -> 4.74.
+
+The gate refuses a drop, and only the owner can make an exception. The step is kept as
+`docs/refactoring/patches/M140-kg-tracepath.patch`, to apply with `git apply` once the
+owner rules.
+
+**Another caution from the same probes:** adding *more* trivial functions keeps raising
+the score (30 of them: 5.01). Raw scores near that limit are not trustworthy, and no
+step here pads a file.
 
 ## Where Phase 2 stands
 
