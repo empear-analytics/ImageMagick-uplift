@@ -1484,6 +1484,27 @@ static void GetAffineImageExtent(const Image *source,
   }
 }
 
+static void GetAffineImageBounds(const PointInfo *extent,PointInfo *min,
+  PointInfo *max)
+{
+  ssize_t
+    i;
+
+  (*min)=extent[0];
+  (*max)=extent[0];
+  for (i=1; i < 4; i++)
+  {
+    if ((*min).x > extent[i].x)
+      (*min).x=extent[i].x;
+    if ((*min).y > extent[i].y)
+      (*min).y=extent[i].y;
+    if ((*max).x < extent[i].x)
+      (*max).x=extent[i].x;
+    if ((*max).y < extent[i].y)
+      (*max).y=extent[i].y;
+  }
+}
+
 typedef struct _AffineImageRowInput
 {
   const Image
@@ -1588,9 +1609,6 @@ MagickExport MagickBooleanType DrawAffineImage(Image *image,
     min,
     max;
 
-  ssize_t
-    i;
-
   SegmentInfo
     edge;
 
@@ -1610,19 +1628,7 @@ MagickExport MagickBooleanType DrawAffineImage(Image *image,
   assert(source->signature == MagickCoreSignature);
   assert(affine != (AffineMatrix *) NULL);
   GetAffineImageExtent(source,affine,extent);
-  min=extent[0];
-  max=extent[0];
-  for (i=1; i < 4; i++)
-  {
-    if (min.x > extent[i].x)
-      min.x=extent[i].x;
-    if (min.y > extent[i].y)
-      min.y=extent[i].y;
-    if (max.x < extent[i].x)
-      max.x=extent[i].x;
-    if (max.y < extent[i].y)
-      max.y=extent[i].y;
-  }
+  GetAffineImageBounds(extent,&min,&max);
   /*
     Affine transform image.
   */
