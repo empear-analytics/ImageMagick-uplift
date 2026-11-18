@@ -553,6 +553,62 @@ static MagickBooleanType GetMVGMacroToken(const char **p,const size_t extent,
   return(MagickTrue);
 }
 
+typedef struct _MVGMacroExtract
+{
+  const char
+    *start,
+    *end,
+    *p;
+
+  size_t
+    extent;
+
+  char
+    *token,
+    *macro;
+
+  SplayTreeInfo
+    *macros;
+
+  char
+    *name;
+} MVGMacroExtract;
+
+static void AddMVGMacro(const MVGMacroExtract *extract)
+{
+  const char
+    *const start = extract->start,
+    *const end = extract->end;
+
+  const char
+    *p = extract->p;
+
+  const size_t
+    extent = extract->extent;
+
+  char
+    *const token = extract->token,
+    *const macro = extract->macro;
+
+  SplayTreeInfo
+    *const macros = extract->macros;
+
+  char
+    *const name = extract->name;
+
+  size_t
+    length;
+
+  length=(size_t) (end-start);
+  (void) GetNextToken(p,&p,extent,token);
+  if (length > 0)
+    {
+      (void) CopyMagickString(macro,start,length);
+      (void) AddValueToSplayTree(macros,ConstantString(name),
+        ConstantString(macro));
+    }
+}
+
 static void MatchMVGMacroPop(const char *token,const char *p,
   const char **end,ssize_t *n)
 {
@@ -619,8 +675,8 @@ static SplayTreeInfo *GetMVGMacros(const char *primitive,
     n=1;
     for (p=q; *p != '\0'; )
     {
-      size_t
-        length;
+      MVGMacroExtract
+        extract;
 
       if (GetMVGMacroToken(&p,extent,token) == MagickFalse)
         break;
@@ -637,14 +693,15 @@ static SplayTreeInfo *GetMVGMacros(const char *primitive,
       /*
         Extract macro.
       */
-      length=(size_t) (end-start);
-      (void) GetNextToken(p,&p,extent,token);
-      if (length > 0)
-        {
-          (void) CopyMagickString(macro,start,length);
-          (void) AddValueToSplayTree(macros,ConstantString(name),
-            ConstantString(macro));
-        }
+      extract.start=start;
+      extract.end=end;
+      extract.p=p;
+      extract.extent=extent;
+      extract.token=token;
+      extract.macro=macro;
+      extract.macros=macros;
+      extract.name=name;
+      AddMVGMacro(&extract);
       break;
     }
   }
