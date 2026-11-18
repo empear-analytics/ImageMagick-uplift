@@ -23244,62 +23244,73 @@ approval of 2026-10-24 to evolve the recipes.
 
 ---
 
-## Recipe OH - Move a Leading Run of a File into a Private Header Only It Includes
+## Recipe OH - Move Items of a File into a Private Header That Only Its File Includes
 
-**Use when:** CodeScene reports *Lines of Code in a Single File* on a `MagickCore/` `.c`
-file (or a finding of a function the run carries away that no other recipe can clear,
-such as a *Complex Method* counted over an `#if 0` label run), and the file's static
-helpers cannot leave by a Recipe S split: they serve only the file's own public roots, so a
-split would move a root too or widen a helper. `morphology-primitive.c` (9.09, 3,648
-lines: the per-pixel walks, the row and column drivers and the direct pass, all reached
-only from `MorphologyApply`) and `morphology-builtin.c` (8.79: the kernel builders of
-`AcquireKernelBuiltIn`, and `IsBaseKernelNeeded`, whose cc 23 is its `#if 0` label run).
+**Use when:** CodeScene reports *Lines of Code in a Single File* or *Number of Functions in a
+Single Module* on a `MagickCore/` `.c` file, or a finding of a function that no other recipe
+may clear, and the statics cannot leave by a Recipe S split because they are reached only from
+the file's own public roots (a split would move a root or widen a helper). Two forms:
+(A) a *leading run*: statics, typedefs, `static const` tables and `#define`s directly after
+the include block (`morphology-primitive.c` 9.09, `morphology-builtin.c` 8.79);
+(B) a *family*: a function that the no-slowdown ruling of 2026-11-17 protects (a per-pixel
+function, `composite-image.c`'s `CompositeChannelColor`), with every `static` only it reaches
+and the typedefs they name, wherever they stand in the file.
 
-**Not covered by:** Recipe S, which moves a family with its public root into a new `.c`
-file and shares helpers through a header that two `.c` files include (its step 2); here
-nothing leaves the translation unit and no second `.c` file exists. Recipe CH, which
-moves one identical helper out of several headers into a common one. Recipes H, L and F,
-which hoist a macro, type or table inside one file.
+**Not covered by:** Recipe S, which moves a public root into a new `.c` file and shares helpers
+through a header that two `.c` files include; here nothing public leaves and no second `.c`
+file exists. Recipe CH (one identical helper out of several headers). Recipes H, L, F (hoists
+inside one file). Recipe E and relatives (change the text; this recipe changes none).
 
 **How:**
 
-1. The run. A contiguous run of the file's text that begins directly after its include
-   block (the last `#include` line, or the last header of an earlier step of this recipe)
-   and ends directly before a top-level item: whole `static` functions, typedefs, `static
-   const` tables, `#define`s and comments, with every `#if`/`#endif` pair it holds
-   (`#if 0` text, OpenMP pragmas, feature branches) inside it. It holds no `#include`, no
-   definition of a function or object with external linkage (`MagickExport`,
-   `MagickPrivate`, `WandExport`: those stay in the `.c` file) and no non-`const`
-   file-scope object.
-2. The header. Create `MagickCore/<stem>-<theme>-private.h`: the short licence of the
-   private headers, an include guard `MAGICKCORE_<STEM>_<THEME>_PRIVATE_H`, and the run
-   verbatim, byte for byte (no `inline` added: one file includes it and uses every
-   static), nothing else. List it under `MAGICKCORE_NOINST_HDRS` and
-   `MAGICKCORE_BASE_SRCS` of `MagickCore/Makefile.am`, mirrored in `Makefile.in` (not
-   installed).
-3. The file. Delete the run and write `#include "MagickCore/<stem>-<theme>-private.h"` as
-   the last line of the include block, where the run began. Nothing else changes. No
-   other file includes the header (`grep -rl` over the tree finds only the one `.c`).
-4. Proof of identity: `sh tools/pp_identical.sh MagickCore/<file>.c` prints `IDENTICAL`
-   (the preprocessed translation unit is the same text, line markers aside, in the
-   oracle build's configuration) and `sh tools/obj_identical.sh MagickCore/<file>.c`
-   prints `IDENTICAL`; when the run holds an OpenMP region or a hot path, the object
-   that the OpenMP -O2 build (`tools/omp_compare.sh build` flags) compiles from the
-   working tree has the same `.text` as the one it compiles from the base (`objdump -d
-   --no-show-raw-insn`, `cmp`), which stands for the timing the rulings ask for.
-5. Scores. The header scores at least the file's score before the step (the gate's
-   split bar), and the file does not fall. A step that leaves the file flat is taken
-   only inside a chain of this recipe whose last step raises the file, measured first on
-   a stub probe (the owner's chain rulings); the message quotes the probe.
+1. Probe first. Delete the items from a copy of the file and score the copy and the items
+   alone under `build-oracle/probe/` with `tools/ch.py`. Take the step when the file rises
+   (or the step is in a chain whose last step raises it, measured on a stub probe) and the
+   header scores at least the file's score before the step (owner, 2026-11-18: a private
+   header that one file includes is allowed when it raises that file and scores at least the
+   file's score before the move). Form A: one contiguous run beginning directly after the
+   include block (the last `#include`, or the last header of an earlier step), ending
+   directly before a top-level item, with every `#if`/`#endif` pair it holds inside it; it
+   holds no `#include`, no definition with external linkage (`MagickExport`, `MagickPrivate`,
+   `WandExport`) and no non-`const` file-scope object. Form B: no item names a file-scope
+   variable, a file-scope `static const` object or a macro of the file that stays, and none
+   holds an OpenMP pragma or an `#if`; a typedef a moving item names moves too (kept functions
+   see it through the include); its members name no type of the file that stays.
+2. The header. Create `MagickCore/<stem>-<theme>-private.h` (not installed: list it under
+   `MAGICKCORE_NOINST_HDRS` and `MAGICKCORE_BASE_SRCS` of `MagickCore/Makefile.am`, mirrored in
+   `Makefile.in`): the short licence of the private headers, an include guard
+   `MAGICKCORE_<STEM>_<THEME>_PRIVATE_H`, optionally the `extern "C"` pair, and the items
+   verbatim in their order in the file, byte for byte. No `inline` is added: one file
+   includes it and calls every moved static, so no unused-function warning arises and no
+   inlining hint changes.
+3. The file. Delete the items (Form B: each with the blank line after it) and write
+   `#include "MagickCore/<stem>-<theme>-private.h"` as the last line of the include block.
+   Nothing else changes. `grep -rl` over the tree finds only this `.c` file as includer.
+4. Proof of identity. Form A: `sh tools/pp_identical.sh MagickCore/<file>.c` and `sh
+   tools/obj_identical.sh MagickCore/<file>.c` both print `IDENTICAL`; when the run holds an
+   OpenMP region or a hot path, the object that the OpenMP -O2 build compiles from the
+   working tree has the same `.text` as from the base (`objdump -d --no-show-raw-insn`,
+   `cmp`). Form B (the order changes, so pp and object text differ):
+   `tools/split_branch_check.py HEAD:<file> <file> cand` prints `IDENTICAL-MODULO-LAYOUT` in
+   the oracle build and, when the file has parallel regions, in the OpenMP build under
+   `build-oracle/`.
+5. Timing (Form B always; Form A when the run holds a hot path and the `.text` of step 4 was
+   not compared). Moving code changes the layout of the statically linked OpenMP -O2 build
+   and can move hot loops. Time the operations that reach the items with
+   `MAGICK_THREAD_LIMIT=1` and 4, alternating with an A/A run, 21 rounds; a ratio above its
+   A/A by more than 0.03 stops the step (re-run at 41 rounds when borderline; quote every
+   re-run).
 6. Checks: the narrow and wide builds, `tools/ci_linux_warnings.sh --campaign-a`,
-   `tools/ci_warnings.sh` and `tools/cxx_warnings.sh` on the file, and
-   `refactor_guard.py --combined` over the file and its headers (every literal's count
-   unchanged in total).
-7. One header per commit (`refactor(<file>): move <first item> to <last item> into
-   <header>`), `Recipe: OH`, `Verified: guard`, the identity lines of step 4 quoted; the
-   branch's whole-catalogue runs cover it.
+   `tools/ci_warnings.sh`, `tools/cxx_warnings.sh`, `refactor_guard.py --combined` over the
+   file and the header (every literal's total unchanged; the header's added `"C"` of
+   `extern "C"` is the one WARN allowed), the oracle on the cases that reach the items (Form
+   B), the whole catalogue before the branch is reported, and the scores of file and header.
+7. One header (Form A) or one family (Form B) per commit: `refactor(<file>): move <first
+   item> to <last item> into <header>` or `... move <Function> into <header>`, `Recipe: OH`,
+   `Verified: guard` (A) or `oracle` (B), the probe's and the result's scores and the lines of
+   steps 4 and 5 quoted.
 
-**Before:** (`morphology-builtin.c`)
+**Before:** (Form A, `morphology-builtin.c`)
 
 ```c
 #include "MagickCore/morphology-apply-private.h"
@@ -23322,34 +23333,160 @@ static KernelInfo *AcquireChebyshevKernel(KernelInfo *kernel,
 
 with `morphology-builtin-shape-private.h` holding, under its licence and guard, the text
 from `static inline size_t fact(size_t n)` to the line before `AcquireChebyshevKernel`.
+Form B (`composite-image.c`): `#include "MagickCore/composite-channel-private.h"` closes the
+include block, and the header holds `CompositeChannelColor`, its helpers and the typedefs
+they name.
 
 **Careful:**
 
-- `#include` is textual (C11 6.10.2p3): the preprocessor replaces the line by the header's
-  text, and the header's guard and comment lines leave nothing behind, so the translation
-  unit the compiler sees is the one it saw before, token for token, in every
-  configuration, because the run moved whole with its `#if` lines and stands at the same
-  point after the same includes. Step 4 checks it; no name, linkage, type or order
-  changes, and every `static` keeps its one definition in its one translation unit.
-- Debug line information names the header for the moved lines; `__FILE__` and
-  `__LINE__` inside the run (assertions, `GetMagickModule()`) now name the header and its
-  lines. The oracle normalises them; an assertion message that fires names the header.
-- The header is not a shared core: a second includer would get a second copy of every
-  static. Step 3's `grep` and the guard comment's file name say it belongs to one file.
-- This moves debt rather than removing it; the owner's 2026-11-17 and 2026-11-18 rulings
-  keep such a step when the products score at least the original did, and the products
-  are worked toward 10.0 like any other file.
+- `#include` is textual: the translation unit is the same tokens. Form A: in the same
+  order, after the same includes, so pp and object identity hold. Form B: the items stand
+  before the file's own definitions, each static still defined before its first use and
+  each typedef the same type.
+- `__FILE__`/`__LINE__` inside the items (assertions, `GetMagickModule()`) now name the
+  header; the oracle normalises them.
+- The header belongs to one file: a second includer would get a second copy of every static.
+  A header that two `.c` files include is a Recipe S split header under the 2026-11-16
+  rulings (`static inline`), not this recipe.
+- The step moves debt, it does not remove it: the header is scored like a split product and
+  worked toward 10.0 (owner, 2026-11-17 and 2026-11-18).
+- A layout change is not a code change but can be a speed change (`pixel.c`, `d38d2ac17`):
+  step 5 is not optional for Form B.
 
-**Evidence level:** guard, with the preprocessed and object identity of step 4.
+**Evidence level:** Form A: guard, with the preprocessed and object identity of step 4.
+Form B: oracle (cases that reach the items), with step 4's object proof and step 5's timing.
 
-**Provenance:** 2026-11-18, `morphology-primitive.c` (9.09) and `morphology-builtin.c`
-(8.79), both left by round 28 with no legal step; the owner's ruling of 2026-11-18
-("for 6 we make it all 10 sooner or later"), read by the agent as allowing a private
-header that only one file includes when it raises the file and itself scores at least the
-file's score before the move. Probes: `morphology-builtin.c` with two headers 8.79 to
-10.0 (the headers 10.0 and 8.79), `morphology-primitive.c` with two headers 9.09 to 9.68
-(the headers 9.38 and 9.38). Added by Claude Code (Claude Opus 5.5), campaign A, W41
-lane b, under the owner's approval of 2026-10-24 to evolve the recipes.
+**Provenance:** 2026-11-18, campaign A, round 30. Form A: `morphology-primitive.c` (9.09) and
+`morphology-builtin.c` (8.79), lane b (probes 9.09 to 9.68 and 8.79 to 10.0 with two headers
+each). Form B: `composite-image.c`'s `CompositeChannelColor` family, lane c (probe 5.01 to 7.27
+for the file, 5.65 for the header). Both under the owner's answers of 2026-11-18 ("for 6 we
+make it all 10 sooner or later"), read by the agents as allowing a private header that only
+one file includes when it raises that file and itself scores at least the file's score before
+the move. Lanes b and c wrote the two forms separately; the round-30 reviewer merged them.
+Added by Claude Code (Claude Opus 5.5) under the owner's approval of 2026-10-24 to evolve
+the recipes.
+
+---
+
+## Recipe RX - Split a Selection at its Default, Returning Whether a Moved Group Returned
+
+**Use when:** CodeScene reports *Complex Method* or *Large Method* on a value-returning
+function whose `switch` has groups that leave the function through `return(R);` with
+different expressions `R` (on some paths) and otherwise `break;` to statements that follow
+the `switch` and stay, as `composite-image.c`'s `CompositeImage` does: its Copy and
+Intensity groups return `CompositeCopyImage(...)` when the source lies inside the canvas
+and break to the general composite otherwise, and its `default:` group already calls the
+argument helpers of an earlier Recipe SD chain.
+
+**Not covered by:** Recipe SD, whose step 1 refuses a `return` in a group; Recipe SR, whose
+returns all give one `R` meeting W step 2; Recipe ST, which needs the `switch` to be
+followed directly by one `return(R_T);` (here a long tail follows; moving it with E step 7
+would need an input struct of some twenty members); Recipe RC, likewise; Recipe RV, whose
+block may hold no `break` that leaves it, and a run of groups is not one block.
+
+**How:**
+
+1. The `switch (e)` lies outside every OpenMP region and holds no `#pragma` line; `e` is a
+   variable, or an expression of variables with no call, assignment or increment, that no
+   statement inside the `switch` writes. It has a `default:` label, and no group falls
+   through into another. The function returns `MagickBooleanType`.
+2. Choose the groups that move: the group carrying `default:` and others beside it. Each
+   ends with `break;` of this `switch` or with `return(R);`, may hold further `break;` of
+   this `switch` inside a selection (as SD step 1 admits) and further `return(R);`, and
+   holds no `continue`, `goto` or `break` of an enclosing loop. Each `R` is an expression
+   of the function's return type evaluated, as before, where the `return` stands.
+3. Written variables, on Recipe RV step 6 (b)'s terms: a plain local of the caller that a
+   moved group writes only on paths that end in `return(R);` (`setup.intensity=MagickTrue;`
+   before `return(...(&setup)...)`) goes by value, a copy the helper may write, since the
+   caller returns at once and never reads its own copy again; writes through pointers the
+   groups already use stay as they are; a `const` targets struct that a moved group only
+   passes on (the earlier helper's call in the `default:` group) goes as a parameter
+   (Recipe O step 8). Nothing else of the caller is written.
+4. Cut the moved groups, labels and bodies, in their order, into a new `static
+   MagickBooleanType` function directly above the caller, whose body is `switch (e) { ...
+   }` with the same text of `e`, followed by `return(MagickFalse);`. Each `return(R);`
+   becomes `{ (*result)=R; return(MagickTrue); }` (the braces only where it stood as the
+   body of an `if`; otherwise the two statements); nothing else in the text changes. The
+   function takes, last, `MagickBooleanType *result`.
+5. Inputs: at most four parameters in all. When the moved groups read more variables than
+   fit, those they only read (and those step 3 passes by value) go in a `const` input
+   struct of Recipe N (steps 2 and 3), the helper binding a `const` local of the same name
+   and type per member it reads (N step 4) and, for a by-value variable it writes, a local
+   without `const` (`T v = name->v;`, RV step 6 (c)); `e` and a passed-on targets struct
+   stay parameters.
+6. Where the `default:` group stood, write `default:` and a compound block holding, when
+   step 5 made an input struct, its fill in Recipe FB's form (`const Name name = { v1,
+   v2, ... };`, the members' variables in declaration order, then a blank line), then `if
+   (Helper(...,&returned) != MagickFalse)` `return(returned);` and `break;`. The caller
+   declares `MagickBooleanType returned;` once among its declarations.
+7. Check by reading that every label of the original is in exactly one of the two
+   `switch`es, `default` in the new one; that each moved group's text is the original but
+   for step 4's rewriting and the names step 5 binds; and every argument and member
+   against its parameter. `refactor_guard.py`: literals `OK`; `--calls`: `+2` for the new
+   function and nothing else.
+8. Why the behaviour is the same: a value of `e` that a moved label names reaches the same
+   group, now in the helper, through the caller's `default:`; where the group returned `R`,
+   the helper stores `R` (evaluated at the same point from the same values) and returns
+   `MagickTrue`, and the caller returns that `R`; where it broke, the helper returns
+   `MagickFalse` and the caller breaks to the same statement after its `switch`. Evidence:
+   the oracle on the cases that reach the function, `ci_warnings.sh`,
+   `ci_linux_warnings.sh` and `cxx_warnings.sh`.
+
+**Before:** (`composite-image.c`, `CompositeImage`, after two Recipe SD steps)
+
+```c
+  switch (compose)
+  {
+    case CopyCompositeOp:
+    {
+      if (IsSourceInsideCanvas(image,source_image,x_offset,y_offset) ==
+          MagickFalse)
+        break;
+      if (IsSourceAlphaNeeded(image,source_image) != MagickFalse)
+        (void) SetImageAlphaChannel(source_image,OpaqueAlphaChannel,exception);
+      return(CompositeCopyImage(image,source_image,&setup,exception));
+    }
+    ...
+    default:
+    {
+      GetBlendArguments(image,compose,exception,&argument_targets);
+      break;
+    }
+  }
+```
+
+**After:**
+
+```c
+    default:
+    {
+      const CopyCompositeInputs
+        copy = { image, source_image, x_offset, y_offset, setup, exception };
+
+      if (CompositeCopyGroups(&copy,compose,&argument_targets,&returned) !=
+          MagickFalse)
+        return(returned);
+      break;
+    }
+```
+
+**Careful:**
+
+- A moved group's `return` used to leave `CompositeImage` directly; now it leaves the
+  helper with `MagickTrue` and the caller's `if` returns the stored value, so no statement
+  of the caller runs in between.
+- A by-value copy (step 3) is read and written only by the helper; the caller's own variable
+  keeps its value, which nothing reads after a returning path.
+- The input struct lives in the `default:` block, filled where the call stands, so every
+  member holds the value the groups would have read in the caller.
+
+**Evidence level:** oracle (the cases that reach the function).
+
+**Provenance:** 2026-11-18, `composite-image.c`'s `CompositeImage` (campaign A, round 30
+lane c): after two Recipe SD steps, the Copy, Intensity, Saliency, Seamless, Blur and
+Displace groups each return on some path, and the `switch` is followed by the general
+composite; no recipe moved such groups. Added by Claude Code (Claude Opus 5.5) under the
+owner's approval of 2026-10-24 to evolve the recipes.
 
 ---
 
@@ -23850,5 +23987,6 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-17 | NEW | TV | Share a Two-View Parallel Row Loop Through a Row Function: functions that clone an image and run the same parallel row loop over the clone's authentic view and a second image's virtual view, differing only in the row's work on `(p,q)`, move the loop into one non-inline `static` driver taking the clone, the second image and a `const` struct of a row function pointer and a `const void *` input; each row function takes a per-iteration `const` row struct (image, source, arguments, y); checked by script, a by-hand write-set reading, the whole catalogue narrow and wide, `omp_compare.sh` at 1 and 4 threads and OpenMP-build timing | `compare-similarity-image.c`'s `SIMDivideImage`, `SIMVarianceImage` and `SIMSubtractImageMean` (campaign A, round 28 lane b): *Code Duplication* and three cc-10 *Complex Method* findings that Recipe RL's one-view row type does not reach | mandate (2026-10-24) |
 | 2026-11-17 | NEW | KX | Replace an Enumerator-Keyed Switch of Assigned Calls by a Table of Function Pointers: a `switch` whose groups each assign one call's result to the same local (`v=F(args);`) and all `return(v);` or all `break;`, the callees of one signature with the same arguments, becomes a `static const` table of `{ label, function }` and a lookup; groups of another signature stay in the `switch`, the default group is the fallback; timed when the function runs per offset or per pixel, indirect calls counted | `compare-similarity-image.c`'s `SimilarityImage` (frequency-domain dispatch, six groups returning the call) and `compare-similarity-private.h`'s `GetSimilarityForMetric` (fifteen labels assigning `status`), which Recipe KF (statement calls) and KD (a `LocaleCompare` ladder) do not reach (campaign A, round 28 lane b) | mandate (2026-10-24) |
 | 2026-11-17 | NEW | SO | Extract Sibling Blocks Differing in One Value, Returning One Written Variable and Writing One Through a Pointer: copies of one small block in one or several functions of a file, differing in one constant and writing two caller locals (one assigned whole first, one advanced), become one `static` function returning the first and taking the second by pointer | `draw.c`'s MVG push handlers (`ParseMVGPushClass`, `-ClipPath`, `-Gradient`, `-Pattern`): `ParseMVGPushClipPath` leaves *Complex Method*, `-Gradient` cc 22 to 16, `-Pattern` 19 to 13 and leaves *Bumpy Road Ahead* in a probe; campaign B, M137 | mandate (2026-10-24) |
-| 2026-11-18 | NEW | OH | Move a Leading Run of a File into a Private Header Only It Includes: a contiguous run of a `.c` file's statics, typedefs and `static const` tables, beginning directly after its include block, moves verbatim into a new non-installed `<stem>-<theme>-private.h` that only that file includes, at the end of its include block; the preprocessed translation unit and the object file are unchanged (`pp_identical.sh`, `obj_identical.sh`, the OpenMP build's `.text`); the header scores at least the file's score before the step | `morphology-primitive.c` (9.09) and `morphology-builtin.c` (8.79), *Lines of Code in a Single File* and `IsBaseKernelNeeded`'s `#if 0` cc 23, no other legal step (round 28); probes 9.09 to 9.68 and 8.79 to 10.0 with two headers each; owner ruling of 2026-11-18 read by the agent (a private header that only one file includes); campaign A, W41 lane b | mandate (2026-10-24) |
+| 2026-11-18 | NEW | OH | Move Items of a File into a Private Header That Only Its File Includes: a leading run (Form A; pp/obj/`.text` identity) or a family with the typedefs it names (Form B; `split_branch_check` IDENTICAL-MODULO-LAYOUT, oracle and OpenMP timing) moves verbatim into a new non-installed `<stem>-<theme>-private.h` that only that file includes; the header scores at least the file's score before the step | `morphology-primitive.c`/`morphology-builtin.c` (lane b) and `composite-image.c`'s `CompositeChannelColor` family (lane c), campaign A, W41 round 30; the owner's ruling of 2026-11-18 read by the agents | mandate (2026-10-24) |
 | 2026-11-18 | AMEND | CB | Step 1: the statement a `critical` governs may be one unbraced statement (a `switch`), which moves whole, the pragma then governing the call statement; step 3: a plain struct the body assigns whole or reads by member goes by pointer as a scalar, `(*v)`, and a private struct value it only reads may be a member of the step 5 input struct, filled before the pragma | `compare-similarity-image.c`'s `SimilarityImage` (campaign A, W41 lane a): its row loop's best-offset merge is an unbraced `switch` under `critical (MagickCore_GetSimilarityMetric)` (cc 30, four bumps); the chain CB then two E steps on the helper's groups, stub-probed, 5.83 to 5.92 | mandate (2026-10-24) |
+| 2026-11-18 | NEW | RX | Split a Selection at its Default, Returning Whether a Moved Group Returned: the `default` group and groups beside it of a `switch` in a `MagickBooleanType` function, groups that `return(R);` with different `R` on some paths and `break;` to code that follows the `switch` on others, move into a `static MagickBooleanType` helper holding `switch (e)` and `return(MagickFalse);`, each `return(R);` becoming `(*result)=R; return(MagickTrue);`; the caller's `default:` fills an input struct in FB form and writes `if (Helper(...,&returned) != MagickFalse) return(returned); break;`; locals written only on returning paths go by value (RV step 6 (b)) | `composite-image.c`'s `CompositeImage` (campaign A, round 30 lane c): after two Recipe SD steps its Copy and Intensity groups return `CompositeCopyImage(...)` or break to the general composite; SD, SR, ST, RC and RV each refuse that shape | mandate (2026-10-24) |
