@@ -100,9 +100,26 @@ Include declarations.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 */
 
-static Image *ComputeBlurImage(const Image* image,MagickCLEnv clEnv,
-  const double radius,const double sigma,ExceptionInfo *exception)
+typedef struct _BlurImageRequest
 {
+  const Image
+    *image;
+
+  double
+    radius,
+    sigma;
+} BlurImageRequest;
+
+static Image *ComputeBlurImage(const BlurImageRequest *request,
+  MagickCLEnv clEnv,ExceptionInfo *exception)
+{
+  const Image
+    *const image = request->image;
+
+  const double
+    radius = request->radius,
+    sigma = request->sigma;
+
   cl_command_queue
     queue;
 
@@ -264,8 +281,11 @@ cleanup:
 MagickPrivate Image* AccelerateBlurImage(const Image *image,
   const double radius,const double sigma,ExceptionInfo *exception)
 {
-  return(ComputeBlurImage(image,getAccelerateEnvironment(image,
-    BasicAccelerateCheck,__func__,exception),radius,sigma,exception));
+  const BlurImageRequest
+    request = { image, radius, sigma };
+
+  return(ComputeBlurImage(&request,getAccelerateEnvironment(image,
+    BasicAccelerateCheck,__func__,exception),exception));
 }
 
 
