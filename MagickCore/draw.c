@@ -6479,6 +6479,38 @@ static ssize_t TracePathClose(const PathTrace *trace)
   return(0);
 }
 
+static ssize_t FinishTracedPath(const PathTrace *trace,
+  const PrimitiveType primitive_type)
+{
+  MVGInfo
+    *mvg_info = trace->mvg_info;
+
+  PrimitiveInfo
+    *primitive_info,
+    *q = (*trace->q);
+
+  size_t
+    number_coordinates = (*trace->number_coordinates),
+    z_count = (*trace->z_count);
+
+  ssize_t
+    i,
+    subpath_offset = (*trace->subpath_offset);
+
+  primitive_info=(*mvg_info->primitive_info)+subpath_offset;
+  primitive_info->coordinates=(size_t) (q-primitive_info);
+  number_coordinates+=primitive_info->coordinates;
+  for (i=0; i < (ssize_t) number_coordinates; i++)
+  {
+    q--;
+    q->primitive=primitive_type;
+    if (z_count > 1)
+      q->method=FillToBorderMethod;
+  }
+  q=primitive_info;
+  return((ssize_t) number_coordinates);
+}
+
 typedef struct _PathCommandInfo
 {
   int
@@ -6577,9 +6609,6 @@ static ssize_t TracePath(MVGInfo *mvg_info,const char *path,
   PrimitiveInfo
     *q;
 
-  ssize_t
-    i;
-
   size_t
     number_coordinates,
     z_count;
@@ -6621,18 +6650,7 @@ static ssize_t TracePath(MVGInfo *mvg_info,const char *path,
   }
   if (status == MagickFalse)
     return(-1);
-  primitive_info=(*mvg_info->primitive_info)+subpath_offset;
-  primitive_info->coordinates=(size_t) (q-primitive_info);
-  number_coordinates+=primitive_info->coordinates;
-  for (i=0; i < (ssize_t) number_coordinates; i++)
-  {
-    q--;
-    q->primitive=primitive_type;
-    if (z_count > 1)
-      q->method=FillToBorderMethod;
-  }
-  q=primitive_info;
-  return((ssize_t) number_coordinates);
+  return(FinishTracedPath(&trace,primitive_type));
 }
 
 static void ClampRoundCornerArc(double *arc,const double segment)
