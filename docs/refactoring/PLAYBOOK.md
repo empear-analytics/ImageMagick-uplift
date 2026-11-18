@@ -7012,6 +7012,11 @@ inside the region's braces and leaves the pragma and the braces in the caller.
    of a loop inside it stay); it takes no lock and calls nothing that could (no
    `omp_set_lock`, no `LockSemaphoreInfo`, no function that enters a `critical` of the same
    name, which would deadlock). Check each callee by reading.
+   The governed statement may instead be one unbraced statement (2026-11-18,
+   `SimilarityImage`'s `switch` on the metric): the whole statement is what moves, with
+   the same conditions on its text, and the pragma (with its `#if` and `#endif`) then
+   governs the one call statement `Helper(...);` that takes its place. A `break` inside
+   it that ends a `switch` or loop of the moved statement moves with it.
 2. What moves is the body between the braces. It may instead be the body less one leading
    or one trailing run of expression statements (`area+=channel_area;`, `mean_error+=...;`)
    that stay between the braces, beside the call, in the order they had; what moves is then
@@ -7023,7 +7028,11 @@ inside the region's braces and leaves the pragma and the braces in the caller.
    step 4 does. Every other variable the body reads is a by-value parameter or a pointer to
    `const`, read at the same point: a shared variable the body reads (a running maximum it
    compares against) is a pointer parameter, read in the helper through its address. No
-   address of a variable of the caller is stored anywhere.
+   address of a variable of the caller is stored anywhere. A plain struct variable the
+   body assigns whole or reads by member (`similarity_info=channel_info;`,
+   `similarity_info.similarity`) is a pointer parameter as a scalar is, each use written
+   `(*v)` (`(*v).similarity`); a private struct value it only reads may be a member of
+   step 5's input struct, filled in the loop body before the pragma.
 4. A variable the body declares moves with it; a counter the caller declared and the body
    writes before reading it moves too if the caller does not read it afterwards, as Recipe E
    step 4 says.
@@ -7109,6 +7118,12 @@ static void MergeChannelSimilarity(const Image *image,
 - A merge body that is the same text in several functions becomes one helper called from
   each region under that region's own name: the names of the critical sections stay
   distinct, so two functions still do not exclude one another.
+- Under step 1's unbraced form the construct's structured block is the one statement after
+  the pragma, braced or not (OpenMP: `#pragma omp critical` governs the structured block
+  that follows it); the call statement that replaces it is that block now, so every
+  statement the old one ran runs inside the same named region, on the same thread, at the
+  same point. The fill of a step 5 input struct runs before the pragma, outside the lock,
+  and reads only the thread's own variables and values no thread writes in the region.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (the guard counts the new
 helper's `+2` and the callees of the moved body), and steps 1 to 3 checked by reading.
@@ -23726,3 +23741,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-17 | NEW | TV | Share a Two-View Parallel Row Loop Through a Row Function: functions that clone an image and run the same parallel row loop over the clone's authentic view and a second image's virtual view, differing only in the row's work on `(p,q)`, move the loop into one non-inline `static` driver taking the clone, the second image and a `const` struct of a row function pointer and a `const void *` input; each row function takes a per-iteration `const` row struct (image, source, arguments, y); checked by script, a by-hand write-set reading, the whole catalogue narrow and wide, `omp_compare.sh` at 1 and 4 threads and OpenMP-build timing | `compare-similarity-image.c`'s `SIMDivideImage`, `SIMVarianceImage` and `SIMSubtractImageMean` (campaign A, round 28 lane b): *Code Duplication* and three cc-10 *Complex Method* findings that Recipe RL's one-view row type does not reach | mandate (2026-10-24) |
 | 2026-11-17 | NEW | KX | Replace an Enumerator-Keyed Switch of Assigned Calls by a Table of Function Pointers: a `switch` whose groups each assign one call's result to the same local (`v=F(args);`) and all `return(v);` or all `break;`, the callees of one signature with the same arguments, becomes a `static const` table of `{ label, function }` and a lookup; groups of another signature stay in the `switch`, the default group is the fallback; timed when the function runs per offset or per pixel, indirect calls counted | `compare-similarity-image.c`'s `SimilarityImage` (frequency-domain dispatch, six groups returning the call) and `compare-similarity-private.h`'s `GetSimilarityForMetric` (fifteen labels assigning `status`), which Recipe KF (statement calls) and KD (a `LocaleCompare` ladder) do not reach (campaign A, round 28 lane b) | mandate (2026-10-24) |
 | 2026-11-17 | NEW | SO | Extract Sibling Blocks Differing in One Value, Returning One Written Variable and Writing One Through a Pointer: copies of one small block in one or several functions of a file, differing in one constant and writing two caller locals (one assigned whole first, one advanced), become one `static` function returning the first and taking the second by pointer | `draw.c`'s MVG push handlers (`ParseMVGPushClass`, `-ClipPath`, `-Gradient`, `-Pattern`): `ParseMVGPushClipPath` leaves *Complex Method*, `-Gradient` cc 22 to 16, `-Pattern` 19 to 13 and leaves *Bumpy Road Ahead* in a probe; campaign B, M137 | mandate (2026-10-24) |
+| 2026-11-18 | AMEND | CB | Step 1: the statement a `critical` governs may be one unbraced statement (a `switch`), which moves whole, the pragma then governing the call statement; step 3: a plain struct the body assigns whole or reads by member goes by pointer as a scalar, `(*v)`, and a private struct value it only reads may be a member of the step 5 input struct, filled before the pragma | `compare-similarity-image.c`'s `SimilarityImage` (campaign A, W41 lane a): its row loop's best-offset merge is an unbraced `switch` under `critical (MagickCore_GetSimilarityMetric)` (cc 30, four bumps); the chain CB then two E steps on the helper's groups, stub-probed, 5.83 to 5.92 | mandate (2026-10-24) |
