@@ -23349,6 +23349,102 @@ approval of 2026-10-24 to evolve the recipes.
 
 ---
 
+## Recipe GP - Move a Run of Guards Sharing One Exit into a Predicate
+
+**Use when:** CodeScene reports *Complex Method* (or *Large Method*) on a function in which
+a run of consecutive `if` statements tests several conditions and every one of them takes
+the same exit: `draw.c`'s `TraceMVGPrimitive`, whose round-rectangle arm rejects its
+points with four guards, each `{ status=MagickFalse; break; }`.
+
+**Not covered by:** Recipe P, which moves one expression and leaves every `if`; Recipe GD,
+which splits one disjunction into guards (the opposite direction); Recipes LB and V, whose
+exits leave a loop or the function and become `return(MagickFalse);` one by one, but whose
+block must leave a loop (LB) or jump or return (V), never only a `switch`; Recipe EI, which
+chains exiting guards of an `else`.
+
+**How:**
+
+1. Find a run `if (A1) X if (A2) X ... if (An) X`, `n` two or more, of consecutive
+   statements of one block, outside every OpenMP region, with no `#` line, no `else` on
+   any of them, and no statement between them. `X` is the same text in every `if`
+   (checked by script, whitespace aside): a statement or a braced block that leaves the
+   enclosing statement on every path (`break;`, `continue;`, `return(...)`, `goto`, or a
+   block ending in one). Each `Ai` contains no assignment, increment, decrement or call
+   of a function that writes anything (library predicates and pure arithmetic only,
+   checked by reading), and reads only variables the run does not write.
+2. Write directly above the function a `static MagickBooleanType` predicate taking every
+   variable the conditions read (at most four parameters, by value; Recipe N's input
+   struct when more), whose body is `if (A1) return(MagickTrue); ... if (An)
+   return(MagickTrue); return(MagickFalse);`, each `Ai` character for character.
+3. Replace the run by `if (<Predicate>(args) != MagickFalse) X`, `X` unchanged.
+4. Every such run of one function may go in one commit (one recipe, one function).
+5. Check by script that the predicate's conditions are the run's, in order, and that the
+   `X` kept is the run's `X`; run the guard (`--calls` moves only the functions the
+   conditions call: none, or each once into the predicate) and the oracle on the
+   function's cases.
+
+**Why it behaves the same.** The original evaluates `A1`, and when it holds runs `X`, which
+leaves; otherwise `A2`, and so on; when none holds, control passes the run. The predicate
+evaluates the same conditions in the same order, stops at the first that holds, and
+returns `MagickTrue` then, `MagickFalse` when none holds; the caller runs `X` exactly when
+it returns `MagickTrue`. No condition has a side effect, so evaluating them in a callee
+at the same point reads the same values; `X` stands where the run stood, inside the same
+loops and `switch`es, so its `break` or `continue` leaves what it left.
+
+**Before:**
+
+```c
+      if (primitive_info[j].coordinates != 3)
+        {
+          status=MagickFalse;
+          break;
+        }
+      if ((primitive_info[j+2].point.x < 0.0) ||
+          (primitive_info[j+2].point.y < 0.0))
+        {
+          status=MagickFalse;
+          break;
+        }
+```
+
+**After:**
+
+```c
+static MagickBooleanType IsInvalidRoundRectangle(
+  const PrimitiveInfo *primitive_info,const ssize_t j)
+{
+  if (primitive_info[j].coordinates != 3)
+    return(MagickTrue);
+  if ((primitive_info[j+2].point.x < 0.0) ||
+      (primitive_info[j+2].point.y < 0.0))
+    return(MagickTrue);
+  return(MagickFalse);
+}
+...
+      if (IsInvalidRoundRectangle(primitive_info,j) != MagickFalse)
+        {
+          status=MagickFalse;
+          break;
+        }
+```
+
+**Careful:**
+
+- A condition that calls a function with an effect (allocation, I/O, a cursor advanced)
+  refuses the step: the run would be the same, but the argument above needs pure
+  conditions.
+- `X` must be identical in every `if`; a run whose exits differ (one also throws) is not
+  this recipe.
+
+**Evidence level:** oracle, with step 5's script.
+
+**Provenance:** 2026-11-18, from `draw.c`'s `TraceMVGPrimitive` (campaign B, M140), whose
+round-rectangle and ellipse arms validate their points with runs of guards that each set
+`status` false and leave the `switch`. Added by Claude Code (Claude Opus 5.5) under the
+mandate of 2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -23856,3 +23952,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-17 | AMEND | MA | Step 2's address form widened: no role (b) condition when the block opens with a side-effect-free call reading a role (a) constant key; the key a `const char *` parameter, the result a local; one function per lvalue type | `draw.c`'s `GetDrawInfo` (nine option reads, three helpers; cc 22 to 13); campaign B, M138 | mandate (2026-10-24) |
 | 2026-11-17 | AMEND | LB | Step 7's converted-read form: the target may outlive the block when every path from the exit reaches its destruction unread (checked by reading the callers' exit path) | `draw.c`'s `ParseMVGViewbox` (four viewbox reads; leaves Complex Method); campaign B, M138 | mandate (2026-10-24) |
 | 2026-11-18 | AMEND | K | Step 6, outside-region form: the function may hold OpenMP regions when the block lies outside every one of them and writes no local a region uses or names in a clause; the file's OpenMP conditions (whole catalogue, `omp_compare.sh`) still apply. *Careful* gives the argument | `draw.c`'s `DrawAffineImage`: its minimum/maximum scan over the four extent corners writes `min` and `max` before the parallel row loop, which reads neither; campaign B, M138 | mandate (2026-10-24) |
+| 2026-11-18 | NEW | GP | Move a Run of Guards Sharing One Exit into a Predicate: consecutive `if (Ai) X` with the same `X` (an exit) and side-effect-free conditions become `if (Pred(...) != MagickFalse) X`, the predicate returning `MagickTrue` at the first condition that holds, in order | `draw.c`'s `TraceMVGPrimitive` (round-rectangle and ellipse point checks, each `{ status=MagickFalse; break; }` out of a `switch`, which LB and V do not take); campaign B, M140 | mandate (2026-10-24) |
