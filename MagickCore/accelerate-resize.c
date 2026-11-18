@@ -206,6 +206,55 @@ static void SelectResizeWorkgroup(const cl_uint resizedColumns,
   }
 }
 
+typedef struct _ResizeVerticalArgs
+{
+  const ResizeFilter
+    *resizeFilter;
+
+  cl_kernel
+    verticalKernel;
+
+  cl_mem
+    imageBuffer;
+
+  cl_uint
+    number_channels,
+    columns,
+    rows;
+
+  cl_mem
+    resizedImageBuffer;
+
+  cl_uint
+    resizedColumns,
+    resizedRows;
+
+  float
+    yFactor;
+
+  int
+    resizeFilterType,
+    resizeWindowType;
+
+  cl_mem
+    resizeFilterCubicCoefficients;
+
+  size_t
+    imageCacheLocalMemorySize;
+
+  int
+    numCachedPixels;
+
+  unsigned int
+    pixelPerWorkgroup,
+    chunkSize;
+
+  size_t
+    pixelAccumulatorLocalMemorySize,
+    weightAccumulatorLocalMemorySize,
+    gammaAccumulatorLocalMemorySize;
+} ResizeVerticalArgs;
+
 static MagickBooleanType resizeHorizontalFilter(const ResizeFilterPass *pass,
   const float xFactor,ExceptionInfo *exception)
 {
@@ -359,55 +408,6 @@ cleanup:
 
   return(outputReady);
 }
-
-typedef struct _ResizeVerticalArgs
-{
-  const ResizeFilter
-    *resizeFilter;
-
-  cl_kernel
-    verticalKernel;
-
-  cl_mem
-    imageBuffer;
-
-  cl_uint
-    number_channels,
-    columns,
-    rows;
-
-  cl_mem
-    resizedImageBuffer;
-
-  cl_uint
-    resizedColumns,
-    resizedRows;
-
-  float
-    yFactor;
-
-  int
-    resizeFilterType,
-    resizeWindowType;
-
-  cl_mem
-    resizeFilterCubicCoefficients;
-
-  size_t
-    imageCacheLocalMemorySize;
-
-  int
-    numCachedPixels;
-
-  unsigned int
-    pixelPerWorkgroup,
-    chunkSize;
-
-  size_t
-    pixelAccumulatorLocalMemorySize,
-    weightAccumulatorLocalMemorySize,
-    gammaAccumulatorLocalMemorySize;
-} ResizeVerticalArgs;
 
 static cl_int SetResizeVerticalFilterArgs(const ResizeVerticalArgs *args)
 {
