@@ -10056,6 +10056,24 @@ static void SetTracedPrimitiveType(const PrimitiveInfo *primitive_info,
   }
 }
 
+static double GetArcCenterFactor(const double alpha,const double beta,
+  const MagickBooleanType large_arc,const MagickBooleanType sweep)
+{
+  double
+    factor;
+
+  factor=MagickSafeReciprocal(alpha*alpha+beta*beta)-0.25;
+  if (factor <= 0.0)
+    factor=0.0;
+  else
+    {
+      factor=sqrt((double) factor);
+      if (sweep == large_arc)
+        factor=(-factor);
+    }
+  return(factor);
+}
+
 static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
   const PointInfo end,const ArcPathShape *shape)
 {
@@ -10135,15 +10153,7 @@ static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
   beta=points[1].y-points[0].y;
   if (fabs(alpha*alpha+beta*beta) < MagickEpsilon)
     return(TraceLine(primitive_info,start,end));
-  factor=MagickSafeReciprocal(alpha*alpha+beta*beta)-0.25;
-  if (factor <= 0.0)
-    factor=0.0;
-  else
-    {
-      factor=sqrt((double) factor);
-      if (sweep == large_arc)
-        factor=(-factor);
-    }
+  factor=GetArcCenterFactor(alpha,beta,large_arc,sweep);
   center.x=(double) ((points[0].x+points[1].x)/2-factor*beta);
   center.y=(double) ((points[0].y+points[1].y)/2+factor*alpha);
   alpha=atan2(points[0].y-center.y,points[0].x-center.x);
