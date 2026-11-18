@@ -4632,7 +4632,9 @@ typedef struct _ComposeArgumentTargets
     *percent_luma,
     *percent_chroma,
     *amount,
-    *threshold;
+    *threshold,
+    *source_dissolve,
+    *canvas_dissolve;
 } ComposeArgumentTargets;
 
 static void GetComposeArguments(Image *image,const CompositeOperator compose,
@@ -4693,6 +4695,52 @@ static void GetComposeArguments(Image *image,const CompositeOperator compose,
   }
 }
 
+static void GetBlendArguments(Image *image,const CompositeOperator compose,
+  ExceptionInfo *exception,const ComposeArgumentTargets *targets)
+{
+  const char
+    *artifact;
+
+  GeometryInfo
+    *const geometry_info = targets->geometry_info;
+
+  MagickRealType
+    *const source_dissolve = targets->source_dissolve,
+    *const canvas_dissolve = targets->canvas_dissolve;
+
+  MagickStatusType
+    flags;
+
+  switch (compose)
+  {
+    case DissolveCompositeOp:
+    {
+      /*
+        Geometry arguments to dissolve factors.
+      */
+      GetDissolveArguments(image,geometry_info,source_dissolve,
+        canvas_dissolve);
+      break;
+    }
+    case BlendCompositeOp:
+    {
+      artifact=GetImageArtifact(image,"compose:args");
+      if (artifact != (char *) NULL)
+        {
+          flags=ParseGeometry(artifact,geometry_info);
+          SetBlendFactors((*geometry_info),flags,source_dissolve,
+            canvas_dissolve);
+        }
+      break;
+    }
+    default:
+    {
+      GetComposeArguments(image,compose,exception,targets);
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -4708,9 +4756,6 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
 
   CompositeSetup
     setup;
-
-  const char
-    *artifact;
 
   double
     white_luminance = 10000.0;
@@ -4744,7 +4789,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
 
   const ComposeArgumentTargets
     argument_targets = { &geometry_info, &percent_luma, &percent_chroma,
-      &amount, &threshold };
+      &amount, &threshold, &source_dissolve, &canvas_dissolve };
 
   const ComposeArtifactTargets
     targets = { &white_luminance, &illuminant, &colorspace, &clamp,
@@ -4861,26 +4906,6 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       source_image=canvas_image;
       break;
     }
-    case DissolveCompositeOp:
-    {
-      /*
-        Geometry arguments to dissolve factors.
-      */
-      GetDissolveArguments(image,&geometry_info,&source_dissolve,
-        &canvas_dissolve);
-      break;
-    }
-    case BlendCompositeOp:
-    {
-      artifact=GetImageArtifact(image,"compose:args");
-      if (artifact != (char *) NULL)
-        {
-          flags=ParseGeometry(artifact,&geometry_info);
-          SetBlendFactors(geometry_info,flags,&source_dissolve,
-            &canvas_dissolve);
-        }
-      break;
-    }
     case SaliencyBlendCompositeOp:
     {
       BlendRequest
@@ -4903,7 +4928,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     }
     default:
     {
-      GetComposeArguments(image,compose,exception,&argument_targets);
+      GetBlendArguments(image,compose,exception,&argument_targets);
       break;
     }
   }
