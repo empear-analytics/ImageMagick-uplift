@@ -512,6 +512,14 @@ static Image *FinishBlendImage(Image *sum_image,
   return(sum_image);
 }
 
+static void DestroySumViews(CacheView *sum_view,CacheView *beta_view,
+  CacheView *alpha_view)
+{
+  sum_view=DestroyCacheView(sum_view);
+  beta_view=DestroyCacheView(beta_view);
+  alpha_view=DestroyCacheView(alpha_view);
+}
+
 static Image *BlendSumImage(const Image *alpha_image,const Image *beta_image,
   const BlendSumWeights *weights,ExceptionInfo *exception)
 {
@@ -578,9 +586,7 @@ static Image *BlendSumImage(const Image *alpha_image,const Image *beta_image,
     SumBlendRow(&row,p,q,r);
     SyncCompositeRow(sum_view,exception,&status);
   }
-  sum_view=DestroyCacheView(sum_view);
-  beta_view=DestroyCacheView(beta_view);
-  alpha_view=DestroyCacheView(alpha_view);
+  DestroySumViews(sum_view,beta_view,alpha_view);
   return(FinishBlendImage(sum_image,status));
 }
 
