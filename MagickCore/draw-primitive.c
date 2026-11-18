@@ -3821,6 +3821,29 @@ static MagickBooleanType TraceZeroLengthSubpath(
   return(MagickFalse);
 }
 
+static void SetStrokeIntersections(const StrokeBoxes *boxes,
+  const StrokeSegment slope)
+{
+  PointInfo
+    *const box_p = boxes->box_p,
+    *const box_q = boxes->box_q;
+
+  if (fabs((double) (slope.p-slope.q)) < MagickEpsilon)
+    {
+      box_p[4]=box_p[1];
+      box_q[4]=box_q[1];
+    }
+  else
+    {
+      box_p[4].x=(double) ((slope.p*box_p[0].x-box_p[0].y-slope.q*box_p[3].x+
+        box_p[3].y)/(slope.p-slope.q));
+      box_p[4].y=(double) (slope.p*(box_p[4].x-box_p[0].x)+box_p[0].y);
+      box_q[4].x=(double) ((slope.p*box_q[0].x-box_q[0].y-slope.q*box_q[3].x+
+        box_q[3].y)/(slope.p-slope.q));
+      box_q[4].y=(double) (slope.p*(box_q[4].x-box_q[0].x)+box_q[0].y);
+    }
+}
+
 typedef struct _StrokeFirstInput
 {
   PrimitiveInfo
@@ -4199,20 +4222,7 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
         box_q[3].x=polygon_primitive[i].point.x-offset.x;
         box_q[3].y=polygon_primitive[i].point.y-offset.y;
       }
-    if (fabs((double) (slope.p-slope.q)) < MagickEpsilon)
-      {
-        box_p[4]=box_p[1];
-        box_q[4]=box_q[1];
-      }
-    else
-      {
-        box_p[4].x=(double) ((slope.p*box_p[0].x-box_p[0].y-slope.q*box_p[3].x+
-          box_p[3].y)/(slope.p-slope.q));
-        box_p[4].y=(double) (slope.p*(box_p[4].x-box_p[0].x)+box_p[0].y);
-        box_q[4].x=(double) ((slope.p*box_q[0].x-box_q[0].y-slope.q*box_q[3].x+
-          box_q[3].y)/(slope.p-slope.q));
-        box_q[4].y=(double) (slope.p*(box_q[4].x-box_q[0].x)+box_q[0].y);
-      }
+    SetStrokeIntersections(&boxes,slope);
     DisableMSCWarning(4127)
     CheckPathExtent(MaxStrokePad,MaxStrokePad);
     RestoreMSCWarning
