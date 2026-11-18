@@ -648,6 +648,17 @@ static MagickBooleanType RelaxBlendStep(const BlendRelaxation *relaxation,
     *relaxation->residual_image,residual,exception));
 }
 
+static MagickBooleanType ReportBlendStart(const Image *image,
+  const BlendRelaxation *relaxation)
+{
+  MagickBooleanType
+    verbose;
+
+  verbose=IsStringTrue(GetImageArtifact(image,"verbose"));
+  ReportBlendTitle(relaxation,verbose);
+  return(verbose);
+}
+
 static MagickBooleanType RelaxBlendImage(Image *image,
   const BlendRelaxation *relaxation,const BlendRequest *request,
   ExceptionInfo *exception)
@@ -677,8 +688,7 @@ static MagickBooleanType RelaxBlendImage(Image *image,
       ReleaseBlendImages(relaxation->kernel_failure);
       return(MagickFalse);
     }
-  verbose=IsStringTrue(GetImageArtifact(image,"verbose"));
-  ReportBlendTitle(relaxation,verbose);
+  verbose=ReportBlendStart(image,relaxation);
   for (i=0; i < (ssize_t) request->iterations; i++)
   {
     double
