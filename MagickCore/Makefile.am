@@ -494,6 +494,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/widget-file-private.h \
   MagickCore/widget-font-private.h \
   MagickCore/widget-list-private.h \
+  MagickCore/widget-notice-private.h \
   MagickCore/widget-private.h \
   MagickCore/xml-tree.c \
   MagickCore/xml-tree-file.c \
@@ -736,6 +737,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/widget-file-private.h \
   MagickCore/widget-font-private.h \
   MagickCore/widget-list-private.h \
+  MagickCore/widget-notice-private.h \
   MagickCore/widget-private.h \
   MagickCore/xml-tree-private.h \
   MagickCore/xwindow-image-private.h \
