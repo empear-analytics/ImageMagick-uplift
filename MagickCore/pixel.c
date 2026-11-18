@@ -71,6 +71,7 @@
 #include "MagickCore/string_.h"
 #include "MagickCore/transform.h"
 #include "MagickCore/utility.h"
+#include "MagickCore/pixel-gamma-private.h"
 
 /*
   Typedef declarations.
@@ -440,13 +441,13 @@ static magick_attribute((__always_inline__)) inline MagickRealType
       return((MagickRealType) (((double) red*red+green*green+blue*blue)/
         (3.0*(double) QuantumRange)));
     case Rec601LumaPixelIntensityMethod:
-      return(GammaWeightedIntensity(sample,EncodePixelGamma,
+      return(GammaWeightedIntensity(sample,EncodeSRGBGamma,
         IsLinearIntensity(space),rec601_weights));
     case Rec601LuminancePixelIntensityMethod:
-      return(GammaWeightedIntensity(sample,DecodePixelGamma,
+      return(GammaWeightedIntensity(sample,DecodeSRGBGamma,
         IsNonlinearIntensity(space),rec601_weights));
     case Rec709LuminancePixelIntensityMethod:
-      return(GammaWeightedIntensity(sample,DecodePixelGamma,
+      return(GammaWeightedIntensity(sample,DecodeSRGBGamma,
         IsNonlinearIntensity(space),rec709_weights));
     case RMSPixelIntensityMethod:
       return((MagickRealType) (sqrt((double) red*red+green*green+blue*blue)/
@@ -454,7 +455,7 @@ static magick_attribute((__always_inline__)) inline MagickRealType
     default:
       break;
   }
-  return(GammaWeightedIntensity(sample,EncodePixelGamma,
+  return(GammaWeightedIntensity(sample,EncodeSRGBGamma,
     IsLinearIntensity(space),rec709_weights));
 }
 
