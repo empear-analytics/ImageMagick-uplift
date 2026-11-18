@@ -2248,6 +2248,73 @@ static MagickBooleanType ScanSimilarityRow(const SimilarityRow *row,
   return(MagickTrue);
 }
 
+typedef struct _SimilarityMerge
+{
+  MetricType
+    metric;
+
+  double
+    similarity_threshold;
+
+  SimilarityInfo
+    channel_info;
+} SimilarityMerge;
+
+static void MergeHigherSimilarityInfo(const double similarity_threshold,
+  const SimilarityInfo channel_info,SimilarityInfo *similarity_info,
+  MagickBooleanType *threshold_trigger)
+{
+  if ((similarity_threshold != DefaultSimilarityThreshold) &&
+      (channel_info.similarity >= similarity_threshold))
+    (*threshold_trigger)=MagickTrue;
+  if (channel_info.similarity >= (*similarity_info).similarity)
+    (*similarity_info)=channel_info;
+}
+
+static void MergeLowerSimilarityInfo(const double similarity_threshold,
+  const SimilarityInfo channel_info,SimilarityInfo *similarity_info,
+  MagickBooleanType *threshold_trigger)
+{
+  if ((similarity_threshold != DefaultSimilarityThreshold) &&
+      (channel_info.similarity < similarity_threshold))
+    (*threshold_trigger)=MagickTrue;
+  if (channel_info.similarity < (*similarity_info).similarity)
+    (*similarity_info)=channel_info;
+}
+
+static void MergeSimilarityInfo(const SimilarityMerge *merge,
+  SimilarityInfo *similarity_info,MagickBooleanType *threshold_trigger)
+{
+  const MetricType
+    metric = merge->metric;
+
+  const double
+    similarity_threshold = merge->similarity_threshold;
+
+  const SimilarityInfo
+    channel_info = merge->channel_info;
+
+  switch (metric)
+  {
+    case DotProductCorrelationErrorMetric:
+    case NormalizedCrossCorrelationErrorMetric:
+    case PeakSignalToNoiseRatioErrorMetric:
+    case PhaseCorrelationErrorMetric:
+    case StructuralSimilarityErrorMetric:
+    {
+      MergeHigherSimilarityInfo(similarity_threshold,channel_info,
+        similarity_info,threshold_trigger);
+      break;
+    }
+    default:
+    {
+      MergeLowerSimilarityInfo(similarity_threshold,channel_info,
+        similarity_info,threshold_trigger);
+      break;
+    }
+  }
+}
+
 MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
   const MetricType metric,const double similarity_threshold,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
@@ -2344,36 +2411,18 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
     const SimilarityRow row = { image, reconstruct, similarity_image,
       similarity_view, metric, threshold_trigger, exception };
 
+    SimilarityMerge
+      merge;
+
     if (ScanSimilarityRow(&row,y,&channel_info,&status) == MagickFalse)
       continue;
+    merge.metric=metric;
+    merge.similarity_threshold=similarity_threshold;
+    merge.channel_info=channel_info;
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
     #pragma omp critical (MagickCore_GetSimilarityMetric)
 #endif
-    switch (metric)
-    {
-      case DotProductCorrelationErrorMetric:
-      case NormalizedCrossCorrelationErrorMetric:
-      case PeakSignalToNoiseRatioErrorMetric:
-      case PhaseCorrelationErrorMetric:
-      case StructuralSimilarityErrorMetric:
-      {
-        if ((similarity_threshold != DefaultSimilarityThreshold) &&
-            (channel_info.similarity >= similarity_threshold))
-          threshold_trigger=MagickTrue;
-        if (channel_info.similarity >= similarity_info.similarity)
-          similarity_info=channel_info;
-        break;
-      }
-      default:
-      {
-        if ((similarity_threshold != DefaultSimilarityThreshold) &&
-            (channel_info.similarity < similarity_threshold))
-          threshold_trigger=MagickTrue;
-        if (channel_info.similarity < similarity_info.similarity)
-          similarity_info=channel_info;
-        break;
-      }
-    }
+    MergeSimilarityInfo(&merge,&similarity_info,&threshold_trigger);
     if (SyncCacheViewAuthenticPixels(similarity_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)

@@ -2309,6 +2309,37 @@ static void MergeSSIMSimilarity(const Image *image,
     channel_similarity[CompositePixelChannel];
 }
 
+typedef struct _SSIMConstant
+{
+  double
+    k;
+
+  const char
+    *option;
+} SSIMConstant;
+
+static inline double GetSSIMConstant(const Image *image,
+  const SSIMConstant *constant)
+{
+  const double
+    k = constant->k;
+
+  const char
+    *const option = constant->option;
+
+  const char
+    *artifact;
+
+  double
+    c;
+
+  c=pow(k*SSIML,2.0);
+  artifact=GetImageArtifact(image,option);
+  if (artifact != (const char *) NULL)
+    c=pow(StringToDouble(artifact,(char **) NULL)*SSIML,2.0);
+  return(c);
+}
+
 static inline MagickBooleanType GetSSIMSimularity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -2316,8 +2347,9 @@ static inline MagickBooleanType GetSSIMSimularity(const Image *image,
     *image_view,
     *reconstruct_view;
 
-  const char
-    *artifact;
+  const SSIMConstant
+    ssim_k1 = { SSIMK1, "compare:ssim-k1" },
+    ssim_k2 = { SSIMK2, "compare:ssim-k2" };
 
   double
     area = 0.0,
@@ -2344,14 +2376,8 @@ static inline MagickBooleanType GetSSIMSimularity(const Image *image,
   if (kernel_info == (KernelInfo *) NULL)
     ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
       image->filename);
-  c1=pow(SSIMK1*SSIML,2.0);
-  artifact=GetImageArtifact(image,"compare:ssim-k1");
-  if (artifact != (const char *) NULL)
-    c1=pow(StringToDouble(artifact,(char **) NULL)*SSIML,2.0);
-  c2=pow(SSIMK2*SSIML,2.0);
-  artifact=GetImageArtifact(image,"compare:ssim-k2");
-  if (artifact != (const char *) NULL)
-    c2=pow(StringToDouble(artifact,(char **) NULL)*SSIML,2.0);
+  c1=GetSSIMConstant(image,&ssim_k1);
+  c2=GetSSIMConstant(image,&ssim_k2);
   SetImageCompareBounds(image,reconstruct_image,&columns,&rows);
   image_view=AcquireVirtualCacheView(image,exception);
   reconstruct_view=AcquireVirtualCacheView(reconstruct_image,exception);
