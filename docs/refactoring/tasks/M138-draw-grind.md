@@ -3,8 +3,8 @@
 Branched from `campaign/M137` after #123 merged it into `main` (ba6c3318d); this branch's
 PR goes to `main`. Scores come from cs-mcp 1.5.16 through `tools/ch.py`.
 
-Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 24 flagged functions, 222 -> 294
-functions (four merges, about eighty helpers), 11,636 -> 11,929 lines. Function findings
+Campaign B: **unchanged** (draw.c 3.27). draw.c: 65 -> 24 flagged functions, 222 -> 292
+functions (four merges, about eighty helpers), 11,636 -> 12,140 lines. Function findings
 (one per function and category) 123 -> 49; the summed cc of the Complex Method
 functions 908 -> 430.
 
