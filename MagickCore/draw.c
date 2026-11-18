@@ -5141,9 +5141,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     /*
       Interpret graphic primitive.
     */
-    if (GetNextToken(q,&q,MagickPathExtent,keyword) < 1)
-      break;
-    if (*keyword == '\0')
+    if (GetMVGMacroToken(&q,MagickPathExtent,keyword) == MagickFalse)
       break;
     if (*keyword == '#')
       {
