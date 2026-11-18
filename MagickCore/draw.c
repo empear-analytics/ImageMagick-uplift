@@ -306,6 +306,27 @@ static void CloneDrawInfoString(const char *source,char **value)
     (void) CloneString(&(*value),source);
 }
 
+static void CloneDrawInfoDashPattern(const DrawInfo *draw_info,
+  DrawInfo *clone_info)
+{
+  if (draw_info->dash_pattern != (double *) NULL)
+    {
+      ssize_t
+        x;
+
+      for (x=0; fabs(draw_info->dash_pattern[x]) >= MagickEpsilon; x++) ;
+      clone_info->dash_pattern=(double *) AcquireQuantumMemory((size_t) (x+1),
+        sizeof(*clone_info->dash_pattern));
+      if (clone_info->dash_pattern == (double *) NULL)
+        ThrowFatalException(ResourceLimitFatalError,
+          "UnableToAllocateDashPattern");
+      (void) memset(clone_info->dash_pattern,0,(size_t) (x+1)*
+        sizeof(*clone_info->dash_pattern));
+      (void) memcpy(clone_info->dash_pattern,draw_info->dash_pattern,(size_t)
+        x*sizeof(*clone_info->dash_pattern));
+    }
+}
+
 static void CloneDrawInfoTextAttributes(const DrawInfo *draw_info,
   DrawInfo *clone_info)
 {
@@ -397,22 +418,7 @@ MagickExport DrawInfo *CloneDrawInfo(const ImageInfo *image_info,
   clone_info->decorate=draw_info->decorate;
   clone_info->compose=draw_info->compose;
   CloneDrawInfoTextAttributes(draw_info,clone_info);
-  if (draw_info->dash_pattern != (double *) NULL)
-    {
-      ssize_t
-        x;
-
-      for (x=0; fabs(draw_info->dash_pattern[x]) >= MagickEpsilon; x++) ;
-      clone_info->dash_pattern=(double *) AcquireQuantumMemory((size_t) (x+1),
-        sizeof(*clone_info->dash_pattern));
-      if (clone_info->dash_pattern == (double *) NULL)
-        ThrowFatalException(ResourceLimitFatalError,
-          "UnableToAllocateDashPattern");
-      (void) memset(clone_info->dash_pattern,0,(size_t) (x+1)*
-        sizeof(*clone_info->dash_pattern));
-      (void) memcpy(clone_info->dash_pattern,draw_info->dash_pattern,(size_t)
-        x*sizeof(*clone_info->dash_pattern));
-    }
+  CloneDrawInfoDashPattern(draw_info,clone_info);
   clone_info->gradient=draw_info->gradient;
   CloneDrawInfoGradientStops(draw_info,clone_info);
   clone_info->bounds=draw_info->bounds;
