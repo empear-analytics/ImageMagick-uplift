@@ -22,6 +22,20 @@
 extern "C" {
 #endif
 
+/*
+  Define declarations.
+*/
+#define BezierQuantum  200
+
+/*
+  Method prototypes.
+*/
+static MagickBooleanType
+  TraceRectangle(PrimitiveInfo *,const PointInfo,const PointInfo);
+
+/*
+  Helper functions.
+*/
 static inline double GetDrawValue(const char *magick_restrict string,
   char **magick_restrict sentinel)
 {
@@ -35,6 +49,71 @@ static inline double GetDrawValue(const char *magick_restrict string,
   value=InterpretLocaleValue(string,q);
   sentinel=q;
   return(value);
+}
+
+static inline MagickBooleanType TracePoint(PrimitiveInfo *primitive_info,
+  const PointInfo point)
+{
+  primitive_info->point=point;
+  primitive_info->coordinates=1;
+  primitive_info->closed_subpath=MagickFalse;
+  primitive_info->text=(char *) NULL;
+  return(MagickTrue);
+}
+
+static inline MagickBooleanType IsClosedEllipse(const double x,const double y)
+{
+  return(((x < MagickEpsilon) && (y < MagickEpsilon)) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline void SetTracedPrimitiveType(const PrimitiveInfo *primitive_info,
+  PrimitiveInfo *p)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) primitive_info->coordinates; i++)
+  {
+    p->primitive=primitive_info->primitive;
+    p--;
+  }
+}
+
+static inline MagickBooleanType TraceRectangle(PrimitiveInfo *primitive_info,
+  const PointInfo start,const PointInfo end)
+{
+  PointInfo
+    point;
+
+  PrimitiveInfo
+    *p;
+
+
+  p=primitive_info;
+  if (TracePoint(p,start) == MagickFalse)
+    return(MagickFalse);
+  p+=(ptrdiff_t) p->coordinates;
+  point.x=start.x;
+  point.y=end.y;
+  if (TracePoint(p,point) == MagickFalse)
+    return(MagickFalse);
+  p+=(ptrdiff_t) p->coordinates;
+  if (TracePoint(p,end) == MagickFalse)
+    return(MagickFalse);
+  p+=(ptrdiff_t) p->coordinates;
+  point.x=end.x;
+  point.y=start.y;
+  if (TracePoint(p,point) == MagickFalse)
+    return(MagickFalse);
+  p+=(ptrdiff_t) p->coordinates;
+  if (TracePoint(p,start) == MagickFalse)
+    return(MagickFalse);
+  p+=(ptrdiff_t) p->coordinates;
+  primitive_info->coordinates=(size_t) (p-primitive_info);
+  primitive_info->closed_subpath=MagickTrue;
+  SetTracedPrimitiveType(primitive_info,p);
+  return(MagickTrue);
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)

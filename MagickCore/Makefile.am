@@ -186,6 +186,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/distribute-cache.h \
   MagickCore/distribute-cache-private.h \
   MagickCore/draw.c \
+  MagickCore/draw-primitive.c \
   MagickCore/draw-info.c \
   MagickCore/draw-gradient.c \
   MagickCore/draw-affine.c \
