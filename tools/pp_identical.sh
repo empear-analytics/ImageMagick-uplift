@@ -17,6 +17,9 @@ file=$1
 rev=${2:-HEAD}
 root=$(git rev-parse --show-toplevel)
 build=$root/build-oracle/cand
+# WIDE=1: the wide candidate (X11 and OpenCL), as in obj_identical.sh, for the files only
+# that build compiles (display-image.c, widget.c, xwindow-image.c and the other X11 files).
+[ -n "${WIDE:-}" ] && build=$root/build-oracle/cand-wide
 cd "$build"
 cflags=$(sed -n 's/^CFLAGS = //p' Makefile)
 cppflags=$(sed -n 's/^CPPFLAGS = //p' Makefile)

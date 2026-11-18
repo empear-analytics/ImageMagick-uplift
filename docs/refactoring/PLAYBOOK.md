@@ -23239,6 +23239,10 @@ split would move a root too or widen a helper. `morphology-primitive.c` (9.09, 3
 lines: the per-pixel walks, the row and column drivers and the direct pass, all reached
 only from `MorphologyApply`) and `morphology-builtin.c` (8.79: the kernel builders of
 `AcquireKernelBuiltIn`, and `IsBaseKernelNeeded`, whose cc 23 is its `#if 0` label run).
+Also *Number of Functions in a Single Module* on a file whose statics sit between its
+external definitions (the run form after a kept item, step 1): `display-image.c` (6.49,
+601 statics around `XDisplayBackgroundImage` and `XDisplayImage`), `widget.c` and
+`xwindow-image.c` (8.28), all inside `#if defined(MAGICKCORE_X11_DELEGATE)`.
 
 **Not covered by:** Recipe S, which moves a family with its public root into a new `.c`
 file and shares helpers through a header that two `.c` files include (its step 2); here
@@ -23256,6 +23260,16 @@ which hoist a macro, type or table inside one file.
    definition of a function or object with external linkage (`MagickExport`,
    `MagickPrivate`, `WandExport`: those stay in the `.c` file) and no non-`const`
    file-scope object.
+   *A run after a kept item:* a run may instead begin directly after a top-level item
+   that must stay in the `.c` file: a definition with external linkage (its `%` doc
+   banner stays above it), a non-`const` file-scope object, or the opening `#if` line of
+   a branch that holds the rest of the file (the X11 files' `#if
+   defined(MAGICKCORE_X11_DELEGATE)`, whose `#endif` closes the file); it ends directly
+   before the next such item (before its banner) or at any earlier top-level boundary
+   outside every `#if` pair it holds, so one long run between two kept items may go into
+   several headers, one per commit, each beginning where the last one's `#include` line
+   stands. The run may name a kept file-scope object (`red_gamma`, `xerror_alert`): the
+   object stays defined once, above it, in the `.c` file.
 2. The header. Create `MagickCore/<stem>-<theme>-private.h`: the short licence of the
    private headers, an include guard `MAGICKCORE_<STEM>_<THEME>_PRIVATE_H`, and the run
    verbatim, byte for byte (no `inline` added: one file includes it and uses every
@@ -23263,7 +23277,9 @@ which hoist a macro, type or table inside one file.
    `MAGICKCORE_BASE_SRCS` of `MagickCore/Makefile.am`, mirrored in `Makefile.in` (not
    installed).
 3. The file. Delete the run and write `#include "MagickCore/<stem>-<theme>-private.h"` as
-   the last line of the include block, where the run began. Nothing else changes. No
+   the last line of the include block, where the run began (for a run after a kept item,
+   on the run's own first line, inside the same `#if` branches as the run; blank lines at
+   the run's edges stay in the `.c` file). Nothing else changes. No
    other file includes the header (`grep -rl` over the tree finds only the one `.c`).
 4. Proof of identity: `sh tools/pp_identical.sh MagickCore/<file>.c` prints `IDENTICAL`
    (the preprocessed translation unit is the same text, line markers aside, in the
@@ -23271,7 +23287,10 @@ which hoist a macro, type or table inside one file.
    prints `IDENTICAL`; when the run holds an OpenMP region or a hot path, the object
    that the OpenMP -O2 build (`tools/omp_compare.sh build` flags) compiles from the
    working tree has the same `.text` as the one it compiles from the base (`objdump -d
-   --no-show-raw-insn`, `cmp`), which stands for the timing the rulings ask for.
+   --no-show-raw-insn`, `cmp`), which stands for the timing the rulings ask for. For a file
+   only the wide build compiles (X11), both tools run with `WIDE=1`; the OpenMP object
+   comparison is then `gcc` with the wide OpenMP build's flags (`-fopenmp -O2`), `__LINE__`
+   and `__FILE__` pinned as the two tools pin them, since the moved lines' numbers change.
 5. Scores. The header scores at least the file's score before the step (the gate's
    split bar), and the file does not fall. A step that leaves the file flat is taken
    only inside a chain of this recipe whose last step raises the file, measured first on
@@ -23836,3 +23855,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-17 | NEW | KX | Replace an Enumerator-Keyed Switch of Assigned Calls by a Table of Function Pointers: a `switch` whose groups each assign one call's result to the same local (`v=F(args);`) and all `return(v);` or all `break;`, the callees of one signature with the same arguments, becomes a `static const` table of `{ label, function }` and a lookup; groups of another signature stay in the `switch`, the default group is the fallback; timed when the function runs per offset or per pixel, indirect calls counted | `compare-similarity-image.c`'s `SimilarityImage` (frequency-domain dispatch, six groups returning the call) and `compare-similarity-private.h`'s `GetSimilarityForMetric` (fifteen labels assigning `status`), which Recipe KF (statement calls) and KD (a `LocaleCompare` ladder) do not reach (campaign A, round 28 lane b) | mandate (2026-10-24) |
 | 2026-11-17 | NEW | SO | Extract Sibling Blocks Differing in One Value, Returning One Written Variable and Writing One Through a Pointer: copies of one small block in one or several functions of a file, differing in one constant and writing two caller locals (one assigned whole first, one advanced), become one `static` function returning the first and taking the second by pointer | `draw.c`'s MVG push handlers (`ParseMVGPushClass`, `-ClipPath`, `-Gradient`, `-Pattern`): `ParseMVGPushClipPath` leaves *Complex Method*, `-Gradient` cc 22 to 16, `-Pattern` 19 to 13 and leaves *Bumpy Road Ahead* in a probe; campaign B, M137 | mandate (2026-10-24) |
 | 2026-11-18 | NEW | OH | Move a Leading Run of a File into a Private Header Only It Includes: a contiguous run of a `.c` file's statics, typedefs and `static const` tables, beginning directly after its include block, moves verbatim into a new non-installed `<stem>-<theme>-private.h` that only that file includes, at the end of its include block; the preprocessed translation unit and the object file are unchanged (`pp_identical.sh`, `obj_identical.sh`, the OpenMP build's `.text`); the header scores at least the file's score before the step | `morphology-primitive.c` (9.09) and `morphology-builtin.c` (8.79), *Lines of Code in a Single File* and `IsBaseKernelNeeded`'s `#if 0` cc 23, no other legal step (round 28); probes 9.09 to 9.68 and 8.79 to 10.0 with two headers each; owner ruling of 2026-11-18 read by the agent (a private header that only one file includes); campaign A, W41 lane b | mandate (2026-10-24) |
+| 2026-11-18 | AMEND | OH | Step 1: a run may also begin directly after a top-level item that must stay in the `.c` file (an external definition with its banner, a non-`const` file-scope object, the opening `#if` of the branch holding the rest of the file) and end before the next one or at any earlier boundary outside its `#if` pairs, one header per run and commit; step 3: the `#include` then stands on the run's first line, inside the same `#if` branches; step 4: `WIDE=1` for the X11 files (`pp_identical.sh` now takes it, as `obj_identical.sh` did) | The X11 files have no run directly after their include block: `#if defined(MAGICKCORE_X11_DELEGATE)` holds the rest of each, and their statics sit between `MagickPrivate` definitions. Stub probes (cs-mcp 1.5.16): `display-image.c` with eight headers 6.49 to 9.68 (headers 6.89 to 9.09); `widget.c` with seven 8.28 to 8.54; campaign A, W41 lane b2 | mandate (2026-10-24) |
