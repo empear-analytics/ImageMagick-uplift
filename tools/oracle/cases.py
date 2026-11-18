@@ -4869,6 +4869,22 @@ GAP_COMMANDS += [
     "compare -metric PHASE -subimage-search {C}/rose.miff ( {C}/rose.miff -crop 20x20+10+10 +repage )",
     "compare -metric PHASE -subimage-search {C}/rose.miff ( {C}/rose_blur.miff -crop 20x20+30+20 +repage )",
 ]
+# compare-similarity-image.c: spatial subimage searches with a metric where higher is
+# better, the HigherSimilaritySide merge of SimilarityImage's row loop, which no case ran
+# (in the HDRI build with FFTW, NCC, DPC, PSNR and PHASE take the frequency domain): NCC,
+# DPC and PSNR with compare:frequency-domain=false, SSIM (no frequency-domain method), and
+# NCC with a similarity threshold that a match meets
+GAP_COMMANDS += [
+    "compare -define compare:frequency-domain=false -metric NCC -subimage-search {C}/rose.miff "
+    "( {C}/rose.miff -crop 12x12+10+10 +repage )",
+    "compare -define compare:frequency-domain=false -metric DPC -subimage-search {C}/rose.miff "
+    "( {C}/rose_blur.miff -crop 12x12+30+20 +repage )",
+    "compare -define compare:frequency-domain=false -metric PSNR -subimage-search {C}/rose.miff "
+    "( {C}/rose_blur.miff -crop 12x12+30+20 +repage )",
+    "compare -metric SSIM -subimage-search {C}/rose.miff ( {C}/rose_blur.miff -crop 12x12+30+20 +repage )",
+    "compare -define compare:frequency-domain=false -metric NCC -subimage-search "
+    "-similarity-threshold 0.5 {C}/rose.miff ( {C}/rose.miff -crop 12x12+10+10 +repage )",
+]
 # compare-similarity-private.h: SSIM and DSSIM with the compare:ssim-radius, -sigma, -k1 and
 # -k2 defines, which no other case sets (GetSSIMSimularity's parameter set-up)
 GAP_COMMANDS += [
