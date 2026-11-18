@@ -10084,6 +10084,96 @@ static double GetArcCenterFactor(const double alpha,const double beta,
   return(factor);
 }
 
+typedef struct _ArcSegmentInput
+{
+  double
+    alpha,
+    theta;
+
+  size_t
+    arc_segments;
+
+  PointInfo
+    center;
+
+  double
+    cosine,
+    sine;
+
+  PointInfo
+    radii,
+    start,
+    end;
+
+  PrimitiveInfo
+    *primitive_info;
+} ArcSegmentInput;
+
+static void TraceArcSegmentPoints(const ArcSegmentInput *segment,
+  const ssize_t i,PrimitiveInfo *p,PointInfo *points)
+{
+  const double
+    alpha = segment->alpha,
+    theta = segment->theta;
+
+  const size_t
+    arc_segments = segment->arc_segments;
+
+  const PointInfo
+    center = segment->center;
+
+  const double
+    cosine = segment->cosine,
+    sine = segment->sine;
+
+  const PointInfo
+    radii = segment->radii,
+    start = segment->start,
+    end = segment->end;
+
+  PrimitiveInfo
+    *const primitive_info = segment->primitive_info;
+
+  double
+    beta,
+    gamma;
+
+  beta=0.5*((alpha+(i+1)*theta/arc_segments)-(alpha+i*theta/arc_segments));
+  gamma=(8.0/3.0)*sin(fmod((double) (0.5*beta),DegreesToRadians(360.0)))*
+    sin(fmod((double) (0.5*beta),DegreesToRadians(360.0)))/
+    sin(fmod((double) beta,DegreesToRadians(360.0)));
+  points[0].x=(double) (center.x+cos(fmod((double) (alpha+(double) i*theta/
+    arc_segments),DegreesToRadians(360.0)))-gamma*sin(fmod((double) (alpha+
+    (double) i*theta/arc_segments),DegreesToRadians(360.0))));
+  points[0].y=(double) (center.y+sin(fmod((double) (alpha+(double) i*theta/
+    arc_segments),DegreesToRadians(360.0)))+gamma*cos(fmod((double) (alpha+
+    (double) i*theta/arc_segments),DegreesToRadians(360.0))));
+  points[2].x=(double) (center.x+cos(fmod((double) (alpha+(double) (i+1)*
+    theta/arc_segments),DegreesToRadians(360.0))));
+  points[2].y=(double) (center.y+sin(fmod((double) (alpha+(double) (i+1)*
+    theta/arc_segments),DegreesToRadians(360.0))));
+  points[1].x=(double) (points[2].x+gamma*sin(fmod((double) (alpha+(double)
+    (i+1)*theta/arc_segments),DegreesToRadians(360.0))));
+  points[1].y=(double) (points[2].y-gamma*cos(fmod((double) (alpha+(double)
+    (i+1)*theta/arc_segments),DegreesToRadians(360.0))));
+  p->point.x=(p == primitive_info) ? start.x : (p-1)->point.x;
+  p->point.y=(p == primitive_info) ? start.y : (p-1)->point.y;
+  (p+1)->point.x=(double) (cosine*radii.x*points[0].x-sine*radii.y*
+    points[0].y);
+  (p+1)->point.y=(double) (sine*radii.x*points[0].x+cosine*radii.y*
+    points[0].y);
+  (p+2)->point.x=(double) (cosine*radii.x*points[1].x-sine*radii.y*
+    points[1].y);
+  (p+2)->point.y=(double) (sine*radii.x*points[1].x+cosine*radii.y*
+    points[1].y);
+  (p+3)->point.x=(double) (cosine*radii.x*points[2].x-sine*radii.y*
+    points[2].y);
+  (p+3)->point.y=(double) (sine*radii.x*points[2].x+cosine*radii.y*
+    points[2].y);
+  if (i == (ssize_t) (arc_segments-1))
+    (p+3)->point=end;
+}
+
 static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
   const PointInfo end,const ArcPathShape *shape)
 {
@@ -10102,7 +10192,6 @@ static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
     beta,
     delta,
     factor,
-    gamma,
     theta;
 
   MagickStatusType
@@ -10175,40 +10264,20 @@ static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
   p=primitive_info;
   for (i=0; i < (ssize_t) arc_segments; i++)
   {
-    beta=0.5*((alpha+(i+1)*theta/arc_segments)-(alpha+i*theta/arc_segments));
-    gamma=(8.0/3.0)*sin(fmod((double) (0.5*beta),DegreesToRadians(360.0)))*
-      sin(fmod((double) (0.5*beta),DegreesToRadians(360.0)))/
-      sin(fmod((double) beta,DegreesToRadians(360.0)));
-    points[0].x=(double) (center.x+cos(fmod((double) (alpha+(double) i*theta/
-      arc_segments),DegreesToRadians(360.0)))-gamma*sin(fmod((double) (alpha+
-      (double) i*theta/arc_segments),DegreesToRadians(360.0))));
-    points[0].y=(double) (center.y+sin(fmod((double) (alpha+(double) i*theta/
-      arc_segments),DegreesToRadians(360.0)))+gamma*cos(fmod((double) (alpha+
-      (double) i*theta/arc_segments),DegreesToRadians(360.0))));
-    points[2].x=(double) (center.x+cos(fmod((double) (alpha+(double) (i+1)*
-      theta/arc_segments),DegreesToRadians(360.0))));
-    points[2].y=(double) (center.y+sin(fmod((double) (alpha+(double) (i+1)*
-      theta/arc_segments),DegreesToRadians(360.0))));
-    points[1].x=(double) (points[2].x+gamma*sin(fmod((double) (alpha+(double)
-      (i+1)*theta/arc_segments),DegreesToRadians(360.0))));
-    points[1].y=(double) (points[2].y-gamma*cos(fmod((double) (alpha+(double)
-      (i+1)*theta/arc_segments),DegreesToRadians(360.0))));
-    p->point.x=(p == primitive_info) ? start.x : (p-1)->point.x;
-    p->point.y=(p == primitive_info) ? start.y : (p-1)->point.y;
-    (p+1)->point.x=(double) (cosine*radii.x*points[0].x-sine*radii.y*
-      points[0].y);
-    (p+1)->point.y=(double) (sine*radii.x*points[0].x+cosine*radii.y*
-      points[0].y);
-    (p+2)->point.x=(double) (cosine*radii.x*points[1].x-sine*radii.y*
-      points[1].y);
-    (p+2)->point.y=(double) (sine*radii.x*points[1].x+cosine*radii.y*
-      points[1].y);
-    (p+3)->point.x=(double) (cosine*radii.x*points[2].x-sine*radii.y*
-      points[2].y);
-    (p+3)->point.y=(double) (sine*radii.x*points[2].x+cosine*radii.y*
-      points[2].y);
-    if (i == (ssize_t) (arc_segments-1))
-      (p+3)->point=end;
+    ArcSegmentInput
+      segment;
+
+    segment.alpha=alpha;
+    segment.theta=theta;
+    segment.arc_segments=arc_segments;
+    segment.center=center;
+    segment.cosine=cosine;
+    segment.sine=sine;
+    segment.radii=radii;
+    segment.start=start;
+    segment.end=end;
+    segment.primitive_info=primitive_info;
+    TraceArcSegmentPoints(&segment,i,p,points);
     status&=(MagickStatusType) TraceBezier(mvg_info,4);
     if (status == 0)
       break;
