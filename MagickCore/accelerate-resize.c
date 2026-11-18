@@ -206,160 +206,6 @@ static void SelectResizeWorkgroup(const cl_uint resizedColumns,
   }
 }
 
-static MagickBooleanType resizeHorizontalFilter(const ResizeFilterPass *pass,
-  const float xFactor,ExceptionInfo *exception)
-{
-  cl_kernel
-    horizontalKernel;
-
-  cl_int
-    status;
-
-  cl_uint
-    i;
-
-  const unsigned int
-    workgroupSize = 256;
-
-  float
-    resizeFilterScale,
-    resizeFilterSupport,
-    resizeFilterWindowSupport,
-    resizeFilterBlur,
-    support;
-
-  int
-    numCachedPixels,
-    resizeFilterType,
-    resizeWindowType;
-
-  MagickBooleanType
-    outputReady;
-
-  size_t
-    gammaAccumulatorLocalMemorySize,
-    gsize[2],
-    imageCacheLocalMemorySize,
-    pixelAccumulatorLocalMemorySize,
-    lsize[2],
-    totalLocalMemorySize,
-    weightAccumulatorLocalMemorySize;
-
-  unsigned int
-    chunkSize,
-    pixelPerWorkgroup;
-
-  horizontalKernel=NULL;
-  outputReady=MagickFalse;
-
-  /*
-  Apply filter to resize vertically from image to resize image.
-  */
-  support=GetResizeScaledSupport(pass->resizeFilter,xFactor);
-
-  SelectResizeWorkgroup(pass->resizedColumns,workgroupSize,&chunkSize,
-    &pixelPerWorkgroup);
-
-DisableMSCWarning(4127)
-  while(1)
-RestoreMSCWarning
-  {
-    /* calculate the local memory size needed per workgroup */
-    numCachedPixels=(int) ceil((pixelPerWorkgroup-1)/xFactor+2*support);
-    imageCacheLocalMemorySize=numCachedPixels*sizeof(CLQuantum)*
-      pass->number_channels;
-    totalLocalMemorySize=imageCacheLocalMemorySize;
-
-    /* local size for the pixel accumulator */
-    pixelAccumulatorLocalMemorySize=chunkSize*sizeof(cl_float4);
-    totalLocalMemorySize+=pixelAccumulatorLocalMemorySize;
-
-    /* local memory size for the weight accumulator */
-    weightAccumulatorLocalMemorySize=chunkSize*sizeof(float);
-    totalLocalMemorySize+=weightAccumulatorLocalMemorySize;
-
-    /* local memory size for the gamma accumulator */
-    gammaAccumulatorLocalMemorySize=GetGammaAccumulatorSize(pass->number_channels,
-      chunkSize);
-    totalLocalMemorySize+=gammaAccumulatorLocalMemorySize;
-
-    if (totalLocalMemorySize <= pass->device->local_memory_size)
-      break;
-    else
-    {
-      pixelPerWorkgroup=pixelPerWorkgroup/2;
-      chunkSize=chunkSize/2;
-      if ((pixelPerWorkgroup == 0) || (chunkSize == 0))
-      {
-        /* quit, fallback to CPU */
-        goto cleanup;
-      }
-    }
-  }
-
-  resizeFilterType=(int)GetResizeFilterWeightingType(pass->resizeFilter);
-  resizeWindowType=(int)GetResizeFilterWindowWeightingType(pass->resizeFilter);
-
-  horizontalKernel=AcquireOpenCLKernel(pass->device,"ResizeHorizontalFilter");
-  if (horizontalKernel == (cl_kernel) NULL)
-  {
-    (void) OpenCLThrowMagickException(pass->device,exception,GetMagickModule(),
-      ResourceLimitWarning,"AcquireOpenCLKernel failed.", ".");
-    goto cleanup;
-  }
-
-  resizeFilterScale=(float) GetResizeFilterScale(pass->resizeFilter);
-  resizeFilterSupport=(float) GetResizeFilterSupport(pass->resizeFilter);
-  resizeFilterWindowSupport=(float) GetResizeFilterWindowSupport(pass->resizeFilter);
-  resizeFilterBlur=(float) GetResizeFilterBlur(pass->resizeFilter);
-
-  i=0;
-  status =SetOpenCLKernelArg(horizontalKernel,i++,sizeof(cl_mem),(void*)&pass->imageBuffer);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(cl_uint),(void*)&pass->number_channels);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(cl_uint),(void*)&pass->columns);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(cl_uint),(void*)&pass->rows);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(cl_mem),(void*)&pass->resizedImageBuffer);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(cl_uint),(void*)&pass->resizedColumns);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(cl_uint),(void*)&pass->resizedRows);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(float),(void*)&xFactor);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(int),(void*)&resizeFilterType);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(int),(void*)&resizeWindowType);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(cl_mem),(void*)&pass->resizeFilterCubicCoefficients);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(float),(void*)&resizeFilterScale);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(float),(void*)&resizeFilterSupport);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(float),(void*)&resizeFilterWindowSupport);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(float),(void*)&resizeFilterBlur);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,imageCacheLocalMemorySize,NULL);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(int),&numCachedPixels);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(unsigned int),&pixelPerWorkgroup);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(unsigned int),&chunkSize);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,pixelAccumulatorLocalMemorySize,NULL);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,weightAccumulatorLocalMemorySize,NULL);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,gammaAccumulatorLocalMemorySize,NULL);
-
-  if (status != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(pass->device,exception,GetMagickModule(),
-      ResourceLimitWarning,"SetOpenCLKernelArg failed.",".");
-    goto cleanup;
-  }
-
-  gsize[0]=(pass->resizedColumns+pixelPerWorkgroup-1)/pixelPerWorkgroup*
-    workgroupSize;
-  gsize[1]=pass->resizedRows;
-  lsize[0]=workgroupSize;
-  lsize[1]=1;
-  outputReady=EnqueueOpenCLKernel(pass->queue,horizontalKernel,2,
-    (const size_t *) NULL,gsize,lsize,pass->image,pass->filteredImage,MagickFalse,
-    exception);
-
-cleanup:
-
-  ReleaseKernel(horizontalKernel);
-
-  return(outputReady);
-}
-
 typedef struct _ResizeVerticalArgs
 {
   const ResizeFilter
@@ -453,14 +299,196 @@ static cl_int SetResizeVerticalFilterArgs(const ResizeVerticalArgs *args)
   return(status);
 }
 
-static MagickBooleanType resizeVerticalFilter(const ResizeFilterPass *pass,
-  const float yFactor,ExceptionInfo *exception)
+typedef enum
+{
+  HorizontalResizeFilter,
+  VerticalResizeFilter
+} ResizeFilterSide;
+
+typedef struct _ResizeFilterRun
+{
+  ResizeFilterSide
+    side;
+
+  const ResizeFilterPass
+    *pass;
+
+  float
+    factor;
+} ResizeFilterRun;
+
+typedef struct _ResizeFilterLaunch
 {
   cl_kernel
-    verticalKernel;
+    filterKernel;
+
+  unsigned int
+    pixelPerWorkgroup,
+    workgroupSize;
+} ResizeFilterLaunch;
+
+static MagickBooleanType EnqueueResizeFilterKernel(const ResizeFilterRun *run,
+  const ResizeFilterLaunch *launch,ExceptionInfo *exception)
+{
+  const ResizeFilterSide
+    side = run->side;
+
+  const ResizeFilterPass
+    *const pass = run->pass;
+
+  const cl_kernel
+    filterKernel = launch->filterKernel;
+
+  const unsigned int
+    pixelPerWorkgroup = launch->pixelPerWorkgroup,
+    workgroupSize = launch->workgroupSize;
+
+  size_t
+    gsize[2],
+    lsize[2];
+
+  gsize[0]=((side == HorizontalResizeFilter) ?
+    (pass->resizedColumns+pixelPerWorkgroup-1)/pixelPerWorkgroup*
+    workgroupSize : pass->resizedColumns);
+  gsize[1]=((side == HorizontalResizeFilter) ? pass->resizedRows :
+    (pass->resizedRows+pixelPerWorkgroup-1)/pixelPerWorkgroup*
+    workgroupSize);
+  lsize[0]=((side == HorizontalResizeFilter) ? workgroupSize : 1);
+  lsize[1]=((side == HorizontalResizeFilter) ? 1 : workgroupSize);
+  return(EnqueueOpenCLKernel(pass->queue,filterKernel,2,
+    (const size_t *) NULL,gsize,lsize,pass->image,pass->filteredImage,MagickFalse,
+    exception));
+}
+
+static MagickBooleanType AcquireResizeFilterKernel(
+  const ResizeFilterSide side,const ResizeFilterPass *pass,
+  cl_kernel *filterKernel,ExceptionInfo *exception)
+{
+  *filterKernel=AcquireOpenCLKernel(pass->device,
+    ((side == HorizontalResizeFilter) ? "ResizeHorizontalFilter" :
+    "ResizeVerticalFilter"));
+  if (*filterKernel == (cl_kernel) NULL)
+  {
+    (void) OpenCLThrowMagickException(pass->device,exception,GetMagickModule(),
+      ResourceLimitWarning,"AcquireOpenCLKernel failed.", ".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+typedef struct _ResizeFilterArgsInput
+{
+  const ResizeFilterPass
+    *pass;
+
+  float
+    factor;
+
+  cl_kernel
+    filterKernel;
+
+  int
+    resizeFilterType,
+    resizeWindowType;
+
+  size_t
+    imageCacheLocalMemorySize;
+
+  int
+    numCachedPixels;
+
+  unsigned int
+    pixelPerWorkgroup,
+    chunkSize;
+
+  size_t
+    pixelAccumulatorLocalMemorySize,
+    weightAccumulatorLocalMemorySize,
+    gammaAccumulatorLocalMemorySize;
+} ResizeFilterArgsInput;
+
+static MagickBooleanType SetResizeFilterKernelArgs(
+  const ResizeFilterArgsInput *input,ExceptionInfo *exception)
+{
+  const ResizeFilterPass
+    *const pass = input->pass;
+
+  const float
+    factor = input->factor;
+
+  const cl_kernel
+    filterKernel = input->filterKernel;
+
+  const int
+    resizeFilterType = input->resizeFilterType,
+    resizeWindowType = input->resizeWindowType;
+
+  const size_t
+    imageCacheLocalMemorySize = input->imageCacheLocalMemorySize;
+
+  const int
+    numCachedPixels = input->numCachedPixels;
+
+  const unsigned int
+    pixelPerWorkgroup = input->pixelPerWorkgroup,
+    chunkSize = input->chunkSize;
+
+  const size_t
+    pixelAccumulatorLocalMemorySize = input->pixelAccumulatorLocalMemorySize,
+    weightAccumulatorLocalMemorySize = input->weightAccumulatorLocalMemorySize,
+    gammaAccumulatorLocalMemorySize = input->gammaAccumulatorLocalMemorySize;
 
   cl_int
     status;
+
+  ResizeVerticalArgs
+    args;
+
+  args.resizeFilter=pass->resizeFilter;
+  args.verticalKernel=filterKernel;
+  args.imageBuffer=pass->imageBuffer;
+  args.number_channels=pass->number_channels;
+  args.columns=pass->columns;
+  args.rows=pass->rows;
+  args.resizedImageBuffer=pass->resizedImageBuffer;
+  args.resizedColumns=pass->resizedColumns;
+  args.resizedRows=pass->resizedRows;
+  args.yFactor=factor;
+  args.resizeFilterType=resizeFilterType;
+  args.resizeWindowType=resizeWindowType;
+  args.resizeFilterCubicCoefficients=pass->resizeFilterCubicCoefficients;
+  args.imageCacheLocalMemorySize=imageCacheLocalMemorySize;
+  args.numCachedPixels=numCachedPixels;
+  args.pixelPerWorkgroup=pixelPerWorkgroup;
+  args.chunkSize=chunkSize;
+  args.pixelAccumulatorLocalMemorySize=pixelAccumulatorLocalMemorySize;
+  args.weightAccumulatorLocalMemorySize=weightAccumulatorLocalMemorySize;
+  args.gammaAccumulatorLocalMemorySize=gammaAccumulatorLocalMemorySize;
+  status=SetResizeVerticalFilterArgs(&args);
+
+  if (status != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(pass->device,exception,GetMagickModule(),
+      ResourceLimitWarning,"SetOpenCLKernelArg failed.",".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+static inline MagickBooleanType ResizeFilterImagePass(
+  const ResizeFilterRun *run,ExceptionInfo *exception)
+{
+  const ResizeFilterSide
+    side = run->side;
+
+  const ResizeFilterPass
+    *const pass = run->pass;
+
+  const float
+    factor = run->factor;
+
+  cl_kernel
+    filterKernel;
 
   const unsigned int
     workgroupSize = 256;
@@ -476,15 +504,13 @@ static MagickBooleanType resizeVerticalFilter(const ResizeFilterPass *pass,
   MagickBooleanType
     outputReady;
 
-  ResizeVerticalArgs
-    args;
+  ResizeFilterLaunch
+    launch;
 
   size_t
     gammaAccumulatorLocalMemorySize,
-    gsize[2],
     imageCacheLocalMemorySize,
     pixelAccumulatorLocalMemorySize,
-    lsize[2],
     totalLocalMemorySize,
     weightAccumulatorLocalMemorySize;
 
@@ -492,15 +518,16 @@ static MagickBooleanType resizeVerticalFilter(const ResizeFilterPass *pass,
     chunkSize,
     pixelPerWorkgroup;
 
-  verticalKernel=NULL;
+  filterKernel=NULL;
   outputReady=MagickFalse;
 
   /*
   Apply filter to resize vertically from image to resize image.
   */
-  support=GetResizeScaledSupport(pass->resizeFilter,yFactor);
+  support=GetResizeScaledSupport(pass->resizeFilter,factor);
 
-  SelectResizeWorkgroup(pass->resizedRows,workgroupSize,&chunkSize,
+  SelectResizeWorkgroup(((side == HorizontalResizeFilter) ?
+    pass->resizedColumns : pass->resizedRows),workgroupSize,&chunkSize,
     &pixelPerWorkgroup);
 
 DisableMSCWarning(4127)
@@ -508,7 +535,7 @@ DisableMSCWarning(4127)
 RestoreMSCWarning
   {
     /* calculate the local memory size needed per workgroup */
-    numCachedPixels=(int)ceil((pixelPerWorkgroup-1)/yFactor+2*support);
+    numCachedPixels=(int) ceil((pixelPerWorkgroup-1)/factor+2*support);
     imageCacheLocalMemorySize=numCachedPixels*sizeof(CLQuantum)*
       pass->number_channels;
     totalLocalMemorySize=imageCacheLocalMemorySize;
@@ -543,54 +570,29 @@ RestoreMSCWarning
   resizeFilterType=(int)GetResizeFilterWeightingType(pass->resizeFilter);
   resizeWindowType=(int)GetResizeFilterWindowWeightingType(pass->resizeFilter);
 
-  verticalKernel=AcquireOpenCLKernel(pass->device,"ResizeVerticalFilter");
-  if (verticalKernel == (cl_kernel) NULL)
-  {
-    (void) OpenCLThrowMagickException(pass->device,exception,GetMagickModule(),
-      ResourceLimitWarning,"AcquireOpenCLKernel failed.",".");
+  if (AcquireResizeFilterKernel(side,pass,&filterKernel,exception) ==
+      MagickFalse)
     goto cleanup;
+
+  {
+    const ResizeFilterArgsInput
+      input = { pass, factor, filterKernel, resizeFilterType,
+        resizeWindowType, imageCacheLocalMemorySize, numCachedPixels,
+        pixelPerWorkgroup, chunkSize, pixelAccumulatorLocalMemorySize,
+        weightAccumulatorLocalMemorySize, gammaAccumulatorLocalMemorySize };
+
+    if (SetResizeFilterKernelArgs(&input,exception) == MagickFalse)
+      goto cleanup;
   }
 
-  args.resizeFilter=pass->resizeFilter;
-  args.verticalKernel=verticalKernel;
-  args.imageBuffer=pass->imageBuffer;
-  args.number_channels=pass->number_channels;
-  args.columns=pass->columns;
-  args.rows=pass->rows;
-  args.resizedImageBuffer=pass->resizedImageBuffer;
-  args.resizedColumns=pass->resizedColumns;
-  args.resizedRows=pass->resizedRows;
-  args.yFactor=yFactor;
-  args.resizeFilterType=resizeFilterType;
-  args.resizeWindowType=resizeWindowType;
-  args.resizeFilterCubicCoefficients=pass->resizeFilterCubicCoefficients;
-  args.imageCacheLocalMemorySize=imageCacheLocalMemorySize;
-  args.numCachedPixels=numCachedPixels;
-  args.pixelPerWorkgroup=pixelPerWorkgroup;
-  args.chunkSize=chunkSize;
-  args.pixelAccumulatorLocalMemorySize=pixelAccumulatorLocalMemorySize;
-  args.weightAccumulatorLocalMemorySize=weightAccumulatorLocalMemorySize;
-  args.gammaAccumulatorLocalMemorySize=gammaAccumulatorLocalMemorySize;
-  status=SetResizeVerticalFilterArgs(&args);
-
-  if (status != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(pass->device,exception,GetMagickModule(),
-      ResourceLimitWarning,"SetOpenCLKernelArg failed.",".");
-    goto cleanup;
-  }
-
-  gsize[0]=pass->resizedColumns;
-  gsize[1]=(pass->resizedRows+pixelPerWorkgroup-1)/pixelPerWorkgroup*
-    workgroupSize;
-  lsize[0]=1;
-  lsize[1]=workgroupSize;
-  outputReady=EnqueueOpenCLKernel(pass->queue,verticalKernel,2,(const size_t *) NULL,
-    gsize,lsize,pass->image,pass->filteredImage,MagickFalse,exception);
+  launch.filterKernel=filterKernel;
+  launch.pixelPerWorkgroup=pixelPerWorkgroup;
+  launch.workgroupSize=workgroupSize;
+  outputReady=EnqueueResizeFilterKernel(run,&launch,exception);
 
 cleanup:
 
-  ReleaseKernel(verticalKernel);
+  ReleaseKernel(filterKernel);
 
   return(outputReady);
 }
@@ -699,7 +701,10 @@ static MagickBooleanType ResizeHorizontalThenVertical(
         *tempImageBuffer, (cl_uint) resizedColumns, (cl_uint) image->rows,
         resizeFilter, cubicCoefficientsBuffer };
 
-    *outputReady=resizeHorizontalFilter(&pass,xFactor,exception);
+    const ResizeFilterRun
+      run = { HorizontalResizeFilter, &pass, xFactor };
+
+    *outputReady=ResizeFilterImagePass(&run,exception);
   }
   if (*outputReady == MagickFalse)
     return(MagickFalse);
@@ -711,7 +716,10 @@ static MagickBooleanType ResizeHorizontalThenVertical(
         filteredImageBuffer, (cl_uint) resizedColumns, (cl_uint) resizedRows,
         resizeFilter, cubicCoefficientsBuffer };
 
-    *outputReady=resizeVerticalFilter(&pass,yFactor,exception);
+    const ResizeFilterRun
+      run = { VerticalResizeFilter, &pass, yFactor };
+
+    *outputReady=ResizeFilterImagePass(&run,exception);
   }
   if (*outputReady == MagickFalse)
     return(MagickFalse);
@@ -924,7 +932,10 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
           tempImageBuffer, (cl_uint) image->columns, (cl_uint) resizedRows,
           resizeFilter, cubicCoefficientsBuffer };
 
-      outputReady=resizeVerticalFilter(&pass,yFactor,exception);
+      const ResizeFilterRun
+        run = { VerticalResizeFilter, &pass, yFactor };
+
+      outputReady=ResizeFilterImagePass(&run,exception);
     }
     if (outputReady == MagickFalse)
       goto cleanup;
@@ -936,7 +947,10 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
           filteredImageBuffer, (cl_uint) resizedColumns,
           (cl_uint) resizedRows, resizeFilter, cubicCoefficientsBuffer };
 
-      outputReady=resizeHorizontalFilter(&pass,xFactor,exception);
+      const ResizeFilterRun
+        run = { HorizontalResizeFilter, &pass, xFactor };
+
+      outputReady=ResizeFilterImagePass(&run,exception);
     }
     if (outputReady == MagickFalse)
       goto cleanup;

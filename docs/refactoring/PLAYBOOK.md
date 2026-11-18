@@ -23229,6 +23229,115 @@ approval of 2026-10-24 to evolve the recipes.
 
 ---
 
+## Recipe OH - Move a Leading Run of a File into a Private Header Only It Includes
+
+**Use when:** CodeScene reports *Lines of Code in a Single File* on a `MagickCore/` `.c`
+file (or a finding of a function the run carries away that no other recipe can clear,
+such as a *Complex Method* counted over an `#if 0` label run), and the file's static
+helpers cannot leave by a Recipe S split: they serve only the file's own public roots, so a
+split would move a root too or widen a helper. `morphology-primitive.c` (9.09, 3,648
+lines: the per-pixel walks, the row and column drivers and the direct pass, all reached
+only from `MorphologyApply`) and `morphology-builtin.c` (8.79: the kernel builders of
+`AcquireKernelBuiltIn`, and `IsBaseKernelNeeded`, whose cc 23 is its `#if 0` label run).
+
+**Not covered by:** Recipe S, which moves a family with its public root into a new `.c`
+file and shares helpers through a header that two `.c` files include (its step 2); here
+nothing leaves the translation unit and no second `.c` file exists. Recipe CH, which
+moves one identical helper out of several headers into a common one. Recipes H, L and F,
+which hoist a macro, type or table inside one file.
+
+**How:**
+
+1. The run. A contiguous run of the file's text that begins directly after its include
+   block (the last `#include` line, or the last header of an earlier step of this recipe)
+   and ends directly before a top-level item: whole `static` functions, typedefs, `static
+   const` tables, `#define`s and comments, with every `#if`/`#endif` pair it holds
+   (`#if 0` text, OpenMP pragmas, feature branches) inside it. It holds no `#include`, no
+   definition of a function or object with external linkage (`MagickExport`,
+   `MagickPrivate`, `WandExport`: those stay in the `.c` file) and no non-`const`
+   file-scope object.
+2. The header. Create `MagickCore/<stem>-<theme>-private.h`: the short licence of the
+   private headers, an include guard `MAGICKCORE_<STEM>_<THEME>_PRIVATE_H`, and the run
+   verbatim, byte for byte (no `inline` added: one file includes it and uses every
+   static), nothing else. List it under `MAGICKCORE_NOINST_HDRS` and
+   `MAGICKCORE_BASE_SRCS` of `MagickCore/Makefile.am`, mirrored in `Makefile.in` (not
+   installed).
+3. The file. Delete the run and write `#include "MagickCore/<stem>-<theme>-private.h"` as
+   the last line of the include block, where the run began. Nothing else changes. No
+   other file includes the header (`grep -rl` over the tree finds only the one `.c`).
+4. Proof of identity: `sh tools/pp_identical.sh MagickCore/<file>.c` prints `IDENTICAL`
+   (the preprocessed translation unit is the same text, line markers aside, in the
+   oracle build's configuration) and `sh tools/obj_identical.sh MagickCore/<file>.c`
+   prints `IDENTICAL`; when the run holds an OpenMP region or a hot path, the object
+   that the OpenMP -O2 build (`tools/omp_compare.sh build` flags) compiles from the
+   working tree has the same `.text` as the one it compiles from the base (`objdump -d
+   --no-show-raw-insn`, `cmp`), which stands for the timing the rulings ask for.
+5. Scores. The header scores at least the file's score before the step (the gate's
+   split bar), and the file does not fall. A step that leaves the file flat is taken
+   only inside a chain of this recipe whose last step raises the file, measured first on
+   a stub probe (the owner's chain rulings); the message quotes the probe.
+6. Checks: the narrow and wide builds, `tools/ci_linux_warnings.sh --campaign-a`,
+   `tools/ci_warnings.sh` and `tools/cxx_warnings.sh` on the file, and
+   `refactor_guard.py --combined` over the file and its headers (every literal's count
+   unchanged in total).
+7. One header per commit (`refactor(<file>): move <first item> to <last item> into
+   <header>`), `Recipe: OH`, `Verified: guard`, the identity lines of step 4 quoted; the
+   branch's whole-catalogue runs cover it.
+
+**Before:** (`morphology-builtin.c`)
+
+```c
+#include "MagickCore/morphology-apply-private.h"
+#include "MagickCore/morphology-apply-kernel-private.h"
+
+static inline size_t fact(size_t n)
+{
+  ...
+static KernelInfo *AcquireChebyshevKernel(KernelInfo *kernel,
+```
+
+**After:**
+
+```c
+#include "MagickCore/morphology-apply-private.h"
+#include "MagickCore/morphology-apply-kernel-private.h"
+#include "MagickCore/morphology-builtin-shape-private.h"
+static KernelInfo *AcquireChebyshevKernel(KernelInfo *kernel,
+```
+
+with `morphology-builtin-shape-private.h` holding, under its licence and guard, the text
+from `static inline size_t fact(size_t n)` to the line before `AcquireChebyshevKernel`.
+
+**Careful:**
+
+- `#include` is textual (C11 6.10.2p3): the preprocessor replaces the line by the header's
+  text, and the header's guard and comment lines leave nothing behind, so the translation
+  unit the compiler sees is the one it saw before, token for token, in every
+  configuration, because the run moved whole with its `#if` lines and stands at the same
+  point after the same includes. Step 4 checks it; no name, linkage, type or order
+  changes, and every `static` keeps its one definition in its one translation unit.
+- Debug line information names the header for the moved lines; `__FILE__` and
+  `__LINE__` inside the run (assertions, `GetMagickModule()`) now name the header and its
+  lines. The oracle normalises them; an assertion message that fires names the header.
+- The header is not a shared core: a second includer would get a second copy of every
+  static. Step 3's `grep` and the guard comment's file name say it belongs to one file.
+- This moves debt rather than removing it; the owner's 2026-11-17 and 2026-11-18 rulings
+  keep such a step when the products score at least the original did, and the products
+  are worked toward 10.0 like any other file.
+
+**Evidence level:** guard, with the preprocessed and object identity of step 4.
+
+**Provenance:** 2026-11-18, `morphology-primitive.c` (9.09) and `morphology-builtin.c`
+(8.79), both left by round 28 with no legal step; the owner's ruling of 2026-11-18
+("for 6 we make it all 10 sooner or later"), read by the agent as allowing a private
+header that only one file includes when it raises the file and itself scores at least the
+file's score before the move. Probes: `morphology-builtin.c` with two headers 8.79 to
+10.0 (the headers 10.0 and 8.79), `morphology-primitive.c` with two headers 9.09 to 9.68
+(the headers 9.38 and 9.38). Added by Claude Code (Claude Opus 5.5), campaign A, W41
+lane b, under the owner's approval of 2026-10-24 to evolve the recipes.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -23726,3 +23835,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-17 | NEW | TV | Share a Two-View Parallel Row Loop Through a Row Function: functions that clone an image and run the same parallel row loop over the clone's authentic view and a second image's virtual view, differing only in the row's work on `(p,q)`, move the loop into one non-inline `static` driver taking the clone, the second image and a `const` struct of a row function pointer and a `const void *` input; each row function takes a per-iteration `const` row struct (image, source, arguments, y); checked by script, a by-hand write-set reading, the whole catalogue narrow and wide, `omp_compare.sh` at 1 and 4 threads and OpenMP-build timing | `compare-similarity-image.c`'s `SIMDivideImage`, `SIMVarianceImage` and `SIMSubtractImageMean` (campaign A, round 28 lane b): *Code Duplication* and three cc-10 *Complex Method* findings that Recipe RL's one-view row type does not reach | mandate (2026-10-24) |
 | 2026-11-17 | NEW | KX | Replace an Enumerator-Keyed Switch of Assigned Calls by a Table of Function Pointers: a `switch` whose groups each assign one call's result to the same local (`v=F(args);`) and all `return(v);` or all `break;`, the callees of one signature with the same arguments, becomes a `static const` table of `{ label, function }` and a lookup; groups of another signature stay in the `switch`, the default group is the fallback; timed when the function runs per offset or per pixel, indirect calls counted | `compare-similarity-image.c`'s `SimilarityImage` (frequency-domain dispatch, six groups returning the call) and `compare-similarity-private.h`'s `GetSimilarityForMetric` (fifteen labels assigning `status`), which Recipe KF (statement calls) and KD (a `LocaleCompare` ladder) do not reach (campaign A, round 28 lane b) | mandate (2026-10-24) |
 | 2026-11-17 | NEW | SO | Extract Sibling Blocks Differing in One Value, Returning One Written Variable and Writing One Through a Pointer: copies of one small block in one or several functions of a file, differing in one constant and writing two caller locals (one assigned whole first, one advanced), become one `static` function returning the first and taking the second by pointer | `draw.c`'s MVG push handlers (`ParseMVGPushClass`, `-ClipPath`, `-Gradient`, `-Pattern`): `ParseMVGPushClipPath` leaves *Complex Method*, `-Gradient` cc 22 to 16, `-Pattern` 19 to 13 and leaves *Bumpy Road Ahead* in a probe; campaign B, M137 | mandate (2026-10-24) |
+| 2026-11-18 | NEW | OH | Move a Leading Run of a File into a Private Header Only It Includes: a contiguous run of a `.c` file's statics, typedefs and `static const` tables, beginning directly after its include block, moves verbatim into a new non-installed `<stem>-<theme>-private.h` that only that file includes, at the end of its include block; the preprocessed translation unit and the object file are unchanged (`pp_identical.sh`, `obj_identical.sh`, the OpenMP build's `.text`); the header scores at least the file's score before the step | `morphology-primitive.c` (9.09) and `morphology-builtin.c` (8.79), *Lines of Code in a Single File* and `IsBaseKernelNeeded`'s `#if 0` cc 23, no other legal step (round 28); probes 9.09 to 9.68 and 8.79 to 10.0 with two headers each; owner ruling of 2026-11-18 read by the agent (a private header that only one file includes); campaign A, W41 lane b | owner |
