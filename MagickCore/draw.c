@@ -10214,10 +10214,28 @@ static MagickBooleanType GetPathPoint(const char **p,char *token,double *x,
   return(MagickTrue);
 }
 
+static MagickBooleanType GetPathArcShape(const char **p,char *token,
+  ArcPathShape *shape)
+{
+  if (GetPathPoint(p,token,&shape->arc.x,&shape->arc.y) == MagickFalse)
+    return(MagickFalse);
+  if (GetPathValue(p,token,&shape->angle) == MagickFalse)
+    return(MagickFalse);
+  if (SkipPathListToken(p,token) == MagickFalse)
+    return(MagickFalse);
+  shape->large_arc=StringToLong(token) != 0 ? MagickTrue : MagickFalse;
+  if (SkipPathListToken(p,token) == MagickFalse)
+    return(MagickFalse);
+  shape->sweep=StringToLong(token) != 0 ? MagickTrue : MagickFalse;
+  if (SkipPathListSeparator(p,token) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static ssize_t TracePathArc(const PathTrace *trace)
 {
-  double
-    angle = 0.0;
+  ArcPathShape
+    shape = { {0.0, 0.0}, 0.0, MagickFalse, MagickFalse };
 
   ExceptionInfo
     *exception = trace->exception;
@@ -10248,43 +10266,19 @@ static ssize_t TracePathArc(const PathTrace *trace)
     x,
     y;
 
-  MagickBooleanType
-    large_arc = MagickFalse,
-    sweep = MagickFalse;
-
-  PointInfo
-    arc = {0.0, 0.0};
-
   /*
     Elliptical arc.
   */
   do
   {
-    if (GetPathValue(&p,token,&arc.x) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    if (GetPathValue(&p,token,&arc.y) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    if (GetPathValue(&p,token,&angle) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    if (SkipPathListToken(&p,token) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    large_arc=StringToLong(token) != 0 ? MagickTrue : MagickFalse;
-    if (SkipPathListToken(&p,token) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    sweep=StringToLong(token) != 0 ? MagickTrue : MagickFalse;
-    if (SkipPathListSeparator(&p,token) == MagickFalse)
+    if (GetPathArcShape(&p,token,&shape) == MagickFalse)
       ThrowPointExpectedException(token,exception);
     if (GetPathPoint(&p,token,&x,&y) == MagickFalse)
       ThrowPointExpectedException(token,exception);
     end.x=GetPathCoordinate(attribute,(int) 'A',x,point.x);
     end.y=GetPathCoordinate(attribute,(int) 'A',y,point.y);
-    {
-      const ArcPathShape
-        shape = { arc, angle, large_arc, sweep };
-
-      if (TraceArcPath(mvg_info,point,end,&shape) == MagickFalse)
-        return(-1);
-    }
+    if (TraceArcPath(mvg_info,point,end,&shape) == MagickFalse)
+      return(-1);
     q=AdvancePrimitiveOffset(mvg_info);
     point=end;
     SkipPathSeparators(&p);
