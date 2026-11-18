@@ -5050,6 +5050,49 @@ static MagickBooleanType ParseMVGClass(const MVGRenderState *state)
   return(MagickTrue);
 }
 
+static void DrawMVGClipPathNode(const MVGRenderState *state)
+{
+  char
+    *token = (*state->token);
+
+  DrawInfo
+    **graphic_context = (*state->graphic_context);
+
+  ExceptionInfo
+    *exception = state->exception;
+
+  Image
+    *image = state->image;
+
+  SplayTreeInfo
+    *macros = (*state->macros);
+
+  ssize_t
+    n = (*state->n);
+
+  const char
+    *clip_path;
+
+  clip_path=(const char *) GetValueFromSplayTree(macros,token);
+  if (clip_path != (const char *) NULL)
+    {
+      ClippingMaskPath
+        clip_input;
+
+      if (graphic_context[n]->clipping_mask != (Image *) NULL)
+        graphic_context[n]->clipping_mask=
+          DestroyImage(graphic_context[n]->clipping_mask);
+      clip_input.id=token;
+      clip_input.clip_path=clip_path;
+      graphic_context[n]->clipping_mask=DrawClippingMask(image,
+        graphic_context[n],&clip_input,exception);
+      if (graphic_context[n]->compliance != SVGCompliance)
+        {
+          ApplyMVGClipPath(state);
+        }
+    }
+}
+
 static MagickBooleanType ParseMVGClipPath(const MVGRenderState *state)
 {
   char
@@ -5060,12 +5103,6 @@ static MagickBooleanType ParseMVGClipPath(const MVGRenderState *state)
 
   DrawInfo
     **graphic_context = (*state->graphic_context);
-
-  ExceptionInfo
-    *exception = state->exception;
-
-  Image
-    *image = state->image;
 
   MagickStatusType
     status = (*state->status);
@@ -5090,9 +5127,6 @@ static MagickBooleanType ParseMVGClipPath(const MVGRenderState *state)
 
   do
   {
-    const char
-      *clip_path;
-
     /*
       Take a node from within the MVG document, and duplicate it here.
     */
@@ -5103,24 +5137,7 @@ static MagickBooleanType ParseMVGClipPath(const MVGRenderState *state)
         break;
       }
     (void) CloneString(&graphic_context[n]->clip_mask,token);
-    clip_path=(const char *) GetValueFromSplayTree(macros,token);
-    if (clip_path != (const char *) NULL)
-      {
-        ClippingMaskPath
-          clip_input;
-
-        if (graphic_context[n]->clipping_mask != (Image *) NULL)
-          graphic_context[n]->clipping_mask=
-            DestroyImage(graphic_context[n]->clipping_mask);
-        clip_input.id=token;
-        clip_input.clip_path=clip_path;
-        graphic_context[n]->clipping_mask=DrawClippingMask(image,
-          graphic_context[n],&clip_input,exception);
-        if (graphic_context[n]->compliance != SVGCompliance)
-          {
-            ApplyMVGClipPath(&arm_state);
-          }
-      }
+    DrawMVGClipPathNode(&arm_state);
     break;
   } while (0);
   (*state->q)=q;
