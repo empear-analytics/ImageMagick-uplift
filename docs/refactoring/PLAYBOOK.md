@@ -23335,6 +23335,128 @@ to evolve the recipes.
 
 ---
 
+## Recipe RX - Split a Selection at its Default, Returning Whether a Moved Group Returned
+
+**Use when:** CodeScene reports *Complex Method* or *Large Method* on a value-returning
+function whose `switch` has groups that leave the function through `return(R);` with
+different expressions `R` (on some paths) and otherwise `break;` to statements that follow
+the `switch` and stay, as `composite-image.c`'s `CompositeImage` does: its Copy and
+Intensity groups return `CompositeCopyImage(...)` when the source lies inside the canvas
+and break to the general composite otherwise, and its `default:` group already calls the
+argument helpers of an earlier Recipe SD chain.
+
+**Not covered by:** Recipe SD, whose step 1 refuses a `return` in a group; Recipe SR, whose
+returns all give one `R` meeting W step 2; Recipe ST, which needs the `switch` to be
+followed directly by one `return(R_T);` (here a long tail follows; moving it with E step 7
+would need an input struct of some twenty members); Recipe RC, likewise; Recipe RV, whose
+block may hold no `break` that leaves it, and a run of groups is not one block.
+
+**How:**
+
+1. The `switch (e)` lies outside every OpenMP region and holds no `#pragma` line; `e` is a
+   variable, or an expression of variables with no call, assignment or increment, that no
+   statement inside the `switch` writes. It has a `default:` label, and no group falls
+   through into another. The function returns `MagickBooleanType`.
+2. Choose the groups that move: the group carrying `default:` and others beside it. Each
+   ends with `break;` of this `switch` or with `return(R);`, may hold further `break;` of
+   this `switch` inside a selection (as SD step 1 admits) and further `return(R);`, and
+   holds no `continue`, `goto` or `break` of an enclosing loop. Each `R` is an expression
+   of the function's return type evaluated, as before, where the `return` stands.
+3. Written variables, on Recipe RV step 6 (b)'s terms: a plain local of the caller that a
+   moved group writes only on paths that end in `return(R);` (`setup.intensity=MagickTrue;`
+   before `return(...(&setup)...)`) goes by value, a copy the helper may write, since the
+   caller returns at once and never reads its own copy again; writes through pointers the
+   groups already use stay as they are; a `const` targets struct that a moved group only
+   passes on (the earlier helper's call in the `default:` group) goes as a parameter
+   (Recipe O step 8). Nothing else of the caller is written.
+4. Cut the moved groups, labels and bodies, in their order, into a new `static
+   MagickBooleanType` function directly above the caller, whose body is `switch (e) { ...
+   }` with the same text of `e`, followed by `return(MagickFalse);`. Each `return(R);`
+   becomes `{ (*result)=R; return(MagickTrue); }` (the braces only where it stood as the
+   body of an `if`; otherwise the two statements); nothing else in the text changes. The
+   function takes, last, `MagickBooleanType *result`.
+5. Inputs: at most four parameters in all. When the moved groups read more variables than
+   fit, those they only read (and those step 3 passes by value) go in a `const` input
+   struct of Recipe N (steps 2 and 3), the helper binding a `const` local of the same name
+   and type per member it reads (N step 4) and, for a by-value variable it writes, a local
+   without `const` (`T v = name->v;`, RV step 6 (c)); `e` and a passed-on targets struct
+   stay parameters.
+6. Where the `default:` group stood, write `default:` and a compound block holding, when
+   step 5 made an input struct, its fill in Recipe FB's form (`const Name name = { v1,
+   v2, ... };`, the members' variables in declaration order, then a blank line), then `if
+   (Helper(...,&returned) != MagickFalse)` `return(returned);` and `break;`. The caller
+   declares `MagickBooleanType returned;` once among its declarations.
+7. Check by reading that every label of the original is in exactly one of the two
+   `switch`es, `default` in the new one; that each moved group's text is the original but
+   for step 4's rewriting and the names step 5 binds; and every argument and member
+   against its parameter. `refactor_guard.py`: literals `OK`; `--calls`: `+2` for the new
+   function and nothing else.
+8. Why the behaviour is the same: a value of `e` that a moved label names reaches the same
+   group, now in the helper, through the caller's `default:`; where the group returned `R`,
+   the helper stores `R` (evaluated at the same point from the same values) and returns
+   `MagickTrue`, and the caller returns that `R`; where it broke, the helper returns
+   `MagickFalse` and the caller breaks to the same statement after its `switch`. Evidence:
+   the oracle on the cases that reach the function, `ci_warnings.sh`,
+   `ci_linux_warnings.sh` and `cxx_warnings.sh`.
+
+**Before:** (`composite-image.c`, `CompositeImage`, after two Recipe SD steps)
+
+```c
+  switch (compose)
+  {
+    case CopyCompositeOp:
+    {
+      if (IsSourceInsideCanvas(image,source_image,x_offset,y_offset) ==
+          MagickFalse)
+        break;
+      if (IsSourceAlphaNeeded(image,source_image) != MagickFalse)
+        (void) SetImageAlphaChannel(source_image,OpaqueAlphaChannel,exception);
+      return(CompositeCopyImage(image,source_image,&setup,exception));
+    }
+    ...
+    default:
+    {
+      GetBlendArguments(image,compose,exception,&argument_targets);
+      break;
+    }
+  }
+```
+
+**After:**
+
+```c
+    default:
+    {
+      const CopyCompositeInputs
+        copy = { image, source_image, x_offset, y_offset, setup, exception };
+
+      if (CompositeCopyGroups(&copy,compose,&argument_targets,&returned) !=
+          MagickFalse)
+        return(returned);
+      break;
+    }
+```
+
+**Careful:**
+
+- A moved group's `return` used to leave `CompositeImage` directly; now it leaves the
+  helper with `MagickTrue` and the caller's `if` returns the stored value, so no statement
+  of the caller runs in between.
+- A by-value copy (step 3) is read and written only by the helper; the caller's own variable
+  keeps its value, which nothing reads after a returning path.
+- The input struct lives in the `default:` block, filled where the call stands, so every
+  member holds the value the groups would have read in the caller.
+
+**Evidence level:** oracle (the cases that reach the function).
+
+**Provenance:** 2026-11-18, `composite-image.c`'s `CompositeImage` (campaign A, round 30
+lane c): after two Recipe SD steps, the Copy, Intensity, Saliency, Seamless, Blur and
+Displace groups each return on some path, and the `switch` is followed by the general
+composite; no recipe moved such groups. Added by Claude Code (Claude Opus 5.5) under the
+owner's approval of 2026-10-24 to evolve the recipes.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -23833,3 +23955,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-17 | NEW | KX | Replace an Enumerator-Keyed Switch of Assigned Calls by a Table of Function Pointers: a `switch` whose groups each assign one call's result to the same local (`v=F(args);`) and all `return(v);` or all `break;`, the callees of one signature with the same arguments, becomes a `static const` table of `{ label, function }` and a lookup; groups of another signature stay in the `switch`, the default group is the fallback; timed when the function runs per offset or per pixel, indirect calls counted | `compare-similarity-image.c`'s `SimilarityImage` (frequency-domain dispatch, six groups returning the call) and `compare-similarity-private.h`'s `GetSimilarityForMetric` (fifteen labels assigning `status`), which Recipe KF (statement calls) and KD (a `LocaleCompare` ladder) do not reach (campaign A, round 28 lane b) | mandate (2026-10-24) |
 | 2026-11-17 | NEW | SO | Extract Sibling Blocks Differing in One Value, Returning One Written Variable and Writing One Through a Pointer: copies of one small block in one or several functions of a file, differing in one constant and writing two caller locals (one assigned whole first, one advanced), become one `static` function returning the first and taking the second by pointer | `draw.c`'s MVG push handlers (`ParseMVGPushClass`, `-ClipPath`, `-Gradient`, `-Pattern`): `ParseMVGPushClipPath` leaves *Complex Method*, `-Gradient` cc 22 to 16, `-Pattern` 19 to 13 and leaves *Bumpy Road Ahead* in a probe; campaign B, M137 | mandate (2026-10-24) |
 | 2026-11-18 | NEW | OH | Move a Family into a Private Header That Only Its File Includes: a function the no-slowdown ruling protects (or a one-root file's family), with every `static` only it reaches and the typedefs they name, moves verbatim (no `inline` added) into a new non-installed `MagickCore/<stem>-<family>-private.h` that only its file includes, when a stub probe shows the file rising and the family scoring at least the file's score; proof: `split_branch_check.py` IDENTICAL-MODULO-LAYOUT, the oracle, and timing of the operations that reach the family in the OpenMP -O2 build (layout can move hot loops) | `composite-image.c`'s `CompositeChannelColor` family (campaign A, round 30 lane c): probe 5.01 to 7.27 for the file, 5.65 for the header; the owner's answers of 2026-11-18 (a private header included by one file is allowed when it raises the file and scores at least the file's score before the move) | owner |
+| 2026-11-18 | NEW | RX | Split a Selection at its Default, Returning Whether a Moved Group Returned: the `default` group and groups beside it of a `switch` in a `MagickBooleanType` function, groups that `return(R);` with different `R` on some paths and `break;` to code that follows the `switch` on others, move into a `static MagickBooleanType` helper holding `switch (e)` and `return(MagickFalse);`, each `return(R);` becoming `(*result)=R; return(MagickTrue);`; the caller's `default:` fills an input struct in FB form and writes `if (Helper(...,&returned) != MagickFalse) return(returned); break;`; locals written only on returning paths go by value (RV step 6 (b)) | `composite-image.c`'s `CompositeImage` (campaign A, round 30 lane c): after two Recipe SD steps its Copy and Intensity groups return `CompositeCopyImage(...)` or break to the general composite; SD, SR, ST, RC and RV each refuse that shape | mandate (2026-10-24) |
