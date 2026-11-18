@@ -964,6 +964,15 @@ typedef struct _MorphologyColumn
     id;
 } MorphologyColumn;
 
+static double NormalizeMorphologyColumnGamma(const MorphologyColumn *column,
+  double gamma,const size_t count)
+{
+  gamma=MagickSafeReciprocal(gamma);
+  if (count != 0)
+    gamma*=(double) column->kernel->height/count;
+  return(gamma);
+}
+
 static void ConvolveMorphologyColumnChannel(const MorphologyColumn *column,
   const Quantum *magick_restrict p,Quantum *magick_restrict q,const ssize_t i)
 {
@@ -1015,9 +1024,7 @@ static void ConvolveMorphologyColumnChannel(const MorphologyColumn *column,
   ConvolveColumnChannelValue(&walk,&pixel,&gamma,&count);
   if (fabs(pixel-(double) p[column->center+i]) >= MagickEpsilon)
     column->changes[column->id]++;
-  gamma=MagickSafeReciprocal(gamma);
-  if (count != 0)
-    gamma*=(double) column->kernel->height/count;
+  gamma=NormalizeMorphologyColumnGamma(column,gamma,count);
   SetPixelChannel(column->morphology_image,channel,ClampToQuantum(gamma*
     pixel),q);
 }
