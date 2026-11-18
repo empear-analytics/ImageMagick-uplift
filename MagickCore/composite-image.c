@@ -1294,7 +1294,7 @@ static CompositeSetup GetCompositeSetup(const ssize_t x_offset,
 %                                                                             %
 %                                                                             %
 %                                                                             %
-%   C o m p o s i t e I m a g e                                           %
+%   C o m p o s i t e I m a g e                                               %
 %                                                                             %
 %                                                                             %
 %                                                                             %
