@@ -648,6 +648,17 @@ static MagickBooleanType RelaxBlendStep(const BlendRelaxation *relaxation,
     *relaxation->residual_image,residual,exception));
 }
 
+static MagickBooleanType ReportBlendStart(const Image *image,
+  const BlendRelaxation *relaxation)
+{
+  MagickBooleanType
+    verbose;
+
+  verbose=IsStringTrue(GetImageArtifact(image,"verbose"));
+  ReportBlendTitle(relaxation,verbose);
+  return(verbose);
+}
+
 static MagickBooleanType RelaxBlendImage(Image *image,
   const BlendRelaxation *relaxation,const BlendRequest *request,
   ExceptionInfo *exception)
@@ -677,8 +688,7 @@ static MagickBooleanType RelaxBlendImage(Image *image,
       ReleaseBlendImages(relaxation->kernel_failure);
       return(MagickFalse);
     }
-  verbose=IsStringTrue(GetImageArtifact(image,"verbose"));
-  ReportBlendTitle(relaxation,verbose);
+  verbose=ReportBlendStart(image,relaxation);
   for (i=0; i < (ssize_t) request->iterations; i++)
   {
     double
@@ -700,6 +710,14 @@ static MagickBooleanType RelaxBlendImage(Image *image,
   }
   kernel_info=DestroyKernelInfo(kernel_info);
   return(MagickTrue);
+}
+
+static void ReleaseSaliencyImages(Image *crop_image,Image *divergent_image,
+  Image *residual_image)
+{
+  crop_image=DestroyImage(crop_image);
+  divergent_image=DestroyImage(divergent_image);
+  residual_image=DestroyImage(residual_image);
 }
 
 static MagickBooleanType SaliencyBlendImage(Image *image,
@@ -766,9 +784,7 @@ static MagickBooleanType SaliencyBlendImage(Image *image,
     if (RelaxBlendImage(image,&relaxation,request,exception) == MagickFalse)
       return(MagickFalse);
   }
-  crop_image=DestroyImage(crop_image);
-  divergent_image=DestroyImage(divergent_image);
-  residual_image=DestroyImage(residual_image);
+  ReleaseSaliencyImages(crop_image,divergent_image,residual_image);
   /*
     Composite relaxed over the background image.
   */
@@ -808,6 +824,12 @@ static Image *BlendSeamlessMeanImage(const Image *image,
   mean_image=BlendMeanImage(sum_image,source_image,exception);
   sum_image=DestroyImage(sum_image);
   return(mean_image);
+}
+
+static void ReleaseSeamlessImages(Image *mean_image,Image *residual_image)
+{
+  mean_image=DestroyImage(mean_image);
+  residual_image=DestroyImage(residual_image);
 }
 
 static MagickBooleanType SeamlessBlendImage(Image *image,
@@ -858,8 +880,7 @@ static MagickBooleanType SeamlessBlendImage(Image *image,
     if (RelaxBlendImage(image,&relaxation,request,exception) == MagickFalse)
       return(MagickFalse);
   }
-  mean_image=DestroyImage(mean_image);
-  residual_image=DestroyImage(residual_image);
+  ReleaseSeamlessImages(mean_image,residual_image);
   /*
     Composite the foreground image over the background image.
   */

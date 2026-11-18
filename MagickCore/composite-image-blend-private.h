@@ -512,6 +512,14 @@ static Image *FinishBlendImage(Image *sum_image,
   return(sum_image);
 }
 
+static void DestroySumViews(CacheView *sum_view,CacheView *beta_view,
+  CacheView *alpha_view)
+{
+  sum_view=DestroyCacheView(sum_view);
+  beta_view=DestroyCacheView(beta_view);
+  alpha_view=DestroyCacheView(alpha_view);
+}
+
 static Image *BlendSumImage(const Image *alpha_image,const Image *beta_image,
   const BlendSumWeights *weights,ExceptionInfo *exception)
 {
@@ -578,9 +586,7 @@ static Image *BlendSumImage(const Image *alpha_image,const Image *beta_image,
     SumBlendRow(&row,p,q,r);
     SyncCompositeRow(sum_view,exception,&status);
   }
-  sum_view=DestroyCacheView(sum_view);
-  beta_view=DestroyCacheView(beta_view);
-  alpha_view=DestroyCacheView(alpha_view);
+  DestroySumViews(sum_view,beta_view,alpha_view);
   return(FinishBlendImage(sum_image,status));
 }
 
@@ -621,6 +627,15 @@ static void DestroyBlendGradients(BlendGradientSet *gradients)
     gradients->dx_image=DestroyImage(gradients->dx_image);
 }
 
+static void ReleaseUnselectedGradients(BlendGradientSet *alpha,
+  BlendGradientSet *beta)
+{
+  beta->dx_image=DestroyImage(beta->dx_image);
+  alpha->dx_image=DestroyImage(alpha->dx_image);
+  beta->magnitude_image=DestroyImage(beta->magnitude_image);
+  alpha->magnitude_image=DestroyImage(alpha->magnitude_image);
+}
+
 static MagickBooleanType SelectBlendGradients(BlendGradientSet *alpha,
   BlendGradientSet *beta,BlendGradientSet *selected,ExceptionInfo *exception)
 {
@@ -639,11 +654,14 @@ static MagickBooleanType SelectBlendGradients(BlendGradientSet *alpha,
     beta->dy_image,exception);
   if (selected->dy_image == (Image *) NULL)
     return(MagickFalse);
-  beta->dx_image=DestroyImage(beta->dx_image);
-  alpha->dx_image=DestroyImage(alpha->dx_image);
-  beta->magnitude_image=DestroyImage(beta->magnitude_image);
-  alpha->magnitude_image=DestroyImage(alpha->magnitude_image);
+  ReleaseUnselectedGradients(alpha,beta);
   return(MagickTrue);
+}
+
+static void ReleaseDivergenceImages(Image *dy_divergent,Image *dx_divergent)
+{
+  dy_divergent=DestroyImage(dy_divergent);
+  dx_divergent=DestroyImage(dx_divergent);
 }
 
 static Image *BlendDivergenceImage(const BlendGradientSet *selected,
@@ -669,9 +687,16 @@ static Image *BlendDivergenceImage(const BlendGradientSet *selected,
     return((Image *) NULL);
   divergent_image=BlendSumImage(dx_divergent,dy_divergent,&quarter_sum,
     exception);
-  dy_divergent=DestroyImage(dy_divergent);
-  dx_divergent=DestroyImage(dx_divergent);
+  ReleaseDivergenceImages(dy_divergent,dx_divergent);
   return(divergent_image);
+}
+
+static void DestroyBlendGradientSets(BlendGradientSet *selected,
+  BlendGradientSet *beta,BlendGradientSet *alpha)
+{
+  DestroyBlendGradients(selected);
+  DestroyBlendGradients(beta);
+  DestroyBlendGradients(alpha);
 }
 
 static Image *BlendDivergentImage(const Image *alpha_image,
@@ -695,9 +720,7 @@ static Image *BlendDivergentImage(const Image *alpha_image,
     status=SelectBlendGradients(&alpha,&beta,&selected,exception);
   if (status != MagickFalse)
     divergent_image=BlendDivergenceImage(&selected,exception);
-  DestroyBlendGradients(&selected);
-  DestroyBlendGradients(&beta);
-  DestroyBlendGradients(&alpha);
+  DestroyBlendGradientSets(&selected,&beta,&alpha);
   return(divergent_image);
 }
 

@@ -1289,6 +1289,33 @@ static CompositeSetup GetCompositeSetup(const ssize_t x_offset,
   return(setup);
 }
 
+static Image *AcquireCompositeSource(Image *image,const Image *composite,
+  ExceptionInfo *exception)
+{
+  Image
+    *source_image;
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(composite != (Image *) NULL);
+  assert(composite->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+    return((Image *) NULL);
+  source_image=CloneImage(composite,0,0,MagickTrue,exception);
+  return(source_image);
+}
+
+static void SetCompositeRowDefaults(CompositeRowInputs *rows)
+{
+  SetGeometryInfo(&(*rows).geometry_info);
+  (*rows).percent_luma=100.0;
+  (*rows).percent_chroma=100.0;
+  (*rows).source_dissolve=1.0;
+  (*rows).threshold=0.05f;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1395,60 +1422,33 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
 {
 #define CompositeImageTag  "Composite/Image"
 
-  ColorspaceType
-    colorspace = HCLColorspace;
-
   CompositeRowInputs
     rows;
 
   CompositeSetup
     setup;
 
-  double
-    white_luminance = 10000.0;
-
-  GeometryInfo
-    geometry_info;
-
-  IlluminantType
-    illuminant = D65Illuminant;
-
   Image
     *canvas_image,
     *source_image;
 
   MagickBooleanType
-    clamp,
-    compose_sync,
     returned,
     status;
 
-  MagickRealType
-    amount,
-    canvas_dissolve,
-    midpoint,
-    percent_luma,
-    percent_chroma,
-    source_dissolve,
-    threshold;
-
   const ComposeArgumentTargets
-    argument_targets = { &geometry_info, &percent_luma, &percent_chroma,
-      &amount, &threshold, &source_dissolve, &canvas_dissolve };
+    argument_targets = { &rows.geometry_info, &rows.percent_luma,
+      &rows.percent_chroma, &rows.amount, &rows.threshold,
+      &rows.source_dissolve, &rows.canvas_dissolve };
 
   const ComposeArtifactTargets
-    targets = { &white_luminance, &illuminant, &colorspace, &clamp,
-      &compose_sync };
+    targets = { &rows.white_luminance, &rows.illuminant, &rows.colorspace,
+      &rows.clamp, &rows.compose_sync };
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(composite != (Image *) NULL);
-  assert(composite->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-    return(MagickFalse);
-  source_image=CloneImage(composite,0,0,MagickTrue,exception);
+  rows.colorspace=HCLColorspace;
+  rows.white_luminance=10000.0;
+  rows.illuminant=D65Illuminant;
+  source_image=AcquireCompositeSource(image,composite,exception);
   if (source_image == (const Image *) NULL)
     return(MagickFalse);
   (void) SetImageColorspace(source_image,image->colorspace,exception);
@@ -1461,20 +1461,16 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       source_image=DestroyImage(source_image);
       return(status);
     }
-  amount=0.5;
+  rows.amount=0.5;
   canvas_image=(Image *) NULL;
-  canvas_dissolve=1.0;
+  rows.canvas_dissolve=1.0;
   GetComposeArtifacts(image,&targets);
-  SetGeometryInfo(&geometry_info);
-  percent_luma=100.0;
-  percent_chroma=100.0;
-  source_dissolve=1.0;
-  threshold=0.05f;
-  setup=GetCompositeSetup(x_offset,y_offset,clamp);
+  SetCompositeRowDefaults(&rows);
+  setup=GetCompositeSetup(x_offset,y_offset,rows.clamp);
   {
     const CanvasCompositeInputs
       canvas_inputs = { image, composite, x_offset, y_offset, setup,
-        exception, &canvas_image, &source_image, &geometry_info };
+        exception, &canvas_image, &source_image, &rows.geometry_info };
 
     if (CompositeBlurGroups(&canvas_inputs,compose,&argument_targets,
         &returned) != MagickFalse)
@@ -1483,7 +1479,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
   /*
     Composite image.
   */
-  midpoint=((MagickRealType) QuantumRange+1.0)/2;
+  rows.midpoint=((MagickRealType) QuantumRange+1.0)/2;
   rows.image=image;
   rows.source_image=source_image;
   rows.compose=compose;
@@ -1492,19 +1488,6 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
   rows.x_offset=x_offset;
   rows.y_offset=y_offset;
   rows.exception=exception;
-  rows.amount=amount;
-  rows.canvas_dissolve=canvas_dissolve;
-  rows.midpoint=midpoint;
-  rows.percent_luma=percent_luma;
-  rows.percent_chroma=percent_chroma;
-  rows.source_dissolve=source_dissolve;
-  rows.threshold=threshold;
-  rows.clamp=clamp;
-  rows.compose_sync=compose_sync;
-  rows.colorspace=colorspace;
-  rows.white_luminance=white_luminance;
-  rows.illuminant=illuminant;
-  rows.geometry_info=geometry_info;
   status=CompositeImageRows(&rows);
   if (canvas_image != (Image * ) NULL)
     canvas_image=DestroyImage(canvas_image);
