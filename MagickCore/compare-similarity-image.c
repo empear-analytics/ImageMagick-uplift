@@ -551,6 +551,28 @@ static void MergeSimilarityInfo(const SimilarityMerge *merge,
   }
 }
 
+static Image *AcquireSimilarityImage(const Image *image,
+  const Image *reconstruct,ExceptionInfo *exception)
+{
+  Image
+    *similarity_image;
+
+  size_t
+    columns,
+    rows;
+
+  if ((image->columns < reconstruct->columns) ||
+      (image->rows < reconstruct->rows))
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+        "GeometryDoesNotContainImage","`%s'",image->filename);
+      return((Image *) NULL);
+    }
+  SetImageCompareBounds(image,reconstruct,&columns,&rows);
+  similarity_image=CloneImage(image,columns,rows,MagickTrue,exception);
+  return(similarity_image);
+}
+
 MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
   const MetricType metric,const double similarity_threshold,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
@@ -571,10 +593,6 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
 
   SimilarityInfo
     similarity_info = { 0.0, 0, 0 };
-
-  size_t
-    columns,
-    rows;
 
   ssize_t
     y;
@@ -609,15 +627,7 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
     }
 }
 #endif
-  if ((image->columns < reconstruct->columns) ||
-      (image->rows < reconstruct->rows))
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-        "GeometryDoesNotContainImage","`%s'",image->filename);
-      return((Image *) NULL);
-    }
-  SetImageCompareBounds(image,reconstruct,&columns,&rows);
-  similarity_image=CloneImage(image,columns,rows,MagickTrue,exception);
+  similarity_image=AcquireSimilarityImage(image,reconstruct,exception);
   if (similarity_image == (Image *) NULL)
     return((Image *) NULL);
   similarity_image->depth=32;
