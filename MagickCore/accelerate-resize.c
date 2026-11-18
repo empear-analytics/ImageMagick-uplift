@@ -360,6 +360,22 @@ static MagickBooleanType EnqueueResizeFilterKernel(const ResizeFilterRun *run,
     exception));
 }
 
+static MagickBooleanType AcquireResizeFilterKernel(
+  const ResizeFilterSide side,const ResizeFilterPass *pass,
+  cl_kernel *filterKernel,ExceptionInfo *exception)
+{
+  *filterKernel=AcquireOpenCLKernel(pass->device,
+    ((side == HorizontalResizeFilter) ? "ResizeHorizontalFilter" :
+    "ResizeVerticalFilter"));
+  if (*filterKernel == (cl_kernel) NULL)
+  {
+    (void) OpenCLThrowMagickException(pass->device,exception,GetMagickModule(),
+      ResourceLimitWarning,"AcquireOpenCLKernel failed.", ".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static inline MagickBooleanType ResizeFilterImagePass(
   const ResizeFilterRun *run,ExceptionInfo *exception)
 {
@@ -461,15 +477,9 @@ RestoreMSCWarning
   resizeFilterType=(int)GetResizeFilterWeightingType(pass->resizeFilter);
   resizeWindowType=(int)GetResizeFilterWindowWeightingType(pass->resizeFilter);
 
-  filterKernel=AcquireOpenCLKernel(pass->device,
-    ((side == HorizontalResizeFilter) ? "ResizeHorizontalFilter" :
-    "ResizeVerticalFilter"));
-  if (filterKernel == (cl_kernel) NULL)
-  {
-    (void) OpenCLThrowMagickException(pass->device,exception,GetMagickModule(),
-      ResourceLimitWarning,"AcquireOpenCLKernel failed.", ".");
+  if (AcquireResizeFilterKernel(side,pass,&filterKernel,exception) ==
+      MagickFalse)
     goto cleanup;
-  }
 
   args.resizeFilter=pass->resizeFilter;
   args.verticalKernel=filterKernel;
