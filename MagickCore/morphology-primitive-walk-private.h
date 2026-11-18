@@ -1336,6 +1336,27 @@ static size_t SumMorphologyChanges(size_t changed,const size_t *changes)
   return(changed);
 }
 
+static ssize_t FinishMorphologyRows(const MorphologyPrimitiveSetup *setup,
+  const MagickBooleanType status)
+{
+  const Image
+    *image = setup->image;
+
+  CacheView
+    *image_view = setup->image_view,
+    *morphology_view = setup->morphology_view;
+
+  size_t
+    changed = setup->changed,
+    *changes = setup->changes;
+
+  morphology_view=DestroyCacheView(morphology_view);
+  image_view=DestroyCacheView(image_view);
+  changed=SumMorphologyChanges(changed,changes);
+  changes=(size_t *) RelinquishMagickMemory(changes);
+  return(status ? (ssize_t) (changed/GetImageChannels(image)) : -1);
+}
+
 static ssize_t MorphologyRows(const MorphologyPrimitiveSetup *setup)
 {
   const MorphologyMethod
@@ -1367,7 +1388,6 @@ static ssize_t MorphologyRows(const MorphologyPrimitiveSetup *setup)
     offset = setup->offset;
 
   size_t
-    changed = setup->changed,
     *changes = setup->changes;
 
   const size_t
@@ -1406,11 +1426,7 @@ static ssize_t MorphologyRows(const MorphologyPrimitiveSetup *setup)
         ReportMorphologyProgress(image,progress,image->rows,&status);
       }
   }
-  morphology_view=DestroyCacheView(morphology_view);
-  image_view=DestroyCacheView(image_view);
-  changed=SumMorphologyChanges(changed,changes);
-  changes=(size_t *) RelinquishMagickMemory(changes);
-  return(status ? (ssize_t) (changed/GetImageChannels(image)) : -1);
+  return(FinishMorphologyRows(setup,status));
 }
 
 static ssize_t ConvolveMorphologyColumns(const MorphologyPrimitiveSetup *setup)
