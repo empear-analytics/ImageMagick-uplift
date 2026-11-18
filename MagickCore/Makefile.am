@@ -150,6 +150,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/composite.c \
   MagickCore/composite-image.c \
   MagickCore/composite.h \
+  MagickCore/composite-channel-private.h \
   MagickCore/composite-private.h \
   MagickCore/composite-row-private.h \
   MagickCore/compress.c \
@@ -627,6 +628,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/colorspace-private.h \
   MagickCore/compare-private.h \
   MagickCore/compare-similarity-private.h \
+  MagickCore/composite-channel-private.h \
   MagickCore/composite-private.h \
   MagickCore/composite-row-private.h \
   MagickCore/configure-private.h \
