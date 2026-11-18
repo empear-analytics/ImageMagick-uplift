@@ -141,6 +141,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/colorspace-generic-rgb.c \
   MagickCore/colorspace.h \
   MagickCore/colorspace-private.h \
+  MagickCore/colorspace-transform-srgb-private.h \
   MagickCore/compare.c \
   MagickCore/compare-similarity.c \
   MagickCore/compare-similarity-image.c \
@@ -182,6 +183,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/distort-affine.c \
   MagickCore/distort-resize.c \
   MagickCore/distort-private.h \
+  MagickCore/distort-map-private.h \
   MagickCore/distort.h \
   MagickCore/distribute-cache.c \
   MagickCore/distribute-cache.h \
@@ -225,6 +227,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/feature-texture.c \
   MagickCore/feature.h \
   MagickCore/feature-private.h \
+  MagickCore/feature-texture-measure-private.h \
   MagickCore/fourier.c \
   MagickCore/fourier-complex.c \
   MagickCore/fourier.h \
@@ -300,6 +303,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/montage.c \
   MagickCore/montage-info.c \
   MagickCore/montage.h \
+  MagickCore/montage-tile-private.h \
   MagickCore/morphology.c \
   MagickCore/morphology-apply.c \
   MagickCore/morphology-primitive.c \
@@ -479,6 +483,8 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/vision.c \
   MagickCore/vision-components.c \
   MagickCore/vision.h \
+  MagickCore/vision-components-object-private.h \
+  MagickCore/vision-components-label-private.h \
   MagickCore/widget.c \
   MagickCore/widget-confirm.c \
   MagickCore/widget-dialog.c \
@@ -632,6 +638,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/color-private.h \
   MagickCore/color-private.h \
   MagickCore/colorspace-private.h \
+  MagickCore/colorspace-transform-srgb-private.h \
   MagickCore/compare-private.h \
   MagickCore/compare-similarity-private.h \
   MagickCore/composite-channel-private.h \
@@ -643,6 +650,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/delegate-private.h \
   MagickCore/display-private.h \
   MagickCore/distort-private.h \
+  MagickCore/distort-map-private.h \
   MagickCore/distribute-cache-private.h \
   MagickCore/draw-private.h \
   MagickCore/effect-blur-adaptive-filters-private.h \
@@ -652,6 +660,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/enhance-color-private.h \
   MagickCore/exception-private.h \
   MagickCore/feature-private.h \
+  MagickCore/feature-texture-measure-private.h \
   MagickCore/fx-private.h \
   MagickCore/fx-execute-private.h \
   MagickCore/gem-private.h \
@@ -669,6 +678,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/mime-private.h \
   MagickCore/module-private.h \
   MagickCore/monitor-private.h \
+  MagickCore/montage-tile-private.h \
   MagickCore/morphology-private.h \
   MagickCore/morphology-apply-private.h \
   MagickCore/morphology-apply-kernel-private.h \
@@ -714,6 +724,8 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/type-private.h \
   MagickCore/utility-private.h \
   MagickCore/version-private.h \
+  MagickCore/vision-components-object-private.h \
+  MagickCore/vision-components-label-private.h \
   MagickCore/visual-effects-pixel-methods-private.h \
   MagickCore/widget-core-private.h \
   MagickCore/widget-private.h \
