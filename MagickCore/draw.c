@@ -4934,6 +4934,13 @@ static void PrepareMVGPrimitive(const MVGRenderState *state)
   } while (0);
 }
 
+static inline MagickBooleanType IsMVGDebugSpan(const DrawInfo *draw_info,
+  const char *p,const char *q)
+{
+  return(((draw_info->debug != MagickFalse) && (q > p)) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickBooleanType FinishMVGRender(const MagickStatusType status,
   const char *keyword,ExceptionInfo *exception)
 {
@@ -5191,7 +5198,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     if (primitive_type == UndefinedPrimitive)
       {
         FinishMVGGradient(&render_state);
-        if ((draw_info->debug != MagickFalse) && (q > p))
+        if (IsMVGDebugSpan(draw_info,p,q) != MagickFalse)
           (void) LogMagickEvent(DrawEvent,GetMagickModule(),"  %.*s",(int)
             (q-p-1),p);
         continue;
@@ -5203,7 +5210,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     if (status == 0)
       break;
     primitive_info[i].primitive=UndefinedPrimitive;
-    if ((draw_info->debug != MagickFalse) && (q > p))
+    if (IsMVGDebugSpan(draw_info,p,q) != MagickFalse)
       (void) LogMagickEvent(DrawEvent,GetMagickModule(),"  %.*s",(int) (q-p),p);
     CheckMVGPrimitiveExtent(&render_state);
     if (status == 0)
