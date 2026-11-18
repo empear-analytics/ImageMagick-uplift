@@ -4420,6 +4420,20 @@ static MagickBooleanType ParseMVGPushDefs(const MVGRenderState *state)
   return(MagickTrue);
 }
 
+static MagickBooleanType GetMVGSegment(const char **q,const size_t extent,
+  char *token,SegmentInfo *segment)
+{
+  if (GetMVGValue(q,extent,token,&(*segment).x1) == MagickFalse)
+    return(MagickFalse);
+  if (GetMVGListValue(q,extent,token,&(*segment).y1) == MagickFalse)
+    return(MagickFalse);
+  if (GetMVGListValue(q,extent,token,&(*segment).x2) == MagickFalse)
+    return(MagickFalse);
+  if (GetMVGListValue(q,extent,token,&(*segment).y2) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static SegmentInfo GetGradientBounds(DrawInfo **graphic_context,
   const ssize_t n,const SegmentInfo segment)
 {
@@ -4486,13 +4500,7 @@ static MagickBooleanType ParseMVGPushGradient(const MVGRenderState *state)
     (void) CopyMagickString(name,token,MagickPathExtent);
     (void) GetNextToken(q,&q,extent,token);
     (void) CopyMagickString(type,token,MagickPathExtent);
-    if (GetMVGValue(&q,extent,token,&segment.x1) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    if (GetMVGListValue(&q,extent,token,&segment.y1) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    if (GetMVGListValue(&q,extent,token,&segment.x2) == MagickFalse)
-      ThrowPointExpectedException(token,exception);
-    if (GetMVGListValue(&q,extent,token,&segment.y2) == MagickFalse)
+    if (GetMVGSegment(&q,extent,token,&segment) == MagickFalse)
       ThrowPointExpectedException(token,exception);
     if ((LocaleCompare(type,"radial") == 0) &&
         (SkipMVGListToken(&q,extent,token) == MagickFalse))
