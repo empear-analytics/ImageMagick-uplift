@@ -255,6 +255,8 @@ typedef struct _ResizeVerticalArgs
     gammaAccumulatorLocalMemorySize;
 } ResizeVerticalArgs;
 
+static cl_int SetResizeVerticalFilterArgs(const ResizeVerticalArgs *);
+
 static MagickBooleanType resizeHorizontalFilter(const ResizeFilterPass *pass,
   const float xFactor,ExceptionInfo *exception)
 {
@@ -264,17 +266,10 @@ static MagickBooleanType resizeHorizontalFilter(const ResizeFilterPass *pass,
   cl_int
     status;
 
-  cl_uint
-    i;
-
   const unsigned int
     workgroupSize = 256;
 
   float
-    resizeFilterScale,
-    resizeFilterSupport,
-    resizeFilterWindowSupport,
-    resizeFilterBlur,
     support;
 
   int
@@ -284,6 +279,9 @@ static MagickBooleanType resizeHorizontalFilter(const ResizeFilterPass *pass,
 
   MagickBooleanType
     outputReady;
+
+  ResizeVerticalArgs
+    args;
 
   size_t
     gammaAccumulatorLocalMemorySize,
@@ -357,34 +355,27 @@ RestoreMSCWarning
     goto cleanup;
   }
 
-  resizeFilterScale=(float) GetResizeFilterScale(pass->resizeFilter);
-  resizeFilterSupport=(float) GetResizeFilterSupport(pass->resizeFilter);
-  resizeFilterWindowSupport=(float) GetResizeFilterWindowSupport(pass->resizeFilter);
-  resizeFilterBlur=(float) GetResizeFilterBlur(pass->resizeFilter);
-
-  i=0;
-  status =SetOpenCLKernelArg(horizontalKernel,i++,sizeof(cl_mem),(void*)&pass->imageBuffer);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(cl_uint),(void*)&pass->number_channels);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(cl_uint),(void*)&pass->columns);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(cl_uint),(void*)&pass->rows);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(cl_mem),(void*)&pass->resizedImageBuffer);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(cl_uint),(void*)&pass->resizedColumns);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(cl_uint),(void*)&pass->resizedRows);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(float),(void*)&xFactor);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(int),(void*)&resizeFilterType);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(int),(void*)&resizeWindowType);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(cl_mem),(void*)&pass->resizeFilterCubicCoefficients);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(float),(void*)&resizeFilterScale);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(float),(void*)&resizeFilterSupport);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(float),(void*)&resizeFilterWindowSupport);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(float),(void*)&resizeFilterBlur);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,imageCacheLocalMemorySize,NULL);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(int),&numCachedPixels);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(unsigned int),&pixelPerWorkgroup);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,sizeof(unsigned int),&chunkSize);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,pixelAccumulatorLocalMemorySize,NULL);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,weightAccumulatorLocalMemorySize,NULL);
-  status|=SetOpenCLKernelArg(horizontalKernel,i++,gammaAccumulatorLocalMemorySize,NULL);
+  args.resizeFilter=pass->resizeFilter;
+  args.verticalKernel=horizontalKernel;
+  args.imageBuffer=pass->imageBuffer;
+  args.number_channels=pass->number_channels;
+  args.columns=pass->columns;
+  args.rows=pass->rows;
+  args.resizedImageBuffer=pass->resizedImageBuffer;
+  args.resizedColumns=pass->resizedColumns;
+  args.resizedRows=pass->resizedRows;
+  args.yFactor=xFactor;
+  args.resizeFilterType=resizeFilterType;
+  args.resizeWindowType=resizeWindowType;
+  args.resizeFilterCubicCoefficients=pass->resizeFilterCubicCoefficients;
+  args.imageCacheLocalMemorySize=imageCacheLocalMemorySize;
+  args.numCachedPixels=numCachedPixels;
+  args.pixelPerWorkgroup=pixelPerWorkgroup;
+  args.chunkSize=chunkSize;
+  args.pixelAccumulatorLocalMemorySize=pixelAccumulatorLocalMemorySize;
+  args.weightAccumulatorLocalMemorySize=weightAccumulatorLocalMemorySize;
+  args.gammaAccumulatorLocalMemorySize=gammaAccumulatorLocalMemorySize;
+  status=SetResizeVerticalFilterArgs(&args);
 
   if (status != CL_SUCCESS)
   {
