@@ -1276,6 +1276,19 @@ static void SetCompositeRowOperators(CompositeRowInputs *rows,
     sizeof(IntensityInputOperators)/sizeof(*IntensityInputOperators),compose);
 }
 
+static CompositeSetup GetCompositeSetup(const ssize_t x_offset,
+  const ssize_t y_offset,const MagickBooleanType clamp)
+{
+  CompositeSetup
+    setup;
+
+  setup.x_offset=x_offset;
+  setup.y_offset=y_offset;
+  setup.clamp=clamp;
+  setup.intensity=MagickFalse;
+  return(setup);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1457,10 +1470,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
   percent_chroma=100.0;
   source_dissolve=1.0;
   threshold=0.05f;
-  setup.x_offset=x_offset;
-  setup.y_offset=y_offset;
-  setup.clamp=clamp;
-  setup.intensity=MagickFalse;
+  setup=GetCompositeSetup(x_offset,y_offset,clamp);
   {
     const CanvasCompositeInputs
       canvas_inputs = { image, composite, x_offset, y_offset, setup,
