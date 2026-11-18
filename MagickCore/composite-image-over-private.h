@@ -702,6 +702,14 @@ static MagickBooleanType RelaxBlendImage(Image *image,
   return(MagickTrue);
 }
 
+static void ReleaseSaliencyImages(Image *crop_image,Image *divergent_image,
+  Image *residual_image)
+{
+  crop_image=DestroyImage(crop_image);
+  divergent_image=DestroyImage(divergent_image);
+  residual_image=DestroyImage(residual_image);
+}
+
 static MagickBooleanType SaliencyBlendImage(Image *image,
   const Image *source_image,const BlendRequest *request,
   ExceptionInfo *exception)
@@ -766,9 +774,7 @@ static MagickBooleanType SaliencyBlendImage(Image *image,
     if (RelaxBlendImage(image,&relaxation,request,exception) == MagickFalse)
       return(MagickFalse);
   }
-  crop_image=DestroyImage(crop_image);
-  divergent_image=DestroyImage(divergent_image);
-  residual_image=DestroyImage(residual_image);
+  ReleaseSaliencyImages(crop_image,divergent_image,residual_image);
   /*
     Composite relaxed over the background image.
   */
