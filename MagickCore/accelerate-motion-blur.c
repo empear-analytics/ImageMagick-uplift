@@ -664,6 +664,66 @@ static MagickBooleanType CreateMotionBlurOutputBuffer(
   return(MagickTrue);
 }
 
+typedef struct _MotionBlurOffsetSource
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  const OffsetInfo
+    *offset;
+
+  size_t
+    width;
+} MotionBlurOffsetSource;
+
+static MagickBooleanType CreateMotionBlurOffsetBuffer(
+  const MotionBlurOffsetSource *source,cl_mem *offsetBuffer,
+  ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = source->clEnv;
+
+  const MagickCLDevice
+    device = source->device;
+
+  const cl_command_queue
+    queue = source->queue;
+
+  const OffsetInfo
+    *const offset = source->offset;
+
+  const size_t
+    width = source->width;
+
+  cl_int
+    clStatus;
+
+  *offsetBuffer = clEnv->library->clCreateBuffer(device->context,
+    CL_MEM_READ_ONLY|CL_MEM_ALLOC_HOST_PTR, width * sizeof(cl_int2), NULL,
+    &clStatus);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) ThrowMagickException(exception, GetMagickModule(),
+      ResourceLimitError, "clEnv->library->clCreateBuffer failed.",".");
+    return(MagickFalse);
+  }
+
+  {
+    const MotionBlurOffsetInputs inputs = { clEnv, queue, *offsetBuffer,
+      offset, width };
+
+    if (FillMotionBlurOffsets(&inputs,exception) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
   const double *kernel,const size_t width,const OffsetInfo *offset,
   ExceptionInfo *exception)
@@ -792,21 +852,12 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
       goto cleanup;
   }
 
-  offsetBuffer = clEnv->library->clCreateBuffer(device->context,
-    CL_MEM_READ_ONLY|CL_MEM_ALLOC_HOST_PTR, width * sizeof(cl_int2), NULL,
-    &clStatus);
-  if (clStatus != CL_SUCCESS)
   {
-    (void) ThrowMagickException(exception, GetMagickModule(),
-      ResourceLimitError, "clEnv->library->clCreateBuffer failed.",".");
-    goto cleanup;
-  }
+    const MotionBlurOffsetSource
+      source = { clEnv, device, queue, offset, width };
 
-  {
-    const MotionBlurOffsetInputs inputs = { clEnv, queue, offsetBuffer,
-      offset, width };
-
-    if (FillMotionBlurOffsets(&inputs,exception) == MagickFalse)
+    if (CreateMotionBlurOffsetBuffer(&source,&offsetBuffer,exception) ==
+        MagickFalse)
       goto cleanup;
   }
 
