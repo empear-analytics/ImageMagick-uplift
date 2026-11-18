@@ -9556,6 +9556,38 @@ static void SetDrawInfoDefaults(DrawInfo *draw_info)
   draw_info->macro_expansion=(size_t *) NULL;
 }
 
+static void SetDrawImageInfoAttributes(DrawInfo *draw_info)
+{
+  if (draw_info->image_info->font != (char *) NULL)
+    draw_info->font=AcquireString(draw_info->image_info->font);
+  if (draw_info->image_info->density != (char *) NULL)
+    draw_info->density=AcquireString(draw_info->image_info->density);
+  draw_info->text_antialias=draw_info->image_info->antialias;
+  if (fabs(draw_info->image_info->pointsize) >= MagickEpsilon)
+    draw_info->pointsize=draw_info->image_info->pointsize;
+  draw_info->border_color=draw_info->image_info->border_color;
+  if (draw_info->image_info->server_name != (char *) NULL)
+    draw_info->server_name=AcquireString(draw_info->image_info->server_name);
+}
+
+static void SetDrawWeightOption(DrawInfo *draw_info)
+{
+  const char
+    *option;
+
+  option=GetImageOption(draw_info->image_info,"weight");
+  if (option != (const char *) NULL)
+    {
+      ssize_t
+        weight;
+
+      weight=ParseCommandOption(MagickWeightOptions,MagickFalse,option);
+      if (weight == -1)
+        weight=(ssize_t) StringToUnsignedLong(option);
+      draw_info->weight=(size_t) weight;
+    }
+}
+
 static void SetDrawColorOption(const ImageInfo *image_info,const char *key,
   PixelInfo *color,ExceptionInfo *exception)
 {
@@ -9640,16 +9672,7 @@ MagickExport void GetDrawInfo(const ImageInfo *image_info,DrawInfo *draw_info)
   (void) QueryColorCompliance("#FFF0",AllCompliance,&draw_info->stroke,
     exception);
   SetDrawInfoDefaults(draw_info);
-  if (draw_info->image_info->font != (char *) NULL)
-    draw_info->font=AcquireString(draw_info->image_info->font);
-  if (draw_info->image_info->density != (char *) NULL)
-    draw_info->density=AcquireString(draw_info->image_info->density);
-  draw_info->text_antialias=draw_info->image_info->antialias;
-  if (fabs(draw_info->image_info->pointsize) >= MagickEpsilon)
-    draw_info->pointsize=draw_info->image_info->pointsize;
-  draw_info->border_color=draw_info->image_info->border_color;
-  if (draw_info->image_info->server_name != (char *) NULL)
-    draw_info->server_name=AcquireString(draw_info->image_info->server_name);
+  SetDrawImageInfoAttributes(draw_info);
   option=GetImageOption(draw_info->image_info,"direction");
   if (option != (const char *) NULL)
     draw_info->direction=(DirectionType) ParseCommandOption(
@@ -9682,17 +9705,7 @@ MagickExport void GetDrawInfo(const ImageInfo *image_info,DrawInfo *draw_info)
       MagickFalse,option);
   SetDrawColorOption(draw_info->image_info,"undercolor",
     &draw_info->undercolor,exception);
-  option=GetImageOption(draw_info->image_info,"weight");
-  if (option != (const char *) NULL)
-    {
-      ssize_t
-        weight;
-
-      weight=ParseCommandOption(MagickWeightOptions,MagickFalse,option);
-      if (weight == -1)
-        weight=(ssize_t) StringToUnsignedLong(option);
-      draw_info->weight=(size_t) weight;
-    }
+  SetDrawWeightOption(draw_info);
   option=GetImageOption(draw_info->image_info,"word-break");
   if (option != (const char *) NULL)
     draw_info->word_break=(WordBreakType) ParseCommandOption(
