@@ -10009,11 +10009,40 @@ static MagickBooleanType GetBezierQuantum(const PrimitiveInfo *primitive_info,
   return(MagickTrue);
 }
 
+static PointInfo GetBezierPoint(const PrimitiveInfo *primitive_info,
+  const double *coefficients,const size_t number_coordinates,
+  const double weight)
+{
+  double
+    alpha;
+
+  PointInfo
+    point;
+
+  const PrimitiveInfo
+    *p;
+
+  ssize_t
+    j;
+
+  p=primitive_info;
+  point.x=0.0;
+  point.y=0.0;
+  alpha=pow((double) (1.0-weight),(double) number_coordinates-1.0);
+  for (j=0; j < (ssize_t) number_coordinates; j++)
+  {
+    point.x+=alpha*coefficients[j]*p->point.x;
+    point.y+=alpha*coefficients[j]*p->point.y;
+    alpha*=weight/(1.0-weight);
+    p++;
+  }
+  return(point);
+}
+
 static MagickBooleanType TraceBezier(MVGInfo *mvg_info,
   const size_t number_coordinates)
 {
   double
-    alpha,
     *coefficients,
     weight;
 
@@ -10029,8 +10058,7 @@ static MagickBooleanType TraceBezier(MVGInfo *mvg_info,
     *p;
 
   ssize_t
-    i,
-    j;
+    i;
 
   size_t
     control_points,
@@ -10079,17 +10107,8 @@ static MagickBooleanType TraceBezier(MVGInfo *mvg_info,
   weight=0.0;
   for (i=0; i < (ssize_t) control_points; i++)
   {
-    p=primitive_info;
-    point.x=0.0;
-    point.y=0.0;
-    alpha=pow((double) (1.0-weight),(double) number_coordinates-1.0);
-    for (j=0; j < (ssize_t) number_coordinates; j++)
-    {
-      point.x+=alpha*coefficients[j]*p->point.x;
-      point.y+=alpha*coefficients[j]*p->point.y;
-      alpha*=weight/(1.0-weight);
-      p++;
-    }
+    point=GetBezierPoint(primitive_info,coefficients,number_coordinates,
+      weight);
     points[i]=point;
     weight+=1.0/control_points;
   }
