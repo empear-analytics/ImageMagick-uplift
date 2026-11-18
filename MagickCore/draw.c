@@ -1193,6 +1193,32 @@ static ssize_t GetTracedPrimitiveEnd(const PrimitiveInfo *primitive_info,
   return(i);
 }
 
+static MagickBooleanType IsInvalidRoundRectanglePoints(
+  const PrimitiveInfo *primitive_info,const ssize_t j)
+{
+  if (primitive_info[j].coordinates != 3)
+    return(MagickTrue);
+  if ((primitive_info[j+2].point.x < 0.0) ||
+      (primitive_info[j+2].point.y < 0.0))
+    return(MagickTrue);
+  if ((primitive_info[j+1].point.x-primitive_info[j].point.x) < 0.0)
+    return(MagickTrue);
+  if ((primitive_info[j+1].point.y-primitive_info[j].point.y) < 0.0)
+    return(MagickTrue);
+  return(MagickFalse);
+}
+
+static MagickBooleanType IsInvalidEllipsePoints(const PrimitiveInfo *primitive_info,
+  const ssize_t j)
+{
+  if (primitive_info[j].coordinates != 3)
+    return(MagickTrue);
+  if ((primitive_info[j+1].point.x < 0.0) ||
+      (primitive_info[j+1].point.y < 0.0))
+    return(MagickTrue);
+  return(MagickFalse);
+}
+
 typedef struct _MVGTextInput
 {
   DrawInfo
@@ -1352,23 +1378,7 @@ static void TraceMVGPrimitive(const MVGRenderState *state)
     }
     case RoundRectanglePrimitive:
     {
-      if (primitive_info[j].coordinates != 3)
-        {
-          status=MagickFalse;
-          break;
-        }
-      if ((primitive_info[j+2].point.x < 0.0) ||
-          (primitive_info[j+2].point.y < 0.0))
-        {
-          status=MagickFalse;
-          break;
-        }
-      if ((primitive_info[j+1].point.x-primitive_info[j].point.x) < 0.0)
-        {
-          status=MagickFalse;
-          break;
-        }
-      if ((primitive_info[j+1].point.y-primitive_info[j].point.y) < 0.0)
+      if (IsInvalidRoundRectanglePoints(primitive_info,j) != MagickFalse)
         {
           status=MagickFalse;
           break;
@@ -1395,13 +1405,7 @@ static void TraceMVGPrimitive(const MVGRenderState *state)
     }
     case EllipsePrimitive:
     {
-      if (primitive_info[j].coordinates != 3)
-        {
-          status=MagickFalse;
-          break;
-        }
-      if ((primitive_info[j+1].point.x < 0.0) ||
-          (primitive_info[j+1].point.y < 0.0))
+      if (IsInvalidEllipsePoints(primitive_info,j) != MagickFalse)
         {
           status=MagickFalse;
           break;
