@@ -4741,6 +4741,71 @@ static void GetBlendArguments(Image *image,const CompositeOperator compose,
   }
 }
 
+typedef struct _CopyCompositeInputs
+{
+  Image
+    *image,
+    *source_image;
+
+  ssize_t
+    x_offset,
+    y_offset;
+
+  CompositeSetup
+    setup;
+
+  ExceptionInfo
+    *exception;
+} CopyCompositeInputs;
+
+static MagickBooleanType CompositeCopyGroups(const CopyCompositeInputs *copy,
+  const CompositeOperator compose,const ComposeArgumentTargets *targets,
+  MagickBooleanType *result)
+{
+  Image
+    *const image = copy->image,
+    *const source_image = copy->source_image;
+
+  const ssize_t
+    x_offset = copy->x_offset,
+    y_offset = copy->y_offset;
+
+  CompositeSetup
+    setup = copy->setup;
+
+  ExceptionInfo
+    *const exception = copy->exception;
+
+  switch (compose)
+  {
+    case CopyCompositeOp:
+    {
+      if (IsSourceInsideCanvas(image,source_image,x_offset,y_offset) ==
+          MagickFalse)
+        break;
+      if (IsSourceAlphaNeeded(image,source_image) != MagickFalse)
+        (void) SetImageAlphaChannel(source_image,OpaqueAlphaChannel,exception);
+      (*result)=CompositeCopyImage(image,source_image,&setup,exception);
+      return(MagickTrue);
+    }
+    case IntensityCompositeOp:
+    {
+      if (IsSourceInsideCanvas(image,source_image,x_offset,y_offset) ==
+          MagickFalse)
+        break;
+      setup.intensity=MagickTrue;
+      (*result)=CompositeCopyImage(image,source_image,&setup,exception);
+      return(MagickTrue);
+    }
+    default:
+    {
+      GetBlendArguments(image,compose,exception,targets);
+      break;
+    }
+  }
+  return(MagickFalse);
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -4773,6 +4838,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
   MagickBooleanType
     clamp,
     compose_sync,
+    returned,
     status;
 
   MagickRealType
@@ -4831,23 +4897,6 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
   setup.intensity=MagickFalse;
   switch (compose)
   {
-    case CopyCompositeOp:
-    {
-      if (IsSourceInsideCanvas(image,source_image,x_offset,y_offset) ==
-          MagickFalse)
-        break;
-      if (IsSourceAlphaNeeded(image,source_image) != MagickFalse)
-        (void) SetImageAlphaChannel(source_image,OpaqueAlphaChannel,exception);
-      return(CompositeCopyImage(image,source_image,&setup,exception));
-    }
-    case IntensityCompositeOp:
-    {
-      if (IsSourceInsideCanvas(image,source_image,x_offset,y_offset) ==
-          MagickFalse)
-        break;
-      setup.intensity=MagickTrue;
-      return(CompositeCopyImage(image,source_image,&setup,exception));
-    }
     case BlurCompositeOp:
     {
       BlurCanvasTargets
@@ -4923,7 +4972,12 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     }
     default:
     {
-      GetBlendArguments(image,compose,exception,&argument_targets);
+      const CopyCompositeInputs
+        copy = { image, source_image, x_offset, y_offset, setup, exception };
+
+      if (CompositeCopyGroups(&copy,compose,&argument_targets,&returned) !=
+          MagickFalse)
+        return(returned);
       break;
     }
   }
