@@ -742,9 +742,17 @@ static inline MagickBooleanType CountCoefficients(const DistortMethod *method,
   return(MagickTrue);
 }
 
-static inline double *GenerateRadialCoefficients(double *coeff,DistortMethod *method,
-  const CoefficientContext *context)
+static inline double *GenerateRadialCoefficients(const CoefficientCall *call)
 {
+  double
+    *const coeff = call->coeff;
+
+  DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   switch (*method)
   {
     case PolarDistortion:
@@ -806,7 +814,7 @@ static inline double *GenerateMappedCoefficients(const CoefficientCall *call)
     default:
       break;
   }
-  return(GenerateRadialCoefficients(coeff,method,context));
+  return(GenerateRadialCoefficients(call));
 }
 
 static inline double *GenerateAffineFamilyCoefficients(
