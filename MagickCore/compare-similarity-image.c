@@ -158,6 +158,9 @@ static double GetSimilarityMetric(const Image *image,
   RectangleInfo
     geometry;
 
+  SimilarityImages
+    images;
+
   size_t
     length = MaxPixelChannels+1UL;
 
@@ -176,8 +179,9 @@ static double GetSimilarityMetric(const Image *image,
   if (channel_similarity == (double *) NULL)
     return(NAN);
   (void) memset(channel_similarity,0,length*sizeof(*channel_similarity));
-  status=GetSimilarityForMetric(similarity_image,reconstruct_image,metric,
-    channel_similarity,exception);
+  images.image=similarity_image;
+  images.reconstruct_image=reconstruct_image;
+  status=GetSimilarityForMetric(&images,metric,channel_similarity,exception);
   similarity_image=DestroyImage(similarity_image);
   similarity=channel_similarity[CompositePixelChannel];
   channel_similarity=(double *) RelinquishMagickMemory(channel_similarity);
