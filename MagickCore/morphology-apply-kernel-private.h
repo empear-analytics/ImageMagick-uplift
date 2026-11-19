@@ -98,6 +98,13 @@ static inline void SetOddSquareSize(KernelInfo *kernel,const ssize_t i)
   kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
 }
 
+typedef struct _KernelSpan
+{
+  const char
+    *kernel_string,
+    *end;
+} KernelSpan;
+
 /* This was separated so that it could be used as a separate
 ** array input handling function, such as for -color-matrix
 */
@@ -212,9 +219,13 @@ typedef struct _KernelSpecificationTargets
     **p;
 } KernelSpecificationTargets;
 
-static inline MagickBooleanType ParseKernelSpecification(const char *kernel_string,
-  const char *end,KernelInfo *kernel,const KernelSpecificationTargets *targets)
+static inline MagickBooleanType ParseKernelSpecification(const KernelSpan *span,
+  KernelInfo *kernel,const KernelSpecificationTargets *targets)
 {
+  const char
+    *const kernel_string = span->kernel_string,
+    *const end = span->end;
+
   MagickStatusType
     *const flags = targets->flags;
 
@@ -368,8 +379,13 @@ static inline KernelInfo *ParseKernelArray(const char *kernel_string)
   p = strchr(kernel_string, ':');
   targets.flags=(&flags);
   targets.p=(&p);
-  if (ParseKernelSpecification(kernel_string,end,kernel,&targets) == MagickFalse)
-    return(DestroyKernelInfo(kernel));
+  {
+    const KernelSpan
+      span = { kernel_string, end };
+
+    if (ParseKernelSpecification(&span,kernel,&targets) == MagickFalse)
+      return(DestroyKernelInfo(kernel));
+  }
 
   /* Read in the kernel values from rest of input string argument */
   if (AcquireKernelValues(kernel) == MagickFalse)
