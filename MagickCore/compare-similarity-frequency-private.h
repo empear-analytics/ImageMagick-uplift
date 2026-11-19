@@ -2002,6 +2002,44 @@ static MagickBooleanType AcquirePhaseMagnitude(Image *target_image,
   return(MagickTrue);
 }
 
+typedef struct _PhaseMaximaTargets
+{
+  Image
+    **magnitude_image;
+
+  double
+    *maxima;
+} PhaseMaximaTargets;
+
+static MagickBooleanType GetPhaseMaxima(Image *phase_image,
+  RectangleInfo *offset,ExceptionInfo *exception,
+  const PhaseMaximaTargets *targets)
+{
+  Image
+    **const magnitude_image = targets->magnitude_image;
+
+  double
+    *const maxima = targets->maxima;
+
+  MagickBooleanType
+    status;
+
+  status=GrayscaleImage(phase_image,AveragePixelIntensityMethod,exception);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  phase_image->depth=32;
+  phase_image->colorspace=GRAYColorspace;
+  phase_image->alpha_trait=UndefinedPixelTrait;
+  status=SIMFilterImageNaNs(phase_image,exception);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  status=SIMMaximaImage(phase_image,maxima,offset,exception);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  *magnitude_image=DestroyImage(*magnitude_image);
+  return(MagickTrue);
+}
+
 static Image *PhaseSimilarityImage(const Image *image,const Image *reconstruct,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
 {
@@ -2019,11 +2057,11 @@ static Image *PhaseSimilarityImage(const Image *image,const Image *reconstruct,
     *target_image = (Image *) NULL,
     *test_magnitude = (Image *) NULL;
 
-  MagickBooleanType
-    status = MagickTrue;
-
   PhaseMagnitudeTargets
     magnitude_targets;
+
+  PhaseMaximaTargets
+    maxima_targets;
 
   PhasePaddedTargets
     targets;
@@ -2075,19 +2113,11 @@ static Image *PhaseSimilarityImage(const Image *image,const Image *reconstruct,
   /*
     Identify the maxima value in the correlation image and its location.
   */
-  status=GrayscaleImage(phase_image,AveragePixelIntensityMethod,exception);
-  if (status == MagickFalse)
+  maxima_targets.magnitude_image=(&magnitude_image);
+  maxima_targets.maxima=(&maxima);
+  if (GetPhaseMaxima(phase_image,offset,exception,&maxima_targets) ==
+      MagickFalse)
     ThrowPhaseSimilarityException();
-  phase_image->depth=32;
-  phase_image->colorspace=GRAYColorspace;
-  phase_image->alpha_trait=UndefinedPixelTrait;
-  status=SIMFilterImageNaNs(phase_image,exception);
-  if (status == MagickFalse)
-    ThrowPhaseSimilarityException();
-  status=SIMMaximaImage(phase_image,&maxima,offset,exception);
-  if (status == MagickFalse)
-    ThrowPhaseSimilarityException();
-  magnitude_image=DestroyImage(magnitude_image);
   *similarity_metric=QuantumScale*maxima;
   return(phase_image);
 }
