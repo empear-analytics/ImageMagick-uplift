@@ -30,12 +30,9 @@ static void SetFunctionExpressionSpan (FxInfo * pfx, char * const pExpStart,
   }
 }
 
-static MagickBooleanType CompleteFunction (FxInfo * pfx,
-  const FunctionCompletion *completion)
+static FunctionE LinkFunctionElements (FxInfo * pfx,
+  const FunctionCompletion *completion, FunctionE fe)
 {
-  FunctionE
-    fe = completion->fe;
-
   const int
     ndx0 = completion->ndx0,
     ndx1 = completion->ndx1,
@@ -50,12 +47,6 @@ static MagickBooleanType CompleteFunction (FxInfo * pfx,
 
   const ImgAttrE
     iaQual = completion->iaQual;
-
-  char
-    *const pExpStart = completion->pExpStart;
-
-  const size_t
-    lenExp = completion->lenExp;
 
   if (fe==fWhile) {
     pfx->Elements[ndx1].element_index = ndx2+1;
@@ -78,6 +69,22 @@ static MagickBooleanType CompleteFunction (FxInfo * pfx,
     access.iaQual=iaQual;
     ApplyPixelAccessQualifiers (&access, pfx);
   }
+  return(fe);
+}
+
+static MagickBooleanType CompleteFunction (FxInfo * pfx,
+  const FunctionCompletion *completion)
+{
+  FunctionE
+    fe = completion->fe;
+
+  char
+    *const pExpStart = completion->pExpStart;
+
+  const size_t
+    lenExp = completion->lenExp;
+
+  fe=LinkFunctionElements (pfx, completion, fe);
 
   SetFunctionExpressionSpan (pfx, pExpStart, lenExp);
 
