@@ -579,6 +579,12 @@ static inline MagickBooleanType GetPHASHSimilarity(const Image *image,
   return(MagickTrue);
 }
 
+static inline double GetPSNRChannelSimilarity(const double value)
+{
+  return(10.0*MagickSafeLog10(MagickSafeReciprocal(value))/
+    MagickSafePSNRRecipicol(10.0));
+}
+
 static inline MagickBooleanType GetPSNRSimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -601,12 +607,10 @@ static inline MagickBooleanType GetPSNRSimilarity(const Image *image,
     if (((traits & UpdatePixelTrait) == 0) ||
         ((reconstruct_traits & UpdatePixelTrait) == 0))
       continue;
-    similarity[i]=10.0*MagickSafeLog10(MagickSafeReciprocal(
-      similarity[i]))/MagickSafePSNRRecipicol(10.0);
+    similarity[i]=GetPSNRChannelSimilarity(similarity[i]);
   }
-  similarity[CompositePixelChannel]=10.0*MagickSafeLog10(
-    MagickSafeReciprocal(similarity[CompositePixelChannel]))/
-    MagickSafePSNRRecipicol(10.0);
+  similarity[CompositePixelChannel]=GetPSNRChannelSimilarity(
+    similarity[CompositePixelChannel]);
   return(status);
 }
 
