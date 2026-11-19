@@ -12,7 +12,7 @@
 # delegate libraries. tools/ci_warnings.sh checks the macOS job's flags against
 # the oracle's HDRI build; neither sees what these jobs see.
 #
-# Seven configurations, each configured once under build-oracle/ci-<cc>-<conf>:
+# Eight configurations, each configured once under build-oracle/ci-<cc>-<conf>:
 #   gcc and clang  x  min (no delegates, no X: the CI container),
 #                     dlg (the installed delegates and FFTW, as the Windows jobs
 #                     compile fourier.c and compare.c's FFT code; no X) and
@@ -32,6 +32,23 @@
 #                         --prefix=/usr <the min configuration's --without-* flags>
 #                     and check `grep ATANH MagickCore/magick-baseconfig.h` reads
 #                     `/* #undef HAVE_ATANH */`.
+#   gcc only          nocomplex: dlg configured with ac_cv_header_complex_h=no, so
+#                     that configure finds no <complex.h> and MAGICKCORE_HAVE_COMPLEX_H
+#                     is undefined. fourier.c is the only file that tests it: with
+#                     FFTW and no complex.h, fftw_complex is double[2], and the `#else`
+#                     side of its `#if defined(MAGICKCORE_HAVE_COMPLEX_H)` blocks
+#                     (the [0]/[1] element stores) is compiled by this one alone
+#                     (owner, 2026-11-19 evening, PR #129 round-33 Q5). cabs, carg,
+#                     cimag and creal are configured absent too (ac_cv_func_cabs=no
+#                     and so on), as on a C library without C99 complex support:
+#                     with only the header absent, configure still finds them in libm
+#                     and fourier.c passes a double[2] to the undeclared builtins (four
+#                     errors, upstream's code, 2026-11-19); with them absent, fourier.c's
+#                     `#if !defined(MAGICKCORE_HAVE_CABS)` (CARG, CIMAG, CREAL) macros
+#                     are compiled instead, by this configuration alone. Reproduce it
+#                     as noatanh above, with those five cache variables and the dlg
+#                     configuration's flags, and check `grep COMPLEX_H
+#                     MagickCore/magick-baseconfig.h` reads `/* #undef HAVE_COMPLEX_H */`.
 # with main.yml's CFLAGS, -Werror left out so a file's diagnostics show at once,
 # and these added for MSVC (C4456/C4457/C4459 hides a declaration; C2440/C2664
 # const to non-const pointer or pointer-to-pointer, an `&` that makes `T **`
@@ -126,15 +143,18 @@ configure_tree() {  # <cc> <conf>
   local extra=("${MIN_FLAGS[@]}")
   [ "$conf" = dlg ] && extra=("${DLG_FLAGS[@]}")
   [ "$conf" = x ] && extra=("${X_FLAGS[@]}")
-  local noatanh=()   # configure's cache variable for "no atanh()": the #else side of HAVE_ATANH
-  [ "$conf" = noatanh ] && noatanh=(ac_cv_func_atanh=no)
-  (cd "$b" && env "${noatanh[@]}" CC=$cc CXX=$cxx CFLAGS="$flags" CXXFLAGS="$flags" \
+  [ "$conf" = nocomplex ] && extra=("${DLG_FLAGS[@]}")
+  local cache=()   # configure's cache variables: the #else sides of HAVE_ATANH, HAVE_COMPLEX_H
+  [ "$conf" = noatanh ] && cache=(ac_cv_func_atanh=no)
+  [ "$conf" = nocomplex ] && cache=(ac_cv_header_complex_h=no ac_cv_func_cabs=no
+    ac_cv_func_carg=no ac_cv_func_cimag=no ac_cv_func_creal=no)
+  (cd "$b" && env "${cache[@]}" CC=$cc CXX=$cxx CFLAGS="$flags" CXXFLAGS="$flags" \
      "$ROOT/configure" --with-quantum-depth=16 --enable-hdri=no --without-perl \
      --prefix=/usr "${extra[@]}" > configure.log 2>&1) \
     || { echo "configure failed, see $b/configure.log" >&2; return 1; }
 }
 
-CONFS="gcc-min clang-min gcc-dlg clang-dlg gcc-x clang-x gcc-noatanh"
+CONFS="gcc-min clang-min gcc-dlg clang-dlg gcc-x clang-x gcc-noatanh gcc-nocomplex"
 for c in $CONFS; do configure_tree "${c%-*}" "${c#*-}" & done
 wait
 for c in $CONFS; do
@@ -142,6 +162,12 @@ for c in $CONFS; do
 done
 grep -q 'undef HAVE_ATANH' "$OUT/ci-gcc-noatanh/MagickCore/magick-baseconfig.h" \
   || { echo "ci-gcc-noatanh still defines HAVE_ATANH: remove $OUT/ci-gcc-noatanh and rerun" >&2; exit 2; }
+for h in COMPLEX_H CABS CARG CIMAG CREAL; do
+  grep -q "undef HAVE_$h \*/" "$OUT/ci-gcc-nocomplex/MagickCore/magick-baseconfig.h" \
+    || { echo "ci-gcc-nocomplex still defines HAVE_$h: remove $OUT/ci-gcc-nocomplex and rerun" >&2; exit 2; }
+done
+grep -q 'define MAGICKCORE_FFTW_DELEGATE' "$OUT/ci-gcc-nocomplex/MagickCore/magick-baseconfig.h" \
+  || { echo "ci-gcc-nocomplex has no FFTW, so fourier.c's #else branches stay compiled out" >&2; exit 2; }
 
 compile_one() {  # <conf> <file>: prints "<diagnostic>\t<conf>"
   local c=$1 f=$2 b="$OUT/ci-$1" cc
