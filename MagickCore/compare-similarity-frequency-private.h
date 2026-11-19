@@ -1351,6 +1351,44 @@ static MagickBooleanType AcquireMSEAlpha(const Image *image,
   return(MagickTrue);
 }
 
+typedef struct _MSESumTargets
+{
+  ChannelStatistics
+    **channel_statistics;
+
+  Image
+    **sum_image;
+} MSESumTargets;
+
+static MagickBooleanType AcquireMSESum(const Image *reconstruct,
+  ExceptionInfo *exception,const MSESumTargets *targets)
+{
+  ChannelStatistics
+    **const channel_statistics = targets->channel_statistics;
+
+  Image
+    **const sum_image = targets->sum_image;
+
+  MagickBooleanType
+    status;
+
+  *sum_image=SIMSquareImage(reconstruct,exception);
+  if (*sum_image == (Image *) NULL)
+    return(MagickFalse);
+  *channel_statistics=GetImageStatistics(*sum_image,exception);
+  if (*channel_statistics == (ChannelStatistics *) NULL)
+    return(MagickFalse);
+  status=SetImageStorageClass(*sum_image,DirectClass,exception);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  status=SIMSetImageMean(*sum_image,*channel_statistics,exception);
+  *channel_statistics=(ChannelStatistics *)
+    RelinquishMagickMemory(*channel_statistics);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
 {
@@ -1373,6 +1411,9 @@ static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
 
   MSEAlphaTargets
     targets;
+
+  MSESumTargets
+    sum_targets;
 
   RectangleInfo
     geometry;
@@ -1403,19 +1444,9 @@ static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
   /*
     Mean of reconstruction squared.
   */
-  sum_image=SIMSquareImage(reconstruct,exception);
-  if (sum_image == (Image *) NULL)
-    ThrowMSESimilarityException();
-  channel_statistics=GetImageStatistics(sum_image,exception);
-  if (channel_statistics == (ChannelStatistics *) NULL)
-    ThrowMSESimilarityException();
-  status=SetImageStorageClass(sum_image,DirectClass,exception);
-  if (status == MagickFalse)
-    ThrowMSESimilarityException();
-  status=SIMSetImageMean(sum_image,channel_statistics,exception);
-  channel_statistics=(ChannelStatistics *)
-    RelinquishMagickMemory(channel_statistics);
-  if (status == MagickFalse)
+  sum_targets.channel_statistics=(&channel_statistics);
+  sum_targets.sum_image=(&sum_image);
+  if (AcquireMSESum(reconstruct,exception,&sum_targets) == MagickFalse)
     ThrowMSESimilarityException();
   /*
     Create mean image.
