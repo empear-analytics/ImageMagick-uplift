@@ -659,6 +659,66 @@ static MagickBooleanType LaunchEqualizeKernel(
   return(MagickTrue);
 }
 
+typedef struct _EqualizeHistogramInput
+{
+  Image
+    *image;
+
+  cl_uint4
+    *histogram;
+
+  cl_float4
+    *map;
+
+  PixelPacket
+    *equalize_map;
+} EqualizeHistogramInput;
+
+static void BuildEqualizeMap(const EqualizeHistogramInput *input,
+  cl_float4 *black,cl_float4 *white)
+{
+  Image
+    *const image = input->image;
+
+  cl_uint4
+    *const histogram = input->histogram;
+
+  cl_float4
+    *const map = input->map;
+
+  PixelPacket
+    *const equalize_map = input->equalize_map;
+
+  cl_uint
+    i;
+
+  EqualizeMapInput
+    map_input;
+
+  /*
+    Integrate the histogram to get the equalization map.
+  */
+  IntegrateEqualizeHistogram(image,histogram,map);
+  *black=map[0];
+  *white=map[(int) MaxMap];
+  (void) memset(equalize_map,0,(MaxMap+1)*sizeof(*equalize_map));
+  map_input.image=image;
+  map_input.map=map;
+  map_input.white=*white;
+  map_input.black=*black;
+  map_input.equalize_map=equalize_map;
+  for (i=0; i <= (ssize_t) MaxMap; i++)
+    SetEqualizeMapEntry(&map_input,i);
+
+  if (image->storage_class == PseudoClass)
+  {
+    /*
+       Equalize colormap.
+       */
+    EqualizeColormap(image,equalize_map,*white,*black);
+  }
+}
+
 typedef struct _EqualizeQueueTargets
 {
   MagickCLDevice
@@ -713,9 +773,6 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
     equalizeKernel,
     histogramKernel;
 
-  cl_uint
-    i;
-
   cl_uint4
     *histogram;
 
@@ -724,11 +781,11 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
     black,
     *map;
 
+  EqualizeHistogramInput
+    histogram_input;
+
   HistogramBufferInfo
     histogram_info;
-
-  EqualizeMapInput
-    map_input;
 
   MagickBooleanType
     outputReady,
@@ -848,28 +905,11 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   if (map == (cl_float4 *) NULL)
     ThrowBinaryException(ResourceLimitWarning,"MemoryAllocationFailed", image->filename);
 
-  /*
-    Integrate the histogram to get the equalization map.
-  */
-  IntegrateEqualizeHistogram(image,histogram,map);
-  black=map[0];
-  white=map[(int) MaxMap];
-  (void) memset(equalize_map,0,(MaxMap+1)*sizeof(*equalize_map));
-  map_input.image=image;
-  map_input.map=map;
-  map_input.white=white;
-  map_input.black=black;
-  map_input.equalize_map=equalize_map;
-  for (i=0; i <= (ssize_t) MaxMap; i++)
-    SetEqualizeMapEntry(&map_input,i);
-
-  if (image->storage_class == PseudoClass)
-  {
-    /*
-       Equalize colormap.
-       */
-    EqualizeColormap(image,equalize_map,white,black);
-  }
+  histogram_input.image=image;
+  histogram_input.histogram=histogram;
+  histogram_input.map=map;
+  histogram_input.equalize_map=equalize_map;
+  BuildEqualizeMap(&histogram_input,&black,&white);
 
   /*
     Equalize image.
