@@ -692,6 +692,13 @@ static MagickBooleanType ReadDespeckleOutput(
   return(MagickTrue);
 }
 
+static void AcquireHullPassKernels(const MagickCLDevice device,
+  cl_kernel *hullPass1,cl_kernel *hullPass2)
+{
+  *hullPass1 = AcquireOpenCLKernel(device,"HullPass1");
+  *hullPass2 = AcquireOpenCLKernel(device,"HullPass2");
+}
+
 typedef struct _DespeckleRunInput
 {
   MagickCLEnv
@@ -752,8 +759,7 @@ static MagickBooleanType RunDespeckleKernels(const DespeckleRunInput *run,
   size_t
     global_work_size[2];
 
-  *hullPass1 = AcquireOpenCLKernel(device,"HullPass1");
-  *hullPass2 = AcquireOpenCLKernel(device,"HullPass2");
+  AcquireHullPassKernels(device,hullPass1,hullPass2);
 
   {
     const HullPassArgsInput
