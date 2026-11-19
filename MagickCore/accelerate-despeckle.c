@@ -806,6 +806,64 @@ static MagickBooleanType RunDespeckleKernels(const DespeckleRunInput *run,
   return(MagickTrue);
 }
 
+typedef struct _DespeckleRelease
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  cl_mem
+    imageBuffer,
+    *tempImageBuffer,
+    filteredImageBuffer;
+
+  cl_kernel
+    hullPass1,
+    hullPass2;
+} DespeckleRelease;
+
+static void ReleaseDespeckleResources(const DespeckleRelease *release)
+{
+  const MagickCLEnv
+    clEnv = release->clEnv;
+
+  const MagickCLDevice
+    device = release->device;
+
+  const cl_command_queue
+    queue = release->queue;
+
+  const cl_mem
+    imageBuffer = release->imageBuffer,
+    filteredImageBuffer = release->filteredImageBuffer;
+
+  cl_mem
+    *const tempImageBuffer = release->tempImageBuffer;
+
+  const cl_kernel
+    hullPass1 = release->hullPass1,
+    hullPass2 = release->hullPass2;
+
+  if (queue != NULL)
+    ReleaseOpenCLCommandQueue(device,queue);
+  if (device != NULL)
+    ReleaseOpenCLDevice(device);
+  if (imageBuffer!=NULL)
+    clEnv->library->clReleaseMemObject(imageBuffer);
+  ReleaseTempImageBuffers(clEnv,tempImageBuffer);
+  if (filteredImageBuffer!=NULL)
+    clEnv->library->clReleaseMemObject(filteredImageBuffer);
+  if (hullPass1!=NULL)
+    ReleaseOpenCLKernel(hullPass1);
+  if (hullPass2!=NULL)
+    ReleaseOpenCLKernel(hullPass2);
+}
+
 typedef struct _DespeckleFinish
 {
   MagickCLEnv
@@ -871,19 +929,13 @@ static Image *FinishDespeckleImage(const DespeckleFinish *finish)
 
   DestroyAccelerateViews(image_view,filteredImage_view);
 
-  if (queue != NULL)
-    ReleaseOpenCLCommandQueue(device,queue);
-  if (device != NULL)
-    ReleaseOpenCLDevice(device);
-  if (imageBuffer!=NULL)
-    clEnv->library->clReleaseMemObject(imageBuffer);
-  ReleaseTempImageBuffers(clEnv,tempImageBuffer);
-  if (filteredImageBuffer!=NULL)
-    clEnv->library->clReleaseMemObject(filteredImageBuffer);
-  if (hullPass1!=NULL)
-    ReleaseOpenCLKernel(hullPass1);
-  if (hullPass2!=NULL)
-    ReleaseOpenCLKernel(hullPass2);
+  {
+    const DespeckleRelease
+      release = { clEnv, device, queue, imageBuffer, tempImageBuffer,
+        filteredImageBuffer, hullPass1, hullPass2 };
+
+    ReleaseDespeckleResources(&release);
+  }
   if (outputReady == MagickFalse && filteredImage != NULL)
     filteredImage=DestroyImage(filteredImage);
 
