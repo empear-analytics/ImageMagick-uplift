@@ -33,6 +33,21 @@ extern MagickPrivate MagickBooleanType
 extern MagickPrivate void
   ColorComponentTerminus(void);
 
+static inline char *FindColorRangeSeparator(char *start_color)
+{
+  char
+    *p;
+
+  for (p=start_color; (*p != '-') && (*p != '\0'); p++)
+    if (*p == '(')
+      {
+        for (p++; (*p != ')') && (*p != '\0'); p++);
+        if (*p == '\0')
+          break;
+      }
+  return(p);
+}
+
 static inline MagickBooleanType GetColorRange(const char *color,
   PixelInfo *start,PixelInfo *stop,ExceptionInfo *exception)
 {
@@ -51,13 +66,7 @@ static inline MagickBooleanType GetColorRange(const char *color,
         *p;
 
       (void) CopyMagickString(start_color,color,MagickPathExtent);
-      for (p=start_color; (*p != '-') && (*p != '\0'); p++)
-        if (*p == '(')
-          {
-            for (p++; (*p != ')') && (*p != '\0'); p++);
-            if (*p == '\0')
-              break;
-          }
+      p=FindColorRangeSeparator(start_color);
       if (*p == '-')
         (void) CopyMagickString(stop_color,p+1,MagickPathExtent);
       *p='\0';
