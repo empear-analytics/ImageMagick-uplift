@@ -452,9 +452,15 @@ static void PrintPolynomialXTerms(const double *coeff,const size_t nterms)
   }
 }
 
-static void PrintPolynomialFX(const double *coeff,const char *image_gen,
-  const char *lookup)
+static void PrintPolynomialFX(const DistortVerboseFX *fx)
 {
+  const double
+    *const coeff = fx->coeff;
+
+  const char
+    *const image_gen = fx->image_gen,
+    *const lookup = fx->lookup;
+
   size_t
     nterms =  CastDoubleToSizeT(coeff[1]);
 
@@ -1366,7 +1372,7 @@ static void PrintDistortFX(const DistortVerboseFX *fx)
     }
     case PolynomialDistortion:
     {
-      PrintPolynomialFX(coeff,image_gen,lookup);
+      PrintPolynomialFX(fx);
       break;
     }
     default:
