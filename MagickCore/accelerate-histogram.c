@@ -554,6 +554,111 @@ static MagickBooleanType ReadEqualizedImageBuffer(
   return(MagickTrue);
 }
 
+typedef struct _EqualizeKernelInputs
+{
+  MagickCLDevice
+    device;
+
+  MagickCLEnv
+    clEnv;
+
+  cl_mem
+    imageBuffer;
+
+  cl_int
+    channel_mask;
+
+  cl_mem
+    equalizeMapBuffer;
+
+  cl_float4
+    white,
+    black;
+
+  Image
+    *image;
+
+  cl_command_queue
+    queue;
+} EqualizeKernelInputs;
+
+static MagickBooleanType LaunchEqualizeKernel(
+  const EqualizeKernelInputs *inputs,cl_kernel *equalizeKernel,
+  ExceptionInfo *exception)
+{
+  const MagickCLDevice
+    device = inputs->device;
+
+  const MagickCLEnv
+    clEnv = inputs->clEnv;
+
+  const cl_mem
+    imageBuffer = inputs->imageBuffer;
+
+  const cl_int
+    channel_mask = inputs->channel_mask;
+
+  const cl_mem
+    equalizeMapBuffer = inputs->equalizeMapBuffer;
+
+  const cl_float4
+    white = inputs->white,
+    black = inputs->black;
+
+  Image
+    *const image = inputs->image;
+
+  const cl_command_queue
+    queue = inputs->queue;
+
+  cl_event
+    event;
+
+  cl_int
+    clStatus;
+
+  cl_uint
+    i;
+
+  size_t
+    global_work_size[2];
+
+  /* get the OpenCL kernel */
+  *equalizeKernel = AcquireOpenCLKernel(device,"Equalize");
+  if (*equalizeKernel == NULL)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "AcquireOpenCLKernel failed.", ".");
+    return(MagickFalse);
+  }
+
+  /* set the kernel arguments */
+  i=0;
+  clStatus=clEnv->library->clSetKernelArg(*equalizeKernel,i++,sizeof(cl_mem),(void *)&imageBuffer);
+  clStatus|=clEnv->library->clSetKernelArg(*equalizeKernel,i++,sizeof(cl_int),&channel_mask);
+  clStatus|=clEnv->library->clSetKernelArg(*equalizeKernel,i++,sizeof(cl_mem),(void *)&equalizeMapBuffer);
+  clStatus|=clEnv->library->clSetKernelArg(*equalizeKernel,i++,sizeof(cl_float4),&white);
+  clStatus|=clEnv->library->clSetKernelArg(*equalizeKernel,i++,sizeof(cl_float4),&black);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
+    return(MagickFalse);
+  }
+
+  /* launch the kernel */
+  global_work_size[0] = image->columns;
+  global_work_size[1] = image->rows;
+
+  clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, *equalizeKernel, 2, NULL, global_work_size, NULL, 0, NULL, &event);
+
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
+    return(MagickFalse);
+  }
+  RecordProfileData(device,*equalizeKernel,event);
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -580,9 +685,6 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   cl_kernel
     equalizeKernel,
     histogramKernel;
-
-  cl_event
-    event;
 
   cl_uint
     i;
@@ -612,7 +714,6 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
     *equalize_map;
 
   size_t
-    global_work_size[2],
     length;
 
   void
@@ -784,39 +885,14 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
       goto cleanup;
   }
 
-  /* get the OpenCL kernel */
-  equalizeKernel = AcquireOpenCLKernel(device,"Equalize");
-  if (equalizeKernel == NULL)
   {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "AcquireOpenCLKernel failed.", ".");
-    goto cleanup;
+    const EqualizeKernelInputs
+      inputs = { device, clEnv, imageBuffer, channel_mask, equalizeMapBuffer,
+        white, black, image, queue };
+
+    if (LaunchEqualizeKernel(&inputs,&equalizeKernel,exception) == MagickFalse)
+      goto cleanup;
   }
-
-  /* set the kernel arguments */
-  i=0;
-  clStatus=clEnv->library->clSetKernelArg(equalizeKernel,i++,sizeof(cl_mem),(void *)&imageBuffer);
-  clStatus|=clEnv->library->clSetKernelArg(equalizeKernel,i++,sizeof(cl_int),&channel_mask);
-  clStatus|=clEnv->library->clSetKernelArg(equalizeKernel,i++,sizeof(cl_mem),(void *)&equalizeMapBuffer);
-  clStatus|=clEnv->library->clSetKernelArg(equalizeKernel,i++,sizeof(cl_float4),&white);
-  clStatus|=clEnv->library->clSetKernelArg(equalizeKernel,i++,sizeof(cl_float4),&black);
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
-    goto cleanup;
-  }
-
-  /* launch the kernel */
-  global_work_size[0] = image->columns;
-  global_work_size[1] = image->rows;
-
-  clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, equalizeKernel, 2, NULL, global_work_size, NULL, 0, NULL, &event);
-
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
-    goto cleanup;
-  }
-  RecordProfileData(device,equalizeKernel,event);
 
   /* read the data back */
   {
