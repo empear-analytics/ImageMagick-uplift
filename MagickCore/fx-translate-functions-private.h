@@ -20,6 +20,16 @@
 #ifndef MAGICKCORE_FX_TRANSLATE_FUNCTIONS_PRIVATE_H
 #define MAGICKCORE_FX_TRANSLATE_FUNCTIONS_PRIVATE_H
 
+static void SetFunctionExpressionSpan (FxInfo * pfx, char * const pExpStart,
+  const size_t lenExp)
+{
+  if (pExpStart && lenExp) {
+    ElementT * pel = &pfx->Elements[pfx->usedElements-1];
+    pel->exp_start = pExpStart;
+    pel->exp_len = lenExp;
+  }
+}
+
 static MagickBooleanType CompleteFunction (FxInfo * pfx,
   const FunctionCompletion *completion)
 {
@@ -69,11 +79,7 @@ static MagickBooleanType CompleteFunction (FxInfo * pfx,
     ApplyPixelAccessQualifiers (&access, pfx);
   }
 
-  if (pExpStart && lenExp) {
-    ElementT * pel = &pfx->Elements[pfx->usedElements-1];
-    pel->exp_start = pExpStart;
-    pel->exp_len = lenExp;
-  }
+  SetFunctionExpressionSpan (pfx, pExpStart, lenExp);
 
   if (fe == fDebug)
     pfx->ContainsDebug = MagickTrue;
