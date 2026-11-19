@@ -980,6 +980,21 @@ static void SetUnityRow(const Image *unity_image,
   }
 }
 
+static Image *AcquireUnityImage(const Image *alpha_image,
+  ExceptionInfo *exception)
+{
+  Image
+    *unity_image;
+
+  unity_image=CloneImage(alpha_image,alpha_image->columns,alpha_image->rows,
+    MagickTrue,exception);
+  if (unity_image == (Image *) NULL)
+    return(unity_image);
+  if (SetImageStorageClass(unity_image,DirectClass,exception) == MagickFalse)
+    return(DestroyImage(unity_image));
+  return(unity_image);
+}
+
 static Image *SIMUnityImage(const Image *alpha_image,const Image *beta_image,
   ExceptionInfo *exception)
 {
@@ -998,12 +1013,9 @@ static Image *SIMUnityImage(const Image *alpha_image,const Image *beta_image,
   /*
     Create a padded unity image.
   */
-  unity_image=CloneImage(alpha_image,alpha_image->columns,alpha_image->rows,
-    MagickTrue,exception);
+  unity_image=AcquireUnityImage(alpha_image,exception);
   if (unity_image == (Image *) NULL)
     return(unity_image);
-  if (SetImageStorageClass(unity_image,DirectClass,exception) == MagickFalse)
-    return(DestroyImage(unity_image));
   image_view=AcquireAuthenticCacheView(unity_image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
   #pragma omp parallel for schedule(static) shared(status) \
