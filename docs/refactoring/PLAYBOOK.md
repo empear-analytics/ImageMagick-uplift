@@ -23497,6 +23497,22 @@ include block (`composite-channel-private.h`, the composite-image headers) has i
 carved header. A `%` banner of a `static` function that stands in the run but documents a
 function that stays moves, unchanged, to directly above that function, as step 1 moves
 an external function's banner (comments are not tokens).
+Upstream shared form (mandate, 2026-11-19; reading 4 of round 34, upstream private headers
+that campaign A works): Form A also applies to an upstream private header that many files
+include (`colorspace-private.h`, 204 including sources in MagickCore and coders). The run is
+the items after its include block: `#define`s, `static const` tables and `static inline`
+functions; the header's `extern "C"` opener, when it stands between the tables and the
+functions, stays where it is and is not part of the run. The new header, which only the
+carved header includes, is named as the last line of the carved header's include block,
+holds the run's items verbatim in their order, and wraps the functions in an `extern "C"`
+pair of its own when they stood inside the carved header's pair (the C translation unit has
+the same tokens in the same order: the pairs are empty in C). Proof (step 4 for this form):
+every including source's preprocessed C translation unit is identical, the carved header
+and the new header placed as at `HEAD` and as in the working tree ahead of every `-I` path,
+line markers and blank lines dropped; every including object of an OpenMP -O2 tree is
+identical to a snapshot of the parent, debug sections stripped; the C++ check runs on the
+MagickCore includers. Step 1's probe applies: the carved header rises and the new header
+scores at least the carved header's score before.
 
 **Not covered by:** Recipe S, which moves a public root into a new `.c` file and shares helpers
 through a header that two `.c` files include; here nothing public leaves and no second `.c`
@@ -25391,6 +25407,109 @@ confirmation.
 
 ---
 
+## Recipe EL - Write an Equality-Chain Predicate as a Label Set
+
+**Use when:** CodeScene reports *Complex Conditional* (or *Complex Method*) on a predicate
+whose whole body tests one parameter against enumeration constants joined by `||`:
+`colorspace-private.h`'s `IssRGBCompatibleColorspace` (nine colourspaces, cc 10, eight
+complex conditional expressions), `IsHueCompatibleColorspace`, `IsLabCompatibleColorspace`,
+`IsGrayImageType`. The chain is one expression, so no extraction shortens it.
+
+**Not covered by:** Recipe EM, which turns the chain into a `static const` table and a
+lookup loop: in a header inlined into per-pixel code (`ConcatenateColorComponent`) a loop
+over a table is a different instruction sequence for every includer, and EM's step 1
+refuses per-pixel callers. Recipe LP, which goes the other way, from a `switch` in a
+function body to a predicate; its step 2 is the shape this recipe writes. Recipe P, which
+names an expression and keeps it whole. Recipe DT, which drops a boolean `?:` after a
+logical expression and keeps the chain.
+
+**How:**
+
+1. The function is `static` (`static inline` in a header), returns `MagickBooleanType`,
+   and its body is exactly `if (C) return(MagickTrue); return(MagickFalse);` or
+   `return((C) ? MagickTrue : MagickFalse);`. `C` is, parentheses, line breaks and spaces
+   aside, `(n == L1) || (n == L2) || ... || (n == Lk)`, `k` at least 2, where `n` is a
+   parameter of an enumeration or integer type and each `Li` an enumeration constant (or
+   an integer constant expression), all of distinct values. No `#if` inside the function.
+2. Replace the body by `switch (n) { case L1: ... case Lk: return(MagickTrue); default:
+   break; } return(MagickFalse);`, one `case` per line in the chain's order, as Recipe LP
+   step 2 writes a label set. The name, parameter, return type and comments stay.
+3. Check by script that the labels are the chain's constants, each once and in order, and
+   that nothing else in the file changed. The compiler refuses two labels of one value.
+4. Every file that compiles the function: in a header, rebuild every including object of
+   an OpenMP -O2 tree and compare it with a snapshot of the parent (debug sections
+   stripped). Objects that differ are listed with the functions whose instructions
+   changed; the changed functions' self Ir at one thread (callgrind, `setarch -R`) is
+   measured on commands that run their per-pixel or per-row users, parent against step,
+   and a rise beyond the allowance in force (reading 1 of round 34: 0.01 % of the hot
+   function's inclusive Ir) stops the step.
+5. The oracle: the whole catalogue, narrow and wide, for a header that many files include
+   (the predicate is inlined, so the case map does not name it); `ci_linux_warnings.sh`
+   and the C++ check on every rebuilt C source.
+6. `refactor_guard.py`: `OK` for the literals; `--calls` moves nothing. One function per
+   commit.
+
+**Before:**
+
+```c
+static inline MagickBooleanType IsYCbCrCompatibleColorspace(
+  const ColorspaceType colorspace)
+{
+  if ((colorspace == YCbCrColorspace) ||
+      (colorspace == Rec709YCbCrColorspace) ||
+      (colorspace == Rec601YCbCrColorspace))
+    return(MagickTrue);
+  return(MagickFalse);
+}
+```
+
+**After:**
+
+```c
+static inline MagickBooleanType IsYCbCrCompatibleColorspace(
+  const ColorspaceType colorspace)
+{
+  switch (colorspace)
+  {
+    case YCbCrColorspace:
+    case Rec709YCbCrColorspace:
+    case Rec601YCbCrColorspace:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+```
+
+**Careful:**
+
+- `n == L1 || ... || n == Lk` is true exactly when `n` equals one of the values; a
+  `switch` jumps to the label of that value, or to `default:` when there is none (C11
+  6.8.4.2p5). The operands have no side effects, so the short-circuit order of the chain
+  is not observable; the result is the same value for every `n`, including values outside
+  the enumeration's named constants.
+- The controlling expression undergoes the integer promotions and each label is converted
+  to the promoted type (C11 6.8.4.2p5), as the `==` operands were converted by the usual
+  arithmetic conversions: for an enumeration and its own constants both give the same
+  comparison.
+- The compiler is free to emit either form as a bit test, a range check or a chain of
+  compares, so objects do differ (block layout and branch order); step 4's measurement is
+  the speed evidence, not object identity.
+
+**Evidence level:** oracle (the whole catalogue, narrow and wide, for a widely included
+header), with step 4's object comparison and Ir.
+
+**Provenance:** 2026-11-19, from `colorspace-private.h` (campaign A, W47 round 34, lane a,
+reading 4 of the round brief): 3.69, with seven *Complex Conditional* findings in its
+`Is...Colorspace` predicates; a probe writing the chains as label sets takes the header to
+4.89, `IssRGBCompatibleColorspace` alone to 3.99. The first step's changed functions ran at
+equal or lower self Ir (`ConcatenateColorComponent` 9,360,000 -> 8,760,000 on a 200x200
+`txt:` write). Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-11-19 (the
+owner's "New recipes are fine").
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -25943,3 +26062,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | AMEND | GD | Step 1: an operand may be a conjunction of two comparisons in its own parentheses, with no call (a range test); its guard is `if (B1 && B2) X` with the conjunction's text, so `&&` stands only inside such a guard. *Careful*: the guard evaluates `B1`, then `B2` only when `B1` held, as the operand did inside the chain | `token-private.h`'s `IsUTFSpace` (campaign A, W47 round 34, lane c; an upstream header worked under owner 2026-11-19 evening, PR #129 round-33 Q4): twelve operands, two of them range conjunctions, cc 15, 13 complex conditional expressions; a probe 6.94 to 8.12 | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | GC | Step 1: one operand may be a disjunction of integer comparisons in its own parentheses, with no call; step 2 writes its inverse `!(Ai)`, the disjunction's text unchanged inside. Step 5: a `static inline` predicate of a private header that no file calls has no object code to compare; when it takes one `int`, reads nothing else and calls nothing, `tools/exhaustive_int_predicate.sh` (new) compares the committed and the new function on all 2^32 `int` values and must print `EQUIVALENT` | `token-private.h`'s `IsUTFValid` (campaign A, W47 round 34, lane c; an upstream header worked under owner 2026-11-19 evening, PR #129 round-33 Q4): four operands, one a range-exclusion disjunction, no caller in the tree; a probe 8.12 to 8.64; the tool's planted change of one operator prints `DIFFERENT at -2147483648` | mandate (2026-11-19) |
 | 2026-11-19 | NEW | XE | Unwrap the Else of an If That Leaves: `if (C) X else { S }`, `X` leaving on every path (`break`/`continue` of the enclosing loop or `switch`, `return`, `goto`), `S` declaring nothing at its top level and holding no label, becomes `if (C) X` followed by `S`'s statements one indent level less; proof `tools/obj_identical.sh` `IDENTICAL` | `accelerate-resize.c`'s `RunResizeFilterPass` (campaign A, W47 round 34, lane c; OpenCL host code, wide build): *Large Method* 72 lines, held since round 33; a probe 69 lines, the file 9.30 to 9.68, `IDENTICAL` | mandate (2026-11-19) |
+| 2026-11-19 | NEW | EL | Write an Equality-Chain Predicate as a Label Set: a `static` predicate whose body is `if (C) return(MagickTrue); return(MagickFalse);` (or the `?:` form), `C` a chain of `n == Li` over distinct enumeration constants, becomes `switch (n)` with the constants as labels in order, `return(MagickTrue);`, `default: break;`, `return(MagickFalse);` (Recipe LP step 2's shape); for a header, every including object compared with a snapshot and the changed functions' self Ir measured on their per-pixel users | `colorspace-private.h` (campaign A, W47 round 34, lane a): seven *Complex Conditional* findings in its `Is...Colorspace` predicates; the label-set probe 3.69 -> 4.89 (`IssRGBCompatibleColorspace` alone 3.99, its changed callers at equal or lower self Ir) | mandate (2026-11-19) |
+| 2026-11-19 | AMEND | OH | Upstream shared form of Form A: an upstream private header that many files include gives its run after the include block (`#define`s, `static const` tables, `static inline` functions; the `extern "C"` opener between tables and functions stays) to a new header that only it includes, named last in its include block, the functions in an `extern "C"` pair of their own; proof: every including source preprocessed identical (C) and every including object of an OpenMP -O2 tree identical to a snapshot, C++ check on the MagickCore includers; both headers at least the carved header's score before | `colorspace-private.h` (campaign A, W47 round 34, lane a, reading 4): 4.32 after four EL steps, its 72 converters (Excess Arguments, Code Duplication, Complex and Large Method) per pixel in every colourspace transform; the carve gives 7.43 and the new `colorspace-conversions-private.h` 5.18, with no instruction changed in any includer | mandate (2026-11-19) |
