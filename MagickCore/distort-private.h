@@ -511,9 +511,17 @@ static inline void SetBarrelXCoefficients(double *coeff,const double *arguments,
   coeff[2] *= rscale;
 }
 
-static inline double *BarrelCoefficients(double *coeff,const DistortMethod *method,
-  const CoefficientContext *context)
+static inline double *BarrelCoefficients(const CoefficientCall *call)
 {
+  double
+    *coeff = call->coeff;
+
+  const DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   const Image
     *const image = context->image;
 
@@ -760,14 +768,8 @@ static inline MagickBooleanType CountCoefficients(const DistortMethod *method,
 
 static inline double *GenerateRadialCoefficients(const CoefficientCall *call)
 {
-  double
-    *const coeff = call->coeff;
-
   DistortMethod
     *const method = call->method;
-
-  const CoefficientContext
-    *const context = call->context;
 
   switch (*method)
   {
@@ -779,7 +781,7 @@ static inline double *GenerateRadialCoefficients(const CoefficientCall *call)
       return(CylinderCoefficients(call));
     case BarrelDistortion:
     case BarrelInverseDistortion:
-      return(BarrelCoefficients(coeff,method,context));
+      return(BarrelCoefficients(call));
     default:
       break;
   }
