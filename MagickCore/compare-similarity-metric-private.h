@@ -550,6 +550,9 @@ static inline void AccumulatePAPixel(const ComparePixels *pixels,
   }
 }
 
+static inline MagickBooleanType
+  GetClearedMetricSimilarity(const PixelMetricInfo,double *,ExceptionInfo *);
+
 static inline MagickBooleanType GetPASimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -557,14 +560,10 @@ static inline MagickBooleanType GetPASimilarity(const Image *image,
     info = { image, reconstruct_image, PeakAbsoluteErrorMetric,
       0.0 };
 
-  double
-    area;
-
   /*
     Compute the peak absolute similarity.
   */
-  (void) memset(similarity,0,(MaxPixelChannels+1)*sizeof(*similarity));
-  return(GetPixelMetricSimilarity(&info,similarity,&area,exception));
+  return(GetClearedMetricSimilarity(info,similarity,exception));
 }
 
 static inline void AccumulatePDCPixel(const ComparePixels *pixels,const double fuzz,
