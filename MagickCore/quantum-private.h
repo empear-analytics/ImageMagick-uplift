@@ -149,6 +149,18 @@ static inline unsigned int NormalizeHalfSubnormal(const unsigned int sign_bit,
     (significand << SignificandShift));
 }
 
+static inline unsigned int HalfInfinityOrNaN(const unsigned int sign_bit,
+  const unsigned int significand)
+{
+  unsigned int
+    value;
+
+  value=(sign_bit << SignBitShift) | 0x7f800000;
+  if (significand != 0)
+    value|=(significand << SignificandShift);
+  return(value);
+}
+
 static inline float HalfToSinglePrecision(const unsigned short half)
 {
   typedef union _SinglePrecision
@@ -188,11 +200,7 @@ static inline float HalfToSinglePrecision(const unsigned short half)
     }
   else
     if (exponent == SignBitShift)
-      {
-        value=(sign_bit << SignBitShift) | 0x7f800000;
-        if (significand != 0)
-          value|=(significand << SignificandShift);
-      }
+      value=HalfInfinityOrNaN(sign_bit,significand);
     else
       {
         exponent+=ExponentBias;
