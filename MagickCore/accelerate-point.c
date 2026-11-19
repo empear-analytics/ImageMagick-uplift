@@ -119,6 +119,22 @@ typedef struct _FunctionKernelTargets
     *functionKernel;
 } FunctionKernelTargets;
 
+static MagickBooleanType AcquireFunctionParameters(
+  const size_t number_parameters,const double *parameters,
+  float **parametersBufferPtr)
+{
+  size_t
+    i;
+
+  *parametersBufferPtr=(float *) AcquireQuantumMemory(number_parameters,
+    sizeof(float));
+  if (*parametersBufferPtr == (float *) NULL)
+    return(MagickFalse);
+  for (i=0; i<number_parameters; i++)
+    (*parametersBufferPtr)[i]=(float) parameters[i];
+  return(MagickTrue);
+}
+
 static MagickBooleanType AcquireFunctionKernel(
   const FunctionKernelInputs *inputs,ExceptionInfo *exception,
   const FunctionKernelTargets *targets)
@@ -141,15 +157,9 @@ static MagickBooleanType AcquireFunctionKernel(
   float
     *parametersBufferPtr;
 
-  size_t
-    i;
-
-  parametersBufferPtr=(float *) AcquireQuantumMemory(number_parameters,
-    sizeof(float));
-  if (parametersBufferPtr == (float *) NULL)
+  if (AcquireFunctionParameters(number_parameters,parameters,
+        &parametersBufferPtr) == MagickFalse)
     return(MagickFalse);
-  for (i=0; i<number_parameters; i++)
-    parametersBufferPtr[i]=(float) parameters[i];
   *parametersBuffer=CreateOpenCLBuffer(device,CL_MEM_READ_ONLY |
     CL_MEM_COPY_HOST_PTR,number_parameters*sizeof(*parametersBufferPtr),
     parametersBufferPtr);
