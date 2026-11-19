@@ -1150,14 +1150,56 @@ static MagickBooleanType AcquireDPCReconstructGradient(
   return(MagickTrue);
 }
 
+typedef struct _DPCEdgeCorrection
+{
+  double
+    *edge_factor;
+
+  Image
+    **threshold_image;
+} DPCEdgeCorrection;
+
+static MagickBooleanType GetDPCEdgeCorrection(Image *magnitude_image,
+  const Image *reconstruct,ExceptionInfo *exception,
+  const DPCEdgeCorrection *targets)
+{
+  double
+    *const edge_factor = targets->edge_factor;
+
+  Image
+    **const threshold_image = targets->threshold_image;
+
+  double
+    mean = 0.0,
+    standard_deviation = 0.0;
+
+  MagickBooleanType
+    status;
+
+  /*
+    Compute an edge normalization correction.
+  */
+  *threshold_image=CloneImage(magnitude_image,0,0,MagickTrue,exception);
+  if (*threshold_image == (Image *) NULL)
+    return(MagickFalse);
+  status=BilevelImage(*threshold_image,0.0,exception);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  status=GetImageMean(*threshold_image,&mean,&standard_deviation,exception);
+  *threshold_image=DestroyImage(*threshold_image);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  *edge_factor=MagickSafeReciprocal(QuantumScale*mean*(double)
+    reconstruct->columns*(double) reconstruct->rows)+QuantumScale;
+  return(MagickTrue);
+}
+
 static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
 {
   double
     edge_factor = 0.0,
-    maxima = 0.0,
-    mean = 0.0,
-    standard_deviation = 0.0;
+    maxima = 0.0;
 
   Image
     *dot_product_image = (Image *) NULL,
@@ -1171,6 +1213,9 @@ static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
     *try_image = (Image *) NULL,
     *tx_image = (Image *) NULL,
     *ty_image = (Image *) NULL;
+
+  DPCEdgeCorrection
+    edge_correction;
 
   DPCReconstructGradient
     reconstruct_gradient;
@@ -1194,21 +1239,11 @@ static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
   if (AcquireDPCReconstructGradient(reconstruct,exception,
         &reconstruct_gradient) == MagickFalse)
     ThrowDPCSimilarityException();
-  /*
-    Compute an edge normalization correction.
-  */
-  threshold_image=CloneImage(magnitude_image,0,0,MagickTrue,exception);
-  if (threshold_image == (Image *) NULL)
+  edge_correction.edge_factor=(&edge_factor);
+  edge_correction.threshold_image=(&threshold_image);
+  if (GetDPCEdgeCorrection(magnitude_image,reconstruct,exception,
+        &edge_correction) == MagickFalse)
     ThrowDPCSimilarityException();
-  status=BilevelImage(threshold_image,0.0,exception);
-  if (status == MagickFalse)
-    ThrowDPCSimilarityException();
-  status=GetImageMean(threshold_image,&mean,&standard_deviation,exception);
-  threshold_image=DestroyImage(threshold_image);
-  if (status == MagickFalse)
-    ThrowDPCSimilarityException();
-  edge_factor=MagickSafeReciprocal(QuantumScale*mean*(double)
-    reconstruct->columns*(double) reconstruct->rows)+QuantumScale;
   /*
     Divide X and Y derivitives of reference image by magnitude.
   */
