@@ -100,6 +100,7 @@
 #include "MagickCore/transform-private.h"
 #include "MagickCore/utility.h"
 #include "MagickCore/fx-execute-private.h"
+#include "MagickCore/fx-translate-rpn-private.h"
 #include "MagickCore/fx-translate-private.h"
 
 
