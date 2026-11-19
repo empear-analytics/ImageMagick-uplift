@@ -340,6 +340,14 @@ cleanup:
   return(outputReady);
 }
 
+static void TraceAccelerateCall(Image *image,ExceptionInfo *exception)
+{
+  assert(image != NULL);
+  assert(exception != (ExceptionInfo *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+}
+
 MagickPrivate MagickBooleanType AccelerateFunctionImage(Image *image,
   const MagickFunction function,const size_t number_parameters,
   const double *parameters,ExceptionInfo *exception)
@@ -350,10 +358,7 @@ MagickPrivate MagickBooleanType AccelerateFunctionImage(Image *image,
   MagickCLEnv
     clEnv;
 
-  assert(image != NULL);
-  assert(exception != (ExceptionInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceAccelerateCall(image,exception);
 
   if (checkAccelerateCondition(image) == MagickFalse)
     return(MagickFalse);
