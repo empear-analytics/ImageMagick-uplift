@@ -699,6 +699,12 @@ static void AcquireHullPassKernels(const MagickCLDevice device,
   *hullPass2 = AcquireOpenCLKernel(device,"HullPass2");
 }
 
+static void SetHullPassWorkSize(const Image *image,size_t *global_work_size)
+{
+  global_work_size[0] = image->columns;
+  global_work_size[1] = image->rows;
+}
+
 typedef struct _DespeckleRunInput
 {
   MagickCLEnv
@@ -770,8 +776,7 @@ static MagickBooleanType RunDespeckleKernels(const DespeckleRunInput *run,
       return(MagickFalse);
   }
 
-  global_work_size[0] = image->columns;
-  global_work_size[1] = image->rows;
+  SetHullPassWorkSize(image,global_work_size);
 
 
   {
