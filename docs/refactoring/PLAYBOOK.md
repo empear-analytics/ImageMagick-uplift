@@ -24643,6 +24643,130 @@ after the selection, where Recipe SG had spread it. Step 2 of the stub-probed re
 
 ---
 
+## Recipe MV - Merge Twin Functions Differing in Values Through an Order Struct
+
+**Use when:** CodeScene reports *Code Duplication* between two `static` functions of one file
+with the same parameter list whose bodies are the same text except for values read at some
+positions (constants, the function's own `const` locals bound from members of its input
+struct, member reads of such locals), and at most a few runs that MT step 3 admits:
+`accelerate-resize.c`'s `ResizeHorizontalThenVertical` and `ResizeVerticalThenHorizontal`,
+which run the same two filter passes through a temporary buffer, one horizontal first
+(`HorizontalResizeFilter`, `xFactor`, the temporary `resizedColumns` by `image->rows`), the
+other vertical first (`VerticalResizeFilter`, `yFactor`, `image->columns` by `resizedRows`).
+
+**Not covered by:** Recipe SC, whose copies stand in one function and are replaced by calls
+in place; Recipe TW, whose copies differ in one value; Recipe MT, which writes every
+differing pair as a conditional on a selector inside the merged body (here six roles at
+eleven positions: eleven conditionals, each a branch); Recipe CF, which merges twins that
+differ only in the function called; Recipe TI, which inlines one twin into the other's
+callers; Recipe D, which needs a reported duplication between blocks and passes the
+differing values as parameters (here more than four).
+
+**How:**
+
+1. The twins `A` and `B` are `static` functions of one file, outside every OpenMP region,
+   with no `#pragma` or preprocessor line, of the same return type and parameter list
+   (types and names), neither used through a function pointer.
+2. Align their bodies token by token (whitespace and line breaks ignored; no variable
+   renamed). Each differing position holds, in each twin, a value: a literal, an
+   enumeration constant, a `const` local of that twin bound once from a member of a
+   pointer-to-`const` parameter, or a member read through such a local or parameter
+   (`image->rows`). Give each differing position a role; positions take one role when every
+   twin has the same value at all of them (Recipe SC step 2). A pair of runs that MT step 3
+   admits (two casts of one value to two integer types, the result converted to one target)
+   may differ as well and is written as MT step 4 writes it, testing a role that is a
+   selector constant (`order->firstSide == HorizontalResizeFilter`).
+3. Write a `typedef struct` `Order` directly above the merged function, one member per role,
+   named for the role, of the type Recipe SC step 3 gives it (the type of every object the
+   value is assigned or passed to; in an expression, the value's own type).
+4. Write the merged `static` function `M` directly above `A`: `A`'s parameters with
+   `const Order *order` added after the input struct (at most four in all), `A`'s body with
+   each role's positions written `order->role` or a `const` local bound from it (Recipe N
+   step 4), and the bindings of locals that no longer appear removed. The function's error
+   calls now name `M` in `GetMagickModule()` (ruling of 2026-11-12).
+5. Replace each twin's body by `const Order order = { v1, ... };`, that twin's values in
+   member order, each written through the twin's parameter (`info->xFactor` where the twin
+   read its local `xFactor` bound from `info->xFactor`; `info->image->rows` where it read
+   `image->rows` with `image` bound from `info->image`), and `return(M(...,&order,...));`.
+   The twins keep their names and their callers.
+6. One merge per commit. Check by script that `A`'s and `B`'s old bodies equal `M`'s body
+   with each twin's values substituted (and its run of step 2 chosen), and by reading that
+   each initialiser lists the twin's values in member order.
+7. Run `refactor_guard.py` (`OK` or `WARN` for literals now written once) and `--calls`
+   (the callees of the twins' bodies drop by one copy; `M` gains its definition and two
+   calls), the warning checks, and the oracle on the twins' callers with both twins reached.
+
+**Before:**
+
+```c
+static MagickBooleanType ResizeHorizontalThenVertical(
+  const ResizeArmInfo *info,ExceptionInfo *exception,
+  const ResizeArmTargets *targets)
+{
+  ...
+  length=resizedColumns*image->rows*number_channels;
+  ...
+      run = { HorizontalResizeFilter, &pass, xFactor };
+  ...
+}
+```
+
+**After:**
+
+```c
+static MagickBooleanType ResizeThroughTempImage(const ResizeArmInfo *info,
+  const ResizeArmOrder *order,ExceptionInfo *exception,
+  const ResizeArmTargets *targets)
+{
+  ...
+  length=tempColumns*tempRows*number_channels;
+  ...
+      run = { order->firstSide, &pass, order->firstFactor };
+  ...
+}
+
+static MagickBooleanType ResizeHorizontalThenVertical(
+  const ResizeArmInfo *info,ExceptionInfo *exception,
+  const ResizeArmTargets *targets)
+{
+  const ResizeArmOrder
+    order = { HorizontalResizeFilter, VerticalResizeFilter, info->xFactor,
+      info->yFactor, info->resizedColumns, info->image->rows };
+
+  return(ResizeThroughTempImage(info,&order,exception,targets));
+}
+```
+
+**Careful:**
+
+- Each value is read once, in the twin's initialiser, where the twin's body read it at each
+  of its positions. A constant is the same every time; a `const` local bound from a member
+  of a pointer-to-`const` parameter, or a member read through one, holds the same value
+  during the whole call when nothing writes the member (check by reading: the body writes
+  only through its targets pointers, never into the input struct or the image it points
+  to). So every position sees the value it saw.
+- The member's type is the target's (step 3), so converting the value at the initialiser
+  gives what the conversion at the position gave; a `size_t` role used in `size_t`
+  arithmetic keeps the arithmetic's type and order of operands.
+- An MT run (step 2) is written as MT step 4 writes it: the conditional's value, converted
+  to the target, is what that twin's run gave (MT's *Careful*); the selector role is a
+  constant of each twin, so each twin takes its own run.
+- The statements run in the same order with the same calls; `M` adds one call level.
+
+**Evidence level:** oracle on the twins' callers, both twins reached (casemap or reading of
+the cases), with `refactor_guard.py --calls` and step 6 checked by script.
+
+**Provenance:** 2026-11-19, from `accelerate-resize.c`'s `ResizeHorizontalThenVertical` and
+`ResizeVerticalThenHorizontal` (campaign A, W46 round 33, lane b, batch 2): *Code
+Duplication* after the `else` arm moved out (`170aed8bb`). MT would write eleven
+conditionals; the stub probe of this form, with the one cast pair (`(cl_uint) image->rows`
+and `(cl_int) image->rows`) as MT's conditional, scored the file 8.73 to 9.30. A probe with
+the cast pair as a seventh role scored 8.73 (the two wrappers then clone each other).
+Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-11-19 (the owner's "New
+recipes are fine", PR #129 Q7).
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -25176,3 +25300,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | NEW | DI | Declare a Local with the Constant Its First Statement Assigns: a run of `v=c;` statements (`NULL`, `(T) NULL`, an enumeration constant, an integer literal) at the top level of a function body, each the first statement to name a local declared without an initialiser in the same block, with no label before it, becomes `=c` in the declarators; `obj_identical.sh` `IDENTICAL` is required. *Careful* gives the argument (C11 6.8p3 and 6.7.9p11; nothing reads the local before the old statement and no jump enters the stretch; C++ jumps stay within the scope) | `accelerate-motion-blur.c`'s `ComputeMotionBlurImage` (campaign A, W46 round 33, lane b): *Large Method* at 72 lines, nine `NULL`/`MagickFalse` statements; a probe 9.30 to 9.68, object code identical in the wide build | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | DI | Step 1: the local is declared before the first statement of the function; step 2: no `goto` before the run, and the declaration and the run under the same preprocessor conditions (no `#if`/`#else`/`#endif` between them or inside the run); step 3: one of the two blank lines around a deleted run goes too (After example fixed); step 5: `clang++ -x c++ -fsyntax-only` in the wide configuration where `tools/cxx_warnings.sh` cannot run; *Careful*: the one path that could differ (a `goto` before the run to code after it) read an indeterminate value, undefined behaviour, and is excluded | Review of batch 1 of W46 lane b (round 33): `46b516c37`, `1b3046a49`, `ebfa1ccfb` meet the amended steps (no `goto` or `#if` before their runs; the first left a doubled blank line, removed in a style commit) | after the fact |
 | 2026-11-19 | NEW | JD | Join Twin Call Arms Around a Common Fill into One Status Dispatch: `if (C) { F } else { F if (G2 == K) goto L; }` followed by `if ((C) && (G1 == K)) goto L;` (the shape Recipes SG and I leave) becomes `F`, `if (C) status=G1; else status=G2;`, `if (status == K) goto L;`. *Careful* gives the path argument (`C` without side effect, unchanged by `F`; each path runs the same statements in the same order) | `accelerate-resize.c`'s `ComputeResizeImage` (campaign A, W46 round 33, lane b, batch 2): the fill of `info` and `targets` written twice after `170aed8bb`; step 2 of the resize chain stub-probed at 9.30 | mandate (2026-11-19) |
+| 2026-11-19 | NEW | MV | Merge Twin Functions Differing in Values Through an Order Struct: two `static` functions with one parameter list whose bodies differ only in values (constants, `const` locals bound from members of a pointer-to-`const` parameter, member reads through them) become one function taking `const Order *order`, the differing positions read from its members; each twin keeps its name and becomes `const Order order = {...}; return(M(...));`; an MT-admitted cast pair is written as MT's conditional on a selector role. *Careful* gives the argument (values read once at the initialiser are the same at every position; member types are the targets'; same statements in the same order) | `accelerate-resize.c`'s `ResizeHorizontalThenVertical` and `ResizeVerticalThenHorizontal` (campaign A, W46 round 33, lane b, batch 2): *Code Duplication*; MT would write eleven conditionals; a stub probe 8.73 to 9.30 | mandate (2026-11-19) |
