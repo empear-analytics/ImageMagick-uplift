@@ -616,6 +616,11 @@ static inline MagickBooleanType GetPSNRSimilarity(const Image *image,
 
 #define RMSESquareRoot(x)  sqrt((x) < 0.0 ? 0.0 : (x))
 
+static inline double GetRMSEChannelSimilarity(const double value)
+{
+  return(RMSESquareRoot(value));
+}
+
 static inline MagickBooleanType GetRMSESimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -638,9 +643,9 @@ static inline MagickBooleanType GetRMSESimilarity(const Image *image,
     if (((traits & UpdatePixelTrait) == 0) ||
         ((reconstruct_traits & UpdatePixelTrait) == 0))
       continue;
-    similarity[i]=RMSESquareRoot(similarity[i]);
+    similarity[i]=GetRMSEChannelSimilarity(similarity[i]);
   }
-  similarity[CompositePixelChannel]=RMSESquareRoot(
+  similarity[CompositePixelChannel]=GetRMSEChannelSimilarity(
     similarity[CompositePixelChannel]);
   return(status);
 }
