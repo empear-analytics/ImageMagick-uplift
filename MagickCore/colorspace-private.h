@@ -24,6 +24,7 @@
 #include "MagickCore/pixel-accessor.h"
 #include "MagickCore/colorspace-to-rgb-private.h"
 #include "MagickCore/colorspace-cie-to-rgb-private.h"
+#include "MagickCore/colorspace-rgb-to-hue-private.h"
 #include "MagickCore/colorspace-conversions-private.h"
 
 #if defined(__cplusplus) || defined(c_plusplus)
