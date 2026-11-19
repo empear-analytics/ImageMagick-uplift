@@ -475,9 +475,23 @@ static inline double *CylinderCoefficients(const CoefficientCall *call)
   return(coeff);
 }
 
-static inline void SetBarrelCenter(double *coeff,const Image *image,
-  const double *arguments,const size_t number_arguments)
+static inline void SetBarrelCenter(const CoefficientCall *call)
 {
+  double
+    *const coeff = call->coeff;
+
+  const CoefficientContext
+    *const context = call->context;
+
+  const Image
+    *const image = context->image;
+
+  const double
+    *const arguments = context->arguments;
+
+  const size_t
+    number_arguments = context->number_arguments;
+
   /* X,Y Center of Distortion (image coordinates) */
   if ( number_arguments == 5 )  {
     coeff[8] = arguments[3];
@@ -588,7 +602,7 @@ static inline double *BarrelCoefficients(const CoefficientCall *call)
     }
   SetBarrelXCoefficients(coeff,arguments,number_arguments,rscale);
   SetBarrelYCoefficients(coeff,arguments,number_arguments,rscale);
-  SetBarrelCenter(coeff,image,arguments,number_arguments);
+  SetBarrelCenter(call);
   return(coeff);
 }
 
