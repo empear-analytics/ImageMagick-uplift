@@ -86,8 +86,22 @@ static inline MagickBooleanType CreateOpenCLCachePath(const char *path)
   return(status);
 }
 
-static inline char *CreateOpenCLCacheDirectory(char *home,char *path,char *temp)
+typedef struct _OpenCLCacheSearch
 {
+  char
+    *home,
+    *path,
+    *temp;
+} OpenCLCacheSearch;
+
+static inline char *CreateOpenCLCacheDirectory(
+  const OpenCLCacheSearch *search)
+{
+  char
+    *home = search->home,
+    *const path = search->path,
+    *temp = search->temp;
+
   MagickBooleanType
     status;
 
@@ -113,14 +127,23 @@ static inline char *CreateOpenCLCacheDirectory(char *home,char *path,char *temp)
   return(temp);
 }
 
-static inline char *AcquireOpenCLCacheDirectory(char *home,char *path,char *temp)
+static inline char *AcquireOpenCLCacheDirectory(
+  const OpenCLCacheSearch *search)
 {
+  char
+    *home = search->home,
+    *const path = search->path,
+    *temp = search->temp;
+
   MagickBooleanType
     status;
 
   if (home != (char *) NULL)
     {
-      temp=CreateOpenCLCacheDirectory(home,path,temp);
+      const OpenCLCacheSearch
+        cache_search = { home, path, temp };
+
+      temp=CreateOpenCLCacheDirectory(&cache_search);
     }
   else
     {
@@ -152,9 +175,19 @@ static inline char *AcquireOpenCLCacheDirectory(char *home,char *path,char *temp
   return(temp);
 }
 
-static inline void SetOpenCLCacheDirectory(char *home,char *path,char *temp)
+static inline void SetOpenCLCacheDirectory(const OpenCLCacheSearch *search)
 {
-  temp=AcquireOpenCLCacheDirectory(home,path,temp);
+  char
+    *const home = search->home,
+    *const path = search->path,
+    *temp = search->temp;
+
+  {
+    const OpenCLCacheSearch
+      cache_search = { home, path, temp };
+
+    temp=AcquireOpenCLCacheDirectory(&cache_search);
+  }
   if (temp == (char *) NULL)
     {
       temp=AcquireString("?");
@@ -209,7 +242,12 @@ static inline const char *GetOpenCLCacheDirectory()
 #endif
             }
 
-          SetOpenCLCacheDirectory(home,path,temp);
+          {
+            const OpenCLCacheSearch
+              cache_search = { home, path, temp };
+
+            SetOpenCLCacheDirectory(&cache_search);
+          }
         }
       UnlockSemaphoreInfo(cache_directory_lock);
   }
