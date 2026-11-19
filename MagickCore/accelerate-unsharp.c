@@ -454,6 +454,98 @@ cleanup:
   return(filteredImage);
 }
 
+typedef struct _UnsharpMaskArgs
+{
+  cl_kernel
+    unsharpMaskKernel;
+
+  cl_mem
+    imageBuffer;
+
+  cl_uint
+    number_channels;
+
+  cl_int
+    channel_mask;
+
+  cl_mem
+    imageKernelBuffer;
+
+  cl_uint
+    kernelWidth;
+
+  cl_uint
+    imageColumns;
+
+  cl_uint
+    imageRows;
+
+  float
+    fGain;
+
+  float
+    fThreshold;
+
+  cl_mem
+    filteredImageBuffer;
+} UnsharpMaskArgs;
+
+static cl_int SetUnsharpMaskArgs(const UnsharpMaskArgs *args)
+{
+  const cl_kernel
+    unsharpMaskKernel = args->unsharpMaskKernel;
+
+  const cl_mem
+    imageBuffer = args->imageBuffer;
+
+  const cl_uint
+    number_channels = args->number_channels;
+
+  const cl_int
+    channel_mask = args->channel_mask;
+
+  const cl_mem
+    imageKernelBuffer = args->imageKernelBuffer;
+
+  const cl_uint
+    kernelWidth = args->kernelWidth;
+
+  const cl_uint
+    imageColumns = args->imageColumns;
+
+  const cl_uint
+    imageRows = args->imageRows;
+
+  const float
+    fGain = args->fGain;
+
+  const float
+    fThreshold = args->fThreshold;
+
+  const cl_mem
+    filteredImageBuffer = args->filteredImageBuffer;
+
+  cl_int
+    status;
+
+  size_t
+    i;
+
+  i=0;
+  status =SetOpenCLKernelArg(unsharpMaskKernel,i++,sizeof(cl_mem),(void *)&imageBuffer);
+  status|=SetOpenCLKernelArg(unsharpMaskKernel,i++,sizeof(cl_uint),(void *)&number_channels);
+  status|=SetOpenCLKernelArg(unsharpMaskKernel,i++,sizeof(cl_int),&channel_mask);
+  status|=SetOpenCLKernelArg(unsharpMaskKernel,i++,sizeof(cl_mem),(void *)&imageKernelBuffer);
+  status|=SetOpenCLKernelArg(unsharpMaskKernel,i++,sizeof(cl_uint),(void *)&kernelWidth);
+  status|=SetOpenCLKernelArg(unsharpMaskKernel,i++,sizeof(cl_uint),(void *)&imageColumns);
+  status|=SetOpenCLKernelArg(unsharpMaskKernel,i++,sizeof(cl_uint),(void *)&imageRows);
+  status|=SetOpenCLKernelArg(unsharpMaskKernel,i++,sizeof(cl_float4)*(8 * (32 + kernelWidth)),(void *) NULL);
+  status|=SetOpenCLKernelArg(unsharpMaskKernel,i++,sizeof(float),(void *)&fGain);
+  status|=SetOpenCLKernelArg(unsharpMaskKernel,i++,sizeof(float),(void *)&fThreshold);
+  status|=SetOpenCLKernelArg(unsharpMaskKernel,i++,sizeof(cl_mem),(void *)&filteredImageBuffer);
+  return(status);
+}
+
 static Image *ComputeUnsharpMaskImageSingle(const Image *image,
   MagickCLEnv clEnv,const double radius,const double sigma,const double gain,
   const double threshold,ExceptionInfo *exception)
@@ -494,7 +586,6 @@ static Image *ComputeUnsharpMaskImageSingle(const Image *image,
 
   size_t
     gsize[2],
-    i,
     lsize[2];
 
   const AccelerateBufferTargets
@@ -530,18 +621,13 @@ static Image *ComputeUnsharpMaskImageSingle(const Image *image,
   fGain=(float) gain;
   fThreshold=(float) threshold;
 
-  i=0;
-  status =SetOpenCLKernelArg(unsharpMaskKernel,i++,sizeof(cl_mem),(void *)&imageBuffer);
-  status|=SetOpenCLKernelArg(unsharpMaskKernel,i++,sizeof(cl_uint),(void *)&number_channels);
-  status|=SetOpenCLKernelArg(unsharpMaskKernel,i++,sizeof(cl_int),&channel_mask);
-  status|=SetOpenCLKernelArg(unsharpMaskKernel,i++,sizeof(cl_mem),(void *)&imageKernelBuffer);
-  status|=SetOpenCLKernelArg(unsharpMaskKernel,i++,sizeof(cl_uint),(void *)&kernelWidth);
-  status|=SetOpenCLKernelArg(unsharpMaskKernel,i++,sizeof(cl_uint),(void *)&imageColumns);
-  status|=SetOpenCLKernelArg(unsharpMaskKernel,i++,sizeof(cl_uint),(void *)&imageRows);
-  status|=SetOpenCLKernelArg(unsharpMaskKernel,i++,sizeof(cl_float4)*(8 * (32 + kernelWidth)),(void *) NULL);
-  status|=SetOpenCLKernelArg(unsharpMaskKernel,i++,sizeof(float),(void *)&fGain);
-  status|=SetOpenCLKernelArg(unsharpMaskKernel,i++,sizeof(float),(void *)&fThreshold);
-  status|=SetOpenCLKernelArg(unsharpMaskKernel,i++,sizeof(cl_mem),(void *)&filteredImageBuffer);
+  {
+    const UnsharpMaskArgs args = { unsharpMaskKernel, imageBuffer,
+      number_channels, channel_mask, imageKernelBuffer, kernelWidth,
+      imageColumns, imageRows, fGain, fThreshold, filteredImageBuffer };
+
+    status=SetUnsharpMaskArgs(&args);
+  }
   if (status != CL_SUCCESS)
   {
     (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
