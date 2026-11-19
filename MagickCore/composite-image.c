@@ -90,6 +90,7 @@
 #include "MagickCore/version.h"
 #include "MagickCore/composite-row-private.h"
 #include "MagickCore/composite-channel-blend-private.h"
+#include "MagickCore/composite-channel-groups-private.h"
 #include "MagickCore/composite-channel-private.h"
 #include "MagickCore/composite-image-blend-private.h"
 #include "MagickCore/composite-image-over-private.h"
