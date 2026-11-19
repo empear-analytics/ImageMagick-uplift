@@ -1726,6 +1726,13 @@ static inline fxFltType GetFxModValue (fxFltType regA, fxFltType regB)
   return(regA);
 }
 
+static inline fxFltType GetFxTruncValue (fxFltType regA)
+{
+          if (regA >= 0) regA = floor ((double) regA);
+          else regA = ceil ((double) regA);
+  return(regA);
+}
+
 static inline MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *result,
   const fxPixelPosT * pos)
 {
@@ -2097,8 +2104,7 @@ static inline MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltTy
           regA = tan ((double) regA);
           break;
         case fTrunc:
-          if (regA >= 0) regA = floor ((double) regA);
-          else regA = ceil ((double) regA);
+          regA = GetFxTruncValue (regA);
           break;
 
         case fDo:
