@@ -725,6 +725,25 @@ static FxInfo *DestroyFxInfoOnFailure (FxInfo * pfx)
   return NULL;
 }
 
+static MagickBooleanType FinishFxTranslation (FxInfo * pfx, char chLimit)
+{
+  if (chLimit != '\0' && chLimit != ';') {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "AcquireFxInfo: TranslateExpression did not exhaust input", "(chLimit=%i) at'%s'",
+      (int)chLimit, pfx->pex);
+
+    return(MagickFalse);
+  }
+
+  if (IsStatisticsPending(pfx) != MagickFalse) {
+    if (!CollectStatistics (pfx)) {
+      return(MagickFalse);
+    }
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType TranslateFxExpression (FxInfo * pfx)
 {
   char chLimit;
@@ -743,21 +762,7 @@ static MagickBooleanType TranslateFxExpression (FxInfo * pfx)
     return(MagickFalse);
   }
 
-  if (chLimit != '\0' && chLimit != ';') {
-    (void) ThrowMagickException (
-      pfx->exception, GetMagickModule(), OptionError,
-      "AcquireFxInfo: TranslateExpression did not exhaust input", "(chLimit=%i) at'%s'",
-      (int)chLimit, pfx->pex);
-
-    return(MagickFalse);
-  }
-
-  if (IsStatisticsPending(pfx) != MagickFalse) {
-    if (!CollectStatistics (pfx)) {
-      return(MagickFalse);
-    }
-  }
-  return(MagickTrue);
+  return(FinishFxTranslation (pfx, chLimit));
 }
 
 static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expression,
