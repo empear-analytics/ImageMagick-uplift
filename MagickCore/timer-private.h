@@ -73,6 +73,25 @@ static inline MagickBooleanType IsImageTTLExpired(const Image* image)
   return(image->ttl < time((time_t *) NULL) ? MagickTrue : MagickFalse);
 }
 
+static inline time_t ScaleTimeToLiveByUnit(const char *q,time_t ttl)
+{
+  if (LocaleNCompare(q,"second",6) == 0)
+    ttl*=1;
+  if (LocaleNCompare(q,"minute",6) == 0)
+    ttl*=60;
+  if (LocaleNCompare(q,"hour",4) == 0)
+    ttl*=3600;
+  if (LocaleNCompare(q,"day",3) == 0)
+    ttl*=86400;
+  if (LocaleNCompare(q,"week",4) == 0)
+    ttl*=604800;
+  if (LocaleNCompare(q,"month",5) == 0)
+    ttl*=2628000;
+  if (LocaleNCompare(q,"year",4) == 0)
+    ttl*=31536000;
+  return(ttl);
+}
+
 static inline time_t ParseMagickTimeToLive(const char *time_to_live)
 {
   char
@@ -89,20 +108,7 @@ static inline time_t ParseMagickTimeToLive(const char *time_to_live)
     {
       while (isspace((int) ((unsigned char) *q)) != 0)
         q++;
-      if (LocaleNCompare(q,"second",6) == 0)
-        ttl*=1;
-      if (LocaleNCompare(q,"minute",6) == 0)
-        ttl*=60;
-      if (LocaleNCompare(q,"hour",4) == 0)
-        ttl*=3600;
-      if (LocaleNCompare(q,"day",3) == 0)
-        ttl*=86400;
-      if (LocaleNCompare(q,"week",4) == 0)
-        ttl*=604800;
-      if (LocaleNCompare(q,"month",5) == 0)
-        ttl*=2628000;
-      if (LocaleNCompare(q,"year",4) == 0)
-        ttl*=31536000;
+      ttl=ScaleTimeToLiveByUnit(q,ttl);
    }
   return(ttl);
 }
