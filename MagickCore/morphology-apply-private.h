@@ -59,6 +59,15 @@ static inline void RotateKernelRingBy45Degrees(KernelInfo *kernel)
   kernel->values[1] = t;
 }
 
+typedef struct _KernelRotation
+{
+  KernelInfo
+    *kernel;
+
+  double
+    angle;
+} KernelRotation;
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -89,8 +98,14 @@ static inline void RotateKernelRingBy45Degrees(KernelInfo *kernel)
 % This function is currently internal to this module only, but can be exported
 % to other modules if needed.
 */
-static inline double RotateKernelBy45Degrees(KernelInfo *kernel,double angle)
+static inline double RotateKernelBy45Degrees(const KernelRotation *rotation)
 {
+  KernelInfo
+    *const kernel = rotation->kernel;
+
+  double
+    angle = rotation->angle;
+
   /* Rotate a 3x3 square by 45 degree angle */
   RotateKernelRingBy45Degrees(kernel);
   /* rotate non-centered origin */
@@ -206,7 +221,12 @@ static inline double AttemptKernelRotationBy45Degrees(KernelInfo *kernel,
   double angle)
 {
   if ( kernel->width == 3 && kernel->height == 3 )
-    angle=RotateKernelBy45Degrees(kernel,angle);
+    {
+      const KernelRotation
+        rotation = { kernel, angle };
+
+      angle=RotateKernelBy45Degrees(&rotation);
+    }
   else
     perror("Unable to rotate non-3x3 kernel by 45 degrees");
   return(angle);
