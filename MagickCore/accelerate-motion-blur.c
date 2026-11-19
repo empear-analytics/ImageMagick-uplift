@@ -1121,10 +1121,7 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
   void
     *filteredPixels;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceAccelerateImage(image);
 
   queue=NULL;
   image_view=NULL;
