@@ -89,10 +89,13 @@
 #include "MagickCore/utility-private.h"
 #include "MagickCore/version.h"
 #include "MagickCore/composite-row-private.h"
+#include "MagickCore/composite-channel-blend-private.h"
 #include "MagickCore/composite-channel-private.h"
 #include "MagickCore/composite-image-blend-private.h"
 #include "MagickCore/composite-image-over-private.h"
 #include "MagickCore/composite-image-virtual-private.h"
+#include "MagickCore/composite-image-alpha-coverage-private.h"
+#include "MagickCore/composite-image-alpha-private.h"
 #include "MagickCore/composite-image-coverage-private.h"
 
 static SegmentInfo RotateBlurAxes(const GeometryInfo geometry_info,

@@ -155,10 +155,13 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/composite.c \
   MagickCore/composite-image.c \
   MagickCore/composite.h \
+  MagickCore/composite-channel-blend-private.h \
   MagickCore/composite-channel-private.h \
   MagickCore/composite-image-blend-private.h \
   MagickCore/composite-image-over-private.h \
   MagickCore/composite-image-virtual-private.h \
+  MagickCore/composite-image-alpha-coverage-private.h \
+  MagickCore/composite-image-alpha-private.h \
   MagickCore/composite-image-coverage-private.h \
   MagickCore/composite-private.h \
   MagickCore/composite-row-private.h \
@@ -658,10 +661,13 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/compare-similarity-metric-private.h \
   MagickCore/compare-similarity-phase-private.h \
   MagickCore/compare-similarity-frequency-private.h \
+  MagickCore/composite-channel-blend-private.h \
   MagickCore/composite-channel-private.h \
   MagickCore/composite-image-blend-private.h \
   MagickCore/composite-image-over-private.h \
   MagickCore/composite-image-virtual-private.h \
+  MagickCore/composite-image-alpha-coverage-private.h \
+  MagickCore/composite-image-alpha-private.h \
   MagickCore/composite-image-coverage-private.h \
   MagickCore/composite-private.h \
   MagickCore/composite-row-private.h \

@@ -23393,6 +23393,12 @@ Form A also applies to a private header that a Recipe S split produced and that 
 *Lines of Code in a Single File* (`compare-similarity-private.h`): the split header is then
 the one file that includes the new header (the owner's 2026-11-16 ruling that a split product
 may be carved again, and the 2026-11-18 reading of a header that one file includes).
+It also applies to a header that this recipe produced and that only one `.c` file includes
+(`composite-channel-private.h`, Form B's product): the leading run after the header's
+`extern "C"` opener moves into the new header, and the `.c` file's include block names the
+new header on the line directly above the old one, so the include block keeps every
+`#include` and the translation unit has the same tokens in the same order (the `extern
+"C"` lines are empty in C); the `.c` file is then the one includer of both.
 
 **Not covered by:** Recipe S, which moves a public root into a new `.c` file and shares helpers
 through a header that two `.c` files include; here nothing public leaves and no second `.c`
@@ -24141,6 +24147,124 @@ take its command switch. Added by Claude Code (Claude Opus 5.5) under the mandat
 
 ---
 
+## Recipe IP - Pass the Input Struct in Place of Primitive Parameters Bound from It
+
+**Use when:** CodeScene reports *Primitive Obsession* on a file ("N % of all functions have
+primitive types as arguments": pointers to `double` and `char`, `double`, `ssize_t`,
+`size_t`), and a `static` function's primitive parameters receive, at every call, values
+that the caller holds in a struct it can pass instead: `distort-map-private.h`'s
+`PrintArcFX(coeff,image_gen)`, called only from `PrintRadialDistortFX`, which binds
+`coeff` and `image_gen` from the members of its `const DistortVerboseFX *fx`.
+
+**Not covered by:** Recipe B, whose *Use when* is *Excess Number of Function Arguments*
+and which builds a new struct per group (its *Existing input struct* form is this
+transformation for argument counts); Recipe DV, which drops a parameter `s->m` beside a
+parameter `s` (here the callee does not receive the struct); Recipe N, which extracts a
+block and creates its input struct.
+
+**How:**
+
+1. The function is `static`, defined in this file (or in a private header only one file
+   includes), never used through a function pointer. Its *group* is the parameters to be
+   replaced: every one of them has a member of the same name in one struct type `Name`
+   whose type converts to the parameter's type without a cast (`double *` to
+   `const double *`, `char *` to `const char *`, or the same type).
+2. Every call passes, for each parameter of the group, the value of that member of one
+   `Name` object, in one of two forms, checked by reading every call (`grep`):
+   (a) the caller is a helper that binds a `const` local of the member's name from
+   `name->member` of its own `const Name *name` parameter, and passes that local; or
+   (b) the caller holds a local `Name v` whose member it assigned from exactly the
+   identifier it passes (`v.coeff=coeff;`), and nothing writes that identifier or member
+   between the assignment and the call.
+3. Replace the group by one parameter `const Name *name` at the group's first position
+   (the other parameters keep their order). At the top of the body declare, for each
+   group parameter, a local of its old name and the parameter's type, initialised from
+   `name->member`; add a top-level `const` when the body never assigns it. Nothing else
+   in the body changes.
+4. At each call replace the group's arguments by `name` (form a) or `&v` (form b).
+5. A local of a caller that was bound only for the replaced arguments and is now unused is
+   deleted with its binding (Recipe DV step 3: `-Wunused-variable` shows it).
+6. One function per commit. Run `refactor_guard.py --calls` (no call appears or vanishes)
+   on the file and on every `.c` file that includes it, `tools/ci_warnings.sh` and
+   `tools/cxx_warnings.sh`, and the oracle on the function's cases; score the file and
+   every including `.c` file (neither may drop, or the chain was stub-probed first and its
+   last step raises the file).
+7. Typedef after the callee. When `Name`'s `typedef` stands below the callee in its file,
+   a commit of its own first moves the `typedef` (with its blank line), unchanged, to
+   directly above the first function that will name it, between two top-level items, in
+   no `#if` block, past no item that declares a name the `typedef` uses. Proof: every
+   `.c` file that includes the file, compiled with the file's text before and after the
+   move (`__LINE__`/`__FILE__` pinned, the oracle build's flags), gives an identical
+   object file; `Verified: guard`.
+
+**Why it behaves the same.** In form (a) the caller's local holds `name->member`, read once
+from a struct that nothing writes while the helpers run (the struct is the caller's
+caller's, filled before the call chain began); the callee reads the same member of the
+same object and gets the same value. In form (b) the member holds the value of the
+identifier, assigned with nothing writing either in between, so the callee's read of
+`v.member` gives the value the argument carried. Each local has the parameter's type, so
+every use in the body compiles to the same conversions; a parameter the body assigned
+(`coeff=(double *) RelinquishMagickMemory(coeff);`) becomes a non-`const` local that the
+body assigns as it assigned its parameter copy, which the caller never saw.
+
+**Before:** (`distort-map-private.h`)
+
+```c
+static void PrintArcFX(const double *coeff,const char *image_gen)
+{
+  ssize_t
+    i;
+...
+    case ArcDistortion:
+    {
+      PrintArcFX(coeff,image_gen);
+```
+
+**After:**
+
+```c
+static void PrintArcFX(const DistortVerboseFX *fx)
+{
+  const double
+    *const coeff = fx->coeff;
+
+  const char
+    *const image_gen = fx->image_gen;
+
+  ssize_t
+    i;
+...
+    case ArcDistortion:
+    {
+      PrintArcFX(fx);
+```
+
+**Careful:**
+
+- The struct's `typedef` must precede the callee. Step 7 moves it up; a type's place in
+  the translation unit does not reach the machine code (Recipe L's argument), and moving
+  it up only makes the name visible earlier, where no other declaration of that name
+  stands (the compiler refuses a clash).
+- A member whose type differs from the parameter's by more than an added `const` on the
+  pointee refuses the step: the local would need a cast.
+- The step trades primitive arguments for one struct pointer; it removes no argument
+  finding and may add none (a callee with five parameters after the step still has
+  *Excess Number of Function Arguments*).
+- The percentage counts arguments, not functions: replacing non-primitive parameters (an
+  `Image *`, a `MagickBooleanType`) by the struct raises it. Probe the chain first.
+
+**Evidence level:** oracle (the cases that reach the function), with `refactor_guard.py
+--calls` and steps 2 and 5 checked by reading; step 7's move: guard, with the identical
+objects of every including `.c` file.
+
+**Provenance:** 2026-11-19, from `distort-map-private.h` (campaign A, W45 round 32, lane c):
+*Primitive Obsession* at 52 %, held by the FX printers of `DistortImage`'s verbose output,
+which take `coeff`, `image_gen` and `lookup` one by one from callers that bind them from a
+`DistortVerboseFX`. A stub probe of eleven such steps: 9.68 to 10.0. Added by Claude Code
+(Claude Opus 5.5) under the mandate of 2026-10-24.
+
+---
+
 ---
 
 ## Catalogue changes
@@ -24662,3 +24786,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-18 | NEW | TT | Merge Twin Helpers Differing in an Element Type and a Constant Through a Source Struct: two one-caller `static` helpers that are one token sequence once variables are renamed, `sizeof(T)` and the type argument of a macro using it only as `sizeof` become roles, and at most two constant expressions become roles, merge into one function taking a `const` source struct (common members, the host pointer as `void *`, `aligned` evaluated by the caller from the verbatim macro call, the constants, `element_size`); each caller's FB-form fill supplies its values; a script checks that substituting them gives each copy's tokens. *Careful* gives the argument (a pure macro evaluated from the same pointer just before the call, the same `size_t` constant, the same flags and pointer) | `accelerate-histogram.c`'s `CreateHistogramBuffer` and `CreateEqualizeMapBuffer` (campaign A, W44 round 31 third batch, lane c): *Code Duplication* of the round-fourteen helper twins, differing in `cl_uint4`/`PixelPacket` and `CL_MEM_READ_WRITE`/`CL_MEM_READ_ONLY`, which Recipe D (one value) refuses; probe 7.73 to 8.22, the merged helper finding-free | mandate (2026-10-24) |
 | 2026-11-18 | NEW | GP | Move a Run of Guards Sharing One Exit into a Predicate: consecutive `if (Ai) X` with the same `X` (an exit) and side-effect-free conditions become `if (Pred(...) != MagickFalse) X`, the predicate returning `MagickTrue` at the first condition that holds, in order | `draw.c`'s `TraceMVGPrimitive` (round-rectangle and ellipse point checks, each `{ status=MagickFalse; break; }` out of a `switch`, which LB and V do not take); campaign B, M140 | mandate (2026-10-24) |
 | 2026-11-18 | NEW | KG | Replace a Character-Keyed Switch of Checked Calls by a Table of Calls: groups `if (F(args) == c) return(c); break;` over functions of a base signature and up to two sided signatures (one trailing enumeration constant) become a `static const` table of `{key, f, f1, f2, s1, s2}`, a lookup and a dispatch; the throwing `default:` stays, its macro's `break` leaving the loop only where the loop would end at once (step 6) | `draw.c`'s `TracePath` (twenty labels, three tracer signatures, `ThrowPointExpectedException` default); designed at the owner's request, campaign B, M140 | mandate (2026-10-24) |
+| 2026-11-19 | NEW | IP | Pass the Input Struct in Place of Primitive Parameters Bound from It: a `static` function's primitive parameters that every call fills from the members of one struct (a helper's `const` locals bound from `name->member`, or a local struct whose members the caller assigned from the passed identifiers) become one `const Name *name` parameter; the callee binds locals of the old names and types from the members | `distort-map-private.h` (campaign A, W45 round 32, lane c): *Primitive Obsession* (52 %) held by `DistortImage`'s verbose FX printers, which take `coeff`, `image_gen` and `lookup` from callers binding them from a `DistortVerboseFX`; Recipe B names only argument counts. A stub probe of eleven steps: 9.68 to 10.0 | mandate (2026-10-24) |
+| 2026-11-19 | AMEND | OH | Form A also carves a header that Recipe OH produced and that one `.c` file includes: its leading run after the `extern "C"` opener moves into a new header, which the `.c` file's include block names directly above the old header (no `#include` outside an include block); the translation unit keeps its tokens and order | `composite-channel-private.h` (5.65; *Lines of Code in a Single File*, 1068 lines, and the `GetSoftBurnBlend`/`GetSoftDodgeBlend` duplication): a probe moving `GetColorDodgeBlend` to `GetPegtopLightBlend` gives 6.17 and a new header at 10.0 (campaign A, W45 round 32, lane c) | mandate (2026-10-24) |
