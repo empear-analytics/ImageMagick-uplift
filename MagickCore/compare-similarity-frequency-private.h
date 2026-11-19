@@ -1104,6 +1104,52 @@ static Image *SIMVarianceImage(Image *alpha_image,const Image *beta_image,
   return((Image *) NULL); \
 }
 
+typedef struct _DPCReconstructGradient
+{
+  Image
+    **magnitude_image,
+    **reconstruct_image,
+    **rx_image,
+    **ry_image;
+} DPCReconstructGradient;
+
+static MagickBooleanType AcquireDPCReconstructGradient(
+  const Image *reconstruct,ExceptionInfo *exception,
+  const DPCReconstructGradient *targets)
+{
+  Image
+    **const magnitude_image = targets->magnitude_image,
+    **const reconstruct_image = targets->reconstruct_image,
+    **const rx_image = targets->rx_image,
+    **const ry_image = targets->ry_image;
+
+  /*
+    Compute the cross correlation of the test and reconstruct magnitudes.
+  */
+  *reconstruct_image=CloneImage(reconstruct,0,0,MagickTrue,exception);
+  if (*reconstruct_image == (Image *) NULL)
+    return(MagickFalse);
+  /*
+    Compute X and Y derivatives of reference image.
+  */
+  (void) SetImageVirtualPixelMethod(*reconstruct_image,EdgeVirtualPixelMethod,
+    exception);
+  *rx_image=SIMDerivativeImage(*reconstruct_image,"Sobel",exception);
+  if (*rx_image == (Image *) NULL)
+    return(MagickFalse);
+  *ry_image=SIMDerivativeImage(*reconstruct_image,"Sobel:90",exception);
+  *reconstruct_image=DestroyImage(*reconstruct_image);
+  if (*ry_image == (Image *) NULL)
+    return(MagickFalse);
+  /*
+    Compute magnitude of derivatives.
+  */
+  *magnitude_image=SIMMagnitudeImage(*rx_image,*ry_image,exception);
+  if (*magnitude_image == (Image *) NULL)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
 {
@@ -1126,6 +1172,9 @@ static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
     *tx_image = (Image *) NULL,
     *ty_image = (Image *) NULL;
 
+  DPCReconstructGradient
+    reconstruct_gradient;
+
   MagickBooleanType
     status = MagickTrue;
 
@@ -1138,29 +1187,12 @@ static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
   target_image=CloneImage(image,0,0,MagickTrue,exception);
   if (target_image == (Image *) NULL)
     return((Image *) NULL);
-  /*
-    Compute the cross correlation of the test and reconstruct magnitudes.
-  */
-  reconstruct_image=CloneImage(reconstruct,0,0,MagickTrue,exception);
-  if (reconstruct_image == (Image *) NULL)
-    ThrowDPCSimilarityException();
-  /*
-    Compute X and Y derivatives of reference image.
-  */
-  (void) SetImageVirtualPixelMethod(reconstruct_image,EdgeVirtualPixelMethod,
-    exception);
-  rx_image=SIMDerivativeImage(reconstruct_image,"Sobel",exception);
-  if (rx_image == (Image *) NULL)
-    ThrowDPCSimilarityException();
-  ry_image=SIMDerivativeImage(reconstruct_image,"Sobel:90",exception);
-  reconstruct_image=DestroyImage(reconstruct_image);
-  if (ry_image == (Image *) NULL)
-    ThrowDPCSimilarityException();
-  /*
-    Compute magnitude of derivatives.
-  */
-  magnitude_image=SIMMagnitudeImage(rx_image,ry_image,exception);
-  if (magnitude_image == (Image *) NULL)
+  reconstruct_gradient.magnitude_image=(&magnitude_image);
+  reconstruct_gradient.reconstruct_image=(&reconstruct_image);
+  reconstruct_gradient.rx_image=(&rx_image);
+  reconstruct_gradient.ry_image=(&ry_image);
+  if (AcquireDPCReconstructGradient(reconstruct,exception,
+        &reconstruct_gradient) == MagickFalse)
     ThrowDPCSimilarityException();
   /*
     Compute an edge normalization correction.
