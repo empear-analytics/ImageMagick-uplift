@@ -1342,6 +1342,74 @@ static MagickBooleanType CorrelateDPCGradients(const double edge_factor,
   return(MagickTrue);
 }
 
+typedef struct _DPCDotProduct
+{
+  Image
+    **dot_product_image;
+
+  double
+    *maxima;
+
+  Image
+    **trx_image;
+} DPCDotProduct;
+
+static MagickBooleanType GetDPCMaxima(const Image *image,
+  RectangleInfo *offset,ExceptionInfo *exception,
+  const DPCDotProduct *targets)
+{
+  Image
+    **const dot_product_image = targets->dot_product_image;
+
+  double
+    *const maxima = targets->maxima;
+
+  Image
+    **const trx_image = targets->trx_image;
+
+  MagickBooleanType
+    status;
+
+  RectangleInfo
+    geometry;
+
+  /*
+    Crop results.
+  */
+  SetGeometry(image,&geometry);
+  geometry.width=image->columns;
+  geometry.height=image->rows;
+  (void) ResetImagePage(*trx_image,"0x0+0+0");
+  *dot_product_image=CropImage(*trx_image,&geometry,exception);
+  *trx_image=DestroyImage(*trx_image);
+  if (*dot_product_image == (Image *) NULL)
+    return(MagickFalse);
+  (void) ResetImagePage(*dot_product_image,"0x0+0+0");
+  /*
+    Identify the maxima value in the image and its location.
+  */
+  status=GrayscaleImage(*dot_product_image,AveragePixelIntensityMethod,
+    exception);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  (*dot_product_image)->depth=32;
+  (*dot_product_image)->colorspace=GRAYColorspace;
+  (*dot_product_image)->alpha_trait=UndefinedPixelTrait;
+  status=SIMFilterImageNaNs(*dot_product_image,exception);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  status=SIMMaximaImage(*dot_product_image,maxima,offset,exception);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  if ((QuantumScale*(*maxima)) > 1.0)
+    {
+      status=SIMMultiplyImage(*dot_product_image,1.0/(QuantumScale*
+        (*maxima)),(const ChannelStatistics *) NULL,exception);
+      *maxima=(double) QuantumRange;
+    }
+  return(MagickTrue);
+}
+
 static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
 {
@@ -1362,6 +1430,9 @@ static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
     *tx_image = (Image *) NULL,
     *ty_image = (Image *) NULL;
 
+  DPCDotProduct
+    dot_product;
+
   DPCEdgeCorrection
     edge_correction;
 
@@ -1379,12 +1450,6 @@ static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
   const DPCTargetUnitGradient
     target_unit = { &magnitude_image, &target_image, &trx_image, &try_image,
       &tx_image, &ty_image };
-
-  MagickBooleanType
-    status = MagickTrue;
-
-  RectangleInfo
-    geometry;
 
   /*
     Dot product correlation-based image similarity using FFT local statistics.
@@ -1413,40 +1478,11 @@ static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
   if (CorrelateDPCGradients(edge_factor,exception,&gradient_correlation) ==
       MagickFalse)
     ThrowDPCSimilarityException();
-  /*
-    Crop results.
-  */
-  SetGeometry(image,&geometry);
-  geometry.width=image->columns;
-  geometry.height=image->rows;
-  (void) ResetImagePage(trx_image,"0x0+0+0");
-  dot_product_image=CropImage(trx_image,&geometry,exception);
-  trx_image=DestroyImage(trx_image);
-  if (dot_product_image == (Image *) NULL)
+  dot_product.dot_product_image=(&dot_product_image);
+  dot_product.maxima=(&maxima);
+  dot_product.trx_image=(&trx_image);
+  if (GetDPCMaxima(image,offset,exception,&dot_product) == MagickFalse)
     ThrowDPCSimilarityException();
-  (void) ResetImagePage(dot_product_image,"0x0+0+0");
-  /*
-    Identify the maxima value in the image and its location.
-  */
-  status=GrayscaleImage(dot_product_image,AveragePixelIntensityMethod,
-    exception);
-  if (status == MagickFalse)
-    ThrowDPCSimilarityException();
-  dot_product_image->depth=32;
-  dot_product_image->colorspace=GRAYColorspace;
-  dot_product_image->alpha_trait=UndefinedPixelTrait;
-  status=SIMFilterImageNaNs(dot_product_image,exception);
-  if (status == MagickFalse)
-    ThrowDPCSimilarityException();
-  status=SIMMaximaImage(dot_product_image,&maxima,offset,exception);
-  if (status == MagickFalse)
-    ThrowDPCSimilarityException();
-  if ((QuantumScale*maxima) > 1.0)
-    {
-      status=SIMMultiplyImage(dot_product_image,1.0/(QuantumScale*maxima),
-        (const ChannelStatistics *) NULL,exception);
-      maxima=(double) QuantumRange;
-    }
   *similarity_metric=QuantumScale*maxima;
   return(dot_product_image);
 }
