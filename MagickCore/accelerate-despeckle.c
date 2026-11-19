@@ -412,6 +412,229 @@ static const int
   X[4] = {0, 1, 1,-1},
   Y[4] = {1, 0, 1, 1};
 
+typedef struct _DespeckleRunInput
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  cl_mem
+    imageBuffer,
+    *tempImageBuffer,
+    filteredImageBuffer;
+
+  void
+    *filteredPixels;
+
+  const Image
+    *image;
+} DespeckleRunInput;
+
+typedef struct _DespeckleRunTargets
+{
+  cl_kernel
+    *hullPass1,
+    *hullPass2;
+} DespeckleRunTargets;
+
+static MagickBooleanType RunDespeckleKernels(const DespeckleRunInput *run,
+  ExceptionInfo *exception,const DespeckleRunTargets *targets)
+{
+  const MagickCLEnv
+    clEnv = run->clEnv;
+
+  const MagickCLDevice
+    device = run->device;
+
+  const cl_command_queue
+    queue = run->queue;
+
+  cl_mem
+    imageBuffer = run->imageBuffer,
+    *const tempImageBuffer = run->tempImageBuffer,
+    filteredImageBuffer = run->filteredImageBuffer;
+
+  void
+    *const filteredPixels = run->filteredPixels;
+
+  const Image
+    *const image = run->image;
+
+  cl_kernel
+    *const hullPass1 = targets->hullPass1,
+    *const hullPass2 = targets->hullPass2;
+
+  cl_int
+    clStatus;
+
+  int
+    k,
+    matte;
+
+  size_t
+    global_work_size[2],
+    length;
+
+  unsigned int
+    imageHeight,
+    imageWidth;
+
+  *hullPass1 = AcquireOpenCLKernel(device,"HullPass1");
+  *hullPass2 = AcquireOpenCLKernel(device,"HullPass2");
+
+  clStatus =clEnv->library->clSetKernelArg(*hullPass1,0,sizeof(cl_mem),(void *)&imageBuffer);
+  clStatus |=clEnv->library->clSetKernelArg(*hullPass1,1,sizeof(cl_mem),(void *)(tempImageBuffer+1));
+  imageWidth = (unsigned int) image->columns;
+  clStatus |=clEnv->library->clSetKernelArg(*hullPass1,2,sizeof(unsigned int),(void *)&imageWidth);
+  imageHeight = (unsigned int) image->rows;
+  clStatus |=clEnv->library->clSetKernelArg(*hullPass1,3,sizeof(unsigned int),(void *)&imageHeight);
+  matte = (image->alpha_trait > CopyPixelTrait)?1:0;
+  clStatus |=clEnv->library->clSetKernelArg(*hullPass1,6,sizeof(int),(void *)&matte);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
+    return(MagickFalse);
+  }
+
+  clStatus = clEnv->library->clSetKernelArg(*hullPass2,0,sizeof(cl_mem),(void *)(tempImageBuffer+1));
+  clStatus |=clEnv->library->clSetKernelArg(*hullPass2,1,sizeof(cl_mem),(void *)tempImageBuffer);
+  imageWidth = (unsigned int) image->columns;
+  clStatus |=clEnv->library->clSetKernelArg(*hullPass2,2,sizeof(unsigned int),(void *)&imageWidth);
+  imageHeight = (unsigned int) image->rows;
+  clStatus |=clEnv->library->clSetKernelArg(*hullPass2,3,sizeof(unsigned int),(void *)&imageHeight);
+  matte = (image->alpha_trait > CopyPixelTrait)?1:0;
+  clStatus |=clEnv->library->clSetKernelArg(*hullPass2,6,sizeof(int),(void *)&matte);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
+    return(MagickFalse);
+  }
+
+
+  global_work_size[0] = image->columns;
+  global_work_size[1] = image->rows;
+
+
+  for (k = 0; k < 4; k++)
+  {
+    cl_int2 offset;
+    int polarity;
+
+
+    offset.s[0] = X[k];
+    offset.s[1] = Y[k];
+    polarity = 1;
+    clStatus = clEnv->library->clSetKernelArg(*hullPass1,4,sizeof(cl_int2),(void *)&offset);
+    clStatus|= clEnv->library->clSetKernelArg(*hullPass1,5,sizeof(int),(void *)&polarity);
+    clStatus|=clEnv->library->clSetKernelArg(*hullPass2,4,sizeof(cl_int2),(void *)&offset);
+    clStatus|=clEnv->library->clSetKernelArg(*hullPass2,5,sizeof(int),(void *)&polarity);
+    if (clStatus != CL_SUCCESS)
+    {
+      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
+      return(MagickFalse);
+    }
+    {
+      const HullPassLaunch
+        launch = { clEnv, device, queue, *hullPass1, *hullPass2,
+          global_work_size };
+
+      if (EnqueueHullPasses(&launch,exception) == MagickFalse)
+        return(MagickFalse);
+    }
+
+    if (k == 0)
+      clStatus =clEnv->library->clSetKernelArg(*hullPass1,0,sizeof(cl_mem),(void *)(tempImageBuffer));
+    offset.s[0] = -X[k];
+    offset.s[1] = -Y[k];
+    polarity = 1;
+    clStatus = clEnv->library->clSetKernelArg(*hullPass1,4,sizeof(cl_int2),(void *)&offset);
+    clStatus|= clEnv->library->clSetKernelArg(*hullPass1,5,sizeof(int),(void *)&polarity);
+    clStatus|=clEnv->library->clSetKernelArg(*hullPass2,4,sizeof(cl_int2),(void *)&offset);
+    clStatus|=clEnv->library->clSetKernelArg(*hullPass2,5,sizeof(int),(void *)&polarity);
+    if (clStatus != CL_SUCCESS)
+    {
+      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
+      return(MagickFalse);
+    }
+    {
+      const HullPassLaunch
+        launch = { clEnv, device, queue, *hullPass1, *hullPass2,
+          global_work_size };
+
+      if (EnqueueHullPasses(&launch,exception) == MagickFalse)
+        return(MagickFalse);
+    }
+
+    offset.s[0] = -X[k];
+    offset.s[1] = -Y[k];
+    polarity = -1;
+    clStatus = clEnv->library->clSetKernelArg(*hullPass1,4,sizeof(cl_int2),(void *)&offset);
+    clStatus|= clEnv->library->clSetKernelArg(*hullPass1,5,sizeof(int),(void *)&polarity);
+    clStatus|=clEnv->library->clSetKernelArg(*hullPass2,4,sizeof(cl_int2),(void *)&offset);
+    clStatus|=clEnv->library->clSetKernelArg(*hullPass2,5,sizeof(int),(void *)&polarity);
+    if (clStatus != CL_SUCCESS)
+    {
+      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
+      return(MagickFalse);
+    }
+    {
+      const HullPassLaunch
+        launch = { clEnv, device, queue, *hullPass1, *hullPass2,
+          global_work_size };
+
+      if (EnqueueHullPasses(&launch,exception) == MagickFalse)
+        return(MagickFalse);
+    }
+
+    offset.s[0] = X[k];
+    offset.s[1] = Y[k];
+    polarity = -1;
+    clStatus = clEnv->library->clSetKernelArg(*hullPass1,4,sizeof(cl_int2),(void *)&offset);
+    clStatus|= clEnv->library->clSetKernelArg(*hullPass1,5,sizeof(int),(void *)&polarity);
+    clStatus|=clEnv->library->clSetKernelArg(*hullPass2,4,sizeof(cl_int2),(void *)&offset);
+    clStatus|=clEnv->library->clSetKernelArg(*hullPass2,5,sizeof(int),(void *)&polarity);
+
+    if (k == 3)
+      clStatus |=clEnv->library->clSetKernelArg(*hullPass2,1,sizeof(cl_mem),(void *)&filteredImageBuffer);
+
+    if (clStatus != CL_SUCCESS)
+    {
+      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
+      return(MagickFalse);
+    }
+    {
+      const HullPassLaunch
+        launch = { clEnv, device, queue, *hullPass1, *hullPass2,
+          global_work_size };
+
+      if (EnqueueHullPasses(&launch,exception) == MagickFalse)
+        return(MagickFalse);
+    }
+  }
+
+  if (ALIGNED(filteredPixels,CLPixelPacket))
+  {
+    length = image->columns * image->rows;
+    clEnv->library->clEnqueueMapBuffer(queue, filteredImageBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(CLPixelPacket), 0, NULL, NULL, &clStatus);
+  }
+  else
+  {
+    length = image->columns * image->rows;
+    clStatus = clEnv->library->clEnqueueReadBuffer(queue, filteredImageBuffer, CL_TRUE, 0, length * sizeof(CLPixelPacket), filteredPixels, 0, NULL, NULL);
+  }
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
   ExceptionInfo*exception)
 {
@@ -421,9 +644,6 @@ static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
 
   cl_command_queue
     queue=NULL;
-
-  cl_int
-    clStatus;
 
   cl_kernel
     hullPass1=NULL,
@@ -437,23 +657,11 @@ static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
   Image
     *filteredImage=NULL;
 
-  int
-    k,
-    matte;
-
   MagickBooleanType
     outputReady=MagickFalse;
 
   MagickCLDevice
     device;
-
-  size_t
-    global_work_size[2],
-    length;
-
-  unsigned int
-    imageHeight,
-    imageWidth;
 
   void
     *filteredPixels=NULL;
@@ -486,153 +694,16 @@ static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
       goto cleanup;
   }
 
-  hullPass1 = AcquireOpenCLKernel(device,"HullPass1");
-  hullPass2 = AcquireOpenCLKernel(device,"HullPass2");
-
-  clStatus =clEnv->library->clSetKernelArg(hullPass1,0,sizeof(cl_mem),(void *)&imageBuffer);
-  clStatus |=clEnv->library->clSetKernelArg(hullPass1,1,sizeof(cl_mem),(void *)(tempImageBuffer+1));
-  imageWidth = (unsigned int) image->columns;
-  clStatus |=clEnv->library->clSetKernelArg(hullPass1,2,sizeof(unsigned int),(void *)&imageWidth);
-  imageHeight = (unsigned int) image->rows;
-  clStatus |=clEnv->library->clSetKernelArg(hullPass1,3,sizeof(unsigned int),(void *)&imageHeight);
-  matte = (image->alpha_trait > CopyPixelTrait)?1:0;
-  clStatus |=clEnv->library->clSetKernelArg(hullPass1,6,sizeof(int),(void *)&matte);
-  if (clStatus != CL_SUCCESS)
   {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
-    goto cleanup;
-  }
+    const DespeckleRunInput
+      run = { clEnv, device, queue, imageBuffer, tempImageBuffer,
+        filteredImageBuffer, filteredPixels, image };
 
-  clStatus = clEnv->library->clSetKernelArg(hullPass2,0,sizeof(cl_mem),(void *)(tempImageBuffer+1));
-  clStatus |=clEnv->library->clSetKernelArg(hullPass2,1,sizeof(cl_mem),(void *)tempImageBuffer);
-  imageWidth = (unsigned int) image->columns;
-  clStatus |=clEnv->library->clSetKernelArg(hullPass2,2,sizeof(unsigned int),(void *)&imageWidth);
-  imageHeight = (unsigned int) image->rows;
-  clStatus |=clEnv->library->clSetKernelArg(hullPass2,3,sizeof(unsigned int),(void *)&imageHeight);
-  matte = (image->alpha_trait > CopyPixelTrait)?1:0;
-  clStatus |=clEnv->library->clSetKernelArg(hullPass2,6,sizeof(int),(void *)&matte);
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
-    goto cleanup;
-  }
+    const DespeckleRunTargets
+      runTargets = { &hullPass1, &hullPass2 };
 
-
-  global_work_size[0] = image->columns;
-  global_work_size[1] = image->rows;
-
-
-  for (k = 0; k < 4; k++)
-  {
-    cl_int2 offset;
-    int polarity;
-
-
-    offset.s[0] = X[k];
-    offset.s[1] = Y[k];
-    polarity = 1;
-    clStatus = clEnv->library->clSetKernelArg(hullPass1,4,sizeof(cl_int2),(void *)&offset);
-    clStatus|= clEnv->library->clSetKernelArg(hullPass1,5,sizeof(int),(void *)&polarity);
-    clStatus|=clEnv->library->clSetKernelArg(hullPass2,4,sizeof(cl_int2),(void *)&offset);
-    clStatus|=clEnv->library->clSetKernelArg(hullPass2,5,sizeof(int),(void *)&polarity);
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
+    if (RunDespeckleKernels(&run,exception,&runTargets) == MagickFalse)
       goto cleanup;
-    }
-    {
-      const HullPassLaunch
-        launch = { clEnv, device, queue, hullPass1, hullPass2,
-          global_work_size };
-
-      if (EnqueueHullPasses(&launch,exception) == MagickFalse)
-        goto cleanup;
-    }
-
-    if (k == 0)
-      clStatus =clEnv->library->clSetKernelArg(hullPass1,0,sizeof(cl_mem),(void *)(tempImageBuffer));
-    offset.s[0] = -X[k];
-    offset.s[1] = -Y[k];
-    polarity = 1;
-    clStatus = clEnv->library->clSetKernelArg(hullPass1,4,sizeof(cl_int2),(void *)&offset);
-    clStatus|= clEnv->library->clSetKernelArg(hullPass1,5,sizeof(int),(void *)&polarity);
-    clStatus|=clEnv->library->clSetKernelArg(hullPass2,4,sizeof(cl_int2),(void *)&offset);
-    clStatus|=clEnv->library->clSetKernelArg(hullPass2,5,sizeof(int),(void *)&polarity);
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
-      goto cleanup;
-    }
-    {
-      const HullPassLaunch
-        launch = { clEnv, device, queue, hullPass1, hullPass2,
-          global_work_size };
-
-      if (EnqueueHullPasses(&launch,exception) == MagickFalse)
-        goto cleanup;
-    }
-
-    offset.s[0] = -X[k];
-    offset.s[1] = -Y[k];
-    polarity = -1;
-    clStatus = clEnv->library->clSetKernelArg(hullPass1,4,sizeof(cl_int2),(void *)&offset);
-    clStatus|= clEnv->library->clSetKernelArg(hullPass1,5,sizeof(int),(void *)&polarity);
-    clStatus|=clEnv->library->clSetKernelArg(hullPass2,4,sizeof(cl_int2),(void *)&offset);
-    clStatus|=clEnv->library->clSetKernelArg(hullPass2,5,sizeof(int),(void *)&polarity);
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
-      goto cleanup;
-    }
-    {
-      const HullPassLaunch
-        launch = { clEnv, device, queue, hullPass1, hullPass2,
-          global_work_size };
-
-      if (EnqueueHullPasses(&launch,exception) == MagickFalse)
-        goto cleanup;
-    }
-
-    offset.s[0] = X[k];
-    offset.s[1] = Y[k];
-    polarity = -1;
-    clStatus = clEnv->library->clSetKernelArg(hullPass1,4,sizeof(cl_int2),(void *)&offset);
-    clStatus|= clEnv->library->clSetKernelArg(hullPass1,5,sizeof(int),(void *)&polarity);
-    clStatus|=clEnv->library->clSetKernelArg(hullPass2,4,sizeof(cl_int2),(void *)&offset);
-    clStatus|=clEnv->library->clSetKernelArg(hullPass2,5,sizeof(int),(void *)&polarity);
-
-    if (k == 3)
-      clStatus |=clEnv->library->clSetKernelArg(hullPass2,1,sizeof(cl_mem),(void *)&filteredImageBuffer);
-
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
-      goto cleanup;
-    }
-    {
-      const HullPassLaunch
-        launch = { clEnv, device, queue, hullPass1, hullPass2,
-          global_work_size };
-
-      if (EnqueueHullPasses(&launch,exception) == MagickFalse)
-        goto cleanup;
-    }
-  }
-
-  if (ALIGNED(filteredPixels,CLPixelPacket))
-  {
-    length = image->columns * image->rows;
-    clEnv->library->clEnqueueMapBuffer(queue, filteredImageBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(CLPixelPacket), 0, NULL, NULL, &clStatus);
-  }
-  else
-  {
-    length = image->columns * image->rows;
-    clStatus = clEnv->library->clEnqueueReadBuffer(queue, filteredImageBuffer, CL_TRUE, 0, length * sizeof(CLPixelPacket), filteredPixels, 0, NULL, NULL);
-  }
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
-    goto cleanup;
   }
 
   outputReady=SyncCacheViewAuthenticPixels(filteredImage_view,exception);
