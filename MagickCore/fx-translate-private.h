@@ -193,17 +193,14 @@ typedef struct _OperatorFlags
     *IncrDecr;
 } OperatorFlags;
 
-static MagickBooleanType GetExpressionOperator (FxInfo * pfx,
+static MagickBooleanType CheckAssignmentOperator (FxInfo * pfx,
   const MagickBooleanType UserSymbol, const MagickBooleanType NewUserSymbol,
   const OperatorFlags * targets)
 {
   MagickBooleanType
     *const Assign = targets->Assign,
-    *const Update = targets->Update,
-    *const IncrDecr = targets->IncrDecr;
+    *const Update = targets->Update;
 
-    if (!GetOperator (pfx, Assign, Update, IncrDecr)) return MagickFalse;
-    SkipSpaces (pfx);
     if (NewUserSymbol && !*Assign) {
       (void) ThrowMagickException (
         pfx->exception, GetMagickModule(), OptionError,
@@ -226,6 +223,20 @@ static MagickBooleanType GetExpressionOperator (FxInfo * pfx,
       return MagickFalse;
     }
   return(MagickTrue);
+}
+
+static MagickBooleanType GetExpressionOperator (FxInfo * pfx,
+  const MagickBooleanType UserSymbol, const MagickBooleanType NewUserSymbol,
+  const OperatorFlags * targets)
+{
+  MagickBooleanType
+    *const Assign = targets->Assign,
+    *const Update = targets->Update,
+    *const IncrDecr = targets->IncrDecr;
+
+    if (!GetOperator (pfx, Assign, Update, IncrDecr)) return MagickFalse;
+    SkipSpaces (pfx);
+  return(CheckAssignmentOperator (pfx, UserSymbol, NewUserSymbol, targets));
 }
 
 typedef struct _OperandTargets
