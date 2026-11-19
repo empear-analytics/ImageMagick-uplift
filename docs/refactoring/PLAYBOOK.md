@@ -25300,6 +25300,97 @@ for the owner's confirmation.
 
 ---
 
+## Recipe XE - Unwrap the Else of an If That Leaves
+
+**Use when:** CodeScene reports *Large Method* (or *Bumpy Road Ahead*, *Deep, Nested
+Complexity*) on a function in which an `if` whose body leaves the enclosing statement on
+every path is followed by an `else` holding the rest of that statement's work in braces:
+`if (C) break; else { S }`. The `else`, its braces and one indent level carry nothing: control
+reaches `S` only when `C` is false either way. `accelerate-resize.c`'s `RunResizeFilterPass`,
+whose local-memory loop ends `if (total <= limit) break; else { halve the sizes; if (either
+is 0) { return(MagickFalse); } }`, is 72 lines, two over the threshold.
+
+**Not covered by:** Recipe EJ, whose `else` holds exactly one `if` statement and joins it
+as `else if` (here the `else` holds several statements); Recipe EI, which chains exiting
+`if` statements into an `else`-`if` ladder (the opposite direction); Recipe G, which inverts
+a condition around a body; Recipe TC, which drops a trailing `continue`; Recipe UX, which
+splits a `||` guard. No recipe removes an `else` whose `if` leaves.
+
+**How:**
+
+1. Find `if (C) X else S` outside every OpenMP region, with no `#` line between `if` and
+   the end of `S`. `X` is one statement, braced or not, that leaves on every path: `break;`
+   or `continue;` of the loop or `switch` that encloses the whole `if` statement,
+   `return(...)`, or `goto`. `S` is a compound statement `{ ... }` (or one statement)
+   that declares nothing at its top level and holds no label.
+2. The `if` statement is the last statement of its block, or the statements after it are
+   unaffected (they run after `S` as before, and after `X` never, since `X` leaves).
+3. Delete the `else` line and `S`'s outer braces; `S`'s statements stand directly after the
+   `if` statement, each line one indent level less, their text unchanged.
+4. Run `sh tools/obj_identical.sh <file>` (`WIDE=1` for a wide-build file): it must print
+   `IDENTICAL`; otherwise revert the step. `refactor_guard.py` and `--calls` unchanged.
+
+**Before:**
+
+```c
+    if (totalLocalMemorySize <= pass->device->local_memory_size)
+      break;
+    else
+    {
+      pixelPerWorkgroup=pixelPerWorkgroup/2;
+      chunkSize=chunkSize/2;
+      if ((pixelPerWorkgroup == 0) || (chunkSize == 0))
+      {
+        /* quit, fallback to CPU */
+        return(MagickFalse);
+      }
+    }
+  }
+```
+
+**After:**
+
+```c
+    if (totalLocalMemorySize <= pass->device->local_memory_size)
+      break;
+    pixelPerWorkgroup=pixelPerWorkgroup/2;
+    chunkSize=chunkSize/2;
+    if ((pixelPerWorkgroup == 0) || (chunkSize == 0))
+    {
+      /* quit, fallback to CPU */
+      return(MagickFalse);
+    }
+  }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. When `C` holds, `X` runs and leaves, so nothing after the
+  `if` statement in that block runs, before or after the step. When `C` is false, the
+  original runs `S`, then whatever follows the `if` statement; the new code skips `X` and
+  runs `S`'s statements, which now follow it directly, then the same rest. `C` is evaluated
+  once either way.
+- `S` declares nothing at its top level (step 1): its declarations would otherwise move into
+  the enclosing block, widening their scope, and could follow a statement there
+  (`-Wdeclaration-after-statement`, the macOS CI job). Declarations in blocks nested inside
+  `S` move with those blocks, unchanged.
+- `X` must leave on every path: an `X` that could fall through would, after the step, be
+  followed by `S`, which it never was.
+- The step changes only lines and indentation; the object file proves the program is the
+  same.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
+`HEAD`, and `refactor_guard.py` literal and call counts unchanged.
+
+**Provenance:** 2026-11-19, from `accelerate-resize.c`'s `RunResizeFilterPass` (campaign A,
+W47 round 34, lane c, batch 3; OpenCL host code, wide build): *Large Method* at 72 lines,
+held since round 33 ("the local-memory loop"); the step makes it 69 lines and the file 9.30
+to 9.68 in a probe, `IDENTICAL` object code. Added by Claude Code (Claude Opus 5.5) under
+the mandate of 2026-11-19 (the owner's "New recipes are fine"), for the owner's
+confirmation.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -25851,3 +25942,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | AMEND | TB | *Inverted membership form*: the one group of labels returns `MagickFalse`, `d` is `MagickTrue` (a `break;` after the group's `return`, which no path reaches, goes with the `switch`), and the loop returns `MagickFalse` at a match; the function may be a `static inline` function of a private header, its table at file scope directly above it, when step 2 holds for every caller in the tree | `composite-private.h`'s `GetCompositeClipToSelf` (campaign A, W47 round 34, lane c; an upstream header worked under owner 2026-11-19 evening, PR #129 round-33 Q4): ten labels returning `MagickFalse`, cc 12, called once per `-compose` setting by `mogrify.c`, `operation.c` and `composite.c`; a probe 8.82 to 9.09 | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | GD | Step 1: an operand may be a conjunction of two comparisons in its own parentheses, with no call (a range test); its guard is `if (B1 && B2) X` with the conjunction's text, so `&&` stands only inside such a guard. *Careful*: the guard evaluates `B1`, then `B2` only when `B1` held, as the operand did inside the chain | `token-private.h`'s `IsUTFSpace` (campaign A, W47 round 34, lane c; an upstream header worked under owner 2026-11-19 evening, PR #129 round-33 Q4): twelve operands, two of them range conjunctions, cc 15, 13 complex conditional expressions; a probe 6.94 to 8.12 | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | GC | Step 1: one operand may be a disjunction of integer comparisons in its own parentheses, with no call; step 2 writes its inverse `!(Ai)`, the disjunction's text unchanged inside. Step 5: a `static inline` predicate of a private header that no file calls has no object code to compare; when it takes one `int`, reads nothing else and calls nothing, `tools/exhaustive_int_predicate.sh` (new) compares the committed and the new function on all 2^32 `int` values and must print `EQUIVALENT` | `token-private.h`'s `IsUTFValid` (campaign A, W47 round 34, lane c; an upstream header worked under owner 2026-11-19 evening, PR #129 round-33 Q4): four operands, one a range-exclusion disjunction, no caller in the tree; a probe 8.12 to 8.64; the tool's planted change of one operator prints `DIFFERENT at -2147483648` | mandate (2026-11-19) |
+| 2026-11-19 | NEW | XE | Unwrap the Else of an If That Leaves: `if (C) X else { S }`, `X` leaving on every path (`break`/`continue` of the enclosing loop or `switch`, `return`, `goto`), `S` declaring nothing at its top level and holding no label, becomes `if (C) X` followed by `S`'s statements one indent level less; proof `tools/obj_identical.sh` `IDENTICAL` | `accelerate-resize.c`'s `RunResizeFilterPass` (campaign A, W47 round 34, lane c; OpenCL host code, wide build): *Large Method* 72 lines, held since round 33; a probe 69 lines, the file 9.30 to 9.68, `IDENTICAL` | mandate (2026-11-19) |
