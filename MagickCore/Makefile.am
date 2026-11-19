@@ -258,6 +258,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/fx-private.h \
   MagickCore/fx-execute-private.h \
   MagickCore/fx-translate-rpn-private.h \
+  MagickCore/fx-translate-attributes-private.h \
   MagickCore/fx-translate-private.h \
   MagickCore/gem.c \
   MagickCore/gem.h \
@@ -708,6 +709,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/fx-private.h \
   MagickCore/fx-execute-private.h \
   MagickCore/fx-translate-rpn-private.h \
+  MagickCore/fx-translate-attributes-private.h \
   MagickCore/fx-translate-private.h \
   MagickCore/gem-private.h \
   MagickCore/geometry-private.h \
