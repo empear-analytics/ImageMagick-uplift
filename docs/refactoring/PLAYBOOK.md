@@ -24432,26 +24432,38 @@ after the run, in the cleanup chain).
 
 1. The function `F` has no OpenMP pragma. Each statement of the run is `v=c;` in `F`'s
    outermost compound statement (not inside a loop, a selection or a nested block), where
-   `v` is an automatic local declared in that same compound statement's declarations without
-   an initialiser (not a parameter, not `static`, not `volatile`, not an array), and `c` is
-   a constant: `NULL`, a cast `(T) NULL`, an enumeration constant (`MagickFalse`) or an
-   integer literal.
+   `v` is an automatic local declared in that same compound statement's declarations,
+   before the first statement of `F`, without an initialiser (not a parameter, not
+   `static`, not `volatile`, not an array), and `c` is a constant: `NULL`, a cast
+   `(T) NULL`, an enumeration constant (`MagickFalse`) or an integer literal.
 2. Nothing before the statement names `v`: no earlier statement, initialiser or macro
    argument of `F` reads, writes or takes the address of `v` (checked by `grep` over the
    lines between the declaration and the statement). No label stands between `F`'s opening
    brace and the statement, so no jump reaches a point between the declaration and the
-   assignment. The statement is `v`'s first assignment; later ones stay as they are.
+   assignment, and no `goto` stands before the run, so no path jumps from before the run to
+   code after it (a `return` before the run leaves `F` and is allowed). The declaration and
+   every statement of the run stand under the same preprocessor conditions: no `#if`,
+   `#ifdef`, `#else`, `#elif` or `#endif` line lies between the declaration and the run or
+   inside the run. The statement is `v`'s first assignment; later ones stay as they are.
 3. Append `=c`, without spaces, to `v`'s name in its declarator, the constant's text unchanged
    (`*image_view,` becomes `*image_view=NULL,`, `queue;` becomes `queue=NULL;`), and delete
-   the statement. Nothing else changes: no declaration moves, no other statement moves.
+   the statement. When the deleted run stood between two blank lines, delete one of them as
+   well, so that one blank line remains. Nothing else changes: no declaration moves, no
+   other statement moves.
 4. Every such statement of one function goes in one commit (one recipe, one function); the
    message lists the variables.
 5. Run `sh tools/obj_identical.sh <file>` (`WIDE=1` for a file only the wide build
    compiles): it must print `IDENTICAL`; otherwise revert. Run `tools/ci_warnings.sh` and
    `tools/cxx_warnings.sh` on the file (C++ refuses a `goto` that jumps over an initialised
-   declaration into its scope: step 2's declarations stand before every statement, so no
-   `goto` of `F` crosses them; the C++ check confirms it), `refactor_guard.py` (`OK`; with
-   `--calls`, no change), and the oracle on `F`'s cases when a case reaches it.
+   declaration into its scope: step 1's declarations stand before every statement, so no
+   `goto` of `F` crosses them; the C++ check confirms it). Where `tools/cxx_warnings.sh`
+   cannot run (it needs an `upstream/main` ref, absent in a clone without the `upstream`
+   remote) or its narrow configuration does not compile the code (OpenCL host code), run
+   `clang++ -x c++ -fsyntax-only` with `-Wall` and the configuration's flags
+   (`DEFS`, `CPPFLAGS`, `MAGICK_CFLAGS` of `build-oracle/cand-wide/Makefile`) on the file
+   as committed at `HEAD` and as changed: no diagnostic may be new. Then run
+   `refactor_guard.py` (`OK`; with `--calls`, no change), and the oracle on `F`'s cases
+   when a case reaches it.
 
 **Before:**
 
@@ -24467,6 +24479,8 @@ after the run, in the cleanup chain).
   queue=NULL;
   ...
   outputReady=MagickFalse;
+
+  {
 ```
 
 **After:**
@@ -24480,6 +24494,7 @@ after the run, in the cleanup chain).
   ...
   TraceAccelerateImage(image);
 
+  {
 ```
 
 **Careful:**
@@ -24491,6 +24506,14 @@ after the run, in the cleanup chain).
   enters the stretch between the declarations and the statement, so every read of `v` sees
   the value it saw before. The statements that ran between (a trace call, a `NULL` test of
   a parameter, an early `return`) do not name `v`.
+- The only path on which the two forms could differ is one that leaves the stretch before
+  the run and reaches code after it: a `goto` before the run to a label after it (a
+  `return` leaves `F`, and nothing of `F` runs after it). On such a path the old code read
+  an indeterminate value, which is undefined behaviour (C11 6.3.2.1p2, J.2), and the new
+  code would read `c`. Step 2 excludes any `goto` before the run, so no such path exists.
+- Step 2's preprocessor condition keeps the declaration and the statement in the same
+  configurations: an initialiser moved out from under an `#if` would run in a build where
+  the statement did not.
 - An early `return` before the old statement now leaves a local that was set; the value is
   never read, so nothing observable changes (and step 5's object comparison shows whether
   the compiler kept the store).
@@ -24510,7 +24533,9 @@ function's cases (wide for OpenCL host code) when a case reaches it.
 `MagickFalse` statements folded into their declarators leave 63 lines; a probe 9.30 to 9.68
 (only the MagickPrivate argument count of `AccelerateMotionBlurImage` left), `obj_identical.sh`
 `IDENTICAL` in the wide build. Added by Claude Code (Claude Opus 5.5) under the mandate of
-2026-10-24 and the owner's "New recipes are fine" of 2026-11-19.
+2026-11-19 (the owner's "New recipes are fine", PR #129 Q7). Amended the same day on review of
+batch 1 (same preprocessor conditions, declarations before the first statement, no `goto`
+before the run, one blank line kept, the C++ check in the wide configuration).
 
 ---
 
@@ -25044,4 +25069,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | WORDING | BP | Step 1 defines the group (a pointer with its scalars, or pointers that travel together, an `&v` of a plain local allowed); step 4 moves an `if` that tests the call, or a `return` of it, whole into the block (`8475fe80b`); *Careful* covers the pointer group | Review of batch 3 of W45 lane c: after `b1fafe29e` the name, step 1 and *Careful* still spoke of a pointer and its scalars only | after the fact |
 | 2026-11-19 | AMEND | IP | Step 2 (a) also counts a caller's non-`const` local bound from the member when every assignment to it stands in a block that leaves the function before any call of the step (`coeff` freed and `NULL` returned), and a local bound from a member of a `const` pointer local that is itself bound from `name->member` (`context->image`, `context = call->context`) | `distort-private.h` and `distort-linear-private.h` (9.68, *Primitive Obsession*): the coefficient generators pass `coeff`, `method` and members of `context` on to their setters; a stub probe of twelve BP/IP steps on `distort-private.h` gives 10.0 (campaign A, W45 round 32, lane c, batch 4) | mandate (2026-10-24) |
 | 2026-11-19 | WORDING | IP | Step 2 (a), second reading of `485b9c818`: the local bound through a `const` pointer local counts only when nothing writes that member, or the pointer member it is read through, between the caller's binding and the call | Review of batch 4 of W45 lane c: the reading's text left the no-write condition implicit (in the distort chain `context` and its members are written by nothing after `GenerateCoefficients` fills them) | after the fact |
-| 2026-11-19 | NEW | DI | Declare a Local with the Constant Its First Statement Assigns: a run of `v=c;` statements (`NULL`, `(T) NULL`, an enumeration constant, an integer literal) at the top level of a function body, each the first statement to name a local declared without an initialiser in the same block, with no label before it, becomes `=c` in the declarators; `obj_identical.sh` `IDENTICAL` is required. *Careful* gives the argument (C11 6.8p3 and 6.7.9p11; nothing reads the local before the old statement and no jump enters the stretch; C++ jumps stay within the scope) | `accelerate-motion-blur.c`'s `ComputeMotionBlurImage` (campaign A, W46 round 33, lane b): *Large Method* at 72 lines, nine `NULL`/`MagickFalse` statements; a probe 9.30 to 9.68, object code identical in the wide build | owner |
+| 2026-11-19 | NEW | DI | Declare a Local with the Constant Its First Statement Assigns: a run of `v=c;` statements (`NULL`, `(T) NULL`, an enumeration constant, an integer literal) at the top level of a function body, each the first statement to name a local declared without an initialiser in the same block, with no label before it, becomes `=c` in the declarators; `obj_identical.sh` `IDENTICAL` is required. *Careful* gives the argument (C11 6.8p3 and 6.7.9p11; nothing reads the local before the old statement and no jump enters the stretch; C++ jumps stay within the scope) | `accelerate-motion-blur.c`'s `ComputeMotionBlurImage` (campaign A, W46 round 33, lane b): *Large Method* at 72 lines, nine `NULL`/`MagickFalse` statements; a probe 9.30 to 9.68, object code identical in the wide build | mandate (2026-11-19) |
+| 2026-11-19 | AMEND | DI | Step 1: the local is declared before the first statement of the function; step 2: no `goto` before the run, and the declaration and the run under the same preprocessor conditions (no `#if`/`#else`/`#endif` between them or inside the run); step 3: one of the two blank lines around a deleted run goes too (After example fixed); step 5: `clang++ -x c++ -fsyntax-only` in the wide configuration where `tools/cxx_warnings.sh` cannot run; *Careful*: the one path that could differ (a `goto` before the run to code after it) read an indeterminate value, undefined behaviour, and is excluded | Review of batch 1 of W46 lane b (round 33): `46b516c37`, `1b3046a49`, `ebfa1ccfb` meet the amended steps (no `goto` or `#if` before their runs; the first left a doubled blank line, removed in a style commit) | after the fact |
