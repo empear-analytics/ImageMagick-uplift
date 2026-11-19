@@ -641,11 +641,22 @@ static MagickBooleanType TranslateStatementList (FxInfo * pfx, const char * strL
   return MagickTrue;
 }
 
+static void CollectAllImgStats (FxInfo * pfx, Image * img)
+{
+  size_t imgNum=0;
+
+  for (;;) {
+    pfx->statistics[imgNum] = CollectOneImgStats (pfx, img);
+
+    if (++imgNum == pfx->ImgListLen) break;
+    img = GetNextImageInList (img);
+    assert (img != (Image *) NULL);
+  }
+}
+
 static MagickBooleanType CollectStatistics (FxInfo * pfx)
 {
   Image * img = GetFirstImageInList (pfx->image);
-
-  size_t imgNum=0;
 
   pfx->statistics = (ChannelStatistics**) AcquireMagickMemory ((size_t) pfx->ImgListLen * sizeof (ChannelStatistics *));
   if (!pfx->statistics) {
@@ -656,13 +667,7 @@ static MagickBooleanType CollectStatistics (FxInfo * pfx)
     return MagickFalse;
   }
 
-  for (;;) {
-    pfx->statistics[imgNum] = CollectOneImgStats (pfx, img);
-
-    if (++imgNum == pfx->ImgListLen) break;
-    img = GetNextImageInList (img);
-    assert (img != (Image *) NULL);
-  }
+  CollectAllImgStats (pfx, img);
   pfx->GotStats = MagickTrue;
 
   return MagickTrue;
