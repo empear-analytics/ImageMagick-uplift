@@ -222,6 +222,76 @@ static MagickBooleanType EnqueueHullPasses(const HullPassLaunch *launch,
   return(MagickTrue);
 }
 
+typedef struct _DespeckleInputTargets
+{
+  MagickCLDevice
+    *device;
+
+  cl_command_queue
+    *queue;
+
+  CacheView
+    **image_view;
+
+  cl_mem
+    *imageBuffer;
+} DespeckleInputTargets;
+
+static MagickBooleanType AcquireDespeckleInput(MagickCLEnv clEnv,
+  const Image *image,ExceptionInfo *exception,
+  const DespeckleInputTargets *targets)
+{
+  MagickCLDevice
+    *const device = targets->device;
+
+  cl_command_queue
+    *const queue = targets->queue;
+
+  CacheView
+    **const image_view = targets->image_view;
+
+  cl_mem
+    *const imageBuffer = targets->imageBuffer;
+
+  cl_int
+    clStatus;
+
+  cl_mem_flags
+    mem_flags;
+
+  const void
+    *inputPixels;
+
+  size_t
+    length;
+
+  *device=RequestOpenCLDevice(clEnv);
+  if (*device == (MagickCLDevice) NULL)
+    return(MagickFalse);
+  *queue=AcquireOpenCLCommandQueue(*device);
+  if (*queue == (cl_command_queue) NULL)
+    return(MagickFalse);
+
+  *image_view=AcquireAuthenticCacheView(image,exception);
+  inputPixels=GetCacheViewAuthenticPixels(*image_view,0,0,image->columns,image->rows,exception);
+  if (inputPixels == (void *) NULL)
+  {
+    (void) OpenCLThrowMagickException(*device,exception,GetMagickModule(),CacheWarning,"UnableToReadPixelCache.","`%s'",image->filename);
+    return(MagickFalse);
+  }
+
+  mem_flags=GetInputBufferFlags(inputPixels);
+  /* create a CL buffer from image pixel buffer */
+  length = image->columns * image->rows;
+  *imageBuffer = clEnv->library->clCreateBuffer((*device)->context, mem_flags, length * sizeof(CLPixelPacket), (void*)inputPixels, &clStatus);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(*device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
   ExceptionInfo*exception)
 {
@@ -250,9 +320,6 @@ static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
     filteredImageBuffer=NULL,
     imageBuffer=NULL,
     tempImageBuffer[2];
-
-  const void
-    *inputPixels=NULL;
 
   Image
     *filteredImage=NULL;
@@ -285,29 +352,13 @@ static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
   tempImageBuffer[0]=NULL;
   tempImageBuffer[1]=NULL;
 
-  device=RequestOpenCLDevice(clEnv);
-  if (device == (MagickCLDevice) NULL)
-    goto cleanup;
-  queue=AcquireOpenCLCommandQueue(device);
-  if (queue == (cl_command_queue) NULL)
-    goto cleanup;
-
-  image_view=AcquireAuthenticCacheView(image,exception);
-  inputPixels=GetCacheViewAuthenticPixels(image_view,0,0,image->columns,image->rows,exception);
-  if (inputPixels == (void *) NULL)
   {
-    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),CacheWarning,"UnableToReadPixelCache.","`%s'",image->filename);
-    goto cleanup;
-  }
+    const DespeckleInputTargets
+      inputTargets = { &device, &queue, &image_view, &imageBuffer };
 
-  mem_flags=GetInputBufferFlags(inputPixels);
-  /* create a CL buffer from image pixel buffer */
-  length = image->columns * image->rows;
-  imageBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(CLPixelPacket), (void*)inputPixels, &clStatus);
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
-    goto cleanup;
+    if (AcquireDespeckleInput(clEnv,image,exception,&inputTargets) ==
+        MagickFalse)
+      goto cleanup;
   }
 
   mem_flags = CL_MEM_READ_WRITE;
