@@ -199,6 +199,37 @@ static MagickBooleanType CloseFunction (FxInfo * pfx, const char chLimit,
   return(CompleteFunction (pfx, &completion));
 }
 
+static MagickBooleanType CheckArgumentCountAndClose (FxInfo * pfx,
+  int FndArgs, char chLimit, const FunctionClosing *closing)
+{
+  const FunctionE
+    fe = closing->fe;
+
+  const char
+    *const funStr = closing->funStr;
+
+  const char
+    expChLimit = closing->expChLimit;
+
+  if (FndArgs > Functions[fe-(int) FirstFunc].number_args)
+  {
+    return (ReportTooManyArgs (pfx, fe, funStr, FndArgs));
+  }
+  if (FndArgs < Functions[fe-(int) FirstFunc].number_args) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "For function", "'%s' expected %i arguments, found too few (%i) at '%s'",
+      funStr, Functions[fe-(int) FirstFunc].number_args, FndArgs, SetShortExp(pfx));
+    return MagickFalse;
+  }
+  /* This is for "rand()" and similar. */
+  if ((IsNoArgsFunction(fe,FndArgs) != MagickFalse) &&
+      (ExpectNoArgsClose (pfx, expChLimit, &chLimit) == MagickFalse))
+    return MagickFalse;
+
+  return(CloseFunction (pfx, chLimit, closing));
+}
+
 static MagickBooleanType FinishFunctionArguments (FxInfo * pfx, int FndArgs,
   char chLimit, const FunctionClosing *closing)
 {
@@ -223,23 +254,7 @@ static MagickBooleanType FinishFunctionArguments (FxInfo * pfx, int FndArgs,
     FndArgs = AddDefaultArgs (pfx, fe, FndArgs);
   }
 
-  if (FndArgs > Functions[fe-(int) FirstFunc].number_args)
-  {
-    return (ReportTooManyArgs (pfx, fe, funStr, FndArgs));
-  }
-  if (FndArgs < Functions[fe-(int) FirstFunc].number_args) {
-    (void) ThrowMagickException (
-      pfx->exception, GetMagickModule(), OptionError,
-      "For function", "'%s' expected %i arguments, found too few (%i) at '%s'",
-      funStr, Functions[fe-(int) FirstFunc].number_args, FndArgs, SetShortExp(pfx));
-    return MagickFalse;
-  }
-  /* This is for "rand()" and similar. */
-  if ((IsNoArgsFunction(fe,FndArgs) != MagickFalse) &&
-      (ExpectNoArgsClose (pfx, expChLimit, &chLimit) == MagickFalse))
-    return MagickFalse;
-
-  return(CloseFunction (pfx, chLimit, closing));
+  return(CheckArgumentCountAndClose (pfx, FndArgs, chLimit, closing));
 }
 
 typedef struct _ArgumentCount
