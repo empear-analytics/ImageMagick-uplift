@@ -13311,6 +13311,10 @@ which spreads a guard over tests inside it; Recipe CN, which combines two nested
    its body is the one statement `return(T);` (braces or none), and the next statement is the
    function's last, `return(F);`, `T` and `F` constants (an enumeration constant or a literal;
    `return T;` written alike). Nothing else stands between them but comments and blank lines.
+   One operand may instead be a disjunction of comparisons of integers in its own
+   parentheses, with no call (`((code < 0xd800) || (code > 0xdfff))`, a test outside a range)
+   (2026-11-19): step 2 writes its inverse `!(Ai)`, so its guard is `if (!(B1 || B2))`, the
+   disjunction's text unchanged inside.
 2. Write the inverse `Ai'` of each operand as Recipe G's *Careful* says: `==` becomes `!=`, `!=`
    becomes `==`, `<` becomes `>=` (and so on) for integer, pointer and enumeration operands; an
    operand that compares a `double`, `float` or `MagickRealType` is written `!(Ai)` (a NaN makes
@@ -13325,6 +13329,10 @@ which spreads a guard over tests inside it; Recipe CN, which combines two nested
    one call), then `WIDE=1 sh tools/obj_modulo.sh <file> <Function> <Function>` for a
    wide-build file (or `tools/obj_identical.sh <file>` for a narrow one): `IDENTICAL` or
    `MODULO-IDENTICAL`; anything else reverts the step.
+   A `static inline` predicate of a private header that no file in the tree calls has no
+   object code to compare (2026-11-19): when it takes one `int` and reads nothing else and
+   calls nothing, `sh tools/exhaustive_int_predicate.sh <header> <Function>` compares the
+   committed and the new function on all 2^32 `int` values and must print `EQUIVALENT`.
 
 **Before:**
 
@@ -13370,6 +13378,11 @@ takes a `MagickCLDeviceBenchmark`, a struct of another type) are the file's only
 Conditional* functions; one of them as guards: 6.33 to 6.83, both: 7.36 (the category leaves;
 the twins read alike and stay no clone finding). Added by Claude Code (Claude Sonnet 5.5)
 under the owner's OK of 2026-11-10 to evolve the recipes.
+The disjunction operand and the exhaustive check: 2026-11-19, from `token-private.h`'s
+`IsUTFValid` (an upstream header worked under owner 2026-11-19 evening, PR #129 round-33 Q4;
+four operands, one of them `((code < 0xd800) || (code > 0xdfff))`; no caller in the tree),
+campaign A, W47 lane c; a probe 8.12 to 8.64. Added by Claude Code (Claude Opus 5.5) under
+the mandate of 2026-11-19.
 
 ---
 
@@ -13394,6 +13407,10 @@ guard over tests inside it.
    none. `X` may instead be `break;` or `continue;` (2026-11-13): every guard of step 2 stands
    where the `if` stood, inside the same loops and `switch`es, so each leaves the same statement
    the original's `X` left.
+   An operand may instead be a conjunction of two comparisons in its own parentheses, with no
+   call in it (`((code >= 0x0009) && (code <= 0x000d))`, a range test) (2026-11-19): its guard
+   is `if (B1 && B2) X` with the conjunction's text, the outer parentheses gone, so that `&&`
+   stands only inside such a guard, never in the original's chain.
 2. Write one guard per operand, in the operands' order, each with the operand's text (the
    outer parentheses of the operand go) and `X` unchanged: `if (A1) X` `if (A2) X` ... `if (An) X`.
 3. Every such `if` of one function may go in one commit (one recipe, one function).
@@ -13429,7 +13446,9 @@ guard over tests inside it.
   first true operand; the guards test `A1`, `A2`, ... in the same order, and the first that holds
   runs `X` and leaves, so no later operand is evaluated, exactly as the short circuit. When none
   holds, nothing runs and control reaches the next statement. Each operand is evaluated at most
-  once, as before.
+  once, as before. A conjunction operand is one operand of the chain: its guard evaluates `B1`,
+  then `B2` only when `B1` held, exactly as the operand did inside the chain, and runs `X` when
+  both held, where the chain would have stopped true.
 - `X` is a bare `return`, `break` or `continue`: a guard that ran any statement before it would
   not be this recipe.
 
@@ -13447,6 +13466,12 @@ predicate is flat (3.19 to 3.19, with a new *Code Duplication* function), three 
 denominator; 4.60 to 4.72 in a probe. Added by Claude Code (Claude Opus 5.5) under the mandate
 of 2026-10-24.
 Lane: c
+
+Conjunction operands (2026-11-19, campaign A, W47 lane c): `token-private.h`'s `IsUTFSpace`, a
+twelve-operand `if (...) return(MagickTrue);` whose two range tests are conjunctions (13
+complex conditional expressions, cc 15, an upstream header worked under owner 2026-11-19
+evening, PR #129 round-33 Q4); a probe 6.94 to 8.12. Added by Claude Code (Claude Opus 5.5)
+under the mandate of 2026-11-19.
 
 ---
 
@@ -25824,3 +25849,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | AMEND | OH | Step 1, Form A: a `static` array of pointers to `const` data that no statement writes and whose only uses are rvalue subscripts may be in the run as a `static const` table is (its top-level qualifier is the only difference); internal linkage, initialiser and the one translation unit unchanged, step 4's pp and object identities still required | `fx.c` (campaign A, W47 round 34, lane b): the Form A run from the `#define` block through DumpUserSymbolValues holds `static const char * sElementTypes[]` (seven strings, read only in DumpRpnElement as `sElementTypes[pel->type]`); probe fx.c 9.09 to 10.0, header 9.09 | mandate (2026-11-19) |
 | 2026-11-19 | NEW | MD | Move a declared function's definition later in its file: an external definition declared in an included header moves unchanged to a later top-level position, so that an OH Form A run can end before it; split_branch_check IDENTICAL-MODULO-LAYOUT and sorted preprocessed lines equal | `fx.c` (campaign A, W47 round 34, lane b): review of batch 4 found `AcquireFxInfo` and `DestroyFxInfo` (MagickPrivate in `fx-private.h`, called from `property.c`) inside the run of `9f6e618fa` | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | TB | *Inverted membership form*: the one group of labels returns `MagickFalse`, `d` is `MagickTrue` (a `break;` after the group's `return`, which no path reaches, goes with the `switch`), and the loop returns `MagickFalse` at a match; the function may be a `static inline` function of a private header, its table at file scope directly above it, when step 2 holds for every caller in the tree | `composite-private.h`'s `GetCompositeClipToSelf` (campaign A, W47 round 34, lane c; an upstream header worked under owner 2026-11-19 evening, PR #129 round-33 Q4): ten labels returning `MagickFalse`, cc 12, called once per `-compose` setting by `mogrify.c`, `operation.c` and `composite.c`; a probe 8.82 to 9.09 | mandate (2026-11-19) |
+| 2026-11-19 | AMEND | GD | Step 1: an operand may be a conjunction of two comparisons in its own parentheses, with no call (a range test); its guard is `if (B1 && B2) X` with the conjunction's text, so `&&` stands only inside such a guard. *Careful*: the guard evaluates `B1`, then `B2` only when `B1` held, as the operand did inside the chain | `token-private.h`'s `IsUTFSpace` (campaign A, W47 round 34, lane c; an upstream header worked under owner 2026-11-19 evening, PR #129 round-33 Q4): twelve operands, two of them range conjunctions, cc 15, 13 complex conditional expressions; a probe 6.94 to 8.12 | mandate (2026-11-19) |
+| 2026-11-19 | AMEND | GC | Step 1: one operand may be a disjunction of integer comparisons in its own parentheses, with no call; step 2 writes its inverse `!(Ai)`, the disjunction's text unchanged inside. Step 5: a `static inline` predicate of a private header that no file calls has no object code to compare; when it takes one `int`, reads nothing else and calls nothing, `tools/exhaustive_int_predicate.sh` (new) compares the committed and the new function on all 2^32 `int` values and must print `EQUIVALENT` | `token-private.h`'s `IsUTFValid` (campaign A, W47 round 34, lane c; an upstream header worked under owner 2026-11-19 evening, PR #129 round-33 Q4): four operands, one a range-exclusion disjunction, no caller in the tree; a probe 8.12 to 8.64; the tool's planted change of one operator prints `DIFFERENT at -2147483648` | mandate (2026-11-19) |

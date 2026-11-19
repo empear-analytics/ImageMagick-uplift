@@ -49,10 +49,36 @@ extern MagickPrivate void
   XTextViewWidget(Display *,const XResourceInfo *,XWindows *,
     const MagickBooleanType,const char *,const char **);
 
-static inline void XTextViewHelp(Display *display,
-  const XResourceInfo *resource_info,XWindows *windows,
-  const MagickBooleanType mono,const char *title,const char *help)
+typedef struct _XHelpView
 {
+  Display
+    *display;
+
+  const XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  MagickBooleanType
+    mono;
+} XHelpView;
+
+static inline void XTextViewHelp(const XHelpView *view,const char *title,
+  const char *help)
+{
+  Display
+    *const display = view->display;
+
+  const XResourceInfo
+    *const resource_info = view->resource_info;
+
+  XWindows
+    *const windows = view->windows;
+
+  const MagickBooleanType
+    mono = view->mono;
+
   char
     **help_list;
 
