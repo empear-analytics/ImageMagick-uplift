@@ -405,8 +405,11 @@ static void XInfoHelpCommand(const AnimateCommandTile *tile,
       /*
         User requested help.
       */
-      XTextViewHelp(display,resource_info,windows,MagickFalse,
-        "Help Viewer - Animate",AnimateHelp);
+      {
+        const XHelpView view = { display, resource_info, windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Animate",AnimateHelp);
+      }
       break;
     }
     case BrowseDocumentationCommand:

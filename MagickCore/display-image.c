@@ -2696,9 +2696,12 @@ static void XAnnotatePointerCommand(const AnnotateContext *context,
     }
     case AnnotateHelpCommand:
     {
-      XTextViewHelp(context->display,context->resource_info,context->windows,
-        MagickFalse,
-        "Help Viewer - Image Annotation",ImageAnnotateHelp);
+      {
+        const XHelpView view = { context->display, context->resource_info,
+          context->windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Image Annotation",ImageAnnotateHelp);
+      }
       break;
     }
     case AnnotateDismissCommand:
@@ -2777,9 +2780,12 @@ static void XAnnotatePointerKey(const AnnotateContext *context,
     case XK_F1:
     case XK_Help:
     {
-      XTextViewHelp(context->display,context->resource_info,context->windows,
-        MagickFalse,
-        "Help Viewer - Image Annotation",ImageAnnotateHelp);
+      {
+        const XHelpView view = { context->display, context->resource_info,
+          context->windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Image Annotation",ImageAnnotateHelp);
+      }
       break;
     }
     default:
@@ -2924,9 +2930,12 @@ static void XAnnotateTextCommand(const AnnotateContext *context,
   {
     case TextHelpCommand:
     {
-      XTextViewHelp(context->display,context->resource_info,context->windows,
-        MagickFalse,
-        "Help Viewer - Image Annotation",ImageAnnotateHelp);
+      {
+        const XHelpView view = { context->display, context->resource_info,
+          context->windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Image Annotation",ImageAnnotateHelp);
+      }
       (void) XCheckDefineCursor(context->display,context->windows->image.id,
         context->cursor);
       break;
@@ -3928,8 +3937,11 @@ static size_t XChopKeyPress(const ChopEventInput *input,XEvent *event,
     {
       (void) XSetFunction(display,windows->image.highlight_context,
         GXcopy);
-      XTextViewHelp(display,resource_info,windows,MagickFalse,
-        "Help Viewer - Image Chop",ImageChopHelp);
+      {
+        const XHelpView view = { display, resource_info, windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Image Chop",ImageChopHelp);
+      }
       (void) XSetFunction(display,windows->image.highlight_context,
         GXinvert);
       break;
@@ -4052,8 +4064,12 @@ static MagickBooleanType XChopCommand(const ChopEventInput *input,XEvent *event,
         }
         case ChopHelpCommand:
         {
-          XTextViewHelp(display,resource_info,windows,MagickFalse,
-            "Help Viewer - Image Chop",ImageChopHelp);
+          {
+            const XHelpView view = { display, resource_info, windows,
+              MagickFalse };
+
+            XTextViewHelp(&view,"Help Viewer - Image Chop",ImageChopHelp);
+          }
           break;
         }
         case ChopDismissCommand:
@@ -5039,8 +5055,13 @@ static void XColorEditCommandAction(const ColorEditContext *context,
     case ColorEditHelpCommand:
     default:
     {
-      XTextViewHelp(context->display,context->resource_info,context->windows,
-        MagickFalse,"Help Viewer - Image Annotation",ImageColorEditHelp);
+      {
+        const XHelpView view = { context->display, context->resource_info,
+          context->windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Image Annotation",
+          ImageColorEditHelp);
+      }
       break;
     }
     case ColorEditDismissCommand:
@@ -5281,8 +5302,13 @@ static void XColorEditKey(const ColorEditContext *context,
     case XK_F1:
     case XK_Help:
     {
-      XTextViewHelp(context->display,context->resource_info,context->windows,
-        MagickFalse,"Help Viewer - Image Annotation",ImageColorEditHelp);
+      {
+        const XHelpView view = { context->display, context->resource_info,
+          context->windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Image Annotation",
+          ImageColorEditHelp);
+      }
       break;
     }
     default:
@@ -5774,8 +5800,11 @@ static void XCompositeControl(const CompositeCommandInput *input,const int id,
     {
       (void) XSetFunction(display,windows->image.highlight_context,
         GXcopy);
-      XTextViewHelp(display,resource_info,windows,MagickFalse,
-        "Help Viewer - Image Composite",ImageCompositeHelp);
+      {
+        const XHelpView view = { display, resource_info, windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Image Composite",ImageCompositeHelp);
+      }
       (void) XSetFunction(display,windows->image.highlight_context,
         GXinvert);
       break;
@@ -5930,8 +5959,11 @@ static void XCompositeKeyPress(const CompositeCommandInput *input,
     {
       (void) XSetFunction(display,windows->image.highlight_context,
         GXcopy);
-      XTextViewHelp(display,resource_info,windows,MagickFalse,
-        "Help Viewer - Image Composite",ImageCompositeHelp);
+      {
+        const XHelpView view = { display, resource_info, windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Image Composite",ImageCompositeHelp);
+      }
       (void) XSetFunction(display,windows->image.highlight_context,
         GXinvert);
       break;
@@ -6700,20 +6732,29 @@ static void XShowCropHelp(Display *display,XResourceInfo *resource_info,
   {
     case CopyMode:
     {
-      XTextViewHelp(display,resource_info,windows,MagickFalse,
-        "Help Viewer - Image Copy",ImageCopyHelp);
+      {
+        const XHelpView view = { display, resource_info, windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Image Copy",ImageCopyHelp);
+      }
       break;
     }
     case CropMode:
     {
-      XTextViewHelp(display,resource_info,windows,MagickFalse,
-        "Help Viewer - Image Crop",ImageCropHelp);
+      {
+        const XHelpView view = { display, resource_info, windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Image Crop",ImageCropHelp);
+      }
       break;
     }
     case CutMode:
     {
-      XTextViewHelp(display,resource_info,windows,MagickFalse,
-        "Help Viewer - Image Cut",ImageCutHelp);
+      {
+        const XHelpView view = { display, resource_info, windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Image Cut",ImageCutHelp);
+      }
       break;
     }
   }
@@ -7065,20 +7106,29 @@ static void XCropKeyHelp(Display *display,XResourceInfo *resource_info,
   {
     case CopyMode:
     {
-      XTextViewHelp(display,resource_info,windows,MagickFalse,
-        "Help Viewer - Image Copy",ImageCopyHelp);
+      {
+        const XHelpView view = { display, resource_info, windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Image Copy",ImageCopyHelp);
+      }
       break;
     }
     case CropMode:
     {
-      XTextViewHelp(display,resource_info,windows,MagickFalse,
-        "Help Viewer - Image Cropg",ImageCropHelp);
+      {
+        const XHelpView view = { display, resource_info, windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Image Cropg",ImageCropHelp);
+      }
       break;
     }
     case CutMode:
     {
-      XTextViewHelp(display,resource_info,windows,MagickFalse,
-        "Help Viewer - Image Cutg",ImageCutHelp);
+      {
+        const XHelpView view = { display, resource_info, windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Image Cutg",ImageCutHelp);
+      }
       break;
     }
   }
@@ -8601,8 +8651,11 @@ static void XDrawKeyPress(const DrawEditContext *context,
     case XK_F1:
     case XK_Help:
     {
-      XTextViewHelp(display,resource_info,windows,MagickFalse,
-        "Help Viewer - Image Rotation",ImageDrawHelp);
+      {
+        const XHelpView view = { display, resource_info, windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Image Rotation",ImageDrawHelp);
+      }
       break;
     }
     default:
@@ -9088,8 +9141,11 @@ static void XDrawCommandAction(const DrawEditContext *context,const int id,
     }
     case DrawHelpCommand:
     {
-      XTextViewHelp(display,resource_info,windows,MagickFalse,
-        "Help Viewer - Image Rotation",ImageDrawHelp);
+      {
+        const XHelpView view = { display, resource_info, windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Image Rotation",ImageDrawHelp);
+      }
       (void) XCheckDefineCursor(display,windows->image.id,cursor);
       break;
     }
@@ -14785,8 +14841,11 @@ static void XApplySessionCommands(const XMagickCommandContext *context,
       /*
         User requested help.
       */
-      XTextViewHelp(display,resource_info,windows,MagickFalse,
-        "Help Viewer - Display",DisplayHelp);
+      {
+        const XHelpView view = { display, resource_info, windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Display",DisplayHelp);
+      }
       break;
     }
     case BrowseDocumentationCommand:
@@ -16273,8 +16332,11 @@ static void XMatteEditControl(const MatteCommandInput *input,const int id,
     }
     case MatteEditHelpCommand:
     {
-      XTextViewHelp(display,resource_info,windows,MagickFalse,
-        "Help Viewer - Matte Edit",ImageMatteEditHelp);
+      {
+        const XHelpView view = { display, resource_info, windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Matte Edit",ImageMatteEditHelp);
+      }
       break;
     }
     case MatteEditDismissCommand:
@@ -16568,8 +16630,12 @@ static size_t XMatteKeyPress(const MatteCommandInput *input,XEvent *event,
     case XK_F1:
     case XK_Help:
     {
-      XTextViewHelp(display,input->resource_info,windows,MagickFalse,
-        "Help Viewer - Matte Edit",ImageMatteEditHelp);
+      {
+        const XHelpView view = { display, input->resource_info, windows,
+          MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Matte Edit",ImageMatteEditHelp);
+      }
       break;
     }
     default:
@@ -17441,8 +17507,12 @@ static MagickBooleanType XPasteCommand(const PasteCommandInput *input,
         }
         case PasteHelpCommand:
         {
-          XTextViewHelp(display,resource_info,windows,MagickFalse,
-            "Help Viewer - Image Composite",ImagePasteHelp);
+          {
+            const XHelpView view = { display, resource_info, windows,
+              MagickFalse };
+
+            XTextViewHelp(&view,"Help Viewer - Image Composite",ImagePasteHelp);
+          }
           break;
         }
         case PasteDismissCommand:
@@ -17650,8 +17720,11 @@ static void XPasteKeyPress(const PasteCommandInput *input,XEvent *event,
     {
       (void) XSetFunction(display,windows->image.highlight_context,
         GXcopy);
-      XTextViewHelp(display,resource_info,windows,MagickFalse,
-        "Help Viewer - Image Composite",ImagePasteHelp);
+      {
+        const XHelpView view = { display, resource_info, windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Image Composite",ImagePasteHelp);
+      }
       (void) XSetFunction(display,windows->image.highlight_context,
         GXinvert);
       break;
@@ -18346,8 +18419,11 @@ static void XROIDownHelpKey(const ROIKeyInput *key_input,
     {
       (void) XSetFunction(display,windows->image.highlight_context,
         GXcopy);
-      XTextViewHelp(display,resource_info,windows,MagickFalse,
-        "Help Viewer - Region of Interest",ImageROIHelp);
+      {
+        const XHelpView view = { display, resource_info, windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Region of Interest",ImageROIHelp);
+      }
       (void) XSetFunction(display,windows->image.highlight_context,
         GXinvert);
       break;
@@ -18723,6 +18799,9 @@ static void XROICommand(const ROICommandInput *command_input,XEvent *event,
   XWindows
     *const windows = command_input->windows;
 
+  const XHelpView
+    view = { display, resource_info, windows, MagickFalse };
+
   const RectangleInfo
     highlight_info = command_input->highlight_info;
 
@@ -18781,8 +18860,7 @@ static void XROICommand(const ROICommandInput *command_input,XEvent *event,
     {
       (void) XSetFunction(display,windows->image.highlight_context,
         GXcopy);
-      XTextViewHelp(display,resource_info,windows,MagickFalse,
-        "Help Viewer - Region of Interest",ImageROIHelp);
+      XTextViewHelp(&view,"Help Viewer - Region of Interest",ImageROIHelp);
       (void) XSetFunction(display,windows->image.highlight_context,
         GXinvert);
       return;
@@ -19056,8 +19134,12 @@ static void XROIPointerCommand(const ROIContext *context,
   {
     case ROIHelpCommand:
     {
-      XTextViewHelp(context->display,context->resource_info,context->windows,
-        MagickFalse,"Help Viewer - Region of Interest",ImageROIHelp);
+      {
+        const XHelpView view = { context->display, context->resource_info,
+          context->windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Region of Interest",ImageROIHelp);
+      }
       break;
     }
     case ROIDismissCommand:
@@ -19137,8 +19219,12 @@ static void XROIPointerKey(const ROIContext *context,
     case XK_F1:
     case XK_Help:
     {
-      XTextViewHelp(context->display,context->resource_info,context->windows,
-        MagickFalse,"Help Viewer - Region of Interest",ImageROIHelp);
+      {
+        const XHelpView view = { context->display, context->resource_info,
+          context->windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Region of Interest",ImageROIHelp);
+      }
       break;
     }
     default:
@@ -19870,8 +19956,11 @@ static void XRotateCommand(const RotateCommandInput *input,
     }
     case RotateHelpCommand:
     {
-      XTextViewHelp(display,resource_info,windows,MagickFalse,
-        "Help Viewer - Image Rotation",ImageRotateHelp);
+      {
+        const XHelpView view = { display, resource_info, windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Image Rotation",ImageRotateHelp);
+      }
       break;
     }
     case RotateDismissCommand:
@@ -19991,8 +20080,11 @@ static void XRotateKeyPress(const RotateKeyInput *key_input,
     {
       (void) XSetFunction(display,windows->image.highlight_context,
         GXcopy);
-      XTextViewHelp(display,resource_info,windows,MagickFalse,
-        "Help Viewer - Image Rotation",ImageRotateHelp);
+      {
+        const XHelpView view = { display, resource_info, windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Image Rotation",ImageRotateHelp);
+      }
       (void) XSetFunction(display,windows->image.highlight_context,
         GXinvert);
       break;
@@ -23991,8 +24083,11 @@ static void XPanWindowKeyPress(const DisplayEventContext *context,
       windows->pan.screen);
   else
     if ((key_symbol == XK_F1) || (key_symbol == XK_Help))
-      XTextViewHelp(display,resource_info,windows,MagickFalse,
-        "Help Viewer - Image Pan",ImagePanHelp);
+      {
+        const XHelpView view = { display, resource_info, windows, MagickFalse };
+
+        XTextViewHelp(&view,"Help Viewer - Image Pan",ImagePanHelp);
+      }
     else
       XTranslateImage(display,windows,*image,key_symbol);
 }
