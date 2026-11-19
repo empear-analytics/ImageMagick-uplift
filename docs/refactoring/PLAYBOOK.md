@@ -2026,7 +2026,15 @@ merges code, not parameters.
    with it). The initialiser is then evaluated directly before the one call with
    nothing between, which is step 4's condition for member accesses and casts; a
    dereference is read the same way, its target unchanged between the read and the
-   call. A second `static` function of the file whose group has the same names and
+   call. The block form also takes an initialiser of plain identifiers (the caller's own
+   locals and parameters), as Recipe BP step 4 writes it (2026-11-19,
+   `HistogramKernelLaunch`, `3aec3f0b4`). When step 1's header form changes a call
+   site inside a caller that no case reaches (`casemap.py` 0 for it and for each of its
+   callers), while the bundled function itself is reached through another includer,
+   that call site takes the checks of *Unreached functions: B and N* (items 1 to 4,
+   `obj_modulo.sh` run on that includer's object, the header placed as at `HEAD` on the
+   before side) and the commit message quotes them for that site; the reached sites keep
+   the oracle. A second `static` function of the file whose group has the same names and
    exact types as one an earlier step of this recipe bundled may take that `Name`
    rather than a second typedef repeating it member for member (Recipe N step 8's
    shared-typedef form).
@@ -24324,6 +24332,11 @@ parameter the callee can read from another.
    parameter's type without top-level `const` and its name, directly above the first
    function that will take it, outside every `#if` block (in the commit of the first step;
    later steps that take the same group reuse it, as Recipe N step 8's shared typedef).
+   When every function and call that will name the typedef stands inside one `#if` block
+   (a header's `#if defined(MAGICKCORE_OPENCL_SUPPORT)`), the typedef stands inside that
+   block, directly above the first function (2026-11-19, `opencl-environment-private.h`'s
+   `OpenCLCacheSearch`, `34c407ee8`): every configuration that compiles a user sees it,
+   and none that compiles no user gains a name.
 3. Replace the group by `const Name *name`. At the top of the body declare a local of each
    old name and parameter type, initialised from `name->member`, with a top-level `const`
    when the body never assigns it (a scalar the body updates, `angle = fmod(...)`, is a
@@ -24939,3 +24952,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | WORDING | BP | Step 1 defines the group (a pointer with its scalars, or pointers that travel together, an `&v` of a plain local allowed); step 4 moves an `if` that tests the call, or a `return` of it, whole into the block (`8475fe80b`); *Careful* covers the pointer group | Review of batch 3 of W45 lane c: after `b1fafe29e` the name, step 1 and *Careful* still spoke of a pointer and its scalars only | after the fact |
 | 2026-11-19 | AMEND | IP | Step 2 (a) also counts a caller's non-`const` local bound from the member when every assignment to it stands in a block that leaves the function before any call of the step (`coeff` freed and `NULL` returned), and a local bound from a member of a `const` pointer local that is itself bound from `name->member` (`context->image`, `context = call->context`) | `distort-private.h` and `distort-linear-private.h` (9.68, *Primitive Obsession*): the coefficient generators pass `coeff`, `method` and members of `context` on to their setters; a stub probe of twelve BP/IP steps on `distort-private.h` gives 10.0 (campaign A, W45 round 32, lane c, batch 4) | mandate (2026-10-24) |
 | 2026-11-19 | WORDING | IP | Step 2 (a), second reading of `485b9c818`: the local bound through a `const` pointer local counts only when nothing writes that member, or the pointer member it is read through, between the caller's binding and the call | Review of batch 4 of W45 lane c: the reading's text left the no-write condition implicit (in the distort chain `context` and its members are written by nothing after `GenerateCoefficients` fills them) | after the fact |
+| 2026-11-19 | AMEND | BP | Step 2: when every function and call that names the typedef stands inside one `#if` block, the typedef stands inside that block, directly above the first function | Review of W46 lane c batch 1: `OpenCLCacheSearch` (`34c407ee8`) and `HistogramKernelLaunch` (`3aec3f0b4`, a B step) sit in their headers' `MAGICKCORE_OPENCL_SUPPORT` blocks, where all their users are; "outside every `#if` block" read literally would put them where no user is compiled (campaign A) | mandate (2026-11-19) |
+| 2026-11-19 | AMEND | B | Step 5: the block form also takes an initialiser of plain identifiers, as BP step 4 does; a call site that step 1's header form changes inside an unreached caller, while the bundled function is reached through another includer, takes the checks of *Unreached functions: B and N* for that site, quoted in the message | Review of W46 lane c batch 1: `3aec3f0b4` (`LaunchHistogramKernel`) filled `{ clEnv, device, queue, imageBuffer, histogramBuffer }` in a block in the never-called `AccelerateContrastStretchImage` (guard, `obj_modulo` MODULO-IDENTICAL) and at the reached equalize site (oracle, object IDENTICAL) (campaign A) | mandate (2026-11-19) |
