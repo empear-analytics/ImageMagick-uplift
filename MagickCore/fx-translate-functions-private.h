@@ -594,11 +594,8 @@ static void SetLastElementChannel (FxInfo * pfx, PixelChannel chQual)
   pel->channel_qual = chQual;
 }
 
-static MagickBooleanType AddImgAttrOperand (FxInfo * pfx, ImgAttrE ia)
+static MagickBooleanType ApplyImgAttrQualifier (FxInfo * pfx, ImgAttrE ia)
 {
-  fxFltType val = 0;
-  (void) AddElement (pfx, val, (int) ia);
-
   if (ImgAttrs[ia-(int) FirstImgAttr].need_stats != MagickFalse) {
     if (IsQualifier (pfx)) {
       PixelChannel chQual = GetChannelQualifier (pfx, (int) ia);
@@ -614,6 +611,14 @@ static MagickBooleanType AddImgAttrOperand (FxInfo * pfx, ImgAttrE ia)
     }
   }
   return MagickTrue;
+}
+
+static MagickBooleanType AddImgAttrOperand (FxInfo * pfx, ImgAttrE ia)
+{
+  fxFltType val = 0;
+  (void) AddElement (pfx, val, (int) ia);
+
+  return(ApplyImgAttrQualifier (pfx, ia));
 }
 
 static MagickBooleanType AddArtifactOperand (FxInfo * pfx, const char * artifact)
