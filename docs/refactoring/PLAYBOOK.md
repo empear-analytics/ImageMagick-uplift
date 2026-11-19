@@ -23402,10 +23402,14 @@ new header on the line directly above the old one, so the include block keeps ev
 On such a header (a split or OH product) the recipe also takes *Overall Code Complexity*,
 when a probe of the carve leaves the header and the new header each at 10.0, or at least
 at the header's score before with a stub-probed chain ending at 10.0
-(`composite-image-coverage-private.h`, `layer-frames-private.h`). A split header that has
-an include block of its own (several `.c` files include it) names the new header as the
-last line of that block, before its `extern "C"` opener, and stays the new header's one
-includer. A `%` banner of a `static` function that stands in the run but documents a
+(`composite-image-coverage-private.h`, `layer-frames-private.h`). Where the new header is
+named depends on the carved header, not on how many files include it: a header that has
+an include block of its own (`layer-frames-private.h`, `distort-private.h`) names the new
+header as the last line of that block, before its `extern "C"` opener, and stays the new
+header's one includer, whether one `.c` file or several include it; a header without an
+include block (`composite-channel-private.h`, the composite-image headers) has its one
+`.c` includer name the new header in the `.c` file's include block, directly above the
+carved header. A `%` banner of a `static` function that stands in the run but documents a
 function that stays moves, unchanged, to directly above that function, as step 1 moves
 an external function's banner (comments are not tokens).
 
@@ -24803,3 +24807,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | AMEND | OH | Form A also carves a header that Recipe OH produced and that one `.c` file includes: its leading run after the `extern "C"` opener moves into a new header, which the `.c` file's include block names directly above the old header (no `#include` outside an include block); the translation unit keeps its tokens and order | `composite-channel-private.h` (5.65; *Lines of Code in a Single File*, 1068 lines, and the `GetSoftBurnBlend`/`GetSoftDodgeBlend` duplication): a probe moving `GetColorDodgeBlend` to `GetPegtopLightBlend` gives 6.17 and a new header at 10.0 (campaign A, W45 round 32, lane c) | mandate (2026-10-24) |
 | 2026-11-19 | AMEND | OH | On a split or OH-product header, Form A also takes *Overall Code Complexity* when the carve's probe leaves both headers at 10.0 (or at least the header's score, with a stub-probed chain ending at 10.0); a split header with its own include block names the new header as that block's last line; a `static` function's banner that stands in the run moves to stay above its function | `composite-image-coverage-private.h` (9.38, a two-carve chain to three headers at 10.0, `2ce6e70d4` and `f1ec40d41`, taken under the composite-channel amendment of the same day: written down after the fact) and `layer-frames-private.h` (9.38; a probe of the carve through `IsOverlayPixelChanged`: both 10.0) (campaign A, W45 round 32, lane c) | mandate (2026-10-24) |
 | 2026-11-19 | WORDING | IP | Step 5: a binding that the callee declared under step 3 and that a later step of the chain leaves unused is deleted too; a binding nothing reads is not declared (as `PrintBilinearForwardFX` lost `lookup` in `323ac63bd`) | Review of batch 1 of W45 lane c: the commits already did so; the step's text named only the caller's bindings | after the fact |
+| 2026-11-19 | WORDING | OH | The placement of the new header's `#include` depends on the carved header, not on its number of includers: a header with an include block of its own names the new header as that block's last line (also when one `.c` file includes it); a header without one has its one `.c` includer name the new header directly above it in the `.c` file's include block | Review of `e36bb7fc8` (W45 round 32): its text tied the header-block rule to several includers and left an OH product with one includer and an include block of its own between the two rules | after the fact |
