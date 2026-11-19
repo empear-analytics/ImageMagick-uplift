@@ -830,8 +830,7 @@ static MagickBooleanType TryLeadingOperand (FxInfo * pfx,
   return MagickFalse;
 }
 
-static MagickBooleanType TryFunctionOperand (FxInfo * pfx,
-  MagickBooleanType * needPopAll, MagickBooleanType * result)
+static FunctionE FindFunctionToken (FxInfo * pfx)
 {
   FunctionE fe;
   for (fe = FirstFunc; fe < fNull; fe=(FunctionE) (fe+1)) {
@@ -840,6 +839,14 @@ static MagickBooleanType TryFunctionOperand (FxInfo * pfx,
       break;
     }
   }
+  return(fe);
+}
+
+static MagickBooleanType TryFunctionOperand (FxInfo * pfx,
+  MagickBooleanType * needPopAll, MagickBooleanType * result)
+{
+  FunctionE fe;
+  fe=FindFunctionToken (pfx);
 
   if (fe == fV && pfx->ImgListLen < 2) {
     (void) ThrowMagickException (
