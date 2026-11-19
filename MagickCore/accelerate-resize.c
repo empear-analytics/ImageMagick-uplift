@@ -589,8 +589,9 @@ static MagickBooleanType RunResizeFilterKernel(
   return(MagickTrue);
 }
 
-static inline MagickBooleanType ResizeFilterImagePass(
-  const ResizeFilterRun *run,ExceptionInfo *exception)
+static MagickBooleanType RunResizeFilterPass(const ResizeFilterRun *run,
+  const unsigned int workgroupSize,ExceptionInfo *exception,
+  const ResizeFilterKernelTargets *passTargets)
 {
   const ResizeFilterSide
     side = run->side;
@@ -602,19 +603,16 @@ static inline MagickBooleanType ResizeFilterImagePass(
     factor = run->factor;
 
   cl_kernel
-    filterKernel;
+    *const filterKernel = passTargets->filterKernel;
 
-  const unsigned int
-    workgroupSize = 256;
+  MagickBooleanType
+    *const outputReady = passTargets->outputReady;
 
   float
     support;
 
   int
     numCachedPixels;
-
-  MagickBooleanType
-    outputReady;
 
   size_t
     gammaAccumulatorLocalMemorySize,
@@ -626,9 +624,6 @@ static inline MagickBooleanType ResizeFilterImagePass(
   unsigned int
     chunkSize,
     pixelPerWorkgroup;
-
-  filterKernel=NULL;
-  outputReady=MagickFalse;
 
   /*
   Apply filter to resize vertically from image to resize image.
@@ -671,7 +666,7 @@ RestoreMSCWarning
       if ((pixelPerWorkgroup == 0) || (chunkSize == 0))
       {
         /* quit, fallback to CPU */
-        goto cleanup;
+        return(MagickFalse);
       }
     }
   }
@@ -684,9 +679,35 @@ RestoreMSCWarning
         gammaAccumulatorLocalMemorySize, workgroupSize, run };
 
     const ResizeFilterKernelTargets
-      kernelTargets = { &filterKernel, &outputReady };
+      kernelTargets = { filterKernel, outputReady };
 
     if (RunResizeFilterKernel(&source,exception,&kernelTargets) ==
+        MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+static inline MagickBooleanType ResizeFilterImagePass(
+  const ResizeFilterRun *run,ExceptionInfo *exception)
+{
+  cl_kernel
+    filterKernel;
+
+  const unsigned int
+    workgroupSize = 256;
+
+  MagickBooleanType
+    outputReady;
+
+  filterKernel=NULL;
+  outputReady=MagickFalse;
+
+  {
+    const ResizeFilterKernelTargets
+      passTargets = { &filterKernel, &outputReady };
+
+    if (RunResizeFilterPass(run,workgroupSize,exception,&passTargets) ==
         MagickFalse)
       goto cleanup;
   }
