@@ -12364,6 +12364,14 @@ how an existing fill is rewritten. Recipe H, which moves preprocessor lines.
    preprocessor line lies inside the run or the call, and none moves.
 6. Run `sh tools/obj_identical.sh <file>`. It must print `IDENTICAL`; otherwise revert
    the step.
+   When the fill stands inside an OpenMP region or a per-pixel (or per-row) loop, the
+   oracle-flags `IDENTICAL` is not enough (2026-11-19): the region function must also be
+   identical instruction for instruction in the OpenMP -O2 build (`tools/omp_compare.sh
+   build`, its `*._omp_fn.N` disassembled base against candidate), or its callgrind Ir at
+   one thread equal or lower on a case that reaches it; otherwise revert the step. The two
+   builds lay out a `const` initialiser differently: `GetSSIMSimularity`'s `window` and
+   `sums` fills as initialisers were `IDENTICAL` under the oracle's flags and 0.06 % slower
+   in the region (Ir 465,895,903 to 466,177,503, `compare -metric SSIM`, 160x160).
 7. One function's fills, however many, go in one commit (one recipe, one function).
 
 **Before:**
@@ -12436,7 +12444,7 @@ geometry are written in the same loop body before each run. The file sits about 
 lines under *Lines of Code in a Single File*, which every extraction of the tile loop
 would otherwise cross. A probe of the three: `IDENTICAL` object code, 227 to 198 lines,
 8.72 to 8.86. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10
-to evolve the recipes.
+to evolve the recipes. Step 6's OpenMP -O2 condition: 2026-11-19, from that `GetSSIMSimularity` measurement (campaign A, W46 round 33, lane a, batch 3), added by Claude Code (Claude Opus 5.5) under the owner's general OK of 2026-11-19 ("New recipes are fine").
 
 ---
 
@@ -25070,3 +25078,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | WORDING | IP | Step 2 (a), second reading of `485b9c818`: the local bound through a `const` pointer local counts only when nothing writes that member, or the pointer member it is read through, between the caller's binding and the call | Review of batch 4 of W45 lane c: the reading's text left the no-write condition implicit (in the distort chain `context` and its members are written by nothing after `GenerateCoefficients` fills them) | after the fact |
 | 2026-11-19 | NEW | GL | Fold a Guard into the Lookup It Encloses, Returning NULL When It Fails: `if (G) { const T *v = L; if (v != NULL) { B } }` becomes `const T *v = Helper(...); if (v != NULL) { B }`, the helper returning `L` when `G` holds and `NULL` otherwise (with the statements that compute only `G`'s operands) | `compare-similarity-image.c`'s `SimilarityImage` (campaign A, W46 round 33, lane a): the frequency-domain dispatch is a bump and two decisions of a `MagickExport` function; E, P, CN and RV do not take it. Probe 8.51 to 8.54 | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | HN | Step 7: a self-guarded head (`v=Make(...); if (v == NULL) return(v);` then guards returning `Release(v)`, a routine that always returns `NULL`, with no `NULL` test of the caller after it) moves whole; the caller gets `v=Helper(...);` and a copy of the block's first guard. *Careful* gives the argument | `compare-similarity-frequency-images-private.h`'s `SIMUnityImage` (campaign A, W46 round 33, lane a): its clone and storage-class head returns `unity_image` and `DestroyImage(unity_image)`, neither one constant `R`, and has no trailing `v=Last(...)`; probe cc 10 to 9, 8.87 to 8.89 | mandate (2026-11-19) |
+| 2026-11-19 | AMEND | FB | Step 6: a fill inside an OpenMP region or a per-pixel or per-row loop also needs the region function identical in the OpenMP -O2 build, or its callgrind Ir at one thread equal or lower; the oracle-flags `IDENTICAL` alone does not cover it | `compare-similarity-private.h`'s `GetSSIMSimularity` (campaign A, W46 round 33, lane a): the `window` and `sums` fills as `const` initialisers were `IDENTICAL` under the oracle's flags but raised `GetSSIMSimularity._omp_fn.0` Ir from 465,895,903 to 466,177,503 (+0.06 %) in the OpenMP -O2 build | mandate (2026-11-19) |
