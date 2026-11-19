@@ -127,8 +127,6 @@ static inline EndianType GetHostEndian(void)
   return((*(char *) &lsb_first) == 1 ? LSBEndian : MSBEndian);
 }
 
-static inline float HalfToSinglePrecision(const unsigned short half)
-{
 #define ExponentBias  (127-15)
 #define ExponentMask  (0x7c00U)
 #define ExponentShift  23
@@ -136,6 +134,8 @@ static inline float HalfToSinglePrecision(const unsigned short half)
 #define SignificandShift  13
 #define SignificandMask  (0x00000400U)
 
+static inline float HalfToSinglePrecision(const unsigned short half)
+{
   typedef union _SinglePrecision
   {
     unsigned int
