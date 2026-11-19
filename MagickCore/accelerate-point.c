@@ -250,6 +250,23 @@ static MagickBooleanType SetFunctionKernelArgs(const FunctionKernelArgs *args,
   return(MagickTrue);
 }
 
+static MagickBooleanType EnqueueFunctionKernel(cl_command_queue queue,
+  cl_kernel functionKernel,Image *image,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    outputReady;
+
+  size_t
+    gsize[2];
+
+  gsize[0]=image->columns;
+  gsize[1]=image->rows;
+  outputReady=EnqueueOpenCLKernel(queue,functionKernel,2,(const size_t *) NULL,
+    gsize,(const size_t *) NULL,image,(const Image *) NULL,MagickFalse,
+    exception);
+  return(outputReady);
+}
+
 static MagickBooleanType ComputeFunctionImage(Image *image,MagickCLEnv clEnv,
   const MagickFunction function,const size_t number_parameters,
   const double *parameters,ExceptionInfo *exception)
@@ -282,9 +299,6 @@ static MagickBooleanType ComputeFunctionImage(Image *image,MagickCLEnv clEnv,
   MagickCLDevice
     device;
 
-  size_t
-    gsize[2];
-
   TraceAccelerateImage(image);
   
   queue=NULL;
@@ -315,11 +329,7 @@ static MagickBooleanType ComputeFunctionImage(Image *image,MagickCLEnv clEnv,
       goto cleanup;
   }
 
-  gsize[0]=image->columns;
-  gsize[1]=image->rows;
-  outputReady=EnqueueOpenCLKernel(queue,functionKernel,2,(const size_t *) NULL,
-    gsize,(const size_t *) NULL,image,(const Image *) NULL,MagickFalse,
-    exception);
+  outputReady=EnqueueFunctionKernel(queue,functionKernel,image,exception);
 
 cleanup:
 
