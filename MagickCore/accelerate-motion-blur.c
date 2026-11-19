@@ -724,29 +724,33 @@ static MagickBooleanType CreateMotionBlurOffsetBuffer(
   return(MagickTrue);
 }
 
-static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
-  const double *kernel,const size_t width,const OffsetInfo *offset,
-  ExceptionInfo *exception)
+typedef struct _MotionBlurInputTargets
 {
+  MagickCLDevice
+    *device;
+
   CacheView
-    *filteredImage_view,
-    *image_view;
-
-  cl_command_queue
-    queue;
-
-  cl_int
-    channel_mask=get32BitChannelValue(image->channel_mask),
-    clStatus;
-
-  cl_kernel
-    motionBlurKernel;
+    **image_view;
 
   cl_mem
-    filteredImageBuffer,
-    imageBuffer,
-    imageKernelBuffer,
-    offsetBuffer;
+    *imageBuffer;
+} MotionBlurInputTargets;
+
+static MagickBooleanType AcquireMotionBlurInput(MagickCLEnv clEnv,
+  const Image *image,ExceptionInfo *exception,
+  const MotionBlurInputTargets *inputTargets)
+{
+  MagickCLDevice
+    *const device = inputTargets->device;
+
+  CacheView
+    **const image_view = inputTargets->image_view;
+
+  cl_mem
+    *const imageBuffer = inputTargets->imageBuffer;
+
+  cl_int
+    clStatus;
 
   cl_mem_flags
     mem_flags;
@@ -754,48 +758,21 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
   const void
     *inputPixels;
 
-  Image
-    *filteredImage;
-
-  MagickBooleanType
-    outputReady;
-
-  MagickCLDevice
-    device;
-
   size_t
     length;
 
-  void
-    *filteredPixels;
-
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-
-  queue=NULL;
-  image_view=NULL;
-  filteredImage=NULL;
-  filteredImage_view=NULL;
-  imageBuffer=NULL;
-  filteredImageBuffer=NULL;
-  imageKernelBuffer=NULL;
-  motionBlurKernel=NULL;
-  outputReady=MagickFalse;
-
-  device=RequestOpenCLDevice(clEnv);
-  if (device == (MagickCLDevice) NULL)
-    goto cleanup;
+  *device=RequestOpenCLDevice(clEnv);
+  if (*device == (MagickCLDevice) NULL)
+    return(MagickFalse);
 
   /* Create and initialize OpenCL buffers. */
 
   {
     const MotionBlurViewTargets
-      targets = { &image_view, &inputPixels };
+      targets = { image_view, &inputPixels };
 
     if (AcquireMotionBlurPixels(image,exception,&targets) == MagickFalse)
-      goto cleanup;
+      return(MagickFalse);
   }
 
   /*
@@ -815,13 +792,74 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
     create a CL buffer from image pixel buffer
   */
   length = image->columns * image->rows;
-  imageBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags,
+  *imageBuffer = clEnv->library->clCreateBuffer((*device)->context, mem_flags,
     length * sizeof(CLPixelPacket), (void*)inputPixels, &clStatus);
   if (clStatus != CL_SUCCESS)
   {
     (void) ThrowMagickException(exception, GetMagickModule(),
       ResourceLimitError, "clEnv->library->clCreateBuffer failed.",".");
-    goto cleanup;
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
+  const double *kernel,const size_t width,const OffsetInfo *offset,
+  ExceptionInfo *exception)
+{
+  CacheView
+    *filteredImage_view,
+    *image_view;
+
+  cl_command_queue
+    queue;
+
+  cl_int
+    channel_mask=get32BitChannelValue(image->channel_mask);
+
+  cl_kernel
+    motionBlurKernel;
+
+  cl_mem
+    filteredImageBuffer,
+    imageBuffer,
+    imageKernelBuffer,
+    offsetBuffer;
+
+  Image
+    *filteredImage;
+
+  MagickBooleanType
+    outputReady;
+
+  MagickCLDevice
+    device;
+
+  void
+    *filteredPixels;
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+
+  queue=NULL;
+  image_view=NULL;
+  filteredImage=NULL;
+  filteredImage_view=NULL;
+  imageBuffer=NULL;
+  filteredImageBuffer=NULL;
+  imageKernelBuffer=NULL;
+  motionBlurKernel=NULL;
+  outputReady=MagickFalse;
+
+  {
+    const MotionBlurInputTargets
+      inputTargets = { &device, &image_view, &imageBuffer };
+
+    if (AcquireMotionBlurInput(clEnv,image,exception,&inputTargets) ==
+        MagickFalse)
+      goto cleanup;
   }
 
 
