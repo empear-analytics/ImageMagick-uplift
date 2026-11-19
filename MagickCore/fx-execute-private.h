@@ -1726,6 +1726,13 @@ static inline fxFltType GetFxModValue (fxFltType regA, fxFltType regB)
   return(regA);
 }
 
+static inline fxFltType GetFxClampValue (fxFltType regA)
+{
+          if (regA < 0) regA = 0.0;
+          else if (regA > 1.0) regA = 1.0;
+  return(regA);
+}
+
 static inline fxFltType GetFxTruncValue (fxFltType regA)
 {
           if (regA >= 0) regA = floor ((double) regA);
@@ -1976,8 +1983,7 @@ static inline MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltTy
           }
           break;
         case fClamp:
-          if (regA < 0) regA = 0.0;
-          else if (regA > 1.0) regA = 1.0;
+          regA = GetFxClampValue (regA);
           break;
         case fCosh:
           regA = cosh ((double) regA);
