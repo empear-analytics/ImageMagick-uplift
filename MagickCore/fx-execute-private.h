@@ -1716,6 +1716,16 @@ static inline MagickBooleanType IsAttrStatisticsChannel(
     MagickTrue : MagickFalse);
 }
 
+static inline fxFltType GetFxModValue (fxFltType regA, fxFltType regB)
+{
+          if (regB == 0) {
+            regA = 0;
+          } else {
+            regA = regA - floor((double) (regA/regB))*regB;
+          }
+  return(regA);
+}
+
 static inline MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *result,
   const fxPixelPosT * pos)
 {
@@ -2044,11 +2054,7 @@ static inline MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltTy
           regA = (regA < regB) ? regA : regB;
           break;
         case fMod:
-          if (regB == 0) {
-            regA = 0;
-          } else {
-            regA = regA - floor((double) (regA/regB))*regB;
-          }
+          regA = GetFxModValue (regA, regB);
           break;
         case fNot:
           regA = (fxFltType) (regA < MagickEpsilon);
