@@ -23407,10 +23407,14 @@ new header on the line directly above the old one, so the include block keeps ev
 On such a header (a split or OH product) the recipe also takes *Overall Code Complexity*,
 when a probe of the carve leaves the header and the new header each at 10.0, or at least
 at the header's score before with a stub-probed chain ending at 10.0
-(`composite-image-coverage-private.h`, `layer-frames-private.h`). A split header that has
-an include block of its own (several `.c` files include it) names the new header as the
-last line of that block, before its `extern "C"` opener, and stays the new header's one
-includer. A `%` banner of a `static` function that stands in the run but documents a
+(`composite-image-coverage-private.h`, `layer-frames-private.h`). Where the new header is
+named depends on the carved header, not on how many files include it: a header that has
+an include block of its own (`layer-frames-private.h`, `distort-private.h`) names the new
+header as the last line of that block, before its `extern "C"` opener, and stays the new
+header's one includer, whether one `.c` file or several include it; a header without an
+include block (`composite-channel-private.h`, the composite-image headers) has its one
+`.c` includer name the new header in the `.c` file's include block, directly above the
+carved header. A `%` banner of a `static` function that stands in the run but documents a
 function that stays moves, unchanged, to directly above that function, as step 1 moves
 an external function's banner (comments are not tokens).
 
@@ -24283,6 +24287,107 @@ which take `coeff`, `image_gen` and `lookup` one by one from callers that bind t
 
 ---
 
+## Recipe BP - Bundle a Pointer and the Scalar It Travels With, for Primitive Obsession
+
+**Use when:** CodeScene reports *Primitive Obsession* on a file, and a `static` function
+takes a pointer and one or more primitive scalars that its callers always pass together,
+each call passing the caller's own variables of the same names: `morphology-apply-private.h`'s
+rotation helpers `RotateKernelBy45Degrees(kernel,angle)`, `ReflectKernel(kernel,angle)` and
+their siblings, called as `angle=F(kernel,angle);` (48 % of the header's arguments primitive;
+a stub probe of four such bundles: 9.68 to 10.0). The group may also be two or more
+primitive pointers that travel together, such as a string and its end
+(`ParseKernelSpecification(kernel_string,end,...)` in `morphology-apply-kernel-private.h`).
+
+**Not covered by:** Recipe B, which bundles for *Excess Number of Function Arguments* (the
+transformation is B's, with its block form; the finding and the per-call fill differ);
+Recipe IP, which passes a struct the callers already hold; Recipe DV, which drops a
+parameter the callee can read from another.
+
+**How:**
+
+1. The function is `static` (or `static inline` in a private header), never used through a
+   function pointer, and no call passes an expression with a side effect for the group.
+2. Declare `typedef struct _Name { ... } Name;` with one member per group parameter, the
+   parameter's type without top-level `const` and its name, directly above the first
+   function that will take it, outside every `#if` block (in the commit of the first step;
+   later steps that take the same group reuse it, as Recipe N step 8's shared typedef).
+3. Replace the group by `const Name *name`. At the top of the body declare a local of each
+   old name and parameter type, initialised from `name->member`, with a top-level `const`
+   when the body never assigns it (a scalar the body updates, `angle = fmod(...)`, is a
+   plain local, as its parameter copy was).
+4. At each call, Recipe B step 5's block form: the call statement becomes a compound
+   statement holding only `const Name name = { <the group's arguments, in member order> };`,
+   a blank line and the call with `&name` for the group. When the call statement is the
+   body of an `if` or `else`, the compound statement takes its place.
+5. One function per commit. Run `refactor_guard.py --calls` on the file and every includer,
+   `tools/ci_warnings.sh`, `tools/cxx_warnings.sh`, `tools/ci_linux_warnings.sh
+   --campaign-a`, and the oracle on the function's cases; score the file and its
+   includers (no drop, or a stub-probed chain whose last step raises the file). Check by
+   reading whether any caller runs per pixel, per row or per kernel element; if so, Ir first.
+
+**Why it behaves the same.** Each member is initialised from the argument expression the
+call passed, directly before the call, with nothing between: the callee's local holds the
+value its parameter held. A scalar the callee updates is a local copy in both forms, and its
+new value still leaves through the return value the caller assigns (`angle=F(&rotation);`).
+The pointer member points to the object the argument pointed to, so writes through it
+(`kernel->angle = ...`) land where they did.
+
+**Before:** (`morphology-apply-private.h`)
+
+```c
+static inline double ReflectKernel(KernelInfo *kernel,double angle)
+{
+  ...
+    angle=ReflectKernel(kernel,angle);
+```
+
+**After:**
+
+```c
+typedef struct _KernelRotation
+{
+  KernelInfo
+    *kernel;
+
+  double
+    angle;
+} KernelRotation;
+...
+static inline double ReflectKernel(const KernelRotation *rotation)
+{
+  KernelInfo
+    *const kernel = rotation->kernel;
+
+  double
+    angle = rotation->angle;
+  ...
+    {
+      const KernelRotation
+        rotation = { kernel, angle };
+
+      angle=ReflectKernel(&rotation);
+    }
+```
+
+**Careful:**
+
+- The initialiser lists the arguments in member order; a swapped pair compiles when the
+  types agree. Check by reading.
+- The fill is per call: a value that changes between calls (`angle`, reassigned from each
+  call's return) is read afresh at each one.
+- The percentage counts arguments: a group that holds non-primitive parameters only raises
+  it. Probe the chain first.
+
+**Evidence level:** oracle (the cases that reach the function), with `refactor_guard.py
+--calls` and steps 2 to 4 checked by reading.
+
+**Provenance:** 2026-11-19, from `morphology-apply-private.h` (campaign A, W45 round 32,
+lane c, batch 3): *Primitive Obsession* (48 %) from the `(kernel,angle)` pairs of the kernel
+rotation helpers, which B (argument counts) and IP (no struct held by the callers) do not
+take. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
+
+---
+
 ---
 
 ## Catalogue changes
@@ -24809,3 +24914,6 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | AMEND | OH | On a split or OH-product header, Form A also takes *Overall Code Complexity* when the carve's probe leaves both headers at 10.0 (or at least the header's score, with a stub-probed chain ending at 10.0); a split header with its own include block names the new header as that block's last line; a `static` function's banner that stands in the run moves to stay above its function | `composite-image-coverage-private.h` (9.38, a two-carve chain to three headers at 10.0, `2ce6e70d4` and `f1ec40d41`, taken under the composite-channel amendment of the same day: written down after the fact) and `layer-frames-private.h` (9.38; a probe of the carve through `IsOverlayPixelChanged`: both 10.0) (campaign A, W45 round 32, lane c) | mandate (2026-10-24) |
 | 2026-11-19 | WORDING | IP | Step 5: a binding that the callee declared under step 3 and that a later step of the chain leaves unused is deleted too; a binding nothing reads is not declared (as `PrintBilinearForwardFX` lost `lookup` in `323ac63bd`) | Review of batch 1 of W45 lane c: the commits already did so; the step's text named only the caller's bindings | after the fact |
 | 2026-11-19 | WORDING | B | Step 1 also covers a `static inline` function of a private (not installed) header whose callers are all in that header's includers and change in the same commit, never called through a function pointer | `compare-similarity-private.h`'s `GetSimilarityForMetric` (five arguments, callers in `compare-similarity.c` and `compare-similarity-image.c`), bundled in `964f4cd49` (8.37 to 8.63); the step's text named only a function declared in one file; taken under the mandate (2026-10-24) and written down after the fact | after the fact |
+| 2026-11-19 | WORDING | OH | The placement of the new header's `#include` depends on the carved header, not on its number of includers: a header with an include block of its own names the new header as that block's last line (also when one `.c` file includes it); a header without one has its one `.c` includer name the new header directly above it in the `.c` file's include block | Review of `e36bb7fc8` (W45 round 32): its text tied the header-block rule to several includers and left an OH product with one includer and an include block of its own between the two rules | after the fact |
+| 2026-11-19 | NEW | BP | Bundle a Pointer and the Scalar It Travels With, for Primitive Obsession: a `static` function's pointer and primitive parameters that every call passes as the caller's own variables become one `const Name *name`, filled per call in Recipe B's block form; the callee binds locals of the old names (a scalar it updates as a plain local) | `morphology-apply-private.h` (campaign A, W45 round 32, lane c): *Primitive Obsession* (48 %) from the kernel rotation helpers' `(kernel,angle)` pairs; B names only argument counts and IP needs a struct the callers hold. A stub probe of four bundles: 9.68 to 10.0 | mandate (2026-10-24) |
+| 2026-11-19 | AMEND | BP | *Use when*: the group may also be two or more primitive pointers that travel together (a string and its end), not only a pointer with its scalars | `morphology-apply-kernel-private.h` (9.68, *Primitive Obsession* 34 %): a stub probe of `ParseKernelSpecification(kernel_string,end,...)` taking a `KernelSpan` and `SetOddSquareKernelSize` passing it on (Recipe IP): 10.0 (campaign A, W45 round 32, lane c) | mandate (2026-10-24) |

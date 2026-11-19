@@ -59,6 +59,15 @@ static inline void RotateKernelRingBy45Degrees(KernelInfo *kernel)
   kernel->values[1] = t;
 }
 
+typedef struct _KernelRotation
+{
+  KernelInfo
+    *kernel;
+
+  double
+    angle;
+} KernelRotation;
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -89,8 +98,14 @@ static inline void RotateKernelRingBy45Degrees(KernelInfo *kernel)
 % This function is currently internal to this module only, but can be exported
 % to other modules if needed.
 */
-static inline double RotateKernelBy45Degrees(KernelInfo *kernel,double angle)
+static inline double RotateKernelBy45Degrees(const KernelRotation *rotation)
 {
+  KernelInfo
+    *const kernel = rotation->kernel;
+
+  double
+    angle = rotation->angle;
+
   /* Rotate a 3x3 square by 45 degree angle */
   RotateKernelRingBy45Degrees(kernel);
   /* rotate non-centered origin */
@@ -100,8 +115,14 @@ static inline double RotateKernelBy45Degrees(KernelInfo *kernel,double angle)
   return(angle);
 }
 
-static inline double TurnTransposedKernelAngle(KernelInfo *kernel,double angle)
+static inline double TurnTransposedKernelAngle(const KernelRotation *rotation)
 {
+  KernelInfo
+    *const kernel = rotation->kernel;
+
+  double
+    angle = rotation->angle;
+
   if ( kernel->width == 1 ) {
     angle = fmod(angle+270.0, 360.0);     /* angle reduced 90 degrees */
     kernel->angle = fmod(kernel->angle+90.0, 360.0);
@@ -125,7 +146,12 @@ static inline double TransposeKernel(KernelInfo *kernel,double angle)
   t = kernel->x;
   kernel->x = kernel->y;
   kernel->y = t;
-  angle=TurnTransposedKernelAngle(kernel,angle);
+  {
+    const KernelRotation
+      rotation = { kernel, angle };
+
+    angle=TurnTransposedKernelAngle(&rotation);
+  }
   return(angle);
 }
 
@@ -157,8 +183,15 @@ static inline void RotateSquareKernelOrigin(KernelInfo *kernel)
   kernel->y = (ssize_t) ( +x +(ssize_t) kernel->height-1)/2;
 }
 
-static inline double RotateSquareKernelBy90Degrees(KernelInfo *kernel,double angle)
+static inline double RotateSquareKernelBy90Degrees(
+  const KernelRotation *rotation)
 {
+  KernelInfo
+    *const kernel = rotation->kernel;
+
+  double
+    angle = rotation->angle;
+
   /* Rotate a square array of values by 90 degrees */
   RotateSquareKernelValues(kernel);
   /* rotate the origin - relative to center of array */
@@ -186,8 +219,14 @@ static inline void ReverseKernelValues(KernelInfo *kernel)
     t=k[i],  k[i]=k[j],  k[j]=t;
 }
 
-static inline double ReflectKernel(KernelInfo *kernel,double angle)
+static inline double ReflectKernel(const KernelRotation *rotation)
 {
+  KernelInfo
+    *const kernel = rotation->kernel;
+
+  double
+    angle = rotation->angle;
+
   /* For a 180 degree rotation - also know as a reflection
    * This is actually a very very common operation!
    * Basically all that is needed is a reversal of the kernel data!
@@ -206,7 +245,12 @@ static inline double AttemptKernelRotationBy45Degrees(KernelInfo *kernel,
   double angle)
 {
   if ( kernel->width == 3 && kernel->height == 3 )
-    angle=RotateKernelBy45Degrees(kernel,angle);
+    {
+      const KernelRotation
+        rotation = { kernel, angle };
+
+      angle=RotateKernelBy45Degrees(&rotation);
+    }
   else
     perror("Unable to rotate non-3x3 kernel by 45 degrees");
   return(angle);
@@ -218,7 +262,12 @@ static inline double AttemptKernelRotationBy90Degrees(KernelInfo *kernel,
   if ( kernel->width == 1 || kernel->height == 1 )
     angle=TransposeKernel(kernel,angle);
   else if ( kernel->width == kernel->height )
-    angle=RotateSquareKernelBy90Degrees(kernel,angle);
+    {
+      const KernelRotation
+        rotation = { kernel, angle };
+
+      angle=RotateSquareKernelBy90Degrees(&rotation);
+    }
   else
     perror("Unable to rotate a non-square, non-linear kernel 90 degrees");
   return(angle);
@@ -232,7 +281,12 @@ static inline void AttemptKernelRotations(KernelInfo *kernel,double angle)
   if ( 45.0 < fmod(angle, 180.0)  && fmod(angle,180.0) <= 135.0 )
     angle=AttemptKernelRotationBy90Degrees(kernel,angle);
   if ( 135.0 < angle && angle <= 225.0 )
-    angle=ReflectKernel(kernel,angle);
+    {
+      const KernelRotation
+        rotation = { kernel, angle };
+
+      angle=ReflectKernel(&rotation);
+    }
 }
 
 static const KernelInfoType
