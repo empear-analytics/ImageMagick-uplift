@@ -659,6 +659,33 @@ static MagickBooleanType LaunchEqualizeKernel(
   return(MagickTrue);
 }
 
+typedef struct _EqualizeQueueTargets
+{
+  MagickCLDevice
+    *device;
+
+  cl_command_queue
+    *queue;
+} EqualizeQueueTargets;
+
+static MagickBooleanType AcquireEqualizeQueue(MagickCLEnv clEnv,
+  const EqualizeQueueTargets *targets)
+{
+  MagickCLDevice
+    *const device = targets->device;
+
+  cl_command_queue
+    *const queue = targets->queue;
+
+  *device=RequestOpenCLDevice(clEnv);
+  if (*device == (MagickCLDevice) NULL)
+    return(MagickFalse);
+  *queue=AcquireOpenCLCommandQueue(*device);
+  if (*queue == (cl_command_queue) NULL)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -743,12 +770,13 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   /*
    * initialize opencl env
    */
-  device=RequestOpenCLDevice(clEnv);
-  if (device == (MagickCLDevice) NULL)
-    goto cleanup;
-  queue=AcquireOpenCLCommandQueue(device);
-  if (queue == (cl_command_queue) NULL)
-    goto cleanup;
+  {
+    const EqualizeQueueTargets
+      queueTargets = { &device, &queue };
+
+    if (AcquireEqualizeQueue(clEnv,&queueTargets) == MagickFalse)
+      goto cleanup;
+  }
 
   /*
     Allocate and initialize histogram arrays.
