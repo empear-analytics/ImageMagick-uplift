@@ -1953,6 +1953,55 @@ static MagickBooleanType AcquirePhasePadded(const Image *image,
   return(MagickTrue);
 }
 
+typedef struct _PhaseMagnitudeTargets
+{
+  Image
+    **fft_images,
+    **magnitude_image,
+    **reconstruct_magnitude,
+    **test_magnitude;
+} PhaseMagnitudeTargets;
+
+static MagickBooleanType AcquirePhaseMagnitude(Image *target_image,
+  Image *reconstruct_image,ExceptionInfo *exception,
+  const PhaseMagnitudeTargets *targets)
+{
+  Image
+    **const fft_images = targets->fft_images,
+    **const magnitude_image = targets->magnitude_image,
+    **const reconstruct_magnitude = targets->reconstruct_magnitude,
+    **const test_magnitude = targets->test_magnitude;
+
+  /*
+    Evaluate phase coorelation image and divide by the product magnitude.
+  */
+  (void) SetImageArtifact(target_image,"fourier:normalize","inverse");
+  *fft_images=ForwardFourierTransformImage(target_image,MagickTrue,exception);
+  if (*fft_images == (Image *) NULL)
+    return(MagickFalse);
+  *test_magnitude=CloneImage(*fft_images,0,0,MagickTrue,exception);
+  *fft_images=DestroyImageList(*fft_images);
+  if (*test_magnitude == (Image *) NULL)
+    return(MagickFalse);
+  (void) SetImageArtifact(reconstruct_image,"fourier:normalize","inverse");
+  *fft_images=ForwardFourierTransformImage(reconstruct_image,MagickTrue,
+    exception);
+  if (*fft_images == (Image *) NULL)
+    return(MagickFalse);
+  *reconstruct_magnitude=CloneImage(*fft_images,0,0,MagickTrue,exception);
+  *fft_images=DestroyImageList(*fft_images);
+  if (*reconstruct_magnitude == (Image *) NULL)
+    return(MagickFalse);
+  *magnitude_image=CloneImage(*reconstruct_magnitude,0,0,MagickTrue,
+    exception);
+  if (*magnitude_image == (Image *) NULL)
+    return(MagickFalse);
+  DisableCompositeClampUnlessSpecified(*magnitude_image);
+  (void) CompositeImage(*magnitude_image,*test_magnitude,MultiplyCompositeOp,
+    MagickTrue,0,0,exception);
+  return(MagickTrue);
+}
+
 static Image *PhaseSimilarityImage(const Image *image,const Image *reconstruct,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
 {
@@ -1973,6 +2022,9 @@ static Image *PhaseSimilarityImage(const Image *image,const Image *reconstruct,
   MagickBooleanType
     status = MagickTrue;
 
+  PhaseMagnitudeTargets
+    magnitude_targets;
+
   PhasePaddedTargets
     targets;
 
@@ -1986,32 +2038,13 @@ static Image *PhaseSimilarityImage(const Image *image,const Image *reconstruct,
   targets.target_image=(&target_image);
   if (AcquirePhasePadded(image,reconstruct,exception,&targets) == MagickFalse)
     ThrowPhaseSimilarityException();
-  /*
-    Evaluate phase coorelation image and divide by the product magnitude.
-  */
-  (void) SetImageArtifact(target_image,"fourier:normalize","inverse");
-  fft_images=ForwardFourierTransformImage(target_image,MagickTrue,exception);
-  if (fft_images == (Image *) NULL)
+  magnitude_targets.fft_images=(&fft_images);
+  magnitude_targets.magnitude_image=(&magnitude_image);
+  magnitude_targets.reconstruct_magnitude=(&reconstruct_magnitude);
+  magnitude_targets.test_magnitude=(&test_magnitude);
+  if (AcquirePhaseMagnitude(target_image,reconstruct_image,exception,
+        &magnitude_targets) == MagickFalse)
     ThrowPhaseSimilarityException();
-  test_magnitude=CloneImage(fft_images,0,0,MagickTrue,exception);
-  fft_images=DestroyImageList(fft_images);
-  if (test_magnitude == (Image *) NULL)
-    ThrowPhaseSimilarityException();
-  (void) SetImageArtifact(reconstruct_image,"fourier:normalize","inverse");
-  fft_images=ForwardFourierTransformImage(reconstruct_image,MagickTrue,
-    exception);
-  if (fft_images == (Image *) NULL)
-    ThrowPhaseSimilarityException();
-  reconstruct_magnitude=CloneImage(fft_images,0,0,MagickTrue,exception);
-  fft_images=DestroyImageList(fft_images);
-  if (reconstruct_magnitude == (Image *) NULL)
-    ThrowPhaseSimilarityException();
-  magnitude_image=CloneImage(reconstruct_magnitude,0,0,MagickTrue,exception);
-  if (magnitude_image == (Image *) NULL)
-    ThrowPhaseSimilarityException();
-  DisableCompositeClampUnlessSpecified(magnitude_image);
-  (void) CompositeImage(magnitude_image,test_magnitude,MultiplyCompositeOp,
-    MagickTrue,0,0,exception);
   /*
     Compute the cross correlation of the target and reconstruction images.
   */
