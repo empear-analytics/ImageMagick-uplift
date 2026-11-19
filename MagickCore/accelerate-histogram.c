@@ -1026,63 +1026,50 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
 #define EqualizeImageTag  "Equalize/Image"
 
   CacheView
-    *image_view;
+    *image_view=NULL;
 
   cl_command_queue
-    queue;
+    queue=NULL;
 
   cl_int
     channel_mask=get32BitChannelValue(image->channel_mask);
 
   cl_mem
-    equalizeMapBuffer,
-    histogramBuffer,
-    imageBuffer;
+    equalizeMapBuffer=NULL,
+    histogramBuffer=NULL,
+    imageBuffer=NULL;
 
   cl_kernel
-    equalizeKernel,
-    histogramKernel;
+    equalizeKernel=NULL,
+    histogramKernel=NULL;
 
   cl_uint4
-    *histogram;
+    *histogram=NULL;
 
   cl_float4
     white,
     black,
-    *map;
+    *map=NULL;
 
   EqualizeHistogramInput
     histogram_input;
 
   MagickBooleanType
-    outputReady;
+    outputReady=MagickFalse;
 
   MagickCLDevice
     device;
 
   PixelPacket
-    *equalize_map;
+    *equalize_map=NULL;
 
   void
-    *inputPixels;
+    *inputPixels=NULL;
 
   if (clEnv == (MagickCLEnv) NULL)
     return(MagickFalse);
 
   TraceAccelerateImage(image);
-
-  queue=NULL;
-  image_view=NULL;
-  map=NULL;
-  histogram=NULL;
-  equalize_map=NULL;
-  inputPixels=NULL;
-  imageBuffer=NULL;
-  histogramBuffer=NULL;
-  equalizeMapBuffer=NULL;
-  histogramKernel=NULL;
-  equalizeKernel=NULL;
-  outputReady=MagickFalse;
 
   /*
    * initialize opencl env
