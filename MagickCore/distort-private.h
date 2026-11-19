@@ -301,9 +301,20 @@ static inline void SetPolarCoefficients(double *coeff,const Image *image,
   SetPolarAngles(coeff,arguments,number_arguments);
 }
 
-static inline void SetPolarRatios(double *coeff,const Image *image,
-  const DistortMethod *method)
+static inline void SetPolarRatios(const CoefficientCall *call)
 {
+  double
+    *const coeff = call->coeff;
+
+  const CoefficientContext
+    *const context = call->context;
+
+  const Image
+    *const image = context->image;
+
+  const DistortMethod
+    *const method = call->method;
+
   /* conversion ratios */
   if ( *method == PolarDistortion ) {
     coeff[6]=(double) image->columns/(coeff[5]-coeff[4]);
@@ -367,7 +378,7 @@ static inline double *PolarCoefficients(const CoefficientCall *call)
     coeff=(double *) RelinquishMagickMemory(coeff);
     return((double *) NULL);
   }
-  SetPolarRatios(coeff,image,method);
+  SetPolarRatios(call);
   return(coeff);
 }
 
