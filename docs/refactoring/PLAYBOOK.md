@@ -24453,13 +24453,18 @@ after the run, in the cleanup chain).
 4. Every such statement of one function goes in one commit (one recipe, one function); the
    message lists the variables.
 5. Run `sh tools/obj_identical.sh <file>` (`WIDE=1` for a file only the wide build
-   compiles): it must print `IDENTICAL`; otherwise revert, with one exception: when the
-   only difference is the order of a function's instructions (the compiler schedules a
-   moved store one place earlier or later), shown by each function's disassembly lines,
-   sorted, being identical before and after, the step is kept on the oracle's evidence when
-   a case reaches the function, and the commit quotes the disassembly difference. A
-   statement of the run's block that is not of step 1's form (`tempImageBuffer[0]=NULL;`,
-   an array element) stays where it stood. Run `tools/ci_warnings.sh` and
+   compiles): it must print `IDENTICAL`; otherwise revert, with one exception (for the
+   owner's confirmation, since it relaxes `IDENTICAL`): when `tools/obj_sorted.sh <file>`
+   (the same `WIDE=1`) prints `REORDERED-CONSTANT-STORES`, the step is kept on the oracle's
+   evidence when a case reaches the function. The script disassembles both object files
+   with relocations (`objdump -dr`, each relocation kept with its instruction, so a call or
+   a data reference to another symbol is a different line), requires every function's
+   sorted lines to be equal, and requires every line that moved to be a store of an
+   immediate constant to a stack slot (`mov $imm,off(%rsp)` or `off(%rbp)`), the moved
+   stores naming distinct slots; sorting alone would accept two calls that swapped places.
+   The commit quotes the script's result with the moved lines. A statement of the run's
+   block that is not of step 1's form (`tempImageBuffer[0]=NULL;`, an array element) stays
+   where it stood. Run `tools/ci_warnings.sh` and
    `tools/cxx_warnings.sh` on the file (C++ refuses a `goto` that jumps over an initialised
    declaration into its scope: step 1's declarations stand before every statement, so no
    `goto` of `F` crosses them; the C++ check confirms it). Where `tools/cxx_warnings.sh`
@@ -25419,3 +25424,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | NEW | MV | Merge Twin Functions Differing in Values Through an Order Struct: two `static` functions with one parameter list whose bodies differ only in values (constants, `const` locals bound from members of a pointer-to-`const` parameter, member reads through them) become one function taking `const Order *order`, the differing positions read from its members; each twin keeps its name and becomes `const Order order = {...}; return(M(...));`; an MT-admitted cast pair is written as MT's conditional on a selector role. *Careful* gives the argument (values read once at the initialiser are the same at every position; member types are the targets'; same statements in the same order) | `accelerate-resize.c`'s `ResizeHorizontalThenVertical` and `ResizeVerticalThenHorizontal` (campaign A, W46 round 33, lane b, batch 2): *Code Duplication*; MT would write eleven conditionals; a stub probe 8.73 to 9.30 | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | DI | Step 5: when `obj_identical.sh` prints DIFFERENT only because a function's instructions are reordered (each function's disassembly lines, sorted, identical before and after: a moved store scheduled one place away), the step is kept on the oracle's evidence when a case reaches the function, the commit quoting the disassembly difference; a statement of the run's block not of step 1's form (an array element's store) stays where it stood | `accelerate-despeckle.c`'s `ComputeDespeckleImage` (campaign A, W46 round 33, lane b, batch 3): eleven locals folded, inlined into `AccelerateDespeckleImage`, whose 736 instruction lines differ only in one `movq $0x0,0xb0(%rsp)` moved by one place; the two `tempImageBuffer[k]=NULL;` stores stay | mandate (2026-11-19) |
 | 2026-11-19 | NEW | SE | Share Identical Exiting Copies Through One Helper Binding the Input Struct: two or more token-identical copies in one function, each leaving through `return(c);` of one constant and reading locals the function binds from members of its pointer-to-`const` struct parameter `P` (plus at most three other values), become one `static MagickBooleanType` helper taking `P` and those values, binding the same locals, each copy `if (Helper(P,...) == MagickFalse) return(c);`. *Careful* gives the argument (the same members, unwritten, give the same values; each path runs the same statements and exits) | `accelerate-despeckle.c`'s `RunHullPassLoop` (campaign A, W46 round 33, lane b, batch 4): four identical check-and-launch copies; SV and SC need a differing value, D a reported duplication; a stub probe 8.83 to 9.38 | mandate (2026-11-19) |
+| 2026-11-19 | AMEND | DI | Step 5's exception (5001463a3) made precise: the reordering is shown by `tools/obj_sorted.sh` (new, b17b0903e), which disassembles with relocations (`objdump -dr`) and accepts only equal sorted lines whose moved lines are all stores of immediate constants to distinct stack slots; the commit quotes the moved lines; the exception is marked for the owner's confirmation, since it relaxes `IDENTICAL` | Review of batch 3 of W46 lane b: the lane's stand-in ran objdump without `-r`, which would hide two calls that swapped places. Rerun on `1bdc1a5a7` against its parent: `REORDERED-CONSTANT-STORES`, 832 instruction lines, one moved line `<AccelerateDespeckleImage>: movq $0x0,0xb0(%rsp)` | mandate (2026-11-19) |
