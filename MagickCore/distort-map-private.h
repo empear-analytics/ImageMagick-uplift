@@ -286,6 +286,24 @@ static inline MagickBooleanType IsArcPageReset(const DistortMethod method,
     MagickTrue : MagickFalse);
 }
 
+typedef struct _DistortVerboseFX
+{
+  DistortMethod
+    method;
+
+  const Image
+    *image;
+
+  double
+    *coeff;
+
+  char
+    *image_gen;
+
+  const char
+    *lookup;
+} DistortVerboseFX;
+
 static void PrintArcFX(const double *coeff,const char *image_gen)
 {
   ssize_t
@@ -1186,24 +1204,6 @@ static void PrintBilinearReverseFX(const double *coeff,const char *image_gen,
      coeff[6], coeff[7]);
   (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
 }
-
-typedef struct _DistortVerboseFX
-{
-  DistortMethod
-    method;
-
-  const Image
-    *image;
-
-  double
-    *coeff;
-
-  char
-    *image_gen;
-
-  const char
-    *lookup;
-} DistortVerboseFX;
 
 static void PrintLensDistortFX(const DistortVerboseFX *fx)
 {
