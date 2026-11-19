@@ -1160,8 +1160,11 @@ static MagickBooleanType PrintPerspectiveFX(double *coeff,
   return(MagickTrue);
 }
 
-static void PrintBilinearForwardYTerm(const double *coeff)
+static void PrintBilinearForwardYTerm(const DistortVerboseFX *fx)
 {
+  const double
+    *const coeff = fx->coeff;
+
   /* Handle Special degenerate (non-quadratic) or trapezoidal case */
   if (coeff[9] != 0)
     {
@@ -1214,7 +1217,7 @@ static void PrintBilinearForwardFX(const DistortVerboseFX *fx)
     coeff[7]);
   (void) FormatLocaleFile(stderr,"       bb=%lf*ii %+lf*jj %+lf;\n",
     coeff[6], -coeff[2], coeff[8]);
-  PrintBilinearForwardYTerm(coeff);
+  PrintBilinearForwardYTerm(fx);
   (void) FormatLocaleFile(stderr,
     "       xx=(ii %+lf*yy)/(%lf %+lf*yy);\n",-coeff[1],coeff[0],
     coeff[2]);
