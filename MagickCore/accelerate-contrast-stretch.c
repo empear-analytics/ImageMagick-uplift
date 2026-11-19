@@ -372,7 +372,13 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
     goto cleanup;
   }
 
-  status = LaunchHistogramKernel(clEnv, device, queue, imageBuffer, histogramBuffer, image, image->channel_mask,exception);
+  {
+    const HistogramKernelLaunch
+      launch = { clEnv, device, queue, imageBuffer, histogramBuffer };
+
+    status = LaunchHistogramKernel(&launch, image, image->channel_mask,
+      exception);
+  }
   if (status == MagickFalse)
     goto cleanup;
 
