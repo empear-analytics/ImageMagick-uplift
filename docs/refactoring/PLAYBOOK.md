@@ -11069,6 +11069,12 @@ recipe turns control flow into data.
    from comments, one `switch (n)` followed by one `return(d);`. Membership form: the
    `switch` has exactly one group of labels `L1 ... Ln`, each an enumeration constant,
    whose body is `return(MagickTrue);`, and `default: break;`; `d` is `MagickFalse`.
+   *Inverted membership form* (2026-11-19): the group's body is `return(MagickFalse);`
+   and `d` is `MagickTrue`; a `break;` after the group's `return`, which no path
+   reaches, goes with the `switch`. Step 4's loop then returns `MagickFalse` at a match.
+   The function may be a `static inline` function of a private header (each includer
+   gets its own copy of the function and of step 3's table, which stands at file scope
+   directly above it, in the header), when step 2 holds for every caller in the tree.
    The labels may instead all be character constants when `n` is a parameter of type
    `char` (a predicate Recipe EC made), each the value of a member of the basic
    character set (C11 5.2.1), so that it is representable in `char` and non-negative.
@@ -11094,8 +11100,8 @@ recipe turns control flow into data.
    Each case's comment stays on its element's line, unchanged.
 4. Replace the `switch` by a lookup that reads the table and returns what the case
    returned. Membership form: a local `size_t i;` and
-   `for (i=0; i < (sizeof(T)/sizeof(*T)); i++) if (T[i] == n) return(MagickTrue);`.
-   Index form: `if ((size_t) n < (sizeof(T)/sizeof(*T))) return(T[n]);`. The closing
+   `for (i=0; i < (sizeof(T)/sizeof(*T)); i++) if (T[i] == n) return(MagickTrue);`
+   (inverted form: `return(MagickFalse);`). Index form: `if ((size_t) n < (sizeof(T)/sizeof(*T))) return(T[n]);`. The closing
    `return(d);` and the function's other comments stay as they are. No literal is added.
 5. Check by script that the table holds exactly the labels in the membership form, each
    once and in the `switch`'s order, or in the index form that element `i` is the value
@@ -11151,7 +11157,11 @@ static const char *poly_basis_str(ssize_t n)
   returns `MagickTrue` at the first equal one; when none is equal it ends and the
   function returns `MagickFalse`. Each element has `n`'s own type, so `==` compares the
   values the `switch` compared. Reading a `const` table and comparing have no side
-  effect; only the number of comparisons changes, which is speed (step 2).
+  effect; only the number of comparisons changes, which is speed (step 2). The inverted
+  form is the same argument with the two constants exchanged: `MagickFalse` exactly for
+  the labels, `MagickTrue` otherwise. In a header, the table is a `static const` object
+  with internal linkage in each includer, written by nothing; an includer that does not
+  call the function does not read it.
 - Character labels. A `case` compares the promoted value of `n` with the constant
   converted to the promoted type (C11 6.8.4.2p5); a character constant is an `int`
   whose value, for a member of the basic character set, is non-negative and fits in
@@ -11193,6 +11203,11 @@ to 3.62 in a probe, no finding left on the function; added under the owner's OK 
 the only fix and no recipe (M23, `option.c`'s `GetOptionInfo`). Probes: `colorspace.c`
 8.62 to 9.38, `distort.c` 7.15 to 7.60; both oracle 0 diverged. Added by Claude Code
 (Claude Opus 5.5) under the owner's OK of 2026-11-10 to evolve the recipes.
+*Inverted membership form* and the header form: 2026-11-19, from `composite-private.h`'s
+`GetCompositeClipToSelf` (ten labels returning `MagickFalse`, `return(MagickTrue);` after
+the `switch`, cc 12; an upstream header shared with MagickWand, called once per
+`-compose` setting), campaign A, W47 lane c; a probe 8.82 to 9.09. Added by Claude Code
+(Claude Opus 5.5) under the mandate of 2026-11-19.
 
 ---
 
@@ -25590,3 +25605,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | AMEND | DI | Step 5's exception (5001463a3) made precise: the reordering is shown by `tools/obj_sorted.sh` (new, b17b0903e), which disassembles with relocations (`objdump -dr`) and accepts only equal sorted lines whose moved lines are all stores of immediate constants to distinct stack slots; the commit quotes the moved lines; the exception is marked for the owner's confirmation, since it relaxes `IDENTICAL` | Review of batch 3 of W46 lane b: the lane's stand-in ran objdump without `-r`, which would hide two calls that swapped places. Rerun on `1bdc1a5a7` against its parent: `REORDERED-CONSTANT-STORES`, 832 instruction lines, one moved line `<AccelerateDespeckleImage>: movq $0x0,0xb0(%rsp)` | mandate (2026-11-19) |
 | 2026-11-19 | WORDING | DI | Step 5: `tools/obj_sorted.sh` does not check that no instruction between a moved store's old and new position reads that slot (a load, an `lea`, a call taking its address); the step relies on step 2's C-level argument; the script's own `--self-test` | Review of batch 4 of W46 lane b: `b17b0903e` dropped the tab-led relocation lines (fixed in `645f80277`, with a self-test); rerun on `1bdc1a5a7` against its parent: `REORDERED-CONSTANT-STORES`, 832 instruction lines, one moved line `<AccelerateDespeckleImage>: movq $0x0,0xb0(%rsp)` | after the fact |
 | 2026-11-19 | WORDING | SE | *Not covered by* names Recipe Y (it builds and fills a new input struct; SE's struct is the function's own `const` parameter, so nothing is built or filled); step 3 adds that no callee between the binding and the copy writes `*P` | Review of batch 4 of W46 lane b: in `RunHullPassLoop` the calls between the bindings and the copies (`clSetKernelArg`, `EnqueueHullPasses` through a copy of the values) receive no pointer to `*loop` | after the fact |
+| 2026-11-19 | AMEND | TB | *Inverted membership form*: the one group of labels returns `MagickFalse`, `d` is `MagickTrue` (a `break;` after the group's `return`, which no path reaches, goes with the `switch`), and the loop returns `MagickFalse` at a match; the function may be a `static inline` function of a private header, its table at file scope directly above it, when step 2 holds for every caller in the tree | `composite-private.h`'s `GetCompositeClipToSelf` (campaign A, W47 round 34, lane c; an upstream header worked under owner 2026-11-19 evening, PR #129 round-33 Q4): ten labels returning `MagickFalse`, cc 12, called once per `-compose` setting by `mogrify.c`, `operation.c` and `composite.c`; a probe 8.82 to 9.09 | mandate (2026-11-19) |
