@@ -478,8 +478,9 @@ static MagickBooleanType GetCorrelationTotals(const CorrelationTotals *totals,
       sums = { channel_similarity, channel_norm,
         channel_reconstruct_norm };
 
-    CorrelationRow
-      row;
+    const CorrelationRow
+      row = { image, reconstruct_image, columns, image_statistics,
+        reconstruct_statistics };
 
     p=GetCacheViewVirtualPixels(image_view,0,y,columns,1,exception);
     q=GetCacheViewVirtualPixels(reconstruct_view,0,y,columns,1,exception);
@@ -488,11 +489,6 @@ static MagickBooleanType GetCorrelationTotals(const CorrelationTotals *totals,
         status=MagickFalse;
         continue;
       }
-    row.image=image;
-    row.reconstruct_image=reconstruct_image;
-    row.columns=columns;
-    row.image_statistics=image_statistics;
-    row.reconstruct_statistics=reconstruct_statistics;
     AccumulateCorrelationRow(&row,p,q,sums);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
     #pragma omp critical (MagickCore_GetCorrelationTotals)

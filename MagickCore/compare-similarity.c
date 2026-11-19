@@ -113,6 +113,9 @@ MagickExport MagickBooleanType GetImageDistortion(Image *image,
   double
     *channel_similarity;
 
+  const SimilarityImages
+    images = { image, reconstruct_image };
+
   MagickBooleanType
     status = MagickTrue;
 
@@ -136,8 +139,7 @@ MagickExport MagickBooleanType GetImageDistortion(Image *image,
   if (channel_similarity == (double *) NULL)
     ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
   (void) memset(channel_similarity,0,length*sizeof(*channel_similarity));
-  status=GetSimilarityForMetric(image,reconstruct_image,metric,
-    channel_similarity,exception);
+  status=GetSimilarityForMetric(&images,metric,channel_similarity,exception);
   *distortion=channel_similarity[CompositePixelChannel];
   ConvertSimilarityToDistortionValue(metric,distortion);
   channel_similarity=(double *) RelinquishMagickMemory(channel_similarity);
@@ -208,6 +210,9 @@ MagickExport double *GetImageDistortions(Image *image,
     *distortion,
     *channel_similarity;
 
+  const SimilarityImages
+    images = { image, reconstruct_image };
+
   MagickBooleanType
     status = MagickTrue;
 
@@ -232,8 +237,7 @@ MagickExport double *GetImageDistortions(Image *image,
   if (channel_similarity == (double *) NULL)
     ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
   (void) memset(channel_similarity,0,length*sizeof(*channel_similarity));
-  status=GetSimilarityForMetric(image,reconstruct_image,metric,
-    channel_similarity,exception);
+  status=GetSimilarityForMetric(&images,metric,channel_similarity,exception);
   if (status == MagickFalse)
     {
       channel_similarity=(double *) RelinquishMagickMemory(channel_similarity);

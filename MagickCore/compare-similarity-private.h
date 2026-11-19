@@ -586,10 +586,25 @@ static inline const SimilarityMetricEntry *GetSimilarityMetricEntry(
   return((const SimilarityMetricEntry *) NULL);
 }
 
-static inline MagickBooleanType GetSimilarityForMetric(Image *image,
-  const Image *reconstruct_image,const MetricType metric,
+typedef struct _SimilarityImages
+{
+  Image
+    *image;
+
+  const Image
+    *reconstruct_image;
+} SimilarityImages;
+
+static inline MagickBooleanType GetSimilarityForMetric(
+  const SimilarityImages *images,const MetricType metric,
   double *channel_similarity,ExceptionInfo *exception)
 {
+  Image
+    *const image = images->image;
+
+  const Image
+    *const reconstruct_image = images->reconstruct_image;
+
   MagickBooleanType
     status = MagickTrue;
 

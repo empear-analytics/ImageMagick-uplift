@@ -256,6 +256,35 @@ static inline void ReducePHASESimilarity(const PHASEReduction *reduction,
     similarity[CompositePixelChannel]/=(double) channels;
 }
 
+typedef struct _PHASEEdgeSurfaces
+{
+  Image
+    **edge_image,
+    **edge_reconstruct;
+} PHASEEdgeSurfaces;
+
+static inline MagickBooleanType AcquirePHASEEdges(const Image *image,
+  const Image *reconstruct_image,ExceptionInfo *exception,
+  const PHASEEdgeSurfaces *targets)
+{
+  Image
+    **const edge_image = targets->edge_image,
+    **const edge_reconstruct = targets->edge_reconstruct;
+
+  *edge_image=GetEdgeCorrelationSurface(image,exception);
+  *edge_reconstruct=GetEdgeCorrelationSurface(reconstruct_image,exception);
+  if ((*edge_image == (Image *) NULL) ||
+      (*edge_reconstruct == (Image *) NULL))
+    {
+      if (*edge_image != (Image *) NULL)
+        *edge_image=DestroyImage(*edge_image);
+      if (*edge_reconstruct != (Image *) NULL)
+        *edge_reconstruct=DestroyImage(*edge_reconstruct);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static inline MagickBooleanType GetPHASESimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -280,6 +309,9 @@ static inline MagickBooleanType GetPHASESimilarity(const Image *image,
   MagickBooleanType
     status = MagickTrue;
 
+  PHASEEdgeSurfaces
+    edges;
+
   size_t
     columns = 0,
     rows = 0;
@@ -295,16 +327,11 @@ static inline MagickBooleanType GetPHASESimilarity(const Image *image,
     Gaussian edge surfaces.
   */
   SetImageCompareBounds(image,reconstruct_image,&columns,&rows);
-  edge_image=GetEdgeCorrelationSurface(image,exception);
-  edge_reconstruct=GetEdgeCorrelationSurface(reconstruct_image,exception);
-  if ((edge_image == (Image *) NULL) || (edge_reconstruct == (Image *) NULL))
-    {
-      if (edge_image != (Image *) NULL)
-        edge_image=DestroyImage(edge_image);
-      if (edge_reconstruct != (Image *) NULL)
-        edge_reconstruct=DestroyImage(edge_reconstruct);
-      return(MagickFalse);
-    }
+  edges.edge_image=(&edge_image);
+  edges.edge_reconstruct=(&edge_reconstruct);
+  if (AcquirePHASEEdges(image,reconstruct_image,exception,&edges) ==
+      MagickFalse)
+    return(MagickFalse);
   image_view=AcquireVirtualCacheView(image,exception);
   reconstruct_view=AcquireVirtualCacheView(reconstruct_image,exception);
   edge_view=AcquireVirtualCacheView(edge_image,exception);
