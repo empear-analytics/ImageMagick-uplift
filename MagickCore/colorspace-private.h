@@ -1878,12 +1878,21 @@ static inline MagickBooleanType IssRGBColorspace(
 static inline MagickBooleanType IssRGBCompatibleColorspace(
   const ColorspaceType colorspace)
 {
-  if ((colorspace == sRGBColorspace) || (colorspace == RGBColorspace) ||
-      (colorspace == Adobe98Colorspace) || (colorspace == ProPhotoColorspace) ||
-      (colorspace == DisplayP3Colorspace) || (colorspace == scRGBColorspace) ||
-      (colorspace == TransparentColorspace) || (colorspace == GRAYColorspace) ||
-      (colorspace == LinearGRAYColorspace))
-    return(MagickTrue);
+  switch (colorspace)
+  {
+    case sRGBColorspace:
+    case RGBColorspace:
+    case Adobe98Colorspace:
+    case ProPhotoColorspace:
+    case DisplayP3Colorspace:
+    case scRGBColorspace:
+    case TransparentColorspace:
+    case GRAYColorspace:
+    case LinearGRAYColorspace:
+      return(MagickTrue);
+    default:
+      break;
+  }
   return(MagickFalse);
 }
 
