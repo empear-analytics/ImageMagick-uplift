@@ -1911,10 +1911,15 @@ static inline MagickBooleanType IssRGBCompatibleColorspace(
 static inline MagickBooleanType IsYCbCrCompatibleColorspace(
   const ColorspaceType colorspace)
 {
-  if ((colorspace == YCbCrColorspace) ||
-      (colorspace == Rec709YCbCrColorspace) ||
-      (colorspace == Rec601YCbCrColorspace))
-    return(MagickTrue);
+  switch (colorspace)
+  {
+    case YCbCrColorspace:
+    case Rec709YCbCrColorspace:
+    case Rec601YCbCrColorspace:
+      return(MagickTrue);
+    default:
+      break;
+  }
   return(MagickFalse);
 }
 
