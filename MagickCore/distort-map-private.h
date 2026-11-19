@@ -361,9 +361,15 @@ static void PrintDePolarFX(const DistortVerboseFX *fx)
   (void) FormatLocaleFile(stderr,"       v.p{xx-.5,yy-.5}' \\\n");
 }
 
-static void PrintCylinder2PlaneFX(const double *coeff,const char *image_gen,
-  const char *lookup)
+static void PrintCylinder2PlaneFX(const DistortVerboseFX *fx)
 {
+  const double
+    *const coeff = fx->coeff;
+
+  const char
+    *const image_gen = fx->image_gen,
+    *const lookup = fx->lookup;
+
   (void) FormatLocaleFile(stderr,
     "Cylinder to Plane Distort, Internal Coefficients\n");
   (void) FormatLocaleFile(stderr,"  cylinder_radius = %+lf\n",coeff[1]);
@@ -1276,9 +1282,6 @@ static void PrintRadialDistortFX(const DistortVerboseFX *fx)
   char
     *const image_gen = fx->image_gen;
 
-  const char
-    *const lookup = fx->lookup;
-
   ssize_t
     i;
 
@@ -1316,7 +1319,7 @@ static void PrintRadialDistortFX(const DistortVerboseFX *fx)
     }
     case Cylinder2PlaneDistortion:
     {
-      PrintCylinder2PlaneFX(coeff,image_gen,lookup);
+      PrintCylinder2PlaneFX(fx);
       break;
     }
     default:
