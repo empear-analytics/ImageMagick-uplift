@@ -833,6 +833,16 @@ static inline MagickBooleanType GetPixelMetricSimilarity(const PixelMetricInfo *
   return(status);
 }
 
+static inline MagickBooleanType GetClearedMetricSimilarity(
+  const PixelMetricInfo info,double *similarity,ExceptionInfo *exception)
+{
+  double
+    area;
+
+  (void) memset(similarity,0,(MaxPixelChannels+1)*sizeof(*similarity));
+  return(GetPixelMetricSimilarity(&info,similarity,&area,exception));
+}
+
 static inline MagickBooleanType GetPDCSimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -840,14 +850,10 @@ static inline MagickBooleanType GetPDCSimilarity(const Image *image,
     info = { image, reconstruct_image, PixelDifferenceCountErrorMetric,
       GetFuzzyColorDistance(image,reconstruct_image) };
 
-  double
-    area;
-
   /*
     Compute the pixel difference count similarity.
   */
-  (void) memset(similarity,0,(MaxPixelChannels+1)*sizeof(*similarity));
-  return(GetPixelMetricSimilarity(&info,similarity,&area,exception));
+  return(GetClearedMetricSimilarity(info,similarity,exception));
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)
