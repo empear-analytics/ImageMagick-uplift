@@ -382,9 +382,23 @@ static inline double *PolarCoefficients(const CoefficientCall *call)
   return(coeff);
 }
 
-static inline void SetCylinderCoefficients(double *coeff,const Image *image,
-  const double *arguments,const DistortMethod *method)
+static inline void SetCylinderCoefficients(const CoefficientCall *call)
 {
+  double
+    *const coeff = call->coeff;
+
+  const CoefficientContext
+    *const context = call->context;
+
+  const Image
+    *const image = context->image;
+
+  const double
+    *const arguments = context->arguments;
+
+  const DistortMethod
+    *const method = call->method;
+
   coeff[0] = DegreesToRadians(arguments[0]);
   if ( *method == Cylinder2PlaneDistortion )
     /* image is curved around cylinder, so FOV angle (in radians)
@@ -411,9 +425,6 @@ static inline double *CylinderCoefficients(const CoefficientCall *call)
 
   const CoefficientContext
     *const context = call->context;
-
-  const Image
-    *const image = context->image;
 
   const double
     *const arguments = context->arguments;
@@ -460,7 +471,7 @@ static inline double *CylinderCoefficients(const CoefficientCall *call)
         CommandOptionToMnemonic(MagickDistortOptions,*method));
     return((double *) NULL);
   }
-  SetCylinderCoefficients(coeff,image,arguments,method);
+  SetCylinderCoefficients(call);
   return(coeff);
 }
 
