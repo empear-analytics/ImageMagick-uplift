@@ -13,7 +13,7 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 
-  MagickCore private methods of compare-similarity-frequency-private.h: the frequency-domain image helpers of SimilarityImage (HDRI with FFTW only), from SIMCrossCorrelationImage to SIMVarianceImage; included by that header only.
+  MagickCore private methods of compare-similarity-image.c: the frequency-domain image helpers of SimilarityImage (HDRI with FFTW only), from SIMCrossCorrelationImage to SIMVarianceImage; used by compare-similarity-frequency-private.h; included by compare-similarity-image.c only, directly above that header.
 */
 #ifndef MAGICKCORE_COMPARE_SIMILARITY_FREQUENCY_IMAGES_PRIVATE_H
 #define MAGICKCORE_COMPARE_SIMILARITY_FREQUENCY_IMAGES_PRIVATE_H

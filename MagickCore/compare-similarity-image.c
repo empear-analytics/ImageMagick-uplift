@@ -92,6 +92,7 @@
 #include "MagickCore/utility.h"
 #include "MagickCore/version.h"
 #include "MagickCore/compare-similarity-private.h"
+#include "MagickCore/compare-similarity-frequency-images-private.h"
 #include "MagickCore/compare-similarity-frequency-private.h"
 
 /*

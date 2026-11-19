@@ -13,12 +13,10 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 
-  MagickCore private methods of compare-similarity-image.c: the frequency-domain similarity of SimilarityImage (HDRI with FFTW only), from AcquireDPCReconstructGradient to IsFrequencyDomainSimilarity, over the image helpers of compare-similarity-frequency-images-private.h; included by that file only.
+  MagickCore private methods of compare-similarity-image.c: the frequency-domain similarity of SimilarityImage (HDRI with FFTW only), from ThrowDPCSimilarityException to IsFrequencyDomainSimilarity, over the image helpers of compare-similarity-frequency-images-private.h, which that file includes directly above this header; included by that file only.
 */
 #ifndef MAGICKCORE_COMPARE_SIMILARITY_FREQUENCY_PRIVATE_H
 #define MAGICKCORE_COMPARE_SIMILARITY_FREQUENCY_PRIVATE_H
-
-#include "MagickCore/compare-similarity-frequency-images-private.h"
 
 #if defined(MAGICKCORE_HDRI_SUPPORT) && defined(MAGICKCORE_FFTW_DELEGATE)
 #define ThrowDPCSimilarityException() \
