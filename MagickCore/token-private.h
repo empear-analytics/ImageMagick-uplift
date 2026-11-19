@@ -235,11 +235,29 @@ static inline MagickBooleanType IsNonBreakingUTFSpace(const int code)
 
 static inline MagickBooleanType IsUTFSpace(const int code)
 {
-  if (((code >= 0x0009) && (code <= 0x000d)) || (code == 0x0020) ||
-      (code == 0x0085) || (code == 0x00a0) || (code == 0x1680) ||
-      (code == 0x180e) || ((code >= 0x2000) && (code <= 0x200a)) ||
-      (code == 0x2028) || (code == 0x2029) || (code == 0x202f) ||
-      (code == 0x205f) || (code == 0x3000))
+  if ((code >= 0x0009) && (code <= 0x000d))
+    return(MagickTrue);
+  if (code == 0x0020)
+    return(MagickTrue);
+  if (code == 0x0085)
+    return(MagickTrue);
+  if (code == 0x00a0)
+    return(MagickTrue);
+  if (code == 0x1680)
+    return(MagickTrue);
+  if (code == 0x180e)
+    return(MagickTrue);
+  if ((code >= 0x2000) && (code <= 0x200a))
+    return(MagickTrue);
+  if (code == 0x2028)
+    return(MagickTrue);
+  if (code == 0x2029)
+    return(MagickTrue);
+  if (code == 0x202f)
+    return(MagickTrue);
+  if (code == 0x205f)
+    return(MagickTrue);
+  if (code == 0x3000)
     return(MagickTrue);
   return(MagickFalse);
 }
