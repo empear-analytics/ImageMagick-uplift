@@ -24551,6 +24551,234 @@ Code (Claude Opus 5.5) under the owner's answer of 2026-11-19 ("New recipes are 
 
 ---
 
+## Recipe JD - Join Twin Call Arms Around a Common Fill into One Status Dispatch
+
+**Use when:** CodeScene reports *Large Method*, *Complex Method* or *Bumpy Road Ahead* on a
+function that holds a selection whose two arms begin with the same fill of the struct locals
+a call reads, one arm ending in its call and exit test, the other arm's call and exit test
+spread after the selection under the selection's own condition (the shape Recipe SG shape c
+and Recipe I leave together): `accelerate-resize.c`'s `ComputeResizeImage` after
+`170aed8bb`, whose `if (xFactor > yFactor)` arm fills `info` and `targets` (fifteen
+assignments), whose `else` arm fills them the same way and calls
+`ResizeVerticalThenHorizontal`, and whose `if ((xFactor > yFactor) &&
+(ResizeHorizontalThenVertical(...) == MagickFalse)) goto cleanup;` follows. The fill is
+written twice and the exit test twice.
+
+**Not covered by:** Recipe SG, which spreads a guard and never joins one; Recipe HT, whose
+branches end in the same `return` test and whose second branch continues after it, and
+which hoists no leading statements; Recipe HF, whose two fills stand in an early-returning
+branch and after it, never in two arms of one selection; Recipe D, whose copies become
+calls; Recipe RF, which deletes a fill already run on every path.
+
+**How:**
+
+1. Find, outside every OpenMP region and with no `#pragma` or preprocessor line in it,
+   `if (C) { F } else { F if (G2 == K) goto L; }` directly followed by
+   `if ((C) && (G1 == K)) goto L;`, where `F` is the same token sequence in both arms
+   (whitespace and line breaks ignored), a run of expression statements with no call,
+   label, `goto`, `return`, `break` or `continue`; `G1` and `G2` are calls of functions
+   returning `MagickBooleanType`; `K` is one constant, the same in both tests; `L` is one
+   label, the same in both.
+2. `C` has no side effect (no call, assignment, increment or `volatile` object) and reads
+   only locals of the function whose address is taken nowhere (`grep`). `F` and the
+   arguments of `G1` and `G2` write none of them (by reading).
+3. Declare a new local `MagickBooleanType status;` (or another name not yet used in the
+   function) among the function's declarations, in their order.
+4. Rewrite the two statements as `F`, re-indented to the selection's level, then
+   `if (C) status=G1; else status=G2;` (`G1`, `G2` and `C` copied character for character,
+   each assignment on its own line under its `if` or `else`), then `if (status == K) goto
+   L;`.
+5. One selection per commit (one recipe, one function).
+6. Run `refactor_guard.py`: the literals of the deleted copy of `F` count as deduplication
+   (`WARN`, every value still present, or `OK`). `--calls`: no call is added or removed
+   (each of `G1` and `G2` is called once before and after). Run the oracle on the
+   function's cases; check by `casemap` or by reading the cases that both arms are reached.
+
+**Before:**
+
+```c
+  if (xFactor > yFactor)
+  {
+    info.device=device;
+    ...
+    targets.outputReady=(&outputReady);
+  }
+  else
+  {
+    info.device=device;
+    ...
+    targets.outputReady=(&outputReady);
+    if (ResizeVerticalThenHorizontal(&info,exception,&targets) ==
+        MagickFalse)
+      goto cleanup;
+  }
+  if ((xFactor > yFactor) &&
+      (ResizeHorizontalThenVertical(&info,exception,&targets) == MagickFalse))
+    goto cleanup;
+```
+
+**After:**
+
+```c
+  info.device=device;
+  ...
+  targets.outputReady=(&outputReady);
+  if (xFactor > yFactor)
+    status=ResizeHorizontalThenVertical(&info,exception,&targets);
+  else
+    status=ResizeVerticalThenHorizontal(&info,exception,&targets);
+  if (status == MagickFalse)
+    goto cleanup;
+```
+
+**Careful:**
+
+- When `C` holds, the old code ran `F` in the first arm, then evaluated `C` again (true:
+  step 2, nothing changed what it reads) and called `G1`, leaving for `L` when it returned
+  `K`. The new code runs `F`, calls `G1`, and leaves for `L` on `K`: the same statements in
+  the same order.
+- When `C` fails, the old code ran `F`, called `G2` and left for `L` on `K`; otherwise it
+  evaluated `C` (false, no side effect) and skipped `G1`. The new code runs `F`, calls
+  `G2` and leaves on `K`: the same calls, the same exit.
+- `status` holds the value the old test compared; it is read only by the new test. Its
+  declaration adds a local and nothing else.
+
+**Evidence level:** oracle on the function's cases (both arms reached), with
+`refactor_guard.py --calls` and steps 1 and 2 checked by reading.
+
+**Provenance:** 2026-11-19, from `accelerate-resize.c`'s `ComputeResizeImage` (campaign A,
+W46 round 33, lane b, batch 2): after Recipe I moved the `else` arm (`170aed8bb`) in the form
+`63044258d` had given the first arm, the fill stood twice and the first arm's call stood
+after the selection, where Recipe SG had spread it. Step 2 of the stub-probed resize chain
+(8.21 to 9.30 at its end). Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-11-19 (the owner's "New recipes are fine", PR #129 Q7).
+
+---
+
+## Recipe MV - Merge Twin Functions Differing in Values Through an Order Struct
+
+**Use when:** CodeScene reports *Code Duplication* between two `static` functions of one file
+with the same parameter list whose bodies are the same text except for values read at some
+positions (constants, the function's own `const` locals bound from members of its input
+struct, member reads of such locals), and at most a few runs that MT step 3 admits:
+`accelerate-resize.c`'s `ResizeHorizontalThenVertical` and `ResizeVerticalThenHorizontal`,
+which run the same two filter passes through a temporary buffer, one horizontal first
+(`HorizontalResizeFilter`, `xFactor`, the temporary `resizedColumns` by `image->rows`), the
+other vertical first (`VerticalResizeFilter`, `yFactor`, `image->columns` by `resizedRows`).
+
+**Not covered by:** Recipe SC, whose copies stand in one function and are replaced by calls
+in place; Recipe TW, whose copies differ in one value; Recipe MT, which writes every
+differing pair as a conditional on a selector inside the merged body (here six roles at
+eleven positions: eleven conditionals, each a branch); Recipe CF, which merges twins that
+differ only in the function called; Recipe TI, which inlines one twin into the other's
+callers; Recipe D, which needs a reported duplication between blocks and passes the
+differing values as parameters (here more than four).
+
+**How:**
+
+1. The twins `A` and `B` are `static` functions of one file, outside every OpenMP region,
+   with no `#pragma` or preprocessor line, of the same return type and parameter list
+   (types and names), neither used through a function pointer.
+2. Align their bodies token by token (whitespace and line breaks ignored; no variable
+   renamed). Each differing position holds, in each twin, a value: a literal, an
+   enumeration constant, a `const` local of that twin bound once from a member of a
+   pointer-to-`const` parameter, or a member read through such a local or parameter
+   (`image->rows`). Give each differing position a role; positions take one role when every
+   twin has the same value at all of them (Recipe SC step 2). A pair of runs that MT step 3
+   admits (two casts of one value to two integer types, the result converted to one target)
+   may differ as well and is written as MT step 4 writes it, testing a role that is a
+   selector constant (`order->firstSide == HorizontalResizeFilter`).
+3. Write a `typedef struct` `Order` directly above the merged function, one member per role,
+   named for the role, of the type Recipe SC step 3 gives it (the type of every object the
+   value is assigned or passed to; in an expression, the value's own type).
+4. Write the merged `static` function `M` directly above `A`: `A`'s parameters with
+   `const Order *order` added after the input struct (at most four in all), `A`'s body with
+   each role's positions written `order->role` or a `const` local bound from it (Recipe N
+   step 4), and the bindings of locals that no longer appear removed. The function's error
+   calls now name `M` in `GetMagickModule()` (ruling of 2026-11-12).
+5. Replace each twin's body by `const Order order = { v1, ... };`, that twin's values in
+   member order, each written through the twin's parameter (`info->xFactor` where the twin
+   read its local `xFactor` bound from `info->xFactor`; `info->image->rows` where it read
+   `image->rows` with `image` bound from `info->image`), and `return(M(...,&order,...));`.
+   The twins keep their names and their callers.
+6. One merge per commit. Check by script that `A`'s and `B`'s old bodies equal `M`'s body
+   with each twin's values substituted (and its run of step 2 chosen), and by reading that
+   each initialiser lists the twin's values in member order.
+7. Run `refactor_guard.py` (`OK` or `WARN` for literals now written once) and `--calls`
+   (the callees of the twins' bodies drop by one copy; `M` gains its definition and two
+   calls), the warning checks, and the oracle on the twins' callers with both twins reached.
+
+**Before:**
+
+```c
+static MagickBooleanType ResizeHorizontalThenVertical(
+  const ResizeArmInfo *info,ExceptionInfo *exception,
+  const ResizeArmTargets *targets)
+{
+  ...
+  length=resizedColumns*image->rows*number_channels;
+  ...
+      run = { HorizontalResizeFilter, &pass, xFactor };
+  ...
+}
+```
+
+**After:**
+
+```c
+static MagickBooleanType ResizeThroughTempImage(const ResizeArmInfo *info,
+  const ResizeArmOrder *order,ExceptionInfo *exception,
+  const ResizeArmTargets *targets)
+{
+  ...
+  length=tempColumns*tempRows*number_channels;
+  ...
+      run = { order->firstSide, &pass, order->firstFactor };
+  ...
+}
+
+static MagickBooleanType ResizeHorizontalThenVertical(
+  const ResizeArmInfo *info,ExceptionInfo *exception,
+  const ResizeArmTargets *targets)
+{
+  const ResizeArmOrder
+    order = { HorizontalResizeFilter, VerticalResizeFilter, info->xFactor,
+      info->yFactor, info->resizedColumns, info->image->rows };
+
+  return(ResizeThroughTempImage(info,&order,exception,targets));
+}
+```
+
+**Careful:**
+
+- Each value is read once, in the twin's initialiser, where the twin's body read it at each
+  of its positions. A constant is the same every time; a `const` local bound from a member
+  of a pointer-to-`const` parameter, or a member read through one, holds the same value
+  during the whole call when nothing writes the member (check by reading: the body writes
+  only through its targets pointers, never into the input struct or the image it points
+  to). So every position sees the value it saw.
+- The member's type is the target's (step 3), so converting the value at the initialiser
+  gives what the conversion at the position gave; a `size_t` role used in `size_t`
+  arithmetic keeps the arithmetic's type and order of operands.
+- An MT run (step 2) is written as MT step 4 writes it: the conditional's value, converted
+  to the target, is what that twin's run gave (MT's *Careful*); the selector role is a
+  constant of each twin, so each twin takes its own run.
+- The statements run in the same order with the same calls; `M` adds one call level.
+
+**Evidence level:** oracle on the twins' callers, both twins reached (casemap or reading of
+the cases), with `refactor_guard.py --calls` and step 6 checked by script.
+
+**Provenance:** 2026-11-19, from `accelerate-resize.c`'s `ResizeHorizontalThenVertical` and
+`ResizeVerticalThenHorizontal` (campaign A, W46 round 33, lane b, batch 2): *Code
+Duplication* after the `else` arm moved out (`170aed8bb`). MT would write eleven
+conditionals; the stub probe of this form, with the one cast pair (`(cl_uint) image->rows`
+and `(cl_int) image->rows`) as MT's conditional, scored the file 8.73 to 9.30. A probe with
+the cast pair as a seventh role scored 8.73 (the two wrappers then clone each other).
+Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-11-19 (the owner's "New
+recipes are fine", PR #129 Q7).
+
+---
+
 ## Recipe DI - Declare a Local with the Constant Its First Statement Assigns
 
 **Use when:** CodeScene reports *Large Method* (or a function is a few lines from its
@@ -25217,3 +25445,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | AMEND | B | Step 5: the block form also takes an initialiser of plain identifiers, as BP step 4 does; a call site that step 1's header form changes inside an unreached caller, while the bundled function is reached through another includer, takes the checks of *Unreached functions: B and N* for that site, quoted in the message | Review of W46 lane c batch 1: `3aec3f0b4` (`LaunchHistogramKernel`) filled `{ clEnv, device, queue, imageBuffer, histogramBuffer }` in a block in the never-called `AccelerateContrastStretchImage` (guard, `obj_modulo` MODULO-IDENTICAL) and at the reached equalize site (oracle, object IDENTICAL) (campaign A) | mandate (2026-11-19) |
 | 2026-11-19 | NEW | GL | Fold a Guard into the Lookup It Encloses, Returning NULL When It Fails: `if (G) { const T *v = L; if (v != NULL) { B } }` becomes `const T *v = Helper(...); if (v != NULL) { B }`, the helper returning `L` when `G` holds and `NULL` otherwise (with the statements that compute only `G`'s operands) | `compare-similarity-image.c`'s `SimilarityImage` (campaign A, W46 round 33, lane a): the frequency-domain dispatch is a bump and two decisions of a `MagickExport` function; E, P, CN and RV do not take it. Probe 8.51 to 8.54 | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | HN | Step 7: a self-guarded head (`v=Make(...); if (v == NULL) return(v);` then guards returning `Release(v)`, a routine that always returns `NULL`, with no `NULL` test of the caller after it) moves whole; the caller gets `v=Helper(...);` and a copy of the block's first guard. *Careful* gives the argument | `compare-similarity-frequency-images-private.h`'s `SIMUnityImage` (campaign A, W46 round 33, lane a): its clone and storage-class head returns `unity_image` and `DestroyImage(unity_image)`, neither one constant `R`, and has no trailing `v=Last(...)`; probe cc 10 to 9, 8.87 to 8.89 | mandate (2026-11-19) |
+| 2026-11-19 | NEW | JD | Join Twin Call Arms Around a Common Fill into One Status Dispatch: `if (C) { F } else { F if (G2 == K) goto L; }` followed by `if ((C) && (G1 == K)) goto L;` (the shape Recipes SG and I leave) becomes `F`, `if (C) status=G1; else status=G2;`, `if (status == K) goto L;`. *Careful* gives the path argument (`C` without side effect, unchanged by `F`; each path runs the same statements in the same order) | `accelerate-resize.c`'s `ComputeResizeImage` (campaign A, W46 round 33, lane b, batch 2): the fill of `info` and `targets` written twice after `170aed8bb`; step 2 of the resize chain stub-probed at 9.30 | mandate (2026-11-19) |
+| 2026-11-19 | NEW | MV | Merge Twin Functions Differing in Values Through an Order Struct: two `static` functions with one parameter list whose bodies differ only in values (constants, `const` locals bound from members of a pointer-to-`const` parameter, member reads through them) become one function taking `const Order *order`, the differing positions read from its members; each twin keeps its name and becomes `const Order order = {...}; return(M(...));`; an MT-admitted cast pair is written as MT's conditional on a selector role. *Careful* gives the argument (values read once at the initialiser are the same at every position; member types are the targets'; same statements in the same order) | `accelerate-resize.c`'s `ResizeHorizontalThenVertical` and `ResizeVerticalThenHorizontal` (campaign A, W46 round 33, lane b, batch 2): *Code Duplication*; MT would write eleven conditionals; a stub probe 8.73 to 9.30 | mandate (2026-11-19) |

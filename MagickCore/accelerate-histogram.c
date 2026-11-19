@@ -1026,6 +1026,47 @@ static MagickBooleanType AcquireEqualizeInput(
   return(MagickTrue);
 }
 
+typedef struct _EqualizeMapTargets
+{
+  PixelPacket
+    **equalize_map;
+
+  cl_float4
+    **map,
+    *black,
+    *white;
+} EqualizeMapTargets;
+
+static MagickBooleanType AcquireEqualizeMaps(Image *image,cl_uint4 *histogram,
+  const EqualizeMapTargets *targets)
+{
+  PixelPacket
+    **const equalize_map = targets->equalize_map;
+
+  cl_float4
+    **const map = targets->map,
+    *const black = targets->black,
+    *const white = targets->white;
+
+  EqualizeHistogramInput
+    histogram_input;
+
+  *equalize_map=(PixelPacket *) AcquireQuantumMemory(MaxMap+1UL, sizeof(**equalize_map));
+  if (*equalize_map == (PixelPacket *) NULL)
+    return(MagickFalse);
+
+  *map=(cl_float4 *) AcquireQuantumMemory(MaxMap+1UL,sizeof(**map));
+  if (*map == (cl_float4 *) NULL)
+    return(MagickFalse);
+
+  histogram_input.image=image;
+  histogram_input.histogram=histogram;
+  histogram_input.map=*map;
+  histogram_input.equalize_map=*equalize_map;
+  BuildEqualizeMap(&histogram_input,black,white);
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -1056,9 +1097,6 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
     white,
     black,
     *map=NULL;
-
-  EqualizeHistogramInput
-    histogram_input;
 
   MagickBooleanType
     outputReady=MagickFalse;
@@ -1124,19 +1162,13 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
 #endif
 
   /* CPU stuff */
-  equalize_map=(PixelPacket *) AcquireQuantumMemory(MaxMap+1UL, sizeof(*equalize_map));
-  if (equalize_map == (PixelPacket *) NULL)
-    ThrowBinaryException(ResourceLimitWarning,"MemoryAllocationFailed", image->filename);
+  {
+    const EqualizeMapTargets
+      mapTargets = { &equalize_map, &map, &black, &white };
 
-  map=(cl_float4 *) AcquireQuantumMemory(MaxMap+1UL,sizeof(*map));
-  if (map == (cl_float4 *) NULL)
-    ThrowBinaryException(ResourceLimitWarning,"MemoryAllocationFailed", image->filename);
-
-  histogram_input.image=image;
-  histogram_input.histogram=histogram;
-  histogram_input.map=map;
-  histogram_input.equalize_map=equalize_map;
-  BuildEqualizeMap(&histogram_input,&black,&white);
+    if (AcquireEqualizeMaps(image,histogram,&mapTargets) == MagickFalse)
+      ThrowBinaryException(ResourceLimitWarning,"MemoryAllocationFailed", image->filename);
+  }
 
   /*
     Equalize image.
