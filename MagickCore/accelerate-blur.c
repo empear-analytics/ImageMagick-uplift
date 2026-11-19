@@ -330,6 +330,125 @@ static MagickBooleanType EnqueueBlurPasses(const BlurPassesInput *input,
   return(MagickTrue);
 }
 
+typedef struct _BlurKernelsSource
+{
+  MagickCLDevice
+    device;
+
+  double
+    radius,
+    sigma;
+
+  const Image
+    *image;
+
+  cl_mem
+    imageBuffer;
+
+  cl_int
+    channel_mask;
+
+  size_t
+    chunkSize;
+
+  cl_command_queue
+    queue;
+
+  Image
+    *filteredImage;
+
+  cl_mem
+    filteredImageBuffer;
+} BlurKernelsSource;
+
+typedef struct _BlurKernelsTargets
+{
+  cl_mem
+    *imageKernelBuffer,
+    *tempImageBuffer;
+
+  cl_kernel
+    *blurRowKernel,
+    *blurColumnKernel;
+
+  MagickBooleanType
+    *outputReady;
+} BlurKernelsTargets;
+
+static MagickBooleanType RunBlurKernels(const BlurKernelsSource *source,
+  ExceptionInfo *exception,const BlurKernelsTargets *targets)
+{
+  const MagickCLDevice
+    device = source->device;
+
+  const double
+    radius = source->radius,
+    sigma = source->sigma;
+
+  const Image
+    *const image = source->image;
+
+  const cl_mem
+    imageBuffer = source->imageBuffer;
+
+  const cl_int
+    channel_mask = source->channel_mask;
+
+  const size_t
+    chunkSize = source->chunkSize;
+
+  const cl_command_queue
+    queue = source->queue;
+
+  Image
+    *const filteredImage = source->filteredImage;
+
+  const cl_mem
+    filteredImageBuffer = source->filteredImageBuffer;
+
+  cl_mem
+    *const imageKernelBuffer = targets->imageKernelBuffer,
+    *const tempImageBuffer = targets->tempImageBuffer;
+
+  cl_kernel
+    *const blurRowKernel = targets->blurRowKernel,
+    *const blurColumnKernel = targets->blurColumnKernel;
+
+  MagickBooleanType
+    *const outputReady = targets->outputReady;
+
+  cl_uint
+    kernelWidth;
+
+  size_t
+    length;
+
+  *imageKernelBuffer=createKernelInfo(device,radius,sigma,&kernelWidth,
+    exception);
+  if (*imageKernelBuffer == (cl_mem) NULL)
+    return(MagickFalse);
+
+  length=image->columns*image->rows;
+  *tempImageBuffer=CreateOpenCLBuffer(device,CL_MEM_READ_WRITE,length*
+    sizeof(cl_float4),(void *) NULL);
+  if (*tempImageBuffer == (cl_mem) NULL)
+    return(MagickFalse);
+
+  {
+    const BlurPassesInput
+      input = { device, image, imageBuffer, channel_mask, *imageKernelBuffer,
+        kernelWidth, chunkSize, *tempImageBuffer, queue, filteredImage,
+        filteredImageBuffer };
+
+    const BlurPassesTargets
+      passTargets = { blurRowKernel, blurColumnKernel, outputReady };
+
+    if (EnqueueBlurPasses(&input,exception,&passTargets) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static Image *ComputeBlurImage(const BlurImageRequest *request,
   MagickCLEnv clEnv,ExceptionInfo *exception)
 {
@@ -356,9 +475,6 @@ static Image *ComputeBlurImage(const BlurImageRequest *request,
     imageKernelBuffer,
     tempImageBuffer;
 
-  cl_uint
-    kernelWidth;
-
   Image
     *filteredImage;
 
@@ -369,8 +485,7 @@ static Image *ComputeBlurImage(const BlurImageRequest *request,
     device;
 
   size_t
-    chunkSize=256,
-    length;
+    chunkSize=256;
 
   const AccelerateBufferTargets
     targets = { &device, &queue, &filteredImage, &imageBuffer,
@@ -394,27 +509,16 @@ static Image *ComputeBlurImage(const BlurImageRequest *request,
   if (AcquireAccelerateBuffers(clEnv,image,exception,&targets) == MagickFalse)
     goto cleanup;
 
-  imageKernelBuffer=createKernelInfo(device,radius,sigma,&kernelWidth,
-    exception);
-  if (imageKernelBuffer == (cl_mem) NULL)
-    goto cleanup;
-
-  length=image->columns*image->rows;
-  tempImageBuffer=CreateOpenCLBuffer(device,CL_MEM_READ_WRITE,length*
-    sizeof(cl_float4),(void *) NULL);
-  if (tempImageBuffer == (cl_mem) NULL)
-    goto cleanup;
-
   {
-    const BlurPassesInput
-      input = { device, image, imageBuffer, channel_mask, imageKernelBuffer,
-        kernelWidth, chunkSize, tempImageBuffer, queue, filteredImage,
-        filteredImageBuffer };
+    const BlurKernelsSource
+      source = { device, radius, sigma, image, imageBuffer, channel_mask,
+        chunkSize, queue, filteredImage, filteredImageBuffer };
 
-    const BlurPassesTargets
-      passTargets = { &blurRowKernel, &blurColumnKernel, &outputReady };
+    const BlurKernelsTargets
+      kernelTargets = { &imageKernelBuffer, &tempImageBuffer, &blurRowKernel,
+        &blurColumnKernel, &outputReady };
 
-    if (EnqueueBlurPasses(&input,exception,&passTargets) == MagickFalse)
+    if (RunBlurKernels(&source,exception,&kernelTargets) == MagickFalse)
       goto cleanup;
   }
 
