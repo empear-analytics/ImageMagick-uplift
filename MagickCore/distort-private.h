@@ -764,9 +764,17 @@ static inline double *GenerateRadialCoefficients(double *coeff,DistortMethod *me
   return((double *) NULL);
 }
 
-static inline double *GenerateMappedCoefficients(double *coeff,DistortMethod *method,
-  const CoefficientContext *context)
+static inline double *GenerateMappedCoefficients(const CoefficientCall *call)
 {
+  double
+    *const coeff = call->coeff;
+
+  DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   switch (*method)
   {
     case BilinearForwardDistortion:
@@ -830,7 +838,7 @@ static inline double *GenerateAffineFamilyCoefficients(
     default:
       break;
   }
-  return(GenerateMappedCoefficients(coeff,method,context));
+  return(GenerateMappedCoefficients(call));
 }
 
 static inline void ZeroCoefficients(double *coeff,
