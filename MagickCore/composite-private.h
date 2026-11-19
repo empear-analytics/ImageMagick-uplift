@@ -193,28 +193,31 @@ static inline void DisableCompositeClampUnlessSpecified(Image *image)
     (void) SetImageArtifact(image,"compose:clamp","off");
 }
 
+static const CompositeOperator
+  NoClipComposeOperators[] =
+  {
+    ClearCompositeOp,
+    SrcCompositeOp,
+    InCompositeOp,
+    SrcInCompositeOp,
+    OutCompositeOp,
+    SrcOutCompositeOp,
+    DstInCompositeOp,
+    DstAtopCompositeOp,
+    CopyAlphaCompositeOp,
+    ChangeMaskCompositeOp
+  };
+
 static inline MagickBooleanType GetCompositeClipToSelf(
   const CompositeOperator compose)
 {
-  switch (compose)
-  {
-    case ClearCompositeOp:
-    case SrcCompositeOp:
-    case InCompositeOp:
-    case SrcInCompositeOp:
-    case OutCompositeOp:
-    case SrcOutCompositeOp:
-    case DstInCompositeOp:
-    case DstAtopCompositeOp:
-    case CopyAlphaCompositeOp:
-    case ChangeMaskCompositeOp:
-    {
+  size_t
+    i;
+
+  for (i=0; i < (sizeof(NoClipComposeOperators)/
+       sizeof(*NoClipComposeOperators)); i++)
+    if (NoClipComposeOperators[i] == compose)
       return(MagickFalse);
-      break;
-    }
-    default:
-      break;
-  }
   return(MagickTrue);
 }
 
