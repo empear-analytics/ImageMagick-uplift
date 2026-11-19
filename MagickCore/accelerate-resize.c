@@ -475,6 +475,120 @@ static MagickBooleanType SetResizeFilterKernelArgs(
   return(MagickTrue);
 }
 
+typedef struct _ResizeFilterKernelSource
+{
+  const ResizeFilterPass
+    *pass;
+
+  ResizeFilterSide
+    side;
+
+  float
+    factor;
+
+  size_t
+    imageCacheLocalMemorySize;
+
+  int
+    numCachedPixels;
+
+  unsigned int
+    pixelPerWorkgroup,
+    chunkSize;
+
+  size_t
+    pixelAccumulatorLocalMemorySize,
+    weightAccumulatorLocalMemorySize,
+    gammaAccumulatorLocalMemorySize;
+
+  unsigned int
+    workgroupSize;
+
+  const ResizeFilterRun
+    *run;
+} ResizeFilterKernelSource;
+
+typedef struct _ResizeFilterKernelTargets
+{
+  cl_kernel
+    *filterKernel;
+
+  MagickBooleanType
+    *outputReady;
+} ResizeFilterKernelTargets;
+
+static MagickBooleanType RunResizeFilterKernel(
+  const ResizeFilterKernelSource *source,ExceptionInfo *exception,
+  const ResizeFilterKernelTargets *kernelTargets)
+{
+  const ResizeFilterPass
+    *const pass = source->pass;
+
+  const ResizeFilterSide
+    side = source->side;
+
+  const float
+    factor = source->factor;
+
+  const size_t
+    imageCacheLocalMemorySize = source->imageCacheLocalMemorySize;
+
+  const int
+    numCachedPixels = source->numCachedPixels;
+
+  const unsigned int
+    pixelPerWorkgroup = source->pixelPerWorkgroup,
+    chunkSize = source->chunkSize;
+
+  const size_t
+    pixelAccumulatorLocalMemorySize = source->pixelAccumulatorLocalMemorySize,
+    weightAccumulatorLocalMemorySize = source->weightAccumulatorLocalMemorySize,
+    gammaAccumulatorLocalMemorySize = source->gammaAccumulatorLocalMemorySize;
+
+  const unsigned int
+    workgroupSize = source->workgroupSize;
+
+  const ResizeFilterRun
+    *const run = source->run;
+
+  cl_kernel
+    *const filterKernel = kernelTargets->filterKernel;
+
+  MagickBooleanType
+    *const outputReady = kernelTargets->outputReady;
+
+  int
+    resizeFilterType,
+    resizeWindowType;
+
+  ResizeFilterLaunch
+    launch;
+
+  resizeFilterType=(int)GetResizeFilterWeightingType(pass->resizeFilter);
+  resizeWindowType=(int)GetResizeFilterWindowWeightingType(pass->resizeFilter);
+
+  if (AcquireResizeFilterKernel(side,pass,filterKernel,exception) ==
+      MagickFalse)
+    return(MagickFalse);
+
+  {
+    const ResizeFilterArgsInput
+      input = { pass, factor, *filterKernel, resizeFilterType,
+        resizeWindowType, imageCacheLocalMemorySize, numCachedPixels,
+        pixelPerWorkgroup, chunkSize, pixelAccumulatorLocalMemorySize,
+        weightAccumulatorLocalMemorySize, gammaAccumulatorLocalMemorySize };
+
+    if (SetResizeFilterKernelArgs(&input,exception) == MagickFalse)
+      return(MagickFalse);
+  }
+
+  launch.filterKernel=*filterKernel;
+  launch.pixelPerWorkgroup=pixelPerWorkgroup;
+  launch.workgroupSize=workgroupSize;
+  *outputReady=EnqueueResizeFilterKernel(run,&launch,exception);
+  return(MagickTrue);
+}
+
 static inline MagickBooleanType ResizeFilterImagePass(
   const ResizeFilterRun *run,ExceptionInfo *exception)
 {
@@ -497,15 +611,10 @@ static inline MagickBooleanType ResizeFilterImagePass(
     support;
 
   int
-    numCachedPixels,
-    resizeFilterType,
-    resizeWindowType;
+    numCachedPixels;
 
   MagickBooleanType
     outputReady;
-
-  ResizeFilterLaunch
-    launch;
 
   size_t
     gammaAccumulatorLocalMemorySize,
@@ -567,28 +676,20 @@ RestoreMSCWarning
     }
   }
 
-  resizeFilterType=(int)GetResizeFilterWeightingType(pass->resizeFilter);
-  resizeWindowType=(int)GetResizeFilterWindowWeightingType(pass->resizeFilter);
-
-  if (AcquireResizeFilterKernel(side,pass,&filterKernel,exception) ==
-      MagickFalse)
-    goto cleanup;
-
   {
-    const ResizeFilterArgsInput
-      input = { pass, factor, filterKernel, resizeFilterType,
-        resizeWindowType, imageCacheLocalMemorySize, numCachedPixels,
-        pixelPerWorkgroup, chunkSize, pixelAccumulatorLocalMemorySize,
-        weightAccumulatorLocalMemorySize, gammaAccumulatorLocalMemorySize };
+    const ResizeFilterKernelSource
+      source = { pass, side, factor, imageCacheLocalMemorySize,
+        numCachedPixels, pixelPerWorkgroup, chunkSize,
+        pixelAccumulatorLocalMemorySize, weightAccumulatorLocalMemorySize,
+        gammaAccumulatorLocalMemorySize, workgroupSize, run };
 
-    if (SetResizeFilterKernelArgs(&input,exception) == MagickFalse)
+    const ResizeFilterKernelTargets
+      kernelTargets = { &filterKernel, &outputReady };
+
+    if (RunResizeFilterKernel(&source,exception,&kernelTargets) ==
+        MagickFalse)
       goto cleanup;
   }
-
-  launch.filterKernel=filterKernel;
-  launch.pixelPerWorkgroup=pixelPerWorkgroup;
-  launch.workgroupSize=workgroupSize;
-  outputReady=EnqueueResizeFilterKernel(run,&launch,exception);
 
 cleanup:
 
