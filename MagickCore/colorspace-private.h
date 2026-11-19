@@ -1833,9 +1833,15 @@ static inline MagickBooleanType IsGrayColorspace(
 
 static inline MagickBooleanType IsGrayImageType(const ImageType type)
 {
-  if ((type == GrayscaleType) || (type == GrayscaleAlphaType) ||
-      (type == BilevelType))
-    return(MagickTrue);
+  switch (type)
+  {
+    case GrayscaleType:
+    case GrayscaleAlphaType:
+    case BilevelType:
+      return(MagickTrue);
+    default:
+      break;
+  }
   return(MagickFalse);
 }
 
