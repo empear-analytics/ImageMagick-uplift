@@ -24289,7 +24289,9 @@ takes a pointer and one or more primitive scalars that its callers always pass t
 each call passing the caller's own variables of the same names: `morphology-apply-private.h`'s
 rotation helpers `RotateKernelBy45Degrees(kernel,angle)`, `ReflectKernel(kernel,angle)` and
 their siblings, called as `angle=F(kernel,angle);` (48 % of the header's arguments primitive;
-a stub probe of four such bundles: 9.68 to 10.0).
+a stub probe of four such bundles: 9.68 to 10.0). The group may also be two or more
+primitive pointers that travel together, such as a string and its end
+(`ParseKernelSpecification(kernel_string,end,...)` in `morphology-apply-kernel-private.h`).
 
 **Not covered by:** Recipe B, which bundles for *Excess Number of Function Arguments* (the
 transformation is B's, with its block form; the finding and the per-call fill differ);
@@ -24908,3 +24910,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | WORDING | IP | Step 5: a binding that the callee declared under step 3 and that a later step of the chain leaves unused is deleted too; a binding nothing reads is not declared (as `PrintBilinearForwardFX` lost `lookup` in `323ac63bd`) | Review of batch 1 of W45 lane c: the commits already did so; the step's text named only the caller's bindings | after the fact |
 | 2026-11-19 | WORDING | OH | The placement of the new header's `#include` depends on the carved header, not on its number of includers: a header with an include block of its own names the new header as that block's last line (also when one `.c` file includes it); a header without one has its one `.c` includer name the new header directly above it in the `.c` file's include block | Review of `e36bb7fc8` (W45 round 32): its text tied the header-block rule to several includers and left an OH product with one includer and an include block of its own between the two rules | after the fact |
 | 2026-11-19 | NEW | BP | Bundle a Pointer and the Scalar It Travels With, for Primitive Obsession: a `static` function's pointer and primitive parameters that every call passes as the caller's own variables become one `const Name *name`, filled per call in Recipe B's block form; the callee binds locals of the old names (a scalar it updates as a plain local) | `morphology-apply-private.h` (campaign A, W45 round 32, lane c): *Primitive Obsession* (48 %) from the kernel rotation helpers' `(kernel,angle)` pairs; B names only argument counts and IP needs a struct the callers hold. A stub probe of four bundles: 9.68 to 10.0 | mandate (2026-10-24) |
+| 2026-11-19 | AMEND | BP | *Use when*: the group may also be two or more primitive pointers that travel together (a string and its end), not only a pointer with its scalars | `morphology-apply-kernel-private.h` (9.68, *Primitive Obsession* 34 %): a stub probe of `ParseKernelSpecification(kernel_string,end,...)` taking a `KernelSpan` and `SetOddSquareKernelSize` passing it on (Recipe IP): 10.0 (campaign A, W45 round 32, lane c) | mandate (2026-10-24) |
