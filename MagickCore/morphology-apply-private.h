@@ -219,8 +219,14 @@ static inline void ReverseKernelValues(KernelInfo *kernel)
     t=k[i],  k[i]=k[j],  k[j]=t;
 }
 
-static inline double ReflectKernel(KernelInfo *kernel,double angle)
+static inline double ReflectKernel(const KernelRotation *rotation)
 {
+  KernelInfo
+    *const kernel = rotation->kernel;
+
+  double
+    angle = rotation->angle;
+
   /* For a 180 degree rotation - also know as a reflection
    * This is actually a very very common operation!
    * Basically all that is needed is a reversal of the kernel data!
@@ -275,7 +281,12 @@ static inline void AttemptKernelRotations(KernelInfo *kernel,double angle)
   if ( 45.0 < fmod(angle, 180.0)  && fmod(angle,180.0) <= 135.0 )
     angle=AttemptKernelRotationBy90Degrees(kernel,angle);
   if ( 135.0 < angle && angle <= 225.0 )
-    angle=ReflectKernel(kernel,angle);
+    {
+      const KernelRotation
+        rotation = { kernel, angle };
+
+      angle=ReflectKernel(&rotation);
+    }
 }
 
 static const KernelInfoType
