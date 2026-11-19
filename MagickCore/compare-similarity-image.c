@@ -578,6 +578,8 @@ static Image *AcquireSimilarityImage(const Image *image,
   return(similarity_image);
 }
 
+#define SimilarityImageTag  "Similarity/Image"
+
 static void SetSimilarityProperties(const Image *image,
   const double *similarity_metric,const RectangleInfo *offset)
 {
@@ -602,20 +604,66 @@ static const FrequencySimilarity *GetRequestedFrequencySimilarity(
 }
 #endif
 
-MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
-  const MetricType metric,const double similarity_threshold,
-  RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
+typedef struct _SimilarityScan
 {
-#define SimilarityImageTag  "Similarity/Image"
+  const Image
+    *image,
+    *reconstruct;
+
+  MetricType
+    metric;
+
+  double
+    similarity_threshold;
+
+  RectangleInfo
+    *offset;
+
+  double
+    *similarity_metric;
+
+  MagickBooleanType
+    status;
+
+  ExceptionInfo
+    *exception;
+} SimilarityScan;
+
+static void SetSimilarityResult(const SimilarityScan *scan,
+  const SimilarityInfo similarity_info)
+{
+  const Image
+    *const image = scan->image;
+
+  *scan->similarity_metric=similarity_info.similarity;
+  if (fabs(*scan->similarity_metric) < MagickEpsilon)
+    *scan->similarity_metric=0.0;
+  scan->offset->x=similarity_info.x;
+  scan->offset->y=similarity_info.y;
+  SetSimilarityProperties(image,scan->similarity_metric,scan->offset);
+}
+
+static Image *MeasureSimilarityImage(const SimilarityScan *scan,
+  Image *similarity_image)
+{
+  const Image
+    *const image = scan->image,
+    *const reconstruct = scan->reconstruct;
+
+  const MetricType
+    metric = scan->metric;
+
+  const double
+    similarity_threshold = scan->similarity_threshold;
+
+  ExceptionInfo
+    *const exception = scan->exception;
 
   CacheView
     *similarity_view;
 
-  Image
-    *similarity_image = (Image *) NULL;
-
   MagickBooleanType
-    status = MagickTrue;
+    status = scan->status;
 
   MagickOffsetType
     progress = 0;
@@ -626,39 +674,6 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
   ssize_t
     y;
 
-  assert(image != (const Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  assert(offset != (RectangleInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  SetGeometry(reconstruct,offset);
-  *similarity_metric=0.0;
-  offset->x=0;
-  offset->y=0;
-#if defined(MAGICKCORE_HDRI_SUPPORT) && defined(MAGICKCORE_FFTW_DELEGATE)
-{
-  const FrequencySimilarity
-    *frequency = GetRequestedFrequencySimilarity(image,metric);
-
-  if (frequency != (const FrequencySimilarity *) NULL)
-    {
-      similarity_image=frequency->similarity_image(image,reconstruct,
-        offset,similarity_metric,exception);
-      return(similarity_image);
-    }
-}
-#endif
-  similarity_image=AcquireSimilarityImage(image,reconstruct,exception);
-  if (similarity_image == (Image *) NULL)
-    return((Image *) NULL);
-  similarity_image->depth=32;
-  similarity_image->colorspace=GRAYColorspace;
-  similarity_image->alpha_trait=UndefinedPixelTrait;
-  status=SetImageStorageClass(similarity_image,DirectClass,exception);
-  if (status == MagickFalse)
-    return(DestroyImage(similarity_image));
   /*
     Measure similarity of reconstruction image against image.
   */
@@ -708,11 +723,63 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
   similarity_view=DestroyCacheView(similarity_view);
   if (status == MagickFalse)
     similarity_image=DestroyImage(similarity_image);
-  *similarity_metric=similarity_info.similarity;
-  if (fabs(*similarity_metric) < MagickEpsilon)
-    *similarity_metric=0.0;
-  offset->x=similarity_info.x;
-  offset->y=similarity_info.y;
-  SetSimilarityProperties(image,similarity_metric,offset);
+  SetSimilarityResult(scan,similarity_info);
   return(similarity_image);
+}
+
+MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
+  const MetricType metric,const double similarity_threshold,
+  RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
+{
+  Image
+    *similarity_image = (Image *) NULL;
+
+  MagickBooleanType
+    status = MagickTrue;
+
+  SimilarityScan
+    scan;
+
+  assert(image != (const Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  assert(offset != (RectangleInfo *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  SetGeometry(reconstruct,offset);
+  *similarity_metric=0.0;
+  offset->x=0;
+  offset->y=0;
+#if defined(MAGICKCORE_HDRI_SUPPORT) && defined(MAGICKCORE_FFTW_DELEGATE)
+{
+  const FrequencySimilarity
+    *frequency = GetRequestedFrequencySimilarity(image,metric);
+
+  if (frequency != (const FrequencySimilarity *) NULL)
+    {
+      similarity_image=frequency->similarity_image(image,reconstruct,
+        offset,similarity_metric,exception);
+      return(similarity_image);
+    }
+}
+#endif
+  similarity_image=AcquireSimilarityImage(image,reconstruct,exception);
+  if (similarity_image == (Image *) NULL)
+    return((Image *) NULL);
+  similarity_image->depth=32;
+  similarity_image->colorspace=GRAYColorspace;
+  similarity_image->alpha_trait=UndefinedPixelTrait;
+  status=SetImageStorageClass(similarity_image,DirectClass,exception);
+  if (status == MagickFalse)
+    return(DestroyImage(similarity_image));
+  scan.image=image;
+  scan.reconstruct=reconstruct;
+  scan.metric=metric;
+  scan.similarity_threshold=similarity_threshold;
+  scan.offset=offset;
+  scan.similarity_metric=similarity_metric;
+  scan.status=status;
+  scan.exception=exception;
+  return(MeasureSimilarityImage(&scan,similarity_image));
 }

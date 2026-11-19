@@ -285,6 +285,18 @@ static inline MagickBooleanType AcquirePHASEEdges(const Image *image,
   return(MagickTrue);
 }
 
+static inline MagickBooleanType CheckPHASEArea(const Image *image,
+  const double area,ExceptionInfo *exception)
+{
+  if (area < 1.0)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
+        "InsufficientImageDataInRaster","`%s'",image->filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static inline MagickBooleanType GetPHASESimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -428,12 +440,8 @@ static inline MagickBooleanType GetPHASESimilarity(const Image *image,
   edge_reconstruct=DestroyImage(edge_reconstruct);
   if (status == MagickFalse)
     return(MagickFalse);
-  if (area < 1.0)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-        "InsufficientImageDataInRaster","`%s'",image->filename);
-      return(MagickFalse);
-    }
+  if (CheckPHASEArea(image,area,exception) == MagickFalse)
+    return(MagickFalse);
   /*
     Reduce to a per-channel Pearson coefficient and average.
   */
