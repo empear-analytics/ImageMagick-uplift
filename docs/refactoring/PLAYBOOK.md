@@ -24409,6 +24409,111 @@ take. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
 
 ---
 
+## Recipe DI - Declare a Local with the Constant Its First Statement Assigns
+
+**Use when:** CodeScene reports *Large Method* (or a function is a few lines from its
+threshold) on a function whose body opens with a run of statements that each assign a
+constant to a local declared without an initialiser, `queue=NULL;`, `image_view=NULL;`,
+`outputReady=MagickFalse;`: the OpenCL host functions of the `accelerate-*.c` files, which
+set every resource a `goto cleanup` chain may release to `NULL` before the first
+acquisition (`accelerate-motion-blur.c`'s `ComputeMotionBlurImage`: nine such statements,
+72 lines against the threshold of 70). Each statement costs a line that an initialiser in
+the declaration does not.
+
+**Not covered by:** Recipe LM, which moves the other way (step 4 turns a constant
+declarator into a statement) and only for locals copied into a struct; Recipe SZ, which
+sinks zeroing `memset` calls down to their reader and keeps the variable's declaration as
+it is; Recipes FI, FB and FU, which rewrite member-by-member struct fills; Recipe IX, which
+inlines a constant extent local into its loop bound and deletes the local; Recipe E and its
+relatives, whose new function cannot take the assignments (the caller reads each local
+after the run, in the cleanup chain).
+
+**How:**
+
+1. The function `F` has no OpenMP pragma. Each statement of the run is `v=c;` in `F`'s
+   outermost compound statement (not inside a loop, a selection or a nested block), where
+   `v` is an automatic local declared in that same compound statement's declarations without
+   an initialiser (not a parameter, not `static`, not `volatile`, not an array), and `c` is
+   a constant: `NULL`, a cast `(T) NULL`, an enumeration constant (`MagickFalse`) or an
+   integer literal.
+2. Nothing before the statement names `v`: no earlier statement, initialiser or macro
+   argument of `F` reads, writes or takes the address of `v` (checked by `grep` over the
+   lines between the declaration and the statement). No label stands between `F`'s opening
+   brace and the statement, so no jump reaches a point between the declaration and the
+   assignment. The statement is `v`'s first assignment; later ones stay as they are.
+3. Append `=c`, without spaces, to `v`'s name in its declarator, the constant's text unchanged
+   (`*image_view,` becomes `*image_view=NULL,`, `queue;` becomes `queue=NULL;`), and delete
+   the statement. Nothing else changes: no declaration moves, no other statement moves.
+4. Every such statement of one function goes in one commit (one recipe, one function); the
+   message lists the variables.
+5. Run `sh tools/obj_identical.sh <file>` (`WIDE=1` for a file only the wide build
+   compiles): it must print `IDENTICAL`; otherwise revert. Run `tools/ci_warnings.sh` and
+   `tools/cxx_warnings.sh` on the file (C++ refuses a `goto` that jumps over an initialised
+   declaration into its scope: step 2's declarations stand before every statement, so no
+   `goto` of `F` crosses them; the C++ check confirms it), `refactor_guard.py` (`OK`; with
+   `--calls`, no change), and the oracle on `F`'s cases when a case reaches it.
+
+**Before:**
+
+```c
+  cl_command_queue
+    queue;
+  ...
+  MagickBooleanType
+    outputReady;
+  ...
+  TraceAccelerateImage(image);
+
+  queue=NULL;
+  ...
+  outputReady=MagickFalse;
+```
+
+**After:**
+
+```c
+  cl_command_queue
+    queue=NULL;
+  ...
+  MagickBooleanType
+    outputReady=MagickFalse;
+  ...
+  TraceAccelerateImage(image);
+
+```
+
+**Careful:**
+
+- An automatic object's initialiser is evaluated each time its declaration is reached in
+  execution, before the block's first statement (C11 6.8p3, 6.2.4p6). `v` then holds `c`
+  from the declarations on, where it held an indeterminate value until the statement. Step 2
+  makes the difference invisible: nothing before the statement can read `v`, and no jump
+  enters the stretch between the declarations and the statement, so every read of `v` sees
+  the value it saw before. The statements that ran between (a trace call, a `NULL` test of
+  a parameter, an early `return`) do not name `v`.
+- An early `return` before the old statement now leaves a local that was set; the value is
+  never read, so nothing observable changes (and step 5's object comparison shows whether
+  the compiler kept the store).
+- The constant is converted to `v`'s type at the initialiser exactly as the assignment
+  converted it (C11 6.7.9p11: the same constraints and conversions as for simple
+  assignment).
+- In C++ (the Windows jobs compile MagickCore as C++), a jump into the scope of an
+  initialised automatic variable past its declaration is ill-formed. Step 1's declarations
+  open `F`'s body, so a `goto cleanup;` in `F` jumps within their scope, never across them.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against `HEAD`
+and `tools/ci_warnings.sh` and `tools/cxx_warnings.sh` printing `OK`; plus the oracle on the
+function's cases (wide for OpenCL host code) when a case reaches it.
+
+**Provenance:** 2026-11-19, from `accelerate-motion-blur.c`'s `ComputeMotionBlurImage`
+(campaign A, W46 round 33, lane b): *Large Method* at 72 lines; the nine `NULL` and
+`MagickFalse` statements folded into their declarators leave 63 lines; a probe 9.30 to 9.68
+(only the MagickPrivate argument count of `AccelerateMotionBlurImage` left), `obj_identical.sh`
+`IDENTICAL` in the wide build. Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-10-24 and the owner's "New recipes are fine" of 2026-11-19.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -24939,3 +25044,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | WORDING | BP | Step 1 defines the group (a pointer with its scalars, or pointers that travel together, an `&v` of a plain local allowed); step 4 moves an `if` that tests the call, or a `return` of it, whole into the block (`8475fe80b`); *Careful* covers the pointer group | Review of batch 3 of W45 lane c: after `b1fafe29e` the name, step 1 and *Careful* still spoke of a pointer and its scalars only | after the fact |
 | 2026-11-19 | AMEND | IP | Step 2 (a) also counts a caller's non-`const` local bound from the member when every assignment to it stands in a block that leaves the function before any call of the step (`coeff` freed and `NULL` returned), and a local bound from a member of a `const` pointer local that is itself bound from `name->member` (`context->image`, `context = call->context`) | `distort-private.h` and `distort-linear-private.h` (9.68, *Primitive Obsession*): the coefficient generators pass `coeff`, `method` and members of `context` on to their setters; a stub probe of twelve BP/IP steps on `distort-private.h` gives 10.0 (campaign A, W45 round 32, lane c, batch 4) | mandate (2026-10-24) |
 | 2026-11-19 | WORDING | IP | Step 2 (a), second reading of `485b9c818`: the local bound through a `const` pointer local counts only when nothing writes that member, or the pointer member it is read through, between the caller's binding and the call | Review of batch 4 of W45 lane c: the reading's text left the no-write condition implicit (in the distort chain `context` and its members are written by nothing after `GenerateCoefficients` fills them) | after the fact |
+| 2026-11-19 | NEW | DI | Declare a Local with the Constant Its First Statement Assigns: a run of `v=c;` statements (`NULL`, `(T) NULL`, an enumeration constant, an integer literal) at the top level of a function body, each the first statement to name a local declared without an initialiser in the same block, with no label before it, becomes `=c` in the declarators; `obj_identical.sh` `IDENTICAL` is required. *Careful* gives the argument (C11 6.8p3 and 6.7.9p11; nothing reads the local before the old statement and no jump enters the stretch; C++ jumps stay within the scope) | `accelerate-motion-blur.c`'s `ComputeMotionBlurImage` (campaign A, W46 round 33, lane b): *Large Method* at 72 lines, nine `NULL`/`MagickFalse` statements; a probe 9.30 to 9.68, object code identical in the wide build | owner |
