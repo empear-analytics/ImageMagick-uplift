@@ -94,6 +94,7 @@
 #include "MagickCore/composite-image-blend-private.h"
 #include "MagickCore/composite-image-over-private.h"
 #include "MagickCore/composite-image-virtual-private.h"
+#include "MagickCore/composite-image-alpha-coverage-private.h"
 #include "MagickCore/composite-image-alpha-private.h"
 #include "MagickCore/composite-image-coverage-private.h"
 

@@ -160,6 +160,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/composite-image-blend-private.h \
   MagickCore/composite-image-over-private.h \
   MagickCore/composite-image-virtual-private.h \
+  MagickCore/composite-image-alpha-coverage-private.h \
   MagickCore/composite-image-alpha-private.h \
   MagickCore/composite-image-coverage-private.h \
   MagickCore/composite-private.h \
@@ -665,6 +666,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/composite-image-blend-private.h \
   MagickCore/composite-image-over-private.h \
   MagickCore/composite-image-virtual-private.h \
+  MagickCore/composite-image-alpha-coverage-private.h \
   MagickCore/composite-image-alpha-private.h \
   MagickCore/composite-image-coverage-private.h \
   MagickCore/composite-private.h \
