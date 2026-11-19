@@ -134,6 +134,21 @@ static inline EndianType GetHostEndian(void)
 #define SignificandShift  13
 #define SignificandMask  (0x00000400U)
 
+static inline unsigned int NormalizeHalfSubnormal(const unsigned int sign_bit,
+  unsigned int exponent,unsigned int significand)
+{
+  while ((significand & SignificandMask) == 0)
+  {
+    significand<<=1;
+    exponent--;
+  }
+  exponent++;
+  significand&=(~SignificandMask);
+  exponent+=ExponentBias;
+  return((sign_bit << SignBitShift) | (exponent << ExponentShift) |
+    (significand << SignificandShift));
+}
+
 static inline float HalfToSinglePrecision(const unsigned short half)
 {
   typedef union _SinglePrecision
@@ -169,18 +184,7 @@ static inline float HalfToSinglePrecision(const unsigned short half)
       if (significand == 0)
         value=sign_bit << SignBitShift;
       else
-        {
-          while ((significand & SignificandMask) == 0)
-          {
-            significand<<=1;
-            exponent--;
-          }
-          exponent++;
-          significand&=(~SignificandMask);
-          exponent+=ExponentBias;
-          value=(sign_bit << SignBitShift) | (exponent << ExponentShift) |
-            (significand << SignificandShift);
-        }
+        value=NormalizeHalfSubnormal(sign_bit,exponent,significand);
     }
   else
     if (exponent == SignBitShift)
