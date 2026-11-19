@@ -1739,6 +1739,69 @@ static MagickBooleanType AcquireNCCVariance(const Image *reconstruct,
   return(MagickTrue);
 }
 
+typedef struct _NCCCorrelationTargets
+{
+  ChannelStatistics
+    **channel_statistics;
+
+  Image
+    **correlation_image,
+    **divide_image,
+    **ncc_image,
+    **normalize_image,
+    **variance_image;
+} NCCCorrelationTargets;
+
+static MagickBooleanType AcquireNCCCorrelation(const Image *image,
+  const Image *reconstruct,ExceptionInfo *exception,
+  const NCCCorrelationTargets *targets)
+{
+  ChannelStatistics
+    **const channel_statistics = targets->channel_statistics;
+
+  Image
+    **const correlation_image = targets->correlation_image,
+    **const divide_image = targets->divide_image,
+    **const ncc_image = targets->ncc_image,
+    **const normalize_image = targets->normalize_image,
+    **const variance_image = targets->variance_image;
+
+  RectangleInfo
+    geometry;
+
+  *normalize_image=SIMSubtractImageMean(image,reconstruct,*channel_statistics,
+    exception);
+  *channel_statistics=(ChannelStatistics *)
+    RelinquishMagickMemory(*channel_statistics);
+  if (*normalize_image == (Image *) NULL)
+    return(MagickFalse);
+  *correlation_image=SIMCrossCorrelationImage(image,*normalize_image,
+    exception);
+  *normalize_image=DestroyImage(*normalize_image);
+  if (*correlation_image == (Image *) NULL)
+    return(MagickFalse);
+  /*
+    Divide the two images.
+  */
+  *divide_image=SIMDivideImage(*correlation_image,*variance_image,exception);
+  *correlation_image=DestroyImage(*correlation_image);
+  *variance_image=DestroyImage(*variance_image);
+  if (*divide_image == (Image *) NULL)
+    return(MagickFalse);
+  /*
+    Crop padding.
+  */
+  SetGeometry(image,&geometry);
+  geometry.width=image->columns;
+  geometry.height=image->rows;
+  (void) ResetImagePage(*divide_image,"0x0+0+0");
+  *ncc_image=CropImage(*divide_image,&geometry,exception);
+  *divide_image=DestroyImage(*divide_image);
+  if (*ncc_image == (Image *) NULL)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static Image *NCCSimilarityImage(const Image *image,const Image *reconstruct,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
 {
@@ -1765,14 +1828,15 @@ static Image *NCCSimilarityImage(const Image *image,const Image *reconstruct,
   NCCAlphaTargets
     targets;
 
+  const NCCCorrelationTargets
+    correlation_targets = { &channel_statistics, &correlation_image,
+      &divide_image, &ncc_image, &normalize_image, &variance_image };
+
   NCCTargetTargets
     beta_targets;
 
   NCCVarianceTargets
     variance_targets;
-
-  RectangleInfo
-    geometry;
 
   /*
     NCC correlation-based image similarity with FFT local statistics.
@@ -1794,34 +1858,8 @@ static Image *NCCSimilarityImage(const Image *image,const Image *reconstruct,
   if (AcquireNCCVariance(reconstruct,exception,&variance_targets) ==
       MagickFalse)
     ThrowNCCSimilarityException();
-  normalize_image=SIMSubtractImageMean(image,reconstruct,channel_statistics,
-    exception);
-  channel_statistics=(ChannelStatistics *)
-    RelinquishMagickMemory(channel_statistics);
-  if (normalize_image == (Image *) NULL)
-    ThrowNCCSimilarityException();
-  correlation_image=SIMCrossCorrelationImage(image,normalize_image,exception);
-  normalize_image=DestroyImage(normalize_image);
-  if (correlation_image == (Image *) NULL)
-    ThrowNCCSimilarityException();
-  /*
-    Divide the two images.
-  */
-  divide_image=SIMDivideImage(correlation_image,variance_image,exception);
-  correlation_image=DestroyImage(correlation_image);
-  variance_image=DestroyImage(variance_image);
-  if (divide_image == (Image *) NULL)
-    ThrowNCCSimilarityException();
-  /*
-    Crop padding.
-  */
-  SetGeometry(image,&geometry);
-  geometry.width=image->columns;
-  geometry.height=image->rows;
-  (void) ResetImagePage(divide_image,"0x0+0+0");
-  ncc_image=CropImage(divide_image,&geometry,exception);
-  divide_image=DestroyImage(divide_image);
-  if (ncc_image == (Image *) NULL)
+  if (AcquireNCCCorrelation(image,reconstruct,exception,
+        &correlation_targets) == MagickFalse)
     ThrowNCCSimilarityException();
   /*
     Identify the maxima value in the image and its location.
