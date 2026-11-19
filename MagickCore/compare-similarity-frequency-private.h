@@ -1389,6 +1389,38 @@ static MagickBooleanType AcquireMSESum(const Image *reconstruct,
   return(MagickTrue);
 }
 
+typedef struct _MSEMeanTargets
+{
+  Image
+    **mean_image,
+    **sum_image;
+} MSEMeanTargets;
+
+static MagickBooleanType AcquireMSEMean(Image *alpha_image,Image *beta_image,
+  ExceptionInfo *exception,const MSEMeanTargets *targets)
+{
+  Image
+    **const mean_image = targets->mean_image,
+    **const sum_image = targets->sum_image;
+
+  MagickBooleanType
+    status;
+
+  /*
+    Create mean image.
+  */
+  AppendImageToList(sum_image,alpha_image);
+  AppendImageToList(sum_image,beta_image);
+  *mean_image=EvaluateImages(*sum_image,SumEvaluateOperator,exception);
+  if (*mean_image == (Image *) NULL)
+    return(MagickFalse);
+  *sum_image=DestroyImage(*sum_image);
+  status=GrayscaleImage(*mean_image,AveragePixelIntensityMethod,exception);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
 {
@@ -1411,6 +1443,9 @@ static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
 
   MSEAlphaTargets
     targets;
+
+  MSEMeanTargets
+    mean_targets;
 
   MSESumTargets
     sum_targets;
@@ -1448,17 +1483,10 @@ static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
   sum_targets.sum_image=(&sum_image);
   if (AcquireMSESum(reconstruct,exception,&sum_targets) == MagickFalse)
     ThrowMSESimilarityException();
-  /*
-    Create mean image.
-  */
-  AppendImageToList(&sum_image,alpha_image);
-  AppendImageToList(&sum_image,beta_image);
-  mean_image=EvaluateImages(sum_image,SumEvaluateOperator,exception);
-  if (mean_image == (Image *) NULL)
-    ThrowMSESimilarityException();
-  sum_image=DestroyImage(sum_image);
-  status=GrayscaleImage(mean_image,AveragePixelIntensityMethod,exception);
-  if (status == MagickFalse)
+  mean_targets.mean_image=(&mean_image);
+  mean_targets.sum_image=(&sum_image);
+  if (AcquireMSEMean(alpha_image,beta_image,exception,&mean_targets) ==
+      MagickFalse)
     ThrowMSESimilarityException();
   /*
     Crop to difference of reconstruction and test images.
