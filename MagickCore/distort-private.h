@@ -315,9 +315,17 @@ static inline void SetPolarRatios(double *coeff,const Image *image,
   }
 }
 
-static inline double *PolarCoefficients(double *coeff,const DistortMethod *method,
-  const CoefficientContext *context)
+static inline double *PolarCoefficients(const CoefficientCall *call)
 {
+  double
+    *coeff = call->coeff;
+
+  const DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   const Image
     *const image = context->image;
 
@@ -757,7 +765,7 @@ static inline double *GenerateRadialCoefficients(const CoefficientCall *call)
   {
     case PolarDistortion:
     case DePolarDistortion:
-      return(PolarCoefficients(coeff,method,context));
+      return(PolarCoefficients(call));
     case Cylinder2PlaneDistortion:
     case Plane2CylinderDistortion:
       return(CylinderCoefficients(coeff,method,context));
