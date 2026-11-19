@@ -15683,6 +15683,16 @@ block leaves through `goto`.
    stays as it was. Check each argument against its parameter by reading.
 6. `refactor_guard.py`: `PASS` or `WARN` with `NULL`'s cast added only; `--calls`: `+2` for
    the new function and nothing else.
+7. Self-guarded form (2026-11-19). The block may instead open with `v=Make(...);` and its own
+   `if (v == (T *) NULL) return(v);`, followed only by guards whose exit is
+   `return(Release(v));` with `Release` a MagickCore routine that always returns `(T *) NULL`
+   (`DestroyImage`, checked by reading its definition), and end there; the caller then reads
+   `v` after the block and has no `NULL` test of its own (`compare-similarity-frequency-images-
+   private.h`'s `SIMUnityImage`: `CloneImage`, its test, then `if (SetImageStorageClass(...) ==
+   MagickFalse) return(DestroyImage(unity_image));`). The block moves whole and unchanged into
+   the new function, which declares `v` and ends with `return(v);` (steps 1, 3 and 4 otherwise
+   hold); in the caller `v=Helper(...);` is followed by a copy of the block's first guard,
+   `if (v == (T *) NULL) return(v);`.
 
 **Before:**
 
@@ -15719,6 +15729,11 @@ block leaves through `goto`.
   reads changes; the images the block releases it still releases, in its order.
 - A `const` struct initialised from parameters now reads them inside the function: the same
   values, since nothing between the caller's declaration and the block wrote them.
+- Step 7: each exit of the block now leaves the helper with `(T *) NULL` (the `NULL` `v`, or
+  `Release(v)`'s value) after the same statements, and the caller's copied guard returns `v`,
+  which holds that `NULL`: the value the caller returned before, at the same point. On the
+  path that passes every guard the helper returns `v` and the caller goes on with it as
+  before; the guard reads `v` once more and has no side effect.
 - The early returns are allocation failures that no case reaches: checked by reading, each
   `return(R);` against its `return((T *) NULL);`; the last path is checked by the oracle.
 
@@ -15729,7 +15744,7 @@ checked by reading.
 after Recipe RD it is a *Large Method* of 73 lines whose head builds `mean_image` from a crop and
 a difference sum; the head as a helper takes it out of the finding, 3.58 to 3.70 in a probe, no
 finding on the helper. Added by Claude Code (Claude Opus 5.5) under the owner's OK of 2026-11-10
-to evolve the recipes.
+to evolve the recipes. Step 7 (the self-guarded head): 2026-11-19, from `compare-similarity-frequency-images-private.h`'s `SIMUnityImage` (campaign A, W46 round 33, lane a), cc 10 to 9 and 8.87 to 8.89 in a probe; added by Claude Code (Claude Opus 5.5) under the owner's answer of 2026-11-19 ("New recipes are fine").
 
 ---
 
@@ -25054,3 +25069,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | AMEND | IP | Step 2 (a) also counts a caller's non-`const` local bound from the member when every assignment to it stands in a block that leaves the function before any call of the step (`coeff` freed and `NULL` returned), and a local bound from a member of a `const` pointer local that is itself bound from `name->member` (`context->image`, `context = call->context`) | `distort-private.h` and `distort-linear-private.h` (9.68, *Primitive Obsession*): the coefficient generators pass `coeff`, `method` and members of `context` on to their setters; a stub probe of twelve BP/IP steps on `distort-private.h` gives 10.0 (campaign A, W45 round 32, lane c, batch 4) | mandate (2026-10-24) |
 | 2026-11-19 | WORDING | IP | Step 2 (a), second reading of `485b9c818`: the local bound through a `const` pointer local counts only when nothing writes that member, or the pointer member it is read through, between the caller's binding and the call | Review of batch 4 of W45 lane c: the reading's text left the no-write condition implicit (in the distort chain `context` and its members are written by nothing after `GenerateCoefficients` fills them) | after the fact |
 | 2026-11-19 | NEW | GL | Fold a Guard into the Lookup It Encloses, Returning NULL When It Fails: `if (G) { const T *v = L; if (v != NULL) { B } }` becomes `const T *v = Helper(...); if (v != NULL) { B }`, the helper returning `L` when `G` holds and `NULL` otherwise (with the statements that compute only `G`'s operands) | `compare-similarity-image.c`'s `SimilarityImage` (campaign A, W46 round 33, lane a): the frequency-domain dispatch is a bump and two decisions of a `MagickExport` function; E, P, CN and RV do not take it. Probe 8.51 to 8.54 | owner |
+| 2026-11-19 | AMEND | HN | Step 7: a self-guarded head (`v=Make(...); if (v == NULL) return(v);` then guards returning `Release(v)`, a routine that always returns `NULL`, with no `NULL` test of the caller after it) moves whole; the caller gets `v=Helper(...);` and a copy of the block's first guard. *Careful* gives the argument | `compare-similarity-frequency-images-private.h`'s `SIMUnityImage` (campaign A, W46 round 33, lane a): its clone and storage-class head returns `unity_image` and `DestroyImage(unity_image)`, neither one constant `R`, and has no trailing `v=Last(...)`; probe cc 10 to 9, 8.87 to 8.89 | owner |
