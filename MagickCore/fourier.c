@@ -1253,6 +1253,44 @@ static MagickBooleanType SwapInversePhaseQuadrants(
   return(status);
 }
 
+typedef struct _InverseFourierSets
+{
+  FourierInfo
+    *fourier_info;
+
+  double
+    *magnitude_pixels,
+    *phase_pixels;
+} InverseFourierSets;
+
+static void MergeInverseFourierPolar(const InverseFourierSets *sets,ssize_t i,
+  fftw_complex *fourier_pixels)
+{
+  FourierInfo
+    *const fourier_info = sets->fourier_info;
+
+  double
+    *const magnitude_pixels = sets->magnitude_pixels,
+    *const phase_pixels = sets->phase_pixels;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0L; y < (ssize_t) fourier_info->height; y++)
+    for (x=0L; x < (ssize_t) fourier_info->center; x++)
+    {
+#if defined(MAGICKCORE_HAVE_COMPLEX_H)
+      fourier_pixels[i]=magnitude_pixels[i]*cos(phase_pixels[i])+I*
+        magnitude_pixels[i]*sin(phase_pixels[i]);
+#else
+      fourier_pixels[i][0]=magnitude_pixels[i]*cos(phase_pixels[i]);
+      fourier_pixels[i][1]=magnitude_pixels[i]*sin(phase_pixels[i]);
+#endif
+      i++;
+    }
+}
+
 static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
   const InverseImagePair *images,fftw_complex *fourier_pixels,
   ExceptionInfo *exception)
@@ -1261,6 +1299,9 @@ static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
     *inverse_pixels,
     *magnitude_pixels,
     *phase_pixels;
+
+  InverseFourierSets
+    sets;
 
   MagickBooleanType
     status;
@@ -1303,19 +1344,11 @@ static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
     Merge two sets.
   */
   i=0L;
+  sets.fourier_info=fourier_info;
+  sets.magnitude_pixels=magnitude_pixels;
+  sets.phase_pixels=phase_pixels;
   if (fourier_info->modulus != MagickFalse)
-    for (y=0L; y < (ssize_t) fourier_info->height; y++)
-       for (x=0L; x < (ssize_t) fourier_info->center; x++)
-       {
-#if defined(MAGICKCORE_HAVE_COMPLEX_H)
-         fourier_pixels[i]=magnitude_pixels[i]*cos(phase_pixels[i])+I*
-           magnitude_pixels[i]*sin(phase_pixels[i]);
-#else
-         fourier_pixels[i][0]=magnitude_pixels[i]*cos(phase_pixels[i]);
-         fourier_pixels[i][1]=magnitude_pixels[i]*sin(phase_pixels[i]);
-#endif
-         i++;
-      }
+    MergeInverseFourierPolar(&sets,i,fourier_pixels);
   else
     for (y=0L; y < (ssize_t) fourier_info->height; y++)
       for (x=0L; x < (ssize_t) fourier_info->center; x++)
