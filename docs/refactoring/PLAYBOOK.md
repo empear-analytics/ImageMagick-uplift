@@ -23399,6 +23399,15 @@ It also applies to a header that this recipe produced and that only one `.c` fil
 new header on the line directly above the old one, so the include block keeps every
 `#include` and the translation unit has the same tokens in the same order (the `extern
 "C"` lines are empty in C); the `.c` file is then the one includer of both.
+On such a header (a split or OH product) the recipe also takes *Overall Code Complexity*,
+when a probe of the carve leaves the header and the new header each at 10.0, or at least
+at the header's score before with a stub-probed chain ending at 10.0
+(`composite-image-coverage-private.h`, `layer-frames-private.h`). A split header that has
+an include block of its own (several `.c` files include it) names the new header as the
+last line of that block, before its `extern "C"` opener, and stays the new header's one
+includer. A `%` banner of a `static` function that stands in the run but documents a
+function that stays moves, unchanged, to directly above that function, as step 1 moves
+an external function's banner (comments are not tokens).
 
 **Not covered by:** Recipe S, which moves a public root into a new `.c` file and shares helpers
 through a header that two `.c` files include; here nothing public leaves and no second `.c`
@@ -24183,7 +24192,11 @@ block and creates its input struct.
    in the body changes.
 4. At each call replace the group's arguments by `name` (form a) or `&v` (form b).
 5. A local of a caller that was bound only for the replaced arguments and is now unused is
-   deleted with its binding (Recipe DV step 3: `-Wunused-variable` shows it).
+   deleted with its binding (Recipe DV step 3: `-Wunused-variable` shows it). The same
+   holds for a binding the callee itself declared under step 3 in an earlier step and
+   that a later step of the chain leaves unused (`PrintBilinearForwardFX` binds no
+   `lookup` once `PrintBilinearForwardLookup` takes `fx`): a binding nothing reads is
+   not declared.
 6. One function per commit. Run `refactor_guard.py --calls` (no call appears or vanishes)
    on the file and on every `.c` file that includes it, `tools/ci_warnings.sh` and
    `tools/cxx_warnings.sh`, and the oracle on the function's cases; score the file and
@@ -24788,3 +24801,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-18 | NEW | KG | Replace a Character-Keyed Switch of Checked Calls by a Table of Calls: groups `if (F(args) == c) return(c); break;` over functions of a base signature and up to two sided signatures (one trailing enumeration constant) become a `static const` table of `{key, f, f1, f2, s1, s2}`, a lookup and a dispatch; the throwing `default:` stays, its macro's `break` leaving the loop only where the loop would end at once (step 6) | `draw.c`'s `TracePath` (twenty labels, three tracer signatures, `ThrowPointExpectedException` default); designed at the owner's request, campaign B, M140 | mandate (2026-10-24) |
 | 2026-11-19 | NEW | IP | Pass the Input Struct in Place of Primitive Parameters Bound from It: a `static` function's primitive parameters that every call fills from the members of one struct (a helper's `const` locals bound from `name->member`, or a local struct whose members the caller assigned from the passed identifiers) become one `const Name *name` parameter; the callee binds locals of the old names and types from the members | `distort-map-private.h` (campaign A, W45 round 32, lane c): *Primitive Obsession* (52 %) held by `DistortImage`'s verbose FX printers, which take `coeff`, `image_gen` and `lookup` from callers binding them from a `DistortVerboseFX`; Recipe B names only argument counts. A stub probe of eleven steps: 9.68 to 10.0 | mandate (2026-10-24) |
 | 2026-11-19 | AMEND | OH | Form A also carves a header that Recipe OH produced and that one `.c` file includes: its leading run after the `extern "C"` opener moves into a new header, which the `.c` file's include block names directly above the old header (no `#include` outside an include block); the translation unit keeps its tokens and order | `composite-channel-private.h` (5.65; *Lines of Code in a Single File*, 1068 lines, and the `GetSoftBurnBlend`/`GetSoftDodgeBlend` duplication): a probe moving `GetColorDodgeBlend` to `GetPegtopLightBlend` gives 6.17 and a new header at 10.0 (campaign A, W45 round 32, lane c) | mandate (2026-10-24) |
+| 2026-11-19 | AMEND | OH | On a split or OH-product header, Form A also takes *Overall Code Complexity* when the carve's probe leaves both headers at 10.0 (or at least the header's score, with a stub-probed chain ending at 10.0); a split header with its own include block names the new header as that block's last line; a `static` function's banner that stands in the run moves to stay above its function | `composite-image-coverage-private.h` (9.38, a two-carve chain to three headers at 10.0, `2ce6e70d4` and `f1ec40d41`, taken under the composite-channel amendment of the same day: written down after the fact) and `layer-frames-private.h` (9.38; a probe of the carve through `IsOverlayPixelChanged`: both 10.0) (campaign A, W45 round 32, lane c) | mandate (2026-10-24) |
+| 2026-11-19 | WORDING | IP | Step 5: a binding that the callee declared under step 3 and that a later step of the chain leaves unused is deleted too; a binding nothing reads is not declared (as `PrintBilinearForwardFX` lost `lookup` in `323ac63bd`) | Review of batch 1 of W45 lane c: the commits already did so; the step's text named only the caller's bindings | after the fact |

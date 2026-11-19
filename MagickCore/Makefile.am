@@ -193,6 +193,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/distort-sparse.c \
   MagickCore/distort-affine.c \
   MagickCore/distort-resize.c \
+  MagickCore/distort-linear-private.h \
   MagickCore/distort-private.h \
   MagickCore/distort-map-private.h \
   MagickCore/distort.h \
@@ -282,6 +283,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/layer-composite.c \
   MagickCore/layer-merge.c \
   MagickCore/layer.h \
+  MagickCore/layer-frames-bounds-private.h \
   MagickCore/layer-frames-private.h \
   MagickCore/linked-list.c \
   MagickCore/linked-list.h \
@@ -676,6 +678,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/delegate-private.h \
   MagickCore/delegate-private.h \
   MagickCore/display-private.h \
+  MagickCore/distort-linear-private.h \
   MagickCore/distort-private.h \
   MagickCore/distort-map-private.h \
   MagickCore/distribute-cache-private.h \
@@ -694,6 +697,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/gem-private.h \
   MagickCore/geometry-private.h \
   MagickCore/image-private.h \
+  MagickCore/layer-frames-bounds-private.h \
   MagickCore/layer-frames-private.h \
   MagickCore/linked-list-private.h \
   MagickCore/locale-private.h \
