@@ -493,7 +493,7 @@ static MagickBooleanType SetHullPassArgs(const HullPassArgsInput *input,
   return(MagickTrue);
 }
 
-typedef struct _DespeckleRunInput
+typedef struct _HullPassLoopInput
 {
   MagickCLEnv
     clEnv;
@@ -504,77 +504,46 @@ typedef struct _DespeckleRunInput
   cl_command_queue
     queue;
 
-  cl_mem
-    imageBuffer,
-    *tempImageBuffer,
-    filteredImageBuffer;
-
-  void
-    *filteredPixels;
-
-  const Image
-    *image;
-} DespeckleRunInput;
-
-typedef struct _DespeckleRunTargets
-{
   cl_kernel
     *hullPass1,
     *hullPass2;
-} DespeckleRunTargets;
 
-static MagickBooleanType RunDespeckleKernels(const DespeckleRunInput *run,
-  ExceptionInfo *exception,const DespeckleRunTargets *targets)
-{
-  const MagickCLEnv
-    clEnv = run->clEnv;
-
-  const MagickCLDevice
-    device = run->device;
-
-  const cl_command_queue
-    queue = run->queue;
+  size_t
+    *global_work_size;
 
   cl_mem
-    imageBuffer = run->imageBuffer,
-    *const tempImageBuffer = run->tempImageBuffer,
-    filteredImageBuffer = run->filteredImageBuffer;
+    *tempImageBuffer,
+    filteredImageBuffer;
+} HullPassLoopInput;
 
-  void
-    *const filteredPixels = run->filteredPixels;
+static MagickBooleanType RunHullPassLoop(const HullPassLoopInput *loop,
+  ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = loop->clEnv;
 
-  const Image
-    *const image = run->image;
+  const MagickCLDevice
+    device = loop->device;
+
+  const cl_command_queue
+    queue = loop->queue;
 
   cl_kernel
-    *const hullPass1 = targets->hullPass1,
-    *const hullPass2 = targets->hullPass2;
+    *const hullPass1 = loop->hullPass1,
+    *const hullPass2 = loop->hullPass2;
+
+  size_t
+    *const global_work_size = loop->global_work_size;
+
+  cl_mem
+    *const tempImageBuffer = loop->tempImageBuffer,
+    filteredImageBuffer = loop->filteredImageBuffer;
 
   cl_int
     clStatus;
 
   int
     k;
-
-  size_t
-    global_work_size[2],
-    length;
-
-  *hullPass1 = AcquireOpenCLKernel(device,"HullPass1");
-  *hullPass2 = AcquireOpenCLKernel(device,"HullPass2");
-
-  {
-    const HullPassArgsInput
-      args = { clEnv, device, hullPass1, hullPass2, imageBuffer,
-        tempImageBuffer, image };
-
-    if (SetHullPassArgs(&args,exception) == MagickFalse)
-      return(MagickFalse);
-  }
-
-  global_work_size[0] = image->columns;
-  global_work_size[1] = image->rows;
-
 
   for (k = 0; k < 4; k++)
   {
@@ -671,6 +640,97 @@ static MagickBooleanType RunDespeckleKernels(const DespeckleRunInput *run,
       if (EnqueueHullPasses(&launch,exception) == MagickFalse)
         return(MagickFalse);
     }
+  }
+  return(MagickTrue);
+}
+
+typedef struct _DespeckleRunInput
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  cl_mem
+    imageBuffer,
+    *tempImageBuffer,
+    filteredImageBuffer;
+
+  void
+    *filteredPixels;
+
+  const Image
+    *image;
+} DespeckleRunInput;
+
+typedef struct _DespeckleRunTargets
+{
+  cl_kernel
+    *hullPass1,
+    *hullPass2;
+} DespeckleRunTargets;
+
+static MagickBooleanType RunDespeckleKernels(const DespeckleRunInput *run,
+  ExceptionInfo *exception,const DespeckleRunTargets *targets)
+{
+  const MagickCLEnv
+    clEnv = run->clEnv;
+
+  const MagickCLDevice
+    device = run->device;
+
+  const cl_command_queue
+    queue = run->queue;
+
+  cl_mem
+    imageBuffer = run->imageBuffer,
+    *const tempImageBuffer = run->tempImageBuffer,
+    filteredImageBuffer = run->filteredImageBuffer;
+
+  void
+    *const filteredPixels = run->filteredPixels;
+
+  const Image
+    *const image = run->image;
+
+  cl_kernel
+    *const hullPass1 = targets->hullPass1,
+    *const hullPass2 = targets->hullPass2;
+
+  cl_int
+    clStatus;
+
+  size_t
+    global_work_size[2],
+    length;
+
+  *hullPass1 = AcquireOpenCLKernel(device,"HullPass1");
+  *hullPass2 = AcquireOpenCLKernel(device,"HullPass2");
+
+  {
+    const HullPassArgsInput
+      args = { clEnv, device, hullPass1, hullPass2, imageBuffer,
+        tempImageBuffer, image };
+
+    if (SetHullPassArgs(&args,exception) == MagickFalse)
+      return(MagickFalse);
+  }
+
+  global_work_size[0] = image->columns;
+  global_work_size[1] = image->rows;
+
+
+  {
+    const HullPassLoopInput
+      loop = { clEnv, device, queue, hullPass1, hullPass2, global_work_size,
+        tempImageBuffer, filteredImageBuffer };
+
+    if (RunHullPassLoop(&loop,exception) == MagickFalse)
+      return(MagickFalse);
   }
 
   if (ALIGNED(filteredPixels,CLPixelPacket))
