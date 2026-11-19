@@ -806,6 +806,90 @@ static MagickBooleanType RunDespeckleKernels(const DespeckleRunInput *run,
   return(MagickTrue);
 }
 
+typedef struct _DespeckleFinish
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  cl_mem
+    imageBuffer,
+    *tempImageBuffer,
+    filteredImageBuffer;
+
+  cl_kernel
+    hullPass1,
+    hullPass2;
+
+  CacheView
+    *image_view,
+    *filteredImage_view;
+
+  MagickBooleanType
+    outputReady;
+
+  Image
+    *filteredImage;
+} DespeckleFinish;
+
+static Image *FinishDespeckleImage(const DespeckleFinish *finish)
+{
+  const MagickCLEnv
+    clEnv = finish->clEnv;
+
+  const MagickCLDevice
+    device = finish->device;
+
+  const cl_command_queue
+    queue = finish->queue;
+
+  const cl_mem
+    imageBuffer = finish->imageBuffer,
+    filteredImageBuffer = finish->filteredImageBuffer;
+
+  cl_mem
+    *const tempImageBuffer = finish->tempImageBuffer;
+
+  const cl_kernel
+    hullPass1 = finish->hullPass1,
+    hullPass2 = finish->hullPass2;
+
+  CacheView
+    *const image_view = finish->image_view,
+    *const filteredImage_view = finish->filteredImage_view;
+
+  const MagickBooleanType
+    outputReady = finish->outputReady;
+
+  Image
+    *filteredImage = finish->filteredImage;
+
+  DestroyAccelerateViews(image_view,filteredImage_view);
+
+  if (queue != NULL)
+    ReleaseOpenCLCommandQueue(device,queue);
+  if (device != NULL)
+    ReleaseOpenCLDevice(device);
+  if (imageBuffer!=NULL)
+    clEnv->library->clReleaseMemObject(imageBuffer);
+  ReleaseTempImageBuffers(clEnv,tempImageBuffer);
+  if (filteredImageBuffer!=NULL)
+    clEnv->library->clReleaseMemObject(filteredImageBuffer);
+  if (hullPass1!=NULL)
+    ReleaseOpenCLKernel(hullPass1);
+  if (hullPass2!=NULL)
+    ReleaseOpenCLKernel(hullPass2);
+  if (outputReady == MagickFalse && filteredImage != NULL)
+    filteredImage=DestroyImage(filteredImage);
+
+  return(filteredImage);
+}
+
 static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
   ExceptionInfo*exception)
 {
@@ -881,25 +965,14 @@ static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
 
 cleanup:
 
-  DestroyAccelerateViews(image_view,filteredImage_view);
+  {
+    const DespeckleFinish
+      finish = { clEnv, device, queue, imageBuffer, tempImageBuffer,
+        filteredImageBuffer, hullPass1, hullPass2, image_view,
+        filteredImage_view, outputReady, filteredImage };
 
-  if (queue != NULL)
-    ReleaseOpenCLCommandQueue(device,queue);
-  if (device != NULL)
-    ReleaseOpenCLDevice(device);
-  if (imageBuffer!=NULL)
-    clEnv->library->clReleaseMemObject(imageBuffer);
-  ReleaseTempImageBuffers(clEnv,tempImageBuffer);
-  if (filteredImageBuffer!=NULL)
-    clEnv->library->clReleaseMemObject(filteredImageBuffer);
-  if (hullPass1!=NULL)
-    ReleaseOpenCLKernel(hullPass1);
-  if (hullPass2!=NULL)
-    ReleaseOpenCLKernel(hullPass2);
-  if (outputReady == MagickFalse && filteredImage != NULL)
-    filteredImage=DestroyImage(filteredImage);
-
-  return(filteredImage);
+    return(FinishDespeckleImage(&finish));
+  }
 }
 
 MagickPrivate Image *AccelerateDespeckleImage(const Image* image,
