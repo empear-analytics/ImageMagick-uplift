@@ -1561,6 +1561,43 @@ static MagickBooleanType AcquireNCCAlpha(const Image *image,
   return(MagickTrue);
 }
 
+typedef struct _NCCTargetTargets
+{
+  Image
+    **beta_image,
+    **reconstruct_image,
+    **target_image;
+} NCCTargetTargets;
+
+static MagickBooleanType AcquireNCCTarget(const Image *image,
+  ExceptionInfo *exception,const NCCTargetTargets *targets)
+{
+  Image
+    **const beta_image = targets->beta_image,
+    **const reconstruct_image = targets->reconstruct_image,
+    **const target_image = targets->target_image;
+
+  MagickBooleanType
+    status;
+
+  /*
+    Compute the cross correlation of the source and reconstruction images.
+  */
+  *beta_image=SIMCrossCorrelationImage(image,*reconstruct_image,exception);
+  *reconstruct_image=DestroyImage(*reconstruct_image);
+  if (*beta_image == (Image *) NULL)
+    return(MagickFalse);
+  *target_image=SIMSquareImage(*beta_image,exception);
+  *beta_image=DestroyImage(*beta_image);
+  if (*target_image == (Image *) NULL)
+    return(MagickFalse);
+  status=SIMMultiplyImage(*target_image,(double) QuantumRange,
+    (const ChannelStatistics *) NULL,exception);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static Image *NCCSimilarityImage(const Image *image,const Image *reconstruct,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
 {
@@ -1587,6 +1624,9 @@ static Image *NCCSimilarityImage(const Image *image,const Image *reconstruct,
   NCCAlphaTargets
     targets;
 
+  NCCTargetTargets
+    beta_targets;
+
   RectangleInfo
     geometry;
 
@@ -1598,20 +1638,10 @@ static Image *NCCSimilarityImage(const Image *image,const Image *reconstruct,
   targets.target_image=(&target_image);
   if (AcquireNCCAlpha(image,reconstruct,exception,&targets) == MagickFalse)
     ThrowNCCSimilarityException();
-  /*
-    Compute the cross correlation of the source and reconstruction images.
-  */
-  beta_image=SIMCrossCorrelationImage(image,reconstruct_image,exception);
-  reconstruct_image=DestroyImage(reconstruct_image);
-  if (beta_image == (Image *) NULL)
-    ThrowNCCSimilarityException();
-  target_image=SIMSquareImage(beta_image,exception);
-  beta_image=DestroyImage(beta_image);
-  if (target_image == (Image *) NULL)
-    ThrowNCCSimilarityException();
-  status=SIMMultiplyImage(target_image,(double) QuantumRange,
-    (const ChannelStatistics *) NULL,exception);
-  if (status == MagickFalse)
+  beta_targets.beta_image=(&beta_image);
+  beta_targets.reconstruct_image=(&reconstruct_image);
+  beta_targets.target_image=(&target_image);
+  if (AcquireNCCTarget(image,exception,&beta_targets) == MagickFalse)
     ThrowNCCSimilarityException();
   /*
     Compute the variance of the two images.
