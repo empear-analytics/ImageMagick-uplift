@@ -434,6 +434,8 @@ static MagickBooleanType RunBlurKernels(const BlurKernelsSource *source,
     radius = source->radius,
     sigma = source->sigma;
 
+  const BlurKernelGeometry geometry = { radius, sigma };
+
   const Image
     *const image = source->image;
 
@@ -472,8 +474,7 @@ static MagickBooleanType RunBlurKernels(const BlurKernelsSource *source,
   size_t
     length;
 
-  *imageKernelBuffer=createKernelInfo(device,radius,sigma,&kernelWidth,
-    exception);
+  *imageKernelBuffer=createKernelInfo(device,&geometry,&kernelWidth,exception);
   if (*imageKernelBuffer == (cl_mem) NULL)
     return(MagickFalse);
 

@@ -152,6 +152,8 @@ static Image *ComputeUnsharpMaskImage(const Image *image,MagickCLEnv clEnv,
     targets = { &device, &queue, &filteredImage, &imageBuffer,
       &filteredImageBuffer };
 
+  const BlurKernelGeometry geometry = { radius, sigma };
+
   queue=NULL;
   filteredImage=NULL;
   imageBuffer=NULL;
@@ -165,8 +167,7 @@ static Image *ComputeUnsharpMaskImage(const Image *image,MagickCLEnv clEnv,
   if (AcquireAccelerateBuffers(clEnv,image,exception,&targets) == MagickFalse)
     goto cleanup;
 
-  imageKernelBuffer=createKernelInfo(device,radius,sigma,&kernelWidth,
-    exception);
+  imageKernelBuffer=createKernelInfo(device,&geometry,&kernelWidth,exception);
 
   length=image->columns*image->rows;
   tempImageBuffer=CreateOpenCLBuffer(device,CL_MEM_READ_WRITE,length*
@@ -320,6 +321,8 @@ static Image *ComputeUnsharpMaskImageSingle(const Image *image,
     targets = { &device, &queue, &filteredImage, &imageBuffer,
       &filteredImageBuffer };
 
+  const BlurKernelGeometry geometry = { radius, sigma };
+
   queue=NULL;
   filteredImage=NULL;
   imageBuffer=NULL;
@@ -331,8 +334,7 @@ static Image *ComputeUnsharpMaskImageSingle(const Image *image,
   if (AcquireAccelerateBuffers(clEnv,image,exception,&targets) == MagickFalse)
     goto cleanup;
 
-  imageKernelBuffer=createKernelInfo(device,radius,sigma,&kernelWidth,
-    exception);
+  imageKernelBuffer=createKernelInfo(device,&geometry,&kernelWidth,exception);
 
   unsharpMaskKernel=AcquireOpenCLKernel(device,"UnsharpMask");
   if (unsharpMaskKernel == NULL)
