@@ -260,9 +260,9 @@ static int AddUserSymbolCopyFrom (FxInfo * pfx,
   return(UserSymNdx1);
 }
 
-static MagickBooleanType GetExpressionOperand (FxInfo * pfx,
-  const MagickBooleanType Assign, MagickBooleanType * needPopAll,
-  const OperandTargets * targets)
+static MagickBooleanType FinishExpressionOperand (FxInfo * pfx,
+  const MagickBooleanType Assign, const OperandTargets * targets,
+  int UserSymNdx1)
 {
   MagickBooleanType
     *const UserSymbol = targets->UserSymbol,
@@ -270,6 +270,28 @@ static MagickBooleanType GetExpressionOperand (FxInfo * pfx,
 
   int
     *const UserSymNdx0 = targets->UserSymNdx0;
+
+    SkipSpaces (pfx);
+    if (*NewUserSymbol && !Assign) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "NewUserSymbol", "'%s' after non-assignment operator at '%s'",
+        pfx->token, SetShortExp(pfx));
+      return MagickFalse;
+    }
+    UserSymNdx1 = AddUserSymbolCopyFrom (pfx, UserSymbol, NewUserSymbol,
+      UserSymNdx1);
+    *UserSymNdx0 = UserSymNdx1;
+  return(MagickTrue);
+}
+
+static MagickBooleanType GetExpressionOperand (FxInfo * pfx,
+  const MagickBooleanType Assign, MagickBooleanType * needPopAll,
+  const OperandTargets * targets)
+{
+  MagickBooleanType
+    *const UserSymbol = targets->UserSymbol,
+    *const NewUserSymbol = targets->NewUserSymbol;
 
   int UserSymNdx1;
 
@@ -283,18 +305,7 @@ static MagickBooleanType GetExpressionOperand (FxInfo * pfx,
         SetShortExp(pfx));
       return MagickFalse;
     }
-    SkipSpaces (pfx);
-    if (*NewUserSymbol && !Assign) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "NewUserSymbol", "'%s' after non-assignment operator at '%s'",
-        pfx->token, SetShortExp(pfx));
-      return MagickFalse;
-    }
-    UserSymNdx1 = AddUserSymbolCopyFrom (pfx, UserSymbol, NewUserSymbol,
-      UserSymNdx1);
-    *UserSymNdx0 = UserSymNdx1;
-  return(MagickTrue);
+  return(FinishExpressionOperand (pfx, Assign, targets, UserSymNdx1));
 }
 
 static MagickBooleanType FinishAssignmentOperand (
