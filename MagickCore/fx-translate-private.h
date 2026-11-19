@@ -585,6 +585,18 @@ static MagickBooleanType TranslateExpression (
 }
 
 
+static void ClearLastElementPush (FxInfo * pfx, char * chLimit)
+{
+  if (pfx->usedElements && *chLimit==';') {
+    /* FIXME: not necessarily the last element,
+       but the last _executed_ element, eg "goto" in a "for()".,
+       Pending a fix, we will use rZerStk.
+    */
+    ElementT * pel = &pfx->Elements[pfx->usedElements-1];
+    if (pel->do_push) pel->do_push = MagickFalse;
+  }
+}
+
 static MagickBooleanType TranslateStatement (FxInfo * pfx, char * strLimit, char * chLimit)
 {
   MagickBooleanType NeedPopAll = MagickFalse;
@@ -596,14 +608,7 @@ static MagickBooleanType TranslateStatement (FxInfo * pfx, char * strLimit, char
   if (!TranslateExpression (pfx, strLimit, chLimit, &NeedPopAll)) {
     return MagickFalse;
   }
-  if (pfx->usedElements && *chLimit==';') {
-    /* FIXME: not necessarily the last element,
-       but the last _executed_ element, eg "goto" in a "for()".,
-       Pending a fix, we will use rZerStk.
-    */
-    ElementT * pel = &pfx->Elements[pfx->usedElements-1];
-    if (pel->do_push) pel->do_push = MagickFalse;
-  }
+  ClearLastElementPush (pfx, chLimit);
 
   return MagickTrue;
 }
