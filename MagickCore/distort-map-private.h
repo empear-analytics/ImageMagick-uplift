@@ -332,8 +332,14 @@ static void PrintArcFX(const DistortVerboseFX *fx)
   (void) FormatLocaleFile(stderr,"       v.p{xx-.5,yy-.5}' \\\n");
 }
 
-static void PrintDePolarFX(const double *coeff,const char *image_gen)
+static void PrintDePolarFX(const DistortVerboseFX *fx)
 {
+  const double
+    *const coeff = fx->coeff;
+
+  const char
+    *const image_gen = fx->image_gen;
+
   ssize_t
     i;
 
@@ -1305,7 +1311,7 @@ static void PrintRadialDistortFX(const DistortVerboseFX *fx)
     }
     case DePolarDistortion:
     {
-      PrintDePolarFX(coeff,image_gen);
+      PrintDePolarFX(fx);
       break;
     }
     case Cylinder2PlaneDistortion:
