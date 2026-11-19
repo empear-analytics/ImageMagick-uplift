@@ -939,6 +939,87 @@ static MagickBooleanType RunEqualizePass(const EqualizePassInput *run,
   return(MagickTrue);
 }
 
+typedef struct _EqualizeInputSource
+{
+  Image
+    *image;
+
+  MagickCLDevice
+    device;
+
+  MagickCLEnv
+    clEnv;
+} EqualizeInputSource;
+
+typedef struct _EqualizeInputTargets
+{
+  CacheView
+    **image_view;
+
+  void
+    **inputPixels;
+
+  cl_mem
+    *imageBuffer;
+} EqualizeInputTargets;
+
+static MagickBooleanType AcquireEqualizeInput(
+  const EqualizeInputSource *source,ExceptionInfo *exception,
+  const EqualizeInputTargets *inputTargets)
+{
+  Image
+    *const image = source->image;
+
+  const MagickCLDevice
+    device = source->device;
+
+  const MagickCLEnv
+    clEnv = source->clEnv;
+
+  CacheView
+    **const image_view = inputTargets->image_view;
+
+  void
+    **const inputPixels = inputTargets->inputPixels;
+
+  cl_mem
+    *const imageBuffer = inputTargets->imageBuffer;
+
+  cl_int
+    clStatus;
+
+  cl_mem_flags
+    mem_flags;
+
+  size_t
+    length;
+
+  /* Create and initialize OpenCL buffers. */
+  /* inputPixels = AcquirePixelCachePixels(image, &length, exception); */
+  /* assume this  will get a writable image */
+  *image_view=AcquireAuthenticCacheView(image,exception);
+  *inputPixels=GetCacheViewAuthenticPixels(*image_view,0,0,image->columns,image->rows,exception);
+
+  if (*inputPixels == (void *) NULL)
+  {
+    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),CacheWarning,"UnableToReadPixelCache.","`%s'",image->filename);
+    return(MagickFalse);
+  }
+  /* If the host pointer is aligned to the size of CLPixelPacket,
+     then use the host buffer directly from the GPU; otherwise,
+     create a buffer on the GPU and copy the data over */
+  mem_flags=GetInputBufferFlags(*inputPixels);
+  /* create a CL buffer from image pixel buffer */
+  length = image->columns * image->rows;
+  *imageBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(CLPixelPacket), (void*)*inputPixels, &clStatus);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -951,11 +1032,7 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
     queue;
 
   cl_int
-    channel_mask=get32BitChannelValue(image->channel_mask),
-    clStatus;
-
-  cl_mem_flags
-    mem_flags;
+    channel_mask=get32BitChannelValue(image->channel_mask);
 
   cl_mem
     equalizeMapBuffer,
@@ -985,9 +1062,6 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
 
   PixelPacket
     *equalize_map;
-
-  size_t
-    length;
 
   void
     *inputPixels;
@@ -1034,28 +1108,15 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   /* reset histogram */
   (void) memset(histogram,0,(MaxMap+1)*sizeof(*histogram));
 
-  /* Create and initialize OpenCL buffers. */
-  /* inputPixels = AcquirePixelCachePixels(image, &length, exception); */
-  /* assume this  will get a writable image */
-  image_view=AcquireAuthenticCacheView(image,exception);
-  inputPixels=GetCacheViewAuthenticPixels(image_view,0,0,image->columns,image->rows,exception);
+  {
+    const EqualizeInputSource
+      source = { image, device, clEnv };
 
-  if (inputPixels == (void *) NULL)
-  {
-    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),CacheWarning,"UnableToReadPixelCache.","`%s'",image->filename);
-    goto cleanup;
-  }
-  /* If the host pointer is aligned to the size of CLPixelPacket,
-     then use the host buffer directly from the GPU; otherwise,
-     create a buffer on the GPU and copy the data over */
-  mem_flags=GetInputBufferFlags(inputPixels);
-  /* create a CL buffer from image pixel buffer */
-  length = image->columns * image->rows;
-  imageBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(CLPixelPacket), (void*)inputPixels, &clStatus);
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
-    goto cleanup;
+    const EqualizeInputTargets
+      inputTargets = { &image_view, &inputPixels, &imageBuffer };
+
+    if (AcquireEqualizeInput(&source,exception,&inputTargets) == MagickFalse)
+      goto cleanup;
   }
 
   {
