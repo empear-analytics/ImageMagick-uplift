@@ -268,10 +268,15 @@ static inline MagickBooleanType IsUTFValid(int code)
     mask;
 
   mask=(int) 0x7fffffff;
-  if (((code & ~mask) != 0) && ((code < 0xd800) || (code > 0xdfff)) &&
-      (code != 0xfffe) && (code != 0xffff))
-    return(MagickFalse);
-  return(MagickTrue);
+  if ((code & ~mask) == 0)
+    return(MagickTrue);
+  if (!((code < 0xd800) || (code > 0xdfff)))
+    return(MagickTrue);
+  if (code == 0xfffe)
+    return(MagickTrue);
+  if (code == 0xffff)
+    return(MagickTrue);
+  return(MagickFalse);
 }
 
 static inline MagickBooleanType IsUTFAscii(int code)
