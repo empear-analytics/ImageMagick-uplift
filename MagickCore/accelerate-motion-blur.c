@@ -1091,29 +1091,29 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
   const MotionBlurRequest *request,ExceptionInfo *exception)
 {
   CacheView
-    *filteredImage_view,
-    *image_view;
+    *filteredImage_view=NULL,
+    *image_view=NULL;
 
   cl_command_queue
-    queue;
+    queue=NULL;
 
   cl_int
     channel_mask=get32BitChannelValue(image->channel_mask);
 
   cl_kernel
-    motionBlurKernel;
+    motionBlurKernel=NULL;
 
   cl_mem
-    filteredImageBuffer,
-    imageBuffer,
-    imageKernelBuffer,
+    filteredImageBuffer=NULL,
+    imageBuffer=NULL,
+    imageKernelBuffer=NULL,
     offsetBuffer;
 
   Image
-    *filteredImage;
+    *filteredImage=NULL;
 
   MagickBooleanType
-    outputReady;
+    outputReady=MagickFalse;
 
   MagickCLDevice
     device;
@@ -1123,15 +1123,6 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
 
   TraceAccelerateImage(image);
 
-  queue=NULL;
-  image_view=NULL;
-  filteredImage=NULL;
-  filteredImage_view=NULL;
-  imageBuffer=NULL;
-  filteredImageBuffer=NULL;
-  imageKernelBuffer=NULL;
-  motionBlurKernel=NULL;
-  outputReady=MagickFalse;
 
   {
     const MotionBlurInputTargets
