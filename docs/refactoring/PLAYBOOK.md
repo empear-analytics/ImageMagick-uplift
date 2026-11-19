@@ -25055,6 +25055,108 @@ before the run, one blank line kept, the C++ check in the wide configuration).
 
 ---
 
+## Recipe NF - Name a Formula as a Function Returning Its Value
+
+**Use when:** CodeScene reports *Code Duplication* between functions that are the same
+text except for the formula each applies to one value (`compare-similarity-phase-private.h`'s
+`GetPSNRSimilarity` and `GetRMSESimilarity`, which turn each channel's mean squared error
+into a PSNR or a root), and Recipe CF would merge them if the formula were a call: NF makes
+it one, so that the functions differ only in the function they call.
+
+**Not covered by:** Recipe P, which names a boolean expression and returns
+`MagickBooleanType`; Recipe E, which moves statements, not the right-hand side of one;
+Recipe MF, which turns a statement macro into a function; Recipe CF, which needs the
+differing code to be calls already; Recipe SV and SC, whose copies differ in constants, not
+in a formula.
+
+**How:**
+
+1. The sites are statements of one function `F` of the form `object=<formula>;`, where
+   the formula reads one value `x` (an identifier, an element `a[i]` whose array and index
+   are identifiers or constants, or a member access), at one or more positions, and
+   otherwise only literals, enumeration constants and calls of functions or function-like
+   macros that read nothing but their arguments and write nothing (`sqrt`,
+   `MagickSafeLog10`, `MagickSafeReciprocal`, `MagickSafePSNRRecipicol`, a macro of the file
+   whose body is such an expression of its parameters). No assignment, `++`, `--` or other
+   side effect, checked by reading. `x`, the formula and `object` have one floating or
+   integer type `T`.
+2. Write `static inline T Name(const T value)` directly above `F` (below any macro the
+   formula uses, Recipe H step 5), whose body is `return(<formula>);` with each position of
+   `x` written `value`, every other character copied as it stands (line breaks aside).
+3. Each site becomes `object=Name(x);`. With several sites (one formula applied to several
+   values, as to each channel and then to the composite channel), check by script that each
+   site's formula equals the body with that site's value for `value`; each value meets step
+   1.
+4. One function per commit. `refactor_guard.py` prints `OK` for the literals with one
+   site, and with several the `WARN` of copies removed with every value still present
+   (the formula's literals now written once); `--calls` moves `+2` for `Name` and `+1`
+   for each further site, and each callee of the formula drops by one for each site
+   beyond the first, nothing else.
+5. Compare the objects of every file that compiles `F` (`tools/obj_identical.sh`, or the
+   header placed as at `HEAD` for a header). IDENTICAL, or the oracle on `F`'s cases when a
+   case reaches it; a site in a per-pixel loop or an OpenMP region is measured as the
+   round's timing rule asks.
+6. A helper in a private header that two or more `.c` files include is `static inline`
+   (it already is by step 2).
+7. Rule 2 keeps a flat step that is a planned step of a Recipe CF merge, named in the
+   message.
+
+**Before:**
+
+```c
+    similarity[i]=10.0*MagickSafeLog10(MagickSafeReciprocal(
+      similarity[i]))/MagickSafePSNRRecipicol(10.0);
+  }
+  similarity[CompositePixelChannel]=10.0*MagickSafeLog10(
+    MagickSafeReciprocal(similarity[CompositePixelChannel]))/
+    MagickSafePSNRRecipicol(10.0);
+```
+
+**After:**
+
+```c
+static inline double GetPSNRChannelSimilarity(const double value)
+{
+  return(10.0*MagickSafeLog10(MagickSafeReciprocal(value))/
+    MagickSafePSNRRecipicol(10.0));
+}
+...
+    similarity[i]=GetPSNRChannelSimilarity(similarity[i]);
+  }
+  similarity[CompositePixelChannel]=GetPSNRChannelSimilarity(
+    similarity[CompositePixelChannel]);
+```
+
+**Careful:**
+
+- The formula is the same text, so its operations run in the same order on the same
+  operands: no floating-point result can change from the order (the hard prohibition on
+  reordering stands untouched).
+- `value` and the return have the type of `x` and of the formula, so the call converts
+  nothing: the argument is `x`'s value as the formula read it, and the returned value is
+  converted to `object`'s type exactly as the assignment converted the formula (C11
+  6.5.2.2p7, 6.8.6.4p3, 6.5.16.1p2). Where a compiler keeps excess precision
+  (`FLT_EVAL_METHOD` 2, x87), C11 6.8.6.4p3 and 6.3.1.8p2 make the return and the
+  assignment both round to `T`, as the assignment alone did.
+- A macro that names its argument twice (`RMSESquareRoot(x)`, `sqrt((x) < 0.0 ? 0.0 :
+  (x))`) read `x` twice; `value` is read twice now. `x` has no side effect and the formula
+  writes nothing, so both reads saw one value before as well.
+- A formula that called a function with a side effect, or read a second variable, is
+  outside step 1: the second variable would need a parameter, and the function's call
+  count or order could change.
+
+**Evidence level:** oracle (object comparison IDENTICAL, or the oracle on `F`'s cases);
+guard for a function no case reaches, with step 5 IDENTICAL.
+
+**Provenance:** 2026-11-19, from `compare-similarity-phase-private.h`'s `GetPSNRSimilarity`
+and `GetRMSESimilarity` (campaign A, W47 round 34, lane a): CodeScene reports them as
+*Code Duplication*; a probe of the plan (H on `RMSESquareRoot`, NF on each, then CF through
+a method pointer) takes the header from 8.03 to 8.54 with the duplication gone. Added by
+Claude Code (Claude Opus 5.5) under the mandate of 2026-11-19 (the owner's "New recipes are
+fine").
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -25600,3 +25702,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | WORDING | DI | Step 5: `tools/obj_sorted.sh` does not check that no instruction between a moved store's old and new position reads that slot (a load, an `lea`, a call taking its address); the step relies on step 2's C-level argument; the script's own `--self-test` | Review of batch 4 of W46 lane b: `b17b0903e` dropped the tab-led relocation lines (fixed in `645f80277`, with a self-test); rerun on `1bdc1a5a7` against its parent: `REORDERED-CONSTANT-STORES`, 832 instruction lines, one moved line `<AccelerateDespeckleImage>: movq $0x0,0xb0(%rsp)` | after the fact |
 | 2026-11-19 | WORDING | SE | *Not covered by* names Recipe Y (it builds and fills a new input struct; SE's struct is the function's own `const` parameter, so nothing is built or filled); step 3 adds that no callee between the binding and the copy writes `*P` | Review of batch 4 of W46 lane b: in `RunHullPassLoop` the calls between the bindings and the copies (`clSetKernelArg`, `EnqueueHullPasses` through a copy of the values) receive no pointer to `*loop` | after the fact |
 | 2026-11-19 | AMEND | B | Step 5, one-line form: a `const` declaration with an initialiser may stand on one line (`const Name name = { a, b };`) and a changed call may be joined onto one line within 80 columns, when the two-line layout would lengthen a *Large Method* caller enough to lower its file; tokens unchanged, layout only | Campaign A, W47 lane a, `8943c3b92` (`createKernelInfo`, header B step): `accelerate-unsharp.c` 8.46 -> 8.44 (two-line declaration) or 8.42 (block form, round 33's probe), 8.46 in the one-line form; earlier one-line declaration `const SimilarityRow row = {...}` in `compare-similarity-image.c`; confirmed by the round-34 coordinator for the owner's mandate | mandate (2026-11-19) |
+| 2026-11-19 | NEW | NF | Name a Formula as a Function Returning Its Value: statements `object=<formula>;` whose formula reads one value and otherwise only constants and calls of pure functions or macros become `object=Name(x);` with `static inline T Name(const T value)` returning the formula copied character for character; several sites by script; objects compared, the oracle when they differ | `compare-similarity-phase-private.h`'s `GetPSNRSimilarity` and `GetRMSESimilarity` (campaign A, W47 lane a), *Code Duplication* that Recipe CF would merge if the formulas were calls; the probed plan (H, NF, NF, CF) 8.03 -> 8.54 | mandate (2026-11-19) |
