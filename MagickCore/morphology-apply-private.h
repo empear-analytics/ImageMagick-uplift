@@ -183,8 +183,15 @@ static inline void RotateSquareKernelOrigin(KernelInfo *kernel)
   kernel->y = (ssize_t) ( +x +(ssize_t) kernel->height-1)/2;
 }
 
-static inline double RotateSquareKernelBy90Degrees(KernelInfo *kernel,double angle)
+static inline double RotateSquareKernelBy90Degrees(
+  const KernelRotation *rotation)
 {
+  KernelInfo
+    *const kernel = rotation->kernel;
+
+  double
+    angle = rotation->angle;
+
   /* Rotate a square array of values by 90 degrees */
   RotateSquareKernelValues(kernel);
   /* rotate the origin - relative to center of array */
@@ -249,7 +256,12 @@ static inline double AttemptKernelRotationBy90Degrees(KernelInfo *kernel,
   if ( kernel->width == 1 || kernel->height == 1 )
     angle=TransposeKernel(kernel,angle);
   else if ( kernel->width == kernel->height )
-    angle=RotateSquareKernelBy90Degrees(kernel,angle);
+    {
+      const KernelRotation
+        rotation = { kernel, angle };
+
+      angle=RotateSquareKernelBy90Degrees(&rotation);
+    }
   else
     perror("Unable to rotate a non-square, non-linear kernel 90 degrees");
   return(angle);
