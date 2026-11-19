@@ -109,8 +109,12 @@ typedef struct _KernelSpan
 ** array input handling function, such as for -color-matrix
 */
 static inline const char *SetOddSquareKernelSize(KernelInfo *kernel,
-  const char *kernel_string,const char *end)
+  const KernelSpan *span)
 {
+  const char
+    *const kernel_string = span->kernel_string,
+    *const end = span->end;
+
   const char
     *p;
 
@@ -240,7 +244,7 @@ static inline MagickBooleanType ParseKernelSpecification(const KernelSpan *span,
       (*p)++; /* advance beyond the ':' */
     }
   else
-    *p=SetOddSquareKernelSize(kernel,kernel_string,end);
+    *p=SetOddSquareKernelSize(kernel,span);
   return(MagickTrue);
 }
 
