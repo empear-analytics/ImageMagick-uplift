@@ -874,6 +874,147 @@ static MagickBooleanType AcquireMotionBlurOutput(
   return(MagickTrue);
 }
 
+typedef struct _MotionBlurRunInput
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  const double
+    *kernel;
+
+  size_t
+    width;
+
+  const OffsetInfo
+    *offset;
+
+  cl_mem
+    imageBuffer,
+    filteredImageBuffer;
+
+  cl_int
+    channel_mask;
+
+  const Image
+    *image;
+
+  void
+    *filteredPixels;
+
+  CacheView
+    *filteredImage_view;
+} MotionBlurRunInput;
+
+typedef struct _MotionBlurRunTargets
+{
+  cl_mem
+    *imageKernelBuffer;
+
+  cl_command_queue
+    *queue;
+
+  cl_mem
+    *offsetBuffer;
+
+  cl_kernel
+    *motionBlurKernel;
+
+  MagickBooleanType
+    *outputReady;
+} MotionBlurRunTargets;
+
+static MagickBooleanType RunMotionBlurKernel(const MotionBlurRunInput *run,
+  ExceptionInfo *exception,const MotionBlurRunTargets *runTargets)
+{
+  const MagickCLEnv
+    clEnv = run->clEnv;
+
+  const MagickCLDevice
+    device = run->device;
+
+  const double
+    *const kernel = run->kernel;
+
+  const size_t
+    width = run->width;
+
+  const OffsetInfo
+    *const offset = run->offset;
+
+  const cl_mem
+    imageBuffer = run->imageBuffer,
+    filteredImageBuffer = run->filteredImageBuffer;
+
+  const cl_int
+    channel_mask = run->channel_mask;
+
+  const Image
+    *const image = run->image;
+
+  void
+    *const filteredPixels = run->filteredPixels;
+
+  CacheView
+    *const filteredImage_view = run->filteredImage_view;
+
+  cl_mem
+    *const imageKernelBuffer = runTargets->imageKernelBuffer;
+
+  cl_command_queue
+    *const queue = runTargets->queue;
+
+  cl_mem
+    *const offsetBuffer = runTargets->offsetBuffer;
+
+  cl_kernel
+    *const motionBlurKernel = runTargets->motionBlurKernel;
+
+  MagickBooleanType
+    *const outputReady = runTargets->outputReady;
+
+  {
+    const MotionBlurFilterInputs inputs = { clEnv, device, kernel, width };
+    const MotionBlurFilterTargets targets = { imageKernelBuffer, queue };
+
+    if (CreateMotionBlurFilterBuffer(&inputs,exception,&targets) ==
+        MagickFalse)
+      return(MagickFalse);
+  }
+
+  {
+    const MotionBlurOffsetSource
+      source = { clEnv, device, *queue, offset, width };
+
+    if (CreateMotionBlurOffsetBuffer(&source,offsetBuffer,exception) ==
+        MagickFalse)
+      return(MagickFalse);
+  }
+
+
+  {
+    const MotionBlurKernelInputs inputs = { clEnv, device, imageBuffer,
+      filteredImageBuffer, *imageKernelBuffer, *offsetBuffer, width,
+      channel_mask, image };
+
+    if (SetMotionBlurKernelArgs(&inputs,motionBlurKernel,exception) ==
+        MagickFalse)
+      return(MagickFalse);
+  }
+
+  {
+    const MotionBlurLaunchInputs inputs = { clEnv, device, *queue,
+      *motionBlurKernel, filteredImageBuffer, image, filteredPixels,
+      filteredImage_view };
+
+    if (LaunchMotionBlurKernel(&inputs,outputReady,exception) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
   const double *kernel,const size_t width,const OffsetInfo *offset,
   ExceptionInfo *exception)
@@ -949,40 +1090,16 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
 
 
   {
-    const MotionBlurFilterInputs inputs = { clEnv, device, kernel, width };
-    const MotionBlurFilterTargets targets = { &imageKernelBuffer, &queue };
+    const MotionBlurRunInput
+      run = { clEnv, device, kernel, width, offset, imageBuffer,
+        filteredImageBuffer, channel_mask, image, filteredPixels,
+        filteredImage_view };
 
-    if (CreateMotionBlurFilterBuffer(&inputs,exception,&targets) ==
-        MagickFalse)
-      goto cleanup;
-  }
+    const MotionBlurRunTargets
+      runTargets = { &imageKernelBuffer, &queue, &offsetBuffer,
+        &motionBlurKernel, &outputReady };
 
-  {
-    const MotionBlurOffsetSource
-      source = { clEnv, device, queue, offset, width };
-
-    if (CreateMotionBlurOffsetBuffer(&source,&offsetBuffer,exception) ==
-        MagickFalse)
-      goto cleanup;
-  }
-
-
-  {
-    const MotionBlurKernelInputs inputs = { clEnv, device, imageBuffer,
-      filteredImageBuffer, imageKernelBuffer, offsetBuffer, width,
-      channel_mask, image };
-
-    if (SetMotionBlurKernelArgs(&inputs,&motionBlurKernel,exception) ==
-        MagickFalse)
-      goto cleanup;
-  }
-
-  {
-    const MotionBlurLaunchInputs inputs = { clEnv, device, queue,
-      motionBlurKernel, filteredImageBuffer, image, filteredPixels,
-      filteredImage_view };
-
-    if (LaunchMotionBlurKernel(&inputs,&outputReady,exception) == MagickFalse)
+    if (RunMotionBlurKernel(&run,exception,&runTargets) == MagickFalse)
       goto cleanup;
   }
 
