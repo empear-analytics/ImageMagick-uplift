@@ -4395,29 +4395,6 @@ static void DestroyFxRuntimes (FxInfo * pfx)
   }
 }
 
-FxInfo *DestroyFxInfo (FxInfo * pfx)
-{
-  assert (pfx != NULL);
-  assert (pfx->image != NULL);
-  assert (pfx->Images != NULL);
-  assert (pfx->Imgs != NULL);
-  assert (pfx->fxrts != NULL);
-
-  DestroyFxRuntimes (pfx);
-  pfx->fxrts = (fxRtT *) RelinquishMagickMemory (pfx->fxrts);
-
-  DestroyRPN (pfx);
-
-  pfx->expression = DestroyString (pfx->expression);
-  pfx->pex = NULL;
-
-  (void) DeInitFx (pfx);
-
-  pfx = (FxInfo*) RelinquishMagickMemory(pfx);
-
-  return NULL;
-}
-
 typedef struct _FxPixelInputs
 {
   const Image
@@ -4579,6 +4556,29 @@ static void DumpUserSymbolValues (FxInfo * pfx)
 FxInfo *AcquireFxInfo (const Image * images, const char * expression, ExceptionInfo *exception)
 {
   return AcquireFxInfoPrivate (images, expression, MagickFalse, exception);
+}
+
+FxInfo *DestroyFxInfo (FxInfo * pfx)
+{
+  assert (pfx != NULL);
+  assert (pfx->image != NULL);
+  assert (pfx->Images != NULL);
+  assert (pfx->Imgs != NULL);
+  assert (pfx->fxrts != NULL);
+
+  DestroyFxRuntimes (pfx);
+  pfx->fxrts = (fxRtT *) RelinquishMagickMemory (pfx->fxrts);
+
+  DestroyRPN (pfx);
+
+  pfx->expression = DestroyString (pfx->expression);
+  pfx->pex = NULL;
+
+  (void) DeInitFx (pfx);
+
+  pfx = (FxInfo*) RelinquishMagickMemory(pfx);
+
+  return NULL;
 }
 
 static void SetFxProgress (const Image *image, const char *tag,
