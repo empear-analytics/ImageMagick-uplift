@@ -1288,6 +1288,60 @@ static MagickBooleanType AcquireDPCTargetUnitGradient(const Image *image,
   return(MagickTrue);
 }
 
+typedef struct _DPCGradientCorrelation
+{
+  Image
+    **rx_image,
+    **ry_image,
+    **trx_image,
+    **try_image,
+    **tx_image,
+    **ty_image;
+} DPCGradientCorrelation;
+
+static MagickBooleanType CorrelateDPCGradients(const double edge_factor,
+  ExceptionInfo *exception,const DPCGradientCorrelation *targets)
+{
+  Image
+    **const rx_image = targets->rx_image,
+    **const ry_image = targets->ry_image,
+    **const trx_image = targets->trx_image,
+    **const try_image = targets->try_image,
+    **const tx_image = targets->tx_image,
+    **const ty_image = targets->ty_image;
+
+  MagickBooleanType
+    status;
+
+  /*
+    Compute the cross correlation of the test and reference images.
+  */
+  *trx_image=SIMCrossCorrelationImage(*tx_image,*rx_image,exception);
+  *rx_image=DestroyImage(*rx_image);
+  *tx_image=DestroyImage(*tx_image);
+  if (*trx_image == (Image *) NULL)
+    return(MagickFalse);
+  *try_image=SIMCrossCorrelationImage(*ty_image,*ry_image,exception);
+  *ry_image=DestroyImage(*ry_image);
+  *ty_image=DestroyImage(*ty_image);
+  if (*try_image == (Image *) NULL)
+    return(MagickFalse);
+  /*
+    Evaluate dot product correlation image.
+  */
+  (void) SetImageArtifact(*try_image,"compose:clamp","false");
+  status=CompositeImage(*trx_image,*try_image,PlusCompositeOp,MagickTrue,0,0,
+    exception);
+  *try_image=DestroyImage(*try_image);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  status=SIMMultiplyImage(*trx_image,edge_factor,
+    (const ChannelStatistics *) NULL,exception);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
 {
@@ -1310,6 +1364,10 @@ static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
 
   DPCEdgeCorrection
     edge_correction;
+
+  const DPCGradientCorrelation
+    gradient_correlation = { &rx_image, &ry_image, &trx_image, &try_image,
+      &tx_image, &ty_image };
 
   DPCReconstructGradient
     reconstruct_gradient;
@@ -1352,31 +1410,8 @@ static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
   if (AcquireDPCTargetUnitGradient(image,exception,&target_unit) ==
       MagickFalse)
     ThrowDPCSimilarityException();
-  /*
-    Compute the cross correlation of the test and reference images.
-  */
-  trx_image=SIMCrossCorrelationImage(tx_image,rx_image,exception);
-  rx_image=DestroyImage(rx_image);
-  tx_image=DestroyImage(tx_image);
-  if (trx_image == (Image *) NULL)
-    ThrowDPCSimilarityException();
-  try_image=SIMCrossCorrelationImage(ty_image,ry_image,exception);
-  ry_image=DestroyImage(ry_image);
-  ty_image=DestroyImage(ty_image);
-  if (try_image == (Image *) NULL)
-    ThrowDPCSimilarityException();
-  /*
-    Evaluate dot product correlation image.
-  */
-  (void) SetImageArtifact(try_image,"compose:clamp","false");
-  status=CompositeImage(trx_image,try_image,PlusCompositeOp,MagickTrue,0,0,
-    exception);
-  try_image=DestroyImage(try_image);
-  if (status == MagickFalse)
-    ThrowDPCSimilarityException();
-  status=SIMMultiplyImage(trx_image,edge_factor,
-    (const ChannelStatistics *) NULL,exception);
-  if (status == MagickFalse)
+  if (CorrelateDPCGradients(edge_factor,exception,&gradient_correlation) ==
+      MagickFalse)
     ThrowDPCSimilarityException();
   /*
     Crop results.
