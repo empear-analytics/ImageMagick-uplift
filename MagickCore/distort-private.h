@@ -801,9 +801,18 @@ static inline double *GenerateMappedCoefficients(double *coeff,DistortMethod *me
   return(GenerateRadialCoefficients(coeff,method,context));
 }
 
-static inline double *GenerateAffineFamilyCoefficients(double *coeff,
-  DistortMethod *method,const CoefficientContext *context)
+static inline double *GenerateAffineFamilyCoefficients(
+  const CoefficientCall *call)
 {
+  double
+    *const coeff = call->coeff;
+
+  DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   switch (*method)
   {
     case AffineDistortion:
@@ -928,7 +937,12 @@ static inline double *GenerateCoefficients(const Image *image,
 
   ZeroCoefficients(coeff,number_coefficients);
 
-  return(GenerateAffineFamilyCoefficients(coeff,method,&context));
+  {
+    const CoefficientCall
+      call = { coeff, method, &context };
+
+    return(GenerateAffineFamilyCoefficients(&call));
+  }
 }
 
 static inline void SetDistortProgress(MagickBooleanType *status,const Image *image,
