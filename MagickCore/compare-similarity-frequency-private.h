@@ -1309,6 +1309,48 @@ static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
   return((Image *) NULL); \
 }
 
+typedef struct _MSEAlphaTargets
+{
+  Image
+    **alpha_image,
+    **reconstruct_image;
+} MSEAlphaTargets;
+
+static MagickBooleanType AcquireMSEAlpha(const Image *image,
+  const Image *reconstruct,ExceptionInfo *exception,
+  const MSEAlphaTargets *targets)
+{
+  Image
+    **const alpha_image = targets->alpha_image,
+    **const reconstruct_image = targets->reconstruct_image;
+
+  Image
+    *target_image;
+
+  MagickBooleanType
+    status;
+
+  target_image=SIMSquareImage(image,exception);
+  if (target_image == (Image *) NULL)
+    return(MagickFalse);
+  *reconstruct_image=SIMUnityImage(image,reconstruct,exception);
+  if (*reconstruct_image == (Image *) NULL)
+    return(MagickFalse);
+  /*
+    Create (U * test)/# pixels.
+  */
+  *alpha_image=SIMCrossCorrelationImage(target_image,*reconstruct_image,
+    exception);
+  target_image=DestroyImage(target_image);
+  if (*alpha_image == (Image *) NULL)
+    return(MagickFalse);
+  status=SIMMultiplyImage(*alpha_image,1.0/(double) reconstruct->columns/
+    (double) reconstruct->rows,(const ChannelStatistics *) NULL,exception);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
 {
@@ -1324,11 +1366,13 @@ static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
     *mean_image = (Image *) NULL,
     *mse_image = (Image *) NULL,
     *reconstruct_image = (Image *) NULL,
-    *sum_image = (Image *) NULL,
-    *target_image = (Image *) NULL;
+    *sum_image = (Image *) NULL;
 
   MagickBooleanType
     status = MagickTrue;
+
+  MSEAlphaTargets
+    targets;
 
   RectangleInfo
     geometry;
@@ -1336,23 +1380,9 @@ static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
   /*
     MSE correlation-based image similarity using FFT local statistics.
   */
-  target_image=SIMSquareImage(image,exception);
-  if (target_image == (Image *) NULL)
-    ThrowMSESimilarityException();
-  reconstruct_image=SIMUnityImage(image,reconstruct,exception);
-  if (reconstruct_image == (Image *) NULL)
-    ThrowMSESimilarityException();
-  /*
-    Create (U * test)/# pixels.
-  */
-  alpha_image=SIMCrossCorrelationImage(target_image,reconstruct_image,
-    exception);
-  target_image=DestroyImage(target_image);
-  if (alpha_image == (Image *) NULL)
-    ThrowMSESimilarityException();
-  status=SIMMultiplyImage(alpha_image,1.0/(double) reconstruct->columns/(double)
-    reconstruct->rows,(const ChannelStatistics *) NULL,exception);
-  if (status == MagickFalse)
+  targets.alpha_image=(&alpha_image);
+  targets.reconstruct_image=(&reconstruct_image);
+  if (AcquireMSEAlpha(image,reconstruct,exception,&targets) == MagickFalse)
     ThrowMSESimilarityException();
   /*
     Create 2*(test * reconstruction)# pixels.
