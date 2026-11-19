@@ -1015,6 +1015,74 @@ static MagickBooleanType RunMotionBlurKernel(const MotionBlurRunInput *run,
   return(MagickTrue);
 }
 
+static void DestroyMotionBlurViews(CacheView *image_view,
+  CacheView *filteredImage_view)
+{
+  image_view=DestroyCacheView(image_view);
+  if (filteredImage_view != NULL)
+    filteredImage_view=DestroyCacheView(filteredImage_view);
+}
+
+typedef struct _MotionBlurFinish
+{
+  MagickCLEnv
+    clEnv;
+
+  cl_mem
+    filteredImageBuffer,
+    imageBuffer,
+    imageKernelBuffer;
+
+  cl_kernel
+    motionBlurKernel;
+
+  cl_command_queue
+    queue;
+
+  MagickCLDevice
+    device;
+
+  MagickBooleanType
+    outputReady;
+} MotionBlurFinish;
+
+static Image *FinishMotionBlurImage(const MotionBlurFinish *finish,
+  CacheView *image_view,CacheView *filteredImage_view,Image *filteredImage)
+{
+  const MagickCLEnv
+    clEnv = finish->clEnv;
+
+  const cl_mem
+    filteredImageBuffer = finish->filteredImageBuffer,
+    imageBuffer = finish->imageBuffer,
+    imageKernelBuffer = finish->imageKernelBuffer;
+
+  const cl_kernel
+    motionBlurKernel = finish->motionBlurKernel;
+
+  const cl_command_queue
+    queue = finish->queue;
+
+  const MagickCLDevice
+    device = finish->device;
+
+  const MagickBooleanType
+    outputReady = finish->outputReady;
+
+  DestroyMotionBlurViews(image_view,filteredImage_view);
+
+  {
+    const MotionBlurReleaseInputs inputs = { clEnv, filteredImageBuffer,
+      imageBuffer, imageKernelBuffer, motionBlurKernel, queue, device };
+
+    ReleaseMotionBlurResources(&inputs);
+  }
+  if (outputReady == MagickFalse && filteredImage != NULL)
+    filteredImage=DestroyImage(filteredImage);
+
+  return(filteredImage);
+}
+
 typedef struct _MotionBlurRequest
 {
   const double
@@ -1116,20 +1184,14 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
 
 cleanup:
 
-  image_view=DestroyCacheView(image_view);
-  if (filteredImage_view != NULL)
-    filteredImage_view=DestroyCacheView(filteredImage_view);
-
   {
-    const MotionBlurReleaseInputs inputs = { clEnv, filteredImageBuffer,
-      imageBuffer, imageKernelBuffer, motionBlurKernel, queue, device };
+    const MotionBlurFinish
+      finish = { clEnv, filteredImageBuffer, imageBuffer, imageKernelBuffer,
+        motionBlurKernel, queue, device, outputReady };
 
-    ReleaseMotionBlurResources(&inputs);
+    return(FinishMotionBlurImage(&finish,image_view,filteredImage_view,
+      filteredImage));
   }
-  if (outputReady == MagickFalse && filteredImage != NULL)
-    filteredImage=DestroyImage(filteredImage);
-
-  return(filteredImage);
 }
 
 MagickPrivate Image *AccelerateMotionBlurImage(const Image *image,
