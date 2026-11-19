@@ -1194,6 +1194,43 @@ static MagickBooleanType GetDPCEdgeCorrection(Image *magnitude_image,
   return(MagickTrue);
 }
 
+typedef struct _DPCReconstructUnitGradient
+{
+  Image
+    **magnitude_image,
+    **rx_image,
+    **ry_image,
+    **trx_image,
+    **try_image;
+} DPCReconstructUnitGradient;
+
+static MagickBooleanType DivideDPCReconstructGradient(const Image *image,
+  ExceptionInfo *exception,const DPCReconstructUnitGradient *targets)
+{
+  Image
+    **const magnitude_image = targets->magnitude_image,
+    **const rx_image = targets->rx_image,
+    **const ry_image = targets->ry_image,
+    **const trx_image = targets->trx_image,
+    **const try_image = targets->try_image;
+
+  /*
+    Divide X and Y derivitives of reference image by magnitude.
+  */
+  *trx_image=SIMDivideByMagnitude(*rx_image,*magnitude_image,image,exception);
+  *rx_image=DestroyImage(*rx_image);
+  if (*trx_image == (Image *) NULL)
+    return(MagickFalse);
+  *rx_image=(*trx_image);
+  *try_image=SIMDivideByMagnitude(*ry_image,*magnitude_image,image,exception);
+  *magnitude_image=DestroyImage(*magnitude_image);
+  *ry_image=DestroyImage(*ry_image);
+  if (*try_image == (Image *) NULL)
+    return(MagickFalse);
+  *ry_image=(*try_image);
+  return(MagickTrue);
+}
+
 static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
 {
@@ -1220,6 +1257,10 @@ static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
   DPCReconstructGradient
     reconstruct_gradient;
 
+  const DPCReconstructUnitGradient
+    reconstruct_unit = { &magnitude_image, &rx_image, &ry_image, &trx_image,
+      &try_image };
+
   MagickBooleanType
     status = MagickTrue;
 
@@ -1244,20 +1285,9 @@ static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
   if (GetDPCEdgeCorrection(magnitude_image,reconstruct,exception,
         &edge_correction) == MagickFalse)
     ThrowDPCSimilarityException();
-  /*
-    Divide X and Y derivitives of reference image by magnitude.
-  */
-  trx_image=SIMDivideByMagnitude(rx_image,magnitude_image,image,exception);
-  rx_image=DestroyImage(rx_image);
-  if (trx_image == (Image *) NULL)
+  if (DivideDPCReconstructGradient(image,exception,&reconstruct_unit) ==
+      MagickFalse)
     ThrowDPCSimilarityException();
-  rx_image=trx_image;
-  try_image=SIMDivideByMagnitude(ry_image,magnitude_image,image,exception);
-  magnitude_image=DestroyImage(magnitude_image);
-  ry_image=DestroyImage(ry_image);
-  if (try_image == (Image *) NULL)
-    ThrowDPCSimilarityException();
-  ry_image=try_image;
   /*
     Compute X and Y derivatives of image.
   */
