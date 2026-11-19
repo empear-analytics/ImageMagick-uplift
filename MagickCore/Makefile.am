@@ -251,6 +251,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/fourier.c \
   MagickCore/fourier-complex.c \
   MagickCore/fourier.h \
+  MagickCore/fourier-forward-private.h \
   MagickCore/fx.c \
   MagickCore/fx-execute.c \
   MagickCore/fx.h \
@@ -698,6 +699,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/exception-private.h \
   MagickCore/feature-private.h \
   MagickCore/feature-texture-measure-private.h \
+  MagickCore/fourier-forward-private.h \
   MagickCore/fx-private.h \
   MagickCore/fx-execute-private.h \
   MagickCore/gem-private.h \
