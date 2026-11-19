@@ -263,6 +263,7 @@ $call Make xwindow-pixel.c
 $call Make xwindow-text.c
 $call Make xwindow-visual.c
 $call Make xwindow-import.c
+$call Make xwindow-import-image.c
 $call Make xwindow-search.c
 $ set default [-.filters]
 $ call Make analyze.c
