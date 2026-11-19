@@ -4386,11 +4386,6 @@ static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expressi
   return (AllocateFxRuntimes (pfx));
 }
 
-FxInfo *AcquireFxInfo (const Image * images, const char * expression, ExceptionInfo *exception)
-{
-  return AcquireFxInfoPrivate (images, expression, MagickFalse, exception);
-}
-
 static void DestroyFxRuntimes (FxInfo * pfx)
 {
   ssize_t t;
@@ -4579,6 +4574,11 @@ static void DumpUserSymbolValues (FxInfo * pfx)
                t, i, NameOfUserSym (pfx, i, UserSym), pfx->precision, pfx->fxrts[t].UserSymVals[i]);
     }
   }
+}
+
+FxInfo *AcquireFxInfo (const Image * images, const char * expression, ExceptionInfo *exception)
+{
+  return AcquireFxInfoPrivate (images, expression, MagickFalse, exception);
 }
 
 static void SetFxProgress (const Image *image, const char *tag,
