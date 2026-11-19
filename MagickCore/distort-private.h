@@ -301,9 +301,20 @@ static inline void SetPolarCoefficients(double *coeff,const Image *image,
   SetPolarAngles(coeff,arguments,number_arguments);
 }
 
-static inline void SetPolarRatios(double *coeff,const Image *image,
-  const DistortMethod *method)
+static inline void SetPolarRatios(const CoefficientCall *call)
 {
+  double
+    *const coeff = call->coeff;
+
+  const CoefficientContext
+    *const context = call->context;
+
+  const Image
+    *const image = context->image;
+
+  const DistortMethod
+    *const method = call->method;
+
   /* conversion ratios */
   if ( *method == PolarDistortion ) {
     coeff[6]=(double) image->columns/(coeff[5]-coeff[4]);
@@ -315,9 +326,17 @@ static inline void SetPolarRatios(double *coeff,const Image *image,
   }
 }
 
-static inline double *PolarCoefficients(double *coeff,const DistortMethod *method,
-  const CoefficientContext *context)
+static inline double *PolarCoefficients(const CoefficientCall *call)
 {
+  double
+    *coeff = call->coeff;
+
+  const DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   const Image
     *const image = context->image;
 
@@ -359,13 +378,27 @@ static inline double *PolarCoefficients(double *coeff,const DistortMethod *metho
     coeff=(double *) RelinquishMagickMemory(coeff);
     return((double *) NULL);
   }
-  SetPolarRatios(coeff,image,method);
+  SetPolarRatios(call);
   return(coeff);
 }
 
-static inline void SetCylinderCoefficients(double *coeff,const Image *image,
-  const double *arguments,const DistortMethod *method)
+static inline void SetCylinderCoefficients(const CoefficientCall *call)
 {
+  double
+    *const coeff = call->coeff;
+
+  const CoefficientContext
+    *const context = call->context;
+
+  const Image
+    *const image = context->image;
+
+  const double
+    *const arguments = context->arguments;
+
+  const DistortMethod
+    *const method = call->method;
+
   coeff[0] = DegreesToRadians(arguments[0]);
   if ( *method == Cylinder2PlaneDistortion )
     /* image is curved around cylinder, so FOV angle (in radians)
@@ -382,11 +415,16 @@ static inline void SetCylinderCoefficients(double *coeff,const Image *image,
   coeff[5] = coeff[3]; /* assuming image size is the same */
 }
 
-static inline double *CylinderCoefficients(double *coeff,const DistortMethod *method,
-  const CoefficientContext *context)
+static inline double *CylinderCoefficients(const CoefficientCall *call)
 {
-  const Image
-    *const image = context->image;
+  double
+    *coeff = call->coeff;
+
+  const DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
 
   const double
     *const arguments = context->arguments;
@@ -433,13 +471,27 @@ static inline double *CylinderCoefficients(double *coeff,const DistortMethod *me
         CommandOptionToMnemonic(MagickDistortOptions,*method));
     return((double *) NULL);
   }
-  SetCylinderCoefficients(coeff,image,arguments,method);
+  SetCylinderCoefficients(call);
   return(coeff);
 }
 
-static inline void SetBarrelCenter(double *coeff,const Image *image,
-  const double *arguments,const size_t number_arguments)
+static inline void SetBarrelCenter(const CoefficientCall *call)
 {
+  double
+    *const coeff = call->coeff;
+
+  const CoefficientContext
+    *const context = call->context;
+
+  const Image
+    *const image = context->image;
+
+  const double
+    *const arguments = context->arguments;
+
+  const size_t
+    number_arguments = context->number_arguments;
+
   /* X,Y Center of Distortion (image coordinates) */
   if ( number_arguments == 5 )  {
     coeff[8] = arguments[3];
@@ -460,9 +512,21 @@ static inline void SetBarrelCenter(double *coeff,const Image *image,
   }
 }
 
-static inline void SetBarrelYCoefficients(double *coeff,const double *arguments,
-  const size_t number_arguments,const double rscale)
+static inline void SetBarrelYCoefficients(const CoefficientCall *call,
+  const double rscale)
 {
+  double
+    *const coeff = call->coeff;
+
+  const CoefficientContext
+    *const context = call->context;
+
+  const double
+    *const arguments = context->arguments;
+
+  const size_t
+    number_arguments = context->number_arguments;
+
   /* Y coefficients: as given OR same as X coefficients */
   if ( number_arguments >= 8 ) {
     coeff[4] = arguments[4] * pow(rscale,3.0);
@@ -478,9 +542,21 @@ static inline void SetBarrelYCoefficients(double *coeff,const double *arguments,
   }
 }
 
-static inline void SetBarrelXCoefficients(double *coeff,const double *arguments,
-  const size_t number_arguments,const double rscale)
+static inline void SetBarrelXCoefficients(const CoefficientCall *call,
+  const double rscale)
 {
+  double
+    *const coeff = call->coeff;
+
+  const CoefficientContext
+    *const context = call->context;
+
+  const double
+    *const arguments = context->arguments;
+
+  const size_t
+    number_arguments = context->number_arguments;
+
   /* A,B,C,D coefficients */
   coeff[0] = arguments[0];
   coeff[1] = arguments[1];
@@ -495,14 +571,19 @@ static inline void SetBarrelXCoefficients(double *coeff,const double *arguments,
   coeff[2] *= rscale;
 }
 
-static inline double *BarrelCoefficients(double *coeff,const DistortMethod *method,
-  const CoefficientContext *context)
+static inline double *BarrelCoefficients(const CoefficientCall *call)
 {
+  double
+    *coeff = call->coeff;
+
+  const DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   const Image
     *const image = context->image;
-
-  const double
-    *const arguments = context->arguments;
 
   ExceptionInfo
     *const exception = context->exception;
@@ -540,15 +621,23 @@ static inline double *BarrelCoefficients(double *coeff,const DistortMethod *meth
         CommandOptionToMnemonic(MagickDistortOptions, *method) );
       return((double *) NULL);
     }
-  SetBarrelXCoefficients(coeff,arguments,number_arguments,rscale);
-  SetBarrelYCoefficients(coeff,arguments,number_arguments,rscale);
-  SetBarrelCenter(coeff,image,arguments,number_arguments);
+  SetBarrelXCoefficients(call,rscale);
+  SetBarrelYCoefficients(call,rscale);
+  SetBarrelCenter(call);
   return(coeff);
 }
 
-static inline double *ShepardsCoefficients(double *coeff,const DistortMethod *method,
-  const CoefficientContext *context)
+static inline double *ShepardsCoefficients(const CoefficientCall *call)
 {
+  double
+    *coeff = call->coeff;
+
+  const DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   const Image
     *const image = context->image;
 
@@ -742,20 +831,22 @@ static inline MagickBooleanType CountCoefficients(const DistortMethod *method,
   return(MagickTrue);
 }
 
-static inline double *GenerateRadialCoefficients(double *coeff,DistortMethod *method,
-  const CoefficientContext *context)
+static inline double *GenerateRadialCoefficients(const CoefficientCall *call)
 {
+  DistortMethod
+    *const method = call->method;
+
   switch (*method)
   {
     case PolarDistortion:
     case DePolarDistortion:
-      return(PolarCoefficients(coeff,method,context));
+      return(PolarCoefficients(call));
     case Cylinder2PlaneDistortion:
     case Plane2CylinderDistortion:
-      return(CylinderCoefficients(coeff,method,context));
+      return(CylinderCoefficients(call));
     case BarrelDistortion:
     case BarrelInverseDistortion:
-      return(BarrelCoefficients(coeff,method,context));
+      return(BarrelCoefficients(call));
     default:
       break;
   }
@@ -764,9 +855,17 @@ static inline double *GenerateRadialCoefficients(double *coeff,DistortMethod *me
   return((double *) NULL);
 }
 
-static inline double *GenerateMappedCoefficients(double *coeff,DistortMethod *method,
-  const CoefficientContext *context)
+static inline double *GenerateMappedCoefficients(const CoefficientCall *call)
 {
+  double
+    *const coeff = call->coeff;
+
+  DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   switch (*method)
   {
     case BilinearForwardDistortion:
@@ -794,16 +893,25 @@ static inline double *GenerateMappedCoefficients(double *coeff,DistortMethod *me
     case ArcDistortion:
       return(ArcCoefficients(coeff,method,context));
     case ShepardsDistortion:
-      return(ShepardsCoefficients(coeff,method,context));
+      return(ShepardsCoefficients(call));
     default:
       break;
   }
-  return(GenerateRadialCoefficients(coeff,method,context));
+  return(GenerateRadialCoefficients(call));
 }
 
-static inline double *GenerateAffineFamilyCoefficients(double *coeff,
-  DistortMethod *method,const CoefficientContext *context)
+static inline double *GenerateAffineFamilyCoefficients(
+  const CoefficientCall *call)
 {
+  double
+    *const coeff = call->coeff;
+
+  DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   switch (*method)
   {
     case AffineDistortion:
@@ -821,7 +929,7 @@ static inline double *GenerateAffineFamilyCoefficients(double *coeff,
     default:
       break;
   }
-  return(GenerateMappedCoefficients(coeff,method,context));
+  return(GenerateMappedCoefficients(call));
 }
 
 static inline void ZeroCoefficients(double *coeff,
@@ -928,7 +1036,12 @@ static inline double *GenerateCoefficients(const Image *image,
 
   ZeroCoefficients(coeff,number_coefficients);
 
-  return(GenerateAffineFamilyCoefficients(coeff,method,&context));
+  {
+    const CoefficientCall
+      call = { coeff, method, &context };
+
+    return(GenerateAffineFamilyCoefficients(&call));
+  }
 }
 
 static inline void SetDistortProgress(MagickBooleanType *status,const Image *image,

@@ -373,6 +373,18 @@ typedef struct _CoefficientContext
     cp_values;
 } CoefficientContext;
 
+typedef struct _CoefficientCall
+{
+  double
+    *coeff;
+
+  DistortMethod
+    *method;
+
+  const CoefficientContext
+    *context;
+} CoefficientCall;
+
 static inline void AddAffineTerms(double *coeff,double **matrix,double **vectors,
   const CoefficientContext *context)
 {
