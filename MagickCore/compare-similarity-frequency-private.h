@@ -1690,6 +1690,55 @@ static MagickBooleanType AcquireNCCTarget(const Image *image,
   return(MagickTrue);
 }
 
+typedef struct _NCCVarianceTargets
+{
+  Image
+    **alpha_image;
+
+  ChannelStatistics
+    **channel_statistics;
+
+  Image
+    **target_image,
+    **variance_image;
+} NCCVarianceTargets;
+
+static MagickBooleanType AcquireNCCVariance(const Image *reconstruct,
+  ExceptionInfo *exception,const NCCVarianceTargets *targets)
+{
+  Image
+    **const alpha_image = targets->alpha_image;
+
+  ChannelStatistics
+    **const channel_statistics = targets->channel_statistics;
+
+  Image
+    **const target_image = targets->target_image,
+    **const variance_image = targets->variance_image;
+
+  MagickBooleanType
+    status;
+
+  /*
+    Compute the variance of the two images.
+  */
+  *variance_image=SIMVarianceImage(*alpha_image,*target_image,exception);
+  *target_image=DestroyImage(*target_image);
+  *alpha_image=DestroyImage(*alpha_image);
+  if (*variance_image == (Image *) NULL)
+    return(MagickFalse);
+  /*
+    Subtract the image mean.
+  */
+  *channel_statistics=GetImageStatistics(reconstruct,exception);
+  if (*channel_statistics == (ChannelStatistics *) NULL)
+    return(MagickFalse);
+  status=SIMMultiplyImage(*variance_image,1.0,*channel_statistics,exception);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static Image *NCCSimilarityImage(const Image *image,const Image *reconstruct,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
 {
@@ -1719,6 +1768,9 @@ static Image *NCCSimilarityImage(const Image *image,const Image *reconstruct,
   NCCTargetTargets
     beta_targets;
 
+  NCCVarianceTargets
+    variance_targets;
+
   RectangleInfo
     geometry;
 
@@ -1735,22 +1787,12 @@ static Image *NCCSimilarityImage(const Image *image,const Image *reconstruct,
   beta_targets.target_image=(&target_image);
   if (AcquireNCCTarget(image,exception,&beta_targets) == MagickFalse)
     ThrowNCCSimilarityException();
-  /*
-    Compute the variance of the two images.
-  */
-  variance_image=SIMVarianceImage(alpha_image,target_image,exception);
-  target_image=DestroyImage(target_image);
-  alpha_image=DestroyImage(alpha_image);
-  if (variance_image == (Image *) NULL)
-    ThrowNCCSimilarityException();
-  /*
-    Subtract the image mean.
-  */
-  channel_statistics=GetImageStatistics(reconstruct,exception);
-  if (channel_statistics == (ChannelStatistics *) NULL)
-    ThrowNCCSimilarityException();
-  status=SIMMultiplyImage(variance_image,1.0,channel_statistics,exception);
-  if (status == MagickFalse)
+  variance_targets.alpha_image=(&alpha_image);
+  variance_targets.channel_statistics=(&channel_statistics);
+  variance_targets.target_image=(&target_image);
+  variance_targets.variance_image=(&variance_image);
+  if (AcquireNCCVariance(reconstruct,exception,&variance_targets) ==
+      MagickFalse)
     ThrowNCCSimilarityException();
   normalize_image=SIMSubtractImageMean(image,reconstruct,channel_statistics,
     exception);
