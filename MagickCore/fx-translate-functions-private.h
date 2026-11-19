@@ -539,19 +539,9 @@ static fxFltType ApplyNumberPrefix (FxInfo * pfx, char * tailptr, fxFltType val)
   return val;
 }
 
-static MagickBooleanType GetParenthesisedOperand (
-  FxInfo * pfx, OperatorE op, MagickBooleanType * needPopAll)
+static MagickBooleanType CloseParenthesisedOperand (FxInfo * pfx,
+  char chLimit)
 {
-  char chLimit = '\0';
-  if (!PushOperatorStack (pfx, (int) op)) return MagickFalse;
-  pfx->pex++;
-  if (!TranslateExpression (pfx, ")", &chLimit, needPopAll)) {
-    (void) ThrowMagickException (
-      pfx->exception, GetMagickModule(), OptionError,
-      "Empty expression in parentheses at", "'%s'",
-      SetShortExp(pfx));
-    return MagickFalse;
-  }
   if (chLimit != ')') {
     (void) ThrowMagickException (
       pfx->exception, GetMagickModule(), OptionError,
@@ -568,6 +558,22 @@ static MagickBooleanType GetParenthesisedOperand (
     return MagickFalse;
   }
   return MagickTrue;
+}
+
+static MagickBooleanType GetParenthesisedOperand (
+  FxInfo * pfx, OperatorE op, MagickBooleanType * needPopAll)
+{
+  char chLimit = '\0';
+  if (!PushOperatorStack (pfx, (int) op)) return MagickFalse;
+  pfx->pex++;
+  if (!TranslateExpression (pfx, ")", &chLimit, needPopAll)) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Empty expression in parentheses at", "'%s'",
+      SetShortExp(pfx));
+    return MagickFalse;
+  }
+  return(CloseParenthesisedOperand (pfx, chLimit));
 }
 
 static MagickBooleanType GetHexColourOperand (FxInfo * pfx)
