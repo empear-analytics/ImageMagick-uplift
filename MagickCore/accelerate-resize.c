@@ -659,15 +659,12 @@ RestoreMSCWarning
 
     if (totalLocalMemorySize <= pass->device->local_memory_size)
       break;
-    else
+    pixelPerWorkgroup=pixelPerWorkgroup/2;
+    chunkSize=chunkSize/2;
+    if ((pixelPerWorkgroup == 0) || (chunkSize == 0))
     {
-      pixelPerWorkgroup=pixelPerWorkgroup/2;
-      chunkSize=chunkSize/2;
-      if ((pixelPerWorkgroup == 0) || (chunkSize == 0))
-      {
-        /* quit, fallback to CPU */
-        return(MagickFalse);
-      }
+      /* quit, fallback to CPU */
+      return(MagickFalse);
     }
   }
 
