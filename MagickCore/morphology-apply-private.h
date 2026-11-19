@@ -115,8 +115,14 @@ static inline double RotateKernelBy45Degrees(const KernelRotation *rotation)
   return(angle);
 }
 
-static inline double TurnTransposedKernelAngle(KernelInfo *kernel,double angle)
+static inline double TurnTransposedKernelAngle(const KernelRotation *rotation)
 {
+  KernelInfo
+    *const kernel = rotation->kernel;
+
+  double
+    angle = rotation->angle;
+
   if ( kernel->width == 1 ) {
     angle = fmod(angle+270.0, 360.0);     /* angle reduced 90 degrees */
     kernel->angle = fmod(kernel->angle+90.0, 360.0);
@@ -140,7 +146,12 @@ static inline double TransposeKernel(KernelInfo *kernel,double angle)
   t = kernel->x;
   kernel->x = kernel->y;
   kernel->y = t;
-  angle=TurnTransposedKernelAngle(kernel,angle);
+  {
+    const KernelRotation
+      rotation = { kernel, angle };
+
+    angle=TurnTransposedKernelAngle(&rotation);
+  }
   return(angle);
 }
 
