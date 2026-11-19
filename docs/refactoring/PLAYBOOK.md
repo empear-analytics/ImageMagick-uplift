@@ -24539,6 +24539,110 @@ before the run, one blank line kept, the C++ check in the wide configuration).
 
 ---
 
+## Recipe JD - Join Twin Call Arms Around a Common Fill into One Status Dispatch
+
+**Use when:** CodeScene reports *Large Method*, *Complex Method* or *Bumpy Road Ahead* on a
+function that holds a selection whose two arms begin with the same fill of the struct locals
+a call reads, one arm ending in its call and exit test, the other arm's call and exit test
+spread after the selection under the selection's own condition (the shape Recipe SG shape c
+and Recipe I leave together): `accelerate-resize.c`'s `ComputeResizeImage` after
+`170aed8bb`, whose `if (xFactor > yFactor)` arm fills `info` and `targets` (fifteen
+assignments), whose `else` arm fills them the same way and calls
+`ResizeVerticalThenHorizontal`, and whose `if ((xFactor > yFactor) &&
+(ResizeHorizontalThenVertical(...) == MagickFalse)) goto cleanup;` follows. The fill is
+written twice and the exit test twice.
+
+**Not covered by:** Recipe SG, which spreads a guard and never joins one; Recipe HT, whose
+branches end in the same `return` test and whose second branch continues after it, and
+which hoists no leading statements; Recipe HF, whose two fills stand in an early-returning
+branch and after it, never in two arms of one selection; Recipe D, whose copies become
+calls; Recipe RF, which deletes a fill already run on every path.
+
+**How:**
+
+1. Find, outside every OpenMP region and with no `#pragma` or preprocessor line in it,
+   `if (C) { F } else { F if (G2 == K) goto L; }` directly followed by
+   `if ((C) && (G1 == K)) goto L;`, where `F` is the same token sequence in both arms
+   (whitespace and line breaks ignored), a run of expression statements with no call,
+   label, `goto`, `return`, `break` or `continue`; `G1` and `G2` are calls of functions
+   returning `MagickBooleanType`; `K` is one constant, the same in both tests; `L` is one
+   label, the same in both.
+2. `C` has no side effect (no call, assignment, increment or `volatile` object) and reads
+   only locals of the function whose address is taken nowhere (`grep`). `F` and the
+   arguments of `G1` and `G2` write none of them (by reading).
+3. Declare a new local `MagickBooleanType status;` (or another name not yet used in the
+   function) among the function's declarations, in their order.
+4. Rewrite the two statements as `F`, re-indented to the selection's level, then
+   `if (C) status=G1; else status=G2;` (`G1`, `G2` and `C` copied character for character,
+   each assignment on its own line under its `if` or `else`), then `if (status == K) goto
+   L;`.
+5. One selection per commit (one recipe, one function).
+6. Run `refactor_guard.py`: the literals of the deleted copy of `F` count as deduplication
+   (`WARN`, every value still present, or `OK`). `--calls`: no call is added or removed
+   (each of `G1` and `G2` is called once before and after). Run the oracle on the
+   function's cases; check by `casemap` or by reading the cases that both arms are reached.
+
+**Before:**
+
+```c
+  if (xFactor > yFactor)
+  {
+    info.device=device;
+    ...
+    targets.outputReady=(&outputReady);
+  }
+  else
+  {
+    info.device=device;
+    ...
+    targets.outputReady=(&outputReady);
+    if (ResizeVerticalThenHorizontal(&info,exception,&targets) ==
+        MagickFalse)
+      goto cleanup;
+  }
+  if ((xFactor > yFactor) &&
+      (ResizeHorizontalThenVertical(&info,exception,&targets) == MagickFalse))
+    goto cleanup;
+```
+
+**After:**
+
+```c
+  info.device=device;
+  ...
+  targets.outputReady=(&outputReady);
+  if (xFactor > yFactor)
+    status=ResizeHorizontalThenVertical(&info,exception,&targets);
+  else
+    status=ResizeVerticalThenHorizontal(&info,exception,&targets);
+  if (status == MagickFalse)
+    goto cleanup;
+```
+
+**Careful:**
+
+- When `C` holds, the old code ran `F` in the first arm, then evaluated `C` again (true:
+  step 2, nothing changed what it reads) and called `G1`, leaving for `L` when it returned
+  `K`. The new code runs `F`, calls `G1`, and leaves for `L` on `K`: the same statements in
+  the same order.
+- When `C` fails, the old code ran `F`, called `G2` and left for `L` on `K`; otherwise it
+  evaluated `C` (false, no side effect) and skipped `G1`. The new code runs `F`, calls
+  `G2` and leaves on `K`: the same calls, the same exit.
+- `status` holds the value the old test compared; it is read only by the new test. Its
+  declaration adds a local and nothing else.
+
+**Evidence level:** oracle on the function's cases (both arms reached), with
+`refactor_guard.py --calls` and steps 1 and 2 checked by reading.
+
+**Provenance:** 2026-11-19, from `accelerate-resize.c`'s `ComputeResizeImage` (campaign A,
+W46 round 33, lane b, batch 2): after Recipe I moved the `else` arm (`170aed8bb`) in the form
+`63044258d` had given the first arm, the fill stood twice and the first arm's call stood
+after the selection, where Recipe SG had spread it. Step 2 of the stub-probed resize chain
+(8.21 to 9.30 at its end). Added by Claude Code (Claude Opus 5.5) under the mandate of
+2026-11-19 (the owner's "New recipes are fine", PR #129 Q7).
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -25071,3 +25175,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | WORDING | IP | Step 2 (a), second reading of `485b9c818`: the local bound through a `const` pointer local counts only when nothing writes that member, or the pointer member it is read through, between the caller's binding and the call | Review of batch 4 of W45 lane c: the reading's text left the no-write condition implicit (in the distort chain `context` and its members are written by nothing after `GenerateCoefficients` fills them) | after the fact |
 | 2026-11-19 | NEW | DI | Declare a Local with the Constant Its First Statement Assigns: a run of `v=c;` statements (`NULL`, `(T) NULL`, an enumeration constant, an integer literal) at the top level of a function body, each the first statement to name a local declared without an initialiser in the same block, with no label before it, becomes `=c` in the declarators; `obj_identical.sh` `IDENTICAL` is required. *Careful* gives the argument (C11 6.8p3 and 6.7.9p11; nothing reads the local before the old statement and no jump enters the stretch; C++ jumps stay within the scope) | `accelerate-motion-blur.c`'s `ComputeMotionBlurImage` (campaign A, W46 round 33, lane b): *Large Method* at 72 lines, nine `NULL`/`MagickFalse` statements; a probe 9.30 to 9.68, object code identical in the wide build | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | DI | Step 1: the local is declared before the first statement of the function; step 2: no `goto` before the run, and the declaration and the run under the same preprocessor conditions (no `#if`/`#else`/`#endif` between them or inside the run); step 3: one of the two blank lines around a deleted run goes too (After example fixed); step 5: `clang++ -x c++ -fsyntax-only` in the wide configuration where `tools/cxx_warnings.sh` cannot run; *Careful*: the one path that could differ (a `goto` before the run to code after it) read an indeterminate value, undefined behaviour, and is excluded | Review of batch 1 of W46 lane b (round 33): `46b516c37`, `1b3046a49`, `ebfa1ccfb` meet the amended steps (no `goto` or `#if` before their runs; the first left a doubled blank line, removed in a style commit) | after the fact |
+| 2026-11-19 | NEW | JD | Join Twin Call Arms Around a Common Fill into One Status Dispatch: `if (C) { F } else { F if (G2 == K) goto L; }` followed by `if ((C) && (G1 == K)) goto L;` (the shape Recipes SG and I leave) becomes `F`, `if (C) status=G1; else status=G2;`, `if (status == K) goto L;`. *Careful* gives the path argument (`C` without side effect, unchanged by `F`; each path runs the same statements in the same order) | `accelerate-resize.c`'s `ComputeResizeImage` (campaign A, W46 round 33, lane b, batch 2): the fill of `info` and `targets` written twice after `170aed8bb`; step 2 of the resize chain stub-probed at 9.30 | mandate (2026-11-19) |
