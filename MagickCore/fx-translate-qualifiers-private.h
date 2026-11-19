@@ -226,6 +226,23 @@ typedef struct _QualifierCheck
     iaQual;
 } QualifierCheck;
 
+static MagickBooleanType CheckHslQualifier (FxInfo * pfx,
+  const PixelChannel chQual,const ImgAttrE iaQual)
+{
+    if (IsHslChannelQualifier(chQual) != MagickFalse) {
+      pfx->NeedHsl = MagickTrue;
+
+      if (iaQual >= FirstImgAttr && iaQual < aNull) {
+        (void) ThrowMagickException (
+          pfx->exception, GetMagickModule(), OptionError,
+          "Can't have image attribute with HLS qualifier at", "'%s'",
+          SetShortExp(pfx));
+        return MagickFalse;
+      }
+    }
+  return MagickTrue;
+}
+
 static MagickBooleanType CheckFunctionQualifiers (const QualifierCheck *check,
   FxInfo * pfx)
 {
@@ -263,18 +280,7 @@ static MagickBooleanType CheckFunctionQualifiers (const QualifierCheck *check,
       return MagickFalse;
     }
 
-    if (IsHslChannelQualifier(chQual) != MagickFalse) {
-      pfx->NeedHsl = MagickTrue;
-
-      if (iaQual >= FirstImgAttr && iaQual < aNull) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "Can't have image attribute with HLS qualifier at", "'%s'",
-          SetShortExp(pfx));
-        return MagickFalse;
-      }
-    }
-  return MagickTrue;
+  return(CheckHslQualifier (pfx, chQual, iaQual));
 }
 
 typedef struct _FunctionQualifiers
