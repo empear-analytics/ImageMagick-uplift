@@ -610,11 +610,11 @@ static inline MagickBooleanType GetPSNRSimilarity(const Image *image,
   return(status);
 }
 
+#define RMSESquareRoot(x)  sqrt((x) < 0.0 ? 0.0 : (x))
+
 static inline MagickBooleanType GetRMSESimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
-#define RMSESquareRoot(x)  sqrt((x) < 0.0 ? 0.0 : (x))
-
   MagickBooleanType
     status = MagickTrue;
 
