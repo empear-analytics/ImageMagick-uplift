@@ -23457,6 +23457,22 @@ include block (`composite-channel-private.h`, the composite-image headers) has i
 carved header. A `%` banner of a `static` function that stands in the run but documents a
 function that stays moves, unchanged, to directly above that function, as step 1 moves
 an external function's banner (comments are not tokens).
+Upstream shared form (mandate, 2026-11-19; reading 4 of round 34, upstream private headers
+that campaign A works): Form A also applies to an upstream private header that many files
+include (`colorspace-private.h`, 204 including sources in MagickCore and coders). The run is
+the items after its include block: `#define`s, `static const` tables and `static inline`
+functions; the header's `extern "C"` opener, when it stands between the tables and the
+functions, stays where it is and is not part of the run. The new header, which only the
+carved header includes, is named as the last line of the carved header's include block,
+holds the run's items verbatim in their order, and wraps the functions in an `extern "C"`
+pair of its own when they stood inside the carved header's pair (the C translation unit has
+the same tokens in the same order: the pairs are empty in C). Proof (step 4 for this form):
+every including source's preprocessed C translation unit is identical, the carved header
+and the new header placed as at `HEAD` and as in the working tree ahead of every `-I` path,
+line markers and blank lines dropped; every including object of an OpenMP -O2 tree is
+identical to a snapshot of the parent, debug sections stripped; the C++ check runs on the
+MagickCore includers. Step 1's probe applies: the carved header rises and the new header
+scores at least the carved header's score before.
 
 **Not covered by:** Recipe S, which moves a public root into a new `.c` file and shares helpers
 through a header that two `.c` files include; here nothing public leaves and no second `.c`
@@ -25912,3 +25928,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | AMEND | OH | Step 1, Form A: a `static` array of pointers to `const` data that no statement writes and whose only uses are rvalue subscripts may be in the run as a `static const` table is (its top-level qualifier is the only difference); internal linkage, initialiser and the one translation unit unchanged, step 4's pp and object identities still required | `fx.c` (campaign A, W47 round 34, lane b): the Form A run from the `#define` block through DumpUserSymbolValues holds `static const char * sElementTypes[]` (seven strings, read only in DumpRpnElement as `sElementTypes[pel->type]`); probe fx.c 9.09 to 10.0, header 9.09 | mandate (2026-11-19) |
 | 2026-11-19 | NEW | MD | Move a declared function's definition later in its file: an external definition declared in an included header moves unchanged to a later top-level position, so that an OH Form A run can end before it; split_branch_check IDENTICAL-MODULO-LAYOUT and sorted preprocessed lines equal | `fx.c` (campaign A, W47 round 34, lane b): review of batch 4 found `AcquireFxInfo` and `DestroyFxInfo` (MagickPrivate in `fx-private.h`, called from `property.c`) inside the run of `9f6e618fa` | mandate (2026-11-19) |
 | 2026-11-19 | NEW | EL | Write an Equality-Chain Predicate as a Label Set: a `static` predicate whose body is `if (C) return(MagickTrue); return(MagickFalse);` (or the `?:` form), `C` a chain of `n == Li` over distinct enumeration constants, becomes `switch (n)` with the constants as labels in order, `return(MagickTrue);`, `default: break;`, `return(MagickFalse);` (Recipe LP step 2's shape); for a header, every including object compared with a snapshot and the changed functions' self Ir measured on their per-pixel users | `colorspace-private.h` (campaign A, W47 round 34, lane a): seven *Complex Conditional* findings in its `Is...Colorspace` predicates; the label-set probe 3.69 -> 4.89 (`IssRGBCompatibleColorspace` alone 3.99, its changed callers at equal or lower self Ir) | mandate (2026-11-19) |
+| 2026-11-19 | AMEND | OH | Upstream shared form of Form A: an upstream private header that many files include gives its run after the include block (`#define`s, `static const` tables, `static inline` functions; the `extern "C"` opener between tables and functions stays) to a new header that only it includes, named last in its include block, the functions in an `extern "C"` pair of their own; proof: every including source preprocessed identical (C) and every including object of an OpenMP -O2 tree identical to a snapshot, C++ check on the MagickCore includers; both headers at least the carved header's score before | `colorspace-private.h` (campaign A, W47 round 34, lane a, reading 4): 4.32 after four EL steps, its 72 converters (Excess Arguments, Code Duplication, Complex and Large Method) per pixel in every colourspace transform; the carve gives 7.43 and the new `colorspace-conversions-private.h` 5.18, with no instruction changed in any includer | mandate (2026-11-19) |
