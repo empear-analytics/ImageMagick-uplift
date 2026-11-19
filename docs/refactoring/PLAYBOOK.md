@@ -2009,6 +2009,15 @@ merges code, not parameters.
    write an identifier of the initialiser between the point where the struct takes its
    values and its last call. Where that point can be the declaration, and the
    initialiser has no member access or cast, declare it `const` with the initialiser.
+   One-line form (mandate, 2026-11-19): that `const` declaration may stand on one line,
+   `const Name name = { a, b };`, and a call this step changes may be joined onto one
+   line when it then fits in 80 columns, when the usual two-line declaration and the
+   wrapped call would lengthen a caller that CodeScene reports as a *Large Method*
+   enough to lower its file (a header step whose including file would otherwise drop:
+   `8943c3b92`, `createKernelInfo`, where `accelerate-unsharp.c` went 8.46 -> 8.44 with
+   two lines and 8.42 with the block form, and stays 8.46 in one; precedent for the
+   declaration: `compare-similarity-image.c`'s `const SimilarityRow row = {...}`). Only
+   the layout of these lines changes; the tokens are those of the two-line form.
    Otherwise declare it without `const` or initialiser, and fill it at that point,
    `name.member=expr;` for every member in declaration order, with nothing between.
    Form for a call in a loop (2026-11-05): when the calls stand in the body of a loop of
@@ -25590,3 +25599,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | AMEND | DI | Step 5's exception (5001463a3) made precise: the reordering is shown by `tools/obj_sorted.sh` (new, b17b0903e), which disassembles with relocations (`objdump -dr`) and accepts only equal sorted lines whose moved lines are all stores of immediate constants to distinct stack slots; the commit quotes the moved lines; the exception is marked for the owner's confirmation, since it relaxes `IDENTICAL` | Review of batch 3 of W46 lane b: the lane's stand-in ran objdump without `-r`, which would hide two calls that swapped places. Rerun on `1bdc1a5a7` against its parent: `REORDERED-CONSTANT-STORES`, 832 instruction lines, one moved line `<AccelerateDespeckleImage>: movq $0x0,0xb0(%rsp)` | mandate (2026-11-19) |
 | 2026-11-19 | WORDING | DI | Step 5: `tools/obj_sorted.sh` does not check that no instruction between a moved store's old and new position reads that slot (a load, an `lea`, a call taking its address); the step relies on step 2's C-level argument; the script's own `--self-test` | Review of batch 4 of W46 lane b: `b17b0903e` dropped the tab-led relocation lines (fixed in `645f80277`, with a self-test); rerun on `1bdc1a5a7` against its parent: `REORDERED-CONSTANT-STORES`, 832 instruction lines, one moved line `<AccelerateDespeckleImage>: movq $0x0,0xb0(%rsp)` | after the fact |
 | 2026-11-19 | WORDING | SE | *Not covered by* names Recipe Y (it builds and fills a new input struct; SE's struct is the function's own `const` parameter, so nothing is built or filled); step 3 adds that no callee between the binding and the copy writes `*P` | Review of batch 4 of W46 lane b: in `RunHullPassLoop` the calls between the bindings and the copies (`clSetKernelArg`, `EnqueueHullPasses` through a copy of the values) receive no pointer to `*loop` | after the fact |
+| 2026-11-19 | AMEND | B | Step 5, one-line form: a `const` declaration with an initialiser may stand on one line (`const Name name = { a, b };`) and a changed call may be joined onto one line within 80 columns, when the two-line layout would lengthen a *Large Method* caller enough to lower its file; tokens unchanged, layout only | Campaign A, W47 lane a, `8943c3b92` (`createKernelInfo`, header B step): `accelerate-unsharp.c` 8.46 -> 8.44 (two-line declaration) or 8.42 (block form, round 33's probe), 8.46 in the one-line form; earlier one-line declaration `const SimilarityRow row = {...}` in `compare-similarity-image.c`; confirmed by the round-34 coordinator for the owner's mandate | mandate (2026-11-19) |
