@@ -512,9 +512,21 @@ static inline void SetBarrelCenter(const CoefficientCall *call)
   }
 }
 
-static inline void SetBarrelYCoefficients(double *coeff,const double *arguments,
-  const size_t number_arguments,const double rscale)
+static inline void SetBarrelYCoefficients(const CoefficientCall *call,
+  const double rscale)
 {
+  double
+    *const coeff = call->coeff;
+
+  const CoefficientContext
+    *const context = call->context;
+
+  const double
+    *const arguments = context->arguments;
+
+  const size_t
+    number_arguments = context->number_arguments;
+
   /* Y coefficients: as given OR same as X coefficients */
   if ( number_arguments >= 8 ) {
     coeff[4] = arguments[4] * pow(rscale,3.0);
@@ -601,7 +613,7 @@ static inline double *BarrelCoefficients(const CoefficientCall *call)
       return((double *) NULL);
     }
   SetBarrelXCoefficients(coeff,arguments,number_arguments,rscale);
-  SetBarrelYCoefficients(coeff,arguments,number_arguments,rscale);
+  SetBarrelYCoefficients(call,rscale);
   SetBarrelCenter(call);
   return(coeff);
 }
