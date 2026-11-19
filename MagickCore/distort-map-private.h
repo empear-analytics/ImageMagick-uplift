@@ -1077,9 +1077,16 @@ static void PrintAffineProjection(const double *inverse)
     GetMagickPrecision(),inverse[4],GetMagickPrecision(),inverse[5]);
 }
 
-static MagickBooleanType PrintAffineFX(double *coeff,const char *image_gen,
-  const char *lookup,ExceptionInfo *exception)
+static MagickBooleanType PrintAffineFX(const DistortVerboseFX *fx,
+  ExceptionInfo *exception)
 {
+  double
+    *coeff = fx->coeff;
+
+  const char
+    *const image_gen = fx->image_gen,
+    *const lookup = fx->lookup;
+
   double
     *inverse;
 
