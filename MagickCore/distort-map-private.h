@@ -1186,9 +1186,15 @@ static void PrintBilinearForwardLookup(const double *coeff,
     (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
 }
 
-static void PrintBilinearForwardFX(const double *coeff,const char *image_gen,
-  const char *lookup)
+static void PrintBilinearForwardFX(const DistortVerboseFX *fx)
 {
+  const double
+    *const coeff = fx->coeff;
+
+  const char
+    *const image_gen = fx->image_gen,
+    *const lookup = fx->lookup;
+
   (void) FormatLocaleFile(stderr,"BilinearForward Mapping Equations:\n");
   (void) FormatLocaleFile(stderr,"%s", image_gen);
   (void) FormatLocaleFile(stderr,"    i = %+lf*x %+lf*y %+lf*x*y %+lf;\n",
@@ -1362,7 +1368,7 @@ static void PrintDistortFX(const DistortVerboseFX *fx)
   {
     case BilinearForwardDistortion:
     {
-      PrintBilinearForwardFX(coeff,image_gen,lookup);
+      PrintBilinearForwardFX(fx);
       break;
     }
     case BilinearReverseDistortion:
