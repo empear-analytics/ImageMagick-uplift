@@ -2026,7 +2026,15 @@ merges code, not parameters.
    with it). The initialiser is then evaluated directly before the one call with
    nothing between, which is step 4's condition for member accesses and casts; a
    dereference is read the same way, its target unchanged between the read and the
-   call. A second `static` function of the file whose group has the same names and
+   call. The block form also takes an initialiser of plain identifiers (the caller's own
+   locals and parameters), as Recipe BP step 4 writes it (2026-11-19,
+   `HistogramKernelLaunch`, `3aec3f0b4`). When step 1's header form changes a call
+   site inside a caller that no case reaches (`casemap.py` 0 for it and for each of its
+   callers), while the bundled function itself is reached through another includer,
+   that call site takes the checks of *Unreached functions: B and N* (items 1 to 4,
+   `obj_modulo.sh` run on that includer's object, the header placed as at `HEAD` on the
+   before side) and the commit message quotes them for that site; the reached sites keep
+   the oracle. A second `static` function of the file whose group has the same names and
    exact types as one an earlier step of this recipe bundled may take that `Name`
    rather than a second typedef repeating it member for member (Recipe N step 8's
    shared-typedef form).
@@ -24324,6 +24332,11 @@ parameter the callee can read from another.
    parameter's type without top-level `const` and its name, directly above the first
    function that will take it, outside every `#if` block (in the commit of the first step;
    later steps that take the same group reuse it, as Recipe N step 8's shared typedef).
+   When every function and call that will name the typedef stands inside one `#if` block
+   (a header's `#if defined(MAGICKCORE_OPENCL_SUPPORT)`), the typedef stands inside that
+   block, directly above the first function (2026-11-19, `opencl-environment-private.h`'s
+   `OpenCLCacheSearch`, `34c407ee8`): every configuration that compiles a user sees it,
+   and none that compiles no user gains a name.
 3. Replace the group by `const Name *name`. At the top of the body declare a local of each
    old name and parameter type, initialised from `name->member`, with a top-level `const`
    when the body never assigns it (a scalar the body updates, `angle = fmod(...)`, is a
@@ -25186,3 +25199,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | NEW | GL | Fold a Guard into the Lookup It Encloses, Returning NULL When It Fails: `if (G) { const T *v = L; if (v != NULL) { B } }` becomes `const T *v = Helper(...); if (v != NULL) { B }`, the helper returning `L` when `G` holds and `NULL` otherwise (with the statements that compute only `G`'s operands) | `compare-similarity-image.c`'s `SimilarityImage` (campaign A, W46 round 33, lane a): the frequency-domain dispatch is a bump and two decisions of a `MagickExport` function; E, P, CN and RV do not take it. Probe 8.51 to 8.54 | owner |
 | 2026-11-19 | NEW | DI | Declare a Local with the Constant Its First Statement Assigns: a run of `v=c;` statements (`NULL`, `(T) NULL`, an enumeration constant, an integer literal) at the top level of a function body, each the first statement to name a local declared without an initialiser in the same block, with no label before it, becomes `=c` in the declarators; `obj_identical.sh` `IDENTICAL` is required. *Careful* gives the argument (C11 6.8p3 and 6.7.9p11; nothing reads the local before the old statement and no jump enters the stretch; C++ jumps stay within the scope) | `accelerate-motion-blur.c`'s `ComputeMotionBlurImage` (campaign A, W46 round 33, lane b): *Large Method* at 72 lines, nine `NULL`/`MagickFalse` statements; a probe 9.30 to 9.68, object code identical in the wide build | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | DI | Step 1: the local is declared before the first statement of the function; step 2: no `goto` before the run, and the declaration and the run under the same preprocessor conditions (no `#if`/`#else`/`#endif` between them or inside the run); step 3: one of the two blank lines around a deleted run goes too (After example fixed); step 5: `clang++ -x c++ -fsyntax-only` in the wide configuration where `tools/cxx_warnings.sh` cannot run; *Careful*: the one path that could differ (a `goto` before the run to code after it) read an indeterminate value, undefined behaviour, and is excluded | Review of batch 1 of W46 lane b (round 33): `46b516c37`, `1b3046a49`, `ebfa1ccfb` meet the amended steps (no `goto` or `#if` before their runs; the first left a doubled blank line, removed in a style commit) | after the fact |
+| 2026-11-19 | AMEND | BP | Step 2: when every function and call that names the typedef stands inside one `#if` block, the typedef stands inside that block, directly above the first function | Review of W46 lane c batch 1: `OpenCLCacheSearch` (`34c407ee8`) and `HistogramKernelLaunch` (`3aec3f0b4`, a B step) sit in their headers' `MAGICKCORE_OPENCL_SUPPORT` blocks, where all their users are; "outside every `#if` block" read literally would put them where no user is compiled (campaign A) | mandate (2026-11-19) |
+| 2026-11-19 | AMEND | B | Step 5: the block form also takes an initialiser of plain identifiers, as BP step 4 does; a call site that step 1's header form changes inside an unreached caller, while the bundled function is reached through another includer, takes the checks of *Unreached functions: B and N* for that site, quoted in the message | Review of W46 lane c batch 1: `3aec3f0b4` (`LaunchHistogramKernel`) filled `{ clEnv, device, queue, imageBuffer, histogramBuffer }` in a block in the never-called `AccelerateContrastStretchImage` (guard, `obj_modulo` MODULO-IDENTICAL) and at the reached equalize site (oracle, object IDENTICAL) (campaign A) | mandate (2026-11-19) |

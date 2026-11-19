@@ -157,6 +157,8 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/composite-image.c \
   MagickCore/composite.h \
   MagickCore/composite-channel-blend-private.h \
+  MagickCore/composite-channel-mix-private.h \
+  MagickCore/composite-channel-groups-private.h \
   MagickCore/composite-channel-private.h \
   MagickCore/composite-image-blend-private.h \
   MagickCore/composite-image-over-private.h \
@@ -666,6 +668,8 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/compare-similarity-frequency-private.h \
   MagickCore/compare-similarity-frequency-images-private.h \
   MagickCore/composite-channel-blend-private.h \
+  MagickCore/composite-channel-mix-private.h \
+  MagickCore/composite-channel-groups-private.h \
   MagickCore/composite-channel-private.h \
   MagickCore/composite-image-blend-private.h \
   MagickCore/composite-image-over-private.h \
