@@ -957,13 +957,13 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
   const ResizeFilter *resizeFilter,ExceptionInfo *exception)
 {
   cl_command_queue
-    queue;
+    queue=NULL;
 
   cl_mem
-    cubicCoefficientsBuffer,
-    filteredImageBuffer,
-    imageBuffer,
-    tempImageBuffer;
+    cubicCoefficientsBuffer=NULL,
+    filteredImageBuffer=NULL,
+    imageBuffer=NULL,
+    tempImageBuffer=NULL;
 
   cl_uint
     number_channels;
@@ -973,13 +973,13 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
     yFactor;
 
   MagickBooleanType
-    outputReady;
+    outputReady=MagickFalse;
 
   MagickCLDevice
     device;
 
   Image
-    *filteredImage;
+    *filteredImage=NULL;
 
   ResizeArmInfo
     info;
@@ -989,14 +989,6 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
 
   size_t
     length;
-
-  queue=NULL;
-  filteredImage=NULL;
-  imageBuffer=NULL;
-  filteredImageBuffer=NULL;
-  tempImageBuffer=NULL;
-  cubicCoefficientsBuffer=NULL;
-  outputReady=MagickFalse;
 
   {
     const ResizeImageSource
