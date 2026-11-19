@@ -347,9 +347,9 @@ typedef struct _NextOperandTargets
     *NewUserSymbol;
 } NextOperandTargets;
 
-static MagickBooleanType PrepareNextOperand (
-  const ExpressionContext * context, const UserSymbolAssignment * assignment,
-  const NextOperandTargets * targets, MagickBooleanType * broke)
+static MagickBooleanType FinishNextOperand (
+  const UserSymbolAssignment * assignment, const NextOperandTargets * targets,
+  MagickBooleanType * broke)
 {
   FxInfo
     *const pfx = assignment->pfx;
@@ -360,22 +360,9 @@ static MagickBooleanType PrepareNextOperand (
   const MagickBooleanType
     IncrDecr = assignment->IncrDecr;
 
-  TernaryT
-    *const ternary = targets->ternary;
-
   MagickBooleanType
     *const UserSymbol = targets->UserSymbol,
     *const NewUserSymbol = targets->NewUserSymbol;
-
-  (*broke)=MagickFalse;
-    if (!ProcessTernaryOpr (pfx, ternary)) return MagickFalse;
-
-    if (TranslateTernaryElse (context, *ternary, broke) == MagickFalse)
-      return MagickFalse;
-    if ((*broke) != MagickFalse) {
-      (*broke)=MagickTrue;
-      return(MagickTrue);
-    }
 
     *UserSymbol = *NewUserSymbol = MagickFalse;
 
@@ -395,6 +382,29 @@ static MagickBooleanType PrepareNextOperand (
       return MagickFalse;
     }
   return(MagickTrue);
+}
+
+static MagickBooleanType PrepareNextOperand (
+  const ExpressionContext * context, const UserSymbolAssignment * assignment,
+  const NextOperandTargets * targets, MagickBooleanType * broke)
+{
+  FxInfo
+    *const pfx = assignment->pfx;
+
+  TernaryT
+    *const ternary = targets->ternary;
+
+  (*broke)=MagickFalse;
+    if (!ProcessTernaryOpr (pfx, ternary)) return MagickFalse;
+
+    if (TranslateTernaryElse (context, *ternary, broke) == MagickFalse)
+      return MagickFalse;
+    if ((*broke) != MagickFalse) {
+      (*broke)=MagickTrue;
+      return(MagickTrue);
+    }
+
+  return(FinishNextOperand (assignment, targets, broke));
 }
 
 typedef struct _ExpressionTargets
