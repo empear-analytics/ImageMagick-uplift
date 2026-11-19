@@ -1982,6 +1982,11 @@ merges code, not parameters.
 
 1. The function is `static`, declared in this file only, and never used through a
    function pointer: its signature is the file's own business.
+   A `static inline` function of a private header (not installed) is the header's own
+   business in the same way when every caller is in the files that include it and every
+   call changes in the same commit (2026-11-19, `GetSimilarityForMetric` of
+   `compare-similarity-private.h`, `964f4cd49`): it is still never used through a function
+   pointer, and the build of each including file refuses a call left with the old arguments.
 2. Declare a `typedef struct _Name { ... } Name;` under *Typedef declarations* near the
    top of the file, one member per parameter in the group, with the parameter's type and
    name.
@@ -24803,3 +24808,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | AMEND | OH | Form A also carves a header that Recipe OH produced and that one `.c` file includes: its leading run after the `extern "C"` opener moves into a new header, which the `.c` file's include block names directly above the old header (no `#include` outside an include block); the translation unit keeps its tokens and order | `composite-channel-private.h` (5.65; *Lines of Code in a Single File*, 1068 lines, and the `GetSoftBurnBlend`/`GetSoftDodgeBlend` duplication): a probe moving `GetColorDodgeBlend` to `GetPegtopLightBlend` gives 6.17 and a new header at 10.0 (campaign A, W45 round 32, lane c) | mandate (2026-10-24) |
 | 2026-11-19 | AMEND | OH | On a split or OH-product header, Form A also takes *Overall Code Complexity* when the carve's probe leaves both headers at 10.0 (or at least the header's score, with a stub-probed chain ending at 10.0); a split header with its own include block names the new header as that block's last line; a `static` function's banner that stands in the run moves to stay above its function | `composite-image-coverage-private.h` (9.38, a two-carve chain to three headers at 10.0, `2ce6e70d4` and `f1ec40d41`, taken under the composite-channel amendment of the same day: written down after the fact) and `layer-frames-private.h` (9.38; a probe of the carve through `IsOverlayPixelChanged`: both 10.0) (campaign A, W45 round 32, lane c) | mandate (2026-10-24) |
 | 2026-11-19 | WORDING | IP | Step 5: a binding that the callee declared under step 3 and that a later step of the chain leaves unused is deleted too; a binding nothing reads is not declared (as `PrintBilinearForwardFX` lost `lookup` in `323ac63bd`) | Review of batch 1 of W45 lane c: the commits already did so; the step's text named only the caller's bindings | after the fact |
+| 2026-11-19 | WORDING | B | Step 1 also covers a `static inline` function of a private (not installed) header whose callers are all in that header's includers and change in the same commit, never called through a function pointer | `compare-similarity-private.h`'s `GetSimilarityForMetric` (five arguments, callers in `compare-similarity.c` and `compare-similarity-image.c`), bundled in `964f4cd49` (8.37 to 8.63); the step's text named only a function declared in one file; taken under the mandate (2026-10-24) and written down after the fact | after the fact |
