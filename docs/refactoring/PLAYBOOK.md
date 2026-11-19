@@ -13385,6 +13385,10 @@ guard over tests inside it.
    none. `X` may instead be `break;` or `continue;` (2026-11-13): every guard of step 2 stands
    where the `if` stood, inside the same loops and `switch`es, so each leaves the same statement
    the original's `X` left.
+   An operand may instead be a conjunction of two comparisons in its own parentheses, with no
+   call in it (`((code >= 0x0009) && (code <= 0x000d))`, a range test) (2026-11-19): its guard
+   is `if (B1 && B2) X` with the conjunction's text, the outer parentheses gone, so that `&&`
+   stands only inside such a guard, never in the original's chain.
 2. Write one guard per operand, in the operands' order, each with the operand's text (the
    outer parentheses of the operand go) and `X` unchanged: `if (A1) X` `if (A2) X` ... `if (An) X`.
 3. Every such `if` of one function may go in one commit (one recipe, one function).
@@ -13420,7 +13424,9 @@ guard over tests inside it.
   first true operand; the guards test `A1`, `A2`, ... in the same order, and the first that holds
   runs `X` and leaves, so no later operand is evaluated, exactly as the short circuit. When none
   holds, nothing runs and control reaches the next statement. Each operand is evaluated at most
-  once, as before.
+  once, as before. A conjunction operand is one operand of the chain: its guard evaluates `B1`,
+  then `B2` only when `B1` held, exactly as the operand did inside the chain, and runs `X` when
+  both held, where the chain would have stopped true.
 - `X` is a bare `return`, `break` or `continue`: a guard that ran any statement before it would
   not be this recipe.
 
@@ -13438,6 +13444,12 @@ predicate is flat (3.19 to 3.19, with a new *Code Duplication* function), three 
 denominator; 4.60 to 4.72 in a probe. Added by Claude Code (Claude Opus 5.5) under the mandate
 of 2026-10-24.
 Lane: c
+
+Conjunction operands (2026-11-19, campaign A, W47 lane c): `token-private.h`'s `IsUTFSpace`, a
+twelve-operand `if (...) return(MagickTrue);` whose two range tests are conjunctions (13
+complex conditional expressions, cc 15, an upstream header worked under owner 2026-11-19
+evening, PR #129 round-33 Q4); a probe 6.94 to 8.12. Added by Claude Code (Claude Opus 5.5)
+under the mandate of 2026-11-19.
 
 ---
 
@@ -25606,3 +25618,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | WORDING | DI | Step 5: `tools/obj_sorted.sh` does not check that no instruction between a moved store's old and new position reads that slot (a load, an `lea`, a call taking its address); the step relies on step 2's C-level argument; the script's own `--self-test` | Review of batch 4 of W46 lane b: `b17b0903e` dropped the tab-led relocation lines (fixed in `645f80277`, with a self-test); rerun on `1bdc1a5a7` against its parent: `REORDERED-CONSTANT-STORES`, 832 instruction lines, one moved line `<AccelerateDespeckleImage>: movq $0x0,0xb0(%rsp)` | after the fact |
 | 2026-11-19 | WORDING | SE | *Not covered by* names Recipe Y (it builds and fills a new input struct; SE's struct is the function's own `const` parameter, so nothing is built or filled); step 3 adds that no callee between the binding and the copy writes `*P` | Review of batch 4 of W46 lane b: in `RunHullPassLoop` the calls between the bindings and the copies (`clSetKernelArg`, `EnqueueHullPasses` through a copy of the values) receive no pointer to `*loop` | after the fact |
 | 2026-11-19 | AMEND | TB | *Inverted membership form*: the one group of labels returns `MagickFalse`, `d` is `MagickTrue` (a `break;` after the group's `return`, which no path reaches, goes with the `switch`), and the loop returns `MagickFalse` at a match; the function may be a `static inline` function of a private header, its table at file scope directly above it, when step 2 holds for every caller in the tree | `composite-private.h`'s `GetCompositeClipToSelf` (campaign A, W47 round 34, lane c; an upstream header worked under owner 2026-11-19 evening, PR #129 round-33 Q4): ten labels returning `MagickFalse`, cc 12, called once per `-compose` setting by `mogrify.c`, `operation.c` and `composite.c`; a probe 8.82 to 9.09 | mandate (2026-11-19) |
+| 2026-11-19 | AMEND | GD | Step 1: an operand may be a conjunction of two comparisons in its own parentheses, with no call (a range test); its guard is `if (B1 && B2) X` with the conjunction's text, so `&&` stands only inside such a guard. *Careful*: the guard evaluates `B1`, then `B2` only when `B1` held, as the operand did inside the chain | `token-private.h`'s `IsUTFSpace` (campaign A, W47 round 34, lane c; an upstream header worked under owner 2026-11-19 evening, PR #129 round-33 Q4): twelve operands, two of them range conjunctions, cc 15, 13 complex conditional expressions; a probe 6.94 to 8.12 | mandate (2026-11-19) |
