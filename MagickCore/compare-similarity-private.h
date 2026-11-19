@@ -456,9 +456,6 @@ static inline MagickBooleanType GetSSIMSimularity(const Image *image,
         y_pixel_mu[MaxPixelChannels+1] = { 0.0 },
         y_pixel_sigma_squared[MaxPixelChannels+1] = { 0.0 };
 
-      SSIMChannelInputs
-        channel_inputs;
-
       SSIMTapTargets
         sums;
 
@@ -484,16 +481,13 @@ static inline MagickBooleanType GetSSIMSimularity(const Image *image,
       sums.y_pixel_sigma_squared=(&y_pixel_sigma_squared);
       sums.xy_sigma=(&xy_sigma);
       SumSSIMWindow(&window,&sums);
-      channel_inputs.image=image;
-      channel_inputs.reconstruct_image=reconstruct_image;
-      channel_inputs.x_pixel_mu=x_pixel_mu;
-      channel_inputs.x_pixel_sigma_squared=x_pixel_sigma_squared;
-      channel_inputs.xy_sigma=xy_sigma;
-      channel_inputs.y_pixel_mu=y_pixel_mu;
-      channel_inputs.y_pixel_sigma_squared=y_pixel_sigma_squared;
-      channel_inputs.c1=c1;
-      channel_inputs.c2=c2;
-      AccumulateSSIMChannels(&channel_inputs,channel_similarity);
+      {
+        const SSIMChannelInputs channel_inputs = { image, reconstruct_image,
+          x_pixel_mu, x_pixel_sigma_squared, xy_sigma, y_pixel_mu,
+          y_pixel_sigma_squared, c1, c2 };
+
+        AccumulateSSIMChannels(&channel_inputs,channel_similarity);
+      }
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
       channel_area++;
