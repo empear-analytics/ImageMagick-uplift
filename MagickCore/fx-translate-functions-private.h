@@ -695,7 +695,7 @@ static MagickBooleanType NotAUserSymbolOperand (FxInfo * pfx,
   return(MagickTrue);
 }
 
-static MagickBooleanType GetUnaryPrefixOperand (FxInfo * pfx, OperatorE op,
+static MagickBooleanType FinishUnaryPrefixOperand (FxInfo * pfx,
   const OperandSymbols * symbols)
 {
   MagickBooleanType
@@ -705,6 +705,29 @@ static MagickBooleanType GetUnaryPrefixOperand (FxInfo * pfx, OperatorE op,
   int
     *const UserSymNdx = symbols->UserSymNdx;
 
+  if (*NewUserSymbol) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "After unary, NewUserSymbol at", "'%s'",
+      SetShortExp(pfx));
+    return MagickFalse;
+  }
+
+  if (*UserSymbol) {
+    (void) AddAddressingElement (pfx, rCopyFrom, *UserSymNdx);
+    *UserSymNdx = NULL_ADDRESS;
+
+    *UserSymbol = MagickFalse;
+    *NewUserSymbol = MagickFalse;
+  }
+
+  (void) GetToken (pfx);
+  return MagickTrue;
+}
+
+static MagickBooleanType GetUnaryPrefixOperand (FxInfo * pfx, OperatorE op,
+  const OperandSymbols * symbols)
+{
   MagickBooleanType operand_ok;
   if (!PushOperatorStack (pfx, (int) op)) return MagickFalse;
   pfx->pex++;
@@ -728,24 +751,7 @@ static MagickBooleanType GetUnaryPrefixOperand (FxInfo * pfx, OperatorE op,
     return MagickFalse;
   }
 
-  if (*NewUserSymbol) {
-    (void) ThrowMagickException (
-      pfx->exception, GetMagickModule(), OptionError,
-      "After unary, NewUserSymbol at", "'%s'",
-      SetShortExp(pfx));
-    return MagickFalse;
-  }
-
-  if (*UserSymbol) {
-    (void) AddAddressingElement (pfx, rCopyFrom, *UserSymNdx);
-    *UserSymNdx = NULL_ADDRESS;
-
-    *UserSymbol = MagickFalse;
-    *NewUserSymbol = MagickFalse;
-  }
-
-  (void) GetToken (pfx);
-  return MagickTrue;
+  return(FinishUnaryPrefixOperand (pfx, symbols));
 }
 
 static MagickBooleanType NotAConstantOperand (FxInfo * pfx)
