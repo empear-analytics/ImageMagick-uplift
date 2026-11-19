@@ -1231,6 +1231,63 @@ static MagickBooleanType DivideDPCReconstructGradient(const Image *image,
   return(MagickTrue);
 }
 
+typedef struct _DPCTargetUnitGradient
+{
+  Image
+    **magnitude_image,
+    **target_image,
+    **trx_image,
+    **try_image,
+    **tx_image,
+    **ty_image;
+} DPCTargetUnitGradient;
+
+static MagickBooleanType AcquireDPCTargetUnitGradient(const Image *image,
+  ExceptionInfo *exception,const DPCTargetUnitGradient *targets)
+{
+  Image
+    **const magnitude_image = targets->magnitude_image,
+    **const target_image = targets->target_image,
+    **const trx_image = targets->trx_image,
+    **const try_image = targets->try_image,
+    **const tx_image = targets->tx_image,
+    **const ty_image = targets->ty_image;
+
+  /*
+    Compute X and Y derivatives of image.
+  */
+  (void) SetImageVirtualPixelMethod(*target_image,EdgeVirtualPixelMethod,
+    exception);
+  *tx_image=SIMDerivativeImage(*target_image,"Sobel",exception);
+  if (*tx_image == (Image *) NULL)
+    return(MagickFalse);
+  *ty_image=SIMDerivativeImage(*target_image,"Sobel:90",exception);
+  *target_image=DestroyImage(*target_image);
+  if (*ty_image == (Image *) NULL)
+    return(MagickFalse);
+  /*
+    Compute magnitude of derivatives.
+  */
+  *magnitude_image=SIMMagnitudeImage(*tx_image,*ty_image,exception);
+  if (*magnitude_image == (Image *) NULL)
+    return(MagickFalse);
+  /*
+    Divide Lx and Ly by magnitude.
+  */
+  *trx_image=SIMDivideByMagnitude(*tx_image,*magnitude_image,image,exception);
+  *tx_image=DestroyImage(*tx_image);
+  if (*trx_image == (Image *) NULL)
+    return(MagickFalse);
+  *tx_image=(*trx_image);
+  *try_image=SIMDivideByMagnitude(*ty_image,*magnitude_image,image,exception);
+  *ty_image=DestroyImage(*ty_image);
+  *magnitude_image=DestroyImage(*magnitude_image);
+  if (*try_image == (Image *) NULL)
+    return(MagickFalse);
+  *ty_image=(*try_image);
+  return(MagickTrue);
+}
+
 static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
 {
@@ -1261,6 +1318,10 @@ static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
     reconstruct_unit = { &magnitude_image, &rx_image, &ry_image, &trx_image,
       &try_image };
 
+  const DPCTargetUnitGradient
+    target_unit = { &magnitude_image, &target_image, &trx_image, &try_image,
+      &tx_image, &ty_image };
+
   MagickBooleanType
     status = MagickTrue;
 
@@ -1288,38 +1349,9 @@ static Image *DPCSimilarityImage(const Image *image,const Image *reconstruct,
   if (DivideDPCReconstructGradient(image,exception,&reconstruct_unit) ==
       MagickFalse)
     ThrowDPCSimilarityException();
-  /*
-    Compute X and Y derivatives of image.
-  */
-  (void) SetImageVirtualPixelMethod(target_image,EdgeVirtualPixelMethod,
-    exception);
-  tx_image=SIMDerivativeImage(target_image,"Sobel",exception);
-  if (tx_image == (Image *) NULL)
+  if (AcquireDPCTargetUnitGradient(image,exception,&target_unit) ==
+      MagickFalse)
     ThrowDPCSimilarityException();
-  ty_image=SIMDerivativeImage(target_image,"Sobel:90",exception);
-  target_image=DestroyImage(target_image);
-  if (ty_image == (Image *) NULL)
-    ThrowDPCSimilarityException();
-  /*
-    Compute magnitude of derivatives.
-  */
-  magnitude_image=SIMMagnitudeImage(tx_image,ty_image,exception);
-  if (magnitude_image == (Image *) NULL)
-    ThrowDPCSimilarityException();
-  /*
-    Divide Lx and Ly by magnitude.
-  */
-  trx_image=SIMDivideByMagnitude(tx_image,magnitude_image,image,exception);
-  tx_image=DestroyImage(tx_image);
-  if (trx_image == (Image *) NULL)
-    ThrowDPCSimilarityException();
-  tx_image=trx_image;
-  try_image=SIMDivideByMagnitude(ty_image,magnitude_image,image,exception);
-  ty_image=DestroyImage(ty_image);
-  magnitude_image=DestroyImage(magnitude_image);
-  if (try_image == (Image *) NULL)
-    ThrowDPCSimilarityException();
-  ty_image=try_image;
   /*
     Compute the cross correlation of the test and reference images.
   */
