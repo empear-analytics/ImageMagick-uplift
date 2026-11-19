@@ -1907,6 +1907,52 @@ static Image *NCCSimilarityImage(const Image *image,const Image *reconstruct,
   return((Image *) NULL); \
 }
 
+typedef struct _PhasePaddedTargets
+{
+  Image
+    **reconstruct_image,
+    **target_image;
+} PhasePaddedTargets;
+
+static MagickBooleanType AcquirePhasePadded(const Image *image,
+  const Image *reconstruct,ExceptionInfo *exception,
+  const PhasePaddedTargets *targets)
+{
+  Image
+    **const reconstruct_image = targets->reconstruct_image,
+    **const target_image = targets->target_image;
+
+  MagickBooleanType
+    status;
+
+  *target_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (*target_image == (Image *) NULL)
+    return(MagickFalse);
+  (void) ResetImagePage(*target_image,"0x0+0+0");
+  GetPixelInfoRGBA((Quantum) 0,(Quantum) 0,(Quantum) 0,(Quantum) 0,
+    &(*target_image)->background_color);
+  status=SetImageExtent(*target_image,2*CastDoubleToSizeT(ceil((double)
+    image->columns/2.0)),2*CastDoubleToSizeT(ceil((double) image->rows/2.0)),
+    exception);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  /*
+    Compute the cross correlation of the target and reconstruct magnitudes.
+  */
+  *reconstruct_image=CloneImage(reconstruct,0,0,MagickTrue,exception);
+  if (*reconstruct_image == (Image *) NULL)
+    return(MagickFalse);
+  (void) ResetImagePage(*reconstruct_image,"0x0+0+0");
+  GetPixelInfoRGBA((Quantum) 0,(Quantum) 0,(Quantum) 0,(Quantum) 0,
+    &(*reconstruct_image)->background_color);
+  status=SetImageExtent(*reconstruct_image,2*CastDoubleToSizeT(ceil((double)
+    image->columns/2.0)),2*CastDoubleToSizeT(ceil((double) image->rows/2.0)),
+    exception);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static Image *PhaseSimilarityImage(const Image *image,const Image *reconstruct,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
 {
@@ -1927,36 +1973,18 @@ static Image *PhaseSimilarityImage(const Image *image,const Image *reconstruct,
   MagickBooleanType
     status = MagickTrue;
 
+  PhasePaddedTargets
+    targets;
+
   RectangleInfo
     geometry;
 
   /*
     Phase correlation-based image similarity using FFT local statistics.
   */
-  target_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (target_image == (Image *) NULL)
-    ThrowPhaseSimilarityException();
-  (void) ResetImagePage(target_image,"0x0+0+0");
-  GetPixelInfoRGBA((Quantum) 0,(Quantum) 0,(Quantum) 0,(Quantum) 0,
-    &target_image->background_color);
-  status=SetImageExtent(target_image,2*CastDoubleToSizeT(ceil((double)
-    image->columns/2.0)),2*CastDoubleToSizeT(ceil((double) image->rows/2.0)),
-    exception);
-  if (status == MagickFalse)
-    ThrowPhaseSimilarityException();
-  /*
-    Compute the cross correlation of the target and reconstruct magnitudes.
-  */
-  reconstruct_image=CloneImage(reconstruct,0,0,MagickTrue,exception);
-  if (reconstruct_image == (Image *) NULL)
-    ThrowPhaseSimilarityException();
-  (void) ResetImagePage(reconstruct_image,"0x0+0+0");
-  GetPixelInfoRGBA((Quantum) 0,(Quantum) 0,(Quantum) 0,(Quantum) 0,
-    &reconstruct_image->background_color);
-  status=SetImageExtent(reconstruct_image,2*CastDoubleToSizeT(ceil((double)
-    image->columns/2.0)),2*CastDoubleToSizeT(ceil((double) image->rows/2.0)),
-    exception);
-  if (status == MagickFalse)
+  targets.reconstruct_image=(&reconstruct_image);
+  targets.target_image=(&target_image);
+  if (AcquirePhasePadded(image,reconstruct,exception,&targets) == MagickFalse)
     ThrowPhaseSimilarityException();
   /*
     Evaluate phase coorelation image and divide by the product magnitude.
