@@ -175,8 +175,13 @@ static inline char *AcquireOpenCLCacheDirectory(
   return(temp);
 }
 
-static inline void SetOpenCLCacheDirectory(char *home,char *path,char *temp)
+static inline void SetOpenCLCacheDirectory(const OpenCLCacheSearch *search)
 {
+  char
+    *const home = search->home,
+    *const path = search->path,
+    *temp = search->temp;
+
   {
     const OpenCLCacheSearch
       cache_search = { home, path, temp };
@@ -237,7 +242,12 @@ static inline const char *GetOpenCLCacheDirectory()
 #endif
             }
 
-          SetOpenCLCacheDirectory(home,path,temp);
+          {
+            const OpenCLCacheSearch
+              cache_search = { home, path, temp };
+
+            SetOpenCLCacheDirectory(&cache_search);
+          }
         }
       UnlockSemaphoreInfo(cache_directory_lock);
   }
