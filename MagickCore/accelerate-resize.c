@@ -1068,9 +1068,6 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
   Image
     *filteredImage=NULL;
 
-  ResizeArmInfo
-    info;
-
   ResizeArmTargets
     targets;
 
@@ -1093,25 +1090,19 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
   number_channels=(cl_uint) image->number_channels;
   xFactor=(float) resizedColumns/(float) image->columns;
   yFactor=(float) resizedRows/(float) image->rows;
-  info.device=device;
-  info.queue=queue;
-  info.image=image;
-  info.filteredImage=filteredImage;
-  info.imageBuffer=imageBuffer;
-  info.filteredImageBuffer=filteredImageBuffer;
-  info.cubicCoefficientsBuffer=cubicCoefficientsBuffer;
-  info.number_channels=number_channels;
-  info.resizedColumns=resizedColumns;
-  info.resizedRows=resizedRows;
-  info.resizeFilter=resizeFilter;
-  info.xFactor=xFactor;
-  info.yFactor=yFactor;
-  targets.tempImageBuffer=(&tempImageBuffer);
-  targets.outputReady=(&outputReady);
-  if (xFactor > yFactor)
-    status=ResizeHorizontalThenVertical(&info,exception,&targets);
-  else
-    status=ResizeVerticalThenHorizontal(&info,exception,&targets);
+  {
+    const ResizeArmInfo
+      info = { device, queue, image, filteredImage, imageBuffer,
+        filteredImageBuffer, cubicCoefficientsBuffer, number_channels,
+        resizedColumns, resizedRows, resizeFilter, xFactor, yFactor };
+
+    targets.tempImageBuffer=(&tempImageBuffer);
+    targets.outputReady=(&outputReady);
+    if (xFactor > yFactor)
+      status=ResizeHorizontalThenVertical(&info,exception,&targets);
+    else
+      status=ResizeVerticalThenHorizontal(&info,exception,&targets);
+  }
   if (status == MagickFalse)
     goto cleanup;
 
