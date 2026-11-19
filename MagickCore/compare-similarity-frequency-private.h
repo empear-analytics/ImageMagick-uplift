@@ -1351,6 +1351,43 @@ static MagickBooleanType AcquireMSEAlpha(const Image *image,
   return(MagickTrue);
 }
 
+typedef struct _MSEBetaTargets
+{
+  Image
+    **beta_image,
+    **reconstruct_image;
+} MSEBetaTargets;
+
+static MagickBooleanType AcquireMSEBeta(const Image *image,
+  const Image *reconstruct,ExceptionInfo *exception,
+  const MSEBetaTargets *targets)
+{
+  Image
+    **const beta_image = targets->beta_image,
+    **const reconstruct_image = targets->reconstruct_image;
+
+  MagickBooleanType
+    status;
+
+  /*
+    Create 2*(test * reconstruction)# pixels.
+  */
+  (void) CompositeImage(*reconstruct_image,reconstruct,CopyCompositeOp,
+    MagickTrue,0,0,exception);
+  *beta_image=SIMCrossCorrelationImage(image,*reconstruct_image,exception);
+  if (*beta_image == (Image *) NULL)
+    {
+      *reconstruct_image=DestroyImage(*reconstruct_image);
+      return(MagickFalse);
+    }
+  status=SIMMultiplyImage(*beta_image,-2.0/(double) reconstruct->columns/
+    (double) reconstruct->rows,(const ChannelStatistics *) NULL,exception);
+  *reconstruct_image=DestroyImage(*reconstruct_image);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 typedef struct _MSESumTargets
 {
   ChannelStatistics
@@ -1444,6 +1481,9 @@ static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
   MSEAlphaTargets
     targets;
 
+  MSEBetaTargets
+    beta_targets;
+
   MSEMeanTargets
     mean_targets;
 
@@ -1460,21 +1500,9 @@ static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
   targets.reconstruct_image=(&reconstruct_image);
   if (AcquireMSEAlpha(image,reconstruct,exception,&targets) == MagickFalse)
     ThrowMSESimilarityException();
-  /*
-    Create 2*(test * reconstruction)# pixels.
-  */
-  (void) CompositeImage(reconstruct_image,reconstruct,CopyCompositeOp,
-    MagickTrue,0,0,exception);
-  beta_image=SIMCrossCorrelationImage(image,reconstruct_image,exception);
-  if (beta_image == (Image *) NULL)
-    {
-      reconstruct_image=DestroyImage(reconstruct_image);
-      ThrowMSESimilarityException();
-    }
-  status=SIMMultiplyImage(beta_image,-2.0/(double) reconstruct->columns/(double)
-    reconstruct->rows,(const ChannelStatistics *) NULL,exception);
-  reconstruct_image=DestroyImage(reconstruct_image);
-  if (status == MagickFalse)
+  beta_targets.beta_image=(&beta_image);
+  beta_targets.reconstruct_image=(&reconstruct_image);
+  if (AcquireMSEBeta(image,reconstruct,exception,&beta_targets) == MagickFalse)
     ThrowMSESimilarityException();
   /*
     Mean of reconstruction squared.
