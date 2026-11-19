@@ -127,8 +127,14 @@ static inline char *CreateOpenCLCacheDirectory(
   return(temp);
 }
 
-static inline char *AcquireOpenCLCacheDirectory(char *home,char *path,char *temp)
+static inline char *AcquireOpenCLCacheDirectory(
+  const OpenCLCacheSearch *search)
 {
+  char
+    *home = search->home,
+    *const path = search->path,
+    *temp = search->temp;
+
   MagickBooleanType
     status;
 
@@ -171,7 +177,12 @@ static inline char *AcquireOpenCLCacheDirectory(char *home,char *path,char *temp
 
 static inline void SetOpenCLCacheDirectory(char *home,char *path,char *temp)
 {
-  temp=AcquireOpenCLCacheDirectory(home,path,temp);
+  {
+    const OpenCLCacheSearch
+      cache_search = { home, path, temp };
+
+    temp=AcquireOpenCLCacheDirectory(&cache_search);
+  }
   if (temp == (char *) NULL)
     {
       temp=AcquireString("?");
