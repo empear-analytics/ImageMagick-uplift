@@ -589,6 +589,19 @@ static void SetSimilarityProperties(const Image *image,
     GetMagickPrecision(),(double) offset->y);
 }
 
+#if defined(MAGICKCORE_HDRI_SUPPORT) && defined(MAGICKCORE_FFTW_DELEGATE)
+static const FrequencySimilarity *GetRequestedFrequencySimilarity(
+  const Image *image,const MetricType metric)
+{
+  const char *artifact = GetImageArtifact(image,"compare:frequency-domain");
+  if (artifact == (const char *) NULL)
+    artifact=GetImageArtifact(image,"compare:accelerate-ncc");
+  if (IsFrequencyDomainSimilarity(image,artifact) != MagickFalse)
+    return(GetFrequencySimilarity(metric));
+  return((const FrequencySimilarity *) NULL);
+}
+#endif
+
 MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
   const MetricType metric,const double similarity_threshold,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
@@ -626,20 +639,14 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
   offset->y=0;
 #if defined(MAGICKCORE_HDRI_SUPPORT) && defined(MAGICKCORE_FFTW_DELEGATE)
 {
-  const char *artifact = GetImageArtifact(image,"compare:frequency-domain");
-  if (artifact == (const char *) NULL)
-    artifact=GetImageArtifact(image,"compare:accelerate-ncc");
-  if (IsFrequencyDomainSimilarity(image,artifact) != MagickFalse)
-    {
-      const FrequencySimilarity
-        *frequency = GetFrequencySimilarity(metric);
+  const FrequencySimilarity
+    *frequency = GetRequestedFrequencySimilarity(image,metric);
 
-      if (frequency != (const FrequencySimilarity *) NULL)
-        {
-          similarity_image=frequency->similarity_image(image,reconstruct,
-            offset,similarity_metric,exception);
-          return(similarity_image);
-        }
+  if (frequency != (const FrequencySimilarity *) NULL)
+    {
+      similarity_image=frequency->similarity_image(image,reconstruct,
+        offset,similarity_metric,exception);
+      return(similarity_image);
     }
 }
 #endif
