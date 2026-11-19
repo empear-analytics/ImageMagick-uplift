@@ -765,6 +765,16 @@ static MagickBooleanType TranslateFxExpression (FxInfo * pfx)
   return(FinishFxTranslation (pfx, chLimit));
 }
 
+static void LoadFxExpression (FxInfo * pfx, const char * expression,
+  ExceptionInfo *exception)
+{
+  if ((*expression == '@') && (strlen(expression) > 1))
+    pfx->expression=FileToString(expression,~0UL,exception);
+  if (pfx->expression == (char *) NULL)
+    pfx->expression=ConstantString(expression);
+  pfx->pex = (char *) pfx->expression;
+}
+
 static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expression,
   MagickBooleanType CalcAllStats, ExceptionInfo *exception)
 {
@@ -783,11 +793,7 @@ static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expressi
     return((FxInfo *) NULL);
   }
 
-  if ((*expression == '@') && (strlen(expression) > 1))
-    pfx->expression=FileToString(expression,~0UL,exception);
-  if (pfx->expression == (char *) NULL)
-    pfx->expression=ConstantString(expression);
-  pfx->pex = (char *) pfx->expression;
+  LoadFxExpression (pfx, expression, exception);
 
   if (TranslateFxExpression (pfx) == MagickFalse)
     return (DestroyFxInfoOnFailure (pfx));
