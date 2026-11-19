@@ -29,6 +29,18 @@ extern "C" {
 static Window
   XSelectWindow(Display *,RectangleInfo *);
 
+static inline Window XPropertyOrTargetWindow(Display *display,
+  Window target_window,Atom state)
+{
+  Window
+    client_window;
+
+  client_window=XWindowByProperty(display,target_window,state);
+  if (client_window == (Window) NULL)
+    return(target_window);
+  return(client_window);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -79,9 +91,6 @@ static inline Window XClientWindow(Display *display,Window target_window)
     after,
     number_items;
 
-  Window
-    client_window;
-
   assert(display != (Display *) NULL);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
@@ -93,10 +102,7 @@ static inline Window XClientWindow(Display *display,Window target_window)
     (Atom) AnyPropertyType,&type,&format,&number_items,&after,&data);
   if ((status == Success) && (type != (Atom) NULL))
     return(target_window);
-  client_window=XWindowByProperty(display,target_window,state);
-  if (client_window == (Window) NULL)
-    return(target_window);
-  return(client_window);
+  return(XPropertyOrTargetWindow(display,target_window,state));
 }
 
 /*
