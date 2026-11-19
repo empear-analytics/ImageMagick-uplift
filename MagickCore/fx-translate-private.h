@@ -573,6 +573,15 @@ static MagickBooleanType FinishExpression (FxInfo * pfx, TernaryT ternary,
   return MagickTrue;
 }
 
+static void TakePendingLimitChar (FxInfo * pfx, const char * strLimit,
+  char * chLimit)
+{
+  if (IsPendingLimitChar(pfx,chLimit,strLimit) != MagickFalse) {
+    *chLimit = *pfx->pex;
+    pfx->pex++;
+  }
+}
+
 static MagickBooleanType TranslateExpression (
   FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
 {
@@ -618,10 +627,7 @@ static MagickBooleanType TranslateExpression (
       MagickFalse) && (!AddFinalCopyFrom (pfx, NewUserSymbol, UserSymNdx0)))
     return MagickFalse;
 
-  if (IsPendingLimitChar(pfx,chLimit,strLimit) != MagickFalse) {
-    *chLimit = *pfx->pex;
-    pfx->pex++;
-  }
+  TakePendingLimitChar (pfx, strLimit, chLimit);
   if (FlushOperatorStack (pfx, Assign, Update, UserSymNdx0) == MagickFalse)
     return MagickFalse;
 
