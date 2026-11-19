@@ -579,9 +579,34 @@ static inline MagickBooleanType GetPHASHSimilarity(const Image *image,
   return(MagickTrue);
 }
 
-static inline MagickBooleanType GetPSNRSimilarity(const Image *image,
-  const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
+static inline double GetPSNRChannelSimilarity(const double value)
 {
+  return(10.0*MagickSafeLog10(MagickSafeReciprocal(value))/
+    MagickSafePSNRRecipicol(10.0));
+}
+
+typedef double
+  (*ChannelSimilarityMethod)(const double);
+
+typedef struct _MSEChannelMethod
+{
+  ChannelSimilarityMethod
+    method;
+
+  const Image
+    *image;
+} MSEChannelMethod;
+
+static inline MagickBooleanType GetMSEMethodSimilarity(
+  const MSEChannelMethod *channel_method,const Image *reconstruct_image,
+  double *similarity,ExceptionInfo *exception)
+{
+  const ChannelSimilarityMethod
+    method = channel_method->method;
+
+  const Image
+    *const image = channel_method->image;
+
   MagickBooleanType
     status = MagickTrue;
 
@@ -589,7 +614,8 @@ static inline MagickBooleanType GetPSNRSimilarity(const Image *image,
     i;
 
   /*
-    Compute the peak signal-to-noise ratio similarity.
+    Compute the mean squared error similarity, then apply the method to each
+    channel.
   */
   status=GetMSESimilarity(image,reconstruct_image,similarity,exception);
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
@@ -601,44 +627,44 @@ static inline MagickBooleanType GetPSNRSimilarity(const Image *image,
     if (((traits & UpdatePixelTrait) == 0) ||
         ((reconstruct_traits & UpdatePixelTrait) == 0))
       continue;
-    similarity[i]=10.0*MagickSafeLog10(MagickSafeReciprocal(
-      similarity[i]))/MagickSafePSNRRecipicol(10.0);
+    similarity[i]=method(similarity[i]);
   }
-  similarity[CompositePixelChannel]=10.0*MagickSafeLog10(
-    MagickSafeReciprocal(similarity[CompositePixelChannel]))/
-    MagickSafePSNRRecipicol(10.0);
+  similarity[CompositePixelChannel]=method(
+    similarity[CompositePixelChannel]);
   return(status);
+}
+
+static inline MagickBooleanType GetPSNRSimilarity(const Image *image,
+  const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
+{
+  const MSEChannelMethod
+    channel_method = { GetPSNRChannelSimilarity, image };
+
+  /*
+    Compute the peak signal-to-noise ratio similarity.
+  */
+  return(GetMSEMethodSimilarity(&channel_method,reconstruct_image,similarity,
+    exception));
+}
+
+#define RMSESquareRoot(x)  sqrt((x) < 0.0 ? 0.0 : (x))
+
+static inline double GetRMSEChannelSimilarity(const double value)
+{
+  return(RMSESquareRoot(value));
 }
 
 static inline MagickBooleanType GetRMSESimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
-#define RMSESquareRoot(x)  sqrt((x) < 0.0 ? 0.0 : (x))
-
-  MagickBooleanType
-    status = MagickTrue;
-
-  ssize_t
-    i;
+  const MSEChannelMethod
+    channel_method = { GetRMSEChannelSimilarity, image };
 
   /*
     Compute the root mean-squared error similarity.
   */
-  status=GetMSESimilarity(image,reconstruct_image,similarity,exception);
-  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-  {
-    PixelChannel channel = GetPixelChannelChannel(image,i);
-    PixelTrait traits = GetPixelChannelTraits(image,channel);
-    PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
-      channel);
-    if (((traits & UpdatePixelTrait) == 0) ||
-        ((reconstruct_traits & UpdatePixelTrait) == 0))
-      continue;
-    similarity[i]=RMSESquareRoot(similarity[i]);
-  }
-  similarity[CompositePixelChannel]=RMSESquareRoot(
-    similarity[CompositePixelChannel]);
-  return(status);
+  return(GetMSEMethodSimilarity(&channel_method,reconstruct_image,similarity,
+    exception));
 }
 
 #if defined(__cplusplus) || defined(c_plusplus)
