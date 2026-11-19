@@ -1015,14 +1015,6 @@ static MagickBooleanType RunMotionBlurKernel(const MotionBlurRunInput *run,
   return(MagickTrue);
 }
 
-static void DestroyMotionBlurViews(CacheView *image_view,
-  CacheView *filteredImage_view)
-{
-  image_view=DestroyCacheView(image_view);
-  if (filteredImage_view != NULL)
-    filteredImage_view=DestroyCacheView(filteredImage_view);
-}
-
 typedef struct _MotionBlurFinish
 {
   MagickCLEnv
@@ -1069,7 +1061,7 @@ static Image *FinishMotionBlurImage(const MotionBlurFinish *finish,
   const MagickBooleanType
     outputReady = finish->outputReady;
 
-  DestroyMotionBlurViews(image_view,filteredImage_view);
+  DestroyAccelerateViews(image_view,filteredImage_view);
 
   {
     const MotionBlurReleaseInputs inputs = { clEnv, filteredImageBuffer,
@@ -1129,10 +1121,7 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
   void
     *filteredPixels;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceAccelerateImage(image);
 
   queue=NULL;
   image_view=NULL;

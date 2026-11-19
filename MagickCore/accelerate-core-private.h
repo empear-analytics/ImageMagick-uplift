@@ -21,6 +21,7 @@
 #define MAGICKCORE_ACCELERATE_CORE_PRIVATE_H
 
 #include "MagickCore/accelerate-private.h"
+#include "MagickCore/cache-view.h"
 #include "MagickCore/exception-private.h"
 #include "MagickCore/image-private.h"
 #include "MagickCore/opencl-private.h"
@@ -179,6 +180,14 @@ static inline Image *DestroyUnfinishedImage(const MagickBooleanType outputReady,
   if ((outputReady == MagickFalse) && (filteredImage != (Image *) NULL))
     filteredImage=DestroyImage(filteredImage);
   return(filteredImage);
+}
+
+static inline void DestroyAccelerateViews(CacheView *image_view,
+  CacheView *filteredImage_view)
+{
+  image_view=DestroyCacheView(image_view);
+  if (filteredImage_view != NULL)
+    filteredImage_view=DestroyCacheView(filteredImage_view);
 }
 
 static inline MagickBooleanType HasUndefinedRGBATraits(const Image *image)
