@@ -803,6 +803,77 @@ static MagickBooleanType AcquireMotionBlurInput(MagickCLEnv clEnv,
   return(MagickTrue);
 }
 
+typedef struct _MotionBlurOutputInput
+{
+  const Image
+    *image;
+
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+} MotionBlurOutputInput;
+
+typedef struct _MotionBlurOutputTargets
+{
+  Image
+    **filteredImage;
+
+  CacheView
+    **filteredImage_view;
+
+  void
+    **filteredPixels;
+
+  cl_mem
+    *filteredImageBuffer;
+} MotionBlurOutputTargets;
+
+static MagickBooleanType AcquireMotionBlurOutput(
+  const MotionBlurOutputInput *input,ExceptionInfo *exception,
+  const MotionBlurOutputTargets *outputTargets)
+{
+  const Image
+    *const image = input->image;
+
+  const MagickCLEnv
+    clEnv = input->clEnv;
+
+  const MagickCLDevice
+    device = input->device;
+
+  Image
+    **const filteredImage = outputTargets->filteredImage;
+
+  CacheView
+    **const filteredImage_view = outputTargets->filteredImage_view;
+
+  void
+    **const filteredPixels = outputTargets->filteredPixels;
+
+  cl_mem
+    *const filteredImageBuffer = outputTargets->filteredImageBuffer;
+
+  {
+    const MotionBlurImageTargets
+      targets = { filteredImage, filteredImage_view, filteredPixels };
+
+    if (CloneMotionBlurImage(image,exception,&targets) == MagickFalse)
+      return(MagickFalse);
+  }
+
+  {
+    const MotionBlurOutputSource
+      source = { clEnv, device, image, *filteredPixels };
+
+    if (CreateMotionBlurOutputBuffer(&source,filteredImageBuffer,exception) ==
+        MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
   const double *kernel,const size_t width,const OffsetInfo *offset,
   ExceptionInfo *exception)
@@ -864,18 +935,14 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
 
 
   {
-    const MotionBlurImageTargets
-      targets = { &filteredImage, &filteredImage_view, &filteredPixels };
+    const MotionBlurOutputInput
+      input = { image, clEnv, device };
 
-    if (CloneMotionBlurImage(image,exception,&targets) == MagickFalse)
-      goto cleanup;
-  }
+    const MotionBlurOutputTargets
+      outputTargets = { &filteredImage, &filteredImage_view, &filteredPixels,
+        &filteredImageBuffer };
 
-  {
-    const MotionBlurOutputSource
-      source = { clEnv, device, image, filteredPixels };
-
-    if (CreateMotionBlurOutputBuffer(&source,&filteredImageBuffer,exception) ==
+    if (AcquireMotionBlurOutput(&input,exception,&outputTargets) ==
         MagickFalse)
       goto cleanup;
   }
