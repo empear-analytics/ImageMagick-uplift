@@ -1867,9 +1867,15 @@ static inline MagickBooleanType IsLabCompatibleColorspace(
 
 static inline MagickBooleanType IsRGBColorspace(const ColorspaceType colorspace)
 {
-  if ((colorspace == RGBColorspace) || (colorspace == scRGBColorspace) ||
-      (colorspace == LinearGRAYColorspace))
-    return(MagickTrue);
+  switch (colorspace)
+  {
+    case RGBColorspace:
+    case scRGBColorspace:
+    case LinearGRAYColorspace:
+      return(MagickTrue);
+    default:
+      break;
+  }
   return(MagickFalse);
 }
 
