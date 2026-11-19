@@ -746,6 +746,77 @@ static MagickBooleanType AcquireEqualizeQueue(MagickCLEnv clEnv,
   return(MagickTrue);
 }
 
+typedef struct _HistogramPassInput
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_uint4
+    *histogram;
+
+  cl_command_queue
+    queue;
+
+  cl_mem
+    imageBuffer;
+
+  Image
+    *image;
+} HistogramPassInput;
+
+static MagickBooleanType RunHistogramPass(const HistogramPassInput *pass,
+  cl_mem *histogramBuffer,ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = pass->clEnv;
+
+  const MagickCLDevice
+    device = pass->device;
+
+  cl_uint4
+    *const histogram = pass->histogram;
+
+  const cl_command_queue
+    queue = pass->queue;
+
+  const cl_mem
+    imageBuffer = pass->imageBuffer;
+
+  Image
+    *const image = pass->image;
+
+  HistogramBufferInfo
+    histogram_info;
+
+  MagickBooleanType
+    status;
+
+  {
+    const HostBufferSource
+      source = { clEnv, device, histogram, ALIGNED(histogram,cl_uint4),
+        CL_MEM_READ_WRITE|CL_MEM_USE_HOST_PTR, sizeof(cl_uint4) };
+
+    if (CreateHostBuffer(&source,histogramBuffer,exception) == MagickFalse)
+      return(MagickFalse);
+  }
+
+  status = LaunchHistogramKernel(clEnv, device, queue, imageBuffer, *histogramBuffer, image, image->channel_mask, exception);
+  if (status == MagickFalse)
+    return(MagickFalse);
+
+  histogram_info.clEnv=clEnv;
+  histogram_info.device=device;
+  histogram_info.queue=queue;
+  histogram_info.histogramBuffer=*histogramBuffer;
+  histogram_info.histogram=histogram;
+  if (ReadHistogramBuffer(&histogram_info,exception) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -784,12 +855,8 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   EqualizeHistogramInput
     histogram_input;
 
-  HistogramBufferInfo
-    histogram_info;
-
   MagickBooleanType
-    outputReady,
-    status;
+    outputReady;
 
   MagickCLDevice
     device;
@@ -870,25 +937,12 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   }
 
   {
-    const HostBufferSource
-      source = { clEnv, device, histogram, ALIGNED(histogram,cl_uint4),
-        CL_MEM_READ_WRITE|CL_MEM_USE_HOST_PTR, sizeof(cl_uint4) };
+    const HistogramPassInput
+      pass = { clEnv, device, histogram, queue, imageBuffer, image };
 
-    if (CreateHostBuffer(&source,&histogramBuffer,exception) == MagickFalse)
+    if (RunHistogramPass(&pass,&histogramBuffer,exception) == MagickFalse)
       goto cleanup;
   }
-
-  status = LaunchHistogramKernel(clEnv, device, queue, imageBuffer, histogramBuffer, image, image->channel_mask, exception);
-  if (status == MagickFalse)
-    goto cleanup;
-
-  histogram_info.clEnv=clEnv;
-  histogram_info.device=device;
-  histogram_info.queue=queue;
-  histogram_info.histogramBuffer=histogramBuffer;
-  histogram_info.histogram=histogram;
-  if (ReadHistogramBuffer(&histogram_info,exception) == MagickFalse)
-    goto cleanup;
 
   /* recreate input buffer later, in case image updated */
 #ifdef RECREATEBUFFER
