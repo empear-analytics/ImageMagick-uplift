@@ -697,9 +697,6 @@ static void ComputeSumFeatures(const TextureDirection *texture)
   const unsigned int
     number_grays = texture->number_grays;
 
-  const ssize_t
-    i = texture->i;
-
   ssize_t
     x;
 
