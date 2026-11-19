@@ -952,6 +952,92 @@ static MagickBooleanType CreateCubicCoefficientsBuffer(
   return(MagickTrue);
 }
 
+static MagickBooleanType ResizeVerticalThenHorizontal(
+  const ResizeArmInfo *info,ExceptionInfo *exception,
+  const ResizeArmTargets *targets)
+{
+  const Image
+    *const image = info->image;
+
+  const MagickCLDevice
+    device = info->device;
+
+  const cl_command_queue
+    queue = info->queue;
+
+  Image
+    *const filteredImage = info->filteredImage;
+
+  const cl_mem
+    cubicCoefficientsBuffer = info->cubicCoefficientsBuffer,
+    filteredImageBuffer = info->filteredImageBuffer,
+    imageBuffer = info->imageBuffer;
+
+  const cl_uint
+    number_channels = info->number_channels;
+
+  const size_t
+    resizedColumns = info->resizedColumns,
+    resizedRows = info->resizedRows;
+
+  const ResizeFilter
+    *const resizeFilter = info->resizeFilter;
+
+  const float
+    xFactor = info->xFactor,
+    yFactor = info->yFactor;
+
+  cl_mem
+    *const tempImageBuffer = targets->tempImageBuffer;
+
+  MagickBooleanType
+    *const outputReady = targets->outputReady;
+
+  size_t
+    length;
+
+  length=image->columns*resizedRows*number_channels;
+  *tempImageBuffer=CreateOpenCLBuffer(device,CL_MEM_READ_WRITE,length*
+    sizeof(CLQuantum),(void *) NULL);
+  if (*tempImageBuffer == (cl_mem) NULL)
+  {
+    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
+      ResourceLimitWarning,"CreateOpenCLBuffer failed.",".");
+    return(MagickFalse);
+  }
+
+  {
+    const ResizeFilterPass
+      pass = { device, queue, image, filteredImage, imageBuffer,
+        number_channels, (cl_uint) image->columns, (cl_int) image->rows,
+        *tempImageBuffer, (cl_uint) image->columns, (cl_uint) resizedRows,
+        resizeFilter, cubicCoefficientsBuffer };
+
+    const ResizeFilterRun
+      run = { VerticalResizeFilter, &pass, yFactor };
+
+    *outputReady=ResizeFilterImagePass(&run,exception);
+  }
+  if (*outputReady == MagickFalse)
+    return(MagickFalse);
+
+  {
+    const ResizeFilterPass
+      pass = { device, queue, image, filteredImage, *tempImageBuffer,
+        number_channels, (cl_uint) image->columns, (cl_uint) resizedRows,
+        filteredImageBuffer, (cl_uint) resizedColumns,
+        (cl_uint) resizedRows, resizeFilter, cubicCoefficientsBuffer };
+
+    const ResizeFilterRun
+      run = { HorizontalResizeFilter, &pass, xFactor };
+
+    *outputReady=ResizeFilterImagePass(&run,exception);
+  }
+  if (*outputReady == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
   const size_t resizedColumns,const size_t resizedRows,
   const ResizeFilter *resizeFilter,ExceptionInfo *exception)
@@ -986,9 +1072,6 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
 
   ResizeArmTargets
     targets;
-
-  size_t
-    length;
 
   {
     const ResizeImageSource
@@ -1029,44 +1112,23 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
   }
   else
   {
-    length=image->columns*resizedRows*number_channels;
-    tempImageBuffer=CreateOpenCLBuffer(device,CL_MEM_READ_WRITE,length*
-      sizeof(CLQuantum),(void *) NULL);
-    if (tempImageBuffer == (cl_mem) NULL)
-    {
-      (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
-        ResourceLimitWarning,"CreateOpenCLBuffer failed.",".");
-      goto cleanup;
-    }
-
-    {
-      const ResizeFilterPass
-        pass = { device, queue, image, filteredImage, imageBuffer,
-          number_channels, (cl_uint) image->columns, (cl_int) image->rows,
-          tempImageBuffer, (cl_uint) image->columns, (cl_uint) resizedRows,
-          resizeFilter, cubicCoefficientsBuffer };
-
-      const ResizeFilterRun
-        run = { VerticalResizeFilter, &pass, yFactor };
-
-      outputReady=ResizeFilterImagePass(&run,exception);
-    }
-    if (outputReady == MagickFalse)
-      goto cleanup;
-
-    {
-      const ResizeFilterPass
-        pass = { device, queue, image, filteredImage, tempImageBuffer,
-          number_channels, (cl_uint) image->columns, (cl_uint) resizedRows,
-          filteredImageBuffer, (cl_uint) resizedColumns,
-          (cl_uint) resizedRows, resizeFilter, cubicCoefficientsBuffer };
-
-      const ResizeFilterRun
-        run = { HorizontalResizeFilter, &pass, xFactor };
-
-      outputReady=ResizeFilterImagePass(&run,exception);
-    }
-    if (outputReady == MagickFalse)
+    info.device=device;
+    info.queue=queue;
+    info.image=image;
+    info.filteredImage=filteredImage;
+    info.imageBuffer=imageBuffer;
+    info.filteredImageBuffer=filteredImageBuffer;
+    info.cubicCoefficientsBuffer=cubicCoefficientsBuffer;
+    info.number_channels=number_channels;
+    info.resizedColumns=resizedColumns;
+    info.resizedRows=resizedRows;
+    info.resizeFilter=resizeFilter;
+    info.xFactor=xFactor;
+    info.yFactor=yFactor;
+    targets.tempImageBuffer=(&tempImageBuffer);
+    targets.outputReady=(&outputReady);
+    if (ResizeVerticalThenHorizontal(&info,exception,&targets) ==
+        MagickFalse)
       goto cleanup;
   }
   if ((xFactor > yFactor) &&
