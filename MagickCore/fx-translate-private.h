@@ -511,6 +511,24 @@ static MagickBooleanType TranslateOperatorsAndOperands (
   return(MagickTrue);
 }
 
+static MagickBooleanType CheckExpressionStart (FxInfo * pfx,
+  const char * strLimit, char * chLimit)
+{
+  if (!*pfx->pex) {
+    pfx->teDepth--;
+    return MagickFalse;
+  }
+
+  if (strchr(strLimit,*pfx->pex)!=NULL) {
+    *chLimit = *pfx->pex;
+    pfx->pex++;
+    pfx->teDepth--;
+
+    return MagickFalse;
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType BeginExpression (FxInfo * pfx,
   const char * strLimit, char * chLimit)
 {
@@ -532,19 +550,7 @@ static MagickBooleanType BeginExpression (FxInfo * pfx,
 
   SkipSpaces (pfx);
 
-  if (!*pfx->pex) {
-    pfx->teDepth--;
-    return MagickFalse;
-  }
-
-  if (strchr(strLimit,*pfx->pex)!=NULL) {
-    *chLimit = *pfx->pex;
-    pfx->pex++;
-    pfx->teDepth--;
-
-    return MagickFalse;
-  }
-  return(MagickTrue);
+  return(CheckExpressionStart (pfx, strLimit, chLimit));
 }
 
 static MagickBooleanType FinishExpression (FxInfo * pfx, TernaryT ternary,
