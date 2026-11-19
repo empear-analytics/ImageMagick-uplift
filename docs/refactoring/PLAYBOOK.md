@@ -24773,6 +24773,116 @@ recipes are fine", PR #129 Q7).
 
 ---
 
+## Recipe SE - Share Identical Exiting Copies Through One Helper Binding the Input Struct
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead* on a
+function that holds two or more copies of one block, the same text token for token, each
+leaving through `return(c);` of one constant, and reading locals that the function binds from
+the members of its own pointer-to-`const` input struct: `accelerate-despeckle.c`'s
+`RunHullPassLoop`, whose four hull-pass directions each end in the same eleven lines (test
+`clStatus`, throw and `return(MagickFalse);`, else fill a `HullPassLaunch` from `clEnv`,
+`device`, `queue`, `*hullPass1`, `*hullPass2` and `global_work_size` and return
+`MagickFalse` when `EnqueueHullPasses` fails).
+
+**Not covered by:** Recipes SV and SC, whose copies differ in at least one value (SV step 2,
+SC step 2); Recipe D, whose *Use when* is a reported *Code Duplication* (CodeScene does not
+report copies inside one function); Recipe V, which moves one block, so that the other copies
+would each become a clone of its helper; Recipe E, whose step 4 refuses a block holding a
+`return` that does not end it; Recipe IP, which changes the parameters of an existing
+function, not a new one.
+
+**How:**
+
+1. The copies lie in one function `F`, outside every OpenMP region, with no `#pragma` or
+   preprocessor line, and are the same token sequence (checked by script, whitespace and line
+   breaks ignored). Each leaves `F` only through `return(c);` of one constant `c`, the same in
+   every copy (Recipe V step 6), with no `goto`, and no `break` or `continue` that leaves it.
+2. A copy writes no variable of `F` that `F` reads after it; a temporary it declares moves
+   with it.
+3. Each variable a copy reads is either a local of `F` bound once, by its declaration, from a
+   member of `F`'s pointer-to-`const` struct parameter `P` (`const MagickCLEnv clEnv =
+   loop->clEnv;`), which nothing in `F` writes (by reading), or another variable of `F` or a
+   parameter, passed by value (`clStatus`, `exception`): `P` and those values make at most
+   four parameters.
+4. Write a new `static MagickBooleanType` function directly above `F`: its parameters are `P`
+   (the same type and name) and the other variables, in the order of first use; it declares,
+   with `F`'s text, the bindings of the locals the copy reads (in `F`'s order), the other
+   values' parameters `const` when they are scalars, then holds one copy, each `return(c);`
+   written `return(MagickFalse);`, and ends with `return(MagickTrue);`.
+5. Replace every copy by `if (Helper(P,...) == MagickFalse) return(c);`. Delete `F`'s
+   bindings that nothing in `F` reads any more.
+6. All copies of one function go in one commit. Run `refactor_guard.py` (`WARN`, copies
+   removed, every value present) and `--calls` (each callee of the copy drops by the copies
+   removed but one; the helper gains its definition and one call per copy); the CI and C++
+   warning checks; the oracle on `F`'s callers, every copy reached.
+
+**Before:**
+
+```c
+    clStatus=SetHullPassDirection(...);
+    if (clStatus != CL_SUCCESS)
+    {
+      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ...);
+      return(MagickFalse);
+    }
+    {
+      const HullPassLaunch
+        launch = { clEnv, device, queue, *hullPass1, *hullPass2,
+          global_work_size };
+
+      if (EnqueueHullPasses(&launch,exception) == MagickFalse)
+        return(MagickFalse);
+    }
+```
+
+**After:**
+
+```c
+static MagickBooleanType LaunchHullPasses(const HullPassLoopInput *loop,
+  const cl_int clStatus,ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = loop->clEnv;
+  ...
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ...);
+    return(MagickFalse);
+  }
+  {
+    ...
+  }
+  return(MagickTrue);
+}
+...
+    if (LaunchHullPasses(loop,clStatus,exception) == MagickFalse)
+      return(MagickFalse);
+```
+
+**Careful:**
+
+- Each binding in the helper reads the same member of the same struct as `F`'s binding did,
+  and nothing writes the member during the call (step 3), so every local holds the value it
+  held in `F`. The other values are read once, at the call, where the copy read them; the copy
+  wrote none of them before reading (step 2), so they are the same.
+- On each path the helper runs the copy's statements in the same order: where the copy
+  returned `c`, the helper returns `MagickFalse` and `F` returns `c` at once; where the copy
+  fell through, the helper returns `MagickTrue` and `F` goes on with the statement after the
+  copy.
+- An error call in the copy now names the helper in `GetMagickModule()` (ruling of
+  2026-11-12).
+
+**Evidence level:** oracle on `F`'s callers with every copy reached, with
+`refactor_guard.py --calls` and step 1 checked by script.
+
+**Provenance:** 2026-11-19, from `accelerate-despeckle.c`'s `RunHullPassLoop` (campaign A,
+W46 round 33, lane b, batch 4), the last step of the despeckle chain: the four identical
+check-and-launch copies (cc 12, 108 lines). A stub probe of this step: 8.83 to 9.38, the
+function out of *Complex* and *Large Method*. Added by Claude Code (Claude Opus 5.5) under
+the mandate of 2026-11-19 (the owner's "New recipes are fine", PR #129 Q7).
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -25308,3 +25418,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | NEW | JD | Join Twin Call Arms Around a Common Fill into One Status Dispatch: `if (C) { F } else { F if (G2 == K) goto L; }` followed by `if ((C) && (G1 == K)) goto L;` (the shape Recipes SG and I leave) becomes `F`, `if (C) status=G1; else status=G2;`, `if (status == K) goto L;`. *Careful* gives the path argument (`C` without side effect, unchanged by `F`; each path runs the same statements in the same order) | `accelerate-resize.c`'s `ComputeResizeImage` (campaign A, W46 round 33, lane b, batch 2): the fill of `info` and `targets` written twice after `170aed8bb`; step 2 of the resize chain stub-probed at 9.30 | mandate (2026-11-19) |
 | 2026-11-19 | NEW | MV | Merge Twin Functions Differing in Values Through an Order Struct: two `static` functions with one parameter list whose bodies differ only in values (constants, `const` locals bound from members of a pointer-to-`const` parameter, member reads through them) become one function taking `const Order *order`, the differing positions read from its members; each twin keeps its name and becomes `const Order order = {...}; return(M(...));`; an MT-admitted cast pair is written as MT's conditional on a selector role. *Careful* gives the argument (values read once at the initialiser are the same at every position; member types are the targets'; same statements in the same order) | `accelerate-resize.c`'s `ResizeHorizontalThenVertical` and `ResizeVerticalThenHorizontal` (campaign A, W46 round 33, lane b, batch 2): *Code Duplication*; MT would write eleven conditionals; a stub probe 8.73 to 9.30 | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | DI | Step 5: when `obj_identical.sh` prints DIFFERENT only because a function's instructions are reordered (each function's disassembly lines, sorted, identical before and after: a moved store scheduled one place away), the step is kept on the oracle's evidence when a case reaches the function, the commit quoting the disassembly difference; a statement of the run's block not of step 1's form (an array element's store) stays where it stood | `accelerate-despeckle.c`'s `ComputeDespeckleImage` (campaign A, W46 round 33, lane b, batch 3): eleven locals folded, inlined into `AccelerateDespeckleImage`, whose 736 instruction lines differ only in one `movq $0x0,0xb0(%rsp)` moved by one place; the two `tempImageBuffer[k]=NULL;` stores stay | mandate (2026-11-19) |
+| 2026-11-19 | NEW | SE | Share Identical Exiting Copies Through One Helper Binding the Input Struct: two or more token-identical copies in one function, each leaving through `return(c);` of one constant and reading locals the function binds from members of its pointer-to-`const` struct parameter `P` (plus at most three other values), become one `static MagickBooleanType` helper taking `P` and those values, binding the same locals, each copy `if (Helper(P,...) == MagickFalse) return(c);`. *Careful* gives the argument (the same members, unwritten, give the same values; each path runs the same statements and exits) | `accelerate-despeckle.c`'s `RunHullPassLoop` (campaign A, W46 round 33, lane b, batch 4): four identical check-and-launch copies; SV and SC need a differing value, D a reported duplication; a stub probe 8.83 to 9.38 | mandate (2026-11-19) |
