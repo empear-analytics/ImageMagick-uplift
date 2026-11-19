@@ -25260,6 +25260,109 @@ for the owner's confirmation.
 
 ---
 
+## Recipe EL - Write an Equality-Chain Predicate as a Label Set
+
+**Use when:** CodeScene reports *Complex Conditional* (or *Complex Method*) on a predicate
+whose whole body tests one parameter against enumeration constants joined by `||`:
+`colorspace-private.h`'s `IssRGBCompatibleColorspace` (nine colourspaces, cc 10, eight
+complex conditional expressions), `IsHueCompatibleColorspace`, `IsLabCompatibleColorspace`,
+`IsGrayImageType`. The chain is one expression, so no extraction shortens it.
+
+**Not covered by:** Recipe EM, which turns the chain into a `static const` table and a
+lookup loop: in a header inlined into per-pixel code (`ConcatenateColorComponent`) a loop
+over a table is a different instruction sequence for every includer, and EM's step 1
+refuses per-pixel callers. Recipe LP, which goes the other way, from a `switch` in a
+function body to a predicate; its step 2 is the shape this recipe writes. Recipe P, which
+names an expression and keeps it whole. Recipe DT, which drops a boolean `?:` after a
+logical expression and keeps the chain.
+
+**How:**
+
+1. The function is `static` (`static inline` in a header), returns `MagickBooleanType`,
+   and its body is exactly `if (C) return(MagickTrue); return(MagickFalse);` or
+   `return((C) ? MagickTrue : MagickFalse);`. `C` is, parentheses, line breaks and spaces
+   aside, `(n == L1) || (n == L2) || ... || (n == Lk)`, `k` at least 2, where `n` is a
+   parameter of an enumeration or integer type and each `Li` an enumeration constant (or
+   an integer constant expression), all of distinct values. No `#if` inside the function.
+2. Replace the body by `switch (n) { case L1: ... case Lk: return(MagickTrue); default:
+   break; } return(MagickFalse);`, one `case` per line in the chain's order, as Recipe LP
+   step 2 writes a label set. The name, parameter, return type and comments stay.
+3. Check by script that the labels are the chain's constants, each once and in order, and
+   that nothing else in the file changed. The compiler refuses two labels of one value.
+4. Every file that compiles the function: in a header, rebuild every including object of
+   an OpenMP -O2 tree and compare it with a snapshot of the parent (debug sections
+   stripped). Objects that differ are listed with the functions whose instructions
+   changed; the changed functions' self Ir at one thread (callgrind, `setarch -R`) is
+   measured on commands that run their per-pixel or per-row users, parent against step,
+   and a rise beyond the allowance in force (reading 1 of round 34: 0.01 % of the hot
+   function's inclusive Ir) stops the step.
+5. The oracle: the whole catalogue, narrow and wide, for a header that many files include
+   (the predicate is inlined, so the case map does not name it); `ci_linux_warnings.sh`
+   and the C++ check on every rebuilt C source.
+6. `refactor_guard.py`: `OK` for the literals; `--calls` moves nothing. One function per
+   commit.
+
+**Before:**
+
+```c
+static inline MagickBooleanType IsYCbCrCompatibleColorspace(
+  const ColorspaceType colorspace)
+{
+  if ((colorspace == YCbCrColorspace) ||
+      (colorspace == Rec709YCbCrColorspace) ||
+      (colorspace == Rec601YCbCrColorspace))
+    return(MagickTrue);
+  return(MagickFalse);
+}
+```
+
+**After:**
+
+```c
+static inline MagickBooleanType IsYCbCrCompatibleColorspace(
+  const ColorspaceType colorspace)
+{
+  switch (colorspace)
+  {
+    case YCbCrColorspace:
+    case Rec709YCbCrColorspace:
+    case Rec601YCbCrColorspace:
+      return(MagickTrue);
+    default:
+      break;
+  }
+  return(MagickFalse);
+}
+```
+
+**Careful:**
+
+- `n == L1 || ... || n == Lk` is true exactly when `n` equals one of the values; a
+  `switch` jumps to the label of that value, or to `default:` when there is none (C11
+  6.8.4.2p5). The operands have no side effects, so the short-circuit order of the chain
+  is not observable; the result is the same value for every `n`, including values outside
+  the enumeration's named constants.
+- The controlling expression undergoes the integer promotions and each label is converted
+  to the promoted type (C11 6.8.4.2p5), as the `==` operands were converted by the usual
+  arithmetic conversions: for an enumeration and its own constants both give the same
+  comparison.
+- The compiler is free to emit either form as a bit test, a range check or a chain of
+  compares, so objects do differ (block layout and branch order); step 4's measurement is
+  the speed evidence, not object identity.
+
+**Evidence level:** oracle (the whole catalogue, narrow and wide, for a widely included
+header), with step 4's object comparison and Ir.
+
+**Provenance:** 2026-11-19, from `colorspace-private.h` (campaign A, W47 round 34, lane a,
+reading 4 of the round brief): 3.69, with seven *Complex Conditional* findings in its
+`Is...Colorspace` predicates; a probe writing the chains as label sets takes the header to
+4.89, `IssRGBCompatibleColorspace` alone to 3.99. The first step's changed functions ran at
+equal or lower self Ir (`ConcatenateColorComponent` 9,360,000 -> 8,760,000 on a 200x200
+`txt:` write). Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-11-19 (the
+owner's "New recipes are fine").
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -25808,3 +25911,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | NEW | NF | Name a Formula as a Function Returning Its Value: statements `object=<formula>;` whose formula reads one value and otherwise only constants and calls of pure functions or macros become `object=Name(x);` with `static inline T Name(const T value)` returning the formula copied character for character; several sites by script; objects compared, the oracle when they differ | `compare-similarity-phase-private.h`'s `GetPSNRSimilarity` and `GetRMSESimilarity` (campaign A, W47 lane a), *Code Duplication* that Recipe CF would merge if the formulas were calls; the probed plan (H, NF, NF, CF) 8.03 -> 8.54 | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | OH | Step 1, Form A: a `static` array of pointers to `const` data that no statement writes and whose only uses are rvalue subscripts may be in the run as a `static const` table is (its top-level qualifier is the only difference); internal linkage, initialiser and the one translation unit unchanged, step 4's pp and object identities still required | `fx.c` (campaign A, W47 round 34, lane b): the Form A run from the `#define` block through DumpUserSymbolValues holds `static const char * sElementTypes[]` (seven strings, read only in DumpRpnElement as `sElementTypes[pel->type]`); probe fx.c 9.09 to 10.0, header 9.09 | mandate (2026-11-19) |
 | 2026-11-19 | NEW | MD | Move a declared function's definition later in its file: an external definition declared in an included header moves unchanged to a later top-level position, so that an OH Form A run can end before it; split_branch_check IDENTICAL-MODULO-LAYOUT and sorted preprocessed lines equal | `fx.c` (campaign A, W47 round 34, lane b): review of batch 4 found `AcquireFxInfo` and `DestroyFxInfo` (MagickPrivate in `fx-private.h`, called from `property.c`) inside the run of `9f6e618fa` | mandate (2026-11-19) |
+| 2026-11-19 | NEW | EL | Write an Equality-Chain Predicate as a Label Set: a `static` predicate whose body is `if (C) return(MagickTrue); return(MagickFalse);` (or the `?:` form), `C` a chain of `n == Li` over distinct enumeration constants, becomes `switch (n)` with the constants as labels in order, `return(MagickTrue);`, `default: break;`, `return(MagickFalse);` (Recipe LP step 2's shape); for a header, every including object compared with a snapshot and the changed functions' self Ir measured on their per-pixel users | `colorspace-private.h` (campaign A, W47 round 34, lane a): seven *Complex Conditional* findings in its `Is...Colorspace` predicates; the label-set probe 3.69 -> 4.89 (`IssRGBCompatibleColorspace` alone 3.99, its changed callers at equal or lower self Ir) | mandate (2026-11-19) |
