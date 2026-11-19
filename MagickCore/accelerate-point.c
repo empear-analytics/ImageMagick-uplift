@@ -789,10 +789,7 @@ MagickPrivate MagickBooleanType AccelerateModulateImage(Image *image,
   MagickCLEnv
     clEnv;
 
-  assert(image != NULL);
-  assert(exception != (ExceptionInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceAccelerateCall(image,exception);
 
   if (checkAccelerateConditionRGBA(image) == MagickFalse)
     return(MagickFalse);
