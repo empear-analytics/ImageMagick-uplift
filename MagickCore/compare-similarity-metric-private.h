@@ -149,12 +149,12 @@ static inline void AccumulateMAEPixel(const ComparePixels *pixels,
   }
 }
 
-static inline MagickBooleanType GetMAESimilarity(const Image *image,
-  const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
+static inline MagickBooleanType GetNormalizedMetricSimilarity(
+  const PixelMetricInfo *info,double *similarity,ExceptionInfo *exception)
 {
-  const PixelMetricInfo
-    info = { image, reconstruct_image, MeanAbsoluteErrorMetric,
-      0.0 };
+  const Image
+    *const image = info->image,
+    *const reconstruct_image = info->reconstruct_image;
 
   double
     area;
@@ -162,13 +162,23 @@ static inline MagickBooleanType GetMAESimilarity(const Image *image,
   MagickBooleanType
     status;
 
+  status=GetPixelMetricSimilarity(info,similarity,&area,exception);
+  NormalizeChannelSimilarity(image,reconstruct_image,area,similarity);
+  return(status);
+}
+
+static inline MagickBooleanType GetMAESimilarity(const Image *image,
+  const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
+{
+  const PixelMetricInfo
+    info = { image, reconstruct_image, MeanAbsoluteErrorMetric,
+      0.0 };
+
   /*
     Compute the mean absolute error similarity.
   */
   (void) memset(similarity,0,(MaxPixelChannels+1)*sizeof(*similarity));
-  status=GetPixelMetricSimilarity(&info,similarity,&area,exception);
-  NormalizeChannelSimilarity(image,reconstruct_image,area,similarity);
-  return(status);
+  return(GetNormalizedMetricSimilarity(&info,similarity,exception));
 }
 
 static inline void AccumulateMEPPPixel(const ComparePixels *pixels,
@@ -423,18 +433,10 @@ static inline MagickBooleanType GetMSESimilarity(const Image *image,
     info = { image, reconstruct_image, MeanSquaredErrorMetric,
       0.0 };
 
-  double
-    area;
-
-  MagickBooleanType
-    status;
-
   /*
     Compute the mean sequared error similarity.
   */
-  status=GetPixelMetricSimilarity(&info,similarity,&area,exception);
-  NormalizeChannelSimilarity(image,reconstruct_image,area,similarity);
-  return(status);
+  return(GetNormalizedMetricSimilarity(&info,similarity,exception));
 }
 
 static inline MagickBooleanType GetNCCSimilarity(const Image *image,

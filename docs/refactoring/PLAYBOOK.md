@@ -24409,6 +24409,120 @@ take. Added by Claude Code (Claude Opus 5.5) under the mandate of 2026-10-24.
 
 ---
 
+## Recipe GL - Fold a Guard into the Lookup It Encloses, Returning NULL When It Fails
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Complex Method* or *Large Method* on a
+function holding a guarded lookup: `if (G) { const T *v = L; if (v != (const T *) NULL) {
+B } }`, where `L` looks a pointer up (a table search that yields `NULL` for a key it does
+not hold) and `B` uses it, often after statements that compute only `G`'s operands, as
+`compare-similarity-image.c`'s `SimilarityImage` does for its frequency-domain dispatch:
+two artifact reads, `if (IsFrequencyDomainSimilarity(image,artifact) != MagickFalse)`, then
+`frequency = GetFrequencySimilarity(metric)` and `if (frequency != NULL) { ... return(...); }`.
+The two nested `if`s are a bump, and the artifact reads and the guard are decisions of the
+caller.
+
+**Not covered by:** Recipe E, whose block must be contiguous and produce one value: the
+guard's `if` holds `B`, which stays; Recipe P, which names `G` as a predicate but leaves
+the nesting (`if (P(...)) { v=L; if (v) B }`); Recipe CN, which needs an `if` whose whole
+body is a second `if` (here `v` is declared and set between them); Recipe RV, whose block
+leaves through `return` and is moved whole.
+
+**How:**
+
+1. The guard is `if (G) { D; if (v != (const T *) NULL) { B } }` with no `else` on either
+   `if`, where `D` is the one declaration `const T *v = L;` (or `T *v = L;`), `L` an
+   expression whose only side effects are its own, and `B` the rest. Statements directly
+   above the guard that write only locals read by `G` alone (`artifact`) may come along;
+   each such local is used nowhere else in the caller (Recipe E step 4).
+2. Write `static const T *Helper(...)` directly above the caller, taking the variables those
+   statements, `G` and `L` read (at most four). Its body is those statements, then
+   `if (G) return(L);` and `return((const T *) NULL);`. `G` and `L` are copied character for
+   character; no comparison is inverted.
+3. In the caller, replace the statements, the guard and `D` with `const T *v =
+   Helper(...);` (the declaration of `D`, initialised by the call) followed by the inner
+   `if (v != (const T *) NULL) { B }`, unchanged, at the guard's former nesting level.
+4. When the guard stands in a conditional branch (`#if defined(...)`), the helper's
+   definition goes in a pair of the same directive lines, as AGENTS.md's ruling of
+   2026-11-13 allows when the caller keeps its own; the branch must be compiled by the
+   oracle's build or by another available build, and `tools/obj_modulo.sh <file> <Caller>
+   <Helper>` there prints `IDENTICAL` or `MODULO-IDENTICAL`.
+5. `refactor_guard.py`: `OK` (a `NULL` cast added only may `WARN`); `--calls`: `+2` for the
+   helper and nothing else.
+
+**Before:**
+
+```c
+{
+  const char *artifact = GetImageArtifact(image,"compare:frequency-domain");
+  if (artifact == (const char *) NULL)
+    artifact=GetImageArtifact(image,"compare:accelerate-ncc");
+  if (IsFrequencyDomainSimilarity(image,artifact) != MagickFalse)
+    {
+      const FrequencySimilarity
+        *frequency = GetFrequencySimilarity(metric);
+
+      if (frequency != (const FrequencySimilarity *) NULL)
+        {
+          similarity_image=frequency->similarity_image(image,reconstruct,
+            offset,similarity_metric,exception);
+          return(similarity_image);
+        }
+    }
+}
+```
+
+**After:**
+
+```c
+static const FrequencySimilarity *GetRequestedFrequencySimilarity(
+  const Image *image,const MetricType metric)
+{
+  const char *artifact = GetImageArtifact(image,"compare:frequency-domain");
+  if (artifact == (const char *) NULL)
+    artifact=GetImageArtifact(image,"compare:accelerate-ncc");
+  if (IsFrequencyDomainSimilarity(image,artifact) != MagickFalse)
+    return(GetFrequencySimilarity(metric));
+  return((const FrequencySimilarity *) NULL);
+}
+...
+{
+  const FrequencySimilarity
+    *frequency = GetRequestedFrequencySimilarity(image,metric);
+
+  if (frequency != (const FrequencySimilarity *) NULL)
+    {
+      similarity_image=frequency->similarity_image(image,reconstruct,
+        offset,similarity_metric,exception);
+      return(similarity_image);
+    }
+}
+```
+
+**Careful:**
+
+- Why the behaviour is the same. When `G` holds, the helper evaluates `L` once, as the
+  guard's body did, and `v` holds its value: `B` runs exactly when it ran. When `G` fails,
+  `L` is not evaluated, as before, `v` is `NULL`, and the inner test skips `B`, as the
+  failed guard skipped it. `G` and the statements above it are evaluated once, in their
+  order, before anything else of the block.
+- `B` must not depend on `G` holding beyond what `v != NULL` already implies; it is not
+  moved and runs only when `L` gave a pointer, which happens only under `G`.
+- A `T` whose `NULL` cast differs from `v`'s declared type (a `const` dropped) is refused;
+  the helper's return type is `v`'s type.
+
+**Evidence level:** oracle (the cases that reach the caller), with `refactor_guard.py
+--calls` and steps 1 to 3 checked by reading; step 4's object comparison when the guard
+stands in a conditional branch.
+
+**Provenance:** 2026-11-19, from `compare-similarity-image.c`'s `SimilarityImage`
+(campaign A, W46 round 33, lane a): the frequency-domain dispatch under `#if
+defined(MAGICKCORE_HDRI_SUPPORT) && defined(MAGICKCORE_FFTW_DELEGATE)`, a bump and two
+decisions of a 7-argument `MagickExport` function whose signature cannot change; a probe
+gave 8.51 to 8.54, bumps 3 to 2, cc 16 to 14, no finding on the helper. Added by Claude
+Code (Claude Opus 5.5) under the owner's answer of 2026-11-19 ("New recipes are fine").
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -24939,3 +25053,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | WORDING | BP | Step 1 defines the group (a pointer with its scalars, or pointers that travel together, an `&v` of a plain local allowed); step 4 moves an `if` that tests the call, or a `return` of it, whole into the block (`8475fe80b`); *Careful* covers the pointer group | Review of batch 3 of W45 lane c: after `b1fafe29e` the name, step 1 and *Careful* still spoke of a pointer and its scalars only | after the fact |
 | 2026-11-19 | AMEND | IP | Step 2 (a) also counts a caller's non-`const` local bound from the member when every assignment to it stands in a block that leaves the function before any call of the step (`coeff` freed and `NULL` returned), and a local bound from a member of a `const` pointer local that is itself bound from `name->member` (`context->image`, `context = call->context`) | `distort-private.h` and `distort-linear-private.h` (9.68, *Primitive Obsession*): the coefficient generators pass `coeff`, `method` and members of `context` on to their setters; a stub probe of twelve BP/IP steps on `distort-private.h` gives 10.0 (campaign A, W45 round 32, lane c, batch 4) | mandate (2026-10-24) |
 | 2026-11-19 | WORDING | IP | Step 2 (a), second reading of `485b9c818`: the local bound through a `const` pointer local counts only when nothing writes that member, or the pointer member it is read through, between the caller's binding and the call | Review of batch 4 of W45 lane c: the reading's text left the no-write condition implicit (in the distort chain `context` and its members are written by nothing after `GenerateCoefficients` fills them) | after the fact |
+| 2026-11-19 | NEW | GL | Fold a Guard into the Lookup It Encloses, Returning NULL When It Fails: `if (G) { const T *v = L; if (v != NULL) { B } }` becomes `const T *v = Helper(...); if (v != NULL) { B }`, the helper returning `L` when `G` holds and `NULL` otherwise (with the statements that compute only `G`'s operands) | `compare-similarity-image.c`'s `SimilarityImage` (campaign A, W46 round 33, lane a): the frequency-domain dispatch is a bump and two decisions of a `MagickExport` function; E, P, CN and RV do not take it. Probe 8.51 to 8.54 | owner |
