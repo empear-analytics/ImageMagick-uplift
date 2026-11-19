@@ -578,6 +578,8 @@ static Image *AcquireSimilarityImage(const Image *image,
   return(similarity_image);
 }
 
+#define SimilarityImageTag  "Similarity/Image"
+
 static void SetSimilarityProperties(const Image *image,
   const double *similarity_metric,const RectangleInfo *offset)
 {
@@ -606,8 +608,6 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
   const MetricType metric,const double similarity_threshold,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
 {
-#define SimilarityImageTag  "Similarity/Image"
-
   CacheView
     *similarity_view;
 
