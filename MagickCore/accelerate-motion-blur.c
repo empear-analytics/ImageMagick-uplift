@@ -1015,9 +1015,20 @@ static MagickBooleanType RunMotionBlurKernel(const MotionBlurRunInput *run,
   return(MagickTrue);
 }
 
+typedef struct _MotionBlurRequest
+{
+  const double
+    *kernel;
+
+  size_t
+    width;
+
+  const OffsetInfo
+    *offset;
+} MotionBlurRequest;
+
 static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
-  const double *kernel,const size_t width,const OffsetInfo *offset,
-  ExceptionInfo *exception)
+  const MotionBlurRequest *request,ExceptionInfo *exception)
 {
   CacheView
     *filteredImage_view,
@@ -1091,9 +1102,9 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
 
   {
     const MotionBlurRunInput
-      run = { clEnv, device, kernel, width, offset, imageBuffer,
-        filteredImageBuffer, channel_mask, image, filteredPixels,
-        filteredImage_view };
+      run = { clEnv, device, request->kernel, request->width,
+        request->offset, imageBuffer, filteredImageBuffer, channel_mask,
+        image, filteredPixels, filteredImage_view };
 
     const MotionBlurRunTargets
       runTargets = { &imageKernelBuffer, &queue, &offsetBuffer,
@@ -1125,6 +1136,9 @@ MagickPrivate Image *AccelerateMotionBlurImage(const Image *image,
   const double* kernel,const size_t width,const OffsetInfo *offset,
   ExceptionInfo *exception)
 {
+  const MotionBlurRequest
+    request = { kernel, width, offset };
+
   Image
     *filteredImage;
 
@@ -1143,8 +1157,7 @@ MagickPrivate Image *AccelerateMotionBlurImage(const Image *image,
   if (clEnv == (MagickCLEnv) NULL)
     return((Image *) NULL);
 
-  filteredImage=ComputeMotionBlurImage(image,clEnv,kernel,width,offset,
-    exception);
+  filteredImage=ComputeMotionBlurImage(image,clEnv,&request,exception);
   return(filteredImage);
 }
 #endif /* MAGICKCORE_OPENCL_SUPPORT */
