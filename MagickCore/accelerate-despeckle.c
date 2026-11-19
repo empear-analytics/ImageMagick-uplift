@@ -516,8 +516,8 @@ typedef struct _HullPassLoopInput
     filteredImageBuffer;
 } HullPassLoopInput;
 
-static MagickBooleanType RunHullPassLoop(const HullPassLoopInput *loop,
-  ExceptionInfo *exception)
+static MagickBooleanType LaunchHullPasses(const HullPassLoopInput *loop,
+  const cl_int clStatus,ExceptionInfo *exception)
 {
   const MagickCLEnv
     clEnv = loop->clEnv;
@@ -534,6 +534,32 @@ static MagickBooleanType RunHullPassLoop(const HullPassLoopInput *loop,
 
   size_t
     *const global_work_size = loop->global_work_size;
+
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
+    return(MagickFalse);
+  }
+  {
+    const HullPassLaunch
+      launch = { clEnv, device, queue, *hullPass1, *hullPass2,
+        global_work_size };
+
+    if (EnqueueHullPasses(&launch,exception) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType RunHullPassLoop(const HullPassLoopInput *loop,
+  ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = loop->clEnv;
+
+  cl_kernel
+    *const hullPass1 = loop->hullPass1,
+    *const hullPass2 = loop->hullPass2;
 
   cl_mem
     *const tempImageBuffer = loop->tempImageBuffer,
@@ -558,19 +584,8 @@ static MagickBooleanType RunHullPassLoop(const HullPassLoopInput *loop,
     clStatus|= clEnv->library->clSetKernelArg(*hullPass1,5,sizeof(int),(void *)&polarity);
     clStatus|=clEnv->library->clSetKernelArg(*hullPass2,4,sizeof(cl_int2),(void *)&offset);
     clStatus|=clEnv->library->clSetKernelArg(*hullPass2,5,sizeof(int),(void *)&polarity);
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
+    if (LaunchHullPasses(loop,clStatus,exception) == MagickFalse)
       return(MagickFalse);
-    }
-    {
-      const HullPassLaunch
-        launch = { clEnv, device, queue, *hullPass1, *hullPass2,
-          global_work_size };
-
-      if (EnqueueHullPasses(&launch,exception) == MagickFalse)
-        return(MagickFalse);
-    }
 
     if (k == 0)
       clStatus =clEnv->library->clSetKernelArg(*hullPass1,0,sizeof(cl_mem),(void *)(tempImageBuffer));
@@ -581,19 +596,8 @@ static MagickBooleanType RunHullPassLoop(const HullPassLoopInput *loop,
     clStatus|= clEnv->library->clSetKernelArg(*hullPass1,5,sizeof(int),(void *)&polarity);
     clStatus|=clEnv->library->clSetKernelArg(*hullPass2,4,sizeof(cl_int2),(void *)&offset);
     clStatus|=clEnv->library->clSetKernelArg(*hullPass2,5,sizeof(int),(void *)&polarity);
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
+    if (LaunchHullPasses(loop,clStatus,exception) == MagickFalse)
       return(MagickFalse);
-    }
-    {
-      const HullPassLaunch
-        launch = { clEnv, device, queue, *hullPass1, *hullPass2,
-          global_work_size };
-
-      if (EnqueueHullPasses(&launch,exception) == MagickFalse)
-        return(MagickFalse);
-    }
 
     offset.s[0] = -X[k];
     offset.s[1] = -Y[k];
@@ -602,19 +606,8 @@ static MagickBooleanType RunHullPassLoop(const HullPassLoopInput *loop,
     clStatus|= clEnv->library->clSetKernelArg(*hullPass1,5,sizeof(int),(void *)&polarity);
     clStatus|=clEnv->library->clSetKernelArg(*hullPass2,4,sizeof(cl_int2),(void *)&offset);
     clStatus|=clEnv->library->clSetKernelArg(*hullPass2,5,sizeof(int),(void *)&polarity);
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
+    if (LaunchHullPasses(loop,clStatus,exception) == MagickFalse)
       return(MagickFalse);
-    }
-    {
-      const HullPassLaunch
-        launch = { clEnv, device, queue, *hullPass1, *hullPass2,
-          global_work_size };
-
-      if (EnqueueHullPasses(&launch,exception) == MagickFalse)
-        return(MagickFalse);
-    }
 
     offset.s[0] = X[k];
     offset.s[1] = Y[k];
@@ -627,19 +620,8 @@ static MagickBooleanType RunHullPassLoop(const HullPassLoopInput *loop,
     if (k == 3)
       clStatus |=clEnv->library->clSetKernelArg(*hullPass2,1,sizeof(cl_mem),(void *)&filteredImageBuffer);
 
-    if (clStatus != CL_SUCCESS)
-    {
-      (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
+    if (LaunchHullPasses(loop,clStatus,exception) == MagickFalse)
       return(MagickFalse);
-    }
-    {
-      const HullPassLaunch
-        launch = { clEnv, device, queue, *hullPass1, *hullPass2,
-          global_work_size };
-
-      if (EnqueueHullPasses(&launch,exception) == MagickFalse)
-        return(MagickFalse);
-    }
   }
   return(MagickTrue);
 }
@@ -710,6 +692,19 @@ static MagickBooleanType ReadDespeckleOutput(
   return(MagickTrue);
 }
 
+static void AcquireHullPassKernels(const MagickCLDevice device,
+  cl_kernel *hullPass1,cl_kernel *hullPass2)
+{
+  *hullPass1 = AcquireOpenCLKernel(device,"HullPass1");
+  *hullPass2 = AcquireOpenCLKernel(device,"HullPass2");
+}
+
+static void SetHullPassWorkSize(const Image *image,size_t *global_work_size)
+{
+  global_work_size[0] = image->columns;
+  global_work_size[1] = image->rows;
+}
+
 typedef struct _DespeckleRunInput
 {
   MagickCLEnv
@@ -770,8 +765,7 @@ static MagickBooleanType RunDespeckleKernels(const DespeckleRunInput *run,
   size_t
     global_work_size[2];
 
-  *hullPass1 = AcquireOpenCLKernel(device,"HullPass1");
-  *hullPass2 = AcquireOpenCLKernel(device,"HullPass2");
+  AcquireHullPassKernels(device,hullPass1,hullPass2);
 
   {
     const HullPassArgsInput
@@ -782,8 +776,7 @@ static MagickBooleanType RunDespeckleKernels(const DespeckleRunInput *run,
       return(MagickFalse);
   }
 
-  global_work_size[0] = image->columns;
-  global_work_size[1] = image->rows;
+  SetHullPassWorkSize(image,global_work_size);
 
 
   {

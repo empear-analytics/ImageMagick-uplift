@@ -119,6 +119,22 @@ typedef struct _FunctionKernelTargets
     *functionKernel;
 } FunctionKernelTargets;
 
+static MagickBooleanType AcquireFunctionParameters(
+  const size_t number_parameters,const double *parameters,
+  float **parametersBufferPtr)
+{
+  size_t
+    i;
+
+  *parametersBufferPtr=(float *) AcquireQuantumMemory(number_parameters,
+    sizeof(float));
+  if (*parametersBufferPtr == (float *) NULL)
+    return(MagickFalse);
+  for (i=0; i<number_parameters; i++)
+    (*parametersBufferPtr)[i]=(float) parameters[i];
+  return(MagickTrue);
+}
+
 static MagickBooleanType AcquireFunctionKernel(
   const FunctionKernelInputs *inputs,ExceptionInfo *exception,
   const FunctionKernelTargets *targets)
@@ -141,15 +157,9 @@ static MagickBooleanType AcquireFunctionKernel(
   float
     *parametersBufferPtr;
 
-  size_t
-    i;
-
-  parametersBufferPtr=(float *) AcquireQuantumMemory(number_parameters,
-    sizeof(float));
-  if (parametersBufferPtr == (float *) NULL)
+  if (AcquireFunctionParameters(number_parameters,parameters,
+        &parametersBufferPtr) == MagickFalse)
     return(MagickFalse);
-  for (i=0; i<number_parameters; i++)
-    parametersBufferPtr[i]=(float) parameters[i];
   *parametersBuffer=CreateOpenCLBuffer(device,CL_MEM_READ_ONLY |
     CL_MEM_COPY_HOST_PTR,number_parameters*sizeof(*parametersBufferPtr),
     parametersBufferPtr);
@@ -250,6 +260,23 @@ static MagickBooleanType SetFunctionKernelArgs(const FunctionKernelArgs *args,
   return(MagickTrue);
 }
 
+static MagickBooleanType EnqueueFunctionKernel(cl_command_queue queue,
+  cl_kernel functionKernel,Image *image,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    outputReady;
+
+  size_t
+    gsize[2];
+
+  gsize[0]=image->columns;
+  gsize[1]=image->rows;
+  outputReady=EnqueueOpenCLKernel(queue,functionKernel,2,(const size_t *) NULL,
+    gsize,(const size_t *) NULL,image,(const Image *) NULL,MagickFalse,
+    exception);
+  return(outputReady);
+}
+
 static MagickBooleanType ComputeFunctionImage(Image *image,MagickCLEnv clEnv,
   const MagickFunction function,const size_t number_parameters,
   const double *parameters,ExceptionInfo *exception)
@@ -282,9 +309,6 @@ static MagickBooleanType ComputeFunctionImage(Image *image,MagickCLEnv clEnv,
   MagickCLDevice
     device;
 
-  size_t
-    gsize[2];
-
   TraceAccelerateImage(image);
   
   queue=NULL;
@@ -315,11 +339,7 @@ static MagickBooleanType ComputeFunctionImage(Image *image,MagickCLEnv clEnv,
       goto cleanup;
   }
 
-  gsize[0]=image->columns;
-  gsize[1]=image->rows;
-  outputReady=EnqueueOpenCLKernel(queue,functionKernel,2,(const size_t *) NULL,
-    gsize,(const size_t *) NULL,image,(const Image *) NULL,MagickFalse,
-    exception);
+  outputReady=EnqueueFunctionKernel(queue,functionKernel,image,exception);
 
 cleanup:
 
@@ -328,6 +348,14 @@ cleanup:
   ReleaseKernel(functionKernel);
   ReleaseAccelerateQueue(device,queue);
   return(outputReady);
+}
+
+static void TraceAccelerateCall(Image *image,ExceptionInfo *exception)
+{
+  assert(image != NULL);
+  assert(exception != (ExceptionInfo *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
 }
 
 MagickPrivate MagickBooleanType AccelerateFunctionImage(Image *image,
@@ -340,10 +368,7 @@ MagickPrivate MagickBooleanType AccelerateFunctionImage(Image *image,
   MagickCLEnv
     clEnv;
 
-  assert(image != NULL);
-  assert(exception != (ExceptionInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceAccelerateCall(image,exception);
 
   if (checkAccelerateCondition(image) == MagickFalse)
     return(MagickFalse);
@@ -711,10 +736,7 @@ static MagickBooleanType ComputeModulateImage(Image *image,MagickCLEnv clEnv,
   void
     *inputPixels;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceAccelerateImage(image);
 
   queue=NULL;
   image_view=NULL;
@@ -777,10 +799,7 @@ MagickPrivate MagickBooleanType AccelerateModulateImage(Image *image,
   MagickCLEnv
     clEnv;
 
-  assert(image != NULL);
-  assert(exception != (ExceptionInfo *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  TraceAccelerateCall(image,exception);
 
   if (checkAccelerateConditionRGBA(image) == MagickFalse)
     return(MagickFalse);
