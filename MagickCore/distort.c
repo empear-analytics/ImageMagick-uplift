@@ -179,8 +179,7 @@ static MagickBooleanType PrintDistortVerbose(
       }
       case PerspectiveDistortion:
       {
-        if (PrintPerspectiveFX(coeff,image_gen,lookup,exception) ==
-            MagickFalse)
+        if (PrintPerspectiveFX(&fx,exception) == MagickFalse)
           return(MagickFalse);
         break;
       }

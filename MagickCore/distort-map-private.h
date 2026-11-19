@@ -1116,9 +1116,16 @@ static MagickBooleanType PrintAffineFX(const DistortVerboseFX *fx,
   return(MagickTrue);
 }
 
-static MagickBooleanType PrintPerspectiveFX(double *coeff,
-  const char *image_gen,const char *lookup,ExceptionInfo *exception)
+static MagickBooleanType PrintPerspectiveFX(const DistortVerboseFX *fx,
+  ExceptionInfo *exception)
 {
+  double
+    *coeff = fx->coeff;
+
+  const char
+    *const image_gen = fx->image_gen,
+    *const lookup = fx->lookup;
+
   double
     *inverse;
 
