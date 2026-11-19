@@ -817,6 +817,128 @@ static MagickBooleanType RunHistogramPass(const HistogramPassInput *pass,
   return(MagickTrue);
 }
 
+typedef struct _EqualizePassInput
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  PixelPacket
+    *equalize_map;
+
+  cl_mem
+    imageBuffer;
+
+  cl_int
+    channel_mask;
+
+  cl_float4
+    white,
+    black;
+
+  Image
+    *image;
+
+  cl_command_queue
+    queue;
+
+  void
+    *inputPixels;
+
+  CacheView
+    *image_view;
+} EqualizePassInput;
+
+typedef struct _EqualizePassTargets
+{
+  cl_mem
+    *equalizeMapBuffer;
+
+  cl_kernel
+    *equalizeKernel;
+
+  MagickBooleanType
+    *outputReady;
+} EqualizePassTargets;
+
+static MagickBooleanType RunEqualizePass(const EqualizePassInput *run,
+  ExceptionInfo *exception,const EqualizePassTargets *runTargets)
+{
+  const MagickCLEnv
+    clEnv = run->clEnv;
+
+  const MagickCLDevice
+    device = run->device;
+
+  PixelPacket
+    *const equalize_map = run->equalize_map;
+
+  const cl_mem
+    imageBuffer = run->imageBuffer;
+
+  const cl_int
+    channel_mask = run->channel_mask;
+
+  const cl_float4
+    white = run->white,
+    black = run->black;
+
+  Image
+    *const image = run->image;
+
+  const cl_command_queue
+    queue = run->queue;
+
+  void
+    *const inputPixels = run->inputPixels;
+
+  CacheView
+    *const image_view = run->image_view;
+
+  cl_mem
+    *const equalizeMapBuffer = runTargets->equalizeMapBuffer;
+
+  cl_kernel
+    *const equalizeKernel = runTargets->equalizeKernel;
+
+  MagickBooleanType
+    *const outputReady = runTargets->outputReady;
+
+  /* Create and initialize OpenCL buffers. */
+  {
+    const HostBufferSource
+      source = { clEnv, device, equalize_map,
+        ALIGNED(equalize_map, PixelPacket),
+        CL_MEM_READ_ONLY|CL_MEM_USE_HOST_PTR, sizeof(PixelPacket) };
+
+    if (CreateHostBuffer(&source,equalizeMapBuffer,exception) == MagickFalse)
+      return(MagickFalse);
+  }
+
+  {
+    const EqualizeKernelInputs
+      inputs = { device, clEnv, imageBuffer, channel_mask, *equalizeMapBuffer,
+        white, black, image, queue };
+
+    if (LaunchEqualizeKernel(&inputs,equalizeKernel,exception) == MagickFalse)
+      return(MagickFalse);
+  }
+
+  /* read the data back */
+  {
+    const EqualizeReadback
+      readback = { clEnv, queue, imageBuffer, image, inputPixels, device };
+
+    if (ReadEqualizedImageBuffer(&readback,exception) == MagickFalse)
+      return(MagickFalse);
+  }
+
+  *outputReady=SyncCacheViewAuthenticPixels(image_view,exception);
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -996,36 +1118,17 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   }
 #endif
 
-  /* Create and initialize OpenCL buffers. */
   {
-    const HostBufferSource
-      source = { clEnv, device, equalize_map,
-        ALIGNED(equalize_map, PixelPacket),
-        CL_MEM_READ_ONLY|CL_MEM_USE_HOST_PTR, sizeof(PixelPacket) };
+    const EqualizePassInput
+      run = { clEnv, device, equalize_map, imageBuffer, channel_mask, white,
+        black, image, queue, inputPixels, image_view };
 
-    if (CreateHostBuffer(&source,&equalizeMapBuffer,exception) == MagickFalse)
+    const EqualizePassTargets
+      runTargets = { &equalizeMapBuffer, &equalizeKernel, &outputReady };
+
+    if (RunEqualizePass(&run,exception,&runTargets) == MagickFalse)
       goto cleanup;
   }
-
-  {
-    const EqualizeKernelInputs
-      inputs = { device, clEnv, imageBuffer, channel_mask, equalizeMapBuffer,
-        white, black, image, queue };
-
-    if (LaunchEqualizeKernel(&inputs,&equalizeKernel,exception) == MagickFalse)
-      goto cleanup;
-  }
-
-  /* read the data back */
-  {
-    const EqualizeReadback
-      readback = { clEnv, queue, imageBuffer, image, inputPixels, device };
-
-    if (ReadEqualizedImageBuffer(&readback,exception) == MagickFalse)
-      goto cleanup;
-  }
-
-  outputReady=SyncCacheViewAuthenticPixels(image_view,exception);
 
 cleanup:
 
