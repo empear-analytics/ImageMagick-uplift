@@ -1059,7 +1059,8 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
     yFactor;
 
   MagickBooleanType
-    outputReady=MagickFalse;
+    outputReady=MagickFalse,
+    status;
 
   MagickCLDevice
     device;
@@ -1092,47 +1093,26 @@ static Image *ComputeResizeImage(const Image* image,MagickCLEnv clEnv,
   number_channels=(cl_uint) image->number_channels;
   xFactor=(float) resizedColumns/(float) image->columns;
   yFactor=(float) resizedRows/(float) image->rows;
+  info.device=device;
+  info.queue=queue;
+  info.image=image;
+  info.filteredImage=filteredImage;
+  info.imageBuffer=imageBuffer;
+  info.filteredImageBuffer=filteredImageBuffer;
+  info.cubicCoefficientsBuffer=cubicCoefficientsBuffer;
+  info.number_channels=number_channels;
+  info.resizedColumns=resizedColumns;
+  info.resizedRows=resizedRows;
+  info.resizeFilter=resizeFilter;
+  info.xFactor=xFactor;
+  info.yFactor=yFactor;
+  targets.tempImageBuffer=(&tempImageBuffer);
+  targets.outputReady=(&outputReady);
   if (xFactor > yFactor)
-  {
-    info.device=device;
-    info.queue=queue;
-    info.image=image;
-    info.filteredImage=filteredImage;
-    info.imageBuffer=imageBuffer;
-    info.filteredImageBuffer=filteredImageBuffer;
-    info.cubicCoefficientsBuffer=cubicCoefficientsBuffer;
-    info.number_channels=number_channels;
-    info.resizedColumns=resizedColumns;
-    info.resizedRows=resizedRows;
-    info.resizeFilter=resizeFilter;
-    info.xFactor=xFactor;
-    info.yFactor=yFactor;
-    targets.tempImageBuffer=(&tempImageBuffer);
-    targets.outputReady=(&outputReady);
-  }
+    status=ResizeHorizontalThenVertical(&info,exception,&targets);
   else
-  {
-    info.device=device;
-    info.queue=queue;
-    info.image=image;
-    info.filteredImage=filteredImage;
-    info.imageBuffer=imageBuffer;
-    info.filteredImageBuffer=filteredImageBuffer;
-    info.cubicCoefficientsBuffer=cubicCoefficientsBuffer;
-    info.number_channels=number_channels;
-    info.resizedColumns=resizedColumns;
-    info.resizedRows=resizedRows;
-    info.resizeFilter=resizeFilter;
-    info.xFactor=xFactor;
-    info.yFactor=yFactor;
-    targets.tempImageBuffer=(&tempImageBuffer);
-    targets.outputReady=(&outputReady);
-    if (ResizeVerticalThenHorizontal(&info,exception,&targets) ==
-        MagickFalse)
-      goto cleanup;
-  }
-  if ((xFactor > yFactor) &&
-      (ResizeHorizontalThenVertical(&info,exception,&targets) == MagickFalse))
+    status=ResizeVerticalThenHorizontal(&info,exception,&targets);
+  if (status == MagickFalse)
     goto cleanup;
 
 cleanup:
