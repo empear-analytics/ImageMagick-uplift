@@ -744,6 +744,23 @@ static inline unsigned short HalfFromSubnormalSingle(
   return((unsigned short) (sign_bit | significand));
 }
 
+static inline unsigned short HalfFromInfinityOrNaNSingle(
+  const unsigned int sign_bit,unsigned int significand)
+{
+  unsigned short
+    half;
+
+  if (significand == 0)
+    return((unsigned short) (sign_bit | ExponentMask));
+  else
+    {
+      significand>>=SignificandShift;
+      half=(unsigned short) (sign_bit | significand |
+        (significand == 0) | ExponentMask);
+      return(half);
+    }
+}
+
 static inline unsigned short SinglePrecisionToHalf(const double value)
 {
   typedef union _SinglePrecision
@@ -783,17 +800,7 @@ static inline unsigned short SinglePrecisionToHalf(const double value)
     return(HalfFromSubnormalSingle(sign_bit,exponent,significand));
   else
     if (exponent == (0xff-ExponentBias))
-      {
-        if (significand == 0)
-          return((unsigned short) (sign_bit | ExponentMask));
-        else
-          {
-            significand>>=SignificandShift;
-            half=(unsigned short) (sign_bit | significand |
-              (significand == 0) | ExponentMask);
-            return(half);
-          }
-      }
+      return(HalfFromInfinityOrNaNSingle(sign_bit,significand));
   significand=significand+((significand >> SignificandShift) & 0x01)+0x00000fff;
   if ((significand & 0x00800000) != 0)
     {
