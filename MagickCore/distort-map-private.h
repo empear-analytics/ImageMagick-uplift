@@ -1221,9 +1221,15 @@ static void PrintBilinearForwardFX(const DistortVerboseFX *fx)
   PrintBilinearForwardLookup(coeff,lookup);
 }
 
-static void PrintBilinearReverseFX(const double *coeff,const char *image_gen,
-  const char *lookup)
+static void PrintBilinearReverseFX(const DistortVerboseFX *fx)
 {
+  const double
+    *const coeff = fx->coeff;
+
+  const char
+    *const image_gen = fx->image_gen,
+    *const lookup = fx->lookup;
+
 #if 0
         (void) FormatLocaleFile(stderr, "Polynomial Projection Distort:\n");
         (void) FormatLocaleFile(stderr, "  -distort PolynomialProjection \\\n");
@@ -1355,15 +1361,6 @@ static void PrintDistortFX(const DistortVerboseFX *fx)
   const DistortMethod
     method = fx->method;
 
-  double
-    *const coeff = fx->coeff;
-
-  char
-    *const image_gen = fx->image_gen;
-
-  const char
-    *const lookup = fx->lookup;
-
   switch (method)
   {
     case BilinearForwardDistortion:
@@ -1373,7 +1370,7 @@ static void PrintDistortFX(const DistortVerboseFX *fx)
     }
     case BilinearReverseDistortion:
     {
-      PrintBilinearReverseFX(coeff,image_gen,lookup);
+      PrintBilinearReverseFX(fx);
       break;
     }
     case PolynomialDistortion:
