@@ -24796,9 +24796,12 @@ the members of its own pointer-to-`const` input struct: `accelerate-despeckle.c`
 **Not covered by:** Recipes SV and SC, whose copies differ in at least one value (SV step 2,
 SC step 2); Recipe D, whose *Use when* is a reported *Code Duplication* (CodeScene does not
 report copies inside one function); Recipe V, which moves one block, so that the other copies
-would each become a clone of its helper; Recipe E, whose step 4 refuses a block holding a
-`return` that does not end it; Recipe IP, which changes the parameters of an existing
-function, not a new one.
+would each become a clone of its helper; Recipe Y, which moves one block and builds a new
+input struct, declared and filled at the call, for the values it reads (here the struct
+already exists as the function's own `const` parameter, so nothing is built or filled: the
+helper takes that parameter and binds the same members again); Recipe E, whose step 4
+refuses a block holding a `return` that does not end it; Recipe IP, which changes the
+parameters of an existing function, not a new one.
 
 **How:**
 
@@ -24810,9 +24813,10 @@ function, not a new one.
    with it.
 3. Each variable a copy reads is either a local of `F` bound once, by its declaration, from a
    member of `F`'s pointer-to-`const` struct parameter `P` (`const MagickCLEnv clEnv =
-   loop->clEnv;`), which nothing in `F` writes (by reading), or another variable of `F` or a
-   parameter, passed by value (`clStatus`, `exception`): `P` and those values make at most
-   four parameters.
+   loop->clEnv;`), which nothing in `F` writes and no callee between the binding and the
+   copy writes through `P` or any pointer to `*P` (by reading each call on those paths), or
+   another variable of `F` or a parameter, passed by value (`clStatus`, `exception`): `P`
+   and those values make at most four parameters.
 4. Write a new `static MagickBooleanType` function directly above `F`: its parameters are `P`
    (the same type and name) and the other variables, in the order of first use; it declares,
    with `F`'s text, the bindings of the locals the copy reads (in `F`'s order), the other
@@ -25430,3 +25434,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | NEW | SE | Share Identical Exiting Copies Through One Helper Binding the Input Struct: two or more token-identical copies in one function, each leaving through `return(c);` of one constant and reading locals the function binds from members of its pointer-to-`const` struct parameter `P` (plus at most three other values), become one `static MagickBooleanType` helper taking `P` and those values, binding the same locals, each copy `if (Helper(P,...) == MagickFalse) return(c);`. *Careful* gives the argument (the same members, unwritten, give the same values; each path runs the same statements and exits) | `accelerate-despeckle.c`'s `RunHullPassLoop` (campaign A, W46 round 33, lane b, batch 4): four identical check-and-launch copies; SV and SC need a differing value, D a reported duplication; a stub probe 8.83 to 9.38 | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | DI | Step 5's exception (5001463a3) made precise: the reordering is shown by `tools/obj_sorted.sh` (new, b17b0903e), which disassembles with relocations (`objdump -dr`) and accepts only equal sorted lines whose moved lines are all stores of immediate constants to distinct stack slots; the commit quotes the moved lines; the exception is marked for the owner's confirmation, since it relaxes `IDENTICAL` | Review of batch 3 of W46 lane b: the lane's stand-in ran objdump without `-r`, which would hide two calls that swapped places. Rerun on `1bdc1a5a7` against its parent: `REORDERED-CONSTANT-STORES`, 832 instruction lines, one moved line `<AccelerateDespeckleImage>: movq $0x0,0xb0(%rsp)` | mandate (2026-11-19) |
 | 2026-11-19 | WORDING | DI | Step 5: `tools/obj_sorted.sh` does not check that no instruction between a moved store's old and new position reads that slot (a load, an `lea`, a call taking its address); the step relies on step 2's C-level argument; the script's own `--self-test` | Review of batch 4 of W46 lane b: `b17b0903e` dropped the tab-led relocation lines (fixed in `645f80277`, with a self-test); rerun on `1bdc1a5a7` against its parent: `REORDERED-CONSTANT-STORES`, 832 instruction lines, one moved line `<AccelerateDespeckleImage>: movq $0x0,0xb0(%rsp)` | after the fact |
+| 2026-11-19 | WORDING | SE | *Not covered by* names Recipe Y (it builds and fills a new input struct; SE's struct is the function's own `const` parameter, so nothing is built or filled); step 3 adds that no callee between the binding and the copy writes `*P` | Review of batch 4 of W46 lane b: in `RunHullPassLoop` the calls between the bindings and the copies (`clSetKernelArg`, `EnqueueHullPasses` through a copy of the values) receive no pointer to `*loop` | after the fact |
