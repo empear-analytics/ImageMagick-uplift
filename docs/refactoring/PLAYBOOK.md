@@ -1313,6 +1313,31 @@ is worth it.
    shared variable only through its accessor, `(*NameReference())`, as the other file
    does (the accessor is declared in the same header, before the helpers); this is still
    one accessor per variable, its only new external name.
+   A function-level `static` variable that a moving helper writes (`widget.c`'s
+   `ReleaseWidgetKey`, whose `static char command[MagickPathExtent]` and `static KeySym
+   key_symbol` serve the calls of the Color, File and Font browsers) does not move into the
+   header inside the helper: each including file would then hold its own copy, and calls
+   from different files would no longer share its state (mandate (2026-11-19); the main
+   session's reading of round 34: one copy, never per-file copies of writable state). Its
+   declaration instead leaves the function for the original's *Variable declarations*
+   block, verbatim but for the name, which takes a prefix from the function's name
+   (`release_key_command`, `release_key_symbol`) so that no local of the file shadows it,
+   checked by grep; the declaration keeps `static`, its type, extent and initialiser (none
+   here). It is then shared through one accessor as above, defined directly after it:
+   `MagickPrivate T *NameReference(void)` for an arithmetic type and, for an array,
+   `MagickPrivate T (*NameReference(void))[N]` returning `&name`, its extent written as the
+   declaration writes it, so that `(*NameReference())` designates the array itself, decays
+   to the pointer the call took before, and `sizeof` of it is the array's size (the operand
+   of `sizeof` is not evaluated, C11 6.5.3.4p2). The helper's uses are written through the
+   accessor, nothing else on the line changing. A block-scope and a file-scope `static`
+   object both have static storage duration and are initialised once before the program
+   starts, to zero when the declaration has no initialiser (C11 6.2.4p3, 6.7.9p10), so the
+   one object keeps its storage, type, size and initial bytes, and every call from every file
+   reads and writes it as the calls did before; only its name and scope change. The proof is
+   the object comparison (`tools/split_branch_check.py` in a build that compiles the helper):
+   every function identical but the helper, whose only differences are the accessor calls
+   and the `.bss` symbol now named by the new name, of the same size; and the oracle on the
+   cases that reach the helper.
    A file-scope variable of the original with external linkage (defined without `static` and
    declared in no header, as `opencl.c`'s `MagickLibrary *openCL_library;`) that both parts
    name is declared rather than shared through an accessor (owner, 2026-11-16, AGENTS.md,
@@ -25851,3 +25876,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | AMEND | TB | *Inverted membership form*: the one group of labels returns `MagickFalse`, `d` is `MagickTrue` (a `break;` after the group's `return`, which no path reaches, goes with the `switch`), and the loop returns `MagickFalse` at a match; the function may be a `static inline` function of a private header, its table at file scope directly above it, when step 2 holds for every caller in the tree | `composite-private.h`'s `GetCompositeClipToSelf` (campaign A, W47 round 34, lane c; an upstream header worked under owner 2026-11-19 evening, PR #129 round-33 Q4): ten labels returning `MagickFalse`, cc 12, called once per `-compose` setting by `mogrify.c`, `operation.c` and `composite.c`; a probe 8.82 to 9.09 | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | GD | Step 1: an operand may be a conjunction of two comparisons in its own parentheses, with no call (a range test); its guard is `if (B1 && B2) X` with the conjunction's text, so `&&` stands only inside such a guard. *Careful*: the guard evaluates `B1`, then `B2` only when `B1` held, as the operand did inside the chain | `token-private.h`'s `IsUTFSpace` (campaign A, W47 round 34, lane c; an upstream header worked under owner 2026-11-19 evening, PR #129 round-33 Q4): twelve operands, two of them range conjunctions, cc 15, 13 complex conditional expressions; a probe 6.94 to 8.12 | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | GC | Step 1: one operand may be a disjunction of integer comparisons in its own parentheses, with no call; step 2 writes its inverse `!(Ai)`, the disjunction's text unchanged inside. Step 5: a `static inline` predicate of a private header that no file calls has no object code to compare; when it takes one `int`, reads nothing else and calls nothing, `tools/exhaustive_int_predicate.sh` (new) compares the committed and the new function on all 2^32 `int` values and must print `EQUIVALENT` | `token-private.h`'s `IsUTFValid` (campaign A, W47 round 34, lane c; an upstream header worked under owner 2026-11-19 evening, PR #129 round-33 Q4): four operands, one a range-exclusion disjunction, no caller in the tree; a probe 8.12 to 8.64; the tool's planted change of one operator prints `DIFFERENT at -2147483648` | mandate (2026-11-19) |
+| 2026-11-19 | AMEND | S | Step 2: a function-level `static` that a helper moving into the private header writes leaves the function for the original's file scope, renamed with a prefix from the function's name, storage, type, extent and initialiser unchanged, and is shared through one accessor; an array's accessor returns a pointer to the array (`T (*NameReference(void))[N]`), so `sizeof` keeps its value. One object as before, never a copy per including file; object comparison identical but the helper's accessor calls and the renamed `.bss` symbol | `widget.c`'s `ReleaseWidgetKey` (campaign A, W47 round 34, lane b6): its `command[MagickPathExtent]` and `key_symbol` serve the Color, File and Font browsers, which the chain stub-probed at widget.c 8.28 to 9.09 puts in three files; the main session refused per-file copies of writable state | mandate (2026-11-19) |
