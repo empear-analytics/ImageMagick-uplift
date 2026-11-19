@@ -297,9 +297,8 @@ static MagickBooleanType GetExpressionOperand (FxInfo * pfx,
   return(MagickTrue);
 }
 
-static MagickBooleanType TranslateAssignmentOperand (
-  const UserSymbolAssignment * assignment, int * UserSymNdx0,
-  MagickBooleanType * broke)
+static MagickBooleanType FinishAssignmentOperand (
+  const UserSymbolAssignment * assignment, int * UserSymNdx0)
 {
   FxInfo
     *const pfx = assignment->pfx;
@@ -309,13 +308,6 @@ static MagickBooleanType TranslateAssignmentOperand (
     Assign = assignment->Assign,
     Update = assignment->Update;
 
-  (*broke)=MagickFalse;
-    if (TranslateAssignedExpression (assignment, broke) == MagickFalse)
-      return MagickFalse;
-    if ((*broke) != MagickFalse) {
-      (*broke)=MagickTrue;
-      return(MagickTrue);
-    }
     if (IsUnassignedUserSymbolRead(UserSymbol,Assign,Update,*UserSymNdx0) !=
         MagickFalse) {
       ElementT * pel;
@@ -329,6 +321,20 @@ static MagickBooleanType TranslateAssignmentOperand (
       FlushUnaryPrefixOperators (pfx);
     }
   return(MagickTrue);
+}
+
+static MagickBooleanType TranslateAssignmentOperand (
+  const UserSymbolAssignment * assignment, int * UserSymNdx0,
+  MagickBooleanType * broke)
+{
+  (*broke)=MagickFalse;
+    if (TranslateAssignedExpression (assignment, broke) == MagickFalse)
+      return MagickFalse;
+    if ((*broke) != MagickFalse) {
+      (*broke)=MagickTrue;
+      return(MagickTrue);
+    }
+  return(FinishAssignmentOperand (assignment, UserSymNdx0));
 }
 
 typedef struct _NextOperandTargets
