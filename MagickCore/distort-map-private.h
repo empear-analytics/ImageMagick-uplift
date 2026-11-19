@@ -396,9 +396,20 @@ static void PrintBarrelCenter(const double *coeff,const double xc,
       0.5,coeff[9]-0.5);
 }
 
-static void PrintBarrelFX(const Image *image,const double *coeff,
-  const DistortMethod method,const char *image_gen)
+static void PrintBarrelFX(const DistortVerboseFX *fx)
 {
+  const Image
+    *const image = fx->image;
+
+  const double
+    *const coeff = fx->coeff;
+
+  const DistortMethod
+    method = fx->method;
+
+  const char
+    *const image_gen = fx->image_gen;
+
   double
     xc,
     yc;
@@ -1228,9 +1239,6 @@ static void PrintLensDistortFX(const DistortVerboseFX *fx)
   const DistortMethod
     method = fx->method;
 
-  const Image
-    *const image = fx->image;
-
   double
     *const coeff = fx->coeff;
 
@@ -1263,7 +1271,7 @@ static void PrintLensDistortFX(const DistortVerboseFX *fx)
     case BarrelDistortion:
     case BarrelInverseDistortion:
     {
-      PrintBarrelFX(image,coeff,method,image_gen);
+      PrintBarrelFX(fx);
       break;
     }
     default:
