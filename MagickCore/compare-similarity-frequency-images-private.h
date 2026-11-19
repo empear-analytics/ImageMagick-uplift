@@ -995,14 +995,11 @@ static Image *AcquireUnityImage(const Image *alpha_image,
   return(unity_image);
 }
 
-static Image *SIMUnityImage(const Image *alpha_image,const Image *beta_image,
-  ExceptionInfo *exception)
+static MagickBooleanType SetUnityImageRows(Image *unity_image,
+  const Image *beta_image,ExceptionInfo *exception)
 {
   CacheView
     *image_view;
-
-  Image
-    *unity_image;
 
   MagickBooleanType
     status = MagickTrue;
@@ -1010,12 +1007,6 @@ static Image *SIMUnityImage(const Image *alpha_image,const Image *beta_image,
   ssize_t
     y;
 
-  /*
-    Create a padded unity image.
-  */
-  unity_image=AcquireUnityImage(alpha_image,exception);
-  if (unity_image == (Image *) NULL)
-    return(unity_image);
   image_view=AcquireAuthenticCacheView(unity_image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
   #pragma omp parallel for schedule(static) shared(status) \
@@ -1040,6 +1031,25 @@ static Image *SIMUnityImage(const Image *alpha_image,const Image *beta_image,
       status=MagickFalse;
   }
   image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+static Image *SIMUnityImage(const Image *alpha_image,const Image *beta_image,
+  ExceptionInfo *exception)
+{
+  Image
+    *unity_image;
+
+  MagickBooleanType
+    status = MagickTrue;
+
+  /*
+    Create a padded unity image.
+  */
+  unity_image=AcquireUnityImage(alpha_image,exception);
+  if (unity_image == (Image *) NULL)
+    return(unity_image);
+  status=SetUnityImageRows(unity_image,beta_image,exception);
   if (status == MagickFalse)
     unity_image=DestroyImage(unity_image);
   return(unity_image);
