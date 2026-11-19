@@ -1067,6 +1067,17 @@ static MagickBooleanType AcquireEqualizeMaps(Image *image,cl_uint4 *histogram,
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireEqualizeHistogram(cl_uint4 **histogram)
+{
+  *histogram=(cl_uint4 *) AcquireQuantumMemory(MaxMap+1UL, sizeof(**histogram));
+  if (*histogram == (cl_uint4 *) NULL)
+    return(MagickFalse);
+
+  /* reset histogram */
+  (void) memset(*histogram,0,(MaxMap+1)*sizeof(**histogram));
+  return(MagickTrue);
+}
+
 static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   ExceptionInfo *exception)
 {
@@ -1129,12 +1140,8 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
   /*
     Allocate and initialize histogram arrays.
   */
-  histogram=(cl_uint4 *) AcquireQuantumMemory(MaxMap+1UL, sizeof(*histogram));
-  if (histogram == (cl_uint4 *) NULL)
+  if (AcquireEqualizeHistogram(&histogram) == MagickFalse)
       ThrowBinaryException(ResourceLimitWarning,"MemoryAllocationFailed", image->filename);
-
-  /* reset histogram */
-  (void) memset(histogram,0,(MaxMap+1)*sizeof(*histogram));
 
   {
     const EqualizeInputSource
