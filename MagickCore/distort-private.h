@@ -542,9 +542,21 @@ static inline void SetBarrelYCoefficients(const CoefficientCall *call,
   }
 }
 
-static inline void SetBarrelXCoefficients(double *coeff,const double *arguments,
-  const size_t number_arguments,const double rscale)
+static inline void SetBarrelXCoefficients(const CoefficientCall *call,
+  const double rscale)
 {
+  double
+    *const coeff = call->coeff;
+
+  const CoefficientContext
+    *const context = call->context;
+
+  const double
+    *const arguments = context->arguments;
+
+  const size_t
+    number_arguments = context->number_arguments;
+
   /* A,B,C,D coefficients */
   coeff[0] = arguments[0];
   coeff[1] = arguments[1];
@@ -572,9 +584,6 @@ static inline double *BarrelCoefficients(const CoefficientCall *call)
 
   const Image
     *const image = context->image;
-
-  const double
-    *const arguments = context->arguments;
 
   ExceptionInfo
     *const exception = context->exception;
@@ -612,7 +621,7 @@ static inline double *BarrelCoefficients(const CoefficientCall *call)
         CommandOptionToMnemonic(MagickDistortOptions, *method) );
       return((double *) NULL);
     }
-  SetBarrelXCoefficients(coeff,arguments,number_arguments,rscale);
+  SetBarrelXCoefficients(call,rscale);
   SetBarrelYCoefficients(call,rscale);
   SetBarrelCenter(call);
   return(coeff);
