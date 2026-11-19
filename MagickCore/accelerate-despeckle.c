@@ -230,39 +230,39 @@ static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
     Y[4] = {1, 0, 1, 1};
 
   CacheView
-    *filteredImage_view,
-    *image_view;
+    *filteredImage_view=NULL,
+    *image_view=NULL;
 
   cl_command_queue
-    queue;
+    queue=NULL;
 
   cl_int
     clStatus;
 
   cl_kernel
-    hullPass1,
-    hullPass2;
+    hullPass1=NULL,
+    hullPass2=NULL;
 
   cl_mem_flags
     mem_flags;
 
   cl_mem
-    filteredImageBuffer,
-    imageBuffer,
+    filteredImageBuffer=NULL,
+    imageBuffer=NULL,
     tempImageBuffer[2];
 
   const void
-    *inputPixels;
+    *inputPixels=NULL;
 
   Image
-    *filteredImage;
+    *filteredImage=NULL;
 
   int
     k,
     matte;
 
   MagickBooleanType
-    outputReady;
+    outputReady=MagickFalse;
 
   MagickCLDevice
     device;
@@ -276,25 +276,14 @@ static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
     imageWidth;
 
   void
-    *filteredPixels,
+    *filteredPixels=NULL,
     *hostPtr;
 
   if (clEnv == (MagickCLEnv) NULL)
     return((Image *) NULL);
 
-  queue=NULL;
-  image_view=NULL;
-  inputPixels=NULL;
-  filteredImage=NULL;
-  filteredImage_view=NULL;
-  filteredPixels=NULL;
-  imageBuffer=NULL;
-  filteredImageBuffer=NULL;
-  hullPass1=NULL;
-  hullPass2=NULL;
   tempImageBuffer[0]=NULL;
   tempImageBuffer[1]=NULL;
-  outputReady=MagickFalse;
 
   device=RequestOpenCLDevice(clEnv);
   if (device == (MagickCLDevice) NULL)
