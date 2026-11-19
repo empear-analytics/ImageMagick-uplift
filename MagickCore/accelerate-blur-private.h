@@ -52,9 +52,21 @@ static inline Image *cloneImage(const Image* image,ExceptionInfo *exception)
   return(clone);
 }
 
-static inline cl_mem createKernelInfo(MagickCLDevice device,const double radius,
-  const double sigma,cl_uint *width,ExceptionInfo *exception)
+typedef struct _BlurKernelGeometry
 {
+  double
+    radius,
+    sigma;
+} BlurKernelGeometry;
+
+static inline cl_mem createKernelInfo(MagickCLDevice device,
+  const BlurKernelGeometry *kernelGeometry,cl_uint *width,
+  ExceptionInfo *exception)
+{
+  const double
+    radius = kernelGeometry->radius,
+    sigma = kernelGeometry->sigma;
+
   char
     geometry[MagickPathExtent];
 

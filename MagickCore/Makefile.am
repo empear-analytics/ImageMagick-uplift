@@ -251,11 +251,18 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/fourier.c \
   MagickCore/fourier-complex.c \
   MagickCore/fourier.h \
+  MagickCore/fourier-forward-private.h \
   MagickCore/fx.c \
   MagickCore/fx-execute.c \
   MagickCore/fx.h \
   MagickCore/fx-private.h \
   MagickCore/fx-execute-private.h \
+  MagickCore/fx-translate-rpn-private.h \
+  MagickCore/fx-translate-attributes-private.h \
+  MagickCore/fx-translate-qualifiers-private.h \
+  MagickCore/fx-translate-functions-private.h \
+  MagickCore/fx-translate-operators-private.h \
+  MagickCore/fx-translate-private.h \
   MagickCore/gem.c \
   MagickCore/gem.h \
   MagickCore/gem-private.h \
@@ -525,6 +532,9 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/xwindow-text.c \
   MagickCore/xwindow-visual.c \
   MagickCore/xwindow-import.c \
+  MagickCore/xwindow-import-image.c \
+  MagickCore/xwindow-import-private.h \
+  MagickCore/xwindow-import-image-window-private.h \
   MagickCore/xwindow-search.c \
   MagickCore/xwindow.h
 
@@ -698,8 +708,15 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/exception-private.h \
   MagickCore/feature-private.h \
   MagickCore/feature-texture-measure-private.h \
+  MagickCore/fourier-forward-private.h \
   MagickCore/fx-private.h \
   MagickCore/fx-execute-private.h \
+  MagickCore/fx-translate-rpn-private.h \
+  MagickCore/fx-translate-attributes-private.h \
+  MagickCore/fx-translate-qualifiers-private.h \
+  MagickCore/fx-translate-functions-private.h \
+  MagickCore/fx-translate-operators-private.h \
+  MagickCore/fx-translate-private.h \
   MagickCore/gem-private.h \
   MagickCore/geometry-private.h \
   MagickCore/image-private.h \
@@ -769,6 +786,8 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/widget-private.h \
   MagickCore/xml-tree-private.h \
   MagickCore/xwindow-image-private.h \
+  MagickCore/xwindow-import-private.h \
+  MagickCore/xwindow-import-image-window-private.h \
   MagickCore/xwindow-private.h
 
 MAGICKCORE_INCLUDEARCH_HDRS = \

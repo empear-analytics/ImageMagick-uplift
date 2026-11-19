@@ -643,6 +643,22 @@ static void SetSimilarityResult(const SimilarityScan *scan,
   SetSimilarityProperties(image,scan->similarity_metric,scan->offset);
 }
 
+static void ReportSimilarityProgress(MagickBooleanType *status,
+  MagickOffsetType *progress,const Image *image)
+{
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      (*progress)++;
+      proceed=SetImageProgress(image,SimilarityImageTag,(*progress),
+        image->rows);
+      if (proceed == MagickFalse)
+        (*status)=MagickFalse;
+    }
+}
+
 static Image *MeasureSimilarityImage(const SimilarityScan *scan,
   Image *similarity_image)
 {
@@ -709,16 +725,7 @@ static Image *MeasureSimilarityImage(const SimilarityScan *scan,
     MergeSimilarityInfo(&merge,&similarity_info,&threshold_trigger);
     if (SyncCacheViewAuthenticPixels(similarity_view,exception) == MagickFalse)
       status=MagickFalse;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-        progress++;
-        proceed=SetImageProgress(image,SimilarityImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
+    ReportSimilarityProgress(&status,&progress,image);
   }
   similarity_view=DestroyCacheView(similarity_view);
   if (status == MagickFalse)

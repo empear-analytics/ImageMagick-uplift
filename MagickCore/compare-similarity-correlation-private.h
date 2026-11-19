@@ -420,6 +420,18 @@ static inline void SetCorrelationProgress(const Image *image,
     (*status)=MagickFalse;
 }
 
+static inline void MergeCorrelationTotalsCritical(const Image *image,
+  const Image *reconstruct_image,const CorrelationSums sums,
+  const CorrelationSums merged)
+{
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  #pragma omp critical (MagickCore_GetCorrelationTotals)
+#endif
+  {
+    MergeCorrelationTotals(image,reconstruct_image,&sums,&merged);
+  }
+}
+
 static MagickBooleanType GetCorrelationTotals(const CorrelationTotals *totals,
   ExceptionInfo *exception)
 {
@@ -490,12 +502,7 @@ static MagickBooleanType GetCorrelationTotals(const CorrelationTotals *totals,
         continue;
       }
     AccumulateCorrelationRow(&row,p,q,sums);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-    #pragma omp critical (MagickCore_GetCorrelationTotals)
-#endif
-    {
-      MergeCorrelationTotals(image,reconstruct_image,&sums,&merged);
-    }
+    MergeCorrelationTotalsCritical(image,reconstruct_image,sums,merged);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)

@@ -2009,6 +2009,15 @@ merges code, not parameters.
    write an identifier of the initialiser between the point where the struct takes its
    values and its last call. Where that point can be the declaration, and the
    initialiser has no member access or cast, declare it `const` with the initialiser.
+   One-line form (mandate, 2026-11-19): that `const` declaration may stand on one line,
+   `const Name name = { a, b };`, and a call this step changes may be joined onto one
+   line when it then fits in 80 columns, when the usual two-line declaration and the
+   wrapped call would lengthen a caller that CodeScene reports as a *Large Method*
+   enough to lower its file (a header step whose including file would otherwise drop:
+   `8943c3b92`, `createKernelInfo`, where `accelerate-unsharp.c` went 8.46 -> 8.44 with
+   two lines and 8.42 with the block form, and stays 8.46 in one; precedent for the
+   declaration: `compare-similarity-image.c`'s `const SimilarityRow row = {...}`). Only
+   the layout of these lines changes; the tokens are those of the two-line form.
    Otherwise declare it without `const` or initialiser, and fill it at that point,
    `name.member=expr;` for every member in declaration order, with nothing between.
    Form for a call in a loop (2026-11-05): when the calls stand in the body of a loop of
@@ -23505,7 +23514,14 @@ inside one file). Recipe E and relatives (change the text; this recipe changes n
    include block (the last `#include`, or the last header of an earlier step), ending
    directly before a top-level item, with every `#if`/`#endif` pair it holds inside it; it
    holds no `#include`, no definition with external linkage (`MagickExport`, `MagickPrivate`,
-   `WandExport`) and no non-`const` file-scope object. A doc comment in the run that documents
+   `WandExport`) and no non-`const` file-scope object. One exception (2026-11-19, mandate): a
+   `static` array of pointers to `const` data whose elements no statement of the file writes
+   and whose address no statement takes other than by subscripting it for a read (`fx.c`'s
+   `static const char * sElementTypes[]`, read only as `sElementTypes[pel->type]`) is a table
+   in all but its top-level qualifier, and may be in the run as a `static const` table is
+   (checked by `grep` over the file: every use is an rvalue subscript). It keeps its internal
+   linkage, its initialiser and its one translation unit (the header has one includer), and
+   step 4's identities show the unit unchanged. A doc comment in the run that documents
    a function with external linkage that stays (its `%` banner, with a plain comment block
    directly after it, such as `composite-image.c`'s SVG composition notes after the
    `CompositeImage` banner) does not move into the header: in the same commit it moves,
@@ -25086,6 +25102,204 @@ before the run, one blank line kept, the C++ check in the wide configuration).
 
 ---
 
+## Recipe NF - Name a Formula as a Function Returning Its Value
+
+**Use when:** CodeScene reports *Code Duplication* between functions that are the same
+text except for the formula each applies to one value (`compare-similarity-phase-private.h`'s
+`GetPSNRSimilarity` and `GetRMSESimilarity`, which turn each channel's mean squared error
+into a PSNR or a root), and Recipe CF would merge them if the formula were a call: NF makes
+it one, so that the functions differ only in the function they call.
+
+**Not covered by:** Recipe P, which names a boolean expression and returns
+`MagickBooleanType`; Recipe E, which moves statements, not the right-hand side of one;
+Recipe MF, which turns a statement macro into a function; Recipe CF, which needs the
+differing code to be calls already; Recipe SV and SC, whose copies differ in constants, not
+in a formula.
+
+**How:**
+
+1. The sites are statements of one function `F` of the form `object=<formula>;`, where
+   the formula reads one value `x` (an identifier, an element `a[i]` whose array and index
+   are identifiers or constants, or a member access), at one or more positions, and
+   otherwise only literals, enumeration constants and calls of functions or function-like
+   macros that read nothing but their arguments and write nothing (`sqrt`,
+   `MagickSafeLog10`, `MagickSafeReciprocal`, `MagickSafePSNRRecipicol`, a macro of the file
+   whose body is such an expression of its parameters). No assignment, `++`, `--` or other
+   side effect, checked by reading. `x`, the formula and `object` have one floating or
+   integer type `T`.
+2. Write `static inline T Name(const T value)` directly above `F` (below any macro the
+   formula uses, Recipe H step 5), whose body is `return(<formula>);` with each position of
+   `x` written `value`, every other character copied as it stands (line breaks aside).
+3. Each site becomes `object=Name(x);`. With several sites (one formula applied to several
+   values, as to each channel and then to the composite channel), check by script that each
+   site's formula equals the body with that site's value for `value`; each value meets step
+   1.
+4. One function per commit. `refactor_guard.py` prints `OK` for the literals with one
+   site, and with several the `WARN` of copies removed with every value still present
+   (the formula's literals now written once); `--calls` moves `+2` for `Name` and `+1`
+   for each further site, and each callee of the formula drops by one for each site
+   beyond the first, nothing else.
+5. Compare the objects of every file that compiles `F` (`tools/obj_identical.sh`, or the
+   header placed as at `HEAD` for a header). IDENTICAL, or the oracle on `F`'s cases when a
+   case reaches it; a site in a per-pixel loop or an OpenMP region is measured as the
+   round's timing rule asks.
+6. A helper in a private header that two or more `.c` files include is `static inline`
+   (it already is by step 2).
+7. Rule 2 keeps a flat step that is a planned step of a Recipe CF merge, named in the
+   message.
+
+**Before:**
+
+```c
+    similarity[i]=10.0*MagickSafeLog10(MagickSafeReciprocal(
+      similarity[i]))/MagickSafePSNRRecipicol(10.0);
+  }
+  similarity[CompositePixelChannel]=10.0*MagickSafeLog10(
+    MagickSafeReciprocal(similarity[CompositePixelChannel]))/
+    MagickSafePSNRRecipicol(10.0);
+```
+
+**After:**
+
+```c
+static inline double GetPSNRChannelSimilarity(const double value)
+{
+  return(10.0*MagickSafeLog10(MagickSafeReciprocal(value))/
+    MagickSafePSNRRecipicol(10.0));
+}
+...
+    similarity[i]=GetPSNRChannelSimilarity(similarity[i]);
+  }
+  similarity[CompositePixelChannel]=GetPSNRChannelSimilarity(
+    similarity[CompositePixelChannel]);
+```
+
+**Careful:**
+
+- The formula is the same text, so its operations run in the same order on the same
+  operands: no floating-point result can change from the order (the hard prohibition on
+  reordering stands untouched).
+- `value` and the return have the type of `x` and of the formula, so the call converts
+  nothing: the argument is `x`'s value as the formula read it, and the returned value is
+  converted to `object`'s type exactly as the assignment converted the formula (C11
+  6.5.2.2p7, 6.8.6.4p3, 6.5.16.1p2). Where a compiler keeps excess precision
+  (`FLT_EVAL_METHOD` 2, x87), C11 6.8.6.4p3 and 6.3.1.8p2 make the return and the
+  assignment both round to `T`, as the assignment alone did.
+- A macro that names its argument twice (`RMSESquareRoot(x)`, `sqrt((x) < 0.0 ? 0.0 :
+  (x))`) read `x` twice; `value` is read twice now. `x` has no side effect and the formula
+  writes nothing, so both reads saw one value before as well.
+- A formula that called a function with a side effect, or read a second variable, is
+  outside step 1: the second variable would need a parameter, and the function's call
+  count or order could change.
+
+**Evidence level:** oracle (object comparison IDENTICAL, or the oracle on `F`'s cases);
+guard for a function no case reaches, with step 5 IDENTICAL.
+
+**Provenance:** 2026-11-19, from `compare-similarity-phase-private.h`'s `GetPSNRSimilarity`
+and `GetRMSESimilarity` (campaign A, W47 round 34, lane a): CodeScene reports them as
+*Code Duplication*; a probe of the plan (H on `RMSESquareRoot`, NF on each, then CF through
+a method pointer) takes the header from 8.03 to 8.54 with the duplication gone. Added by
+Claude Code (Claude Opus 5.5) under the mandate of 2026-11-19 (the owner's "New recipes are
+fine").
+
+---
+
+## Recipe MD - Move a Declared Function's Definition Later in Its File
+
+**Use when:** a Recipe OH Form A run is blocked only because it holds a definition with
+external linkage (`MagickExport`, `MagickPrivate`, or a plain external definition such as
+`fx.c`'s `FxInfo *AcquireFxInfo (...)`), and moving that definition below the run's end
+frees the run. The move does not change a score by itself. It is the first step of a chain
+whose next step raises the file, and rule 2 applies: the message names that next step and
+quotes its probe.
+
+**Not covered by:** Recipe OH, which moves items into a header and refuses an external
+definition (the definition must stay in the `.c` file); Recipe S, which moves a public root
+to another `.c` file with its family; Recipes H, L and F, which hoist function-local items.
+
+**How:**
+
+1. The function `F` is declared in a header that the file includes in its include block,
+   above every definition of the file (`fx-private.h` declares `AcquireFxInfo` and
+   `DestroyFxInfo`). So every use of `F` in the file follows a declaration, wherever its
+   definition stands. A file-local `static` is not taken by this recipe.
+2. Each name that `F`'s body uses and the file defines (a static function, a type, a macro, a
+   file-scope object) is defined above `F`'s new position as well as above its old one, so
+   moving down only makes more of the file visible to `F`. No macro that the body names is
+   `#undef`ed or redefined between the two positions (`grep`).
+3. Cut `F`'s definition, with its `%` banner if it has one and one blank line, and paste it
+   unchanged between two top-level items at the new position. Both positions stand under the
+   same preprocessor conditions (here, none). Nothing else in the file changes.
+4. One function per commit.
+5. Proof of identity. `tools/split_branch_check.py HEAD:<file> <file> <build>` prints
+   `IDENTICAL-MODULO-LAYOUT` for every function of the file, in the oracle build and in each
+   configuration that compiles `F`. The preprocessed text of `HEAD` and of the working tree
+   (`-E -P`, `__LINE__` and `__FILE__` pinned) has the same lines once sorted. With the OpenMP
+   -O2 build, the object's functions compare the same way, so no timing is needed.
+6. Checks: the oracle on the cases of `F` and of its callers in other files (`casemap.py`),
+   `tools/ci_linux_warnings.sh` and `tools/ci_warnings.sh` on the file, `refactor_guard.py
+   --calls` (every call and literal kept).
+
+**Before:** (`fx.c`)
+
+```c
+static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expression,
+...
+FxInfo *AcquireFxInfo (const Image * images, const char * expression, ExceptionInfo *exception)
+{
+  return AcquireFxInfoPrivate (images, expression, MagickFalse, exception);
+}
+
+static void DestroyFxRuntimes (FxInfo * pfx)
+...
+static void DumpUserSymbolValues (FxInfo * pfx)
+...
+}
+
+static void SetFxProgress (const Image *image, const char *tag,
+```
+
+**After:**
+
+```c
+static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expression,
+...
+static void DestroyFxRuntimes (FxInfo * pfx)
+...
+static void DumpUserSymbolValues (FxInfo * pfx)
+...
+}
+
+FxInfo *AcquireFxInfo (const Image * images, const char * expression, ExceptionInfo *exception)
+{
+  return AcquireFxInfoPrivate (images, expression, MagickFalse, exception);
+}
+
+static void SetFxProgress (const Image *image, const char *tag,
+```
+
+**Careful:**
+
+- Only the definition moves. The name, signature, linkage and declaration in the header do
+  not change, so nothing public changes. Callers in other files (`property.c`) link to the
+  same symbol.
+- `__LINE__` inside `F` (an `assert`, `GetMagickModule()`) gets a new value, as for any
+  recipe that moves code; the oracle normalises line numbers in messages, and step 5 pins
+  them.
+- A compiler may decide inlining by position. Step 5 compares every function, so a changed
+  decision shows up there, and the step is then refused.
+
+**Evidence level:** oracle when a case reaches `F` (else guard), with step 5's identities.
+
+**Provenance:** 2026-11-19, from `fx.c` (campaign A, W47 round 34, lane b). Review of batch 4
+found that the OH carve `9f6e618fa` held `AcquireFxInfo` and `DestroyFxInfo`, external
+definitions declared `MagickPrivate` in `fx-private.h` and called from `property.c`. The
+carve was redone after this recipe moved them below the run. Added by Claude Code (Claude
+Opus 5.5) under the mandate of 2026-11-19 (the owner's "New recipes are fine", PR #129 Q7),
+for the owner's confirmation.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -25630,6 +25844,10 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | AMEND | DI | Step 5's exception (5001463a3) made precise: the reordering is shown by `tools/obj_sorted.sh` (new, b17b0903e), which disassembles with relocations (`objdump -dr`) and accepts only equal sorted lines whose moved lines are all stores of immediate constants to distinct stack slots; the commit quotes the moved lines; the exception is marked for the owner's confirmation, since it relaxes `IDENTICAL` | Review of batch 3 of W46 lane b: the lane's stand-in ran objdump without `-r`, which would hide two calls that swapped places. Rerun on `1bdc1a5a7` against its parent: `REORDERED-CONSTANT-STORES`, 832 instruction lines, one moved line `<AccelerateDespeckleImage>: movq $0x0,0xb0(%rsp)` | mandate (2026-11-19) |
 | 2026-11-19 | WORDING | DI | Step 5: `tools/obj_sorted.sh` does not check that no instruction between a moved store's old and new position reads that slot (a load, an `lea`, a call taking its address); the step relies on step 2's C-level argument; the script's own `--self-test` | Review of batch 4 of W46 lane b: `b17b0903e` dropped the tab-led relocation lines (fixed in `645f80277`, with a self-test); rerun on `1bdc1a5a7` against its parent: `REORDERED-CONSTANT-STORES`, 832 instruction lines, one moved line `<AccelerateDespeckleImage>: movq $0x0,0xb0(%rsp)` | after the fact |
 | 2026-11-19 | WORDING | SE | *Not covered by* names Recipe Y (it builds and fills a new input struct; SE's struct is the function's own `const` parameter, so nothing is built or filled); step 3 adds that no callee between the binding and the copy writes `*P` | Review of batch 4 of W46 lane b: in `RunHullPassLoop` the calls between the bindings and the copies (`clSetKernelArg`, `EnqueueHullPasses` through a copy of the values) receive no pointer to `*loop` | after the fact |
+| 2026-11-19 | AMEND | B | Step 5, one-line form: a `const` declaration with an initialiser may stand on one line (`const Name name = { a, b };`) and a changed call may be joined onto one line within 80 columns, when the two-line layout would lengthen a *Large Method* caller enough to lower its file; tokens unchanged, layout only | Campaign A, W47 lane a, `8943c3b92` (`createKernelInfo`, header B step): `accelerate-unsharp.c` 8.46 -> 8.44 (two-line declaration) or 8.42 (block form, round 33's probe), 8.46 in the one-line form; earlier one-line declaration `const SimilarityRow row = {...}` in `compare-similarity-image.c`; confirmed by the round-34 coordinator for the owner's mandate | mandate (2026-11-19) |
+| 2026-11-19 | NEW | NF | Name a Formula as a Function Returning Its Value: statements `object=<formula>;` whose formula reads one value and otherwise only constants and calls of pure functions or macros become `object=Name(x);` with `static inline T Name(const T value)` returning the formula copied character for character; several sites by script; objects compared, the oracle when they differ | `compare-similarity-phase-private.h`'s `GetPSNRSimilarity` and `GetRMSESimilarity` (campaign A, W47 lane a), *Code Duplication* that Recipe CF would merge if the formulas were calls; the probed plan (H, NF, NF, CF) 8.03 -> 8.54 | mandate (2026-11-19) |
+| 2026-11-19 | AMEND | OH | Step 1, Form A: a `static` array of pointers to `const` data that no statement writes and whose only uses are rvalue subscripts may be in the run as a `static const` table is (its top-level qualifier is the only difference); internal linkage, initialiser and the one translation unit unchanged, step 4's pp and object identities still required | `fx.c` (campaign A, W47 round 34, lane b): the Form A run from the `#define` block through DumpUserSymbolValues holds `static const char * sElementTypes[]` (seven strings, read only in DumpRpnElement as `sElementTypes[pel->type]`); probe fx.c 9.09 to 10.0, header 9.09 | mandate (2026-11-19) |
+| 2026-11-19 | NEW | MD | Move a declared function's definition later in its file: an external definition declared in an included header moves unchanged to a later top-level position, so that an OH Form A run can end before it; split_branch_check IDENTICAL-MODULO-LAYOUT and sorted preprocessed lines equal | `fx.c` (campaign A, W47 round 34, lane b): review of batch 4 found `AcquireFxInfo` and `DestroyFxInfo` (MagickPrivate in `fx-private.h`, called from `property.c`) inside the run of `9f6e618fa` | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | TB | *Inverted membership form*: the one group of labels returns `MagickFalse`, `d` is `MagickTrue` (a `break;` after the group's `return`, which no path reaches, goes with the `switch`), and the loop returns `MagickFalse` at a match; the function may be a `static inline` function of a private header, its table at file scope directly above it, when step 2 holds for every caller in the tree | `composite-private.h`'s `GetCompositeClipToSelf` (campaign A, W47 round 34, lane c; an upstream header worked under owner 2026-11-19 evening, PR #129 round-33 Q4): ten labels returning `MagickFalse`, cc 12, called once per `-compose` setting by `mogrify.c`, `operation.c` and `composite.c`; a probe 8.82 to 9.09 | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | GD | Step 1: an operand may be a conjunction of two comparisons in its own parentheses, with no call (a range test); its guard is `if (B1 && B2) X` with the conjunction's text, so `&&` stands only inside such a guard. *Careful*: the guard evaluates `B1`, then `B2` only when `B1` held, as the operand did inside the chain | `token-private.h`'s `IsUTFSpace` (campaign A, W47 round 34, lane c; an upstream header worked under owner 2026-11-19 evening, PR #129 round-33 Q4): twelve operands, two of them range conjunctions, cc 15, 13 complex conditional expressions; a probe 6.94 to 8.12 | mandate (2026-11-19) |
 | 2026-11-19 | AMEND | GC | Step 1: one operand may be a disjunction of integer comparisons in its own parentheses, with no call; step 2 writes its inverse `!(Ai)`, the disjunction's text unchanged inside. Step 5: a `static inline` predicate of a private header that no file calls has no object code to compare; when it takes one `int`, reads nothing else and calls nothing, `tools/exhaustive_int_predicate.sh` (new) compares the committed and the new function on all 2^32 `int` values and must print `EQUIVALENT` | `token-private.h`'s `IsUTFValid` (campaign A, W47 round 34, lane c; an upstream header worked under owner 2026-11-19 evening, PR #129 round-33 Q4): four operands, one a range-exclusion disjunction, no caller in the tree; a probe 8.12 to 8.64; the tool's planted change of one operator prints `DIFFERENT at -2147483648` | mandate (2026-11-19) |

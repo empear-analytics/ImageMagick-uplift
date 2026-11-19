@@ -621,6 +621,14 @@ static MinimaInfo FindPixelMinima(const MinimaPixelInfo *minima_pixel,
   return(channel_minima);
 }
 
+static MinimaInfo SeedMinimaInfo(const Quantum *magick_restrict q,
+  MinimaInfo minima_info)
+{
+  if (q != (const Quantum *) NULL)
+    minima_info.minima=IsNaN((double) q[0]) != 0 ? 0.0 : (double) q[0];
+  return(minima_info);
+}
+
 static MagickBooleanType SIMMinimaImage(const Image *image,double *minima,
   RectangleInfo *offset,ExceptionInfo *exception)
 {
@@ -645,8 +653,7 @@ static MagickBooleanType SIMMinimaImage(const Image *image,double *minima,
   image_view=AcquireVirtualCacheView(image,exception);
   q=GetCacheViewVirtualPixels(image_view,minima_info.x,minima_info.y,1,1,
     exception);
-  if (q != (const Quantum *) NULL)
-    minima_info.minima=IsNaN((double) q[0]) != 0 ? 0.0 : (double) q[0];
+  minima_info=SeedMinimaInfo(q,minima_info);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
   #pragma omp parallel for schedule(static) shared(minima_info,status) \
     magick_number_threads(image,image,image->rows,1)
