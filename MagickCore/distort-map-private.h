@@ -304,8 +304,14 @@ typedef struct _DistortVerboseFX
     *lookup;
 } DistortVerboseFX;
 
-static void PrintArcFX(const double *coeff,const char *image_gen)
+static void PrintArcFX(const DistortVerboseFX *fx)
 {
+  const double
+    *const coeff = fx->coeff;
+
+  const char
+    *const image_gen = fx->image_gen;
+
   ssize_t
     i;
 
@@ -1274,7 +1280,7 @@ static void PrintRadialDistortFX(const DistortVerboseFX *fx)
   {
     case ArcDistortion:
     {
-      PrintArcFX(coeff,image_gen);
+      PrintArcFX(fx);
       break;
     }
     case PolarDistortion:
