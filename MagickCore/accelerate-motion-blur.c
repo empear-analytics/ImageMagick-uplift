@@ -1123,7 +1123,6 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
 
   TraceAccelerateImage(image);
 
-
   {
     const MotionBlurInputTargets
       inputTargets = { &device, &image_view, &imageBuffer };
