@@ -644,6 +644,72 @@ static MagickBooleanType RunHullPassLoop(const HullPassLoopInput *loop,
   return(MagickTrue);
 }
 
+typedef struct _DespeckleReadSource
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  cl_mem
+    filteredImageBuffer;
+
+  void
+    *filteredPixels;
+
+  const Image
+    *image;
+} DespeckleReadSource;
+
+static MagickBooleanType ReadDespeckleOutput(
+  const DespeckleReadSource *source,ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = source->clEnv;
+
+  const MagickCLDevice
+    device = source->device;
+
+  const cl_command_queue
+    queue = source->queue;
+
+  const cl_mem
+    filteredImageBuffer = source->filteredImageBuffer;
+
+  void
+    *const filteredPixels = source->filteredPixels;
+
+  const Image
+    *const image = source->image;
+
+  cl_int
+    clStatus;
+
+  size_t
+    length;
+
+  if (ALIGNED(filteredPixels,CLPixelPacket))
+  {
+    length = image->columns * image->rows;
+    clEnv->library->clEnqueueMapBuffer(queue, filteredImageBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(CLPixelPacket), 0, NULL, NULL, &clStatus);
+  }
+  else
+  {
+    length = image->columns * image->rows;
+    clStatus = clEnv->library->clEnqueueReadBuffer(queue, filteredImageBuffer, CL_TRUE, 0, length * sizeof(CLPixelPacket), filteredPixels, 0, NULL, NULL);
+  }
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 typedef struct _DespeckleRunInput
 {
   MagickCLEnv
@@ -701,12 +767,8 @@ static MagickBooleanType RunDespeckleKernels(const DespeckleRunInput *run,
     *const hullPass1 = targets->hullPass1,
     *const hullPass2 = targets->hullPass2;
 
-  cl_int
-    clStatus;
-
   size_t
-    global_work_size[2],
-    length;
+    global_work_size[2];
 
   *hullPass1 = AcquireOpenCLKernel(device,"HullPass1");
   *hullPass2 = AcquireOpenCLKernel(device,"HullPass2");
@@ -733,20 +795,13 @@ static MagickBooleanType RunDespeckleKernels(const DespeckleRunInput *run,
       return(MagickFalse);
   }
 
-  if (ALIGNED(filteredPixels,CLPixelPacket))
   {
-    length = image->columns * image->rows;
-    clEnv->library->clEnqueueMapBuffer(queue, filteredImageBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(CLPixelPacket), 0, NULL, NULL, &clStatus);
-  }
-  else
-  {
-    length = image->columns * image->rows;
-    clStatus = clEnv->library->clEnqueueReadBuffer(queue, filteredImageBuffer, CL_TRUE, 0, length * sizeof(CLPixelPacket), filteredPixels, 0, NULL, NULL);
-  }
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
-    return(MagickFalse);
+    const DespeckleReadSource
+      source = { clEnv, device, queue, filteredImageBuffer, filteredPixels,
+        image };
+
+    if (ReadDespeckleOutput(&source,exception) == MagickFalse)
+      return(MagickFalse);
   }
   return(MagickTrue);
 }
