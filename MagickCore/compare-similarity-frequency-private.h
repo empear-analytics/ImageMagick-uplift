@@ -1519,6 +1519,48 @@ static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
   return((Image *) NULL); \
 }
 
+typedef struct _NCCAlphaTargets
+{
+  Image
+    **alpha_image,
+    **reconstruct_image,
+    **target_image;
+} NCCAlphaTargets;
+
+static MagickBooleanType AcquireNCCAlpha(const Image *image,
+  const Image *reconstruct,ExceptionInfo *exception,
+  const NCCAlphaTargets *targets)
+{
+  Image
+    **const alpha_image = targets->alpha_image,
+    **const reconstruct_image = targets->reconstruct_image,
+    **const target_image = targets->target_image;
+
+  MagickBooleanType
+    status;
+
+  *target_image=SIMSquareImage(image,exception);
+  if (*target_image == (Image *) NULL)
+    return(MagickFalse);
+  *reconstruct_image=SIMUnityImage(image,reconstruct,exception);
+  if (*reconstruct_image == (Image *) NULL)
+    return(MagickFalse);
+  /*
+    Compute the cross correlation of the test and reconstruction images.
+  */
+  *alpha_image=SIMCrossCorrelationImage(*target_image,*reconstruct_image,
+    exception);
+  *target_image=DestroyImage(*target_image);
+  if (*alpha_image == (Image *) NULL)
+    return(MagickFalse);
+  status=SIMMultiplyImage(*alpha_image,(double) QuantumRange*
+    (double) reconstruct->columns*(double) reconstruct->rows,
+    (const ChannelStatistics *) NULL,exception);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static Image *NCCSimilarityImage(const Image *image,const Image *reconstruct,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
 {
@@ -1542,30 +1584,19 @@ static Image *NCCSimilarityImage(const Image *image,const Image *reconstruct,
   MagickBooleanType
     status = MagickTrue;
 
+  NCCAlphaTargets
+    targets;
+
   RectangleInfo
     geometry;
 
   /*
     NCC correlation-based image similarity with FFT local statistics.
   */
-  target_image=SIMSquareImage(image,exception);
-  if (target_image == (Image *) NULL)
-    ThrowNCCSimilarityException();
-  reconstruct_image=SIMUnityImage(image,reconstruct,exception);
-  if (reconstruct_image == (Image *) NULL)
-    ThrowNCCSimilarityException();
-  /*
-    Compute the cross correlation of the test and reconstruction images.
-  */
-  alpha_image=SIMCrossCorrelationImage(target_image,reconstruct_image,
-    exception);
-  target_image=DestroyImage(target_image);
-  if (alpha_image == (Image *) NULL)
-    ThrowNCCSimilarityException();
-  status=SIMMultiplyImage(alpha_image,(double) QuantumRange*
-    (double) reconstruct->columns*(double) reconstruct->rows,
-    (const ChannelStatistics *) NULL,exception);
-  if (status == MagickFalse)
+  targets.alpha_image=(&alpha_image);
+  targets.reconstruct_image=(&reconstruct_image);
+  targets.target_image=(&target_image);
+  if (AcquireNCCAlpha(image,reconstruct,exception,&targets) == MagickFalse)
     ThrowNCCSimilarityException();
   /*
     Compute the cross correlation of the source and reconstruction images.
