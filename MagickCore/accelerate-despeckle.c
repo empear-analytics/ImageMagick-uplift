@@ -408,13 +408,13 @@ static MagickBooleanType AcquireDespeckleOutput(
   return(MagickTrue);
 }
 
+static const int
+  X[4] = {0, 1, 1,-1},
+  Y[4] = {1, 0, 1, 1};
+
 static Image *ComputeDespeckleImage(const Image *image,MagickCLEnv clEnv,
   ExceptionInfo*exception)
 {
-  static const int
-    X[4] = {0, 1, 1,-1},
-    Y[4] = {1, 0, 1, 1};
-
   CacheView
     *filteredImage_view=NULL,
     *image_view=NULL;
