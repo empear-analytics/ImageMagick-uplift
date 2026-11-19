@@ -199,6 +199,305 @@ typedef struct _BlurImageRequest
     sigma;
 } BlurImageRequest;
 
+typedef struct _BlurPassesInput
+{
+  MagickCLDevice
+    device;
+
+  const Image
+    *image;
+
+  cl_mem
+    imageBuffer;
+
+  cl_int
+    channel_mask;
+
+  cl_mem
+    imageKernelBuffer;
+
+  cl_uint
+    kernelWidth;
+
+  size_t
+    chunkSize;
+
+  cl_mem
+    tempImageBuffer;
+
+  cl_command_queue
+    queue;
+
+  Image
+    *filteredImage;
+
+  cl_mem
+    filteredImageBuffer;
+} BlurPassesInput;
+
+typedef struct _BlurPassesTargets
+{
+  cl_kernel
+    *blurRowKernel,
+    *blurColumnKernel;
+
+  MagickBooleanType
+    *outputReady;
+} BlurPassesTargets;
+
+typedef struct _BlurColumnPass
+{
+  const BlurPassesInput
+    *input;
+
+  cl_kernel
+    *blurColumnKernel;
+
+  cl_uint
+    number_channels,
+    imageColumns,
+    imageRows;
+
+  MagickBooleanType
+    *outputReady;
+} BlurColumnPass;
+
+static MagickBooleanType EnqueueBlurColumnPass(const BlurColumnPass *pass,
+  ExceptionInfo *exception)
+{
+  const BlurPassesInput
+    *const input = pass->input;
+
+  cl_kernel
+    *const blurColumnKernel = pass->blurColumnKernel;
+
+  const cl_uint
+    number_channels = pass->number_channels,
+    imageColumns = pass->imageColumns,
+    imageRows = pass->imageRows;
+
+  MagickBooleanType
+    *const outputReady = pass->outputReady;
+
+  size_t
+    gsize[2],
+    lsize[2];
+
+  *blurColumnKernel=AcquireOpenCLKernel(input->device,"BlurColumn");
+  if (*blurColumnKernel == (cl_kernel) NULL)
+  {
+    (void) OpenCLThrowMagickException(input->device,exception,
+      GetMagickModule(),ResourceLimitWarning,"AcquireOpenCLKernel failed.",".");
+    return(MagickFalse);
+  }
+
+  {
+    const BlurKernelArgs
+      args = { input->device, *blurColumnKernel, input->tempImageBuffer,
+        number_channels, input->channel_mask, input->imageKernelBuffer,
+        input->kernelWidth, imageColumns, imageRows, input->chunkSize,
+        input->filteredImageBuffer };
+
+    if (SetBlurKernelArgs(&args,exception) == MagickFalse)
+      return(MagickFalse);
+  }
+
+  gsize[0]=input->image->columns;
+  gsize[1]=input->chunkSize*((input->image->rows+input->chunkSize-1)/
+    input->chunkSize);
+  lsize[0]=1;
+  lsize[1]=input->chunkSize;
+
+  *outputReady=EnqueueOpenCLKernel(input->queue,*blurColumnKernel,2,
+    (size_t *) NULL,gsize,lsize,input->image,input->filteredImage,MagickFalse,
+    exception);
+  return(MagickTrue);
+}
+
+static MagickBooleanType EnqueueBlurPasses(const BlurPassesInput *input,
+  ExceptionInfo *exception,const BlurPassesTargets *targets)
+{
+  cl_kernel
+    *const blurRowKernel = targets->blurRowKernel,
+    *const blurColumnKernel = targets->blurColumnKernel;
+
+  MagickBooleanType
+    *const outputReady = targets->outputReady;
+
+  cl_uint
+    imageColumns,
+    imageRows,
+    number_channels;
+
+  size_t
+    gsize[2],
+    lsize[2];
+
+  *blurRowKernel=AcquireOpenCLKernel(input->device,"BlurRow");
+  if (*blurRowKernel == (cl_kernel) NULL)
+  {
+    (void) OpenCLThrowMagickException(input->device,exception,
+      GetMagickModule(),ResourceLimitWarning,"AcquireOpenCLKernel failed.",".");
+    return(MagickFalse);
+  }
+
+  number_channels=(cl_uint) input->image->number_channels;
+  imageColumns=(cl_uint) input->image->columns;
+  imageRows=(cl_uint) input->image->rows;
+
+  {
+    const BlurKernelArgs
+      args = { input->device, *blurRowKernel, input->imageBuffer,
+        number_channels, input->channel_mask, input->imageKernelBuffer,
+        input->kernelWidth, imageColumns, imageRows, input->chunkSize,
+        input->tempImageBuffer };
+
+    if (SetBlurKernelArgs(&args,exception) == MagickFalse)
+      return(MagickFalse);
+  }
+
+  gsize[0]=input->chunkSize*((input->image->columns+input->chunkSize-1)/
+    input->chunkSize);
+  gsize[1]=input->image->rows;
+  lsize[0]=input->chunkSize;
+  lsize[1]=1;
+
+  *outputReady=EnqueueOpenCLKernel(input->queue,*blurRowKernel,2,
+    (size_t *) NULL,gsize,lsize,input->image,input->filteredImage,MagickFalse,
+    exception);
+  if (*outputReady == MagickFalse)
+    return(MagickFalse);
+
+  {
+    const BlurColumnPass
+      pass = { input, blurColumnKernel, number_channels, imageColumns,
+        imageRows, outputReady };
+
+    if (EnqueueBlurColumnPass(&pass,exception) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+typedef struct _BlurKernelsSource
+{
+  MagickCLDevice
+    device;
+
+  double
+    radius,
+    sigma;
+
+  const Image
+    *image;
+
+  cl_mem
+    imageBuffer;
+
+  cl_int
+    channel_mask;
+
+  size_t
+    chunkSize;
+
+  cl_command_queue
+    queue;
+
+  Image
+    *filteredImage;
+
+  cl_mem
+    filteredImageBuffer;
+} BlurKernelsSource;
+
+typedef struct _BlurKernelsTargets
+{
+  cl_mem
+    *imageKernelBuffer,
+    *tempImageBuffer;
+
+  cl_kernel
+    *blurRowKernel,
+    *blurColumnKernel;
+
+  MagickBooleanType
+    *outputReady;
+} BlurKernelsTargets;
+
+static MagickBooleanType RunBlurKernels(const BlurKernelsSource *source,
+  ExceptionInfo *exception,const BlurKernelsTargets *targets)
+{
+  const MagickCLDevice
+    device = source->device;
+
+  const double
+    radius = source->radius,
+    sigma = source->sigma;
+
+  const Image
+    *const image = source->image;
+
+  const cl_mem
+    imageBuffer = source->imageBuffer;
+
+  const cl_int
+    channel_mask = source->channel_mask;
+
+  const size_t
+    chunkSize = source->chunkSize;
+
+  const cl_command_queue
+    queue = source->queue;
+
+  Image
+    *const filteredImage = source->filteredImage;
+
+  const cl_mem
+    filteredImageBuffer = source->filteredImageBuffer;
+
+  cl_mem
+    *const imageKernelBuffer = targets->imageKernelBuffer,
+    *const tempImageBuffer = targets->tempImageBuffer;
+
+  cl_kernel
+    *const blurRowKernel = targets->blurRowKernel,
+    *const blurColumnKernel = targets->blurColumnKernel;
+
+  MagickBooleanType
+    *const outputReady = targets->outputReady;
+
+  cl_uint
+    kernelWidth;
+
+  size_t
+    length;
+
+  *imageKernelBuffer=createKernelInfo(device,radius,sigma,&kernelWidth,
+    exception);
+  if (*imageKernelBuffer == (cl_mem) NULL)
+    return(MagickFalse);
+
+  length=image->columns*image->rows;
+  *tempImageBuffer=CreateOpenCLBuffer(device,CL_MEM_READ_WRITE,length*
+    sizeof(cl_float4),(void *) NULL);
+  if (*tempImageBuffer == (cl_mem) NULL)
+    return(MagickFalse);
+
+  {
+    const BlurPassesInput
+      input = { device, image, imageBuffer, channel_mask, *imageKernelBuffer,
+        kernelWidth, chunkSize, *tempImageBuffer, queue, filteredImage,
+        filteredImageBuffer };
+
+    const BlurPassesTargets
+      passTargets = { blurRowKernel, blurColumnKernel, outputReady };
+
+    if (EnqueueBlurPasses(&input,exception,&passTargets) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static Image *ComputeBlurImage(const BlurImageRequest *request,
   MagickCLEnv clEnv,ExceptionInfo *exception)
 {
@@ -225,12 +524,6 @@ static Image *ComputeBlurImage(const BlurImageRequest *request,
     imageKernelBuffer,
     tempImageBuffer;
 
-  cl_uint
-    imageColumns,
-    imageRows,
-    kernelWidth,
-    number_channels;
-
   Image
     *filteredImage;
 
@@ -241,10 +534,7 @@ static Image *ComputeBlurImage(const BlurImageRequest *request,
     device;
 
   size_t
-    chunkSize=256,
-    gsize[2],
-    length,
-    lsize[2];
+    chunkSize=256;
 
   const AccelerateBufferTargets
     targets = { &device, &queue, &filteredImage, &imageBuffer,
@@ -268,74 +558,18 @@ static Image *ComputeBlurImage(const BlurImageRequest *request,
   if (AcquireAccelerateBuffers(clEnv,image,exception,&targets) == MagickFalse)
     goto cleanup;
 
-  imageKernelBuffer=createKernelInfo(device,radius,sigma,&kernelWidth,
-    exception);
-  if (imageKernelBuffer == (cl_mem) NULL)
-    goto cleanup;
-
-  length=image->columns*image->rows;
-  tempImageBuffer=CreateOpenCLBuffer(device,CL_MEM_READ_WRITE,length*
-    sizeof(cl_float4),(void *) NULL);
-  if (tempImageBuffer == (cl_mem) NULL)
-    goto cleanup;
-
-  blurRowKernel=AcquireOpenCLKernel(device,"BlurRow");
-  if (blurRowKernel == (cl_kernel) NULL)
   {
-    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
-      ResourceLimitWarning,"AcquireOpenCLKernel failed.",".");
-    goto cleanup;
-  }
+    const BlurKernelsSource
+      source = { device, radius, sigma, image, imageBuffer, channel_mask,
+        chunkSize, queue, filteredImage, filteredImageBuffer };
 
-  number_channels=(cl_uint) image->number_channels;
-  imageColumns=(cl_uint) image->columns;
-  imageRows=(cl_uint) image->rows;
+    const BlurKernelsTargets
+      kernelTargets = { &imageKernelBuffer, &tempImageBuffer, &blurRowKernel,
+        &blurColumnKernel, &outputReady };
 
-  {
-    const BlurKernelArgs
-      args = { device, blurRowKernel, imageBuffer, number_channels,
-        channel_mask, imageKernelBuffer, kernelWidth, imageColumns, imageRows,
-        chunkSize, tempImageBuffer };
-
-    if (SetBlurKernelArgs(&args,exception) == MagickFalse)
+    if (RunBlurKernels(&source,exception,&kernelTargets) == MagickFalse)
       goto cleanup;
   }
-
-  gsize[0]=chunkSize*((image->columns+chunkSize-1)/chunkSize);
-  gsize[1]=image->rows;
-  lsize[0]=chunkSize;
-  lsize[1]=1;
-
-  outputReady=EnqueueOpenCLKernel(queue,blurRowKernel,2,(size_t *) NULL,gsize,
-    lsize,image,filteredImage,MagickFalse,exception);
-  if (outputReady == MagickFalse)
-    goto cleanup;
-
-  blurColumnKernel=AcquireOpenCLKernel(device,"BlurColumn");
-  if (blurColumnKernel == (cl_kernel) NULL)
-  {
-    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),
-      ResourceLimitWarning,"AcquireOpenCLKernel failed.",".");
-    goto cleanup;
-  }
-
-  {
-    const BlurKernelArgs
-      args = { device, blurColumnKernel, tempImageBuffer, number_channels,
-        channel_mask, imageKernelBuffer, kernelWidth, imageColumns, imageRows,
-        chunkSize, filteredImageBuffer };
-
-    if (SetBlurKernelArgs(&args,exception) == MagickFalse)
-      goto cleanup;
-  }
-
-  gsize[0]=image->columns;
-  gsize[1]=chunkSize*((image->rows+chunkSize-1)/chunkSize);
-  lsize[0]=1;
-  lsize[1]=chunkSize;
-
-  outputReady=EnqueueOpenCLKernel(queue,blurColumnKernel,2,(size_t *) NULL,gsize,
-    lsize,image,filteredImage,MagickFalse,exception);
 
 cleanup:
 
