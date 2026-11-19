@@ -24195,7 +24195,9 @@ block and creates its input struct.
    (`coeff=(double *) RelinquishMagickMemory(coeff); ... return((double *) NULL);`), so
    at every call it still holds the member's value; and a local bound from a member of a
    `const` pointer local that is itself bound from `name->member` (`image =
-   context->image` with `context = call->context`), the callee binding the same chain.
+   context->image` with `context = call->context`), the callee binding the same chain,
+   when nothing writes that member (or the pointer member it is read through) between
+   the caller's binding and the call, checked by reading.
 3. Replace the group by one parameter `const Name *name` at the group's first position
    (the other parameters keep their order). At the top of the body declare, for each
    group parameter, a local of its old name and the parameter's type, initialised from
@@ -24930,3 +24932,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | AMEND | BP | *Use when*: the group may also be two or more primitive pointers that travel together (a string and its end), not only a pointer with its scalars | `morphology-apply-kernel-private.h` (9.68, *Primitive Obsession* 34 %): a stub probe of `ParseKernelSpecification(kernel_string,end,...)` taking a `KernelSpan` and `SetOddSquareKernelSize` passing it on (Recipe IP): 10.0 (campaign A, W45 round 32, lane c) | mandate (2026-10-24) |
 | 2026-11-19 | WORDING | BP | Step 1 defines the group (a pointer with its scalars, or pointers that travel together, an `&v` of a plain local allowed); step 4 moves an `if` that tests the call, or a `return` of it, whole into the block (`8475fe80b`); *Careful* covers the pointer group | Review of batch 3 of W45 lane c: after `b1fafe29e` the name, step 1 and *Careful* still spoke of a pointer and its scalars only | after the fact |
 | 2026-11-19 | AMEND | IP | Step 2 (a) also counts a caller's non-`const` local bound from the member when every assignment to it stands in a block that leaves the function before any call of the step (`coeff` freed and `NULL` returned), and a local bound from a member of a `const` pointer local that is itself bound from `name->member` (`context->image`, `context = call->context`) | `distort-private.h` and `distort-linear-private.h` (9.68, *Primitive Obsession*): the coefficient generators pass `coeff`, `method` and members of `context` on to their setters; a stub probe of twelve BP/IP steps on `distort-private.h` gives 10.0 (campaign A, W45 round 32, lane c, batch 4) | mandate (2026-10-24) |
+| 2026-11-19 | WORDING | IP | Step 2 (a), second reading of `485b9c818`: the local bound through a `const` pointer local counts only when nothing writes that member, or the pointer member it is read through, between the caller's binding and the call | Review of batch 4 of W45 lane c: the reading's text left the no-write condition implicit (in the distort chain `context` and its members are written by nothing after `GenerateCoefficients` fills them) | after the fact |
