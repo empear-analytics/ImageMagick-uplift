@@ -570,9 +570,17 @@ static inline double *BarrelCoefficients(const CoefficientCall *call)
   return(coeff);
 }
 
-static inline double *ShepardsCoefficients(double *coeff,const DistortMethod *method,
-  const CoefficientContext *context)
+static inline double *ShepardsCoefficients(const CoefficientCall *call)
 {
+  double
+    *coeff = call->coeff;
+
+  const DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   const Image
     *const image = context->image;
 
@@ -828,7 +836,7 @@ static inline double *GenerateMappedCoefficients(const CoefficientCall *call)
     case ArcDistortion:
       return(ArcCoefficients(coeff,method,context));
     case ShepardsDistortion:
-      return(ShepardsCoefficients(coeff,method,context));
+      return(ShepardsCoefficients(call));
     default:
       break;
   }
