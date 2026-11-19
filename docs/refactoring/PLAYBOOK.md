@@ -25053,6 +25053,102 @@ before the run, one blank line kept, the C++ check in the wide configuration).
 
 ---
 
+## Recipe MD - Move a Declared Function's Definition Later in Its File
+
+**Use when:** a Recipe OH Form A run is blocked only because it holds a definition with
+external linkage (`MagickExport`, `MagickPrivate`, or a plain external definition such as
+`fx.c`'s `FxInfo *AcquireFxInfo (...)`), and moving that definition below the run's end
+frees the run. The move does not change a score by itself. It is the first step of a chain
+whose next step raises the file, and rule 2 applies: the message names that next step and
+quotes its probe.
+
+**Not covered by:** Recipe OH, which moves items into a header and refuses an external
+definition (the definition must stay in the `.c` file); Recipe S, which moves a public root
+to another `.c` file with its family; Recipes H, L and F, which hoist function-local items.
+
+**How:**
+
+1. The function `F` is declared in a header that the file includes in its include block,
+   above every definition of the file (`fx-private.h` declares `AcquireFxInfo` and
+   `DestroyFxInfo`). So every use of `F` in the file follows a declaration, wherever its
+   definition stands. A file-local `static` is not taken by this recipe.
+2. Each name that `F`'s body uses and the file defines (a static function, a type, a macro, a
+   file-scope object) is defined above `F`'s new position as well as above its old one, so
+   moving down only makes more of the file visible to `F`. No macro that the body names is
+   `#undef`ed or redefined between the two positions (`grep`).
+3. Cut `F`'s definition, with its `%` banner if it has one and one blank line, and paste it
+   unchanged between two top-level items at the new position. Both positions stand under the
+   same preprocessor conditions (here, none). Nothing else in the file changes.
+4. One function per commit.
+5. Proof of identity. `tools/split_branch_check.py HEAD:<file> <file> <build>` prints
+   `IDENTICAL-MODULO-LAYOUT` for every function of the file, in the oracle build and in each
+   configuration that compiles `F`. The preprocessed text of `HEAD` and of the working tree
+   (`-E -P`, `__LINE__` and `__FILE__` pinned) has the same lines once sorted. With the OpenMP
+   -O2 build, the object's functions compare the same way, so no timing is needed.
+6. Checks: the oracle on the cases of `F` and of its callers in other files (`casemap.py`),
+   `tools/ci_linux_warnings.sh` and `tools/ci_warnings.sh` on the file, `refactor_guard.py
+   --calls` (every call and literal kept).
+
+**Before:** (`fx.c`)
+
+```c
+static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expression,
+...
+FxInfo *AcquireFxInfo (const Image * images, const char * expression, ExceptionInfo *exception)
+{
+  return AcquireFxInfoPrivate (images, expression, MagickFalse, exception);
+}
+
+static void DestroyFxRuntimes (FxInfo * pfx)
+...
+static void DumpUserSymbolValues (FxInfo * pfx)
+...
+}
+
+static void SetFxProgress (const Image *image, const char *tag,
+```
+
+**After:**
+
+```c
+static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expression,
+...
+static void DestroyFxRuntimes (FxInfo * pfx)
+...
+static void DumpUserSymbolValues (FxInfo * pfx)
+...
+}
+
+FxInfo *AcquireFxInfo (const Image * images, const char * expression, ExceptionInfo *exception)
+{
+  return AcquireFxInfoPrivate (images, expression, MagickFalse, exception);
+}
+
+static void SetFxProgress (const Image *image, const char *tag,
+```
+
+**Careful:**
+
+- Only the definition moves. The name, signature, linkage and declaration in the header do
+  not change, so nothing public changes. Callers in other files (`property.c`) link to the
+  same symbol.
+- `__LINE__` inside `F` (an `assert`, `GetMagickModule()`) gets a new value, as for any
+  recipe that moves code; the oracle normalises line numbers in messages, and step 5 pins
+  them.
+- A compiler may decide inlining by position. Step 5 compares every function, so a changed
+  decision shows up there, and the step is then refused.
+
+**Evidence level:** oracle when a case reaches `F` (else guard), with step 5's identities.
+
+**Provenance:** 2026-11-19, from `fx.c` (campaign A, W47 round 34, lane b). Review of batch 4
+found that the OH carve `9f6e618fa` held `AcquireFxInfo` and `DestroyFxInfo`, external
+definitions declared `MagickPrivate` in `fx-private.h` and called from `property.c`. The
+carve was redone after this recipe moved them below the run. Added by Claude Code (Claude
+Opus 5.5) under the mandate of 2026-11-19 (the owner's "New recipes are fine", PR #129 Q7),
+for the owner's confirmation.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -25598,3 +25694,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-19 | WORDING | DI | Step 5: `tools/obj_sorted.sh` does not check that no instruction between a moved store's old and new position reads that slot (a load, an `lea`, a call taking its address); the step relies on step 2's C-level argument; the script's own `--self-test` | Review of batch 4 of W46 lane b: `b17b0903e` dropped the tab-led relocation lines (fixed in `645f80277`, with a self-test); rerun on `1bdc1a5a7` against its parent: `REORDERED-CONSTANT-STORES`, 832 instruction lines, one moved line `<AccelerateDespeckleImage>: movq $0x0,0xb0(%rsp)` | after the fact |
 | 2026-11-19 | WORDING | SE | *Not covered by* names Recipe Y (it builds and fills a new input struct; SE's struct is the function's own `const` parameter, so nothing is built or filled); step 3 adds that no callee between the binding and the copy writes `*P` | Review of batch 4 of W46 lane b: in `RunHullPassLoop` the calls between the bindings and the copies (`clSetKernelArg`, `EnqueueHullPasses` through a copy of the values) receive no pointer to `*loop` | after the fact |
 | 2026-11-19 | AMEND | OH | Step 1, Form A: a `static` array of pointers to `const` data that no statement writes and whose only uses are rvalue subscripts may be in the run as a `static const` table is (its top-level qualifier is the only difference); internal linkage, initialiser and the one translation unit unchanged, step 4's pp and object identities still required | `fx.c` (campaign A, W47 round 34, lane b): the Form A run from the `#define` block through DumpUserSymbolValues holds `static const char * sElementTypes[]` (seven strings, read only in DumpRpnElement as `sElementTypes[pel->type]`); probe fx.c 9.09 to 10.0, header 9.09 | mandate (2026-11-19) |
+| 2026-11-19 | NEW | MD | Move a declared function's definition later in its file: an external definition declared in an included header moves unchanged to a later top-level position, so that an OH Form A run can end before it; split_branch_check IDENTICAL-MODULO-LAYOUT and sorted preprocessed lines equal | `fx.c` (campaign A, W47 round 34, lane b): review of batch 4 found `AcquireFxInfo` and `DestroyFxInfo` (MagickPrivate in `fx-private.h`, called from `property.c`) inside the run of `9f6e618fa` | mandate (2026-11-19) |
