@@ -629,6 +629,20 @@ typedef struct _SimilarityScan
     *exception;
 } SimilarityScan;
 
+static void SetSimilarityResult(const SimilarityScan *scan,
+  const SimilarityInfo similarity_info)
+{
+  const Image
+    *const image = scan->image;
+
+  *scan->similarity_metric=similarity_info.similarity;
+  if (fabs(*scan->similarity_metric) < MagickEpsilon)
+    *scan->similarity_metric=0.0;
+  scan->offset->x=similarity_info.x;
+  scan->offset->y=similarity_info.y;
+  SetSimilarityProperties(image,scan->similarity_metric,scan->offset);
+}
+
 static Image *MeasureSimilarityImage(const SimilarityScan *scan,
   Image *similarity_image)
 {
@@ -709,12 +723,7 @@ static Image *MeasureSimilarityImage(const SimilarityScan *scan,
   similarity_view=DestroyCacheView(similarity_view);
   if (status == MagickFalse)
     similarity_image=DestroyImage(similarity_image);
-  *scan->similarity_metric=similarity_info.similarity;
-  if (fabs(*scan->similarity_metric) < MagickEpsilon)
-    *scan->similarity_metric=0.0;
-  scan->offset->x=similarity_info.x;
-  scan->offset->y=similarity_info.y;
-  SetSimilarityProperties(image,scan->similarity_metric,scan->offset);
+  SetSimilarityResult(scan,similarity_info);
   return(similarity_image);
 }
 
