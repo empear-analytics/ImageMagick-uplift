@@ -390,9 +390,17 @@ static inline void SetCylinderCoefficients(double *coeff,const Image *image,
   coeff[5] = coeff[3]; /* assuming image size is the same */
 }
 
-static inline double *CylinderCoefficients(double *coeff,const DistortMethod *method,
-  const CoefficientContext *context)
+static inline double *CylinderCoefficients(const CoefficientCall *call)
 {
+  double
+    *coeff = call->coeff;
+
+  const DistortMethod
+    *const method = call->method;
+
+  const CoefficientContext
+    *const context = call->context;
+
   const Image
     *const image = context->image;
 
@@ -768,7 +776,7 @@ static inline double *GenerateRadialCoefficients(const CoefficientCall *call)
       return(PolarCoefficients(call));
     case Cylinder2PlaneDistortion:
     case Plane2CylinderDistortion:
-      return(CylinderCoefficients(coeff,method,context));
+      return(CylinderCoefficients(call));
     case BarrelDistortion:
     case BarrelInverseDistortion:
       return(BarrelCoefficients(coeff,method,context));
