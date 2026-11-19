@@ -1458,6 +1458,65 @@ static MagickBooleanType AcquireMSEMean(Image *alpha_image,Image *beta_image,
   return(MagickTrue);
 }
 
+typedef struct _MSEMinimaTargets
+{
+  Image
+    **mean_image;
+
+  double
+    *minima;
+
+  Image
+    **mse_image;
+} MSEMinimaTargets;
+
+static MagickBooleanType GetMSEMinima(const Image *image,
+  RectangleInfo *offset,ExceptionInfo *exception,
+  const MSEMinimaTargets *targets)
+{
+  Image
+    **const mean_image = targets->mean_image;
+
+  double
+    *const minima = targets->minima;
+
+  Image
+    **const mse_image = targets->mse_image;
+
+  MagickBooleanType
+    status;
+
+  RectangleInfo
+    geometry;
+
+  /*
+    Crop to difference of reconstruction and test images.
+  */
+  SetGeometry(image,&geometry);
+  geometry.width=image->columns;
+  geometry.height=image->rows;
+  (void) ResetImagePage(*mean_image,"0x0+0+0");
+  *mse_image=CropImage(*mean_image,&geometry,exception);
+  *mean_image=DestroyImage(*mean_image);
+  if (*mse_image == (Image *) NULL)
+    return(MagickFalse);
+  /*
+    Identify the minima value in the correlation image and its location.
+  */
+  (void) ResetImagePage(*mse_image,"0x0+0+0");
+  (void) ClampImage(*mse_image,exception);
+  (*mse_image)->depth=32;
+  (*mse_image)->colorspace=GRAYColorspace;
+  (*mse_image)->alpha_trait=UndefinedPixelTrait;
+  status=SIMMinimaImage(*mse_image,minima,offset,exception);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  status=NegateImage(*mse_image,MagickFalse,exception);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
   RectangleInfo *offset,double *similarity_metric,ExceptionInfo *exception)
 {
@@ -1475,9 +1534,6 @@ static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
     *reconstruct_image = (Image *) NULL,
     *sum_image = (Image *) NULL;
 
-  MagickBooleanType
-    status = MagickTrue;
-
   MSEAlphaTargets
     targets;
 
@@ -1487,11 +1543,11 @@ static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
   MSEMeanTargets
     mean_targets;
 
+  MSEMinimaTargets
+    minima_targets;
+
   MSESumTargets
     sum_targets;
-
-  RectangleInfo
-    geometry;
 
   /*
     MSE correlation-based image similarity using FFT local statistics.
@@ -1516,30 +1572,10 @@ static Image *MSESimilarityImage(const Image *image,const Image *reconstruct,
   if (AcquireMSEMean(alpha_image,beta_image,exception,&mean_targets) ==
       MagickFalse)
     ThrowMSESimilarityException();
-  /*
-    Crop to difference of reconstruction and test images.
-  */
-  SetGeometry(image,&geometry);
-  geometry.width=image->columns;
-  geometry.height=image->rows;
-  (void) ResetImagePage(mean_image,"0x0+0+0");
-  mse_image=CropImage(mean_image,&geometry,exception);
-  mean_image=DestroyImage(mean_image);
-  if (mse_image == (Image *) NULL)
-    ThrowMSESimilarityException();
-  /*
-    Identify the minima value in the correlation image and its location.
-  */
-  (void) ResetImagePage(mse_image,"0x0+0+0");
-  (void) ClampImage(mse_image,exception);
-  mse_image->depth=32;
-  mse_image->colorspace=GRAYColorspace;
-  mse_image->alpha_trait=UndefinedPixelTrait;
-  status=SIMMinimaImage(mse_image,&minima,offset,exception);
-  if (status == MagickFalse)
-    ThrowMSESimilarityException();
-  status=NegateImage(mse_image,MagickFalse,exception);
-  if (status == MagickFalse)
+  minima_targets.mean_image=(&mean_image);
+  minima_targets.minima=(&minima);
+  minima_targets.mse_image=(&mse_image);
+  if (GetMSEMinima(image,offset,exception,&minima_targets) == MagickFalse)
     ThrowMSESimilarityException();
   alpha_image=DestroyImage(alpha_image);
   beta_image=DestroyImage(beta_image);
