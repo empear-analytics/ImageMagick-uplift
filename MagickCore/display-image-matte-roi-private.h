@@ -3198,6 +3198,43 @@ typedef struct _ROICommandInput
     **Commands;
 } ROICommandInput;
 
+static void XSelectROIPopupEntry(const ROICommandInput *command_input,
+  const int id,char *command,DisplayCommand *display_command)
+{
+  Display
+    *const display = command_input->display;
+
+  XWindows
+    *const windows = command_input->windows;
+
+  const char
+    *const *const ApplyMenu = command_input->ApplyMenu;
+
+  const char
+    *const **const Menus = command_input->Menus;
+
+  const DisplayCommand
+    **const Commands = command_input->Commands;
+
+  int
+    entry;
+
+  ROIMenuEntry
+    menu_entry;
+
+  /*
+    Select a command from a pop-up menu.
+  */
+  entry=XMenuWidget(display,windows,ApplyMenu[id],
+    (const char **) Menus[id],command);
+  menu_entry.Menus=Menus;
+  menu_entry.Commands=Commands;
+  menu_entry.id=id;
+  menu_entry.entry=entry;
+  (*display_command)=XSelectROIMenuEntry(&menu_entry,command,
+    (*display_command));
+}
+
 static void XROICommand(const ROICommandInput *command_input,XEvent *event,
   DisplayCommand *display_command,size_t *state)
 {
@@ -3222,17 +3259,10 @@ static void XROICommand(const ROICommandInput *command_input,XEvent *event,
   const DisplayCommand
     *const ApplyCommands = command_input->ApplyCommands;
 
-  const char
-    *const **const Menus = command_input->Menus;
-
-  const DisplayCommand
-    **const Commands = command_input->Commands;
-
   char
     command[MagickPathExtent];
 
   int
-    entry,
     id;
 
   /*
@@ -3246,22 +3276,7 @@ static void XROICommand(const ROICommandInput *command_input,XEvent *event,
       (void) CopyMagickString(command,ApplyMenu[id],MagickPathExtent);
       (*display_command)=ApplyCommands[id];
       if (id < ApplyMenus)
-        {
-          ROIMenuEntry
-            menu_entry;
-
-          /*
-            Select a command from a pop-up menu.
-          */
-          entry=XMenuWidget(display,windows,ApplyMenu[id],
-            (const char **) Menus[id],command);
-          menu_entry.Menus=Menus;
-          menu_entry.Commands=Commands;
-          menu_entry.id=id;
-          menu_entry.entry=entry;
-          (*display_command)=XSelectROIMenuEntry(&menu_entry,command,
-            (*display_command));
-        }
+        XSelectROIPopupEntry(command_input,id,command,display_command);
     }
   (void) XSetFunction(display,windows->image.highlight_context,
     GXinvert);
