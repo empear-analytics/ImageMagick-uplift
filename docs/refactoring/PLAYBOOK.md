@@ -1038,6 +1038,22 @@ place in it; every other condition of the form stands. The replacement removes t
 block's branches from the function and adds no function, so it lowers the file's mean
 cyclomatic complexity as removing a function finding does.
 
+**A struct member as the returned output** (mandate (2026-11-19), added 2026-11-20 for
+`fourier-forward-private.h`'s `ForwardFourierTransformChannel`, please confirm). In form
+(b), *Unreached functions* and *Object code that differs only in the caller*, the block's
+single output that the helper returns (Recipe E step 3, `v=Helper(...,v);`) may be a
+member `s.m` of a struct local `s` of the caller instead of a plain variable: the call is
+`s.m=Helper(...,s.m,...);`, `s.m` passed to the by-value parameter that the helper's
+closing `return(p);` returns. Conditions: one `.` and no `->` (the caller's own object,
+not one reached through a pointer, so no other name of the caller can alias it); `s.m` is
+set on every path before the block (checked by reading: the call reads it, as the
+block's untaken path left it); the block writes no other member of `s` and reads no
+other member of `s` (the helper sees only the one value). `tools/reuse_check.py` accepts
+this shape (2026-11-20, `tools/test_reuse_check.py`'s `ReturnedMemberOutput`) and
+refuses a member through `->`, another member assigned, and another member passed. The
+member is an lvalue of the same type as a variable, read once at the call and assigned
+once at the return, so the caller's object ends with the value the block left in it.
+
 **A helper defined further down, or taking an input struct** (2026-11-11). Form (b),
 *Unreached functions* and *Object code that differs only in the caller* may call a
 helper that the file defines below the caller, and one whose block reads its inputs
@@ -26372,3 +26388,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-20 | NEW | MS | Merge twins differing in one statement run through a selector in a struct: the bodies are equal under role renaming except one run of whole statements (no declaration, no jump); a merged function takes a `{ first parameter, side }` struct in place of the first parameter (at most four parameters) and selects `RA` or `RB` at the run's place; the twins keep names and callers and call it with a constant; proof object identity per includer, else the oracle with both twins reached | `widget-browser-private.h`'s `ReleaseListBrowserAction` and `ReleaseListBrowserCancel` (campaign A, W47 round 34, lane b6): the header's one finding after `27a800815` (9.38); a probe of the merge 10.0 | mandate (2026-11-19) |
 | 2026-11-20 | AMEND | S | Step 2: a file-scope `static` variable of struct type that both parts name is shared through one pointer accessor `T *NameReference(void)`, on four conditions: one object per variable (`nm`), declaration, storage and initialiser unchanged; every use through `(*NameReference())`, no new copy of the struct; object identity per function with `-fno-inline` apart from the accessor calls and loads; the oracle on each rewritten function | `widget.c`'s `submenu_info` and `toggle_info` (campaign A, W47 round 34, lane b6), named by the Command and Menu families and declared in one group with `monitor_info` and `selection_info`; the main session's extension of the accessor form of the owner's round-23 ruling. A probe of the Command/Menu split with it left widget.c flat at 9.09 (Lines of Code remains), so the split was not taken | mandate (2026-11-19) |
 | 2026-11-20 | AMEND | S | Step 2's struct-typed accessor: a pointer declarator of the same declaration group is shared on the same four conditions through `T **NameReference(void)`, every use written `(*NameReference())` | `widget.c`'s `*selection_info` (campaign A, W47 round 34, lane b6): the heap array of selection buttons that the Command family allocates and indexes and `DestroyXWidget` releases; found when the Command split of the probed chain did not compile without it | mandate (2026-11-19) |
+| 2026-11-20 | AMEND | D | Form (b), *Unreached functions* and *Object code that differs only in the caller*: the block's single output that the helper returns may be a member `s.m` of a struct local of the caller, the call `s.m=Helper(...,s.m,...);`, when the member is reached with one `.` and no `->`, is set on every path before the block, and the block reads and writes no other member of `s`; `tools/reuse_check.py` accepts the shape and refuses `->` | `fourier-forward-private.h`'s `ForwardFourierTransformChannel` (campaign A, W48 round 35, lane b): its padding block is `PadFourierWidth`'s body with `fourier_info.width` as the padded width; the call clears the header's Overall Code Complexity, 9.38 -> 10.0 | mandate (2026-11-19) |
