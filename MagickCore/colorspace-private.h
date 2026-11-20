@@ -22,6 +22,7 @@
 #include "MagickCore/image-private.h"
 #include "MagickCore/pixel.h"
 #include "MagickCore/pixel-accessor.h"
+#include "MagickCore/colorspace-illuminant-xyz-private.h"
 #include "MagickCore/colorspace-xyz-to-rgb-private.h"
 #include "MagickCore/colorspace-to-rgb-private.h"
 #include "MagickCore/colorspace-lab-to-rgb-private.h"
