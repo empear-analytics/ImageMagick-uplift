@@ -23583,6 +23583,96 @@ take its command switch. Added by Claude Code (Claude Opus 5.5) under the mandat
 
 ---
 
+## Recipe CM - Name a Clamp Selection
+
+**Use when:** CodeScene reports *Complex Method* (or *Overall Code Complexity*) on a
+function whose decisions are mostly nested conditional expressions that clamp a value to a
+range, `v=v < 0.0 ? 0.0 : v >= e ? l : v;`, repeated for several values: `draw-primitive.c`'s
+`ClampPolygonBounds`, twelve lines and cc 9, four such statements and nothing else.
+
+**Not covered by:** Recipe NS, whose selection is one `?:` between two constants or two
+plain variables; here there are two nested `?:` and the operands are the clamped value
+itself and expressions of the caller (`(double) image->columns-1.0`). Recipe P, which names
+a boolean condition and leaves the `?:` in place. Recipe D, which merges copies of
+statements, not of an expression with different operands. Recipes E and SV, which move
+statements: each helper would carry the same decisions.
+
+**How:**
+
+1. Each site is the whole right-hand side of an assignment statement, `t=A < 0.0 ? 0.0 : A
+   >= E ? L : A;`, where `A` is the same text at its three places, `t` is `A` or another
+   lvalue, and `A`, `E` and `L` are free of calls, assignments, increments and
+   decrements (identifiers, member accesses, casts, literals and arithmetic on them). The
+   literals `0.0` are exactly those; `A`, `E` and `L` all have type `double` (a cast or a
+   `double` operand makes them so; check by reading). No site lies in a `#pragma omp`
+   region or a preprocessor branch the build does not compile.
+2. Directly above the first function that uses it, write `static inline double
+   ClampBoundsCoordinate(const double value,const double edge,const double limit)` (or a
+   name for the range at hand) whose body is `return(value < 0.0 ? 0.0 : value >= edge ?
+   limit : value);`.
+3. Replace each site's right-hand side by `ClampBoundsCoordinate(A,E,L)`, with `A`, `E` and
+   `L` as written. When `E` and `L` are the same text, both arguments are that text.
+   Check by script that each replaced right-hand side equals the helper's body with the
+   arguments substituted, character for character.
+4. One function's sites per commit.
+5. Run `sh tools/obj_identical.sh <file>`. If it prints `DIFFERENT`, run `sh
+   tools/obj_modulo.sh <file> <function> ClampBoundsCoordinate`: every difference it
+   reports must be a renaming of registers within an otherwise identical instruction
+   sequence (no instruction added, removed or reordered), in the function or in a
+   caller it is inlined into; quote the differing lines in the commit. Otherwise revert.
+6. The function is oracle-reached (`casemap.py`); run the oracle for it and, for a file
+   with OpenMP regions, the timing the owner's ruling of 2026-11-17 asks for.
+
+**Before:**
+
+```c
+static SegmentInfo ClampPolygonBounds(const Image *image,SegmentInfo bounds)
+{
+  bounds.x1=bounds.x1 < 0.0 ? 0.0 : bounds.x1 >= (double) image->columns-1.0 ?
+    (double) image->columns-1.0 : bounds.x1;
+  ...
+```
+
+**After:**
+
+```c
+static inline double ClampBoundsCoordinate(const double value,
+  const double edge,const double limit)
+{
+  return(value < 0.0 ? 0.0 : value >= edge ? limit : value);
+}
+
+static SegmentInfo ClampPolygonBounds(const Image *image,SegmentInfo bounds)
+{
+  bounds.x1=ClampBoundsCoordinate(bounds.x1,(double) image->columns-1.0,
+    (double) image->columns-1.0);
+  ...
+```
+
+**Careful:**
+
+- Why the behaviour is the same. `?:` is right-associative and binds looser than `-` and
+  `>=`, so the site reads `A < 0.0 ? 0.0 : (A >= (E) ? (L) : A)`, which is the helper's
+  body. The arguments are evaluated once each before the call, where the site evaluated
+  `A` up to three times and `E` and `L` at most once each: none has a side effect (step
+  1), and each has type `double`, so passing it converts nothing and the selected value
+  reaches `t` unchanged. Evaluating `L` when the site would not have is an extra
+  side-effect-free floating-point operation whose result is discarded.
+- The comparisons keep their operators and operand order; a NaN `A` fails both tests and
+  is returned unchanged, as before.
+- `E` and `L` stay separate parameters: `GetPolygonBounds` tests against `(double)
+  image->columns` and returns `(double) image->columns-1`, a different pair.
+
+**Evidence level:** oracle, with the object comparison of step 5.
+
+**Provenance:** 2026-11-20, from `draw-primitive.c`'s `ClampPolygonBounds` (campaign B,
+M141): a probe took it out of *Complex Method*, 3.60 to 3.67, with object code differing
+only in one register choice inside `DrawPolygonPrimitive`, into which it is inlined.
+`GetPolygonBounds` has the same clamps but no oracle case reaches it. Added by Claude Code
+(Claude Opus 5.5) under the mandate of 2026-10-24.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -24093,3 +24183,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-18 | NEW | GP | Move a Run of Guards Sharing One Exit into a Predicate: consecutive `if (Ai) X` with the same `X` (an exit) and side-effect-free conditions become `if (Pred(...) != MagickFalse) X`, the predicate returning `MagickTrue` at the first condition that holds, in order | `draw.c`'s `TraceMVGPrimitive` (round-rectangle and ellipse point checks, each `{ status=MagickFalse; break; }` out of a `switch`, which LB and V do not take); campaign B, M140 | mandate (2026-10-24) |
 | 2026-11-18 | NEW | KG | Replace a Character-Keyed Switch of Checked Calls by a Table of Calls: groups `if (F(args) == c) return(c); break;` over functions of a base signature and up to two sided signatures (one trailing enumeration constant) become a `static const` table of `{key, f, f1, f2, s1, s2}`, a lookup and a dispatch; the throwing `default:` stays, its macro's `break` leaving the loop only where the loop would end at once (step 6) | `draw.c`'s `TracePath` (twenty labels, three tracer signatures, `ThrowPointExpectedException` default); designed at the owner's request, campaign B, M140 | mandate (2026-10-24) |
 | 2026-11-18 | AMEND | CS | Step 1, outside-loop form: in form A the segment may be a run of the caller's own body outside every loop, with no exit of its own, when the caller already declares the state struct | `draw.c`'s `RenderMVGContent` (6c5c0be35, merged in #127, labelled CS form A before this text existed: the first graphic context's setup and the release after the loop); campaign B, M141 | mandate (2026-10-24) |
+| 2026-11-20 | NEW | CM | Name a Clamp Selection: assignments `t=A < 0.0 ? 0.0 : A >= E ? L : A;` with side-effect-free `double` operands become `t=ClampBoundsCoordinate(A,E,L);`, one `static inline` helper; object code identical or differing only in register choice | `draw-primitive.c`'s `ClampPolygonBounds` (cc 9 from four clamps; probe 3.60 to 3.67, out of *Complex Method*); campaign B, M141 | mandate (2026-10-24) |
