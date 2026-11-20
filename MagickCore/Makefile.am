@@ -95,6 +95,10 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/animate-window.c \
   MagickCore/animate.h \
   MagickCore/animate-private.h \
+  MagickCore/animate-window-command-private.h \
+  MagickCore/animate-window-scene-private.h \
+  MagickCore/animate-window-events-private.h \
+  MagickCore/animate-window-session-private.h \
   MagickCore/annotate.c \
   MagickCore/annotate-metrics.c \
   MagickCore/annotate.h \
@@ -219,6 +223,14 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/display-image.c \
   MagickCore/display.h \
   MagickCore/display-private.h \
+  MagickCore/display-image-annotate-private.h \
+  MagickCore/display-image-crop-private.h \
+  MagickCore/display-image-draw-private.h \
+  MagickCore/display-image-apply-private.h \
+  MagickCore/display-image-matte-private.h \
+  MagickCore/display-image-tile-private.h \
+  MagickCore/display-image-window-private.h \
+  MagickCore/display-image-event-private.h \
   MagickCore/distort.c \
   MagickCore/distort-sparse.c \
   MagickCore/distort-affine.c \
@@ -702,6 +714,10 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/accelerate-histogram-private.h \
   MagickCore/accelerate-core-private.h \
   MagickCore/animate-private.h \
+  MagickCore/animate-window-command-private.h \
+  MagickCore/animate-window-scene-private.h \
+  MagickCore/animate-window-events-private.h \
+  MagickCore/animate-window-session-private.h \
   MagickCore/annotate-private.h \
   MagickCore/blob-private.h \
   MagickCore/cache-private.h \
@@ -763,6 +779,14 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/delegate-private.h \
   MagickCore/delegate-private.h \
   MagickCore/display-private.h \
+  MagickCore/display-image-annotate-private.h \
+  MagickCore/display-image-crop-private.h \
+  MagickCore/display-image-draw-private.h \
+  MagickCore/display-image-apply-private.h \
+  MagickCore/display-image-matte-private.h \
+  MagickCore/display-image-tile-private.h \
+  MagickCore/display-image-window-private.h \
+  MagickCore/display-image-event-private.h \
   MagickCore/distort-linear-private.h \
   MagickCore/distort-private.h \
   MagickCore/distort-map-private.h \
