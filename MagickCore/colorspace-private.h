@@ -41,20 +41,11 @@
 #include "MagickCore/colorspace-rgb-to-luma-private.h"
 #include "MagickCore/colorspace-conversions-private.h"
 #include "MagickCore/colorspace-predicates-private.h"
+#include "MagickCore/colorspace-lab-compatible-private.h"
 
 #if defined(__cplusplus) || defined(c_plusplus)
 extern "C" {
 #endif
-
-static inline MagickBooleanType IsLabCompatibleColorspace(
-  const ColorspaceType colorspace)
-{
-  if ((colorspace == LabColorspace) || (colorspace == LCHColorspace) ||
-      (colorspace == LCHabColorspace) || (colorspace == LCHuvColorspace) ||
-      (colorspace == OklabColorspace))
-    return(MagickTrue);
-  return(MagickFalse);
-}
 
 static inline MagickBooleanType IsRGBColorspace(const ColorspaceType colorspace)
 {
