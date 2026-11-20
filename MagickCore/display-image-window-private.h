@@ -206,8 +206,12 @@ static MagickBooleanType XSelectCommandMenuEntry(
       /*
         Select a command from a pop-up menu.
       */
-      entry=XMenuWidget(display,windows,CommandMenu[id],Menus[id],
-        command);
+      {
+        const XMenuRequest
+          menu_request = { CommandMenu[id], Menus[id], command };
+
+        entry=XMenuWidget(display,windows,&menu_request);
+      }
       if (entry < 0)
         return(MagickTrue);
       (void) CopyMagickString(command,Menus[id][entry],MagickPathExtent);

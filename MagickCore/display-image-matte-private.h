@@ -347,8 +347,12 @@ static void XSelectRotatePenColor(const RotatePenMenu *menu,
   /*
     Select a pen color from the pop-up menu.
   */
-  pen_number=XMenuWidget(display,windows,RotateMenu[id],
-    (const char **) ColorMenu,command);
+  {
+    const XMenuRequest
+      menu_request = { RotateMenu[id], (const char **) ColorMenu, command };
+
+    pen_number=XMenuWidget(display,windows,&menu_request);
+  }
   if (pen_number < 0)
     return;
   if (pen_number == (MaxNumberPens-2))
@@ -403,6 +407,38 @@ typedef struct _RotateCommandInput
     targets;
 } RotateCommandInput;
 
+static void XSelectRotateDirection(const RotateCommandInput *input,int id,
+  ModeType *direction)
+{
+  Display
+    *const display = input->display;
+
+  XWindows
+    *const windows = input->windows;
+
+  const char
+    *const *const RotateMenu = input->RotateMenu;
+
+  const char
+    *Directions[] =
+    {
+      "horizontal",
+      "vertical",
+      (char *) NULL,
+    };
+
+  /*
+    Select a command from the pop-up menu.
+  */
+  {
+    const XMenuRequest
+      menu_request = { RotateMenu[id], Directions, input->command };
+
+    id=XMenuWidget(display,windows,&menu_request);
+  }
+  *direction=XSelectChopDirection(id,input->DirectionCommands,*direction);
+}
+
 static void XRotateCommand(const RotateCommandInput *input,
   ModeType *direction,size_t *state)
 {
@@ -450,20 +486,7 @@ static void XRotateCommand(const RotateCommandInput *input,
     }
     case RotateDirectionCommand:
     {
-      const char
-        *Directions[] =
-        {
-          "horizontal",
-          "vertical",
-          (char *) NULL,
-        };
-
-      /*
-        Select a command from the pop-up menu.
-      */
-      id=XMenuWidget(display,windows,RotateMenu[id],
-        Directions,input->command);
-      *direction=XSelectChopDirection(id,input->DirectionCommands,*direction);
+      XSelectRotateDirection(input,id,direction);
       break;
     }
     case RotateHelpCommand:

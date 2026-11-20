@@ -985,7 +985,7 @@ static Cursor DefineMenuCursor(Display *display,XWindows *windows)
 }
 
 MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
-  const char *title,const char *const *selections,char *item)
+  const XMenuRequest *request)
 {
   Cursor
     cursor;
@@ -1022,17 +1022,17 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   */
   assert(display != (Display *) NULL);
   assert(windows != (XWindows *) NULL);
-  assert(title != (char *) NULL);
-  assert(selections != (const char **) NULL);
-  assert(item != (char *) NULL);
+  assert(request->title != (char *) NULL);
+  assert(request->selections != (const char **) NULL);
+  assert(request->item != (char *) NULL);
   if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",title);
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",request->title);
   font_info=windows->widget.font_info;
   windows->widget.width=(*SubmenuInfoReference()).active == 0 ?
-    WidgetTextWidth(font_info,(char *) title) : 0;
-  for (id=0; selections[id] != (char *) NULL; id++)
+    WidgetTextWidth(font_info,(char *) request->title) : 0;
+  for (id=0; request->selections[id] != (char *) NULL; id++)
   {
-    width=WidgetTextWidth(font_info,(char *) selections[id]);
+    width=WidgetTextWidth(font_info,(char *) request->selections[id]);
     if (width > windows->widget.width)
       windows->widget.width=width;
   }
@@ -1040,7 +1040,7 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   XGetWidgetInfo((char *) NULL,&menu_info);
   title_height=(unsigned int) ((*SubmenuInfoReference()).active == 0 ?
     (3*(font_info->descent+font_info->ascent) >> 1)+5 : 2);
-  width=WidgetTextWidth(font_info,(char *) title);
+  width=WidgetTextWidth(font_info,(char *) request->title);
   height=(unsigned int) ((3*(font_info->ascent+font_info->descent)) >> 1);
   /*
     Position Menu widget.
@@ -1062,12 +1062,12 @@ MagickPrivate int XMenuWidget(Display *display,XWindows *windows,
   state=UpdateConfigurationState;
   event_context.display=display;
   event_context.windows=windows;
-  event_context.selections=selections;
+  event_context.selections=request->selections;
   event_context.number_selections=number_selections;
   event_context.top_offset=top_offset;
-  event_context.item=item;
+  event_context.item=request->item;
   event_context.height=height;
-  event_context.title=title;
+  event_context.title=request->title;
   event_context.title_height=title_height;
   RespondToMenuEvents(&event_context,&targets);
   return(CloseMenuWidget(&event_context,&targets,cursor));

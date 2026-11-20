@@ -515,8 +515,12 @@ static MagickBooleanType XSaveImageFile(const AnimateSaveInputs *save)
       */
       (void) FormatLocaleString(quality,MagickPathExtent,"%.17g",(double)
         image_info->quality);
-      status=XDialogWidget(display,windows,"Save","Enter JPEG quality:",
-        quality);
+      {
+        const XDialogRequest
+          dialog_request = { "Save", "Enter JPEG quality:", quality };
+
+        status=XDialogWidget(display,windows,&dialog_request);
+      }
       if (*quality == '\0')
         return(MagickTrue);
       XSetJPEGQuality(image,image_info,quality,status);

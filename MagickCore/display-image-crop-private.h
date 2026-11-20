@@ -173,8 +173,12 @@ static void XSelectDrawStipple(const DrawEditContext *context,const int id,
     Select a command from the pop-up menu.
   */
   StipplesMenu[7]="Open...";
-  entry=XMenuWidget(display,windows,DrawMenu[id],StipplesMenu,
-    command);
+  {
+    const XMenuRequest
+      menu_request = { DrawMenu[id], StipplesMenu, command };
+
+    entry=XMenuWidget(display,windows,&menu_request);
+  }
   if (entry < 0)
     return;
   if ((*stipple) != (Pixmap) NULL)
@@ -842,8 +846,12 @@ static void XDrawCommand(const DrawEditContext *context,
       /*
         Select a command from the pop-up menu.
       */
-      (*element)=(ElementType) (XMenuWidget(display,windows,
-        DrawMenu[id],Elements,context->command)+1);
+      {
+        const XMenuRequest
+          menu_request = { DrawMenu[id], Elements, context->command };
+
+        (*element)=(ElementType) (XMenuWidget(display,windows,&menu_request)+1);
+      }
       break;
     }
     case DrawColorCommand:

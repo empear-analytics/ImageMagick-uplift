@@ -291,8 +291,12 @@ static void XSelectPaintMethod(const EditMenuInput *menu,
   methods=GetCommandOptions(MagickMethodOptions);
   if (methods == (char **) NULL)
     return;
-  entry=XMenuWidget(display,windows,MatteEditMenu[id],
-    (const char **) methods,command);
+  {
+    const XMenuRequest
+      menu_request = { MatteEditMenu[id], (const char **) methods, command };
+
+    entry=XMenuWidget(display,windows,&menu_request);
+  }
   if (entry >= 0)
     (*method)=(PaintMethod) ParseCommandOption(MagickMethodOptions,
       MagickFalse,methods[entry]);
@@ -323,8 +327,12 @@ static void XSelectFuzzFactor(const EditMenuInput *menu,
   /*
     Select a command from the pop-up menu.
   */
-  entry=XMenuWidget(display,windows,MatteEditMenu[id],FuzzMenu,
-    command);
+  {
+    const XMenuRequest
+      menu_request = { MatteEditMenu[id], FuzzMenu, command };
+
+    entry=XMenuWidget(display,windows,&menu_request);
+  }
   if (entry < 0)
     return;
   if (entry != 5)
@@ -334,8 +342,12 @@ static void XSelectFuzzFactor(const EditMenuInput *menu,
       return;
     }
   (void) CopyMagickString(fuzz,"20%",MagickPathExtent);
-  (void) XDialogWidget(display,windows,"Ok",
-    "Enter fuzz factor (0.0 - 99.9%):",fuzz);
+  {
+    const XDialogRequest
+      dialog_request = { "Ok", "Enter fuzz factor (0.0 - 99.9%):", fuzz };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*fuzz == '\0')
     return;
   (void) ConcatenateMagickString(fuzz,"%",MagickPathExtent);
@@ -629,8 +641,12 @@ static void XSelectBorderColor(const EditMenuInput *menu,
   /*
     Select a pen color from the pop-up menu.
   */
-  pen_number=XMenuWidget(display,windows,MatteEditMenu[id],
-    (const char **) ColorMenu,command);
+  {
+    const XMenuRequest
+      menu_request = { MatteEditMenu[id], (const char **) ColorMenu, command };
+
+    pen_number=XMenuWidget(display,windows,&menu_request);
+  }
   if (pen_number < 0)
     return;
   if (pen_number == (MaxNumberPens-2))
@@ -677,8 +693,12 @@ static void XSelectMatteValue(const EditMenuInput *menu,
   /*
     Select a command from the pop-up menu.
   */
-  entry=XMenuWidget(display,windows,MatteEditMenu[id],MatteMenu,
-    command);
+  {
+    const XMenuRequest
+      menu_request = { MatteEditMenu[id], MatteMenu, command };
+
+    entry=XMenuWidget(display,windows,&menu_request);
+  }
   if (entry < 0)
     return;
   if (entry != 2)
@@ -692,7 +712,12 @@ static void XSelectMatteValue(const EditMenuInput *menu,
     }
   (void) FormatLocaleString(message,MagickPathExtent,
     "Enter matte value (0 - " "%g" "):",(double) QuantumRange);
-  (void) XDialogWidget(display,windows,"Matte",message,matte);
+  {
+    const XDialogRequest
+      dialog_request = { "Matte", message, matte };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*matte == '\0')
     return;
 }
@@ -1450,8 +1475,12 @@ static MagickBooleanType XGrabDelay(Display *display,XWindows *windows,
         User may want to delay the X server screen grab.
       */
       (void) CopyMagickString(seconds,"0",MagickPathExtent);
-      (void) XDialogWidget(display,windows,"Grab","Enter any delay in seconds:",
-        seconds);
+      {
+        const XDialogRequest
+          dialog_request = { "Grab", "Enter any delay in seconds:", seconds };
+
+        (void) XDialogWidget(display,windows,&dialog_request);
+      }
       if (*seconds == '\0')
         return(MagickFalse);
       XDelay(display,(size_t) (1000*StringToLong(seconds)));
@@ -1474,8 +1503,12 @@ static void XRequestImageSize(Display *display,XWindows *windows,
       (void) CopyMagickString(geometry,"512x512",MagickPathExtent);
       if (image_info->size != (char *) NULL)
         (void) CopyMagickString(geometry,image_info->size,MagickPathExtent);
-      (void) XDialogWidget(display,windows,"Load","Enter the image geometry:",
-        geometry);
+      {
+        const XDialogRequest
+          dialog_request = { "Load", "Enter the image geometry:", geometry };
+
+        (void) XDialogWidget(display,windows,&dialog_request);
+      }
       (void) CloneString(&image_info->size,geometry);
     }
 }
@@ -1870,8 +1903,12 @@ static CompositeOperator XSelectPasteOperator(const ComposeMenuInfo *menu_info,
   operators=GetCommandOptions(MagickComposeOptions);
   if (operators == (char **) NULL)
     return(compose);
-  entry=XMenuWidget(display,windows,PasteMenu[id],
-    (const char **) operators,command);
+  {
+    const XMenuRequest
+      menu_request = { PasteMenu[id], (const char **) operators, command };
+
+    entry=XMenuWidget(display,windows,&menu_request);
+  }
   if (entry >= 0)
     compose=(CompositeOperator) ParseCommandOption(
       MagickComposeOptions,MagickFalse,operators[entry]);
@@ -3198,6 +3235,47 @@ typedef struct _ROICommandInput
     **Commands;
 } ROICommandInput;
 
+static void XSelectROIPopupEntry(const ROICommandInput *command_input,
+  const int id,char *command,DisplayCommand *display_command)
+{
+  Display
+    *const display = command_input->display;
+
+  XWindows
+    *const windows = command_input->windows;
+
+  const char
+    *const *const ApplyMenu = command_input->ApplyMenu;
+
+  const char
+    *const **const Menus = command_input->Menus;
+
+  const DisplayCommand
+    **const Commands = command_input->Commands;
+
+  int
+    entry;
+
+  ROIMenuEntry
+    menu_entry;
+
+  /*
+    Select a command from a pop-up menu.
+  */
+  {
+    const XMenuRequest
+      menu_request = { ApplyMenu[id], (const char **) Menus[id], command };
+
+    entry=XMenuWidget(display,windows,&menu_request);
+  }
+  menu_entry.Menus=Menus;
+  menu_entry.Commands=Commands;
+  menu_entry.id=id;
+  menu_entry.entry=entry;
+  (*display_command)=XSelectROIMenuEntry(&menu_entry,command,
+    (*display_command));
+}
+
 static void XROICommand(const ROICommandInput *command_input,XEvent *event,
   DisplayCommand *display_command,size_t *state)
 {
@@ -3222,17 +3300,10 @@ static void XROICommand(const ROICommandInput *command_input,XEvent *event,
   const DisplayCommand
     *const ApplyCommands = command_input->ApplyCommands;
 
-  const char
-    *const **const Menus = command_input->Menus;
-
-  const DisplayCommand
-    **const Commands = command_input->Commands;
-
   char
     command[MagickPathExtent];
 
   int
-    entry,
     id;
 
   /*
@@ -3246,22 +3317,7 @@ static void XROICommand(const ROICommandInput *command_input,XEvent *event,
       (void) CopyMagickString(command,ApplyMenu[id],MagickPathExtent);
       (*display_command)=ApplyCommands[id];
       if (id < ApplyMenus)
-        {
-          ROIMenuEntry
-            menu_entry;
-
-          /*
-            Select a command from a pop-up menu.
-          */
-          entry=XMenuWidget(display,windows,ApplyMenu[id],
-            (const char **) Menus[id],command);
-          menu_entry.Menus=Menus;
-          menu_entry.Commands=Commands;
-          menu_entry.id=id;
-          menu_entry.entry=entry;
-          (*display_command)=XSelectROIMenuEntry(&menu_entry,command,
-            (*display_command));
-        }
+        XSelectROIPopupEntry(command_input,id,command,display_command);
     }
   (void) XSetFunction(display,windows->image.highlight_context,
     GXinvert);

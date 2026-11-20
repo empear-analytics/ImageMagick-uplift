@@ -128,8 +128,12 @@ static MagickBooleanType XRequestJPEGQuality(Display *display,
       */
       (void) FormatLocaleString(quality,MagickPathExtent,"%.17g",(double)
         image->quality);
-      status=XDialogWidget(display,windows,"Save","Enter JPEG quality:",
-        quality);
+      {
+        const XDialogRequest
+          dialog_request = { "Save", "Enter JPEG quality:", quality };
+
+        status=XDialogWidget(display,windows,&dialog_request);
+      }
       if (*quality == '\0')
         return(MagickFalse);
       image->quality=StringToUnsignedLong(quality);
@@ -1202,7 +1206,12 @@ static Image *XTileImage(Display *display,XResourceInfo *resource_info,
   /*
     Select a command from the pop-up menu.
   */
-  id=XMenuWidget(display,windows,"Tile Verb",VerbMenu,command);
+  {
+    const XMenuRequest
+      menu_request = { "Tile Verb", VerbMenu, command };
+
+    id=XMenuWidget(display,windows,&menu_request);
+  }
   if (id < 0)
     return((Image *) NULL);
   q=p;

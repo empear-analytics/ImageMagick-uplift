@@ -2248,8 +2248,12 @@ static void XSelectDrawColor(const DrawEditContext *context,const int id,
   /*
     Select a pen color from the pop-up menu.
   */
-  pen_number=XMenuWidget(display,windows,DrawMenu[id],
-    (const char **) ColorMenu,command);
+  {
+    const XMenuRequest
+      menu_request = { DrawMenu[id], (const char **) ColorMenu, command };
+
+    pen_number=XMenuWidget(display,windows,&menu_request);
+  }
   if (pen_number < 0)
     return;
   transparent=(MagickBooleanType) (pen_number == (MaxNumberPens-2));
@@ -2322,8 +2326,12 @@ static void XSelectDrawWidth(const DrawEditContext *context,const int id,
   /*
     Select a command from the pop-up menu.
   */
-  entry=XMenuWidget(display,windows,DrawMenu[id],WidthsMenu,
-    command);
+  {
+    const XMenuRequest
+      menu_request = { DrawMenu[id], WidthsMenu, command };
+
+    entry=XMenuWidget(display,windows,&menu_request);
+  }
   if (entry < 0)
     return;
   if (entry != 5)
@@ -2332,8 +2340,12 @@ static void XSelectDrawWidth(const DrawEditContext *context,const int id,
         WidthsMenu[entry]);
       return;
     }
-  (void) XDialogWidget(display,windows,"Ok","Enter line width:",
-    width);
+  {
+    const XDialogRequest
+      dialog_request = { "Ok", "Enter line width:", width };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*width == '\0')
     return;
   (*line_width)=(unsigned int) StringToUnsignedLong(width);

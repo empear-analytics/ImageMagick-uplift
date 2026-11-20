@@ -258,7 +258,12 @@ static void XApplyTrimCommand(const XMagickCommandContext *context)
   */
   (void) FormatLocaleString(fuzz,MagickPathExtent,"%g%%",100.0*
     (*image)->fuzz/((double) QuantumRange+1.0));
-  (void) XDialogWidget(display,windows,"Trim","Enter fuzz factor:",fuzz);
+  {
+    const XDialogRequest
+      dialog_request = { "Trim", "Enter fuzz factor:", fuzz };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*fuzz == '\0')
     return;
   (*image)->fuzz=StringToDoubleInterval(fuzz,(double) QuantumRange+1.0);
@@ -312,8 +317,14 @@ static void XApplySaturationCommand(const XMagickCommandContext *context)
   /*
     Query user for percent saturation change.
   */
-  (void) XDialogWidget(display,windows,"Apply",
-    "Enter percent change in color saturation (0-200):",saturation_percent);
+  {
+    const XDialogRequest
+      dialog_request = { "Apply",
+        "Enter percent change in color saturation (0-200):",
+        saturation_percent };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*saturation_percent == '\0')
     return;
   /*
@@ -365,8 +376,14 @@ static void XApplyBrightnessCommand(const XMagickCommandContext *context)
   /*
     Query user for percent brightness change.
   */
-  (void) XDialogWidget(display,windows,"Apply",
-    "Enter percent change in color brightness (0-200):",brightness_percent);
+  {
+    const XDialogRequest
+      dialog_request = { "Apply",
+        "Enter percent change in color brightness (0-200):",
+        brightness_percent };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*brightness_percent == '\0')
     return;
   /*
@@ -412,8 +429,12 @@ static void XApplyGammaCommand(const XMagickCommandContext *context)
   /*
     Query user for gamma value.
   */
-  (void) XDialogWidget(display,windows,"Gamma",
-    "Enter gamma value (e.g. 1.2):",factor);
+  {
+    const XDialogRequest
+      dialog_request = { "Gamma", "Enter gamma value (e.g. 1.2):", factor };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*factor == '\0')
     return;
   /*
@@ -532,8 +553,13 @@ static void XApplyContrastStretchCommand(const XMagickCommandContext *context)
   /*
     Query user for gamma value.
   */
-  (void) XDialogWidget(display,windows,"Contrast Stretch",
-    "Enter black and white points:",levels);
+  {
+    const XDialogRequest
+      dialog_request = { "Contrast Stretch", "Enter black and white points:",
+        levels };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*levels == '\0')
     return;
   /*
@@ -588,8 +614,13 @@ static void XApplySigmoidalContrastCommand(const XMagickCommandContext *context)
   /*
     Query user for gamma value.
   */
-  (void) XDialogWidget(display,windows,"Sigmoidal Contrast",
-    "Enter contrast and midpoint:",levels);
+  {
+    const XDialogRequest
+      dialog_request = { "Sigmoidal Contrast", "Enter contrast and midpoint:",
+        levels };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*levels == '\0')
     return;
   /*
@@ -796,8 +827,13 @@ static void XApplyResizeCommand(const XMagickCommandContext *context)
   y=0;
   (void) FormatLocaleString(geometry,MagickPathExtent,"%.17gx%.17g+0+0",
     (double) width,(double) height);
-  status=XDialogWidget(display,windows,"Resize",
-    "Enter resize geometry (e.g. 640x480, 200%):",geometry);
+  {
+    const XDialogRequest
+      dialog_request = { "Resize",
+        "Enter resize geometry (e.g. 640x480, 200%):", geometry };
+
+    status=XDialogWidget(display,windows,&dialog_request);
+  }
   if (*geometry == '\0')
     return;
   if (status == 0)
@@ -972,8 +1008,12 @@ static void XApplyQuantizeCommand(const XMagickCommandContext *context,
   /*
     Query user for maximum number of colors.
   */
-  status=XDialogWidget(display,windows,"Quantize",
-    "Maximum number of colors:",colors);
+  {
+    const XDialogRequest
+      dialog_request = { "Quantize", "Maximum number of colors:", colors };
+
+    status=XDialogWidget(display,windows,&dialog_request);
+  }
   if (*colors == '\0')
     return;
   /*

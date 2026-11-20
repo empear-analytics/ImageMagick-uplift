@@ -544,8 +544,12 @@ static void XSelectVirtualCommand(const DisplayEventContext *context,
   /*
     Select a command from the Virtual menu.
   */
-  entry=XMenuWidget(display,windows,"Commands",VirtualMenu,
-    command);
+  {
+    const XMenuRequest
+      menu_request = { "Commands", VirtualMenu, command };
+
+    entry=XMenuWidget(display,windows,&menu_request);
+  }
   if (entry >= 0)
     (*nexus)=XMagickCommand(display,resource_info,windows,
       VirtualCommands[entry],display_image,exception);
@@ -648,8 +652,12 @@ static void XPressImageButton3(const DisplayEventContext *context,
   /*
     Select a command from the Short Cuts menu.
   */
-  entry=XMenuWidget(display,windows,"Short Cuts",ShortCutsMenu,
-    command);
+  {
+    const XMenuRequest
+      menu_request = { "Short Cuts", ShortCutsMenu, command };
+
+    entry=XMenuWidget(display,windows,&menu_request);
+  }
   if (entry >= 0)
     (*nexus)=XMagickCommand(display,resource_info,windows,
       ShortCutsCommands[entry],display_image,exception);
@@ -772,7 +780,12 @@ static void XPressMagnifyWindow(const DisplayEventContext *context)
   /*
     Select a magnify factor from the pop-up menu.
   */
-  factor=XMenuWidget(display,windows,"Magnify",MagnifyMenu,command);
+  {
+    const XMenuRequest
+      menu_request = { "Magnify", MagnifyMenu, command };
+
+    factor=XMenuWidget(display,windows,&menu_request);
+  }
   if (factor >= 0)
     XMagnifyWindowCommand(&input,0,MagnifyCommands[factor]);
 }

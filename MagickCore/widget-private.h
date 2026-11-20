@@ -61,11 +61,31 @@ typedef struct _XListBrowserRequest
     *reply;
 } XListBrowserRequest;
 
+typedef struct _XMenuRequest
+{
+  const char
+    *title,
+    *const *selections;
+
+  char
+    *item;
+} XMenuRequest;
+
+typedef struct _XDialogRequest
+{
+  const char
+    *action,
+    *query;
+
+  char
+    *reply;
+} XDialogRequest;
+
 extern MagickPrivate int
   XCommandWidget(Display *,XWindows *,const char *const *,XEvent *),
   XConfirmWidget(Display *,XWindows *,const char *,const char *),
-  XDialogWidget(Display *,XWindows *,const char *,const char *,char *),
-  XMenuWidget(Display *,XWindows *,const char *,const char *const *,char *);
+  XDialogWidget(Display *,XWindows *,const XDialogRequest *),
+  XMenuWidget(Display *,XWindows *,const XMenuRequest *);
 
 extern MagickPrivate MagickBooleanType
   XPreferencesWidget(Display *,XResourceInfo *,XWindows *);

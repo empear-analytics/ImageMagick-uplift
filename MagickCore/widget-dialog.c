@@ -1083,7 +1083,7 @@ static MagickBooleanType IsDialogOptionAction(const char *action)
 }
 
 MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
-  const char *action,const char *query,char *reply)
+  const XDialogRequest *request)
 {
   char
     primary_selection[MagickPathExtent];
@@ -1121,18 +1121,19 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   */
   assert(display != (Display *) NULL);
   assert(windows != (XWindows *) NULL);
-  assert(action != (char *) NULL);
-  assert(query != (char *) NULL);
-  assert(reply != (char *) NULL);
+  assert(request->action != (char *) NULL);
+  assert(request->query != (char *) NULL);
+  assert(request->reply != (char *) NULL);
   if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",action);
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",request->action);
   XCheckRefreshWindows(display,windows);
   font_info=windows->widget.font_info;
-  width=GetDialogButtonWidth(font_info,action);
+  width=GetDialogButtonWidth(font_info,request->action);
   height=(unsigned int) (font_info->ascent+font_info->descent);
   {
     const DialogLayout
-      layout = { display, font_info, width, height, query, reply };
+      layout = { display, font_info, width, height, request->query,
+        request->reply };
 
     PositionDialogWidget(windows,&layout);
   }
@@ -1143,7 +1144,7 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   /*
     Respond to X events.
   */
-  anomaly=(IsDialogOptionAction(action) != MagickFalse);
+  anomaly=(IsDialogOptionAction(request->action) != MagickFalse);
   state=UpdateConfigurationState;
   XSetCursorState(display,windows,MagickTrue);
   context.display=display;
@@ -1151,18 +1152,18 @@ MagickPrivate int XDialogWidget(Display *display,XWindows *windows,
   context.font_info=font_info;
   context.anomaly=anomaly;
   context.primary_selection=primary_selection;
-  context.action=action;
-  context.query=query;
+  context.action=request->action;
+  context.query=request->query;
   context.height=height;
   context.raised=raised;
-  context.reply=reply;
+  context.reply=request->reply;
   context.width=width;
   RespondToDialogEvents(&context,&targets);
   XSetCursorState(display,windows,MagickFalse);
   (void) XWithdrawWindow(display,windows->widget.id,windows->widget.screen);
   XCheckRefreshWindows(display,windows);
   if ((anomaly) && (special_info.raised))
-    if (*reply != '\0')
+    if (*request->reply != '\0')
       raised=MagickTrue;
   return(raised == MagickFalse);
 }
