@@ -33,13 +33,25 @@ extern "C" {
 
 #if defined(MAGICKCORE_OPENCL_SUPPORT)
 
+typedef struct _AccelerateMotionBlurRequest
+{
+  const double
+    *kernel;
+
+  const size_t
+    width;
+
+  const OffsetInfo
+    *offset;
+} AccelerateMotionBlurRequest;
+
 extern MagickPrivate Image
   *AccelerateBlurImage(const Image *,const double,const double,ExceptionInfo *),
   *AccelerateDespeckleImage(const Image *,ExceptionInfo *),
   *AccelerateLocalContrastImage(const Image *,const double,const double,
     ExceptionInfo *),
-  *AccelerateMotionBlurImage(const Image*,const double*,const size_t,
-    const OffsetInfo*,ExceptionInfo*),
+  *AccelerateMotionBlurImage(const Image*,const AccelerateMotionBlurRequest*,
+    ExceptionInfo*),
   *AccelerateResizeImage(const Image *,const size_t,const size_t,
     const ResizeFilter *,ExceptionInfo *),
   *AccelerateRotationalBlurImage(const Image *,const double,ExceptionInfo *),
