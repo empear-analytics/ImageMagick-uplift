@@ -597,9 +597,20 @@ static inline double XPixelIntensity(const XColor *pixel)
 
 #endif
 
+typedef struct _XRenderText
+{
+  const DrawInfo
+    *draw_info;
+
+  const PointInfo
+    *offset;
+
+  TypeMetric
+    *metrics;
+} XRenderText;
+
 extern MagickPrivate MagickBooleanType
-  XRenderImage(Image *,const DrawInfo *,const PointInfo *,TypeMetric *,
-    ExceptionInfo *);
+  XRenderImage(Image *,const XRenderText *,ExceptionInfo *);
 
 #if defined(__cplusplus) || defined(c_plusplus)
 }

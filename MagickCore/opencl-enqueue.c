@@ -287,11 +287,30 @@ static void RegisterOpenCLKernelEvent(CacheInfo *input_info,
     }
 }
 
-MagickPrivate MagickBooleanType EnqueueOpenCLKernel(cl_command_queue queue,
-  cl_kernel kernel,cl_uint work_dim,const size_t *offset,const size_t *gsize,
-  const size_t *lsize,const Image *input_image,const Image *output_image,
-  MagickBooleanType flush,ExceptionInfo *exception)
+MagickPrivate MagickBooleanType EnqueueOpenCLKernel(
+  const OpenCLKernelLaunch *enqueue,ExceptionInfo *exception)
 {
+  const cl_command_queue
+    queue = enqueue->queue;
+
+  const cl_kernel
+    kernel = enqueue->kernel;
+
+  const cl_uint
+    work_dim = enqueue->work_dim;
+
+  const size_t
+    *const offset = enqueue->offset,
+    *const gsize = enqueue->gsize,
+    *const lsize = enqueue->lsize;
+
+  const Image
+    *const input_image = enqueue->input_image,
+    *const output_image = enqueue->output_image;
+
+  const MagickBooleanType
+    flush = enqueue->flush;
+
   CacheInfo
     *output_info,
     *input_info;

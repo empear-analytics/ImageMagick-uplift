@@ -355,9 +355,13 @@ static MagickBooleanType EnqueueResizeFilterKernel(const ResizeFilterRun *run,
     workgroupSize);
   lsize[0]=((side == HorizontalResizeFilter) ? workgroupSize : 1);
   lsize[1]=((side == HorizontalResizeFilter) ? 1 : workgroupSize);
-  return(EnqueueOpenCLKernel(pass->queue,filterKernel,2,
-    (const size_t *) NULL,gsize,lsize,pass->image,pass->filteredImage,MagickFalse,
-    exception));
+  {
+    const OpenCLKernelLaunch
+      enqueue = { pass->queue, filterKernel, 2, (const size_t *) NULL, gsize,
+        lsize, pass->image, pass->filteredImage, MagickFalse };
+
+    return(EnqueueOpenCLKernel(&enqueue,exception));
+  }
 }
 
 static MagickBooleanType AcquireResizeFilterKernel(

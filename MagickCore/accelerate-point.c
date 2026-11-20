@@ -271,9 +271,13 @@ static MagickBooleanType EnqueueFunctionKernel(cl_command_queue queue,
 
   gsize[0]=image->columns;
   gsize[1]=image->rows;
-  outputReady=EnqueueOpenCLKernel(queue,functionKernel,2,(const size_t *) NULL,
-    gsize,(const size_t *) NULL,image,(const Image *) NULL,MagickFalse,
-    exception);
+  {
+    const OpenCLKernelLaunch
+      enqueue = { queue, functionKernel, 2, (const size_t *) NULL, gsize,
+        (const size_t *) NULL, image, (const Image *) NULL, MagickFalse };
+
+    outputReady=EnqueueOpenCLKernel(&enqueue,exception);
+  }
   return(outputReady);
 }
 

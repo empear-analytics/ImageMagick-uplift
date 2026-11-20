@@ -301,14 +301,14 @@ static Image *ComputeUnsharpMaskImage(const Image *image,MagickCLEnv clEnv,
     status;
 
   cl_kernel
-    blurRowKernel,
-    unsharpMaskBlurColumnKernel;
+    blurRowKernel=NULL,
+    unsharpMaskBlurColumnKernel=NULL;
 
   cl_mem
     filteredImageBuffer,
     imageBuffer,
-    imageKernelBuffer,
-    tempImageBuffer;
+    imageKernelBuffer=NULL,
+    tempImageBuffer=NULL;
 
   cl_uint
     imageColumns,
@@ -327,7 +327,7 @@ static Image *ComputeUnsharpMaskImage(const Image *image,MagickCLEnv clEnv,
     chunkSize;
 
   MagickBooleanType
-    outputReady;
+    outputReady=MagickFalse;
 
   MagickCLDevice
     device;
@@ -347,11 +347,6 @@ static Image *ComputeUnsharpMaskImage(const Image *image,MagickCLEnv clEnv,
   filteredImage=NULL;
   imageBuffer=NULL;
   filteredImageBuffer=NULL;
-  tempImageBuffer=NULL;
-  imageKernelBuffer=NULL;
-  blurRowKernel=NULL;
-  unsharpMaskBlurColumnKernel=NULL;
-  outputReady=MagickFalse;
 
   if (AcquireAccelerateBuffers(clEnv,image,exception,&targets) == MagickFalse)
     goto cleanup;
@@ -409,9 +404,12 @@ static Image *ComputeUnsharpMaskImage(const Image *image,MagickCLEnv clEnv,
   gsize[1]=image->rows;
   lsize[0]=chunkSize;
   lsize[1]=1;
-  outputReady=EnqueueOpenCLKernel(queue,blurRowKernel,2,
-    (const size_t *) NULL,gsize,lsize,image,filteredImage,MagickFalse,
-    exception);
+  {
+    const OpenCLKernelLaunch enqueue = { queue, blurRowKernel, 2,
+      (const size_t *) NULL, gsize, lsize, image, filteredImage, MagickFalse };
+
+    outputReady=EnqueueOpenCLKernel(&enqueue,exception);
+  }
 
   chunkSize=256;
   fGain=(float) gain;
@@ -436,9 +434,12 @@ static Image *ComputeUnsharpMaskImage(const Image *image,MagickCLEnv clEnv,
   gsize[1]=chunkSize*((image->rows+chunkSize-1)/chunkSize);
   lsize[0]=1;
   lsize[1]=chunkSize;
-  outputReady=EnqueueOpenCLKernel(queue,unsharpMaskBlurColumnKernel,2,
-    (const size_t *) NULL,gsize,lsize,image,filteredImage,MagickFalse,
-    exception);
+  {
+    const OpenCLKernelLaunch enqueue = { queue, unsharpMaskBlurColumnKernel, 2,
+      (const size_t *) NULL, gsize, lsize, image, filteredImage, MagickFalse };
+
+    outputReady=EnqueueOpenCLKernel(&enqueue,exception);
+  }
 
 cleanup:
 
@@ -558,12 +559,12 @@ static Image *ComputeUnsharpMaskImageSingle(const Image *image,
     status;
 
   cl_kernel
-    unsharpMaskKernel;
+    unsharpMaskKernel=NULL;
 
   cl_mem
     filteredImageBuffer,
     imageBuffer,
-    imageKernelBuffer;
+    imageKernelBuffer=NULL;
 
   cl_uint
     imageColumns,
@@ -579,7 +580,7 @@ static Image *ComputeUnsharpMaskImageSingle(const Image *image,
     *filteredImage;
 
   MagickBooleanType
-    outputReady;
+    outputReady=MagickFalse;
 
   MagickCLDevice
     device;
@@ -598,9 +599,6 @@ static Image *ComputeUnsharpMaskImageSingle(const Image *image,
   filteredImage=NULL;
   imageBuffer=NULL;
   filteredImageBuffer=NULL;
-  imageKernelBuffer=NULL;
-  unsharpMaskKernel=NULL;
-  outputReady=MagickFalse;
 
   if (AcquireAccelerateBuffers(clEnv,image,exception,&targets) == MagickFalse)
     goto cleanup;
@@ -639,8 +637,12 @@ static Image *ComputeUnsharpMaskImageSingle(const Image *image,
   gsize[1]=((image->rows + 31) / 32)*32;
   lsize[0]=8;
   lsize[1]=32;
-  outputReady=EnqueueOpenCLKernel(queue,unsharpMaskKernel,2,(const size_t *) NULL,
-    gsize,lsize,image,filteredImage,MagickFalse,exception);
+  {
+    const OpenCLKernelLaunch enqueue = { queue, unsharpMaskKernel, 2,
+      (const size_t *) NULL, gsize, lsize, image, filteredImage, MagickFalse };
+
+    outputReady=EnqueueOpenCLKernel(&enqueue,exception);
+  }
 
 cleanup:
 
