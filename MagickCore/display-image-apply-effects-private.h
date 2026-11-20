@@ -1833,10 +1833,24 @@ static void XApplyZoomCommand(const XMagickCommandContext *context)
     }
 }
 
-static void XShowImagePreview(Display *display,XWindows *windows,
-  char *preview_type,Image **image,char *filename,ImageInfo *image_info,
-  ExceptionInfo *exception)
+static void XShowImagePreview(const XMagickCommandContext *context,
+  char *preview_type,char *filename)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ImageInfo
+    *const image_info = context->image_info;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   MagickStatusType
     status;
 
@@ -1878,15 +1892,6 @@ static void XApplyShowPreviewCommand(const XMagickCommandContext *context)
   XWindows
     *const windows = context->windows;
 
-  Image
-    **const image = context->image;
-
-  ImageInfo
-    *const image_info = context->image_info;
-
-  ExceptionInfo
-    *const exception = context->exception;
-
   char
     filename[MagickPathExtent];
 
@@ -1915,8 +1920,7 @@ static void XApplyShowPreviewCommand(const XMagickCommandContext *context)
   /*
     Show image preview.
   */
-  XShowImagePreview(display,windows,preview_type,image,filename,image_info,
-    exception);
+  XShowImagePreview(context,preview_type,filename);
 }
 
 static void XApplyShowHistogramCommand(const XMagickCommandContext *context)
