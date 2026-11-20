@@ -26033,6 +26033,83 @@ the mandate of 2026-11-19, for the owner's confirmation.
 
 ---
 
+## Recipe JN - Drop a Conditional Jump to the Label That Follows It
+
+**Use when:** CodeScene reports *Complex Method* or *Large Method* on a function whose last
+statement before a label `L:` is `if (cond) goto L;` with no `else`: the jump lands where
+falling through lands, so the test decides nothing, yet CodeScene counts the `if` and the
+`goto` (`accelerate-histogram.c`'s `ComputeEqualizeImage`, whose last step before `cleanup:`
+is `if (RunEqualizePass(&run,exception,&runTargets) == MagickFalse) goto cleanup;`).
+
+**Not covered by:** Recipe TC, which drops a trailing `if (cond) continue;` of a loop body
+and refuses a `cond` that makes a call; Recipes V, Y and I, which move a block that jumps to
+a cleanup label into a helper and keep the caller's jump; Recipe NG, which drops a test
+before a NULL-safe call.
+
+**How:**
+
+1. The statement `if (cond) goto L;` has no `else`, and on every path the next thing
+   control reaches after it is the label `L:`: the label directly follows it, or nothing
+   but closing braces of blocks that hold it stand between them (a block that ends there
+   adds no statement on any path). No `#if` line stands between them. The function holds
+   no other statement between the two, and nothing else of the function changes.
+2. `cond` is either free of side effects (no assignment, increment, decrement or call:
+   Recipe TC step 2), or one call `F(args)` compared with a constant (`F(args) ==
+   MagickFalse`, `F(args) != MagickTrue`, `F(args) < 0`), or the call alone (`if
+   (F(args))`), with no other side effect in the comparison.
+3. A side-effect-free `cond`: delete the two lines. A call: the statement becomes
+   `(void) F(args);`, the call's text unchanged; the comparison and the `goto` go.
+4. Proof: `tools/obj_identical.sh FILE` prints `IDENTICAL` (in the build that compiles the
+   function: `WIDE=1` for the OpenCL and X11 files), and the oracle on the function's cases
+   where some case reaches it. Any object difference refuses the step.
+
+**Before:**
+
+```c
+    if (RunEqualizePass(&run,exception,&runTargets) == MagickFalse)
+      goto cleanup;
+  }
+
+cleanup:
+```
+
+**After:**
+
+```c
+    (void) RunEqualizePass(&run,exception,&runTargets);
+  }
+
+cleanup:
+```
+
+**Careful:**
+
+- Why the behaviour is the same. Both outcomes of the test lead to `L:`: the `goto` jumps
+  there, and falling through reaches it as the next point of execution (step 1). So the
+  only effect the statement has is evaluating `cond`. Under step 3 the call is still made,
+  once, with the same arguments, at the same point; only its result is no longer compared,
+  and comparing a returned value with a constant has no effect. A side-effect-free `cond`
+  has no effect to keep (Recipe TC's argument).
+- Closing braces between the statement and the label end blocks; leaving a block runs no
+  code in C (no destructors), and the block-scope objects it ends are not named at `L`.
+- `(void)` keeps the convention for a discarded `MagickBooleanType` result, so no compiler
+  warns about an unused result (`warn_unused_result` is not set on these functions, but the
+  cast says that the discard is deliberate).
+- Not taken when anything other than closing braces stands before the label (a statement,
+  a declaration, a `#if` line): then the test decides whether that runs.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL`; the oracle on
+the function's cases as well where some case reaches it.
+
+**Provenance:** 2026-11-20, from `accelerate-histogram.c`'s `ComputeEqualizeImage`
+(campaign A, W50 round 37, lane c): after the Recipe I step that merged its input and
+histogram blocks (cc 12 to 10), the last jump before `cleanup:` is one of the two tests that
+keep it at *Complex Method* (cc 10, threshold 9); a probe of this step takes it to cc 8 and
+the file 8.97 to 8.98, object code identical in the wide build. Added by Claude Code (Claude
+Opus 5.5) under the mandate of 2026-11-19, for the owner's confirmation.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -26604,3 +26681,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-20 | WORDING | UB | Step 5: `pp_identical.sh` may print DIFFERENT only in the indentation of the line after the include (clang `-E -P` loses a leading blank after a nested file returns); the units must then be identical under `diff -b`, and `obj_identical.sh` must print IDENTICAL | The first use, `accelerate-histogram.c` (wide build): one line, `  {` against ` {`, object IDENTICAL | mandate (2026-11-19) |
 | 2026-11-20 | AMEND | OH | *Mid-file conditional form* of Form A: when the file's whole-file conditional opens with a conditional `#include` that some build compiles (`ltdl.h` in `opencl-initialize.c`), the run begins after that include's `#endif` and the new header is named on the next line, inside the conditional (a mid-file include); the header has no conditional of its own; proof `pp_identical`/`obj_identical` in every build that compiles the file | `opencl-initialize.c` (campaign A, W49 round 36, lane c): *Lines of Code in a Single File* (1307 lines); a probe of the run from its typedefs to `LoadOpenCLBenchmarks` leaves the file at 10.0 and the header at 9.38 (the file's score before); naming the header in the include block would move `ltdl.h`'s tokens after the items in the wide build, which defines `MAGICKCORE_LTDL_DELEGATE`; owner 2026-11-20 on mid-file includes, as the main session reads it | mandate (2026-11-19) |
 | 2026-11-20 | WORDING | OH | *Mid-file conditional form*: the run begins with the blank line after the inner `#endif` (which stays in the `.c` file below the include); "no conditional of its own" means no wrapping conditional around the items; the conditional blocks inside the run (`#if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT`, `#ifdef _WIN32`) move with it, directives and all, unedited | Review of `247c503b7` (campaign A, W49 round 36, lane c): the wording left the start of the run and the inner conditionals ambiguous; `02688eb72` did exactly this | mandate (2026-11-19) |
+| 2026-11-20 | NEW | JN | Drop a Conditional Jump to the Label That Follows It: an `if (cond) goto L;` whose next point of execution is `L:` (nothing but closing braces between) is deleted when `cond` has no side effect, or becomes `(void) F(args);` when `cond` is one call compared with a constant; proof `obj_identical.sh` IDENTICAL, oracle where reached | `accelerate-histogram.c`'s `ComputeEqualizeImage` (campaign A, W50 round 37, lane c): the last jump before `cleanup:`; a probe after the round's Recipe I step: cc 10 to 8 (leaves *Complex Method*), 8.97 to 8.98, object IDENTICAL (wide) | mandate (2026-11-19) |
