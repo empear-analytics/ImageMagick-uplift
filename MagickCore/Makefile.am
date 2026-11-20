@@ -386,6 +386,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/opencl.h \
   MagickCore/opencl-private.h \
   MagickCore/opencl-environment-private.h \
+  MagickCore/opencl-initialize-benchmark-private.h \
   MagickCore/option.c \
   MagickCore/option-image.c \
   MagickCore/option.h \
@@ -820,6 +821,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/nt-feature.h \
   MagickCore/opencl-private.h \
   MagickCore/opencl-environment-private.h \
+  MagickCore/opencl-initialize-benchmark-private.h \
   MagickCore/option-private.h \
   MagickCore/pixel-gamma-private.h \
   MagickCore/pixel-private.h \
