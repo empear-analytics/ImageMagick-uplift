@@ -2981,16 +2981,10 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     point=GetGlyphBitmapPoint(offset,bitmap,origin);
     if (draw_info->render != MagickFalse)
       {
-        GlyphBitmapTarget
-          glyph_target;
+        const GlyphBitmapTarget
+          glyph_target = { image, draw_info, bitmap, point, annotate_info,
+            offset, exception };
 
-        glyph_target.image=image;
-        glyph_target.draw_info=draw_info;
-        glyph_target.bitmap=bitmap;
-        glyph_target.point=point;
-        glyph_target.annotate_info=annotate_info;
-        glyph_target.offset=offset;
-        glyph_target.exception=exception;
         status=RasterizeGlyphBitmap(&glyph_target,status);
       }
     if (IsInterwordSpace(draw_info,p+grapheme[i].cluster,code) != MagickFalse)
