@@ -527,9 +527,30 @@ static inline size_t ConfirmListBrowserReply(Display *display,
   return(state);
 }
 
-static inline void ReleaseListBrowserAction(const ListBrowserRelease *release,
-  const XWidgetInfo reply_info,XWidgetInfo *action_info,size_t *state)
+typedef enum
 {
+  ActionListBrowserButton,
+  CancelListBrowserButton
+} ListBrowserButtonSide;
+
+typedef struct _ListBrowserButton
+{
+  const ListBrowserRelease
+    *release;
+
+  ListBrowserButtonSide
+    side;
+} ListBrowserButton;
+
+static inline void ReleaseListBrowserButton(const ListBrowserButton *button,
+  const XWidgetInfo reply_info,XWidgetInfo *button_info,size_t *state)
+{
+  const ListBrowserRelease
+    *const release = button->release;
+
+  const ListBrowserButtonSide
+    side = button->side;
+
   Display
     *const display = release->display;
 
@@ -539,41 +560,40 @@ static inline void ReleaseListBrowserAction(const ListBrowserRelease *release,
   const XEvent
     event = release->event;
 
-  if ((*action_info).raised == MagickFalse)
+  if ((*button_info).raised == MagickFalse)
     {
       if ((event.xbutton.window == window_info->id) &&
-          (MatteIsActive((*action_info),event.xbutton)))
+          (MatteIsActive((*button_info),event.xbutton)))
         {
-          (*state)=ConfirmListBrowserReply(display,reply_info,(*state));
+          if (side == ActionListBrowserButton)
+            (*state)=ConfirmListBrowserReply(display,reply_info,(*state));
+          else
+            {
+              *reply_info.text='\0';
+              (*state)|=ExitState;
+            }
         }
-      (*action_info).raised=MagickTrue;
-      XDrawBeveledButton(display,window_info,&(*action_info));
+      (*button_info).raised=MagickTrue;
+      XDrawBeveledButton(display,window_info,&(*button_info));
     }
+}
+
+static inline void ReleaseListBrowserAction(const ListBrowserRelease *release,
+  const XWidgetInfo reply_info,XWidgetInfo *action_info,size_t *state)
+{
+  const ListBrowserButton
+    button = { release, ActionListBrowserButton };
+
+  ReleaseListBrowserButton(&button,reply_info,action_info,state);
 }
 
 static inline void ReleaseListBrowserCancel(const ListBrowserRelease *release,
   const XWidgetInfo reply_info,XWidgetInfo *cancel_info,size_t *state)
 {
-  Display
-    *const display = release->display;
+  const ListBrowserButton
+    button = { release, CancelListBrowserButton };
 
-  XWindowInfo
-    *const window_info = release->window_info;
-
-  const XEvent
-    event = release->event;
-
-  if ((*cancel_info).raised == MagickFalse)
-    {
-      if ((event.xbutton.window == window_info->id) &&
-          (MatteIsActive((*cancel_info),event.xbutton)))
-        {
-          *reply_info.text='\0';
-          (*state)|=ExitState;
-        }
-      (*cancel_info).raised=MagickTrue;
-      XDrawBeveledButton(display,window_info,&(*cancel_info));
-    }
+  ReleaseListBrowserButton(&button,reply_info,cancel_info,state);
 }
 
 static inline XWidgetInfo ApplyListBrowserControlKey(XWidgetInfo reply_info,
