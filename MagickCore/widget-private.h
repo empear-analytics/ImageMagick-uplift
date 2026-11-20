@@ -71,10 +71,20 @@ typedef struct _XMenuRequest
     *item;
 } XMenuRequest;
 
+typedef struct _XDialogRequest
+{
+  const char
+    *action,
+    *query;
+
+  char
+    *reply;
+} XDialogRequest;
+
 extern MagickPrivate int
   XCommandWidget(Display *,XWindows *,const char *const *,XEvent *),
   XConfirmWidget(Display *,XWindows *,const char *,const char *),
-  XDialogWidget(Display *,XWindows *,const char *,const char *,char *),
+  XDialogWidget(Display *,XWindows *,const XDialogRequest *),
   XMenuWidget(Display *,XWindows *,const XMenuRequest *);
 
 extern MagickPrivate MagickBooleanType

@@ -1995,8 +1995,12 @@ static void XSelectAnnotateRotation(const AnnotateMenuInput *menu,
       (*degrees)=StringToDouble(RotateMenu[entry],(char **) NULL);
       return;
     }
-  (void) XDialogWidget(display,windows,"OK","Enter rotation angle:",
-    angle);
+  {
+    const XDialogRequest
+      dialog_request = { "OK", "Enter rotation angle:", angle };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*angle == '\0')
     return;
   (*degrees)=StringToDouble(angle,(char **) NULL);
@@ -3641,8 +3645,13 @@ static MagickBooleanType XBackgroundImage(
   /*
     Put image in background.
   */
-  status=XDialogWidget(display,windows,"Background",
-    "Enter window id (id 0x00 selects window with pointer):",window_id);
+  {
+    const XDialogRequest
+      dialog_request = { "Background",
+        "Enter window id (id 0x00 selects window with pointer):", window_id };
+
+    status=XDialogWidget(display,windows,&dialog_request);
+  }
   if (*window_id == '\0')
     return(MagickFalse);
   (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,

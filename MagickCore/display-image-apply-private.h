@@ -87,8 +87,12 @@ static Image *XApplyNewCommand(const XMagickCommandContext *context,
   /*
     Query user for canvas geometry.
   */
-  status=XDialogWidget(display,windows,"New","Enter image geometry:",
-    geometry);
+  {
+    const XDialogRequest
+      dialog_request = { "New", "Enter image geometry:", geometry };
+
+    status=XDialogWidget(display,windows,&dialog_request);
+  }
   if (*geometry == '\0')
     return(nexus);
   if (status == 0)
@@ -144,8 +148,12 @@ static void XApplyShearCommand(const XMagickCommandContext *context,char *color)
   XColorBrowserWidget(display,windows,"Select",color);
   if (*color == '\0')
     return;
-  (void) XDialogWidget(display,windows,"Shear","Enter shear geometry:",
-    geometry);
+  {
+    const XDialogRequest
+      dialog_request = { "Shear", "Enter shear geometry:", geometry };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*geometry == '\0')
     return;
   /*

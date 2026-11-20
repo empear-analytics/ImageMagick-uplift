@@ -1296,11 +1296,13 @@ MagickPrivate void XFileBrowserWidget(Display *display,XWindows *windows,
   filelist=ListFiles(working_path,glob_pattern,&files);
   if (filelist == (char **) NULL)
     {
+      const XDialogRequest dialog = { action, "Enter filename:", reply };
+
       /*
         Directory read failed.
       */
       XNoticeWidget(display,windows,"Unable to read directory:",working_path);
-      (void) XDialogWidget(display,windows,action,"Enter filename:",reply);
+      (void) XDialogWidget(display,windows,&dialog);
       return;
     }
   /*

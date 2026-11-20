@@ -128,8 +128,12 @@ static MagickBooleanType XRequestJPEGQuality(Display *display,
       */
       (void) FormatLocaleString(quality,MagickPathExtent,"%.17g",(double)
         image->quality);
-      status=XDialogWidget(display,windows,"Save","Enter JPEG quality:",
-        quality);
+      {
+        const XDialogRequest
+          dialog_request = { "Save", "Enter JPEG quality:", quality };
+
+        status=XDialogWidget(display,windows,&dialog_request);
+      }
       if (*quality == '\0')
         return(MagickFalse);
       image->quality=StringToUnsignedLong(quality);

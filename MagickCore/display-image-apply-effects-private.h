@@ -44,8 +44,12 @@ static void XApplyReduceNoiseCommand(const XMagickCommandContext *context,
   /*
     Query user for noise radius.
   */
-  (void) XDialogWidget(display,windows,"Reduce Noise",
-    "Enter the noise radius:",radius);
+  {
+    const XDialogRequest
+      dialog_request = { "Reduce Noise", "Enter the noise radius:", radius };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*radius == '\0')
     return;
   /*
@@ -105,8 +109,13 @@ static void XApplySharpenCommand(const XMagickCommandContext *context,
   /*
     Query user for sharpen radius.
   */
-  (void) XDialogWidget(display,windows,"Sharpen",
-    "Enter the sharpen radius and standard deviation:",radius);
+  {
+    const XDialogRequest
+      dialog_request = { "Sharpen",
+        "Enter the sharpen radius and standard deviation:", radius };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*radius == '\0')
     return;
   /*
@@ -166,8 +175,13 @@ static void XApplyBlurCommand(const XMagickCommandContext *context,
   /*
     Query user for blur radius.
   */
-  (void) XDialogWidget(display,windows,"Blur",
-    "Enter the blur radius and standard deviation:",radius);
+  {
+    const XDialogRequest
+      dialog_request = { "Blur",
+        "Enter the blur radius and standard deviation:", radius };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*radius == '\0')
     return;
   /*
@@ -217,8 +231,12 @@ static void XApplyThresholdCommand(const XMagickCommandContext *context)
   /*
     Query user for threshold value.
   */
-  (void) XDialogWidget(display,windows,"Threshold",
-    "Enter threshold value:",factor);
+  {
+    const XDialogRequest
+      dialog_request = { "Threshold", "Enter threshold value:", factor };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*factor == '\0')
     return;
   /*
@@ -276,8 +294,13 @@ static void XApplyEdgeDetectCommand(const XMagickCommandContext *context,
   /*
     Query user for edge factor.
   */
-  (void) XDialogWidget(display,windows,"Detect Edges",
-    "Enter the edge detect radius:",radius);
+  {
+    const XDialogRequest
+      dialog_request = { "Detect Edges", "Enter the edge detect radius:",
+        radius };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*radius == '\0')
     return;
   /*
@@ -336,8 +359,12 @@ static void XApplySpreadCommand(const XMagickCommandContext *context,
   /*
     Query user for spread amount.
   */
-  (void) XDialogWidget(display,windows,"Spread",
-    "Enter the displacement amount:",amount);
+  {
+    const XDialogRequest
+      dialog_request = { "Spread", "Enter the displacement amount:", amount };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*amount == '\0')
     return;
   /*
@@ -404,8 +431,13 @@ static void XApplyShadeCommand(const XMagickCommandContext *context)
   /*
     Query user for the shade geometry.
   */
-  status=XDialogWidget(display,windows,"Shade",
-    "Enter the azimuth and elevation of the light source:",geometry);
+  {
+    const XDialogRequest
+      dialog_request = { "Shade",
+        "Enter the azimuth and elevation of the light source:", geometry };
+
+    status=XDialogWidget(display,windows,&dialog_request);
+  }
   if (*geometry == '\0')
     return;
   /*
@@ -456,7 +488,12 @@ static void XApplyRaiseCommand(const XMagickCommandContext *context)
   /*
     Query user for bevel width.
   */
-  (void) XDialogWidget(display,windows,"Raise","Bevel width:",bevel_width);
+  {
+    const XDialogRequest
+      dialog_request = { "Raise", "Bevel width:", bevel_width };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*bevel_width == '\0')
     return;
   /*
@@ -513,8 +550,12 @@ static void XApplySegmentCommand(const XMagickCommandContext *context)
   /*
     Query user for smoothing threshold.
   */
-  (void) XDialogWidget(display,windows,"Segment","Smooth threshold:",
-    threshold);
+  {
+    const XDialogRequest
+      dialog_request = { "Segment", "Smooth threshold:", threshold };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*threshold == '\0')
     return;
   /*
@@ -571,8 +612,13 @@ static void XApplySepiaToneCommand(const XMagickCommandContext *context)
   /*
     Query user for sepia-tone factor.
   */
-  (void) XDialogWidget(display,windows,"Sepia Tone",
-    "Enter the sepia tone factor (0 - 99.9%):",factor);
+  {
+    const XDialogRequest
+      dialog_request = { "Sepia Tone",
+        "Enter the sepia tone factor (0 - 99.9%):", factor };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*factor == '\0')
     return;
   /*
@@ -622,8 +668,13 @@ static void XApplySolarizeCommand(const XMagickCommandContext *context)
   /*
     Query user for solarize factor.
   */
-  (void) XDialogWidget(display,windows,"Solarize",
-    "Enter the solarize factor (0 - 99.9%):",factor);
+  {
+    const XDialogRequest
+      dialog_request = { "Solarize", "Enter the solarize factor (0 - 99.9%):",
+        factor };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*factor == '\0')
     return;
   /*
@@ -682,8 +733,12 @@ static void XApplySwirlCommand(const XMagickCommandContext *context,
   /*
     Query user for swirl angle.
   */
-  (void) XDialogWidget(display,windows,"Swirl","Enter the swirl angle:",
-    degrees);
+  {
+    const XDialogRequest
+      dialog_request = { "Swirl", "Enter the swirl angle:", degrees };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*degrees == '\0')
     return;
   /*
@@ -743,8 +798,13 @@ static void XApplyImplodeCommand(const XMagickCommandContext *context,
   /*
     Query user for implode factor.
   */
-  (void) XDialogWidget(display,windows,"Implode",
-    "Enter the implosion/explosion factor (-1.0 - 1.0):",factor);
+  {
+    const XDialogRequest
+      dialog_request = { "Implode",
+        "Enter the implosion/explosion factor (-1.0 - 1.0):", factor };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*factor == '\0')
     return;
   /*
@@ -813,8 +873,13 @@ static void XApplyVignetteCommand(const XMagickCommandContext *context)
   /*
     Query user for the vignette geometry.
   */
-  (void) XDialogWidget(display,windows,"Vignette",
-    "Enter the radius, sigma, and x and y offsets:",geometry);
+  {
+    const XDialogRequest
+      dialog_request = { "Vignette",
+        "Enter the radius, sigma, and x and y offsets:", geometry };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*geometry == '\0')
     return;
   /*
@@ -874,8 +939,12 @@ static void XApplyRollCommand(const XMagickCommandContext *context)
   /*
     Query user for the roll geometry.
   */
-  (void) XDialogWidget(display,windows,"Roll","Enter roll geometry:",
-    geometry);
+  {
+    const XDialogRequest
+      dialog_request = { "Roll", "Enter roll geometry:", geometry };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*geometry == '\0')
     return;
   /*
@@ -932,8 +1001,13 @@ static void XApplyHueCommand(const XMagickCommandContext *context)
   /*
     Query user for percent hue change.
   */
-  (void) XDialogWidget(display,windows,"Apply",
-    "Enter percent change in image hue (0-200):",hue_percent);
+  {
+    const XDialogRequest
+      dialog_request = { "Apply", "Enter percent change in image hue (0-200):",
+        hue_percent };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*hue_percent == '\0')
     return;
   /*
@@ -997,8 +1071,13 @@ static void XApplyEmbossCommand(const XMagickCommandContext *context)
   /*
     Query user for emboss radius.
   */
-  (void) XDialogWidget(display,windows,"Emboss",
-    "Enter the emboss radius and standard deviation:",radius);
+  {
+    const XDialogRequest
+      dialog_request = { "Emboss",
+        "Enter the emboss radius and standard deviation:", radius };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*radius == '\0')
     return;
   /*
@@ -1062,8 +1141,13 @@ static void XApplyWaveCommand(const XMagickCommandContext *context)
   /*
     Query user for the wave geometry.
   */
-  (void) XDialogWidget(display,windows,"Wave",
-    "Enter the amplitude and length of the wave:",geometry);
+  {
+    const XDialogRequest
+      dialog_request = { "Wave", "Enter the amplitude and length of the wave:",
+        geometry };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*geometry == '\0')
     return;
   /*
@@ -1123,8 +1207,12 @@ static void XApplyOilPaintCommand(const XMagickCommandContext *context,
   /*
     Query user for circular neighborhood radius.
   */
-  (void) XDialogWidget(display,windows,"Oil Paint",
-    "Enter the mask radius:",radius);
+  {
+    const XDialogRequest
+      dialog_request = { "Oil Paint", "Enter the mask radius:", radius };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*radius == '\0')
     return;
   /*
@@ -1188,8 +1276,13 @@ static void XApplyCharcoalDrawCommand(const XMagickCommandContext *context)
   /*
     Query user for charcoal radius.
   */
-  (void) XDialogWidget(display,windows,"Charcoal Draw",
-    "Enter the charcoal radius and sigma:",radius);
+  {
+    const XDialogRequest
+      dialog_request = { "Charcoal Draw",
+        "Enter the charcoal radius and sigma:", radius };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*radius == '\0')
     return;
   /*
@@ -1400,8 +1493,12 @@ static void XApplyAddBorderCommand(const XMagickCommandContext *context,
   XColorBrowserWidget(display,windows,"Select",color);
   if (*color == '\0')
     return;
-  (void) XDialogWidget(display,windows,"Add Border",
-    "Enter border geometry:",geometry);
+  {
+    const XDialogRequest
+      dialog_request = { "Add Border", "Enter border geometry:", geometry };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*geometry == '\0')
     return;
   /*
@@ -1468,8 +1565,12 @@ static void XApplyAddFrameCommand(const XMagickCommandContext *context,
   XColorBrowserWidget(display,windows,"Select",color);
   if (*color == '\0')
     return;
-  (void) XDialogWidget(display,windows,"Add Frame","Enter frame geometry:",
-    geometry);
+  {
+    const XDialogRequest
+      dialog_request = { "Add Frame", "Enter frame geometry:", geometry };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*geometry == '\0')
     return;
   /*
@@ -1932,8 +2033,13 @@ static void XApplySlideShowCommand(const XMagickCommandContext *context)
   /*
     Display next image after pausing.
   */
-  (void) XDialogWidget(display,windows,"Slide Show",
-    "Pause how many 1/100ths of a second between images:",delay);
+  {
+    const XDialogRequest
+      dialog_request = { "Slide Show",
+        "Pause how many 1/100ths of a second between images:", delay };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*delay == '\0')
     return;
   resource_info->delay=StringToUnsignedLong(delay);

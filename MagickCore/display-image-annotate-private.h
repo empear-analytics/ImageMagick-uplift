@@ -1149,8 +1149,13 @@ static void XSelectDissolveBlend(Display *display,XWindows *windows,
   */
   (void) XSetFunction(display,windows->image.highlight_context,
     GXcopy);
-  (void) XDialogWidget(display,windows,"Dissolve",
-    "Enter the blend factor (0.0 - 99.9%):",factor);
+  {
+    const XDialogRequest
+      dialog_request = { "Dissolve", "Enter the blend factor (0.0 - 99.9%):",
+        factor };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   (void) XSetFunction(display,windows->image.highlight_context,
     GXinvert);
   if (*factor == '\0')
@@ -1170,8 +1175,13 @@ static void XSelectDisplaceGeometry(Display *display,XWindows *windows,
   */
   (void) XSetFunction(display,windows->image.highlight_context,
     GXcopy);
-  (void) XDialogWidget(display,windows,"Displace",
-    "Enter the horizontal and vertical scale:",displacement_geometry);
+  {
+    const XDialogRequest
+      dialog_request = { "Displace", "Enter the horizontal and vertical scale:",
+        displacement_geometry };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   (void) XSetFunction(display,windows->image.highlight_context,
     GXinvert);
   if (*displacement_geometry == '\0')

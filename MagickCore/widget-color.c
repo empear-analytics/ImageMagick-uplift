@@ -1034,10 +1034,12 @@ MagickPrivate void XColorBrowserWidget(Display *display,XWindows *windows,
       colorlist=GetColorList(glob_pattern,&colors,exception);
       if (colorlist == (char **) NULL)
         {
+          const XDialogRequest
+            dialog_request = { action, "Enter color name:", reply };
+
           XNoticeWidget(display,windows,"Unable to obtain colors names:",
             glob_pattern);
-          (void) XDialogWidget(display,windows,action,"Enter color name:",
-            reply);
+          (void) XDialogWidget(display,windows,&dialog_request);
           return;
         }
     }

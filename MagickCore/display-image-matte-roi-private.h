@@ -342,8 +342,12 @@ static void XSelectFuzzFactor(const EditMenuInput *menu,
       return;
     }
   (void) CopyMagickString(fuzz,"20%",MagickPathExtent);
-  (void) XDialogWidget(display,windows,"Ok",
-    "Enter fuzz factor (0.0 - 99.9%):",fuzz);
+  {
+    const XDialogRequest
+      dialog_request = { "Ok", "Enter fuzz factor (0.0 - 99.9%):", fuzz };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*fuzz == '\0')
     return;
   (void) ConcatenateMagickString(fuzz,"%",MagickPathExtent);
@@ -708,7 +712,12 @@ static void XSelectMatteValue(const EditMenuInput *menu,
     }
   (void) FormatLocaleString(message,MagickPathExtent,
     "Enter matte value (0 - " "%g" "):",(double) QuantumRange);
-  (void) XDialogWidget(display,windows,"Matte",message,matte);
+  {
+    const XDialogRequest
+      dialog_request = { "Matte", message, matte };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*matte == '\0')
     return;
 }
@@ -1466,8 +1475,12 @@ static MagickBooleanType XGrabDelay(Display *display,XWindows *windows,
         User may want to delay the X server screen grab.
       */
       (void) CopyMagickString(seconds,"0",MagickPathExtent);
-      (void) XDialogWidget(display,windows,"Grab","Enter any delay in seconds:",
-        seconds);
+      {
+        const XDialogRequest
+          dialog_request = { "Grab", "Enter any delay in seconds:", seconds };
+
+        (void) XDialogWidget(display,windows,&dialog_request);
+      }
       if (*seconds == '\0')
         return(MagickFalse);
       XDelay(display,(size_t) (1000*StringToLong(seconds)));
@@ -1490,8 +1503,12 @@ static void XRequestImageSize(Display *display,XWindows *windows,
       (void) CopyMagickString(geometry,"512x512",MagickPathExtent);
       if (image_info->size != (char *) NULL)
         (void) CopyMagickString(geometry,image_info->size,MagickPathExtent);
-      (void) XDialogWidget(display,windows,"Load","Enter the image geometry:",
-        geometry);
+      {
+        const XDialogRequest
+          dialog_request = { "Load", "Enter the image geometry:", geometry };
+
+        (void) XDialogWidget(display,windows,&dialog_request);
+      }
       (void) CloneString(&image_info->size,geometry);
     }
 }

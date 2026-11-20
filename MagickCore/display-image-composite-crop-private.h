@@ -2340,8 +2340,12 @@ static void XSelectDrawWidth(const DrawEditContext *context,const int id,
         WidthsMenu[entry]);
       return;
     }
-  (void) XDialogWidget(display,windows,"Ok","Enter line width:",
-    width);
+  {
+    const XDialogRequest
+      dialog_request = { "Ok", "Enter line width:", width };
+
+    (void) XDialogWidget(display,windows,&dialog_request);
+  }
   if (*width == '\0')
     return;
   (*line_width)=(unsigned int) StringToUnsignedLong(width);
