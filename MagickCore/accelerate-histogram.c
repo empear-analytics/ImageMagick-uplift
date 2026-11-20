@@ -1267,8 +1267,7 @@ static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
     const EqualizePassTargets
       runTargets = { &equalizeMapBuffer, &equalizeKernel, &outputReady };
 
-    if (RunEqualizePass(&run,exception,&runTargets) == MagickFalse)
-      goto cleanup;
+    (void) RunEqualizePass(&run,exception,&runTargets);
   }
 
 cleanup:
