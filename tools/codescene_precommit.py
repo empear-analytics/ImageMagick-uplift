@@ -18,9 +18,11 @@ Only library code is gated: .c and .cpp files in the subsystems that
 tools/codehealth_sweep.py scores, and the private headers there (`*-private.h`),
 which hold static and static inline functions (owner, 2026-11-20). CodeScene gives
 no score ("Could not determine Code Health score.") both for a header with no function
-and for one it cannot parse, so such a header counts as 10.0 only when it is listed in
-tools/noscore_headers.txt (as staged), a reviewed list of headers read and found to
-hold no function definition; every other header without a score is refused. Public
+and for one it cannot parse, so such a header counts as 10.0 only when its exact content
+(path and git blob hash) is listed in tools/noscore_headers.txt, a reviewed list of
+headers read and found to hold no function definition; any other header without a
+score, and any edit to a listed one whose entry the same commit does not update, is
+refused. Public
 headers are declarations and are not gated. Adapted from the 3SX campaign.
 """
 
@@ -169,23 +171,37 @@ def parse_score(stdout: str, path: str) -> float:
     return float(match.group(1))
 
 
-def noscore_headers() -> set[str]:
-    """The paths of tools/noscore_headers.txt as staged (else as in the working tree)."""
-    staged_exists, text = show_staged(NOSCORE_LIST)
-    if not staged_exists:
-        listed = REPO / NOSCORE_LIST
-        text = listed.read_text(encoding="utf-8") if listed.is_file() else ""
-    return {line.split("#")[0].strip() for line in text.splitlines()} - {""}
+def list_entries(text: str) -> set[tuple[str, ...]]:
+    """(path, blob hash) of each entry of a noscore_headers.txt text."""
+    return {tuple(line.split("#")[0].split()) for line in text.splitlines()} - {()}
+
+
+def noscore_entries() -> set[tuple[str, ...]]:
+    """The entries of tools/noscore_headers.txt as staged and as at HEAD (the HEAD entries
+    vouch for the content a commit replaces; the staged ones for what it stages), else as in
+    the working tree."""
+    entries: set[tuple[str, ...]] = set()
+    for exists, text in (show_staged(NOSCORE_LIST), show("HEAD", NOSCORE_LIST)):
+        entries |= list_entries(text) if exists else set()
+    listed = REPO / NOSCORE_LIST
+    if not entries and listed.is_file():
+        entries = list_entries(listed.read_text(encoding="utf-8"))
+    return entries
+
+
+def blob_hash(path: str) -> str:
+    return git("hash-object", "--no-filters", path).stdout.strip()
 
 
 def score(path: str, exe: str, name: str) -> float:
     """The score of the file at PATH, which holds a version of NAME. cs-mcp gives NO_SCORE both
-    for a header with no function and for one it cannot parse: only a header listed in
-    tools/noscore_headers.txt, read and found to hold no function, counts as 10.0."""
+    for a header with no function and for one it cannot parse: only content listed in
+    tools/noscore_headers.txt by NAME and its exact blob hash, read and found to hold no
+    function, counts as 10.0. An edit to a listed header passes only with its entry updated."""
     stdout = run_score_request(exe, path)
-    if NO_SCORE in stdout and name in noscore_headers():
+    if NO_SCORE in stdout and (name, blob_hash(path)) in noscore_entries():
         return 10.0
-    return parse_score(stdout, f"{name} (not in {NOSCORE_LIST})")
+    return parse_score(stdout, f"{name} (this content not in {NOSCORE_LIST})")
 
 
 def temp_file(content: str, suffix: str) -> str:

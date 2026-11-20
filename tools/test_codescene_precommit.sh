@@ -56,7 +56,16 @@ printf '%s' "$good" > "$repo/MagickCore/x-private.h"
 printf '%s' "$good" > "$repo/MagickCore/x.h"
 printf '%s\n%s' "$good" "$bad" > "$repo/MagickCore/y.c"
 printf '%s\n%s' "$good" "$bad" > "$repo/MagickCore/z-private.h"
-git -C "$repo" init -q && git -C "$repo" add -A &&
+printf '#ifdef NEVER\n  r=2;\n#endif\n' > "$repo/MagickCore/l-private.h"   # no score, listed
+git -C "$repo" init -q
+listing() {  # listing PATH...: tools/noscore_headers.txt naming each PATH's present content
+  : > "$repo/tools/noscore_headers.txt"
+  for p in "$@"; do
+    echo "$p $(git -C "$repo" hash-object --no-filters "$p")  # no function" >> "$repo/tools/noscore_headers.txt"
+  done
+}
+listing MagickCore/l-private.h
+git -C "$repo" add -A &&
   git -C "$repo" -c user.name=t -c user.email=t@t commit -qm base || exit 2
 
 expect() {  # expect LABEL RC PATTERN: run the gate on what is staged, then reset
@@ -72,13 +81,23 @@ printf '%s\n%s' "$good" "$bad" > "$repo/MagickCore/x-private.h"; git -C "$repo" 
 expect "private header degrades" 1 "x-private.h: Code Health degraded from 10.00"
 printf '%s\n%s' "$good" "$bad" > "$repo/MagickCore/x.h"; git -C "$repo" add -A
 expect "public header degrades (not gated: nothing staged to score)" 0 ""
-# A header cs-mcp cannot score passes only when tools/noscore_headers.txt (as staged) lists it.
+# A header cs-mcp cannot score passes only when tools/noscore_headers.txt lists its path with
+# the blob hash of exactly this content.
 printf '#ifdef NEVER\n  r=1;\n#endif\n' > "$repo/MagickCore/frag-private.h"; git -C "$repo" add -A
-expect "new header with no score, not listed" 1 "frag-private.h (not in tools/noscore_headers.txt)"
+expect "new header with no score, not listed" 1 "frag-private.h (this content not in tools/noscore_headers.txt)"
 printf '#ifdef NEVER\n  r=1;\n#endif\n' > "$repo/MagickCore/frag-private.h"
-printf 'MagickCore/frag-private.h  # a fragment, no function\n' > "$repo/tools/noscore_headers.txt"
-git -C "$repo" add -A
+listing MagickCore/l-private.h MagickCore/frag-private.h; git -C "$repo" add -A
 expect "new header with no score, listed in the same commit" 0 "gate passed"
+# A listed header edited to add a function (K&R, no score) without its entry updated: refused.
+# The same edit with the entry updated to the new content passes: the list is the review point.
+printf 'static int Bad3(a,b)\n  int a,b;\n{\n  if (a > 0) { if (b > 0) { if (a > b) return(1); } }\n  return(0);\n}\n' \
+  >> "$repo/MagickCore/l-private.h"; git -C "$repo" add -A
+expect "listed header gains a K&R function, list not updated" 1 \
+  "l-private.h (this content not in tools/noscore_headers.txt)"
+printf 'static int Bad3(a,b)\n  int a,b;\n{\n  if (a > 0) { if (b > 0) { if (a > b) return(1); } }\n  return(0);\n}\n' \
+  >> "$repo/MagickCore/l-private.h"
+listing MagickCore/l-private.h; git -C "$repo" add -A
+expect "the same edit with its entry updated (re-reviewed in the diff)" 0 "gate passed"
 printf '%s' "$bad" > "$repo/MagickCore/n-private.h"; git -C "$repo" add -A
 expect "new private header below 10.0" 1 "n-private.h: new code must score 10.0"
 printf '%s' "$good" > "$repo/MagickCore/y.c"
@@ -100,8 +119,7 @@ expect "a K&R definition" 1 "x-private.h"
 printf '%s' "$bad" | sed '1s/)$/) MAGICK_ATTRIBUTE/' > "$repo/MagickCore/x-private.h"; git -C "$repo" add -A
 expect "a macro between ) and {" 1 "x-private.h"
 printf '#ifdef NEVER\n  if (r != 0)\n  {\n    r=1;\n  }\n#endif\n' > "$repo/MagickCore/frag2-private.h"
-printf 'MagickCore/frag2-private.h  # a fragment, no function\n' > "$repo/tools/noscore_headers.txt"
-git -C "$repo" add -A
+listing MagickCore/l-private.h MagickCore/frag2-private.h; git -C "$repo" add -A
 expect "new fragment with an if block, listed" 0 "gate passed"
 [ $fail -eq 0 ] && echo "test_codescene_precommit: all passed"
 exit $fail
