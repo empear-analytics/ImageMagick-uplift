@@ -1333,13 +1333,9 @@ static Cache GetImagePixelCache(Image *image,const MagickBooleanType clone,
       LockSemaphoreInfo(cache_info->semaphore);
       if ((cache_info->reference_count > 1) || (cache_info->mode == ReadMode))
         {
-          ImagePixelCacheClone
-            pixel_cache_clone;
+          const ImagePixelCacheClone
+            pixel_cache_clone = { image, clone, cache_info, exception };
 
-          pixel_cache_clone.image=image;
-          pixel_cache_clone.clone=clone;
-          pixel_cache_clone.cache_info=cache_info;
-          pixel_cache_clone.exception=exception;
           CloneImagePixelCache(&pixel_cache_clone,&status,&destroy);
         }
       UnlockSemaphoreInfo(cache_info->semaphore);
