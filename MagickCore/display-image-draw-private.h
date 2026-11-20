@@ -398,9 +398,21 @@ static void XApplyBrightnessCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
-static void XApplyGammaToImage(Display *display,XWindows *windows,Image **image,
-  char *factor,ExceptionInfo *exception)
+static void XApplyGammaToImage(const XMagickCommandContext *context,
+  char *factor)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
   (void) GammaImage(*image,strtod(factor,(char **) NULL),exception);
@@ -440,7 +452,7 @@ static void XApplyGammaCommand(const XMagickCommandContext *context)
   /*
     Gamma correct image.
   */
-  XApplyGammaToImage(display,windows,image,factor,exception);
+  XApplyGammaToImage(context,factor);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
