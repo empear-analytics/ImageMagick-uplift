@@ -1450,6 +1450,9 @@ static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
     j,
     n;
 
+  const DashSegmentTargets
+    targets = { (&j), (&status) };
+
   assert(draw_info != (const DrawInfo *) NULL);
   if (draw_info->debug != MagickFalse)
     (void) LogMagickEvent(DrawEvent,GetMagickModule(),"    begin draw-dash");
@@ -1488,9 +1491,6 @@ static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
       DashSegmentInfo
         segment;
 
-      DashSegmentTargets
-        targets;
-
       total_length+=length;
       segment.number_vertices=number_vertices;
       segment.dash_polygon=dash_polygon;
@@ -1504,8 +1504,6 @@ static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
       segment.image=image;
       segment.clone_info=clone_info;
       segment.exception=exception;
-      targets.j=(&j);
-      targets.status=(&status);
       if (DrawDashSegment(&segment,&targets) == MagickFalse)
         break;
       n=GetNextDashIndex(draw_info,n);
