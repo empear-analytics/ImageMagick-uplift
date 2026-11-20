@@ -53,7 +53,6 @@ static MagickBooleanType IsBaseKernelNeeded(const KernelInfoType type)
 #endif
       return(MagickTrue);
   }
-  return(MagickFalse);
 }
 
 #endif
