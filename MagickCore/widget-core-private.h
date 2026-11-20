@@ -93,6 +93,15 @@ typedef struct _DialogRelease
     event;
 } DialogRelease;
 
+typedef struct _WidgetTextKey
+{
+  const KeySym
+    key_symbol;
+
+  char
+    *text;
+} WidgetTextKey;
+
 /*
   Accessor declarations.
 */
@@ -775,8 +784,14 @@ static inline void XEditTextBackspace(XWidgetInfo *text_info)
 }
 
 static inline void XEditText(Display *display,XWidgetInfo *text_info,
-  const KeySym key_symbol,char *text,const size_t state)
+  const WidgetTextKey *key,const size_t state)
 {
+  const KeySym
+    key_symbol = key->key_symbol;
+
+  char
+    *const text = key->text;
+
   switch ((int) key_symbol)
   {
     case XK_BackSpace:

@@ -410,8 +410,12 @@ static void SelectFontBrowserReply(const FontBrowserContext *context,
         Insert primary selection in reply text.
       */
       *(data+length)='\0';
-      XEditText(display,reply_info,(KeySym) XK_Insert,(char *) data,
-        (*state));
+      {
+        const WidgetTextKey
+          key = { (KeySym) XK_Insert, (char *) data };
+
+        XEditText(display,reply_info,&key,(*state));
+      }
       XDrawMatteText(display,&windows->widget,reply_info);
       (*state)|=JumpListState;
       (*state)|=RedrawActionState;
@@ -577,7 +581,12 @@ static void PressFontBrowserKey(const FontBrowserContext *context,
       return;
     }
   (*reply_info)=ApplyListBrowserControlKey((*reply_info),key_symbol,(*state));
-  XEditText(display,reply_info,key_symbol,command,(*state));
+  {
+    const WidgetTextKey
+      key = { key_symbol, command };
+
+    XEditText(display,reply_info,&key,(*state));
+  }
   XDrawMatteText(display,&windows->widget,reply_info);
   (*state)|=JumpListState;
 }
