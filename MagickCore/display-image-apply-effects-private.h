@@ -796,9 +796,21 @@ static void XApplyImplodeCommand(const XMagickCommandContext *context,
   XRunDialogCommand(context,&command,flags);
 }
 
-static void XApplyVignetteToImage(Display *display,XWindows *windows,
-  char *geometry,Image **image,ExceptionInfo *exception)
+static void XApplyVignetteToImage(const XMagickCommandContext *context,
+  char *geometry)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   GeometryInfo
     geometry_info;
 
@@ -862,7 +874,7 @@ static void XApplyVignetteCommand(const XMagickCommandContext *context)
   /*
     Soften the edges of the image in vignette style
   */
-  XApplyVignetteToImage(display,windows,geometry,image,exception);
+  XApplyVignetteToImage(context,geometry);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
