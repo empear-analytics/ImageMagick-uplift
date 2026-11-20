@@ -25851,6 +25851,102 @@ for the owner's confirmation.
 
 ---
 
+## Recipe UB - Move an Unbuilt Block Verbatim into a Fragment Header Included in Its Place
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Overall Code
+Complexity* on a function that holds a conditional block no Linux build compiles (an
+`#ifdef` of a macro nothing defines, such as `RECREATEBUFFER` in the OpenCL histogram
+methods, or an `#if 0` block), whose text CodeScene counts (its `if`s and lines) although no
+compiler ever sees it. The block names the function's locals (or names that no longer exist:
+`accelerate-histogram.c`'s block assigns `mem_flags`, `length` and `clStatus` and reads
+`context`, none of which `ComputeEqualizeImage` declares), so it cannot move into a helper
+without being edited, and every extraction around it is blocked by the rule that unbuilt code
+is never edited.
+
+**Not covered by:** the *Preprocessor branches* exception for `#if 0`, which moves a dead
+branch together with the code that holds it (an extraction); here the block moves alone and
+nothing around it changes. Recipe OH, which moves file-scope items to a header named in the
+include block; here the block stays inside its function and the header is named where the
+block stood. Recipe S (whole functions, a branch inside them).
+
+**How:**
+
+1. Probe first: replace the block by the `#include` line of step 3 in a copy of the file and
+   score the copy with `tools/ch.py`. Take the step when the file rises, or when the step is
+   the first of a chain whose next step is named and probed (rule 2).
+2. The block. It runs from its opening directive (`#ifdef X`, `#if 0`) through its matching
+   `#endif`, both lines included, and no build compiles any line of it: its condition is
+   false in every configuration (`grep -rn X` over the tree, `configure.ac`, `config/` and
+   the Windows project files finds no definition; `#if 0` needs no check). A block with an
+   `#else` that some build compiles is not taken.
+3. The header. Create `MagickCore/<stem>-<theme>-private.h` holding the short licence comment
+   of the private headers, saying which functions include it in place, and then the block
+   byte for byte. It has no include guard and no other code: it is a fragment, included where
+   the block stood, possibly in several places. List it under `MAGICKCORE_NOINST_HDRS` and
+   `MAGICKCORE_BASE_SRCS` in `MagickCore/Makefile.am`, mirrored in `Makefile.in`.
+4. The file. Replace the block's lines by one line, `#include
+   "MagickCore/<stem>-<theme>-private.h"`, at column 0 where the opening directive stood.
+   Nothing else changes; a comment above the block stays above the include. Another function
+   (in this file or another) that holds the same block byte for byte includes the same header
+   in a commit of its own; no copy of the header is made.
+5. Proof. A script checks that the header's text after its licence comment equals the lines
+   removed from the file, and that `git show HEAD:<file>` with the include line replaced by
+   that text is the working file. `tools/pp_identical.sh` and `tools/obj_identical.sh` print
+   `IDENTICAL` in every build that compiles the function (`WIDE=1` for OpenCL and X11), and
+   in the narrow build when it compiles it. With the macro defined, the translation unit gets
+   the same tokens in the same place, because `#include` is textual.
+6. Checks: `tools/ci_linux_warnings.sh --campaign-a`, `refactor_guard.py --combined` over the
+   file and the header (every literal's total unchanged), the scores of the file and of the
+   header, and the wide oracle when a case reaches the function.
+
+**Before:** (`accelerate-histogram.c`, `ComputeEqualizeImage`)
+
+```c
+  /* recreate input buffer later, in case image updated */
+#ifdef RECREATEBUFFER
+  if (imageBuffer!=NULL)
+    clEnv->library->clReleaseMemObject(imageBuffer);
+#endif
+```
+
+**After:**
+
+```c
+  /* recreate input buffer later, in case image updated */
+#include "MagickCore/accelerate-recreate-release-private.h"
+```
+
+with `accelerate-recreate-release-private.h` holding the licence comment and the four lines
+from `#ifdef RECREATEBUFFER` to `#endif`.
+
+**Careful:**
+
+- The block is dead text: nothing in it is edited, not even names that no longer exist in its
+  function. Whoever defines the macro later finds it, unchanged, in the header the function
+  names in its place, and must adjust it there, as before.
+- No include guard: a guard would make a second inclusion in one translation unit (two
+  functions of one file holding the same block) silently empty, so the second place would
+  lose its text under the macro.
+- `__LINE__` of the code after the block changes (fewer lines in the file); the proof pins it
+  and the oracle normalises it.
+- CodeScene does not see the block any more, so the function's score rises without any code
+  changing: this is the point of the recipe, and the reason it is limited to text no build
+  compiles (owner 2026-11-20: such code "may move verbatim into a header; it is never edited
+  or deleted").
+
+**Evidence level:** guard, with step 5's identities (the block is not compiled; the rest of
+the unit is unchanged).
+
+**Provenance:** 2026-11-20, from `accelerate-histogram.c` (8.85) and
+`accelerate-contrast-stretch.c` (7.30) (campaign A, W49 round 36, lane c): both hold the same
+two `#ifdef RECREATEBUFFER` blocks, which CodeScene counts in `ComputeEqualizeImage` (cc 16 to
+12 and 103 to 84 lines in a probe, the file 8.85 to 8.95) and `ComputeContrastStretchImage`
+(cc 79 to 75, 7.30 to 7.38). Written under the owner's ruling of 2026-11-20 that code no Linux
+build compiles may move verbatim into a header. Added by Claude Code (Claude Opus 5.5) under
+the mandate of 2026-11-19, for the owner's confirmation.
+
+---
+
 ## Catalogue changes
 
 | Date | Type | Recipe | Change | Evidence | Decided by |
@@ -26414,3 +26510,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-20 | AMEND | OH | *X11 conditional form* of Form A: in a `.c` file whose include block is followed directly by `#if defined(MAGICKCORE_X11_DELEGATE)` closing at the file's end (the `widget-*.c` split products), the run begins after the opener; the new header wraps the items, verbatim and in order, in the same conditional inside its guard, and the `.c` file names it as the last line of its include block, above the opener (no mid-file include); proof `pp_identical.sh` and `obj_identical.sh` with `WIDE=1` (`pp_identical.sh` gains `WIDE=1`) | `widget-color.c`, `widget-font.c`, `widget-file.c`, `widget-text.c` and `widget-list.c` (campaign A, W48 round 35, lane a), each one family carrying *Lines of Code in a Single File* (one public root each, so Recipe S has nothing to split); probes: color 9.38 to 10.0 with a 10.0 header, font 9.38 to 10.0 with a 10.0 header, file 8.81 to 10.0 with a 9.38 header | mandate (2026-11-19) |
 | 2026-11-20 | AMEND | D | Form (b), *Unreached functions* and *Object code that differs only in the caller*: the block's single output that the helper returns may be a member `s.m` of a struct local of the caller, the call `s.m=Helper(...,s.m,...);`, when the member is reached with one `.` and no `->`, is set on every path before the block, and the block reads and writes no other member of `s`; `tools/reuse_check.py` accepts the shape and refuses `->` | `fourier-forward-private.h`'s `ForwardFourierTransformChannel` (campaign A, W48 round 35, lane b): its padding block is `PadFourierWidth`'s body with `fourier_info.width` as the padded width; the call clears the header's Overall Code Complexity, 9.38 -> 10.0 | mandate (2026-11-19) |
 | 2026-11-20 | AMEND | OH | *X11 conditional form* on a header it produced that one `.c` file includes: the run begins after the header's own X11 opener, the new header wraps it in the same conditional, the `.c` file names the new header directly above the carved one; proof compiles the `.c` file against `HEAD`'s and the working tree's headers (preprocessed unit and object identical, wide flags), since `obj_identical.sh`/`pp_identical.sh` cannot see a header-only change | `widget-list-actions-private.h` (campaign A, W48 round 35, lane a): at 998 lines of code it blocks the Recipe B bundle of `XEditText` (`widget-core-private.h` 9.68 to 10.0), whose two block-form call sites would put it at 1005 (9.38); a carve of its leading run up to `MoveListBrowserSliderByPage` leaves both headers at 10.0 | mandate (2026-11-19) |
+| 2026-11-20 | NEW | UB | Move an Unbuilt Block Verbatim into a Fragment Header Included in Its Place: a conditional block no Linux build compiles (`#ifdef RECREATEBUFFER`, `#if 0`) inside a function moves, byte for byte, into a guard-less private header that the function `#include`s at the block's place; files holding the same block include the same header; proof by script (the text moved unchanged) and `pp_identical.sh`/`obj_identical.sh` IDENTICAL | `accelerate-histogram.c`'s `ComputeEqualizeImage` and `accelerate-contrast-stretch.c`'s `ComputeContrastStretchImage` (campaign A, W49 round 36, lane c), each holding the same two `RECREATEBUFFER` blocks; probes 8.85 to 8.95 and 7.30 to 7.38; the owner's ruling of 2026-11-20 that code no Linux build compiles may move verbatim into a header | mandate (2026-11-19) |
