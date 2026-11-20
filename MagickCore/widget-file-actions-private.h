@@ -398,9 +398,13 @@ static void SelectFileBrowserFormat(Display *display,XWindows *windows,
     windows->widget.busy_cursor);
   windows->popup.x=windows->widget.x+60;
   windows->popup.y=windows->widget.y+60;
-  XListBrowserWidget(display,windows,&windows->popup,
-    (const char **) formats,"Select","Select image format type:",
-    format);
+  {
+    const XListBrowserRequest
+      browse_request = { (const char **) formats, "Select",
+        "Select image format type:", format };
+
+    XListBrowserWidget(display,windows,&windows->popup,&browse_request);
+  }
   XSetCursorState(display,windows,MagickTrue);
   (void) XCheckDefineCursor(display,windows->widget.id,
     windows->widget.cursor);

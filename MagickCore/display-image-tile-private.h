@@ -99,8 +99,13 @@ static void XSelectPageGeometry(Display *display,XWindows *windows,
         (void) CopyMagickString(geometry,PSPageGeometry,MagickPathExtent);
       if (image_info->page != (char *) NULL)
         (void) CopyMagickString(geometry,image_info->page,MagickPathExtent);
-      XListBrowserWidget(display,windows,&windows->widget,PageSizes,"Select",
-        "Select page geometry:",geometry);
+      {
+        const XListBrowserRequest
+          browse_request = { PageSizes, "Select", "Select page geometry:",
+            geometry };
+
+        XListBrowserWidget(display,windows,&windows->widget,&browse_request);
+      }
       if (*geometry != '\0')
         image_info->page=GetPageGeometry(geometry);
     }

@@ -1413,8 +1413,13 @@ static MagickBooleanType XSelectCommandLineFile(Display *display,
     if (*files[i] != '-')
       filelist[j++]=files[i];
   filelist[j]=(char *) NULL;
-  XListBrowserWidget(display,windows,&windows->widget,
-    (const char **) filelist,"Load","Select Image to Load:",filename);
+  {
+    const XListBrowserRequest
+      browse_request = { (const char **) filelist, "Load",
+        "Select Image to Load:", filename };
+
+    XListBrowserWidget(display,windows,&windows->widget,&browse_request);
+  }
   filelist=(char **) RelinquishMagickMemory(filelist);
   (void) XFreeStringList(files);
   return(MagickTrue);
@@ -2550,8 +2555,13 @@ static MagickBooleanType XPrintImage(Display *display,
   (void) FormatLocaleString(geometry,MagickPathExtent,"Letter");
   if (image_info->page != (char *) NULL)
     (void) CopyMagickString(geometry,image_info->page,MagickPathExtent);
-  XListBrowserWidget(display,windows,&windows->widget,PageSizes,"Select",
-    "Select Postscript Page Geometry:",geometry);
+  {
+    const XListBrowserRequest
+      browse_request = { PageSizes, "Select",
+        "Select Postscript Page Geometry:", geometry };
+
+    XListBrowserWidget(display,windows,&windows->widget,&browse_request);
+  }
   if (*geometry == '\0')
     return(MagickTrue);
   image_info->page=GetPageGeometry(geometry);
