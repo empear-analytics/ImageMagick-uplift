@@ -1,0 +1,3 @@
+# SimilarityImage spatial row loop, 600x600 image (360000 pixels, above the one-thread threshold), 4x4 reconstruction
+compare -dissimilarity-threshold 1 -metric AE -subimage-search -size 600x600 gradient:"#ff0000-#0000ff" -size 4x4 gradient:"#ff0000-#00ff00" null:
+compare -dissimilarity-threshold 1 -metric MAE -subimage-search -size 600x600 gradient:"#ff0000-#0000ff" -size 4x4 gradient:"#ff0000-#00ff00" -depth 16 ppm:- | md5sum

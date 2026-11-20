@@ -340,7 +340,7 @@ static void SetEqualizeMapEntry(const EqualizeMapInput *input,const cl_uint i)
       (MagickRealType) ((MaxMap*(map[i].w-black.w))/(white.w-black.w)));
 }
 
-typedef struct _HistogramBufferSource
+typedef struct _HostBufferSource
 {
   MagickCLEnv
     clEnv;
@@ -348,13 +348,21 @@ typedef struct _HistogramBufferSource
   MagickCLDevice
     device;
 
-  cl_uint4
-    *histogram;
-} HistogramBufferSource;
+  void
+    *host;
 
-static MagickBooleanType CreateHistogramBuffer(
-  const HistogramBufferSource *source,cl_mem *histogramBuffer,
-  ExceptionInfo *exception)
+  int
+    aligned;
+
+  cl_mem_flags
+    aligned_flags;
+
+  size_t
+    element_size;
+} HostBufferSource;
+
+static MagickBooleanType CreateHostBuffer(const HostBufferSource *source,
+  cl_mem *buffer,ExceptionInfo *exception)
 {
   const MagickCLEnv
     clEnv = source->clEnv;
@@ -362,8 +370,17 @@ static MagickBooleanType CreateHistogramBuffer(
   const MagickCLDevice
     device = source->device;
 
-  cl_uint4
-    *const histogram = source->histogram;
+  void
+    *const host = source->host;
+
+  const int
+    aligned = source->aligned;
+
+  const cl_mem_flags
+    aligned_flags = source->aligned_flags;
+
+  const size_t
+    element_size = source->element_size;
 
   cl_int
     clStatus;
@@ -380,19 +397,19 @@ static MagickBooleanType CreateHistogramBuffer(
   /* If the host pointer is aligned to the size of cl_uint,
      then use the host buffer directly from the GPU; otherwise,
      create a buffer on the GPU and copy the data over */
-  if (ALIGNED(histogram,cl_uint4))
+  if (aligned)
   {
-    mem_flags = CL_MEM_READ_WRITE|CL_MEM_USE_HOST_PTR;
-    hostPtr = histogram;
+    mem_flags = aligned_flags;
+    hostPtr = host;
   }
   else
   {
     mem_flags = CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR;
-    hostPtr = histogram;
+    hostPtr = host;
   }
   /* create a CL buffer for histogram  */
   length = (MaxMap+1);
-  *histogramBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(cl_uint4), hostPtr, &clStatus);
+  *buffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * element_size, hostPtr, &clStatus);
   if (clStatus != CL_SUCCESS)
   {
     (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
@@ -401,347 +418,61 @@ static MagickBooleanType CreateHistogramBuffer(
   return(MagickTrue);
 }
 
-typedef struct _EqualizeMapSource
+static void ReleaseEqualizeKernels(MagickCLDevice device,cl_command_queue queue,
+  cl_kernel histogramKernel,cl_kernel equalizeKernel)
+{
+  if (histogramKernel!=NULL)
+    ReleaseOpenCLKernel(histogramKernel);
+  if (equalizeKernel!=NULL)
+    ReleaseOpenCLKernel(equalizeKernel);
+  if (queue != NULL)
+    ReleaseOpenCLCommandQueue(device, queue);
+  if (device != NULL)
+    ReleaseOpenCLDevice(device);
+}
+
+typedef struct _EqualizeBuffers
 {
   MagickCLEnv
     clEnv;
 
-  MagickCLDevice
-    device;
+  cl_mem
+    imageBuffer;
+
+  cl_float4
+    *map;
+
+  cl_mem
+    equalizeMapBuffer;
 
   PixelPacket
     *equalize_map;
-} EqualizeMapSource;
-
-static MagickBooleanType CreateEqualizeMapBuffer(
-  const EqualizeMapSource *source,cl_mem *equalizeMapBuffer,
-  ExceptionInfo *exception)
-{
-  const MagickCLEnv
-    clEnv = source->clEnv;
-
-  const MagickCLDevice
-    device = source->device;
-
-  PixelPacket
-    *const equalize_map = source->equalize_map;
-
-  cl_int
-    clStatus;
-
-  cl_mem_flags
-    mem_flags;
-
-  size_t
-    length;
-
-  void
-    *hostPtr;
-
-  /* Create and initialize OpenCL buffers. */
-  if (ALIGNED(equalize_map, PixelPacket))
-  {
-    mem_flags = CL_MEM_READ_ONLY|CL_MEM_USE_HOST_PTR;
-    hostPtr = equalize_map;
-  }
-  else
-  {
-    mem_flags = CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR;
-    hostPtr = equalize_map;
-  }
-  /* create a CL buffer for equalize_map  */
-  length = (MaxMap+1);
-  *equalizeMapBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(PixelPacket), hostPtr, &clStatus);
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
-    return(MagickFalse);
-  }
-  return(MagickTrue);
-}
-
-static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
-  ExceptionInfo *exception)
-{
-#define EqualizeImageTag  "Equalize/Image"
-
-  CacheView
-    *image_view;
-
-  cl_command_queue
-    queue;
-
-  cl_int
-    channel_mask=get32BitChannelValue(image->channel_mask),
-    clStatus;
-
-  cl_mem_flags
-    mem_flags;
 
   cl_mem
-    equalizeMapBuffer,
-    histogramBuffer,
-    imageBuffer;
-
-  cl_kernel
-    equalizeKernel,
-    histogramKernel;
-
-  cl_event
-    event;
-
-  cl_uint
-    i;
+    histogramBuffer;
 
   cl_uint4
     *histogram;
+} EqualizeBuffers;
+
+static void ReleaseEqualizeBuffers(const EqualizeBuffers *buffers)
+{
+  const MagickCLEnv
+    clEnv = buffers->clEnv;
+
+  const cl_mem
+    imageBuffer = buffers->imageBuffer,
+    equalizeMapBuffer = buffers->equalizeMapBuffer,
+    histogramBuffer = buffers->histogramBuffer;
 
   cl_float4
-    white,
-    black,
-    *map;
-
-  HistogramBufferInfo
-    histogram_info;
-
-  EqualizeMapInput
-    map_input;
-
-  MagickBooleanType
-    outputReady,
-    status;
-
-  MagickCLDevice
-    device;
+    *map = buffers->map;
 
   PixelPacket
-    *equalize_map;
+    *equalize_map = buffers->equalize_map;
 
-  size_t
-    global_work_size[2],
-    length;
-
-  void
-    *inputPixels;
-
-  if (clEnv == (MagickCLEnv) NULL)
-    return(MagickFalse);
-
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-
-  queue=NULL;
-  image_view=NULL;
-  map=NULL;
-  histogram=NULL;
-  equalize_map=NULL;
-  inputPixels=NULL;
-  imageBuffer=NULL;
-  histogramBuffer=NULL;
-  equalizeMapBuffer=NULL;
-  histogramKernel=NULL;
-  equalizeKernel=NULL;
-  outputReady=MagickFalse;
-
-  /*
-   * initialize opencl env
-   */
-  device=RequestOpenCLDevice(clEnv);
-  if (device == (MagickCLDevice) NULL)
-    goto cleanup;
-  queue=AcquireOpenCLCommandQueue(device);
-  if (queue == (cl_command_queue) NULL)
-    goto cleanup;
-
-  /*
-    Allocate and initialize histogram arrays.
-  */
-  histogram=(cl_uint4 *) AcquireQuantumMemory(MaxMap+1UL, sizeof(*histogram));
-  if (histogram == (cl_uint4 *) NULL)
-      ThrowBinaryException(ResourceLimitWarning,"MemoryAllocationFailed", image->filename);
-
-  /* reset histogram */
-  (void) memset(histogram,0,(MaxMap+1)*sizeof(*histogram));
-
-  /* Create and initialize OpenCL buffers. */
-  /* inputPixels = AcquirePixelCachePixels(image, &length, exception); */
-  /* assume this  will get a writable image */
-  image_view=AcquireAuthenticCacheView(image,exception);
-  inputPixels=GetCacheViewAuthenticPixels(image_view,0,0,image->columns,image->rows,exception);
-
-  if (inputPixels == (void *) NULL)
-  {
-    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),CacheWarning,"UnableToReadPixelCache.","`%s'",image->filename);
-    goto cleanup;
-  }
-  /* If the host pointer is aligned to the size of CLPixelPacket,
-     then use the host buffer directly from the GPU; otherwise,
-     create a buffer on the GPU and copy the data over */
-  mem_flags=GetInputBufferFlags(inputPixels);
-  /* create a CL buffer from image pixel buffer */
-  length = image->columns * image->rows;
-  imageBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(CLPixelPacket), (void*)inputPixels, &clStatus);
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
-    goto cleanup;
-  }
-
-  {
-    const HistogramBufferSource
-      source = { clEnv, device, histogram };
-
-    if (CreateHistogramBuffer(&source,&histogramBuffer,exception) == MagickFalse)
-      goto cleanup;
-  }
-
-  status = LaunchHistogramKernel(clEnv, device, queue, imageBuffer, histogramBuffer, image, image->channel_mask, exception);
-  if (status == MagickFalse)
-    goto cleanup;
-
-  histogram_info.clEnv=clEnv;
-  histogram_info.device=device;
-  histogram_info.queue=queue;
-  histogram_info.histogramBuffer=histogramBuffer;
-  histogram_info.histogram=histogram;
-  if (ReadHistogramBuffer(&histogram_info,exception) == MagickFalse)
-    goto cleanup;
-
-  /* recreate input buffer later, in case image updated */
-#ifdef RECREATEBUFFER
-  if (imageBuffer!=NULL)
-    clEnv->library->clReleaseMemObject(imageBuffer);
-#endif
-
-  /* CPU stuff */
-  equalize_map=(PixelPacket *) AcquireQuantumMemory(MaxMap+1UL, sizeof(*equalize_map));
-  if (equalize_map == (PixelPacket *) NULL)
-    ThrowBinaryException(ResourceLimitWarning,"MemoryAllocationFailed", image->filename);
-
-  map=(cl_float4 *) AcquireQuantumMemory(MaxMap+1UL,sizeof(*map));
-  if (map == (cl_float4 *) NULL)
-    ThrowBinaryException(ResourceLimitWarning,"MemoryAllocationFailed", image->filename);
-
-  /*
-    Integrate the histogram to get the equalization map.
-  */
-  IntegrateEqualizeHistogram(image,histogram,map);
-  black=map[0];
-  white=map[(int) MaxMap];
-  (void) memset(equalize_map,0,(MaxMap+1)*sizeof(*equalize_map));
-  map_input.image=image;
-  map_input.map=map;
-  map_input.white=white;
-  map_input.black=black;
-  map_input.equalize_map=equalize_map;
-  for (i=0; i <= (ssize_t) MaxMap; i++)
-    SetEqualizeMapEntry(&map_input,i);
-
-  if (image->storage_class == PseudoClass)
-  {
-    /*
-       Equalize colormap.
-       */
-    EqualizeColormap(image,equalize_map,white,black);
-  }
-
-  /*
-    Equalize image.
-  */
-
-  /* GPU can work on this again, image and equalize map as input
-    image:        uchar4 (CLPixelPacket)
-    equalize_map: uchar4 (PixelPacket)
-    black, white: float4 (FloatPixelPacket) */
-
-#ifdef RECREATEBUFFER
-  /* If the host pointer is aligned to the size of CLPixelPacket,
-     then use the host buffer directly from the GPU; otherwise,
-     create a buffer on the GPU and copy the data over */
-  if (ALIGNED(inputPixels,CLPixelPacket))
-  {
-    mem_flags = CL_MEM_READ_WRITE|CL_MEM_USE_HOST_PTR;
-  }
-  else
-  {
-    mem_flags = CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR;
-  }
-  /* create a CL buffer from image pixel buffer */
-  length = image->columns * image->rows;
-  imageBuffer = clEnv->library->clCreateBuffer(context, mem_flags, length * sizeof(CLPixelPacket), (void*)inputPixels, &clStatus);
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
-    goto cleanup;
-  }
-#endif
-
-  {
-    const EqualizeMapSource
-      source = { clEnv, device, equalize_map };
-
-    if (CreateEqualizeMapBuffer(&source,&equalizeMapBuffer,exception) == MagickFalse)
-      goto cleanup;
-  }
-
-  /* get the OpenCL kernel */
-  equalizeKernel = AcquireOpenCLKernel(device,"Equalize");
-  if (equalizeKernel == NULL)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "AcquireOpenCLKernel failed.", ".");
-    goto cleanup;
-  }
-
-  /* set the kernel arguments */
-  i=0;
-  clStatus=clEnv->library->clSetKernelArg(equalizeKernel,i++,sizeof(cl_mem),(void *)&imageBuffer);
-  clStatus|=clEnv->library->clSetKernelArg(equalizeKernel,i++,sizeof(cl_int),&channel_mask);
-  clStatus|=clEnv->library->clSetKernelArg(equalizeKernel,i++,sizeof(cl_mem),(void *)&equalizeMapBuffer);
-  clStatus|=clEnv->library->clSetKernelArg(equalizeKernel,i++,sizeof(cl_float4),&white);
-  clStatus|=clEnv->library->clSetKernelArg(equalizeKernel,i++,sizeof(cl_float4),&black);
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
-    goto cleanup;
-  }
-
-  /* launch the kernel */
-  global_work_size[0] = image->columns;
-  global_work_size[1] = image->rows;
-
-  clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, equalizeKernel, 2, NULL, global_work_size, NULL, 0, NULL, &event);
-
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
-    goto cleanup;
-  }
-  RecordProfileData(device,equalizeKernel,event);
-
-  /* read the data back */
-  if (ALIGNED(inputPixels,CLPixelPacket))
-  {
-    length = image->columns * image->rows;
-    clEnv->library->clEnqueueMapBuffer(queue, imageBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(CLPixelPacket), 0, NULL, NULL, &clStatus);
-  }
-  else
-  {
-    length = image->columns * image->rows;
-    clStatus = clEnv->library->clEnqueueReadBuffer(queue, imageBuffer, CL_TRUE, 0, length * sizeof(CLPixelPacket), inputPixels, 0, NULL, NULL);
-  }
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
-    goto cleanup;
-  }
-
-  outputReady=SyncCacheViewAuthenticPixels(image_view,exception);
-
-cleanup:
-
-  image_view=DestroyCacheView(image_view);
+  cl_uint4
+    *histogram = buffers->histogram;
 
   if (imageBuffer!=NULL)
     clEnv->library->clReleaseMemObject(imageBuffer);
@@ -755,14 +486,792 @@ cleanup:
     clEnv->library->clReleaseMemObject(histogramBuffer);
   if (histogram!=NULL)
     histogram=(cl_uint4 *) RelinquishMagickMemory(histogram);
-  if (histogramKernel!=NULL)
-    ReleaseOpenCLKernel(histogramKernel);
-  if (equalizeKernel!=NULL)
-    ReleaseOpenCLKernel(equalizeKernel);
-  if (queue != NULL)
-    ReleaseOpenCLCommandQueue(device, queue);
-  if (device != NULL)
-    ReleaseOpenCLDevice(device);
+}
+
+typedef struct _EqualizeReadback
+{
+  MagickCLEnv
+    clEnv;
+
+  cl_command_queue
+    queue;
+
+  cl_mem
+    imageBuffer;
+
+  Image
+    *image;
+
+  void
+    *inputPixels;
+
+  MagickCLDevice
+    device;
+} EqualizeReadback;
+
+static MagickBooleanType ReadEqualizedImageBuffer(
+  const EqualizeReadback *readback,ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = readback->clEnv;
+
+  const cl_command_queue
+    queue = readback->queue;
+
+  const cl_mem
+    imageBuffer = readback->imageBuffer;
+
+  Image
+    *const image = readback->image;
+
+  void
+    *const inputPixels = readback->inputPixels;
+
+  const MagickCLDevice
+    device = readback->device;
+
+  cl_int
+    clStatus;
+
+  size_t
+    length;
+
+  if (ALIGNED(inputPixels,CLPixelPacket))
+  {
+    length = image->columns * image->rows;
+    clEnv->library->clEnqueueMapBuffer(queue, imageBuffer, CL_TRUE, CL_MAP_READ|CL_MAP_WRITE, 0, length * sizeof(CLPixelPacket), 0, NULL, NULL, &clStatus);
+  }
+  else
+  {
+    length = image->columns * image->rows;
+    clStatus = clEnv->library->clEnqueueReadBuffer(queue, imageBuffer, CL_TRUE, 0, length * sizeof(CLPixelPacket), inputPixels, 0, NULL, NULL);
+  }
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "Reading output image from CL buffer failed.", ".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+typedef struct _EqualizeKernelInputs
+{
+  MagickCLDevice
+    device;
+
+  MagickCLEnv
+    clEnv;
+
+  cl_mem
+    imageBuffer;
+
+  cl_int
+    channel_mask;
+
+  cl_mem
+    equalizeMapBuffer;
+
+  cl_float4
+    white,
+    black;
+
+  Image
+    *image;
+
+  cl_command_queue
+    queue;
+} EqualizeKernelInputs;
+
+static MagickBooleanType LaunchEqualizeKernel(
+  const EqualizeKernelInputs *inputs,cl_kernel *equalizeKernel,
+  ExceptionInfo *exception)
+{
+  const MagickCLDevice
+    device = inputs->device;
+
+  const MagickCLEnv
+    clEnv = inputs->clEnv;
+
+  const cl_mem
+    imageBuffer = inputs->imageBuffer;
+
+  const cl_int
+    channel_mask = inputs->channel_mask;
+
+  const cl_mem
+    equalizeMapBuffer = inputs->equalizeMapBuffer;
+
+  const cl_float4
+    white = inputs->white,
+    black = inputs->black;
+
+  Image
+    *const image = inputs->image;
+
+  const cl_command_queue
+    queue = inputs->queue;
+
+  cl_event
+    event;
+
+  cl_int
+    clStatus;
+
+  cl_uint
+    i;
+
+  size_t
+    global_work_size[2];
+
+  /* get the OpenCL kernel */
+  *equalizeKernel = AcquireOpenCLKernel(device,"Equalize");
+  if (*equalizeKernel == NULL)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "AcquireOpenCLKernel failed.", ".");
+    return(MagickFalse);
+  }
+
+  /* set the kernel arguments */
+  i=0;
+  clStatus=clEnv->library->clSetKernelArg(*equalizeKernel,i++,sizeof(cl_mem),(void *)&imageBuffer);
+  clStatus|=clEnv->library->clSetKernelArg(*equalizeKernel,i++,sizeof(cl_int),&channel_mask);
+  clStatus|=clEnv->library->clSetKernelArg(*equalizeKernel,i++,sizeof(cl_mem),(void *)&equalizeMapBuffer);
+  clStatus|=clEnv->library->clSetKernelArg(*equalizeKernel,i++,sizeof(cl_float4),&white);
+  clStatus|=clEnv->library->clSetKernelArg(*equalizeKernel,i++,sizeof(cl_float4),&black);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clSetKernelArg failed.", ".");
+    return(MagickFalse);
+  }
+
+  /* launch the kernel */
+  global_work_size[0] = image->columns;
+  global_work_size[1] = image->rows;
+
+  clStatus = clEnv->library->clEnqueueNDRangeKernel(queue, *equalizeKernel, 2, NULL, global_work_size, NULL, 0, NULL, &event);
+
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clEnqueueNDRangeKernel failed.", ".");
+    return(MagickFalse);
+  }
+  RecordProfileData(device,*equalizeKernel,event);
+  return(MagickTrue);
+}
+
+typedef struct _EqualizeHistogramInput
+{
+  Image
+    *image;
+
+  cl_uint4
+    *histogram;
+
+  cl_float4
+    *map;
+
+  PixelPacket
+    *equalize_map;
+} EqualizeHistogramInput;
+
+static void BuildEqualizeMap(const EqualizeHistogramInput *input,
+  cl_float4 *black,cl_float4 *white)
+{
+  Image
+    *const image = input->image;
+
+  cl_uint4
+    *const histogram = input->histogram;
+
+  cl_float4
+    *const map = input->map;
+
+  PixelPacket
+    *const equalize_map = input->equalize_map;
+
+  cl_uint
+    i;
+
+  EqualizeMapInput
+    map_input;
+
+  /*
+    Integrate the histogram to get the equalization map.
+  */
+  IntegrateEqualizeHistogram(image,histogram,map);
+  *black=map[0];
+  *white=map[(int) MaxMap];
+  (void) memset(equalize_map,0,(MaxMap+1)*sizeof(*equalize_map));
+  map_input.image=image;
+  map_input.map=map;
+  map_input.white=*white;
+  map_input.black=*black;
+  map_input.equalize_map=equalize_map;
+  for (i=0; i <= (ssize_t) MaxMap; i++)
+    SetEqualizeMapEntry(&map_input,i);
+
+  if (image->storage_class == PseudoClass)
+  {
+    /*
+       Equalize colormap.
+       */
+    EqualizeColormap(image,equalize_map,*white,*black);
+  }
+}
+
+typedef struct _EqualizeQueueTargets
+{
+  MagickCLDevice
+    *device;
+
+  cl_command_queue
+    *queue;
+} EqualizeQueueTargets;
+
+static MagickBooleanType AcquireEqualizeQueue(MagickCLEnv clEnv,
+  const EqualizeQueueTargets *targets)
+{
+  MagickCLDevice
+    *const device = targets->device;
+
+  cl_command_queue
+    *const queue = targets->queue;
+
+  *device=RequestOpenCLDevice(clEnv);
+  if (*device == (MagickCLDevice) NULL)
+    return(MagickFalse);
+  *queue=AcquireOpenCLCommandQueue(*device);
+  if (*queue == (cl_command_queue) NULL)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+typedef struct _HistogramPassInput
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_uint4
+    *histogram;
+
+  cl_command_queue
+    queue;
+
+  cl_mem
+    imageBuffer;
+
+  Image
+    *image;
+} HistogramPassInput;
+
+static MagickBooleanType RunHistogramPass(const HistogramPassInput *pass,
+  cl_mem *histogramBuffer,ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = pass->clEnv;
+
+  const MagickCLDevice
+    device = pass->device;
+
+  cl_uint4
+    *const histogram = pass->histogram;
+
+  const cl_command_queue
+    queue = pass->queue;
+
+  const cl_mem
+    imageBuffer = pass->imageBuffer;
+
+  Image
+    *const image = pass->image;
+
+  HistogramBufferInfo
+    histogram_info;
+
+  MagickBooleanType
+    status;
+
+  {
+    const HostBufferSource
+      source = { clEnv, device, histogram, ALIGNED(histogram,cl_uint4),
+        CL_MEM_READ_WRITE|CL_MEM_USE_HOST_PTR, sizeof(cl_uint4) };
+
+    if (CreateHostBuffer(&source,histogramBuffer,exception) == MagickFalse)
+      return(MagickFalse);
+  }
+
+  {
+    const HistogramKernelLaunch
+      launch = { clEnv, device, queue, imageBuffer, *histogramBuffer };
+
+    status = LaunchHistogramKernel(&launch, image, image->channel_mask,
+      exception);
+  }
+  if (status == MagickFalse)
+    return(MagickFalse);
+
+  histogram_info.clEnv=clEnv;
+  histogram_info.device=device;
+  histogram_info.queue=queue;
+  histogram_info.histogramBuffer=*histogramBuffer;
+  histogram_info.histogram=histogram;
+  if (ReadHistogramBuffer(&histogram_info,exception) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+typedef struct _EqualizePassInput
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  PixelPacket
+    *equalize_map;
+
+  cl_mem
+    imageBuffer;
+
+  cl_int
+    channel_mask;
+
+  cl_float4
+    white,
+    black;
+
+  Image
+    *image;
+
+  cl_command_queue
+    queue;
+
+  void
+    *inputPixels;
+
+  CacheView
+    *image_view;
+} EqualizePassInput;
+
+typedef struct _EqualizePassTargets
+{
+  cl_mem
+    *equalizeMapBuffer;
+
+  cl_kernel
+    *equalizeKernel;
+
+  MagickBooleanType
+    *outputReady;
+} EqualizePassTargets;
+
+static MagickBooleanType RunEqualizePass(const EqualizePassInput *run,
+  ExceptionInfo *exception,const EqualizePassTargets *runTargets)
+{
+  const MagickCLEnv
+    clEnv = run->clEnv;
+
+  const MagickCLDevice
+    device = run->device;
+
+  PixelPacket
+    *const equalize_map = run->equalize_map;
+
+  const cl_mem
+    imageBuffer = run->imageBuffer;
+
+  const cl_int
+    channel_mask = run->channel_mask;
+
+  const cl_float4
+    white = run->white,
+    black = run->black;
+
+  Image
+    *const image = run->image;
+
+  const cl_command_queue
+    queue = run->queue;
+
+  void
+    *const inputPixels = run->inputPixels;
+
+  CacheView
+    *const image_view = run->image_view;
+
+  cl_mem
+    *const equalizeMapBuffer = runTargets->equalizeMapBuffer;
+
+  cl_kernel
+    *const equalizeKernel = runTargets->equalizeKernel;
+
+  MagickBooleanType
+    *const outputReady = runTargets->outputReady;
+
+  /* Create and initialize OpenCL buffers. */
+  {
+    const HostBufferSource
+      source = { clEnv, device, equalize_map,
+        ALIGNED(equalize_map, PixelPacket),
+        CL_MEM_READ_ONLY|CL_MEM_USE_HOST_PTR, sizeof(PixelPacket) };
+
+    if (CreateHostBuffer(&source,equalizeMapBuffer,exception) == MagickFalse)
+      return(MagickFalse);
+  }
+
+  {
+    const EqualizeKernelInputs
+      inputs = { device, clEnv, imageBuffer, channel_mask, *equalizeMapBuffer,
+        white, black, image, queue };
+
+    if (LaunchEqualizeKernel(&inputs,equalizeKernel,exception) == MagickFalse)
+      return(MagickFalse);
+  }
+
+  /* read the data back */
+  {
+    const EqualizeReadback
+      readback = { clEnv, queue, imageBuffer, image, inputPixels, device };
+
+    if (ReadEqualizedImageBuffer(&readback,exception) == MagickFalse)
+      return(MagickFalse);
+  }
+
+  *outputReady=SyncCacheViewAuthenticPixels(image_view,exception);
+  return(MagickTrue);
+}
+
+typedef struct _EqualizeInputSource
+{
+  Image
+    *image;
+
+  MagickCLDevice
+    device;
+
+  MagickCLEnv
+    clEnv;
+} EqualizeInputSource;
+
+typedef struct _EqualizeInputTargets
+{
+  CacheView
+    **image_view;
+
+  void
+    **inputPixels;
+
+  cl_mem
+    *imageBuffer;
+} EqualizeInputTargets;
+
+static MagickBooleanType AcquireEqualizeInput(
+  const EqualizeInputSource *source,ExceptionInfo *exception,
+  const EqualizeInputTargets *inputTargets)
+{
+  Image
+    *const image = source->image;
+
+  const MagickCLDevice
+    device = source->device;
+
+  const MagickCLEnv
+    clEnv = source->clEnv;
+
+  CacheView
+    **const image_view = inputTargets->image_view;
+
+  void
+    **const inputPixels = inputTargets->inputPixels;
+
+  cl_mem
+    *const imageBuffer = inputTargets->imageBuffer;
+
+  cl_int
+    clStatus;
+
+  cl_mem_flags
+    mem_flags;
+
+  size_t
+    length;
+
+  /* Create and initialize OpenCL buffers. */
+  /* inputPixels = AcquirePixelCachePixels(image, &length, exception); */
+  /* assume this  will get a writable image */
+  *image_view=AcquireAuthenticCacheView(image,exception);
+  *inputPixels=GetCacheViewAuthenticPixels(*image_view,0,0,image->columns,image->rows,exception);
+
+  if (*inputPixels == (void *) NULL)
+  {
+    (void) OpenCLThrowMagickException(device,exception,GetMagickModule(),CacheWarning,"UnableToReadPixelCache.","`%s'",image->filename);
+    return(MagickFalse);
+  }
+  /* If the host pointer is aligned to the size of CLPixelPacket,
+     then use the host buffer directly from the GPU; otherwise,
+     create a buffer on the GPU and copy the data over */
+  mem_flags=GetInputBufferFlags(*inputPixels);
+  /* create a CL buffer from image pixel buffer */
+  length = image->columns * image->rows;
+  *imageBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags, length * sizeof(CLPixelPacket), (void*)*inputPixels, &clStatus);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+typedef struct _EqualizeMapTargets
+{
+  PixelPacket
+    **equalize_map;
+
+  cl_float4
+    **map,
+    *black,
+    *white;
+} EqualizeMapTargets;
+
+static MagickBooleanType AcquireEqualizeMaps(Image *image,cl_uint4 *histogram,
+  const EqualizeMapTargets *targets)
+{
+  PixelPacket
+    **const equalize_map = targets->equalize_map;
+
+  cl_float4
+    **const map = targets->map,
+    *const black = targets->black,
+    *const white = targets->white;
+
+  EqualizeHistogramInput
+    histogram_input;
+
+  *equalize_map=(PixelPacket *) AcquireQuantumMemory(MaxMap+1UL, sizeof(**equalize_map));
+  if (*equalize_map == (PixelPacket *) NULL)
+    return(MagickFalse);
+
+  *map=(cl_float4 *) AcquireQuantumMemory(MaxMap+1UL,sizeof(**map));
+  if (*map == (cl_float4 *) NULL)
+    return(MagickFalse);
+
+  histogram_input.image=image;
+  histogram_input.histogram=histogram;
+  histogram_input.map=*map;
+  histogram_input.equalize_map=*equalize_map;
+  BuildEqualizeMap(&histogram_input,black,white);
+  return(MagickTrue);
+}
+
+static MagickBooleanType AcquireEqualizeHistogram(cl_uint4 **histogram)
+{
+  *histogram=(cl_uint4 *) AcquireQuantumMemory(MaxMap+1UL, sizeof(**histogram));
+  if (*histogram == (cl_uint4 *) NULL)
+    return(MagickFalse);
+
+  /* reset histogram */
+  (void) memset(*histogram,0,(MaxMap+1)*sizeof(**histogram));
+  return(MagickTrue);
+}
+
+typedef struct _EqualizeHistogramStageInput
+{
+  Image
+    *image;
+
+  MagickCLDevice
+    device;
+
+  MagickCLEnv
+    clEnv;
+
+  cl_uint4
+    *histogram;
+
+  cl_command_queue
+    queue;
+} EqualizeHistogramStageInput;
+
+typedef struct _EqualizeHistogramStageTargets
+{
+  CacheView
+    **image_view;
+
+  void
+    **inputPixels;
+
+  cl_mem
+    *imageBuffer,
+    *histogramBuffer;
+} EqualizeHistogramStageTargets;
+
+static MagickBooleanType RunEqualizeHistogramStage(
+  const EqualizeHistogramStageInput *stage,ExceptionInfo *exception,
+  const EqualizeHistogramStageTargets *targets)
+{
+  Image
+    *const image = stage->image;
+
+  const MagickCLDevice
+    device = stage->device;
+
+  const MagickCLEnv
+    clEnv = stage->clEnv;
+
+  cl_uint4
+    *const histogram = stage->histogram;
+
+  const cl_command_queue
+    queue = stage->queue;
+
+  CacheView
+    **const image_view = targets->image_view;
+
+  void
+    **const inputPixels = targets->inputPixels;
+
+  cl_mem
+    *const imageBuffer = targets->imageBuffer,
+    *const histogramBuffer = targets->histogramBuffer;
+
+  {
+    const EqualizeInputSource
+      source = { image, device, clEnv };
+
+    const EqualizeInputTargets
+      inputTargets = { image_view, inputPixels, imageBuffer };
+
+    if (AcquireEqualizeInput(&source,exception,&inputTargets) == MagickFalse)
+      return(MagickFalse);
+  }
+
+  {
+    const HistogramPassInput
+      pass = { clEnv, device, histogram, queue, *imageBuffer, image };
+
+    if (RunHistogramPass(&pass,histogramBuffer,exception) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+#define EqualizeImageTag  "Equalize/Image"
+
+static MagickBooleanType ComputeEqualizeImage(Image *image,MagickCLEnv clEnv,
+  ExceptionInfo *exception)
+{
+  CacheView
+    *image_view=NULL;
+
+  EqualizeBuffers
+    buffers = { clEnv, NULL, NULL, NULL, NULL, NULL, NULL };
+
+  cl_command_queue
+    queue=NULL;
+
+  cl_int
+    channel_mask=get32BitChannelValue(image->channel_mask);
+
+  cl_mem
+    imageBuffer=NULL;
+
+  cl_kernel
+    equalizeKernel=NULL,
+    histogramKernel=NULL;
+
+  cl_float4
+    white,
+    black;
+
+  MagickBooleanType
+    outputReady=MagickFalse;
+
+  MagickCLDevice
+    device;
+
+  void
+    *inputPixels=NULL;
+
+  if (clEnv == (MagickCLEnv) NULL)
+    return(MagickFalse);
+
+  TraceAccelerateImage(image);
+
+  /*
+   * initialize opencl env
+   */
+  {
+    const EqualizeQueueTargets
+      queueTargets = { &device, &queue };
+
+    if (AcquireEqualizeQueue(clEnv,&queueTargets) == MagickFalse)
+      goto cleanup;
+  }
+
+  /*
+    Allocate and initialize histogram arrays.
+  */
+  if (AcquireEqualizeHistogram(&buffers.histogram) == MagickFalse)
+      ThrowBinaryException(ResourceLimitWarning,"MemoryAllocationFailed", image->filename);
+
+  {
+    const EqualizeHistogramStageInput
+      stage = { image, device, clEnv, buffers.histogram, queue };
+
+    const EqualizeHistogramStageTargets
+      targets = { &image_view, &inputPixels, &imageBuffer,
+        &buffers.histogramBuffer };
+
+    if (RunEqualizeHistogramStage(&stage,exception,&targets) == MagickFalse)
+      goto cleanup;
+  }
+
+  /* recreate input buffer later, in case image updated */
+#include "MagickCore/accelerate-recreate-release-private.h"
+
+  /* CPU stuff */
+  {
+    const EqualizeMapTargets
+      mapTargets = { &buffers.equalize_map, &buffers.map, &black, &white };
+
+    if (AcquireEqualizeMaps(image,buffers.histogram,&mapTargets) == MagickFalse)
+      ThrowBinaryException(ResourceLimitWarning,"MemoryAllocationFailed", image->filename);
+  }
+
+  /*
+    Equalize image.
+  */
+
+  /* GPU can work on this again, image and equalize map as input
+    image:        uchar4 (CLPixelPacket)
+    equalize_map: uchar4 (PixelPacket)
+    black, white: float4 (FloatPixelPacket) */
+
+#include "MagickCore/accelerate-recreate-buffer-private.h"
+
+  {
+    const EqualizePassInput
+      run = { clEnv, device, buffers.equalize_map, imageBuffer, channel_mask,
+        white, black, image, queue, inputPixels, image_view };
+
+    const EqualizePassTargets
+      runTargets = { &buffers.equalizeMapBuffer, &equalizeKernel,
+        &outputReady };
+
+    (void) RunEqualizePass(&run,exception,&runTargets);
+  }
+
+cleanup:
+
+  image_view=DestroyCacheView(image_view);
+
+  buffers.imageBuffer=imageBuffer;
+  ReleaseEqualizeBuffers(&buffers);
+  ReleaseEqualizeKernels(device,queue,histogramKernel,equalizeKernel);
 
   return(outputReady);
 }

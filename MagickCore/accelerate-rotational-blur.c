@@ -307,9 +307,13 @@ static void LaunchRotationalBlurKernel(const RotationalBlurLaunchInputs *inputs,
 
   gsize[0]=image->columns;
   gsize[1]=image->rows;
-  *outputReady=EnqueueOpenCLKernel(queue,*rotationalBlurKernel,2,
-    (const size_t *) NULL,gsize,(const size_t *) NULL,image,filteredImage,
-    MagickFalse,exception);
+  {
+    const OpenCLKernelLaunch
+      enqueue = { queue, *rotationalBlurKernel, 2, (const size_t *) NULL,
+        gsize, (const size_t *) NULL, image, filteredImage, MagickFalse };
+
+    *outputReady=EnqueueOpenCLKernel(&enqueue,exception);
+  }
 }
 
 static Image* ComputeRotationalBlurImage(const Image *image,MagickCLEnv clEnv,

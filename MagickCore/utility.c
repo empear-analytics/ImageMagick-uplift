@@ -299,6 +299,8 @@ static MagickBooleanType VerifyBase64Terminal(const char *p,const int state,
 static void CheckBase64DecodeArguments(const char *source,
   const size_t *length)
 {
+  magick_unreferenced(source);
+  magick_unreferenced(length);
   assert(source != (char *) NULL);
   assert(length != (size_t *) NULL);
   if (IsEventLogging() != MagickFalse)
@@ -1063,6 +1065,7 @@ static char **AcquireArgumentVector(const int *number_arguments,
   char
     **vector;
 
+  magick_unreferenced(arguments);
   /*
     Allocate argument vector.
   */
@@ -2275,6 +2278,7 @@ static char **SortFileList(char **filelist,const size_t *number_entries)
 static void CheckListFilesArguments(const char *directory,
   const char *pattern,size_t *number_entries)
 {
+  magick_unreferenced(pattern);
   /*
     Open directory.
   */

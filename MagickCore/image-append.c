@@ -306,6 +306,7 @@ static void SubtractAppendGeometry(const RectangleInfo *geometry,
 static void CheckAppendArguments(const Image *images,
   ExceptionInfo *exception)
 {
+  magick_unreferenced(exception);
   assert(images != (Image *) NULL);
   assert(images->signature == MagickCoreSignature);
   assert(exception != (ExceptionInfo *) NULL);

@@ -94,6 +94,16 @@ Include declarations.
 #if defined(MAGICKCORE_OPENCL_SUPPORT)
 
 /*
+  Typedef declarations.
+*/
+typedef struct _ContrastStretchPoints
+{
+  double
+    black_point,
+    white_point;
+} ContrastStretchPoints;
+
+/*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
 %                                                                             %
@@ -215,11 +225,15 @@ static void StretchImageClass(Image *image,PixelPacket *stretch_map,
 }
 
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
-  MagickCLEnv clEnv,const double black_point,const double white_point,
+  MagickCLEnv clEnv,const ContrastStretchPoints *points,
   ExceptionInfo *exception)
 {
 #define ContrastStretchImageTag  "ContrastStretch/Image"
 #define MaxRange(color)  ((cl_float) ScaleQuantumToMap((Quantum) (color)))
+
+  const double
+    black_point = points->black_point,
+    white_point = points->white_point;
 
   CacheView
     *image_view;
@@ -372,7 +386,13 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
     goto cleanup;
   }
 
-  status = LaunchHistogramKernel(clEnv, device, queue, imageBuffer, histogramBuffer, image, image->channel_mask,exception);
+  {
+    const HistogramKernelLaunch
+      launch = { clEnv, device, queue, imageBuffer, histogramBuffer };
+
+    status = LaunchHistogramKernel(&launch, image, image->channel_mask,
+      exception);
+  }
   if (status == MagickFalse)
     goto cleanup;
 
@@ -403,10 +423,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
   }
 
   /* recreate input buffer later, in case image updated */
-#ifdef RECREATEBUFFER
-  if (imageBuffer!=NULL)
-    clEnv->library->clReleaseMemObject(imageBuffer);
-#endif
+#include "MagickCore/accelerate-recreate-release-private.h"
 
   /* CPU stuff */
   /*
@@ -527,27 +544,7 @@ static MagickBooleanType ComputeContrastStretchImage(Image *image,
     stretch_map:  uchar4 (PixelPacket)
     black, white: float4 (FloatPixelPacket) */
 
-#ifdef RECREATEBUFFER
-  /* If the host pointer is aligned to the size of CLPixelPacket,
-     then use the host buffer directly from the GPU; otherwise,
-     create a buffer on the GPU and copy the data over */
-  if (ALIGNED(inputPixels,CLPixelPacket))
-  {
-    mem_flags = CL_MEM_READ_WRITE|CL_MEM_USE_HOST_PTR;
-  }
-  else
-  {
-    mem_flags = CL_MEM_READ_WRITE|CL_MEM_COPY_HOST_PTR;
-  }
-  /* create a CL buffer from image pixel buffer */
-  length = image->columns * image->rows;
-  imageBuffer = clEnv->library->clCreateBuffer(context, mem_flags, length * sizeof(CLPixelPacket), (void*)inputPixels, &clStatus);
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) OpenCLThrowMagickException(device,exception, GetMagickModule(), ResourceLimitWarning, "clEnv->library->clCreateBuffer failed.",".");
-    goto cleanup;
-  }
-#endif
+#include "MagickCore/accelerate-recreate-buffer-private.h"
 
   /* Create and initialize OpenCL buffers. */
   if (ALIGNED(stretch_map, PixelPacket))
@@ -653,8 +650,10 @@ MagickPrivate MagickBooleanType AccelerateContrastStretchImage(
   Image *image,const double black_point,const double white_point,
   ExceptionInfo *exception)
 {
+  const ContrastStretchPoints
+    points = { black_point, white_point };
+
   return(ComputeContrastStretchImage(image,getAccelerateEnvironment(image,
-    HistogramAccelerateCheck,__func__,exception),black_point,white_point,
-    exception));
+    HistogramAccelerateCheck,__func__,exception),&points,exception));
 }
 #endif /* MAGICKCORE_OPENCL_SUPPORT */

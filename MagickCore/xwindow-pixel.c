@@ -144,23 +144,23 @@
 %
 %  The format of the XGetPixelInfo method is:
 %
-%      void XGetPixelInfo(Display *display,const XVisualInfo *visual_info,
-%        const XStandardColormap *map_info,const XResourceInfo *resource_info,
+%      void XGetPixelInfo(Display *display,const XPixelInfoSource *source,
 %        Image *image,XPixelInfo *pixel)
-%        pixel)
 %
 %  A description of each parameter follows:
 %
 %    o display: Specifies a connection to an X server; returned from
 %      XOpenDisplay.
 %
-%    o visual_info: Specifies a pointer to a X11 XVisualInfo structure;
-%      returned from XGetVisualInfo.
+%    o source: the visual, colormap and resources, in these members:
 %
-%    o map_info: If map_type is specified, this structure is initialized
-%      with info from the Standard Colormap.
+%      o visual_info: Specifies a pointer to a X11 XVisualInfo structure;
+%        returned from XGetVisualInfo.
 %
-%    o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
+%      o map_info: If map_type is specified, this structure is initialized
+%        with info from the Standard Colormap.
+%
+%      o resource_info: Specifies a pointer to a X11 XResourceInfo structure.
 %
 %    o image: the image.
 %
@@ -399,9 +399,17 @@ static void XGetPenColors(const XPixelColorContext *context,
 }
 
 MagickPrivate void XGetPixelInfo(Display *display,
-  const XVisualInfo *visual_info,const XStandardColormap *map_info,
-  const XResourceInfo *resource_info,Image *image,XPixelInfo *pixel)
+  const XPixelInfoSource *source,Image *image,XPixelInfo *pixel)
 {
+  const XVisualInfo
+    *const visual_info = source->visual_info;
+
+  const XStandardColormap
+    *const map_info = source->map_info;
+
+  const XResourceInfo
+    *const resource_info = source->resource_info;
+
   static const char
     *PenColors[MaxNumberPens]=
     {

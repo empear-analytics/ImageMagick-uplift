@@ -26,11 +26,66 @@ extern "C" {
 #endif
 
 #if defined(MAGICKCORE_X11_DELEGATE)
+typedef struct _XProgressMonitorSpan
+{
+  const MagickOffsetType
+    offset;
+
+  const MagickSizeType
+    span;
+} XProgressMonitorSpan;
+
+typedef struct _XHelpView
+{
+  Display
+    *display;
+
+  const XResourceInfo
+    *resource_info;
+
+  XWindows
+    *windows;
+
+  MagickBooleanType
+    mono;
+} XHelpView;
+
+typedef struct _XListBrowserRequest
+{
+  const char
+    *const *list,
+    *action,
+    *query;
+
+  char
+    *reply;
+} XListBrowserRequest;
+
+typedef struct _XMenuRequest
+{
+  const char
+    *title,
+    *const *selections;
+
+  char
+    *item;
+} XMenuRequest;
+
+typedef struct _XDialogRequest
+{
+  const char
+    *action,
+    *query;
+
+  char
+    *reply;
+} XDialogRequest;
+
 extern MagickPrivate int
   XCommandWidget(Display *,XWindows *,const char *const *,XEvent *),
   XConfirmWidget(Display *,XWindows *,const char *,const char *),
-  XDialogWidget(Display *,XWindows *,const char *,const char *,char *),
-  XMenuWidget(Display *,XWindows *,const char *,const char *const *,char *);
+  XDialogWidget(Display *,XWindows *,const XDialogRequest *),
+  XMenuWidget(Display *,XWindows *,const XMenuRequest *);
 
 extern MagickPrivate MagickBooleanType
   XPreferencesWidget(Display *,XResourceInfo *,XWindows *);
@@ -41,17 +96,15 @@ extern MagickPrivate void
   XFileBrowserWidget(Display *,XWindows *,const char *,char *),
   XFontBrowserWidget(Display *,XWindows *,const char *,char *),
   XInfoWidget(Display *,XWindows *,const char *),
-  XListBrowserWidget(Display *,XWindows *,XWindowInfo *,const char *const *,
-    const char *,const char *,char *),
+  XListBrowserWidget(Display *,XWindows *,XWindowInfo *,
+    const XListBrowserRequest *),
   XNoticeWidget(Display *,XWindows *,const char *,const char *),
   XProgressMonitorWidget(Display *,XWindows *,const char *,
-    const MagickOffsetType,const MagickSizeType),
-  XTextViewWidget(Display *,const XResourceInfo *,XWindows *,
-    const MagickBooleanType,const char *,const char **);
+    const XProgressMonitorSpan *),
+  XTextViewWidget(const XHelpView *,const char *,const char **);
 
-static inline void XTextViewHelp(Display *display,
-  const XResourceInfo *resource_info,XWindows *windows,
-  const MagickBooleanType mono,const char *title,const char *help)
+static inline void XTextViewHelp(const XHelpView *view,const char *title,
+  const char *help)
 {
   char
     **help_list;
@@ -62,8 +115,7 @@ static inline void XTextViewHelp(Display *display,
   help_list=StringToList(help);
   if (help_list == (char **) NULL)
     return;
-  XTextViewWidget(display,resource_info,windows,mono,title,(const char **)
-    help_list);
+  XTextViewWidget(view,title,(const char **) help_list);
   for (i=0; help_list[i] != (char *) NULL; i++)
     help_list[i]=DestroyString(help_list[i]);
   help_list=(char **) RelinquishMagickMemory(help_list);

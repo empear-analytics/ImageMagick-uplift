@@ -1006,9 +1006,26 @@ static Image *ReleaseLocalContrastResources(
   return(filteredImage);
 }
 
-static Image *ComputeLocalContrastImage(const Image *image,MagickCLEnv clEnv,
-  const double radius,const double strength,ExceptionInfo *exception)
+typedef struct _LocalContrastRequest
 {
+  const Image
+    *image;
+
+  double
+    radius,
+    strength;
+} LocalContrastRequest;
+
+static Image *ComputeLocalContrastImage(const LocalContrastRequest *request,
+  MagickCLEnv clEnv,ExceptionInfo *exception)
+{
+  const Image
+    *const image = request->image;
+
+  const double
+    radius = request->radius,
+    strength = request->strength;
+
   CacheView
     *filteredImage_view,
     *image_view;
@@ -1091,8 +1108,10 @@ cleanup:
 MagickPrivate Image *AccelerateLocalContrastImage(const Image *image,
   const double radius,const double strength,ExceptionInfo *exception)
 {
-  return(ComputeLocalContrastImage(image,getAccelerateEnvironment(image,
-    RGBAAccelerateCheck,(const char *) NULL,exception),radius,strength,
-    exception));
+  const LocalContrastRequest
+    request = { image, radius, strength };
+
+  return(ComputeLocalContrastImage(&request,getAccelerateEnvironment(image,
+    RGBAAccelerateCheck,(const char *) NULL,exception),exception));
 }
 #endif /* MAGICKCORE_OPENCL_SUPPORT */

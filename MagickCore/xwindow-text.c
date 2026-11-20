@@ -370,18 +370,20 @@ MagickPrivate void XGetAnnotateInfo(XAnnotateInfo *annotate_info)
 %
 %  The format of the XRenderImage method is:
 %
-%      MagickBooleanType XRenderImage(Image *image,DrawInfo *draw_info,
-%        const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
+%      MagickBooleanType XRenderImage(Image *image,const XRenderText *text,
+%        ExceptionInfo *exception)
 %
 %  A description of each parameter follows:
 %
 %    o image: the image.
 %
-%    o draw_info: the draw info.
+%    o text: the text to render, in these members:
 %
-%    o offset: (x,y) location of text relative to image.
+%      o draw_info: the draw info.
 %
-%    o metrics: bounding box of text.
+%      o offset: (x,y) location of text relative to image.
+%
+%      o metrics: bounding box of text.
 %
 %    o exception: return any errors or warnings in this structure.
 %
@@ -430,6 +432,32 @@ typedef struct _XRenderTargets
   Display
     **display;
 } XRenderTargets;
+
+static void XInitializeRenderColormap(Display *display,
+  const XRenderTargets *targets)
+{
+  XResourceInfo
+    *const resource_info = targets->resource_info;
+
+  XStandardColormap
+    **const map_info = targets->map_info;
+
+  XVisualInfo
+    **const visual_info = targets->visual_info;
+
+  XPixelInfo
+    *const pixel = targets->pixel;
+
+  XGetMapInfo((*visual_info),XDefaultColormap(display,(*visual_info)->screen),
+    (*map_info));
+  {
+    const XPixelInfoSource
+      pixel_source = { (*visual_info), (*map_info), resource_info };
+
+    XGetPixelInfo(display,&pixel_source,(Image *) NULL,pixel);
+  }
+  (*pixel).annotate_context=XDefaultGC(display,(*visual_info)->screen);
+}
 
 static MagickBooleanType XInitializeRenderResources(const DrawInfo *draw_info,
   const Image *image,Display *display,const XRenderTargets *targets)
@@ -497,11 +525,7 @@ static MagickBooleanType XInitializeRenderResources(const DrawInfo *draw_info,
   /*
     Initialize Standard Colormap info.
   */
-  XGetMapInfo((*visual_info),XDefaultColormap(display,(*visual_info)->screen),
-    (*map_info));
-  XGetPixelInfo(display,(*visual_info),(*map_info),resource_info,(Image *) NULL,
-    pixel);
-  (*pixel).annotate_context=XDefaultGC(display,(*visual_info)->screen);
+  XInitializeRenderColormap(display,targets);
   /*
     Initialize font info.
   */
@@ -554,6 +578,9 @@ static MagickBooleanType XRenderFillColor(const XRenderRequest *request,
   ExceptionInfo
     *const exception = request->exception;
 
+  const XImageRenderTarget
+    target = { display, pixel };
+
   MagickBooleanType
     status;
 
@@ -584,7 +611,7 @@ static MagickBooleanType XRenderFillColor(const XRenderRequest *request,
     ClampToQuantum(draw_info->fill.green));
   (*pixel).pen_color.blue=ScaleQuantumToShort(
     ClampToQuantum(draw_info->fill.blue));
-  status=XAnnotateImage(display,pixel,annotate_info,image,exception);
+  status=XAnnotateImage(&target,annotate_info,image,exception);
   if (status == 0)
     {
       ThrowXWindowException(ResourceLimitError,"MemoryAllocationFailed",
@@ -646,9 +673,17 @@ static MagickBooleanType XOpenRenderResources(const DrawInfo *draw_info,
 }
 
 MagickPrivate MagickBooleanType XRenderImage(Image *image,
-  const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
-  ExceptionInfo *exception)
+  const XRenderText *text,ExceptionInfo *exception)
 {
+  const DrawInfo
+    *const draw_info = text->draw_info;
+
+  const PointInfo
+    *const offset = text->offset;
+
+  TypeMetric
+    *const metrics = text->metrics;
+
   XRenderRequest
     request;
 
@@ -736,26 +771,36 @@ MagickPrivate MagickBooleanType XRenderImage(Image *image,
 %
 %  The format of the XRenderImage method is:
 %
-%      MagickBooleanType XRenderImage(Image *image,DrawInfo *draw_info,
-%        const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
+%      MagickBooleanType XRenderImage(Image *image,const XRenderText *text,
+%        ExceptionInfo *exception)
 %
 %  A description of each parameter follows:
 %
 %    o image: the image.
 %
-%    o draw_info: the draw info.
+%    o text: the text to render, in these members:
 %
-%    o offset: (x,y) location of text relative to image.
+%      o draw_info: the draw info.
 %
-%    o metrics: bounding box of text.
+%      o offset: (x,y) location of text relative to image.
+%
+%      o metrics: bounding box of text.
 %
 %    o exception: return any errors or warnings in this structure.
 %
 */
 MagickPrivate MagickBooleanType XRenderImage(Image *image,
-  const DrawInfo *draw_info,const PointInfo *offset,TypeMetric *metrics,
-  ExceptionInfo *exception)
+  const XRenderText *text,ExceptionInfo *exception)
 {
+  const DrawInfo
+    *const draw_info = text->draw_info;
+
+  const PointInfo
+    *const offset = text->offset;
+
+  TypeMetric
+    *const metrics = text->metrics;
+
   (void) draw_info;
   (void) offset;
   (void) metrics;

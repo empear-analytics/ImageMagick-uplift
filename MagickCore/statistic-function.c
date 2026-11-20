@@ -395,9 +395,13 @@ MagickExport MagickBooleanType FunctionImage(Image *image,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
 #if defined(MAGICKCORE_OPENCL_SUPPORT)
-  if (AccelerateFunctionImage(image,function,number_parameters,parameters,
-        exception) != MagickFalse)
-    return(MagickTrue);
+  {
+    const AccelerateFunctionRequest
+      request = { function, number_parameters, parameters };
+
+    if (AccelerateFunctionImage(image,&request,exception) != MagickFalse)
+      return(MagickTrue);
+  }
 #endif
   if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
     return(MagickFalse);

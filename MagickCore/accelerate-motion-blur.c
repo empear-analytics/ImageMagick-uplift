@@ -664,29 +664,93 @@ static MagickBooleanType CreateMotionBlurOutputBuffer(
   return(MagickTrue);
 }
 
-static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
-  const double *kernel,const size_t width,const OffsetInfo *offset,
-  ExceptionInfo *exception)
+typedef struct _MotionBlurOffsetSource
 {
-  CacheView
-    *filteredImage_view,
-    *image_view;
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
 
   cl_command_queue
     queue;
 
+  const OffsetInfo
+    *offset;
+
+  size_t
+    width;
+} MotionBlurOffsetSource;
+
+static MagickBooleanType CreateMotionBlurOffsetBuffer(
+  const MotionBlurOffsetSource *source,cl_mem *offsetBuffer,
+  ExceptionInfo *exception)
+{
+  const MagickCLEnv
+    clEnv = source->clEnv;
+
+  const MagickCLDevice
+    device = source->device;
+
+  const cl_command_queue
+    queue = source->queue;
+
+  const OffsetInfo
+    *const offset = source->offset;
+
+  const size_t
+    width = source->width;
+
   cl_int
-    channel_mask=get32BitChannelValue(image->channel_mask),
     clStatus;
 
-  cl_kernel
-    motionBlurKernel;
+  *offsetBuffer = clEnv->library->clCreateBuffer(device->context,
+    CL_MEM_READ_ONLY|CL_MEM_ALLOC_HOST_PTR, width * sizeof(cl_int2), NULL,
+    &clStatus);
+  if (clStatus != CL_SUCCESS)
+  {
+    (void) ThrowMagickException(exception, GetMagickModule(),
+      ResourceLimitError, "clEnv->library->clCreateBuffer failed.",".");
+    return(MagickFalse);
+  }
+
+  {
+    const MotionBlurOffsetInputs inputs = { clEnv, queue, *offsetBuffer,
+      offset, width };
+
+    if (FillMotionBlurOffsets(&inputs,exception) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+typedef struct _MotionBlurInputTargets
+{
+  MagickCLDevice
+    *device;
+
+  CacheView
+    **image_view;
 
   cl_mem
-    filteredImageBuffer,
-    imageBuffer,
-    imageKernelBuffer,
-    offsetBuffer;
+    *imageBuffer;
+} MotionBlurInputTargets;
+
+static MagickBooleanType AcquireMotionBlurInput(MagickCLEnv clEnv,
+  const Image *image,ExceptionInfo *exception,
+  const MotionBlurInputTargets *inputTargets)
+{
+  MagickCLDevice
+    *const device = inputTargets->device;
+
+  CacheView
+    **const image_view = inputTargets->image_view;
+
+  cl_mem
+    *const imageBuffer = inputTargets->imageBuffer;
+
+  cl_int
+    clStatus;
 
   cl_mem_flags
     mem_flags;
@@ -694,48 +758,21 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
   const void
     *inputPixels;
 
-  Image
-    *filteredImage;
-
-  MagickBooleanType
-    outputReady;
-
-  MagickCLDevice
-    device;
-
   size_t
     length;
 
-  void
-    *filteredPixels;
-
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-
-  queue=NULL;
-  image_view=NULL;
-  filteredImage=NULL;
-  filteredImage_view=NULL;
-  imageBuffer=NULL;
-  filteredImageBuffer=NULL;
-  imageKernelBuffer=NULL;
-  motionBlurKernel=NULL;
-  outputReady=MagickFalse;
-
-  device=RequestOpenCLDevice(clEnv);
-  if (device == (MagickCLDevice) NULL)
-    goto cleanup;
+  *device=RequestOpenCLDevice(clEnv);
+  if (*device == (MagickCLDevice) NULL)
+    return(MagickFalse);
 
   /* Create and initialize OpenCL buffers. */
 
   {
     const MotionBlurViewTargets
-      targets = { &image_view, &inputPixels };
+      targets = { image_view, &inputPixels };
 
     if (AcquireMotionBlurPixels(image,exception,&targets) == MagickFalse)
-      goto cleanup;
+      return(MagickFalse);
   }
 
   /*
@@ -755,86 +792,276 @@ static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
     create a CL buffer from image pixel buffer
   */
   length = image->columns * image->rows;
-  imageBuffer = clEnv->library->clCreateBuffer(device->context, mem_flags,
+  *imageBuffer = clEnv->library->clCreateBuffer((*device)->context, mem_flags,
     length * sizeof(CLPixelPacket), (void*)inputPixels, &clStatus);
   if (clStatus != CL_SUCCESS)
   {
     (void) ThrowMagickException(exception, GetMagickModule(),
       ResourceLimitError, "clEnv->library->clCreateBuffer failed.",".");
-    goto cleanup;
+    return(MagickFalse);
   }
+  return(MagickTrue);
+}
 
+typedef struct _MotionBlurOutputInput
+{
+  const Image
+    *image;
+
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+} MotionBlurOutputInput;
+
+typedef struct _MotionBlurOutputTargets
+{
+  Image
+    **filteredImage;
+
+  CacheView
+    **filteredImage_view;
+
+  void
+    **filteredPixels;
+
+  cl_mem
+    *filteredImageBuffer;
+} MotionBlurOutputTargets;
+
+static MagickBooleanType AcquireMotionBlurOutput(
+  const MotionBlurOutputInput *input,ExceptionInfo *exception,
+  const MotionBlurOutputTargets *outputTargets)
+{
+  const Image
+    *const image = input->image;
+
+  const MagickCLEnv
+    clEnv = input->clEnv;
+
+  const MagickCLDevice
+    device = input->device;
+
+  Image
+    **const filteredImage = outputTargets->filteredImage;
+
+  CacheView
+    **const filteredImage_view = outputTargets->filteredImage_view;
+
+  void
+    **const filteredPixels = outputTargets->filteredPixels;
+
+  cl_mem
+    *const filteredImageBuffer = outputTargets->filteredImageBuffer;
 
   {
     const MotionBlurImageTargets
-      targets = { &filteredImage, &filteredImage_view, &filteredPixels };
+      targets = { filteredImage, filteredImage_view, filteredPixels };
 
     if (CloneMotionBlurImage(image,exception,&targets) == MagickFalse)
-      goto cleanup;
+      return(MagickFalse);
   }
 
   {
     const MotionBlurOutputSource
-      source = { clEnv, device, image, filteredPixels };
+      source = { clEnv, device, image, *filteredPixels };
 
-    if (CreateMotionBlurOutputBuffer(&source,&filteredImageBuffer,exception) ==
+    if (CreateMotionBlurOutputBuffer(&source,filteredImageBuffer,exception) ==
         MagickFalse)
-      goto cleanup;
+      return(MagickFalse);
   }
+  return(MagickTrue);
+}
 
+typedef struct _MotionBlurRunInput
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  const double
+    *kernel;
+
+  size_t
+    width;
+
+  const OffsetInfo
+    *offset;
+
+  cl_mem
+    imageBuffer,
+    filteredImageBuffer;
+
+  cl_int
+    channel_mask;
+
+  const Image
+    *image;
+
+  void
+    *filteredPixels;
+
+  CacheView
+    *filteredImage_view;
+} MotionBlurRunInput;
+
+typedef struct _MotionBlurRunTargets
+{
+  cl_mem
+    *imageKernelBuffer;
+
+  cl_command_queue
+    *queue;
+
+  cl_mem
+    *offsetBuffer;
+
+  cl_kernel
+    *motionBlurKernel;
+
+  MagickBooleanType
+    *outputReady;
+} MotionBlurRunTargets;
+
+static MagickBooleanType RunMotionBlurKernel(const MotionBlurRunInput *run,
+  ExceptionInfo *exception,const MotionBlurRunTargets *runTargets)
+{
+  const MagickCLEnv
+    clEnv = run->clEnv;
+
+  const MagickCLDevice
+    device = run->device;
+
+  const double
+    *const kernel = run->kernel;
+
+  const size_t
+    width = run->width;
+
+  const OffsetInfo
+    *const offset = run->offset;
+
+  const cl_mem
+    imageBuffer = run->imageBuffer,
+    filteredImageBuffer = run->filteredImageBuffer;
+
+  const cl_int
+    channel_mask = run->channel_mask;
+
+  const Image
+    *const image = run->image;
+
+  void
+    *const filteredPixels = run->filteredPixels;
+
+  CacheView
+    *const filteredImage_view = run->filteredImage_view;
+
+  cl_mem
+    *const imageKernelBuffer = runTargets->imageKernelBuffer;
+
+  cl_command_queue
+    *const queue = runTargets->queue;
+
+  cl_mem
+    *const offsetBuffer = runTargets->offsetBuffer;
+
+  cl_kernel
+    *const motionBlurKernel = runTargets->motionBlurKernel;
+
+  MagickBooleanType
+    *const outputReady = runTargets->outputReady;
 
   {
     const MotionBlurFilterInputs inputs = { clEnv, device, kernel, width };
-    const MotionBlurFilterTargets targets = { &imageKernelBuffer, &queue };
+    const MotionBlurFilterTargets targets = { imageKernelBuffer, queue };
 
     if (CreateMotionBlurFilterBuffer(&inputs,exception,&targets) ==
         MagickFalse)
-      goto cleanup;
-  }
-
-  offsetBuffer = clEnv->library->clCreateBuffer(device->context,
-    CL_MEM_READ_ONLY|CL_MEM_ALLOC_HOST_PTR, width * sizeof(cl_int2), NULL,
-    &clStatus);
-  if (clStatus != CL_SUCCESS)
-  {
-    (void) ThrowMagickException(exception, GetMagickModule(),
-      ResourceLimitError, "clEnv->library->clCreateBuffer failed.",".");
-    goto cleanup;
+      return(MagickFalse);
   }
 
   {
-    const MotionBlurOffsetInputs inputs = { clEnv, queue, offsetBuffer,
-      offset, width };
+    const MotionBlurOffsetSource
+      source = { clEnv, device, *queue, offset, width };
 
-    if (FillMotionBlurOffsets(&inputs,exception) == MagickFalse)
-      goto cleanup;
+    if (CreateMotionBlurOffsetBuffer(&source,offsetBuffer,exception) ==
+        MagickFalse)
+      return(MagickFalse);
   }
 
 
   {
     const MotionBlurKernelInputs inputs = { clEnv, device, imageBuffer,
-      filteredImageBuffer, imageKernelBuffer, offsetBuffer, width,
+      filteredImageBuffer, *imageKernelBuffer, *offsetBuffer, width,
       channel_mask, image };
 
-    if (SetMotionBlurKernelArgs(&inputs,&motionBlurKernel,exception) ==
+    if (SetMotionBlurKernelArgs(&inputs,motionBlurKernel,exception) ==
         MagickFalse)
-      goto cleanup;
+      return(MagickFalse);
   }
 
   {
-    const MotionBlurLaunchInputs inputs = { clEnv, device, queue,
-      motionBlurKernel, filteredImageBuffer, image, filteredPixels,
+    const MotionBlurLaunchInputs inputs = { clEnv, device, *queue,
+      *motionBlurKernel, filteredImageBuffer, image, filteredPixels,
       filteredImage_view };
 
-    if (LaunchMotionBlurKernel(&inputs,&outputReady,exception) == MagickFalse)
-      goto cleanup;
+    if (LaunchMotionBlurKernel(&inputs,outputReady,exception) == MagickFalse)
+      return(MagickFalse);
   }
+  return(MagickTrue);
+}
 
-cleanup:
+typedef struct _MotionBlurFinish
+{
+  MagickCLEnv
+    clEnv;
 
-  image_view=DestroyCacheView(image_view);
-  if (filteredImage_view != NULL)
-    filteredImage_view=DestroyCacheView(filteredImage_view);
+  cl_mem
+    filteredImageBuffer,
+    imageBuffer,
+    imageKernelBuffer;
+
+  cl_kernel
+    motionBlurKernel;
+
+  cl_command_queue
+    queue;
+
+  MagickCLDevice
+    device;
+
+  MagickBooleanType
+    outputReady;
+} MotionBlurFinish;
+
+static Image *FinishMotionBlurImage(const MotionBlurFinish *finish,
+  CacheView *image_view,CacheView *filteredImage_view,Image *filteredImage)
+{
+  const MagickCLEnv
+    clEnv = finish->clEnv;
+
+  const cl_mem
+    filteredImageBuffer = finish->filteredImageBuffer,
+    imageBuffer = finish->imageBuffer,
+    imageKernelBuffer = finish->imageKernelBuffer;
+
+  const cl_kernel
+    motionBlurKernel = finish->motionBlurKernel;
+
+  const cl_command_queue
+    queue = finish->queue;
+
+  const MagickCLDevice
+    device = finish->device;
+
+  const MagickBooleanType
+    outputReady = finish->outputReady;
+
+  DestroyAccelerateViews(image_view,filteredImage_view);
 
   {
     const MotionBlurReleaseInputs inputs = { clEnv, filteredImageBuffer,
@@ -848,10 +1075,119 @@ cleanup:
   return(filteredImage);
 }
 
-MagickPrivate Image *AccelerateMotionBlurImage(const Image *image,
-  const double* kernel,const size_t width,const OffsetInfo *offset,
-  ExceptionInfo *exception)
+typedef struct _MotionBlurRequest
 {
+  const double
+    *kernel;
+
+  size_t
+    width;
+
+  const OffsetInfo
+    *offset;
+} MotionBlurRequest;
+
+static Image* ComputeMotionBlurImage(const Image *image,MagickCLEnv clEnv,
+  const MotionBlurRequest *request,ExceptionInfo *exception)
+{
+  CacheView
+    *filteredImage_view=NULL,
+    *image_view=NULL;
+
+  cl_command_queue
+    queue=NULL;
+
+  cl_int
+    channel_mask=get32BitChannelValue(image->channel_mask);
+
+  cl_kernel
+    motionBlurKernel=NULL;
+
+  cl_mem
+    filteredImageBuffer=NULL,
+    imageBuffer=NULL,
+    imageKernelBuffer=NULL,
+    offsetBuffer;
+
+  Image
+    *filteredImage=NULL;
+
+  MagickBooleanType
+    outputReady=MagickFalse;
+
+  MagickCLDevice
+    device;
+
+  void
+    *filteredPixels;
+
+  TraceAccelerateImage(image);
+
+  {
+    const MotionBlurInputTargets
+      inputTargets = { &device, &image_view, &imageBuffer };
+
+    if (AcquireMotionBlurInput(clEnv,image,exception,&inputTargets) ==
+        MagickFalse)
+      goto cleanup;
+  }
+
+
+  {
+    const MotionBlurOutputInput
+      input = { image, clEnv, device };
+
+    const MotionBlurOutputTargets
+      outputTargets = { &filteredImage, &filteredImage_view, &filteredPixels,
+        &filteredImageBuffer };
+
+    if (AcquireMotionBlurOutput(&input,exception,&outputTargets) ==
+        MagickFalse)
+      goto cleanup;
+  }
+
+
+  {
+    const MotionBlurRunInput
+      run = { clEnv, device, request->kernel, request->width,
+        request->offset, imageBuffer, filteredImageBuffer, channel_mask,
+        image, filteredPixels, filteredImage_view };
+
+    const MotionBlurRunTargets
+      runTargets = { &imageKernelBuffer, &queue, &offsetBuffer,
+        &motionBlurKernel, &outputReady };
+
+    if (RunMotionBlurKernel(&run,exception,&runTargets) == MagickFalse)
+      goto cleanup;
+  }
+
+cleanup:
+
+  {
+    const MotionBlurFinish
+      finish = { clEnv, filteredImageBuffer, imageBuffer, imageKernelBuffer,
+        motionBlurKernel, queue, device, outputReady };
+
+    return(FinishMotionBlurImage(&finish,image_view,filteredImage_view,
+      filteredImage));
+  }
+}
+
+MagickPrivate Image *AccelerateMotionBlurImage(const Image *image,
+  const AccelerateMotionBlurRequest *motion,ExceptionInfo *exception)
+{
+  const double
+    *const kernel = motion->kernel;
+
+  const size_t
+    width = motion->width;
+
+  const OffsetInfo
+    *const offset = motion->offset;
+
+  const MotionBlurRequest
+    request = { kernel, width, offset };
+
   Image
     *filteredImage;
 
@@ -870,8 +1206,7 @@ MagickPrivate Image *AccelerateMotionBlurImage(const Image *image,
   if (clEnv == (MagickCLEnv) NULL)
     return((Image *) NULL);
 
-  filteredImage=ComputeMotionBlurImage(image,clEnv,kernel,width,offset,
-    exception);
+  filteredImage=ComputeMotionBlurImage(image,clEnv,&request,exception);
   return(filteredImage);
 }
 #endif /* MAGICKCORE_OPENCL_SUPPORT */

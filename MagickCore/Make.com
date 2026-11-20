@@ -251,6 +251,14 @@ $call Make vision.c
 $call Make vision-components.c
 $call Make vms.c
 $call Make widget.c
+$call Make widget-text.c
+$call Make widget-command.c
+$call Make widget-menu.c
+$call Make widget-list.c
+$call Make widget-font.c
+$call Make widget-file.c
+$call Make widget-color.c
+$call Make widget-prefs.c
 $call Make widget-confirm.c
 $call Make widget-dialog.c
 $call Make xml-tree.c
@@ -263,6 +271,7 @@ $call Make xwindow-pixel.c
 $call Make xwindow-text.c
 $call Make xwindow-visual.c
 $call Make xwindow-import.c
+$call Make xwindow-import-image.c
 $call Make xwindow-search.c
 $ set default [-.filters]
 $ call Make analyze.c

@@ -173,8 +173,13 @@ static MagickBooleanType ComputeContrastImage(Image *image,MagickCLEnv clEnv,
   gsize[0]=image->columns;
   gsize[1]=image->rows;
 
-  outputReady=EnqueueOpenCLKernel(queue,contrastKernel,2,(const size_t *) NULL,
-    gsize,(const size_t *) NULL,image,(Image *) NULL,MagickFalse,exception);
+  {
+    const OpenCLKernelLaunch
+      enqueue = { queue, contrastKernel, 2, (const size_t *) NULL, gsize,
+        (const size_t *) NULL, image, (Image *) NULL, MagickFalse };
+
+    outputReady=EnqueueOpenCLKernel(&enqueue,exception);
+  }
 
 cleanup:
 
@@ -323,9 +328,13 @@ static MagickBooleanType ComputeGrayscaleImage(Image *image,MagickCLEnv clEnv,
 
   gsize[0]=image->columns;
   gsize[1]=image->rows;
-  outputReady=EnqueueOpenCLKernel(queue,grayscaleKernel,2,
-    (const size_t *) NULL,gsize,(const size_t *) NULL,image,(Image *) NULL,
-    MagickFalse,exception);
+  {
+    const OpenCLKernelLaunch
+      enqueue = { queue, grayscaleKernel, 2, (const size_t *) NULL, gsize,
+        (const size_t *) NULL, image, (Image *) NULL, MagickFalse };
+
+    outputReady=EnqueueOpenCLKernel(&enqueue,exception);
+  }
 
 cleanup:
 

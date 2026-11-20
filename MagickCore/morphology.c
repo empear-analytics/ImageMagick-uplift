@@ -338,8 +338,12 @@ MagickExport Image *MorphologyImage(const Image *image,
    */
   compose=GetMorphologyCompose(image,compose,exception);
   /* Apply the Morphology */
-  morphology_image = MorphologyApply(image,method,iterations,
-    curr_kernel,compose,bias,exception);
+  {
+    const MorphologyApplyRequest
+      request = { method, iterations, curr_kernel, compose, bias };
+
+    morphology_image = MorphologyApply(image,&request,exception);
+  }
 
   /* Cleanup and Exit */
   if ( curr_kernel != kernel )

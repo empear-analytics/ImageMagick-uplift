@@ -111,9 +111,16 @@
 */
 MagickPrivate MagickBooleanType FxEvaluateChannelExpression (
   FxInfo *pfx,
-  const PixelChannel channel, const ssize_t x, const ssize_t y,
+  const FxChannelPosition *position,
   double *result, ExceptionInfo *exception)
 {
+  const PixelChannel
+    channel = position->channel;
+
+  const ssize_t
+    x = position->x,
+    y = position->y;
+
   const int
     id = GetOpenMPThreadId();
 

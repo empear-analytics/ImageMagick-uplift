@@ -4869,6 +4869,31 @@ GAP_COMMANDS += [
     "compare -metric PHASE -subimage-search {C}/rose.miff ( {C}/rose.miff -crop 20x20+10+10 +repage )",
     "compare -metric PHASE -subimage-search {C}/rose.miff ( {C}/rose_blur.miff -crop 20x20+30+20 +repage )",
 ]
+# compare-similarity-frequency-private.h: the frequency-domain PSNR subimage search
+# (PSNRSimilarityImage, MSESimilarityImage's result turned into decibels), which no case ran:
+# PSNR took only the spatial path below (compare:frequency-domain=false). Against an exact
+# patch (MSE 0, the reciprocal guard) and a blurred one. Added under the owner's 2026-11-20
+# ruling that cases may be added for code no case reaches.
+GAP_COMMANDS += [
+    "compare -metric PSNR -subimage-search {C}/rose.miff ( {C}/rose.miff -crop 20x20+10+10 +repage )",
+    "compare -metric PSNR -subimage-search {C}/rose.miff ( {C}/rose_blur.miff -crop 20x20+30+20 +repage )",
+]
+# compare-similarity-image.c: spatial subimage searches with a metric where higher is
+# better, the HigherSimilaritySide merge of SimilarityImage's row loop, which no case ran
+# (in the HDRI build with FFTW, NCC, DPC, PSNR and PHASE take the frequency domain): NCC,
+# DPC and PSNR with compare:frequency-domain=false, SSIM (no frequency-domain method), and
+# NCC with a similarity threshold that a match meets
+GAP_COMMANDS += [
+    "compare -define compare:frequency-domain=false -metric NCC -subimage-search {C}/rose.miff "
+    "( {C}/rose.miff -crop 12x12+10+10 +repage )",
+    "compare -define compare:frequency-domain=false -metric DPC -subimage-search {C}/rose.miff "
+    "( {C}/rose_blur.miff -crop 12x12+30+20 +repage )",
+    "compare -define compare:frequency-domain=false -metric PSNR -subimage-search {C}/rose.miff "
+    "( {C}/rose_blur.miff -crop 12x12+30+20 +repage )",
+    "compare -metric SSIM -subimage-search {C}/rose.miff ( {C}/rose_blur.miff -crop 12x12+30+20 +repage )",
+    "compare -define compare:frequency-domain=false -metric NCC -subimage-search "
+    "-similarity-threshold 0.5 {C}/rose.miff ( {C}/rose.miff -crop 12x12+10+10 +repage )",
+]
 # compare-similarity-private.h: SSIM and DSSIM with the compare:ssim-radius, -sigma, -k1 and
 # -k2 defines, which no other case sets (GetSSIMSimularity's parameter set-up)
 GAP_COMMANDS += [
@@ -5389,6 +5414,23 @@ GAP_XEVENTS_GRAB_CASES = [
 ] + [("xevents grab: %s menu" % menu, _xev_menu_grab(menu, item, items), [])
      for menu, item, items in (("View", "Half Size", _XEV_VIEW), ("Transform", "Flip", _XEV_TRANSFORM),
                                ("Enhance", "Spiff", _XEV_ENHANCE))]
+# Widget code no case ran (round 36; owner 2026-11-20: cases may be added for code no case
+# reaches): the Commands widget following the pointer with the button held (widget-command.c
+# FollowCommandMotion, TrackCommandSelections: press on File, move over Edit, release on View,
+# whose menu then opens as for a click); a line of the image-info text view pressed and the
+# pointer moved over it (widget-text-view-private.h SelectTextViewLine, MoveTextViewPointer);
+# and a click in a list browser's reply field (widget-browser-private.h FindListBrowserCursor,
+# HighlightListBrowserReply), in the preview list below.
+GAP_XEVENTS_GRAB_CASES += [
+    ("xevents grab: View menu, opened by a drag from File",
+     _xev_menu_grab("View", "Half Size", _XEV_VIEW).replace(
+         "map click:65,165 ", "map press:65,101 move:65,133 move:65,165 release:65,165 "), []),
+    ("xevents grab: image info, a line pressed",
+     "map key:question map press:100,60 move:100,70 move:100,80 release:100,80 grab:out.ppm "
+     "key:Return use:1 key:q", []),
+]
+_XEV_LIST_CASES += [("xevents grab: preview list, a click in the field",
+                     _XEV_PREVIEW + "click:130,322 grab:out.ppm click:217,360 use:1 key:q", ["rose"])]
 # Drags (xevents press/move/release, 2026-10-06): display's crop and chop modes. c enters crop
 # mode (its mode widget maps; use:1 keeps the image window), a drag marks the rectangle, arrow
 # keys move its corner, Return crops and Escape gives up; Transform > Chop reuses the Commands
@@ -5636,6 +5678,19 @@ LOAD_SENSITIVE.update({label: _DISK_MATRIX for label in (
     "-hough-lines accumulator, matrix on disk",
     "-hough-lines matrix on disk",
 )})
+# Two more, listed by the owner (2026-11-20). infra/0fd402f13a writes 10300 files in one command
+# (about 11-15 s alone): in full runs a side has passed the 30 s TIMEOUT, the wide baseline of
+# e644889a92 among them (cached as a timeout, so it diverged in every later wide run); alone it
+# agrees. xevents/0e762518fe presses the preview list's scroll trough: it diverged once in a full
+# wide run and agreed three times alone (round 32).
+LOAD_SENSITIVE.update({
+    "10300 frames to 10300 files":
+        "10300 files written in one command take about 11-15 s alone and passed the 30 s timeout "
+        "in full runs, on either side",
+    "xevents grab: preview list, trough pressed":
+        "an X11 press on the preview list's scroll trough: whether the grab sees the list scrolled "
+        "depends on scheduling under load",
+})
 # The magnifier (plus): a q or Escape sent to the magnify window itself (use:2) closes it, which a
 # q to the image window did not; the grab, with no use before it, is the magnify window. Moved
 # with the arrow keys, its factor set with a digit (xwindow.c XMakeMagnifyImage, display.c's

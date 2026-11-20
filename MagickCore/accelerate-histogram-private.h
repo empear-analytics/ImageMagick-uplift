@@ -27,11 +27,39 @@ extern "C" {
 
 #if defined(MAGICKCORE_OPENCL_SUPPORT)
 
-static inline MagickBooleanType LaunchHistogramKernel(MagickCLEnv clEnv,
-  MagickCLDevice device,cl_command_queue queue,cl_mem imageBuffer,
-  cl_mem histogramBuffer,Image *image,const ChannelType channel,
+typedef struct _HistogramKernelLaunch
+{
+  MagickCLEnv
+    clEnv;
+
+  MagickCLDevice
+    device;
+
+  cl_command_queue
+    queue;
+
+  cl_mem
+    imageBuffer,
+    histogramBuffer;
+} HistogramKernelLaunch;
+
+static inline MagickBooleanType LaunchHistogramKernel(
+  const HistogramKernelLaunch *launch,Image *image,const ChannelType channel,
   ExceptionInfo *exception)
 {
+  const MagickCLEnv
+    clEnv = launch->clEnv;
+
+  const MagickCLDevice
+    device = launch->device;
+
+  const cl_command_queue
+    queue = launch->queue;
+
+  cl_mem
+    imageBuffer = launch->imageBuffer,
+    histogramBuffer = launch->histogramBuffer;
+
   MagickBooleanType
     outputReady;
 
