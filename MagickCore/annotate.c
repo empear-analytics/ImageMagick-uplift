@@ -2960,9 +2960,6 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   last_character=(ssize_t) length-1;
   for (i=0; i < (ssize_t) length; i++)
   {
-    GlyphLoadInput
-      glyph_input;
-
     /*
       Render UTF-8 sequence.
     */
@@ -2972,15 +2969,14 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     glyph.origin=origin;
     glyph.origin.x+=(FT_Pos) grapheme[i].x_offset;
     glyph.origin.y+=(FT_Pos) grapheme[i].y_offset;
-    glyph_input.face=face;
-    glyph_input.flags=flags;
-    glyph_input.draw_info=draw_info;
-    glyph_input.status=status;
-    glyph_input.annotate_info=annotate_info;
-    glyph_input.affine=affine;
-    glyph_input.metrics=metrics;
-    if (LoadFreetypeGlyph(&glyph_input,&glyph,&bounds) != MagickFalse)
-      continue;
+    {
+      const GlyphLoadInput
+        glyph_input = { face, flags, draw_info, status, annotate_info, affine,
+          metrics };
+
+      if (LoadFreetypeGlyph(&glyph_input,&glyph,&bounds) != MagickFalse)
+        continue;
+    }
     bitmap=(FT_BitmapGlyph) glyph.image;
     point=GetGlyphBitmapPoint(offset,bitmap,origin);
     if (draw_info->render != MagickFalse)
