@@ -251,6 +251,7 @@ $call Make vision.c
 $call Make vision-components.c
 $call Make vms.c
 $call Make widget.c
+$call Make widget-font.c
 $call Make widget-file.c
 $call Make widget-color.c
 $call Make widget-prefs.c

@@ -514,6 +514,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/vision-components-object-private.h \
   MagickCore/vision-components-label-private.h \
   MagickCore/widget.c \
+  MagickCore/widget-font.c \
   MagickCore/widget-file.c \
   MagickCore/widget-color.c \
   MagickCore/widget-prefs.c \
