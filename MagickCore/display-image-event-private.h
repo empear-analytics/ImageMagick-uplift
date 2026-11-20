@@ -875,6 +875,23 @@ static void XMakePopupWindow(const DisplayEventContext *context)
       "Window id: 0x%lx (pop up)",windows->popup.id);
 }
 
+static void XSetMagnifyWindowAttributes(XWindows *windows,
+  XResourceInfo *resource_info)
+{
+  windows->magnify.width=MagnifySize;
+  windows->magnify.height=MagnifySize;
+  windows->magnify.flags|=PPosition;
+  windows->magnify.min_width=MagnifySize;
+  windows->magnify.min_height=MagnifySize;
+  windows->magnify.width_inc=MagnifySize;
+  windows->magnify.height_inc=MagnifySize;
+  windows->magnify.data=resource_info->magnify;
+  windows->magnify.attributes.cursor=windows->magnify.cursor;
+  windows->magnify.attributes.event_mask=ButtonPressMask | ButtonReleaseMask |
+    ExposureMask | KeyPressMask | KeyReleaseMask | OwnerGrabButtonMask |
+    StructureNotifyMask;
+}
+
 static void XMakeMagnifyWindow(const DisplayEventContext *context,
   const Image *display_image)
 {
@@ -937,18 +954,7 @@ static void XMakeMagnifyWindow(const DisplayEventContext *context,
   if (windows->magnify.cursor == (Cursor) NULL)
     ThrowXWindowFatalException(XServerFatalError,"UnableToCreateCursor",
       display_image->filename);
-  windows->magnify.width=MagnifySize;
-  windows->magnify.height=MagnifySize;
-  windows->magnify.flags|=PPosition;
-  windows->magnify.min_width=MagnifySize;
-  windows->magnify.min_height=MagnifySize;
-  windows->magnify.width_inc=MagnifySize;
-  windows->magnify.height_inc=MagnifySize;
-  windows->magnify.data=resource_info->magnify;
-  windows->magnify.attributes.cursor=windows->magnify.cursor;
-  windows->magnify.attributes.event_mask=ButtonPressMask | ButtonReleaseMask |
-    ExposureMask | KeyPressMask | KeyReleaseMask | OwnerGrabButtonMask |
-    StructureNotifyMask;
+  XSetMagnifyWindowAttributes(windows,resource_info);
   manager_hints->flags=InputHint | StateHint | WindowGroupHint;
   manager_hints->input=MagickTrue;
   manager_hints->initial_state=NormalState;
