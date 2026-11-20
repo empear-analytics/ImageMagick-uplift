@@ -371,6 +371,15 @@ static void ClientCommandMessage(Display *display,XWindows *windows,
     windows->command.screen);
 }
 
+static void MoveCommandWindow(XWindows *windows,XEvent *event)
+{
+  if (event->xconfigure.send_event != 0)
+    {
+      windows->command.x=event->xconfigure.x;
+      windows->command.y=event->xconfigure.y;
+    }
+}
+
 static size_t ConfigureCommandWindow(XWindows *windows,XEvent *event,
   size_t state)
 {
@@ -379,11 +388,7 @@ static size_t ConfigureCommandWindow(XWindows *windows,XEvent *event,
   */
   if (event->xconfigure.window != windows->command.id)
     return(state);
-  if (event->xconfigure.send_event != 0)
-    {
-      windows->command.x=event->xconfigure.x;
-      windows->command.y=event->xconfigure.y;
-    }
+  MoveCommandWindow(windows,event);
   if ((event->xconfigure.width == (int) windows->command.width) &&
       (event->xconfigure.height == (int) windows->command.height))
     return(state);
