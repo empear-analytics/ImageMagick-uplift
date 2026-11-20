@@ -2499,6 +2499,18 @@ static MagickBooleanType ParseMVGBorderColor(const MVGRenderState *state)
   return(MagickTrue);
 }
 
+static MagickBooleanType IsNewGraphicContextId(DrawInfo **graphic_context,
+  const ssize_t n,const char *token)
+{
+  ssize_t
+    i;
+
+  for (i=0; i <= n; i++)
+    if (LocaleCompare(token,graphic_context[i]->id) == 0)
+      return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType ParseMVGClass(const MVGRenderState *state)
 {
   char
@@ -2526,7 +2538,6 @@ static MagickBooleanType ParseMVGClass(const MVGRenderState *state)
 
   ssize_t
     classDepth = (*state->classDepth),
-    i,
     n = (*state->n);
 
   do
@@ -2543,10 +2554,7 @@ static MagickBooleanType ParseMVGClass(const MVGRenderState *state)
     /*
       Identify recursion.
     */
-    for (i=0; i <= n; i++)
-      if (LocaleCompare(token,graphic_context[i]->id) == 0)
-        break;
-    if (i <= n)
+    if (IsNewGraphicContextId(graphic_context,n,token) == MagickFalse)
       break;
     if (classDepth++ >= MagickMaxRecursionDepth)
       {
