@@ -638,6 +638,8 @@ static void XMakeInfoWindow(const DisplayEventContext *context)
   XWMHints
     *const manager_hints = context->manager_hints;
 
+  const XMakeWindowHints hints = { argv, argc, class_hints, manager_hints };
+
   XGetWindowInfo(display,visual_info,map_info,pixel,font_info,resource_info,
     &windows->info);
   (void) CloneString(&windows->info.name,"Info");
@@ -653,8 +655,7 @@ static void XMakeInfoWindow(const DisplayEventContext *context)
   manager_hints->input=MagickFalse;
   manager_hints->initial_state=NormalState;
   manager_hints->window_group=windows->image.id;
-  XMakeWindow(display,windows->image.id,argv,argc,class_hints,manager_hints,
-    &windows->info);
+  XMakeWindow(display,windows->image.id,&hints,&windows->info);
   windows->info.highlight_stipple=XCreateBitmapFromData(display,
     windows->info.id,(char *) HighlightBitmap,HighlightWidth,HighlightHeight);
   windows->info.shadow_stipple=XCreateBitmapFromData(display,
@@ -708,6 +709,8 @@ static void XMakeCommandWindow(const DisplayEventContext *context)
   char
     resource_name[MagickPathExtent];
 
+  const XMakeWindowHints hints = { argv, argc, class_hints, manager_hints };
+
   XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
     resource_info,&windows->command);
   windows->command.data=MagickMenus;
@@ -726,8 +729,7 @@ static void XMakeCommandWindow(const DisplayEventContext *context)
   manager_hints->input=MagickTrue;
   manager_hints->initial_state=NormalState;
   manager_hints->window_group=windows->image.id;
-  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-    &windows->command);
+  XMakeWindow(display,root_window,&hints,&windows->command);
   windows->command.highlight_stipple=XCreateBitmapFromData(display,
     windows->command.id,(char *) HighlightBitmap,HighlightWidth,
     HighlightHeight);
@@ -782,6 +784,8 @@ static void XMakeWidgetWindow(const DisplayEventContext *context)
   char
     resource_name[MagickPathExtent];
 
+  const XMakeWindowHints hints = { argv, argc, class_hints, manager_hints };
+
   XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
     resource_info,&windows->widget);
   (void) FormatLocaleString(resource_name,MagickPathExtent,"%s.widget",
@@ -798,8 +802,7 @@ static void XMakeWidgetWindow(const DisplayEventContext *context)
   manager_hints->input=MagickTrue;
   manager_hints->initial_state=NormalState;
   manager_hints->window_group=windows->image.id;
-  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-    &windows->widget);
+  XMakeWindow(display,root_window,&hints,&windows->widget);
   windows->widget.highlight_stipple=XCreateBitmapFromData(display,
     windows->widget.id,(char *) HighlightBitmap,HighlightWidth,HighlightHeight);
   windows->widget.shadow_stipple=XCreateBitmapFromData(display,
@@ -848,6 +851,8 @@ static void XMakePopupWindow(const DisplayEventContext *context)
   XWMHints
     *const manager_hints = context->manager_hints;
 
+  const XMakeWindowHints hints = { argv, argc, class_hints, manager_hints };
+
   XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
     resource_info,&windows->popup);
   windows->popup.border_width=0;
@@ -859,8 +864,7 @@ static void XMakePopupWindow(const DisplayEventContext *context)
   manager_hints->input=MagickTrue;
   manager_hints->initial_state=NormalState;
   manager_hints->window_group=windows->image.id;
-  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-    &windows->popup);
+  XMakeWindow(display,root_window,&hints,&windows->popup);
   windows->popup.highlight_stipple=XCreateBitmapFromData(display,
     windows->popup.id,(char *) HighlightBitmap,HighlightWidth,HighlightHeight);
   windows->popup.shadow_stipple=XCreateBitmapFromData(display,
@@ -913,6 +917,8 @@ static void XMakeMagnifyWindow(const DisplayEventContext *context,
   char
     resource_name[MagickPathExtent];
 
+  const XMakeWindowHints hints = { argv, argc, class_hints, manager_hints };
+
   XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
     resource_info,&windows->magnify);
   if (resource_info->use_shared_memory == MagickFalse)
@@ -947,8 +953,7 @@ static void XMakeMagnifyWindow(const DisplayEventContext *context,
   manager_hints->input=MagickTrue;
   manager_hints->initial_state=NormalState;
   manager_hints->window_group=windows->image.id;
-  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-    &windows->magnify);
+  XMakeWindow(display,root_window,&hints,&windows->magnify);
   if (resource_info->debug != MagickFalse)
     (void) LogMagickEvent(X11Event,GetMagickModule(),
       "Window id: 0x%lx (magnify)",windows->magnify.id);
@@ -995,6 +1000,8 @@ static void XMakePanWindow(const DisplayEventContext *context)
   char
     resource_name[MagickPathExtent];
 
+  const XMakeWindowHints hints = { argv, argc, class_hints, manager_hints };
+
   XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
     resource_info,&windows->pan);
   (void) CloneString(&windows->pan.name,"Pan Icon");
@@ -1015,8 +1022,7 @@ static void XMakePanWindow(const DisplayEventContext *context)
   manager_hints->input=MagickFalse;
   manager_hints->initial_state=NormalState;
   manager_hints->window_group=windows->image.id;
-  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-    &windows->pan);
+  XMakeWindow(display,root_window,&hints,&windows->pan);
   if (resource_info->debug != MagickFalse)
     (void) LogMagickEvent(X11Event,GetMagickModule(),"Window id: 0x%lx (pan)",
       windows->pan.id);
@@ -1726,6 +1732,8 @@ static void XMakeIconWindow(const DisplayEventContext *context,
   XWMHints
     *const manager_hints = context->manager_hints;
 
+  const XMakeWindowHints hints = { argv, argc, class_hints, manager_hints };
+
   XGetWindowInfo(display,icon_visual,icon_map,icon_pixel,(XFontStruct *) NULL,
     icon_resources,&windows->icon);
   windows->icon.geometry=resource_info->icon_geometry;
@@ -1736,8 +1744,7 @@ static void XMakeIconWindow(const DisplayEventContext *context,
   manager_hints->flags=InputHint | StateHint;
   manager_hints->input=MagickFalse;
   manager_hints->initial_state=IconicState;
-  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-    &windows->icon);
+  XMakeWindow(display,root_window,&hints,&windows->icon);
   if (resource_info->debug != MagickFalse)
     (void) LogMagickEvent(X11Event,GetMagickModule(),"Window id: 0x%lx (icon)",
       windows->icon.id);
@@ -1785,6 +1792,8 @@ static void XMakeContextWindow(const DisplayEventContext *context)
   XWMHints
     *const manager_hints = context->manager_hints;
 
+  const XMakeWindowHints hints = { argv, argc, class_hints, manager_hints };
+
   windows->context.id=(Window) NULL;
   XGetWindowInfo(display,visual_info,map_info,pixel,font_info,
     resource_info,&windows->context);
@@ -1795,8 +1804,7 @@ static void XMakeContextWindow(const DisplayEventContext *context)
   manager_hints->flags=InputHint | StateHint;
   manager_hints->input=MagickFalse;
   manager_hints->initial_state=WithdrawnState;
-  XMakeWindow(display,root_window,argv,argc,class_hints,manager_hints,
-    &windows->context);
+  XMakeWindow(display,root_window,&hints,&windows->context);
   if (resource_info->debug != MagickFalse)
     (void) LogMagickEvent(X11Event,GetMagickModule(),
       "Window id: 0x%lx (context)",windows->context.id);

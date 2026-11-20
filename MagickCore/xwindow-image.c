@@ -7246,11 +7246,22 @@ static void XQueryShapeSupport(Display *display,XWindowInfo *window_info)
 }
 #endif
 
-MagickPrivate void XMakeWindow(Display *display,Window parent,char **argv,
-  int argc,XClassHint *class_hint,XWMHints *manager_hints,
-  XWindowInfo *window_info)
+MagickPrivate void XMakeWindow(Display *display,Window parent,
+  const XMakeWindowHints *hints,XWindowInfo *window_info)
 {
 #define MinWindowSize  64
+
+  char
+    **const argv = hints->argv;
+
+  const int
+    argc = hints->argc;
+
+  XClassHint
+    *const class_hint = hints->class_hint;
+
+  XWMHints
+    *const manager_hints = hints->manager_hints;
 
   int
     gravity;
