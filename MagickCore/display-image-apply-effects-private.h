@@ -211,6 +211,9 @@ static void XApplyAddBorderCommand(const XMagickCommandContext *context,
   static char
     geometry[MagickPathExtent] = "6x6";
 
+  const XImageCacheContext
+    command_context = { display, resource_info, windows, image, exception };
+
   /*
     Query user for border color and geometry.
   */
@@ -228,8 +231,7 @@ static void XApplyAddBorderCommand(const XMagickCommandContext *context,
   /*
     Add a border to the image.
   */
-  (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
-    exception);
+  (void) XMagickCommand(&command_context,ApplyCommand);
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
   (void) QueryColorCompliance(color,AllCompliance,&(*image)->border_color,
@@ -283,6 +285,9 @@ static void XApplyAddFrameCommand(const XMagickCommandContext *context,
   static char
     geometry[MagickPathExtent] = "6x6";
 
+  const XImageCacheContext
+    command_context = { display, resource_info, windows, image, exception };
+
   /*
     Query user for frame color and geometry.
   */
@@ -300,8 +305,7 @@ static void XApplyAddFrameCommand(const XMagickCommandContext *context,
   /*
     Surround image with an ornamental border.
   */
-  (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
-    exception);
+  (void) XMagickCommand(&command_context,ApplyCommand);
   XSetCursorState(display,windows,MagickTrue);
   XCheckRefreshWindows(display,windows);
   (void) QueryColorCompliance(color,AllCompliance,&(*image)->matte_color,

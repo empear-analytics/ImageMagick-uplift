@@ -287,10 +287,12 @@ static void XPrepareDrawInfo(const DrawEditContext *context,
   Pixmap
     *const stipple = style_targets->stipple;
 
+  const XImageCacheContext
+    command_context = { display, resource_info, windows, image, exception };
+
   (*draw_info).x=(int) (*rectangle_info).x;
   (*draw_info).y=(int) (*rectangle_info).y;
-  (void) XMagickCommand(display,resource_info,windows,SaveToUndoBufferCommand,
-    image,exception);
+  (void) XMagickCommand(&command_context,SaveToUndoBufferCommand);
   XSizeDrawRegion(context,draw_info,(*line_width),rectangle_info);
   /*
     Initialize drawing attributes.

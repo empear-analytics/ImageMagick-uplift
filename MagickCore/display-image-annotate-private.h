@@ -529,8 +529,13 @@ static void XColorEditCommandAction(const ColorEditContext *context,
   {
     case ColorEditUndoCommand:
     {
-      (void) XMagickCommand(context->display,context->resource_info,
-        context->windows,UndoCommand,context->image,context->exception);
+      {
+        const XImageCacheContext
+          command_context = { context->display, context->resource_info,
+            context->windows, context->image, context->exception };
+
+        (void) XMagickCommand(&command_context,UndoCommand);
+      }
       break;
     }
     case ColorEditHelpCommand:
@@ -707,9 +712,13 @@ static void XColorEditPress(const ColorEditContext *context,
   */
   (*x)=(*event).xbutton.x;
   (*y)=(*event).xbutton.y;
-  (void) XMagickCommand(context->display,context->resource_info,
-    context->windows,
-    SaveToUndoBufferCommand,context->image,context->exception);
+  {
+    const XImageCacheContext
+      command_context = { context->display, context->resource_info,
+        context->windows, context->image, context->exception };
+
+    (void) XMagickCommand(&command_context,SaveToUndoBufferCommand);
+  }
   (*state)|=UpdateConfigurationState;
 }
 
