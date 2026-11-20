@@ -22,6 +22,16 @@
 #include "MagickCore/image-private.h"
 #include "MagickCore/pixel.h"
 #include "MagickCore/pixel-accessor.h"
+#include "MagickCore/colorspace-xyz-to-rgb-private.h"
+#include "MagickCore/colorspace-to-rgb-private.h"
+#include "MagickCore/colorspace-lab-to-rgb-private.h"
+#include "MagickCore/colorspace-cie-to-rgb-private.h"
+#include "MagickCore/colorspace-rgb-to-xyz-private.h"
+#include "MagickCore/colorspace-rgb-to-hue-private.h"
+#include "MagickCore/colorspace-rgb-to-lab-private.h"
+#include "MagickCore/colorspace-rgb-to-cie-private.h"
+#include "MagickCore/colorspace-jzazbz-private.h"
+#include "MagickCore/colorspace-jzazbz-oklab-private.h"
 #include "MagickCore/colorspace-conversions-private.h"
 
 #if defined(__cplusplus) || defined(c_plusplus)
