@@ -1936,16 +1936,22 @@ static SegmentInfo GetPolygonEdgesExtent(PolygonInfo **polygon_info,
   return(bounds);
 }
 
+static inline double ClampBoundsCoordinate(const double value,
+  const double edge,const double limit)
+{
+  return(value < 0.0 ? 0.0 : value >= edge ? limit : value);
+}
+
 static SegmentInfo ClampPolygonBounds(const Image *image,SegmentInfo bounds)
 {
-  bounds.x1=bounds.x1 < 0.0 ? 0.0 : bounds.x1 >= (double) image->columns-1.0 ?
-    (double) image->columns-1.0 : bounds.x1;
-  bounds.y1=bounds.y1 < 0.0 ? 0.0 : bounds.y1 >= (double) image->rows-1.0 ?
-    (double) image->rows-1.0 : bounds.y1;
-  bounds.x2=bounds.x2 < 0.0 ? 0.0 : bounds.x2 >= (double) image->columns-1.0 ?
-    (double) image->columns-1.0 : bounds.x2;
-  bounds.y2=bounds.y2 < 0.0 ? 0.0 : bounds.y2 >= (double) image->rows-1.0 ?
-    (double) image->rows-1.0 : bounds.y2;
+  bounds.x1=ClampBoundsCoordinate(bounds.x1,(double) image->columns-1.0,
+    (double) image->columns-1.0);
+  bounds.y1=ClampBoundsCoordinate(bounds.y1,(double) image->rows-1.0,
+    (double) image->rows-1.0);
+  bounds.x2=ClampBoundsCoordinate(bounds.x2,(double) image->columns-1.0,
+    (double) image->columns-1.0);
+  bounds.y2=ClampBoundsCoordinate(bounds.y2,(double) image->rows-1.0,
+    (double) image->rows-1.0);
   return(bounds);
 }
 
