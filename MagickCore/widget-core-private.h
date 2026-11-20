@@ -100,6 +100,10 @@ extern MagickPrivate const int
   *BorderOffsetReference(void),
   *DoubleClickReference(void);
 
+extern MagickPrivate XWidgetInfo
+  *SubmenuInfoReference(void),
+  *ToggleInfoReference(void);
+
 /*
   Method prototypes.
 */
