@@ -450,9 +450,7 @@ static MagickBooleanType XDrawEditStep(const DrawEditContext *context,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static MagickBooleanType XDrawEditImage(Display *display,
-  XResourceInfo *resource_info,XWindows *windows,Image **image,
-  ExceptionInfo *exception)
+static MagickBooleanType XDrawEditImage(const XImageCacheContext *edit)
 {
   static ElementType
     element = PointElement;
@@ -516,23 +514,25 @@ static MagickBooleanType XDrawEditImage(Display *display,
   /*
     Allocate polygon info.
   */
-  if (XAcquireDrawCoordinates(exception,&shape_targets) == MagickFalse)
+  if (XAcquireDrawCoordinates(edit->exception,&shape_targets) ==
+      MagickFalse)
     return(MagickFalse);
   /*
     Map Command widget.
   */
-  XMapDrawCommandWidget(display,windows,DrawEditMenu);
+  XMapDrawCommandWidget(edit->display,edit->windows,DrawEditMenu);
   /*
     Wait for first button press.
   */
-  root_window=XRootWindow(display,XDefaultScreen(display));
+  root_window=XRootWindow(edit->display,XDefaultScreen(edit->display));
   draw_info.stencil=OpaqueStencil;
   status=MagickTrue;
-  cursor=XCreateFontCursor(display,XC_tcross);
+  cursor=XCreateFontCursor(edit->display,XC_tcross);
   {
     const DrawEditContext
-      draw_context = { display, resource_info, windows, DrawEditMenu, command,
-        root_window, exception, image, cursor, DrawEditCommands };
+      draw_context = { edit->display, edit->resource_info, edit->windows,
+        DrawEditMenu, command, root_window, edit->exception, edit->image,
+        cursor, DrawEditCommands };
 
     for ( ; ; )
     {
@@ -541,7 +541,7 @@ static MagickBooleanType XDrawEditImage(Display *display,
         break;
     }
   }
-  XSetCursorState(display,windows,MagickFalse);
+  XSetCursorState(edit->display,edit->windows,MagickFalse);
   coordinate_info=(XPoint *) RelinquishMagickMemory(coordinate_info);
   return((MagickBooleanType) (status != 0));
 }

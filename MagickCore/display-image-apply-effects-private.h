@@ -72,10 +72,13 @@ static void XApplyDrawCommand(const XMagickCommandContext *context)
   MagickStatusType
     status;
 
+  const XImageCacheContext
+    edit_context = { display, resource_info, windows, image, exception };
+
   /*
     Draw image.
   */
-  status=XDrawEditImage(display,resource_info,windows,image,exception);
+  status=XDrawEditImage(&edit_context);
   if (status == MagickFalse)
     {
       XNoticeWidget(display,windows,"Unable to draw on the X image",
