@@ -409,9 +409,12 @@ static Image *ComputeUnsharpMaskImage(const Image *image,MagickCLEnv clEnv,
   gsize[1]=image->rows;
   lsize[0]=chunkSize;
   lsize[1]=1;
-  outputReady=EnqueueOpenCLKernel(queue,blurRowKernel,2,
-    (const size_t *) NULL,gsize,lsize,image,filteredImage,MagickFalse,
-    exception);
+  {
+    const OpenCLKernelLaunch enqueue = { queue, blurRowKernel, 2,
+      (const size_t *) NULL, gsize, lsize, image, filteredImage, MagickFalse };
+
+    outputReady=EnqueueOpenCLKernel(&enqueue,exception);
+  }
 
   chunkSize=256;
   fGain=(float) gain;
@@ -436,9 +439,12 @@ static Image *ComputeUnsharpMaskImage(const Image *image,MagickCLEnv clEnv,
   gsize[1]=chunkSize*((image->rows+chunkSize-1)/chunkSize);
   lsize[0]=1;
   lsize[1]=chunkSize;
-  outputReady=EnqueueOpenCLKernel(queue,unsharpMaskBlurColumnKernel,2,
-    (const size_t *) NULL,gsize,lsize,image,filteredImage,MagickFalse,
-    exception);
+  {
+    const OpenCLKernelLaunch enqueue = { queue, unsharpMaskBlurColumnKernel, 2,
+      (const size_t *) NULL, gsize, lsize, image, filteredImage, MagickFalse };
+
+    outputReady=EnqueueOpenCLKernel(&enqueue,exception);
+  }
 
 cleanup:
 
@@ -639,8 +645,12 @@ static Image *ComputeUnsharpMaskImageSingle(const Image *image,
   gsize[1]=((image->rows + 31) / 32)*32;
   lsize[0]=8;
   lsize[1]=32;
-  outputReady=EnqueueOpenCLKernel(queue,unsharpMaskKernel,2,(const size_t *) NULL,
-    gsize,lsize,image,filteredImage,MagickFalse,exception);
+  {
+    const OpenCLKernelLaunch enqueue = { queue, unsharpMaskKernel, 2,
+      (const size_t *) NULL, gsize, lsize, image, filteredImage, MagickFalse };
+
+    outputReady=EnqueueOpenCLKernel(&enqueue,exception);
+  }
 
 cleanup:
 
