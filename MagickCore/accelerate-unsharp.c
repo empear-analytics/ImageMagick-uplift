@@ -301,14 +301,14 @@ static Image *ComputeUnsharpMaskImage(const Image *image,MagickCLEnv clEnv,
     status;
 
   cl_kernel
-    blurRowKernel,
-    unsharpMaskBlurColumnKernel;
+    blurRowKernel=NULL,
+    unsharpMaskBlurColumnKernel=NULL;
 
   cl_mem
     filteredImageBuffer,
     imageBuffer,
-    imageKernelBuffer,
-    tempImageBuffer;
+    imageKernelBuffer=NULL,
+    tempImageBuffer=NULL;
 
   cl_uint
     imageColumns,
@@ -327,7 +327,7 @@ static Image *ComputeUnsharpMaskImage(const Image *image,MagickCLEnv clEnv,
     chunkSize;
 
   MagickBooleanType
-    outputReady;
+    outputReady=MagickFalse;
 
   MagickCLDevice
     device;
@@ -347,11 +347,6 @@ static Image *ComputeUnsharpMaskImage(const Image *image,MagickCLEnv clEnv,
   filteredImage=NULL;
   imageBuffer=NULL;
   filteredImageBuffer=NULL;
-  tempImageBuffer=NULL;
-  imageKernelBuffer=NULL;
-  blurRowKernel=NULL;
-  unsharpMaskBlurColumnKernel=NULL;
-  outputReady=MagickFalse;
 
   if (AcquireAccelerateBuffers(clEnv,image,exception,&targets) == MagickFalse)
     goto cleanup;
