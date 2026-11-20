@@ -36,6 +36,7 @@
 #include "MagickCore/colorspace-rgb-to-lchuv-private.h"
 #include "MagickCore/colorspace-rgb-to-cie-private.h"
 #include "MagickCore/colorspace-rgb-to-jzazbz-private.h"
+#include "MagickCore/colorspace-jzazbz-to-xyz-private.h"
 #include "MagickCore/colorspace-jzazbz-private.h"
 #include "MagickCore/colorspace-jzazbz-oklab-private.h"
 #include "MagickCore/colorspace-rgb-to-ycc-private.h"
