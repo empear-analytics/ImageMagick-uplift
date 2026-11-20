@@ -895,9 +895,21 @@ static void XApplyVignetteCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
-static void XApplyRollToImage(Display *display,XWindows *windows,Image **image,
-  char *geometry,ExceptionInfo *exception)
+static void XApplyRollToImage(const XMagickCommandContext *context,
+  char *geometry)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   RectangleInfo
     page_geometry;
 
@@ -953,7 +965,7 @@ static void XApplyRollCommand(const XMagickCommandContext *context)
   */
   (void) XMagickCommand(display,resource_info,windows,ApplyCommand,image,
     exception);
-  XApplyRollToImage(display,windows,image,geometry,exception);
+  XApplyRollToImage(context,geometry);
   CatchException(exception);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
