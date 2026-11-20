@@ -5591,6 +5591,16 @@ static void TraceArcSegmentPoints(const ArcSegmentInput *segment,
     (p+3)->point=end;
 }
 
+static PointInfo ScaleArcRadii(PointInfo radii,const double delta)
+{
+  if (delta > 1.0)
+    {
+      radii.x*=sqrt((double) delta);
+      radii.y*=sqrt((double) delta);
+    }
+  return(radii);
+}
+
 static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
   const PointInfo end,const ArcPathShape *shape)
 {
@@ -5656,11 +5666,7 @@ static MagickBooleanType TraceArcPath(MVGInfo *mvg_info,const PointInfo start,
     (radii.y*radii.y);
   if (delta < MagickEpsilon)
     return(TraceLine(primitive_info,start,end));
-  if (delta > 1.0)
-    {
-      radii.x*=sqrt((double) delta);
-      radii.y*=sqrt((double) delta);
-    }
+  radii=ScaleArcRadii(radii,delta);
   points[0].x=(double) (cosine*start.x/radii.x+sine*start.y/radii.x);
   points[0].y=(double) (cosine*start.y/radii.y-sine*start.x/radii.y);
   points[1].x=(double) (cosine*end.x/radii.x+sine*end.y/radii.x);
