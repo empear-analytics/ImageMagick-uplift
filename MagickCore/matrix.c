@@ -825,9 +825,6 @@ MagickExport Image *MatrixToImage(const MatrixInfo *matrix_info,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    MatrixPixelScale
-      pixel_scale;
-
     Quantum
       *q;
 
@@ -839,11 +836,12 @@ MagickExport Image *MatrixToImage(const MatrixInfo *matrix_info,
         status=MagickFalse;
         continue;
       }
-    pixel_scale.matrix_info=matrix_info;
-    pixel_scale.image=image;
-    pixel_scale.min_value=min_value;
-    pixel_scale.scale_factor=scale_factor;
-    ScaleMatrixRow(&pixel_scale,y,q);
+    {
+      const MatrixPixelScale
+        pixel_scale = { matrix_info, image, min_value, scale_factor };
+
+      ScaleMatrixRow(&pixel_scale,y,q);
+    }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
   }
