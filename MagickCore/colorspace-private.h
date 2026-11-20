@@ -25,6 +25,7 @@
 #include "MagickCore/colorspace-xyz-to-rgb-private.h"
 #include "MagickCore/colorspace-to-rgb-private.h"
 #include "MagickCore/colorspace-lab-to-rgb-private.h"
+#include "MagickCore/colorspace-luv-lms-to-rgb-private.h"
 #include "MagickCore/colorspace-cie-to-rgb-private.h"
 #include "MagickCore/colorspace-rgb-to-xyz-private.h"
 #include "MagickCore/colorspace-rgb-to-hue-private.h"
