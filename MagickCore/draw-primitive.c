@@ -849,6 +849,42 @@ static ssize_t AppendNewSubpathPoint(const NewSubpathPointInput *subpath,
   return(n);
 }
 
+typedef struct _OpenSubpathInput
+{
+  PathInfo
+    *path_info;
+
+  ssize_t
+    start;
+
+  PointInfo
+    point,
+    p;
+} OpenSubpathInput;
+
+static ssize_t AppendOpenSubpathEnd(const OpenSubpathInput *open_subpath,
+  ssize_t n)
+{
+  PathInfo
+    *const path_info = open_subpath->path_info;
+
+  const ssize_t
+    start = open_subpath->start;
+
+  const PointInfo
+    point = open_subpath->point,
+    p = open_subpath->p;
+
+  path_info[start].code=OpenCode;
+  path_info[n].code=GhostlineCode;
+  path_info[n].point=point;
+  n++;
+  path_info[n].code=LineToCode;
+  path_info[n].point=p;
+  n++;
+  return(n);
+}
+
 static PathInfo *ConvertPrimitiveToPath(const PrimitiveInfo *primitive_info,
   ExceptionInfo *exception)
 {
@@ -917,16 +953,15 @@ static PathInfo *ConvertPrimitiveToPath(const PrimitiveInfo *primitive_info,
         closed_subpath=MagickFalse;
         continue;
       }
-    /*
-      Mark the p point as open if the subpath is not closed.
-    */
-    path_info[start].code=OpenCode;
-    path_info[n].code=GhostlineCode;
-    path_info[n].point=primitive_info[i].point;
-    n++;
-    path_info[n].code=LineToCode;
-    path_info[n].point=p;
-    n++;
+    {
+      const OpenSubpathInput
+        open_subpath = { path_info, start, primitive_info[i].point, p };
+
+      /*
+        Mark the p point as open if the subpath is not closed.
+      */
+      n=AppendOpenSubpathEnd(&open_subpath,n);
+    }
   }
   return(TerminatePathInfo(path_info,n));
 }
