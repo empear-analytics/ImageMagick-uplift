@@ -209,51 +209,9 @@ raw=$(printf '%s\n' "$raw" | awk -F'\t' '$2 !~ /-x$/ || $1 ~ /error:|\[-W(incomp
 pat=$(printf '%s\n' "${FILES[@]}" | sed "s#^$ROOT/##; s/\./\\\\./g; s/^/^/; s/\$/:/" | paste -sd'|')
 raw=$(printf '%s\n' "$raw" | grep -E "$pat")
 
-# MSVC C4065: a switch whose body has a default label and no case label.
-scan=$(cd "$ROOT" && python3 - "${FILES[@]}" <<'EOF'
-import re, sys
-def strip(s):
-    # blank comments, string and character literals, and preprocessor lines, keeping offsets
-    out = list(s)
-    for m in re.finditer(r'/\*.*?\*/|//[^\n]*|"(?:\\.|[^"\\\n])*"|\'(?:\\.|[^\'\\\n])*\'|^[ \t]*#[^\n]*(?:\\\n[^\n]*)*', s, re.S | re.M):
-        for i in range(m.start(), m.end()):
-            if out[i] != '\n':
-                out[i] = ' '
-    return ''.join(out)
-def match(t, i, o, c):
-    d = 0
-    while i < len(t):
-        if t[i] == o: d += 1
-        elif t[i] == c:
-            d -= 1
-            if d == 0: return i
-        i += 1
-    return -1
-for f in sys.argv[1:]:
-    t = strip(open(f, errors='replace').read())
-    for m in re.finditer(r'\bswitch\s*\(', t):
-        p = match(t, m.end() - 1, '(', ')')
-        b = re.compile(r'\s*\{').match(t, p + 1)
-        if not b: continue
-        e = match(t, b.end() - 1, '{', '}')
-        body, cases, dflt, i = t[b.end():e], 0, 0, 0
-        while i < len(body):   # skip nested switches, count this one's labels
-            n = re.compile(r'\bswitch\s*\(|\bcase\b|\bdefault\s*:').search(body, i)
-            if not n: break
-            if n.group().startswith('switch'):
-                q = match(body, n.end() - 1, '(', ')')
-                r = re.compile(r'\s*\{').match(body, q + 1)
-                i = match(body, r.end() - 1, '{', '}') + 1 if r else q + 1
-                continue
-            if n.group() == 'case': cases += 1
-            else: dflt += 1
-            i = n.end()
-        if dflt and not cases:
-            line = t.count('\n', 0, m.start()) + 1
-            col = m.start() - t.rfind('\n', 0, m.start())
-            print(f"{f}:{line}:{col}: warning: switch has a default label and no case label (MSVC C4065)\tscan")
-EOF
-)
+# MSVC C4065: a switch whose body has a default label and no case label
+# (tools/c4065_scan.py; case labels in an #if 0 branch do not count).
+scan=$(cd "$ROOT" && python3 "$ROOT/tools/c4065_scan.py" "${FILES[@]}")
 
 all=$(printf '%s\n%s\n' "$raw" "$scan" | grep . )
 for k in "${KNOWN[@]}"; do all=$(printf '%s\n' "$all" | grep -Ev "$k"); done
