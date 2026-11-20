@@ -119,6 +119,7 @@
 
 #include "MagickCore/display-image-apply-private.h"
 
+#include "MagickCore/display-image-matte-roi-private.h"
 #include "MagickCore/display-image-matte-private.h"
 
 #include "MagickCore/display-image-tile-private.h"
