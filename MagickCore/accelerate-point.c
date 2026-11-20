@@ -796,10 +796,16 @@ cleanup:
 }
 
 MagickPrivate MagickBooleanType AccelerateModulateImage(Image *image,
-  const double percent_brightness,const double percent_hue,
-  const double percent_saturation,const ColorspaceType colorspace,
-  ExceptionInfo *exception)
+  const AccelerateModulateRequest *request,ExceptionInfo *exception)
 {
+  const double
+    percent_brightness = request->percent_brightness,
+    percent_hue = request->percent_hue,
+    percent_saturation = request->percent_saturation;
+
+  const ColorspaceType
+    colorspace = request->colorspace;
+
   MagickBooleanType
     status;
 

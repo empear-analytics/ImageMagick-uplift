@@ -45,6 +45,17 @@ typedef struct _AccelerateFunctionRequest
     *parameters;
 } AccelerateFunctionRequest;
 
+typedef struct _AccelerateModulateRequest
+{
+  const double
+    percent_brightness,
+    percent_hue,
+    percent_saturation;
+
+  const ColorspaceType
+    colorspace;
+} AccelerateModulateRequest;
+
 typedef struct _AccelerateMotionBlurRequest
 {
   const double
@@ -90,8 +101,8 @@ extern MagickPrivate MagickBooleanType
     ExceptionInfo *),
   AccelerateGrayscaleImage(Image *,const PixelIntensityMethod,
     ExceptionInfo *),
-  AccelerateModulateImage(Image *,const double,const double,const double,
-    const ColorspaceType, ExceptionInfo*);
+  AccelerateModulateImage(Image *,const AccelerateModulateRequest *,
+    ExceptionInfo*);
 
 #endif /* MAGICKCORE_OPENCL_SUPPORT */
 
