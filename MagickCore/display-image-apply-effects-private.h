@@ -628,9 +628,21 @@ static void XApplySepiaToneCommand(const XMagickCommandContext *context)
   (void) XConfigureImage(display,resource_info,windows,*image,exception);
 }
 
-static void XApplySolarizeToImage(Display *display,XWindows *windows,
-  char *factor,Image **image,ExceptionInfo *exception)
+static void XApplySolarizeToImage(const XMagickCommandContext *context,
+  char *factor)
 {
+  Display
+    *const display = context->display;
+
+  XWindows
+    *const windows = context->windows;
+
+  Image
+    **const image = context->image;
+
+  ExceptionInfo
+    *const exception = context->exception;
+
   double
     threshold;
 
@@ -675,7 +687,7 @@ static void XApplySolarizeCommand(const XMagickCommandContext *context)
   /*
     Solarize image pixels.
   */
-  XApplySolarizeToImage(display,windows,factor,image,exception);
+  XApplySolarizeToImage(context,factor);
   XSetCursorState(display,windows,MagickFalse);
   if (windows->image.orphan != MagickFalse)
     return;
