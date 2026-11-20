@@ -24,6 +24,7 @@
 #include "MagickCore/pixel-accessor.h"
 #include "MagickCore/colorspace-illuminant-xyz-private.h"
 #include "MagickCore/colorspace-xyz-to-rgb-private.h"
+#include "MagickCore/colorspace-hcl-to-rgb-private.h"
 #include "MagickCore/colorspace-to-rgb-private.h"
 #include "MagickCore/colorspace-lab-to-rgb-private.h"
 #include "MagickCore/colorspace-luv-lms-to-rgb-private.h"
