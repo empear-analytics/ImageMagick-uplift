@@ -894,9 +894,6 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
   ConstituteInfo
     constitute_info;
 
-  DecodeFallbackInfo
-    fallback;
-
   const MagickInfo
     *magick_info;
 
@@ -930,10 +927,12 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
     return((Image *) NULL);
   image=NewImageList();
   decoder=GetImageDecoder(magick_info);
-  fallback.read_info=read_info;
-  fallback.filename=filename;
-  fallback.exception=exception;
-  FindFallbackDecoder(&fallback,&magick_info,&decoder);
+  {
+    const DecodeFallbackInfo
+      fallback = { read_info, filename, exception };
+
+    FindFallbackDecoder(&fallback,&magick_info,&decoder);
+  }
   if (decoder != (DecodeImageHandler *) NULL)
     {
       /*
