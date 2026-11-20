@@ -25,7 +25,10 @@ A helper that returns the block's single output (Recipe E step 3, `v=Helper(v,..
 is accepted when the call is the statement `v=HELPER(...);` with `v` a plain name
 passed as one of the arguments, and HELPER's body ends with `return(p);` for the
 parameter `p` that argument binds: that one line is the assignment back and is not
-compared. When the lines differ only in where they are broken (a wrapped expression
+compared. `v` may also be a member of a local struct object, `s.m` (one `.`, no `->`:
+the caller's own object, reached through no pointer), passed as the argument and
+assigned back in the same way (added 2026-11-20 for Recipe D form (b) in
+fourier-forward-private.h). When the lines differ only in where they are broken (a wrapped expression
 broken at another token), the rewritten block and HELPER's body are compared as one
 token stream, in order, whitespace removed, and the script says so.
 
@@ -421,7 +424,7 @@ def main(argv):
             problems.append(f"preprocessor line removed: {line}")
     body_lines = [canonical(b) for i, b in enumerate(body_all)
                   if b not in TRIVIAL and i not in dropped]
-    returned = re.match(r"^(\w+)=" + re.escape(helper) + r"\(", call)
+    returned = re.match(r"^(\w+(?:\.\w+)?)=" + re.escape(helper) + r"\(", call)
     note = note_proto
     if returned:
         target = returned.group(1)
@@ -430,7 +433,7 @@ def main(argv):
                     if body_lines[i] == f"{target};"
                     and re.fullmatch(r"[\w\s]+", body_lines[i - 1])]
         if not call.endswith(");") or not re.fullmatch(
-                r"\w+=" + re.escape(helper) + r"\(.*\);", call):
+                r"\w+(?:\.\w+)?=" + re.escape(helper) + r"\(.*\);", call):
             problems.append(f"the call is not the statement {target}={helper}(...);")
         elif not bound and len(own_decl) == 1 and body_lines \
                 and body_lines[-1] == f"return({target});":
