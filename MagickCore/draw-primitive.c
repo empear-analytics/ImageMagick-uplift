@@ -4185,9 +4185,6 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
     *returned,
     *stroke_polygon;
 
-  StrokeSubpathInput
-    subpath;
-
   ssize_t
     i;
 
@@ -4214,12 +4211,6 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
 
   StrokeArc
     arc;
-
-  StrokePolygonInput
-    assembly;
-
-  StrokeStartInput
-    start;
 
   StrokeFirstInput
     first;
@@ -4258,12 +4249,13 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
   first.polygon_primitive=polygon_primitive;
   first.number_vertices=number_vertices;
   FindStrokeFirstSegment(&first,&dx,&dy,&n);
-  subpath.draw_info=draw_info;
-  subpath.polygon_primitive=polygon_primitive;
-  subpath.number_vertices=number_vertices;
-  subpath.closed_path=closed_path;
-  if (TraceZeroLengthSubpath(&subpath,&n,&returned) != MagickFalse)
-    return(returned);
+  {
+    const StrokeSubpathInput
+      subpath = { draw_info, polygon_primitive, number_vertices, closed_path };
+
+    if (TraceZeroLengthSubpath(&subpath,&n,&returned) != MagickFalse)
+      return(returned);
+  }
   extent_p=2*number_vertices;
   extent_q=2*number_vertices;
   stroke_p=(PointInfo *) AcquireQuantumMemory((size_t) extent_p+MaxStrokePad,
@@ -4287,13 +4279,12 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
     (void) TraceSquareLinecap(polygon_primitive,number_vertices,mid);
   offset.x=sqrt((double) (mid*mid/(inverse_slope.p*inverse_slope.p+1.0)));
   offset.y=(double) (offset.x*inverse_slope.p);
-  start.polygon_primitive=polygon_primitive;
-  start.n=n;
-  start.offset=offset;
-  start.dx=dx;
-  start.dy=dy;
-  start.inverse_slope=inverse_slope;
-  SetStrokeStartBoxes(&boxes,&start);
+  {
+    const StrokeStartInput
+      start = { polygon_primitive, n, offset, dx, dy, inverse_slope };
+
+    SetStrokeStartBoxes(&boxes,&start);
+  }
   /*
     Create strokes for the line join attribute: bevel, miter, round.
   */
@@ -4433,13 +4424,12 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
         polygon_primitive);
       return(stroke_polygon);
     }
-  assembly.polygon_primitive=polygon_primitive;
-  assembly.stroke_p=stroke_p;
-  assembly.stroke_q=stroke_q;
-  assembly.p=p;
-  assembly.q=q;
-  assembly.closed_path=closed_path;
-  AssembleStrokePolygon(&assembly,stroke_polygon);
+  {
+    const StrokePolygonInput
+      assembly = { polygon_primitive, stroke_p, stroke_q, p, q, closed_path };
+
+    AssembleStrokePolygon(&assembly,stroke_polygon);
+  }
   stroke_p=(PointInfo *) RelinquishMagickMemory(stroke_p);
   stroke_q=(PointInfo *) RelinquishMagickMemory(stroke_q);
   polygon_primitive=(PrimitiveInfo *) RelinquishMagickMemory(polygon_primitive);
