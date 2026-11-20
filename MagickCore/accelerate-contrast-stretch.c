@@ -94,6 +94,16 @@ Include declarations.
 #if defined(MAGICKCORE_OPENCL_SUPPORT)
 
 /*
+  Typedef declarations.
+*/
+typedef struct _ContrastStretchPoints
+{
+  double
+    black_point,
+    white_point;
+} ContrastStretchPoints;
+
+/*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
 %                                                                             %
@@ -215,11 +225,15 @@ static void StretchImageClass(Image *image,PixelPacket *stretch_map,
 }
 
 static MagickBooleanType ComputeContrastStretchImage(Image *image,
-  MagickCLEnv clEnv,const double black_point,const double white_point,
+  MagickCLEnv clEnv,const ContrastStretchPoints *points,
   ExceptionInfo *exception)
 {
 #define ContrastStretchImageTag  "ContrastStretch/Image"
 #define MaxRange(color)  ((cl_float) ScaleQuantumToMap((Quantum) (color)))
+
+  const double
+    black_point = points->black_point,
+    white_point = points->white_point;
 
   CacheView
     *image_view;
@@ -636,8 +650,10 @@ MagickPrivate MagickBooleanType AccelerateContrastStretchImage(
   Image *image,const double black_point,const double white_point,
   ExceptionInfo *exception)
 {
+  const ContrastStretchPoints
+    points = { black_point, white_point };
+
   return(ComputeContrastStretchImage(image,getAccelerateEnvironment(image,
-    HistogramAccelerateCheck,__func__,exception),black_point,white_point,
-    exception));
+    HistogramAccelerateCheck,__func__,exception),&points,exception));
 }
 #endif /* MAGICKCORE_OPENCL_SUPPORT */
