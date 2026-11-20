@@ -270,6 +270,16 @@ static void XRemoteBrowseDocumentation(Display *display,XWindows *windows,
   XSetCursorState(display,windows,MagickFalse);
 }
 
+static void XQuitAnimate(Display *display,XResourceInfo *resource_info,
+  XWindows *windows)
+{
+  if (resource_info->confirm_exit == MagickFalse)
+    XClientMessage(display,windows->image.id,windows->im_protocols,
+      windows->im_exit,CurrentTime);
+  else
+    XConfirmAnimateExit(display,resource_info,windows);
+}
+
 static void XVersionQuitCommand(const AnimateCommandTile *tile,
   const AnimateCommand animate_command)
 {
@@ -295,11 +305,7 @@ static void XVersionQuitCommand(const AnimateCommandTile *tile,
       /*
         exit program
       */
-      if (resource_info->confirm_exit == MagickFalse)
-        XClientMessage(display,windows->image.id,windows->im_protocols,
-          windows->im_exit,CurrentTime);
-      else
-        XConfirmAnimateExit(display,resource_info,windows);
+      XQuitAnimate(display,resource_info,windows);
       break;
     }
     default:
