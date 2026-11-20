@@ -40,50 +40,11 @@
 #include "MagickCore/colorspace-jzazbz-oklab-private.h"
 #include "MagickCore/colorspace-rgb-to-luma-private.h"
 #include "MagickCore/colorspace-conversions-private.h"
+#include "MagickCore/colorspace-predicates-private.h"
 
 #if defined(__cplusplus) || defined(c_plusplus)
 extern "C" {
 #endif
-
-static inline MagickBooleanType IsCMYKColorspace(
-  const ColorspaceType colorspace)
-{
-  if (colorspace == CMYKColorspace)
-    return(MagickTrue);
-  return(MagickFalse);
-}
-
-static inline MagickBooleanType IsGrayColorspace(
-  const ColorspaceType colorspace)
-{
-  if ((colorspace == LinearGRAYColorspace) || (colorspace == GRAYColorspace))
-    return(MagickTrue);
-  return(MagickFalse);
-}
-
-static inline MagickBooleanType IsGrayImageType(const ImageType type)
-{
-  switch (type)
-  {
-    case GrayscaleType:
-    case GrayscaleAlphaType:
-    case BilevelType:
-      return(MagickTrue);
-    default:
-      break;
-  }
-  return(MagickFalse);
-}
-
-static inline MagickBooleanType IsHueCompatibleColorspace(
-  const ColorspaceType colorspace)
-{
-  if ((colorspace == HCLColorspace) || (colorspace == HCLpColorspace) ||
-      (colorspace == HSBColorspace) || (colorspace == HSIColorspace) ||
-      (colorspace == HSLColorspace) || (colorspace == HSVColorspace))
-    return(MagickTrue);
-  return(MagickFalse);
-}
 
 static inline MagickBooleanType IsLabCompatibleColorspace(
   const ColorspaceType colorspace)
