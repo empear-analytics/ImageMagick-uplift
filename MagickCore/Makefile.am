@@ -426,6 +426,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/pixel-accessor.h \
   MagickCore/pixel-gamma-private.h \
   MagickCore/pixel-private.h \
+  MagickCore/pixel-export-private.h \
   MagickCore/policy.c \
   MagickCore/policy-path.c \
   MagickCore/policy.h \
@@ -871,6 +872,7 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/option-private.h \
   MagickCore/pixel-gamma-private.h \
   MagickCore/pixel-private.h \
+  MagickCore/pixel-export-private.h \
   MagickCore/policy-private.h \
   MagickCore/profile-private.h \
   MagickCore/quantize-private.h \
