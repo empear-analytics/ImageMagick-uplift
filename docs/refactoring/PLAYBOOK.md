@@ -1338,6 +1338,24 @@ is worth it.
    every function identical but the helper, whose only differences are the accessor calls
    and the `.bss` symbol now named by the new name, of the same size; and the oracle on the
    cases that reach the helper.
+   A file-scope `static` variable of struct type that both parts name (2026-11-20, mandate
+   (2026-11-19); the main session's extension, round 34, of the owner-approved accessor form
+   for arithmetic variables), as `widget.c`'s `XWidgetInfo submenu_info` and `toggle_info`,
+   which the Command and Menu families write and read and which stand in one declaration
+   group with `monitor_info` and `selection_info` that other families name, is shared the
+   same way: one accessor `MagickPrivate T *NameReference(void)` returning `&name`, defined
+   directly after the declaration group and declared in the private header after the
+   struct's typedef. Its conditions: (a) one object per variable in the whole program, its
+   declaration, storage and zero (or written) initialiser unchanged, checked with `nm` (one
+   `b`/`d` symbol of the struct's size in the defining object, none elsewhere); (b) every use
+   in the other file goes through the accessor as the lvalue `(*NameReference())`, so a
+   member read or write, an assignment of a whole struct value into it, or `&` of it acts on
+   the one object, and no line copies the variable into a local or passes it by value where
+   it did not before (a use that passed it by value already, as a macro argument read
+   member by member, keeps its form with the accessor in its place); (c) the object code of
+   every function, compiled with `-fno-inline` (`tools/split_branch_check.py`), is identical
+   to `HEAD`'s apart from the accessor calls and the loads through their result; and (d)
+   the oracle on the cases that execute each rewritten function, as for any split.
    A file-scope variable of the original with external linkage (defined without `static` and
    declared in no header, as `opencl.c`'s `MagickLibrary *openCL_library;`) that both parts
    name is declared rather than shared through an accessor (owner, 2026-11-16, AGENTS.md,
@@ -26131,3 +26149,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-20 | NEW | HM | Move a family header's helpers into the private header it includes: `static inline` helpers of a Recipe S family header that every includer also sees through the first header move, unchanged, to the end of the first header when that clears *Code Duplication* in the family header and the first header keeps its score; proof: every including file's object byte-identical against HEAD's headers | `widget-browser-private.h` (campaign A, W47 round 34, lane b6): 8.81 with *Code Duplication* in seven functions, three of them the arrow helpers `XDrawTriangleEast`/`North`/`South`; a probe 9.38 without the four arrow helpers, `widget-core-private.h` 9.68 with them (unchanged) | mandate (2026-11-19) |
 | 2026-11-20 | AMEND | FG | Step 6, *wrapper form*: for *Code Duplication* between the twins, when a caller of `F` is unreached or in another file (both `static inline` in one private header), `F` keeps its name, parameters and callers and its body becomes `return(G(...,E(t)));`; evidence the oracle on the cases that execute `F` | `widget-browser-private.h`'s `TrackListBrowserSlider` and `TrackFontBrowserSlider` (campaign A, W47 round 34, lane b6): two of the header's four duplicated functions after `a1492c8ff`; `TrackListBrowserSlider`'s callers are `widget-list.c`'s `MoveListBrowserPointer` (1 case) and `widget.c`'s `MoveTextViewPointer` (0 cases), so step 4 could not rewrite every call under the oracle | mandate (2026-11-19) |
 | 2026-11-20 | NEW | MS | Merge twins differing in one statement run through a selector in a struct: the bodies are equal under role renaming except one run of whole statements (no declaration, no jump); a merged function takes a `{ first parameter, side }` struct in place of the first parameter (at most four parameters) and selects `RA` or `RB` at the run's place; the twins keep names and callers and call it with a constant; proof object identity per includer, else the oracle with both twins reached | `widget-browser-private.h`'s `ReleaseListBrowserAction` and `ReleaseListBrowserCancel` (campaign A, W47 round 34, lane b6): the header's one finding after `27a800815` (9.38); a probe of the merge 10.0 | mandate (2026-11-19) |
+| 2026-11-20 | AMEND | S | Step 2: a file-scope `static` variable of struct type that both parts name is shared through one pointer accessor `T *NameReference(void)`, on four conditions: one object per variable (`nm`), declaration, storage and initialiser unchanged; every use through `(*NameReference())`, no new copy of the struct; object identity per function with `-fno-inline` apart from the accessor calls and loads; the oracle on each rewritten function | `widget.c`'s `submenu_info` and `toggle_info` (campaign A, W47 round 34, lane b6), named by the Command and Menu families and declared in one group with `monitor_info` and `selection_info`; the main session's extension of the accessor form of the owner's round-23 ruling. A probe of the Command/Menu split with it left widget.c flat at 9.09 (Lines of Code remains), so the split was not taken | mandate (2026-11-19) |
