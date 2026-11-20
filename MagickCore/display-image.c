@@ -108,14 +108,19 @@
 #include "MagickCore/xwindow-private.h"
 #if defined(MAGICKCORE_X11_DELEGATE)
 
+#include "MagickCore/display-image-annotate-chop-private.h"
 #include "MagickCore/display-image-annotate-private.h"
 
+#include "MagickCore/display-image-composite-crop-private.h"
 #include "MagickCore/display-image-crop-private.h"
 
+#include "MagickCore/display-image-draw-undo-private.h"
 #include "MagickCore/display-image-draw-private.h"
 
+#include "MagickCore/display-image-apply-effects-private.h"
 #include "MagickCore/display-image-apply-private.h"
 
+#include "MagickCore/display-image-matte-roi-private.h"
 #include "MagickCore/display-image-matte-private.h"
 
 #include "MagickCore/display-image-tile-private.h"
@@ -240,6 +245,7 @@ MagickExport MagickBooleanType XDisplayBackgroundImage(Display *display,
   return((MagickBooleanType) (window_info.id == root_window));
 }
 
+#include "MagickCore/display-image-window-setup-private.h"
 #include "MagickCore/display-image-window-private.h"
 
 static DisplayCommand

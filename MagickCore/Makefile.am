@@ -224,12 +224,18 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/display.h \
   MagickCore/display-private.h \
   MagickCore/display-image-annotate-private.h \
+  MagickCore/display-image-annotate-chop-private.h \
   MagickCore/display-image-crop-private.h \
+  MagickCore/display-image-composite-crop-private.h \
   MagickCore/display-image-draw-private.h \
+  MagickCore/display-image-draw-undo-private.h \
   MagickCore/display-image-apply-private.h \
+  MagickCore/display-image-apply-effects-private.h \
   MagickCore/display-image-matte-private.h \
+  MagickCore/display-image-matte-roi-private.h \
   MagickCore/display-image-tile-private.h \
   MagickCore/display-image-window-private.h \
+  MagickCore/display-image-window-setup-private.h \
   MagickCore/display-image-event-private.h \
   MagickCore/distort.c \
   MagickCore/distort-sparse.c \
@@ -780,12 +786,18 @@ MAGICKCORE_NOINST_HDRS = \
   MagickCore/delegate-private.h \
   MagickCore/display-private.h \
   MagickCore/display-image-annotate-private.h \
+  MagickCore/display-image-annotate-chop-private.h \
   MagickCore/display-image-crop-private.h \
+  MagickCore/display-image-composite-crop-private.h \
   MagickCore/display-image-draw-private.h \
+  MagickCore/display-image-draw-undo-private.h \
   MagickCore/display-image-apply-private.h \
+  MagickCore/display-image-apply-effects-private.h \
   MagickCore/display-image-matte-private.h \
+  MagickCore/display-image-matte-roi-private.h \
   MagickCore/display-image-tile-private.h \
   MagickCore/display-image-window-private.h \
+  MagickCore/display-image-window-setup-private.h \
   MagickCore/display-image-event-private.h \
   MagickCore/distort-linear-private.h \
   MagickCore/distort-private.h \
