@@ -2155,9 +2155,6 @@ static MagickBooleanType DrawPolygonPrimitive(Image *image,
 #endif
       for (y=poly_extent.y1; y <= poly_extent.y2; y++)
       {
-        PolygonPointRow
-          row;
-
         ssize_t
           x;
 
@@ -2174,13 +2171,13 @@ static MagickBooleanType DrawPolygonPrimitive(Image *image,
             status=MagickFalse;
             continue;
           }
-        row.image=image;
-        row.draw_info=draw_info;
-        row.primitive_info=primitive_info;
-        row.poly_extent=poly_extent;
-        row.y=y;
-        row.exception=exception;
-        DrawPolygonPointRow(&row,x,q);
+        {
+          const PolygonPointRow
+            row = { image, draw_info, primitive_info, poly_extent, y,
+              exception };
+
+          DrawPolygonPointRow(&row,x,q);
+        }
         if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
           status=MagickFalse;
       }
